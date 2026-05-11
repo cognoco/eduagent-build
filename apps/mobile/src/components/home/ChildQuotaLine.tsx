@@ -1,64 +1,28 @@
 import { Text } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
-import { useUsage } from '../../hooks/use-subscription';
+import { useOverallProgress } from '../../hooks/use-progress';
 
 export function ChildQuotaLine(): React.ReactElement | null {
   const { t } = useTranslation();
-  const { data } = useUsage();
+  const { data } = useOverallProgress();
 
   if (!data) return null;
 
-  const dailyRemaining = data.dailyRemainingQuestions;
-  const monthlyRemaining =
-    data.monthlyLimit == null ? null : data.remainingQuestions;
+  const total = data.totalTopicsCompleted;
+  if (total < 1) return null;
 
-  if (dailyRemaining == null && monthlyRemaining == null) {
-    return (
-      <Text
-        testID="child-quota-line"
-        className="text-body-sm text-text-secondary"
-      >
-        {t('home.learner.quota.lineUnlimited')}
-      </Text>
-    );
-  }
-
-  if (monthlyRemaining == null) {
-    return (
-      <Text
-        testID="child-quota-line"
-        className="text-body-sm text-text-secondary"
-      >
-        {t('home.learner.quota.lineDailyOnly', {
-          questionsLeftToday: dailyRemaining,
-        })}
-      </Text>
-    );
-  }
-
-  if (dailyRemaining == null) {
-    return (
-      <Text
-        testID="child-quota-line"
-        className="text-body-sm text-text-secondary"
-      >
-        {t('home.learner.quota.lineMonthlyOnly', {
-          questionsLeftMonth: monthlyRemaining,
-        })}
-      </Text>
-    );
-  }
+  const key =
+    total === 1
+      ? 'home.learner.momentum.topicLearned'
+      : 'home.learner.momentum.topicsLearned';
 
   return (
     <Text
-      testID="child-quota-line"
+      testID="home-momentum-line"
       className="text-body-sm text-text-secondary"
     >
-      {t('home.learner.quota.line', {
-        questionsLeftToday: dailyRemaining,
-        questionsLeftMonth: monthlyRemaining,
-      })}
+      {t(key, { n: total })}
     </Text>
   );
 }

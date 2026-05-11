@@ -272,11 +272,17 @@ describe('LearnerScreen', () => {
     });
   });
 
-  it('shows the child quota line on Home', async () => {
+  it('shows the topics-learned momentum line on Home', async () => {
+    mockFetch.setRoute('/progress/overview', {
+      subjects: [],
+      totalTopicsCompleted: 5,
+      totalTopicsVerified: 5,
+    });
+
     render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
 
     await waitFor(() => {
-      screen.getByText(/7 questions left today.*84 left this month/);
+      screen.getByText(/5 topics learned/);
     });
   });
 
@@ -342,7 +348,6 @@ describe('LearnerScreen', () => {
       screen.getByText(
         '24 min this week · Ready to start · up from 5 last week',
       );
-      screen.getByText(/7 questions left today.*84 left this month/);
     });
   });
 

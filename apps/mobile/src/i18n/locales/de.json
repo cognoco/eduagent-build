@@ -118,11 +118,9 @@
       "emptySubjectsTitle": "Deine Fächer erscheinen hier",
       "emptySubjectsMessage": "Starte jetzt eins, oder nutze einfach Hausaufgabenhilfe, wenn du sie brauchst.",
       "addSubject": "Fach hinzufügen",
-      "quota": {
-        "line": "{{questionsLeftToday}} questions left today · {{questionsLeftMonth}} left this month",
-        "lineDailyOnly": "{{questionsLeftToday}} questions left today",
-        "lineMonthlyOnly": "{{questionsLeftMonth}} questions left this month",
-        "lineUnlimited": "Plenty of questions today"
+      "momentum": {
+        "topicLearned": "{{n}} topic learned",
+        "topicsLearned": "{{n}} topics learned"
       },
       "intentActions": {
         "homework": {

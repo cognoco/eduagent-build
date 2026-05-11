@@ -102,6 +102,28 @@
         margin-top: 6px;
       }
 
+      .profile-pills {
+        display: flex;
+        gap: 12px;
+        margin-top: 22px;
+      }
+
+      .pill {
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        background: var(--surface);
+        color: var(--text-primary);
+        padding: 13px 22px;
+        font-size: 15px;
+        font-weight: 800;
+      }
+
+      .pill.active {
+        border-color: var(--primary);
+        background: var(--primary);
+        color: #fafafa;
+      }
+
       .section {
         margin-top: 18px;
       }
@@ -213,6 +235,35 @@
         letter-spacing: 0;
       }
 
+      .report-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 18px;
+        margin-top: 18px;
+      }
+
+      .report-shell {
+        background: var(--background);
+        border-radius: 16px;
+        padding: 16px;
+        margin-top: 14px;
+      }
+
+      .report-stat {
+        font-size: 23px;
+        line-height: 1.16;
+        font-weight: 800;
+        margin-top: 8px;
+      }
+
+      .report-note {
+        color: var(--text-secondary);
+        font-size: 14px;
+        line-height: 1.45;
+        margin-top: 5px;
+      }
+
       .mini-grid {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
@@ -263,6 +314,13 @@
         margin: 14px 0;
       }
 
+      .link-row {
+        color: var(--primary);
+        font-size: 15px;
+        font-weight: 800;
+        margin-top: 14px;
+      }
+
       .tabbar {
         position: absolute;
         left: 0;
@@ -272,7 +330,7 @@
         background: var(--surface);
         border-top: 1px solid var(--border);
         display: grid;
-        grid-template-columns: repeat(4, 1fr);
+        grid-template-columns: repeat(5, 1fr);
         align-items: center;
         padding-bottom: 8px;
       }
@@ -317,85 +375,120 @@
       <section class="phone" aria-label="Progress low-data mockup">
         <div class="screen">
           <div>
-            <h1>Progress</h1>
-            <p class="subtitle">A small start, already saved.</p>
+            <h1>My Learning Journey</h1>
+            <p class="subtitle">Reports and signals from your recent learning.</p>
+          </div>
+
+          <div class="profile-pills">
+            <button class="pill">TestKid</button>
+            <button class="pill active">Mine</button>
           </div>
 
           <div class="progress-hero">
-            <p class="eyebrow">This week</p>
-            <div class="hero-title">2 learning sessions</div>
+            <p class="eyebrow">Learning rhythm</p>
+            <div class="hero-title">28 sessions completed</div>
             <p class="subtitle">
-              You have enough signal to keep going, not enough to judge the
-              whole story yet.
+              You have built a steady rhythm. The reports below turn that work
+              into a clearer story.
             </p>
             <div class="mini-grid">
               <div class="mini-stat">
+                <strong>31h</strong>
+                <span>47m spent</span>
+              </div>
+              <div class="mini-stat">
+                <strong>8</strong>
+                <span>day streak</span>
+              </div>
+              <div class="mini-stat">
                 <strong>2</strong>
-                <span>sessions</span>
+                <span>this week</span>
               </div>
-              <div class="mini-stat">
-                <strong>12</strong>
-                <span>minutes</span>
+            </div>
+          </div>
+
+          <div class="report-card">
+            <h2>Weekly report</h2>
+            <div class="report-shell">
+              <p class="eyebrow">Week of May 4</p>
+              <div class="report-stat">2 sessions this week</div>
+              <p class="report-note">
+                A quieter but active week. You kept the streak alive and added
+                another Italian practice block.
+              </p>
+              <div class="chip-row">
+                <span class="chip">1h 12m Italian</span>
+                <span class="chip">1 topic started</span>
+                <span class="chip">8-day streak</span>
               </div>
-              <div class="mini-stat">
-                <strong>1</strong>
-                <span>topic touched</span>
+            </div>
+          </div>
+
+          <div class="report-card">
+            <h2>Monthly report</h2>
+            <div class="report-shell">
+              <p class="eyebrow">May 2026</p>
+              <div class="report-stat">28 sessions completed</div>
+              <p class="report-note">
+                Most of this month has gone into building consistency and
+                getting Italian started.
+              </p>
+              <div class="soft-divider"></div>
+              <h3>Highlights</h3>
+              <div class="preview">
+                <div class="preview-line">
+                  <span class="dot"></span>
+                  <p>Kept learning across an 8-day streak.</p>
+                </div>
+                <div class="preview-line">
+                  <span class="dot"></span>
+                  <p>Started Italian Beginner 1 and opened the first topic.</p>
+                </div>
+                <div class="preview-line">
+                  <span class="dot"></span>
+                  <p>Spent 31h 47m in learning sessions overall.</p>
+                </div>
+              </div>
+              <div class="soft-divider"></div>
+              <h3>What's next</h3>
+              <div class="preview">
+                <div class="preview-line">
+                  <span class="dot"></span>
+                  <p>Choose the next Italian topic and keep the first shelf moving.</p>
+                </div>
+                <div class="preview-line">
+                  <span class="dot"></span>
+                  <p>Do one short session this week so the next report has more signal.</p>
+                </div>
               </div>
             </div>
           </div>
 
           <div class="section warm-card">
             <div class="eyebrow">Next up</div>
-            <h2>Pick up where you left off</h2>
+            <h2>Italian Beginner 1</h2>
             <p class="subtitle">
-              Continue Spanish Greetings. The next step is a quick back-and-forth
-              using the words you practiced yesterday.
+              0 of 10 planned topics mastered. 1 topic started, 9 not started.
             </p>
-            <button class="action">Continue Spanish</button>
+            <button class="action">Choose next</button>
+            <div class="link-row">View Italian progress -&gt;</div>
           </div>
 
           <div class="section card">
             <div class="row">
-              <div class="icon blue">L</div>
+              <div class="icon blue">R</div>
               <div class="row-main">
-                <h2>Recent lesson preview</h2>
-                <p>Spanish &middot; Greetings &middot; Yesterday</p>
+                <h2>Recent sessions</h2>
+                <p>Italian practice, vocabulary, and guided learning.</p>
               </div>
-            </div>
-            <div class="soft-divider"></div>
-            <div class="preview">
-              <div class="preview-line">
-                <span class="dot"></span>
-                <p>Strong start on simple introductions.</p>
-              </div>
-              <div class="preview-line">
-                <span class="dot"></span>
-                <p>Next session can practice answering in a full sentence.</p>
-              </div>
-            </div>
-          </div>
-
-          <div class="section card">
-            <div class="eyebrow">Helpful nudge</div>
-            <h2>One more short session will sharpen this view</h2>
-            <p class="subtitle">
-              After a little more practice, Progress can show a clearer weekly
-              summary and better next steps.
-            </p>
-          </div>
-
-          <div class="section card">
-            <h2>Currently working on</h2>
-            <p class="subtitle">Detected from recent sessions</p>
-            <div class="chip-row">
-              <span class="chip">Introducing yourself</span>
-              <span class="chip">Simple answers</span>
+              <div class="chevron">&gt;</div>
             </div>
           </div>
         </div>
 
         <nav class="tabbar" aria-label="Progress tabs">
           <div class="tab"><span class="tab-icon"></span><span>Home</span></div>
+          <div class="tab"><span class="tab-icon"></span><span>My Learni...</span></div>
           <div class="tab"><span class="tab-icon"></span><span>Library</span></div>
           <div class="tab active">
             <span class="tab-icon"></span><strong>Progress</strong>

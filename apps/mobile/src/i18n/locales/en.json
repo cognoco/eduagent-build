@@ -118,11 +118,9 @@
       "emptySubjectsTitle": "Your subjects will show up here",
       "emptySubjectsMessage": "Start one now, or just use homework help when you need it.",
       "addSubject": "Add a subject",
-      "quota": {
-        "line": "{{questionsLeftToday}} questions left today · {{questionsLeftMonth}} left this month",
-        "lineDailyOnly": "{{questionsLeftToday}} questions left today",
-        "lineMonthlyOnly": "{{questionsLeftMonth}} questions left this month",
-        "lineUnlimited": "Plenty of questions today"
+      "momentum": {
+        "topicLearned": "{{n}} topic learned",
+        "topicsLearned": "{{n}} topics learned"
       },
       "intentActions": {
         "homework": {

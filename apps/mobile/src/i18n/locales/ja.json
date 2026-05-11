@@ -118,11 +118,9 @@
       "emptySubjectsTitle": "ここに科目が表示されます",
       "emptySubjectsMessage": "今すぐ始めてもいいし、必要なときだけ宿題ヘルプを使っても大丈夫です。",
       "addSubject": "科目を追加",
-      "quota": {
-        "line": "{{questionsLeftToday}} questions left today · {{questionsLeftMonth}} left this month",
-        "lineDailyOnly": "{{questionsLeftToday}} questions left today",
-        "lineMonthlyOnly": "{{questionsLeftMonth}} questions left this month",
-        "lineUnlimited": "Plenty of questions today"
+      "momentum": {
+        "topicLearned": "{{n}} topic learned",
+        "topicsLearned": "{{n}} topics learned"
       },
       "intentActions": {
         "homework": {

@@ -118,11 +118,9 @@
       "emptySubjectsTitle": "Fagene dine vises her",
       "emptySubjectsMessage": "Start ett nå, eller bruk leksehjelp når du trenger det.",
       "addSubject": "Legg til fag",
-      "quota": {
-        "line": "{{questionsLeftToday}} spørsmål igjen i dag · {{questionsLeftMonth}} igjen denne måneden",
-        "lineDailyOnly": "{{questionsLeftToday}} spørsmål igjen i dag",
-        "lineMonthlyOnly": "{{questionsLeftMonth}} spørsmål igjen denne måneden",
-        "lineUnlimited": "Masser av spørsmål i dag"
+      "momentum": {
+        "topicLearned": "{{n}} emne lært",
+        "topicsLearned": "{{n}} emner lært"
       },
       "intentActions": {
         "homework": {

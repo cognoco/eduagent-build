@@ -118,11 +118,9 @@
       "emptySubjectsTitle": "Tus materias aparecerán aquí",
       "emptySubjectsMessage": "Empieza una ahora, o usa la ayuda con tareas cuando la necesites.",
       "addSubject": "Agregar materia",
-      "quota": {
-        "line": "{{questionsLeftToday}} questions left today · {{questionsLeftMonth}} left this month",
-        "lineDailyOnly": "{{questionsLeftToday}} questions left today",
-        "lineMonthlyOnly": "{{questionsLeftMonth}} questions left this month",
-        "lineUnlimited": "Plenty of questions today"
+      "momentum": {
+        "topicLearned": "{{n}} topic learned",
+        "topicsLearned": "{{n}} topics learned"
       },
       "intentActions": {
         "homework": {
