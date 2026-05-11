@@ -59,10 +59,12 @@ initNotificationHandler();
 // Only these routes render a visible tab button. Every other route in
 // (app)/ is auto-hidden — no manual Tabs.Screen entry required.
 //
-// Three navigation shapes:
-//   guardian     — parent with linked children: all tabs including own-learning
-//   soloLearner — owner with no children: own-learning is redundant with home
-//   child       — non-owner child profile: home only
+// Two navigation shapes:
+//   guardian — owner with linked children: all 5 tabs including own-learning
+//   learner — everyone else (solo owner OR child on parent account): 4 tabs
+//
+// Content INSIDE tabs (especially More) varies by isOwner and age — but
+// those are per-screen concerns, not tab-visibility concerns.
 const GUARDIAN_TABS: ReadonlySet<string> = new Set([
   'home',
   'own-learning',
@@ -71,16 +73,14 @@ const GUARDIAN_TABS: ReadonlySet<string> = new Set([
   'more',
 ]);
 
-const SOLO_LEARNER_TABS: ReadonlySet<string> = new Set([
+const LEARNER_TABS: ReadonlySet<string> = new Set([
   'home',
   'library',
   'progress',
   'more',
 ]);
 
-const CHILD_TABS: ReadonlySet<string> = new Set(['home']);
-
-export type TabShape = 'guardian' | 'soloLearner' | 'child';
+export type TabShape = 'guardian' | 'learner';
 
 export function resolveTabShape({
   activeProfile,
@@ -92,19 +92,16 @@ export function resolveTabShape({
   isParentProxy: boolean;
 }): TabShape {
   if (!activeProfile || isParentProxy) return 'guardian';
-  if (!activeProfile.isOwner) return 'child';
   if (isGuardianProfile(activeProfile, profiles)) return 'guardian';
-  return 'soloLearner';
+  return 'learner';
 }
 
 export function computeVisibleTabs(shape: TabShape = 'guardian'): Set<string> {
   switch (shape) {
     case 'guardian':
       return new Set(GUARDIAN_TABS);
-    case 'soloLearner':
-      return new Set(SOLO_LEARNER_TABS);
-    case 'child':
-      return new Set(CHILD_TABS);
+    case 'learner':
+      return new Set(LEARNER_TABS);
   }
 }
 
