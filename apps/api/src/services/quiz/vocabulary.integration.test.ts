@@ -1,10 +1,3 @@
-// EXTERNAL boundary mock — routeAndCall is the LLM provider HTTP call. Per C1 D-MOCK-1 this is the formalized LLM external boundary.
-const mockRouteAndCall = jest.fn();
-jest.mock('../llm', () => ({
-  ...(jest.requireActual('../llm') as Record<string, unknown>),
-  routeAndCall: (...args: unknown[]) => mockRouteAndCall(...args),
-}));
-
 import { and, eq, inArray } from 'drizzle-orm';
 import {
   accounts,
@@ -20,6 +13,7 @@ import { loadDatabaseEnv } from '@eduagent/test-utils';
 import { sm2 } from '@eduagent/retention';
 import { resolve } from 'path';
 import type { QuizQuestion } from '@eduagent/schemas';
+import { registerProvider, _resetCircuits } from '../llm';
 import { completeQuizRound } from './complete-round';
 import { generateQuizRound } from './generate-round';
 import { getVocabularyRoundContext } from './queries';
@@ -35,11 +29,21 @@ const VOCAB_ROUND_SIZE = QUIZ_CONFIG.perActivity.vocabulary.roundSize;
 
 loadDatabaseEnv(resolve(__dirname, '../../../../..'));
 
+const mockChat = jest.fn<Promise<string>, [unknown, unknown]>();
+
+registerProvider({
+  id: 'gemini',
+  chat: mockChat,
+  async *chatStream() {
+    yield '';
+  },
+});
+
 function requireDatabaseUrl(): string {
   const url = process.env.DATABASE_URL;
   if (!url) {
     throw new Error(
-      'DATABASE_URL is not set. Create .env.test.local or .env.development.local.'
+      'DATABASE_URL is not set. Create .env.test.local or .env.development.local.',
     );
   }
   return url;
@@ -65,8 +69,8 @@ async function cleanupTestAccounts() {
     await db.delete(accounts).where(
       inArray(
         accounts.id,
-        rows.map((row) => row.id)
-      )
+        rows.map((row) => row.id),
+      ),
     );
   }
 }
@@ -184,6 +188,7 @@ beforeEach(async () => {
   // same sm2() function as the production code, so both sides compute
   // from the same real Date and the assertions still match.
   jest.clearAllMocks();
+  _resetCircuits();
   await cleanupTestAccounts();
 });
 
@@ -198,8 +203,8 @@ describe('vocabulary quiz round lifecycle (integration)', () => {
     const { db, profile, subject } = await seedProfileAndSubject();
     await seedVocabularyBank(profile.id, subject.id);
 
-    mockRouteAndCall.mockResolvedValue({
-      response: JSON.stringify({
+    mockChat.mockResolvedValue(
+      JSON.stringify({
         theme: 'German Animals',
         targetLanguage: 'German',
         questions: [
@@ -229,10 +234,7 @@ describe('vocabulary quiz round lifecycle (integration)', () => {
           },
         ],
       }),
-      provider: 'mock',
-      model: 'mock',
-      latencyMs: 25,
-    });
+    );
 
     const context = await getVocabularyRoundContext(db, profile.id, subject.id);
     expect(context.libraryItems).toHaveLength(4);
@@ -252,14 +254,11 @@ describe('vocabulary quiz round lifecycle (integration)', () => {
     });
 
     expect(round.questions).toHaveLength(VOCAB_ROUND_SIZE);
-    // Break-test for D-MOCK-1: prove the real `buildVocabularyPrompt` and
-    // `generateQuizRound` orchestration ran before reaching the provider
-    // boundary. If `jest.requireActual` is dropped, the barrel becomes a
-    // bare stub, the real prompt builder no longer runs, and these
-    // content/shape assertions fail. A simple `toHaveBeenCalledTimes(1)`
-    // would pass even with a full barrel mock — these don't.
-    expect(mockRouteAndCall).toHaveBeenCalledTimes(1);
-    expect(mockRouteAndCall).toHaveBeenCalledWith(
+    // D-MOCK-1 break-test: the full routeAndCall dispatch now runs (provider-
+    // registry pattern), so we verify the real prompt builder and safety
+    // preamble executed by inspecting the messages that reached the provider.
+    expect(mockChat).toHaveBeenCalledTimes(1);
+    expect(mockChat).toHaveBeenCalledWith(
       expect.arrayContaining([
         expect.objectContaining({
           role: 'system',
@@ -270,30 +269,29 @@ describe('vocabulary quiz round lifecycle (integration)', () => {
           content: 'Generate the quiz round.',
         }),
       ]),
-      1,
-      expect.objectContaining({ ageBracket: expect.any(String) })
+      expect.objectContaining({ provider: 'gemini' }),
     );
-    const [systemPrompt] = mockRouteAndCall.mock.calls[0][0] as Array<{
+    const [systemPrompt] = mockChat.mock.calls[0]![0] as Array<{
       role: string;
       content: string;
     }>;
     expect(systemPrompt.content).toContain(
-      `Maximum CEFR level: ${context.cefrCeiling}`
+      `Maximum CEFR level: ${context.cefrCeiling}`,
     );
     const masteryQuestions = round.questions.filter(
       (question): question is Extract<QuizQuestion, { type: 'vocabulary' }> =>
-        question.type === 'vocabulary' && question.isLibraryItem
+        question.type === 'vocabulary' && question.isLibraryItem,
     );
     expect(masteryQuestions).toHaveLength(3);
 
     const masteryIds = masteryQuestions.map(
-      (question) => question.vocabularyId!
+      (question) => question.vocabularyId!,
     );
     const beforeCards = await db.query.vocabularyRetentionCards.findMany({
       where: inArray(vocabularyRetentionCards.vocabularyId, masteryIds),
     });
     const beforeById = new Map(
-      beforeCards.map((card) => [card.vocabularyId, card] as const)
+      beforeCards.map((card) => [card.vocabularyId, card] as const),
     );
 
     let wrongDiscoveryRecorded = false;
@@ -331,7 +329,7 @@ describe('vocabulary quiz round lifecycle (integration)', () => {
       db,
       profile.id,
       round.id,
-      results
+      results,
     );
     expect(completion.total).toBe(VOCAB_ROUND_SIZE);
 
@@ -363,17 +361,17 @@ describe('vocabulary quiz round lifecycle (integration)', () => {
       // Date assertions use day-level precision — the production and test
       // sm2() calls run milliseconds apart, so exact ISO match is fragile.
       expect(card.lastReviewedAt?.toISOString().slice(0, 10)).toBe(
-        expected.card.lastReviewedAt.slice(0, 10)
+        expected.card.lastReviewedAt.slice(0, 10),
       );
       expect(card.nextReviewAt?.toISOString().slice(0, 10)).toBe(
-        expected.card.nextReviewAt.slice(0, 10)
+        expected.card.nextReviewAt.slice(0, 10),
       );
     }
 
     const storedRound = await db.query.quizRounds.findFirst({
       where: and(
         eq(quizRounds.id, round.id),
-        eq(quizRounds.profileId, profile.id)
+        eq(quizRounds.profileId, profile.id),
       ),
     });
     expect(storedRound?.status).toBe('completed');
@@ -383,7 +381,7 @@ describe('vocabulary quiz round lifecycle (integration)', () => {
     });
     expect(missedItems.length).toBeGreaterThanOrEqual(1);
     expect(
-      missedItems.some((item) => item.questionText.startsWith('Translate: '))
+      missedItems.some((item) => item.questionText.startsWith('Translate: ')),
     ).toBe(true);
   }, 15_000);
 });

@@ -11,17 +11,7 @@ import {
   type Database,
 } from '@eduagent/database';
 import { and, eq, like } from 'drizzle-orm';
-
-// EXTERNAL boundary mock — routeAndCall is the LLM provider HTTP call. Per C1 D-MOCK-1 this is the formalized LLM external boundary.
-const mockRouteAndCall = jest.fn();
-
-jest.mock('./llm', () => {
-  const actual = jest.requireActual('./llm') as Record<string, unknown>;
-  return {
-    ...actual,
-    routeAndCall: (...args: unknown[]) => mockRouteAndCall(...args),
-  };
-});
+import { registerProvider, _resetCircuits } from './llm';
 
 import {
   closeSession,
@@ -32,6 +22,16 @@ import {
 } from './session';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
+
+const mockChat = jest.fn<Promise<string>, [unknown, unknown]>();
+
+registerProvider({
+  id: 'gemini',
+  chat: mockChat,
+  async *chatStream() {
+    yield '';
+  },
+});
 
 let db: Database;
 
@@ -82,7 +82,7 @@ beforeAll(async () => {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
     throw new Error(
-      'DATABASE_URL is not set for session summary integration tests'
+      'DATABASE_URL is not set for session summary integration tests',
     );
   }
 
@@ -91,17 +91,15 @@ beforeAll(async () => {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  mockRouteAndCall.mockResolvedValue({
-    response: JSON.stringify({
+  _resetCircuits();
+  mockChat.mockResolvedValue(
+    JSON.stringify({
       feedback: 'Great summary! You captured the key idea.',
       hasUnderstandingGaps: false,
       gapAreas: [],
       isAccepted: true,
     }),
-    provider: 'mock',
-    model: 'mock',
-    latencyMs: 1,
-  });
+  );
 });
 
 afterAll(async () => {
@@ -195,7 +193,7 @@ describe('session summary integration', () => {
     const storedSummary = await db.query.sessionSummaries.findFirst({
       where: and(
         eq(sessionSummaries.sessionId, session.id),
-        eq(sessionSummaries.profileId, profileId)
+        eq(sessionSummaries.profileId, profileId),
       ),
     });
     const learningModeRow = await db.query.learningModes.findFirst({
@@ -207,7 +205,7 @@ describe('session summary integration', () => {
         sessionId: session.id,
         status: 'accepted',
         aiFeedback: 'Great summary! You captured the key idea.',
-      })
+      }),
     );
     expect(storedSummary).toEqual(
       expect.objectContaining({
@@ -215,9 +213,9 @@ describe('session summary integration', () => {
           'Plants use sunlight, water, and carbon dioxide to make the food they need.',
         aiFeedback: 'Great summary! You captured the key idea.',
         status: 'accepted',
-      })
+      }),
     );
     expect(learningModeRow?.consecutiveSummarySkips).toBe(0);
-    expect(mockRouteAndCall).toHaveBeenCalled();
+    expect(mockChat).toHaveBeenCalled();
   });
 });
