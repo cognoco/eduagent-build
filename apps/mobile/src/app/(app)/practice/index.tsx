@@ -1,3 +1,4 @@
+// uppercase-allowed: section labels use uppercase for visual hierarchy
 import React from 'react';
 import {
   Platform,
@@ -38,7 +39,7 @@ function usePracticeColors() {
     surface: theme.surface,
     reviewBg: isDark ? '#1a2e24' : '#effcf5',
     reviewBorder: isDark ? '#2a5040' : '#b9ddc8',
-    mint: '#2f9c6a',
+    mint: theme.practiceMint,
     quizBg: isDark ? '#1a2030' : '#f2f7ff',
     quizBorder: isDark ? '#2a3a58' : '#b8ccec',
     quiz: isDark ? '#5b8fd6' : '#386dbe',
@@ -52,9 +53,9 @@ function usePracticeColors() {
     historyBorder: isDark ? '#4a2a34' : '#edbdc7',
     chipBg: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.86)',
     chipText: theme.textPrimary,
-    chipStrongText: '#ffffff',
-    primaryButtonBg: isDark ? theme.textPrimary : '#12352a',
-    xpPillBg: '#12352a',
+    chipStrongText: theme.textInverse,
+    primaryButtonBg: isDark ? theme.textPrimary : theme.practiceDarkTeal,
+    xpPillBg: theme.practiceDarkTeal,
     quizOptionBg: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.76)',
   };
 }
