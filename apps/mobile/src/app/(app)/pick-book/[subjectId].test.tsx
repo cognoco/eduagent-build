@@ -429,6 +429,146 @@ describe('PickBookScreen', () => {
     });
   });
 
+  // ---------------------------------------------------------------------------
+  // Suggestion grouping by category
+  // ---------------------------------------------------------------------------
+
+  describe('suggestion grouping by category', () => {
+    it('renders flat grid when hasAnyBook = false', async () => {
+      mockFetch.setRoute('/book-suggestions', {
+        suggestions: [
+          {
+            id: 'g1',
+            title: 'A',
+            emoji: null,
+            description: 'd',
+            category: null,
+            createdAt: '2024-01-01T00:00:00.000Z',
+            pickedAt: null,
+          },
+          {
+            id: 'g2',
+            title: 'B',
+            emoji: null,
+            description: 'd',
+            category: 'explore',
+            createdAt: '2024-01-01T00:00:00.000Z',
+            pickedAt: null,
+          },
+        ],
+        curriculumBookCount: 0,
+      });
+
+      const { getByTestId, queryByTestId } = render(<PickBookScreen />, {
+        wrapper: TestWrapper,
+      });
+
+      await waitFor(() => {
+        getByTestId('pick-book-suggestion-grid-flat');
+      });
+      expect(queryByTestId('pick-book-suggestion-section-related')).toBeNull();
+      expect(queryByTestId('pick-book-suggestion-section-explore')).toBeNull();
+    });
+
+    it('renders related + explore sections when hasAnyBook = true', async () => {
+      mockFetch.setRoute('/book-suggestions', {
+        suggestions: [
+          {
+            id: 'g1',
+            title: 'A',
+            emoji: null,
+            description: 'd',
+            category: 'related',
+            createdAt: '2024-01-01T00:00:00.000Z',
+            pickedAt: null,
+          },
+          {
+            id: 'g2',
+            title: 'B',
+            emoji: null,
+            description: 'd',
+            category: 'explore',
+            createdAt: '2024-01-01T00:00:00.000Z',
+            pickedAt: null,
+          },
+        ],
+        curriculumBookCount: 3,
+      });
+
+      const { getByTestId, queryByTestId } = render(<PickBookScreen />, {
+        wrapper: TestWrapper,
+      });
+
+      await waitFor(() => {
+        getByTestId('pick-book-suggestion-section-related');
+      });
+      expect(getByTestId('pick-book-suggestion-section-explore')).toBeTruthy();
+      expect(queryByTestId('pick-book-suggestion-grid-flat')).toBeNull();
+    });
+
+    it('renders legacy null-category section under headers when hasAnyBook = true', async () => {
+      mockFetch.setRoute('/book-suggestions', {
+        suggestions: [
+          {
+            id: 'g1',
+            title: 'Old',
+            emoji: null,
+            description: 'd',
+            category: null,
+            createdAt: '2024-01-01T00:00:00.000Z',
+            pickedAt: null,
+          },
+          {
+            id: 'g2',
+            title: 'New',
+            emoji: null,
+            description: 'd',
+            category: 'explore',
+            createdAt: '2024-01-01T00:00:00.000Z',
+            pickedAt: null,
+          },
+        ],
+        curriculumBookCount: 2,
+      });
+
+      const { getByTestId, queryByTestId } = render(<PickBookScreen />, {
+        wrapper: TestWrapper,
+      });
+
+      await waitFor(() => {
+        getByTestId('pick-book-suggestion-section-explore');
+      });
+      expect(getByTestId('pick-book-suggestion-section-legacy')).toBeTruthy();
+      expect(queryByTestId('pick-book-suggestion-section-related')).toBeNull();
+    });
+
+    it('suppresses section header when its category is empty', async () => {
+      mockFetch.setRoute('/book-suggestions', {
+        suggestions: [
+          {
+            id: 'g1',
+            title: 'A',
+            emoji: null,
+            description: 'd',
+            category: 'related',
+            createdAt: '2024-01-01T00:00:00.000Z',
+            pickedAt: null,
+          },
+        ],
+        curriculumBookCount: 2,
+      });
+
+      const { queryByTestId, getByTestId } = render(<PickBookScreen />, {
+        wrapper: TestWrapper,
+      });
+
+      await waitFor(() => {
+        getByTestId('pick-book-suggestion-section-related');
+      });
+      expect(queryByTestId('pick-book-suggestion-section-explore')).toBeNull();
+    });
+  });
+
   // [BUG-692] Tapping Skip while filing is in flight must (1) navigate the
   // user to the shelf via router.replace and (2) drop the post-await
   // router.push that would otherwise land them on a book they did not pick.

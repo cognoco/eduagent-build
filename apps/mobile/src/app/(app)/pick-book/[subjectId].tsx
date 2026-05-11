@@ -24,10 +24,12 @@ import { platformAlert } from '../../../lib/platform-alert';
 // [BUG-539] Cycling messages mirror the quiz/launch.tsx pattern so users
 // see visual activity during the Neon + Worker cold-start window.
 const LOADING_MESSAGES = [
-  'Finding what to explore...',
-  'Building your options...',
+  'Finding fresh books for you...',
+  'Picking books to suggest...',
   'Almost there...',
 ];
+
+const SLOW_LOADING_HINT_MS = 5_000;
 
 export default function PickBookScreen(): React.ReactElement {
   const router = useRouter();
@@ -100,12 +102,22 @@ export default function PickBookScreen(): React.ReactElement {
       setLoadingSlow(false);
       return;
     }
-    const timer = setTimeout(() => setLoadingSlow(true), 8_000);
+    const timer = setTimeout(() => setLoadingSlow(true), SLOW_LOADING_HINT_MS);
     return () => clearTimeout(timer);
   }, [suggestionsQuery.isLoading]);
 
   const suggestionsData = suggestionsQuery.data;
   const suggestions = suggestionsData?.suggestions ?? [];
+  const hasAnyBook = (suggestionsData?.curriculumBookCount ?? 0) > 0;
+  const relatedSuggestions = suggestions.filter(
+    (s) => s.category === 'related',
+  );
+  const exploreSuggestions = suggestions.filter(
+    (s) => s.category === 'explore' || (!hasAnyBook && s.category === null),
+  );
+  const legacySuggestions = hasAnyBook
+    ? suggestions.filter((s) => s.category === null)
+    : [];
   const subject = subjects?.find((s) => s.id === subjectId);
 
   // BUG-318: Auto-open custom input when suggestions load empty — the user
@@ -359,19 +371,83 @@ export default function PickBookScreen(): React.ReactElement {
           Pick what interests you
         </Text>
 
-        {/* Suggestion grid */}
-        <View className="flex-row flex-wrap gap-3 mb-6">
-          {suggestions.map((suggestion) => (
-            <SuggestionCard
-              key={suggestion.id}
-              title={suggestion.title}
-              emoji={suggestion.emoji}
-              description={suggestion.description}
-              onPress={() => void handlePickSuggestion(suggestion)}
-              testID={`pick-book-suggestion-${suggestion.id}`}
-            />
-          ))}
-        </View>
+        {/* Flat grid — no books yet (first visit / narrow subject) */}
+        {!hasAnyBook && (
+          <View
+            className="flex-row flex-wrap gap-3 mb-6"
+            testID="pick-book-suggestion-grid-flat"
+          >
+            {suggestions.map((suggestion) => (
+              <SuggestionCard
+                key={suggestion.id}
+                title={suggestion.title}
+                emoji={suggestion.emoji}
+                description={suggestion.description}
+                onPress={() => void handlePickSuggestion(suggestion)}
+                testID={`pick-book-suggestion-${suggestion.id}`}
+              />
+            ))}
+          </View>
+        )}
+
+        {/* Grouped sections — user has ≥1 book */}
+        {hasAnyBook && relatedSuggestions.length > 0 && (
+          <View className="mb-6" testID="pick-book-suggestion-section-related">
+            <Text className="text-h3 font-semibold text-text-primary mb-3">
+              Based on what you&apos;ve studied
+            </Text>
+            <View className="flex-row flex-wrap gap-3">
+              {relatedSuggestions.map((suggestion) => (
+                <SuggestionCard
+                  key={suggestion.id}
+                  title={suggestion.title}
+                  emoji={suggestion.emoji}
+                  description={suggestion.description}
+                  onPress={() => void handlePickSuggestion(suggestion)}
+                  testID={`pick-book-suggestion-${suggestion.id}`}
+                />
+              ))}
+            </View>
+          </View>
+        )}
+
+        {hasAnyBook && exploreSuggestions.length > 0 && (
+          <View className="mb-6" testID="pick-book-suggestion-section-explore">
+            <Text className="text-h3 font-semibold text-text-primary mb-3">
+              Try something new
+            </Text>
+            <View className="flex-row flex-wrap gap-3">
+              {exploreSuggestions.map((suggestion) => (
+                <SuggestionCard
+                  key={suggestion.id}
+                  title={suggestion.title}
+                  emoji={suggestion.emoji}
+                  description={suggestion.description}
+                  onPress={() => void handlePickSuggestion(suggestion)}
+                  testID={`pick-book-suggestion-${suggestion.id}`}
+                />
+              ))}
+            </View>
+          </View>
+        )}
+
+        {hasAnyBook && legacySuggestions.length > 0 && (
+          <View
+            className="flex-row flex-wrap gap-3 mb-6"
+            testID="pick-book-suggestion-section-legacy"
+          >
+            {legacySuggestions.map((suggestion) => (
+              <SuggestionCard
+                key={suggestion.id}
+                title={suggestion.title}
+                emoji={suggestion.emoji}
+                description={suggestion.description}
+                onPress={() => void handlePickSuggestion(suggestion)}
+                testID={`pick-book-suggestion-${suggestion.id}`}
+              />
+            ))}
+          </View>
+        )}
 
         {/* Empty state for suggestions */}
         {suggestions.length === 0 && (
