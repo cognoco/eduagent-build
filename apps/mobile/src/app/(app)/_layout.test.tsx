@@ -92,6 +92,10 @@ jest.mock('expo-speech-recognition', () => ({
 jest.mock('../../lib/profile', () => ({
   useProfile: () => mockUseProfile(),
   personaFromBirthYear: () => 'learner',
+  isGuardianProfile: (
+    profile: { isOwner: boolean } | null | undefined,
+    profiles: ReadonlyArray<{ isOwner: boolean }>,
+  ) => profile?.isOwner === true && profiles.some((p) => !p.isOwner),
 }));
 
 // use-consent uses useApiClient — mocked at the fetch boundary via mockFetch.
@@ -141,7 +145,10 @@ jest.mock('../../components/feedback/FeedbackProvider', () => ({
 // Route: GET /subjects → { subjects: [] }
 
 const AppLayout = require('./_layout').default;
-const { computeVisibleTabs } = require('./_layout');
+const {
+  computeVisibleTabs,
+  shouldUseStudentHomeOnlyTabs,
+} = require('./_layout');
 
 describe('AppLayout', () => {
   let testQueryClient: QueryClient;
@@ -666,16 +673,54 @@ describe('AppLayout', () => {
 });
 
 describe('computeVisibleTabs', () => {
-  it('returns exactly the base visible tabs', () => {
+  it('returns exactly the guardian visible tabs by default', () => {
     const tabs = computeVisibleTabs();
     expect(tabs).toEqual(
       new Set(['home', 'own-learning', 'library', 'progress', 'more']),
     );
   });
 
+  it('returns only home for pure student navigation', () => {
+    const tabs = computeVisibleTabs({ studentHomeOnly: true });
+
+    expect(tabs).toEqual(new Set(['home']));
+  });
+
   it('does not include family tab', () => {
     const tabs = computeVisibleTabs();
     expect(tabs.has('family')).toBe(false);
+  });
+});
+
+describe('shouldUseStudentHomeOnlyTabs', () => {
+  it('uses Home-only tabs for a pure student account with no linked profiles', () => {
+    expect(
+      shouldUseStudentHomeOnlyTabs({
+        activeProfile: { isOwner: true },
+        profiles: [{ isOwner: true }],
+        isParentProxy: false,
+      }),
+    ).toBe(true);
+  });
+
+  it('keeps the broader tab set for guardian accounts with linked children', () => {
+    expect(
+      shouldUseStudentHomeOnlyTabs({
+        activeProfile: { isOwner: true },
+        profiles: [{ isOwner: true }, { isOwner: false }],
+        isParentProxy: false,
+      }),
+    ).toBe(false);
+  });
+
+  it('keeps proxy sessions out of pure-student navigation', () => {
+    expect(
+      shouldUseStudentHomeOnlyTabs({
+        activeProfile: { isOwner: false },
+        profiles: [{ isOwner: true }, { isOwner: false }],
+        isParentProxy: true,
+      }),
+    ).toBe(false);
   });
 });
 

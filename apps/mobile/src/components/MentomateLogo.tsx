@@ -15,6 +15,7 @@ type Size = 'sm' | 'md' | 'lg';
 
 type MentomateLogoProps = {
   size?: Size;
+  orientation?: 'vertical' | 'horizontal';
 };
 
 /**
@@ -41,6 +42,7 @@ const BRAND = {
  */
 export function MentomateLogo({
   size = 'md',
+  orientation = 'vertical',
 }: MentomateLogoProps): React.JSX.Element {
   const { colorScheme } = useTheme();
   const isDark = colorScheme === 'dark';
@@ -51,15 +53,20 @@ export function MentomateLogo({
   const mentColor = brand.ment;
   const mateColor = brand.mate;
   const circleColor = brand.circle;
+  const isHorizontal = orientation === 'horizontal';
+  const iconPx = isHorizontal ? Math.round(s.font * 1.6) : s.icon;
+  const wordmarkOffset = isHorizontal
+    ? { marginTop: 0, marginLeft: s.gap }
+    : { marginTop: s.gap };
 
   return (
     <View
-      style={styles.container}
+      style={isHorizontal ? styles.containerHorizontal : styles.container}
       accessibilityLabel="Mentomate"
       accessibilityRole="image"
     >
-      <Icon width={s.icon} height={s.icon} />
-      <View style={[styles.wordmark, { marginTop: s.gap }]}>
+      <Icon width={iconPx} height={iconPx} />
+      <View style={[styles.wordmark, wordmarkOffset]}>
         <Text style={[styles.text, { fontSize: s.font, color: mentColor }]}>
           ment
         </Text>
@@ -96,6 +103,10 @@ export function MentomateLogo({
 
 const styles = StyleSheet.create({
   container: {
+    alignItems: 'center',
+  },
+  containerHorizontal: {
+    flexDirection: 'row',
     alignItems: 'center',
   },
   wordmark: {

@@ -121,6 +121,7 @@ jest.mock('../../lib/greeting', () => ({
     title: 'Good morning!',
     subtitle: 'Fresh mind, fresh start',
   }),
+  getTimeOfDay: () => 'evening',
 }));
 
 jest.mock(

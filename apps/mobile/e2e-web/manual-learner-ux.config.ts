@@ -29,7 +29,7 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     trace: 'retain-on-failure',
     video: 'retain-on-failure',
-    viewport: { width: 1440, height: 1080 },
+    viewport: { width: 390, height: 844 },
   },
   webServer: [
     ...(shouldStartLocalApi

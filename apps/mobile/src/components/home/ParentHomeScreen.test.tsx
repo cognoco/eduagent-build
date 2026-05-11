@@ -21,6 +21,7 @@ jest.mock(
       textSecondary: '#94a3b8',
       primary: '#00b4d8',
     }),
+    useTheme: () => ({ colorScheme: 'light' }),
   }),
 );
 

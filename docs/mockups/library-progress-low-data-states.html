@@ -1,0 +1,531 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Library and Progress Low-Data States</title>
+    <style>
+      :root {
+        --background: #faf5ee;
+        --surface: #ffffff;
+        --surface-elevated: #f3ede4;
+        --text-primary: #1a1a1a;
+        --text-secondary: #525252;
+        --primary: #0d9488;
+        --primary-soft: rgba(13, 148, 136, 0.1);
+        --border: #e8e0d4;
+        --warning: #a16207;
+        --amber-soft: rgba(180, 83, 9, 0.14);
+        --purple: #7c3aed;
+        --purple-soft: rgba(124, 58, 237, 0.14);
+        --blue: #2563eb;
+        --blue-soft: rgba(37, 99, 235, 0.14);
+        --shadow: 0 24px 70px rgba(26, 26, 26, 0.14);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: #eee6db;
+        color: var(--text-primary);
+        font-family:
+          Inter,
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+      }
+
+      .canvas {
+        display: flex;
+        gap: 28px;
+        align-items: flex-start;
+        justify-content: center;
+        padding: 40px 24px;
+        flex-wrap: wrap;
+      }
+
+      .phone {
+        width: 390px;
+        min-height: 844px;
+        border-radius: 34px;
+        background: var(--background);
+        box-shadow: var(--shadow);
+        overflow: hidden;
+        border: 10px solid #111;
+        position: relative;
+      }
+
+      .screen {
+        min-height: 824px;
+        padding: 24px 20px 88px;
+      }
+
+      .screen-title {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 16px;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: 32px;
+        line-height: 1.05;
+        letter-spacing: 0;
+      }
+
+      h2 {
+        font-size: 18px;
+        line-height: 1.2;
+        letter-spacing: 0;
+      }
+
+      h3 {
+        font-size: 15px;
+        line-height: 1.2;
+        letter-spacing: 0;
+      }
+
+      p {
+        color: var(--text-secondary);
+        font-size: 14px;
+        line-height: 1.45;
+      }
+
+      .subtitle {
+        margin-top: 6px;
+      }
+
+      .manage {
+        border: 0;
+        background: var(--surface-elevated);
+        color: var(--primary);
+        border-radius: 999px;
+        padding: 9px 14px;
+        font-size: 13px;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+
+      .search {
+        margin: 20px 0 12px;
+        min-height: 46px;
+        border-radius: 16px;
+        background: var(--surface);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 0 14px;
+        color: var(--text-secondary);
+        font-size: 14px;
+      }
+
+      .section {
+        margin-top: 18px;
+      }
+
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 16px;
+      }
+
+      .warm-card {
+        background: var(--surface-elevated);
+        border-radius: 16px;
+        padding: 18px;
+      }
+
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .icon {
+        width: 42px;
+        height: 42px;
+        border-radius: 13px;
+        display: grid;
+        place-items: center;
+        font-weight: 800;
+        color: var(--primary);
+        background: var(--primary-soft);
+        flex: 0 0 auto;
+      }
+
+      .icon.purple {
+        color: var(--purple);
+        background: var(--purple-soft);
+      }
+
+      .icon.amber {
+        color: #b45309;
+        background: var(--amber-soft);
+      }
+
+      .icon.blue {
+        color: var(--blue);
+        background: var(--blue-soft);
+      }
+
+      .row-main {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .chevron {
+        color: var(--text-secondary);
+        font-weight: 800;
+      }
+
+      .chip-row {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 13px;
+      }
+
+      .chip {
+        border-radius: 999px;
+        background: var(--background);
+        color: var(--text-primary);
+        padding: 7px 10px;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .eyebrow {
+        color: var(--primary);
+        font-size: 12px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0;
+        margin-bottom: 8px;
+      }
+
+      .action {
+        width: 100%;
+        border: 0;
+        border-radius: 12px;
+        background: var(--primary);
+        color: #fafafa;
+        min-height: 46px;
+        margin-top: 14px;
+        font-weight: 800;
+        font-size: 15px;
+      }
+
+      .secondary-action {
+        width: 100%;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: var(--surface);
+        color: var(--text-primary);
+        min-height: 44px;
+        margin-top: 10px;
+        font-weight: 800;
+        font-size: 14px;
+      }
+
+      .progress-hero {
+        background: var(--surface-elevated);
+        border-radius: 16px;
+        padding: 20px;
+        margin-top: 18px;
+      }
+
+      .hero-title {
+        font-size: 25px;
+        line-height: 1.12;
+        font-weight: 800;
+        letter-spacing: 0;
+      }
+
+      .mini-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 9px;
+        margin-top: 14px;
+      }
+
+      .mini-stat {
+        border-radius: 14px;
+        background: var(--background);
+        padding: 11px 8px;
+      }
+
+      .mini-stat strong {
+        display: block;
+        font-size: 18px;
+      }
+
+      .mini-stat span {
+        color: var(--text-secondary);
+        font-size: 11px;
+        line-height: 1.2;
+      }
+
+      .preview {
+        display: grid;
+        gap: 11px;
+      }
+
+      .preview-line {
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+      }
+
+      .dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 999px;
+        margin-top: 7px;
+        background: var(--primary);
+        flex: 0 0 auto;
+      }
+
+      .soft-divider {
+        height: 1px;
+        background: var(--border);
+        margin: 14px 0;
+      }
+
+      .tabbar {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 72px;
+        background: var(--surface);
+        border-top: 1px solid var(--border);
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        align-items: center;
+        padding-bottom: 8px;
+      }
+
+      .tab {
+        display: grid;
+        place-items: center;
+        gap: 3px;
+        color: var(--text-secondary);
+        font-size: 11px;
+        font-weight: 700;
+      }
+
+      .tab strong {
+        color: var(--primary);
+      }
+
+      .tab-icon {
+        width: 20px;
+        height: 20px;
+        border-radius: 7px;
+        border: 2px solid currentColor;
+      }
+
+      .tab.active {
+        color: var(--primary);
+      }
+
+      @media (max-width: 860px) {
+        .canvas {
+          padding: 20px 12px;
+        }
+
+        .phone {
+          width: min(390px, 100%);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="canvas">
+      <section class="phone" aria-label="Library low-data mockup">
+        <div class="screen">
+          <div class="screen-title">
+            <div>
+              <h1>Library</h1>
+              <p class="subtitle">1 subject ready when you are.</p>
+            </div>
+            <button class="manage">Manage</button>
+          </div>
+
+          <div class="search">Search subjects, books, notes</div>
+
+          <div class="card row">
+            <div class="icon">L</div>
+            <div class="row-main">
+              <h3>Spanish</h3>
+              <p>1 book &middot; 2 of 10 topics explored</p>
+            </div>
+            <div class="chevron">&gt;</div>
+          </div>
+
+          <div class="section warm-card">
+            <div class="eyebrow">Next up</div>
+            <h2>Keep going with Greetings</h2>
+            <p class="subtitle">
+              You already started the first conversation set. A short session
+              here will make the rest of the shelf feel less blank.
+            </p>
+            <div class="chip-row">
+              <span class="chip">5 min</span>
+              <span class="chip">Speaking practice</span>
+              <span class="chip">A1</span>
+            </div>
+            <button class="action">Continue lesson</button>
+          </div>
+
+          <div class="section card">
+            <div class="row">
+              <div class="icon purple">R</div>
+              <div class="row-main">
+                <h2>Recent lesson</h2>
+                <p>Greetings and introductions &middot; Yesterday</p>
+              </div>
+            </div>
+            <div class="soft-divider"></div>
+            <div class="preview">
+              <div class="preview-line">
+                <span class="dot"></span>
+                <p>Practiced hello, goodbye, and saying your name.</p>
+              </div>
+              <div class="preview-line">
+                <span class="dot"></span>
+                <p>Next lesson can add a tiny role-play instead of starting over.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="section card row">
+            <div class="icon amber">N</div>
+            <div class="row-main">
+              <h3>Add one small goal</h3>
+              <p>
+                Pick a topic you want to use this week. The shelf will fill in
+                around that choice.
+              </p>
+            </div>
+          </div>
+          <button class="secondary-action">Browse Spanish shelf</button>
+        </div>
+
+        <nav class="tabbar" aria-label="Library tabs">
+          <div class="tab"><span class="tab-icon"></span><span>Home</span></div>
+          <div class="tab active">
+            <span class="tab-icon"></span><strong>Library</strong>
+          </div>
+          <div class="tab"><span class="tab-icon"></span><span>Progress</span></div>
+          <div class="tab"><span class="tab-icon"></span><span>More</span></div>
+        </nav>
+      </section>
+
+      <section class="phone" aria-label="Progress low-data mockup">
+        <div class="screen">
+          <div>
+            <h1>Progress</h1>
+            <p class="subtitle">A small start, already saved.</p>
+          </div>
+
+          <div class="progress-hero">
+            <p class="eyebrow">This week</p>
+            <div class="hero-title">2 learning sessions</div>
+            <p class="subtitle">
+              You have enough signal to keep going, not enough to judge the
+              whole story yet.
+            </p>
+            <div class="mini-grid">
+              <div class="mini-stat">
+                <strong>2</strong>
+                <span>sessions</span>
+              </div>
+              <div class="mini-stat">
+                <strong>12</strong>
+                <span>minutes</span>
+              </div>
+              <div class="mini-stat">
+                <strong>1</strong>
+                <span>topic touched</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="section warm-card">
+            <div class="eyebrow">Next up</div>
+            <h2>Pick up where you left off</h2>
+            <p class="subtitle">
+              Continue Spanish Greetings. The next step is a quick back-and-forth
+              using the words you practiced yesterday.
+            </p>
+            <button class="action">Continue Spanish</button>
+          </div>
+
+          <div class="section card">
+            <div class="row">
+              <div class="icon blue">L</div>
+              <div class="row-main">
+                <h2>Recent lesson preview</h2>
+                <p>Spanish &middot; Greetings &middot; Yesterday</p>
+              </div>
+            </div>
+            <div class="soft-divider"></div>
+            <div class="preview">
+              <div class="preview-line">
+                <span class="dot"></span>
+                <p>Strong start on simple introductions.</p>
+              </div>
+              <div class="preview-line">
+                <span class="dot"></span>
+                <p>Next session can practice answering in a full sentence.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="section card">
+            <div class="eyebrow">Helpful nudge</div>
+            <h2>One more short session will sharpen this view</h2>
+            <p class="subtitle">
+              After a little more practice, Progress can show a clearer weekly
+              summary and better next steps.
+            </p>
+          </div>
+
+          <div class="section card">
+            <h2>Currently working on</h2>
+            <p class="subtitle">Detected from recent sessions</p>
+            <div class="chip-row">
+              <span class="chip">Introducing yourself</span>
+              <span class="chip">Simple answers</span>
+            </div>
+          </div>
+        </div>
+
+        <nav class="tabbar" aria-label="Progress tabs">
+          <div class="tab"><span class="tab-icon"></span><span>Home</span></div>
+          <div class="tab"><span class="tab-icon"></span><span>Library</span></div>
+          <div class="tab active">
+            <span class="tab-icon"></span><strong>Progress</strong>
+          </div>
+          <div class="tab"><span class="tab-icon"></span><span>More</span></div>
+        </nav>
+      </section>
+    </main>
+  </body>
+</html>

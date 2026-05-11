@@ -1,4 +1,22 @@
-import { getGreeting } from './greeting';
+import { getGreeting, getTimeOfDay } from './greeting';
+
+describe('getTimeOfDay', () => {
+  it('returns morning between 5:00 and 11:59', () => {
+    expect(getTimeOfDay(new Date('2026-04-08T05:00:00'))).toBe('morning');
+    expect(getTimeOfDay(new Date('2026-04-08T11:59:00'))).toBe('morning');
+  });
+
+  it('returns afternoon between 12:00 and 16:59', () => {
+    expect(getTimeOfDay(new Date('2026-04-08T12:00:00'))).toBe('afternoon');
+    expect(getTimeOfDay(new Date('2026-04-08T16:59:00'))).toBe('afternoon');
+  });
+
+  it('returns evening from 17:00 onward and through the night', () => {
+    expect(getTimeOfDay(new Date('2026-04-08T17:00:00'))).toBe('evening');
+    expect(getTimeOfDay(new Date('2026-04-08T23:59:00'))).toBe('evening');
+    expect(getTimeOfDay(new Date('2026-04-09T04:59:00'))).toBe('evening');
+  });
+});
 
 describe('getGreeting', () => {
   describe('time-of-day titles', () => {

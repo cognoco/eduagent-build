@@ -15,7 +15,11 @@ import { useAuth, useClerk, useUser } from '@clerk/clerk-expo';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as SecureStore from '../../lib/secure-storage';
-import { useProfile, personaFromBirthYear } from '../../lib/profile';
+import {
+  useProfile,
+  personaFromBirthYear,
+  isGuardianProfile,
+} from '../../lib/profile';
 import { useThemeColors, useTokenVars } from '../../lib/theme';
 import { useConsentStatus, useRequestConsent } from '../../hooks/use-consent';
 import {
@@ -62,8 +66,29 @@ const BASE_VISIBLE_TABS: ReadonlySet<string> = new Set([
   'more',
 ]);
 
-export function computeVisibleTabs(): Set<string> {
-  return new Set<string>(BASE_VISIBLE_TABS);
+const STUDENT_HOME_ONLY_TABS: ReadonlySet<string> = new Set(['home']);
+
+export function computeVisibleTabs({
+  studentHomeOnly = false,
+}: {
+  studentHomeOnly?: boolean;
+} = {}): Set<string> {
+  return new Set<string>(
+    studentHomeOnly ? STUDENT_HOME_ONLY_TABS : BASE_VISIBLE_TABS,
+  );
+}
+
+export function shouldUseStudentHomeOnlyTabs({
+  activeProfile,
+  profiles,
+  isParentProxy,
+}: {
+  activeProfile: { isOwner: boolean } | null | undefined;
+  profiles: ReadonlyArray<{ isOwner: boolean }>;
+  isParentProxy: boolean;
+}): boolean {
+  if (!activeProfile || isParentProxy) return false;
+  return !isGuardianProfile(activeProfile, profiles);
 }
 
 // Routes where the entire tab bar is hidden (immersive / full-screen UX).
@@ -1292,7 +1317,15 @@ export default function AppLayout() {
   useMentorLanguageSync();
   const { isParentProxy, childProfile, parentProfile } = useParentProxy();
   const role = useActiveProfileRole();
-  const visibleTabs = React.useMemo(() => computeVisibleTabs(), []);
+  const studentHomeOnlyTabs = shouldUseStudentHomeOnlyTabs({
+    activeProfile,
+    profiles,
+    isParentProxy,
+  });
+  const visibleTabs = React.useMemo(
+    () => computeVisibleTabs({ studentHomeOnly: studentHomeOnlyTabs }),
+    [studentHomeOnlyTabs],
+  );
 
   // Sync Clerk auth state with RevenueCat identity (runs on auth change)
   useRevenueCatIdentity();

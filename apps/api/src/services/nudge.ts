@@ -49,14 +49,29 @@ function mapNudgeRow(row: {
 }
 
 function isQuietHours(now: Date, timezone: string | null | undefined): boolean {
-  const formatter = new Intl.DateTimeFormat('en-US', {
-    hour: 'numeric',
-    hour12: false,
-    timeZone: timezone ?? 'UTC',
-  });
-  const hour = Number(formatter.format(now));
-  if (!Number.isFinite(hour)) return false;
-  return hour >= QUIET_HOURS_START || hour < QUIET_HOURS_END;
+  // An invalid timezone string stored on the recipient account would otherwise
+  // throw RangeError from the Intl.DateTimeFormat constructor (e.g. 'foo',
+  // 'Europe/', '<garbage>'). The nudge row has already been committed by the
+  // time this runs, so an exception here would return 500 to the client and
+  // burn another rate-limit slot on retry. Allow the push (return false) and
+  // log so the bad timezone is debuggable.
+  try {
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      hour: 'numeric',
+      hour12: false,
+      timeZone: timezone ?? 'UTC',
+    });
+    const hour = Number(formatter.format(now));
+    if (!Number.isFinite(hour)) return false;
+    return hour >= QUIET_HOURS_START || hour < QUIET_HOURS_END;
+  } catch (error) {
+    logger.warn('nudge_quiet_hours_invalid_timezone', {
+      metric: 'nudge_quiet_hours_invalid_timezone',
+      timezone: timezone ?? null,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return false;
+  }
 }
 
 export async function createNudge(
@@ -71,8 +86,15 @@ export async function createNudge(
   const now = params.now ?? new Date();
   await assertParentAccess(db, params.fromProfileId, params.toProfileId);
 
+  // null means no consent_states row exists — which for the post-profile-create
+  // state happens when consent isn't required for this profile's age (17+).
+  // See checkConsentRequired in consent.ts: ages 17+ return required:false, and
+  // createProfile skips createPendingConsentState / createGrantedConsentState
+  // in that case, so getConsentStatus resolves null. Treating null the same as
+  // 'CONSENTED' here lets parents nudge their 17+ linked children. The block
+  // still rejects PENDING / WITHDRAWN / PARENTAL_CONSENT_REQUESTED.
   const consentStatus = await getConsentStatus(db, params.toProfileId);
-  if (consentStatus !== 'CONSENTED') {
+  if (consentStatus !== null && consentStatus !== 'CONSENTED') {
     throw new ConsentRequiredError(
       "This child can't receive nudges until consent is active.",
       'CONSENT_REQUIRED',
