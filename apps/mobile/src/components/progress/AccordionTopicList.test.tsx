@@ -3,9 +3,11 @@ import { AccordionTopicList } from './AccordionTopicList';
 
 const mockPush = jest.fn();
 const mockUseChildSubjectTopics = jest.fn();
+let mockSegments: string[] = ['(app)', 'child', '[profileId]'];
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
+  useSegments: () => mockSegments,
 }));
 
 jest.mock('../../hooks/use-dashboard', () => ({
@@ -26,6 +28,7 @@ jest.mock('./RetentionSignal', () => {
 describe('AccordionTopicList', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockSegments = ['(app)', 'child', '[profileId]'];
     mockUseChildSubjectTopics.mockReturnValue({
       data: [],
       isLoading: false,
@@ -234,5 +237,96 @@ describe('AccordionTopicList', () => {
     fireEvent.press(screen.getByTestId('accordion-topics-browse'));
 
     expect(mockPush).toHaveBeenCalledWith('/(app)/library');
+  });
+
+  it('[MOBILE-1 F2] pushes parent chain when rendered outside the child stack', () => {
+    mockSegments = ['(app)', 'progress'];
+    mockUseChildSubjectTopics.mockReturnValue({
+      data: [
+        {
+          topicId: 'topic-1',
+          title: 'Fractions',
+          description: 'Desc',
+          completionStatus: 'in_progress',
+          retentionStatus: null,
+          struggleStatus: 'normal',
+          masteryScore: 0.5,
+          summaryExcerpt: null,
+          xpStatus: 'pending',
+          totalSessions: 2,
+        },
+      ],
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+
+    render(
+      <AccordionTopicList
+        childProfileId="child-1"
+        subjectId="subject-1"
+        subjectName="Mathematics"
+        expanded
+      />,
+    );
+
+    fireEvent.press(screen.getByTestId('accordion-topic-topic-1'));
+
+    expect(mockPush).toHaveBeenCalledTimes(2);
+    expect(mockPush).toHaveBeenNthCalledWith(1, {
+      pathname: '/(app)/child/[profileId]',
+      params: { profileId: 'child-1' },
+    });
+    expect(mockPush).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        pathname: '/(app)/child/[profileId]/topic/[topicId]',
+        params: expect.objectContaining({
+          profileId: 'child-1',
+          topicId: 'topic-1',
+        }),
+      }),
+    );
+  });
+
+  it('[MOBILE-1 F2] does not double-push when already inside the child stack', () => {
+    mockSegments = ['(app)', 'child', '[profileId]'];
+    mockUseChildSubjectTopics.mockReturnValue({
+      data: [
+        {
+          topicId: 'topic-1',
+          title: 'Fractions',
+          description: 'Desc',
+          completionStatus: 'in_progress',
+          retentionStatus: null,
+          struggleStatus: 'normal',
+          masteryScore: 0.5,
+          summaryExcerpt: null,
+          xpStatus: 'pending',
+          totalSessions: 2,
+        },
+      ],
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+
+    render(
+      <AccordionTopicList
+        childProfileId="child-1"
+        subjectId="subject-1"
+        subjectName="Mathematics"
+        expanded
+      />,
+    );
+
+    fireEvent.press(screen.getByTestId('accordion-topic-topic-1'));
+
+    expect(mockPush).toHaveBeenCalledTimes(1);
+    expect(mockPush).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pathname: '/(app)/child/[profileId]/topic/[topicId]',
+      }),
+    );
   });
 });
