@@ -1894,42 +1894,6 @@
     "more": "Mais",
     "moreLabel": "Mais"
   },
-  "coaching": {
-    "parentDashboard": {
-      "consent": {
-        "accessibilityLabel": "Status do consentimento: {{status}}",
-        "checkStatusAction": "Verificar status do consentimento",
-        "consented": "Consentimento ativo",
-        "metricsHiddenTitle": "O progresso está oculto por enquanto",
-        "parentalConsentRequested": "Aguardando aprovação dos pais",
-        "parentalConsentRequestedMessage": "Enviamos a solicitação de consentimento. Os detalhes de aprendizagem de {{name}} aparecerão aqui assim que o consentimento estiver ativo.",
-        "pending": "Consentimento pendente",
-        "pendingMessage": "{{name}} precisa de consentimento ativo antes que o progresso de aprendizagem possa ser mostrado.",
-        "redactedMessage": "As métricas de aprendizagem ficam ocultas até que o consentimento esteja ativo.",
-        "restoreAction": "Restaurar consentimento",
-        "withdrawnMessage": "Os detalhes de aprendizagem de {{name}} estão ocultos porque o consentimento foi retirado.",
-        "withdrawn": "Consentimento retirado"
-      },
-      "engagementTrend": {
-        "declining": "Engajamento precisa de atenção",
-        "increasing": "Engagement increasing",
-        "stable": "Engagement stable"
-      },
-      "reviewHealth": "Revisar saúde",
-      "retentionTrend": {
-        "improving": "Melhorando",
-        "declining": "Precisa de revisão",
-        "stable": "Estável"
-      },
-      "signal": {
-        "needsAttention": "Precisa de Atenção",
-        "onTrack": "No Caminho Certo",
-        "fallingBehind": "Ficando para Trás"
-      },
-      "noDataYet": "Nenhum dado ainda",
-      "viewDetails": "Ver detalhes"
-    }
-  },
   "ocrTimeout": "A leitura demorou muito — tente novamente",
   "permissionTitle": "É necessário acesso à câmera",
   "permissionDenied": "Acesso à câmera negado",

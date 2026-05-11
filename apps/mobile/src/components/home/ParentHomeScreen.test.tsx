@@ -41,6 +41,13 @@ jest.mock(
 );
 
 jest.mock(
+  '../../hooks/use-active-profile-role' /* gc1-allow: external hook boundary — wraps profile context + family-links query */,
+  () => ({
+    useActiveProfileRole: () => 'owner',
+  }),
+);
+
+jest.mock(
   '../../hooks/use-dashboard' /* gc1-allow: external hook boundary — wraps TanStack query that requires QueryClient */,
   () => ({
     useDashboard: () => ({ data: undefined }),
@@ -51,6 +58,16 @@ jest.mock(
   '../../hooks/use-progress' /* gc1-allow: external hook boundary — wraps TanStack query that requires QueryClient */,
   () => ({
     useLearningResumeTarget: () => ({ data: undefined }),
+  }),
+);
+
+jest.mock(
+  '../../hooks/use-subscription' /* gc1-allow: external hook boundary — wraps TanStack query that requires QueryClient */,
+  () => ({
+    useSubscription: () => ({ data: { tier: 'family' } }),
+    useFamilySubscription: () => ({
+      data: { profileCount: 2, maxProfiles: 5 },
+    }),
   }),
 );
 

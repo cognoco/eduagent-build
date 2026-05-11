@@ -82,32 +82,41 @@ export async function createNudge(
   const windowStart = new Date(
     now.getTime() - NUDGE_WINDOW_HOURS * 60 * 60 * 1000,
   );
-  const [countRow] = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(nudges)
-    .where(
-      and(
-        eq(nudges.toProfileId, params.toProfileId),
-        gt(nudges.createdAt, windowStart),
-      ),
+  const inserted = await db.transaction(async (tx) => {
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtextextended(${
+        'nudge-rate:' + params.toProfileId
+      }, 0))`,
     );
-  if ((countRow?.count ?? 0) >= NUDGE_RATE_LIMIT) {
-    throw new RateLimitedError(
-      "You've sent enough encouragement for now.",
-      'NUDGE_RATE_LIMITED',
-    );
-  }
 
-  const [inserted] = await db
-    .insert(nudges)
-    .values({
-      fromProfileId: params.fromProfileId,
-      toProfileId: params.toProfileId,
-      template: params.template,
-      createdAt: now,
-    })
-    .returning();
-  if (!inserted) throw new Error('Nudge insert did not return a row');
+    const [countRow] = await tx
+      .select({ count: sql<number>`count(*)::int` })
+      .from(nudges)
+      .where(
+        and(
+          eq(nudges.toProfileId, params.toProfileId),
+          gt(nudges.createdAt, windowStart),
+        ),
+      );
+    if ((countRow?.count ?? 0) >= NUDGE_RATE_LIMIT) {
+      throw new RateLimitedError(
+        "You've sent enough encouragement for now.",
+        'NUDGE_RATE_LIMITED',
+      );
+    }
+
+    const [row] = await tx
+      .insert(nudges)
+      .values({
+        fromProfileId: params.fromProfileId,
+        toProfileId: params.toProfileId,
+        template: params.template,
+        createdAt: now,
+      })
+      .returning();
+    if (!row) throw new Error('Nudge insert did not return a row');
+    return row;
+  });
 
   const [fromProfile, toProfile] = await Promise.all([
     db.query.profiles.findFirst({

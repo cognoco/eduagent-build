@@ -1870,42 +1870,6 @@
     "more": "More",
     "moreLabel": "More"
   },
-  "coaching": {
-    "parentDashboard": {
-      "consent": {
-        "accessibilityLabel": "Consent status: {{status}}",
-        "checkStatusAction": "Check consent status",
-        "consented": "Consent active",
-        "metricsHiddenTitle": "Progress is hidden for now",
-        "parentalConsentRequested": "Waiting for parent approval",
-        "parentalConsentRequestedMessage": "We have sent the consent request. {{name}}'s learning details will appear here as soon as consent is active.",
-        "pending": "Consent pending",
-        "pendingMessage": "{{name}} needs active consent before learning progress can be shown.",
-        "redactedMessage": "Learning metrics are hidden until consent is active.",
-        "restoreAction": "Restore consent",
-        "withdrawnMessage": "{{name}}'s learning details are hidden because consent was withdrawn.",
-        "withdrawn": "Consent withdrawn"
-      },
-      "engagementTrend": {
-        "declining": "Engagement needs attention",
-        "increasing": "Engagement increasing",
-        "stable": "Engagement stable"
-      },
-      "reviewHealth": "Review health",
-      "retentionTrend": {
-        "improving": "Improving",
-        "declining": "Needs review",
-        "stable": "Stable"
-      },
-      "signal": {
-        "needsAttention": "Needs Attention",
-        "onTrack": "On Track",
-        "fallingBehind": "Falling Behind"
-      },
-      "noDataYet": "No data yet",
-      "viewDetails": "View details"
-    }
-  },
   "ocrTimeout": "Reading took too long — please try again",
   "permissionTitle": "Camera access needed",
   "permissionDenied": "Camera access denied",

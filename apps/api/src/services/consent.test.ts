@@ -6,6 +6,7 @@ import {
   requestConsent,
   processConsentResponse,
   getConsentStatus,
+  revokeConsent,
   EmailDeliveryError,
 } from './consent';
 
@@ -42,7 +43,7 @@ function mockConsentRow(
       | 'CONSENTED'
       | 'WITHDRAWN';
     parentEmail: string | null;
-  }>
+  }>,
 ) {
   return {
     id: overrides?.id ?? 'consent-1',
@@ -95,7 +96,7 @@ function createMockDb({
           async (callback: (tx: unknown) => Promise<unknown>) => {
             const tx = { insert: txInsert };
             return callback(tx);
-          }
+          },
         );
 
   return {
@@ -188,12 +189,12 @@ describe('requestConsent', () => {
         consentType: 'GDPR',
       },
       'https://test.example.com',
-      EMAIL_OPTIONS
+      EMAIL_OPTIONS,
     );
 
     expect(result.consentState.status).toBe('PARENTAL_CONSENT_REQUESTED');
     expect(result.consentState.profileId).toBe(
-      '550e8400-e29b-41d4-a716-446655440000'
+      '550e8400-e29b-41d4-a716-446655440000',
     );
     expect(result.consentState.consentType).toBe('GDPR');
     expect(result.consentState.parentEmail).toBe('parent@example.com');
@@ -214,7 +215,7 @@ describe('requestConsent', () => {
         consentType: 'GDPR',
       },
       'https://test.example.com',
-      EMAIL_OPTIONS
+      EMAIL_OPTIONS,
     );
 
     const insertCall = (db.insert as jest.Mock).mock.results[0].value;
@@ -236,7 +237,7 @@ describe('requestConsent', () => {
         parentEmail: 'parent@example.com',
         consentType: 'GDPR',
       },
-      'https://test.example.com'
+      'https://test.example.com',
     );
 
     expect(result.emailDelivered).toBe(false);
@@ -247,7 +248,7 @@ describe('requestConsent', () => {
 
   it('throws EmailDeliveryError and rolls back counter when email delivery fails', async () => {
     fetchMock.mockResolvedValueOnce(
-      createFetchResponse({ ok: false, status: 503 })
+      createFetchResponse({ ok: false, status: 503 }),
     );
     const row = mockConsentRow();
     const db = createMockDb({ insertReturning: [row] });
@@ -261,8 +262,8 @@ describe('requestConsent', () => {
           consentType: 'GDPR',
         },
         'https://test.example.com',
-        EMAIL_OPTIONS
-      )
+        EMAIL_OPTIONS,
+      ),
     ).rejects.toThrow(EmailDeliveryError);
 
     // Verify counter rollback was attempted
@@ -281,14 +282,14 @@ describe('requestConsent', () => {
         consentType: 'GDPR',
       },
       'https://api.mentomate.com',
-      EMAIL_OPTIONS
+      EMAIL_OPTIONS,
     );
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [, init] = fetchMock.mock.calls[0];
     const emailRequestBody = JSON.parse(String(init?.body)) as { text: string };
     expect(emailRequestBody.text).toContain(
-      'https://api.mentomate.com/v1/consent-page?token='
+      'https://api.mentomate.com/v1/consent-page?token=',
     );
   });
 
@@ -304,7 +305,7 @@ describe('requestConsent', () => {
         consentType: 'GDPR',
       },
       'https://api.mentomate.com',
-      EMAIL_OPTIONS
+      EMAIL_OPTIONS,
     );
 
     const [, init] = fetchMock.mock.calls[0];
@@ -324,7 +325,7 @@ describe('requestConsent', () => {
         consentType: 'COPPA',
       },
       'https://test.example.com',
-      EMAIL_OPTIONS
+      EMAIL_OPTIONS,
     );
 
     expect(result.consentState.consentType).toBe('COPPA');
@@ -360,7 +361,7 @@ describe('processConsentResponse', () => {
     const db = createMockDb({ findFirstResult: undefined });
 
     await expect(
-      processConsentResponse(db, 'invalid-token', true)
+      processConsentResponse(db, 'invalid-token', true),
     ).rejects.toThrow('Invalid consent token');
   });
 
@@ -406,7 +407,7 @@ describe('getConsentStatus', () => {
     const db = createMockDb({ findFirstResult: row });
     const result = await getConsentStatus(
       db,
-      '550e8400-e29b-41d4-a716-446655440000'
+      '550e8400-e29b-41d4-a716-446655440000',
     );
 
     expect(result).toBe('CONSENTED');
@@ -425,7 +426,7 @@ describe('createPendingConsentState', () => {
     const result = await createPendingConsentState(
       db,
       '550e8400-e29b-41d4-a716-446655440000',
-      'GDPR'
+      'GDPR',
     );
 
     expect(result.status).toBe('PENDING');
@@ -441,7 +442,7 @@ describe('createPendingConsentState', () => {
     const result = await createPendingConsentState(
       db,
       '550e8400-e29b-41d4-a716-446655440000',
-      'COPPA'
+      'COPPA',
     );
 
     expect(result.status).toBe('PENDING');
@@ -455,7 +456,7 @@ describe('createPendingConsentState', () => {
     await createPendingConsentState(
       db,
       '550e8400-e29b-41d4-a716-446655440000',
-      'GDPR'
+      'GDPR',
     );
 
     const onConflictArgs = (db.insert as jest.Mock).mock.results[0].value.values
@@ -489,7 +490,7 @@ describe('createGrantedConsentState', () => {
       db,
       CHILD_ID,
       'GDPR',
-      PARENT_ID
+      PARENT_ID,
     );
 
     expect(result.status).toBe('CONSENTED');
@@ -514,12 +515,12 @@ describe('createGrantedConsentState', () => {
     // Simulate the transaction being rejected — e.g. FK violation on familyLinks
     // after the consent row was already written within the BEGIN block.
     const transactionError = new Error(
-      'FK violation: parent profile does not exist'
+      'FK violation: parent profile does not exist',
     );
     const db = createMockDb({ transactionError });
 
     await expect(
-      createGrantedConsentState(db, CHILD_ID, 'GDPR', PARENT_ID)
+      createGrantedConsentState(db, CHILD_ID, 'GDPR', PARENT_ID),
     ).rejects.toThrow('FK violation: parent profile does not exist');
 
     // Confirm db.transaction was the call path (not fire-and-forget)
@@ -548,7 +549,141 @@ describe('createGrantedConsentState', () => {
     const db = createMockDb({ insertReturning: [] });
 
     await expect(
-      createGrantedConsentState(db, CHILD_ID, 'GDPR', PARENT_ID)
+      createGrantedConsentState(db, CHILD_ID, 'GDPR', PARENT_ID),
     ).rejects.toThrow('Insert into consentStates did not return a row');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// revokeConsent — nudge-suppression branch
+// ---------------------------------------------------------------------------
+
+interface RevokeConsentMockOptions {
+  /** Pass null to simulate a missing family link (triggers auth error). */
+  familyLink?: Record<string, unknown> | null;
+  consentRow?: ReturnType<typeof mockConsentRow>;
+  transactionError?: Error;
+}
+
+function createRevokeConsentMockDb({
+  familyLink = { id: 'link-1' } as Record<string, unknown> | null,
+  consentRow = undefined as ReturnType<typeof mockConsentRow> | undefined,
+  transactionError = undefined as Error | undefined,
+}: RevokeConsentMockOptions = {}): {
+  db: Database;
+  txUpdate: jest.Mock;
+} {
+  const txUpdateReturning = jest
+    .fn()
+    .mockResolvedValue(consentRow ? [consentRow] : []);
+  const txUpdateWhere = jest
+    .fn()
+    .mockReturnValue({ returning: txUpdateReturning });
+  const txUpdateSet = jest.fn().mockReturnValue({ where: txUpdateWhere });
+  const txUpdate = jest.fn().mockReturnValue({ set: txUpdateSet });
+
+  const transactionFn = transactionError
+    ? jest.fn().mockRejectedValue(transactionError)
+    : jest
+        .fn()
+        .mockImplementation(
+          async (callback: (tx: unknown) => Promise<unknown>) => {
+            const tx = { update: txUpdate };
+            return callback(tx);
+          },
+        );
+
+  const db = {
+    query: {
+      familyLinks: {
+        // null bypasses the default-parameter fallback that undefined triggers.
+        // mockResolvedValue(null ?? undefined) = mockResolvedValue(undefined),
+        // which makes !link truthy and fires the auth guard.
+        findFirst: jest.fn().mockResolvedValue(familyLink ?? undefined),
+      },
+      consentStates: {
+        findFirst: jest.fn().mockResolvedValue(consentRow),
+      },
+    },
+    transaction: transactionFn,
+    update: jest.fn(),
+    insert: jest.fn(),
+    delete: jest.fn(),
+  } as unknown as Database;
+
+  return { db, txUpdate };
+}
+
+describe('revokeConsent — nudge-suppression branch', () => {
+  const CHILD_ID = '550e8400-e29b-41d4-a716-000000000001';
+  const PARENT_ID = '550e8400-e29b-41d4-a716-000000000002';
+
+  it('[nudge-suppression] wraps consent update AND nudges update in a single db.transaction call', async () => {
+    const consentRow = mockConsentRow({
+      status: 'CONSENTED',
+      profileId: CHILD_ID,
+    });
+    const { db, txUpdate } = createRevokeConsentMockDb({ consentRow });
+
+    await revokeConsent(db, CHILD_ID, PARENT_ID);
+
+    expect(db.transaction).toHaveBeenCalledTimes(1);
+    expect(txUpdate).toHaveBeenCalledTimes(2);
+  });
+
+  it('[nudge-suppression] calls tx.update for two distinct tables inside the transaction', async () => {
+    const consentRow = mockConsentRow({
+      status: 'CONSENTED',
+      profileId: CHILD_ID,
+    });
+    const { db, txUpdate } = createRevokeConsentMockDb({ consentRow });
+
+    await revokeConsent(db, CHILD_ID, PARENT_ID);
+
+    const firstCallArg = txUpdate.mock.calls[0]?.[0];
+    const secondCallArg = txUpdate.mock.calls[1]?.[0];
+    expect(firstCallArg).toBeDefined();
+    expect(secondCallArg).toBeDefined();
+    expect(firstCallArg).not.toBe(secondCallArg);
+  });
+
+  it('[nudge-suppression] skips the transaction entirely when existing status is already WITHDRAWN', async () => {
+    const withdrawnRow = mockConsentRow({
+      status: 'WITHDRAWN',
+      profileId: CHILD_ID,
+    });
+    const { db } = createRevokeConsentMockDb({ consentRow: withdrawnRow });
+
+    const result = await revokeConsent(db, CHILD_ID, PARENT_ID);
+
+    expect(result.status).toBe('WITHDRAWN');
+    expect(db.transaction).not.toHaveBeenCalled();
+  });
+
+  it('[nudge-suppression] throws ConsentNotAuthorizedError when no family link exists', async () => {
+    const consentRow = mockConsentRow({
+      status: 'CONSENTED',
+      profileId: CHILD_ID,
+    });
+    const { db } = createRevokeConsentMockDb({ familyLink: null, consentRow });
+
+    await expect(revokeConsent(db, CHILD_ID, PARENT_ID)).rejects.toThrow(
+      'Not authorized to revoke consent for this profile',
+    );
+    expect(db.transaction).not.toHaveBeenCalled();
+  });
+
+  it('[nudge-suppression] propagates transaction failure so no partial write is silently swallowed', async () => {
+    const consentRow = mockConsentRow({
+      status: 'CONSENTED',
+      profileId: CHILD_ID,
+    });
+    const transactionError = new Error('simulated DB rollback');
+    const { db } = createRevokeConsentMockDb({ consentRow, transactionError });
+
+    await expect(revokeConsent(db, CHILD_ID, PARENT_ID)).rejects.toThrow(
+      'simulated DB rollback',
+    );
+    expect(db.transaction).toHaveBeenCalledTimes(1);
   });
 });

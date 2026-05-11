@@ -880,8 +880,10 @@ describe('dashboard service integration', () => {
             totalSessions: 0,
             subjects: [],
             progress: null,
+            currentlyWorkingOn: [],
           }),
         );
+        expect(child!.weeklyHeadline).toBeUndefined();
         expect(child!.summary).toContain(summaryCopy);
       }
     },

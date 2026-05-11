@@ -122,6 +122,36 @@ jest.mock('../../lib/greeting', () => ({
   }),
 }));
 
+jest.mock(
+  '../../hooks/use-active-profile-role' /* gc1-allow: external hook boundary — wraps profile context + family-links query */,
+  () => ({
+    useActiveProfileRole: () => 'owner',
+  }),
+);
+
+jest.mock(
+  '../../hooks/use-subscription' /* gc1-allow: external hook boundary — wraps TanStack query that requires QueryClient */,
+  () => ({
+    useSubscription: () => ({ data: { tier: 'family' } }),
+    useFamilySubscription: () => ({
+      data: { profileCount: 2, maxProfiles: 5 },
+    }),
+    useUsage: () => ({
+      data: {
+        monthlyLimit: 100,
+        usedThisMonth: 16,
+        remainingQuestions: 84,
+        topUpCreditsRemaining: 0,
+        warningLevel: 'none',
+        cycleResetAt: '2026-06-01T00:00:00Z',
+        dailyLimit: 10,
+        usedToday: 3,
+        dailyRemainingQuestions: 7,
+      },
+    }),
+  }),
+);
+
 jest.mock('../../lib/session-recovery', () => ({
   readSessionRecoveryMarker: (...args: unknown[]) =>
     mockReadSessionRecoveryMarker(...args),

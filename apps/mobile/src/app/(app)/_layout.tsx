@@ -18,7 +18,10 @@ import * as SecureStore from '../../lib/secure-storage';
 import { useProfile, personaFromBirthYear } from '../../lib/profile';
 import { useThemeColors, useTokenVars } from '../../lib/theme';
 import { useConsentStatus, useRequestConsent } from '../../hooks/use-consent';
-import { useNotificationResponseHandler } from '../../hooks/use-notification-response-handler';
+import {
+  initNotificationHandler,
+  useNotificationResponseHandler,
+} from '../../hooks/use-notification-response-handler';
 import { usePushTokenRegistration } from '../../hooks/use-push-token-registration';
 import { useRevenueCatIdentity } from '../../hooks/use-revenuecat';
 import {
@@ -45,6 +48,8 @@ import {
   type ActiveProfileRole,
 } from '../../hooks/use-active-profile-role';
 import { useMentorLanguageSync } from '../../hooks/use-mentor-language-sync';
+
+initNotificationHandler();
 
 // ─── Tab visibility whitelist ────────────────────────────────────────
 // Only these routes render a visible tab button. Every other route in

@@ -46,13 +46,14 @@ jest.mock(
 );
 
 // ---------------------------------------------------------------------------
-// External boundary mock — Expo push notification API
+// Internal module stub — notifications has its own suite; we stub it here to
+// isolate nudge logic from the push-delivery path.
 // ---------------------------------------------------------------------------
 
 const mockSendPushNotification = jest.fn();
 
 jest.mock(
-  './notifications' /* gc1-allow: external push notification boundary (Expo Push API) */,
+  './notifications' /* gc1-allow: nudge.test stubs push delivery; notifications service has its own dedicated test suite */,
   () => ({
     ...jest.requireActual('./notifications'),
     sendPushNotification: (...args: unknown[]) =>
@@ -196,10 +197,24 @@ function makeDb({
       accountTimezone !== null ? { timezone: accountTimezone } : undefined,
     );
 
+  // ── transaction wrapper ───────────────────────────────────────────────────
+  // createNudge wraps count-check + insert in db.transaction(). The tx object
+  // receives the same select/insert/execute API as the outer db.
+  const executeFn = jest.fn().mockResolvedValue(undefined);
+  const tx = {
+    select: selectFn,
+    insert: insertFn,
+    execute: executeFn,
+  };
+  const transactionFn = jest
+    .fn()
+    .mockImplementation((cb: (tx: typeof tx) => Promise<unknown>) => cb(tx));
+
   return {
     select: selectFn,
     insert: insertFn,
     update: updateFn,
+    transaction: transactionFn,
     query: {
       profiles: { findFirst: profilesFindFirst },
       accounts: { findFirst: accountsFindFirst },

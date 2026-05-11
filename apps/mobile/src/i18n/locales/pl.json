@@ -1894,42 +1894,6 @@
     "more": "Więcej",
     "moreLabel": "Więcej"
   },
-  "coaching": {
-    "parentDashboard": {
-      "consent": {
-        "accessibilityLabel": "Status zgody: {{status}}",
-        "checkStatusAction": "Sprawdź status zgody",
-        "consented": "Zgoda aktywna",
-        "metricsHiddenTitle": "Postępy są na razie ukryte",
-        "parentalConsentRequested": "Oczekiwanie na zgodę rodzica",
-        "parentalConsentRequestedMessage": "Wysłaliśmy prośbę o zgodę. Szczegóły nauki {{name}} pojawią się tutaj, gdy tylko zgoda będzie aktywna.",
-        "pending": "Zgoda oczekuje",
-        "pendingMessage": "{{name}} potrzebuje aktywnej zgody, zanim będzie można pokazać postępy w nauce.",
-        "redactedMessage": "Metryki nauki są ukryte, dopóki zgoda nie będzie aktywna.",
-        "restoreAction": "Przywróć zgodę",
-        "withdrawnMessage": "Szczegóły nauki {{name}} są ukryte, ponieważ zgoda została wycofana.",
-        "withdrawn": "Zgoda wycofana"
-      },
-      "engagementTrend": {
-        "declining": "Zaangażowanie wymaga uwagi",
-        "increasing": "Engagement increasing",
-        "stable": "Engagement stable"
-      },
-      "reviewHealth": "Sprawdź stan",
-      "retentionTrend": {
-        "improving": "Poprawia się",
-        "declining": "Wymaga przeglądu",
-        "stable": "Stabilny"
-      },
-      "signal": {
-        "needsAttention": "Wymaga uwagi",
-        "onTrack": "Na dobrej drodze",
-        "fallingBehind": "Zostaje w tyle"
-      },
-      "noDataYet": "Brak jeszcze danych",
-      "viewDetails": "Zobacz szczegóły"
-    }
-  },
   "ocrTimeout": "Odczyt trwał zbyt długo — spróbuj ponownie",
   "permissionTitle": "Wymagany dostęp do aparatu",
   "permissionDenied": "Odmówiono dostępu do aparatu",

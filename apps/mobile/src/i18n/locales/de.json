@@ -1870,42 +1870,6 @@
     "more": "Mehr",
     "moreLabel": "Mehr"
   },
-  "coaching": {
-    "parentDashboard": {
-      "consent": {
-        "accessibilityLabel": "Zustimmungsstatus: {{status}}",
-        "checkStatusAction": "Zustimmungsstatus prüfen",
-        "consented": "Zustimmung aktiv",
-        "metricsHiddenTitle": "Fortschritt ist vorerst ausgeblendet",
-        "parentalConsentRequested": "Wartet auf Elterngenehmigung",
-        "parentalConsentRequestedMessage": "Wir haben die Zustimmungsanfrage gesendet. {{name}}s Lerndetails erscheinen hier, sobald die Zustimmung aktiv ist.",
-        "pending": "Zustimmung ausstehend",
-        "pendingMessage": "{{name}} benötigt eine aktive Zustimmung, bevor Lernfortschritt angezeigt werden kann.",
-        "redactedMessage": "Lernmetriken sind ausgeblendet, bis die Zustimmung aktiv ist.",
-        "restoreAction": "Zustimmung wiederherstellen",
-        "withdrawnMessage": "{{name}}s Lerndetails sind ausgeblendet, weil die Zustimmung widerrufen wurde.",
-        "withdrawn": "Zustimmung widerrufen"
-      },
-      "engagementTrend": {
-        "declining": "Engagement braucht Aufmerksamkeit",
-        "increasing": "Engagement increasing",
-        "stable": "Engagement stable"
-      },
-      "reviewHealth": "Gesundheit überprüfen",
-      "retentionTrend": {
-        "improving": "Verbessert sich",
-        "declining": "Wiederholung empfohlen",
-        "stable": "Stabil"
-      },
-      "signal": {
-        "needsAttention": "Benötigt Aufmerksamkeit",
-        "onTrack": "Auf Kurs",
-        "fallingBehind": "Fällt zurück"
-      },
-      "noDataYet": "Noch keine Daten",
-      "viewDetails": "Details ansehen"
-    }
-  },
   "ocrTimeout": "Lesen hat zu lange gedauert – bitte versuche es erneut",
   "permissionTitle": "Kamerazugriff benötigt",
   "permissionDenied": "Kamerazugriff verweigert",

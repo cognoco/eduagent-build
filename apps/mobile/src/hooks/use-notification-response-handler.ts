@@ -4,15 +4,22 @@ import { useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { useProfile } from '../lib/profile';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+let notificationHandlerInitialized = false;
+
+export function initNotificationHandler(): void {
+  if (notificationHandlerInitialized) return;
+  notificationHandlerInitialized = false;
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
+  notificationHandlerInitialized = true;
+}
 
 export function useNotificationResponseHandler(): void {
   const router = useRouter();

@@ -1,14 +1,21 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
+import { isAdultOwner } from '@eduagent/schemas';
 import type { DashboardData, Profile } from '@eduagent/schemas';
 
+import { useActiveProfileRole } from '../../hooks/use-active-profile-role';
 import { useDashboard } from '../../hooks/use-dashboard';
 import { useLearningResumeTarget } from '../../hooks/use-progress';
+import {
+  useFamilySubscription,
+  useSubscription,
+} from '../../hooks/use-subscription';
 import { getGreeting } from '../../lib/greeting';
+import { platformAlert } from '../../lib/platform-alert';
 import { useLinkedChildren } from '../../lib/profile';
 import { useThemeColors } from '../../lib/theme';
 import { FamilyOrientationCue } from '../family/FamilyOrientationCue';
@@ -56,13 +63,22 @@ export function ParentHomeScreen({
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
+  const role = useActiveProfileRole();
   const linkedChildren = useLinkedChildren();
   const { data: dashboard } = useDashboard();
   const { data: resumeTarget } = useLearningResumeTarget();
+  const { data: subscription } = useSubscription();
+  const { data: familyData } = useFamilySubscription(
+    subscription?.tier === 'family' || subscription?.tier === 'pro',
+  );
   const [sheetChildId, setSheetChildId] = useState<string | null>(null);
   const { subtitle } = getGreeting(activeProfile?.displayName ?? '', now);
   const firstName = activeProfile?.displayName?.split(' ')[0] ?? 'there';
   const sheetChild = linkedChildren.find((child) => child.id === sheetChildId);
+  const showAddChild = isAdultOwner({
+    role,
+    birthYear: activeProfile?.birthYear,
+  });
 
   const ownLearningSubtitle = useMemo(() => {
     if (!resumeTarget) return t('home.parent.cards.continueOwnEmptySubtitle');
@@ -71,6 +87,48 @@ export function ParentHomeScreen({
       topicTitle: resumeTarget.topicTitle ?? resumeTarget.subjectName,
     });
   }, [resumeTarget, t]);
+
+  const handleAddChild = useCallback(() => {
+    if (!subscription) {
+      platformAlert(t('common.loading'), t('more.errors.tryAgainMoment'));
+      return;
+    }
+    const tier = subscription.tier;
+    if (tier !== 'family' && tier !== 'pro') {
+      platformAlert(
+        t('more.family.upgradeRequiredTitle'),
+        t('more.family.upgradeRequiredMessage'),
+        [
+          {
+            text: t('more.family.viewPlans'),
+            onPress: () => router.push('/(app)/subscription'),
+          },
+          { text: t('common.cancel'), style: 'cancel' },
+        ],
+      );
+      return;
+    }
+    if (familyData && familyData.profileCount >= familyData.maxProfiles) {
+      platformAlert(
+        t('more.family.profileLimitTitle'),
+        t('more.family.profileLimitMessage', {
+          plan: tier === 'pro' ? 'Pro' : 'Family',
+          max: familyData.maxProfiles,
+        }),
+        tier === 'family'
+          ? [
+              {
+                text: t('more.family.viewPlans'),
+                onPress: () => router.push('/(app)/subscription'),
+              },
+              { text: t('common.cancel'), style: 'cancel' },
+            ]
+          : [{ text: t('common.ok') }],
+      );
+      return;
+    }
+    router.push('/create-profile?for=child');
+  }, [subscription, familyData, router, t]);
 
   function pushChildDetail(childProfileId: string): void {
     router.push({
@@ -81,10 +139,12 @@ export function ParentHomeScreen({
 
   function pushChildReports(childProfileId: string): void {
     pushChildDetail(childProfileId);
-    router.push({
-      pathname: '/(app)/child/[profileId]/reports',
-      params: { profileId: childProfileId },
-    } as never);
+    setTimeout(() => {
+      router.push({
+        pathname: '/(app)/child/[profileId]/reports',
+        params: { profileId: childProfileId },
+      } as never);
+    }, 0);
   }
 
   return (
@@ -163,6 +223,17 @@ export function ParentHomeScreen({
               onPress={() => setSheetChildId(child.id)}
             />
           ))}
+
+          {showAddChild ? (
+            <IntentCard
+              testID="parent-home-add-child"
+              title={t('more.family.addChild')}
+              subtitle={t('more.family.addChildDescription')}
+              icon="person-add-outline"
+              variant="subtle"
+              onPress={handleAddChild}
+            />
+          ) : null}
 
           <IntentCard
             testID="parent-home-own-learning"

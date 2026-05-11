@@ -37,11 +37,6 @@ describe('child/[profileId]/_layout.tsx', () => {
     capturedScreens.length = 0;
   });
 
-  // Regression guard: parent views call
-  // goBackOrReplace(router, `/(app)/child/${profileId}`) to return to the
-  // child overview. Without initialRouteName="index", the Stack would pick
-  // the first JSX-declared child (session/[sessionId]) as the initial
-  // route — landing the parent on a blank session-detail screen.
   it('sets initialRouteName="index" on the Stack', () => {
     render(<ChildDetailLayout />);
     expect(capturedStackProps?.initialRouteName).toBe('index');
@@ -50,6 +45,7 @@ describe('child/[profileId]/_layout.tsx', () => {
   it.each([
     ['session/[sessionId]', 'sessionId'],
     ['report/[reportId]', 'reportId'],
+    ['weekly-report/[weeklyReportId]', 'weeklyReportId'],
     ['subjects/[subjectId]', 'subjectId'],
     ['topic/[topicId]', 'topicId'],
   ])('declares %s with getId returning %s from params', (name, paramKey) => {

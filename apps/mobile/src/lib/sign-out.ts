@@ -28,6 +28,7 @@
 // than re-implementing the steps.
 // ---------------------------------------------------------------------------
 
+import * as Sentry from '@sentry/react-native';
 import type { QueryClient } from '@tanstack/react-query';
 import { clearProfileSecureStorageOnSignOut } from './sign-out-cleanup';
 import { clearTransitionState } from './auth-transition';
@@ -77,6 +78,14 @@ export async function signOutWithCleanup(
   // check (profile.ts) can match a previous user's profile and propagate
   // their id back into the api-client module.
   queryClient.clear();
+
+  // [SEC-SENTRY-SCOPE] Wipe the Sentry scope so that any crash between
+  // sign-out and the next sign-in does not carry the previous user's
+  // breadcrumbs, tags, contexts, or user identity. Sentry.setUser(null) is
+  // called by evaluateSentryForProfile() only AFTER the next profile loads —
+  // too late. We call both here so the window is bounded to the cleanup block.
+  Sentry.getCurrentScope().clear();
+  Sentry.setUser(null);
 
   // SecureStore + AsyncStorage + Outbox cleanup. Bounded by
   // SIGNOUT_CLEANUP_TIMEOUT_MS so a stuck Keychain/Keystore can't trap the
