@@ -186,18 +186,27 @@ export default function ProgressSubjectScreen(): React.ReactElement {
     }
     return (
       <View
-        className="flex-1 bg-background"
+        className="flex-1 bg-background px-6 items-center justify-center"
         style={{ paddingTop: insets.top }}
         testID="progress-subject-loading"
       >
-        <View className="px-5 pt-4">
-          <View className="bg-border rounded h-6 w-1/2 mb-4" />
-          <View className="bg-coaching-card rounded-card p-5">
-            <View className="bg-border rounded h-5 w-2/3 mb-3" />
-            <View className="bg-border rounded h-4 w-full mb-2" />
-            <View className="bg-border rounded h-4 w-3/4" />
-          </View>
-        </View>
+        <Text className="text-h3 font-semibold text-text-primary mt-4 text-center">
+          {t('progress.subject.loadingTitle')}
+        </Text>
+        <Text className="text-body-sm text-text-secondary mt-2 text-center">
+          {t('progress.subject.loadingMessage')}
+        </Text>
+        <Pressable
+          onPress={() => goBackOrReplace(router, '/(app)/progress')}
+          className="mt-6 rounded-button bg-surface-elevated px-6 py-3 min-h-[48px] items-center justify-center"
+          accessibilityRole="button"
+          accessibilityLabel={t('common.goBack')}
+          testID="progress-subject-loading-back"
+        >
+          <Text className="text-body font-semibold text-text-primary">
+            {t('common.goBack')}
+          </Text>
+        </Pressable>
       </View>
     );
   }

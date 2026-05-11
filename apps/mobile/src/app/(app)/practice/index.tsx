@@ -21,50 +21,67 @@ import { goBackOrReplace, homeHrefForReturnTo } from '../../../lib/navigation';
 import { useReviewSummary } from '../../../hooks/use-progress';
 import { useParentProxy } from '../../../hooks/use-parent-proxy';
 import { useAssessmentEligibleTopics } from '../../../hooks/use-assessments';
+import { useThemeColors } from '../../../lib/theme';
 
 const PRACTICE_WEB_MAX_WIDTH = 560;
 
-const PRACTICE_COLORS = {
-  ink: '#16201b',
-  muted: '#637067',
-  line: '#dbe5dc',
-  surface: '#ffffff',
-  reviewBg: '#effcf5',
-  reviewBorder: '#b9ddc8',
-  mint: '#2f9c6a',
-  quizBg: '#f2f7ff',
-  quizBorder: '#b8ccec',
-  quiz: '#386dbe',
-  dictationBg: '#fff6df',
-  dictationBorder: '#e6c883',
-  dictation: '#b46f00',
-  reciteBg: '#f4efff',
-  reciteBorder: '#c7bdf1',
-  recite: '#7058c8',
-  history: '#b64a62',
-  historyBorder: '#edbdc7',
-} as const;
+type PracticeColors = ReturnType<typeof usePracticeColors>;
+
+function usePracticeColors() {
+  const theme = useThemeColors();
+  const isDark = theme.background !== '#faf5ef';
+  return {
+    ink: theme.textPrimary,
+    muted: theme.textSecondary,
+    line: theme.border,
+    surface: theme.surface,
+    reviewBg: isDark ? '#1a2e24' : '#effcf5',
+    reviewBorder: isDark ? '#2a5040' : '#b9ddc8',
+    mint: '#2f9c6a',
+    quizBg: isDark ? '#1a2030' : '#f2f7ff',
+    quizBorder: isDark ? '#2a3a58' : '#b8ccec',
+    quiz: isDark ? '#5b8fd6' : '#386dbe',
+    dictationBg: isDark ? '#2a2518' : '#fff6df',
+    dictationBorder: isDark ? '#5a4a2a' : '#e6c883',
+    dictation: isDark ? '#d89830' : '#b46f00',
+    reciteBg: isDark ? '#221a30' : '#f4efff',
+    reciteBorder: isDark ? '#3a2a58' : '#c7bdf1',
+    recite: isDark ? '#9080e0' : '#7058c8',
+    history: isDark ? '#d06a82' : '#b64a62',
+    historyBorder: isDark ? '#4a2a34' : '#edbdc7',
+    chipBg: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.86)',
+    chipText: theme.textPrimary,
+    chipStrongText: '#ffffff',
+    primaryButtonBg: isDark ? theme.textPrimary : '#12352a',
+    xpPillBg: '#12352a',
+    quizOptionBg: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.76)',
+  };
+}
 
 function pointerStyle(): StyleProp<ViewStyle> {
   return Platform.OS === 'web' ? ({ cursor: 'pointer' } as ViewStyle) : null;
 }
 
-function formatTimeUntil(isoDate: string): string {
+function formatTimeUntil(
+  isoDate: string,
+  t: (key: string, opts?: Record<string, unknown>) => string,
+): string {
   const diff = new Date(isoDate).getTime() - Date.now();
 
-  if (diff <= 0) return 'soon';
+  if (diff <= 0) return t('practiceHub.review.timeSoon');
 
   const hours = Math.floor(diff / (1000 * 60 * 60));
-  if (hours < 1) return 'less than an hour';
-  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'}`;
+  if (hours < 1) return t('practiceHub.review.timeLessThanAnHour');
+  if (hours < 24) return t('practiceHub.review.timeHours', { count: hours });
 
   const days = Math.floor(hours / 24);
-  return `${days} day${days === 1 ? '' : 's'}`;
+  return t('practiceHub.review.timeDays', { count: days });
 }
 
 function getActivityCue(
   quizStats: QuizStats[] | undefined,
   activityType: QuizActivityType,
+  t: (key: string, opts?: Record<string, unknown>) => string,
 ): string | null {
   const stats = quizStats?.find((stat) => stat.activityType === activityType);
 
@@ -75,11 +92,16 @@ function getActivityCue(
     stats.bestTotal != null &&
     stats.bestTotal > 0
   ) {
-    return `Best ${stats.bestScore}/${stats.bestTotal}`;
+    return t('practiceHub.quiz.bestFraction', {
+      score: stats.bestScore,
+      total: stats.bestTotal,
+    });
   }
 
   if ((stats.roundsPlayed ?? 0) > 0) {
-    return `Played ${stats.roundsPlayed}`;
+    return t('practiceHub.quiz.playedFraction', {
+      count: stats.roundsPlayed,
+    });
   }
 
   return null;
@@ -88,11 +110,43 @@ function getActivityCue(
 function SectionLabel({ children }: { children: string }): React.ReactElement {
   return (
     <Text
-      className="text-caption font-bold uppercase text-text-secondary"
+      className="text-caption font-bold text-text-secondary"
       style={styles.sectionLabel}
     >
       {children}
     </Text>
+  );
+}
+
+function CueChip({
+  children,
+  strong = false,
+  testID,
+  colors,
+}: {
+  children: string;
+  strong?: boolean;
+  testID?: string;
+  colors: PracticeColors;
+}): React.ReactElement {
+  return (
+    <View
+      testID={testID}
+      style={[
+        styles.chip,
+        {
+          backgroundColor: strong ? colors.mint : colors.chipBg,
+          borderColor: strong ? colors.mint : colors.line,
+        },
+      ]}
+    >
+      <Text
+        className="text-caption font-bold"
+        style={{ color: strong ? colors.chipStrongText : colors.chipText }}
+      >
+        {children}
+      </Text>
+    </View>
   );
 }
 
@@ -102,7 +156,6 @@ const styles = StyleSheet.create({
     maxWidth: Platform.OS === 'web' ? PRACTICE_WEB_MAX_WIDTH : undefined,
   },
   roundButton: {
-    borderColor: PRACTICE_COLORS.line,
     borderWidth: 1,
   },
   xpPill: {
@@ -110,32 +163,26 @@ const styles = StyleSheet.create({
     minWidth: 76,
     paddingHorizontal: 14,
     borderRadius: 18,
-    backgroundColor: '#12352a',
   },
   sectionLabel: {
     letterSpacing: 1.2,
+    textTransform: 'uppercase' as const,
   },
   reviewCard: {
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: PRACTICE_COLORS.reviewBorder,
-    backgroundColor: PRACTICE_COLORS.reviewBg,
     paddingHorizontal: 18,
     paddingVertical: 18,
   },
   challengeRow: {
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: PRACTICE_COLORS.reviewBorder,
-    backgroundColor: PRACTICE_COLORS.surface,
     paddingHorizontal: 14,
     paddingVertical: 14,
   },
   quizCard: {
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: PRACTICE_COLORS.quizBorder,
-    backgroundColor: PRACTICE_COLORS.quizBg,
     paddingHorizontal: 18,
     paddingVertical: 18,
   },
@@ -143,8 +190,6 @@ const styles = StyleSheet.create({
     minHeight: 128,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: PRACTICE_COLORS.line,
-    backgroundColor: 'rgba(255,255,255,0.76)',
     paddingHorizontal: 14,
     paddingVertical: 14,
   },
@@ -155,19 +200,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 14,
   },
-  dictationCard: {
-    borderColor: PRACTICE_COLORS.dictationBorder,
-    backgroundColor: PRACTICE_COLORS.dictationBg,
-  },
-  reciteCard: {
-    borderColor: PRACTICE_COLORS.reciteBorder,
-    backgroundColor: PRACTICE_COLORS.reciteBg,
-  },
   historyRow: {
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: PRACTICE_COLORS.historyBorder,
-    backgroundColor: PRACTICE_COLORS.surface,
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
@@ -185,75 +220,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  reviewIconCircle: {
-    backgroundColor: '#dff5e9',
-  },
-  challengeIconCircle: {
-    backgroundColor: PRACTICE_COLORS.mint,
-  },
-  quizIconCircle: {
-    backgroundColor: PRACTICE_COLORS.quiz,
-  },
-  dictationIconCircle: {
-    backgroundColor: PRACTICE_COLORS.dictation,
-  },
-  reciteIconCircle: {
-    backgroundColor: PRACTICE_COLORS.recite,
-  },
-  historyIconCircle: {
-    backgroundColor: PRACTICE_COLORS.history,
-  },
   chip: {
     minHeight: 28,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: PRACTICE_COLORS.line,
-    backgroundColor: 'rgba(255,255,255,0.86)',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 10,
     paddingVertical: 5,
   },
-  chipStrong: {
-    borderColor: PRACTICE_COLORS.mint,
-    backgroundColor: PRACTICE_COLORS.mint,
-  },
-  chipText: {
-    color: PRACTICE_COLORS.ink,
-  },
-  chipStrongText: {
-    color: '#ffffff',
-  },
   primaryButton: {
     minHeight: 48,
     borderRadius: 18,
-    backgroundColor: PRACTICE_COLORS.ink,
   },
 });
-
-function CueChip({
-  children,
-  strong = false,
-  testID,
-}: {
-  children: string;
-  strong?: boolean;
-  testID?: string;
-}): React.ReactElement {
-  return (
-    <View
-      testID={testID}
-      style={[styles.chip, strong ? styles.chipStrong : null]}
-    >
-      <Text
-        className="text-caption font-bold"
-        style={strong ? styles.chipStrongText : styles.chipText}
-      >
-        {children}
-      </Text>
-    </View>
-  );
-}
 
 export default function PracticeScreen(): React.ReactElement {
   const { t } = useTranslation();
@@ -261,6 +241,7 @@ export default function PracticeScreen(): React.ReactElement {
   const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
   const insets = useSafeAreaInsets();
   const { isParentProxy } = useParentProxy();
+  const colors = usePracticeColors();
   const { data: reviewSummary, isError: reviewError } = useReviewSummary();
   const { data: quizStats, isError: statsError } = useQuizStats();
   const { data: assessmentTopics, isError: assessmentTopicsError } =
@@ -269,7 +250,7 @@ export default function PracticeScreen(): React.ReactElement {
   const reviewDueCount = reviewSummary?.totalOverdue ?? 0;
   const hasOverdue = reviewDueCount > 0;
   const reviewSubtitle = reviewError
-    ? 'Could not load review status'
+    ? t('practiceHub.review.couldNotLoad')
     : hasOverdue
       ? t('practiceHub.review.topicsReady', { count: reviewDueCount })
       : reviewSummary?.nextUpcomingReviewAt
@@ -297,34 +278,36 @@ export default function PracticeScreen(): React.ReactElement {
     bestActivity.bestScore != null &&
     bestActivity.bestTotal != null &&
     bestActivity.bestTotal > 0
-      ? `Best: ${Math.round(
-          (bestActivity.bestScore / bestActivity.bestTotal) * 100,
-        )}%`
+      ? t('practiceHub.quiz.bestCue', {
+          pct: Math.round(
+            (bestActivity.bestScore / bestActivity.bestTotal) * 100,
+          ),
+        })
       : null;
   const quizSubtitle = statsError
-    ? 'Could not load quiz stats'
+    ? t('practiceHub.quiz.couldNotLoad')
     : bestPct
       ? [
           bestPct,
-          `Played: ${totalRoundsPlayed}`,
+          t('practiceHub.quiz.playedCue', { count: totalRoundsPlayed }),
           t('practiceHub.xpLabel', { xp: totalXp }),
         ]
           .filter(Boolean)
           .join(' · ')
       : totalRoundsPlayed > 0
         ? [
-            `Played: ${totalRoundsPlayed}`,
+            t('practiceHub.quiz.playedCue', { count: totalRoundsPlayed }),
             t('practiceHub.xpLabel', { xp: totalXp }),
           ].join(' · ')
         : t('practiceHub.quiz.defaultSubtitle', { xp: totalXp });
   const assessmentCount = assessmentTopics?.length ?? 0;
   const assessmentSubtitle = assessmentTopicsError
-    ? 'Could not load assessment topics'
+    ? t('practiceHub.assessment.couldNotLoad')
     : assessmentCount > 0
       ? t('practiceHub.assessment.topicsReady', { count: assessmentCount })
       : t('practiceHub.assessment.afterFinishTopic');
-  const capitalsCue = getActivityCue(quizStats, 'capitals');
-  const guessWhoCue = getActivityCue(quizStats, 'guess_who');
+  const capitalsCue = getActivityCue(quizStats, 'capitals', t);
+  const guessWhoCue = getActivityCue(quizStats, 'guess_who', t);
   const progressCue =
     totalRoundsPlayed > 0
       ? t('practiceHub.history.roundsPlayed', { count: totalRoundsPlayed })
@@ -362,12 +345,16 @@ export default function PracticeScreen(): React.ReactElement {
           <Pressable
             onPress={handleBack}
             className="mr-3 min-h-[44px] min-w-[44px] items-center justify-center rounded-full bg-surface"
-            style={[styles.roundButton, pointerStyle()]}
+            style={[
+              styles.roundButton,
+              { borderColor: colors.line },
+              pointerStyle(),
+            ]}
             accessibilityRole="button"
             accessibilityLabel={t('common.goBack')}
             testID="practice-back"
           >
-            <Ionicons name="arrow-back" size={24} color={PRACTICE_COLORS.ink} />
+            <Ionicons name="arrow-back" size={24} color={colors.ink} />
           </Pressable>
           <View className="flex-1">
             <Text className="text-h1 font-bold text-text-primary">
@@ -379,7 +366,7 @@ export default function PracticeScreen(): React.ReactElement {
           </View>
           <View
             className="ml-3 items-center justify-center"
-            style={styles.xpPill}
+            style={[styles.xpPill, { backgroundColor: colors.xpPillBg }]}
             testID="practice-xp-header"
           >
             <Text className="text-body-sm font-bold text-text-inverse">
@@ -395,7 +382,14 @@ export default function PracticeScreen(): React.ReactElement {
             </SectionLabel>
             <Pressable
               className="active:opacity-80"
-              style={[styles.reviewCard, pointerStyle()]}
+              style={[
+                styles.reviewCard,
+                {
+                  borderColor: colors.reviewBorder,
+                  backgroundColor: colors.reviewBg,
+                },
+                pointerStyle(),
+              ]}
               onPress={() =>
                 router.push({
                   pathname: '/(app)/topic/relearn',
@@ -406,15 +400,20 @@ export default function PracticeScreen(): React.ReactElement {
               }
               accessibilityRole="button"
               accessibilityLabel={t('practiceHub.review.title')}
-              accessibilityHint="Opens review topics"
+              accessibilityHint={t('practiceHub.review.hintOpenReview')}
               testID="practice-review"
             >
               <View className="flex-row items-start">
-                <View style={[styles.iconCircle, styles.reviewIconCircle]}>
+                <View
+                  style={[
+                    styles.iconCircle,
+                    { backgroundColor: colors.reviewBg },
+                  ]}
+                >
                   <Ionicons
                     name="refresh-outline"
                     size={28}
-                    color={PRACTICE_COLORS.mint}
+                    color={colors.mint}
                   />
                 </View>
                 <View className="ml-4 flex-1">
@@ -425,7 +424,11 @@ export default function PracticeScreen(): React.ReactElement {
                     {!reviewError &&
                     hasOverdue &&
                     reviewSummary?.nextReviewTopic ? (
-                      <CueChip testID="practice-review-badge" strong>
+                      <CueChip
+                        testID="practice-review-badge"
+                        strong
+                        colors={colors}
+                      >
                         {String(reviewDueCount)}
                       </CueChip>
                     ) : null}
@@ -435,17 +438,22 @@ export default function PracticeScreen(): React.ReactElement {
                   </Text>
                   <View className="mt-4 flex-row flex-wrap gap-2">
                     {!reviewError && hasOverdue ? (
-                      <CueChip>
+                      <CueChip colors={colors}>
                         {t('practiceHub.review.topicsReady', {
                           count: reviewDueCount,
                         })}
                       </CueChip>
                     ) : null}
-                    <CueChip>Memory boost</CueChip>
+                    <CueChip colors={colors}>
+                      {t('practiceHub.review.memoryBoost')}
+                    </CueChip>
                   </View>
                   <View
                     className="mt-4 items-center justify-center"
-                    style={styles.primaryButton}
+                    style={[
+                      styles.primaryButton,
+                      { backgroundColor: colors.primaryButtonBg },
+                    ]}
                   >
                     <Text className="text-body font-bold text-text-inverse">
                       {t('practiceHub.review.startReview')}
@@ -468,6 +476,7 @@ export default function PracticeScreen(): React.ReactElement {
                       {t('practiceHub.review.nextReviewIn', {
                         time: formatTimeUntil(
                           reviewSummary.nextUpcomingReviewAt,
+                          t,
                         ),
                       })}
                     </Text>
@@ -490,21 +499,31 @@ export default function PracticeScreen(): React.ReactElement {
             ) : null}
             <Pressable
               className="active:opacity-80"
-              style={[styles.challengeRow, pointerStyle()]}
+              style={[
+                styles.challengeRow,
+                {
+                  borderColor: colors.line,
+                  backgroundColor: colors.surface,
+                },
+                pointerStyle(),
+              ]}
               onPress={openAssessment}
               accessibilityRole="button"
               accessibilityLabel={t('practiceHub.assessment.title')}
               accessibilityHint={
                 assessmentCount > 0
-                  ? 'Opens the assessment picker'
-                  : 'Opens the library'
+                  ? t('practiceHub.assessment.hintOpenPicker')
+                  : t('practiceHub.assessment.hintOpenLibrary')
               }
               testID="practice-assessment"
             >
               <View className="flex-row items-center">
                 <View
                   className="mr-3"
-                  style={[styles.smallIconCircle, styles.challengeIconCircle]}
+                  style={[
+                    styles.smallIconCircle,
+                    { backgroundColor: colors.mint },
+                  ]}
                 >
                   <Ionicons name="checkmark" size={24} color="#ffffff" />
                 </View>
@@ -519,7 +538,7 @@ export default function PracticeScreen(): React.ReactElement {
                 <Ionicons
                   name="chevron-forward"
                   size={20}
-                  color={PRACTICE_COLORS.muted}
+                  color={colors.muted}
                 />
               </View>
             </Pressable>
@@ -529,11 +548,18 @@ export default function PracticeScreen(): React.ReactElement {
             <SectionLabel>{t('practiceHub.sections.quiz')}</SectionLabel>
             <Pressable
               className="active:opacity-80"
-              style={[styles.quizCard, pointerStyle()]}
+              style={[
+                styles.quizCard,
+                {
+                  borderColor: colors.quizBorder,
+                  backgroundColor: colors.quizBg,
+                },
+                pointerStyle(),
+              ]}
               onPress={openQuiz}
               accessibilityRole="button"
               accessibilityLabel={t('practiceHub.quiz.title')}
-              accessibilityHint="Opens quiz choices"
+              accessibilityHint={t('practiceHub.quiz.hintOpenQuiz')}
               testID="practice-quiz"
             >
               <View className="flex-row items-start justify-between">
@@ -546,7 +572,7 @@ export default function PracticeScreen(): React.ReactElement {
                   </Text>
                 </View>
                 {!statsError ? (
-                  <CueChip strong testID="practice-quiz-xp">
+                  <CueChip strong testID="practice-quiz-xp" colors={colors}>
                     {t('practiceHub.xpLabel', { xp: totalXp })}
                   </CueChip>
                 ) : null}
@@ -554,7 +580,14 @@ export default function PracticeScreen(): React.ReactElement {
               <View className="mt-4 flex-row gap-3">
                 <Pressable
                   className="flex-1 active:opacity-80"
-                  style={[styles.quizOption, pointerStyle()]}
+                  style={[
+                    styles.quizOption,
+                    {
+                      borderColor: colors.quizBorder,
+                      backgroundColor: colors.quizOptionBg,
+                    },
+                    pointerStyle(),
+                  ]}
                   onPress={openQuiz}
                   accessibilityRole="button"
                   accessibilityLabel={t('practiceHub.quiz.capitals')}
@@ -562,26 +595,38 @@ export default function PracticeScreen(): React.ReactElement {
                 >
                   <View className="flex-row items-start justify-between">
                     <View
-                      style={[styles.smallIconCircle, styles.quizIconCircle]}
+                      style={[
+                        styles.smallIconCircle,
+                        { backgroundColor: colors.quiz },
+                      ]}
                     >
                       <Text className="text-body font-bold text-text-inverse">
                         ?
                       </Text>
                     </View>
-                    {capitalsCue ? <CueChip>{capitalsCue}</CueChip> : null}
+                    {capitalsCue ? (
+                      <CueChip colors={colors}>{capitalsCue}</CueChip>
+                    ) : null}
                   </View>
                   <View className="mt-3">
                     <Text className="text-body font-bold text-text-primary">
                       {t('practiceHub.quiz.capitals')}
                     </Text>
                     <Text className="mt-1 text-caption text-text-secondary">
-                      Countries, capitals, and places.
+                      {t('practiceHub.quiz.capitalsDescription')}
                     </Text>
                   </View>
                 </Pressable>
                 <Pressable
                   className="flex-1 active:opacity-80"
-                  style={[styles.quizOption, pointerStyle()]}
+                  style={[
+                    styles.quizOption,
+                    {
+                      borderColor: colors.quizBorder,
+                      backgroundColor: colors.quizOptionBg,
+                    },
+                    pointerStyle(),
+                  ]}
                   onPress={openQuiz}
                   accessibilityRole="button"
                   accessibilityLabel={t('practiceHub.quiz.guessWho')}
@@ -589,20 +634,25 @@ export default function PracticeScreen(): React.ReactElement {
                 >
                   <View className="flex-row items-start justify-between">
                     <View
-                      style={[styles.smallIconCircle, styles.quizIconCircle]}
+                      style={[
+                        styles.smallIconCircle,
+                        { backgroundColor: colors.quiz },
+                      ]}
                     >
                       <Text className="text-body font-bold text-text-inverse">
                         W
                       </Text>
                     </View>
-                    {guessWhoCue ? <CueChip>{guessWhoCue}</CueChip> : null}
+                    {guessWhoCue ? (
+                      <CueChip colors={colors}>{guessWhoCue}</CueChip>
+                    ) : null}
                   </View>
                   <View className="mt-3">
                     <Text className="text-body font-bold text-text-primary">
                       {t('practiceHub.quiz.guessWho')}
                     </Text>
                     <Text className="mt-1 text-caption text-text-secondary">
-                      Guess the person from clues.
+                      {t('practiceHub.quiz.guessWhoDescription')}
                     </Text>
                   </View>
                 </Pressable>
@@ -619,7 +669,10 @@ export default function PracticeScreen(): React.ReactElement {
                 className="flex-1 active:opacity-80"
                 style={[
                   styles.practiceModeCard,
-                  styles.dictationCard,
+                  {
+                    borderColor: colors.dictationBorder,
+                    backgroundColor: colors.dictationBg,
+                  },
                   pointerStyle(),
                 ]}
                 onPress={() => router.push('/(app)/dictation' as never)}
@@ -629,13 +682,15 @@ export default function PracticeScreen(): React.ReactElement {
               >
                 <View className="flex-row items-start justify-between">
                   <View
-                    style={[styles.smallIconCircle, styles.dictationIconCircle]}
+                    style={[
+                      styles.smallIconCircle,
+                      { backgroundColor: colors.dictation },
+                    ]}
                   >
                     <Text className="text-body font-bold text-text-inverse">
                       D
                     </Text>
                   </View>
-                  <CueChip>{t('practiceHub.xpLabel', { xp: 25 })}</CueChip>
                 </View>
                 <View className="mt-4">
                   <Text className="text-body font-bold text-text-primary">
@@ -650,7 +705,10 @@ export default function PracticeScreen(): React.ReactElement {
                 className="flex-1 active:opacity-80"
                 style={[
                   styles.practiceModeCard,
-                  styles.reciteCard,
+                  {
+                    borderColor: colors.reciteBorder,
+                    backgroundColor: colors.reciteBg,
+                  },
                   pointerStyle(),
                 ]}
                 onPress={() =>
@@ -665,13 +723,18 @@ export default function PracticeScreen(): React.ReactElement {
               >
                 <View className="flex-row items-start justify-between">
                   <View
-                    style={[styles.smallIconCircle, styles.reciteIconCircle]}
+                    style={[
+                      styles.smallIconCircle,
+                      { backgroundColor: colors.recite },
+                    ]}
                   >
                     <Text className="text-body font-bold text-text-inverse">
                       R
                     </Text>
                   </View>
-                  <CueChip>Beta</CueChip>
+                  <CueChip colors={colors}>
+                    {t('practiceHub.recitation.betaLabel')}
+                  </CueChip>
                 </View>
                 <View className="mt-4">
                   <Text className="text-body font-bold text-text-primary">
@@ -691,14 +754,26 @@ export default function PracticeScreen(): React.ReactElement {
             </SectionLabel>
             <Pressable
               className="min-h-[56px] flex-row items-center active:opacity-80"
-              style={[styles.historyRow, pointerStyle()]}
+              style={[
+                styles.historyRow,
+                {
+                  borderColor: colors.historyBorder,
+                  backgroundColor: colors.surface,
+                },
+                pointerStyle(),
+              ]}
               onPress={() => router.push('/(app)/quiz/history' as never)}
               accessibilityRole="button"
               accessibilityLabel={t('practiceHub.history.title')}
-              accessibilityHint="Opens quiz history"
+              accessibilityHint={t('practiceHub.history.hintOpenHistory')}
               testID="practice-quiz-history"
             >
-              <View style={[styles.smallIconCircle, styles.historyIconCircle]}>
+              <View
+                style={[
+                  styles.smallIconCircle,
+                  { backgroundColor: colors.history },
+                ]}
+              >
                 <Text className="text-body font-bold text-text-inverse">H</Text>
               </View>
               <View className="ml-3 flex-1">
@@ -709,11 +784,7 @@ export default function PracticeScreen(): React.ReactElement {
                   {progressCue}
                 </Text>
               </View>
-              <Ionicons
-                name="chevron-forward"
-                size={20}
-                color={PRACTICE_COLORS.muted}
-              />
+              <Ionicons name="chevron-forward" size={20} color={colors.muted} />
             </Pressable>
           </View>
         </View>

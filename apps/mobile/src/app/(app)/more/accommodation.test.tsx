@@ -3,6 +3,7 @@ import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const mockPush = jest.fn();
+const mockNavigate = jest.fn();
 const mockAccommodationMutate = jest.fn();
 const mockCelebrationLevelMutate = jest.fn();
 const mockPlatformAlert = jest.fn();
@@ -28,7 +29,12 @@ let mockCelebrationLevel: 'all' | 'big_only' | 'off' | undefined = 'big_only';
 const mockLearnerProfileRefetch = jest.fn();
 
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ push: mockPush, replace: jest.fn(), back: jest.fn() }),
+  useRouter: () => ({
+    push: mockPush,
+    navigate: mockNavigate,
+    replace: jest.fn(),
+    back: jest.fn(),
+  }),
 }));
 
 jest.mock('@expo/vector-icons/Ionicons', () => {

@@ -222,8 +222,8 @@ export async function generateReportHighlights(
 
 function mapMonthlyReportRow(
   row: typeof monthlyReports.$inferSelect,
-): MonthlyReportRecord {
-  return monthlyReportRecordSchema.parse({
+): MonthlyReportRecord | null {
+  const result = monthlyReportRecordSchema.safeParse({
     id: row.id,
     profileId: row.profileId,
     childProfileId: row.childProfileId,
@@ -232,6 +232,7 @@ function mapMonthlyReportRow(
     viewedAt: row.viewedAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
   });
+  return result.success ? result.data : null;
 }
 
 function getMonthlyReportData(row: typeof monthlyReports.$inferSelect): {

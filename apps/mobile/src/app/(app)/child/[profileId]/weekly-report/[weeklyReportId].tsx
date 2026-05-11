@@ -11,29 +11,11 @@ import {
 import { classifyApiError } from '../../../../../lib/format-api-error';
 import { formatMinutes } from '../../../../../lib/format-relative-date';
 import { ErrorFallback } from '../../../../../components/common';
+import { MetricCard } from '../../../../../components/progress';
 import {
   useChildWeeklyReportDetail,
   useMarkWeeklyReportViewed,
 } from '../../../../../hooks/use-progress';
-
-function MetricCard({
-  label,
-  value,
-  testID,
-}: {
-  label: string;
-  value: string;
-  testID?: string;
-}): React.ReactElement {
-  return (
-    <View className="bg-background rounded-card p-4 flex-1" testID={testID}>
-      <Text className="text-caption text-text-secondary">{label}</Text>
-      <Text className="text-h3 font-semibold text-text-primary mt-2">
-        {value}
-      </Text>
-    </View>
-  );
-}
 
 /**
  * BUG-903 (c): Render a "Apr 27 – May 3, 2026" date range so the parent sees

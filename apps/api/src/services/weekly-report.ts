@@ -125,8 +125,8 @@ export function generateWeeklyReportData(
 
 function mapWeeklyReportRow(
   row: typeof weeklyReports.$inferSelect,
-): WeeklyReportRecord {
-  return weeklyReportRecordSchema.parse({
+): WeeklyReportRecord | null {
+  const result = weeklyReportRecordSchema.safeParse({
     id: row.id,
     profileId: row.profileId,
     childProfileId: row.childProfileId,
@@ -135,6 +135,7 @@ function mapWeeklyReportRow(
     viewedAt: row.viewedAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
   });
+  return result.success ? result.data : null;
 }
 
 function getWeeklyReportData(row: typeof weeklyReports.$inferSelect): {

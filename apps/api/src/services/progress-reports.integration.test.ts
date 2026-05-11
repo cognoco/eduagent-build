@@ -136,9 +136,35 @@ async function seedMonthlyReport(
       childProfileId,
       reportMonth: '2026-04-01',
       reportData: {
-        headlineStat: { label: 'Topics mastered', value: 0, comparison: '' },
-        highlights: [],
-        nextSteps: [],
+        childName: 'Test Child',
+        month: '2026-04',
+        thisMonth: {
+          totalSessions: 5,
+          totalActiveMinutes: 120,
+          topicsMastered: 2,
+          topicsExplored: 3,
+          vocabularyTotal: 50,
+          streakBest: 3,
+        },
+        lastMonth: null,
+        highlights: ['Good progress'],
+        nextSteps: ['Keep going'],
+        subjects: [
+          {
+            subjectName: 'Math',
+            topicsMastered: 2,
+            topicsAttempted: 3,
+            topicsExplored: 3,
+            vocabularyTotal: 0,
+            activeMinutes: 60,
+            trend: 'growing',
+          },
+        ],
+        headlineStat: {
+          label: 'Topics mastered',
+          value: 2,
+          comparison: 'in a first month',
+        },
       },
     })
     .returning({ id: monthlyReports.id });
@@ -157,7 +183,22 @@ async function seedWeeklyReport(
       childProfileId,
       reportWeek: '2026-04-07',
       reportData: {
-        headlineStat: { label: 'Topics mastered', value: 0, comparison: '' },
+        childName: 'Test Child',
+        weekStart: '2026-04-07',
+        thisWeek: {
+          totalSessions: 3,
+          totalActiveMinutes: 60,
+          topicsMastered: 1,
+          topicsExplored: 2,
+          vocabularyTotal: 20,
+          streakBest: 2,
+        },
+        lastWeek: null,
+        headlineStat: {
+          label: 'Topics mastered',
+          value: 1,
+          comparison: 'in a first week',
+        },
       },
     })
     .returning({ id: weeklyReports.id });

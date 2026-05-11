@@ -10,12 +10,26 @@ const mockGoBackOrReplace = jest.fn();
 const mockUseReviewSummary = jest.fn();
 const mockUseQuizStats = jest.fn();
 const mockUseAssessmentEligibleTopics = jest.fn();
+const mockUseParentProxy = jest.fn();
 let mockSearchParams: Record<string, string> = {};
 
-jest.mock('expo-router', () => ({
-  useRouter: () => ({ push: mockPush }),
-  useLocalSearchParams: () => mockSearchParams,
-}));
+jest.mock('expo-router', () => {
+  const { Text } = require('react-native');
+  return {
+    useRouter: () => ({ push: mockPush }),
+    useLocalSearchParams: () => mockSearchParams,
+    Redirect: ({ href }: { href: string }) => (
+      <Text testID="redirect">{href}</Text>
+    ),
+  };
+});
+
+jest.mock(
+  '../../../hooks/use-parent-proxy' /* gc1-allow: grandfathered pattern, used in mentor-memory/relearn/session-summary */,
+  () => ({
+    useParentProxy: () => mockUseParentProxy(),
+  }),
+);
 
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
@@ -52,6 +66,7 @@ describe('PracticeScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockSearchParams = {};
+    mockUseParentProxy.mockReturnValue({ isParentProxy: false });
     jest
       .spyOn(Date, 'now')
       .mockReturnValue(new Date('2026-04-18T12:00:00.000Z').getTime());
@@ -96,7 +111,8 @@ describe('PracticeScreen', () => {
     screen.getByText('Quick quiz');
     screen.getByText('Capitals');
     screen.getByText("Who's who");
-    screen.getByText('Recite from memory (Beta)');
+    screen.getByText('Recite from memory');
+    screen.getByText('Beta');
     screen.getByText('Dictation');
     screen.getByText('Quiz history');
   });
@@ -322,5 +338,13 @@ describe('PracticeScreen', () => {
     const quizHistoryRow = screen.getByTestId('practice-quiz-history');
     expect(quizHistoryRow.props.className).toContain('min-h-[56px]');
     screen.getByText('No rounds yet');
+  });
+
+  it('redirects to home when in parent proxy session', () => {
+    mockUseParentProxy.mockReturnValue({ isParentProxy: true });
+
+    render(<PracticeScreen />);
+
+    expect(screen.getByTestId('redirect').props.children).toBe('/(app)/home');
   });
 });

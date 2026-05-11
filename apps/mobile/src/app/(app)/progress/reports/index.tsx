@@ -8,6 +8,7 @@ import {
 } from '../../../../hooks/use-progress';
 import { goBackOrReplace } from '../../../../lib/navigation';
 import { useProfile } from '../../../../lib/profile';
+import { ErrorFallback } from '../../../../components/common';
 
 function formatDateOnly(
   isoDate: string,
@@ -88,25 +89,24 @@ export default function ProgressReportsScreen(): React.ReactElement {
             </Text>
           </View>
         ) : isError ? (
-          <View className="bg-surface rounded-card p-4 mt-4">
-            <Text className="text-body-sm text-text-secondary">
-              {t('parentView.reports.checkConnectionRetry')}
-            </Text>
-            <Pressable
-              onPress={() => {
+          <ErrorFallback
+            variant="card"
+            message={t('parentView.reports.checkConnectionRetry')}
+            primaryAction={{
+              label: t('common.tryAgain'),
+              onPress: () => {
                 void monthlyReports.refetch();
                 void weeklyReports.refetch();
-              }}
-              className="bg-primary rounded-button px-4 py-3 mt-3 items-center"
-              accessibilityRole="button"
-              accessibilityLabel={t('common.tryAgain')}
-              testID="progress-reports-retry"
-            >
-              <Text className="text-body font-semibold text-text-inverse">
-                {t('common.tryAgain')}
-              </Text>
-            </Pressable>
-          </View>
+              },
+              testID: 'progress-reports-retry',
+            }}
+            secondaryAction={{
+              label: t('common.goBack'),
+              onPress: () => goBackOrReplace(router, '/(app)/progress'),
+              testID: 'progress-reports-back-secondary',
+            }}
+            testID="progress-reports-error"
+          />
         ) : items.length > 0 ? (
           items.map((item) => (
             <Pressable

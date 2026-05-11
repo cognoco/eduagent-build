@@ -281,7 +281,8 @@
     },
     "mentorMemory": {
       "sectionHeader": "メンターが知っていること",
-      "viewAndManage": "表示と管理"
+      "viewAndManage": "表示と管理",
+      "viewAndManageDescription": "Strengths, interests, and how you learn best"
     },
     "family": {
       "sectionHeader": "ファミリー",
@@ -405,7 +406,8 @@
         "disabled": "記憶の収集はオフになっています。",
         "pendingOwner": "記憶の収集はまだ有効になっていません。",
         "pendingChild": "保護者が記憶の収集を有効にする必要があります。",
-        "useMemoryLabel": "メンターが知っていることを使う"
+        "useMemoryLabel": "メンターが知っていることを使う",
+        "useMemoryDisabledHint": "Enable memory first, then this can turn on."
       },
       "consent": {
         "title": "メンターの記憶を有効にする",
@@ -466,6 +468,10 @@
         "school": "学校",
         "freeTime": "自由時間",
         "both": "両方"
+      },
+      "examples": {
+        "title": "Examples you can add",
+        "body": "\"I learn best with examples,\" \"I like space analogies,\" or \"Fractions still feel tricky.\""
       }
     },
     "accessories": {
@@ -694,7 +700,9 @@
       "iHaveAText": "テキストを持っています",
       "iHaveATextSubtitle": "自分のテキストを入力または貼り付け",
       "surpriseMe": "おまかせ",
-      "surpriseMeSubtitle": "新しいディクテーションで練習"
+      "surpriseMeSubtitle": "新しいディクテーションで練習",
+      "loadingTitle": "Finding your next review...",
+      "loadingMessage": "We're choosing a dictation that should feel useful, not random."
     },
     "complete": {
       "noSessionTitle": "完了するディクテーションがありません",
@@ -856,7 +864,9 @@
       "organizing": "ライブラリを整理中...",
       "skip": "スキップ — とにかく学習を開始",
       "skipAccessibilityLabel": "スキップしてとにかく学習を開始",
-      "filingErrorTitle": "その本を追加できませんでした"
+      "filingErrorTitle": "その本を追加できませんでした",
+      "loadingTitle": "Opening your shelf...",
+      "loadingMessage": "We're finding the books and next steps saved for this subject."
     },
     "noteMenu": {
       "title": "メモのオプション",
@@ -1136,7 +1146,8 @@
     "ocrDefaultError": "はっきりと読み取れませんでした。明るい場所で再度写真を撮ってみてください。",
     "problemsFound": "見つかった問題はこちらです：",
     "addSkippedFragmentsLabel": "スキップされた部分を戻す",
-    "skippedFragments": "不明瞭な部分が{{count}}箇所スキップされました。タップして戻してください。",
+    "skippedFragments_one": "不明瞭な部分が{{count}}箇所スキップされました。タップして戻してください。",
+    "skippedFragments_other": "不明瞭な部分が{{count}}箇所スキップされました。タップして戻してください。",
     "problemNumber": "問題 {{number}}",
     "removeProblemLabel": "問題 {{number}} を削除",
     "remove": "削除",
@@ -1245,16 +1256,16 @@
         "child": "最初の週間まとめはもうすぐ届きます。",
         "adult": "最初の週間まとめは、1週間の学習後に届きます。"
       },
-      "practiceTitle": "Practice highlights",
+      "practiceTitle": "練習ハイライト",
       "chips": {
-        "time": "{{time}} spent",
-        "topics": "{{count}} topic started",
-        "topics_other": "{{count}} topics started",
-        "streak": "{{count}}-day streak"
+        "time": "{{time}}の学習時間",
+        "topics": "{{count}}トピック開始",
+        "topics_other": "{{count}}トピック開始",
+        "streak": "{{count}}日連続"
       },
       "practice": {
-        "quizzes": "quizzes completed",
-        "reviews": "reviews finished"
+        "quizzes": "クイズ完了",
+        "reviews": "復習完了"
       }
     },
     "monthlyReport": {
@@ -1263,11 +1274,11 @@
         "child": "最初の月間まとめは{{month}}の終わりに届きます。",
         "adult": "最初の月間まとめは{{month}}の終わりに届きます。"
       },
-      "nextStepTitle": "Next step",
+      "nextStepTitle": "次のステップ",
       "bars": {
-        "sessions": "Sessions",
-        "time": "Time",
-        "topics": "Topics"
+        "sessions": "セッション",
+        "time": "時間",
+        "topics": "トピック"
       }
     },
     "newLearner": {
@@ -1401,7 +1412,9 @@
       "hideErrorTitle": "科目を非表示にできませんでした",
       "goneTitle": "この科目は利用できなくなりました",
       "goneSubtitle": "削除されたか、別の科目に統合された可能性があります。",
-      "pastConversations": "過去の会話"
+      "pastConversations": "過去の会話",
+      "loadingTitle": "Finding your progress...",
+      "loadingMessage": "We're pulling together sessions, reviews, and saved words for this subject."
     },
     "vocabulary": {
       "pageTitle": "あなたの語彙",
@@ -2192,47 +2205,72 @@
     }
   },
   "practiceHub": {
-    "title": "Test yourself",
-    "subtitle": "Pick a quick win. Every round helps your memory stick.",
+    "title": "自分を試す",
+    "subtitle": "手軽なチャレンジを選ぼう。毎回の練習が記憶の定着に役立ちます。",
     "xpLabel": "{{xp}} XP",
     "sections": {
-      "bestNextStep": "Best next step",
-      "quiz": "Quiz",
-      "otherPractice": "Other practice",
-      "recentProgress": "Recent progress"
+      "bestNextStep": "おすすめの次のステップ",
+      "quiz": "クイズ",
+      "otherPractice": "その他の練習",
+      "recentProgress": "最近の進捗"
     },
     "review": {
-      "title": "Today's review",
-      "startReview": "Start review",
-      "topicsReady": "{{count}} topic(s) ready",
-      "allCaughtUp": "All caught up",
-      "nextReviewIn": "Your next review is in {{time}}",
-      "completeATopic": "Complete a topic to start reviewing",
-      "browseTopics": "Browse your topics"
+      "title": "今日の復習",
+      "startReview": "復習を開始",
+      "topicsReady_one": "{{count}}トピックが準備完了",
+      "topicsReady_other": "{{count}}トピックが準備完了",
+      "allCaughtUp": "すべて復習済み",
+      "nextReviewIn": "次の復習は{{time}}後です",
+      "completeATopic": "トピックを完了して復習を始めましょう",
+      "browseTopics": "トピックを見る",
+      "memoryBoost": "記憶力ブースト",
+      "timeSoon": "もうすぐ",
+      "timeLessThanAnHour": "1時間未満",
+      "timeHours_one": "{{count}}時間",
+      "timeHours_other": "{{count}}時間",
+      "timeDays_one": "{{count}}日",
+      "timeDays_other": "{{count}}日",
+      "hintOpenReview": "復習トピックを開く",
+      "couldNotLoad": "復習ステータスを読み込めませんでした"
     },
     "assessment": {
-      "title": "Prove I know this",
-      "topicsReady": "{{count}} topic(s) ready to test",
-      "afterFinishTopic": "Available after you finish a topic"
+      "title": "理解度をテスト",
+      "topicsReady_one": "{{count}}トピックがテスト可能",
+      "topicsReady_other": "{{count}}トピックがテスト可能",
+      "afterFinishTopic": "トピック完了後に利用可能",
+      "hintOpenPicker": "アセスメントピッカーを開く",
+      "hintOpenLibrary": "ライブラリを開く",
+      "couldNotLoad": "アセスメントトピックを読み込めませんでした"
     },
     "quiz": {
-      "title": "Quick quiz",
-      "capitals": "Capitals",
-      "guessWho": "Who's who",
-      "defaultSubtitle": "Test yourself with multiple choice questions · {{xp}} XP"
+      "title": "クイッククイズ",
+      "capitals": "首都クイズ",
+      "guessWho": "人物当て",
+      "defaultSubtitle": "選択問題で自分を試そう · {{xp}} XP",
+      "capitalsDescription": "国、首都、場所。",
+      "guessWhoDescription": "ヒントから人物を推測。",
+      "bestCue": "ベスト: {{pct}}%",
+      "playedCue": "プレイ回数: {{count}}",
+      "bestFraction": "ベスト {{score}}/{{total}}",
+      "playedFraction": "プレイ回数 {{count}}",
+      "hintOpenQuiz": "クイズの選択肢を開く",
+      "couldNotLoad": "クイズの統計を読み込めませんでした"
     },
     "recitation": {
-      "title": "Recite from memory (Beta)",
-      "subtitle": "Recite a poem or text from memory"
+      "title": "暗唱する",
+      "subtitle": "詩やテキストを暗唱する",
+      "betaLabel": "ベータ版"
     },
     "dictation": {
-      "title": "Dictation",
-      "subtitle": "Practice writing what you hear"
+      "title": "ディクテーション",
+      "subtitle": "聞いたことを書く練習"
     },
     "history": {
-      "title": "Quiz history",
-      "roundsPlayed": "{{count}} round(s) played",
-      "noRoundsYet": "No rounds yet"
+      "title": "クイズ履歴",
+      "roundsPlayed_one": "{{count}}ラウンドプレイ済み",
+      "roundsPlayed_other": "{{count}}ラウンドプレイ済み",
+      "noRoundsYet": "まだラウンドなし",
+      "hintOpenHistory": "クイズの履歴を開く"
     }
   }
 }

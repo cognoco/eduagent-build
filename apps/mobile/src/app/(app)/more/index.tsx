@@ -129,9 +129,30 @@ export default function MoreScreen() {
         keyboardShouldPersistTaps="handled"
         testID="more-scroll"
       >
-        <View className="mt-6">
+        <View className="mt-6 gap-2">
+          <SettingsRow
+            label={t('more.account.profile')}
+            onPress={() => router.push('/(app)/more/account')}
+            testID="more-row-account"
+          />
+          <SettingsRow
+            label={t('more.account.mentorLanguage')}
+            onPress={() => router.push('/(app)/more/account')}
+            testID="more-row-mentor-language"
+          />
+          <SettingsRow
+            label={t('more.mentorMemory.sectionHeader')}
+            onPress={() => router.push('/(app)/mentor-memory?returnTo=more')}
+            testID="more-row-mentor-memory"
+          />
+          <SettingsRow
+            label={t('more.notifications.sectionHeader')}
+            onPress={() => router.push('/(app)/more/notifications')}
+            testID="more-row-notifications"
+          />
           <SettingsRow
             label={t('more.learningPreferences.rowLabel')}
+            labelClassName="text-body font-semibold text-primary"
             onPress={() => router.push('/(app)/more/learning-preferences')}
             testID="more-row-learning-preferences"
           />
@@ -193,16 +214,6 @@ export default function MoreScreen() {
 
         {/* 3. Sub-screen links */}
         <SectionHeader>{t('more.sections.settings')}</SectionHeader>
-        <SettingsRow
-          label={t('more.notifications.sectionHeader')}
-          onPress={() => router.push('/(app)/more/notifications')}
-          testID="more-row-notifications"
-        />
-        <SettingsRow
-          label={t('more.account.sectionHeader')}
-          onPress={() => router.push('/(app)/more/account')}
-          testID="more-row-account"
-        />
         <SettingsRow
           label={t('more.privacy.privacyAndData')}
           onPress={() => router.push('/(app)/more/privacy')}

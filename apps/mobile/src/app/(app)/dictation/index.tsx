@@ -164,10 +164,10 @@ export default function DictationChoiceScreen(): React.ReactElement {
           ) : (
             <>
               <Text className="text-body text-text-primary mb-2">
-                {t('dictation.index.pickingTopic')}
+                {t('dictation.index.loadingTitle')}
               </Text>
-              <Text className="text-body-sm text-text-secondary">
-                {t('dictation.index.takesAFewSeconds')}
+              <Text className="text-body-sm text-text-secondary text-center px-6">
+                {t('dictation.index.loadingMessage')}
               </Text>
             </>
           )}

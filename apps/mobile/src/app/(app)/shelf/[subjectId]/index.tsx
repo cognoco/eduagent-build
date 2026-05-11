@@ -210,21 +210,24 @@ export default function ShelfScreen() {
   if (isLoading) {
     return (
       <View
-        className="flex-1 bg-background items-center justify-center"
+        className="flex-1 bg-background px-6 items-center justify-center"
         style={{ paddingTop: insets.top }}
         testID="shelf-loading"
       >
         <BookPageFlipAnimation size={140} color={themeColors.accent} />
-        <Text className="text-body-sm text-text-secondary mt-3">
-          {t('library.shelf.loading')}
+        <Text className="text-h3 font-semibold text-text-primary mt-4 text-center">
+          {t('library.shelf.loadingTitle')}
+        </Text>
+        <Text className="text-body-sm text-text-secondary mt-2 text-center">
+          {t('library.shelf.loadingMessage')}
         </Text>
         <Pressable
           onPress={handleBack}
-          className="mt-6 px-5 py-3"
+          className="mt-6 rounded-button bg-surface-elevated px-6 py-3 min-h-[48px] items-center justify-center"
           accessibilityLabel={t('common.back')}
           testID="shelf-loading-back"
         >
-          <Text className="text-body text-primary font-semibold">
+          <Text className="text-body text-text-primary font-semibold">
             {t('common.back')}
           </Text>
         </Pressable>

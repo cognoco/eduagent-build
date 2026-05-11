@@ -281,7 +281,8 @@
     },
     "mentorMemory": {
       "sectionHeader": "Was dein Mentor weiß",
-      "viewAndManage": "Ansehen & verwalten"
+      "viewAndManage": "Ansehen & verwalten",
+      "viewAndManageDescription": "Strengths, interests, and how you learn best"
     },
     "family": {
       "sectionHeader": "Familie",
@@ -405,7 +406,8 @@
         "disabled": "Gedächtniserfassung ist ausgeschaltet.",
         "pendingOwner": "Gedächtniserfassung wurde noch nicht aktiviert.",
         "pendingChild": "Ein Elternteil oder Erziehungsberechtigter muss die Gedächtniserfassung noch aktivieren.",
-        "useMemoryLabel": "Nutzen, was der Mentor weiß"
+        "useMemoryLabel": "Nutzen, was der Mentor weiß",
+        "useMemoryDisabledHint": "Enable memory first, then this can turn on."
       },
       "consent": {
         "title": "Mentor-Gedächtnis aktivieren",
@@ -466,6 +468,10 @@
         "school": "Schule",
         "freeTime": "Freizeit",
         "both": "Beides"
+      },
+      "examples": {
+        "title": "Examples you can add",
+        "body": "\"I learn best with examples,\" \"I like space analogies,\" or \"Fractions still feel tricky.\""
       }
     },
     "accessories": {
@@ -694,7 +700,9 @@
       "iHaveAText": "Ich habe einen Text",
       "iHaveATextSubtitle": "Gib deinen eigenen Text ein oder füge ihn ein",
       "surpriseMe": "Überrasche mich",
-      "surpriseMeSubtitle": "Übe mit einem neuen Diktat"
+      "surpriseMeSubtitle": "Übe mit einem neuen Diktat",
+      "loadingTitle": "Finding your next review...",
+      "loadingMessage": "We're choosing a dictation that should feel useful, not random."
     },
     "complete": {
       "noSessionTitle": "Kein Diktat zum Beenden",
@@ -880,7 +888,9 @@
       "organizing": "Deine Bibliothek wird organisiert...",
       "skip": "Überspringen – trotzdem lernen",
       "skipAccessibilityLabel": "Überspringen und trotzdem lernen",
-      "filingErrorTitle": "Dieses Buch konnte nicht hinzugefügt werden"
+      "filingErrorTitle": "Dieses Buch konnte nicht hinzugefügt werden",
+      "loadingTitle": "Opening your shelf...",
+      "loadingMessage": "We're finding the books and next steps saved for this subject."
     },
     "noteMenu": {
       "title": "Notizoptionen",
@@ -1136,7 +1146,8 @@
     "ocrDefaultError": "Wir konnten das nicht deutlich lesen. Versuche, das Foto bei besserem Licht erneut aufzunehmen.",
     "problemsFound": "Hier sind die Aufgaben, die ich gefunden habe:",
     "addSkippedFragmentsLabel": "Übersprungene Fragmente wieder hinzufügen",
-    "skippedFragments": "Wir haben {{count}} unklare Fragment(e) übersprungen. Tippe, um sie wieder hinzuzufügen.",
+    "skippedFragments_one": "Wir haben {{count}} unklares Fragment übersprungen. Tippe, um es wieder hinzuzufügen.",
+    "skippedFragments_other": "Wir haben {{count}} unklare Fragmente übersprungen. Tippe, um sie wieder hinzuzufügen.",
     "problemNumber": "Aufgabe {{number}}",
     "removeProblemLabel": "Aufgabe {{number}} entfernen",
     "remove": "Entfernen",
@@ -1245,16 +1256,16 @@
         "child": "Deine erste Wochenübersicht ist unterwegs.",
         "adult": "Deine erste Wochenübersicht kommt nach einer vollen Lernwoche."
       },
-      "practiceTitle": "Practice highlights",
+      "practiceTitle": "Übungshöhepunkte",
       "chips": {
-        "time": "{{time}} spent",
-        "topics": "{{count}} topic started",
-        "topics_other": "{{count}} topics started",
-        "streak": "{{count}}-day streak"
+        "time": "{{time}} aufgewendet",
+        "topics": "{{count}} Thema begonnen",
+        "topics_other": "{{count}} Themen begonnen",
+        "streak": "{{count}} Tage in Folge"
       },
       "practice": {
-        "quizzes": "quizzes completed",
-        "reviews": "reviews finished"
+        "quizzes": "Quizze abgeschlossen",
+        "reviews": "Wiederholungen abgeschlossen"
       }
     },
     "monthlyReport": {
@@ -1263,11 +1274,11 @@
         "child": "Deine erste Monatsübersicht kommt Ende {{month}}.",
         "adult": "Deine erste Monatsübersicht kommt Ende {{month}}."
       },
-      "nextStepTitle": "Next step",
+      "nextStepTitle": "Nächster Schritt",
       "bars": {
-        "sessions": "Sessions",
-        "time": "Time",
-        "topics": "Topics"
+        "sessions": "Sitzungen",
+        "time": "Zeit",
+        "topics": "Themen"
       }
     },
     "newLearner": {
@@ -1401,7 +1412,9 @@
       "hideErrorTitle": "Fach konnte nicht ausgeblendet werden",
       "goneTitle": "Dieses Fach ist nicht mehr verfügbar",
       "goneSubtitle": "Es wurde möglicherweise entfernt oder in ein anderes Fach integriert.",
-      "pastConversations": "Vergangene Gespräche"
+      "pastConversations": "Vergangene Gespräche",
+      "loadingTitle": "Finding your progress...",
+      "loadingMessage": "We're pulling together sessions, reviews, and saved words for this subject."
     },
     "vocabulary": {
       "pageTitle": "Deine Vokabeln",
@@ -2192,47 +2205,72 @@
     }
   },
   "practiceHub": {
-    "title": "Test yourself",
-    "subtitle": "Pick a quick win. Every round helps your memory stick.",
+    "title": "Teste dich",
+    "subtitle": "Wähle einen schnellen Erfolg. Jede Runde hilft deinem Gedächtnis.",
     "xpLabel": "{{xp}} XP",
     "sections": {
-      "bestNextStep": "Best next step",
+      "bestNextStep": "Bester nächster Schritt",
       "quiz": "Quiz",
-      "otherPractice": "Other practice",
-      "recentProgress": "Recent progress"
+      "otherPractice": "Weitere Übungen",
+      "recentProgress": "Letzte Fortschritte"
     },
     "review": {
-      "title": "Today's review",
-      "startReview": "Start review",
-      "topicsReady": "{{count}} topic(s) ready",
-      "allCaughtUp": "All caught up",
-      "nextReviewIn": "Your next review is in {{time}}",
-      "completeATopic": "Complete a topic to start reviewing",
-      "browseTopics": "Browse your topics"
+      "title": "Heutige Wiederholung",
+      "startReview": "Wiederholung starten",
+      "topicsReady_one": "{{count}} Thema bereit",
+      "topicsReady_other": "{{count}} Themen bereit",
+      "allCaughtUp": "Alles erledigt",
+      "nextReviewIn": "Deine nächste Wiederholung ist in {{time}}",
+      "completeATopic": "Schließe ein Thema ab, um mit Wiederholungen zu beginnen",
+      "browseTopics": "Deine Themen durchsuchen",
+      "memoryBoost": "Gedächtnis-Boost",
+      "timeSoon": "bald",
+      "timeLessThanAnHour": "weniger als eine Stunde",
+      "timeHours_one": "{{count}} Stunde",
+      "timeHours_other": "{{count}} Stunden",
+      "timeDays_one": "{{count}} Tag",
+      "timeDays_other": "{{count}} Tage",
+      "hintOpenReview": "Öffnet Wiederholungsthemen",
+      "couldNotLoad": "Wiederholungsstatus konnte nicht geladen werden"
     },
     "assessment": {
-      "title": "Prove I know this",
-      "topicsReady": "{{count}} topic(s) ready to test",
-      "afterFinishTopic": "Available after you finish a topic"
+      "title": "Zeig, dass ich das kann",
+      "topicsReady_one": "{{count}} Thema testbereit",
+      "topicsReady_other": "{{count}} Themen testbereit",
+      "afterFinishTopic": "Verfügbar, nachdem du ein Thema abgeschlossen hast",
+      "hintOpenPicker": "Öffnet die Testauswahl",
+      "hintOpenLibrary": "Öffnet die Bibliothek",
+      "couldNotLoad": "Testthemen konnten nicht geladen werden"
     },
     "quiz": {
-      "title": "Quick quiz",
-      "capitals": "Capitals",
-      "guessWho": "Who's who",
-      "defaultSubtitle": "Test yourself with multiple choice questions · {{xp}} XP"
+      "title": "Schnellquiz",
+      "capitals": "Hauptstädte",
+      "guessWho": "Wer ist wer",
+      "defaultSubtitle": "Teste dich mit Multiple-Choice-Fragen · {{xp}} XP",
+      "capitalsDescription": "Länder, Hauptstädte und Orte.",
+      "guessWhoDescription": "Errate die Person anhand von Hinweisen.",
+      "bestCue": "Bester: {{pct}}%",
+      "playedCue": "Gespielt: {{count}}",
+      "bestFraction": "Bester {{score}}/{{total}}",
+      "playedFraction": "Gespielt {{count}}",
+      "hintOpenQuiz": "Öffnet die Quiz-Auswahl",
+      "couldNotLoad": "Laden der Quiz-Statistiken fehlgeschlagen"
     },
     "recitation": {
-      "title": "Recite from memory (Beta)",
-      "subtitle": "Recite a poem or text from memory"
+      "title": "Auswendig aufsagen",
+      "subtitle": "Sage ein Gedicht oder einen Text auswendig auf",
+      "betaLabel": "Beta"
     },
     "dictation": {
-      "title": "Dictation",
-      "subtitle": "Practice writing what you hear"
+      "title": "Diktat",
+      "subtitle": "Übe, das Gehörte aufzuschreiben"
     },
     "history": {
-      "title": "Quiz history",
-      "roundsPlayed": "{{count}} round(s) played",
-      "noRoundsYet": "No rounds yet"
+      "title": "Quiz-Verlauf",
+      "roundsPlayed_one": "{{count}} Runde gespielt",
+      "roundsPlayed_other": "{{count}} Runden gespielt",
+      "noRoundsYet": "Noch keine Runden",
+      "hintOpenHistory": "Öffnet den Quiz-Verlauf"
     }
   }
 }

@@ -211,6 +211,7 @@ export default function MentorMemoryScreen() {
   );
 
   const consentStatus = profile?.memoryConsentStatus ?? 'pending';
+  const memoryEnabled = consentStatus === 'granted';
   const resolvedReturnTo = Array.isArray(returnTo) ? returnTo[0] : returnTo;
 
   const handleBack = useCallback(() => {
@@ -345,18 +346,38 @@ export default function MentorMemoryScreen() {
                   : t('session.mentorMemory.status.pendingChild')}
           </Text>
           <View className="flex-row items-center justify-between mt-4">
-            <Text className="text-body text-text-primary">
-              {t('session.mentorMemory.status.useMemoryLabel')}
-            </Text>
+            <View className="flex-1 pr-3">
+              <Text className="text-body text-text-primary">
+                {t('session.mentorMemory.status.useMemoryLabel')}
+              </Text>
+              {!memoryEnabled ? (
+                <Text className="text-caption text-text-secondary mt-1">
+                  {t('session.mentorMemory.status.useMemoryDisabledHint')}
+                </Text>
+              ) : null}
+            </View>
             <Switch
-              value={profile?.memoryInjectionEnabled ?? false}
+              value={
+                memoryEnabled && (profile?.memoryInjectionEnabled ?? false)
+              }
               onValueChange={handleToggleInjection}
-              disabled={isLoading || toggleInjection.isPending}
+              disabled={
+                !memoryEnabled || isLoading || toggleInjection.isPending
+              }
               accessibilityLabel={t(
                 'session.mentorMemory.status.useMemoryLabel',
               )}
             />
           </View>
+        </View>
+
+        <View className="bg-primary-soft rounded-card px-4 py-3 mt-3">
+          <Text className="text-body-sm font-semibold text-text-primary">
+            {t('session.mentorMemory.examples.title')}
+          </Text>
+          <Text className="text-body-sm text-text-secondary mt-1">
+            {t('session.mentorMemory.examples.body')}
+          </Text>
         </View>
 
         {consentStatus === 'pending' && activeProfile?.isOwner && (

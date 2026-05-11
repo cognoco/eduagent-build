@@ -336,6 +336,24 @@ describe('generateCategorizedBookSuggestions', () => {
 
       expect(routeAndCallMock).not.toHaveBeenCalled();
     });
+
+    it('throws when tx.execute returns an unexpected Drizzle result shape', async () => {
+      const subject = makeSubject();
+      const { tx } = makeTx({ lockGot: true });
+      // Return a shape that is neither { rows: [...] } nor a plain array
+      // — simulates a future Drizzle driver upgrade changing the result shape.
+      (tx as never as { execute: jest.Mock }).execute = jest
+        .fn()
+        .mockResolvedValue({ result: true });
+
+      const { db } = makeDb(subject, async (cb) => cb(tx));
+
+      await expect(
+        generateCategorizedBookSuggestions(db, PROFILE_ID, SUBJECT_ID),
+      ).rejects.toThrow(
+        'pg_try_advisory_xact_lock returned an unexpected Drizzle result shape',
+      );
+    });
   });
 
   // -------------------------------------------------------------------------

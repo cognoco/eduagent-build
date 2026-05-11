@@ -32,10 +32,9 @@ export default function LearningPreferencesScreen(): React.ReactElement {
 
   const { data: learnerProfile } = useLearnerProfile();
 
-  const activeModeName =
-    ACCOMMODATION_OPTIONS.find(
-      (o) => o.mode === (learnerProfile?.accommodationMode ?? 'none'),
-    )?.title ?? '';
+  const activeOption = ACCOMMODATION_OPTIONS.find(
+    (o) => o.mode === (learnerProfile?.accommodationMode ?? 'none'),
+  );
 
   const handleBack = useCallback(() => {
     goBackOrReplace(router, '/(app)/more' as const);
@@ -68,8 +67,8 @@ export default function LearningPreferencesScreen(): React.ReactElement {
           {t('more.accommodation.sectionHeader')}
         </SectionHeader>
         <SettingsRow
-          label={t('more.accommodation.viewAndManage')}
-          value={activeModeName}
+          label={activeOption?.title ?? t('more.accommodation.viewAndManage')}
+          description={activeOption?.description}
           onPress={() => router.push('/(app)/more/accommodation')}
           testID="accommodation-link"
         />
@@ -81,6 +80,7 @@ export default function LearningPreferencesScreen(): React.ReactElement {
             </SectionHeader>
             <SettingsRow
               label={t('more.mentorMemory.viewAndManage')}
+              description={t('more.mentorMemory.viewAndManageDescription')}
               onPress={() =>
                 router.push(
                   '/(app)/mentor-memory?returnTo=learning-preferences',

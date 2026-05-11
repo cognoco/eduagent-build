@@ -248,7 +248,7 @@ describe('ShelfScreen', () => {
       wrapper: TestWrapper,
     });
     getByTestId('shelf-loading');
-    getByText('Loading this shelf...');
+    getByText('Opening your shelf...');
 
     // Resolve to prevent test teardown warnings
     resolveBooksResponse(
