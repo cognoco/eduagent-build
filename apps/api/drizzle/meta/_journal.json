@@ -491,6 +491,13 @@
       "when": 1779000014000,
       "tag": "0069_learning_profile_celebration_level",
       "breakpoints": true
+    },
+    {
+      "idx": 70,
+      "version": "7",
+      "when": 1778491978458,
+      "tag": "0070_omniscient_landau",
+      "breakpoints": true
     }
   ]
 }
