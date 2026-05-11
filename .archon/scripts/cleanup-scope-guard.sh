@@ -11,8 +11,11 @@ if [[ ! -f "$wo" ]]; then
     exit 1
 fi
 
-# Extract all backtick-wrapped paths that look like file paths (contain / and .)
-# from the work-order. Covers both the Files Summary table and per-phase Files lists.
+# Extract all backtick-wrapped paths that look like file paths (have a real
+# extension) from the work-order. Covers both the Files Summary table and
+# per-phase Files lists. Uses an anchored extension regex so top-level files
+# like CLAUDE.md are accepted alongside sub-paths like apps/foo.tsx, while
+# glob-style tokens like tokens.colors.* are correctly rejected.
 #
 # The trailing `|| true` is NOT a fail-open pattern. Under `set -euo pipefail`,
 # any grep in the chain that finds no matches exits 1, which (via pipefail)
@@ -22,8 +25,7 @@ fi
 # The empty-allowed-files check IS the fail-closed gate.
 allowed_files="$(grep -oE '\`[^`]+\`' "$wo" \
     | tr -d '`' \
-    | grep '/' \
-    | grep '\.' \
+    | grep -E '\.[a-zA-Z][a-zA-Z0-9]*$' \
     | sort -u || true)"
 
 if [[ -z "$allowed_files" ]]; then
