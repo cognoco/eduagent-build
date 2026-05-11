@@ -1,0 +1,144 @@
+# Flow: Nudge Rate Limit — 4th Nudge Shows Inline Error
+# Validates: after sending 3 nudges to the same child, the 4th attempt
+# renders the inline rate-limit error copy inside the action sheet
+# instead of sending. No "Nudge sent" alert appears.
+# Tags: nightly, parent, nudge
+#
+# Journey: UX Journey 4 (Parent Oversight) — Nudge Rate Limit
+# Prerequisite: Seeded parent user with linked children
+#               (scenario: parent-with-children)
+# Env vars: CHILD_PROFILE_ID (injected by seed)
+#
+# NOTE: The rate limit is 3 nudges per recipient per rolling 24h window.
+# This flow sends 3 successful nudges then attempts a 4th. Each send
+# requires opening the sheet, picking a template, dismissing the alert,
+# then re-opening the sheet.
+appId: com.mentomate.app
+tags:
+  - nightly
+  - parent
+  - nudge
+---
+# 1. Seed & sign in as parent
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "parent-with-children"
+      API_URL: ${API_URL}
+
+# 2. Wait for parent Home
+- extendedWaitUntil:
+    visible:
+      id: "parent-home-screen"
+    timeout: 15000
+
+# ── Nudge 1 of 3 ─────────────────────────────────────────────────────
+- tapOn:
+    id: "parent-home-send-nudge-${CHILD_PROFILE_ID}"
+- extendedWaitUntil:
+    visible:
+      id: "nudge-template-you_got_this"
+    timeout: 5000
+- tapOn:
+    id: "nudge-template-you_got_this"
+- extendedWaitUntil:
+    visible:
+      text: "Nudge sent"
+    timeout: 5000
+    optional: true
+- tapOn:
+    text: "OK"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "parent-home-screen"
+    timeout: 5000
+
+# ── Nudge 2 of 3 ─────────────────────────────────────────────────────
+- tapOn:
+    id: "parent-home-send-nudge-${CHILD_PROFILE_ID}"
+- extendedWaitUntil:
+    visible:
+      id: "nudge-template-proud_of_you"
+    timeout: 5000
+- tapOn:
+    id: "nudge-template-proud_of_you"
+- extendedWaitUntil:
+    visible:
+      text: "Nudge sent"
+    timeout: 5000
+    optional: true
+- tapOn:
+    text: "OK"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "parent-home-screen"
+    timeout: 5000
+
+# ── Nudge 3 of 3 ─────────────────────────────────────────────────────
+- tapOn:
+    id: "parent-home-send-nudge-${CHILD_PROFILE_ID}"
+- extendedWaitUntil:
+    visible:
+      id: "nudge-template-quick_session"
+    timeout: 5000
+- tapOn:
+    id: "nudge-template-quick_session"
+- extendedWaitUntil:
+    visible:
+      text: "Nudge sent"
+    timeout: 5000
+    optional: true
+- tapOn:
+    text: "OK"
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "parent-home-screen"
+    timeout: 5000
+
+# ── Nudge 4: should be rate-limited ──────────────────────────────────
+- tapOn:
+    id: "parent-home-send-nudge-${CHILD_PROFILE_ID}"
+- extendedWaitUntil:
+    visible:
+      id: "nudge-template-thinking_of_you"
+    timeout: 5000
+
+# 3. Screenshot: sheet open before 4th attempt
+- takeScreenshot: nudge-rate-limit-01-sheet-before-4th
+
+# 4. Tap 4th template — should trigger inline error, not success
+- tapOn:
+    id: "nudge-template-thinking_of_you"
+
+# 5. Wait for the inline rate-limit error copy inside the sheet
+#    en.json: "You've sent enough encouragement for now"
+- extendedWaitUntil:
+    visible:
+      text: "enough encouragement for now"
+    timeout: 5000
+
+# 6. Screenshot: inline rate-limit error visible in sheet
+- takeScreenshot: nudge-rate-limit-02-error-inline
+
+# 7. Verify the "Nudge sent" alert did NOT appear
+#    We can't assert "not visible" on a native alert reliably, but the
+#    sheet should still be open (not auto-closed), which proves the send
+#    did not succeed. Assert the sheet subtitle is still showing.
+- assertVisible:
+    text: "Pick one short encouragement."
+
+# 8. Dismiss sheet via Cancel
+- tapOn:
+    id: "nudge-action-sheet-cancel"
+
+# 9. Confirm we're back on Home
+- extendedWaitUntil:
+    visible:
+      id: "parent-home-screen"
+    timeout: 5000
+
+# 10. Final screenshot
+- takeScreenshot: nudge-rate-limit-03-home-after-dismiss

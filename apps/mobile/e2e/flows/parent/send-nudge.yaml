@@ -1,0 +1,95 @@
+# Flow: Parent Send Nudge — Happy Path
+# Validates: parent can open the nudge action sheet from Home, pick a
+# template, see the "Nudge sent" alert, and the sheet auto-closes.
+# Tags: nightly, parent, nudge
+#
+# Journey: UX Journey 4 (Parent Oversight) — Nudge Feature
+# Prerequisite: Seeded parent user with linked children
+#               (scenario: parent-with-children)
+# Env vars: CHILD_PROFILE_ID (injected by seed)
+appId: com.mentomate.app
+tags:
+  - nightly
+  - parent
+  - nudge
+---
+# 1. Seed & sign in as parent
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+    env:
+      SEED_SCENARIO: "parent-with-children"
+      API_URL: ${API_URL}
+
+# 2. Wait for parent Home
+- extendedWaitUntil:
+    visible:
+      id: "parent-home-screen"
+    timeout: 15000
+
+# 3. Screenshot: parent Home with nudge card visible
+- takeScreenshot: send-nudge-01-home
+
+# 4. Tap "Send <child> a nudge" card
+- tapOn:
+    id: "parent-home-send-nudge-${CHILD_PROFILE_ID}"
+
+# 5. Wait for the nudge action sheet to appear
+- extendedWaitUntil:
+    visible:
+      text: "Pick one short encouragement."
+    timeout: 5000
+
+# 6. Screenshot: action sheet with 4 template options
+- takeScreenshot: send-nudge-02-action-sheet
+
+# 7. Verify all four templates are visible
+- assertVisible:
+    id: "nudge-template-you_got_this"
+- assertVisible:
+    id: "nudge-template-proud_of_you"
+- assertVisible:
+    id: "nudge-template-quick_session"
+- assertVisible:
+    id: "nudge-template-thinking_of_you"
+
+# 8. Verify cancel and close buttons are present
+- assertVisible:
+    id: "nudge-action-sheet-cancel"
+- assertVisible:
+    id: "nudge-action-sheet-close"
+
+# 9. Tap "You got this" to send the nudge
+- tapOn:
+    id: "nudge-template-you_got_this"
+
+# 10. Wait for the native "Nudge sent" alert
+#     platformAlert renders a native Alert.alert on Android.
+#     Text matching on native alerts can be unreliable (BUG-49 pattern),
+#     so use optional: true and back up with a screenshot.
+- extendedWaitUntil:
+    visible:
+      text: "Nudge sent"
+    timeout: 5000
+    optional: true
+
+# 11. Screenshot: success alert
+- takeScreenshot: send-nudge-03-sent-alert
+
+# 12. Dismiss the native alert (tap OK)
+- tapOn:
+    text: "OK"
+    optional: true
+
+# 13. The action sheet should auto-close after success.
+#     Verify we're back on the parent Home screen.
+- extendedWaitUntil:
+    visible:
+      id: "parent-home-screen"
+    timeout: 5000
+
+# 14. Confirm the action sheet is no longer visible
+- assertNotVisible:
+    text: "Pick one short encouragement."
+
+# 15. Screenshot: back on Home after sending
+- takeScreenshot: send-nudge-04-home-after-send
