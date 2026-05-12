@@ -67,6 +67,7 @@ function createProps(overrides: Record<string, unknown> = {}) {
 describe('SessionFooter', () => {
   beforeEach(() => {
     jest.restoreAllMocks();
+    jest.clearAllMocks();
     // platformAlert delegates to Alert.alert on non-web platforms in Jest.
     jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
   });
@@ -139,10 +140,11 @@ describe('SessionFooter', () => {
   it('keeps the note editor open when note saving fails', () => {
     const setShowNoteInput = jest.fn();
     const createNote = {
-      mutate: jest.fn((...args: unknown[]) => {
-        const options = args[1] as { onError: (error: Error) => void };
-        options.onError(new Error('network down'));
-      }),
+      mutate: jest.fn(
+        (_vars: unknown, options?: { onError?: (error: Error) => void }) => {
+          options?.onError?.(new Error('network down'));
+        },
+      ),
       isPending: false,
     };
     const props = createProps({

@@ -8,7 +8,7 @@ When a PR shows an expected required check stuck on "Waiting for status to be re
 
 **Why:** PR #233 had passing CI and Playwright, but `API Quality Gate` was required and never reported because it lived in `deploy.yml`, which did not run on pull requests.
 
-**How to apply:** Add the PR trigger only for the reporting gate, and explicitly guard deploy/build jobs so pull requests cannot deploy. In deploy workflows, do not rely on skipped `needs` results alone; include an event guard such as `github.event_name == 'push' || github.event_name == 'workflow_dispatch'` on deploy jobs.
+**How to apply:** Prefer a small PR-only workflow/job that reports the required check name without starting deploy machinery. If adding a PR trigger to an existing deploy workflow is unavoidable, explicitly guard deploy/build jobs so pull requests cannot deploy. In deploy workflows, do not rely on skipped `needs` results alone; include an event guard such as `github.event_name == 'push' || github.event_name == 'workflow_dispatch'` on deploy jobs.
 
 For Playwright web smoke failures, inspect `error-context.md` plus the trace network log before changing selectors. If the UI shows offline/profile fallbacks and `0-trace.network` has `net::ERR_FAILED`/CORS failures, fix the staging/API target or workflow configuration instead of weakening the assertion.
 
