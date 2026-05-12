@@ -19,7 +19,7 @@
     "format:write": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,scss,html}\"",
     "prepare": "husky",
     "db:push:dev": "C:/Tools/doppler/doppler.exe run -- pnpm --filter @eduagent/database exec tsx node_modules/drizzle-kit/bin.cjs push",
-    "db:generate": "C:/Tools/doppler/doppler.exe run -- pnpm --filter @eduagent/database exec tsx node_modules/drizzle-kit/bin.cjs generate",
+    "db:generate:dev": "C:/Tools/doppler/doppler.exe run -- pnpm --filter @eduagent/database exec tsx node_modules/drizzle-kit/bin.cjs generate",
     "db:migrate:dev": "C:/Tools/doppler/doppler.exe run -- pnpm --filter @eduagent/database exec tsx node_modules/drizzle-kit/bin.cjs migrate",
     "db:studio:dev": "C:/Tools/doppler/doppler.exe run -- pnpm --filter @eduagent/database exec tsx node_modules/drizzle-kit/bin.cjs studio",
     "test:integration": "C:/Tools/doppler/doppler.exe run -- jest --config tests/integration/jest.config.cjs --no-coverage",
