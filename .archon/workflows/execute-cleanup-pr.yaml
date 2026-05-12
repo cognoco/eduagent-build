@@ -1,4 +1,4 @@
-name: execute-cleanup-pr
+name: execute-cleanup-pr-merged
 description: |
   Execute a cleanup-plan.md work package by PR number.
   Usage: archon workflow run execute-cleanup-pr-merged --branch cleanup-pr-XX "PR-16"
@@ -115,12 +115,12 @@ nodes:
         The artifacts directory is: $ARTIFACTS_DIR
       until: ALL_PHASES_COMPLETE
       until_bash: |
-        work_order_phases=$(rg --no-filename -oP '^### Phase \K[A-Z0-9]+(?=:)' \
+        work_order_phases=$(rg --no-filename -oP '^### Phase \K[A-Z0-9]+[a-z]*(?=:)' \
           "$ARTIFACTS_DIR/work-order.md" | sort -u)
         done_phases=$(
-            rg --no-filename -oP '^## Phase \K[A-Z0-9]+(?=:)' \
+            rg --no-filename -oP '^## Phase \K[A-Z0-9]+[a-z]*(?=:)' \
               "$ARTIFACTS_DIR/progress.md" 2>/dev/null
-            rg --no-filename -oP '^## BLOCKED:\K[A-Z0-9]+$' \
+            rg --no-filename -oP '^## BLOCKED:\K[A-Z0-9]+[a-z]*$' \
               "$ARTIFACTS_DIR/blocked.md" 2>/dev/null
         )
         done_phases=$(echo "$done_phases" | sort -u)
@@ -172,7 +172,7 @@ nodes:
   - id: review-scope
     command: cleanup-pr-review-scope
     depends_on: [risk-class, validate]
-    trigger_rule: one_success   # risk-class succeeds even for tiny PRs; blocks when entire upstream chain is skipped/failed
+    trigger_rule: all_success   # validate must succeed before reviews fan out (one_success previously let a failed validate slip past — risk-class always succeeds)
     context: fresh
     idle_timeout: 300000
     provider: claude

@@ -83,12 +83,12 @@ nodes:
         The artifacts directory is: $ARTIFACTS_DIR
       until: ALL_PHASES_COMPLETE
       until_bash: |
-        work_order_phases=$(rg --no-filename -oP '^### Phase \K[A-Z0-9]+(?=:)' \
+        work_order_phases=$(rg --no-filename -oP '^### Phase \K[A-Z0-9]+[a-z]*(?=:)' \
           "$ARTIFACTS_DIR/work-order.md" | sort -u)
         done_phases=$(
-            rg --no-filename -oP '^## Phase \K[A-Z0-9]+(?=:)' \
+            rg --no-filename -oP '^## Phase \K[A-Z0-9]+[a-z]*(?=:)' \
               "$ARTIFACTS_DIR/progress.md" 2>/dev/null
-            rg --no-filename -oP '^## BLOCKED:\K[A-Z0-9]+$' \
+            rg --no-filename -oP '^## BLOCKED:\K[A-Z0-9]+[a-z]*$' \
               "$ARTIFACTS_DIR/blocked.md" 2>/dev/null
         )
         done_phases=$(echo "$done_phases" | sort -u)
