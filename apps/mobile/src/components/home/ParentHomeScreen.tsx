@@ -559,7 +559,7 @@ export function ParentHomeScreen({
               child={child}
               dashboardChild={findDashboardChild(dashboard, child.id)}
               highlight={index === 0}
-              onOpenProgress={() => pushChildReports(child.id)}
+              onOpenProgress={() => pushChildDetail(child.id)}
               onOpenReports={() => pushChildReports(child.id)}
               onOpenNudge={() => setSheetChildId(child.id)}
               t={t}

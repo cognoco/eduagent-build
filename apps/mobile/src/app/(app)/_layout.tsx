@@ -1337,6 +1337,9 @@ export default function AppLayout() {
     () => computeVisibleTabs(tabShape),
     [tabShape],
   );
+  const profileNavigationKey = activeProfile
+    ? `${activeProfile.id}:${isParentProxy ? 'proxy' : 'direct'}`
+    : 'no-active-profile';
   const refreshLearningTabQueries = React.useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: ['subjects'] });
     void queryClient.invalidateQueries({ queryKey: ['progress'] });
@@ -1359,6 +1362,10 @@ export default function AppLayout() {
     void queryClient.invalidateQueries({ queryKey: ['usage'] });
     void queryClient.invalidateQueries({ queryKey: ['settings'] });
   }, [queryClient]);
+  const handleMoreTabPress = React.useCallback(() => {
+    refreshMoreTabQueries();
+    router.replace('/(app)/more' as never);
+  }, [refreshMoreTabQueries, router]);
   const refreshProgressTabQueries = React.useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: ['progress'] });
     void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
@@ -1667,6 +1674,7 @@ export default function AppLayout() {
            (immersive screens like session, onboarding, homework).
          ──────────────────────────────────────────────────────────── */}
         <Tabs
+          key={profileNavigationKey}
           screenOptions={({ route }) => {
             const isVisible = visibleTabs.has(route.name);
             const isFullScreen = FULL_SCREEN_ROUTES.has(route.name);
@@ -1768,7 +1776,7 @@ export default function AppLayout() {
           <Tabs.Screen
             name="more"
             listeners={{
-              tabPress: refreshMoreTabQueries,
+              tabPress: handleMoreTabPress,
             }}
             options={{
               title: t('tabs.more'),

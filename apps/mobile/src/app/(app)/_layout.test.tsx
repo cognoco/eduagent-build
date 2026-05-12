@@ -25,9 +25,18 @@ const mockUseProfile = jest.fn();
 const mockUsePathname = jest.fn();
 const mockReplace = jest.fn();
 const mockTabScreens: Array<Record<string, unknown>> = [];
+let mockTabsMounts = 0;
+let mockTabsUnmounts = 0;
 const mockTabs = Object.assign(
   ({ children }: { children?: React.ReactNode }) => {
+    const ReactRuntime = require('react');
     const { View } = require('react-native');
+    ReactRuntime.useEffect(() => {
+      mockTabsMounts += 1;
+      return () => {
+        mockTabsUnmounts += 1;
+      };
+    }, []);
     return <View testID="tabs">{children}</View>;
   },
   {
@@ -106,6 +115,7 @@ jest.mock('../../lib/profile', () => ({
 // Routes: GET /consent/my-status, POST /consent/request
 
 jest.mock('../../lib/theme', () => ({
+  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
   useThemeColors: () => ({
     accent: '#0ea5e9',
     border: '#d4d4d8',
@@ -167,6 +177,8 @@ describe('AppLayout', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockTabScreens.length = 0;
+    mockTabsMounts = 0;
+    mockTabsUnmounts = 0;
     testQueryClient = new QueryClient({
       defaultOptions: { queries: { retry: false, gcTime: 0 } },
     });
@@ -357,6 +369,36 @@ describe('AppLayout', () => {
     });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['usage'] });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['settings'] });
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/more');
+  });
+
+  it('remounts the tab shell when the active profile changes', () => {
+    const { rerender } = renderLayout();
+
+    expect(mockTabsMounts).toBe(1);
+    expect(mockTabsUnmounts).toBe(0);
+
+    mockUseProfile.mockReturnValue({
+      profiles: [
+        { id: 'p1', isOwner: true, consentStatus: null, birthYear: 1990 },
+        { id: 'c1', isOwner: false, consentStatus: null, birthYear: 2014 },
+      ],
+      activeProfile: {
+        id: 'c1',
+        isOwner: false,
+        consentStatus: null,
+        birthYear: 2014,
+      },
+      isLoading: false,
+      profileWasRemoved: false,
+      acknowledgeProfileRemoval: jest.fn(),
+      switchProfile: jest.fn(),
+    });
+
+    rerender(<AppLayout />);
+
+    expect(mockTabsUnmounts).toBe(1);
+    expect(mockTabsMounts).toBe(2);
   });
 
   afterEach(() => {

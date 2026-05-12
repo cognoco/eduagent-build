@@ -9,6 +9,7 @@ import {
 } from '../../../components/more/settings-rows';
 import { useExportData } from '../../../hooks/use-account';
 import { useActiveProfileRole } from '../../../hooks/use-active-profile-role';
+import { useLinkedChildren } from '../../../lib/profile';
 import {
   useUpdateWithdrawalArchivePreference,
   useWithdrawalArchivePreference,
@@ -20,6 +21,7 @@ export default function PrivacyScreen(): React.ReactElement {
   const router = useRouter();
   const { t } = useTranslation();
   const role = useActiveProfileRole();
+  const linkedChildren = useLinkedChildren();
   const exportData = useExportData();
   const { data: withdrawalArchivePreference, isLoading: archivePrefLoading } =
     useWithdrawalArchivePreference();
@@ -91,7 +93,7 @@ export default function PrivacyScreen(): React.ReactElement {
         testID="more-privacy-scroll"
       >
         <SectionHeader>{t('more.privacy.privacyAndData')}</SectionHeader>
-        {role === 'owner' ? (
+        {role === 'owner' && linkedChildren.length > 0 ? (
           <>
             <Text className="text-body font-semibold text-text-primary mb-2">
               {t('more.privacy.withdrawalArchiveTitle')}
