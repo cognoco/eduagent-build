@@ -2,10 +2,31 @@
 
 > **Parent finding:** `docs/_archive/plans/bug-fix-plan HR.md` → S-06
 > **Created:** 2026-04-15
-> **Last updated:** 2026-04-27 — re-verification + 14-site audit; risk reassessed High; recommendation revised from Option C to Option B.
+> **Last updated:** 2026-05-12 — consolidated status table added (AUDIT-SPECS-2); reflects PR #126 (2026-04-28) and 2026-04-27 post-audit state.
 > **Risk:** ~~Low~~ **High** — RLS scaffolding shipped without Phase 0 prerequisites. Multiple live production races currently hidden by the silent fallback (see Audit Results below). Switching the connection role to `app_user` will silently return zero rows for every scoped query until Phase 0.0 + 0.1 + 0.3 ship.
 > **Estimated effort:** 2 days for Phase 0 if Option B is taken; longer if Option C dual-client is preferred.
 > **Branch:** create from `main` after stabilization merges
+
+---
+
+## Status Update (2026-05-12) — Consolidated phase status (AUDIT-SPECS-2 refresh)
+
+Supersedes the 2026-04-27 table for current state. Phases 0.0, 0.1, and 0.3 were completed in PR #126 (2026-04-28, commit `c80bb903`).
+
+| Phase | Current Status | Evidence / Notes |
+|---|---|---|
+| **0.0** — Option B: switch to `neon-serverless` WS | ✅ DONE (2026-04-28, PR #126, commit `c80bb903`) | `packages/database/src/client.ts` switched; `nodejs_compat` confirmed in `wrangler.toml`. |
+| **0.1** — Remove silent fallback from `client.ts` | ✅ DONE (2026-04-28, PR #126) | `onTransactionFallback` deleted; callers in `middleware/database.ts` and `inngest/helpers.ts` updated. |
+| **0.2** — `withProfileScope()` utility | ✅ DONE — now **functional** (was silent no-op until 0.0+0.1 landed) | `packages/database/src/rls.ts` |
+| **0.3** — Integration test: context propagation | ✅ DONE (2026-04-28, PR #126) | `packages/database/src/rls.integration.test.ts` — covers SET LOCAL propagation, rollback, concurrent isolation, regression guard. |
+| **0.4 audit** — classify all `db.transaction()` callers | ✅ DONE (2026-04-27) | 14 sites: 12 interactive (I), 2 batch-safe (B), 0 deletable (S). Full table in Audit Results section below. |
+| **0.4a** — Migrate 6 live-race sites | ❌ NOT DONE | `consent.ts:199` (B), `filing.ts:371` (I), `home-surface-cache.ts:186` (I), `profile.ts:227` (I), `parking-lot-data.ts:72` (I), `settings.ts:564` (I). |
+| **0.4b** — Migrate remaining 7 sites | ❌ NOT DONE | `vocabulary.ts:261`, `complete-round.ts:230`, `curriculum.ts:780/1180/1340`, `assessments.ts:121`, `rls.ts:20`. |
+| **1.1** — RLS migrations applied | ✅ DONE | `0027_enable_rls.sql`, `0029_rls_sweep_gaps.sql`, `0032_rls_quiz_mastery_items.sql`, `0037_rls_weekly_reports.sql`. |
+| **1.2** — Drizzle snapshot metadata | ✅ DONE (presumed) | Verify `apps/api/drizzle/meta/*.json` shows `isRLSEnabled: true` for all 26 tables if in doubt. |
+| **1.3** — Deploy + verify in staging/prod | ⚠️ PENDING VERIFICATION | Migrations committed. **Action:** run `SELECT tablename, rowsecurity FROM pg_tables WHERE schemaname = 'public'` against staging + prod; paste result here. |
+
+**Pre-Phase-3 gate:** 0.0 ✅, 0.1 ✅, 0.3 ✅ — **gate is blocked on 0.4a** (6 live-race sites must be migrated and break-tested before switching to `app_user` connection role).
 
 ---
 
