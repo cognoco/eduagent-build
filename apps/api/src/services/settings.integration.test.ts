@@ -88,7 +88,7 @@ async function cleanup() {
   const found = await db.query.accounts.findMany({
     where: eq(accounts.email, ACCOUNT.email),
   });
-  const ids = found.map((a) => a.id);
+  const ids = found.map((a: typeof accounts.$inferSelect) => a.id);
   if (ids.length > 0) {
     await db.delete(accounts).where(inArray(accounts.id, ids));
   }
@@ -317,7 +317,7 @@ async function cleanupCelebration() {
       CELEB_PARENT_B.email,
     ]),
   });
-  const ids = found.map((a) => a.id);
+  const ids = found.map((a: typeof accounts.$inferSelect) => a.id);
   if (ids.length > 0) {
     await db.delete(accounts).where(inArray(accounts.id, ids));
   }

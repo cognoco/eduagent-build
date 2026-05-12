@@ -11,6 +11,7 @@ import {
   type Database,
 } from '@eduagent/database';
 import { like } from 'drizzle-orm';
+import type { Bookmark, SessionBookmark } from '@eduagent/schemas';
 import {
   createBookmark,
   deleteBookmark,
@@ -140,7 +141,7 @@ describeIfDb('Bookmarks (integration)', () => {
     expect(bookmark.sessionId).toBe(sessionId);
     expect(bookmark.subjectId).toBe(subjectId);
     expect(bookmark.content).toBe(
-      'The Calvin cycle uses CO₂ to build glucose through carbon fixation.'
+      'The Calvin cycle uses CO₂ to build glucose through carbon fixation.',
     );
     expect(bookmark.subjectName).toBe('Mathematics');
     expect(bookmark.topicTitle).toBeNull();
@@ -149,13 +150,13 @@ describeIfDb('Bookmarks (integration)', () => {
 
   it('rejects duplicate eventId for same profile', async () => {
     await expect(createBookmark(db, profileId, aiEventId)).rejects.toThrow(
-      'Bookmark already exists'
+      'Bookmark already exists',
     );
   });
 
   it('404 for nonexistent eventId', async () => {
     await expect(
-      createBookmark(db, profileId, generateUUIDv7())
+      createBookmark(db, profileId, generateUUIDv7()),
     ).rejects.toThrow('Session event not found');
   });
 
@@ -164,7 +165,7 @@ describeIfDb('Bookmarks (integration)', () => {
   // profile attempting to bookmark the same event should see it as missing.
   it("scoped to profileId — cannot bookmark another profile's event", async () => {
     await expect(createBookmark(db, otherProfileId, aiEventId)).rejects.toThrow(
-      'Session event not found'
+      'Session event not found',
     );
   });
 
@@ -199,10 +200,12 @@ describeIfDb('Bookmarks (integration)', () => {
     const sessionBookmarks = await listSessionBookmarks(
       db,
       profileId,
-      sessionId
+      sessionId,
     );
     expect(sessionBookmarks.length).toBe(2);
-    const eventIds = sessionBookmarks.map((b) => b.eventId).sort();
+    const eventIds = sessionBookmarks
+      .map((b: SessionBookmark) => b.eventId)
+      .sort();
     expect(eventIds).toEqual([aiEventId, aiEventId2].sort());
     for (const row of sessionBookmarks) {
       expect(typeof row.bookmarkId).toBe('string');
@@ -213,7 +216,7 @@ describeIfDb('Bookmarks (integration)', () => {
     const otherSessionBookmarks = await listSessionBookmarks(
       db,
       otherProfileId,
-      sessionId
+      sessionId,
     );
     expect(otherSessionBookmarks).toEqual([]);
   });
@@ -221,9 +224,9 @@ describeIfDb('Bookmarks (integration)', () => {
   it('deletes bookmark', async () => {
     await deleteBookmark(db, profileId, createdBookmarkId);
     const result = await listBookmarks(db, profileId, {});
-    expect(result.bookmarks.every((b) => b.id !== createdBookmarkId)).toBe(
-      true
-    );
+    expect(
+      result.bookmarks.every((b: Bookmark) => b.id !== createdBookmarkId),
+    ).toBe(true);
   });
 
   // Break test for the delete scoping guarantee: the DELETE WHERE clause
@@ -233,7 +236,7 @@ describeIfDb('Bookmarks (integration)', () => {
   it('delete scoped to profileId', async () => {
     const bookmark = await createBookmark(db, profileId, aiEventId);
     await expect(
-      deleteBookmark(db, otherProfileId, bookmark.id)
+      deleteBookmark(db, otherProfileId, bookmark.id),
     ).rejects.toThrow('Bookmark not found');
     // Cleanup to keep the suite self-contained.
     await deleteBookmark(db, profileId, bookmark.id);

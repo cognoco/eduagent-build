@@ -12,6 +12,7 @@
 // ---------------------------------------------------------------------------
 
 import { buildCuratedMemoryView } from '../curated-memory';
+import type { MemoryCategory } from '@eduagent/schemas';
 import {
   type MemoryProjection,
   PROJECTION_OPT_OUT,
@@ -365,7 +366,7 @@ describe('drift guard — every MemoryProjection field is wired or opted out', (
 
     const view = toCuratedView(projection);
     const categories = view.categories;
-    const labels = categories.map((c) => c.label);
+    const labels = categories.map((c: MemoryCategory) => c.label);
 
     expect(labels).toContain('Interests');
     expect(labels).toContain('Strengths');

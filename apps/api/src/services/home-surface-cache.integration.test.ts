@@ -30,6 +30,7 @@ import {
   readHomeSurfaceCacheData,
 } from './home-surface-cache';
 import type { HomeSurfaceCacheData } from './home-surface-cache';
+import type { HomeCard } from '@eduagent/schemas';
 
 // ---------------------------------------------------------------------------
 // DB setup — real connection
@@ -41,7 +42,7 @@ function requireDatabaseUrl(): string {
   const url = process.env.DATABASE_URL;
   if (!url) {
     throw new Error(
-      'DATABASE_URL is not set. Create .env.test.local or .env.development.local.'
+      'DATABASE_URL is not set. Create .env.test.local or .env.development.local.',
     );
   }
   return url;
@@ -88,7 +89,7 @@ async function cleanup() {
   const found = await db.query.accounts.findMany({
     where: eq(accounts.email, ACCOUNT.email),
   });
-  const ids = found.map((a) => a.id);
+  const ids = found.map((a: typeof accounts.$inferSelect) => a.id);
   if (ids.length > 0) {
     await db.delete(accounts).where(inArray(accounts.id, ids));
   }
@@ -150,7 +151,7 @@ describe('[BUG-859] mergeHomeSurfaceCacheData concurrent lost-update guard (inte
     const { data } = await readHomeSurfaceCacheData(db, profile.id);
     // With SELECT FOR UPDATE serialising merges each card must appear exactly once.
     expect(data.rankedHomeCards).toHaveLength(3);
-    const labels = data.rankedHomeCards.map((c) => c.id).sort();
+    const labels = data.rankedHomeCards.map((c: HomeCard) => c.id).sort();
     expect(labels).toEqual(['card-alpha', 'card-beta', 'card-gamma']);
   });
 
@@ -161,8 +162,8 @@ describe('[BUG-859] mergeHomeSurfaceCacheData concurrent lost-update guard (inte
     // No prior cache row; two concurrent merges both trigger the
     // INSERT … ON CONFLICT DO NOTHING bootstrap path.
     await Promise.all([
-      mergeHomeSurfaceCacheData(db, profile.id, (c) => c),
-      mergeHomeSurfaceCacheData(db, profile.id, (c) => c),
+      mergeHomeSurfaceCacheData(db, profile.id, (c: HomeSurfaceCacheData) => c),
+      mergeHomeSurfaceCacheData(db, profile.id, (c: HomeSurfaceCacheData) => c),
     ]);
 
     const rows = await db.query.coachingCardCache.findMany({

@@ -37,7 +37,7 @@ let seedCounter = 0;
 function createSessionSummaryProvider(): LLMProvider {
   return {
     id: 'gemini',
-    async chat(messages, config) {
+    async chat(messages: ChatMessage[], config: ModelConfig) {
       llmProviderCalls.push({ messages, config });
       return { content: llmResponse, stopReason: 'stop' };
     },

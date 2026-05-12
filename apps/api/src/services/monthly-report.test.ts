@@ -11,7 +11,11 @@ jest.mock('./sentry', () => ({
 }));
 
 import type { Database } from '@eduagent/database';
-import type { ProgressMetrics, MonthlyReportData } from '@eduagent/schemas';
+import type {
+  ProgressMetrics,
+  MonthlyReportData,
+  SubjectMonthlyDetail,
+} from '@eduagent/schemas';
 import { ForbiddenError } from '@eduagent/schemas';
 import { routeAndCall } from './llm';
 import {
@@ -672,8 +676,12 @@ describe('generateMonthlyReportData — subject breakdowns', () => {
       lastMonth,
     );
 
-    const math = result.subjects.find((s) => s.subjectName === 'Math');
-    const sci = result.subjects.find((s) => s.subjectName === 'Science');
+    const math = result.subjects.find(
+      (s: SubjectMonthlyDetail) => s.subjectName === 'Math',
+    );
+    const sci = result.subjects.find(
+      (s: SubjectMonthlyDetail) => s.subjectName === 'Science',
+    );
 
     expect(math?.topicsMastered).toBe(3); // 4 - 1
     expect(math?.activeMinutes).toBe(50); // 80 - 30
