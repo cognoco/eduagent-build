@@ -199,7 +199,7 @@
         "needsEncouragement": "needs encouragement",
         "steady": "steady",
         "progressAction": "Progress",
-        "recapAction": "Recap",
+        "reportsAction": "レポート",
         "nudgeAction": "Nudge"
       }
     }
@@ -897,6 +897,12 @@
       "shelfActionExpand": "展開",
       "shelfActionCollapse": "折りたたむ",
       "shelfActionOpen": "開く"
+    },
+    "nextAction": {
+      "title": "{{subject}}を続ける",
+      "message": "本棚を開いて次の本を選ぶか、復習が必要な項目を再確認しましょう。",
+      "cta": "開く",
+      "accessibilityLabel": "{{subject}}を続ける"
     }
   },
   "topic": {
@@ -1117,7 +1123,10 @@
     "studiedToday": "今日学習",
     "studiedYesterday": "昨日学習",
     "studiedDaysAgo": "{{count}}日前に学習",
-    "topicPassedNote": "よくできました。このトピックは合格として記録され、弱いところは必要なタイミングで復習に戻ってきます。"
+    "topicPassedNote": "よくできました。このトピックは合格として記録され、弱いところは必要なタイミングで復習に戻ってきます。",
+    "pickerLoadingBody": "適切なテストを実施できるトピックを確認しています。",
+    "pickerLoadTimeoutTitle": "アセスメントのトピックの読み込みに時間がかかりすぎています",
+    "pickerLoadTimeoutMessage": "接続を確認して再試行するか、前に戻ってください。"
   },
   "homework": {
     "permissionTitle": "カメラへのアクセスが必要です",
@@ -1290,7 +1299,9 @@
     },
     "empty": {
       "title": "最初のセッションを開始しましょう",
-      "subtitle": "最初のセッションを開始して、ここにあなたの進捗を表示しましょう"
+      "subtitle": "最初のセッションを開始して、ここにあなたの進捗を表示しましょう",
+      "withSubjectTitle": "{{subject}}を学習すると進捗がアンロックされます",
+      "withSubjectSubtitle": "まず{{subject}}のトピックを学習しましょう。測定できるものができ次第、セッション、習熟度、復習がここに表示されます。"
     },
     "error": {
       "loadTitle": "進捗を読み込めませんでした",
@@ -1439,7 +1450,9 @@
       "title": "過去の会話",
       "empty": "会話はまだありません",
       "untitledTopic": "無題のトピック",
-      "openSessionFrom": "{{date}} のセッションを開く"
+      "openSessionFrom": "{{date}} のセッションを開く",
+      "loadingTooLong": "会話の読み込みに時間がかかりすぎています",
+      "loadingMessage": "接続を確認して再試行するか、科目の進捗に戻ってください。"
     },
     "retention": {
       "strong": {
@@ -1477,6 +1490,11 @@
       "title": "Previous reports",
       "subtitle": "Weekly and monthly snapshots from your learning.",
       "viewAll": "View all reports"
+    },
+    "loadingTitle": "学習の道のりを読み込み中",
+    "loadTimeout": {
+      "title": "進捗の読み込みに時間がかかりすぎています",
+      "message": "接続を確認して再試行するか、ホームに戻ってください。"
     }
   },
   "onboarding": {
@@ -2159,6 +2177,10 @@
       "purchaseConfirmedBody": "Your subscription is being activated. It usually appears within a minute — pull down to refresh.",
       "topUpTitle": "Top-up",
       "topUpBody": "500 additional credits have been added!"
+    },
+    "web": {
+      "plansOnMobile": "プランはモバイルアプリでご利用いただけます",
+      "storePurchaseUnavailable": "このデバイスではストア購入はご利用いただけません。"
     }
   },
   "sessionSummary": {
@@ -2241,7 +2263,8 @@
       "afterFinishTopic": "トピック完了後に利用可能",
       "hintOpenPicker": "アセスメントピッカーを開く",
       "hintOpenLibrary": "ライブラリを開く",
-      "couldNotLoad": "アセスメントトピックを読み込めませんでした"
+      "couldNotLoad": "アセスメントトピックを読み込めませんでした",
+      "studySubjectFirst": "これをアンロックするには、まず{{subject}}を学習しましょう"
     },
     "quiz": {
       "title": "クイッククイズ",

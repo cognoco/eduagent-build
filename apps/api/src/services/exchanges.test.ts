@@ -75,12 +75,13 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('Crisp, professional');
   });
 
-  // [B.5] Fallback when birthYear is null: resolveAgeBracket returns 'adult',
-  // and the bracket-only path honours the explicit bracket, returning ADULT_VOICE.
-  it('falls back to ADULT voice when birthYear is unavailable (bracket = adult)', () => {
+  // [B.5] Fallback when birthYear is null: resolveAgeBracket returns
+  // 'adolescent' (defence-in-depth — unknown age takes the minor-safe path),
+  // so the bracket-only mapping produces TEEN_VOICE.
+  it('falls back to TEEN voice when birthYear is unavailable (bracket = adolescent)', () => {
     const prompt = buildSystemPrompt({ ...baseContext, birthYear: null });
-    expect(prompt).toContain('Crisp, professional');
-    expect(prompt).not.toContain('Peer-adjacent and matter-of-fact');
+    expect(prompt).toContain('Peer-adjacent and matter-of-fact');
+    expect(prompt).not.toContain('Crisp, professional');
   });
 
   // [B.5] Age-calibration anchors rephrased for the strict 11+ product.
@@ -920,9 +921,39 @@ describe('classifyExchangeOutcome', () => {
   );
 
   it('returns malformed_envelope fallback on parse failure', () => {
-    const result = classifyExchangeOutcome('plain text, no json', ctx);
+    const result = classifyExchangeOutcome('{"signals":', ctx);
 
     expect(result.fallback?.reason).toBe('malformed_envelope');
+  });
+
+  it('[STREAM-SPINE] recovers plain prose as the visible reply instead of fallback', () => {
+    const result = classifyExchangeOutcome(
+      'Yes — plants get carbon dioxide from the air. Nice correction.',
+      ctx,
+    );
+
+    expect(result.fallback).toBeUndefined();
+    expect(result.parsed.cleanResponse).toBe(
+      'Yes — plants get carbon dioxide from the air. Nice correction.',
+    );
+  });
+
+  it('[STREAM-SPINE] recovers a non-empty reply when side-channel fields are malformed', () => {
+    const raw = JSON.stringify({
+      reply:
+        'Exactly. Carbon dioxide is in the air, and plants take it in through tiny openings in their leaves.',
+      signals: { partial_progress: 'yes' },
+      ui_hints: { fluency_drill: { active: true, duration_s: 0 } },
+    });
+
+    const result = classifyExchangeOutcome(raw, ctx);
+
+    expect(result.fallback).toBeUndefined();
+    expect(result.parsed.cleanResponse).toBe(
+      'Exactly. Carbon dioxide is in the air, and plants take it in through tiny openings in their leaves.',
+    );
+    expect(result.parsed.partialProgress).toBe(false);
+    expect(result.parsed.fluencyDrill).toBeNull();
   });
 
   // REGRESSION GUARD: notePrompt is a live UI signal dispatched by the

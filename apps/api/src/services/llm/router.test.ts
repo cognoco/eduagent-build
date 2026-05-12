@@ -629,7 +629,7 @@ describe('LLM Router', () => {
       const receivedMessages: ChatMessage[][] = [];
       const spy: LLMProvider = {
         id: 'gemini',
-        async chat(messages) {
+        async chat(messages: ChatMessage[]) {
           receivedMessages.push(messages);
           return okResult;
         },
@@ -654,7 +654,7 @@ describe('LLM Router', () => {
       const receivedMessages: ChatMessage[][] = [];
       const spy: LLMProvider = {
         id: 'gemini',
-        async chat(messages) {
+        async chat(messages: ChatMessage[]) {
           receivedMessages.push(messages);
           return okResult;
         },
@@ -673,11 +673,11 @@ describe('LLM Router', () => {
       expect(msgs[0]!.content).not.toContain('young learners');
     });
 
-    it('uses minor framing for child ageBracket', async () => {
+    it('uses minor framing for adolescent ageBracket', async () => {
       const receivedMessages: ChatMessage[][] = [];
       const spy: LLMProvider = {
         id: 'gemini',
-        async chat(messages) {
+        async chat(messages: ChatMessage[]) {
           receivedMessages.push(messages);
           return okResult;
         },
@@ -696,11 +696,34 @@ describe('LLM Router', () => {
       expect(msgs[0]!.content).not.toContain('adult');
     });
 
+    it('uses minor framing for child ageBracket', async () => {
+      const receivedMessages: ChatMessage[][] = [];
+      const spy: LLMProvider = {
+        id: 'gemini',
+        async chat(messages: ChatMessage[]) {
+          receivedMessages.push(messages);
+          return okResult;
+        },
+        async *chatStream() {
+          yield 'ok';
+        },
+      };
+      registerProvider(spy);
+
+      await routeAndCall([{ role: 'user', content: 'Hello' }], 1, {
+        ageBracket: 'child',
+      });
+
+      const msgs = receivedMessages[0]!;
+      expect(msgs[0]!.content).toContain('for young learners');
+      expect(msgs[0]!.content).not.toContain('adult');
+    });
+
     it('merges preamble into existing system message', async () => {
       const receivedMessages: ChatMessage[][] = [];
       const spy: LLMProvider = {
         id: 'gemini',
-        async chat(messages) {
+        async chat(messages: ChatMessage[]) {
           receivedMessages.push(messages);
           return okResult;
         },
@@ -729,7 +752,7 @@ describe('LLM Router', () => {
       const receivedMessages: ChatMessage[][] = [];
       const spy: LLMProvider = {
         id: 'gemini',
-        async chat(messages) {
+        async chat(messages: ChatMessage[]) {
           receivedMessages.push(messages);
           return okResult;
         },
@@ -766,7 +789,7 @@ describe('LLM Router', () => {
       const receivedMessages: ChatMessage[][] = [];
       const spy: LLMProvider = {
         id: 'gemini',
-        async chat(messages) {
+        async chat(messages: ChatMessage[]) {
           receivedMessages.push(messages);
           return okResult;
         },
@@ -788,7 +811,7 @@ describe('LLM Router', () => {
       const receivedMessages: ChatMessage[][] = [];
       const spy: LLMProvider = {
         id: 'gemini',
-        async chat(messages) {
+        async chat(messages: ChatMessage[]) {
           receivedMessages.push(messages);
           return okResult;
         },
@@ -812,7 +835,7 @@ describe('LLM Router', () => {
       const receivedMessages: ChatMessage[][] = [];
       const spy: LLMProvider = {
         id: 'gemini',
-        async chat(messages) {
+        async chat(messages: ChatMessage[]) {
           receivedMessages.push(messages);
           return okResult;
         },
@@ -844,7 +867,7 @@ describe('LLM Router', () => {
       const receivedMessages: ChatMessage[][] = [];
       const spy: LLMProvider = {
         id: 'gemini',
-        async chat(messages) {
+        async chat(messages: ChatMessage[]) {
           receivedMessages.push(messages);
           return okResult;
         },
@@ -865,7 +888,7 @@ describe('LLM Router', () => {
       const receivedMessages: ChatMessage[][] = [];
       const spy: LLMProvider = {
         id: 'gemini',
-        async chat(messages) {
+        async chat(messages: ChatMessage[]) {
           receivedMessages.push(messages);
           return okResult;
         },
@@ -890,7 +913,7 @@ describe('LLM Router', () => {
       const receivedMessages: ChatMessage[][] = [];
       const spy: LLMProvider = {
         id: 'gemini',
-        async chat(messages) {
+        async chat(messages: ChatMessage[]) {
           receivedMessages.push(messages);
           return okResult;
         },

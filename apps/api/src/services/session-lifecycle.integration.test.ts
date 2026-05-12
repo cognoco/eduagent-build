@@ -32,6 +32,10 @@ import {
   resetSessionStaticContextCache,
 } from './session';
 
+type StaleSessionResult = Awaited<
+  ReturnType<typeof closeStaleSessions>
+>[number];
+
 // ---------------------------------------------------------------------------
 // DB setup — loads DATABASE_URL from .env.development.local in local dev,
 // uses the already-set DATABASE_URL in CI.
@@ -79,7 +83,7 @@ async function seedProfile() {
 
 async function seedSubject(
   profileId: string,
-  status: 'active' | 'paused' | 'archived' = 'active'
+  status: 'active' | 'paused' | 'archived' = 'active',
 ) {
   const [subject] = await db
     .insert(subjects)
@@ -102,7 +106,7 @@ beforeAll(async () => {
   if (!dbUrl) {
     throw new Error(
       'DATABASE_URL is not set — cannot run session lifecycle integration tests.\n' +
-        'Copy .env.example → .env.development.local and add a test DATABASE_URL.'
+        'Copy .env.example → .env.development.local and add a test DATABASE_URL.',
     );
   }
   db = createDatabase(dbUrl);
@@ -170,7 +174,7 @@ describe('Session lifecycle (integration)', () => {
     const events = await db.query.sessionEvents.findMany({
       where: and(
         eq(sessionEvents.sessionId, session.id),
-        eq(sessionEvents.profileId, profileId)
+        eq(sessionEvents.profileId, profileId),
       ),
     });
 
@@ -189,7 +193,7 @@ describe('Session lifecycle (integration)', () => {
     await expect(
       startSession(db, profileId, archivedSubjectId, {
         sessionType: 'learning',
-      })
+      }),
     ).rejects.toThrow(SubjectInactiveError);
   });
 
@@ -216,19 +220,25 @@ describe('Session lifecycle (integration)', () => {
     const events = await db.query.sessionEvents.findMany({
       where: and(
         eq(sessionEvents.sessionId, session.id),
-        eq(sessionEvents.profileId, profileId)
+        eq(sessionEvents.profileId, profileId),
       ),
     });
 
-    const eventTypes = events.map((e) => e.eventType);
+    const eventTypes = events.map(
+      (e: typeof sessionEvents.$inferSelect) => e.eventType,
+    );
     expect(eventTypes).toContain('session_start');
     expect(eventTypes).toContain('user_message');
     expect(eventTypes).toContain('ai_response');
 
-    const userEvent = events.find((e) => e.eventType === 'user_message');
+    const userEvent = events.find(
+      (e: typeof sessionEvents.$inferSelect) => e.eventType === 'user_message',
+    );
     expect(userEvent?.content).toBe('What is 2 + 2?');
 
-    const aiEvent = events.find((e) => e.eventType === 'ai_response');
+    const aiEvent = events.find(
+      (e: typeof sessionEvents.$inferSelect) => e.eventType === 'ai_response',
+    );
     expect(typeof aiEvent?.content).toBe('string');
     expect(aiEvent?.content.length).toBeGreaterThan(0);
   });
@@ -261,7 +271,7 @@ describe('Session lifecycle (integration)', () => {
     await expect(
       processMessage(db, profileId, session.id, {
         message: 'Exchange number 51',
-      })
+      }),
     ).rejects.toThrow(SessionExchangeLimitError);
   });
 
@@ -328,7 +338,7 @@ describe('Session lifecycle (integration)', () => {
       where: and(
         eq(sessionEvents.sessionId, session.id),
         eq(sessionEvents.profileId, profileId),
-        eq(sessionEvents.eventType, 'user_message')
+        eq(sessionEvents.eventType, 'user_message'),
       ),
     });
     expect(userMessages).toHaveLength(1);
@@ -337,7 +347,7 @@ describe('Session lifecycle (integration)', () => {
       where: and(
         eq(sessionEvents.sessionId, session.id),
         eq(sessionEvents.profileId, profileId),
-        eq(sessionEvents.eventType, 'ai_response')
+        eq(sessionEvents.eventType, 'ai_response'),
       ),
     });
     expect(aiResponses).toHaveLength(1);
@@ -376,7 +386,7 @@ describe('Session lifecycle (integration)', () => {
         hintCountInSession: 0,
         drillCorrect: 4,
         drillTotal: 5,
-      }
+      },
     );
 
     const [row] = await db
@@ -389,8 +399,8 @@ describe('Session lifecycle (integration)', () => {
         and(
           eq(sessionEvents.sessionId, session.id),
           eq(sessionEvents.profileId, profileId),
-          eq(sessionEvents.eventType, 'ai_response')
-        )
+          eq(sessionEvents.eventType, 'ai_response'),
+        ),
       )
       .limit(1);
 
@@ -418,7 +428,7 @@ describe('Session lifecycle (integration)', () => {
         isUnderstandingCheck: false,
         timeToAnswerMs: 2000,
         hintCountInSession: 0,
-      }
+      },
     );
 
     const [row] = await db
@@ -431,8 +441,8 @@ describe('Session lifecycle (integration)', () => {
         and(
           eq(sessionEvents.sessionId, session.id),
           eq(sessionEvents.profileId, profileId),
-          eq(sessionEvents.eventType, 'ai_response')
-        )
+          eq(sessionEvents.eventType, 'ai_response'),
+        ),
       )
       .limit(1);
 
@@ -478,7 +488,7 @@ describe('Session lifecycle (integration)', () => {
     const summaries = await db.query.sessionSummaries.findMany({
       where: and(
         eq(sessionSummaries.sessionId, session.id),
-        eq(sessionSummaries.profileId, profileId)
+        eq(sessionSummaries.profileId, profileId),
       ),
     });
 
@@ -517,7 +527,7 @@ describe('Session lifecycle (integration)', () => {
     const closed = await closeStaleSessions(db, cutoff);
 
     // The stale session should appear in closed results
-    const closedIds = closed.map((r) => r.sessionId);
+    const closedIds = closed.map((r: StaleSessionResult) => r.sessionId);
     expect(closedIds).toContain(staleSession.id);
     expect(closedIds).not.toContain(recentSession.id);
 

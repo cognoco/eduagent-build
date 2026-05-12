@@ -131,6 +131,7 @@ const mockGenerateReportHighlights = jest.fn().mockResolvedValue({
   nextSteps: ['Keep going'],
   comparison: null,
 });
+const mockListEligibleSelfReportProfileIds = jest.fn().mockResolvedValue([]);
 
 jest.mock('../../services/monthly-report', () => ({
   generateMonthlyReportData: (...args: unknown[]) =>
@@ -138,6 +139,14 @@ jest.mock('../../services/monthly-report', () => ({
   generateReportHighlights: (...args: unknown[]) =>
     mockGenerateReportHighlights(...args),
 }));
+
+jest.mock(
+  '../../services/solo-progress-reports' /* gc1-allow: unit test boundary */,
+  () => ({
+    listEligibleSelfReportProfileIds: (...args: unknown[]) =>
+      mockListEligibleSelfReportProfileIds(...args),
+  }),
+);
 
 const mockGetSnapshotsInRange = jest.fn().mockResolvedValue([]);
 
@@ -239,18 +248,35 @@ const SAMPLE_METRICS = {
 // ---------------------------------------------------------------------------
 
 /** Simulate Inngest step runner for cron functions */
-async function executeCronSteps(): Promise<Record<string, unknown>> {
-  const mockStep = {
+interface CronResult {
+  status: string;
+  queuedPairs: number;
+  totalPairs?: number;
+  queuedBatches?: number;
+  failedBatches?: number;
+}
+
+interface CronMockStep {
+  run: jest.Mock;
+  sendEvent: jest.Mock;
+  sleep: jest.Mock;
+}
+
+async function executeCronSteps(): Promise<{
+  result: CronResult;
+  mockStep: CronMockStep;
+}> {
+  const mockStep: CronMockStep = {
     run: jest.fn(async (name: string, fn: () => Promise<unknown>) => fn()),
     sendEvent: jest.fn().mockResolvedValue(undefined),
     sleep: jest.fn(),
   };
 
   const handler = (monthlyReportCron as any).fn;
-  const result = await handler({
+  const result = (await handler({
     event: { name: 'inngest/function.invoked' },
     step: mockStep,
-  });
+  })) as CronResult;
 
   return { result, mockStep };
 }
@@ -320,6 +346,7 @@ beforeEach(() => {
   );
   mockGetSnapshotsInRange.mockResolvedValue([]);
   mockOnConflictDoNothing.mockResolvedValue(undefined);
+  mockListEligibleSelfReportProfileIds.mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -389,6 +416,40 @@ describe('monthlyReportCron', () => {
       const { result } = await executeCronSteps();
 
       expect(result).toMatchObject({ status: 'completed', queuedPairs: 1 });
+    });
+
+    it('includes eligible self-managed profiles alongside linked child pairs', async () => {
+      (
+        mockMonthlyReportDb.query.familyLinks.findMany as jest.Mock
+      ).mockResolvedValue([
+        { parentProfileId: 'parent-001', childProfileId: 'child-001' },
+      ]);
+      mockSelectDistinctWhere.mockResolvedValue([
+        { childProfileId: 'child-001' },
+      ]);
+      mockListEligibleSelfReportProfileIds.mockResolvedValue([
+        '11111111-1111-4111-8111-111111111111',
+      ]);
+
+      const { mockStep, result } = await executeCronSteps();
+
+      expect(result).toMatchObject({ status: 'completed', queuedPairs: 2 });
+      expect(mockStep.sendEvent).toHaveBeenCalledWith(
+        'fan-out-monthly-reports-0',
+        expect.arrayContaining([
+          expect.objectContaining({
+            name: 'app/monthly-report.generate',
+            data: { parentId: 'parent-001', childId: 'child-001' },
+          }),
+          expect.objectContaining({
+            name: 'app/monthly-report.generate',
+            data: {
+              parentId: '11111111-1111-4111-8111-111111111111',
+              childId: '11111111-1111-4111-8111-111111111111',
+            },
+          }),
+        ]),
+      );
     });
 
     it('fans out sendEvent for each pair found', async () => {
@@ -505,13 +566,7 @@ describe('monthlyReportCron', () => {
       const result = (await handler({
         event: { name: 'inngest/function.invoked' },
         step: mockStep,
-      })) as {
-        status: string;
-        queuedPairs: number;
-        totalPairs: number;
-        queuedBatches: number;
-        failedBatches: number;
-      };
+      })) as CronResult;
 
       expect(sendEventCalls).toBe(3);
       expect(result.status).toBe('partial');
@@ -868,6 +923,68 @@ describe('monthlyReportGenerate', () => {
         SAMPLE_METRICS,
         null,
       );
+    });
+
+    it('skips self reports with a blank display name and avoids notifications', async () => {
+      (
+        mockMonthlyReportDb.query.profiles.findFirst as jest.Mock
+      ).mockResolvedValue({
+        displayName: '',
+      });
+
+      const profileId = '11111111-1111-4111-8111-111111111111';
+      const { result } = await executeGenerateSteps(
+        makeGenerateEvent({
+          parentId: profileId,
+          childId: profileId,
+        }),
+      );
+
+      expect(result).toEqual({
+        status: 'skipped',
+        parentId: profileId,
+        childId: profileId,
+        reason: 'self_display_name_missing',
+      });
+      expect(mockSendPushNotification).not.toHaveBeenCalled();
+      expect(mockSendEmail).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('self report notification behavior', () => {
+    it('stores a self report without sending push or email', async () => {
+      const profileId = '11111111-1111-4111-8111-111111111111';
+      (
+        mockMonthlyReportDb.query.profiles.findFirst as jest.Mock
+      ).mockResolvedValue({
+        displayName: 'Alex',
+      });
+      mockGetSnapshotsInRange
+        .mockResolvedValueOnce([
+          { snapshotDate: '2026-03-29', metrics: SAMPLE_METRICS },
+        ])
+        .mockResolvedValueOnce([]);
+
+      const { result } = await executeGenerateSteps(
+        makeGenerateEvent({
+          parentId: profileId,
+          childId: profileId,
+        }),
+      );
+
+      expect(result).toEqual({
+        status: 'completed',
+        parentId: profileId,
+        childId: profileId,
+      });
+      expect(mockInsertValues).toHaveBeenCalledWith(
+        expect.objectContaining({
+          profileId,
+          childProfileId: profileId,
+        }),
+      );
+      expect(mockSendPushNotification).not.toHaveBeenCalled();
+      expect(mockSendEmail).not.toHaveBeenCalled();
     });
   });
 

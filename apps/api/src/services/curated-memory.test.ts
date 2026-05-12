@@ -1,3 +1,4 @@
+import type { MemoryCategory } from '@eduagent/schemas';
 import { buildCuratedMemoryView } from './curated-memory';
 
 function makeLearningProfile(overrides: Record<string, unknown> = {}) {
@@ -52,7 +53,7 @@ describe('buildCuratedMemoryView', () => {
     const result = buildCuratedMemoryView(profile);
 
     const struggleCategory = result.categories.find(
-      (c) => c.label === 'Struggles with'
+      (c: MemoryCategory) => c.label === 'Struggles with',
     );
     expect(struggleCategory).toEqual(expect.objectContaining({}));
     expect(struggleCategory!.items[0]).toEqual({
@@ -69,7 +70,7 @@ describe('buildCuratedMemoryView', () => {
     const result = buildCuratedMemoryView(profile);
 
     const strengthCategory = result.categories.find(
-      (c) => c.label === 'Strengths'
+      (c: MemoryCategory) => c.label === 'Strengths',
     );
     expect(strengthCategory).toEqual(expect.objectContaining({}));
     expect(strengthCategory!.items[0]).toEqual({
@@ -86,7 +87,7 @@ describe('buildCuratedMemoryView', () => {
     const result = buildCuratedMemoryView(profile);
 
     const styleCategory = result.categories.find(
-      (c) => c.label === 'Learning style'
+      (c: MemoryCategory) => c.label === 'Learning style',
     );
     expect(styleCategory).toEqual(expect.objectContaining({}));
     expect(styleCategory!.items).toHaveLength(2);
@@ -112,7 +113,7 @@ describe('buildCuratedMemoryView', () => {
     const result = buildCuratedMemoryView(profile);
 
     const notesCategory = result.categories.find(
-      (c) => c.label === 'Learning pace & notes'
+      (c: MemoryCategory) => c.label === 'Learning pace & notes',
     );
     expect(notesCategory).toEqual(expect.objectContaining({}));
     expect(notesCategory!.items).toHaveLength(2);

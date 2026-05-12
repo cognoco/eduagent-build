@@ -19,7 +19,11 @@ import {
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import { resolve } from 'path';
 
-import { decrementQuota, incrementQuota } from '../billing';
+import {
+  decrementQuota,
+  incrementQuota,
+  type DecrementResult,
+} from '../billing';
 import { getTierConfig } from '../subscription';
 
 // ---------------------------------------------------------------------------
@@ -32,7 +36,7 @@ function requireDatabaseUrl(): string {
   const url = process.env.DATABASE_URL;
   if (!url) {
     throw new Error(
-      'DATABASE_URL is not set. Create .env.test.local or .env.development.local.'
+      'DATABASE_URL is not set. Create .env.test.local or .env.development.local.',
     );
   }
   return url;
@@ -104,7 +108,7 @@ async function seedSubscriptionWithQuota(input: {
       usedThisMonth: input.usedThisMonth ?? 0,
       dailyLimit:
         input.dailyLimit === undefined
-          ? tierConfig.dailyLimit ?? null
+          ? (tierConfig.dailyLimit ?? null)
           : input.dailyLimit,
       usedToday: input.usedToday ?? 0,
       cycleResetAt: new Date('2026-05-01T00:00:00.000Z'),
@@ -193,7 +197,7 @@ describe('Quota metering (integration)', () => {
 
     const result = await decrementQuota(
       createIntegrationDb(),
-      seeded.subscription.id
+      seeded.subscription.id,
     );
     const pool = await loadQuotaPool(seeded.subscription.id);
 
@@ -217,7 +221,7 @@ describe('Quota metering (integration)', () => {
 
     const result = await decrementQuota(
       createIntegrationDb(),
-      seeded.subscription.id
+      seeded.subscription.id,
     );
     const pool = await loadQuotaPool(seeded.subscription.id);
 
@@ -246,7 +250,7 @@ describe('Quota metering (integration)', () => {
 
     const result = await decrementQuota(
       createIntegrationDb(),
-      seeded.subscription.id
+      seeded.subscription.id,
     );
     const topUps = await loadTopUps(seeded.subscription.id);
 
@@ -302,12 +306,14 @@ describe('Quota metering (integration)', () => {
     // ONE should be admitted before the cap is hit.
     const results = await Promise.all(
       Array.from({ length: 3 }, () =>
-        decrementQuota(createIntegrationDb(), seeded.subscription.id)
-      )
+        decrementQuota(createIntegrationDb(), seeded.subscription.id),
+      ),
     );
 
-    const successes = results.filter((r) => r.success);
-    const dailyExceeded = results.filter((r) => r.source === 'daily_exceeded');
+    const successes = results.filter((r: DecrementResult) => r.success);
+    const dailyExceeded = results.filter(
+      (r: DecrementResult) => r.source === 'daily_exceeded',
+    );
 
     expect(successes).toHaveLength(1);
     expect(dailyExceeded).toHaveLength(2);
@@ -336,12 +342,12 @@ describe('Quota metering (integration)', () => {
 
     const results = await Promise.all(
       Array.from({ length: 5 }, () =>
-        decrementQuota(createIntegrationDb(), seeded.subscription.id)
-      )
+        decrementQuota(createIntegrationDb(), seeded.subscription.id),
+      ),
     );
 
-    const successes = results.filter((r) => r.success);
-    const failures = results.filter((r) => !r.success);
+    const successes = results.filter((r: DecrementResult) => r.success);
+    const failures = results.filter((r: DecrementResult) => !r.success);
 
     // Exactly 1 of the 5 concurrent calls should succeed
     expect(successes).toHaveLength(1);

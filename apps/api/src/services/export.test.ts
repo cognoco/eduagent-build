@@ -223,7 +223,7 @@ describe('generateExport', () => {
     expect(result.consentStates[0].consentType).toBe('GDPR');
     expect(result.consentStates[0].status).toBe('CONSENTED');
     expect(result.consentStates[0].requestedAt).toBe(
-      '2025-01-15T10:00:00.000Z'
+      '2025-01-15T10:00:00.000Z',
     );
   });
 
@@ -314,7 +314,7 @@ describe('generateExport', () => {
     const result = await generateExport(db, 'account-1');
 
     const aiRow = result.sessionEvents.find(
-      (e) => (e as Record<string, unknown>)['eventType'] === 'ai_response'
+      (e: Record<string, unknown>) => e['eventType'] === 'ai_response',
     ) as Record<string, unknown> | undefined;
     expect(aiRow).toEqual(expect.objectContaining({}));
     expect(aiRow!['content']).toBe('Great job today!');
@@ -323,7 +323,7 @@ describe('generateExport', () => {
 
     // user_message rows must be left untouched
     const userRow = result.sessionEvents.find(
-      (e) => (e as Record<string, unknown>)['eventType'] === 'user_message'
+      (e: Record<string, unknown>) => e['eventType'] === 'user_message',
     ) as Record<string, unknown> | undefined;
     expect(userRow!['content']).toBe('What is gravity?');
   });

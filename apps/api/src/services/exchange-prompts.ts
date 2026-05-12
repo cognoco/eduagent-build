@@ -24,7 +24,11 @@ import type { ExchangeContext } from './exchanges';
 // ---------------------------------------------------------------------------
 
 export function resolveAgeBracket(birthYear?: number | null): AgeBracket {
-  return birthYear == null ? 'adult' : computeAgeBracket(birthYear);
+  // Defence-in-depth: unknown birthYear takes the minor-safe path. This
+  // matches the rest of PR-11's sweep (generate-round.ts, relearn.tsx,
+  // mentor-memory.tsx, session-summary) — null/undefined birthYear should
+  // never silently produce adult-framed content.
+  return birthYear == null ? 'adolescent' : computeAgeBracket(birthYear);
 }
 
 /**

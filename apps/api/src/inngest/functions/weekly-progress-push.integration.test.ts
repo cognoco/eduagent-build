@@ -297,8 +297,13 @@ async function ensureWeeklyReportsTable(): Promise<void> {
   }
 }
 
+interface WeeklyPushCronResult {
+  status: string;
+  queuedParents: number;
+}
+
 async function executeCronSteps(): Promise<{
-  result: unknown;
+  result: WeeklyPushCronResult;
   step: { run: jest.Mock; sendEvent: jest.Mock };
 }> {
   const step = {
@@ -309,10 +314,10 @@ async function executeCronSteps(): Promise<{
   const handler = (
     weeklyProgressPushCron as { fn: (ctx: unknown) => Promise<unknown> }
   ).fn;
-  const result = await handler({
+  const result = (await handler({
     event: { name: 'inngest/function.invoked' },
     step,
-  });
+  })) as WeeklyPushCronResult;
 
   return { result, step };
 }

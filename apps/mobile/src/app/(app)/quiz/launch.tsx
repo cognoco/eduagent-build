@@ -1,13 +1,16 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { i18next } from '../../../i18n';
-import type { QuizRoundResponse } from '@eduagent/schemas';
+import {
+  quizActivityTypeSchema,
+  type QuizActivityType,
+  type QuizRoundResponse,
+} from '@eduagent/schemas';
 import { ErrorFallback } from '../../../components/common/ErrorFallback';
 import { useGenerateRound } from '../../../hooks/use-quiz';
-import { goBackOrReplace } from '../../../lib/navigation';
 import { useThemeColors } from '../../../lib/theme';
 import { useQuizFlow } from './_layout';
 
@@ -47,12 +50,53 @@ const LOADING_MESSAGE_KEYS = [
   'quiz.launch.loadingAlmost',
 ] as const;
 
+function firstRouteParam(value: string | string[] | undefined): string | null {
+  if (Array.isArray(value)) return value[0] ?? null;
+  return value ?? null;
+}
+
+function parseRouteActivityType(
+  value: string | string[] | undefined,
+): QuizActivityType | null {
+  const result = quizActivityTypeSchema.safeParse(firstRouteParam(value));
+  return result.success ? result.data : null;
+}
+
 export default function QuizLaunchScreen(): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
+  const {
+    activityType: routeActivityTypeParam,
+    subjectId: routeSubjectIdParam,
+    languageName: routeLanguageNameParam,
+    returnTo: routeReturnToParam,
+  } = useLocalSearchParams<{
+    activityType?: string | string[];
+    subjectId?: string | string[];
+    languageName?: string | string[];
+    returnTo?: string | string[];
+  }>();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
-  const { activityType, subjectId, setRound } = useQuizFlow();
+  const {
+    activityType,
+    subjectId,
+    returnTo,
+    setActivityType,
+    setSubjectId,
+    setLanguageName,
+    setReturnTo,
+    setRound,
+  } = useQuizFlow();
+  const routeActivityType = parseRouteActivityType(routeActivityTypeParam);
+  const routeSubjectId = firstRouteParam(routeSubjectIdParam);
+  const routeLanguageName = firstRouteParam(routeLanguageNameParam);
+  const routeReturnTo = firstRouteParam(routeReturnToParam);
+  const effectiveActivityType = activityType ?? routeActivityType;
+  const effectiveSubjectId = subjectId ?? routeSubjectId ?? null;
+  const effectiveReturnTo = returnTo ?? routeReturnTo ?? null;
+  const exitHref =
+    effectiveReturnTo === 'practice' ? '/(app)/practice' : '/(app)/quiz';
   const generateRound = useGenerateRound();
   const generateRoundMutate = generateRound.mutate;
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
@@ -83,9 +127,12 @@ export default function QuizLaunchScreen(): React.ReactElement {
   // with no callbacks, so on retry success nothing navigated and the user
   // was stuck on the loading spinner.
   const startRound = useCallback(() => {
-    if (!activityType) return;
+    if (!effectiveActivityType) return;
     generateRoundMutate(
-      { activityType, subjectId: subjectId ?? undefined },
+      {
+        activityType: effectiveActivityType,
+        subjectId: effectiveSubjectId ?? undefined,
+      },
       {
         onSuccess: (round) => {
           if (round.difficultyBump) {
@@ -97,17 +144,41 @@ export default function QuizLaunchScreen(): React.ReactElement {
       },
     );
     // [BUG-542] Use .mutate (stable ref) instead of whole mutation result
-  }, [activityType, enterPlay, generateRoundMutate, subjectId]);
+  }, [
+    effectiveActivityType,
+    effectiveSubjectId,
+    enterPlay,
+    generateRoundMutate,
+  ]);
 
   useEffect(() => {
-    if (!activityType) {
+    if (!activityType && routeActivityType) {
+      setActivityType(routeActivityType);
+      setSubjectId(routeSubjectId);
+      setLanguageName(routeLanguageName);
+      setReturnTo(routeReturnTo);
+    }
+  }, [
+    activityType,
+    routeActivityType,
+    routeLanguageName,
+    routeReturnTo,
+    routeSubjectId,
+    setActivityType,
+    setLanguageName,
+    setReturnTo,
+    setSubjectId,
+  ]);
+
+  useEffect(() => {
+    if (!effectiveActivityType) {
       router.replace('/(app)/quiz' as never);
       return;
     }
     if (startedRef.current) return;
     startedRef.current = true;
     startRound();
-  }, [activityType, router, startRound]);
+  }, [effectiveActivityType, router, startRound]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -149,7 +220,7 @@ export default function QuizLaunchScreen(): React.ReactElement {
   // Kids reading slowly may miss the banner entirely if it auto-dismisses.
   // The Start button is the only way to advance — explicit user action.
 
-  if (!activityType) {
+  if (!effectiveActivityType) {
     return <View className="flex-1 bg-background" />;
   }
 
@@ -213,7 +284,7 @@ export default function QuizLaunchScreen(): React.ReactElement {
           }}
           secondaryAction={{
             label: t('common.goBack'),
-            onPress: () => goBackOrReplace(router, '/(app)/quiz'),
+            onPress: () => router.replace(exitHref as never),
             testID: 'quiz-launch-back',
           }}
           testID="quiz-launch-error-fallback"
@@ -268,7 +339,7 @@ export default function QuizLaunchScreen(): React.ReactElement {
           }
           secondaryAction={{
             label: t('common.goBack'),
-            onPress: () => goBackOrReplace(router, '/(app)/quiz'),
+            onPress: () => router.replace(exitHref as never),
             testID: 'quiz-launch-back',
           }}
           testID="quiz-launch-error-fallback"
@@ -301,7 +372,7 @@ export default function QuizLaunchScreen(): React.ReactElement {
         </Text>
       ) : null}
       <Pressable
-        onPress={() => goBackOrReplace(router, '/(app)/quiz')}
+        onPress={() => router.replace(exitHref as never)}
         className="mt-10 min-h-[44px] items-center justify-center rounded-button px-6 py-3"
         testID="quiz-launch-cancel"
         accessibilityRole="button"

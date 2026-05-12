@@ -53,6 +53,8 @@ import type {
   SubjectProgressMetrics,
 } from '@eduagent/schemas';
 
+type SnapshotInRange = Awaited<ReturnType<typeof getSnapshotsInRange>>[number];
+
 type SubjectRow = typeof subjects.$inferSelect;
 type SessionRow = typeof learningSessions.$inferSelect;
 type AssessmentRow = typeof assessments.$inferSelect;
@@ -591,7 +593,7 @@ describe('getSnapshotsInRange', () => {
     );
 
     expect(result).toHaveLength(3);
-    expect(result.map((r) => r.snapshotDate)).toEqual([
+    expect(result.map((r: SnapshotInRange) => r.snapshotDate)).toEqual([
       '2026-04-01',
       '2026-04-15',
       '2026-04-30',

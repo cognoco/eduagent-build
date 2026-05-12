@@ -325,8 +325,8 @@ function ChildCommandCard({
           testID={`parent-home-child-progress-${child.id}`}
         />
         <ChildActionButton
-          icon="calendar-outline"
-          label={t('home.parent.childCard.recapAction')}
+          icon="document-text-outline"
+          label={t('home.parent.childCard.reportsAction')}
           onPress={onOpenReports}
           testID={`parent-home-weekly-report-${child.id}`}
         />

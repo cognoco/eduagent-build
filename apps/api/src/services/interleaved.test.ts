@@ -28,6 +28,7 @@ jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 import {
   selectInterleavedTopics,
   startInterleavedSession,
+  type InterleavedTopic,
   NoInterleavedTopicsError,
 } from './interleaved';
 
@@ -133,9 +134,9 @@ describe('selectInterleavedTopics', () => {
 
     expect(topics).toHaveLength(3);
     // All due topics should be present
-    const topicIds = topics.map((t) => t.topicId);
+    const topicIds = topics.map((t: InterleavedTopic) => t.topicId);
     expect(topicIds).toEqual(
-      expect.arrayContaining(['topic-001', 'topic-002', 'topic-003'])
+      expect.arrayContaining(['topic-001', 'topic-002', 'topic-003']),
     );
   });
 
@@ -277,8 +278,12 @@ describe('selectInterleavedTopics', () => {
       topicCount: 2,
     });
 
-    const stableTopic = topics.find((t) => t.topicId === 'topic-001');
-    const unstableTopic = topics.find((t) => t.topicId === 'topic-002');
+    const stableTopic = topics.find(
+      (t: InterleavedTopic) => t.topicId === 'topic-001',
+    );
+    const unstableTopic = topics.find(
+      (t: InterleavedTopic) => t.topicId === 'topic-002',
+    );
 
     expect(stableTopic?.isStable).toBe(true);
     expect(unstableTopic?.isStable).toBe(false);
@@ -349,7 +354,7 @@ describe('startInterleavedSession', () => {
     // Assert on the typed class — not on the message text. The route layer
     // classifies via instanceof; this test pins the contract.
     await expect(
-      startInterleavedSession(db, PROFILE_ID)
+      startInterleavedSession(db, PROFILE_ID),
     ).rejects.toBeInstanceOf(NoInterleavedTopicsError);
   });
 });

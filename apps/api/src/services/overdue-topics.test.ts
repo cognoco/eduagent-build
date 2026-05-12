@@ -11,6 +11,7 @@ jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
 import type { Database } from '@eduagent/database';
 import { createScopedRepository } from '@eduagent/database';
+import type { OverdueTopic, OverdueSubject } from '@eduagent/schemas';
 import { getOverdueTopicsGrouped } from './overdue-topics';
 
 const profileId = 'test-profile-id';
@@ -182,11 +183,9 @@ describe('getOverdueTopicsGrouped', () => {
 
     const result = await getOverdueTopicsGrouped(db, profileId);
 
-    expect(result.subjects[0]?.topics.map((topic) => topic.topicId)).toEqual([
-      'topic-2',
-      'topic-3',
-      'topic-1',
-    ]);
+    expect(
+      result.subjects[0]?.topics.map((topic: OverdueTopic) => topic.topicId),
+    ).toEqual(['topic-2', 'topic-3', 'topic-1']);
   });
 
   it('sorts subjects by highest overdue count descending', async () => {
@@ -225,10 +224,9 @@ describe('getOverdueTopicsGrouped', () => {
 
     const result = await getOverdueTopicsGrouped(db, profileId);
 
-    expect(result.subjects.map((subject) => subject.subjectId)).toEqual([
-      'subject-a',
-      'subject-b',
-    ]);
+    expect(
+      result.subjects.map((subject: OverdueSubject) => subject.subjectId),
+    ).toEqual(['subject-a', 'subject-b']);
     expect(result.subjects[0]?.overdueCount).toBe(2);
   });
 
