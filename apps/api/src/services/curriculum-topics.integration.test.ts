@@ -31,6 +31,14 @@ import { loadDatabaseEnv } from '@eduagent/test-utils';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 
+type TopicSummary = Awaited<
+  ReturnType<
+    ReturnType<
+      typeof createScopedRepository
+    >['curriculumTopics']['findLaterInBook']
+  >
+>[number];
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -171,7 +179,7 @@ describe('findLaterInBook SQL correctness (integration) [PR-FIX-06]', () => {
       10,
     );
 
-    expect(results.map((r: { id: string; title: string }) => r.id)).toEqual([
+    expect(results.map((r: TopicSummary) => r.id)).toEqual([
       tree.topicIds[1],
       tree.topicIds[2],
     ]);
@@ -193,7 +201,7 @@ describe('findLaterInBook SQL correctness (integration) [PR-FIX-06]', () => {
     );
 
     // sortOrder 1, 2, 3 returned in ascending order.
-    expect(results.map((r: { id: string; title: string }) => r.id)).toEqual([
+    expect(results.map((r: TopicSummary) => r.id)).toEqual([
       tree.topicIds[1],
       tree.topicIds[2],
       tree.topicIds[3],
@@ -212,7 +220,7 @@ describe('findLaterInBook SQL correctness (integration) [PR-FIX-06]', () => {
       50,
     );
 
-    const returnedIds = results.map((r: { id: string; title: string }) => r.id);
+    const returnedIds = results.map((r: TopicSummary) => r.id);
     expect(returnedIds).not.toContain(bookD.topicIds[0]);
     expect(returnedIds).not.toContain(bookD.topicIds[1]);
     // Only bookC's topic at sortOrder 1 should be present.
@@ -266,7 +274,7 @@ describe('findLaterInBook SQL correctness (integration) [PR-FIX-06]', () => {
       10,
     );
 
-    expect(results.map((r: { id: string; title: string }) => r.id)).toEqual([
+    expect(results.map((r: TopicSummary) => r.id)).toEqual([
       tree.topicIds[2], // first topic of Chapter 2
       tree.topicIds[3],
     ]);
