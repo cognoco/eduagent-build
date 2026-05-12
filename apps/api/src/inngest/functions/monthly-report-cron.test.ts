@@ -242,6 +242,9 @@ const SAMPLE_METRICS = {
 interface CronResult {
   status: string;
   queuedPairs: number;
+  totalPairs: number;
+  queuedBatches: number;
+  failedBatches: number;
 }
 
 interface CronMockStep {
@@ -519,13 +522,7 @@ describe('monthlyReportCron', () => {
       const result = (await handler({
         event: { name: 'inngest/function.invoked' },
         step: mockStep,
-      })) as {
-        status: string;
-        queuedPairs: number;
-        totalPairs: number;
-        queuedBatches: number;
-        failedBatches: number;
-      };
+      })) as CronResult;
 
       expect(sendEventCalls).toBe(3);
       expect(result.status).toBe('partial');

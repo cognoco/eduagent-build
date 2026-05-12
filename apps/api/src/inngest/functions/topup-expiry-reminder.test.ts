@@ -54,6 +54,12 @@ import { topupExpiryReminder } from './topup-expiry-reminder';
 
 const NOW = new Date('2025-07-15T09:00:00.000Z');
 
+interface TopupExpiryResult {
+  status: string;
+  totalReminders: number;
+  timestamp: string;
+}
+
 interface TopupMockStep {
   run: jest.Mock;
   sendEvent: jest.Mock;
@@ -61,7 +67,7 @@ interface TopupMockStep {
 }
 
 async function executeSteps(): Promise<{
-  result: unknown;
+  result: TopupExpiryResult;
   mockStep: TopupMockStep;
   stepResults: Record<string, unknown>;
 }> {
@@ -79,10 +85,10 @@ async function executeSteps(): Promise<{
   };
 
   const handler = (topupExpiryReminder as any).fn ?? topupExpiryReminder;
-  const result = await handler({
+  const result = (await handler({
     event: { name: 'inngest/function.invoked' },
     step: mockStep,
-  });
+  })) as TopupExpiryResult;
 
   return { result, mockStep, stepResults };
 }
@@ -137,10 +143,7 @@ describe('topupExpiryReminder', () => {
       .mockResolvedValueOnce([]) // 2-month milestone
       .mockResolvedValueOnce([]); // 0-month (expiring today)
 
-    const { result, mockStep } = (await executeSteps()) as unknown as {
-      result: { totalReminders: number };
-      mockStep: { sendEvent: jest.Mock };
-    };
+    const { result, mockStep } = await executeSteps();
 
     expect(result.totalReminders).toBe(1);
     // [SWEEP-J7] Memoized step.sendEvent carrying the array of per-credit
@@ -187,10 +190,7 @@ describe('topupExpiryReminder', () => {
       .mockResolvedValueOnce([credit2]) // 2-month milestone
       .mockResolvedValueOnce([]); // 0-month
 
-    const { result, mockStep } = (await executeSteps()) as unknown as {
-      result: { totalReminders: number };
-      mockStep: { sendEvent: jest.Mock };
-    };
+    const { result, mockStep } = await executeSteps();
 
     expect(result.totalReminders).toBe(2);
     // Two milestones produced credits → two memoized step.sendEvent calls.

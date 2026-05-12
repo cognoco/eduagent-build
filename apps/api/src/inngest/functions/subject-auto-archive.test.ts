@@ -30,11 +30,16 @@ interface SubjectAutoArchiveResult {
   timestamp: string;
 }
 
+interface SubjectAutoArchiveMockStep {
+  run: jest.Mock;
+  sleep: jest.Mock;
+}
+
 async function executeSteps(): Promise<{
   result: SubjectAutoArchiveResult;
-  mockStep: { run: jest.Mock; sleep: jest.Mock };
+  mockStep: SubjectAutoArchiveMockStep;
 }> {
-  const mockStep = {
+  const mockStep: SubjectAutoArchiveMockStep = {
     run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
     sleep: jest.fn(),
   };

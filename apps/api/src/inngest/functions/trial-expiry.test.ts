@@ -101,6 +101,8 @@ import { trialExpiry } from './trial-expiry';
 const NOW = new Date('2025-01-15T00:00:00.000Z');
 
 interface TrialExpiryResult {
+  status: string;
+  date: string;
   expiredCount: number;
   extendedExpiredCount: number;
   warningsSent: number;
