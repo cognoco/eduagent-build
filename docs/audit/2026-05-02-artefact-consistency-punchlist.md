@@ -137,6 +137,11 @@
   - Severity: YELLOW; Effort: ~2 hr (PR #135 only fixed migration 0017; broader audit pending)
   - Why: closes the CLAUDE.md "Schema And Deploy Safety" rule across history
 
+- **AUDIT-TS6307-EVAL-LLM-FLOWS** (synthesized 2026-05-12) Residual TS6307 ("File not listed within the file list of project") errors on `apps/api/eval-llm/flows/*.ts` when running `pnpm exec tsc --noEmit -p apps/api/tsconfig.spec.json` manually.
+  - Severity: GREEN (cosmetic — CI path is jest + ts-jest, which doesn't consult `tsconfig.spec.json`'s `include`); Effort: ~5 min
+  - Origin: surfaced while closing PR-15d as no-op. D-C6-1 is a resolved decision with no live owner, so this is recorded here for paper trail only — no committed PR.
+  - Fix when annoying: extend `apps/api/tsconfig.spec.json` `include` to cover `eval-llm/**`, verify with the same re-grep.
+
 ## Formerly unclassified findings (now resolved)
 
 _(AUDIT-INNGEST-2 recon completed 2026-05-02; promoted to Track B above with concrete file list.)_
