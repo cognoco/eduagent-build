@@ -28,6 +28,12 @@ allowed_files="$(grep -oE '\`[^`]+\`' "$wo" \
     | grep -E '\.[a-zA-Z][a-zA-Z0-9]*$' \
     | sort -u || true)"
 
+# Snapshot the original work-order claim set before any unions below.
+# Used by the post-fix shrinkage detection so that validate-phase test files
+# committed by the validate node (and possibly reverted by fix-locally) are
+# NOT mis-reported as "claimed but not delivered" (AW-001).
+claimed_files="$allowed_files"
+
 if [[ -z "$allowed_files" ]]; then
     echo "ERROR: no file paths found in work-order.md — failing closed" >&2
     echo "  (treating all files as allowed would silently disable the scope guard;" >&2
@@ -233,7 +239,7 @@ if [[ -d "${artifacts_dir}/review" ]]; then
         if ! echo "$changed_files" | grep -qxF "$claimed"; then
             echo "$claimed" >> "$reverted_file"
         fi
-    done <<< "$allowed_files"
+    done <<< "$claimed_files"
     reverted_count="$(grep -c . "$reverted_file" 2>/dev/null || echo 0)"
     if [[ "${reverted_count:-0}" -gt 0 ]]; then
         echo "Scope guard: ${reverted_count} claimed file(s) not in final diff (recorded in .reverted-files)"

@@ -70,10 +70,6 @@ case "$severity" in
     *) echo "ERROR: --severity must be P0|P1|P2|P3 (got: $severity)" >&2; exit 64;;
 esac
 
-if ! command -v doppler >/dev/null 2>&1; then
-    echo "ERROR: doppler CLI not on PATH." >&2
-    exit 1
-fi
 if ! command -v jq >/dev/null 2>&1; then
     echo "ERROR: jq not on PATH." >&2
     exit 1
@@ -81,12 +77,18 @@ fi
 
 # Prefer NOTION_API_KEY from the environment (Archon injects codebase env vars
 # into bash nodes). Fall back to Doppler CLI for interactive / non-Archon use.
+# The doppler binary check is gated inside the else branch so machines that
+# have NOTION_API_KEY set but no doppler installed still succeed (AW-003).
 doppler_err="$(mktemp)"
 response=""
 trap 'rm -f "$doppler_err" "$response"' EXIT
 if [[ -n "${NOTION_API_KEY:-}" ]]; then
     echo "Using NOTION_API_KEY from environment" >&2
 else
+    if ! command -v doppler >/dev/null 2>&1; then
+        echo "ERROR: NOTION_API_KEY not set and doppler CLI not on PATH." >&2
+        exit 1
+    fi
     if NOTION_API_KEY="$(doppler secrets get NOTION_API_KEY --plain -p mentomate -c dev 2>"$doppler_err")"; then
         doppler_rc=0
     else
