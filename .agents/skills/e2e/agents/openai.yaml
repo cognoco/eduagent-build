@@ -1,0 +1,6 @@
+interface:
+  display_name: "E2E"
+  short_description: "Run mobile Maestro E2E checks"
+  default_prompt: "Use $e2e to run a mobile Maestro smoke test."
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,6 @@
+interface:
+  display_name: "Notion"
+  short_description: "EduAgent Notion workflow rules"
+  default_prompt: "Use $notion before working with EduAgent Notion databases."
+policy:
+  allow_implicit_invocation: true

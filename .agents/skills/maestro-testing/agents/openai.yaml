@@ -1,0 +1,6 @@
+interface:
+  display_name: "Maestro Testing"
+  short_description: "Write reliable Maestro mobile flows"
+  default_prompt: "Use $maestro-testing to write or debug a Maestro mobile E2E flow."
+policy:
+  allow_implicit_invocation: true

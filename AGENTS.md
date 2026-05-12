@@ -3,43 +3,56 @@
 ## Snapshot
 
 - Mobile: ~80 screens, 225 test suites, ~2,390 tests
-- API: 42 route groups, 187 test suites, ~3,470 tests, 40 Inngest functions
-- Cross-package integration tests: 36 suites in `tests/integration/`, ~290 cases
+- API: 42 route groups, 187 test suites, ~3,470 tests, 41 Inngest functions
+- Cross-package integration tests: 42 suites in `tests/integration/`, ~290 cases
 - Monorepo: `apps/api`, `apps/mobile`, shared packages in `packages/`
 - Core docs: `docs/project_context.md`, `docs/architecture.md`, relevant spec/plan under `docs/plans/` or `docs/specs/`
 
 > Counts verified 2026-05-06. Test-case totals are a heuristic grep of `it(` / `test(` line starts; jest-reported totals may be slightly higher due to `it.each(...)` expansion at runtime. Re-verify with `git ls-files | grep '\.test\.'` for suite counts.
 
-## Read This Before Editing
+## Codex Initialization
 
-1. Start with the relevant plan/spec if one exists for the task.
-2. Use `docs/project_context.md` for repo-specific implementation rules.
-3. Use `docs/architecture.md` when the change touches routing, data access, background jobs, or deployment.
+1. Read this file before editing.
+2. Start with the relevant plan/spec if one exists for the task.
+3. Use `docs/project_context.md` for repo-specific implementation rules.
+4. Use `docs/architecture.md` when the change touches routing, data access, background jobs, or deployment.
+5. For substantial repo work, durable decisions, repeated feedback, or any request involving "memory", use `$project-memory` and read `.claude/memory/MEMORY.md` plus only the relevant linked memory files.
+
+Memory is context, not law. If memory conflicts with this file, current docs, code, or explicit user instructions, follow the higher-priority source and update/archive the stale memory when appropriate.
+
+## Codex Native Support
+
+- Repo-scoped Codex skills live in `.agents/skills/<skill-name>/SKILL.md`.
+- Use `$commit` for commits in Codex. This is the Codex-native equivalent of Claude's `/commit` workflow.
+- Use `$project-memory` to read, create, update, or archive project memory.
+- Use `$build` for safe EAS build checks/triggers, `$e2e` for mobile Maestro smoke runs, and `$maestro-testing` when writing or debugging Maestro flows.
+- Use `$deep-bugfixing` for adversarial runtime-assumption reviews, `$audit-status` for `docs/audit/cleanup-plan.md`, `$learning-evolution-next` for the learning-product evolution audit, and `$notion` before touching EduAgent/MentoMate Notion work items.
+- `.codex/prompts/` contains BMAD-generated prompt stubs, but it is not the reliable Codex-native slash-command mechanism in this setup. Do not add new repo workflows there unless Codex prompt discovery is re-verified.
+- Do not symlink Claude commands into Codex. Port useful workflows into `.agents/skills/` instead.
+
+## Git Commits
+
+Always use `$commit` for all commits in Codex. Never use ad-hoc commit flows, `--no-verify`, or broad staging without first checking scope. `$commit` is the single source of truth for staging, message format, hook handling, and push behavior.
+
+Subagents must never run `git add`, `git commit`, or `git push`, except when a structured workflow explicitly prescribes the git step or the user explicitly asks for a one-off commit subagent. The coordinator commits sequentially.
 
 ## Non-Negotiable Engineering Rules
 
 - `@eduagent/schemas` is the shared contract. Do not redefine API-facing types locally.
-- Hono route files keep handlers inline for RPC inference, but business logic belongs in `services/`.
-- Route files must not import ORM primitives, schema tables, or `createScopedRepository`.
-- Reads must use `createScopedRepository(profileId)`.
+- Business logic belongs in `services/`, not in route handlers. Route/service boundaries are lint-enforced (eslint G1 and G5 in `eslint.config.mjs`).
+- Reads must use `createScopedRepository(profileId)` when the query operates on a single scoped table. For queries that join through a parent chain, use direct `db.select()` and enforce `profileId` through the closest owning ancestor in the WHERE clause. Existing examples: `services/session/session-topic.ts`, `session-book.ts`, `session-subject.ts`.
 - Writes must include explicit `profileId` protection or verify ownership through the parent chain before updating child records.
 - Shared mobile components stay persona-unaware. Use semantic tokens and CSS variables, not persona checks or hardcoded hex colors.
 - Durable async work goes through Inngest. Do not fire-and-forget background work from route handlers.
-- LLM calls go through `services/llm/router.ts` (or its barrel), not direct provider SDK calls.
-- LLM responses that drive state-machine decisions (close interview, hold escalation, trigger UI widget) must use the structured response envelope (`llmResponseEnvelopeSchema` from `@eduagent/schemas`). Parse with `parseEnvelope()` from `services/llm/envelope.ts`. Never embed `[MARKER]` tokens or JSON blobs in free-text replies. Every envelope signal must have a server-side hard cap (e.g., `MAX_INTERVIEW_EXCHANGES = 4`) so the flow terminates even if the LLM never emits the signal. See `docs/architecture.md` → "LLM Response Envelope" for the full contract.
-- When changing LLM prompts, run the eval harness (`pnpm eval:llm`) to snapshot before/after across the 5 fixture profiles. Use `pnpm eval:llm --live` (Tier 2) to validate real LLM responses against `expectedResponseSchema` when set. Harness code: `apps/api/eval-llm/`.
-- Subagents (agents spawned via the Agent tool) must NEVER run `git add`, `git commit`, or `git push`. Only the coordinator (main conversation) commits. Subagents write code, run tests, and report which files they changed — the coordinator commits their work sequentially using `/commit`.
+- LLM calls go through `services/llm/router.ts` or its barrel, not direct provider SDK calls.
+- LLM responses that drive state-machine decisions must use the structured response envelope (`llmResponseEnvelopeSchema` from `@eduagent/schemas`). Parse with `parseEnvelope()` from `services/llm/envelope.ts`. Never embed marker tokens or JSON blobs in free-text replies. Every envelope signal must have a server-side hard cap. See `docs/architecture.md` -> "LLM Response Envelope".
+- When changing LLM prompts (`apps/api/src/services/**/*-prompts.ts` or `apps/api/src/services/llm/*.ts`), run `pnpm eval:llm` to snapshot before/after, and `pnpm eval:llm --live` when validating real LLM responses against `expectedResponseSchema`. The pre-commit hook only checks that snapshot files are staged; it does not run the harness.
 
-## Known Exceptions to Engineering Rules
+## Known Exceptions
 
-These deviations from the rules above exist in the codebase as of 2026-05-01. They are listed here so reviewers don't try to "fix" them in unrelated PRs and so new contributors don't take them as precedent. Each exception should either be tracked toward a refactor, or promoted into an explicit rule.
+These deviations exist so reviewers do not try to fix them in unrelated PRs.
 
-- **`apps/api/src/routes/sessions.ts` imports `drizzle-orm` primitives directly**, in violation of the "Route files must not import ORM primitives" rule. The exact import (verifiable via `grep -n "from 'drizzle-orm'" apps/api/src/routes/sessions.ts`) is:
-  ```ts
-  import { and, eq, lt, sql } from 'drizzle-orm';
-  ```
-  This predates the rule and has not been refactored. **New route code must NOT follow this pattern** — keep ORM access inside `services/` and `createScopedRepository`. Treat this file as the *only* sanctioned exception, not as a license. To re-verify the "only" claim: `grep -lE "from 'drizzle-orm'" apps/api/src/routes/*.ts` should return exactly `apps/api/src/routes/sessions.ts` and nothing else. (Earlier drafts of this list also named `routes/quiz.ts`; that was incorrect — `quiz.ts` has zero ORM imports and contains an explicit in-file guard against them.)
-- **`apps/mobile/tsconfig.json` declares `references[]: [{ "path": "../api" }]`**, in tension with the conceptual "mobile must not depend on api" rule. This is required so `import type { AppType } from '@eduagent/api'` resolves for the Hono RPC client. **Type-only imports** from `@eduagent/api` are accepted; runtime imports remain forbidden (they would pull API server code into the mobile bundle). See `docs/architecture.md` → "AppType" example for the rationale.
+- `apps/mobile/tsconfig.json` declares `references[]: [{ "path": "../api" }]` so `import type { AppType } from '@eduagent/api'` resolves for the Hono RPC client. Type-only imports from `@eduagent/api` are accepted; runtime imports remain forbidden.
 
 ## Schema And Deploy Safety
 
@@ -48,99 +61,80 @@ These deviations from the rules above exist in the codebase as of 2026-05-01. Th
 - Never run `drizzle-kit push` against staging or production.
 - A worker deploy does not migrate Neon. Apply the target migration before shipping code that reads new columns.
 - Keep staging and production database credentials separate in CI. Never let staging deploys point at production data.
-- Any migration that drops columns, tables, or types must include a `## Rollback` section in the plan specifying: (a) whether rollback is possible, (b) what data is lost, (c) what the recovery procedure is. If rollback is impossible, say so explicitly — "rollback is not possible, data is permanently destroyed."
+- Any migration that drops columns, tables, or types must include a `## Rollback` section in the plan specifying whether rollback is possible, what data is lost, and the recovery procedure. If rollback is impossible, say so explicitly.
 
 ## Required Validation
 
-Run the smallest useful verification first, then the project-level checks for the touched area.
+Unit tests, lint, typecheck, and formatting are enforced by pre-commit hooks (`lint-staged`, `tsc --build`, `scripts/pre-commit-tests.sh`). Verify locally while iterating, and focus on what hooks do not cover:
 
-- Targeted tests: `pnpm exec jest --findRelatedTests <changed-files> --no-coverage`
-- API lint/typecheck: `pnpm exec nx run api:lint` and `pnpm exec nx run api:typecheck`
-- Mobile lint/typecheck: `pnpm exec nx lint mobile` and `cd apps/mobile && pnpm exec tsc --noEmit`
-- Run integration tests when changing DB behavior, auth/profile scoping, Inngest flows, or cross-package contracts.
-
-Do not call work complete if related tests, lint, typecheck, or required migrations are still failing.
-- No suppression, no shortcuts — always address the root of the error. Never use `eslint-disable` or suppress warnings to make lint pass. Fix the actual code or improve the lint rule to handle the pattern correctly.
+- Run integration tests when changing DB behavior, auth/profile scoping, Inngest flows, or cross-package contracts. The pre-commit hook intentionally skips `.integration.test.` files.
+- Do not call work complete if related tests, lint, typecheck, required migrations, or required eval snapshots are still failing.
+- No suppression, no shortcuts. Never use `eslint-disable` or suppress warnings to make lint pass. Fix the code or improve the lint rule.
 
 ## Repo-Specific Guardrails
 
 - Default exports are only for Expo Router page components.
 - Tests are co-located with source files. Do not create `__tests__/` folders.
-- Package imports go through the package barrel (`@eduagent/schemas`, `@eduagent/database`, etc.).
+- Package imports go through the package barrel, enforced by `@nx/enforce-module-boundaries`.
 - SecureStore keys must use Expo-safe characters only: letters, numbers, `.`, `-`, `_`.
 - In API code, use the typed config object instead of raw `process.env` reads.
-- Cross-tab / cross-stack `router.push` calls must push the full ancestor chain, not just the leaf. A direct push to `shelf/[subjectId]/book/[bookId]` from another tab synthesizes a 1-deep stack containing only the leaf, so `router.back()` falls through to the Tabs first-route (Home). Either push the parent first then the child, or rely on `unstable_settings.initialRouteName` in the nested layout — but the rule of thumb is to push the chain. `unstable_settings` only seeds one level, so it does not protect future deeper paths (e.g. `shelf/[subjectId]/book/[bookId]/chapter/[chapterId]`).
+- Cross-tab / cross-stack `router.push` calls must push the full ancestor chain, not just the leaf.
 - Any new nested Expo Router layout that contains both an `index` screen and a deeper dynamic child must export `unstable_settings = { initialRouteName: 'index' }` as a safety net for cross-stack deep pushes.
 
 ## UX Resilience Rules
 
-These rules prevent dead-end states where users get stuck with no actionable escape. Learned from a full-app UX audit (2026-04-05) that found 44 dead-end issues across all flows.
+- Classify errors at the API client boundary, not per-screen. Screens must never parse HTTP status codes.
+- Define and use a shared typed error hierarchy in the schema package.
+- Primary error fallback action retries or fixes the specific problem; secondary action goes back, home, or signs out. Prefer reusable `ErrorFallback` and `TimeoutLoader`.
+- Every feature spec/story must include a Failure Modes table with: State, Trigger, User sees, Recovery.
+- For every event handler, cron function, or background job, verify something actually dispatches the event or schedules the cron in production code.
 
-- **Classify errors at the API client boundary, not per-screen.** Distinguish quota exhausted, forbidden, gone, network error, etc. in middleware. Screens must never parse HTTP status codes.
-- **Typed error hierarchy.** Define a shared error class hierarchy in the schema package (e.g., `QuotaExhaustedError`, `ResourceGoneError`, `ForbiddenError`). The API client middleware classifies HTTP responses into typed errors ONCE. Screens switch on error type.
-- **Standard error fallback pattern.** Primary action retries / fixes the specific problem; secondary action goes back / home / signs out. Build reusable `ErrorFallback` and `TimeoutLoader` components rather than ad-hoc per-screen handling.
-- **Spec failure modes before coding.** Every feature spec / story must include a Failure Modes table with columns: State, Trigger, User sees, Recovery. If the Recovery column can't be filled, the design isn't complete.
-- **End-to-end feature tracing.** For every event handler, cron function, or background job, verify something actually dispatches the event or schedules the cron in production code. Wired-but-untriggered code is worse than dead code — it creates false confidence.
+## Fix Development Rules
 
-## Fix Verification Rules
+Changed code is not fixed code. Every fix must be verified.
 
-Changed code is not fixed code. Every fix must be verified, not just applied. These rules apply to all bug fixes, security patches, and review-finding resolutions.
-
-- **Security fixes require a "break test."** Every fix tagged CRITICAL or HIGH in a security or data-integrity context must include at least one negative-path test that attempts the exact attack being prevented (unauthorized access, missing auth, invalid input). Use the red-green regression pattern (see `superpowers:verification-before-completion` → "Regression tests"): write the test, watch it pass, revert the fix, watch it fail, restore.
-- **Silent recovery without escalation is banned.** Any `catch` block or fallback path in billing, auth, or webhook code that silently recovers must also emit a structured metric or Inngest event. `console.warn` alone is never sufficient — if you can't query how many times the fallback fired in the last 24 hours, the "recovery" is invisible.
-- **Fix tables must include a "Verified By" column** with one of: `test: file.test.ts:"test name"`, `manual: description`, or `N/A: reason`. An empty cell means the fix is PARTIAL, not DONE.
-- **Fix commits must reference the finding ID** — e.g. `fix(api): atomic quota decrement [CR-1C.1]`. This makes `git log --grep="CR-1C"` useful and links code changes to the discovery that motivated them.
+- Security fixes tagged CRITICAL or HIGH require a negative-path break test that attempts the exact attack being prevented.
+- Silent recovery without escalation is banned in billing, auth, and webhook code. Emit a structured metric or Inngest event; `console.warn` alone is not enough.
+- When fixing a drift that has 3+ sibling locations, either install a forward-only guard test and sweep all current sites in the same PR, or document a deferred sweep with tracked ID, owner, and target date.
+- Commit-specific rules such as finding IDs, Verified-By tables, and sweep-audit blocks live in `$commit`.
 
 ## Code Quality Guards
 
-These rules catch bugs that survive type-checking and only surface at runtime. Learned from adversarial review (2026-04-05).
-
-- **No internal mocks in integration tests.** Never `jest.mock` your own database, services, or middleware in integration tests. Mock only true external boundaries (Stripe, Clerk JWKS, email providers, push notification services). Internal mocks hide real bugs.
-- **Response bodies are single-use.** Never call both `.json()` and `.text()` on the same `fetch` Response — the body stream is consumed on first read. If you need both JSON parsing with a text fallback, read `.text()` once and `JSON.parse` it manually. Applies to `assertOk`-style helpers, error-extraction middleware, and SSE error handlers.
-- **Classify errors before formatting.** When code branches on error *type* (reconnectable vs. fatal, quota vs. network) and also formats errors for display, classify the **raw** error object first, then format for the user. Never string-match on the output of `formatApiError` — the formatter strips status codes, error codes, and keywords classifiers depend on.
-- **Clean up all artifacts when removing a feature.** Grep the entire project for all references: types, imports, constants, SecureStore keys, commented-out JSX, fallback branches. Orphaned types create false confidence, unreachable fallback branches inflate coverage, leaked storage keys waste device storage forever.
-- **Verify JSX handler references exist.** Every `onPress`, `onSubmit`, or event handler referenced in JSX must be defined or imported in the component scope. A missing handler is a **runtime crash** (`ReferenceError`), not a lint warning. After adding any `Pressable`/`Button`, search the file for the handler name before committing.
+- No internal mocks in integration tests. Mock only true external boundaries such as Stripe, Clerk JWKS, email providers, push notification services, and LLM providers.
+- No new internal relative-path `jest.mock()` in tests unless genuinely required; use `jest.requireActual()` with targeted overrides. If unavoidable, append `// gc1-allow: <reason>` on the same line.
+- Response bodies are single-use. Never call both `.json()` and `.text()` on the same `fetch` Response.
+- Classify raw errors before formatting. Never string-match on `formatApiError` output.
+- When removing a feature, grep the entire project for all references: types, imports, constants, SecureStore keys, commented-out JSX, and fallback branches.
+- Verify JSX handler references exist after adding any `Pressable` or `Button`.
 
 ## Secrets Management
 
-All secrets are managed through **Doppler**. Never suggest `wrangler secret put`, direct Cloudflare dashboard entry, AWS console, or any other platform-specific secret management. When secrets need to be set, say "add to Doppler."
+All secrets are managed through Doppler. Never suggest `wrangler secret put`, direct Cloudflare dashboard entry, AWS console, or platform-specific secret management. When secrets need to be set, say "add to Doppler."
 
 ## PR Review & CI Protocol
 
-**ALL agents MUST follow this protocol when working with PRs. This is non-negotiable.**
+Before declaring a PR ready to merge:
 
-### Before Declaring a PR "Ready to Merge"
+1. Read the actual PR diff: `gh pr diff <number>`.
+2. Check all CI checks: `gh pr checks <number>`.
+3. Read automated review findings with `gh api repos/{owner}/{repo}/pulls/<number>/reviews` and `gh api repos/{owner}/{repo}/pulls/<number>/comments`.
+4. Never dismiss review failures as OK to merge.
 
-1. **Read the actual PR diff** — run `gh pr diff <number>` to see what files are actually changed relative to the base branch. Do NOT assume from commit messages alone.
-2. **Check all CI checks** — run `gh pr checks <number>`. ALL checks must pass, including automated code reviews (Codex Review, etc.).
-3. **Read automated code review findings** — if a code review check exists, fetch and triage findings:
-   ```bash
-   gh pr checks <number>
-   gh api repos/{owner}/{repo}/pulls/<number>/reviews
-   gh api repos/{owner}/{repo}/pulls/<number>/comments
-   ```
-   - **High (Must fix):** Security issues, data loss risks, correctness bugs — MUST be fixed before merge
-   - **Medium:** Best practice violations, missing validation, config issues — SHOULD be fixed before merge
-   - **Low:** Style, docs, minor improvements — can be deferred but note them
-4. **NEVER dismiss review failures as "OK to merge."** Automated code review catches real bugs, security issues, and architectural violations. Treat findings with the same weight as a senior engineer's review.
+When rebasing PRs:
 
-### When Rebasing PRs
-
-- After rebase, always verify the PR diff (`gh pr diff`) — merge strategies like `-X theirs` can silently drop code.
+- After rebase, always verify the PR diff.
 - Check for duplicate functions/tests, missing imports, and schema export gaps.
-- Run type checking (`tsc --noEmit`) to catch errors before pushing.
+- Run type checking before pushing.
 
 ## On Compaction
 
-When the conversation is compacted, preserve at minimum:
+When conversation context is compacted, preserve at minimum:
 
-- The full list of files modified in this session (paths only, no diffs).
-- Names and reproductions of any failing tests, lint errors, or typecheck errors not yet resolved.
-- The active plan or task list — current step, next step, and anything blocked.
-- The current branch name and which base branch it tracks.
-- Any decisions made in conversation that aren't reflected in the diff yet (e.g., "we agreed to defer X").
-
-It is fine to discard: tool-call output bodies, exploratory file reads that didn't change anything, and resolved error messages.
+- Full list of files modified in this session.
+- Names and reproductions of failing tests, lint errors, or typecheck errors not yet resolved.
+- Active plan/task list, current step, next step, and anything blocked.
+- Current branch name and which base branch it tracks.
+- Decisions made in conversation that are not reflected in the diff yet.
 
 ## Handy Commands
 
@@ -166,15 +160,12 @@ pnpm run db:generate
 pnpm run db:migrate:dev
 
 # LLM Eval Harness
-pnpm eval:llm                    # Tier 1: snapshot prompts (no LLM call)
-pnpm eval:llm --live             # Tier 2: real LLM call + schema validation
+pnpm eval:llm
+pnpm eval:llm --live
 
 # Playwright E2E (web)
-# IMPORTANT: Must use Doppler with -c stg to match .dev.vars (which is generated from stg config).
-# Using default Doppler config (dev) causes TEST_SEED_SECRET mismatch → 403 on seed endpoint.
-C:/Tools/doppler/doppler.exe run -c stg -- pnpm run test:e2e:web:smoke   # smoke only (~1-2 min)
-C:/Tools/doppler/doppler.exe run -c stg -- pnpm run test:e2e:web         # full suite
-# CLERK_TESTING_TOKEN is currently a placeholder — tests work without it but Clerk may rate-limit.
+C:/Tools/doppler/doppler.exe run -c stg -- pnpm run test:e2e:web:smoke
+C:/Tools/doppler/doppler.exe run -c stg -- pnpm run test:e2e:web
 ```
 
-Last updated: 2026-04-30
+Last updated: 2026-05-12
