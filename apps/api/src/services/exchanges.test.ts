@@ -75,12 +75,13 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('Crisp, professional');
   });
 
-  // [B.5] Fallback when birthYear is null: resolveAgeBracket returns 'adult',
-  // and the bracket-only path honours the explicit bracket, returning ADULT_VOICE.
-  it('falls back to ADULT voice when birthYear is unavailable (bracket = adult)', () => {
+  // [B.5] Fallback when birthYear is null: resolveAgeBracket returns
+  // 'adolescent' (defence-in-depth — unknown age takes the minor-safe path),
+  // so the bracket-only mapping produces TEEN_VOICE.
+  it('falls back to TEEN voice when birthYear is unavailable (bracket = adolescent)', () => {
     const prompt = buildSystemPrompt({ ...baseContext, birthYear: null });
-    expect(prompt).toContain('Crisp, professional');
-    expect(prompt).not.toContain('Peer-adjacent and matter-of-fact');
+    expect(prompt).toContain('Peer-adjacent and matter-of-fact');
+    expect(prompt).not.toContain('Crisp, professional');
   });
 
   // [B.5] Age-calibration anchors rephrased for the strict 11+ product.
@@ -241,7 +242,18 @@ describe('buildSystemPrompt', () => {
       homeworkMode: 'check_answer',
     });
     expect(prompt).toContain('1-2 sentences');
-    expect(prompt).toContain('Teens want speed');
+    expect(prompt).toContain('Young learners want speed');
+  });
+
+  it('uses youth brevity in homework mode for child learners', () => {
+    const prompt = buildSystemPrompt({
+      ...baseContext,
+      birthYear: currentYear - 11,
+      sessionType: 'homework',
+      homeworkMode: 'check_answer',
+    });
+    expect(prompt).toContain('1-2 sentences');
+    expect(prompt).toContain('Young learners want speed');
   });
 
   it('uses standard brevity in homework mode for adult learners', () => {
@@ -252,7 +264,7 @@ describe('buildSystemPrompt', () => {
       homeworkMode: 'check_answer',
     });
     expect(prompt).toContain('2-6 sentences');
-    expect(prompt).not.toContain('Teens want speed');
+    expect(prompt).not.toContain('Young learners want speed');
   });
 
   // Regression: a homework problem about Spain loaded inside a Geography-of-Africa

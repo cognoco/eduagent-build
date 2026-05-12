@@ -30,6 +30,8 @@ let mockProfileData: Record<string, unknown> = {
   interests: [],
 };
 
+let mockActiveProfileBirthYear: number | undefined;
+
 const mockPlatformAlert = jest.fn();
 
 jest.mock('react-native-safe-area-context', () => ({
@@ -61,9 +63,11 @@ jest.mock('../../lib/profile', () => ({
       conversationLanguage: 'en',
       pronouns: null,
       consentStatus: null,
+      get birthYear() {
+        return mockActiveProfileBirthYear;
+      },
     },
   }),
-  personaFromBirthYear: () => 'learner',
   ProfileContext: {
     Provider: ({ children }: { children: React.ReactNode }) => children,
   },
@@ -300,6 +304,44 @@ describe('MentorMemoryScreen — accommodation helper copy is role-gated [BUG-91
 
     expect(screen.queryByTestId('accommodation-badge')).toBeNull();
     expect(screen.queryByTestId('accommodation-set-by-parent')).toBeNull();
+  });
+});
+
+describe('MentorMemoryScreen — accommodation badge text by age bracket', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockProfileData = {
+      ...mockProfileBase,
+      interests: [],
+      accommodationMode: 'audio-first',
+    };
+  });
+
+  afterEach(() => {
+    mockActiveProfileBirthYear = undefined;
+  });
+
+  it('shows young label for child bracket', async () => {
+    mockActiveProfileBirthYear = new Date().getFullYear() - 10;
+    render(<MentorMemoryScreen />, { wrapper: makeWrapper() });
+    const badge = await screen.findByTestId('accommodation-badge');
+    expect(badge).toHaveTextContent(
+      'Your mentor uses a special way to teach you!',
+    );
+  });
+
+  it('shows mid label for adolescent bracket', async () => {
+    mockActiveProfileBirthYear = new Date().getFullYear() - 15;
+    render(<MentorMemoryScreen />, { wrapper: makeWrapper() });
+    const badge = await screen.findByTestId('accommodation-badge');
+    expect(badge).toHaveTextContent(/Learning style: Audio-First/);
+  });
+
+  it('shows mid label when birthYear is null (adolescent fallback)', async () => {
+    mockActiveProfileBirthYear = undefined;
+    render(<MentorMemoryScreen />, { wrapper: makeWrapper() });
+    const badge = await screen.findByTestId('accommodation-badge');
+    expect(badge).toHaveTextContent(/Learning style: Audio-First/);
   });
 });
 

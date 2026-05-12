@@ -315,7 +315,7 @@ export default function SessionScreen() {
  * metacognitive intent (learner signals uncertainty about their own
  * understanding) but adjust phrasing to fit the learner's voice.
  *
- * Brackets follow `personaFromBirthYear` thresholds (under 13 / 13–17 / 18+).
+ * Brackets follow `computeAgeBracket` thresholds (under 13 / 13–17 / 18+).
  * `null` birthYear falls back to the middle bracket — neutral default.
  */
 function getConfidenceCopy(birthYear: number | null): {

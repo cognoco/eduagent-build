@@ -5,8 +5,8 @@ description: |
   Input: PR identifier (e.g. "PR-08", "PR-15", "08", "15")
   Output: GitHub PR ready for human review.
 
-  DRAFT — not yet replacing execute-cleanup-pr-{claude,codex}.yaml.
-  Replaces the dual-flavor bake-off with a single merged flow.
+  Canonical cleanup-PR workflow. Replaced the earlier dual-flavor
+  execute-cleanup-pr-{claude,codex}.yaml variants with a single merged flow.
   Audit + rationale: .archon/workflow-audit.md (Phase D).
 
   Provider/model selection (verify with audit doc):

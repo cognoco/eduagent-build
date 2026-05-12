@@ -17,11 +17,22 @@ describe('buildGuessWhoPrompt', () => {
     });
 
     expect(prompt).toContain('4');
-    // AgeBracket 'adolescent' now describes 11-13 after the <11 dead-code cleanup.
-    expect(prompt).toContain('11-13');
+    // AgeBracket 'adolescent' describes 13-17 in the three-way bracket.
+    expect(prompt).toContain('13-17');
     expect(prompt).toContain('Isaac Newton');
     expect(prompt).toContain('Classical mechanics');
     expect(prompt).toContain('History and science');
+  });
+
+  it('includes age description for child bracket', () => {
+    const prompt = buildGuessWhoPrompt({
+      discoveryCount: 4,
+      ageBracket: 'child',
+      recentAnswers: [],
+      topicTitles: ['Animals'],
+    });
+
+    expect(prompt).toContain('under 13');
   });
 
   it('uses generic fallback when no topics are available', () => {

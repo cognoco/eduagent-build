@@ -17,7 +17,8 @@ import {
   type OverdueSubject,
   type OverdueTopic,
 } from '../../../hooks/use-progress';
-import { useProfile, personaFromBirthYear } from '../../../lib/profile';
+import { useProfile } from '../../../lib/profile';
+import { computeAgeBracket } from '@eduagent/schemas';
 import { goBackOrReplace, homeHrefForReturnTo } from '../../../lib/navigation';
 import { formatApiError } from '../../../lib/format-api-error';
 import { useParentProxy } from '../../../hooks/use-parent-proxy';
@@ -131,10 +132,13 @@ export default function RelearnScreen() {
   const overdueTopics = useOverdueTopics();
   const { activeProfile } = useProfile();
   const { isParentProxy } = useParentProxy();
-  const persona = personaFromBirthYear(activeProfile?.birthYear);
-  const isLearner = persona === 'learner';
-  const methods = isLearner ? TEACHING_METHODS_LEARNER : TEACHING_METHODS;
-  const copy = isLearner ? COPY_LEARNER : COPY_DEFAULT;
+  const ageBracket =
+    activeProfile?.birthYear != null
+      ? computeAgeBracket(activeProfile.birthYear)
+      : 'adolescent';
+  const isMinor = ageBracket !== 'adult';
+  const methods = isMinor ? TEACHING_METHODS_LEARNER : TEACHING_METHODS;
+  const copy = isMinor ? COPY_LEARNER : COPY_DEFAULT;
 
   const [phase, setPhase] = useState<Phase>(directEntry ? 'method' : 'topics');
   const [selectedSubject, setSelectedSubject] = useState<OverdueSubject | null>(

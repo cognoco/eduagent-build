@@ -15,6 +15,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useReducedMotion } from 'react-native-reanimated';
 import { useTranslation } from 'react-i18next';
 import { useRequestConsent } from '../hooks/use-consent';
+import { useProfile } from '../lib/profile';
+import { computeAgeBracket } from '@eduagent/schemas';
 import { useThemeColors } from '../lib/theme';
 import { Button } from '../components/common/Button';
 import { useKeyboardScroll } from '../hooks/use-keyboard-scroll';
@@ -47,7 +49,12 @@ export default function ConsentScreen() {
   const consentType = 'GDPR' as const;
 
   const { user } = useUser();
+  const { activeProfile } = useProfile();
   const { mutateAsync, isPending } = useRequestConsent();
+  const ageBracket =
+    activeProfile?.birthYear != null
+      ? computeAgeBracket(activeProfile.birthYear)
+      : 'adolescent';
   const { isOffline } = useNetworkStatus();
   const reduceMotion = useReducedMotion();
 
@@ -106,11 +113,16 @@ export default function ConsentScreen() {
     [fadeAnim, reduceMotion],
   );
 
-  // Hand-off copy uses learner variant (consent screen is always shown to children).
-  const copy = getConsentHandOffCopy('learner');
+  // Hand-off copy adapts to the active profile's age bracket.
+  // Routing invariant: consent.tsx is only reached when consentStatus is
+  // 'PENDING' or 'PARENTAL_CONSENT_REQUESTED' (see create-profile.tsx and
+  // (app)/_layout.tsx consent-pending gate). Those statuses are only set
+  // for non-owner profiles needing parental approval, so ageBracket is
+  // 'child' or 'adolescent' in practice — adult is never reached here.
+  const copy = getConsentHandOffCopy(ageBracket);
 
-  // Regulation text uses the default (non-learner) variant since the PARENT reads it.
-  const regulationCopy = getConsentRequestCopy('parent');
+  // Regulation text uses adult variant since the PARENT reads it.
+  const regulationCopy = getConsentRequestCopy('adult');
   const regulationText = regulationCopy.regulation;
 
   const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(parentEmail);
