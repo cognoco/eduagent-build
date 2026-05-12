@@ -11,7 +11,10 @@ import {
 import { classifyApiError } from '../../../../../lib/format-api-error';
 import { formatMinutes } from '../../../../../lib/format-relative-date';
 import { ErrorFallback } from '../../../../../components/common';
-import { MetricCard } from '../../../../../components/progress';
+import {
+  MetricCard,
+  PracticeActivitySummaryCard,
+} from '../../../../../components/progress';
 import {
   useChildWeeklyReportDetail,
   useMarkWeeklyReportViewed,
@@ -239,6 +242,11 @@ export default function ChildWeeklyReportDetailScreen(): React.ReactElement {
                 testID="child-weekly-report-metric-test-points"
               />
             </View>
+
+            <PracticeActivitySummaryCard
+              summary={report.reportData.practiceSummary}
+              testID="child-weekly-report-practice-summary"
+            />
 
             {/* BUG-903 (d): Empty-state guidance when nothing happened this */}
             {/* week. Without this, parents see four zero cards and stop. */}

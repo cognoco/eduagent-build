@@ -505,6 +505,13 @@
       "when": 1779000020000,
       "tag": "0071_enable_rls_nudges",
       "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "7",
+      "when": 1779000021000,
+      "tag": "0072_practice_activity_events",
+      "breakpoints": true
     }
   ]
 }

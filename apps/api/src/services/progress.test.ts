@@ -9,6 +9,34 @@ const mockDatabaseModule = createDatabaseModuleMock({
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
+const mockGetPracticeActivitySummary = jest.fn().mockResolvedValue({
+  quizzesCompleted: 0,
+  reviewsCompleted: 0,
+  totals: {
+    activitiesCompleted: 0,
+    reviewsCompleted: 0,
+    pointsEarned: 0,
+    celebrations: 0,
+    distinctActivityTypes: 0,
+  },
+  scores: {
+    scoredActivities: 0,
+    score: 0,
+    total: 0,
+    accuracy: null,
+  },
+  byType: [],
+  bySubject: [],
+});
+
+jest.mock(
+  './practice-activity-summary' /* gc1-allow: unit test boundary */,
+  () => ({
+    getPracticeActivitySummary: (...args: unknown[]) =>
+      mockGetPracticeActivitySummary(...args),
+  }),
+);
+
 import type { Database } from '@eduagent/database';
 import type { SubjectProgress } from '@eduagent/schemas';
 import { createScopedRepository } from '@eduagent/database';

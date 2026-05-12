@@ -10,7 +10,10 @@ import {
 import { classifyApiError } from '../../../../../lib/format-api-error';
 import { formatMinutes } from '../../../../../lib/format-relative-date';
 import { ErrorFallback } from '../../../../../components/common';
-import { MetricCard } from '../../../../../components/progress';
+import {
+  MetricCard,
+  PracticeActivitySummaryCard,
+} from '../../../../../components/progress';
 import {
   useChildReportDetail,
   useMarkChildReportViewed,
@@ -180,6 +183,11 @@ export default function ChildReportDetailScreen(): React.ReactElement {
                 testID="child-report-metric-test-points"
               />
             </View>
+
+            <PracticeActivitySummaryCard
+              summary={report.reportData.practiceSummary}
+              testID="child-report-practice-summary"
+            />
 
             {report.reportData.highlights.length > 0 ? (
               <View

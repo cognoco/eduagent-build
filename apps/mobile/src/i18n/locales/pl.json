@@ -1350,7 +1350,9 @@
       },
       "practice": {
         "quizzes": "quizy ukończone",
-        "reviews": "powtórki zakończone"
+        "reviews": "powtórki zakończone",
+        "tests": "testy",
+        "points": "punkty"
       }
     },
     "monthlyReport": {
@@ -1868,6 +1870,39 @@
       "reportGoneTitle": "Nie znaleziono raportu",
       "testsCompleted": "Testy",
       "testPoints": "Punkty za testy"
+    },
+    "practiceSummary": {
+      "title": "Szczegóły testów",
+      "subtitle": "{{count}} ukończonych testów, w tym {{reviews}} powtórek",
+      "accuracy": "Trafność",
+      "reviews": "Powtórki",
+      "points": "Punkty",
+      "celebrations": "Świętowania",
+      "activityKinds": "Rodzaje",
+      "comparison": "{{tests}} testów · {{points}} punktów · {{celebrations}} świętowań",
+      "byType": "Według typu",
+      "bySubject": "Według przedmiotu",
+      "typeDetail": "{{count}} ukończono · {{points}} punktów",
+      "typeDetailWithScore": "{{count}} ukończono · {{points}} punktów · {{accuracy}}%",
+      "subjectDetail": "{{count}} testów · {{points}} punktów · {{types}}",
+      "unknownSubject": "Nieprzypisane",
+      "activityTypes": {
+        "quiz": "Quiz",
+        "review": "Powtórka",
+        "assessment": "Udowodnij, że to wiem",
+        "dictation": "Dyktando",
+        "recitation": "Recytacja",
+        "fluency_drill": "Ćwiczenie płynności"
+      },
+      "activitySubtypes": {
+        "capitals": "Stolice",
+        "guess_who": "Zgadnij kto",
+        "vocabulary": "Słownictwo",
+        "assessment": "Udowodnij, że to wiem",
+        "dictation": "Dyktando",
+        "recitation": "Recytacja",
+        "fluency_drill": "Ćwiczenie płynności"
+      }
     },
     "session": {
       "error": "Nie można załadować sesji",

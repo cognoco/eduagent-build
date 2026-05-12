@@ -1325,7 +1325,9 @@
       },
       "practice": {
         "quizzes": "quizer fullført",
-        "reviews": "repetisjoner fullført"
+        "reviews": "repetisjoner fullført",
+        "tests": "tester",
+        "points": "poeng"
       }
     },
     "monthlyReport": {
@@ -1843,6 +1845,39 @@
       "reportGoneTitle": "Rapport ikke funnet",
       "testsCompleted": "Tester",
       "testPoints": "Testpoeng"
+    },
+    "practiceSummary": {
+      "title": "Testdetaljer",
+      "subtitle": "{{count}} tester fullført, inkludert {{reviews}} repetisjoner",
+      "accuracy": "Treffprosent",
+      "reviews": "Repetisjoner",
+      "points": "Poeng",
+      "celebrations": "Feiringer",
+      "activityKinds": "Typer",
+      "comparison": "{{tests}} tester · {{points}} poeng · {{celebrations}} feiringer",
+      "byType": "Etter type",
+      "bySubject": "Etter fag",
+      "typeDetail": "{{count}} fullført · {{points}} poeng",
+      "typeDetailWithScore": "{{count}} fullført · {{points}} poeng · {{accuracy}}%",
+      "subjectDetail": "{{count}} tester · {{points}} poeng · {{types}}",
+      "unknownSubject": "Ikke tilordnet",
+      "activityTypes": {
+        "quiz": "Quiz",
+        "review": "Repetisjon",
+        "assessment": "Bevis at jeg kan det",
+        "dictation": "Diktat",
+        "recitation": "Resitasjon",
+        "fluency_drill": "Flytøvelse"
+      },
+      "activitySubtypes": {
+        "capitals": "Hovedsteder",
+        "guess_who": "Gjett hvem",
+        "vocabulary": "Ordforråd",
+        "assessment": "Bevis at jeg kan det",
+        "dictation": "Diktat",
+        "recitation": "Resitasjon",
+        "fluency_drill": "Flytøvelse"
+      }
     },
     "session": {
       "error": "Kunne ikke laste økt",

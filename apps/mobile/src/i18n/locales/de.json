@@ -1325,7 +1325,9 @@
       },
       "practice": {
         "quizzes": "Quizze abgeschlossen",
-        "reviews": "Wiederholungen abgeschlossen"
+        "reviews": "Wiederholungen abgeschlossen",
+        "tests": "Tests",
+        "points": "Punkte"
       }
     },
     "monthlyReport": {
@@ -1843,6 +1845,39 @@
       "reportGoneTitle": "Bericht nicht gefunden",
       "testsCompleted": "Tests",
       "testPoints": "Testpunkte"
+    },
+    "practiceSummary": {
+      "title": "Testdetails",
+      "subtitle": "{{count}} Tests abgeschlossen, davon {{reviews}} Wiederholungen",
+      "accuracy": "Genauigkeit",
+      "reviews": "Wiederholungen",
+      "points": "Punkte",
+      "celebrations": "Feiern",
+      "activityKinds": "Arten",
+      "comparison": "{{tests}} Tests · {{points}} Punkte · {{celebrations}} Feiern",
+      "byType": "Nach Typ",
+      "bySubject": "Nach Fach",
+      "typeDetail": "{{count}} abgeschlossen · {{points}} Punkte",
+      "typeDetailWithScore": "{{count}} abgeschlossen · {{points}} Punkte · {{accuracy}}%",
+      "subjectDetail": "{{count}} Tests · {{points}} Punkte · {{types}}",
+      "unknownSubject": "Nicht zugeordnet",
+      "activityTypes": {
+        "quiz": "Quiz",
+        "review": "Wiederholung",
+        "assessment": "Beweisen, dass ich es kann",
+        "dictation": "Diktat",
+        "recitation": "Vortragen",
+        "fluency_drill": "Flüssigkeitsübung"
+      },
+      "activitySubtypes": {
+        "capitals": "Hauptstädte",
+        "guess_who": "Wer ist das?",
+        "vocabulary": "Wortschatz",
+        "assessment": "Beweisen, dass ich es kann",
+        "dictation": "Diktat",
+        "recitation": "Vortragen",
+        "fluency_drill": "Flüssigkeitsübung"
+      }
     },
     "session": {
       "error": "Sitzung konnte nicht geladen werden",

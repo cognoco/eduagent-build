@@ -35,7 +35,7 @@ function mockVocabRow(
     cefrLevel: string | null;
     milestoneId: string | null;
     mastered: boolean;
-  }> = {}
+  }> = {},
 ) {
   return {
     id: overrides.id ?? VOCAB_ID,
@@ -64,7 +64,7 @@ function mockRetentionCardRow(
     nextReviewAt: Date | null;
     failureCount: number;
     consecutiveSuccesses: number;
-  }> = {}
+  }> = {},
 ) {
   return {
     vocabularyId: overrides.vocabularyId ?? VOCAB_ID,
@@ -121,7 +121,9 @@ function createMockDb({
           }),
         }
       : {
-          onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
+          onConflictDoNothing: jest.fn().mockReturnValue({
+            returning: jest.fn().mockResolvedValue(insertReturning),
+          }),
         };
 
   const db = {
@@ -153,7 +155,7 @@ function createMockDb({
     transaction: jest
       .fn()
       .mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) =>
-        fn(db)
+        fn(db),
       ),
   } as unknown as Database;
 
@@ -199,7 +201,7 @@ describe('listVocabulary', () => {
     const db = createMockDb({ subjectFindFirst: null });
 
     await expect(listVocabulary(db, PROFILE_ID, SUBJECT_ID)).rejects.toThrow(
-      'Subject not found'
+      'Subject not found',
     );
   });
 
@@ -241,7 +243,7 @@ describe('createVocabulary', () => {
         term: 'hola',
         translation: 'hello',
         type: 'word',
-      })
+      }),
     ).rejects.toThrow('Subject not found');
   });
 
@@ -351,7 +353,7 @@ describe('ensureVocabularyRetentionCard', () => {
     const result = await ensureVocabularyRetentionCard(
       db,
       PROFILE_ID,
-      VOCAB_ID
+      VOCAB_ID,
     );
 
     expect(result.vocabularyId).toBe(VOCAB_ID);
@@ -367,7 +369,7 @@ describe('ensureVocabularyRetentionCard', () => {
     });
 
     await expect(
-      ensureVocabularyRetentionCard(db, PROFILE_ID, VOCAB_ID)
+      ensureVocabularyRetentionCard(db, PROFILE_ID, VOCAB_ID),
     ).rejects.toThrow('Failed to ensure retention card');
   });
 });
@@ -381,7 +383,7 @@ describe('reviewVocabulary', () => {
     const db = createMockDb({ vocabFindFirst: null });
 
     await expect(
-      reviewVocabulary(db, PROFILE_ID, VOCAB_ID, { quality: 4 })
+      reviewVocabulary(db, PROFILE_ID, VOCAB_ID, { quality: 4 }),
     ).rejects.toThrow('Vocabulary item not found');
   });
 
@@ -543,7 +545,7 @@ describe('upsertExtractedVocabulary', () => {
       db,
       PROFILE_ID,
       SUBJECT_ID,
-      []
+      [],
     );
 
     expect(result).toEqual([]);

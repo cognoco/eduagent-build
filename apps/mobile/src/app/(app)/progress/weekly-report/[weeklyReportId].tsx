@@ -5,7 +5,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Sentry from '@sentry/react-native';
 import { useTranslation } from 'react-i18next';
 import { ErrorFallback } from '../../../../components/common';
-import { MetricCard } from '../../../../components/progress';
+import {
+  MetricCard,
+  PracticeActivitySummaryCard,
+} from '../../../../components/progress';
 import { classifyApiError } from '../../../../lib/format-api-error';
 import { formatMinutes } from '../../../../lib/format-relative-date';
 import { goBackOrReplace } from '../../../../lib/navigation';
@@ -160,6 +163,11 @@ export default function ProgressWeeklyReportDetail(): React.ReactElement {
                 )}
               />
             </View>
+
+            <PracticeActivitySummaryCard
+              summary={report.reportData.practiceSummary}
+              testID="progress-weekly-report-practice-summary"
+            />
           </>
         ) : (
           <View className="bg-surface rounded-card p-5 mt-4">

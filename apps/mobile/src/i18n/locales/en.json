@@ -1388,7 +1388,9 @@
       },
       "practice": {
         "quizzes": "quizzes completed",
-        "reviews": "reviews finished"
+        "reviews": "reviews finished",
+        "tests": "tests",
+        "points": "points"
       },
       "mini": {
         "sessions": "{{count}} session",
@@ -1913,6 +1915,39 @@
       "subtitle": "A summary of your child's learning this month",
       "totalWords": "Total words",
       "reportGoneTitle": "Report not found"
+    },
+    "practiceSummary": {
+      "title": "Test detail",
+      "subtitle": "{{count}} tests finished, including {{reviews}} reviews",
+      "accuracy": "Accuracy",
+      "reviews": "Reviews",
+      "points": "Points",
+      "celebrations": "Celebrations",
+      "activityKinds": "Kinds",
+      "comparison": "{{tests}} tests · {{points}} points · {{celebrations}} celebrations",
+      "byType": "By type",
+      "bySubject": "By subject",
+      "typeDetail": "{{count}} finished · {{points}} points",
+      "typeDetailWithScore": "{{count}} finished · {{points}} points · {{accuracy}}%",
+      "subjectDetail": "{{count}} tests · {{points}} points · {{types}}",
+      "unknownSubject": "Unassigned",
+      "activityTypes": {
+        "quiz": "Quiz",
+        "review": "Review",
+        "assessment": "Prove I know this",
+        "dictation": "Dictation",
+        "recitation": "Recite",
+        "fluency_drill": "Fluency drill"
+      },
+      "activitySubtypes": {
+        "capitals": "Capitals",
+        "guess_who": "Guess who",
+        "vocabulary": "Vocabulary",
+        "assessment": "Prove I know this",
+        "dictation": "Dictation",
+        "recitation": "Recite",
+        "fluency_drill": "Fluency drill"
+      }
     },
     "session": {
       "error": "Could not load session",

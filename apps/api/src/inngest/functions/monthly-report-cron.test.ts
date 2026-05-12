@@ -132,6 +132,25 @@ const mockGenerateReportHighlights = jest.fn().mockResolvedValue({
   comparison: null,
 });
 const mockListEligibleSelfReportProfileIds = jest.fn().mockResolvedValue([]);
+const mockGetPracticeActivitySummary = jest.fn().mockResolvedValue({
+  quizzesCompleted: 0,
+  reviewsCompleted: 0,
+  totals: {
+    activitiesCompleted: 0,
+    reviewsCompleted: 0,
+    pointsEarned: 0,
+    celebrations: 0,
+    distinctActivityTypes: 0,
+  },
+  scores: {
+    scoredActivities: 0,
+    score: 0,
+    total: 0,
+    accuracy: null,
+  },
+  byType: [],
+  bySubject: [],
+});
 
 jest.mock('../../services/monthly-report', () => ({
   generateMonthlyReportData: (...args: unknown[]) =>
@@ -139,6 +158,14 @@ jest.mock('../../services/monthly-report', () => ({
   generateReportHighlights: (...args: unknown[]) =>
     mockGenerateReportHighlights(...args),
 }));
+
+jest.mock(
+  '../../services/practice-activity-summary' /* gc1-allow: unit test boundary */,
+  () => ({
+    getPracticeActivitySummary: (...args: unknown[]) =>
+      mockGetPracticeActivitySummary(...args),
+  }),
+);
 
 jest.mock(
   '../../services/solo-progress-reports' /* gc1-allow: unit test boundary */,
@@ -719,6 +746,9 @@ describe('monthlyReportGenerate', () => {
         expect.any(String), // monthLabel from toLocaleDateString
         SAMPLE_METRICS,
         SAMPLE_METRICS, // previousMetrics from last snapshot of previous window
+        expect.objectContaining({
+          totals: expect.objectContaining({ activitiesCompleted: 0 }),
+        }),
       );
     });
 
@@ -879,6 +909,9 @@ describe('monthlyReportGenerate', () => {
         expect.any(String),
         SAMPLE_METRICS,
         null, // previousMetrics is null
+        expect.objectContaining({
+          totals: expect.objectContaining({ activitiesCompleted: 0 }),
+        }),
       );
     });
 
@@ -926,6 +959,9 @@ describe('monthlyReportGenerate', () => {
         expect.any(String),
         SAMPLE_METRICS,
         null,
+        expect.objectContaining({
+          totals: expect.objectContaining({ activitiesCompleted: 0 }),
+        }),
       );
     });
 
@@ -1237,6 +1273,9 @@ describe('monthlyReportGenerate', () => {
         expect.any(String),
         laterMetrics, // last() snapshot used
         null,
+        expect.objectContaining({
+          totals: expect.objectContaining({ activitiesCompleted: 0 }),
+        }),
       );
     });
   });

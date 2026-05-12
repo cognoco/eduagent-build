@@ -27,7 +27,9 @@ function createMockDb(pendingCelebrations: unknown[] = []) {
     insert: jest.fn().mockReturnValue({
       values: jest.fn().mockReturnValue({
         onConflictDoUpdate: jest.fn().mockResolvedValue(undefined),
-        onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
+        onConflictDoNothing: jest.fn().mockReturnValue({
+          returning: jest.fn().mockResolvedValue([]),
+        }),
       }),
     }),
     select: jest.fn().mockReturnValue({
@@ -91,7 +93,7 @@ describe('filterPendingCelebrations', () => {
       {
         viewer: 'child',
         now: new Date('2025-01-10T00:00:00.000Z'),
-      }
+      },
     );
 
     expect(result).toEqual([]);
@@ -114,7 +116,7 @@ describe('filterPendingCelebrations', () => {
       {
         viewer: 'parent',
         now: new Date('2025-01-06T00:00:00.000Z'),
-      }
+      },
     );
 
     expect(result).toEqual([
@@ -141,7 +143,7 @@ describe('queueCelebration', () => {
       profileId,
       'comet',
       'topic_mastered',
-      'Quadratic Equations'
+      'Quadratic Equations',
     );
 
     expect(result).toHaveLength(1);
@@ -164,7 +166,7 @@ describe('queueCelebration', () => {
       profileId,
       'comet',
       'topic_mastered',
-      'Linear Equations'
+      'Linear Equations',
     );
 
     expect(result).toHaveLength(2);

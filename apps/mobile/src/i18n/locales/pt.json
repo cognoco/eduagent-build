@@ -1350,7 +1350,9 @@
       },
       "practice": {
         "quizzes": "quizzes concluídos",
-        "reviews": "revisões concluídas"
+        "reviews": "revisões concluídas",
+        "tests": "testes",
+        "points": "pontos"
       }
     },
     "monthlyReport": {
@@ -1868,6 +1870,39 @@
       "reportGoneTitle": "Relatório não encontrado",
       "testsCompleted": "Testes",
       "testPoints": "Pontos de teste"
+    },
+    "practiceSummary": {
+      "title": "Detalhes dos testes",
+      "subtitle": "{{count}} testes concluídos, incluindo {{reviews}} revisões",
+      "accuracy": "Precisão",
+      "reviews": "Revisões",
+      "points": "Pontos",
+      "celebrations": "Celebrações",
+      "activityKinds": "Tipos",
+      "comparison": "{{tests}} testes · {{points}} pontos · {{celebrations}} celebrações",
+      "byType": "Por tipo",
+      "bySubject": "Por matéria",
+      "typeDetail": "{{count}} concluídos · {{points}} pontos",
+      "typeDetailWithScore": "{{count}} concluídos · {{points}} pontos · {{accuracy}}%",
+      "subjectDetail": "{{count}} testes · {{points}} pontos · {{types}}",
+      "unknownSubject": "Sem matéria",
+      "activityTypes": {
+        "quiz": "Quiz",
+        "review": "Revisão",
+        "assessment": "Provar que eu sei",
+        "dictation": "Ditado",
+        "recitation": "Recitação",
+        "fluency_drill": "Treino de fluência"
+      },
+      "activitySubtypes": {
+        "capitals": "Capitais",
+        "guess_who": "Adivinha quem",
+        "vocabulary": "Vocabulário",
+        "assessment": "Provar que eu sei",
+        "dictation": "Ditado",
+        "recitation": "Recitação",
+        "fluency_drill": "Treino de fluência"
+      }
     },
     "session": {
       "error": "Não foi possível carregar a sessão",
