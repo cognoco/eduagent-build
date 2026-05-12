@@ -32,6 +32,10 @@ import {
   resetSessionStaticContextCache,
 } from './session';
 
+type StaleSessionResult = Awaited<
+  ReturnType<typeof closeStaleSessions>
+>[number];
+
 // ---------------------------------------------------------------------------
 // DB setup — loads DATABASE_URL from .env.development.local in local dev,
 // uses the already-set DATABASE_URL in CI.
@@ -523,10 +527,7 @@ describe('Session lifecycle (integration)', () => {
     const closed = await closeStaleSessions(db, cutoff);
 
     // The stale session should appear in closed results
-    const closedIds = closed.map(
-      (r: Awaited<ReturnType<typeof closeStaleSessions>>[number]) =>
-        r.sessionId,
-    );
+    const closedIds = closed.map((r: StaleSessionResult) => r.sessionId);
     expect(closedIds).toContain(staleSession.id);
     expect(closedIds).not.toContain(recentSession.id);
 
