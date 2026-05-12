@@ -114,6 +114,11 @@ export default function ConsentScreen() {
   );
 
   // Hand-off copy adapts to the active profile's age bracket.
+  // Routing invariant: consent.tsx is only reached when consentStatus is
+  // 'PENDING' or 'PARENTAL_CONSENT_REQUESTED' (see create-profile.tsx and
+  // (app)/_layout.tsx consent-pending gate). Those statuses are only set
+  // for non-owner profiles needing parental approval, so ageBracket is
+  // 'child' or 'adolescent' in practice — adult is never reached here.
   const copy = getConsentHandOffCopy(ageBracket);
 
   // Regulation text uses adult variant since the PARENT reads it.
