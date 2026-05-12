@@ -21,7 +21,7 @@ The cleanup should not start by editing hundreds of tests one by one. First, est
 | U2 | API Inngest transport capture | **Established first pass**: `apps/api/src/test-utils/inngest-transport-capture.ts` | Capture `inngest.send` / `createFunction` at the transport boundary without mocking handler/business behavior. |
 | U3 | API integration DB harness | Existing partial helpers | Run real route/service/workflow tests against PostgreSQL with seeded rows and cleanup. |
 | U4 | API local DB runner | Partial support in `tests/integration/api-setup.ts` | Make local Postgres an explicit opt-in integration-test mode. |
-| U5 | API LLM provider fixtures | Existing `registerProvider` pattern | Keep router/envelope/prompt logic real while supplying deterministic provider responses. |
+| U5 | API LLM provider fixtures | **Established first pass**: `apps/api/src/test-utils/llm-provider-fixtures.ts` | Keep router/envelope/prompt logic real while supplying deterministic provider responses. |
 | U6 | API external fetch/provider helpers | Existing `fetch-interceptor.ts` | Mock true external HTTP boundaries only: JWKS, LLM provider HTTP, embeddings, email, push. |
 | U7 | Mobile render harness | Hook-level partial helper exists | Render screens with QueryClient, profile/auth fixtures, routed API responses, and teardown. |
 | U8 | Mobile native boundary shim catalog | Scattered per-test mocks | Standardize approved Jest shims for router, safe area, icons, SecureStore, alerts, Sentry, theme/native color scheme. |
@@ -121,21 +121,24 @@ Tasks:
 
 - Create a short local DB runbook: **Done.** `docs/runbooks/local-db-testing.md` + `docker-compose.test.yml`.
 - Decide pgvector handling: **Done.** Use `pgvector/pgvector:pg16` image (pgvector pre-installed, matches Neon). All suites run locally without modification.
-- Add LLM provider fixtures:
-  - valid envelope
-  - invalid envelope
-  - plain text fallback
-  - streaming response
-  - provider failure/failover
+- Add LLM provider fixtures: **Done, first pass.**
+  - valid envelope via `llmEnvelopeReply()`
+  - invalid JSON via `llmInvalidJson()`
+  - plain text fallback via `llmPlainText()`
+  - streaming response via `streamResponse` / `queueStreamResponse`
+  - provider failure via `chatError` / `chatErrors`
 - Add fetch-provider helpers on top of `tests/integration/fetch-interceptor.ts`:
   - JWKS helper already exists
   - LLM HTTP provider helper
   - embedding helper
   - email/push helper where needed
-- Convert one internal LLM integration mock offender to the provider/fetch pattern.
+- Convert one LLM test to the shared provider fixture. **Done:** `apps/api/src/services/summaries.test.ts`.
+- Convert one DB-backed integration suite to the same fixture. **Done but DB proof blocked locally:** `tests/integration/learning-session.integration.test.ts`.
 
 Representative proof tests:
 
+- `apps/api/src/test-utils/llm-provider-fixtures.test.ts`
+- `apps/api/src/services/summaries.test.ts`
 - `tests/integration/assessments-routes.integration.test.ts`
 - `tests/integration/learning-session.integration.test.ts`
 - `apps/api/src/services/book-suggestion-generation.integration.test.ts`
@@ -150,10 +153,19 @@ Verification:
 
 ```powershell
 $env:NX_DAEMON='false'; $env:NX_ISOLATE_PLUGINS='false'
-pnpm exec jest -c apps/api/jest.integration.config.cjs tests/integration/assessments-routes.integration.test.ts --runInBand --no-coverage
+pnpm exec jest -c apps/api/jest.config.cjs apps/api/src/test-utils/llm-provider-fixtures.test.ts apps/api/src/services/summaries.test.ts --runInBand --no-coverage
 ```
 
-Note: local DB verification requires a real `DATABASE_URL`; otherwise these tests should be reported as blocked, not skipped silently.
+Result on 2026-05-12: **passed**, 2 suites, 12 tests.
+
+DB-backed integration proof attempted:
+
+```powershell
+$env:NX_DAEMON='false'; $env:NX_ISOLATE_PLUGINS='false'
+pnpm exec jest -c tests/integration/jest.config.cjs learning-session.integration.test.ts --runInBand --no-coverage
+```
+
+Result on 2026-05-12: **blocked by environment**, because `DATABASE_URL` is not set. The suite loads through TypeScript before failing in integration setup.
 
 ### Phase 3 - Mobile Screen Harness
 

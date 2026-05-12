@@ -7,7 +7,7 @@
  * Mocked boundaries:
  * - JWT verification (Clerk JWKS — via fetch interceptor in setup.ts)
  * - Inngest event HTTP API — via fetch interceptor
- * - LLM provider — via registerProvider (real routeAndCall dispatch, mock chat fn)
+ * - LLM provider — via shared provider fixture (real routeAndCall dispatch)
  */
 
 import { eq } from 'drizzle-orm';
@@ -34,39 +34,30 @@ import {
 import { buildAuthHeaders } from './test-keys';
 import { getCapturedInngestEvents, mockInngestEvents } from './mocks';
 import { clearFetchCalls } from './fetch-interceptor';
-import { registerProvider } from '../../apps/api/src/services/llm';
+import {
+  llmEnvelopeReply,
+  registerLlmProviderFixture,
+} from '../../apps/api/src/test-utils/llm-provider-fixtures';
 
 // Controllable mock provider — overrides the default mock registered in setup.ts.
 // Avoids jest.mock on an internal service (CLAUDE.md rule: no internal mocks in
-// integration tests). Uses registerProvider so the full routeAndCall path runs.
-const mockChat = jest
-  .fn<Promise<string>, [unknown, unknown]>()
-  .mockResolvedValue(
-    JSON.stringify({
+// integration tests). Uses the shared fixture so the full routeAndCall path runs.
+beforeAll(() => {
+  mockInngestEvents();
+  registerLlmProviderFixture({
+    chatResponse: {
       feedback: 'Great summary!',
       hasUnderstandingGaps: false,
       gapAreas: [],
       isAccepted: true,
-    }),
-  );
-
-// Register once — overrides setup.ts default so tests control the LLM response
-// without bypassing the real routeAndCall dispatch path.
-beforeAll(() => {
-  mockInngestEvents();
-  registerProvider({
-    id: 'gemini',
-    chat: mockChat,
+    },
     // [BUG-941] streamMessage's onComplete now runs classifyExchangeOutcome,
     // which requires a parseable envelope with a non-empty `reply` field.
-    // Yielding zero chunks routes the response into the fallback bucket and
-    // the exchange is intentionally not persisted. Yield a minimal valid
-    // envelope so the streaming success-path assertions exercise persist.
-    async *chatStream() {
-      yield JSON.stringify({
-        reply: 'Gravity is the force that pulls objects toward each other.',
-      });
-    },
+    // Yield a minimal valid envelope so the streaming success-path assertions
+    // exercise persist.
+    streamResponse: llmEnvelopeReply(
+      'Gravity is the force that pulls objects toward each other.',
+    ),
   });
 });
 

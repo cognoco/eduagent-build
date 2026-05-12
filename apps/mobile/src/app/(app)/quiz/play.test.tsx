@@ -8,6 +8,7 @@ import {
 const mockReplace = jest.fn();
 const mockSetPrefetchedRoundId = jest.fn();
 const mockSetCompletionResult = jest.fn();
+const mockSetRound = jest.fn();
 const mockCheckAnswer = jest.fn();
 const mockPrefetchMutate = jest.fn();
 const mockCompleteRoundMutate = jest.fn();
@@ -47,7 +48,33 @@ jest.mock('../../../lib/navigation', () => ({
 }));
 
 jest.mock('../../../components/quiz/GuessWhoQuestion', () => ({
-  GuessWhoQuestion: () => null,
+  GuessWhoQuestion: ({
+    onResolved,
+  }: {
+    onResolved: (result: {
+      correct: boolean;
+      answerGiven: string;
+      cluesUsed: number;
+      answerMode: 'free_text' | 'multiple_choice';
+    }) => void;
+  }) => {
+    const { Pressable, Text } = require('react-native');
+    return (
+      <Pressable
+        onPress={() =>
+          onResolved({
+            correct: true,
+            answerGiven: 'Nikola Tesla',
+            cluesUsed: 3,
+            answerMode: 'free_text',
+          })
+        }
+        testID="guess-who-resolve-correct"
+      >
+        <Text>Resolve Guess Who</Text>
+      </Pressable>
+    );
+  },
 }));
 
 jest.mock(
@@ -111,14 +138,28 @@ let mockRound: object | null = {
 jest.mock('./_layout', () => ({
   useQuizFlow: () => ({
     round: mockRound,
-    activityType: mockRound ? 'capitals' : null,
+    activityType:
+      mockRound && 'activityType' in mockRound ? mockRound.activityType : null,
     subjectId: null,
     setPrefetchedRoundId: mockSetPrefetchedRoundId,
+    setRound: mockSetRound,
     setCompletionResult: mockSetCompletionResult,
   }),
 }));
 
 const { default: QuizPlayScreen } = require('./play');
+
+beforeEach(() => {
+  mockCompleteRoundMutate.mockImplementation((_input, opts) => {
+    opts.onSuccess({
+      score: 1,
+      total: 1,
+      xpEarned: 10,
+      celebrationTier: 'perfect',
+      questionResults: [],
+    });
+  });
+});
 
 describe('QuizPlayScreen', () => {
   beforeEach(() => {
@@ -352,7 +393,9 @@ describe('QuizPlayScreen — dispute button visibility (BUG-927)', () => {
     });
     screen.getByTestId('quiz-correct-celebration');
     screen.getByText('Nailed it!');
-    screen.getByText('That answer is locked in.');
+    screen.getByText('Saved. Ready when you are.');
+    screen.getByTestId('quiz-final-see-results');
+    screen.getByText('Wait, just one more!');
     expect(screen.queryByTestId('quiz-dispute-button')).toBeNull();
     expect(screen.queryByText('Not quite right?')).toBeNull();
   });
@@ -371,6 +414,82 @@ describe('QuizPlayScreen — dispute button visibility (BUG-927)', () => {
     });
     expect(screen.queryByTestId('quiz-correct-celebration')).toBeNull();
     screen.getByTestId('quiz-dispute-button');
+  });
+});
+
+describe('QuizPlayScreen — Guess Who finish autosave', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockRound = {
+      id: 'round-guess-who',
+      activityType: 'guess_who' as const,
+      theme: 'Inventors',
+      total: 1,
+      questions: [
+        {
+          type: 'guess_who' as const,
+          clues: [
+            'He imagined many inventions before building them.',
+            'He worked with electricity.',
+            'He has a unit of magnetic flux density named after him.',
+          ],
+          mcFallbackOptions: [
+            'Nikola Tesla',
+            'Thomas Edison',
+            'Albert Einstein',
+            'Isaac Newton',
+          ],
+          funFact: 'Tesla held hundreds of patents.',
+        },
+      ],
+    };
+  });
+
+  it('celebrates and autosaves when a person guess finishes the round', async () => {
+    render(<QuizPlayScreen />);
+
+    fireEvent.press(screen.getByTestId('guess-who-resolve-correct'));
+
+    await waitFor(() => {
+      screen.getByTestId('quiz-correct-celebration');
+    });
+    screen.getByText('You found them in 3 clues!');
+    screen.getByText('Saved. Ready when you are.');
+    screen.getByTestId('quiz-final-see-results');
+    screen.getByText('Wait, just one more!');
+
+    expect(mockCompleteRoundMutate).toHaveBeenCalledWith(
+      {
+        roundId: 'round-guess-who',
+        results: [
+          expect.objectContaining({
+            questionIndex: 0,
+            correct: true,
+            answerGiven: 'Nikola Tesla',
+            cluesUsed: 3,
+            answerMode: 'free_text',
+          }),
+        ],
+      },
+      expect.objectContaining({
+        onSuccess: expect.any(Function),
+        onError: expect.any(Function),
+      }),
+    );
+    expect(mockSetCompletionResult).toHaveBeenCalled();
+    expect(mockReplace).not.toHaveBeenCalledWith('/(app)/quiz/results');
+  });
+
+  it('can start one more round after the final autosave', async () => {
+    render(<QuizPlayScreen />);
+
+    fireEvent.press(screen.getByTestId('guess-who-resolve-correct'));
+    await waitFor(() => screen.getByTestId('quiz-final-one-more'));
+
+    fireEvent.press(screen.getByTestId('quiz-final-one-more'));
+
+    expect(mockSetRound).toHaveBeenCalledWith(null);
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/quiz/launch');
   });
 });
 
@@ -945,12 +1064,13 @@ describe('QuizPlayScreen — error feedback [BUG-799 / BUG-806]', () => {
     screen.getByTestId('quiz-quit-confirm');
     screen.getByTestId('quiz-quit-save');
     screen.getByText('Save progress before leaving?');
+    screen.getByTestId('quiz-quit-cancel');
     expect(mockPlatformAlert).not.toHaveBeenCalledWith(
       'Quit this round?',
       expect.any(String),
       expect.any(Array),
     );
-    expect(mockCompleteRoundMutate).not.toHaveBeenCalled();
+    expect(mockCompleteRoundMutate).toHaveBeenCalledTimes(1);
   });
 
   // [BUG-892] On Expo Web, platformAlert routes through window.confirm for
@@ -1012,6 +1132,28 @@ describe('QuizPlayScreen — error feedback [BUG-799 / BUG-806]', () => {
   });
 
   it('saves answered progress from the quit modal', async () => {
+    mockRound = {
+      id: 'round-err',
+      activityType: 'capitals' as const,
+      theme: 'Europe',
+      total: 2,
+      questions: [
+        {
+          type: 'capitals' as const,
+          country: 'Slovakia',
+          options: ['Bratislava', 'Prague', 'Warsaw', 'Budapest'],
+          isLibraryItem: true,
+          freeTextEligible: false,
+        },
+        {
+          type: 'capitals' as const,
+          country: 'France',
+          options: ['Paris', 'Lyon', 'Madrid', 'Rome'],
+          isLibraryItem: true,
+          freeTextEligible: false,
+        },
+      ],
+    };
     mockCheckAnswer.mockResolvedValueOnce({ correct: true });
     render(<QuizPlayScreen />);
 

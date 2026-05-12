@@ -96,7 +96,7 @@ pnpm exec jest -c tests/integration/jest.config.cjs tests/integration/streaks-ro
 
 # API-scoped integration suites
 $env:DATABASE_URL = "postgresql://test:test@localhost:5433/eduagent_test"
-pnpm exec jest -c apps/api/jest.config.cjs apps/api/src/services/auth-scoping.integration.test.ts --runInBand --no-coverage
+pnpm exec jest -c apps/api/jest.integration.config.cjs apps/api/src/services/auth-scoping.integration.test.ts --runInBand --no-coverage
 ```
 
 ## Using .env.test.local

@@ -78,7 +78,7 @@ jest.mock('@eduagent/database', () => {
 
 afterAll(async () => {
   if (_pool) {
-    await (_pool as any).end();
+    await _pool.end();
     _pool = null;
   }
 });
