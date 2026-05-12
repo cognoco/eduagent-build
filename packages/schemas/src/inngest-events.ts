@@ -167,39 +167,6 @@ export type SummaryReconciliationRequeuedEvent = z.infer<
 >;
 
 // ---------------------------------------------------------------------------
-// Payment failed observability (BUG-30 / CCR-PR132-M-C)
-// ---------------------------------------------------------------------------
-
-/** Stripe webhook: all identifying fields are required. */
-export const stripePaymentFailedEventSchema = z.object({
-  subscriptionId: z.string(),
-  stripeSubscriptionId: z.string(),
-  accountId: z.string(),
-  attempt: z.number().int().positive(),
-  timestamp: z.string(),
-});
-export type StripePaymentFailedEvent = z.infer<
-  typeof stripePaymentFailedEventSchema
->;
-
-/** RevenueCat webhook: source is always 'revenuecat'; no Stripe-specific fields. */
-export const revenuecatPaymentFailedEventSchema = z.object({
-  subscriptionId: z.string(),
-  accountId: z.string(),
-  source: z.literal('revenuecat'),
-  timestamp: z.string(),
-});
-export type RevenuecatPaymentFailedEvent = z.infer<
-  typeof revenuecatPaymentFailedEventSchema
->;
-
-export const paymentFailedEventSchema = z.union([
-  stripePaymentFailedEventSchema,
-  revenuecatPaymentFailedEventSchema,
-]);
-export type PaymentFailedEvent = z.infer<typeof paymentFailedEventSchema>;
-
-// ---------------------------------------------------------------------------
 // Ask-classification observability events (CCR-PR126-NEW-2)
 // ---------------------------------------------------------------------------
 

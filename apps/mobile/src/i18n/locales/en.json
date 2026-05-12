@@ -719,6 +719,7 @@
       "title": "Prove I know this",
       "topicsReady_one": "{{count}} topic ready to test",
       "topicsReady_other": "{{count}} topics ready to test",
+      "studySubjectFirst": "Study {{subject}} first to unlock this",
       "afterFinishTopic": "Available after you finish a topic",
       "hintOpenPicker": "Opens the assessment picker",
       "hintOpenLibrary": "Opens the library",
@@ -880,6 +881,12 @@
       "title": "Your library will grow as you learn",
       "message": "Start with homework help or learn something new. Books and topics will appear here afterward.",
       "goHome": "Back to Home"
+    },
+    "nextAction": {
+      "title": "Continue {{subject}}",
+      "message": "Open the shelf, pick the next book, or revisit what is due.",
+      "cta": "Open",
+      "accessibilityLabel": "Continue {{subject}}"
     },
     "curriculumComplete": {
       "title": "You've covered everything here!",
@@ -1179,6 +1186,9 @@
     "pickerSubtitle": "You've studied these recently - pick one to prove what stuck.",
     "pickerLoadError": "Could not load topics ready for assessment.",
     "pickerLoading": "Loading topics...",
+    "pickerLoadingBody": "We're checking which topics are ready for a fair test.",
+    "pickerLoadTimeoutTitle": "Assessment topics are taking too long to load",
+    "pickerLoadTimeoutMessage": "Check your connection, then try again or go back.",
     "pickerEmptyTitle": "You haven't studied any topics recently",
     "pickerEmptyBody": "Start a session first, then come back to check what stuck.",
     "pickerBrowseTopics": "Browse topics",
@@ -1263,6 +1273,11 @@
     "keepLearning": "Keep learning",
     "refreshFailedTitle": "Refresh failed",
     "refreshFailed": "We couldn't refresh your progress right now.",
+    "loadingTitle": "Loading your learning journey",
+    "loadTimeout": {
+      "title": "Progress is taking too long to load",
+      "message": "Check your connection, then try again or head home."
+    },
     "hero": {
       "sessionsCompleted": "{{count}} session completed",
       "sessionsCompleted_other": "{{count}} sessions completed",
@@ -1364,7 +1379,9 @@
     },
     "empty": {
       "title": "Start your first session",
-      "subtitle": "Start your first session to see your progress here"
+      "subtitle": "Start your first session to see your progress here",
+      "withSubjectTitle": "Progress unlocks after you study {{subject}}",
+      "withSubjectSubtitle": "Study a topic in {{subject}} first. Sessions, mastery, and reviews will appear here once there is something to measure."
     },
     "error": {
       "loadTitle": "We couldn't load your progress",
@@ -1511,6 +1528,8 @@
     },
     "subjectSessions": {
       "title": "Past conversations",
+      "loadingTooLong": "Conversations are taking too long to load",
+      "loadingMessage": "Check your connection and try again, or go back to subject progress.",
       "empty": "No conversations yet",
       "untitledTopic": "Untitled topic",
       "openSessionFrom": "Open session from {{date}}"

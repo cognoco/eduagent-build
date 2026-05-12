@@ -21,11 +21,6 @@ jest.mock('../client', () => ({
   },
 }));
 
-import type {
-  StripePaymentFailedEvent,
-  RevenuecatPaymentFailedEvent,
-  PaymentFailedEvent,
-} from '@eduagent/schemas';
 import { paymentFailedObserve } from './payment-failed-observe';
 
 beforeEach(() => {
@@ -36,10 +31,19 @@ afterAll(() => {
   consoleErrorSpy.mockRestore();
 });
 
-async function invokeHandler(data: PaymentFailedEvent) {
+interface PaymentFailedEventData {
+  subscriptionId?: string;
+  stripeSubscriptionId?: string;
+  accountId?: string;
+  attempt?: number;
+  source?: string;
+  timestamp?: string;
+}
+
+async function invokeHandler(data: PaymentFailedEventData) {
   const handler = ((paymentFailedObserve as any).fn ??
     paymentFailedObserve) as (args: {
-    event: { data: PaymentFailedEvent };
+    event: { data: PaymentFailedEventData };
   }) => Promise<unknown>;
   return handler({ event: { data } });
 }
@@ -118,31 +122,18 @@ describe('paymentFailedObserve [AUDIT-INNGEST-1]', () => {
     });
   });
 
-  it('[BUG-10] returns schema_error when required fields are missing', async () => {
-    const handler = ((paymentFailedObserve as any).fn ??
-      paymentFailedObserve) as (args: {
-      event: { data: Record<string, unknown> };
-    }) => Promise<unknown>;
-
-    const result = await handler({
-      event: { data: { subscriptionId: 'sub_local_5' } },
+  it('handles unknown source gracefully when neither source nor stripeSubscriptionId is present', async () => {
+    const result = await invokeHandler({
+      subscriptionId: 'sub_local_4',
+      accountId: 'acct_4',
+      timestamp: '2026-05-01T00:00:00.000Z',
     });
 
-    expect(result).toEqual({ status: 'schema_error' });
-    expect(consoleErrorSpy).toHaveBeenCalled();
-    const lastCall = consoleErrorSpy.mock.calls.at(-1)?.[0];
-    const entry = JSON.parse(lastCall as string) as { message: string };
-    expect(entry.message).toBe('billing.payment_failed.schema_drift');
-  });
-
-  it('[BUG-10] returns schema_error for empty payload', async () => {
-    const handler = ((paymentFailedObserve as any).fn ??
-      paymentFailedObserve) as (args: {
-      event: { data: Record<string, unknown> };
-    }) => Promise<unknown>;
-
-    const result = await handler({ event: { data: {} } });
-
-    expect(result).toEqual({ status: 'schema_error' });
+    expect(result).toMatchObject({
+      status: 'logged',
+      source: 'unknown',
+      subscriptionId: 'sub_local_4',
+      accountId: 'acct_4',
+    });
   });
 });

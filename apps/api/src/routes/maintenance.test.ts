@@ -1,4 +1,4 @@
-jest.mock('../inngest/client', () => ({
+jest.mock('../inngest/client' /* gc1-allow: unit test boundary */, () => ({
   inngest: {
     send: jest.fn().mockResolvedValue(undefined),
   },
@@ -56,6 +56,45 @@ describe('maintenanceRoutes', () => {
     expect(await res.json()).toEqual({ queued: true });
     expect(inngest.send).toHaveBeenCalledWith({
       name: 'admin/memory-facts-backfill.requested',
+      data: {
+        requestedAt: expect.any(String),
+        environment: 'staging',
+      },
+    });
+  });
+
+  it('rejects self progress backfill without the maintenance secret', async () => {
+    const app = createTestApp({ MAINTENANCE_SECRET: 'secret' });
+
+    const res = await app.request(
+      '/maintenance/progress-self-reports-backfill',
+      {
+        method: 'POST',
+      },
+    );
+
+    expect(res.status).toBe(403);
+    expect(inngest.send).not.toHaveBeenCalled();
+  });
+
+  it('dispatches the self progress backfill event with a valid secret', async () => {
+    const app = createTestApp({
+      ENVIRONMENT: 'staging',
+      MAINTENANCE_SECRET: 'secret',
+    });
+
+    const res = await app.request(
+      '/maintenance/progress-self-reports-backfill',
+      {
+        method: 'POST',
+        headers: { 'X-Maintenance-Secret': 'secret' },
+      },
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ queued: true });
+    expect(inngest.send).toHaveBeenCalledWith({
+      name: 'admin/progress-self-reports-backfill.requested',
       data: {
         requestedAt: expect.any(String),
         environment: 'staging',

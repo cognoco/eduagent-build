@@ -127,6 +127,12 @@ jest.mock('react-i18next', () => ({
 }));
 
 jest.mock('../../hooks/use-progress');
+jest.mock(
+  '../../hooks/use-subjects' /* gc1-allow: hook requires QueryClientProvider; not runnable in unit env */,
+  () => ({
+    useSubjects: () => ({ data: [] }),
+  }),
+);
 const mockUseActiveProfileRole = jest.fn();
 jest.mock('../../hooks/use-active-profile-role' /* gc1-allow */, () => ({
   useActiveProfileRole: () => mockUseActiveProfileRole(),

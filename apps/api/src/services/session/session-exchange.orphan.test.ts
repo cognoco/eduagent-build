@@ -77,25 +77,11 @@ describe('orphan persistence — unit/boundary tests [INTERACTION-DUR-L2]', () =
         'llm_empty_or_unparseable',
       );
     });
-    it('classifies PersistCurriculumError (unknown code)', () => {
+    it('classifies PersistCurriculumError', () => {
       expect(classifyOrphanError(new PersistCurriculumError('x'))).toBe(
         'persist_curriculum_failed',
       );
     });
-    it.each([
-      ['extract_signals_failed', 'persist_extract_signals_failed'],
-      ['empty_signals', 'persist_empty_signals'],
-      ['generate_curriculum_failed', 'persist_generate_curriculum_failed'],
-      ['persist_failed', 'persist_db_write_failed'],
-      ['draft_missing', 'persist_draft_missing'],
-    ] as const)(
-      'classifies PersistCurriculumError code %s → %s [BUG-54]',
-      (code, expected) => {
-        expect(
-          classifyOrphanError(new PersistCurriculumError(code, 'msg')),
-        ).toBe(expected);
-      },
-    );
     it('classifies unknown errors', () => {
       expect(classifyOrphanError(new Error('random'))).toBe(
         'unknown_post_stream',

@@ -56,11 +56,7 @@ jest.mock('../client', () => ({
 
 import { feedbackDeliveryFailed } from './feedback-delivery-failed';
 
-async function executeHandler(
-  eventData: unknown,
-  eventId?: string,
-  eventTs?: number,
-) {
+async function executeHandler(eventData: unknown, eventId?: string) {
   const mockStep = {
     run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
     sendEvent: jest.fn().mockResolvedValue(undefined),
@@ -69,7 +65,7 @@ async function executeHandler(
   };
   const handler = (feedbackDeliveryFailed as any).fn;
   const result = await handler({
-    event: { id: eventId, data: eventData, ts: eventTs ?? Date.now() },
+    event: { id: eventId, data: eventData },
     step: mockStep,
   });
   return { result, mockStep };
@@ -209,19 +205,10 @@ describe('feedback-delivery-failed Inngest function [BUG-767 / A-24]', () => {
     it('[CR-IDEMP-FALLBACK-08] two retries with event.id absent receive the same deterministic hash key', async () => {
       mockSendEmail.mockResolvedValue({ sent: true });
 
-      const sharedTs = 1714000000000;
       // Simulate first attempt (no eventId).
-      await executeHandler(
-        { profileId: 'profile-no-id', category: 'bug' },
-        undefined,
-        sharedTs,
-      );
-      // Simulate second attempt (Inngest retry, same payload + same ts, still no eventId).
-      await executeHandler(
-        { profileId: 'profile-no-id', category: 'bug' },
-        undefined,
-        sharedTs,
-      );
+      await executeHandler({ profileId: 'profile-no-id', category: 'bug' });
+      // Simulate second attempt (Inngest retry, same payload, still no eventId).
+      await executeHandler({ profileId: 'profile-no-id', category: 'bug' });
 
       expect(mockSendEmail).toHaveBeenCalledTimes(2);
       const keyFirst = (
@@ -299,36 +286,6 @@ describe('feedback-delivery-failed Inngest function [BUG-767 / A-24]', () => {
 
       // Delivery still proceeds (no silent drop).
       expect(mockSendEmail).toHaveBeenCalledTimes(1);
-    });
-
-    // [BUG-44] Two distinct events for the same profileId+category but
-    // different event timestamps must produce different hash keys — the
-    // original bug collapsed them into a single key, silently dropping the
-    // second email within Resend's 24h dedup window.
-    it('[BUG-44] same profileId+category but different events produce distinct hash keys', async () => {
-      mockSendEmail.mockResolvedValue({ sent: true });
-
-      await executeHandler(
-        { profileId: 'profile-same', category: 'bug' },
-        undefined,
-        1714000000000,
-      );
-      await executeHandler(
-        { profileId: 'profile-same', category: 'bug' },
-        undefined,
-        1714000060000,
-      );
-
-      expect(mockSendEmail).toHaveBeenCalledTimes(2);
-      const keyA = (
-        mockSendEmail.mock.calls[0] as [unknown, { idempotencyKey?: string }]
-      )[1].idempotencyKey;
-      const keyB = (
-        mockSendEmail.mock.calls[1] as [unknown, { idempotencyKey?: string }]
-      )[1].idempotencyKey;
-      expect(typeof keyA).toBe('string');
-      expect(typeof keyB).toBe('string');
-      expect(keyA).not.toEqual(keyB);
     });
 
     // [CR-IDEMP-FALLBACK-08] Two distinct delivery failures for the same

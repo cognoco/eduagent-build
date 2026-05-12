@@ -17,10 +17,12 @@ export default function QuizResultsScreen(): React.ReactElement {
     activityType,
     completionResult,
     prefetchedRoundId,
+    returnTo,
     round,
     setPrefetchedRoundId,
     setRound,
   } = useQuizFlow();
+  const practiceReturnParams = returnTo === 'practice' ? { returnTo } : {};
   // [BUG-777 / M-15] Pin the FIRST non-null round we see so a "Play Again"
   // press — which sets a NEW round into context BEFORE this screen unmounts
   // — can't cause a render flash where questionPrompt's 'Question' fallback
@@ -277,7 +279,12 @@ export default function QuizResultsScreen(): React.ReactElement {
 
         <Pressable
           testID="quiz-results-history"
-          onPress={() => router.push('/(app)/quiz/history')}
+          onPress={() =>
+            router.push({
+              pathname: '/(app)/quiz/history',
+              params: practiceReturnParams,
+            } as never)
+          }
         >
           <Text className="text-primary mt-2">View History</Text>
         </Pressable>

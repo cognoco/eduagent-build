@@ -9,7 +9,6 @@ import type {
   ValidatedQuestionResult,
 } from '@eduagent/schemas';
 import { useRoundDetail } from '../../../hooks/use-quiz';
-import { goBackOrReplace } from '../../../lib/navigation';
 import { useThemeColors } from '../../../lib/theme';
 import { TimeoutLoader } from '../../../components/common/TimeoutLoader';
 
@@ -41,12 +40,17 @@ function formatActivityType(raw: string): string {
 
 export default function QuizRoundDetailScreen() {
   const { t } = useTranslation();
-  const { roundId } = useLocalSearchParams<{ roundId: string }>();
+  const { roundId, returnTo } = useLocalSearchParams<{
+    roundId: string;
+    returnTo?: string;
+  }>();
   const router = useRouter();
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const { data: round, isLoading, isError, refetch } = useRoundDetail(roundId);
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
+  const backHref =
+    returnTo === 'practice' ? '/(app)/practice' : '/(app)/quiz/history';
 
   const toggleExpanded = (index: number) => {
     setExpanded((prev) => {
@@ -72,7 +76,7 @@ export default function QuizRoundDetailScreen() {
         }}
         secondaryAction={{
           label: t('common.goBack'),
-          onPress: () => goBackOrReplace(router, '/(app)/quiz'),
+          onPress: () => router.replace(backHref as never),
         }}
       />
     );
@@ -88,7 +92,7 @@ export default function QuizRoundDetailScreen() {
         <Pressable
           testID="round-detail-back"
           className="mt-4 min-h-[44px] min-w-[44px] items-center justify-center"
-          onPress={() => goBackOrReplace(router, '/(app)/quiz/history')}
+          onPress={() => router.replace(backHref as never)}
           accessibilityRole="button"
           accessibilityLabel={t('quiz.round.goBack')}
         >
@@ -109,7 +113,7 @@ export default function QuizRoundDetailScreen() {
       <View className="px-4 pb-4" style={{ paddingTop: insets.top + 16 }}>
         <Pressable
           testID="round-detail-back-btn"
-          onPress={() => goBackOrReplace(router, '/(app)/quiz/history')}
+          onPress={() => router.replace(backHref as never)}
           className="min-h-[44px] min-w-[44px] items-center justify-center self-start"
           accessibilityRole="button"
           accessibilityLabel={t('quiz.round.goBack')}

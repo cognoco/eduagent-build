@@ -771,15 +771,6 @@ export function createScopedRepository(db: Database, profileId: string) {
         const [row] = await db
           .insert(dictationResults)
           .values({ profileId, ...values })
-          .onConflictDoUpdate({
-            target: [dictationResults.profileId, dictationResults.date],
-            set: {
-              sentenceCount: values.sentenceCount,
-              mistakeCount: values.mistakeCount,
-              mode: values.mode,
-              reviewed: values.reviewed,
-            },
-          })
           .returning();
         return row;
       },

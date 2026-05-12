@@ -33,6 +33,7 @@ import {
   generateMonthlyReportData,
   generateReportHighlights,
 } from '../../services/monthly-report';
+import { listEligibleSelfReportProfileIds } from '../../services/solo-progress-reports';
 import { getSnapshotsInRange } from '../../services/snapshot-aggregation';
 import {
   sendPushNotification,
@@ -83,6 +84,8 @@ export const monthlyReportCron = inngest.createFunction(
       const db = getStepDatabase();
       const lastMonthStart = monthRangeStart(new Date(), -1);
       const lastMonthEnd = monthRangeEnd(new Date(), -1);
+      const lastMonthEndExclusive = new Date(lastMonthEnd);
+      lastMonthEndExclusive.setUTCDate(lastMonthEndExclusive.getUTCDate() + 1);
       const links = await db.query.familyLinks.findMany({
         columns: {
           parentProfileId: true,
@@ -104,13 +107,25 @@ export const monthlyReportCron = inngest.createFunction(
           ),
         );
       const activeChildIds = new Set(rows.map((r) => r.childProfileId));
-
-      return links
+      const linkedPairs = links
         .filter((l) => activeChildIds.has(l.childProfileId))
         .map((l) => ({
           parentId: l.parentProfileId,
           childId: l.childProfileId,
         }));
+
+      const selfProfileIds = await listEligibleSelfReportProfileIds(db, {
+        start: lastMonthStart,
+        endExclusive: lastMonthEndExclusive,
+      });
+
+      return [
+        ...linkedPairs,
+        ...selfProfileIds.map((profileId) => ({
+          parentId: profileId,
+          childId: profileId,
+        })),
+      ];
     });
 
     if (pairs.length === 0) {
@@ -168,6 +183,7 @@ export const monthlyReportGenerate = inngest.createFunction(
   { event: 'app/monthly-report.generate' },
   async ({ event, step }) => {
     const { parentId, childId } = event.data;
+    const isSelfReport = parentId === childId;
 
     // [J-6] Step 1: Generate and persist report data.
     // The DB insert uses onConflictDoNothing, so retries are idempotent.
@@ -197,6 +213,26 @@ export const monthlyReportGenerate = inngest.createFunction(
         });
         if (!child) {
           return { status: 'skipped' as const, reason: 'child_missing' };
+        }
+        if (
+          isSelfReport &&
+          (!child.displayName || child.displayName.trim().length === 0)
+        ) {
+          captureException(
+            new Error('monthly self report missing display name'),
+            {
+              extra: {
+                parentId,
+                childId,
+                context: 'monthly-report-generate',
+                reason: 'self_display_name_missing',
+              },
+            },
+          );
+          return {
+            status: 'skipped' as const,
+            reason: 'self_display_name_missing',
+          };
         }
 
         const lastMonthStart = monthRangeStart(new Date(), -1);
@@ -253,8 +289,12 @@ export const monthlyReportGenerate = inngest.createFunction(
           previousSnapshots.at(-1)?.metrics,
         );
 
+        const childDisplayName = isSelfReport
+          ? child.displayName
+          : (child.displayName ?? 'Your child');
+
         let reportData = generateMonthlyReportData(
-          child.displayName ?? 'Your child',
+          childDisplayName,
           lastMonthStart.toLocaleDateString(undefined, {
             month: 'long',
             year: 'numeric',
@@ -312,9 +352,10 @@ export const monthlyReportGenerate = inngest.createFunction(
 
         return {
           status: 'completed' as const,
-          childDisplayName: child.displayName ?? 'Your child',
+          childDisplayName,
           reportMonth: isoDate(lastMonthStart),
           struggleTopics,
+          isSelfReport,
         };
       } catch (error) {
         captureException(error, {
@@ -340,6 +381,10 @@ export const monthlyReportGenerate = inngest.createFunction(
           ? { reason: reportResult.reason }
           : {}),
       };
+    }
+
+    if (reportResult.isSelfReport) {
+      return { status: 'completed', parentId, childId };
     }
 
     // [J-6] Step 2: Send push notification + email in a separate step so that

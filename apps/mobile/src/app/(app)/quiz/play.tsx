@@ -23,7 +23,6 @@ import {
   useCompleteRound,
   usePrefetchRound,
 } from '../../../hooks/use-quiz';
-import { goBackOrReplace } from '../../../lib/navigation';
 import { platformAlert } from '../../../lib/platform-alert';
 // platformAlert maps to window.confirm on web for 2-button prompts, which
 // blocks the renderer (BUG-892). For the quit-quiz confirmation we use a
@@ -46,10 +45,12 @@ export default function QuizPlayScreen(): React.ReactElement {
   const {
     round,
     activityType,
+    returnTo,
     subjectId,
     setPrefetchedRoundId,
     setCompletionResult,
   } = useQuizFlow();
+  const exitHref = returnTo === 'practice' ? '/(app)/practice' : '/(app)/quiz';
   const completeRound = useCompleteRound();
   const prefetchRound = usePrefetchRound();
   // [BUG-542] Extract .mutate so the useEffect dep array references a stable
@@ -124,9 +125,9 @@ export default function QuizPlayScreen(): React.ReactElement {
 
   useEffect(() => {
     if (!round || !currentQuestion) {
-      router.replace('/(app)/quiz' as never);
+      router.replace(exitHref as never);
     }
-  }, [currentQuestion, round, router]);
+  }, [currentQuestion, exitHref, round, router]);
 
   useEffect(() => {
     if (!currentQuestion) return;
@@ -206,7 +207,7 @@ export default function QuizPlayScreen(): React.ReactElement {
   };
   const handleConfirmQuit = () => {
     setQuitConfirmVisible(false);
-    goBackOrReplace(router, '/(app)/quiz');
+    router.replace(exitHref as never);
   };
 
   // [CR-1] Callback for server-side answer checking, declared before the
@@ -339,7 +340,7 @@ export default function QuizPlayScreen(): React.ReactElement {
             </Text>
           </Pressable>
           <Pressable
-            onPress={() => goBackOrReplace(router, '/(app)/quiz')}
+            onPress={() => router.replace(exitHref as never)}
             className="flex-1 bg-surface-elevated rounded-button px-4 py-3 min-h-[48px] items-center justify-center"
             accessibilityRole="button"
             accessibilityLabel="Go Home"

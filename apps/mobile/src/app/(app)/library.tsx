@@ -414,6 +414,11 @@ export default function LibraryScreen() {
     });
   }, [sortedSubjects, debouncedQuery, serverMatchSubjectIds]);
 
+  const nextLearningSubject = useMemo(
+    () => visibleSubjects.find((subject) => subject.status === 'active'),
+    [visibleSubjects],
+  );
+
   // ---- Shimmer skeleton ---------------------------------------------------
 
   const renderShimmerSkeleton = (): React.ReactElement => (
@@ -645,6 +650,31 @@ export default function LibraryScreen() {
         {/* Subject shelf list (hidden when searching) */}
         {!isSearching && (
           <View testID="shelves-list">
+            {nextLearningSubject ? (
+              <Pressable
+                onPress={() => handleShelfPress(nextLearningSubject.id)}
+                className="bg-primary-soft rounded-card px-4 py-4 mb-3 flex-row items-center"
+                accessibilityRole="button"
+                accessibilityLabel={t('library.nextAction.accessibilityLabel', {
+                  subject: nextLearningSubject.name,
+                })}
+                testID="library-next-action"
+              >
+                <View className="flex-1 pr-3">
+                  <Text className="text-body font-semibold text-text-primary">
+                    {t('library.nextAction.title', {
+                      subject: nextLearningSubject.name,
+                    })}
+                  </Text>
+                  <Text className="text-body-sm text-text-secondary mt-1">
+                    {t('library.nextAction.message')}
+                  </Text>
+                </View>
+                <Text className="text-body-sm font-semibold text-primary">
+                  {t('library.nextAction.cta')}
+                </Text>
+              </Pressable>
+            ) : null}
             {visibleSubjects.map((subject) => {
               const retData = retentionDataBySubjectId.get(subject.id);
               const books = booksBySubjectId.get(subject.id) ?? [];

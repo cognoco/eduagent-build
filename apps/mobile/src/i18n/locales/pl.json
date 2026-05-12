@@ -922,6 +922,12 @@
       "title": "Opcje notatki",
       "deleteTitle": "Usuń notatkę",
       "deleteMessage": "Czy na pewno chcesz usunąć tę notatkę?"
+    },
+    "nextAction": {
+      "title": "Kontynuuj {{subject}}",
+      "message": "Otwórz półkę, wybierz następną książkę lub powtórz zaległy materiał.",
+      "cta": "Otwórz",
+      "accessibilityLabel": "Kontynuuj {{subject}}"
     }
   },
   "topic": {
@@ -1142,7 +1148,10 @@
     "studiedToday": "Uczono się dzisiaj",
     "studiedYesterday": "Uczono się wczoraj",
     "studiedDaysAgo": "Uczono się {{count}} dni temu",
-    "topicPassedNote": "Dobra robota - ten temat jest oznaczony jako zaliczony, a słabsze miejsca wrócą w powtórce, gdy będą wymagały uwagi."
+    "topicPassedNote": "Dobra robota - ten temat jest oznaczony jako zaliczony, a słabsze miejsca wrócą w powtórce, gdy będą wymagały uwagi.",
+    "pickerLoadingBody": "Sprawdzamy, które tematy są gotowe do sprawiedliwego testu.",
+    "pickerLoadTimeoutTitle": "Ładowanie tematów do oceny trwa zbyt długo",
+    "pickerLoadTimeoutMessage": "Sprawdź połączenie, a następnie spróbuj ponownie lub wróć."
   },
   "homework": {
     "permissionTitle": "Wymagany dostęp do aparatu",
@@ -1315,7 +1324,9 @@
     },
     "empty": {
       "title": "Rozpocznij swoją pierwszą sesję",
-      "subtitle": "Rozpocznij swoją pierwszą sesję, aby zobaczyć tutaj swoje postępy"
+      "subtitle": "Rozpocznij swoją pierwszą sesję, aby zobaczyć tutaj swoje postępy",
+      "withSubjectTitle": "Postępy odblokują się po nauce {{subject}}",
+      "withSubjectSubtitle": "Najpierw przestudiuj temat z {{subject}}. Sesje, poziom opanowania i powtórki pojawią się tutaj, gdy będzie co mierzyć."
     },
     "error": {
       "loadTitle": "Nie mogliśmy załadować Twoich postępów",
@@ -1464,7 +1475,9 @@
       "title": "Poprzednie rozmowy",
       "empty": "Brak rozmów",
       "untitledTopic": "Temat bez tytułu",
-      "openSessionFrom": "Otwórz sesję z {{date}}"
+      "openSessionFrom": "Otwórz sesję z {{date}}",
+      "loadingTooLong": "Ładowanie rozmów trwa zbyt długo",
+      "loadingMessage": "Sprawdź połączenie i spróbuj ponownie lub wróć do postępów w temacie."
     },
     "retention": {
       "strong": {
@@ -1502,6 +1515,11 @@
       "title": "Previous reports",
       "subtitle": "Weekly and monthly snapshots from your learning.",
       "viewAll": "View all reports"
+    },
+    "loadingTitle": "Ładowanie Twojej ścieżki nauki",
+    "loadTimeout": {
+      "title": "Ładowanie postępów trwa zbyt długo",
+      "message": "Sprawdź połączenie, spróbuj ponownie lub wróć do strony głównej."
     }
   },
   "onboarding": {
@@ -2241,7 +2259,8 @@
       "afterFinishTopic": "Dostępne po ukończeniu tematu",
       "hintOpenPicker": "Otwiera wybór testów",
       "hintOpenLibrary": "Otwiera bibliotekę",
-      "couldNotLoad": "Nie udało się wczytać tematów testów"
+      "couldNotLoad": "Nie udało się wczytać tematów testów",
+      "studySubjectFirst": "Najpierw ucz się {{subject}}, aby to odblokować"
     },
     "quiz": {
       "title": "Szybki quiz",

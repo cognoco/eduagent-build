@@ -1,6 +1,19 @@
 import { render } from '@testing-library/react-native';
 import { NoteDisplay } from './NoteDisplay';
 
+jest.mock(
+  '../../lib/theme' /* gc1-allow: useThemeColors requires ThemeContext provider; not runnable in unit env */,
+  () => ({
+    useThemeColors: () => ({
+      textSecondary: '#999',
+      primary: '#00bcd4',
+      error: '#f44',
+      warning: '#ff9800',
+      success: '#4caf50',
+    }),
+  }),
+);
+
 describe('NoteDisplay', () => {
   it('shows note content', () => {
     const { getByText } = render(

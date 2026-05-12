@@ -1,11 +1,11 @@
 import {
   boolean,
   date,
+  index,
   integer,
   pgEnum,
   pgTable,
   timestamp,
-  uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
 import { generateUUIDv7 } from '../utils/uuid';
@@ -35,9 +35,6 @@ export const dictationResults = pgTable(
       .defaultNow(),
   },
   (table) => [
-    uniqueIndex('idx_dictation_results_profile_date').on(
-      table.profileId,
-      table.date,
-    ),
+    index('idx_dictation_results_profile_date').on(table.profileId, table.date),
   ],
 );

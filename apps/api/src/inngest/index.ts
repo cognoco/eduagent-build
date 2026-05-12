@@ -53,6 +53,11 @@ import {
   monthlyReportCron,
   monthlyReportGenerate,
 } from './functions/monthly-report-cron';
+import {
+  selfProgressReportsBackfill,
+  weeklySelfReportCron,
+  weeklySelfReportGenerate,
+} from './functions/weekly-self-reports';
 import { feedbackDeliveryFailed } from './functions/feedback-delivery-failed';
 import { orphanPersistFailed } from './functions/orphan-persist-failed';
 import { subjectPrewarmCurriculum } from './functions/subject-prewarm-curriculum';
@@ -104,8 +109,11 @@ export {
   dailySnapshotRefresh,
   weeklyProgressPushCron,
   weeklyProgressPushGenerate,
+  weeklySelfReportCron,
+  weeklySelfReportGenerate,
   monthlyReportCron,
   monthlyReportGenerate,
+  selfProgressReportsBackfill,
   freeformFilingRetry,
   filingCompletedObserve,
   filingTimedOutObserve,
