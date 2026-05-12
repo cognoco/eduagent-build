@@ -51,7 +51,7 @@ export const feedbackDeliveryFailed = inngest.createFunction(
         '[feedback-delivery-failed] invalid payload — skipping retries',
         {
           issues,
-        }
+        },
       );
       // Structured escalation per global "no silent recovery" rule —
       // captureException keeps the case in Sentry for queryable counts.
@@ -63,7 +63,7 @@ export const feedbackDeliveryFailed = inngest.createFunction(
             reason: 'invalid_payload',
             issues,
           },
-        }
+        },
       );
       return { status: 'skipped' as const, reason: 'invalid_payload', issues };
     }
@@ -73,8 +73,8 @@ export const feedbackDeliveryFailed = inngest.createFunction(
       category === 'bug'
         ? 'Bug Report'
         : category === 'suggestion'
-        ? 'Suggestion'
-        : 'Feedback';
+          ? 'Suggestion'
+          : 'Feedback';
 
     return step.run('retry-delivery', async () => {
       const resendApiKey = getStepResendApiKey();
@@ -89,12 +89,9 @@ export const feedbackDeliveryFailed = inngest.createFunction(
       // [CR-IDEMP-FALLBACK-08] When event.id is missing, fall back to a
       // deterministic per-payload hash so Inngest retries of the *same* event
       // are still idempotent without colliding across distinct events.
-      // The previous `event.id ?? 'no-event'` fallback collapsed every distinct
-      // delivery failure for the same profile within Resend's 24h dedup window
-      // onto a single key (silently discarding emails 2..N). The previous fix
-      // dropped the key entirely (risking double-sends on replay). A hash of
-      // stable payload fields satisfies both constraints: no cross-event
-      // collision AND idempotent across retries of the same event.
+      // The hash includes event.ts (the Inngest event creation timestamp,
+      // constant across retries but unique per dispatch) so two distinct
+      // submissions for the same profileId+category produce different keys.
       //
       // [CR-MISSING-EVENT-ID-VISIBILITY] Per global "no silent recovery" rule,
       // the hash-fallback path must be observable so ops can count occurrences.
@@ -104,7 +101,7 @@ export const feedbackDeliveryFailed = inngest.createFunction(
       if (event.id) {
         idempotencyKey = `feedback-delivery-failed:${profileId}:${event.id}:retry-delivery`;
       } else {
-        const hashInput = JSON.stringify({ profileId, category });
+        const hashInput = JSON.stringify({ profileId, category, ts: event.ts });
         const hash = createHash('sha256')
           .update(hashInput)
           .digest('hex')
@@ -117,11 +114,11 @@ export const feedbackDeliveryFailed = inngest.createFunction(
             reason: 'missing_event_id',
             profileId,
             category,
-          }
+          },
         );
         captureException(
           new Error(
-            'feedback-delivery-failed: missing event.id — using payload hash idempotency key'
+            'feedback-delivery-failed: missing event.id — using payload hash idempotency key',
           ),
           {
             extra: {
@@ -130,7 +127,7 @@ export const feedbackDeliveryFailed = inngest.createFunction(
               profileId,
               category,
             },
-          }
+          },
         );
       }
 
@@ -139,19 +136,19 @@ export const feedbackDeliveryFailed = inngest.createFunction(
           to: getStepSupportEmail(),
           subject: `[MentoMate ${categoryLabel}] delivery-retry for ${profileId.slice(
             0,
-            8
+            8,
           )}`,
           body: `[Delayed delivery] Category: ${category}\nProfile: ${profileId}\nOriginal delivery failed — this is a retry from the Inngest queue.`,
           type: 'feedback',
         },
-        { resendApiKey, emailFrom, idempotencyKey }
+        { resendApiKey, emailFrom, idempotencyKey },
       );
 
       if (!result.sent) {
         const err = new Error(
           `feedback-delivery-failed retry unsuccessful: ${
             result.reason ?? 'unknown'
-          }`
+          }`,
         );
         captureException(err, {
           profileId,
@@ -167,5 +164,5 @@ export const feedbackDeliveryFailed = inngest.createFunction(
 
       return { ok: true, profileId };
     });
-  }
+  },
 );

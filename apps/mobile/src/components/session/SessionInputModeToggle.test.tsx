@@ -1,13 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react-native';
 import { SessionInputModeToggle } from './SessionInputModeToggle';
 
-jest.mock('../../lib/theme', () => ({
-  useThemeColors: () => ({
-    textInverse: '#fff',
-    textSecondary: '#888',
-  }),
-}));
-
 jest.mock('@expo/vector-icons', () => {
   const { Text } = require('react-native');
   return {

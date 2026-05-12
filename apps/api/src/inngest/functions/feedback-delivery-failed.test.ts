@@ -56,7 +56,11 @@ jest.mock('../client', () => ({
 
 import { feedbackDeliveryFailed } from './feedback-delivery-failed';
 
-async function executeHandler(eventData: unknown, eventId?: string) {
+async function executeHandler(
+  eventData: unknown,
+  eventId?: string,
+  eventTs?: number,
+) {
   const mockStep = {
     run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
     sendEvent: jest.fn().mockResolvedValue(undefined),
@@ -65,7 +69,7 @@ async function executeHandler(eventData: unknown, eventId?: string) {
   };
   const handler = (feedbackDeliveryFailed as any).fn;
   const result = await handler({
-    event: { id: eventId, data: eventData },
+    event: { id: eventId, data: eventData, ts: eventTs ?? Date.now() },
     step: mockStep,
   });
   return { result, mockStep };
@@ -179,22 +183,22 @@ describe('feedback-delivery-failed Inngest function [BUG-767 / A-24]', () => {
 
       await executeHandler(
         { profileId: 'profile-xyz-99999999', category: 'bug' },
-        'evt-feedback-123'
+        'evt-feedback-123',
       );
 
       expect(mockSendEmail).toHaveBeenCalledTimes(1);
       const [, optsArg] = mockSendEmail.mock.calls[0] as [
         unknown,
-        { idempotencyKey?: string }
+        { idempotencyKey?: string },
       ];
       expect(optsArg.idempotencyKey).toEqual(
-        expect.stringContaining('profile-xyz-99999999')
+        expect.stringContaining('profile-xyz-99999999'),
       );
       expect(optsArg.idempotencyKey).toEqual(
-        expect.stringContaining('evt-feedback-123')
+        expect.stringContaining('evt-feedback-123'),
       );
       expect(optsArg.idempotencyKey).toEqual(
-        expect.stringContaining('retry-delivery')
+        expect.stringContaining('retry-delivery'),
       );
     });
 
@@ -205,10 +209,19 @@ describe('feedback-delivery-failed Inngest function [BUG-767 / A-24]', () => {
     it('[CR-IDEMP-FALLBACK-08] two retries with event.id absent receive the same deterministic hash key', async () => {
       mockSendEmail.mockResolvedValue({ sent: true });
 
+      const sharedTs = 1714000000000;
       // Simulate first attempt (no eventId).
-      await executeHandler({ profileId: 'profile-no-id', category: 'bug' });
-      // Simulate second attempt (Inngest retry, same payload, still no eventId).
-      await executeHandler({ profileId: 'profile-no-id', category: 'bug' });
+      await executeHandler(
+        { profileId: 'profile-no-id', category: 'bug' },
+        undefined,
+        sharedTs,
+      );
+      // Simulate second attempt (Inngest retry, same payload + same ts, still no eventId).
+      await executeHandler(
+        { profileId: 'profile-no-id', category: 'bug' },
+        undefined,
+        sharedTs,
+      );
 
       expect(mockSendEmail).toHaveBeenCalledTimes(2);
       const keyFirst = (
@@ -259,14 +272,14 @@ describe('feedback-delivery-failed Inngest function [BUG-767 / A-24]', () => {
       // No eventId — simulates Inngest replay without an event id.
       await executeHandler(
         { profileId: 'profile-no-id-visibility', category: 'suggestion' },
-        undefined
+        undefined,
       );
 
       // logger.warn must fire with the queryable surface + reason tags.
       expect(mockLoggerWarn).toHaveBeenCalledTimes(1);
       const [warnMsg, warnCtx] = mockLoggerWarn.mock.calls[0] as [
         string,
-        Record<string, unknown>
+        Record<string, unknown>,
       ];
       expect(warnMsg).toContain('event.id missing');
       expect(warnCtx.surface).toBe('feedback-delivery-failed');
@@ -278,7 +291,7 @@ describe('feedback-delivery-failed Inngest function [BUG-767 / A-24]', () => {
       expect(mockCaptureException).toHaveBeenCalledTimes(1);
       const [sentryErr, sentryCtx] = mockCaptureException.mock.calls[0] as [
         Error,
-        { extra: Record<string, unknown> }
+        { extra: Record<string, unknown> },
       ];
       expect(sentryErr).toBeInstanceOf(Error);
       expect(sentryCtx.extra.surface).toBe('feedback-delivery-failed');
@@ -286,6 +299,36 @@ describe('feedback-delivery-failed Inngest function [BUG-767 / A-24]', () => {
 
       // Delivery still proceeds (no silent drop).
       expect(mockSendEmail).toHaveBeenCalledTimes(1);
+    });
+
+    // [BUG-44] Two distinct events for the same profileId+category but
+    // different event timestamps must produce different hash keys — the
+    // original bug collapsed them into a single key, silently dropping the
+    // second email within Resend's 24h dedup window.
+    it('[BUG-44] same profileId+category but different events produce distinct hash keys', async () => {
+      mockSendEmail.mockResolvedValue({ sent: true });
+
+      await executeHandler(
+        { profileId: 'profile-same', category: 'bug' },
+        undefined,
+        1714000000000,
+      );
+      await executeHandler(
+        { profileId: 'profile-same', category: 'bug' },
+        undefined,
+        1714000060000,
+      );
+
+      expect(mockSendEmail).toHaveBeenCalledTimes(2);
+      const keyA = (
+        mockSendEmail.mock.calls[0] as [unknown, { idempotencyKey?: string }]
+      )[1].idempotencyKey;
+      const keyB = (
+        mockSendEmail.mock.calls[1] as [unknown, { idempotencyKey?: string }]
+      )[1].idempotencyKey;
+      expect(typeof keyA).toBe('string');
+      expect(typeof keyB).toBe('string');
+      expect(keyA).not.toEqual(keyB);
     });
 
     // [CR-IDEMP-FALLBACK-08] Two distinct delivery failures for the same
@@ -297,11 +340,11 @@ describe('feedback-delivery-failed Inngest function [BUG-767 / A-24]', () => {
 
       await executeHandler(
         { profileId: 'profile-shared', category: 'bug' },
-        'evt-A'
+        'evt-A',
       );
       await executeHandler(
         { profileId: 'profile-shared', category: 'bug' },
-        'evt-B'
+        'evt-B',
       );
 
       expect(mockSendEmail).toHaveBeenCalledTimes(2);
@@ -323,7 +366,7 @@ describe('feedback-delivery-failed Inngest function [BUG-767 / A-24]', () => {
 
       await expect(
         // Pass an eventId so the missing-event-id visibility path doesn't fire.
-        executeHandler({ profileId: 'p-1', category: 'bug' }, 'evt-retry-1')
+        executeHandler({ profileId: 'p-1', category: 'bug' }, 'evt-retry-1'),
       ).rejects.toThrow(/feedback-delivery-failed retry unsuccessful/);
     });
 
@@ -336,7 +379,7 @@ describe('feedback-delivery-failed Inngest function [BUG-767 / A-24]', () => {
       await expect(
         // Pass an eventId so the missing-event-id visibility path doesn't fire,
         // keeping captureException call count at exactly 1 (the retry failure).
-        executeHandler({ profileId: 'p-1', category: 'bug' }, 'evt-retry-2')
+        executeHandler({ profileId: 'p-1', category: 'bug' }, 'evt-retry-2'),
       ).rejects.toThrow();
 
       expect(mockCaptureException).toHaveBeenCalledTimes(1);
@@ -414,7 +457,7 @@ describe('[BUG-767 / A-24] handler is registered with serve()', () => {
       }));
       const { functions } = require('../index');
       const ids = functions.map(
-        (f: { _config?: { id?: string } }) => f._config?.id
+        (f: { _config?: { id?: string } }) => f._config?.id,
       );
       expect(ids).toContain('feedback-delivery-failed');
     });

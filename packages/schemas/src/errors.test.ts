@@ -167,6 +167,22 @@ describe('typed error classes [BUG-644]', () => {
         expect(classifyOrphanError(err)).toBe(expected);
       },
     );
+
+    it.each([
+      ['extract_signals_failed', 'persist_extract_signals_failed'],
+      ['empty_signals', 'persist_empty_signals'],
+      ['generate_curriculum_failed', 'persist_generate_curriculum_failed'],
+      ['persist_failed', 'persist_db_write_failed'],
+      ['draft_missing', 'persist_draft_missing'],
+      ['unknown', 'persist_curriculum_failed'],
+    ] as const)(
+      'classifyOrphanError maps PersistCurriculumError code %s → %s [BUG-54]',
+      (code, expected) => {
+        expect(
+          classifyOrphanError(new PersistCurriculumError(code, 'msg')),
+        ).toBe(expected);
+      },
+    );
   });
 
   // The whole point of moving these into schemas: an instance created

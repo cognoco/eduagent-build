@@ -9,6 +9,14 @@ export const orphanReasonSchema = z.enum([
   'llm_stream_error',
   'llm_empty_or_unparseable',
   'persist_curriculum_failed',
+  'persist_extract_signals_failed',
+  'persist_empty_signals',
+  'persist_generate_curriculum_failed',
+  'persist_db_write_failed',
+  'persist_draft_missing',
+  'bad_request',
+  'forbidden',
+  'quota_exceeded',
   'unknown_post_stream',
 ]);
 export type OrphanReason = z.infer<typeof orphanReasonSchema>;

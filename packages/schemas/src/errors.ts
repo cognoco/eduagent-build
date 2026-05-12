@@ -235,12 +235,28 @@ export class PersistCurriculumError extends Error {
   }
 }
 
+const PERSIST_CODE_TO_ORPHAN_REASON: Record<
+  PersistFailureCode,
+  import('./sessions').OrphanReason
+> = {
+  extract_signals_failed: 'persist_extract_signals_failed',
+  empty_signals: 'persist_empty_signals',
+  generate_curriculum_failed: 'persist_generate_curriculum_failed',
+  persist_failed: 'persist_db_write_failed',
+  draft_missing: 'persist_draft_missing',
+  unknown: 'persist_curriculum_failed',
+};
+
 export function classifyOrphanError(
   err: unknown,
 ): import('./sessions').OrphanReason {
   if (err instanceof LlmStreamError) return 'llm_stream_error';
   if (err instanceof LlmEnvelopeError) return 'llm_empty_or_unparseable';
-  if (err instanceof PersistCurriculumError) return 'persist_curriculum_failed';
+  if (err instanceof PersistCurriculumError)
+    return PERSIST_CODE_TO_ORPHAN_REASON[err.code];
+  if (err instanceof BadRequestError) return 'bad_request';
+  if (err instanceof ForbiddenError) return 'forbidden';
+  if (err instanceof QuotaExceededError) return 'quota_exceeded';
   return 'unknown_post_stream';
 }
 

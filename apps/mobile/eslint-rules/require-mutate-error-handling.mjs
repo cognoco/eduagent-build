@@ -34,14 +34,18 @@ const rule = {
         node,
       ) {
         // ── Check 1: .catch() chained directly ──────────────────────
-        // Pattern: foo.mutateAsync(...).catch(...)
+        // Pattern: foo.mutateAsync(...).catch(handler)
+        // Must verify the .catch MemberExpression is actually called (CallExpression
+        // parent), not just accessed as a property reference.
         const parent = node.parent;
         if (
           parent &&
           parent.type === 'MemberExpression' &&
-          parent.property.name === 'catch'
+          parent.property.name === 'catch' &&
+          parent.parent &&
+          parent.parent.type === 'CallExpression'
         ) {
-          return; // has .catch() — OK
+          return; // has .catch(handler) — OK
         }
 
         // ── Check 2: .then(onFulfilled, onRejected) with 2+ args ──

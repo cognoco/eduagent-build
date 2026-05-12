@@ -1,12 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import {
-  Platform,
-  Pressable,
-  ScrollView,
-  Text,
-  View,
-  type GestureResponderEvent,
-} from 'react-native';
+import { Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -244,14 +237,9 @@ function ChildActionButton({
   testID: string;
 }): React.ReactElement {
   const colors = useThemeColors();
-  const handlePress = (event?: GestureResponderEvent): void => {
-    event?.stopPropagation();
-    onPress();
-  };
-
   return (
     <Pressable
-      onPress={handlePress}
+      onPress={onPress}
       className="flex-1 bg-background rounded-button px-2 py-2.5 items-center justify-center min-h-[52px]"
       style={Platform.OS === 'web' ? { cursor: 'pointer' } : undefined}
       accessibilityRole="button"
@@ -288,34 +276,38 @@ function ChildCommandCard({
   t: (key: string, opts?: Record<string, unknown>) => string;
 }): React.ReactElement {
   return (
-    <Pressable
-      onPress={onOpenProgress}
+    <View
       className={`rounded-card px-4 py-4 ${
         highlight ? 'bg-primary-soft' : 'bg-surface'
       }`}
-      style={Platform.OS === 'web' ? { cursor: 'pointer' } : undefined}
-      accessibilityRole="button"
-      accessibilityLabel={child.displayName}
       testID={`parent-home-check-child-${child.id}`}
     >
-      <View className="flex-row items-start">
-        <View
-          className="w-11 h-11 rounded-full bg-primary items-center justify-center me-3"
-          accessibilityElementsHidden
-        >
-          <Text className="text-h3 font-bold text-text-inverse">
-            {initialOf(child.displayName)}
-          </Text>
+      <Pressable
+        onPress={onOpenProgress}
+        style={Platform.OS === 'web' ? { cursor: 'pointer' } : undefined}
+        accessibilityRole="button"
+        accessibilityLabel={child.displayName}
+        testID={`parent-home-child-body-${child.id}`}
+      >
+        <View className="flex-row items-start">
+          <View
+            className="w-11 h-11 rounded-full bg-primary items-center justify-center me-3"
+            accessibilityElementsHidden
+          >
+            <Text className="text-h3 font-bold text-text-inverse">
+              {initialOf(child.displayName)}
+            </Text>
+          </View>
+          <View className="flex-1">
+            <Text className="text-h3 font-bold text-text-primary">
+              {child.displayName}
+            </Text>
+            <Text className="text-body-sm text-text-secondary mt-1">
+              {formatChildSnapshot(dashboardChild, t)}
+            </Text>
+          </View>
         </View>
-        <View className="flex-1">
-          <Text className="text-h3 font-bold text-text-primary">
-            {child.displayName}
-          </Text>
-          <Text className="text-body-sm text-text-secondary mt-1">
-            {formatChildSnapshot(dashboardChild, t)}
-          </Text>
-        </View>
-      </View>
+      </Pressable>
 
       <View className="flex-row gap-2 mt-4">
         <ChildActionButton
@@ -337,7 +329,7 @@ function ChildCommandCard({
           testID={`parent-home-send-nudge-${child.id}`}
         />
       </View>
-    </Pressable>
+    </View>
   );
 }
 

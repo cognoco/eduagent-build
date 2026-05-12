@@ -80,7 +80,11 @@ export function getCapturedInngestEvents(): CapturedInngestEvent[] {
       return [];
     }
 
-    const body = JSON.parse(call.body) as CapturedInngestEvent[];
-    return Array.isArray(body) ? body : [body];
+    try {
+      const body = JSON.parse(call.body) as CapturedInngestEvent[];
+      return Array.isArray(body) ? body : [body];
+    } catch {
+      return [];
+    }
   });
 }

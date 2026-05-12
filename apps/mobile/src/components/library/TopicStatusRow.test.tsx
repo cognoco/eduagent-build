@@ -1,17 +1,6 @@
 import { fireEvent, render } from '@testing-library/react-native';
 import { TopicStatusRow } from './TopicStatusRow';
 
-jest.mock('../../lib/theme', () => ({
-  useThemeColors: () => ({
-    primary: '#0088cc',
-    accent: '#d97706',
-    success: '#22c55e',
-    textSecondary: '#6b7280',
-    border: '#e5e7eb',
-    surface: '#ffffff',
-  }),
-}));
-
 describe('TopicStatusRow', () => {
   const onPress = jest.fn();
 

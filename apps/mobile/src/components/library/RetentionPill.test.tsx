@@ -1,16 +1,6 @@
 import { render, screen } from '@testing-library/react-native';
 import { RetentionPill } from './RetentionPill';
 
-jest.mock('../../lib/theme', () => ({
-  useThemeColors: () => ({
-    retentionStrong: '#22c55e',
-    retentionFading: '#eab308',
-    retentionWeak: '#f97316',
-    retentionForgotten: '#737373',
-    textSecondary: '#525252',
-  }),
-}));
-
 describe('RetentionPill', () => {
   it('renders still-remembered status with green dot and label', () => {
     render(<RetentionPill status="strong" />);

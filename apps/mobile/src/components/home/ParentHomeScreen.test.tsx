@@ -340,4 +340,24 @@ describe('ParentHomeScreen', () => {
 
     screen.getByTestId('nudge-action-sheet-close');
   });
+
+  it('pressing child card body navigates to child detail [BUG-1027]', () => {
+    mockLinkedChildren = [CHILD_A];
+
+    render(<ParentHomeScreen activeProfile={makeProfile()} />);
+
+    fireEvent.press(screen.getByTestId('parent-home-child-body-child-a'));
+
+    expect(mockPush).toHaveBeenCalledWith('/(app)/child/child-a');
+  });
+
+  it('pressing child progress action button navigates to child detail [BUG-1027]', () => {
+    mockLinkedChildren = [CHILD_A];
+
+    render(<ParentHomeScreen activeProfile={makeProfile()} />);
+
+    fireEvent.press(screen.getByTestId('parent-home-child-progress-child-a'));
+
+    expect(mockPush).toHaveBeenCalledWith('/(app)/child/child-a');
+  });
 });

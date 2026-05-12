@@ -1,10 +1,6 @@
 import { render, fireEvent } from '@testing-library/react-native';
 import { PasswordInput } from './PasswordInput';
 
-jest.mock('../../lib/theme', () => ({
-  useThemeColors: () => ({ muted: '#888' }),
-}));
-
 describe('PasswordInput', () => {
   it('hides password by default', () => {
     const { getByTestId } = render(

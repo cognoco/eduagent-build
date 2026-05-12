@@ -1,17 +1,6 @@
 import { render, fireEvent } from '@testing-library/react-native';
 import { CoachBand, type CoachBandProps } from './CoachBand';
 
-jest.mock('../../lib/theme', () => ({
-  useThemeColors: () => ({
-    primarySoft: 'rgba(45,212,191,0.16)',
-    primary: '#2dd4bf',
-    secondary: '#a78bfa',
-    textTertiary: '#94a3b8',
-    textInverse: '#ffffff',
-    border: '#2a2a54',
-  }),
-}));
-
 describe('CoachBand', () => {
   const baseProps: CoachBandProps = {
     headline: 'Pick up where you stopped in Linear equations.',
