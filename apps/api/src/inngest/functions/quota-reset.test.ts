@@ -73,9 +73,25 @@ import { quotaReset } from './quota-reset';
 
 const NOW = new Date('2025-01-15T01:00:00.000Z');
 
-async function executeSteps(): Promise<Record<string, unknown>> {
+interface QuotaResetResult {
+  status: string;
+  dailyResetCount: number;
+  monthlyResetCount: number;
+  timestamp: string;
+}
+
+interface QuotaResetMockStep {
+  run: jest.Mock;
+  sleep: jest.Mock;
+}
+
+async function executeSteps(): Promise<{
+  result: QuotaResetResult;
+  mockStep: QuotaResetMockStep;
+  stepResults: Record<string, unknown>;
+}> {
   const stepResults: Record<string, unknown> = {};
-  const mockStep = {
+  const mockStep: QuotaResetMockStep = {
     run: jest.fn(async (name: string, fn: () => Promise<unknown>) => {
       const result = await fn();
       stepResults[name] = result;
@@ -85,10 +101,10 @@ async function executeSteps(): Promise<Record<string, unknown>> {
   };
 
   const handler = (quotaReset as any).fn;
-  const result = await handler({
+  const result = (await handler({
     event: { name: 'inngest/function.invoked' },
     step: mockStep,
-  });
+  })) as QuotaResetResult;
 
   return { result, mockStep, stepResults };
 }
@@ -121,7 +137,7 @@ describe('quotaReset', () => {
   it('should have a cron trigger at 01:00 UTC', () => {
     const triggers = (quotaReset as any).opts?.triggers;
     expect(triggers).toEqual(
-      expect.arrayContaining([expect.objectContaining({ cron: '0 1 * * *' })])
+      expect.arrayContaining([expect.objectContaining({ cron: '0 1 * * *' })]),
     );
   });
 

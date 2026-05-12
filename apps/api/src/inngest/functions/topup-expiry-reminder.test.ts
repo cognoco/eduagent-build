@@ -35,7 +35,7 @@ jest.mock('../client', () => ({
           opts: _opts,
           fn,
         });
-      }
+      },
     ),
     send: (...args: unknown[]) => mockInngestSend(...args),
   },
@@ -54,9 +54,19 @@ import { topupExpiryReminder } from './topup-expiry-reminder';
 
 const NOW = new Date('2025-07-15T09:00:00.000Z');
 
-async function executeSteps(): Promise<Record<string, unknown>> {
+interface TopupMockStep {
+  run: jest.Mock;
+  sendEvent: jest.Mock;
+  sleep: jest.Mock;
+}
+
+async function executeSteps(): Promise<{
+  result: unknown;
+  mockStep: TopupMockStep;
+  stepResults: Record<string, unknown>;
+}> {
   const stepResults: Record<string, unknown> = {};
-  const mockStep = {
+  const mockStep: TopupMockStep = {
     run: jest.fn(async (name: string, fn: () => Promise<unknown>) => {
       const result = await fn();
       stepResults[name] = result;
@@ -146,7 +156,7 @@ describe('topupExpiryReminder', () => {
             remaining: 300,
           }),
         }),
-      ])
+      ]),
     );
     expect(mockInngestSend).not.toHaveBeenCalled();
   });
