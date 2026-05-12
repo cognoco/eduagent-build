@@ -1,4 +1,4 @@
-# EduAgent Project Memory
+# Mentomate Project Memory
 
 ## Implementation Status
 
@@ -7,7 +7,7 @@
 
 ## Consistency Cleanup
 
-- Plan and current stage: `docs/audit/cleanup-plan.md` (single source of truth).
+- `docs/audit/cleanup-plan.md` is the single source of truth for the consistency cleanup track. Status per PR lives there; do not duplicate state into memory.
 
 ## Product Constraint — Strictly 11+
 
