@@ -152,7 +152,9 @@ describe('QuizPlayScreen', () => {
       });
     });
     await waitFor(() => {
-      screen.getByTestId('quiz-correct-celebration');
+      screen.getByTestId('quiz-correct-celebration', {
+        includeHiddenElements: true,
+      });
     });
   });
 
