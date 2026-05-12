@@ -91,7 +91,7 @@ cluster_title="$(sed -n "${cluster_header_line}p" "$PLAN" | sed 's/^###[[:space:
 
 # Extract cluster metadata (Severity, Headline)
 cluster_block="$(sed -n "${cluster_header_line},${next_section_line}p" "$PLAN")"
-cluster_severity="$(echo "$cluster_block" | grep -oE '\*\*(RED|YELLOW-RED|YELLOW|GREEN-YELLOW|GREEN)\*\*' | head -1 | tr -d '*')"
+cluster_severity="$(echo "$cluster_block" | grep -oE '\*\*(RED|YELLOW-RED|YELLOW|GREEN-YELLOW|GREEN)\*\*' | head -1 | tr -d '*' || true)"
 cluster_severity="${cluster_severity:-UNKNOWN}"
 
 # ── Step 3: Phase details from cluster table ───────────────────────────

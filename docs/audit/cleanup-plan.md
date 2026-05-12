@@ -363,7 +363,7 @@ These PRs need coordinator or human review beyond agent execution:
 ### C8 — Track C archeology
 
 **Source:** Original cleanup-triage + DEP-DRIFT-1 + AUDIT-MIGRATIONS series
-**Severity:** **GREEN-leaning-YELLOW** (unchanged; standalone-shippable janitor work)
+**Severity:** **GREEN-YELLOW** (unchanged; standalone-shippable janitor work)
 **Headline:** Each item ships independently for clean git blame. No cross-coupling.
 
 | Phase | Description | Status | Owner | PR | Files-claimed | Notes |
