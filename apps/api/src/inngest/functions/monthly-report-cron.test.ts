@@ -242,9 +242,9 @@ const SAMPLE_METRICS = {
 interface CronResult {
   status: string;
   queuedPairs: number;
-  totalPairs: number;
-  queuedBatches: number;
-  failedBatches: number;
+  totalPairs?: number;
+  queuedBatches?: number;
+  failedBatches?: number;
 }
 
 interface CronMockStep {
