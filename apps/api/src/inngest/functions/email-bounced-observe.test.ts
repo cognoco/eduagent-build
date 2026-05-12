@@ -108,16 +108,10 @@ describe('emailBouncedObserve [PR-17-P1]', () => {
       timestamp: '2026-05-12T02:00:00.000Z',
     });
 
-    const last = consoleWarnSpy.mock.calls.at(-1)?.[0];
-    expect(typeof last).toBe('string');
-    const entry = JSON.parse(last as string) as {
-      message: string;
-      level: string;
-      context?: Record<string, unknown>;
-    };
-    expect(entry.message).toBe('email.bounced.received');
-    expect(entry.level).toBe('warn');
-    expect(entry.context).toMatchObject({
+    const entry = lastJsonLine(consoleWarnSpy);
+    expect(entry?.message).toBe('email.bounced.received');
+    expect(entry?.level).toBe('warn');
+    expect(entry?.context).toMatchObject({
       type: 'email.bounced',
       emailId: 'msg-ghi-789',
     });
