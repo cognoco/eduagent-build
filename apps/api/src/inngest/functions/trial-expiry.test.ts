@@ -100,8 +100,26 @@ import { trialExpiry } from './trial-expiry';
 
 const NOW = new Date('2025-01-15T00:00:00.000Z');
 
-async function executeSteps(): Promise<Record<string, unknown>> {
-  const mockStep = {
+interface TrialExpiryResult {
+  status: string;
+  date: string;
+  expiredCount: number;
+  extendedExpiredCount: number;
+  warningsSent: number;
+  softLandingSent: number;
+}
+
+interface TrialExpiryMockStep {
+  run: jest.Mock;
+  sendEvent: jest.Mock;
+  sleep: jest.Mock;
+}
+
+async function executeSteps(): Promise<{
+  result: TrialExpiryResult;
+  mockStep: TrialExpiryMockStep;
+}> {
+  const mockStep: TrialExpiryMockStep = {
     run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
     // [SWEEP-J7] Per-trial escalation events now batched and dispatched via
     // memoized step.sendEvent OUTSIDE the per-trial step.run loop. Bare
@@ -111,10 +129,10 @@ async function executeSteps(): Promise<Record<string, unknown>> {
   };
 
   const handler = (trialExpiry as any).fn;
-  const result = await handler({
+  const result = (await handler({
     event: { name: 'inngest/function.invoked' },
     step: mockStep,
-  });
+  })) as TrialExpiryResult;
 
   return { result, mockStep };
 }
@@ -126,7 +144,7 @@ beforeEach(() => {
   mockFindOwnerProfile.mockImplementation(
     async (_db: unknown, accountId: string) => ({
       id: `owner-${accountId}`,
-    })
+    }),
   );
 });
 
@@ -152,7 +170,7 @@ describe('trialExpiry', () => {
   it('should have a cron trigger', () => {
     const triggers = (trialExpiry as any).opts?.triggers;
     expect(triggers).toEqual(
-      expect.arrayContaining([expect.objectContaining({ cron: '0 0 * * *' })])
+      expect.arrayContaining([expect.objectContaining({ cron: '0 0 * * *' })]),
     );
   });
 
@@ -185,7 +203,7 @@ describe('trialExpiry', () => {
     expect(mockTransitionToExtendedTrial).toHaveBeenCalledWith(
       expect.anything(),
       'sub-1',
-      450
+      450,
     );
     // Should NOT call downgradeQuotaPool for initial expiry (that happens at day 28)
     expect(mockDowngradeQuotaPool).not.toHaveBeenCalled();
@@ -208,7 +226,7 @@ describe('trialExpiry', () => {
       expect.anything(),
       'sub-2',
       100,
-      10
+      10,
     );
   });
 
@@ -267,7 +285,7 @@ describe('trialExpiry', () => {
             context: 'trial-expiry.transition',
             subscriptionId: 'sub-fail',
           }),
-        })
+        }),
       );
 
       // [SWEEP-J7] Escalation event now dispatched via memoized step.sendEvent
@@ -285,7 +303,7 @@ describe('trialExpiry', () => {
               timestamp: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
             }),
           }),
-        ])
+        ]),
       );
       expect(mockInngestSend).not.toHaveBeenCalled();
 
@@ -324,13 +342,13 @@ describe('trialExpiry', () => {
         { id: 'sub-fail', accountId: 'acc' },
       ]);
       mockTransitionToExtendedTrial.mockRejectedValueOnce(
-        new Error('Primary failure')
+        new Error('Primary failure'),
       );
 
       const failingExecuteSteps = async () => {
         const mockStep = {
           run: jest.fn(async (_name: string, fn: () => Promise<unknown>) =>
-            fn()
+            fn(),
           ),
           sendEvent: jest
             .fn()
@@ -345,7 +363,7 @@ describe('trialExpiry', () => {
       };
 
       await expect(failingExecuteSteps()).rejects.toThrow(
-        'Inngest unavailable'
+        'Inngest unavailable',
       );
       // Sentry capture for the primary failure ran before the dispatch attempt.
       expect(mockCaptureException).toHaveBeenCalled();
@@ -373,7 +391,7 @@ describe('trialExpiry', () => {
       expect.anything(),
       'trial',
       expect.any(Date),
-      expect.any(Date)
+      expect.any(Date),
     );
     expect(mockSendPushNotification).toHaveBeenCalledWith(
       expect.anything(),
@@ -382,7 +400,7 @@ describe('trialExpiry', () => {
         title: 'Trial ending soon',
         body: '3 days left of your trial',
         type: 'trial_expiry',
-      })
+      }),
     );
   });
 
@@ -410,7 +428,7 @@ describe('trialExpiry', () => {
       expect.anything(),
       'expired',
       expect.any(Date),
-      expect.any(Date)
+      expect.any(Date),
     );
     expect(mockSendPushNotification).toHaveBeenCalledWith(
       expect.anything(),
@@ -419,7 +437,7 @@ describe('trialExpiry', () => {
         title: 'Your trial has ended',
         body: 'giving you 15/day for 2 more weeks',
         type: 'trial_expiry',
-      })
+      }),
     );
   });
 
@@ -487,13 +505,13 @@ describe('trialExpiry', () => {
     expect(mockTransitionToExtendedTrial).toHaveBeenCalledWith(
       expect.anything(),
       'sub-5',
-      450
+      450,
     );
     expect(mockDowngradeQuotaPool).toHaveBeenCalledWith(
       expect.anything(),
       'sub-6',
       100,
-      10
+      10,
     );
   });
 
@@ -524,7 +542,7 @@ describe('trialExpiry', () => {
       expect(mockTransitionToExtendedTrial).toHaveBeenCalledWith(
         expect.anything(),
         'sub-tz-plus12',
-        450
+        450,
       );
     });
 
@@ -572,7 +590,7 @@ describe('trialExpiry', () => {
       // Verify structurally: first 'trial' query should be a valid full-day range
       const warningCalls =
         mockFindSubscriptionsByTrialDateRange.mock.calls.filter(
-          (call: unknown[]) => call[1] === 'trial'
+          (call: unknown[]) => call[1] === 'trial',
         );
       expect(warningCalls.length).toBe(3); // 3 warning queries (days 3, 1, 0)
 
@@ -581,13 +599,13 @@ describe('trialExpiry', () => {
         unknown,
         unknown,
         Date,
-        Date
+        Date,
       ];
       expect(start3.toISOString()).toMatch(/T00:00:00\.000Z$/);
       expect(end3.toISOString()).toMatch(/T23:59:59\.999Z$/);
       // The date portion should match (same day)
       expect(start3.toISOString().slice(0, 10)).toBe(
-        end3.toISOString().slice(0, 10)
+        end3.toISOString().slice(0, 10),
       );
 
       expect(result.warningsSent).toBeGreaterThanOrEqual(1);

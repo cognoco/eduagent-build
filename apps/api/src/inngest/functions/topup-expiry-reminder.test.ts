@@ -35,7 +35,7 @@ jest.mock('../client', () => ({
           opts: _opts,
           fn,
         });
-      }
+      },
     ),
     send: (...args: unknown[]) => mockInngestSend(...args),
   },
@@ -54,9 +54,25 @@ import { topupExpiryReminder } from './topup-expiry-reminder';
 
 const NOW = new Date('2025-07-15T09:00:00.000Z');
 
-async function executeSteps(): Promise<Record<string, unknown>> {
+interface TopupExpiryResult {
+  status: string;
+  totalReminders: number;
+  timestamp: string;
+}
+
+interface TopupMockStep {
+  run: jest.Mock;
+  sendEvent: jest.Mock;
+  sleep: jest.Mock;
+}
+
+async function executeSteps(): Promise<{
+  result: TopupExpiryResult;
+  mockStep: TopupMockStep;
+  stepResults: Record<string, unknown>;
+}> {
   const stepResults: Record<string, unknown> = {};
-  const mockStep = {
+  const mockStep: TopupMockStep = {
     run: jest.fn(async (name: string, fn: () => Promise<unknown>) => {
       const result = await fn();
       stepResults[name] = result;
@@ -69,10 +85,10 @@ async function executeSteps(): Promise<Record<string, unknown>> {
   };
 
   const handler = (topupExpiryReminder as any).fn ?? topupExpiryReminder;
-  const result = await handler({
+  const result = (await handler({
     event: { name: 'inngest/function.invoked' },
     step: mockStep,
-  });
+  })) as TopupExpiryResult;
 
   return { result, mockStep, stepResults };
 }
@@ -127,10 +143,7 @@ describe('topupExpiryReminder', () => {
       .mockResolvedValueOnce([]) // 2-month milestone
       .mockResolvedValueOnce([]); // 0-month (expiring today)
 
-    const { result, mockStep } = (await executeSteps()) as unknown as {
-      result: { totalReminders: number };
-      mockStep: { sendEvent: jest.Mock };
-    };
+    const { result, mockStep } = await executeSteps();
 
     expect(result.totalReminders).toBe(1);
     // [SWEEP-J7] Memoized step.sendEvent carrying the array of per-credit
@@ -146,7 +159,7 @@ describe('topupExpiryReminder', () => {
             remaining: 300,
           }),
         }),
-      ])
+      ]),
     );
     expect(mockInngestSend).not.toHaveBeenCalled();
   });
@@ -177,10 +190,7 @@ describe('topupExpiryReminder', () => {
       .mockResolvedValueOnce([credit2]) // 2-month milestone
       .mockResolvedValueOnce([]); // 0-month
 
-    const { result, mockStep } = (await executeSteps()) as unknown as {
-      result: { totalReminders: number };
-      mockStep: { sendEvent: jest.Mock };
-    };
+    const { result, mockStep } = await executeSteps();
 
     expect(result.totalReminders).toBe(2);
     // Two milestones produced credits → two memoized step.sendEvent calls.

@@ -23,17 +23,32 @@ import { subjectAutoArchive } from './subject-auto-archive';
 
 const NOW = new Date('2025-01-15T02:00:00.000Z');
 
-async function executeSteps(): Promise<Record<string, unknown>> {
-  const mockStep = {
+interface SubjectAutoArchiveResult {
+  status: string;
+  archivedCount: number;
+  cutoffDate: string;
+  timestamp: string;
+}
+
+interface SubjectAutoArchiveMockStep {
+  run: jest.Mock;
+  sleep: jest.Mock;
+}
+
+async function executeSteps(): Promise<{
+  result: SubjectAutoArchiveResult;
+  mockStep: SubjectAutoArchiveMockStep;
+}> {
+  const mockStep: SubjectAutoArchiveMockStep = {
     run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
     sleep: jest.fn(),
   };
 
   const handler = (subjectAutoArchive as any).fn;
-  const result = await handler({
+  const result = (await handler({
     event: { name: 'inngest/function.invoked' },
     step: mockStep,
-  });
+  })) as SubjectAutoArchiveResult;
 
   return { result, mockStep };
 }
@@ -66,7 +81,7 @@ describe('subjectAutoArchive', () => {
   it('should have a cron trigger at 02:00 UTC', () => {
     const triggers = (subjectAutoArchive as any).opts?.triggers;
     expect(triggers).toEqual(
-      expect.arrayContaining([expect.objectContaining({ cron: '0 2 * * *' })])
+      expect.arrayContaining([expect.objectContaining({ cron: '0 2 * * *' })]),
     );
   });
 
@@ -98,7 +113,7 @@ describe('subjectAutoArchive', () => {
 
     expect(mockArchiveInactiveSubjects).toHaveBeenCalledWith(
       expect.anything(), // db instance
-      expect.any(Date)
+      expect.any(Date),
     );
 
     const cutoffArg = mockArchiveInactiveSubjects.mock.calls[0][1] as Date;

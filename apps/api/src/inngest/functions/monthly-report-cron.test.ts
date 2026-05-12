@@ -239,18 +239,35 @@ const SAMPLE_METRICS = {
 // ---------------------------------------------------------------------------
 
 /** Simulate Inngest step runner for cron functions */
-async function executeCronSteps(): Promise<Record<string, unknown>> {
-  const mockStep = {
+interface CronResult {
+  status: string;
+  queuedPairs: number;
+  totalPairs?: number;
+  queuedBatches?: number;
+  failedBatches?: number;
+}
+
+interface CronMockStep {
+  run: jest.Mock;
+  sendEvent: jest.Mock;
+  sleep: jest.Mock;
+}
+
+async function executeCronSteps(): Promise<{
+  result: CronResult;
+  mockStep: CronMockStep;
+}> {
+  const mockStep: CronMockStep = {
     run: jest.fn(async (name: string, fn: () => Promise<unknown>) => fn()),
     sendEvent: jest.fn().mockResolvedValue(undefined),
     sleep: jest.fn(),
   };
 
   const handler = (monthlyReportCron as any).fn;
-  const result = await handler({
+  const result = (await handler({
     event: { name: 'inngest/function.invoked' },
     step: mockStep,
-  });
+  })) as CronResult;
 
   return { result, mockStep };
 }
@@ -505,13 +522,7 @@ describe('monthlyReportCron', () => {
       const result = (await handler({
         event: { name: 'inngest/function.invoked' },
         step: mockStep,
-      })) as {
-        status: string;
-        queuedPairs: number;
-        totalPairs: number;
-        queuedBatches: number;
-        failedBatches: number;
-      };
+      })) as CronResult;
 
       expect(sendEventCalls).toBe(3);
       expect(result.status).toBe('partial');
