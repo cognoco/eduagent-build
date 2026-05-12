@@ -52,7 +52,7 @@ export const askGateDecisionObserve = inngest.createFunction(
     if (!parseResult.success) {
       logger.error('ask.gate_decision.schema_drift', {
         issues: parseResult.error.issues,
-        rawData: event.data,
+        rawData: event.data, // non-PII: sessionId is an internal ID; no user-identifying fields in payload
       });
       return { status: 'schema_error' as const };
     }
@@ -89,7 +89,7 @@ export const askGateTimeoutObserve = inngest.createFunction(
     if (!parseResult.success) {
       logger.error('ask.gate_timeout.schema_drift', {
         issues: parseResult.error.issues,
-        rawData: event.data,
+        rawData: event.data, // non-PII: sessionId is an internal ID; no user-identifying fields in payload
       });
       return { status: 'schema_error' as const };
     }
@@ -104,6 +104,7 @@ export const askGateTimeoutObserve = inngest.createFunction(
     return {
       status: 'logged' as const,
       sessionId: data.sessionId ?? null,
+      exchangeCount: data.exchangeCount ?? null,
     };
   },
 );

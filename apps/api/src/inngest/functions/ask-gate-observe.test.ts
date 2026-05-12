@@ -158,6 +158,7 @@ describe('askGateTimeoutObserve [PR-17-P1]', () => {
     expect(result).toMatchObject({
       status: 'logged',
       sessionId: 'sess-3',
+      exchangeCount: 4,
     });
   });
 
