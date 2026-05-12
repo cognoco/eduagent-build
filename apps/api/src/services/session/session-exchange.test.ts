@@ -17,7 +17,12 @@ describe('buildExchangeHistory', () => {
 
     const history = buildExchangeHistory(events);
 
-    expect(history.map((h) => h.role)).toEqual(['user', 'assistant', 'system']);
+    expect(
+      history.map(
+        (h: { role: 'user' | 'system' | 'assistant'; content: string }) =>
+          h.role,
+      ),
+    ).toEqual(['user', 'assistant', 'system']);
   });
 
   it('re-wraps every prior assistant turn in a JSON envelope with FULL default signals [BUG-560 / BUG-610]', () => {
@@ -35,7 +40,10 @@ describe('buildExchangeHistory', () => {
     ];
 
     const history = buildExchangeHistory(events);
-    const assistantTurns = history.filter((h) => h.role === 'assistant');
+    const assistantTurns = history.filter(
+      (h: { role: 'user' | 'system' | 'assistant'; content: string }) =>
+        h.role === 'assistant',
+    );
     expect(assistantTurns).toHaveLength(2);
 
     for (const turn of assistantTurns) {
@@ -120,7 +128,10 @@ describe('buildExchangeHistory', () => {
     ];
 
     const history = buildExchangeHistory(events);
-    const assistantTurn = history.find((h) => h.role === 'assistant');
+    const assistantTurn = history.find(
+      (h: { role: 'user' | 'system' | 'assistant'; content: string }) =>
+        h.role === 'assistant',
+    );
     expect(assistantTurn).toEqual(expect.objectContaining({}));
 
     const rewrapped = JSON.parse(assistantTurn!.content) as { reply: string };

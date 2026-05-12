@@ -1,4 +1,6 @@
 import { detectMilestones } from './milestone-detection';
+
+type DetectedMilestone = ReturnType<typeof detectMilestones>[number];
 import type { ProgressMetrics } from '@eduagent/schemas';
 
 function makeMetrics(
@@ -96,7 +98,9 @@ describe('milestone thresholds (lowered)', () => {
     const milestones = detectMilestones(profileId, previous, current);
 
     expect(
-      milestones.filter((m) => m.milestoneType === 'book_completed'),
+      milestones.filter(
+        (m: DetectedMilestone) => m.milestoneType === 'book_completed',
+      ),
     ).toHaveLength(0);
   });
 
@@ -107,7 +111,9 @@ describe('milestone thresholds (lowered)', () => {
     const milestones = detectMilestones(profileId, previous, current);
 
     expect(
-      milestones.filter((m) => m.milestoneType === 'book_completed'),
+      milestones.filter(
+        (m: DetectedMilestone) => m.milestoneType === 'book_completed',
+      ),
     ).toHaveLength(0);
   });
 
@@ -147,7 +153,9 @@ describe('milestone thresholds (lowered)', () => {
 
     // No session_count milestone at 9 — thresholds are 1,3,5,10,...
     expect(
-      milestones.filter((m) => m.milestoneType === 'session_count'),
+      milestones.filter(
+        (m: DetectedMilestone) => m.milestoneType === 'session_count',
+      ),
     ).toHaveLength(0);
   });
 

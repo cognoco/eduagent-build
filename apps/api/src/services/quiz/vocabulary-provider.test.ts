@@ -37,7 +37,7 @@ describe('CEFR helpers', () => {
       detectCefrCeilingMasteryWeighted([
         { cefrLevel: 'B1', repetitions: 0 },
         { cefrLevel: 'A2', repetitions: 2 },
-      ])
+      ]),
     ).toBe('A1');
   });
 
@@ -47,14 +47,14 @@ describe('CEFR helpers', () => {
         { cefrLevel: 'A1', repetitions: 4 },
         { cefrLevel: 'A2', repetitions: 4 },
         { cefrLevel: 'C1', repetitions: 1 },
-      ])
+      ]),
     ).toBe('A2');
   });
 
   it('returns a beginner-safe discovery ceiling for new learners', () => {
     expect(getCefrCeilingForDiscovery([])).toBe('A1');
     expect(
-      getCefrCeilingForDiscovery([{ cefrLevel: 'A1', repetitions: 3 }])
+      getCefrCeilingForDiscovery([{ cefrLevel: 'A1', repetitions: 3 }]),
     ).toBe('A2');
   });
 });
@@ -184,7 +184,9 @@ describe('pickDistractors', () => {
     const result = pickDistractors('dog', vocabPool);
 
     expect(result).toHaveLength(3);
-    expect(result.map((value) => value.toLowerCase())).not.toContain('dog');
+    expect(result.map((value: string) => value.toLowerCase())).not.toContain(
+      'dog',
+    );
   });
 
   it('returns fewer distractors when the pool is too small', () => {
@@ -215,7 +217,7 @@ describe('buildVocabularyMasteryQuestion', () => {
         cefrLevel: 'A1',
       },
       allVocabulary,
-      'A2'
+      'A2',
     );
 
     expect(result.ok).toBe(true);
@@ -243,7 +245,7 @@ describe('buildVocabularyMasteryQuestion', () => {
         cefrLevel: 'A1',
       },
       [{ translation: 'dog' }],
-      'A2'
+      'A2',
     );
 
     expect(result).toEqual({

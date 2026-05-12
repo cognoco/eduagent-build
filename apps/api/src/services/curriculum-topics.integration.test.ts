@@ -39,7 +39,7 @@ function requireDatabaseUrl(): string {
   const url = process.env.DATABASE_URL;
   if (!url) {
     throw new Error(
-      'DATABASE_URL is not set. Create .env.test.local or .env.development.local.'
+      'DATABASE_URL is not set. Create .env.test.local or .env.development.local.',
     );
   }
   return url;
@@ -69,7 +69,7 @@ async function seedBook(
   database: Database,
   label: string,
   topicTitles: string[],
-  chapters?: (string | null)[]
+  chapters?: (string | null)[],
 ): Promise<SeededBook> {
   const [account] = await database
     .insert(accounts)
@@ -168,10 +168,10 @@ describe('findLaterInBook SQL correctness (integration) [PR-FIX-06]', () => {
     const results = await repo.curriculumTopics.findLaterInBook(
       tree.bookId,
       0,
-      10
+      10,
     );
 
-    expect(results.map((r) => r.id)).toEqual([
+    expect(results.map((r: { id: string; title: string }) => r.id)).toEqual([
       tree.topicIds[1],
       tree.topicIds[2],
     ]);
@@ -189,11 +189,11 @@ describe('findLaterInBook SQL correctness (integration) [PR-FIX-06]', () => {
     const results = await repo.curriculumTopics.findLaterInBook(
       tree.bookId,
       0,
-      50
+      50,
     );
 
     // sortOrder 1, 2, 3 returned in ascending order.
-    expect(results.map((r) => r.id)).toEqual([
+    expect(results.map((r: { id: string; title: string }) => r.id)).toEqual([
       tree.topicIds[1],
       tree.topicIds[2],
       tree.topicIds[3],
@@ -209,10 +209,10 @@ describe('findLaterInBook SQL correctness (integration) [PR-FIX-06]', () => {
     const results = await repo.curriculumTopics.findLaterInBook(
       bookC.bookId,
       0,
-      50
+      50,
     );
 
-    const returnedIds = results.map((r) => r.id);
+    const returnedIds = results.map((r: { id: string; title: string }) => r.id);
     expect(returnedIds).not.toContain(bookD.topicIds[0]);
     expect(returnedIds).not.toContain(bookD.topicIds[1]);
     // Only bookC's topic at sortOrder 1 should be present.
@@ -227,7 +227,7 @@ describe('findLaterInBook SQL correctness (integration) [PR-FIX-06]', () => {
     const results = await repo.curriculumTopics.findLaterInBook(
       tree.bookId,
       1,
-      10
+      10,
     );
 
     expect(results).toHaveLength(0);
@@ -241,7 +241,7 @@ describe('findLaterInBook SQL correctness (integration) [PR-FIX-06]', () => {
     const results = await repo.curriculumTopics.findLaterInBook(
       tree.bookId,
       0,
-      10
+      10,
     );
 
     expect(results).toHaveLength(0);
@@ -255,7 +255,7 @@ describe('findLaterInBook SQL correctness (integration) [PR-FIX-06]', () => {
       db,
       'F',
       ['Ch1-Topic-A', 'Ch1-Topic-B', 'Ch2-Topic-A', 'Ch2-Topic-B'],
-      ['Chapter 1', 'Chapter 1', 'Chapter 2', 'Chapter 2']
+      ['Chapter 1', 'Chapter 1', 'Chapter 2', 'Chapter 2'],
     );
     const repo = createScopedRepository(db, tree.profileId);
 
@@ -263,10 +263,10 @@ describe('findLaterInBook SQL correctness (integration) [PR-FIX-06]', () => {
     const results = await repo.curriculumTopics.findLaterInBook(
       tree.bookId,
       1,
-      10
+      10,
     );
 
-    expect(results.map((r) => r.id)).toEqual([
+    expect(results.map((r: { id: string; title: string }) => r.id)).toEqual([
       tree.topicIds[2], // first topic of Chapter 2
       tree.topicIds[3],
     ]);
@@ -281,7 +281,7 @@ describe('findLaterInBook SQL correctness (integration) [PR-FIX-06]', () => {
     const results = await repo.curriculumTopics.findLaterInBook(
       tree.bookId,
       0,
-      2
+      2,
     );
 
     expect(results).toHaveLength(2);

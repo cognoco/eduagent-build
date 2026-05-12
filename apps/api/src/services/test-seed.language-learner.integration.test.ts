@@ -23,7 +23,7 @@ beforeAll(async () => {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
     throw new Error(
-      'DATABASE_URL is not set for language learner seed integration tests'
+      'DATABASE_URL is not set for language learner seed integration tests',
     );
   }
 
@@ -53,7 +53,7 @@ describe('language-learner seed scenario integration', () => {
         name: 'Spanish',
         pedagogyMode: 'four_strands',
         languageCode: 'es',
-      })
+      }),
     );
 
     const vocabRows = await db
@@ -62,19 +62,19 @@ describe('language-learner seed scenario integration', () => {
       .where(
         and(
           eq(vocabulary.profileId, result.profileId),
-          eq(vocabulary.subjectId, result.ids.subjectId)
-        )
+          eq(vocabulary.subjectId, result.ids.subjectId),
+        ),
       );
 
     expect(vocabRows).toHaveLength(3);
-    expect(vocabRows.map((row) => row.termNormalized).sort()).toEqual([
-      'biblioteca',
-      'gracias',
-      'hola',
-    ]);
-    expect(vocabRows.map((row) => row.cefrLevel)).toEqual(
-      expect.arrayContaining(['A1', 'A2'])
-    );
+    expect(
+      vocabRows
+        .map((row: typeof vocabulary.$inferSelect) => row.termNormalized)
+        .sort(),
+    ).toEqual(['biblioteca', 'gracias', 'hola']);
+    expect(
+      vocabRows.map((row: typeof vocabulary.$inferSelect) => row.cefrLevel),
+    ).toEqual(expect.arrayContaining(['A1', 'A2']));
 
     const sessions = await db
       .select()
@@ -82,13 +82,16 @@ describe('language-learner seed scenario integration', () => {
       .where(
         and(
           eq(learningSessions.profileId, result.profileId),
-          eq(learningSessions.status, 'completed')
-        )
+          eq(learningSessions.status, 'completed'),
+        ),
       );
 
     expect(sessions).toHaveLength(4);
     expect(
-      sessions.every((session) => session.subjectId === result.ids.subjectId)
+      sessions.every(
+        (session: typeof learningSessions.$inferSelect) =>
+          session.subjectId === result.ids.subjectId,
+      ),
     ).toBe(true);
   });
 });

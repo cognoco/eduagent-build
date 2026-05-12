@@ -16,6 +16,7 @@ import {
   type Database,
 } from '@eduagent/database';
 
+import type { LibrarySearchResult } from '@eduagent/schemas';
 import { searchLibrary } from './library-search';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
@@ -224,9 +225,11 @@ describeIfDb('searchLibrary (integration)', () => {
         });
         const term = value.split(' ')[0]!;
         const result = await searchLibrary(db, profileId, term);
-        expect(result.sessions.some((s) => s.snippet.includes(term))).toBe(
-          true,
-        );
+        expect(
+          result.sessions.some((s: LibrarySearchResult['sessions'][number]) =>
+            s.snippet.includes(term),
+          ),
+        ).toBe(true);
       }
     });
 

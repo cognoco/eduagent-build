@@ -591,11 +591,12 @@ describe('getSnapshotsInRange', () => {
     );
 
     expect(result).toHaveLength(3);
-    expect(result.map((r) => r.snapshotDate)).toEqual([
-      '2026-04-01',
-      '2026-04-15',
-      '2026-04-30',
-    ]);
+    expect(
+      result.map(
+        (r: { snapshotDate: string; metrics: ProgressMetrics }) =>
+          r.snapshotDate,
+      ),
+    ).toEqual(['2026-04-01', '2026-04-15', '2026-04-30']);
   });
 
   it('excludes snapshots outside the range', async () => {

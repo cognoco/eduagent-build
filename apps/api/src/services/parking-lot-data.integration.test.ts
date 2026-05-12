@@ -42,7 +42,7 @@ function requireDatabaseUrl(): string {
   const url = process.env.DATABASE_URL;
   if (!url) {
     throw new Error(
-      'DATABASE_URL is not set. Create .env.test.local or .env.development.local.'
+      'DATABASE_URL is not set. Create .env.test.local or .env.development.local.',
     );
   }
   return url;
@@ -109,7 +109,7 @@ async function cleanup() {
   const found = await db.query.accounts.findMany({
     where: eq(accounts.email, ACCOUNT.email),
   });
-  const ids = found.map((a) => a.id);
+  const ids = found.map((a: typeof accounts.$inferSelect) => a.id);
   if (ids.length > 0) {
     await db.delete(accounts).where(inArray(accounts.id, ids));
   }
@@ -143,7 +143,7 @@ describe('[BUG-860] addParkingLotItem concurrent cap enforcement (integration)',
         db,
         profile.id,
         session.id,
-        `Pre-filled question ${i + 1}`
+        `Pre-filled question ${i + 1}`,
       );
       expect(result).not.toBeNull();
     }
@@ -155,8 +155,8 @@ describe('[BUG-860] addParkingLotItem concurrent cap enforcement (integration)',
       .where(
         and(
           eq(parkingLotItems.sessionId, session.id),
-          eq(parkingLotItems.profileId, profile.id)
-        )
+          eq(parkingLotItems.profileId, profile.id),
+        ),
       );
     expect(before!.n).toBe(cap - 1);
 
@@ -165,8 +165,8 @@ describe('[BUG-860] addParkingLotItem concurrent cap enforcement (integration)',
     const CONCURRENT = 15;
     const results = await Promise.allSettled(
       Array.from({ length: CONCURRENT }, (_, i) =>
-        addParkingLotItem(db, profile.id, session.id, `Racing question ${i}`)
-      )
+        addParkingLotItem(db, profile.id, session.id, `Racing question ${i}`),
+      ),
     );
 
     // None should reject — the service returns null for over-cap, not throws
@@ -175,7 +175,7 @@ describe('[BUG-860] addParkingLotItem concurrent cap enforcement (integration)',
 
     // Count how many of the concurrent calls actually inserted a row
     const inserted = results.filter(
-      (r) => r.status === 'fulfilled' && r.value !== null
+      (r) => r.status === 'fulfilled' && r.value !== null,
     );
 
     // The final count must equal the cap exactly — the advisory lock must
@@ -189,8 +189,8 @@ describe('[BUG-860] addParkingLotItem concurrent cap enforcement (integration)',
       .where(
         and(
           eq(parkingLotItems.sessionId, session.id),
-          eq(parkingLotItems.profileId, profile.id)
-        )
+          eq(parkingLotItems.profileId, profile.id),
+        ),
       );
 
     // Hard invariant: exactly 1 of the concurrent calls must have inserted,

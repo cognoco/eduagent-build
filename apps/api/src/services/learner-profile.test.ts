@@ -1,5 +1,9 @@
 import type { StrengthEntry, StruggleEntry } from '@eduagent/schemas';
-import type { MemoryBlockProfile } from './learner-profile';
+import type {
+  MemoryBlockProfile,
+  MemoryBlockEntry,
+  StruggleNotification,
+} from './learner-profile';
 import {
   analyzeSessionTranscript,
   archiveStaleStruggles,
@@ -1129,7 +1133,9 @@ describe('buildMemoryBlock', () => {
       memoryConsentStatus: 'granted',
     };
     const result = buildMemoryBlock(profile, null, null);
-    const strengthEntry = result.entries.find((e) => e.kind === 'strength');
+    const strengthEntry = result.entries.find(
+      (e: MemoryBlockEntry) => e.kind === 'strength',
+    );
     expect(strengthEntry).toEqual(expect.objectContaining({}));
     expect(strengthEntry!.text).toContain('fractions');
     // Entry text must appear as substring in the full .text
@@ -1203,7 +1209,9 @@ describe('buildMemoryBlock', () => {
       activeUrgency: { reason: 'Science test', boostUntil },
     };
     const result = buildMemoryBlock(profile, null, null);
-    const urgencyEntry = result.entries.find((e) => e.kind === 'urgency');
+    const urgencyEntry = result.entries.find(
+      (e: MemoryBlockEntry) => e.kind === 'urgency',
+    );
     expect(urgencyEntry).toEqual(expect.objectContaining({}));
     expect(urgencyEntry!.text).toContain('Science test');
     // Entry text must appear as substring in the full .text
@@ -1240,7 +1248,7 @@ describe('buildMemoryBlock', () => {
       expect(result.text).toContain(entry.text);
     }
     // At least one entry per expected kind in this fixture
-    const kinds = result.entries.map((e) => e.kind);
+    const kinds = result.entries.map((e: MemoryBlockEntry) => e.kind);
     expect(kinds).toContain('struggle');
     expect(kinds).toContain('strength');
     expect(kinds).toContain('interest');
@@ -1565,10 +1573,9 @@ describe('detectStruggleNotifications', () => {
     const resolved = [{ topic: 'decimals', subject: 'Math' as string | null }];
     const notifications = detectStruggleNotifications(before, after, resolved);
     expect(notifications).toHaveLength(2);
-    expect(notifications.map((n) => n.type).sort()).toEqual([
-      'struggle_flagged',
-      'struggle_resolved',
-    ]);
+    expect(
+      notifications.map((n: StruggleNotification) => n.type).sort(),
+    ).toEqual(['struggle_flagged', 'struggle_resolved']);
   });
 
   it('matches topics case-insensitively', () => {
