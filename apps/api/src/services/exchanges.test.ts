@@ -241,7 +241,7 @@ describe('buildSystemPrompt', () => {
       homeworkMode: 'check_answer',
     });
     expect(prompt).toContain('1-2 sentences');
-    expect(prompt).toContain('Teens want speed');
+    expect(prompt).toContain('Young learners want speed');
   });
 
   it('uses youth brevity in homework mode for child learners', () => {
@@ -252,7 +252,7 @@ describe('buildSystemPrompt', () => {
       homeworkMode: 'check_answer',
     });
     expect(prompt).toContain('1-2 sentences');
-    expect(prompt).toContain('Teens want speed');
+    expect(prompt).toContain('Young learners want speed');
   });
 
   it('uses standard brevity in homework mode for adult learners', () => {
@@ -263,7 +263,7 @@ describe('buildSystemPrompt', () => {
       homeworkMode: 'check_answer',
     });
     expect(prompt).toContain('2-6 sentences');
-    expect(prompt).not.toContain('Teens want speed');
+    expect(prompt).not.toContain('Young learners want speed');
   });
 
   // Regression: a homework problem about Spain loaded inside a Geography-of-Africa

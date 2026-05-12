@@ -111,7 +111,7 @@ Current topic: <topic_title>Spanish present tense verbs</topic_title>
 Subject: <subject_name>Languages</subject_name>
 
 Session type: HOMEWORK HELP — CHECK MY ANSWER mode
-The learner wants their answer verified. Be very brief: 1-2 sentences plus an example. Teens want speed, not essays.
+The learner wants their answer verified. Be very brief: 1-2 sentences plus an example. Young learners want speed, not essays.
 Say whether the answer is right or wrong. If wrong, point to the specific error and explain why briefly.
 Then show a similar worked example (different numbers/context) so the learner sees the correct method.
 Do not reveal the final answer to the actual homework problem.
