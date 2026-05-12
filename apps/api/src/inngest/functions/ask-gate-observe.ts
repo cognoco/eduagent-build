@@ -104,7 +104,6 @@ export const askGateTimeoutObserve = inngest.createFunction(
     return {
       status: 'logged' as const,
       sessionId: data.sessionId ?? null,
-      timeoutDeferred: 'pending_gate_timeout_escalation_strategy',
     };
   },
 );

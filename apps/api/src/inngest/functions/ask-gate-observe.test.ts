@@ -97,7 +97,7 @@ describe('askGateDecisionObserve [PR-17-P1]', () => {
     });
   });
 
-  it('emits a structured info log with gate decision context', async () => {
+  it('[BREAK] emits a structured info log with gate decision context (observability terminus)', async () => {
     await invoke(askGateDecisionObserve, {
       sessionId: 'sess-2',
       meaningful: false,
@@ -123,6 +123,19 @@ describe('askGateDecisionObserve [PR-17-P1]', () => {
     const result = await invoke(askGateDecisionObserve, {});
     expect(result).toMatchObject({ status: 'logged', sessionId: null });
   });
+
+  it('[BREAK] returns schema_error and logs schema_drift on type-mismatched payload', async () => {
+    const result = await invoke(askGateDecisionObserve, {
+      sessionId: 123,
+      meaningful: 'yes',
+      exchangeCount: 'many',
+    } as unknown as Record<string, unknown>);
+
+    expect(result).toEqual({ status: 'schema_error' });
+    const entry = lastJsonLine(consoleErrorSpy);
+    expect(entry?.message).toBe('ask.gate_decision.schema_drift');
+    expect(entry?.level).toBe('error');
+  });
 });
 
 describe('askGateTimeoutObserve [PR-17-P1]', () => {
@@ -145,7 +158,6 @@ describe('askGateTimeoutObserve [PR-17-P1]', () => {
     expect(result).toMatchObject({
       status: 'logged',
       sessionId: 'sess-3',
-      timeoutDeferred: 'pending_gate_timeout_escalation_strategy',
     });
   });
 
@@ -167,5 +179,16 @@ describe('askGateTimeoutObserve [PR-17-P1]', () => {
   it('handles empty payload gracefully (all fields optional)', async () => {
     const result = await invoke(askGateTimeoutObserve, {});
     expect(result).toMatchObject({ status: 'logged', sessionId: null });
+  });
+
+  it('[BREAK] returns schema_error and logs schema_drift on type-mismatched payload', async () => {
+    const result = await invoke(askGateTimeoutObserve, {
+      exchangeCount: 'many',
+    } as unknown as Record<string, unknown>);
+
+    expect(result).toEqual({ status: 'schema_error' });
+    const entry = lastJsonLine(consoleErrorSpy);
+    expect(entry?.message).toBe('ask.gate_timeout.schema_drift');
+    expect(entry?.level).toBe('error');
   });
 });

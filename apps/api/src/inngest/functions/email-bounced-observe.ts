@@ -24,7 +24,7 @@ import { createLogger } from '../../services/logger';
 const logger = createLogger();
 
 const emailBouncedPayloadSchema = z.object({
-  type: z.string().optional(),
+  type: z.enum(['email.bounced', 'email.complained']).optional(),
   to: z.string().optional(),
   emailId: z.string().nullable().optional(),
   timestamp: z.string().optional(),
@@ -41,7 +41,7 @@ export const emailBouncedObserve = inngest.createFunction(
     if (!parseResult.success) {
       logger.error('email.bounced.schema_drift', {
         issues: parseResult.error.issues,
-        rawData: event.data,
+        rawData: event.data, // `to` is pre-masked by sender (resend-webhook.ts:maskEmail)
       });
       return { status: 'schema_error' as const };
     }
@@ -59,7 +59,6 @@ export const emailBouncedObserve = inngest.createFunction(
       status: 'logged' as const,
       type: data.type ?? null,
       emailId: data.emailId ?? null,
-      suppressionDeferred: 'pending_email_bounce_suppression_strategy',
     };
   },
 );

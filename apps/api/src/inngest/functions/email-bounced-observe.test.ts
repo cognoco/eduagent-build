@@ -39,19 +39,24 @@ afterAll(() => {
   consoleErrorSpy.mockRestore();
 });
 
-interface EmailBouncedEventData {
-  type?: string;
-  to?: string;
-  emailId?: string | null;
-  timestamp?: string;
+async function invoke<T extends Record<string, unknown>>(
+  handler: unknown,
+  data: T,
+) {
+  const fn = ((handler as { fn?: unknown }).fn ?? handler) as (args: {
+    event: { data: T };
+  }) => Promise<unknown>;
+  return fn({ event: { data } });
 }
 
-async function invokeHandler(data: EmailBouncedEventData) {
-  const handler = ((emailBouncedObserve as unknown as { fn?: unknown }).fn ??
-    emailBouncedObserve) as (args: {
-    event: { data: EmailBouncedEventData };
-  }) => Promise<unknown>;
-  return handler({ event: { data } });
+function lastJsonLine(spy: jest.SpyInstance): Record<string, unknown> | null {
+  const last = spy.mock.calls.at(-1)?.[0];
+  if (typeof last !== 'string') return null;
+  try {
+    return JSON.parse(last) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
 }
 
 describe('emailBouncedObserve [PR-17-P1]', () => {
@@ -66,7 +71,7 @@ describe('emailBouncedObserve [PR-17-P1]', () => {
   });
 
   it('returns logged status with bounce payload', async () => {
-    const result = await invokeHandler({
+    const result = await invoke(emailBouncedObserve, {
       type: 'email.bounced',
       to: 'j***@example.com',
       emailId: 'msg-abc-123',
@@ -77,12 +82,11 @@ describe('emailBouncedObserve [PR-17-P1]', () => {
       status: 'logged',
       type: 'email.bounced',
       emailId: 'msg-abc-123',
-      suppressionDeferred: 'pending_email_bounce_suppression_strategy',
     });
   });
 
   it('returns logged status with complained payload', async () => {
-    const result = await invokeHandler({
+    const result = await invoke(emailBouncedObserve, {
       type: 'email.complained',
       to: 'u***@example.com',
       emailId: 'msg-def-456',
@@ -97,7 +101,7 @@ describe('emailBouncedObserve [PR-17-P1]', () => {
   });
 
   it('[BREAK] emits a warn-level structured log so bounce events are queryable', async () => {
-    await invokeHandler({
+    await invoke(emailBouncedObserve, {
       type: 'email.bounced',
       to: 'j***@example.com',
       emailId: 'msg-ghi-789',
@@ -120,7 +124,7 @@ describe('emailBouncedObserve [PR-17-P1]', () => {
   });
 
   it('handles null emailId gracefully', async () => {
-    const result = await invokeHandler({
+    const result = await invoke(emailBouncedObserve, {
       type: 'email.bounced',
       to: 'x***@example.com',
       emailId: null,
@@ -134,11 +138,23 @@ describe('emailBouncedObserve [PR-17-P1]', () => {
   });
 
   it('handles empty payload gracefully (all fields optional)', async () => {
-    const result = await invokeHandler({});
+    const result = await invoke(emailBouncedObserve, {});
     expect(result).toMatchObject({
       status: 'logged',
       type: null,
       emailId: null,
     });
+  });
+
+  it('[BREAK] returns schema_error and logs schema_drift on type-mismatched payload', async () => {
+    const result = await invoke(emailBouncedObserve, {
+      type: 'email.unsubscribed',
+      emailId: 123,
+    } as unknown as Record<string, unknown>);
+
+    expect(result).toEqual({ status: 'schema_error' });
+    const entry = lastJsonLine(consoleErrorSpy);
+    expect(entry?.message).toBe('email.bounced.schema_drift');
+    expect(entry?.level).toBe('error');
   });
 });
