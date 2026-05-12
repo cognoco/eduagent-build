@@ -22,12 +22,29 @@ PLAN="docs/audit/cleanup-plan.md"
 
 [[ -f "$PLAN" ]] || { echo "ERROR: $PLAN not found" >&2; exit 1; }
 
-# Normalize PR number: PR-08, PR-8, 08, 8 → 08 (two-digit zero-padded)
-pr_num="$(echo "$raw_pr" | grep -oE '[0-9]+' | head -1)"
-[[ -n "$pr_num" ]] || { echo "ERROR: cannot parse PR number from '$raw_pr'" >&2; exit 1; }
+# Markdown-table-safe field extractor.
+# awk -F'|' splits on every literal `|`, including escaped `\|` characters
+# that appear inside cell content (e.g. type unions like `'a' \| 'b'`).
+# We substitute `\|` → \001 (SOH, won't appear in markdown) before splitting,
+# then restore `|` in the extracted field. Caller specifies 1-based field index.
+safe_field() {
+    local row="$1" field="$2"
+    echo "$row" \
+        | sed 's/\\|/\x01/g' \
+        | awk -F'|' -v f="$field" '{print $f}' \
+        | tr '\001' '|' \
+        | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
+}
+
+# Normalize PR number: PR-08, PR-8, 08, 8 → 08 (two-digit zero-padded).
+# Optional lowercase letter suffix is preserved for sub-PRs: PR-15a, 15b, etc.
+pr_token="$(echo "$raw_pr" | grep -oE '[0-9]+[a-z]*' | head -1)"
+[[ -n "$pr_token" ]] || { echo "ERROR: cannot parse PR number from '$raw_pr'" >&2; exit 1; }
+pr_num="${pr_token//[a-z]/}"
+pr_suffix="${pr_token//[0-9]/}"
 # Force base-10 (leading zeros like "08" are invalid octal in bash/printf)
 pr_num="$(printf '%02d' "$((10#$pr_num))")"
-pr_id="PR-${pr_num}"
+pr_id="PR-${pr_num}${pr_suffix}"
 
 echo "Extracting work order for ${pr_id}..."
 
@@ -42,9 +59,9 @@ if echo "$pr_row" | grep -q '~~'; then
 fi
 
 # Parse pipe-separated fields (1-indexed): PR | Cluster | Phases | Summary
-cluster_raw="$(echo "$pr_row" | awk -F'|' '{print $3}' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
-phases_raw="$(echo "$pr_row" | awk -F'|' '{print $4}' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
-summary_raw="$(echo "$pr_row" | awk -F'|' '{print $5}' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+cluster_raw="$(safe_field "$pr_row" 3)"
+phases_raw="$(safe_field "$pr_row" 4)"
+summary_raw="$(safe_field "$pr_row" 5)"
 
 # Extract cluster number (C1, C3, etc.)
 cluster_num="$(echo "$cluster_raw" | grep -oE 'C[0-9]+' | head -1)"
@@ -88,10 +105,10 @@ for pid in "${phase_ids[@]}"; do
     fi
 
     # Parse pipe-separated fields: Phase | Description | Status | Owner | PR | Files-claimed | Notes
-    p_desc="$(echo "$phase_row" | awk -F'|' '{print $3}' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
-    p_status="$(echo "$phase_row" | awk -F'|' '{print $4}' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
-    p_files="$(echo "$phase_row" | awk -F'|' '{print $7}' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
-    p_notes="$(echo "$phase_row" | awk -F'|' '{print $8}' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+    p_desc="$(safe_field "$phase_row" 3)"
+    p_status="$(safe_field "$phase_row" 4)"
+    p_files="$(safe_field "$phase_row" 7)"
+    p_notes="$(safe_field "$phase_row" 8)"
 
     # Extract individual file paths from backticks (no mapfile — macOS bash 3.x compat)
     files=()
@@ -297,6 +314,20 @@ touched_pkgs="$(echo "$touched_pkgs" | tr ' ' '\n' | sort -u | tr '\n' ' ')"
     if echo "$touched_pkgs" | grep -q 'database'; then
         echo ""
         sed -n '/^## Schema And Deploy Safety/,/^## /{ /^## Schema/p; /^## [^S]/!p; }' CLAUDE.md 2>/dev/null || true
+    fi
+
+    # Always include governance enforcement constraints — these describe
+    # non-obvious interactions between the enforcement layer and common change
+    # types. CLAUDE.md describes the rules; this doc describes how the rules
+    # are enforced and what surprising things break when adjacent code changes.
+    # Captures gotchas like ESLint flat-config glob resolution and tsc --build
+    # reference graph traversal that have caused prior Archon runs to ship
+    # reverted-mid-PR changes.
+    if [[ -f .archon/governance-constraints.md ]]; then
+        echo ""
+        echo "---"
+        echo ""
+        cat .archon/governance-constraints.md
     fi
 } > "$ARTIFACTS_DIR/rules-digest.md"
 

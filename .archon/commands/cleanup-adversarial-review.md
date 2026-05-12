@@ -52,6 +52,12 @@ CLAUDE.md is already loaded into your system prompt — do not re-read it. Treat
 non-negotiable rules and Code Quality Guards as CRITICAL: any violation in the diff
 is a CRITICAL finding.
 
+Also read `.archon/governance-constraints.md` (or the appended section in
+`$ARTIFACTS_DIR/rules-digest.md`). It catalogs non-obvious enforcement-layer
+interactions (ESLint flat-config glob resolution, `tsc --build` reference graph
+traversal, GC1 ratchet, paired-stage requirements). Match the diff against the
+"Common Anti-Patterns" table — any verbatim match is a CRITICAL finding.
+
 ---
 
 ## Phase 2: ATTACK — Try to Break It

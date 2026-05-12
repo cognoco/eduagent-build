@@ -212,4 +212,32 @@ if [[ ${#violations[@]} -gt 0 ]]; then
     exit 1
 fi
 
+# Shrinkage detection (post-fix run only).
+#
+# Forward scope-guard above catches NEW unexpected files. It does NOT detect
+# when claimed files are MISSING from the final diff — which happens when
+# fix-locally reverts a file that implement created (e.g. PR-212's eslint.config.mjs,
+# PR-214's tsconfig.json). The result is a PR that promises files in its
+# work order that the diff doesn't deliver.
+#
+# Record the set of claimed-but-not-delivered files so create-pr-body can
+# surface them in a "Scope changes during execution" section. Not an error —
+# fix-locally reverts are legitimate; we just need the PR to be honest.
+#
+# Only runs on post-fix invocation (review/ dir present, set above).
+if [[ -d "${artifacts_dir}/review" ]]; then
+    reverted_file="${artifacts_dir}/.reverted-files"
+    : > "$reverted_file"
+    while IFS= read -r claimed; do
+        [[ -z "$claimed" ]] && continue
+        if ! echo "$changed_files" | grep -qxF "$claimed"; then
+            echo "$claimed" >> "$reverted_file"
+        fi
+    done <<< "$allowed_files"
+    reverted_count="$(grep -c . "$reverted_file" 2>/dev/null || echo 0)"
+    if [[ "${reverted_count:-0}" -gt 0 ]]; then
+        echo "Scope guard: ${reverted_count} claimed file(s) not in final diff (recorded in .reverted-files)"
+    fi
+fi
+
 echo "Scope guard: clean — ${allowed_count} files match work order"

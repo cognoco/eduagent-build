@@ -1,4 +1,4 @@
-name: execute-cleanup-pr-merged
+name: execute-cleanup-pr
 description: |
   Execute a cleanup-plan.md work package by PR number.
   Usage: archon workflow run execute-cleanup-pr-merged --branch cleanup-pr-XX "PR-16"
@@ -64,10 +64,20 @@ nodes:
     depends_on: [init-tracing]
     bash: ./.archon/scripts/cleanup-extract.sh "$ARGUMENTS" "$ARTIFACTS_DIR"
 
+  # ── PHASE 1a: VALIDATE EXTRACT ───────────────────────────────────────
+  # Fail-fast guard. Aborts before implement burns tokens on a malformed
+  # work order (e.g. PR-11's pipe-escape extraction bug that produced an
+  # empty Files Summary). Checks: non-empty Files Summary table, at least
+  # one Phase block, non-empty Summary/Phases cells.
+
+  - id: validate-extract
+    depends_on: [extract]
+    bash: ./.archon/scripts/cleanup-validate-extract.sh "$ARTIFACTS_DIR"
+
   # ── PHASE 1b: INSTALL ────────────────────────────────────────────────
 
   - id: install
-    depends_on: [extract]
+    depends_on: [validate-extract]
     timeout: 300000
     bash: |
       ./.archon/scripts/install.sh

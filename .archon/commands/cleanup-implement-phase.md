@@ -20,11 +20,20 @@ Read these files (they were written by the extract step):
 3. `$ARTIFACTS_DIR/patterns.md` — sibling-shape hints. Shows which claimed files have
    existing test siblings (append to them) vs. which don't (do NOT create new test files).
 4. `$ARTIFACTS_DIR/rules-digest.md` — the subset of CLAUDE.md rules most relevant to
-   this PR's touched packages. CLAUDE.md is also in your system prompt; the digest
-   highlights what matters for THIS specific work order.
+   this PR's touched packages, plus `governance-constraints.md` (appended verbatim).
+   CLAUDE.md is also in your system prompt; the digest highlights what matters for
+   THIS specific work order AND describes how the enforcement layer interacts with
+   common change types (ESLint flat-config glob resolution, `tsc --build` reference
+   graph traversal, GC1 ratchet, pre-commit paired-stage requirements, etc.).
 
 CLAUDE.md is already loaded into your system prompt — do not re-read it. Its
 project conventions are non-negotiable; follow every rule.
+
+**Before editing a tsconfig, ESLint config, prompt file, or test file**, check the
+matching section of `governance-constraints.md` (now in `rules-digest.md`). If the
+phase as written matches an entry in the "Common Anti-Patterns" table, STOP and
+record the conflict in `progress.md` rather than implementing — the adversarial
+reviewer will catch it later anyway and the fix will undo your work.
 
 From the work order, extract:
 - The list of phases with their descriptions

@@ -17,6 +17,7 @@ progress="${artifacts_dir}/progress.md"
 validation="${artifacts_dir}/validation.md"
 findings_json="${artifacts_dir}/review/findings.json"
 consolidated_review="${artifacts_dir}/review/consolidated-review.md"
+reverted_files="${artifacts_dir}/.reverted-files"
 pr_body="${artifacts_dir}/.pr-body.md"
 pr_title_file="${artifacts_dir}/.pr-title"
 
@@ -120,6 +121,36 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Scope-changes section (claimed files that fix-locally reverted)
+# ---------------------------------------------------------------------------
+# scope-guard-post-fix writes .reverted-files with one path per line for
+# files in the work order's claim that don't appear in the final diff.
+# Each entry is annotated with the matching adversarial finding (if any)
+# so reviewers understand why the file was dropped.
+scope_changes_section=""
+if [[ -s "$reverted_files" ]]; then
+    scope_changes_section+=$'The work order claimed the following file(s), but `fix-locally` reverted them after review (typically because the adversarial reviewer caught a problem with the implementation). They are NOT in this PR\'s diff:\n\n'
+    while IFS= read -r f; do
+        [[ -z "$f" ]] && continue
+        reason=""
+        if [[ -f "$findings_json" ]]; then
+            reason="$(jq -r --arg f "$f" '
+                [.findings[]
+                 | select(.file == $f)
+                 | select(.severity == "CRITICAL" or .severity == "HIGH")
+                 | "\(.severity) (\(.id)): \(.summary)"]
+                | first // ""
+            ' "$findings_json" 2>/dev/null || true)"
+        fi
+        if [[ -n "$reason" ]]; then
+            scope_changes_section+="- \`$f\` — $reason"$'\n'
+        else
+            scope_changes_section+="- \`$f\` — reverted by fix-locally (no matching CRITICAL/HIGH finding; see review artifacts)"$'\n'
+        fi
+    done < "$reverted_files"
+fi
+
+# ---------------------------------------------------------------------------
 # Write PR body
 # ---------------------------------------------------------------------------
 {
@@ -135,6 +166,12 @@ fi
     echo ""
     printf '%s' "$changes_section"
     echo ""
+    if [[ -n "$scope_changes_section" ]]; then
+        echo "## Scope changes during execution"
+        echo ""
+        printf '%s' "$scope_changes_section"
+        echo ""
+    fi
     echo "## Verification"
     echo ""
     printf '%s\n' "$validation_section"
