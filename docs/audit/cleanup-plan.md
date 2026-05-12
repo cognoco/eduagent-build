@@ -155,7 +155,7 @@ Consecutive numbering across all clusters. **Numbering does not imply strict seq
 | PR-15f | C6 | P3f | Closure — add `tsconfig.spec.json` to `apps/api/tsconfig.json` references, re-enable `noUncheckedIndexedAccess` and `noUnusedLocals`, gate `tsc --noEmit -p tsconfig.spec.json` in `api:typecheck`. |
 | PR-16 | C6 | P4+P5 | Drop broken nx e2e block + rename `db:generate` → `db:generate:dev` |
 | PR-17 | C7 | P1+P2+P3+P4+P5+P7 | Doc reconciliation bundle — Inngest observers, RLS plan refresh, CLAUDE.md persona rule + db:* commands, UX spec paths, SCHEMA-2 plan numbers, baseline-delta amendment, overlap-flags supersede. **Co-land with PR-27.** |
-| PR-18 | C8 | P1 | Regenerate 11 missing drizzle migration snapshots |
+| PR-18 | C8 | P1 | Regenerate 11 missing drizzle migration snapshots + 6 prevId chain fixes — **PR #231** |
 | PR-19 | C8 | P2 | Fix non-monotonic `_journal.json` timestamps |
 | PR-20 | C8 | P3 | Sweep destructive migrations for missing rollback sections |
 | PR-21 | C8 | P4 | Memory file dedupe (~96 files) |
@@ -180,7 +180,7 @@ Consecutive numbering across all clusters. **Numbering does not imply strict seq
 
 ### Independently startable (no ordering constraints)
 
-PR-11, PR-12, PR-14, PR-15, PR-16, PR-18, PR-19, PR-20, PR-21, PR-22, PR-23, PR-24, PR-26, PR-28, PR-29.
+PR-11, PR-12, PR-14, PR-15, PR-16, ~~PR-18~~ (done → #231), PR-19, PR-20, PR-21, PR-22, PR-23, PR-24, PR-26, PR-28, PR-29.
 
 (PR-05 superseded by GC1 ratchet. PR-13 sequenced after PR-12. PR-17 / PR-25 / PR-27 are co-land-coordinated. PR #187 `blocked-validation` gates lifted 2026-05-09 — agents claiming PR-01, PR-02, PR-03, PR-11, PR-17 must re-read affected files at HEAD but no longer wait.)
 
@@ -368,7 +368,7 @@ These PRs need coordinator or human review beyond agent execution:
 
 | Phase | Description | Status | Owner | PR | Files-claimed | Notes |
 |---|---|---|---|---|---|---|
-| P1 | Regenerate 11 missing drizzle snapshots | todo | | **PR-18** | `apps/api/drizzle/meta/{0006,0007,0008,0009,0010,0013,0021,0025,0043,0044,0055}_snapshot.json` | [YELLOW] ~1 hr. **Confirmed 2026-05-09 post-#187 merge:** 69 migrations / 58 snapshots on `origin/main` = 11 missing. PR #187 filled 0063-0065 and shipped 0066-0068 with snapshots, as predicted. Verify: `pnpm run db:generate:dev` completes without errors (or `db:generate` if PR-16 hasn't landed yet). **Governance:** `.archon/governance-constraints.md` §5 (DB — snapshot regeneration must not introduce migration content; this is a meta-only fix). |
+| P1 | Regenerate 11 missing drizzle snapshots | done | | **PR-18** → PR #231 | `apps/api/drizzle/meta/0006_watery_birth_year_snapshot.json`, `apps/api/drizzle/meta/0007_teaching_preferences_unique_snapshot.json`, `apps/api/drizzle/meta/0008_language_learning_schema_snapshot.json`, `apps/api/drizzle/meta/0009_backfill_owner_profiles_snapshot.json`, `apps/api/drizzle/meta/0010_missing_schema_catchup_snapshot.json`, `apps/api/drizzle/meta/0013_profile_premium_llm_snapshot.json`, `apps/api/drizzle/meta/0021_book_sort_order_unique_snapshot.json`, `apps/api/drizzle/meta/0025_accommodation_mode_check_snapshot.json`, `apps/api/drizzle/meta/0043_topic_dedup_unique_index_snapshot.json`, `apps/api/drizzle/meta/0044_shelf_book_dedup_unique_indexes_snapshot.json`, `apps/api/drizzle/meta/0055_retention_query_indexes_snapshot.json`, `apps/api/drizzle/meta/0011_snapshot.json` (prevId fix), `apps/api/drizzle/meta/0014_snapshot.json` (prevId fix), `apps/api/drizzle/meta/0022_snapshot.json` (prevId fix), `apps/api/drizzle/meta/0026_snapshot.json` (prevId fix), `apps/api/drizzle/meta/0045_snapshot.json` (prevId fix), `apps/api/drizzle/meta/0056_snapshot.json` (prevId fix) | [GREEN] Shipped 2026-05-12 as PR #231. 11 new snapshots + 6 downstream `prevId` chain corrections (drizzle snapshots link via `prevId`; regenerating a snapshot gives it a new `id`, so the next snapshot's `prevId` must be updated). Meta-only — no migration SQL content added or changed. **Governance:** `.archon/governance-constraints.md` §5 (DB — snapshot regeneration must not introduce migration content; this is a meta-only fix). |
 | P2 | AUDIT-MIGRATIONS-2 — Fix non-monotonic `_journal.json` timestamps | todo | | **PR-19** | `apps/api/drizzle/meta/_journal.json` | [YELLOW] ~30 min. Verify: timestamps are monotonically increasing in `_journal.json`. **Governance:** `.archon/governance-constraints.md` §5 (DB — drizzle relies on `_journal.json` ordering for migration application; coordinate with anyone running `db:generate:dev` to avoid conflicts). |
 | P3 | AUDIT-MIGRATIONS-3-SWEEP — Sweep destructive migrations for missing rollback sections | done (no-op 2026-05-12) | | **PR-20** | `apps/api/drizzle/0*_*.sql`, `apps/api/drizzle/*.rollback.md` | [YELLOW] ~2 hr. **Governance:** `.archon/governance-constraints.md` §5 (DB — `scripts/check-migration-rollback.sh` is a CI check; rollback sections must conform to its parsing rules. Test the script locally before pushing). **Closed 2026-05-12 as no-op:** `scripts/check-migration-rollback.sh` passes — 12 of 72 migrations are destructive and all have either a sibling `*.rollback.md` or an inline `-- ## Rollback` comment. No remaining gaps. |
 | P4 | AUDIT-MEMORY-2 — Memory file dedupe (~96 files) | todo | | **PR-21** | `.claude/memory/*.md` | [YELLOW] ~1 hr. |

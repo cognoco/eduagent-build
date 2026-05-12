@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>PR Dispatch Graph — Cleanup Plan (2026-05-12)</title>
+<style>
+  :root {
+    --done-bg: #1f3d1f;
+    --done-fg: #b6f0b6;
+    --done-border: #4a7a4a;
+    --ready-bg: #1f2f4d;
+    --ready-fg: #cfe0ff;
+    --ready-border: #5a78a8;
+    --inprog-bg: #1a3d3d;
+    --inprog-fg: #b6f0f0;
+    --inprog-border: #4aa8a8;
+    --review-bg: #2d3a1a;
+    --review-fg: #d4f0b6;
+    --review-border: #7aa83a;
+    --seq-bg: #4a3a1a;
+    --seq-fg: #ffe6b3;
+    --seq-border: #a87f3a;
+    --coland-bg: #3a1f4d;
+    --coland-fg: #e0c2ff;
+    --coland-border: #7a4aa8;
+    --blocked-bg: #4d1f1f;
+    --blocked-fg: #ffb6b6;
+    --blocked-border: #a85a5a;
+    --superseded-bg: #2a2a2a;
+    --superseded-fg: #888;
+    --superseded-border: #444;
+    --bg: #0d1117;
+    --fg: #e6edf3;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --panel: #161b22;
+    --border: #30363d;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 0 24px 64px 24px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+    line-height: 1.5;
+  }
+  h1 { font-size: 22px; margin: 24px 0 4px 0; }
+  h2 { font-size: 17px; margin: 32px 0 8px 0; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+  h3 { font-size: 14px; margin: 18px 0 6px 0; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .timestamp { color: var(--muted); font-size: 12px; margin-bottom: 16px; }
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 12px 0 24px 0;
+    font-size: 12px;
+  }
+  .legend .chip {
+    padding: 4px 10px;
+    border-radius: 4px;
+    border: 1px solid;
+    font-weight: 500;
+  }
+  .chip.done       { background: var(--done-bg);       color: var(--done-fg);       border-color: var(--done-border); }
+  .chip.ready      { background: var(--ready-bg);      color: var(--ready-fg);      border-color: var(--ready-border); }
+  .chip.inprog     { background: var(--inprog-bg);     color: var(--inprog-fg);     border-color: var(--inprog-border); }
+  .chip.review     { background: var(--review-bg);     color: var(--review-fg);     border-color: var(--review-border); }
+  .chip.seq        { background: var(--seq-bg);        color: var(--seq-fg);        border-color: var(--seq-border); }
+  .chip.coland     { background: var(--coland-bg);     color: var(--coland-fg);     border-color: var(--coland-border); }
+  .chip.blocked    { background: var(--blocked-bg);    color: var(--blocked-fg);    border-color: var(--blocked-border); }
+  .chip.superseded { background: var(--superseded-bg); color: var(--superseded-fg); border-color: var(--superseded-border); }
+
+  .wave {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 16px 16px 16px;
+    margin-bottom: 16px;
+  }
+  .wave-title {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+  .wave-title h2 {
+    margin: 0;
+    border: none;
+    padding: 0;
+    font-size: 16px;
+  }
+  .wave-title .meta { color: var(--muted); font-size: 12px; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .card {
+    border: 1px solid;
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+  .card.done       { background: var(--done-bg);       border-color: var(--done-border);       color: var(--done-fg); }
+  .card.ready      { background: var(--ready-bg);      border-color: var(--ready-border);      color: var(--ready-fg); }
+  .card.inprog     { background: var(--inprog-bg);     border-color: var(--inprog-border);     color: var(--inprog-fg); }
+  .card.review     { background: var(--review-bg);     border-color: var(--review-border);     color: var(--review-fg); }
+  .card.seq        { background: var(--seq-bg);        border-color: var(--seq-border);        color: var(--seq-fg); }
+  .card.coland     { background: var(--coland-bg);     border-color: var(--coland-border);     color: var(--coland-fg); }
+  .card.blocked    { background: var(--blocked-bg);    border-color: var(--blocked-border);    color: var(--blocked-fg); }
+  .card.superseded { background: var(--superseded-bg); border-color: var(--superseded-border); color: var(--superseded-fg); text-decoration: line-through; }
+
+  .card .pr {
+    font-weight: 700;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    margin-right: 6px;
+  }
+  .card .cluster {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.08);
+    font-size: 10px;
+    margin-right: 6px;
+  }
+  .card .summary { display: block; margin-top: 4px; opacity: 0.9; }
+  .card .meta    { display: block; margin-top: 4px; font-size: 10px; opacity: 0.7; font-style: italic; }
+
+  .deps {
+    margin: 12px 0;
+    padding: 10px 14px;
+    background: var(--panel);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 6px 6px 0;
+    font-size: 13px;
+  }
+  .deps code { background: rgba(255,255,255,0.08); padding: 1px 5px; border-radius: 3px; font-size: 12px; }
+
+  table { border-collapse: collapse; width: 100%; margin-top: 12px; font-size: 12px; }
+  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+  td.pr { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 600; white-space: nowrap; }
+  td.status { white-space: nowrap; }
+
+  /* Mermaid container */
+  .mermaid-wrap {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    margin: 16px 0;
+    overflow-x: auto;
+  }
+  .mermaid { font-size: 13px; }
+
+  .footnote { color: var(--muted); font-size: 11px; margin-top: 4px; }
+  .arrow { color: var(--muted); margin: 0 6px; }
+</style>
+</head>
+<body>
+
+<h1>PR Dispatch Graph — Cleanup Plan</h1>
+<div class="timestamp">Generated 2026-05-12 from <code>docs/audit/cleanup-plan.md</code> (HEAD <code>be969776</code>) · branch <code>consistency2</code></div>
+
+<div class="legend">
+  <span class="chip done">DONE / MERGED</span>
+  <span class="chip inprog">IN PROGRESS (Archon running)</span>
+  <span class="chip review">IN PR REVIEW</span>
+  <span class="chip ready">READY NOW (dispatch in parallel)</span>
+  <span class="chip seq">SEQUENCED (waits on upstream PR)</span>
+  <span class="chip coland">CO-LAND (must merge together)</span>
+  <span class="chip blocked">BLOCKED (decision required)</span>
+  <span class="chip superseded">SUPERSEDED</span>
+</div>
+
+<h2>In Progress — Archon currently running</h2>
+
+<div class="wave">
+  <div class="grid">
+    <div class="card inprog"><span class="pr">PR-18</span><span class="cluster">C8 P1</span> Regenerate 11 drizzle snapshots</div>
+    <div class="card inprog"><span class="pr">PR-19</span><span class="cluster">C8 P2</span> Fix non-monotonic _journal.json timestamps</div>
+    <div class="card inprog"><span class="pr">PR-21</span><span class="cluster">C8 P4</span> Memory file dedupe (~96 files)</div>
+    <div class="card inprog"><span class="pr">PR-24</span><span class="cluster">C8 P7</span> Per-package READMEs</div>
+  </div>
+</div>
+
+<h2>In PR Review</h2>
+
+<div class="wave">
+  <div class="grid">
+    <div class="card review"><span class="pr">PR-11</span><span class="cluster">C4 P7</span> AgeBracket migration<span class="meta">On merge → unlocks PR-17 P3 sub-phase.</span></div>
+    <div class="card review"><span class="pr">PR-17</span><span class="cluster">C7 P1-P5,P7</span> Doc bundle + 2 Inngest observers <span class="chip" style="font-size:10px;padding:1px 5px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:3px;">#226</span><span class="meta">P3 doc edits read better after PR-11 merges, but CI-safe now. Co-land with PR-27.</span></div>
+  </div>
+</div>
+
+<h2>Wave 1 — Ready to dispatch right now (parallel)</h2>
+<p class="footnote">No upstream PR dependencies. Spawn as many Archon runs as your budget allows. Order within the wave doesn't matter.</p>
+
+<div class="wave">
+  <div class="grid">
+    <div class="card ready"><span class="pr">PR-15d</span><span class="cluster">C6 P3d</span> eval-llm/flows — ~3 errors / 2 files<span class="meta">Scope shrank from 5 files. Touches LLM production code → eval:llm --live if input shape changes.</span></div>
+    <div class="card ready"><span class="pr">PR-20</span><span class="cluster">C8 P3</span> Sweep destructive migrations for rollback<span class="meta">Human involvement: rollback assessment per migration.</span></div>
+    <div class="card ready"><span class="pr">PR-22</span><span class="cluster">C8 P5</span> Resolve vendored bmad vs installed plugin</div>
+    <div class="card ready"><span class="pr">PR-23</span><span class="cluster">C8 P6</span> EduAgent → Mentomate naming sweep<span class="meta">Human review required — keep <code>@eduagent/*</code> package names.</span></div>
+    <div class="card ready"><span class="pr">PR-26</span><span class="cluster">C9 P2</span> Triage 23 Cat 2 possibly-obsolete files<span class="meta">Per-file human decision.</span></div>
+    <div class="card ready"><span class="pr">PR-28</span><span class="cluster">C9 P4</span> Verify 116 Cat 3 keep-files</div>
+  </div>
+</div>
+
+<h2>Wave 2 — Sequenced (waits on in-progress / wave-1 PRs)</h2>
+
+<div class="wave">
+  <div class="grid">
+    <div class="card seq"><span class="pr">PR-15e</span><span class="cluster">C6 P3e</span> Heterogeneous test type fixes (~95 errors / ~30 files)<span class="meta">→ Waits for PR-15d (ready — last remaining precondition). PR-15b (#222) + PR-15c merged. Scope grew from PR #211/#215. <strong>D-C6-4 resolved here</strong>.</span></div>
+  </div>
+</div>
+
+<h2>Wave 3 — Co-land coordination (merge together)</h2>
+<p class="footnote">These PRs touch overlapping files (inbound links + archive paths). Land them in the same merge window or sequence carefully.</p>
+
+<div class="wave">
+  <div class="grid">
+    <div class="card coland"><span class="pr">PR-17</span><span class="cluster">C7</span> Doc reconciliation<span class="meta">↔ PR-27 (inbound link conflicts)</span></div>
+    <div class="card coland"><span class="pr">PR-25</span><span class="cluster">C9 P1</span> Archive 25 Cat 1 obsolete files<span class="meta">↔ PR-27 (link redirects). Human decision per file.</span></div>
+    <div class="card coland"><span class="pr">PR-27</span><span class="cluster">C9 P3</span> 8 inbound-link conflicts<span class="meta">↔ PR-17, PR-25, PR-29 (the hub of the co-land cluster)</span></div>
+    <div class="card coland"><span class="pr">PR-29</span><span class="cluster">C9 P5</span> Folder-level archive moves<span class="meta">↔ PR-25 + PR-27 (creates new archive paths the link fixes target)</span></div>
+  </div>
+</div>
+
+<h2>Wave 4 — Closure (waits on entire Wave 2 chain)</h2>
+
+<div class="wave">
+  <div class="grid">
+    <div class="card seq"><span class="pr">PR-15f</span><span class="cluster">C6 P3f</span> Wire spec config + re-tighten flags<span class="meta">→ Waits for PR-15b + PR-15c + PR-15d + PR-15e all merged. Pre-commit hook runs <code>tsc --build</code> — if any test still fails, every commit on every branch fails.</span></div>
+  </div>
+</div>
+
+<h2>Blocked — needs human decision</h2>
+
+<div class="wave">
+  <div class="grid">
+    <div class="card blocked"><span class="pr">C6 P2</span><span class="cluster">D-C6-3</span> apps/api/eslint.config.mjs disposition<span class="meta">No PR until D-C6-3 resolved. Recommendation in plan: drop as wontfix (root config already covers via <code>nx run api:lint</code>).</span></div>
+  </div>
+</div>
+
+<h2>Already shipped</h2>
+
+<div class="wave">
+  <div class="grid">
+    <div class="card done"><span class="pr">PR-01</span><span class="cluster">C1 P1+P2</span> Typed errors → schemas (#200)</div>
+    <div class="card done"><span class="pr">PR-02</span><span class="cluster">C1 P3</span> Dead celebration export delete (#198)</div>
+    <div class="card done"><span class="pr">PR-03</span><span class="cluster">C1 P4-P6</span> Schema renames + error frame (#199)</div>
+    <div class="card done"><span class="pr">PR-04</span><span class="cluster">C1 P7</span> Auth 501 stub deletion (#201)</div>
+    <div class="card done"><span class="pr">PR-06</span><span class="cluster">C2 P3</span> LLM mock allowlist drained (#209)</div>
+    <div class="card done"><span class="pr">PR-07</span><span class="cluster">C2 P4</span> Inngest mock allowlist drained (#204)</div>
+    <div class="card done"><span class="pr">PR-08</span><span class="cluster">C3 P1+P2</span> Quiz unstable_settings + AccordionTopicList (#196)</div>
+    <div class="card done"><span class="pr">PR-09</span><span class="cluster">C4 P1+P2</span> Hex literals + brand carve-out (#208)</div>
+    <div class="card done"><span class="pr">PR-10</span><span class="cluster">C4 P3+P4+P6</span> RemediationCard + persona sweep + guard (#206)</div>
+    <div class="card done"><span class="pr">PR-12</span><span class="cluster">C5 P1</span> Manifest cleanup (~17 deps)</div>
+    <div class="card done"><span class="pr">PR-13</span><span class="cluster">C5 P3+P7</span> Small dep adds</div>
+    <div class="card done"><span class="pr">PR-16</span><span class="cluster">C6 P4+P5</span> nx e2e drop + db:generate rename</div>
+    <div class="card done"><span class="pr">PR-14</span><span class="cluster">C6 P1b</span> Drizzle import guard test (#212) <span class="meta" style="color: var(--seq-fg)">⚠ partial — P2 reverted, blocked on D-C6-3</span></div>
+    <div class="card done"><span class="pr">PR-15a</span><span class="cluster">C6 P3a</span> tsconfig.spec.json plumbing (#214)</div>
+    <div class="card done"><span class="pr">PR-15b</span><span class="cluster">C6 P3b</span> TS18046 type fixes (37 errors / 6 files)</div>
+    <div class="card done"><span class="pr">PR-15c</span><span class="cluster">C6 P3c</span> TS7006 — 129 errors / 42 files (#222)</div>
+    <div class="card superseded"><span class="pr">PR-05</span><span class="cluster">C2 P1+P2</span> Per-channel mock guard — replaced by GC1 ratchet (#171)</div>
+  </div>
+</div>
+
+<h2>Dependency Graph</h2>
+
+<div class="mermaid-wrap">
+<pre class="mermaid">
+flowchart LR
+  classDef done       fill:#1f3d1f,stroke:#4a7a4a,color:#b6f0b6;
+  classDef inprog     fill:#1a3d3d,stroke:#4aa8a8,color:#b6f0f0;
+  classDef review     fill:#2d3a1a,stroke:#7aa83a,color:#d4f0b6;
+  classDef ready      fill:#1f2f4d,stroke:#5a78a8,color:#cfe0ff;
+  classDef seq        fill:#4a3a1a,stroke:#a87f3a,color:#ffe6b3;
+  classDef coland     fill:#3a1f4d,stroke:#7a4aa8,color:#e0c2ff;
+  classDef blocked    fill:#4d1f1f,stroke:#a85a5a,color:#ffb6b6;
+  classDef superseded fill:#2a2a2a,stroke:#444,color:#888;
+
+  %% In progress
+  PR16[PR-16 ✓<br/>C6 P4+5]:::done
+  PR17[PR-17 #226<br/>C7 bundle]:::review
+
+  %% In PR review
+  PR11[PR-11<br/>C4 P7]:::review
+  PR13[PR-13 ✓<br/>C5 P3+P7]:::done
+  PR15c[PR-15c #222 ✓<br/>C6 P3c]:::done
+
+  %% Wave-1 ready
+  PR15d[PR-15d<br/>C6 P3d]:::ready
+  PR18[PR-18]:::inprog
+  PR19[PR-19]:::inprog
+  PR20[PR-20]:::ready
+  PR21[PR-21]:::inprog
+  PR22[PR-22]:::ready
+  PR23[PR-23]:::ready
+  PR24[PR-24]:::inprog
+  PR26[PR-26]:::ready
+  PR28[PR-28]:::ready
+
+  %% Wave-2 sequenced
+  PR15e[PR-15e<br/>C6 P3e]:::seq
+
+  %% Wave-3 co-land
+  PR25[PR-25<br/>C9 P1]:::coland
+  PR27[PR-27<br/>C9 P3]:::coland
+  PR29[PR-29<br/>C9 P5]:::coland
+
+  %% Wave-4 closure
+  PR15f[PR-15f<br/>C6 P3f]:::seq
+
+  %% Blocked
+  C6P2[C6 P2<br/>D-C6-3]:::blocked
+
+  %% Done
+  PR12[PR-12 ✓]:::done
+  PR15a[PR-15a #214]:::done
+  PR15b[PR-15b ✓]:::done
+
+  %% Dependencies
+  PR15a --> PR15b
+  PR15a --> PR15c
+  PR15a --> PR15d
+  PR15b --> PR15e
+  PR15c --> PR15e
+  PR15d --> PR15e
+  PR15e --> PR15f
+
+  PR12 --> PR13
+  PR11 -- "P3 sub-phase only" --> PR17
+
+  PR17 -.co-land.- PR27
+  PR25 -.co-land.- PR27
+  PR29 -.co-land.- PR27
+  PR29 -.co-land.- PR25
+</pre>
+</div>
+
+<h2>Status table — all PRs</h2>
+
+<table>
+  <thead>
+    <tr><th>PR</th><th>Cluster / Phase</th><th>Status</th><th>Depends on</th><th>Co-land with</th><th>Notes</th></tr>
+  </thead>
+  <tbody>
+    <tr><td class="pr">PR-01</td><td>C1 P1+P2</td><td class="status"><span class="chip done">DONE #200</span></td><td>—</td><td>—</td><td>Typed errors → schemas</td></tr>
+    <tr><td class="pr">PR-02</td><td>C1 P3</td><td class="status"><span class="chip done">DONE #198</span></td><td>—</td><td>—</td><td>Dead celebration export</td></tr>
+    <tr><td class="pr">PR-03</td><td>C1 P4-P6</td><td class="status"><span class="chip done">DONE #199</span></td><td>—</td><td>—</td><td>Schema renames + error frame</td></tr>
+    <tr><td class="pr">PR-04</td><td>C1 P7</td><td class="status"><span class="chip done">DONE #201</span></td><td>—</td><td>—</td><td>Auth 501 stub deletion</td></tr>
+    <tr><td class="pr">PR-05</td><td>C2 P1+P2</td><td class="status"><span class="chip superseded">SUPERSEDED</span></td><td>—</td><td>—</td><td>Replaced by GC1 ratchet (#171)</td></tr>
+    <tr><td class="pr">PR-06</td><td>C2 P3</td><td class="status"><span class="chip done">DONE #209</span></td><td>—</td><td>—</td><td>LLM mock drain</td></tr>
+    <tr><td class="pr">PR-07</td><td>C2 P4</td><td class="status"><span class="chip done">DONE #204</span></td><td>—</td><td>—</td><td>Inngest mock drain</td></tr>
+    <tr><td class="pr">PR-08</td><td>C3 P1+P2</td><td class="status"><span class="chip done">DONE #196</span></td><td>—</td><td>—</td><td>Mobile nav safety nets</td></tr>
+    <tr><td class="pr">PR-09</td><td>C4 P1+P2</td><td class="status"><span class="chip done">DONE #208</span></td><td>—</td><td>—</td><td>Hex literals + brand carve-out</td></tr>
+    <tr><td class="pr">PR-10</td><td>C4 P3+P4+P6</td><td class="status"><span class="chip done">DONE #206</span></td><td>—</td><td>—</td><td>RemediationCard + persona sweep</td></tr>
+    <tr><td class="pr">PR-11</td><td>C4 P7</td><td class="status"><span class="chip review">IN PR REVIEW</span></td><td>—</td><td>—</td><td>Re-dispatch with expanded Files-claimed; unlocks PR-17 P3 on merge</td></tr>
+    <tr><td class="pr">PR-12</td><td>C5 P1</td><td class="status"><span class="chip done">DONE</span></td><td>—</td><td>—</td><td>Manifest cleanup merged</td></tr>
+    <tr><td class="pr">PR-13</td><td>C5 P3+P7</td><td class="status"><span class="chip done">DONE</span></td><td>PR-12 (done)</td><td>—</td><td>Small dep adds — merged</td></tr>
+    <tr><td class="pr">PR-14</td><td>C6 P1b</td><td class="status"><span class="chip done">DONE #212</span></td><td>—</td><td>—</td><td>Partial — C6 P2 reverted, blocked on D-C6-3</td></tr>
+    <tr><td class="pr">—</td><td>C6 P2</td><td class="status"><span class="chip blocked">BLOCKED</span></td><td>D-C6-3</td><td>—</td><td>Recommendation: drop as wontfix</td></tr>
+    <tr><td class="pr">PR-15a</td><td>C6 P3a</td><td class="status"><span class="chip done">DONE #214</span></td><td>—</td><td>—</td><td>tsconfig.spec.json plumbing</td></tr>
+    <tr><td class="pr">PR-15b</td><td>C6 P3b</td><td class="status"><span class="chip done">DONE</span></td><td>—</td><td>—</td><td>TS18046 fixes merged</td></tr>
+    <tr><td class="pr">PR-15c</td><td>C6 P3c</td><td class="status"><span class="chip done">DONE #222</span></td><td>PR-15a (done)</td><td>—</td><td>TS7006 fixes merged — PR-15e now only waiting on PR-15d</td></tr>
+    <tr><td class="pr">PR-15d</td><td>C6 P3d</td><td class="status"><span class="chip ready">READY</span></td><td>PR-15a (done)</td><td>—</td><td>Scope shrank to 2 files</td></tr>
+    <tr><td class="pr">PR-15e</td><td>C6 P3e</td><td class="status"><span class="chip seq">SEQUENCED</span></td><td>PR-15d (ready — last precondition)</td><td>—</td><td>Scope grew (~95 errors / ~30 files); D-C6-4 resolved here. PR-15c #222 merged.</td></tr>
+    <tr><td class="pr">PR-15f</td><td>C6 P3f</td><td class="status"><span class="chip seq">SEQUENCED</span></td><td>PR-15c/d/e all merged</td><td>—</td><td>Pre-commit hook gate hardened</td></tr>
+    <tr><td class="pr">PR-16</td><td>C6 P4+P5</td><td class="status"><span class="chip done">DONE</span></td><td>—</td><td>—</td><td>nx e2e drop + db:generate rename — merged</td></tr>
+    <tr><td class="pr">PR-17</td><td>C7 P1-P5,P7</td><td class="status"><span class="chip review">IN PR REVIEW #226</span> <span class="chip coland">CO-LAND</span></td><td>—</td><td>PR-27</td><td>Doc bundle + 2 new Inngest observers. P3 doc edits read better after PR-11, but all sub-phases are CI-safe now.</td></tr>
+    <tr><td class="pr">PR-18</td><td>C8 P1</td><td class="status"><span class="chip inprog">IN PROGRESS</span></td><td>—</td><td>—</td><td>Drizzle snapshots</td></tr>
+    <tr><td class="pr">PR-19</td><td>C8 P2</td><td class="status"><span class="chip inprog">IN PROGRESS</span></td><td>—</td><td>—</td><td>_journal.json timestamps</td></tr>
+    <tr><td class="pr">PR-20</td><td>C8 P3</td><td class="status"><span class="chip ready">READY</span></td><td>—</td><td>—</td><td>Migration rollback sweep — human review</td></tr>
+    <tr><td class="pr">PR-21</td><td>C8 P4</td><td class="status"><span class="chip inprog">IN PROGRESS</span></td><td>—</td><td>—</td><td>Memory file dedupe</td></tr>
+    <tr><td class="pr">PR-22</td><td>C8 P5</td><td class="status"><span class="chip ready">READY</span></td><td>—</td><td>—</td><td>bmad commands resolution</td></tr>
+    <tr><td class="pr">PR-23</td><td>C8 P6</td><td class="status"><span class="chip ready">READY</span></td><td>—</td><td>—</td><td>EduAgent→Mentomate sweep — human review</td></tr>
+    <tr><td class="pr">PR-24</td><td>C8 P7</td><td class="status"><span class="chip inprog">IN PROGRESS</span></td><td>—</td><td>—</td><td>Per-package READMEs</td></tr>
+    <tr><td class="pr">PR-25</td><td>C9 P1</td><td class="status"><span class="chip coland">CO-LAND</span></td><td>—</td><td>PR-27, PR-29</td><td>25 Cat 1 obsolete files — human decision</td></tr>
+    <tr><td class="pr">PR-26</td><td>C9 P2</td><td class="status"><span class="chip ready">READY</span></td><td>—</td><td>—</td><td>23 Cat 2 — per-file human decision</td></tr>
+    <tr><td class="pr">PR-27</td><td>C9 P3</td><td class="status"><span class="chip coland">CO-LAND</span></td><td>—</td><td>PR-17, PR-25, PR-29</td><td>8 inbound-link conflicts (hub of co-land cluster)</td></tr>
+    <tr><td class="pr">PR-28</td><td>C9 P4</td><td class="status"><span class="chip ready">READY</span></td><td>—</td><td>—</td><td>Verify 116 Cat 3 keep-files</td></tr>
+    <tr><td class="pr">PR-29</td><td>C9 P5</td><td class="status"><span class="chip coland">CO-LAND</span></td><td>—</td><td>PR-25, PR-27</td><td>Folder-level archive moves</td></tr>
+  </tbody>
+</table>
+
+<h2>Suggested dispatch order</h2>
+
+<div class="deps">
+  <strong>What to dispatch next (PR-18/19/21/24 running; PR-11, PR-17 (#226) in PR review; PR-12/13/15b/15c (#222)/16 merged):</strong>
+  <ol>
+    <li><strong>Highest-leverage now:</strong> <code>PR-15d</code> — the last precondition for PR-15e (PR-15c #222 merged). Once PR-15d lands, PR-15e is immediately dispatchable.</li>
+    <li><strong>Janitor batch:</strong> <code>PR-18</code>, <code>PR-19</code>, <code>PR-21</code>, <code>PR-22</code>, <code>PR-24</code> — small standalone work, safe in any order.</li>
+    <li><strong>After PR-15c merges + PR-15d merges:</strong> dispatch <code>PR-15e</code>.</li>
+    <li><strong>After PR-15e merges:</strong> dispatch <code>PR-15f</code> (closure — pre-commit hook hardening).</li>
+    <li><strong>Note on PR-17 P3:</strong> the doc edits in P3 reference AgeBracket conventions from PR-11 — they're CI-safe now but read better once PR-11 is merged. No action needed.</li>
+    <li><strong>Co-land window:</strong> orchestrate <code>PR-17</code>, <code>PR-25</code>, <code>PR-27</code>, <code>PR-29</code> as a single merge-train.</li>
+  </ol>
+  <strong>Human-review-required (don't auto-merge):</strong> <code>PR-20</code>, <code>PR-23</code>, <code>PR-25</code>, <code>PR-26</code>.
+</div>
+
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: "dark",
+    themeVariables: {
+      darkMode: true,
+      background: "#161b22",
+      primaryColor: "#1f2f4d",
+      primaryTextColor: "#e6edf3",
+      primaryBorderColor: "#5a78a8",
+      lineColor: "#8b949e",
+      fontFamily: "-apple-system, BlinkMacSystemFont, system-ui, sans-serif"
+    },
+    flowchart: { curve: "basis", padding: 20 }
+  });
+</script>
+
+</body>
+</html>
