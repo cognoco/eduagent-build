@@ -124,8 +124,8 @@
 - **AUDIT-MEMORY-2** `.claude/memory/` ~96-file dedupe
   - Severity: YELLOW (low-impact); Effort: ~1 hr
 
-- **AUDIT-SKILLS-2** Vendored `commands/bmad/` vs installed plugin — pick canonical
-  - Severity: YELLOW (cosmetic / maintenance); Effort: ~30 min
+- **AUDIT-SKILLS-2** ~~Vendored `commands/bmad/` vs installed plugin — pick canonical~~ — **closed 2026-05-12 as misframed:** no BMAD plugin is installed or published in any registered marketplace; the `bmad:` skills visible in-session ARE the vendored shims (Claude Code namespaces slash commands by their parent directory, so the same files surface as both slash commands and Skills). Current setup documented in `_bmad/README.md`.
+  - Severity: ~~YELLOW (cosmetic / maintenance)~~ N/A (no action); Effort: ~~~30 min~~ resolved
 
 - **AUDIT-EXTREFS-2** EduAgent → Mentomate naming sweep across docs/code (carefully — NOT `@eduagent/*` package names)
   - Severity: YELLOW (cosmetic); Effort: ~1 hr
