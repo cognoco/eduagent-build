@@ -1,6 +1,6 @@
 {
-  "id": "17878839-badb-42a8-952a-3555b6640a49",
-  "prevId": "d62293e4-7361-43f9-9a1f-4f6de0d1cca4",
+  "id": "f1ceb0b2-e8b2-441f-af7b-6255142d9b2a",
+  "prevId": "e88e068c-6f0d-4133-930d-38f88d1adcc3",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -856,102 +856,6 @@
       },
       "isRLSEnabled": false
     },
-    "public.dictation_results": {
-      "name": "dictation_results",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "profile_id": {
-          "name": "profile_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "date": {
-          "name": "date",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "sentence_count": {
-          "name": "sentence_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "mistake_count": {
-          "name": "mistake_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "mode": {
-          "name": "mode",
-          "type": "dictation_mode",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "reviewed": {
-          "name": "reviewed",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "idx_dictation_results_profile_date": {
-          "name": "idx_dictation_results_profile_date",
-          "columns": [
-            {
-              "expression": "profile_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "date",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "dictation_results_profile_id_profiles_id_fk": {
-          "name": "dictation_results_profile_id_profiles_id_fk",
-          "tableFrom": "dictation_results",
-          "tableTo": "profiles",
-          "columnsFrom": ["profile_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.session_embeddings": {
       "name": "session_embeddings",
       "schema": "",
@@ -1758,29 +1662,7 @@
           "default": "now()"
         }
       },
-      "indexes": {
-        "curriculum_books_subject_sort_order_uq": {
-          "name": "curriculum_books_subject_sort_order_uq",
-          "columns": [
-            {
-              "expression": "subject_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "sort_order",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
+      "indexes": {},
       "foreignKeys": {
         "curriculum_books_subject_id_subjects_id_fk": {
           "name": "curriculum_books_subject_id_subjects_id_fk",
@@ -1926,35 +1808,7 @@
           "default": "now()"
         }
       },
-      "indexes": {
-        "curriculum_topics_book_sort_order_uq": {
-          "name": "curriculum_topics_book_sort_order_uq",
-          "columns": [
-            {
-              "expression": "curriculum_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "book_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "sort_order",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
+      "indexes": {},
       "foreignKeys": {
         "curriculum_topics_curriculum_id_curricula_id_fk": {
           "name": "curriculum_topics_curriculum_id_curricula_id_fk",
@@ -4218,20 +4072,6 @@
           "notNull": true,
           "default": true
         },
-        "accommodation_mode": {
-          "name": "accommodation_mode",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'none'"
-        },
-        "recently_resolved_topics": {
-          "name": "recently_resolved_topics",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'[]'::jsonb"
-        },
         "version": {
           "name": "version",
           "type": "integer",
@@ -4340,11 +4180,6 @@
       "name": "subscription_tier",
       "schema": "public",
       "values": ["free", "plus", "family", "pro"]
-    },
-    "public.dictation_mode": {
-      "name": "dictation_mode",
-      "schema": "public",
-      "values": ["homework", "surprise"]
     },
     "public.consent_status": {
       "name": "consent_status",
@@ -4462,10 +4297,7 @@
         "recall_nudge",
         "weekly_progress",
         "monthly_report",
-        "progress_refresh",
-        "struggle_noticed",
-        "struggle_flagged",
-        "struggle_resolved"
+        "progress_refresh"
       ]
     },
     "public.vocab_type": {

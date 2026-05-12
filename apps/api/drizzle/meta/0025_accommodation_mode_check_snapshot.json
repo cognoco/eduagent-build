@@ -1,6 +1,6 @@
 {
-  "id": "17878839-badb-42a8-952a-3555b6640a49",
-  "prevId": "d62293e4-7361-43f9-9a1f-4f6de0d1cca4",
+  "id": "d62293e4-7361-43f9-9a1f-4f6de0d1cca4",
+  "prevId": "950e942f-da3f-47bd-a900-79c06859e5d5",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -854,102 +854,6 @@
           "value": "\"top_up_credits\".\"remaining\" >= 0"
         }
       },
-      "isRLSEnabled": false
-    },
-    "public.dictation_results": {
-      "name": "dictation_results",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "profile_id": {
-          "name": "profile_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "date": {
-          "name": "date",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "sentence_count": {
-          "name": "sentence_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "mistake_count": {
-          "name": "mistake_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "mode": {
-          "name": "mode",
-          "type": "dictation_mode",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "reviewed": {
-          "name": "reviewed",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "idx_dictation_results_profile_date": {
-          "name": "idx_dictation_results_profile_date",
-          "columns": [
-            {
-              "expression": "profile_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "date",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "dictation_results_profile_id_profiles_id_fk": {
-          "name": "dictation_results_profile_id_profiles_id_fk",
-          "tableFrom": "dictation_results",
-          "tableTo": "profiles",
-          "columnsFrom": ["profile_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.session_embeddings": {
@@ -4340,11 +4244,6 @@
       "name": "subscription_tier",
       "schema": "public",
       "values": ["free", "plus", "family", "pro"]
-    },
-    "public.dictation_mode": {
-      "name": "dictation_mode",
-      "schema": "public",
-      "values": ["homework", "surprise"]
     },
     "public.consent_status": {
       "name": "consent_status",

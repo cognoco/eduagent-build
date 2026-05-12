@@ -1,6 +1,6 @@
 {
-  "id": "17878839-badb-42a8-952a-3555b6640a49",
-  "prevId": "d62293e4-7361-43f9-9a1f-4f6de0d1cca4",
+  "id": "0a64fab9-e7ae-437f-a788-a86670a34b52",
+  "prevId": "14c624be-fbaf-4113-8de6-26673f701019",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -856,102 +856,6 @@
       },
       "isRLSEnabled": false
     },
-    "public.dictation_results": {
-      "name": "dictation_results",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "profile_id": {
-          "name": "profile_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "date": {
-          "name": "date",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "sentence_count": {
-          "name": "sentence_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "mistake_count": {
-          "name": "mistake_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "mode": {
-          "name": "mode",
-          "type": "dictation_mode",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "reviewed": {
-          "name": "reviewed",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "idx_dictation_results_profile_date": {
-          "name": "idx_dictation_results_profile_date",
-          "columns": [
-            {
-              "expression": "profile_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "date",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "dictation_results_profile_id_profiles_id_fk": {
-          "name": "dictation_results_profile_id_profiles_id_fk",
-          "tableFrom": "dictation_results",
-          "tableTo": "profiles",
-          "columnsFrom": ["profile_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.session_embeddings": {
       "name": "session_embeddings",
       "schema": "",
@@ -1347,15 +1251,15 @@
           "primaryKey": false,
           "notNull": false
         },
+        "birth_date": {
+          "name": "birth_date",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
         "birth_year": {
           "name": "birth_year",
           "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "birth_year_set_by": {
-          "name": "birth_year_set_by",
-          "type": "uuid",
           "primaryKey": false,
           "notNull": false
         },
@@ -1368,13 +1272,6 @@
         },
         "is_owner": {
           "name": "is_owner",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "has_premium_llm": {
-          "name": "has_premium_llm",
           "type": "boolean",
           "primaryKey": false,
           "notNull": true,
@@ -1418,97 +1315,6 @@
           "tableFrom": "profiles",
           "tableTo": "accounts",
           "columnsFrom": ["account_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "profiles_birth_year_set_by_profiles_id_fk": {
-          "name": "profiles_birth_year_set_by_profiles_id_fk",
-          "tableFrom": "profiles",
-          "tableTo": "profiles",
-          "columnsFrom": ["birth_year_set_by"],
-          "columnsTo": ["id"],
-          "onDelete": "set null",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.book_suggestions": {
-      "name": "book_suggestions",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "subject_id": {
-          "name": "subject_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "title": {
-          "name": "title",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "emoji": {
-          "name": "emoji",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "description": {
-          "name": "description",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "picked_at": {
-          "name": "picked_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {
-        "book_suggestions_subject_id_idx": {
-          "name": "book_suggestions_subject_id_idx",
-          "columns": [
-            {
-              "expression": "subject_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "book_suggestions_subject_id_subjects_id_fk": {
-          "name": "book_suggestions_subject_id_subjects_id_fk",
-          "tableFrom": "book_suggestions",
-          "tableTo": "subjects",
-          "columnsFrom": ["subject_id"],
           "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
@@ -1758,29 +1564,7 @@
           "default": "now()"
         }
       },
-      "indexes": {
-        "curriculum_books_subject_sort_order_uq": {
-          "name": "curriculum_books_subject_sort_order_uq",
-          "columns": [
-            {
-              "expression": "subject_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "sort_order",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
+      "indexes": {},
       "foreignKeys": {
         "curriculum_books_subject_id_subjects_id_fk": {
           "name": "curriculum_books_subject_id_subjects_id_fk",
@@ -1858,7 +1642,7 @@
           "name": "book_id",
           "type": "uuid",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "chapter": {
           "name": "chapter",
@@ -1897,20 +1681,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "filed_from": {
-          "name": "filed_from",
-          "type": "filed_from",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'pre_generated'"
-        },
-        "session_id": {
-          "name": "session_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -1926,35 +1696,7 @@
           "default": "now()"
         }
       },
-      "indexes": {
-        "curriculum_topics_book_sort_order_uq": {
-          "name": "curriculum_topics_book_sort_order_uq",
-          "columns": [
-            {
-              "expression": "curriculum_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "book_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "sort_order",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
+      "indexes": {},
       "foreignKeys": {
         "curriculum_topics_curriculum_id_curricula_id_fk": {
           "name": "curriculum_topics_curriculum_id_curricula_id_fk",
@@ -2149,76 +1891,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.topic_suggestions": {
-      "name": "topic_suggestions",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "book_id": {
-          "name": "book_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "title": {
-          "name": "title",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "used_at": {
-          "name": "used_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        }
-      },
-      "indexes": {
-        "topic_suggestions_book_id_idx": {
-          "name": "topic_suggestions_book_id_idx",
-          "columns": [
-            {
-              "expression": "book_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "topic_suggestions_book_id_curriculum_books_id_fk": {
-          "name": "topic_suggestions_book_id_curriculum_books_id_fk",
-          "tableFrom": "topic_suggestions",
-          "tableTo": "curriculum_books",
-          "columnsFrom": ["book_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
     "public.learning_sessions": {
       "name": "learning_sessions",
       "schema": "",
@@ -2328,12 +2000,6 @@
           "primaryKey": false,
           "notNull": false,
           "default": "'{}'::jsonb"
-        },
-        "raw_input": {
-          "name": "raw_input",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
         },
         "created_at": {
           "name": "created_at",
@@ -3090,13 +2756,6 @@
           "notNull": true,
           "default": false
         },
-        "weekly_progress_push": {
-          "name": "weekly_progress_push",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
         "push_enabled": {
           "name": "push_enabled",
           "type": "boolean",
@@ -3356,391 +3015,6 @@
           "tableFrom": "xp_ledger",
           "tableTo": "subjects",
           "columnsFrom": ["subject_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.milestones": {
-      "name": "milestones",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "profile_id": {
-          "name": "profile_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "milestone_type": {
-          "name": "milestone_type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "threshold": {
-          "name": "threshold",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "subject_id": {
-          "name": "subject_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "book_id": {
-          "name": "book_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "metadata": {
-          "name": "metadata",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "celebrated_at": {
-          "name": "celebrated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "milestones_scope_uq": {
-          "name": "milestones_scope_uq",
-          "columns": [
-            {
-              "expression": "profile_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "milestone_type",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "threshold",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "coalesce(\"subject_id\", '00000000-0000-0000-0000-000000000000'::uuid)",
-              "asc": true,
-              "isExpression": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "coalesce(\"book_id\", '00000000-0000-0000-0000-000000000000'::uuid)",
-              "asc": true,
-              "isExpression": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "milestones_profile_created_idx": {
-          "name": "milestones_profile_created_idx",
-          "columns": [
-            {
-              "expression": "profile_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "milestones_profile_id_profiles_id_fk": {
-          "name": "milestones_profile_id_profiles_id_fk",
-          "tableFrom": "milestones",
-          "tableTo": "profiles",
-          "columnsFrom": ["profile_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "milestones_subject_id_subjects_id_fk": {
-          "name": "milestones_subject_id_subjects_id_fk",
-          "tableFrom": "milestones",
-          "tableTo": "subjects",
-          "columnsFrom": ["subject_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "milestones_book_id_curriculum_books_id_fk": {
-          "name": "milestones_book_id_curriculum_books_id_fk",
-          "tableFrom": "milestones",
-          "tableTo": "curriculum_books",
-          "columnsFrom": ["book_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.monthly_reports": {
-      "name": "monthly_reports",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "profile_id": {
-          "name": "profile_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "child_profile_id": {
-          "name": "child_profile_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "report_month": {
-          "name": "report_month",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "report_data": {
-          "name": "report_data",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "viewed_at": {
-          "name": "viewed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "monthly_reports_parent_child_month_uq": {
-          "name": "monthly_reports_parent_child_month_uq",
-          "columns": [
-            {
-              "expression": "profile_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "child_profile_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "report_month",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "monthly_reports_child_month_idx": {
-          "name": "monthly_reports_child_month_idx",
-          "columns": [
-            {
-              "expression": "child_profile_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "report_month",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "monthly_reports_profile_id_profiles_id_fk": {
-          "name": "monthly_reports_profile_id_profiles_id_fk",
-          "tableFrom": "monthly_reports",
-          "tableTo": "profiles",
-          "columnsFrom": ["profile_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "monthly_reports_child_profile_id_profiles_id_fk": {
-          "name": "monthly_reports_child_profile_id_profiles_id_fk",
-          "tableFrom": "monthly_reports",
-          "tableTo": "profiles",
-          "columnsFrom": ["child_profile_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.progress_snapshots": {
-      "name": "progress_snapshots",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "profile_id": {
-          "name": "profile_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "snapshot_date": {
-          "name": "snapshot_date",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "metrics": {
-          "name": "metrics",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "progress_snapshots_profile_date_uq": {
-          "name": "progress_snapshots_profile_date_uq",
-          "columns": [
-            {
-              "expression": "profile_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "snapshot_date",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "progress_snapshots_profile_date_idx": {
-          "name": "progress_snapshots_profile_date_idx",
-          "columns": [
-            {
-              "expression": "profile_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "snapshot_date",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "progress_snapshots_profile_id_profiles_id_fk": {
-          "name": "progress_snapshots_profile_id_profiles_id_fk",
-          "tableFrom": "progress_snapshots",
-          "tableTo": "profiles",
-          "columnsFrom": ["profile_id"],
           "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
@@ -4036,263 +3310,6 @@
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
-    },
-    "public.topic_notes": {
-      "name": "topic_notes",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "topic_id": {
-          "name": "topic_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "profile_id": {
-          "name": "profile_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "content": {
-          "name": "content",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "topic_notes_topic_id_curriculum_topics_id_fk": {
-          "name": "topic_notes_topic_id_curriculum_topics_id_fk",
-          "tableFrom": "topic_notes",
-          "tableTo": "curriculum_topics",
-          "columnsFrom": ["topic_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "topic_notes_profile_id_profiles_id_fk": {
-          "name": "topic_notes_profile_id_profiles_id_fk",
-          "tableFrom": "topic_notes",
-          "tableTo": "profiles",
-          "columnsFrom": ["profile_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "topic_notes_topic_id_profile_id_unique": {
-          "name": "topic_notes_topic_id_profile_id_unique",
-          "nullsNotDistinct": false,
-          "columns": ["topic_id", "profile_id"]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.learning_profiles": {
-      "name": "learning_profiles",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "profile_id": {
-          "name": "profile_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "learning_style": {
-          "name": "learning_style",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "interests": {
-          "name": "interests",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'[]'::jsonb"
-        },
-        "strengths": {
-          "name": "strengths",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'[]'::jsonb"
-        },
-        "struggles": {
-          "name": "struggles",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'[]'::jsonb"
-        },
-        "communication_notes": {
-          "name": "communication_notes",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'[]'::jsonb"
-        },
-        "suppressed_inferences": {
-          "name": "suppressed_inferences",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'[]'::jsonb"
-        },
-        "interest_timestamps": {
-          "name": "interest_timestamps",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'{}'::jsonb"
-        },
-        "effectiveness_session_count": {
-          "name": "effectiveness_session_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "memory_enabled": {
-          "name": "memory_enabled",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
-        "memory_consent_status": {
-          "name": "memory_consent_status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'pending'"
-        },
-        "consent_prompt_dismissed_at": {
-          "name": "consent_prompt_dismissed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "memory_collection_enabled": {
-          "name": "memory_collection_enabled",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "memory_injection_enabled": {
-          "name": "memory_injection_enabled",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": true
-        },
-        "accommodation_mode": {
-          "name": "accommodation_mode",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'none'"
-        },
-        "recently_resolved_topics": {
-          "name": "recently_resolved_topics",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'[]'::jsonb"
-        },
-        "version": {
-          "name": "version",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 1
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "learning_profiles_profile_id_idx": {
-          "name": "learning_profiles_profile_id_idx",
-          "columns": [
-            {
-              "expression": "profile_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "learning_profiles_profile_id_profiles_id_fk": {
-          "name": "learning_profiles_profile_id_profiles_id_fk",
-          "tableFrom": "learning_profiles",
-          "tableTo": "profiles",
-          "columnsFrom": ["profile_id"],
-          "columnsTo": ["id"],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "learning_profiles_profile_id_unique": {
-          "name": "learning_profiles_profile_id_unique",
-          "nullsNotDistinct": false,
-          "columns": ["profile_id"]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
     }
   },
   "enums": {
@@ -4341,11 +3358,6 @@
       "schema": "public",
       "values": ["free", "plus", "family", "pro"]
     },
-    "public.dictation_mode": {
-      "name": "dictation_mode",
-      "schema": "public",
-      "values": ["homework", "surprise"]
-    },
     "public.consent_status": {
       "name": "consent_status",
       "schema": "public",
@@ -4370,11 +3382,6 @@
       "name": "curriculum_topic_source",
       "schema": "public",
       "values": ["generated", "user"]
-    },
-    "public.filed_from": {
-      "name": "filed_from",
-      "schema": "public",
-      "values": ["pre_generated", "session_filing", "freeform_filing"]
     },
     "public.pedagogy_mode": {
       "name": "pedagogy_mode",
@@ -4458,14 +3465,7 @@
         "consent_reminder",
         "consent_warning",
         "consent_expired",
-        "subscribe_request",
-        "recall_nudge",
-        "weekly_progress",
-        "monthly_report",
-        "progress_refresh",
-        "struggle_noticed",
-        "struggle_flagged",
-        "struggle_resolved"
+        "subscribe_request"
       ]
     },
     "public.vocab_type": {
