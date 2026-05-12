@@ -485,6 +485,15 @@ function clampDrillDuration(seconds: number): number {
   return Math.min(90, Math.max(15, seconds));
 }
 
+function parsedFromVisibleFallbackText(text: string): ParsedExchangeEnvelope {
+  const cleanResponse = stripPhoneticHints(normalizeReplyText(text).trim());
+  return {
+    ...EMPTY_PARSED_ENVELOPE,
+    cleanResponse,
+    understandingCheck: detectUnderstandingCheckFromProse(cleanResponse),
+  };
+}
+
 /**
  * Parse the full envelope from a (non-streaming or accumulated-stream) LLM
  * response and normalise signals + ui_hints into the flat structure exchange
@@ -706,14 +715,21 @@ export function classifyExchangeOutcome(
     return { parsed };
   }
 
-  // Envelope parse failed. Two sub-cases need separate treatment before
-  // declaring the response malformed:
+  // Envelope parse failed. Several sub-cases need separate treatment before
+  // declaring the response unrecoverable:
   //   1. Payload has a reply field but it's empty/whitespace → empty_reply
   //      (schema violation: reply: z.string().min(1)). Semantically the LLM
   //      refused to answer, not a format drift.
-  //   2. Marker-shaped payloads with no `reply` field → HANDLED markers
+  //   2. Payload has a non-empty reply but invalid side-channel fields →
+  //      recover the visible reply and default signals/UI hints. The learner
+  //      should not lose a good answer because `duration_s` or another
+  //      non-visible field drifted.
+  //   3. Plain prose with no JSON → recover as visible text. This is still
+  //      logged by parseEnvelope above, but it is not a user-facing dead end.
+  //   4. Marker-shaped payloads with no `reply` field → HANDLED markers
   //      pass through, unhandled markers become orphan_marker.
-  // Anything else is genuine garbage (malformed_envelope).
+  // Anything else has no safe learner-facing text and becomes
+  // malformed_envelope.
   const replyCandidate = extractReplyCandidate(rawResponse);
   if (replyCandidate !== undefined && replyCandidate.trim().length === 0) {
     return {
@@ -723,6 +739,9 @@ export function classifyExchangeOutcome(
         fallbackText: DEFAULT_FALLBACK_TEXT,
       },
     };
+  }
+  if (replyCandidate !== undefined) {
+    return { parsed: parsedFromVisibleFallbackText(replyCandidate) };
   }
 
   const markerKey = extractKnownMarkerKey(rawResponse);
@@ -736,6 +755,11 @@ export function classifyExchangeOutcome(
   }
 
   if (markerKey === null) {
+    const trimmed = rawResponse.trim();
+    if (trimmed.length > 0 && !trimmed.startsWith('{')) {
+      return { parsed: parsedFromVisibleFallbackText(trimmed) };
+    }
+
     return {
       parsed: { ...EMPTY_PARSED_ENVELOPE },
       fallback: {

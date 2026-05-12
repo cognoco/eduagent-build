@@ -1,10 +1,9 @@
 import { View, Text, Pressable, FlatList } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { i18next } from '../../../i18n';
 import { useRecentRounds } from '../../../hooks/use-quiz';
-import { goBackOrReplace } from '../../../lib/navigation';
 import { useThemeColors } from '../../../lib/theme';
 import { ErrorFallback } from '../../../components/common/ErrorFallback';
 import { extractLanguageFromTheme } from '../../../lib/extract-vocabulary-language';
@@ -32,12 +31,16 @@ function formatDateHeader(isoDate: string): string {
 export default function QuizHistoryScreen() {
   const { t } = useTranslation();
   const router = useRouter();
+  const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
   const colors = useThemeColors();
   // [BUG-933] On web, useSafeAreaInsets returns top:0 — useScreenTopInset
   // applies a 24px minimum so the header doesn't sit flush against the
   // browser URL bar. Native devices pass through unchanged.
   const insets = useScreenTopInset();
   const { data: rounds, isLoading, isError, refetch } = useRecentRounds();
+  const isPracticeReturn = returnTo === 'practice';
+  const backHref = isPracticeReturn ? '/(app)/practice' : '/(app)/quiz';
+  const returnParams = isPracticeReturn ? { returnTo } : {};
 
   if (isLoading) {
     return (
@@ -66,7 +69,7 @@ export default function QuizHistoryScreen() {
         }}
         secondaryAction={{
           label: t('common.goBack'),
-          onPress: () => goBackOrReplace(router, '/(app)/quiz'),
+          onPress: () => router.replace(backHref as never),
           testID: 'quiz-history-go-back',
         }}
         testID="quiz-history-error"
@@ -89,7 +92,12 @@ export default function QuizHistoryScreen() {
         <Pressable
           testID="quiz-history-try-quiz"
           className="bg-primary mt-4 rounded-xl px-6 py-3"
-          onPress={() => router.push('/(app)/quiz')}
+          onPress={() =>
+            router.push({
+              pathname: '/(app)/quiz',
+              params: returnParams,
+            } as never)
+          }
         >
           <Text className="text-on-primary font-semibold">
             {t('quiz.history.tryQuiz')}
@@ -120,7 +128,7 @@ export default function QuizHistoryScreen() {
       >
         <Pressable
           testID="quiz-history-back"
-          onPress={() => goBackOrReplace(router, '/(app)/practice')}
+          onPress={() => router.replace(backHref as never)}
           className="min-h-[44px] min-w-[44px] items-center justify-center"
           accessibilityRole="button"
           accessibilityLabel={t('quiz.history.goBack')}
@@ -166,7 +174,12 @@ export default function QuizHistoryScreen() {
                   key={round.id}
                   testID={`quiz-history-row-${round.id}`}
                   className="bg-surface-elevated mx-4 mb-2 rounded-xl p-4"
-                  onPress={() => router.push(`/(app)/quiz/${round.id}`)}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/(app)/quiz/[roundId]',
+                      params: { roundId: round.id, ...returnParams },
+                    } as never)
+                  }
                   accessibilityRole="button"
                   accessibilityLabel={t('quiz.history.rowLabel', {
                     label,

@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
 import { authStateDir } from '../../helpers/runtime';
+import { pressableClick } from '../../helpers/pressable';
 
 test.use({ storageState: path.join(authStateDir, 'solo-learner.json') });
 
@@ -12,18 +13,18 @@ test('J-10 learner → Practice → Quiz → launch → play → results → hom
     timeout: 60_000,
   });
 
-  await page.getByTestId('home-action-practice').click();
+  await pressableClick(page.getByTestId('home-action-practice'));
   await expect(page.getByTestId('practice-screen')).toBeVisible({
     timeout: 30_000,
   });
 
-  await page.getByTestId('practice-quiz').click();
+  await pressableClick(page.getByTestId('practice-quiz'));
   await expect(page.getByTestId('quiz-index-screen')).toBeVisible({
     timeout: 30_000,
   });
 
   // Launch capitals quiz — a general-knowledge activity always available
-  await page.getByTestId('quiz-capitals').click();
+  await pressableClick(page.getByTestId('quiz-capitals'));
   await expect(page.getByTestId('quiz-play-screen')).toBeVisible({
     timeout: 30_000,
   });
@@ -40,17 +41,17 @@ test('J-10 learner → Practice → Quiz → launch → play → results → hom
 
     const firstOption = quizScreen.getByTestId('quiz-option-0');
     await expect(
-      firstOption.or(page.getByTestId('quiz-results-screen'))
+      firstOption.or(page.getByTestId('quiz-results-screen')),
     ).toBeVisible({
       timeout: 30_000,
     });
     await page.waitForFunction(
       () => {
         const results = document.querySelector(
-          '[data-testid="quiz-results-screen"]'
+          '[data-testid="quiz-results-screen"]',
         );
         const option = document.querySelector(
-          '[data-testid="quiz-play-screen"] [data-testid="quiz-option-0"]'
+          '[data-testid="quiz-play-screen"] [data-testid="quiz-option-0"]',
         );
         const isVisible = (element: Element | null) => {
           if (!element) return false;
@@ -70,7 +71,7 @@ test('J-10 learner → Practice → Quiz → launch → play → results → hom
         );
       },
       null,
-      { timeout: 30_000 }
+      { timeout: 30_000 },
     );
 
     if (await page.getByTestId('quiz-results-screen').isVisible()) break;

@@ -51,7 +51,7 @@ export const feedbackDeliveryFailed = inngest.createFunction(
         '[feedback-delivery-failed] invalid payload — skipping retries',
         {
           issues,
-        }
+        },
       );
       // Structured escalation per global "no silent recovery" rule —
       // captureException keeps the case in Sentry for queryable counts.
@@ -63,7 +63,7 @@ export const feedbackDeliveryFailed = inngest.createFunction(
             reason: 'invalid_payload',
             issues,
           },
-        }
+        },
       );
       return { status: 'skipped' as const, reason: 'invalid_payload', issues };
     }
@@ -73,8 +73,8 @@ export const feedbackDeliveryFailed = inngest.createFunction(
       category === 'bug'
         ? 'Bug Report'
         : category === 'suggestion'
-        ? 'Suggestion'
-        : 'Feedback';
+          ? 'Suggestion'
+          : 'Feedback';
 
     return step.run('retry-delivery', async () => {
       const resendApiKey = getStepResendApiKey();
@@ -117,11 +117,11 @@ export const feedbackDeliveryFailed = inngest.createFunction(
             reason: 'missing_event_id',
             profileId,
             category,
-          }
+          },
         );
         captureException(
           new Error(
-            'feedback-delivery-failed: missing event.id — using payload hash idempotency key'
+            'feedback-delivery-failed: missing event.id — using payload hash idempotency key',
           ),
           {
             extra: {
@@ -130,7 +130,7 @@ export const feedbackDeliveryFailed = inngest.createFunction(
               profileId,
               category,
             },
-          }
+          },
         );
       }
 
@@ -139,19 +139,19 @@ export const feedbackDeliveryFailed = inngest.createFunction(
           to: getStepSupportEmail(),
           subject: `[MentoMate ${categoryLabel}] delivery-retry for ${profileId.slice(
             0,
-            8
+            8,
           )}`,
           body: `[Delayed delivery] Category: ${category}\nProfile: ${profileId}\nOriginal delivery failed — this is a retry from the Inngest queue.`,
           type: 'feedback',
         },
-        { resendApiKey, emailFrom, idempotencyKey }
+        { resendApiKey, emailFrom, idempotencyKey },
       );
 
       if (!result.sent) {
         const err = new Error(
           `feedback-delivery-failed retry unsuccessful: ${
             result.reason ?? 'unknown'
-          }`
+          }`,
         );
         captureException(err, {
           profileId,
@@ -167,5 +167,5 @@ export const feedbackDeliveryFailed = inngest.createFunction(
 
       return { ok: true, profileId };
     });
-  }
+  },
 );

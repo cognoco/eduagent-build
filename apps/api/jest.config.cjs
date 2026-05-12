@@ -5,7 +5,7 @@ module.exports = {
   rootDir: '../..',
   testEnvironment: 'node',
   transform: {
-    '^.+\\.ts$': ['ts-jest', { tsconfig: '<rootDir>/apps/api/tsconfig.spec.json' }],
+    '^.+\\.ts$': ['ts-jest', { tsconfig: '<rootDir>/apps/api/tsconfig.app.json' }],
   },
   // Swap Neon HTTP driver for standard pg when DATABASE_URL points at
   // localhost (CI container). Unit tests override with their own jest.mock.

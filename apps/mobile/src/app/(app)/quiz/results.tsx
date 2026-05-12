@@ -3,11 +3,12 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BrandCelebration } from '../../../components/common/BrandCelebration';
+import { RewardBurst } from '../../../components/common/RewardBurst';
 import { useFetchRound } from '../../../hooks/use-quiz';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { useThemeColors } from '../../../lib/theme';
 import { useQuizFlow } from './_layout';
+import { rewardVariantForActivity } from './_quiz-utils';
 
 export default function QuizResultsScreen(): React.ReactElement {
   const router = useRouter();
@@ -17,10 +18,12 @@ export default function QuizResultsScreen(): React.ReactElement {
     activityType,
     completionResult,
     prefetchedRoundId,
+    returnTo,
     round,
     setPrefetchedRoundId,
     setRound,
   } = useQuizFlow();
+  const practiceReturnParams = returnTo === 'practice' ? { returnTo } : {};
   // [BUG-777 / M-15] Pin the FIRST non-null round we see so a "Play Again"
   // press — which sets a NEW round into context BEFORE this screen unmounts
   // — can't cause a render flash where questionPrompt's 'Question' fallback
@@ -160,11 +163,16 @@ export default function QuizResultsScreen(): React.ReactElement {
       }}
       testID="quiz-results-screen"
     >
-      {(celebrationTier === 'perfect' || celebrationTier === 'great') && (
-        <View className="mb-6">
-          <BrandCelebration size={96} />
-        </View>
-      )}
+      <RewardBurst
+        variant={rewardVariantForActivity(activityType)}
+        intensity={
+          celebrationTier === 'perfect' || celebrationTier === 'great'
+            ? 'round'
+            : 'answer'
+        }
+        message={config.title}
+        testID="quiz-results-celebration"
+      />
 
       <Ionicons name={config.icon} size={56} color={config.color} />
       <Text className="mt-4 text-center text-h1 font-bold text-text-primary">
@@ -277,7 +285,12 @@ export default function QuizResultsScreen(): React.ReactElement {
 
         <Pressable
           testID="quiz-results-history"
-          onPress={() => router.push('/(app)/quiz/history')}
+          onPress={() =>
+            router.push({
+              pathname: '/(app)/quiz/history',
+              params: practiceReturnParams,
+            } as never)
+          }
         >
           <Text className="text-primary mt-2">View History</Text>
         </Pressable>
