@@ -1,0 +1,18 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./out-tsc/jest",
+    "types": ["jest", "node"],
+    // Deferred: ~279 pre-existing test errors surface when these are enabled.
+    // Cleaned up in follow-up cleanup PRs (see docs/audit/cleanup-plan.md C6).
+    // Do not re-enable until the test files are fixed.
+    "noUncheckedIndexedAccess": false,
+    "noUnusedLocals": false
+  },
+  "include": ["src/**/*.test.ts", "eval-llm/**/*.test.ts"],
+  "references": [
+    {
+      "path": "./tsconfig.app.json"
+    }
+  ]
+}
