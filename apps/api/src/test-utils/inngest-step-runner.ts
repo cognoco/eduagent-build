@@ -26,7 +26,7 @@ export interface InngestStepRunnerOptions {
   sendEventResult?: StepResult;
   sendEventErrors?: Record<string, unknown>;
   waitForEventResult?: StepResult;
-  waitForEventResults?: Record<string, StepResult | StepResult[]>;
+  waitForEventResults?: Record<string, StepResult | readonly StepResult[]>;
 }
 
 async function resolveStepResult(result: StepResult): Promise<unknown> {
@@ -47,6 +47,7 @@ export function createInngestStepRunner(
   const sendEventCalls: InngestStepSendEventCall[] = [];
   const sleepCalls: InngestStepSleepCall[] = [];
   const waitForEventCalls: InngestStepWaitForEventCall[] = [];
+  const waitForEventArrayIndices = new Map<string, number>();
 
   const step = {
     async run<T>(name: string, callback: StepCallback<T>): Promise<T> {
@@ -77,7 +78,9 @@ export function createInngestStepRunner(
       if (options.waitForEventResults && name in options.waitForEventResults) {
         const result = options.waitForEventResults[name];
         if (Array.isArray(result)) {
-          const next = result.shift();
+          const idx = waitForEventArrayIndices.get(name) ?? 0;
+          waitForEventArrayIndices.set(name, idx + 1);
+          const next = result[idx];
           return next === undefined ? null : resolveStepResult(next);
         }
         return resolveStepResult(result);

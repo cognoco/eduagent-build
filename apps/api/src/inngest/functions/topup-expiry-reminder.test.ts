@@ -35,7 +35,7 @@ jest.mock('../client', () => ({
           opts: _opts,
           fn,
         });
-      }
+      },
     ),
     send: (...args: unknown[]) => mockInngestSend(...args),
   },
@@ -54,7 +54,17 @@ import { topupExpiryReminder } from './topup-expiry-reminder';
 
 const NOW = new Date('2025-07-15T09:00:00.000Z');
 
-async function executeSteps(): Promise<Record<string, unknown>> {
+interface TopupExpiryResult {
+  status: string;
+  totalReminders: number;
+  timestamp: string;
+}
+
+async function executeSteps(): Promise<{
+  result: TopupExpiryResult;
+  mockStep: { run: jest.Mock; sendEvent: jest.Mock; sleep: jest.Mock };
+  stepResults: Record<string, unknown>;
+}> {
   const stepResults: Record<string, unknown> = {};
   const mockStep = {
     run: jest.fn(async (name: string, fn: () => Promise<unknown>) => {
@@ -127,10 +137,7 @@ describe('topupExpiryReminder', () => {
       .mockResolvedValueOnce([]) // 2-month milestone
       .mockResolvedValueOnce([]); // 0-month (expiring today)
 
-    const { result, mockStep } = (await executeSteps()) as unknown as {
-      result: { totalReminders: number };
-      mockStep: { sendEvent: jest.Mock };
-    };
+    const { result, mockStep } = await executeSteps();
 
     expect(result.totalReminders).toBe(1);
     // [SWEEP-J7] Memoized step.sendEvent carrying the array of per-credit
@@ -146,7 +153,7 @@ describe('topupExpiryReminder', () => {
             remaining: 300,
           }),
         }),
-      ])
+      ]),
     );
     expect(mockInngestSend).not.toHaveBeenCalled();
   });
@@ -177,10 +184,7 @@ describe('topupExpiryReminder', () => {
       .mockResolvedValueOnce([credit2]) // 2-month milestone
       .mockResolvedValueOnce([]); // 0-month
 
-    const { result, mockStep } = (await executeSteps()) as unknown as {
-      result: { totalReminders: number };
-      mockStep: { sendEvent: jest.Mock };
-    };
+    const { result, mockStep } = await executeSteps();
 
     expect(result.totalReminders).toBe(2);
     // Two milestones produced credits → two memoized step.sendEvent calls.
@@ -211,7 +215,7 @@ describe('topupExpiryReminder', () => {
       const { result } = await executeSteps();
       // Cron must still resolve cleanly even though the clock is invalid —
       // not throw a RangeError up to Inngest.
-      expect((result as { status: string }).status).toBe('completed');
+      expect(result.status).toBe('completed');
     } finally {
       global.Date = originalDate;
     }
@@ -255,7 +259,7 @@ describe('topupExpiryReminder', () => {
       const { result } = await executeSteps();
       // Cron must still resolve cleanly even though the clock is invalid —
       // not throw a RangeError up to Inngest.
-      expect((result as { status: string }).status).toBe('completed');
+      expect(result.status).toBe('completed');
     } finally {
       global.Date = originalDate;
     }

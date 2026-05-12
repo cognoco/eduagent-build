@@ -73,7 +73,18 @@ import { quotaReset } from './quota-reset';
 
 const NOW = new Date('2025-01-15T01:00:00.000Z');
 
-async function executeSteps(): Promise<Record<string, unknown>> {
+interface QuotaResetResult {
+  status: string;
+  dailyResetCount: number;
+  monthlyResetCount: number;
+  timestamp: string;
+}
+
+async function executeSteps(): Promise<{
+  result: QuotaResetResult;
+  mockStep: { run: jest.Mock; sleep: jest.Mock };
+  stepResults: Record<string, unknown>;
+}> {
   const stepResults: Record<string, unknown> = {};
   const mockStep = {
     run: jest.fn(async (name: string, fn: () => Promise<unknown>) => {
@@ -121,7 +132,7 @@ describe('quotaReset', () => {
   it('should have a cron trigger at 01:00 UTC', () => {
     const triggers = (quotaReset as any).opts?.triggers;
     expect(triggers).toEqual(
-      expect.arrayContaining([expect.objectContaining({ cron: '0 1 * * *' })])
+      expect.arrayContaining([expect.objectContaining({ cron: '0 1 * * *' })]),
     );
   });
 

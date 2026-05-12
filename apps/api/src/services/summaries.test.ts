@@ -1,4 +1,4 @@
-import { registerProvider, createMockProvider } from './llm';
+import { registerProvider, createMockProvider, _resetCircuits } from './llm';
 import { evaluateSummary } from './summaries';
 import {
   llmPlainText,
@@ -12,7 +12,7 @@ import {
 
 describe('evaluateSummary', () => {
   afterEach(() => {
-    // Restore generic mock after each test
+    _resetCircuits();
     registerProvider(createMockProvider('gemini'));
   });
 

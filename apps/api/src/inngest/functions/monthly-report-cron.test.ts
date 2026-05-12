@@ -238,8 +238,26 @@ const SAMPLE_METRICS = {
 // Helpers
 // ---------------------------------------------------------------------------
 
+interface MonthlyReportCronResult {
+  status: string;
+  queuedPairs: number;
+  totalPairs?: number;
+  queuedBatches?: number;
+  failedBatches?: number;
+}
+
+interface MonthlyReportGenerateResult {
+  status: string;
+  parentId?: string;
+  childId?: string;
+  reason?: string;
+}
+
 /** Simulate Inngest step runner for cron functions */
-async function executeCronSteps(): Promise<Record<string, unknown>> {
+async function executeCronSteps(): Promise<{
+  result: MonthlyReportCronResult;
+  mockStep: { run: jest.Mock; sendEvent: jest.Mock; sleep: jest.Mock };
+}> {
   const mockStep = {
     run: jest.fn(async (name: string, fn: () => Promise<unknown>) => fn()),
     sendEvent: jest.fn().mockResolvedValue(undefined),
@@ -258,7 +276,10 @@ async function executeCronSteps(): Promise<Record<string, unknown>> {
 /** Simulate Inngest step runner for the generate event handler */
 async function executeGenerateSteps(
   eventData: Record<string, unknown>,
-): Promise<Record<string, unknown>> {
+): Promise<{
+  result: MonthlyReportGenerateResult;
+  mockStep: { run: jest.Mock; sleep: jest.Mock };
+}> {
   const mockStep = {
     run: jest.fn(async (name: string, fn: () => Promise<unknown>) => fn()),
     sleep: jest.fn(),
@@ -502,16 +523,10 @@ describe('monthlyReportCron', () => {
       };
 
       const handler = (monthlyReportCron as any).fn;
-      const result = (await handler({
+      const result: MonthlyReportCronResult = await handler({
         event: { name: 'inngest/function.invoked' },
         step: mockStep,
-      })) as {
-        status: string;
-        queuedPairs: number;
-        totalPairs: number;
-        queuedBatches: number;
-        failedBatches: number;
-      };
+      });
 
       expect(sendEventCalls).toBe(3);
       expect(result.status).toBe('partial');
