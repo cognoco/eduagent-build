@@ -8,7 +8,7 @@ jest.mock('../../lib/theme', () => ({
     textSecondary: '#9ca3af',
     warning: '#f59e0b',
   }),
-);
+}));
 
 describe('LivingBook', () => {
   it('renders with zero exchanges (no counter text)', () => {

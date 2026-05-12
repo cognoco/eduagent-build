@@ -16,7 +16,6 @@ import {
 } from '../../../hooks/use-settings';
 import { formatApiError } from '../../../lib/format-api-error';
 import { platformAlert } from '../../../lib/platform-alert';
-import { useLinkedChildren } from '../../../lib/profile';
 
 export default function PrivacyScreen(): React.ReactElement {
   const router = useRouter();
@@ -28,8 +27,6 @@ export default function PrivacyScreen(): React.ReactElement {
     useWithdrawalArchivePreference();
   const updateWithdrawalArchivePreference =
     useUpdateWithdrawalArchivePreference();
-  const showFamilyConsentControls =
-    role === 'owner' && linkedChildren.length > 0;
 
   const withdrawalArchiveOptions = [
     {

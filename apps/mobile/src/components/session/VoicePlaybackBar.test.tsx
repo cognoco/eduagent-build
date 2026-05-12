@@ -7,7 +7,7 @@ jest.mock('../../lib/theme', () => ({
     muted: '#888',
     primary: '#007AFF',
   }),
-);
+}));
 
 jest.mock('@expo/vector-icons', () => {
   const { Text } = require('react-native');

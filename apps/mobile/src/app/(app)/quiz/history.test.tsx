@@ -2,10 +2,13 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 import QuizHistoryScreen from './history';
 
 const mockPush = jest.fn();
+const mockReplace = jest.fn();
 const mockGoBackOrReplace = jest.fn();
+let mockSearchParams: Record<string, string> = {};
 
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ push: mockPush }),
+  useRouter: () => ({ push: mockPush, replace: mockReplace }),
+  useLocalSearchParams: () => mockSearchParams,
 }));
 
 jest.mock(
@@ -82,6 +85,7 @@ const recentRounds = [
 describe('QuizHistoryScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockSearchParams = {};
     mockUseRecentRounds.mockReturnValue({
       data: recentRounds,
       isLoading: false,
@@ -129,7 +133,10 @@ describe('QuizHistoryScreen', () => {
     render(<QuizHistoryScreen />);
     expect(screen.getByTestId('quiz-history-empty')).toBeTruthy();
     fireEvent.press(screen.getByTestId('quiz-history-try-quiz'));
-    expect(mockPush).toHaveBeenCalledWith('/(app)/quiz');
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/quiz',
+      params: {},
+    });
   });
 
   it('shows error state with retry and go-back actions', () => {
@@ -147,9 +154,6 @@ describe('QuizHistoryScreen', () => {
     expect(refetch).toHaveBeenCalled();
 
     fireEvent.press(screen.getByTestId('quiz-history-go-back'));
-    expect(mockGoBackOrReplace).toHaveBeenCalledWith(
-      expect.objectContaining({ push: mockPush }),
-      '/(app)/quiz',
-    );
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/quiz');
   });
 });

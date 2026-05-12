@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { i18next } from '../../../i18n';
 import { useRecentRounds } from '../../../hooks/use-quiz';
+import { goBackOrReplace } from '../../../lib/navigation';
 import { useThemeColors } from '../../../lib/theme';
 import { ErrorFallback } from '../../../components/common/ErrorFallback';
 import { extractLanguageFromTheme } from '../../../lib/extract-vocabulary-language';

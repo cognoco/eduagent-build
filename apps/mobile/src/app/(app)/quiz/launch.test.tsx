@@ -67,6 +67,7 @@ jest.mock('../../../i18n', () => {
 });
 
 const mockReplace = jest.fn();
+const mockGoBackOrReplace = jest.fn();
 const mockSetRound = jest.fn();
 const mockSetActivityType = jest.fn();
 const mockSetSubjectId = jest.fn();
@@ -124,6 +125,7 @@ jest.mock('../../../lib/theme', () => ({
 }));
 
 jest.mock('../../../lib/navigation', () => ({
+  // gc1-allow: navigation helper mock keeps screen unit-scoped
   goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
 }));
 

@@ -156,61 +156,6 @@ function LoadingBlock(): React.ReactElement {
   );
 }
 
-function ProgressLoadingFallback({
-  onRetry,
-  onGoHome,
-}: {
-  onRetry: () => void;
-  onGoHome: () => void;
-}): React.ReactElement {
-  const { t } = useTranslation();
-  const [loadTimedOut, setLoadTimedOut] = useState(false);
-
-  useEffect(() => {
-    const timeout = setTimeout(() => setLoadTimedOut(true), 15000);
-    return () => clearTimeout(timeout);
-  }, []);
-
-  if (loadTimedOut) {
-    return (
-      <ErrorFallback
-        title={t('progress.loadTimeout.title')}
-        message={t('progress.loadTimeout.message')}
-        primaryAction={{
-          label: t('common.tryAgain'),
-          onPress: onRetry,
-          testID: 'progress-loading-retry',
-        }}
-        secondaryAction={{
-          label: t('common.goHome'),
-          onPress: onGoHome,
-          testID: 'progress-loading-home',
-        }}
-        testID="progress-loading-timeout"
-      />
-    );
-  }
-
-  return (
-    <>
-      <View
-        className="bg-coaching-card rounded-card p-5"
-        testID="progress-loading-state"
-      >
-        <Text className="text-h3 font-semibold text-text-primary">
-          {t('progress.loadingTitle')}
-        </Text>
-        <Text className="text-body text-text-secondary mt-2">
-          {t('common.loading')}
-        </Text>
-      </View>
-      <View className="mt-4">
-        <LoadingBlock />
-      </View>
-    </>
-  );
-}
-
 export default function ProgressScreen(): React.ReactElement {
   const { t } = useTranslation();
   const role = useActiveProfileRole();

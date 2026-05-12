@@ -29,7 +29,6 @@ import {
   usePrefetchRound,
 } from '../../../hooks/use-quiz';
 import { PolarStar } from '../../../components/common';
-import { goBackOrReplace } from '../../../lib/navigation';
 import { platformAlert } from '../../../lib/platform-alert';
 // platformAlert maps to window.confirm on web for 2-button prompts, which
 // blocks the renderer (BUG-892). For the quit-quiz confirmation we use a
@@ -100,6 +99,9 @@ export default function QuizPlayScreen(): React.ReactElement {
   const [quitConfirmVisible, setQuitConfirmVisible] = useState(false);
   const [roundAutoSaveStarted, setRoundAutoSaveStarted] = useState(false);
   const [roundAutoSaved, setRoundAutoSaved] = useState(false);
+  const [correctCelebrationKey, setCorrectCelebrationKey] = useState<
+    number | null
+  >(null);
 
   const questions = (round?.questions ?? []) as ClientQuizQuestion[];
   const totalQuestions = round?.total ?? 0;

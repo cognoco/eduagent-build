@@ -10,7 +10,7 @@ jest.mock('../../lib/theme', () => ({
     retentionForgotten: '#737373',
     textSecondary: '#525252',
   }),
-);
+}));
 
 describe('RetentionPill', () => {
   it('renders still-remembered status with green dot and label', () => {

@@ -137,6 +137,7 @@ jest.mock('./_layout', () => ({
     round: mockRound,
     activityType:
       mockRound && 'activityType' in mockRound ? mockRound.activityType : null,
+    returnTo: mockReturnTo,
     subjectId: null,
     setPrefetchedRoundId: mockSetPrefetchedRoundId,
     setRound: mockSetRound,
