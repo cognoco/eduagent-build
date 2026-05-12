@@ -76,7 +76,7 @@ describe('maintenanceRoutes', () => {
     );
 
     expect(res.status).toBe(403);
-    expect(inngest.send).not.toHaveBeenCalled();
+    expect(mockInngestTransport.sentEvents).toHaveLength(0);
   });
 
   it('dispatches the self progress backfill event with a valid secret', async () => {
@@ -95,12 +95,14 @@ describe('maintenanceRoutes', () => {
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ queued: true });
-    expect(inngest.send).toHaveBeenCalledWith({
-      name: 'admin/progress-self-reports-backfill.requested',
-      data: {
-        requestedAt: expect.any(String),
-        environment: 'staging',
+    expect(mockInngestTransport.sentPayloads()).toEqual([
+      {
+        name: 'admin/progress-self-reports-backfill.requested',
+        data: {
+          requestedAt: expect.any(String),
+          environment: 'staging',
+        },
       },
-    });
+    ]);
   });
 });
