@@ -118,11 +118,9 @@
       "emptySubjectsTitle": "Fagene dine vises her",
       "emptySubjectsMessage": "Start ett nå, eller bruk leksehjelp når du trenger det.",
       "addSubject": "Legg til fag",
-      "quota": {
-        "line": "{{questionsLeftToday}} spørsmål igjen i dag · {{questionsLeftMonth}} igjen denne måneden",
-        "lineDailyOnly": "{{questionsLeftToday}} spørsmål igjen i dag",
-        "lineMonthlyOnly": "{{questionsLeftMonth}} spørsmål igjen denne måneden",
-        "lineUnlimited": "Masser av spørsmål i dag"
+      "momentum": {
+        "topicLearned": "{{n}} emne lært",
+        "topicsLearned": "{{n}} emner lært"
       },
       "intentActions": {
         "homework": {
@@ -151,6 +149,7 @@
     },
     "parent": {
       "greeting": "Hei {{displayName}}",
+      "accountLink": "Åpne konto",
       "intentHeader": "Hva trenger du akkurat nå?",
       "encouragementNote": "Nudger er korte, milde oppmuntringer en vei.",
       "transitionNoticeTitle": "Du veileder nå {{childNames}}",
@@ -172,10 +171,15 @@
         "sessions_other": "{{count}} økter denne uken"
       },
       "tonight": {
-        "title": "Tonight",
-        "promptWithTopic": "Ask {{childName}}: what made {{topic}} click today?",
-        "promptNoActivity": "Ask {{childName}}: what would make starting feel easy tonight?",
-        "promptFallback": "Ask {{childName}}: what felt easier today than yesterday?"
+        "titleMorning": "I morges",
+        "titleAfternoon": "I ettermiddag",
+        "titleEvening": "I kveld",
+        "promptWithTopic": "Spør {{childName}}: hva gjorde at {{topic}} ga mening i dag?",
+        "promptNoActivity": "Spør {{childName}}: hva ville gjort det lett å starte i kveld?",
+        "promptFallback": "Spør {{childName}}: hva føltes lettere i dag enn i går?",
+        "promptTrickiestWithTopic": "Spør {{childName}}: hva er det vanskeligste med {{topic}} akkurat nå?",
+        "promptTomorrow": "Spør {{childName}}: hva bør vi fokusere på i morgen?",
+        "promptCurious": "Spør {{childName}}: er det noe de er nysgjerrige på?"
       },
       "empty": {
         "title": "Your family dashboard starts here",
@@ -251,8 +255,8 @@
       "subtitle": "Gjelder for dine egne læringsøkter.",
       "subtitleWithChildren": "Gjelder for dine egne økter. For å endre et barns, åpne profilen deres fra dashbordet.",
       "childPreferencesAccessLabel": "Åpne {{name}}s profilinnstillinger",
-      "childPreferencesLink": "For å endre {{name}}s preferanser, åpne profilen deres →",
-      "familyPreferencesLink": "For å endre et barns preferanser, åpne Familie →",
+      "childPreferencesLink": "For å endre {{name}}s innstillinger, trykk på profilen deres på Hjem →",
+      "familyPreferencesLink": "For å endre et barns innstillinger, trykk på profilen deres på Hjem →",
       "sheetTitle": "Læringsmodus",
       "sheetEffectMessage": "Gjelder fra neste melding.",
       "casual": {
@@ -265,11 +269,21 @@
       }
     },
     "accommodation": {
-      "sectionHeader": "{{name}}s læringstilpasning"
+      "sectionHeader": "Din læringstilpasning",
+      "viewAndManage": "Vis og administrer",
+      "screenTitle": "Læringstilpasning",
+      "notSureWhichToPick": "Ikke sikker på hvilken du skal velge?",
+      "guideActive": "Aktiv",
+      "childScreenTitle": "{{name}}s læringstilpasning"
+    },
+    "learningPreferences": {
+      "rowLabel": "Læringsinnstillinger",
+      "screenTitle": "Læringsinnstillinger"
     },
     "mentorMemory": {
       "sectionHeader": "Hva mentoren din vet",
-      "viewAndManage": "Se og administrer"
+      "viewAndManage": "Se og administrer",
+      "viewAndManageDescription": "Strengths, interests, and how you learn best"
     },
     "family": {
       "sectionHeader": "Familie",
@@ -393,7 +407,8 @@
         "disabled": "Minneinnsamling er slått av.",
         "pendingOwner": "Minneinnsamling er ikke aktivert ennå.",
         "pendingChild": "En forelder eller verge må fortsatt aktivere minneinnsamling.",
-        "useMemoryLabel": "Bruk det mentoren vet"
+        "useMemoryLabel": "Bruk det mentoren vet",
+        "useMemoryDisabledHint": "Enable memory first, then this can turn on."
       },
       "consent": {
         "title": "Aktiver mentorens minne",
@@ -454,6 +469,10 @@
         "school": "Skole",
         "freeTime": "Fritid",
         "both": "Begge"
+      },
+      "examples": {
+        "title": "Examples you can add",
+        "body": "\"I learn best with examples,\" \"I like space analogies,\" or \"Fractions still feel tricky.\""
       }
     },
     "accessories": {
@@ -682,7 +701,9 @@
       "iHaveAText": "Jeg har en tekst",
       "iHaveATextSubtitle": "Skriv eller lim inn din egen tekst",
       "surpriseMe": "Overrask meg",
-      "surpriseMeSubtitle": "Øv med et nytt diktat"
+      "surpriseMeSubtitle": "Øv med et nytt diktat",
+      "loadingTitle": "Finding your next review...",
+      "loadingMessage": "We're choosing a dictation that should feel useful, not random."
     },
     "complete": {
       "noSessionTitle": "Ingen diktat å fullføre",
@@ -844,7 +865,9 @@
       "organizing": "Organiserer biblioteket ditt ...",
       "skip": "Hopp over – start læringen uansett",
       "skipAccessibilityLabel": "Hopp over og start læringen uansett",
-      "filingErrorTitle": "Kunne ikke legge til den boken"
+      "filingErrorTitle": "Kunne ikke legge til den boken",
+      "loadingTitle": "Opening your shelf...",
+      "loadingMessage": "We're finding the books and next steps saved for this subject."
     },
     "noteMenu": {
       "title": "Notatalternativer",
@@ -1124,7 +1147,8 @@
     "ocrDefaultError": "Vi kunne ikke lese det tydelig. Prøv å ta bildet på nytt med bedre belysning.",
     "problemsFound": "Her er oppgavene jeg fant:",
     "addSkippedFragmentsLabel": "Legg til overhoppede fragmenter igjen",
-    "skippedFragments": "Vi hoppet over {{count}} uklare fragment(er). Trykk for å legge dem til igjen.",
+    "skippedFragments_one": "Vi hoppet over {{count}} uklart fragment. Trykk for å legge det til igjen.",
+    "skippedFragments_other": "Vi hoppet over {{count}} uklare fragmenter. Trykk for å legge dem til igjen.",
     "problemNumber": "Oppgave {{number}}",
     "removeProblemLabel": "Fjern oppgave {{number}}",
     "remove": "Fjern",
@@ -1232,14 +1256,30 @@
       "empty": {
         "child": "Din første ukesoppsummering er på vei.",
         "adult": "Din første ukesoppsummering kommer etter en hel uke med læring."
+      },
+      "practiceTitle": "Høydepunkter fra øving",
+      "chips": {
+        "time": "{{time}} brukt",
+        "topics": "{{count}} tema startet",
+        "topics_other": "{{count}} temaer startet",
+        "streak": "{{count}} dager på rad"
+      },
+      "practice": {
+        "quizzes": "quizer fullført",
+        "reviews": "repetisjoner fullført"
       }
     },
     "monthlyReport": {
       "highlightsTitle": "Høydepunkter",
-      "nextStepsTitle": "Hva nå",
       "empty": {
         "child": "Din første månedsoppsummering kommer ved slutten av {{month}}.",
         "adult": "Din første månedsoppsummering kommer ved slutten av {{month}}."
+      },
+      "nextStepTitle": "Neste steg",
+      "bars": {
+        "sessions": "Økter",
+        "time": "Tid",
+        "topics": "Temaer"
       }
     },
     "newLearner": {
@@ -1373,7 +1413,9 @@
       "hideErrorTitle": "Kunne ikke skjule emnet",
       "goneTitle": "Dette emnet er ikke lenger tilgjengelig",
       "goneSubtitle": "Det kan ha blitt fjernet eller slått sammen med et annet emne.",
-      "pastConversations": "Tidligere samtaler"
+      "pastConversations": "Tidligere samtaler",
+      "loadingTitle": "Finding your progress...",
+      "loadingMessage": "We're pulling together sessions, reviews, and saved words for this subject."
     },
     "vocabulary": {
       "pageTitle": "Ditt vokabular",
@@ -1430,6 +1472,11 @@
         "wordsAdded": "ord lagt til",
         "vocabularyGrowth": "vokabularvekst"
       }
+    },
+    "previousReports": {
+      "title": "Previous reports",
+      "subtitle": "Weekly and monthly snapshots from your learning.",
+      "viewAll": "View all reports"
     }
   },
   "onboarding": {
@@ -2156,6 +2203,75 @@
       "title": "{{fromDisplayName}} sendte deg en nudge",
       "unreadCount": "{{count}} nye",
       "modalTitle": "Nye nudger"
+    }
+  },
+  "practiceHub": {
+    "title": "Test deg selv",
+    "subtitle": "Velg en rask seier. Hver runde hjelper hukommelsen.",
+    "xpLabel": "{{xp}} XP",
+    "sections": {
+      "bestNextStep": "Beste neste steg",
+      "quiz": "Quiz",
+      "otherPractice": "Annen øving",
+      "recentProgress": "Nylig fremgang"
+    },
+    "review": {
+      "title": "Dagens repetisjon",
+      "startReview": "Start repetisjon",
+      "topicsReady_one": "{{count}} tema klart",
+      "topicsReady_other": "{{count}} temaer klare",
+      "allCaughtUp": "Alt er gjennomgått",
+      "nextReviewIn": "Neste repetisjon er om {{time}}",
+      "completeATopic": "Fullfør et tema for å begynne med repetisjon",
+      "browseTopics": "Utforsk temaene dine",
+      "memoryBoost": "Hukommelsesboost",
+      "timeSoon": "snart",
+      "timeLessThanAnHour": "mindre enn en time",
+      "timeHours_one": "{{count}} time",
+      "timeHours_other": "{{count}} timer",
+      "timeDays_one": "{{count}} dag",
+      "timeDays_other": "{{count}} dager",
+      "hintOpenReview": "Åpner repetisjonsemner",
+      "couldNotLoad": "Kunne ikke laste repetisjonsstatus"
+    },
+    "assessment": {
+      "title": "Vis at jeg kan dette",
+      "topicsReady_one": "{{count}} tema klart for test",
+      "topicsReady_other": "{{count}} temaer klare for test",
+      "afterFinishTopic": "Tilgjengelig etter at du fullfører et tema",
+      "hintOpenPicker": "Åpner vurderingsvelgeren",
+      "hintOpenLibrary": "Åpner biblioteket",
+      "couldNotLoad": "Kunne ikke laste vurderingsemner"
+    },
+    "quiz": {
+      "title": "Hurtigquiz",
+      "capitals": "Hovedsteder",
+      "guessWho": "Hvem er hvem",
+      "defaultSubtitle": "Test deg selv med flervalgsspørsmål · {{xp}} XP",
+      "capitalsDescription": "Land, hovedsteder og steder.",
+      "guessWhoDescription": "Gjett personen ut fra ledetråder.",
+      "bestCue": "Beste: {{pct}} %",
+      "playedCue": "Spilt: {{count}}",
+      "bestFraction": "Beste {{score}}/{{total}}",
+      "playedFraction": "Spilt {{count}}",
+      "hintOpenQuiz": "Åpner quiz-valg",
+      "couldNotLoad": "Kunne ikke laste quiz-statistikk"
+    },
+    "recitation": {
+      "title": "Resiter fra hukommelsen",
+      "subtitle": "Resiter et dikt eller en tekst fra hukommelsen",
+      "betaLabel": "Beta"
+    },
+    "dictation": {
+      "title": "Diktat",
+      "subtitle": "Øv på å skrive det du hører"
+    },
+    "history": {
+      "title": "Quiz-historikk",
+      "roundsPlayed_one": "{{count}} runde spilt",
+      "roundsPlayed_other": "{{count}} runder spilt",
+      "noRoundsYet": "Ingen runder ennå",
+      "hintOpenHistory": "Åpner quiz-historikk"
     }
   }
 }

@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { computeChangedKeys, validateTranslation } from './translate';
+import { validateTranslation } from './translate';
 
 type NestedStrings = { [k: string]: string | NestedStrings };
 
@@ -41,9 +41,35 @@ function unflattenKeys(flat: Record<string, string>): NestedStrings {
   return result;
 }
 
+function pickSourceKeys(
+  source: NestedStrings,
+  keys: readonly string[],
+): NestedStrings {
+  const sourceFlat = flattenKeys(source);
+  const picked: Record<string, string> = {};
+  for (const key of keys) {
+    if (key in sourceFlat) picked[key] = sourceFlat[key];
+  }
+  return unflattenKeys(picked);
+}
+
+function getMissingAndExtraKeys(
+  source: NestedStrings,
+  previous: NestedStrings,
+): { missingKeys: string[]; extraKeys: string[] } {
+  const sourceFlat = flattenKeys(source);
+  const previousFlat = flattenKeys(previous);
+  return {
+    missingKeys: Object.keys(sourceFlat).filter(
+      (key) => !(key in previousFlat),
+    ),
+    extraKeys: Object.keys(previousFlat).filter((key) => !(key in sourceFlat)),
+  };
+}
+
 function buildSystemPrompt(
   lang: string,
-  glossary: Record<string, Record<string, string>>
+  glossary: Record<string, Record<string, string>>,
 ): string {
   const glossaryEntries = Object.entries(glossary)
     .filter(([term, translations]) => term !== '_meta' && lang in translations)
@@ -92,7 +118,7 @@ async function translateWithRetry(
   apiKey: string,
   systemPrompt: string,
   sourceJson: string,
-  lang: string
+  lang: string,
 ): Promise<string> {
   let lastError: Error | null = null;
   // SECURITY NOTE: Gemini's documented auth pattern is `?key=<API_KEY>` in the
@@ -108,7 +134,7 @@ async function translateWithRetry(
   //   3. Never run this script against a CI environment that ships request
   //      logs to a shared sink.
   const url = `${GEMINI_BASE}/${GEMINI_MODEL}:generateContent?key=${encodeURIComponent(
-    apiKey
+    apiKey,
   )}`;
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
@@ -166,7 +192,7 @@ async function translateWithRetry(
         console.warn(
           `[${lang}] Attempt ${attempt + 1} failed: ${
             lastError.message
-          }. Retrying in ${delay}ms...`
+          }. Retrying in ${delay}ms...`,
         );
         await new Promise((r) => setTimeout(r, delay));
       }
@@ -174,7 +200,7 @@ async function translateWithRetry(
   }
 
   throw new Error(
-    `[${lang}] All ${MAX_RETRIES} attempts failed. Last error: ${lastError?.message}`
+    `[${lang}] All ${MAX_RETRIES} attempts failed. Last error: ${lastError?.message}`,
   );
 }
 
@@ -208,15 +234,15 @@ async function main(): Promise<void> {
   const opts = parseArgs(process.argv.slice(2));
   const languages = opts.lang
     ? [opts.lang].filter((l) =>
-        (TARGET_LANGUAGES as readonly string[]).includes(l)
+        (TARGET_LANGUAGES as readonly string[]).includes(l),
       )
     : [...TARGET_LANGUAGES];
 
   if (languages.length === 0) {
     console.error(
       `Unknown language: ${opts.lang}. Supported: ${TARGET_LANGUAGES.join(
-        ', '
-      )}`
+        ', ',
+      )}`,
     );
     process.exit(1);
   }
@@ -263,29 +289,55 @@ async function main(): Promise<void> {
 
       let toTranslate: NestedStrings;
       let previousFlat: Record<string, string> | null = null;
+      let validationSource: NestedStrings = source;
 
       if (opts.full || !previous) {
         toTranslate = source;
         console.log(
           `[${lang}] Full translation (${
             Object.keys(flattenKeys(source)).length
-          } keys)`
+          } keys)`,
         );
       } else {
-        const changedKeys = computeChangedKeys(source, previous);
-        if (changedKeys.length === 0) {
+        const { missingKeys, extraKeys } = getMissingAndExtraKeys(
+          source,
+          previous,
+        );
+        if (missingKeys.length === 0 && extraKeys.length === 0) {
           console.log(`[${lang}] No changes detected, skipping`);
           succeeded.push(lang);
           return;
         }
-        const sourceFlat = flattenKeys(source);
-        const changedFlat: Record<string, string> = {};
-        for (const key of changedKeys) {
-          if (key in sourceFlat) changedFlat[key] = sourceFlat[key];
-        }
-        toTranslate = unflattenKeys(changedFlat);
+
         previousFlat = flattenKeys(previous);
-        console.log(`[${lang}] Diff-mode: ${changedKeys.length} changed keys`);
+        const sourceFlat = flattenKeys(source);
+        for (const key of extraKeys) {
+          delete previousFlat[key];
+        }
+
+        if (missingKeys.length === 0) {
+          const pruned = unflattenKeys(previousFlat);
+          fs.writeFileSync(
+            targetPath,
+            JSON.stringify(pruned, null, 2) + '\n',
+            'utf-8',
+          );
+          console.log(
+            `[${lang}] Pruned ${extraKeys.length} removed key(s), no translation needed`,
+          );
+          succeeded.push(lang);
+          return;
+        }
+
+        const missingFlat: Record<string, string> = {};
+        for (const key of missingKeys) {
+          missingFlat[key] = sourceFlat[key];
+        }
+        toTranslate = unflattenKeys(missingFlat);
+        validationSource = pickSourceKeys(source, missingKeys);
+        console.log(
+          `[${lang}] Diff-mode: ${missingKeys.length} missing key(s), ${extraKeys.length} extra key(s)`,
+        );
       }
 
       const systemPrompt = buildSystemPrompt(lang, glossary);
@@ -295,7 +347,7 @@ async function main(): Promise<void> {
         console.log(
           `[${lang}] Dry run — would translate ${
             Object.keys(flattenKeys(toTranslate)).length
-          } keys (model=${GEMINI_MODEL})`
+          } keys (model=${GEMINI_MODEL})`,
         );
         succeeded.push(lang);
         return;
@@ -305,7 +357,7 @@ async function main(): Promise<void> {
         apiKey,
         systemPrompt,
         sourceJson,
-        lang
+        lang,
       );
       let translated: NestedStrings = JSON.parse(translatedJson);
 
@@ -322,11 +374,14 @@ async function main(): Promise<void> {
         translated = unflattenKeys(merged);
       }
 
+      const validationTarget = previousFlat
+        ? pickSourceKeys(translated, Object.keys(flattenKeys(validationSource)))
+        : translated;
       const validation = validateTranslation(
-        source,
-        translated,
+        validationSource,
+        validationTarget,
         lang,
-        glossary
+        glossary,
       );
 
       if (validation.warnings.length > 0) {
@@ -342,10 +397,10 @@ async function main(): Promise<void> {
         // glossary_violation) ALWAYS hard-skip — those represent contract
         // breaks, not UX-quality issues that a human can fix in 5 minutes.
         const blocking = validation.errors.filter(
-          (e) => !(opts.writeAnyway && e.type === 'length_exceeded')
+          (e) => !(opts.writeAnyway && e.type === 'length_exceeded'),
         );
         const downgraded = validation.errors.filter(
-          (e) => opts.writeAnyway && e.type === 'length_exceeded'
+          (e) => opts.writeAnyway && e.type === 'length_exceeded',
         );
         if (blocking.length > 0) {
           console.error(`[${lang}] Validation FAILED:`);
@@ -353,7 +408,7 @@ async function main(): Promise<void> {
             console.error(
               `  ${e.type}: ${e.key}${e.variable ? ` (${e.variable})` : ''}${
                 e.detail ? ` — ${e.detail}` : ''
-              }`
+              }`,
             );
           }
           console.error(`[${lang}] Skipping — previous file preserved`);
@@ -362,7 +417,7 @@ async function main(): Promise<void> {
         }
         if (downgraded.length > 0) {
           console.warn(
-            `[${lang}] Writing despite ${downgraded.length} length issue(s) — patch these manually:`
+            `[${lang}] Writing despite ${downgraded.length} length issue(s) — patch these manually:`,
           );
           for (const e of downgraded) {
             console.warn(`  NEEDS_PATCH ${e.key} — ${e.detail}`);
@@ -387,7 +442,7 @@ async function main(): Promise<void> {
       fs.writeFileSync(
         tmpPath,
         JSON.stringify(translated, null, 2) + '\n',
-        'utf-8'
+        'utf-8',
       );
       fs.renameSync(tmpPath, targetPath);
       console.log(`[${lang}] Written to ${targetPath}`);
@@ -404,7 +459,7 @@ async function main(): Promise<void> {
   await Promise.all(tasks);
 
   console.log(
-    `\nResults: ${succeeded.length} succeeded, ${failed.length} failed`
+    `\nResults: ${succeeded.length} succeeded, ${failed.length} failed`,
   );
   if (failed.length > 0) {
     console.error(`Failed languages: ${failed.join(', ')}`);

@@ -21,6 +21,7 @@ jest.mock(
       textSecondary: '#94a3b8',
       primary: '#00b4d8',
     }),
+    useTheme: () => ({ colorScheme: 'light' }),
   }),
 );
 
@@ -109,9 +110,14 @@ jest.mock(
   }),
 );
 
-jest.mock('./ChildQuotaLine' /* gc1-allow: has own test suite */, () => ({
-  ChildQuotaLine: () => null,
-}));
+jest.mock(
+  '../../hooks/use-learner-profile' /* gc1-allow: external hook boundary — wraps TanStack query that requires QueryClient */,
+  () => ({
+    useChildLearnerProfile: () => ({
+      data: { accommodationMode: 'none' },
+    }),
+  }),
+);
 
 const makeProfile = (overrides: Partial<Profile> = {}): Profile => ({
   id: 'profile-1',
@@ -235,6 +241,80 @@ describe('ParentHomeScreen', () => {
     screen.getByTestId('parent-home-tonight-section');
     screen.getByText('Ask Emma: what made Fractions click today?');
     screen.getByText('18 min this week · Fractions · confidence improving');
+  });
+
+  it('ranks multi-child tonight prompts by sessions — most active child appears first', () => {
+    mockLinkedChildren = [CHILD_B, CHILD_A]; // intentionally reversed to verify sort
+    mockDashboardData = {
+      children: [
+        {
+          profileId: 'child-a',
+          displayName: 'Emma',
+          consentStatus: null,
+          respondedAt: null,
+          summary: '',
+          sessionsThisWeek: 5,
+          sessionsLastWeek: 3,
+          totalTimeThisWeek: 30,
+          totalTimeLastWeek: 20,
+          exchangesThisWeek: 15,
+          exchangesLastWeek: 10,
+          trend: 'up',
+          subjects: [
+            { subjectId: 'sub-a', name: 'Math', retentionStatus: 'strong' },
+          ],
+          guidedVsImmediateRatio: 0.5,
+          retentionTrend: 'improving',
+          totalSessions: 10,
+          weeklyHeadline: undefined,
+          currentlyWorkingOn: ['Math'],
+          progress: null,
+          currentStreak: 0,
+          longestStreak: 0,
+          totalXp: 0,
+        },
+        {
+          profileId: 'child-b',
+          displayName: 'Liam',
+          consentStatus: null,
+          respondedAt: null,
+          summary: '',
+          sessionsThisWeek: 0,
+          sessionsLastWeek: 0,
+          totalTimeThisWeek: 0,
+          totalTimeLastWeek: 0,
+          exchangesThisWeek: 0,
+          exchangesLastWeek: 0,
+          trend: 'stable',
+          subjects: [],
+          guidedVsImmediateRatio: 0,
+          retentionTrend: 'stable',
+          totalSessions: 0,
+          weeklyHeadline: undefined,
+          currentlyWorkingOn: [],
+          progress: null,
+          currentStreak: 0,
+          longestStreak: 0,
+          totalXp: 0,
+        },
+      ],
+      pendingNotices: [],
+      demoMode: false,
+    };
+
+    render(<ParentHomeScreen activeProfile={makeProfile()} />);
+
+    const emmaPrompt = screen.getByTestId(
+      'parent-home-tonight-child-a-primary',
+    );
+    const liamPrompt = screen.getByTestId(
+      'parent-home-tonight-child-b-primary',
+    );
+    const allPrompts = screen.getAllByTestId(/^parent-home-tonight-/);
+    // Emma (5 sessions) must appear before Liam (0 sessions) regardless of input order
+    expect(allPrompts.indexOf(emmaPrompt)).toBeLessThan(
+      allPrompts.indexOf(liamPrompt),
+    );
   });
 
   it('shows ParentTransitionNotice', async () => {

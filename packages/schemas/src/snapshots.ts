@@ -199,6 +199,12 @@ export const monthlyReportHeadlineSchema = z.object({
 });
 export type MonthlyReportHeadline = z.infer<typeof monthlyReportHeadlineSchema>;
 
+export const reportPracticeSummarySchema = z.object({
+  quizzesCompleted: z.number().int().min(0),
+  reviewsCompleted: z.number().int().min(0),
+});
+export type ReportPracticeSummary = z.infer<typeof reportPracticeSummarySchema>;
+
 export const monthlyReportDataSchema = z.object({
   childName: z.string(),
   month: z.string(),
@@ -208,6 +214,7 @@ export const monthlyReportDataSchema = z.object({
   nextSteps: z.array(z.string()),
   subjects: z.array(subjectMonthlyDetailSchema),
   headlineStat: monthlyReportHeadlineSchema,
+  practiceSummary: reportPracticeSummarySchema.optional(),
 });
 export type MonthlyReportData = z.infer<typeof monthlyReportDataSchema>;
 
@@ -230,6 +237,8 @@ export const monthlyReportSummarySchema = z.object({
   headlineStat: monthlyReportHeadlineSchema,
   highlights: z.array(z.string()).default([]),
   nextSteps: z.array(z.string()).default([]),
+  thisMonth: monthMetricsSchema.optional(),
+  practiceSummary: reportPracticeSummarySchema.optional(),
 });
 export type MonthlyReportSummary = z.infer<typeof monthlyReportSummarySchema>;
 
@@ -256,6 +265,7 @@ export const weeklyReportDataSchema = z.object({
   thisWeek: monthMetricsSchema,
   lastWeek: monthMetricsSchema.nullable(),
   headlineStat: monthlyReportHeadlineSchema,
+  practiceSummary: reportPracticeSummarySchema.optional(),
 });
 export type WeeklyReportData = z.infer<typeof weeklyReportDataSchema>;
 
@@ -276,6 +286,8 @@ export const weeklyReportSummarySchema = z.object({
   viewedAt: z.string().datetime().nullable().optional(),
   createdAt: z.string().datetime(),
   headlineStat: monthlyReportHeadlineSchema,
+  thisWeek: monthMetricsSchema.optional(),
+  practiceSummary: reportPracticeSummarySchema.optional(),
 });
 export type WeeklyReportSummary = z.infer<typeof weeklyReportSummarySchema>;
 

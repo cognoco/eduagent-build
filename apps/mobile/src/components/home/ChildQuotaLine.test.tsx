@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react-native';
 
 import { ChildQuotaLine } from './ChildQuotaLine';
 
-const mockUseUsage = jest.fn();
+const mockUseOverallProgress = jest.fn();
 
 jest.mock(
   'react-i18next',
@@ -10,68 +10,53 @@ jest.mock(
 );
 
 jest.mock(
-  '../../hooks/use-subscription' /* gc1-allow: ChildQuotaLine renders quota data; hook mocked to isolate rendering from network */,
-  () => ({ useUsage: () => mockUseUsage() }),
+  '../../hooks/use-progress' /* gc1-allow: ChildQuotaLine renders progress data; hook mocked to isolate rendering from network */,
+  () => ({ useOverallProgress: () => mockUseOverallProgress() }),
 );
 
-function mockUseChildQuota(
-  data:
-    | {
-        dailyRemainingQuestions: number | null;
-        remainingQuestions: number;
-        monthlyLimit: number | null;
-      }
-    | undefined,
-): void {
-  mockUseUsage.mockReturnValue({ data });
+function mockProgress(totalTopicsCompleted: number | undefined): void {
+  if (totalTopicsCompleted === undefined) {
+    mockUseOverallProgress.mockReturnValue({ data: undefined });
+    return;
+  }
+  mockUseOverallProgress.mockReturnValue({
+    data: { subjects: [], totalTopicsCompleted, totalTopicsVerified: 0 },
+  });
 }
 
-describe('ChildQuotaLine', () => {
+describe('ChildQuotaLine (momentum)', () => {
   beforeEach(() => {
-    mockUseUsage.mockReset();
+    mockUseOverallProgress.mockReset();
   });
 
-  it('shows daily and monthly remaining when both are bounded', () => {
-    mockUseChildQuota({
-      dailyRemainingQuestions: 7,
-      remainingQuestions: 84,
-      monthlyLimit: 100,
-    });
+  it('renders plural copy when several topics completed', () => {
+    mockProgress(7);
 
     render(<ChildQuotaLine />);
 
-    screen.getByText(/7 questions left today.*84 left this month/);
+    screen.getByText(/7 topics learned/);
   });
 
-  it('shows only monthly when daily is unlimited', () => {
-    mockUseChildQuota({
-      dailyRemainingQuestions: null,
-      remainingQuestions: 84,
-      monthlyLimit: 100,
-    });
+  it('renders singular copy when exactly one topic completed', () => {
+    mockProgress(1);
 
     render(<ChildQuotaLine />);
 
-    screen.getByText(/84 questions left this month/);
-    expect(screen.queryByText(/today/)).toBeNull();
+    screen.getByText(/1 topic learned/);
+    expect(screen.queryByText(/topics learned/)).toBeNull();
   });
 
-  it('shows neutral line when no caps apply', () => {
-    mockUseChildQuota({
-      dailyRemainingQuestions: null,
-      remainingQuestions: 0,
-      monthlyLimit: null,
-    });
-
-    render(<ChildQuotaLine />);
-
-    screen.getByText(/Plenty of questions/);
-  });
-
-  it('renders nothing while quota query is loading', () => {
-    mockUseChildQuota(undefined);
+  it('renders nothing when no topics completed yet', () => {
+    mockProgress(0);
     const { queryByTestId } = render(<ChildQuotaLine />);
 
-    expect(queryByTestId('child-quota-line')).toBeNull();
+    expect(queryByTestId('home-momentum-line')).toBeNull();
+  });
+
+  it('renders nothing while progress query is loading', () => {
+    mockProgress(undefined);
+    const { queryByTestId } = render(<ChildQuotaLine />);
+
+    expect(queryByTestId('home-momentum-line')).toBeNull();
   });
 });

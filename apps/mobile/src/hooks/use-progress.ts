@@ -23,8 +23,10 @@ import type {
   WeeklyReportSummary,
 } from '@eduagent/schemas';
 import {
+  childReportDetailResponseSchema,
   childReportsResponseSchema,
   childSessionsResponseSchema,
+  weeklyReportDetailResponseSchema,
   weeklyReportsResponseSchema,
 } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
@@ -729,6 +731,42 @@ export function useChildReportDetail(
   });
 }
 
+export function useProfileReportDetail(
+  reportId: string | undefined,
+): UseQueryResult<MonthlyReportRecord | null> {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+
+  return useQuery({
+    queryKey: ['progress', 'profile', activeProfile?.id, 'report', reportId],
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const reportsClient = (
+          client.progress.reports as unknown as {
+            ':reportId': {
+              $get: (
+                args: { param: { reportId: string } },
+                options?: { init?: RequestInit },
+              ) => Promise<Response>;
+            };
+          }
+        )[':reportId'];
+        const res = await reportsClient.$get(
+          { param: { reportId: reportId ?? '' } },
+          { init: { signal } },
+        );
+        await assertOk(res);
+        const data = childReportDetailResponseSchema.parse(await res.json());
+        return data.report;
+      } finally {
+        cleanup();
+      }
+    },
+    enabled: !!activeProfile && !!reportId,
+  });
+}
+
 export function useMarkChildReportViewed(): UseMutationResult<
   { viewed: boolean },
   Error,
@@ -853,6 +891,48 @@ export function useChildWeeklyReportDetail(
   });
 }
 
+export function useProfileWeeklyReportDetail(
+  reportId: string | undefined,
+): UseQueryResult<WeeklyReportRecord | null> {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+
+  return useQuery({
+    queryKey: [
+      'progress',
+      'profile',
+      activeProfile?.id,
+      'weekly-report',
+      reportId,
+    ],
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const weeklyReportsClient = (
+          client.progress['weekly-reports'] as unknown as {
+            ':weeklyReportId': {
+              $get: (
+                args: { param: { weeklyReportId: string } },
+                options?: { init?: RequestInit },
+              ) => Promise<Response>;
+            };
+          }
+        )[':weeklyReportId'];
+        const res = await weeklyReportsClient.$get(
+          { param: { weeklyReportId: reportId ?? '' } },
+          { init: { signal } },
+        );
+        await assertOk(res);
+        const data = weeklyReportDetailResponseSchema.parse(await res.json());
+        return data.report;
+      } finally {
+        cleanup();
+      }
+    },
+    enabled: !!activeProfile && !!reportId,
+  });
+}
+
 export function useMarkWeeklyReportViewed(): UseMutationResult<
   { viewed: boolean },
   Error,
@@ -887,6 +967,102 @@ export function useMarkWeeklyReportViewed(): UseMutationResult<
           'dashboard',
           'child',
           variables.childProfileId,
+          'weekly-report',
+          variables.reportId,
+        ],
+      });
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Self-view Mark-Viewed [I-8]
+// ---------------------------------------------------------------------------
+
+export function useMarkProfileReportViewed(): UseMutationResult<
+  { viewed: boolean },
+  Error,
+  { reportId: string }
+> {
+  const client = useApiClient();
+  const queryClient = useQueryClient();
+  const { activeProfile } = useProfile();
+
+  return useMutation({
+    retry: 0,
+    mutationFn: async ({ reportId }) => {
+      const reportsClient = (
+        client.progress.reports as unknown as {
+          ':reportId': {
+            view: {
+              $post: (args: {
+                param: { reportId: string };
+              }) => Promise<Response>;
+            };
+          };
+        }
+      )[':reportId'];
+      const res = await reportsClient.view.$post({
+        param: { reportId },
+      });
+      await assertOk(res);
+      return (await res.json()) as { viewed: boolean };
+    },
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({
+        queryKey: ['progress', 'profile', activeProfile?.id, 'reports'],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: [
+          'progress',
+          'profile',
+          activeProfile?.id,
+          'report',
+          variables.reportId,
+        ],
+      });
+    },
+  });
+}
+
+export function useMarkProfileWeeklyReportViewed(): UseMutationResult<
+  { viewed: boolean },
+  Error,
+  { reportId: string }
+> {
+  const client = useApiClient();
+  const queryClient = useQueryClient();
+  const { activeProfile } = useProfile();
+
+  return useMutation({
+    retry: 0,
+    mutationFn: async ({ reportId }) => {
+      const weeklyReportsClient = (
+        client.progress['weekly-reports'] as unknown as {
+          ':weeklyReportId': {
+            view: {
+              $post: (args: {
+                param: { weeklyReportId: string };
+              }) => Promise<Response>;
+            };
+          };
+        }
+      )[':weeklyReportId'];
+      const res = await weeklyReportsClient.view.$post({
+        param: { weeklyReportId: reportId },
+      });
+      await assertOk(res);
+      return (await res.json()) as { viewed: boolean };
+    },
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({
+        queryKey: ['progress', 'profile', activeProfile?.id, 'weekly-reports'],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: [
+          'progress',
+          'profile',
+          activeProfile?.id,
           'weekly-report',
           variables.reportId,
         ],

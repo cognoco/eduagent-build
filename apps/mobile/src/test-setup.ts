@@ -315,6 +315,18 @@ if (typeof global.structuredClone === 'undefined') {
   global.structuredClone = (object) => JSON.parse(JSON.stringify(object));
 }
 
+// Restore Node's native FormData before each test. Cross-test pollution in the
+// same jest worker can corrupt global.FormData (e.g., RN's FormData whose
+// _parts.push crashes). jest.polyfills.js saves the original on __nodeFormData.
+const _savedFormData = (global as Record<string, unknown>).__nodeFormData as
+  | typeof FormData
+  | undefined;
+if (_savedFormData) {
+  beforeEach(() => {
+    global.FormData = _savedFormData;
+  });
+}
+
 // Force TanStack Query to notify synchronously in tests.
 // The default scheduler uses setTimeout(cb, 0) which causes React state updates
 // to fire after act() boundaries, triggering "not wrapped in act()" warnings.

@@ -57,12 +57,17 @@ if (typeof globalThis.structuredClone === 'function') {
 // call is a no-op, leaving Node.js's built-in FormData in place. Node's FormData
 // converts plain objects via toString() without crashing; the fetch body content
 // is irrelevant since tests use mockFetch.
+//
+// writable stays true so test-setup.ts can restore FormData if cross-test
+// pollution corrupts it. configurable: false is sufficient to block RN's
+// polyfillObjectProperty (it checks configurable before redefining).
 if (typeof globalThis.FormData === 'function') {
   const nativeFormData = globalThis.FormData;
+  global.__nodeFormData = nativeFormData;
   Object.defineProperty(global, 'FormData', {
     value: nativeFormData,
     configurable: false,
-    writable: false,
+    writable: true,
     enumerable: false,
   });
 }

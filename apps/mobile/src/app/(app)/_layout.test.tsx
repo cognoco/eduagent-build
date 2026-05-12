@@ -92,6 +92,10 @@ jest.mock('expo-speech-recognition', () => ({
 jest.mock('../../lib/profile', () => ({
   useProfile: () => mockUseProfile(),
   personaFromBirthYear: () => 'learner',
+  isGuardianProfile: (
+    profile: { isOwner: boolean } | null | undefined,
+    profiles: ReadonlyArray<{ isOwner: boolean }>,
+  ) => profile?.isOwner === true && profiles.some((p) => !p.isOwner),
 }));
 
 // use-consent uses useApiClient — mocked at the fetch boundary via mockFetch.
@@ -141,7 +145,7 @@ jest.mock('../../components/feedback/FeedbackProvider', () => ({
 // Route: GET /subjects → { subjects: [] }
 
 const AppLayout = require('./_layout').default;
-const { computeVisibleTabs } = require('./_layout');
+const { computeVisibleTabs, resolveTabShape } = require('./_layout');
 
 describe('AppLayout', () => {
   let testQueryClient: QueryClient;
@@ -260,11 +264,19 @@ describe('AppLayout', () => {
     jest.useRealTimers();
   });
 
-  it('keeps linked-parent accounts in the learner tab shell for adaptive home', () => {
+  it('renders guardian tab shell for accounts with linked children', () => {
     renderLayout();
 
     screen.getByTestId('tabs');
     expect(screen.queryByTestId('redirect')).toBeNull();
+
+    const shape = resolveTabShape({
+      activeProfile: { isOwner: true },
+      profiles: [{ isOwner: true }, { isOwner: false }],
+      isParentProxy: false,
+    });
+    expect(shape).toBe('guardian');
+    expect(computeVisibleTabs(shape).has('own-learning')).toBe(true);
   });
 
   // [BUG-923] AUTH-DEBUG must log only on auth state transitions, not on
@@ -666,16 +678,73 @@ describe('AppLayout', () => {
 });
 
 describe('computeVisibleTabs', () => {
-  it('returns exactly the base visible tabs', () => {
-    const tabs = computeVisibleTabs();
+  it('returns all 5 tabs for guardian shape', () => {
+    const tabs = computeVisibleTabs('guardian');
     expect(tabs).toEqual(
       new Set(['home', 'own-learning', 'library', 'progress', 'more']),
     );
   });
 
-  it('does not include family tab', () => {
-    const tabs = computeVisibleTabs();
-    expect(tabs.has('family')).toBe(false);
+  it('defaults to guardian shape', () => {
+    expect(computeVisibleTabs()).toEqual(computeVisibleTabs('guardian'));
+  });
+
+  it('returns 4 tabs for learner shape (no own-learning)', () => {
+    const tabs = computeVisibleTabs('learner');
+    expect(tabs).toEqual(new Set(['home', 'library', 'progress', 'more']));
+    expect(tabs.has('own-learning')).toBe(false);
+  });
+});
+
+describe('resolveTabShape', () => {
+  it('returns learner for a solo owner with no linked profiles', () => {
+    expect(
+      resolveTabShape({
+        activeProfile: { isOwner: true },
+        profiles: [{ isOwner: true }],
+        isParentProxy: false,
+      }),
+    ).toBe('learner');
+  });
+
+  it('returns learner for a child on a parent account', () => {
+    expect(
+      resolveTabShape({
+        activeProfile: { isOwner: false },
+        profiles: [{ isOwner: true }, { isOwner: false }],
+        isParentProxy: false,
+      }),
+    ).toBe('learner');
+  });
+
+  it('returns guardian for an owner with linked children', () => {
+    expect(
+      resolveTabShape({
+        activeProfile: { isOwner: true },
+        profiles: [{ isOwner: true }, { isOwner: false }],
+        isParentProxy: false,
+      }),
+    ).toBe('guardian');
+  });
+
+  it('returns learner during proxy sessions', () => {
+    expect(
+      resolveTabShape({
+        activeProfile: { isOwner: false },
+        profiles: [{ isOwner: true }, { isOwner: false }],
+        isParentProxy: true,
+      }),
+    ).toBe('learner');
+  });
+
+  it('returns guardian when activeProfile is null', () => {
+    expect(
+      resolveTabShape({
+        activeProfile: null,
+        profiles: [],
+        isParentProxy: false,
+      }),
+    ).toBe('guardian');
   });
 });
 

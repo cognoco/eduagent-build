@@ -72,10 +72,24 @@ export async function generateCategorizedBookSuggestions(
     const lockResult = await tx.execute(
       sql`SELECT pg_try_advisory_xact_lock(hashtextextended(${lockKey}, 0)) AS got`,
     );
+    // Drizzle's tx.execute() return shape is driver-dependent and not part of
+    // its stable surface: neon-serverless (current prod via WebSocket Pool)
+    // returns { rows: [...] }, while some other adapters return the rows
+    // array directly. If a future Drizzle upgrade changes the shape to neither,
+    // an undetected mismatch would silently default `got` to false and the
+    // generator would route every call to 'lock_loser' with no error. Verified
+    // against drizzle-orm@neon-serverless as of 2026-05-11.
     const rows =
       (lockResult as unknown as { rows?: Array<{ got: boolean }> }).rows ??
       (lockResult as unknown as Array<{ got: boolean }>);
-    const got = Array.isArray(rows) ? rows[0]?.got : false;
+    if (!Array.isArray(rows) || typeof rows[0]?.got !== 'boolean') {
+      throw new Error(
+        'pg_try_advisory_xact_lock returned an unexpected Drizzle result shape — ' +
+          'driver may have been upgraded. Inspect the shape and update the cast in ' +
+          'book-suggestion-generation.ts.',
+      );
+    }
+    const got = rows[0].got;
     if (!got) {
       emitFailureMetric(profileId, subjectId, 'lock_loser');
       return 'lock_loser';

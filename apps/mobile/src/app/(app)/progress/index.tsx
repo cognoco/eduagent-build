@@ -33,13 +33,15 @@ import {
   useProgressHistory,
   useProgressInventory,
   useProgressMilestones,
+  useProfileReports,
   useProfileSessions,
+  useProfileWeeklyReports,
   useRefreshProgressSnapshot,
 } from '../../../hooks/use-progress';
 import { pushLearningResumeTarget } from '../../../lib/navigation';
 import { copyRegisterFor, type CopyRegister } from '../../../lib/copy-register';
 import { useLinkedChildren, useProfile } from '../../../lib/profile';
-import { isProfileStale } from '../../../lib/progress';
+import { buildGrowthData, isProfileStale } from '../../../lib/progress';
 import { bucketAccountAge, hashProfileId, track } from '../../../lib/analytics';
 
 function heroCopy(
@@ -118,43 +120,6 @@ function heroCopy(
       words: vocabularyTotal,
     }),
   };
-}
-
-function formatWeekLabel(iso: string): string {
-  const date = new Date(`${iso}T00:00:00Z`);
-  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-}
-
-function buildGrowthData(
-  history:
-    | {
-        dataPoints: Array<{
-          date: string;
-          topicsMastered: number;
-          vocabularyTotal: number;
-        }>;
-      }
-    | undefined,
-) {
-  const points = history?.dataPoints ?? [];
-
-  return points.slice(-8).map((point, index) => {
-    const previous = points[index - 1];
-    return {
-      label: formatWeekLabel(point.date),
-      value: Math.max(
-        0,
-        point.topicsMastered - (previous?.topicsMastered ?? 0),
-      ),
-      secondaryValue:
-        point.vocabularyTotal > 0
-          ? Math.max(
-              0,
-              point.vocabularyTotal - (previous?.vocabularyTotal ?? 0),
-            )
-          : undefined,
-    };
-  });
 }
 
 const MILESTONE_THRESHOLDS = [1, 3, 5, 10, 25, 50, 100];
@@ -242,6 +207,12 @@ export default function ProgressScreen(): React.ReactElement {
   const profileSessionsQuery = useProfileSessions(
     selectedProfileId || activeProfile?.id,
   );
+  const monthlyReportsQuery = useProfileReports(
+    selectedProfileId || activeProfile?.id,
+  );
+  const weeklyReportsQuery = useProfileWeeklyReports(
+    selectedProfileId || activeProfile?.id,
+  );
   const resumeTargetQuery = useLearningResumeTarget();
   const milestonesQuery = useProgressMilestones(5);
   const refreshSnapshot = useRefreshProgressSnapshot();
@@ -276,6 +247,8 @@ export default function ProgressScreen(): React.ReactElement {
     await Promise.all([
       inventoryQuery.refetch(),
       historyQuery.refetch(),
+      monthlyReportsQuery.refetch(),
+      weeklyReportsQuery.refetch(),
       ...(isViewingSelf ? [milestonesQuery.refetch()] : []),
     ]);
   };
@@ -299,6 +272,9 @@ export default function ProgressScreen(): React.ReactElement {
     !!inventory &&
     inventory.global.totalSessions === 0 &&
     inventory.subjects.length === 0;
+  const hasAnyReports =
+    (monthlyReportsQuery.data?.length ?? 0) > 0 ||
+    (weeklyReportsQuery.data?.length ?? 0) > 0;
   const sessionCount =
     profileSessionsQuery.data?.length ?? inventory?.global.totalSessions ?? 0;
   const lastSessionAt =
@@ -312,6 +288,10 @@ export default function ProgressScreen(): React.ReactElement {
     !!inventory &&
     !profileSessionsQuery.isLoading &&
     isProfileStale({ sessionCount, lastSessionAt });
+  // TODO: D-RP-5 Phase 2 — add 'ineligible' once API provides the discriminator.
+  // Until then, no-reports-yet and truly-ineligible both collapse to 'awaiting'.
+  const progressSurfaceState: 'empty' | 'awaiting' | 'ready' =
+    isEmpty || isStale ? 'empty' : hasAnyReports ? 'ready' : 'awaiting';
 
   const hasLanguageSubject = inventory?.subjects?.some(
     (s) => s.pedagogyMode === 'four_strands',
@@ -362,9 +342,9 @@ export default function ProgressScreen(): React.ReactElement {
           <ErrorFallback
             title={t('progress.error.loadTitle')}
             message={
-              inventoryQuery.error?.message?.includes('API error')
-                ? t('progress.error.loadMessageServer')
-                : t('progress.error.loadMessageNetwork')
+              classifyApiError(inventoryQuery.error).category === 'network'
+                ? t('progress.error.loadMessageNetwork')
+                : t('progress.error.loadMessageServer')
             }
             primaryAction={{
               label: t('common.tryAgain'),
@@ -378,7 +358,7 @@ export default function ProgressScreen(): React.ReactElement {
             }}
             testID="progress-error-state"
           />
-        ) : isEmpty || isStale ? (
+        ) : progressSurfaceState === 'empty' ? (
           <View className="bg-coaching-card rounded-card p-5">
             <Text className="text-h3 font-semibold text-text-primary">
               {t('progress.empty.title')}
@@ -446,9 +426,7 @@ export default function ProgressScreen(): React.ReactElement {
                       })}
                     </Text>
                   </View>
-                  {/* [F-012] Show vocabulary pill for language subjects only.
-                      Gate by pedagogyMode so non-language users don't see
-                      a misleading "Vocabulary →" link. */}
+                  {/* [F-012] Show vocabulary pill for language subjects only. */}
                   {hasLanguageSubject ? (
                     <Pressable
                       onPress={() =>
@@ -494,14 +472,6 @@ export default function ProgressScreen(): React.ReactElement {
               ) : null}
             </View>
 
-            {inventory?.currentlyWorkingOn?.length ? (
-              <CurrentlyWorkingOnCard
-                items={inventory.currentlyWorkingOn}
-                register={register}
-                testID="progress-currently-working-on"
-              />
-            ) : null}
-
             {selectedProfileId ? (
               <>
                 <TrackedView
@@ -544,6 +514,22 @@ export default function ProgressScreen(): React.ReactElement {
                   />
                 </TrackedView>
               </>
+            ) : null}
+
+            {selectedProfileId && progressSurfaceState === 'ready' ? (
+              <ReportsListCard
+                profileId={selectedProfileId}
+                interactive
+                selfView={isViewingSelf}
+              />
+            ) : null}
+
+            {inventory?.currentlyWorkingOn?.length ? (
+              <CurrentlyWorkingOnCard
+                items={inventory.currentlyWorkingOn}
+                register={register}
+                testID="progress-currently-working-on"
+              />
             ) : null}
 
             <View className="mt-6">
@@ -647,10 +633,6 @@ export default function ProgressScreen(): React.ReactElement {
                   />
                 </Pressable>
               </>
-            ) : null}
-
-            {selectedProfileId ? (
-              <ReportsListCard profileId={selectedProfileId} />
             ) : null}
 
             {isViewingSelf ? (

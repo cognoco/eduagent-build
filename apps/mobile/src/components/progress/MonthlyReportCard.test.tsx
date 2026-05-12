@@ -13,7 +13,10 @@ jest.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, opts?: Record<string, unknown>) => {
       if (key === 'progress.monthlyReport.highlightsTitle') return 'Highlights';
-      if (key === 'progress.monthlyReport.nextStepsTitle') return "What's next";
+      if (key === 'progress.monthlyReport.nextStepTitle') return 'Next step';
+      if (key === 'progress.monthlyReport.bars.sessions') return 'Sessions';
+      if (key === 'progress.monthlyReport.bars.time') return 'Time';
+      if (key === 'progress.monthlyReport.bars.topics') return 'Topics';
       if (key === 'progress.monthlyReport.empty.child')
         return `Your first monthly summary lands at the end of ${opts?.month}.`;
       if (key === 'progress.monthlyReport.empty.adult')
@@ -36,7 +39,7 @@ describe('MonthlyReportCard', () => {
     jest.clearAllMocks();
   });
 
-  it('renders highlights and next steps from the latest report', () => {
+  it('renders headline, bar block, highlights, and one next step from the latest report', () => {
     mockReports([
       {
         id: 'report-1',
@@ -50,6 +53,14 @@ describe('MonthlyReportCard', () => {
         },
         highlights: ['Solved fraction problems', 'Kept a steady rhythm'],
         nextSteps: ['Review decimals'],
+        thisMonth: {
+          totalSessions: 4,
+          totalActiveMinutes: 80,
+          topicsMastered: 2,
+          topicsExplored: 3,
+          vocabularyTotal: 0,
+          streakBest: 5,
+        },
       },
     ]);
 
@@ -59,11 +70,12 @@ describe('MonthlyReportCard', () => {
     screen.getByText('Highlights');
     screen.getByText('Solved fraction problems');
     screen.getByText('Kept a steady rhythm');
-    screen.getByText("What's next");
+    screen.getByTestId('monthly-bars');
+    screen.getByText('Next step');
     screen.getByText('Review decimals');
   });
 
-  it('caps highlights and next steps defensively', () => {
+  it('caps highlights and renders only one next step defensively', () => {
     mockReports([
       {
         id: 'report-1',
@@ -86,7 +98,7 @@ describe('MonthlyReportCard', () => {
     screen.getByText('Three');
     expect(screen.queryByText('Four')).toBeNull();
     screen.getByText('A');
-    screen.getByText('B');
+    expect(screen.queryByText('B')).toBeNull();
     expect(screen.queryByText('C')).toBeNull();
   });
 
@@ -110,7 +122,7 @@ describe('MonthlyReportCard', () => {
     render(<MonthlyReportCard profileId="profile-1" />);
 
     expect(screen.queryByText('Highlights')).toBeNull();
-    expect(screen.queryByText("What's next")).toBeNull();
+    expect(screen.queryByText('Next step')).toBeNull();
   });
 
   it('uses register-aware empty copy when no latest report exists', () => {

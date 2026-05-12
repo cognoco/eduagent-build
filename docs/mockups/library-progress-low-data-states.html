@@ -1,0 +1,676 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Progress Low-Data State</title>
+    <style>
+      :root {
+        --background: #faf5ee;
+        --surface: #ffffff;
+        --surface-elevated: #f3ede4;
+        --text-primary: #1a1a1a;
+        --text-secondary: #525252;
+        --primary: #0d9488;
+        --primary-soft: rgba(13, 148, 136, 0.1);
+        --border: #e8e0d4;
+        --warning: #a16207;
+        --amber-soft: rgba(180, 83, 9, 0.14);
+        --purple: #7c3aed;
+        --purple-soft: rgba(124, 58, 237, 0.14);
+        --blue: #2563eb;
+        --blue-soft: rgba(37, 99, 235, 0.14);
+        --shadow: 0 24px 70px rgba(26, 26, 26, 0.14);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: #eee6db;
+        color: var(--text-primary);
+        font-family:
+          Inter,
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+      }
+
+      .canvas {
+        display: flex;
+        gap: 28px;
+        align-items: flex-start;
+        justify-content: center;
+        padding: 40px 24px;
+        flex-wrap: wrap;
+      }
+
+      .phone {
+        width: 390px;
+        min-height: 844px;
+        border-radius: 34px;
+        background: var(--background);
+        box-shadow: var(--shadow);
+        overflow: hidden;
+        border: 10px solid #111;
+        position: relative;
+      }
+
+      .screen {
+        min-height: 824px;
+        padding: 24px 20px 88px;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: 32px;
+        line-height: 1.05;
+        letter-spacing: 0;
+      }
+
+      h2 {
+        font-size: 18px;
+        line-height: 1.2;
+        letter-spacing: 0;
+      }
+
+      h3 {
+        font-size: 15px;
+        line-height: 1.2;
+        letter-spacing: 0;
+      }
+
+      p {
+        color: var(--text-secondary);
+        font-size: 14px;
+        line-height: 1.45;
+      }
+
+      .subtitle {
+        margin-top: 6px;
+      }
+
+      .profile-pills {
+        display: flex;
+        gap: 12px;
+        margin-top: 22px;
+      }
+
+      .pill {
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        background: var(--surface);
+        color: var(--text-primary);
+        padding: 13px 22px;
+        font-size: 15px;
+        font-weight: 800;
+      }
+
+      .pill.active {
+        border-color: var(--primary);
+        background: var(--primary);
+        color: #fafafa;
+      }
+
+      .section {
+        margin-top: 18px;
+      }
+
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 16px;
+      }
+
+      .warm-card {
+        background: var(--surface-elevated);
+        border-radius: 16px;
+        padding: 18px;
+      }
+
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .icon {
+        width: 42px;
+        height: 42px;
+        border-radius: 13px;
+        display: grid;
+        place-items: center;
+        font-weight: 800;
+        color: var(--primary);
+        background: var(--primary-soft);
+        flex: 0 0 auto;
+      }
+
+      .icon.purple {
+        color: var(--purple);
+        background: var(--purple-soft);
+      }
+
+      .icon.amber {
+        color: #b45309;
+        background: var(--amber-soft);
+      }
+
+      .icon.blue {
+        color: var(--blue);
+        background: var(--blue-soft);
+      }
+
+      .row-main {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .chevron {
+        color: var(--text-secondary);
+        font-weight: 800;
+      }
+
+      .chip-row {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 13px;
+      }
+
+      .chip {
+        border-radius: 999px;
+        background: var(--background);
+        color: var(--text-primary);
+        padding: 7px 10px;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .eyebrow {
+        color: var(--primary);
+        font-size: 12px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0;
+        margin-bottom: 8px;
+      }
+
+      .action {
+        width: 100%;
+        border: 0;
+        border-radius: 12px;
+        background: var(--primary);
+        color: #fafafa;
+        min-height: 46px;
+        margin-top: 14px;
+        font-weight: 800;
+        font-size: 15px;
+      }
+
+      .progress-hero {
+        background: var(--surface-elevated);
+        border-radius: 16px;
+        padding: 20px;
+        margin-top: 18px;
+      }
+
+      .hero-title {
+        font-size: 25px;
+        line-height: 1.12;
+        font-weight: 800;
+        letter-spacing: 0;
+      }
+
+      .report-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 18px;
+        margin-top: 18px;
+      }
+
+      .report-shell {
+        background: var(--background);
+        border-radius: 16px;
+        padding: 16px;
+        margin-top: 14px;
+      }
+
+      .report-stat {
+        font-size: 23px;
+        line-height: 1.16;
+        font-weight: 800;
+        margin-top: 8px;
+      }
+
+      .report-note {
+        color: var(--text-secondary);
+        font-size: 14px;
+        line-height: 1.45;
+        margin-top: 5px;
+      }
+
+      .badge-row {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 14px;
+      }
+
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border-radius: 999px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        padding: 8px 10px;
+        color: var(--text-primary);
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .bar-list {
+        display: grid;
+        gap: 10px;
+        margin-top: 14px;
+      }
+
+      .bar-row {
+        display: grid;
+        grid-template-columns: 82px 1fr 44px;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .bar-label,
+      .bar-value {
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .bar-value {
+        text-align: right;
+      }
+
+      .bar-track {
+        height: 8px;
+        border-radius: 999px;
+        background: #e8e0d4;
+        overflow: hidden;
+      }
+
+      .bar-fill {
+        display: block;
+        height: 100%;
+        border-radius: inherit;
+        background: var(--primary);
+      }
+
+      .practice-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+        margin-top: 12px;
+      }
+
+      .practice-tile {
+        border-radius: 14px;
+        background: var(--surface);
+        padding: 12px;
+      }
+
+      .practice-tile strong {
+        display: block;
+        font-size: 20px;
+      }
+
+      .practice-tile span {
+        color: var(--text-secondary);
+        display: block;
+        font-size: 12px;
+        margin-top: 3px;
+      }
+
+      .mini-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 9px;
+        margin-top: 14px;
+      }
+
+      .mini-stat {
+        border-radius: 14px;
+        background: var(--background);
+        padding: 11px 8px;
+      }
+
+      .mini-stat strong {
+        display: block;
+        font-size: 18px;
+      }
+
+      .mini-stat span {
+        color: var(--text-secondary);
+        font-size: 11px;
+        line-height: 1.2;
+      }
+
+      .preview {
+        display: grid;
+        gap: 11px;
+      }
+
+      .preview-line {
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+      }
+
+      .dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 999px;
+        margin-top: 7px;
+        background: var(--primary);
+        flex: 0 0 auto;
+      }
+
+      .soft-divider {
+        height: 1px;
+        background: var(--border);
+        margin: 14px 0;
+      }
+
+      .link-row {
+        color: var(--primary);
+        font-size: 15px;
+        font-weight: 800;
+        margin-top: 14px;
+      }
+
+      .report-list {
+        display: grid;
+        gap: 10px;
+        margin-top: 14px;
+      }
+
+      .report-list-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        border-radius: 14px;
+        background: var(--background);
+        padding: 13px 14px;
+      }
+
+      .report-list-item strong {
+        display: block;
+        font-size: 14px;
+      }
+
+      .report-list-item span {
+        display: block;
+        color: var(--text-secondary);
+        font-size: 12px;
+        margin-top: 3px;
+      }
+
+      .tabbar {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 72px;
+        background: var(--surface);
+        border-top: 1px solid var(--border);
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        align-items: center;
+        padding-bottom: 8px;
+      }
+
+      .tab {
+        display: grid;
+        place-items: center;
+        gap: 3px;
+        color: var(--text-secondary);
+        font-size: 11px;
+        font-weight: 700;
+      }
+
+      .tab strong {
+        color: var(--primary);
+      }
+
+      .tab-icon {
+        width: 20px;
+        height: 20px;
+        border-radius: 7px;
+        border: 2px solid currentColor;
+      }
+
+      .tab.active {
+        color: var(--primary);
+      }
+
+      @media (max-width: 860px) {
+        .canvas {
+          padding: 20px 12px;
+        }
+
+        .phone {
+          width: min(390px, 100%);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="canvas">
+      <section class="phone" aria-label="Progress low-data mockup">
+        <div class="screen">
+          <div>
+            <h1>My Learning Journey</h1>
+            <p class="subtitle">Reports and signals from your recent learning.</p>
+          </div>
+
+          <div class="profile-pills">
+            <button class="pill">TestKid</button>
+            <button class="pill active">Mine</button>
+          </div>
+
+          <div class="progress-hero">
+            <p class="eyebrow">Learning rhythm</p>
+            <div class="hero-title">28 sessions completed</div>
+            <p class="subtitle">
+              You have built a steady rhythm. The reports below turn that work
+              into a clearer story.
+            </p>
+            <div class="mini-grid">
+              <div class="mini-stat">
+                <strong>31h</strong>
+                <span>47m spent</span>
+              </div>
+              <div class="mini-stat">
+                <strong>8</strong>
+                <span>day streak</span>
+              </div>
+              <div class="mini-stat">
+                <strong>2</strong>
+                <span>this week</span>
+              </div>
+            </div>
+            <div class="badge-row">
+              <span class="badge">8-day streak</span>
+              <span class="badge">3 stars earned</span>
+            </div>
+          </div>
+
+          <div class="report-card">
+            <h2>Weekly report</h2>
+            <div class="report-shell">
+              <p class="eyebrow">Week of May 4</p>
+              <div class="report-stat">2 sessions this week</div>
+              <p class="report-note">
+                A quieter but active week. You kept the streak alive and added
+                another Italian practice block.
+              </p>
+              <div class="chip-row">
+                <span class="chip">1h 12m Italian</span>
+                <span class="chip">1 topic started</span>
+                <span class="chip">8-day streak</span>
+              </div>
+              <div class="soft-divider"></div>
+              <h3>Practice highlights</h3>
+              <div class="practice-grid">
+                <div class="practice-tile">
+                  <strong>3</strong>
+                  <span>quizzes completed</span>
+                </div>
+                <div class="practice-tile">
+                  <strong>5</strong>
+                  <span>reviews finished</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="report-card">
+            <h2>Monthly report</h2>
+            <div class="report-shell">
+              <p class="eyebrow">May 2026</p>
+              <div class="report-stat">28 sessions completed</div>
+              <p class="report-note">
+                Most of this month has gone into building consistency and
+                getting Italian started.
+              </p>
+              <div class="bar-list">
+                <div class="bar-row">
+                  <span class="bar-label">Sessions</span>
+                  <span class="bar-track"><span class="bar-fill" style="width: 88%"></span></span>
+                  <span class="bar-value">28</span>
+                </div>
+                <div class="bar-row">
+                  <span class="bar-label">Time</span>
+                  <span class="bar-track"><span class="bar-fill" style="width: 72%"></span></span>
+                  <span class="bar-value">31h</span>
+                </div>
+                <div class="bar-row">
+                  <span class="bar-label">Quizzes</span>
+                  <span class="bar-track"><span class="bar-fill" style="width: 42%"></span></span>
+                  <span class="bar-value">3</span>
+                </div>
+                <div class="bar-row">
+                  <span class="bar-label">Reviews</span>
+                  <span class="bar-track"><span class="bar-fill" style="width: 58%"></span></span>
+                  <span class="bar-value">5</span>
+                </div>
+              </div>
+              <div class="soft-divider"></div>
+              <h3>Highlights</h3>
+              <div class="preview">
+                <div class="preview-line">
+                  <span class="dot"></span>
+                  <p>Kept learning across an 8-day streak.</p>
+                </div>
+                <div class="preview-line">
+                  <span class="dot"></span>
+                  <p>Started Italian Beginner 1 and opened the first topic.</p>
+                </div>
+                <div class="preview-line">
+                  <span class="dot"></span>
+                  <p>Spent 31h 47m in learning sessions overall.</p>
+                </div>
+              </div>
+              <div class="soft-divider"></div>
+              <h3>What's next</h3>
+              <div class="preview">
+                <div class="preview-line">
+                  <span class="dot"></span>
+                  <p>Choose the next Italian topic and keep the first shelf moving.</p>
+                </div>
+                <div class="preview-line">
+                  <span class="dot"></span>
+                  <p>Do one short session this week so the next report has more signal.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="report-card">
+            <div class="row">
+              <div class="row-main">
+                <h2>Previous reports</h2>
+                <p class="subtitle">A short history of what changed over time.</p>
+              </div>
+              <div class="chevron">&gt;</div>
+            </div>
+            <div class="report-list">
+              <div class="report-list-item">
+                <div>
+                  <strong>April monthly report</strong>
+                  <span>12 sessions completed</span>
+                </div>
+                <div class="chevron">&gt;</div>
+              </div>
+              <div class="report-list-item">
+                <div>
+                  <strong>Week of Apr 28</strong>
+                  <span>4 sessions this week</span>
+                </div>
+                <div class="chevron">&gt;</div>
+              </div>
+            </div>
+            <div class="link-row">View all reports -&gt;</div>
+          </div>
+
+          <div class="section warm-card">
+            <div class="eyebrow">Next up</div>
+            <h2>Italian Beginner 1</h2>
+            <p class="subtitle">
+              0 of 10 planned topics mastered. 1 topic started, 9 not started.
+            </p>
+            <button class="action">Choose next</button>
+            <div class="link-row">View Italian progress -&gt;</div>
+          </div>
+
+          <div class="section card">
+            <div class="row">
+              <div class="icon blue">R</div>
+              <div class="row-main">
+                <h2>Recent sessions</h2>
+                <p>Italian practice, vocabulary, and guided learning.</p>
+              </div>
+              <div class="chevron">&gt;</div>
+            </div>
+          </div>
+        </div>
+
+        <nav class="tabbar" aria-label="Progress tabs">
+          <div class="tab"><span class="tab-icon"></span><span>Home</span></div>
+          <div class="tab"><span class="tab-icon"></span><span>My Learni...</span></div>
+          <div class="tab"><span class="tab-icon"></span><span>Library</span></div>
+          <div class="tab active">
+            <span class="tab-icon"></span><strong>Progress</strong>
+          </div>
+          <div class="tab"><span class="tab-icon"></span><span>More</span></div>
+        </nav>
+      </section>
+    </main>
+  </body>
+</html>

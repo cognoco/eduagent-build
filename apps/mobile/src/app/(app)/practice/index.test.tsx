@@ -1,24 +1,49 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 
+jest.mock(
+  'react-i18next',
+  () => require('../../../test-utils/mock-i18n').i18nMock,
+);
+
 const mockPush = jest.fn();
 const mockGoBackOrReplace = jest.fn();
 const mockUseReviewSummary = jest.fn();
 const mockUseQuizStats = jest.fn();
+const mockUseAssessmentEligibleTopics = jest.fn();
+const mockUseParentProxy = jest.fn();
 let mockSearchParams: Record<string, string> = {};
 
-jest.mock('expo-router', () => ({
-  useRouter: () => ({ push: mockPush }),
-  useLocalSearchParams: () => mockSearchParams,
-}));
+jest.mock('expo-router', () => {
+  const { Text } = require('react-native');
+  return {
+    useRouter: () => ({ push: mockPush }),
+    useLocalSearchParams: () => mockSearchParams,
+    Redirect: ({ href }: { href: string }) => (
+      <Text testID="redirect">{href}</Text>
+    ),
+  };
+});
+
+jest.mock(
+  '../../../hooks/use-parent-proxy' /* gc1-allow: grandfathered pattern, used in mentor-memory/relearn/session-summary */,
+  () => ({
+    useParentProxy: () => mockUseParentProxy(),
+  }),
+);
 
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
 jest.mock('../../../lib/theme', () => ({
+  useTheme: () => ({ colorScheme: 'light' }),
   useThemeColors: () => ({
     textPrimary: '#ffffff',
+    textSecondary: '#a0a0a0',
     primary: '#00b4d8',
+    border: '#303030',
+    surface: '#1e1e1e',
+    background: '#faf5ef',
   }),
 }));
 
@@ -37,7 +62,7 @@ jest.mock('../../../hooks/use-quiz', () => ({
 }));
 
 jest.mock('../../../hooks/use-assessments', () => ({
-  useAssessmentEligibleTopics: () => ({ data: [], isError: false }),
+  useAssessmentEligibleTopics: () => mockUseAssessmentEligibleTopics(),
 }));
 
 const PracticeScreen = require('./index').default;
@@ -46,6 +71,7 @@ describe('PracticeScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockSearchParams = {};
+    mockUseParentProxy.mockReturnValue({ isParentProxy: false });
     jest
       .spyOn(Date, 'now')
       .mockReturnValue(new Date('2026-04-18T12:00:00.000Z').getTime());
@@ -63,6 +89,17 @@ describe('PracticeScreen', () => {
       isError: false,
     });
     mockUseQuizStats.mockReturnValue({ data: [], isError: false });
+    mockUseAssessmentEligibleTopics.mockReturnValue({
+      data: [
+        {
+          topicId: 'topic-1',
+          subjectId: 'subject-1',
+          subjectName: 'Math',
+          topicTitle: 'Algebra',
+        },
+      ],
+      isError: false,
+    });
   });
 
   afterEach(() => {
@@ -73,10 +110,16 @@ describe('PracticeScreen', () => {
     render(<PracticeScreen />);
 
     screen.getByText('Test yourself');
-    screen.getByText('Review what is fading, then check yourself.');
-    screen.getByText('Refresh topics');
-    screen.getByText('Quiz yourself');
+    screen.getByText('Pick a quick win. Every round helps your memory stick.');
+    screen.getByText("Today's review");
     screen.getByText('Prove I know this');
+    screen.getByText('Quick quiz');
+    screen.getByText('Capitals');
+    screen.getByText("Who's who");
+    screen.getByText('Recite from memory');
+    screen.getByText('Beta');
+    screen.getByText('Dictation');
+    screen.getByText('Quiz history');
   });
 
   it('routes the back button to home', () => {
@@ -138,7 +181,7 @@ describe('PracticeScreen', () => {
     render(<PracticeScreen />);
 
     screen.getByTestId('review-empty-state');
-    screen.getByText('Nothing to review right now');
+    screen.getAllByText('All caught up');
     screen.getByText('Your next review is in 3 hours');
   });
 
@@ -158,10 +201,103 @@ describe('PracticeScreen', () => {
     expect(mockPush).toHaveBeenCalledWith('/(app)/library');
   });
 
-  it('shows quiz XP even before any XP is earned', () => {
+  it('shows quiz XP in the header and quick quiz cue before any XP is earned', () => {
     render(<PracticeScreen />);
 
+    // XP appears in both the header pill and the quiz card; target by testID
+    expect(
+      screen
+        .getByTestId('practice-xp-header')
+        .findByProps({ children: '0 XP' }),
+    ).toBeTruthy();
+    expect(
+      screen.getByTestId('practice-quiz-xp').findByProps({ children: '0 XP' }),
+    ).toBeTruthy();
     screen.getByText('Test yourself with multiple choice questions · 0 XP');
+  });
+
+  it('navigates to the assessment picker when assessment topics are available', () => {
+    render(<PracticeScreen />);
+
+    fireEvent.press(screen.getByTestId('practice-assessment'));
+    expect(mockPush).toHaveBeenCalledWith('/(app)/practice/assessment-picker');
+  });
+
+  it('routes the assessment row to library when no topics are ready', () => {
+    mockUseAssessmentEligibleTopics.mockReturnValue({
+      data: [],
+      isError: false,
+    });
+
+    render(<PracticeScreen />);
+
+    screen.getByText('Available after you finish a topic');
+    fireEvent.press(screen.getByTestId('practice-assessment'));
+    expect(mockPush).toHaveBeenCalledWith('/(app)/library');
+  });
+
+  it('routes every quiz entry point to the quiz index', () => {
+    render(<PracticeScreen />);
+
+    fireEvent.press(screen.getByTestId('practice-quiz'));
+    fireEvent.press(screen.getByTestId('practice-quiz-capitals'));
+    fireEvent.press(screen.getByTestId('practice-quiz-guess-who'));
+
+    expect(mockPush).toHaveBeenCalledTimes(3);
+    expect(mockPush).toHaveBeenNthCalledWith(1, '/(app)/quiz');
+    expect(mockPush).toHaveBeenNthCalledWith(2, '/(app)/quiz');
+    expect(mockPush).toHaveBeenNthCalledWith(3, '/(app)/quiz');
+  });
+
+  it('routes recitation, dictation, and quiz history to their flows', () => {
+    render(<PracticeScreen />);
+
+    fireEvent.press(screen.getByTestId('practice-recitation'));
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/session',
+      params: { mode: 'recitation' },
+    });
+
+    fireEvent.press(screen.getByTestId('practice-dictation'));
+    expect(mockPush).toHaveBeenCalledWith('/(app)/dictation');
+
+    fireEvent.press(screen.getByTestId('practice-quiz-history'));
+    expect(mockPush).toHaveBeenCalledWith('/(app)/quiz/history');
+  });
+
+  it('shows per-option quiz cues from activity stats', () => {
+    mockUseQuizStats.mockReturnValue({
+      data: [
+        {
+          activityType: 'capitals',
+          languageCode: null,
+          roundsPlayed: 3,
+          bestScore: 4,
+          bestTotal: 5,
+          totalXp: 120,
+        },
+        {
+          activityType: 'guess_who',
+          languageCode: null,
+          roundsPlayed: 2,
+          bestScore: null,
+          bestTotal: null,
+          totalXp: 80,
+        },
+      ],
+      isError: false,
+    });
+
+    render(<PracticeScreen />);
+
+    screen.getByText('Best 4/5');
+    screen.getByText('Played 2');
+    // 200 XP appears in both header pill and quiz card; target the quiz card chip
+    expect(
+      screen
+        .getByTestId('practice-quiz-xp')
+        .findByProps({ children: '200 XP' }),
+    ).toBeTruthy();
   });
 
   it('places recitation and dictation after the main review and test actions', () => {
@@ -182,8 +318,8 @@ describe('PracticeScreen', () => {
       .filter((testID: string) =>
         [
           'practice-review',
-          'practice-quiz',
           'practice-assessment',
+          'practice-quiz',
           'practice-recitation',
           'practice-dictation',
           'practice-quiz-history',
@@ -193,20 +329,27 @@ describe('PracticeScreen', () => {
 
     expect(uniqueCardOrder).toEqual([
       'practice-review',
-      'practice-quiz',
       'practice-assessment',
-      'practice-recitation',
+      'practice-quiz',
       'practice-dictation',
+      'practice-recitation',
       'practice-quiz-history',
     ]);
   });
 
-  it('renders quiz history with a quieter visual treatment', () => {
+  it('renders quiz history as a quiet recent-progress row', () => {
     render(<PracticeScreen />);
 
-    const quizHistoryCard = screen.getByTestId('practice-quiz-history');
-    expect(quizHistoryCard.props.className).toContain(
-      'bg-surface border-border',
-    );
+    const quizHistoryRow = screen.getByTestId('practice-quiz-history');
+    expect(quizHistoryRow.props.className).toContain('min-h-[56px]');
+    screen.getByText('No rounds yet');
+  });
+
+  it('redirects to home when in parent proxy session', () => {
+    mockUseParentProxy.mockReturnValue({ isParentProxy: true });
+
+    render(<PracticeScreen />);
+
+    expect(screen.getByTestId('redirect').props.children).toBe('/(app)/home');
   });
 });

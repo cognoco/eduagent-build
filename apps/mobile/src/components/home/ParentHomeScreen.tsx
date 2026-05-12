@@ -20,15 +20,22 @@ import {
   useFamilySubscription,
   useSubscription,
 } from '../../hooks/use-subscription';
-import { getGreeting } from '../../lib/greeting';
+import { getGreeting, getTimeOfDay } from '../../lib/greeting';
 import { platformAlert } from '../../lib/platform-alert';
 import { useLinkedChildren } from '../../lib/profile';
 import { useThemeColors } from '../../lib/theme';
+import { MentomateLogo } from '../MentomateLogo';
 import { WithdrawalCountdownBanner } from '../family/WithdrawalCountdownBanner';
 import { NudgeActionSheet } from '../nudge/NudgeActionSheet';
-import { ChildQuotaLine } from './ChildQuotaLine';
-import { IntentCard } from './IntentCard';
+import { useChildLearnerProfile } from '../../hooks/use-learner-profile';
+import { ACCOMMODATION_OPTIONS } from '../../lib/accommodation-options';
 import { ParentTransitionNotice } from './ParentTransitionNotice';
+
+const MAX_TONIGHT_PROMPTS = 3;
+
+function initialOf(name: string): string {
+  return name.trim().charAt(0).toUpperCase() || '?';
+}
 
 interface ParentHomeScreenProps {
   activeProfile: Profile | null;
@@ -112,7 +119,13 @@ function formatChildSnapshot(
   });
 }
 
-function formatTonightPrompt(
+interface TonightPrompt {
+  key: string;
+  childId: string;
+  text: string;
+}
+
+function primaryPromptFor(
   child: Profile,
   dashboardChild: DashboardChild | undefined,
   t: (key: string, opts?: Record<string, unknown>) => string,
@@ -133,6 +146,90 @@ function formatTonightPrompt(
   }
 
   return t('home.parent.tonight.promptFallback', { childName });
+}
+
+function buildSingleChildPrompts(
+  child: Profile,
+  dashboardChild: DashboardChild | undefined,
+  t: (key: string, opts?: Record<string, unknown>) => string,
+): TonightPrompt[] {
+  const childName = firstNameOf(child.displayName);
+  const focus =
+    dashboardChild?.currentlyWorkingOn[0] ?? dashboardChild?.subjects[0]?.name;
+  const prompts: TonightPrompt[] = [
+    {
+      key: `${child.id}-primary`,
+      childId: child.id,
+      text: primaryPromptFor(child, dashboardChild, t),
+    },
+  ];
+
+  if (focus) {
+    prompts.push({
+      key: `${child.id}-trickiest`,
+      childId: child.id,
+      text: t('home.parent.tonight.promptTrickiestWithTopic', {
+        childName,
+        topic: focus,
+      }),
+    });
+    prompts.push({
+      key: `${child.id}-tomorrow`,
+      childId: child.id,
+      text: t('home.parent.tonight.promptTomorrow', { childName }),
+    });
+  } else if (dashboardChild && dashboardChild.sessionsThisWeek > 0) {
+    prompts.push({
+      key: `${child.id}-tomorrow`,
+      childId: child.id,
+      text: t('home.parent.tonight.promptTomorrow', { childName }),
+    });
+  } else {
+    prompts.push({
+      key: `${child.id}-curious`,
+      childId: child.id,
+      text: t('home.parent.tonight.promptCurious', { childName }),
+    });
+  }
+
+  return prompts.slice(0, MAX_TONIGHT_PROMPTS);
+}
+
+function buildTonightPrompts(
+  children: Profile[],
+  dashboard: DashboardData | undefined,
+  t: (key: string, opts?: Record<string, unknown>) => string,
+): TonightPrompt[] {
+  const first = children[0];
+  if (!first) return [];
+  if (children.length === 1) {
+    return buildSingleChildPrompts(
+      first,
+      findDashboardChild(dashboard, first.id),
+      t,
+    );
+  }
+
+  const ranked = [...children].sort((a, b) => {
+    const aSessions =
+      findDashboardChild(dashboard, a.id)?.sessionsThisWeek ?? 0;
+    const bSessions =
+      findDashboardChild(dashboard, b.id)?.sessionsThisWeek ?? 0;
+    return bSessions - aSessions;
+  });
+
+  return ranked.slice(0, MAX_TONIGHT_PROMPTS).map((child) => ({
+    key: `${child.id}-primary`,
+    childId: child.id,
+    text: primaryPromptFor(child, findDashboardChild(dashboard, child.id), t),
+  }));
+}
+
+function tonightTitleKey(now?: Date): string {
+  const tod = getTimeOfDay(now ?? new Date());
+  if (tod === 'morning') return 'home.parent.tonight.titleMorning';
+  if (tod === 'afternoon') return 'home.parent.tonight.titleAfternoon';
+  return 'home.parent.tonight.titleEvening';
 }
 
 function ChildActionButton({
@@ -190,8 +287,6 @@ function ChildCommandCard({
   onOpenNudge: () => void;
   t: (key: string, opts?: Record<string, unknown>) => string;
 }): React.ReactElement {
-  const colors = useThemeColors();
-
   return (
     <Pressable
       onPress={onOpenProgress}
@@ -203,8 +298,16 @@ function ChildCommandCard({
       accessibilityLabel={child.displayName}
       testID={`parent-home-check-child-${child.id}`}
     >
-      <View className="flex-row items-start justify-between">
-        <View className="flex-1 me-3">
+      <View className="flex-row items-start">
+        <View
+          className="w-11 h-11 rounded-full bg-primary items-center justify-center me-3"
+          accessibilityElementsHidden
+        >
+          <Text className="text-h3 font-bold text-text-inverse">
+            {initialOf(child.displayName)}
+          </Text>
+        </View>
+        <View className="flex-1">
           <Text className="text-h3 font-bold text-text-primary">
             {child.displayName}
           </Text>
@@ -212,11 +315,6 @@ function ChildCommandCard({
             {formatChildSnapshot(dashboardChild, t)}
           </Text>
         </View>
-        <Ionicons
-          name="person-circle-outline"
-          size={28}
-          color={colors.textSecondary}
-        />
       </View>
 
       <View className="flex-row gap-2 mt-4">
@@ -239,6 +337,52 @@ function ChildCommandCard({
           testID={`parent-home-send-nudge-${child.id}`}
         />
       </View>
+    </Pressable>
+  );
+}
+
+function ChildAccommodationRow({
+  childProfileId,
+  childName,
+}: {
+  childProfileId: string;
+  childName: string;
+}): React.ReactElement {
+  const { t } = useTranslation();
+  const colors = useThemeColors();
+  const router = useRouter();
+  const { data: learnerProfile } = useChildLearnerProfile(childProfileId);
+
+  const activeOption = ACCOMMODATION_OPTIONS.find(
+    (o) => o.mode === (learnerProfile?.accommodationMode ?? 'none'),
+  );
+
+  return (
+    <Pressable
+      onPress={() =>
+        router.push(
+          `/(app)/more/accommodation?childProfileId=${childProfileId}`,
+        )
+      }
+      className="flex-row items-center justify-between bg-surface rounded-card px-4 py-3.5 mb-2"
+      style={Platform.OS === 'web' ? { cursor: 'pointer' } : undefined}
+      accessibilityRole="button"
+      accessibilityLabel={t('more.accommodation.childScreenTitle', {
+        name: childName,
+      })}
+      testID={`child-accommodation-row-${childProfileId}`}
+    >
+      <View className="flex-1 pr-3">
+        <Text className="text-body font-semibold text-text-primary">
+          {t('more.accommodation.childScreenTitle', { name: childName })}
+        </Text>
+        {activeOption ? (
+          <Text className="text-body-sm text-text-secondary mt-0.5">
+            {activeOption.title} — {activeOption.description}
+          </Text>
+        ) : null}
+      </View>
+      <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
     </Pressable>
   );
 }
@@ -326,16 +470,34 @@ export function ParentHomeScreen({
     router.push(`/(app)/child/${childProfileId}/reports` as never);
   }
 
+  const parentInitial = initialOf(activeProfile?.displayName ?? firstName);
+
   return (
     <View className="flex-1 bg-background" testID="parent-home-screen">
-      <View className="px-5" style={{ paddingTop: insets.top + 16 }}>
+      <View className="px-5" style={{ paddingTop: insets.top + 12 }}>
+        <View className="flex-row items-center justify-between mb-3">
+          <MentomateLogo size="sm" orientation="horizontal" />
+          <Pressable
+            onPress={() => router.push('/(app)/more/account' as never)}
+            className="w-10 h-10 rounded-full bg-primary-soft items-center justify-center"
+            style={Platform.OS === 'web' ? { cursor: 'pointer' } : undefined}
+            accessibilityRole="button"
+            accessibilityLabel={t('home.parent.accountLink', {
+              defaultValue: 'Open account',
+            })}
+            testID="parent-home-account-avatar"
+          >
+            <Text className="text-body font-bold text-primary">
+              {parentInitial}
+            </Text>
+          </Pressable>
+        </View>
         <Text className="text-h2 font-bold text-text-primary leading-tight">
           {t('home.parent.greeting', { displayName: firstName })}
         </Text>
         <Text className="text-body-sm text-text-secondary mt-0.5">
           {subtitle}
         </Text>
-        <ChildQuotaLine />
       </View>
 
       <ScrollView
@@ -357,26 +519,21 @@ export function ParentHomeScreen({
         {linkedChildren.length > 0 ? (
           <View className="mt-5" testID="parent-home-tonight-section">
             <Text className="text-h3 font-bold text-text-primary mb-3">
-              {t('home.parent.tonight.title')}
+              {t(tonightTitleKey(now))}
             </Text>
             <View className="bg-coaching-card rounded-card px-4 py-2">
-              {linkedChildren.map((child) => {
-                const dashboardChild = findDashboardChild(dashboard, child.id);
-                return (
+              {buildTonightPrompts(linkedChildren, dashboard, t).map(
+                (prompt) => (
                   <Pressable
-                    key={`tonight-${child.id}`}
-                    onPress={() => pushChildDetail(child.id)}
+                    key={`tonight-${prompt.key}`}
+                    onPress={() => pushChildDetail(prompt.childId)}
                     className="flex-row items-center py-2.5"
                     style={
                       Platform.OS === 'web' ? { cursor: 'pointer' } : undefined
                     }
                     accessibilityRole="button"
-                    accessibilityLabel={formatTonightPrompt(
-                      child,
-                      dashboardChild,
-                      t,
-                    )}
-                    testID={`parent-home-tonight-${child.id}`}
+                    accessibilityLabel={prompt.text}
+                    testID={`parent-home-tonight-${prompt.key}`}
                   >
                     <Ionicons
                       name="chatbubble-outline"
@@ -384,11 +541,11 @@ export function ParentHomeScreen({
                       color={colors.textSecondary}
                     />
                     <Text className="text-body-sm text-text-primary ms-3 flex-1">
-                      {formatTonightPrompt(child, dashboardChild, t)}
+                      {prompt.text}
                     </Text>
                   </Pressable>
-                );
-              })}
+                ),
+              )}
             </View>
           </View>
         ) : null}
@@ -439,20 +596,37 @@ export function ParentHomeScreen({
             />
           ))}
 
+          {linkedChildren.map((child) => (
+            <ChildAccommodationRow
+              key={`accommodation-${child.id}`}
+              childProfileId={child.id}
+              childName={child.displayName}
+            />
+          ))}
+
           {showAddChild ? (
-            <View className="mt-2">
-              <Text className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2">
-                {t('home.parent.familyToolsHeader')}
-              </Text>
-              <IntentCard
-                testID="parent-home-add-child"
-                title={t('more.family.addChild')}
-                subtitle={t('more.family.addChildDescription')}
-                icon="person-add-outline"
-                variant="subtle"
-                onPress={handleAddChild}
+            <Pressable
+              onPress={handleAddChild}
+              className="flex-row items-center bg-surface rounded-card px-4 py-3 mt-4"
+              style={Platform.OS === 'web' ? { cursor: 'pointer' } : undefined}
+              accessibilityRole="button"
+              accessibilityLabel={t('more.family.addChild')}
+              testID="parent-home-add-child"
+            >
+              <Ionicons
+                name="person-add-outline"
+                size={20}
+                color={colors.textSecondary}
               />
-            </View>
+              <Text className="text-body font-semibold text-text-primary ms-3 flex-1">
+                {t('more.family.addChild')}
+              </Text>
+              <Ionicons
+                name="chevron-forward"
+                size={18}
+                color={colors.textSecondary}
+              />
+            </Pressable>
           ) : null}
         </View>
 

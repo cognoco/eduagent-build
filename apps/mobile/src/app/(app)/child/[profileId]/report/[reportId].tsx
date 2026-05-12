@@ -8,31 +8,14 @@ import {
   goBackOrReplace,
 } from '../../../../../lib/navigation';
 import { classifyApiError } from '../../../../../lib/format-api-error';
+import { formatMinutes } from '../../../../../lib/format-relative-date';
 import { ErrorFallback } from '../../../../../components/common';
+import { MetricCard } from '../../../../../components/progress';
 import {
   useChildReportDetail,
   useMarkChildReportViewed,
 } from '../../../../../hooks/use-progress';
 import { useTranslation } from 'react-i18next';
-
-function MetricCard({
-  label,
-  value,
-  testID,
-}: {
-  label: string;
-  value: string;
-  testID?: string;
-}): React.ReactElement {
-  return (
-    <View className="bg-background rounded-card p-4 flex-1" testID={testID}>
-      <Text className="text-caption text-text-secondary">{label}</Text>
-      <Text className="text-h3 font-semibold text-text-primary mt-2">
-        {value}
-      </Text>
-    </View>
-  );
-}
 
 export default function ChildReportDetailScreen(): React.ReactElement {
   const { t } = useTranslation();
@@ -157,7 +140,9 @@ export default function ChildReportDetailScreen(): React.ReactElement {
               />
               <MetricCard
                 label={t('parentView.report.timeOnApp')}
-                value={String(report.reportData.thisMonth.totalActiveMinutes)}
+                value={formatMinutes(
+                  report.reportData.thisMonth.totalActiveMinutes,
+                )}
                 testID="child-report-metric-minutes"
               />
             </View>

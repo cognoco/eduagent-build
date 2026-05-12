@@ -417,18 +417,24 @@ describe('createNudge', () => {
       ).rejects.toThrow(ConsentRequiredError);
     });
 
-    it('throws ConsentRequiredError when consent status is null', async () => {
+    it('[BREAK] allows nudge when consent status is null (age 17+, no consent_states row)', async () => {
+      // Regression: previously `consentStatus !== 'CONSENTED'` rejected the
+      // null case, blocking parents from nudging their 17+ linked children
+      // (checkConsentRequired returns required:false for age >= 17, so
+      // createProfile skips inserting a consent_states row → getConsentStatus
+      // resolves null). The fix treats null as "consent not required".
       mockGetConsentStatus.mockResolvedValue(null);
       const db = makeDb();
 
-      await expect(
-        createNudge(db, {
-          fromProfileId: FROM_PROFILE_ID,
-          toProfileId: TO_PROFILE_ID,
-          template: 'you_got_this',
-          now: BASE_NOW,
-        }),
-      ).rejects.toThrow(ConsentRequiredError);
+      const result = await createNudge(db, {
+        fromProfileId: FROM_PROFILE_ID,
+        toProfileId: TO_PROFILE_ID,
+        template: 'you_got_this',
+        now: BASE_NOW,
+      });
+
+      expect(result.pushSent).toBe(true);
+      expect(db.insert as jest.Mock).toHaveBeenCalled();
     });
 
     it('error carries the expected code CONSENT_REQUIRED', async () => {
@@ -650,6 +656,28 @@ describe('createNudge', () => {
 
       expect(result.pushSent).toBe(true);
       expect(mockSendPushNotification).toHaveBeenCalled();
+    });
+
+    it('[BREAK] does not throw when recipient timezone is an invalid Intl string', async () => {
+      // Regression: Intl.DateTimeFormat throws RangeError for malformed
+      // timezone strings ('foo', 'Europe/', etc.). The nudge transaction
+      // commits BEFORE isQuietHours runs, so an exception would return 500
+      // while the row sits in the DB — every client retry would consume a
+      // rate-limit slot. The fix wraps the formatter call in try/catch and
+      // returns false (allow push) on failure.
+      const db = makeDb({ accountTimezone: 'this-is-not-a-real-timezone' });
+
+      const result = await createNudge(db, {
+        fromProfileId: FROM_PROFILE_ID,
+        toProfileId: TO_PROFILE_ID,
+        template: 'you_got_this',
+        now: BASE_NOW,
+      });
+
+      // Insert must have happened (we're past the transaction); push attempted.
+      expect(db.insert as jest.Mock).toHaveBeenCalled();
+      expect(mockSendPushNotification).toHaveBeenCalled();
+      expect(result.pushSent).toBe(true);
     });
 
     it('defaults to UTC when no account record is found (toProfile has no accountId)', async () => {

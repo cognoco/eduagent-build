@@ -222,105 +222,44 @@ function setupDefaultMocks() {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe('ChildDetailScreen — accommodation guide', () => {
+describe('ChildDetailScreen — accommodation nav row', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     setupDefaultMocks();
   });
 
-  it('renders the accommodation guide toggle button', () => {
+  it('renders the accommodation nav row', () => {
     render(<ChildDetailScreen />);
 
-    expect(screen.getByTestId('accommodation-guide-toggle')).toBeTruthy();
+    expect(
+      screen.getByTestId('child-accommodation-row-child-001'),
+    ).toBeTruthy();
   });
 
-  it('guide content is not visible before toggle is pressed', () => {
+  it('navigates to the accommodation screen when pressed', () => {
     render(<ChildDetailScreen />);
 
-    expect(screen.queryByTestId('accommodation-guide-content')).toBeNull();
+    fireEvent.press(screen.getByTestId('child-accommodation-row-child-001'));
+
+    expect(mockPush).toHaveBeenCalledWith(
+      '/(app)/more/accommodation?childProfileId=child-001',
+    );
   });
 
-  it('pressing the toggle reveals the guide content', () => {
-    render(<ChildDetailScreen />);
-
-    fireEvent.press(screen.getByTestId('accommodation-guide-toggle'));
-
-    expect(screen.getByTestId('accommodation-guide-content')).toBeTruthy();
-  });
-
-  it('renders the try-it sub-copy', () => {
-    render(<ChildDetailScreen />);
-
-    expect(screen.getByTestId('accommodation-try-it')).toBeTruthy();
-  });
-
-  it('guide shows a pickable button for short-burst after toggle', () => {
-    render(<ChildDetailScreen />);
-
-    fireEvent.press(screen.getByTestId('accommodation-guide-toggle'));
-
-    expect(screen.getByTestId('guide-pick-short-burst')).toBeTruthy();
-  });
-
-  it('guide shows a pickable button for audio-first after toggle', () => {
-    render(<ChildDetailScreen />);
-
-    fireEvent.press(screen.getByTestId('accommodation-guide-toggle'));
-
-    expect(screen.getByTestId('guide-pick-audio-first')).toBeTruthy();
-  });
-
-  it('guide shows a pickable button for predictable after toggle', () => {
-    render(<ChildDetailScreen />);
-
-    fireEvent.press(screen.getByTestId('accommodation-guide-toggle'));
-
-    expect(screen.getByTestId('guide-pick-predictable')).toBeTruthy();
-  });
-
-  it('guide shows a pickable button for none after toggle', () => {
-    render(<ChildDetailScreen />);
-
-    fireEvent.press(screen.getByTestId('accommodation-guide-toggle'));
-
-    expect(screen.getByTestId('guide-pick-none')).toBeTruthy();
-  });
-
-  it('pressing a guide pick button closes the guide and calls updateAccommodation', () => {
-    const mockMutate = jest.fn();
-    mockUseUpdateAccommodationMode.mockReturnValue({
-      mutate: mockMutate,
-      isPending: false,
+  it('shows the active accommodation mode name', () => {
+    mockUseChildLearnerProfile.mockReturnValue({
+      data: {
+        accommodationMode: 'audio-first',
+        memoryConsentStatus: 'granted',
+        updatedAt: null,
+      },
+      isLoading: false,
     });
 
     render(<ChildDetailScreen />);
 
-    fireEvent.press(screen.getByTestId('accommodation-guide-toggle'));
-    expect(screen.getByTestId('accommodation-guide-content')).toBeTruthy();
-
-    fireEvent.press(screen.getByTestId('guide-pick-short-burst'));
-
-    // Guide closes after picking
-    expect(screen.queryByTestId('accommodation-guide-content')).toBeNull();
-
-    // Accommodation mutation was called with the right mode
-    expect(mockMutate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        childProfileId: 'child-001',
-        accommodationMode: 'short-burst',
-      }),
-      expect.any(Object),
-    );
-  });
-
-  it('pressing the toggle again hides the guide', () => {
-    render(<ChildDetailScreen />);
-
-    fireEvent.press(screen.getByTestId('accommodation-guide-toggle'));
-    expect(screen.getByTestId('accommodation-guide-content')).toBeTruthy();
-
-    fireEvent.press(screen.getByTestId('accommodation-guide-toggle'));
-    expect(screen.queryByTestId('accommodation-guide-content')).toBeNull();
+    const row = screen.getByTestId('child-accommodation-row-child-001');
+    expect(row).toHaveTextContent(/Audio-First/);
   });
 });
 
@@ -424,35 +363,6 @@ describe('ChildDetailScreen — new sections', () => {
 
     expect(mockCurrentlyWorkingOnCard).not.toHaveBeenCalled();
   });
-
-  // Celebration follow-up
-  it('shows celebration follow-up when accommodationMode is short-burst', () => {
-    mockUseChildLearnerProfile.mockReturnValue({
-      data: {
-        accommodationMode: 'short-burst',
-        memoryConsentStatus: 'granted',
-        updatedAt: null,
-      },
-    });
-
-    render(<ChildDetailScreen />);
-
-    expect(
-      screen.getByTestId('child-celebration-followup-short-burst'),
-    ).toBeTruthy();
-  });
-
-  it('hides celebration follow-up when accommodationMode is none', () => {
-    render(<ChildDetailScreen />);
-
-    expect(screen.queryByTestId('child-celebration-followup-none')).toBeNull();
-    expect(
-      screen.queryByTestId('child-celebration-followup-short-burst'),
-    ).toBeNull();
-    expect(
-      screen.queryByTestId('child-celebration-followup-predictable'),
-    ).toBeNull();
-  });
 });
 
 describe('ChildDetailScreen — restricted consent', () => {
@@ -487,7 +397,9 @@ describe('ChildDetailScreen — restricted consent', () => {
 
     screen.getByTestId('consent-required-panel');
     screen.getByTestId('check-consent-status-button');
-    expect(screen.queryByTestId('accommodation-guide-toggle')).toBeNull();
+    expect(
+      screen.queryByTestId('child-accommodation-row-child-001'),
+    ).toBeNull();
     expect(mockUseChildInventory).toHaveBeenCalledWith('child-001', {
       enabled: false,
     });

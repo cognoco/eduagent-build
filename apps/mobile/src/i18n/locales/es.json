@@ -118,11 +118,9 @@
       "emptySubjectsTitle": "Tus materias aparecerán aquí",
       "emptySubjectsMessage": "Empieza una ahora, o usa la ayuda con tareas cuando la necesites.",
       "addSubject": "Agregar materia",
-      "quota": {
-        "line": "{{questionsLeftToday}} questions left today · {{questionsLeftMonth}} left this month",
-        "lineDailyOnly": "{{questionsLeftToday}} questions left today",
-        "lineMonthlyOnly": "{{questionsLeftMonth}} questions left this month",
-        "lineUnlimited": "Plenty of questions today"
+      "momentum": {
+        "topicLearned": "{{n}} topic learned",
+        "topicsLearned": "{{n}} topics learned"
       },
       "intentActions": {
         "homework": {
@@ -151,6 +149,7 @@
     },
     "parent": {
       "greeting": "Hola, {{displayName}}",
+      "accountLink": "Abrir cuenta",
       "intentHeader": "¿Qué necesitas ahora?",
       "encouragementNote": "Los nudges son ánimos suaves de una sola dirección.",
       "transitionNoticeTitle": "Ahora guías a {{childNames}}",
@@ -172,10 +171,15 @@
         "sessions_other": "{{count}} sesiones esta semana"
       },
       "tonight": {
-        "title": "Tonight",
-        "promptWithTopic": "Ask {{childName}}: what made {{topic}} click today?",
-        "promptNoActivity": "Ask {{childName}}: what would make starting feel easy tonight?",
-        "promptFallback": "Ask {{childName}}: what felt easier today than yesterday?"
+        "titleMorning": "Esta mañana",
+        "titleAfternoon": "Esta tarde",
+        "titleEvening": "Esta noche",
+        "promptWithTopic": "Pregunta a {{childName}}: ¿qué hizo que {{topic}} tuviera sentido hoy?",
+        "promptNoActivity": "Pregunta a {{childName}}: ¿qué haría que empezar fuera fácil esta noche?",
+        "promptFallback": "Pregunta a {{childName}}: ¿qué se sintió más fácil hoy que ayer?",
+        "promptTrickiestWithTopic": "Pregunta a {{childName}}: ¿cuál es la parte más difícil de {{topic}} ahora mismo?",
+        "promptTomorrow": "Pregunta a {{childName}}: ¿en qué deberíamos enfocarnos mañana?",
+        "promptCurious": "Pregunta a {{childName}}: ¿hay algo que les genere curiosidad?"
       },
       "empty": {
         "title": "Your family dashboard starts here",
@@ -251,8 +255,8 @@
       "subtitle": "Se aplica a tus propias sesiones de aprendizaje.",
       "subtitleWithChildren": "Se aplica a tus propias sesiones. Para cambiar la de un niño, abre su perfil desde el panel.",
       "childPreferencesAccessLabel": "Abrir preferencias del perfil de {{name}}",
-      "childPreferencesLink": "Para cambiar las preferencias de {{name}}, abre su perfil →",
-      "familyPreferencesLink": "Para cambiar las preferencias de un niño, abre Familia →",
+      "childPreferencesLink": "Para cambiar las preferencias de {{name}}, toca su perfil en Inicio →",
+      "familyPreferencesLink": "Para cambiar las preferencias de un niño, toca su perfil en Inicio →",
       "sheetTitle": "Modo de aprendizaje",
       "sheetEffectMessage": "Se aplicará a partir de tu próximo mensaje.",
       "casual": {
@@ -265,11 +269,21 @@
       }
     },
     "accommodation": {
-      "sectionHeader": "Adaptación de aprendizaje de {{name}}"
+      "sectionHeader": "Tu adaptación de aprendizaje",
+      "viewAndManage": "Ver y gestionar",
+      "screenTitle": "Adaptación de aprendizaje",
+      "notSureWhichToPick": "¿No estás seguro de cuál elegir?",
+      "guideActive": "Activo",
+      "childScreenTitle": "Adaptación de {{name}}"
+    },
+    "learningPreferences": {
+      "rowLabel": "Preferencias de aprendizaje",
+      "screenTitle": "Preferencias de aprendizaje"
     },
     "mentorMemory": {
       "sectionHeader": "Lo que tu mentor sabe",
-      "viewAndManage": "Ver y gestionar"
+      "viewAndManage": "Ver y gestionar",
+      "viewAndManageDescription": "Strengths, interests, and how you learn best"
     },
     "family": {
       "sectionHeader": "Familia",
@@ -393,7 +407,8 @@
         "disabled": "La recopilación de memoria está desactivada.",
         "pendingOwner": "La recopilación de memoria aún no se ha activado.",
         "pendingChild": "Un padre o tutor aún necesita activar la recopilación de memoria.",
-        "useMemoryLabel": "Usar lo que el mentor sabe"
+        "useMemoryLabel": "Usar lo que el mentor sabe",
+        "useMemoryDisabledHint": "Enable memory first, then this can turn on."
       },
       "consent": {
         "title": "Activar memoria del mentor",
@@ -454,6 +469,10 @@
         "school": "Escuela",
         "freeTime": "Tiempo libre",
         "both": "Ambos"
+      },
+      "examples": {
+        "title": "Examples you can add",
+        "body": "\"I learn best with examples,\" \"I like space analogies,\" or \"Fractions still feel tricky.\""
       }
     },
     "accessories": {
@@ -682,7 +701,9 @@
       "iHaveAText": "Tengo un texto",
       "iHaveATextSubtitle": "Escribe o pega tu propio texto",
       "surpriseMe": "Sorpréndeme",
-      "surpriseMeSubtitle": "Practica con un nuevo dictado"
+      "surpriseMeSubtitle": "Practica con un nuevo dictado",
+      "loadingTitle": "Finding your next review...",
+      "loadingMessage": "We're choosing a dictation that should feel useful, not random."
     },
     "complete": {
       "noSessionTitle": "No hay dictado que terminar",
@@ -868,7 +889,9 @@
       "organizing": "Organizando tu biblioteca...",
       "skip": "Omitir — empezar a aprender de todos modos",
       "skipAccessibilityLabel": "Omitir y empezar a aprender de todos modos",
-      "filingErrorTitle": "No se pudo añadir ese libro"
+      "filingErrorTitle": "No se pudo añadir ese libro",
+      "loadingTitle": "Opening your shelf...",
+      "loadingMessage": "We're finding the books and next steps saved for this subject."
     },
     "noteMenu": {
       "title": "Opciones de nota",
@@ -1124,7 +1147,8 @@
     "ocrDefaultError": "No pudimos leer eso claramente. Intenta tomar la foto de nuevo con mejor iluminación.",
     "problemsFound": "Estos son los problemas que encontré:",
     "addSkippedFragmentsLabel": "Añadir fragmentos omitidos",
-    "skippedFragments": "Omitimos {{count}} fragmento(s) poco claro(s). Toca para añadirlos de nuevo.",
+    "skippedFragments_one": "Omitimos {{count}} fragmento poco claro. Toca para añadirlo de nuevo.",
+    "skippedFragments_other": "Omitimos {{count}} fragmentos poco claros. Toca para añadirlos de nuevo.",
     "problemNumber": "Problema {{number}}",
     "removeProblemLabel": "Eliminar problema {{number}}",
     "remove": "Eliminar",
@@ -1232,14 +1256,30 @@
       "empty": {
         "child": "Tu primer resumen semanal está en camino.",
         "adult": "Tu primer resumen semanal llega después de una semana completa de aprendizaje."
+      },
+      "practiceTitle": "Destacados de la práctica",
+      "chips": {
+        "time": "{{time}} dedicado",
+        "topics": "{{count}} tema iniciado",
+        "topics_other": "{{count}} temas iniciados",
+        "streak": "{{count}} días seguidos"
+      },
+      "practice": {
+        "quizzes": "quizzes completados",
+        "reviews": "repasos terminados"
       }
     },
     "monthlyReport": {
       "highlightsTitle": "Destacados",
-      "nextStepsTitle": "Qué sigue",
       "empty": {
         "child": "Tu primer resumen mensual llega al final de {{month}}.",
         "adult": "Tu primer resumen mensual llega al final de {{month}}."
+      },
+      "nextStepTitle": "Siguiente paso",
+      "bars": {
+        "sessions": "Sesiones",
+        "time": "Tiempo",
+        "topics": "Temas"
       }
     },
     "newLearner": {
@@ -1373,7 +1413,9 @@
       "hideErrorTitle": "No se pudo ocultar la materia",
       "goneTitle": "Esta materia ya no está disponible",
       "goneSubtitle": "Puede haber sido eliminada o fusionada con otra materia.",
-      "pastConversations": "Conversaciones anteriores"
+      "pastConversations": "Conversaciones anteriores",
+      "loadingTitle": "Finding your progress...",
+      "loadingMessage": "We're pulling together sessions, reviews, and saved words for this subject."
     },
     "vocabulary": {
       "pageTitle": "Tu Vocabulario",
@@ -1430,6 +1472,11 @@
         "wordsAdded": "palabras añadidas",
         "vocabularyGrowth": "crecimiento de vocabulario"
       }
+    },
+    "previousReports": {
+      "title": "Previous reports",
+      "subtitle": "Weekly and monthly snapshots from your learning.",
+      "viewAll": "View all reports"
     }
   },
   "onboarding": {
@@ -2156,6 +2203,75 @@
       "title": "{{fromDisplayName}} te envio un nudge",
       "unreadCount": "{{count}} nuevos",
       "modalTitle": "Nuevos nudges"
+    }
+  },
+  "practiceHub": {
+    "title": "Ponte a prueba",
+    "subtitle": "Elige algo rápido. Cada ronda refuerza tu memoria.",
+    "xpLabel": "{{xp}} XP",
+    "sections": {
+      "bestNextStep": "Mejor siguiente paso",
+      "quiz": "Quiz",
+      "otherPractice": "Otra práctica",
+      "recentProgress": "Progreso reciente"
+    },
+    "review": {
+      "title": "Repaso de hoy",
+      "startReview": "Iniciar repaso",
+      "topicsReady_one": "{{count}} tema listo",
+      "topicsReady_other": "{{count}} temas listos",
+      "allCaughtUp": "Todo al día",
+      "nextReviewIn": "Tu próximo repaso es en {{time}}",
+      "completeATopic": "Completa un tema para empezar a repasar",
+      "browseTopics": "Explora tus temas",
+      "memoryBoost": "Refuerzo de memoria",
+      "timeSoon": "pronto",
+      "timeLessThanAnHour": "menos de una hora",
+      "timeHours_one": "{{count}} hora",
+      "timeHours_other": "{{count}} horas",
+      "timeDays_one": "{{count}} día",
+      "timeDays_other": "{{count}} días",
+      "hintOpenReview": "Abre los temas de repaso",
+      "couldNotLoad": "Error al cargar estado del repaso"
+    },
+    "assessment": {
+      "title": "Demuestra que lo sabes",
+      "topicsReady_one": "{{count}} tema listo para evaluar",
+      "topicsReady_other": "{{count}} temas listos para evaluar",
+      "afterFinishTopic": "Disponible después de completar un tema",
+      "hintOpenPicker": "Abre el selector de evaluación",
+      "hintOpenLibrary": "Abre la biblioteca",
+      "couldNotLoad": "Error al cargar temas de evaluación"
+    },
+    "quiz": {
+      "title": "Quiz rápido",
+      "capitals": "Capitales",
+      "guessWho": "¿Quién es quién?",
+      "defaultSubtitle": "Ponte a prueba con preguntas de opción múltiple · {{xp}} XP",
+      "capitalsDescription": "Países, capitales y lugares.",
+      "guessWhoDescription": "Adivina el personaje con pistas.",
+      "bestCue": "Mejor: {{pct}} %",
+      "playedCue": "Jugado: {{count}}",
+      "bestFraction": "Mejor {{score}}/{{total}}",
+      "playedFraction": "Jugado {{count}}",
+      "hintOpenQuiz": "Abre las opciones de quiz",
+      "couldNotLoad": "Error al cargar estadísticas del quiz"
+    },
+    "recitation": {
+      "title": "Recitar de memoria",
+      "subtitle": "Recita un poema o texto de memoria",
+      "betaLabel": "Beta"
+    },
+    "dictation": {
+      "title": "Dictado",
+      "subtitle": "Practica escribir lo que escuchas"
+    },
+    "history": {
+      "title": "Historial de quiz",
+      "roundsPlayed_one": "{{count}} ronda jugada",
+      "roundsPlayed_other": "{{count}} rondas jugadas",
+      "noRoundsYet": "Sin rondas aún",
+      "hintOpenHistory": "Abre el historial de quiz"
     }
   }
 }

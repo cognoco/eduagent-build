@@ -232,6 +232,7 @@ jest.mock(
 jest.mock(
   '../../../../lib/format-api-error' /* gc1-allow: unit test boundary */,
   () => ({
+    ...jest.requireActual('../../../../lib/format-api-error'),
     formatApiError: (err: Error) => `formatted: ${err.message}`,
   }),
 );

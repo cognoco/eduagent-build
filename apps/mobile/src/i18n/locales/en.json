@@ -118,11 +118,9 @@
       "emptySubjectsTitle": "Your subjects will show up here",
       "emptySubjectsMessage": "Start one now, or just use homework help when you need it.",
       "addSubject": "Add a subject",
-      "quota": {
-        "line": "{{questionsLeftToday}} questions left today · {{questionsLeftMonth}} left this month",
-        "lineDailyOnly": "{{questionsLeftToday}} questions left today",
-        "lineMonthlyOnly": "{{questionsLeftMonth}} questions left this month",
-        "lineUnlimited": "Plenty of questions today"
+      "momentum": {
+        "topicLearned": "{{n}} topic learned",
+        "topicsLearned": "{{n}} topics learned"
       },
       "intentActions": {
         "homework": {
@@ -151,12 +149,18 @@
     },
     "parent": {
       "greeting": "Hey {{displayName}}",
+      "accountLink": "Open account",
       "intentHeader": "What do you need right now?",
       "tonight": {
-        "title": "Tonight",
+        "titleMorning": "This morning",
+        "titleAfternoon": "This afternoon",
+        "titleEvening": "Tonight",
         "promptWithTopic": "Ask {{childName}}: what made {{topic}} click today?",
         "promptNoActivity": "Ask {{childName}}: what would make starting feel easy tonight?",
-        "promptFallback": "Ask {{childName}}: what felt easier today than yesterday?"
+        "promptFallback": "Ask {{childName}}: what felt easier today than yesterday?",
+        "promptTrickiestWithTopic": "Ask {{childName}}: what's the trickiest part of {{topic}} right now?",
+        "promptTomorrow": "Ask {{childName}}: what should we focus on tomorrow?",
+        "promptCurious": "Ask {{childName}}: what's something they're curious about?"
       },
       "empty": {
         "title": "Your family dashboard starts here",
@@ -251,8 +255,8 @@
       "subtitle": "Applies to your own learning sessions.",
       "subtitleWithChildren": "Applies to your own sessions. To change a child's, open their profile from the dashboard.",
       "childPreferencesAccessLabel": "Open {{name}}'s profile preferences",
-      "childPreferencesLink": "To change {{name}}'s preferences, open their profile →",
-      "familyPreferencesLink": "To change a child's preferences, open Family →",
+      "childPreferencesLink": "To change {{name}}'s preferences, tap their profile on Home →",
+      "familyPreferencesLink": "To change a child's preferences, tap their profile on Home →",
       "sheetTitle": "Learning mode",
       "sheetEffectMessage": "Takes effect from your next message.",
       "casual": {
@@ -265,11 +269,21 @@
       }
     },
     "accommodation": {
-      "sectionHeader": "{{name}}'s Learning Accommodation"
+      "sectionHeader": "Your learning accommodation",
+      "viewAndManage": "View & manage",
+      "screenTitle": "Learning accommodation",
+      "notSureWhichToPick": "Not sure which to pick?",
+      "guideActive": "Active",
+      "childScreenTitle": "{{name}}'s accommodation"
+    },
+    "learningPreferences": {
+      "rowLabel": "Your learning preferences",
+      "screenTitle": "Your learning preferences"
     },
     "mentorMemory": {
-      "sectionHeader": "What your mentor knows",
-      "viewAndManage": "View & manage"
+      "sectionHeader": "Mentor memory",
+      "viewAndManage": "What your mentor knows",
+      "viewAndManageDescription": "Strengths, interests, and how you learn best"
     },
     "family": {
       "sectionHeader": "Family",
@@ -376,8 +390,8 @@
   },
   "session": {
     "mentorMemory": {
-      "title": "What My Mentor Knows",
-      "subtitle": "Review, edit, or add what your mentor remembers.",
+      "title": "Help your mentor learn how to teach you",
+      "subtitle": "Add what helps, fix what feels wrong, and choose what your mentor can use.",
       "loadError": "We couldn't load your mentor memory right now",
       "loadTimeout": {
         "title": "Loading is taking too long",
@@ -388,16 +402,21 @@
       "lastSeen": "Last seen {{date}}",
       "bringBack": "Bring back",
       "status": {
-        "heading": "Memory status",
-        "enabled": "Memory collection is enabled.",
-        "disabled": "Memory collection is turned off.",
-        "pendingOwner": "Memory collection hasn't been enabled yet.",
+        "heading": "How memory helps",
+        "enabled": "Your mentor can remember helpful learning notes.",
+        "disabled": "Your mentor will not use saved learning notes.",
+        "pendingOwner": "Memory is off until you choose to enable it.",
         "pendingChild": "A parent or guardian still needs to enable memory collection.",
-        "useMemoryLabel": "Use what the mentor knows"
+        "useMemoryLabel": "Use saved notes in lessons",
+        "useMemoryDisabledHint": "Enable memory first, then this can turn on."
       },
       "consent": {
-        "title": "Enable mentor memory",
+        "title": "Let your mentor remember what helps",
         "description": "Let the mentor remember what works for you — your strengths, preferred explanations, and topics you find tricky."
+      },
+      "examples": {
+        "title": "Examples you can add",
+        "body": "\"I learn best with examples,\" \"I like space analogies,\" or \"Fractions still feel tricky.\""
       },
       "accommodation": {
         "setByParent": "Set by your parent in their settings.",
@@ -667,6 +686,75 @@
       }
     }
   },
+  "practiceHub": {
+    "title": "Test yourself",
+    "subtitle": "Pick a quick win. Every round helps your memory stick.",
+    "xpLabel": "{{xp}} XP",
+    "sections": {
+      "bestNextStep": "Best next step",
+      "quiz": "Quiz",
+      "otherPractice": "Other practice",
+      "recentProgress": "Recent progress"
+    },
+    "review": {
+      "title": "Today's review",
+      "startReview": "Start review",
+      "topicsReady_one": "{{count}} topic ready",
+      "topicsReady_other": "{{count}} topics ready",
+      "allCaughtUp": "All caught up",
+      "nextReviewIn": "Your next review is in {{time}}",
+      "completeATopic": "Complete a topic to start reviewing",
+      "browseTopics": "Browse your topics",
+      "memoryBoost": "Memory boost",
+      "timeSoon": "soon",
+      "timeLessThanAnHour": "less than an hour",
+      "timeHours_one": "{{count}} hour",
+      "timeHours_other": "{{count}} hours",
+      "timeDays_one": "{{count}} day",
+      "timeDays_other": "{{count}} days",
+      "hintOpenReview": "Opens review topics",
+      "couldNotLoad": "Could not load review status"
+    },
+    "assessment": {
+      "title": "Prove I know this",
+      "topicsReady_one": "{{count}} topic ready to test",
+      "topicsReady_other": "{{count}} topics ready to test",
+      "afterFinishTopic": "Available after you finish a topic",
+      "hintOpenPicker": "Opens the assessment picker",
+      "hintOpenLibrary": "Opens the library",
+      "couldNotLoad": "Could not load assessment topics"
+    },
+    "quiz": {
+      "title": "Quick quiz",
+      "capitals": "Capitals",
+      "guessWho": "Who's who",
+      "defaultSubtitle": "Test yourself with multiple choice questions · {{xp}} XP",
+      "capitalsDescription": "Countries, capitals, and places.",
+      "guessWhoDescription": "Guess the person from clues.",
+      "bestCue": "Best: {{pct}}%",
+      "playedCue": "Played: {{count}}",
+      "bestFraction": "Best {{score}}/{{total}}",
+      "playedFraction": "Played {{count}}",
+      "hintOpenQuiz": "Opens quiz choices",
+      "couldNotLoad": "Could not load quiz stats"
+    },
+    "recitation": {
+      "title": "Recite from memory",
+      "subtitle": "Recite a poem or text from memory",
+      "betaLabel": "Beta"
+    },
+    "dictation": {
+      "title": "Dictation",
+      "subtitle": "Practice writing what you hear"
+    },
+    "history": {
+      "title": "Quiz history",
+      "roundsPlayed_one": "{{count}} round played",
+      "roundsPlayed_other": "{{count}} rounds played",
+      "noRoundsYet": "No rounds yet",
+      "hintOpenHistory": "Opens quiz history"
+    }
+  },
   "dictation": {
     "index": {
       "title": "Dictation",
@@ -678,6 +766,8 @@
       "retryGenerating": "Retry generating a dictation",
       "pickingTopic": "Picking a topic...",
       "takesAFewSeconds": "This takes a few seconds",
+      "loadingTitle": "Finding your next review...",
+      "loadingMessage": "We're choosing a dictation that should feel useful, not random.",
       "cancelGenerating": "Cancel generating a dictation",
       "iHaveAText": "I have a text",
       "iHaveATextSubtitle": "Type or paste your own text",
@@ -851,6 +941,8 @@
     "shelf": {
       "missingParam": "Missing subject. Please go back and try again.",
       "loading": "Loading this shelf...",
+      "loadingTitle": "Opening your shelf...",
+      "loadingMessage": "We're finding the books and next steps saved for this subject.",
       "errorTitle": "Couldn't load this shelf",
       "fallbackTitle": "Shelf",
       "bookCount": "{{count}} book",
@@ -900,9 +992,9 @@
       "analogyTitle": "Analogy Preference",
       "analogyDescription": "Choose a domain for analogies. The mentor will prefer analogies from this world when explaining concepts, but won't force them when a direct explanation is clearer."
     },
-    "title": "New subject",
-    "prompt": "What would you like to learn? Enter any subject or describe what interests you — we'll figure out the rest.",
-    "nameLabel": "Subject name",
+    "title": "What do you want to learn?",
+    "prompt": "Choose a starting point or type it in your own words. Your mentor will help shape it into a subject.",
+    "nameLabel": "Type your idea",
     "namePlaceholder": "e.g. Calculus, World History, 'learn about ants'...",
     "resolveTookTooLong": "Check took too long — try again",
     "resolveNetworkError": "Could not check if this subject exists. Please check your connection and try again.",
@@ -1124,7 +1216,8 @@
     "ocrDefaultError": "We couldn't read that clearly. Try taking the photo again with better lighting.",
     "problemsFound": "Here are the problems I found:",
     "addSkippedFragmentsLabel": "Add skipped fragments back",
-    "skippedFragments": "We skipped {{count}} unclear fragment(s). Tap to add them back.",
+    "skippedFragments_one": "We skipped {{count}} unclear fragment. Tap to add it back.",
+    "skippedFragments_other": "We skipped {{count}} unclear fragments. Tap to add them back.",
     "problemNumber": "Problem {{number}}",
     "removeProblemLabel": "Remove problem {{number}}",
     "remove": "Remove",
@@ -1164,7 +1257,7 @@
   },
   "progress": {
     "pageTitle": "My Learning Journey",
-    "pageSubtitle": "Progress that reflects what you actually know.",
+    "pageSubtitle": "Reports and signals from your recent learning.",
     "ownProfilePill": "Mine",
     "startLearning": "Start learning",
     "keepLearning": "Keep learning",
@@ -1173,7 +1266,7 @@
     "hero": {
       "sessionsCompleted": "{{count}} session completed",
       "sessionsCompleted_other": "{{count}} sessions completed",
-      "sessionsCompletedSubtitle": "Topics mastered and vocabulary will appear as you progress.",
+      "sessionsCompletedSubtitle": "Your learning rhythm is visible here, even before mastery catches up.",
       "buildingLanguage": "You're building your language",
       "buildingLanguageSubtitle_one": "{{count}} word and counting.",
       "buildingLanguageSubtitle_other": "{{count}} words and counting.",
@@ -1221,6 +1314,17 @@
     },
     "weeklyReport": {
       "thisWeekSoFar": "This week so far",
+      "practiceTitle": "Practice highlights",
+      "chips": {
+        "time": "{{time}} spent",
+        "topics": "{{count}} topic started",
+        "topics_other": "{{count}} topics started",
+        "streak": "{{count}}-day streak"
+      },
+      "practice": {
+        "quizzes": "quizzes completed",
+        "reviews": "reviews finished"
+      },
       "mini": {
         "sessions": "{{count}} session",
         "sessions_other": "{{count}} sessions",
@@ -1236,11 +1340,21 @@
     },
     "monthlyReport": {
       "highlightsTitle": "Highlights",
-      "nextStepsTitle": "What's next",
+      "nextStepTitle": "Next step",
+      "bars": {
+        "sessions": "Sessions",
+        "time": "Time",
+        "topics": "Topics"
+      },
       "empty": {
         "child": "Your first monthly summary lands at the end of {{month}}.",
         "adult": "Your first monthly summary lands at the end of {{month}}."
       }
+    },
+    "previousReports": {
+      "title": "Previous reports",
+      "subtitle": "Weekly and monthly snapshots from your learning.",
+      "viewAll": "View all reports"
     },
     "newLearner": {
       "title": "You've completed {{count}} session. Keep going!",
@@ -1326,6 +1440,8 @@
       "noSubjectTitle": "No subject selected",
       "noSubjectSubtitle": "Pick a subject from your progress page to see details.",
       "backToProgress": "Back to progress",
+      "loadingTitle": "Finding your progress...",
+      "loadingMessage": "We're pulling together sessions, reviews, and saved words for this subject.",
       "loadingTooLong": "Loading is taking too long",
       "checkConnection": "Check your connection and try again.",
       "errorTitle": "We couldn't load this subject",

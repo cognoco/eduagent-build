@@ -15,7 +15,11 @@ import { useAuth, useClerk, useUser } from '@clerk/clerk-expo';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as SecureStore from '../../lib/secure-storage';
-import { useProfile, personaFromBirthYear } from '../../lib/profile';
+import {
+  useProfile,
+  personaFromBirthYear,
+  isGuardianProfile,
+} from '../../lib/profile';
 import { useThemeColors, useTokenVars } from '../../lib/theme';
 import { useConsentStatus, useRequestConsent } from '../../hooks/use-consent';
 import {
@@ -54,7 +58,14 @@ initNotificationHandler();
 // ─── Tab visibility whitelist ────────────────────────────────────────
 // Only these routes render a visible tab button. Every other route in
 // (app)/ is auto-hidden — no manual Tabs.Screen entry required.
-const BASE_VISIBLE_TABS: ReadonlySet<string> = new Set([
+//
+// Two navigation shapes:
+//   guardian — owner with linked children: all 5 tabs including own-learning
+//   learner — everyone else (solo owner OR child on parent account): 4 tabs
+//
+// Content INSIDE tabs (especially More) varies by isOwner and age — but
+// those are per-screen concerns, not tab-visibility concerns.
+const GUARDIAN_TABS: ReadonlySet<string> = new Set([
   'home',
   'own-learning',
   'library',
@@ -62,8 +73,37 @@ const BASE_VISIBLE_TABS: ReadonlySet<string> = new Set([
   'more',
 ]);
 
-export function computeVisibleTabs(): Set<string> {
-  return new Set<string>(BASE_VISIBLE_TABS);
+const LEARNER_TABS: ReadonlySet<string> = new Set([
+  'home',
+  'library',
+  'progress',
+  'more',
+]);
+
+export type TabShape = 'guardian' | 'learner';
+
+export function resolveTabShape({
+  activeProfile,
+  profiles,
+  isParentProxy,
+}: {
+  activeProfile: { isOwner: boolean } | null | undefined;
+  profiles: ReadonlyArray<{ isOwner: boolean }>;
+  isParentProxy: boolean;
+}): TabShape {
+  if (!activeProfile) return 'guardian';
+  if (isParentProxy) return 'learner';
+  if (isGuardianProfile(activeProfile, profiles)) return 'guardian';
+  return 'learner';
+}
+
+export function computeVisibleTabs(shape: TabShape = 'guardian'): Set<string> {
+  switch (shape) {
+    case 'guardian':
+      return new Set(GUARDIAN_TABS);
+    case 'learner':
+      return new Set(LEARNER_TABS);
+  }
 }
 
 // Routes where the entire tab bar is hidden (immersive / full-screen UX).
@@ -1292,7 +1332,11 @@ export default function AppLayout() {
   useMentorLanguageSync();
   const { isParentProxy, childProfile, parentProfile } = useParentProxy();
   const role = useActiveProfileRole();
-  const visibleTabs = React.useMemo(() => computeVisibleTabs(), []);
+  const tabShape = resolveTabShape({ activeProfile, profiles, isParentProxy });
+  const visibleTabs = React.useMemo(
+    () => computeVisibleTabs(tabShape),
+    [tabShape],
+  );
 
   // Sync Clerk auth state with RevenueCat identity (runs on auth change)
   useRevenueCatIdentity();

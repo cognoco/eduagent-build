@@ -5,14 +5,18 @@ import { useThemeColors } from '../../lib/theme';
 
 export function SettingsRow({
   label,
+  description,
   value,
   onPress,
   testID,
+  labelClassName,
 }: {
   label: string;
+  description?: string;
   value?: string;
   onPress?: () => void;
   testID?: string;
+  labelClassName?: string;
 }): React.ReactElement {
   const themeColors = useThemeColors();
   return (
@@ -28,7 +32,16 @@ export function SettingsRow({
       accessibilityRole="button"
       testID={testID}
     >
-      <Text className="text-body text-text-primary">{label}</Text>
+      <View className="flex-1 pr-3">
+        <Text className={labelClassName ?? 'text-body text-text-primary'}>
+          {label}
+        </Text>
+        {description ? (
+          <Text className="text-body-sm text-text-secondary mt-0.5">
+            {description}
+          </Text>
+        ) : null}
+      </View>
       <View className="flex-row items-center gap-2">
         {value ? (
           <Text className="text-body-sm text-text-secondary">{value}</Text>

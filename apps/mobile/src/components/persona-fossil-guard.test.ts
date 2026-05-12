@@ -1,5 +1,5 @@
 import { execSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 // Epic 12 removed personaType from the database. Several vocabulary fossils
@@ -44,6 +44,7 @@ function listMobileSources(): string[] {
 }
 
 function fileHasPersonaFossil(absPath: string): boolean {
+  if (!existsSync(absPath)) return false;
   const source = readFileSync(absPath, 'utf-8');
   return FOSSIL_PATTERNS.some((p) => p.test(source));
 }

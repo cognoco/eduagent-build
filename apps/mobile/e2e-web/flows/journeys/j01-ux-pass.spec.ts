@@ -14,6 +14,7 @@ const shotDir = path.join(
 );
 
 async function capture(page: Page, name: string): Promise<void> {
+  await page.waitForLoadState('networkidle');
   await page.screenshot({
     path: path.join(shotDir, `${name}.png`),
     fullPage: true,
@@ -37,11 +38,11 @@ test('single learner UX screenshot crawl', async ({ page }) => {
   });
   await capture(page, '01-home');
 
-  await page.getByTestId('home-action-practice').click();
+  await page.goto('/practice', { waitUntil: 'commit' });
   await capture(page, '02-practice-entry');
 
   await page.goto('/home', { waitUntil: 'commit' });
-  await page.getByTestId('home-action-study-new').click();
+  await page.goto('/create-subject', { waitUntil: 'commit' });
   await capture(page, '03-study-new-click');
 
   await page.goto('/library', { waitUntil: 'commit' });

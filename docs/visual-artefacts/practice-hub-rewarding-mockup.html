@@ -1,0 +1,569 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Practice Hub Rewarding Mockup</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #16201b;
+      --muted: #637067;
+      --line: #dbe5dc;
+      --paper: #f7faf6;
+      --surface: #ffffff;
+      --mint: #dff5e9;
+      --mint-strong: #2f9c6a;
+      --amber: #ffe8b8;
+      --amber-strong: #b46f00;
+      --blue: #e4efff;
+      --blue-strong: #386dbe;
+      --rose: #ffe3e9;
+      --rose-strong: #b64a62;
+      --violet: #ece7ff;
+      --violet-strong: #7058c8;
+      --shadow: 0 18px 50px rgba(26, 37, 31, 0.16);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 32px;
+      background:
+        linear-gradient(135deg, rgba(223, 245, 233, 0.8), rgba(228, 239, 255, 0.72)),
+        var(--paper);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--ink);
+    }
+
+    .phone {
+      width: min(390px, calc(100vw - 32px));
+      min-height: 812px;
+      background: var(--paper);
+      border: 1px solid rgba(22, 32, 27, 0.12);
+      border-radius: 36px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .screen {
+      min-height: 812px;
+      padding: 22px 18px 28px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .back {
+      width: 42px;
+      height: 42px;
+      border: 1px solid var(--line);
+      border-radius: 21px;
+      background: var(--surface);
+      display: grid;
+      place-items: center;
+      font-size: 21px;
+      line-height: 1;
+      color: var(--ink);
+    }
+
+    .heading-row {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    h1,
+    h2,
+    p {
+      margin: 0;
+    }
+
+    h1 {
+      font-size: 29px;
+      line-height: 1.05;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      margin-top: 5px;
+      font-size: 14px;
+      line-height: 1.35;
+      color: var(--muted);
+    }
+
+    .xp-pill {
+      min-width: 78px;
+      padding: 10px 12px;
+      border-radius: 18px;
+      background: #12352a;
+      color: white;
+      text-align: center;
+      font-weight: 800;
+      font-size: 16px;
+      flex: 0 0 auto;
+    }
+
+    .xp-pill small {
+      display: block;
+      margin-top: 2px;
+      font-size: 11px;
+      font-weight: 700;
+      color: rgba(255, 255, 255, 0.72);
+    }
+
+    .section-label {
+      margin: 18px 2px 9px;
+      font-size: 12px;
+      line-height: 1;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .review-card {
+      display: grid;
+      gap: 14px;
+      padding: 18px;
+      border: 1px solid rgba(47, 156, 106, 0.24);
+      border-radius: 24px;
+      background: linear-gradient(180deg, #f8fffb, var(--mint));
+    }
+
+    .review-head,
+    .row-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .title {
+      font-size: 19px;
+      line-height: 1.15;
+      font-weight: 820;
+      letter-spacing: 0;
+    }
+
+    .body {
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.35;
+    }
+
+    .cue-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .cue {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 6px 9px;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.72);
+      border: 1px solid rgba(22, 32, 27, 0.08);
+      font-size: 12px;
+      line-height: 1;
+      font-weight: 760;
+      color: var(--ink);
+    }
+
+    .cue.strong {
+      color: #ffffff;
+      background: var(--mint-strong);
+      border-color: var(--mint-strong);
+    }
+
+    .button {
+      width: 100%;
+      min-height: 48px;
+      border: 0;
+      border-radius: 18px;
+      background: var(--ink);
+      color: white;
+      font-size: 15px;
+      font-weight: 820;
+    }
+
+    .challenge-row {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 12px;
+      margin-top: 10px;
+      padding: 14px;
+      border: 1px solid rgba(47, 156, 106, 0.18);
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.68);
+    }
+
+    .challenge-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 18px;
+      display: grid;
+      place-items: center;
+      color: white;
+      background: var(--mint-strong);
+      font-weight: 900;
+    }
+
+    .challenge-title {
+      font-size: 15px;
+      line-height: 1.15;
+      font-weight: 820;
+    }
+
+    .challenge-body {
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.3;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .quiz-card {
+      display: grid;
+      gap: 14px;
+      padding: 18px;
+      border: 1px solid rgba(56, 109, 190, 0.22);
+      border-radius: 24px;
+      background: linear-gradient(180deg, #ffffff, var(--blue));
+    }
+
+    .quiz-options {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .quiz-option {
+      min-height: 112px;
+      padding: 12px;
+      border: 1px solid rgba(22, 32, 27, 0.08);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.72);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .quiz-option-title {
+      font-size: 15px;
+      line-height: 1.15;
+      font-weight: 820;
+    }
+
+    .quiz-option-body {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.3;
+    }
+
+    .mini-card {
+      min-height: 142px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      background: var(--surface);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .mini-card.recite {
+      background: linear-gradient(180deg, #ffffff, var(--violet));
+      border-color: rgba(112, 88, 200, 0.22);
+    }
+
+    .mini-card.dictation {
+      background: linear-gradient(180deg, #ffffff, var(--amber));
+      border-color: rgba(180, 111, 0, 0.2);
+    }
+
+    .icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 18px;
+      display: grid;
+      place-items: center;
+      font-weight: 900;
+      color: white;
+      font-size: 16px;
+    }
+
+    .quiz-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 18px;
+      display: grid;
+      place-items: center;
+      font-weight: 900;
+      color: white;
+      font-size: 16px;
+      background: var(--blue-strong);
+    }
+
+    .recite .icon {
+      background: var(--violet-strong);
+    }
+
+    .dictation .icon {
+      background: var(--amber-strong);
+    }
+
+    .mini-title {
+      font-size: 16px;
+      line-height: 1.15;
+      font-weight: 820;
+    }
+
+    .mini-body {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.3;
+    }
+
+    .tiny-cues {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .tiny-cue {
+      min-height: 24px;
+      padding: 5px 7px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.72);
+      border: 1px solid rgba(22, 32, 27, 0.08);
+      color: var(--ink);
+      font-size: 11px;
+      font-weight: 780;
+      line-height: 1;
+    }
+
+    .locked {
+      margin-top: 12px;
+      padding: 14px;
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.62);
+      border: 1px dashed rgba(22, 32, 27, 0.22);
+    }
+
+    .locked .title {
+      font-size: 15px;
+    }
+
+    .history-row {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 12px;
+      margin-top: 12px;
+      padding: 14px;
+      border: 1px solid rgba(182, 74, 98, 0.18);
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.68);
+    }
+
+    .history-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 18px;
+      display: grid;
+      place-items: center;
+      color: white;
+      background: var(--rose-strong);
+      font-weight: 900;
+    }
+
+    .history-title {
+      font-size: 15px;
+      line-height: 1.15;
+      font-weight: 820;
+    }
+
+    .history-body {
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.3;
+    }
+
+    .chevron {
+      color: var(--muted);
+      font-size: 22px;
+      font-weight: 700;
+    }
+
+    @media (max-width: 420px) {
+      body {
+        padding: 0;
+        background: var(--paper);
+      }
+
+      .phone {
+        width: 100vw;
+        min-height: 100vh;
+        border: 0;
+        border-radius: 0;
+        box-shadow: none;
+      }
+
+      .screen {
+        min-height: 100vh;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="phone" aria-label="Practice hub rewarding mockup">
+    <section class="screen">
+      <header class="topbar">
+        <div class="back" aria-hidden="true">&lt;</div>
+        <div class="heading-row">
+          <div>
+            <h1>Test yourself</h1>
+            <p class="subtitle">Pick a quick win. Every round helps your memory stick.</p>
+          </div>
+          <div class="xp-pill">420<small>XP</small></div>
+        </div>
+      </header>
+
+      <div class="section-label">Best next step</div>
+      <section class="review-card">
+        <div class="review-head">
+          <div>
+            <h2 class="title">Today's review</h2>
+            <p class="body">2 topics are ready: Fractions and World Capitals.</p>
+          </div>
+          <span class="cue strong">+30 XP</span>
+        </div>
+        <div class="cue-row" aria-label="Review cues">
+          <span class="cue">4 min</span>
+          <span class="cue">2 topics</span>
+          <span class="cue">Memory boost</span>
+        </div>
+        <button class="button">Start review</button>
+      </section>
+
+      <section class="challenge-row">
+        <div class="challenge-icon" aria-hidden="true">✓</div>
+        <div>
+          <h2 class="challenge-title">Prove I know this</h2>
+          <p class="challenge-body">6 topics ready · 5 min · +40 XP</p>
+        </div>
+        <div class="chevron" aria-hidden="true">&gt;</div>
+      </section>
+
+      <div class="section-label">Quiz</div>
+      <section class="quiz-card">
+        <div class="review-head">
+          <div>
+            <h2 class="title">Quick quiz</h2>
+            <p class="body">Pick a quiz style and do a short scored round.</p>
+          </div>
+          <span class="cue strong">+20 XP</span>
+        </div>
+        <div class="quiz-options">
+          <article class="quiz-option">
+            <div class="row-head">
+              <div class="quiz-icon" aria-hidden="true">?</div>
+              <span class="tiny-cue">2 min</span>
+            </div>
+            <div>
+              <h2 class="quiz-option-title">Capitals</h2>
+              <p class="quiz-option-body">Countries, capitals, and places.</p>
+            </div>
+            <div class="tiny-cues">
+              <span class="tiny-cue">Best 8/10</span>
+            </div>
+          </article>
+
+          <article class="quiz-option">
+            <div class="row-head">
+              <div class="quiz-icon" aria-hidden="true">W</div>
+              <span class="tiny-cue">3 min</span>
+            </div>
+            <div>
+              <h2 class="quiz-option-title">Who's who</h2>
+              <p class="quiz-option-body">Guess the person from clues.</p>
+            </div>
+            <div class="tiny-cues">
+              <span class="tiny-cue">Clues</span>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <div class="section-label">Other practice</div>
+      <section class="grid">
+        <article class="mini-card dictation">
+          <div class="row-head">
+            <div class="icon" aria-hidden="true">D</div>
+            <span class="tiny-cue">+25 XP</span>
+          </div>
+          <div>
+            <h2 class="mini-title">Dictation</h2>
+            <p class="mini-body">Listen, write, then check your accuracy.</p>
+          </div>
+          <div class="tiny-cues">
+            <span class="tiny-cue">5 min</span>
+            <span class="tiny-cue">Writing</span>
+          </div>
+        </article>
+
+        <article class="mini-card recite">
+          <div class="row-head">
+            <div class="icon" aria-hidden="true">R</div>
+            <span class="tiny-cue">Beta</span>
+          </div>
+          <div>
+            <h2 class="mini-title">Recite</h2>
+            <p class="mini-body">Say a poem, speech, or facts from memory.</p>
+          </div>
+          <div class="tiny-cues">
+            <span class="tiny-cue">3 min</span>
+            <span class="tiny-cue">Voice</span>
+          </div>
+        </article>
+      </section>
+
+      <div class="section-label">Recent progress</div>
+      <section class="history-row">
+        <div class="history-icon" aria-hidden="true">H</div>
+        <div>
+          <h2 class="history-title">Quiz history</h2>
+          <p class="history-body">12 rounds played · Last score 9/10 · 180 XP earned</p>
+        </div>
+        <div class="chevron" aria-hidden="true">&gt;</div>
+      </section>
+    </section>
+  </main>
+</body>
+</html>

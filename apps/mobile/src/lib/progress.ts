@@ -1,3 +1,49 @@
+export function formatWeekLabel(iso: string): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+export function formatMonthLabel(iso: string): string {
+  return new Date(`${iso}T00:00:00Z`).toLocaleDateString(undefined, {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+}
+
+export function buildGrowthData(
+  history:
+    | {
+        dataPoints: Array<{
+          date: string;
+          topicsMastered: number;
+          vocabularyTotal: number;
+        }>;
+      }
+    | null
+    | undefined,
+) {
+  const points = history?.dataPoints ?? [];
+
+  return points.slice(-8).map((point, index) => {
+    const previous = points[index - 1];
+    return {
+      label: formatWeekLabel(point.date),
+      value: Math.max(
+        0,
+        point.topicsMastered - (previous?.topicsMastered ?? 0),
+      ),
+      secondaryValue:
+        point.vocabularyTotal > 0
+          ? Math.max(
+              0,
+              point.vocabularyTotal - (previous?.vocabularyTotal ?? 0),
+            )
+          : undefined,
+    };
+  });
+}
+
 export const STALE_PROFILE_HEURISTIC = {
   maxFreshSessionCount: 2,
   staleAfterDays: 14,

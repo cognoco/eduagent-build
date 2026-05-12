@@ -26,6 +26,8 @@ export interface ThemeTokens {
     coachingCard: string;
     coachBubble: string;
     homeworkLane: string;
+    practiceMint: string;
+    practiceDarkTeal: string;
   };
   radii: {
     card: string;
@@ -71,6 +73,8 @@ export const tokens: Record<ColorScheme, ThemeTokens> = {
       coachingCard: '#f3ede4',
       coachBubble: 'rgba(13, 148, 136, 0.08)',
       homeworkLane: '#d97706',
+      practiceMint: '#2f9c6a',
+      practiceDarkTeal: '#12352a',
     },
     radii: { card: '16px', button: '12px', input: '10px' },
     spacing: { cardPadding: '24px' },
@@ -101,6 +105,8 @@ export const tokens: Record<ColorScheme, ThemeTokens> = {
       coachingCard: '#2a2a54',
       coachBubble: 'rgba(45, 212, 191, 0.12)',
       homeworkLane: '#f59e0b',
+      practiceMint: '#2f9c6a',
+      practiceDarkTeal: '#12352a',
     },
     radii: { card: '16px', button: '12px', input: '10px' },
     spacing: { cardPadding: '24px' },
@@ -289,6 +295,8 @@ export function tokensToCssVars(t: ThemeTokens): Record<`--${string}`, string> {
     '--color-coaching-card': t.colors.coachingCard,
     '--color-coach-bubble': t.colors.coachBubble,
     '--color-homework-lane': t.colors.homeworkLane,
+    '--color-practice-mint': t.colors.practiceMint,
+    '--color-practice-dark-teal': t.colors.practiceDarkTeal,
     '--radius-card': t.radii.card,
     '--radius-button': t.radii.button,
     '--radius-input': t.radii.input,

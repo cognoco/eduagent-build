@@ -1,0 +1,704 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Library Modern Refresh Concept</title>
+    <style>
+      :root {
+        --page: #dde5e8;
+        --app: #faf7f1;
+        --surface: #fffdf9;
+        --surface-soft: #f0ebe3;
+        --line: #e2d9cd;
+        --ink: #171717;
+        --muted: #67615a;
+        --faint: #9a9286;
+        --teal: #139b82;
+        --teal-soft: #dceee9;
+        --pink: #c72b8c;
+        --pink-soft: #f8dcea;
+        --violet: #9872f4;
+        --violet-soft: #eee7ff;
+        --orange: #d75a24;
+        --orange-soft: #fee7d9;
+        --blue: #2b73c7;
+        --blue-soft: #dfecf9;
+        --green: #16864f;
+        --green-soft: #dff0e8;
+        --shadow: 0 24px 70px rgba(23, 23, 23, 0.16);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--page);
+        color: var(--ink);
+        font-family:
+          Inter,
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+      }
+
+      .canvas {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 28px;
+        justify-content: center;
+        align-items: flex-start;
+        padding: 40px 24px;
+      }
+
+      .phone {
+        width: 390px;
+        min-height: 844px;
+        border: 10px solid #111;
+        border-radius: 34px;
+        overflow: hidden;
+        background: var(--app);
+        box-shadow: var(--shadow);
+      }
+
+      .screen {
+        min-height: 824px;
+        padding: 48px 20px 90px;
+        position: relative;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: 34px;
+        line-height: 1.05;
+        letter-spacing: 0;
+      }
+
+      h2 {
+        font-size: 20px;
+        line-height: 1.18;
+        letter-spacing: 0;
+      }
+
+      h3 {
+        font-size: 18px;
+        line-height: 1.22;
+        letter-spacing: 0;
+      }
+
+      p {
+        color: var(--muted);
+        font-size: 15px;
+        line-height: 1.38;
+      }
+
+      .top {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 14px;
+      }
+
+      .subtitle {
+        margin-top: 8px;
+      }
+
+      .manage {
+        min-height: 44px;
+        border: 0;
+        border-radius: 999px;
+        background: var(--surface-soft);
+        color: var(--teal);
+        padding: 0 18px;
+        font-size: 16px;
+        font-weight: 850;
+      }
+
+      .icon-button {
+        width: 44px;
+        height: 44px;
+        border: 0;
+        border-radius: 999px;
+        display: grid;
+        place-items: center;
+        background: transparent;
+        color: var(--violet);
+        font-size: 31px;
+        line-height: 1;
+      }
+
+      .icon-button.secondary {
+        color: var(--muted);
+        background: rgba(255, 253, 249, 0.6);
+      }
+
+      .search {
+        min-height: 58px;
+        margin-top: 24px;
+        border: 1px solid rgba(226, 217, 205, 0.7);
+        border-radius: 21px;
+        background: var(--surface);
+        display: flex;
+        align-items: center;
+        gap: 13px;
+        padding: 0 18px;
+        color: var(--faint);
+        font-size: 18px;
+        box-shadow: 0 10px 26px rgba(23, 23, 23, 0.05);
+      }
+
+      .section {
+        margin-top: 24px;
+      }
+
+      .section-title {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 10px;
+      }
+
+      .link {
+        color: var(--teal);
+        font-size: 14px;
+        font-weight: 850;
+      }
+
+      .soft-panel {
+        border: 1px solid rgba(226, 217, 205, 0.72);
+        border-radius: 24px;
+        background: rgba(255, 253, 249, 0.74);
+        padding: 6px 14px;
+        box-shadow: 0 12px 34px rgba(23, 23, 23, 0.06);
+      }
+
+      .shelf-row {
+        min-height: 78px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 12px 0;
+        border-bottom: 1px solid rgba(226, 217, 205, 0.7);
+      }
+
+      .shelf-row:last-child {
+        border-bottom: 0;
+      }
+
+      .tile {
+        width: 52px;
+        height: 52px;
+        border-radius: 17px;
+        display: grid;
+        place-items: center;
+        font-size: 25px;
+        font-weight: 900;
+        flex: 0 0 auto;
+      }
+
+      .tile.teal {
+        color: var(--teal);
+        background: var(--teal-soft);
+      }
+
+      .tile.pink {
+        color: var(--pink);
+        background: var(--pink-soft);
+      }
+
+      .tile.blue {
+        color: var(--blue);
+        background: var(--blue-soft);
+      }
+
+      .main {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .meta {
+        margin-top: 4px;
+        color: var(--muted);
+        font-size: 15px;
+      }
+
+      .chip {
+        min-height: 30px;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        padding: 0 11px;
+        font-size: 13px;
+        font-weight: 850;
+        white-space: nowrap;
+      }
+
+      .chip.orange {
+        color: var(--orange);
+        background: var(--orange-soft);
+      }
+
+      .chip.green {
+        color: var(--green);
+        background: var(--green-soft);
+      }
+
+      .chip.muted {
+        color: var(--muted);
+        background: var(--surface-soft);
+      }
+
+      .chev {
+        color: var(--muted);
+        font-size: 30px;
+        line-height: 1;
+      }
+
+      .progress {
+        height: 7px;
+        margin-top: 12px;
+        border-radius: 999px;
+        background: var(--surface-soft);
+        overflow: hidden;
+      }
+
+      .fill {
+        width: 20%;
+        height: 100%;
+        border-radius: inherit;
+        background: var(--teal);
+      }
+
+      .hero-card {
+        margin-top: 24px;
+        border-radius: 24px;
+        border: 1px solid rgba(19, 155, 130, 0.3);
+        background: linear-gradient(180deg, #ffffff 0%, #edf7f4 100%);
+        padding: 17px;
+        box-shadow: 0 14px 34px rgba(19, 155, 130, 0.12);
+      }
+
+      .hero-card .shelf-row {
+        min-height: 0;
+        padding: 0;
+        border-bottom: 0;
+      }
+
+      .primary {
+        width: 100%;
+        min-height: 50px;
+        border: 0;
+        border-radius: 16px;
+        margin-top: 15px;
+        background: var(--teal);
+        color: white;
+        font-size: 16px;
+        font-weight: 900;
+      }
+
+      .book-card {
+        border-radius: 24px;
+        border: 1px solid rgba(19, 155, 130, 0.38);
+        background: rgba(255, 253, 249, 0.72);
+        padding: 18px;
+        box-shadow: 0 12px 30px rgba(23, 23, 23, 0.05);
+      }
+
+      .book-card .shelf-row {
+        min-height: 0;
+        padding: 0;
+        border: 0;
+      }
+
+      .chapter {
+        margin: 24px 0 10px;
+        color: var(--muted);
+        font-size: 16px;
+        font-weight: 900;
+      }
+
+      .topic-row {
+        display: flex;
+        align-items: center;
+        gap: 13px;
+        min-height: 64px;
+        margin-bottom: 10px;
+        padding: 13px 15px;
+        border-radius: 18px;
+        background: var(--surface);
+        border: 1px solid transparent;
+        box-shadow: 0 8px 20px rgba(23, 23, 23, 0.04);
+      }
+
+      .topic-row.current {
+        border-color: rgba(152, 114, 244, 0.75);
+        background: var(--violet-soft);
+      }
+
+      .topic-row.next {
+        border-style: dashed;
+        border-color: rgba(152, 114, 244, 0.7);
+        background: rgba(255, 253, 249, 0.52);
+      }
+
+      .mark {
+        width: 24px;
+        text-align: center;
+        color: var(--green);
+        font-size: 19px;
+        font-weight: 900;
+        flex: 0 0 auto;
+      }
+
+      .mark.violet {
+        color: var(--violet);
+      }
+
+      .mark.muted {
+        color: var(--faint);
+      }
+
+      .note-card {
+        border-radius: 22px;
+        border: 1px solid rgba(226, 217, 205, 0.82);
+        background: var(--surface);
+        padding: 16px;
+        margin-bottom: 13px;
+        box-shadow: 0 12px 26px rgba(23, 23, 23, 0.05);
+      }
+
+      .note-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 10px;
+      }
+
+      .note-date {
+        color: var(--teal);
+        font-size: 13px;
+        font-weight: 900;
+      }
+
+      .quote {
+        color: var(--ink);
+        font-size: 15px;
+        line-height: 1.45;
+      }
+
+      .ai-box {
+        margin-top: 12px;
+        border-radius: 16px;
+        background: rgba(43, 115, 199, 0.08);
+        padding: 12px;
+      }
+
+      .ai-label {
+        color: var(--blue);
+        font-size: 12px;
+        font-weight: 900;
+        margin-bottom: 5px;
+        text-transform: uppercase;
+      }
+
+      .bottom-cta {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        padding: 12px 20px 18px;
+        background: rgba(250, 247, 241, 0.96);
+        border-top: 1px solid var(--line);
+      }
+
+      .bottom-cta button {
+        width: 100%;
+        min-height: 54px;
+        border: 0;
+        border-radius: 18px;
+        background: var(--teal);
+        color: white;
+        font-size: 16px;
+        font-weight: 900;
+      }
+
+      .nav {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 70px;
+        background: rgba(255, 253, 249, 0.94);
+        border-top: 1px solid var(--line);
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        align-items: center;
+      }
+
+      .nav span {
+        text-align: center;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 850;
+      }
+
+      .nav .active {
+        color: var(--teal);
+      }
+    </style>
+  </head>
+  <body>
+    <main class="canvas">
+      <section class="phone" aria-label="Library shelves modern refresh">
+        <div class="screen">
+          <div class="top">
+            <div>
+              <h1>Library</h1>
+              <p class="subtitle">Your personal library · 9 subjects · 51 topics</p>
+            </div>
+            <button class="manage">Manage</button>
+          </div>
+
+          <div class="search">⌕ Search books, topics, notes...</div>
+
+          <div class="section soft-panel">
+            <div class="shelf-row">
+              <div class="tile pink">▥</div>
+              <div class="main">
+                <h3>Chemistry</h3>
+                <p class="meta" style="color: var(--pink); font-weight: 850">
+                  Start learning
+                </p>
+              </div>
+              <div class="chev">›</div>
+            </div>
+
+            <div class="shelf-row">
+              <div class="tile teal">▥</div>
+              <div class="main">
+                <h3>Italian</h3>
+                <p class="meta">1 book · 1/10 topics</p>
+              </div>
+              <div class="chev">›</div>
+            </div>
+
+            <div class="shelf-row">
+              <div class="tile teal">▥</div>
+              <div class="main">
+                <h3>Biology</h3>
+                <p class="meta">1 book · 2/10 topics</p>
+              </div>
+              <span class="chip orange">Keep fresh</span>
+              <div class="chev">›</div>
+            </div>
+
+            <div class="shelf-row">
+              <div class="tile teal">▥</div>
+              <div class="main">
+                <h3>Math</h3>
+                <p class="meta">1 book · 1/1 topics</p>
+              </div>
+              <span class="chip green">Finished</span>
+              <div class="chev">›</div>
+            </div>
+
+            <div class="shelf-row">
+              <div class="tile pink">▥</div>
+              <div class="main">
+                <h3>Geography</h3>
+                <p class="meta">1 book · 2/10 topics</p>
+              </div>
+              <div class="chev">›</div>
+            </div>
+          </div>
+
+          <nav class="nav">
+            <span>Home</span>
+            <span class="active">Library</span>
+            <span>Progress</span>
+            <span>More</span>
+          </nav>
+        </div>
+      </section>
+
+      <section class="phone" aria-label="Subject shelf modern refresh">
+        <div class="screen">
+          <div class="top">
+            <button class="icon-button">‹</button>
+            <div class="main">
+              <h1>Biology</h1>
+              <p class="subtitle">1 book</p>
+              <p class="subtitle">2/10 topics</p>
+              <div class="progress"><div class="fill"></div></div>
+            </div>
+            <button class="icon-button secondary">⚙</button>
+          </div>
+
+          <div class="hero-card">
+            <div class="shelf-row">
+              <div class="tile blue">▶</div>
+              <div class="main">
+                <h3>Continue learning</h3>
+                <p class="meta">Photosynthesis · Nature’s Energy Recipe</p>
+              </div>
+              <span class="chip orange">Review soon</span>
+            </div>
+            <button class="primary">Start next topic</button>
+          </div>
+
+          <div class="section">
+            <div class="section-title">
+              <h2>Books</h2>
+              <span class="link">Add another</span>
+            </div>
+            <div class="book-card">
+              <div class="shelf-row">
+                <div class="tile blue">📘</div>
+                <div class="main">
+                  <h2>Photosynthesis</h2>
+                  <p class="meta">
+                    How plants use sunlight to create food and energy
+                  </p>
+                </div>
+                <span class="chip muted">In progress</span>
+              </div>
+              <div class="progress"><div class="fill"></div></div>
+              <p class="meta">2 of 10 topics finished · 5 sessions</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="phone" aria-label="Book modern refresh">
+        <div class="screen">
+          <div class="top">
+            <button class="icon-button">‹</button>
+            <div class="main">
+              <h1>Photosynthesis</h1>
+              <p class="subtitle">
+                How plants use sunlight to create food and energy
+              </p>
+              <div class="progress"><div class="fill"></div></div>
+              <p class="meta">2 of 10 topics finished</p>
+            </div>
+            <button class="icon-button">♡</button>
+          </div>
+
+          <div class="hero-card">
+            <div class="shelf-row">
+              <div class="tile blue">▶</div>
+              <div class="main">
+                <h3>Current topic</h3>
+                <p class="meta">Photosynthesis: Nature’s Energy Recipe</p>
+              </div>
+              <span class="chip orange">4 sessions</span>
+            </div>
+          </div>
+
+          <h2 class="chapter">The Grand Overview</h2>
+          <div class="topic-row current">
+            <div class="mark violet">→</div>
+            <div class="main">
+              <h3>Photosynthesis: Nature’s Energy Recipe</h3>
+              <p class="meta">Current · 4 sessions</p>
+            </div>
+          </div>
+          <div class="topic-row">
+            <div class="mark">✓</div>
+            <div class="main">
+              <h3>What Plants Need: The Ingredients</h3>
+              <p class="meta">Done · 1 session note</p>
+            </div>
+          </div>
+
+          <h2 class="chapter">The Green Factories</h2>
+          <div class="topic-row next">
+            <div class="mark violet">→</div>
+            <div class="main">
+              <h3>The Plant’s Powerhouse: Chloroplasts</h3>
+              <p class="meta">Up next</p>
+            </div>
+          </div>
+
+          <div class="bottom-cta">
+            <button>▶ Continue: Nature’s Energy Recipe</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="phone" aria-label="Topic modern refresh">
+        <div class="screen">
+          <div class="top">
+            <button class="icon-button">‹</button>
+            <button class="icon-button">♡</button>
+          </div>
+
+          <div class="section">
+            <h1>The Plant’s Powerhouse: Chloroplasts</h1>
+            <p class="subtitle">
+              Needs a fresh pass · Last studied 17 days ago
+            </p>
+            <p class="meta">Photosynthesis · Biology</p>
+          </div>
+
+          <div class="section">
+            <div class="section-title">
+              <h2>Session notes</h2>
+              <span class="link">Add note</span>
+            </div>
+
+            <div class="note-card">
+              <div class="note-top">
+                <span class="note-date">Jan 8 · 18 min</span>
+                <span class="chip green">Saved</span>
+              </div>
+              <p class="quote">
+                I learned that chloroplasts are where photosynthesis happens.
+                They use sunlight to help make food for the plant.
+              </p>
+              <div class="ai-box">
+                <div class="ai-label">AI recap</div>
+                <p>
+                  Chloroplasts contain chlorophyll, which captures light energy
+                  for photosynthesis.
+                </p>
+              </div>
+              <p class="meta" style="color: var(--teal); font-weight: 850">
+                View session summary
+              </p>
+            </div>
+
+            <div class="note-card">
+              <div class="note-top">
+                <span class="note-date">Jan 3 · 12 min</span>
+              </div>
+              <p class="quote">
+                Chlorophyll makes leaves green and helps catch sunlight.
+              </p>
+              <p class="meta" style="color: var(--teal); font-weight: 850">
+                View session summary
+              </p>
+            </div>
+          </div>
+
+          <div class="bottom-cta">
+            <button>▶ Review this topic</button>
+          </div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
