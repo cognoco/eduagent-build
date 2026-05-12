@@ -1,0 +1,6 @@
+interface:
+  display_name: "Learning Evolution"
+  short_description: "Plan next learning-product phase"
+  default_prompt: "Use $learning-evolution-next to propose the next learning-product evolution phase."
+policy:
+  allow_implicit_invocation: true

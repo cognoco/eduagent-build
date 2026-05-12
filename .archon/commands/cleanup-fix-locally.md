@@ -70,6 +70,13 @@ CI on every cleanup PR. Treat them as non-negotiable.
    `.archon/commands/cleanup-validate.md` Phase 2.5. If it fails, treat the
    regression as your bug and fix it; do NOT commit a known-broken state.
 
+5. **Read `.archon/governance-constraints.md` before applying any fix that
+   touches a tsconfig, ESLint config, prompt file, or test file.** It catalogs
+   enforcement-layer interactions that aren't in CLAUDE.md. If a fix you're
+   about to apply matches an entry in the "Common Anti-Patterns" table, the
+   fix is wrong — file a P1 follow-up explaining why the finding needs human
+   judgment instead of forcing the change through.
+
 ---
 
 ## Phase 1: LOAD - Get Fix List

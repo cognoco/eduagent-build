@@ -82,7 +82,7 @@ Read the phase description (and title) and classify by keyword presence (case-in
 | Keywords in description (any) | Phase intent | Effect on file checks |
 |---|---|---|
 | `create`, `add`, `new`, `author`, `introduce` | creates new files | Missing file on `origin/main` is **expected**, not a finding |
-| `delete`, `remove`, `drop`, `kill` | deletes existing files | File present on `origin/main` is required (deleting a file that's already gone is a `BLOCK`) |
+| `delete`, `remove`, `drop`, `kill`, `drain`, `deprecate` | deletes existing files | File present on `origin/main` is required (deleting a file that's already gone is a `BLOCK`). Triggers the cross-cutting reference scan in 2.7. |
 | `rename`, `move` | both | Skip the existence check entirely; flag as `WARN` if no claimed files exist |
 | (none of the above) — e.g. `wrap`, `migrate`, `convert`, `replace`, `update`, `refactor`, `fix` | edits existing files | Missing file on `origin/main` is a `BLOCK` |
 
@@ -136,6 +136,133 @@ For each phase's verification command, **do not run it**. Just sanity-check the 
 
 A bad-shape command (typo, missing tool, bogus path on an edit phase) is a `WARN`, not a `BLOCK` — the validate step has its own retry budget. Only escalate to `BLOCK` if the verification command is structurally garbage (e.g., empty, or claims to invoke something completely unrelated to the touched packages).
 
+### 2.6 Governance constraint check (all phases)
+
+This check exists to catch tasks that will work as written but interact badly with the repo's enforcement layer (ESLint flat-config glob resolution, `tsc --build` reference graph traversal, GC1 ratchet, pre-commit paired-stage requirements, etc.). PR-12 and PR-15a shipped half-reverted PRs because the work order prescribed steps that adversarial-review later caught and `fix-locally` undid; this section catches them at the gate.
+
+**Source of truth**: `.archon/governance-constraints.md` (also included verbatim in `rules-digest.md`). Read it once at the start of your review and apply the relevant sections per phase.
+
+For each phase, classify the touched files by change kind and check the matching constraint section:
+
+| Touched file pattern | Constraint section to apply |
+|---|---|
+| `eslint.config.mjs`, `apps/*/eslint.config.mjs`, `eslint-rules/**` | §1 ESLint config |
+| `tsconfig*.json` | §2 TypeScript config |
+| `*.test.ts`, `*.test.tsx`, `*.spec.ts`, `*.integration.test.ts` | §3 Tests |
+| `apps/api/src/services/**/*-prompts.ts`, `apps/api/src/services/llm/**` | §4 LLM prompts |
+| `packages/database/**`, `apps/api/drizzle/*.sql`, `docs/plans/*.md` with destructive ops | §5 DB / migrations |
+| `apps/api/src/**` reading `process.env` | §6 process.env |
+| `apps/mobile/src/**` touching colors, secure storage, default exports, crypto, mutateAsync | §7 Mobile |
+| `apps/mobile/src/i18n/locales/**` | §9 i18n |
+
+Apply the "Common Anti-Patterns" table at the bottom of `governance-constraints.md` regardless of section — these are the exact failure modes that have shipped half-reverted PRs.
+
+**Severity rules**:
+
+- A phase that **prescribes a step listed verbatim in the Anti-Patterns table** is `BLOCK`. Example: "add `apps/api/eslint.config.mjs` re-exporting root", "register `tsconfig.spec.json` in `tsconfig.json` references", "add `it.skip()` to defer this test".
+- A phase that **touches a file in a constrained area but does not violate a specific constraint** is `OK`. The point is not to flag every config change — only the ones that contradict a constraint.
+- A phase whose constraints **cannot be evaluated from the work order alone** (e.g. "add LLM prompt change" without specifying whether a snapshot is included) is `WARN`. The implementer needs to know the constraint but the plan isn't necessarily wrong.
+
+Record per phase under the existing findings list:
+
+```markdown
+- Governance constraints: <section refs checked, e.g. §1, §2>
+  - <severity>: <constraint refs> — <one-line explanation citing the specific anti-pattern or constraint>
+    Suggested rewrite: <how to rephrase the phase to avoid the constraint, OR "drop this phase">
+```
+
+If no constraints apply to the phase, omit the bullet entirely. Do not pad findings with "no constraint hits" lines.
+
+**Verdict effect**: if any phase produces a `BLOCK` here, the whole-run verdict is `BLOCK`. The risk-class promotion (BLOCK → risky → full reviewer fan-out) then ensures the constraint warning reaches the human-attached PR artifact.
+
+#### Worked example — PR-12 (ESLint nested re-export)
+
+Phase P2 says:
+
+> Add `apps/api/eslint.config.mjs` re-exporting `../../eslint.config.mjs` so ESLint resolves rules when invoked from `apps/api/`.
+
+Classify: touches `apps/api/eslint.config.mjs` → §1 applies.
+
+Anti-Patterns table row: "Bare nested ESLint re-export — Glob resolution semantics silently disabled G1-G5".
+
+Record under P2:
+
+- **Severity**: BLOCK
+- Governance constraints: §1 ESLint config
+  - BLOCK: §1 first bullet, Anti-Patterns row 1 — ESLint flat config resolves globs relative to CWD, so a nested re-export silently disables G1/G3/G4/G5. Phase as written matches the exact anti-pattern.
+    Suggested rewrite: drop this phase; if the underlying problem is "running ESLint from `apps/api/` needs the root config", solve it by always invoking from repo root (which the existing scripts already do).
+
+#### Worked example — PR-15a (tsconfig.spec.json in references)
+
+Phase P3a says:
+
+> Create `apps/api/tsconfig.spec.json` with relaxed `noUncheckedIndexedAccess: false`, register it in `apps/api/tsconfig.json` `references[]`, and switch `apps/api/jest.config.cjs` to use it.
+
+Classify: touches `tsconfig*.json` → §2 applies.
+
+Anti-Patterns table row: "`tsconfig.spec.json` in `references[]` — `tsc --build` (pre-commit) hit ~279 test type errors".
+
+Record under P3a:
+
+- **Severity**: BLOCK
+- Governance constraints: §2 TypeScript config
+  - BLOCK: §2 second bullet, Anti-Patterns row 2 — adding tsconfig.spec.json to `references[]` forces `tsc --build` (pre-commit) to type-check ~279 test files with known errors, breaking every future commit. Phase as written matches the exact anti-pattern.
+    Suggested rewrite: create `tsconfig.spec.json` and switch jest to use it directly (`jest.config.cjs` → `tsconfig`), but do NOT add it to `apps/api/tsconfig.json` `references[]`. Two of three intended changes still ship cleanly.
+
+### 2.7 Cross-cutting reference scan (delete-intent phases only)
+
+This scan exists to catch the "drain the allowlist" / "delete this surface" class of phase where the human plan author enumerated the obvious target files but missed config or fixture files that reference those targets by name. Empirically (see Stage 3 outcomes and the PR-06 failures), the unclaimed reference is typically a static allowlist, a registry, or a glob fixture that lists the claimed file by basename.
+
+**Only runs on phases whose intent (from 2.2) is `delete` AND that have at least one claimed file.** Edit, create, and rename phases skip this check entirely — false-positive surface there would be too high.
+
+For each claimed file, build a basename set:
+
+- **Full basename**, e.g. `session-summary.integration.test.ts`
+- **Short basename** (strip the rightmost extension), e.g. `session-summary.integration`
+
+The short form catches allowlist entries that omit the `.test.ts` suffix or that reference the file by import-style identifier. Both forms are searched; deduplicate hits.
+
+For each basename, run from the repo root:
+
+```bash
+rg --fixed-strings --files-with-matches "$basename" \
+    --glob '!.archon/**' \
+    --glob '!docs/**' \
+    --glob '!plans/**' \
+    --glob '!node_modules/**' \
+    --glob '!dist/**' \
+    --glob '!.next/**' \
+    --glob '!.turbo/**' \
+    --glob '!*.lock' \
+    --glob '!pnpm-lock.yaml' \
+    2>/dev/null || true
+```
+
+`plans/` is excluded for the same reason `docs/` is: plan documents and fix notes legitimately quote claimed basenames in their narrative, and surfacing the plan doc as a "cross-cutting reference" is a self-fulfilling false positive.
+
+From the resulting paths, subtract:
+
+- The claimed file itself (it trivially contains its own basename).
+- Any other file claimed by this same phase.
+
+Any remaining paths are **cross-cutting references in unclaimed files**. They become per-file `WARN` findings on this phase. Record up to 5 hit paths per claimed file with `…and N more` truncation if there are more.
+
+**Verdict effect:** if any phase produces ≥1 cross-cutting finding, the whole-run verdict escalates to `BLOCK`. This is intentional: a delete/drain phase that touches files unnamed in the work order will almost always trip `scope-guard` later. Escalating here gets the reasoning artifact attached to the PR (via the `BLOCK` → `risky` → full-reviewer-fan-out pipe) and gives the human reviewing the eventual scope violation a head-start on amending the work order.
+
+The finding is **informational, not a correctness claim**. A false positive looks like: a claimed file's basename happens to appear in a fixture file that the exclude list missed. A true positive looks like PR-06: the GC1 ratchet's `KNOWN_OFFENDERS` allowlist enumerates the offender by name and must be edited as part of draining the offender. The artifact lets the human distinguish.
+
+Record per phase, under the existing findings list:
+
+```markdown
+- Cross-cutting refs: <N basenames searched; M unclaimed hits>
+  - `<claimed-file-path>` → basename `<basename>` referenced in:
+    - `<unclaimed-hit-path>`
+    - `<unclaimed-hit-path>`
+    - …and N more
+```
+
+If a phase has intent=delete but zero cross-cutting hits, record one line: `- Cross-cutting refs: scanned N basenames; no unclaimed hits`.
+
 ---
 
 ## Step 3: Emit artifacts
@@ -174,6 +301,10 @@ Write `$ARTIFACTS_DIR/plan-review.md`. Use this template — one section per pha
 - Semantic: <or "no mismatch detected">
   - MISMATCH (BLOCK): `<path>` — phase claims "<excerpt of phase desc>", file head shows `<literal one-liner from head -40>`
 - Verify command: <`runnable` | `WARN: <why>`>
+- Cross-cutting refs: <only for delete-intent phases; omit otherwise>
+  - `<claimed-path>` → basename `<basename>` referenced in:
+    - `<unclaimed-hit-path>`
+    - …and N more
 
 (repeat for each phase)
 ```
@@ -240,3 +371,39 @@ Record under that phase:
 ## Worked example — what OK looks like
 
 All phases parse, every claimed file's existence matches the phase intent, no head-sample mismatch is glaring, every verification command references a real tool/path. Verdict file: `OK`. Final stdout line: `OK`. Exit 0.
+
+---
+
+## Worked example — what cross-cutting BLOCK looks like
+
+PR-06 / C2 / P3 — "AUDIT-TESTS-2C — **Drain** LLM allowlist". Phase intent is classified `delete` (keyword `drain`). Claimed files:
+
+- `apps/api/src/services/session-summary.integration.test.ts`
+- `apps/api/src/services/quiz/vocabulary.integration.test.ts`
+
+Existence and semantic checks pass: both files exist on `origin/main`, both reference LLM mocks. So far the verdict would be `OK`.
+
+Section 2.7 then runs, deriving short basenames `session-summary.integration` and `vocabulary.integration`:
+
+```bash
+rg --fixed-strings --files-with-matches 'session-summary.integration' \
+    --glob '!.archon/**' --glob '!docs/**' --glob '!node_modules/**'
+# Hits: apps/api/src/services/session-summary.integration.test.ts  (claimed — subtract)
+#       apps/api/src/services/llm/integration-mock-guard.test.ts   (unclaimed — FLAG)
+```
+
+Same scan on `vocabulary.integration` also returns `integration-mock-guard.test.ts` — it lists both offenders in its `KNOWN_OFFENDERS` allowlist array.
+
+Record under P3:
+
+- **Severity**: BLOCK
+- Existence: 2/2 OK
+- Semantic: no mismatch detected
+- Verify command: runnable
+- Cross-cutting refs: 2 basenames searched; 1 unclaimed hit
+  - `apps/api/src/services/session-summary.integration.test.ts` → basename `session-summary.integration` referenced in:
+    - `apps/api/src/services/llm/integration-mock-guard.test.ts`
+  - `apps/api/src/services/quiz/vocabulary.integration.test.ts` → basename `vocabulary.integration` referenced in:
+    - `apps/api/src/services/llm/integration-mock-guard.test.ts`
+
+`Verdict` becomes `BLOCK` because P3 has cross-cutting findings. Write `BLOCK` to the verdict file. risk-class promotes the run to `risky` and the reasoning artifact lands on the PR. The human reviewing the eventual scope-guard rejection (or, ideally, reading the PR-attached artifact first) can amend `docs/audit/cleanup-plan.md`'s P3 row to claim `integration-mock-guard.test.ts` before the next run.

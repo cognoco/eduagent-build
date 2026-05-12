@@ -1,0 +1,6 @@
+interface:
+  display_name: "Deep Bugfixing"
+  short_description: "Adversarial assumption review"
+  default_prompt: "Use $deep-bugfixing to review this code for runtime assumption bugs."
+policy:
+  allow_implicit_invocation: true

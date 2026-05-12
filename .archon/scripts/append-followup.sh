@@ -70,19 +70,42 @@ case "$severity" in
     *) echo "ERROR: --severity must be P0|P1|P2|P3 (got: $severity)" >&2; exit 64;;
 esac
 
-if ! command -v doppler >/dev/null 2>&1; then
-    echo "ERROR: doppler CLI not on PATH." >&2
-    exit 1
-fi
 if ! command -v jq >/dev/null 2>&1; then
     echo "ERROR: jq not on PATH." >&2
     exit 1
 fi
 
-NOTION_API_KEY="$(doppler secrets get NOTION_API_KEY --plain -p mentomate -c dev 2>/dev/null || true)"
-if [[ -z "$NOTION_API_KEY" ]]; then
-    echo "ERROR: NOTION_API_KEY not retrievable from Doppler (project=mentomate config=dev)." >&2
-    exit 1
+# Prefer NOTION_API_KEY from the environment (Archon injects codebase env vars
+# into bash nodes). Fall back to Doppler CLI for interactive / non-Archon use.
+# The doppler binary check is gated inside the else branch so machines that
+# have NOTION_API_KEY set but no doppler installed still succeed (AW-003).
+doppler_err="$(mktemp)"
+response=""
+trap 'rm -f "$doppler_err" "$response"' EXIT
+if [[ -n "${NOTION_API_KEY:-}" ]]; then
+    echo "Using NOTION_API_KEY from environment" >&2
+else
+    if ! command -v doppler >/dev/null 2>&1; then
+        echo "ERROR: NOTION_API_KEY not set and doppler CLI not on PATH." >&2
+        exit 1
+    fi
+    if NOTION_API_KEY="$(doppler secrets get NOTION_API_KEY --plain -p mentomate -c dev 2>"$doppler_err")"; then
+        doppler_rc=0
+    else
+        doppler_rc=$?
+    fi
+    if (( doppler_rc != 0 )) || [[ -z "$NOTION_API_KEY" ]]; then
+        {
+            echo "ERROR: NOTION_API_KEY not in environment and not retrievable from Doppler (project=mentomate config=dev)."
+            echo "  doppler exit: ${doppler_rc}"
+            echo "  doppler stderr:"
+            sed 's/^/    /' < "$doppler_err"
+        } >&2
+        if [[ -n "${ARTIFACTS_DIR:-}" && -d "${ARTIFACTS_DIR}" ]]; then
+            cp "$doppler_err" "${ARTIFACTS_DIR}/notion-filer-doppler-error.txt"
+        fi
+        exit 1
+    fi
 fi
 
 today="$(date -u +%Y-%m-%d)"
@@ -142,7 +165,7 @@ payload="$(jq -nc \
     }')"
 
 response="$(mktemp)"
-trap 'rm -f "$response"' EXIT
+# EXIT trap was set earlier (line ~84) to clean up both $doppler_err and $response.
 
 http_code="$(curl -sS -o "$response" -w '%{http_code}' \
     -X POST "https://api.notion.com/v1/pages" \
