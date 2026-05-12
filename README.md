@@ -74,7 +74,7 @@ pnpm exec nx run-many -t typecheck
 pnpm run db:push:dev
 
 # Generate migration
-pnpm run db:generate
+pnpm run db:generate:dev
 
 # Apply migration
 pnpm run db:migrate:dev
