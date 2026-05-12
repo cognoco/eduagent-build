@@ -3,11 +3,22 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BrandCelebration } from '../../../components/common/BrandCelebration';
+import {
+  RewardBurst,
+  type RewardBurstVariant,
+} from '../../../components/common/RewardBurst';
 import { useFetchRound } from '../../../hooks/use-quiz';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { useThemeColors } from '../../../lib/theme';
 import { useQuizFlow } from './_layout';
+
+function rewardVariantForActivity(
+  activityType: 'capitals' | 'guess_who' | 'vocabulary' | null,
+): RewardBurstVariant {
+  if (activityType === 'guess_who') return 'guess_who';
+  if (activityType === 'vocabulary') return 'vocabulary';
+  return 'capitals';
+}
 
 export default function QuizResultsScreen(): React.ReactElement {
   const router = useRouter();
@@ -162,11 +173,16 @@ export default function QuizResultsScreen(): React.ReactElement {
       }}
       testID="quiz-results-screen"
     >
-      {(celebrationTier === 'perfect' || celebrationTier === 'great') && (
-        <View className="mb-6">
-          <BrandCelebration size={96} />
-        </View>
-      )}
+      <RewardBurst
+        variant={rewardVariantForActivity(activityType)}
+        intensity={
+          celebrationTier === 'perfect' || celebrationTier === 'great'
+            ? 'round'
+            : 'answer'
+        }
+        message={config.title}
+        testID="quiz-results-celebration"
+      />
 
       <Ionicons name={config.icon} size={56} color={config.color} />
       <Text className="mt-4 text-center text-h1 font-bold text-text-primary">

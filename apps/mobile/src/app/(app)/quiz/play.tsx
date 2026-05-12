@@ -35,8 +35,20 @@ import {
   GuessWhoQuestion,
   type GuessWhoResolvedResult,
 } from '../../../components/quiz/GuessWhoQuestion';
+import {
+  RewardBurst,
+  type RewardBurstVariant,
+} from '../../../components/common/RewardBurst';
 
 type AnswerState = 'unanswered' | 'checking' | 'correct' | 'wrong';
+
+function rewardVariantForActivity(
+  activityType: 'capitals' | 'guess_who' | 'vocabulary' | null,
+): RewardBurstVariant {
+  if (activityType === 'guess_who') return 'guess_who';
+  if (activityType === 'vocabulary') return 'vocabulary';
+  return 'capitals';
+}
 
 export default function QuizPlayScreen(): React.ReactElement {
   const router = useRouter();
@@ -74,6 +86,9 @@ export default function QuizPlayScreen(): React.ReactElement {
   // [BUG-892] Quit confirmation rendered as an in-app Modal so web doesn't
   // hit window.confirm via Alert.alert mapping (which blocks the renderer).
   const [quitConfirmVisible, setQuitConfirmVisible] = useState(false);
+  const [correctCelebrationKey, setCorrectCelebrationKey] = useState<
+    number | null
+  >(null);
 
   const questions = (round?.questions ?? []) as ClientQuizQuestion[];
   const totalQuestions = round?.total ?? 0;
@@ -524,6 +539,7 @@ export default function QuizPlayScreen(): React.ReactElement {
     }, 4000);
 
     if (correct) {
+      setCorrectCelebrationKey(Date.now());
       hapticSuccess();
     } else {
       hapticError();
@@ -568,6 +584,7 @@ export default function QuizPlayScreen(): React.ReactElement {
     setAnswerState('unanswered');
     setSelectedAnswer(null);
     setCorrectAnswer(null);
+    setCorrectCelebrationKey(null);
     setShowContinueHint(false);
     setAnswerCheckFailed(false);
     // [BUG-929] Also reset freeTextAnswer and guessWhoCluesUsed in the same
@@ -627,6 +644,15 @@ export default function QuizPlayScreen(): React.ReactElement {
       style={{ paddingTop: insets.top + 12, paddingBottom: insets.bottom + 20 }}
       testID="quiz-play-screen"
     >
+      {correctCelebrationKey != null ? (
+        <RewardBurst
+          key={correctCelebrationKey}
+          variant={rewardVariantForActivity(activityType)}
+          intensity="answer"
+          testID="quiz-correct-celebration"
+          onComplete={() => setCorrectCelebrationKey(null)}
+        />
+      ) : null}
       <View className="mb-6 flex-row items-center justify-between px-5">
         <Pressable
           onPress={handleQuit}

@@ -43,6 +43,10 @@ jest.mock('react-i18next', () => ({
         return 'Your progress keeps stacking up.';
       if (key === 'progress.hero.masteredTopicsAndWords')
         return `And you know ${opts?.words ?? ''} words across your subjects.`;
+      if (key === 'progress.empty.withSubjectTitle')
+        return `Progress unlocks after you study ${opts?.subject ?? ''}`;
+      if (key === 'progress.empty.withSubjectSubtitle')
+        return `Study a topic in ${opts?.subject ?? ''} first.`;
       if (key === 'progress.register.child.weekTitle') return 'Your week';
       if (key === 'progress.register.child.monthTitle') return 'Your month';
       if (key === 'progress.register.child.growthTitle')
@@ -127,10 +131,13 @@ jest.mock('react-i18next', () => ({
 }));
 
 jest.mock('../../hooks/use-progress');
+const mockUseSubjects = jest.fn(() => ({
+  data: [] as Array<{ id: string; name: string; status: string }>,
+}));
 jest.mock(
   '../../hooks/use-subjects' /* gc1-allow: hook requires QueryClientProvider; not runnable in unit env */,
   () => ({
-    useSubjects: () => ({ data: [] }),
+    useSubjects: () => mockUseSubjects(),
   }),
 );
 const mockUseActiveProfileRole = jest.fn();
@@ -321,6 +328,7 @@ describe('ProgressScreen — progressive disclosure', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUseActiveProfileRole.mockReturnValue('owner');
+    mockUseSubjects.mockReturnValue({ data: [] });
   });
 
   it('shows full progress view when totalSessions < 4', () => {
@@ -446,6 +454,20 @@ describe('ProgressScreen — progressive disclosure', () => {
 
     screen.getByTestId('progress-start-learning');
     expect(screen.queryByTestId('progress-new-learner-teaser')).toBeNull();
+  });
+
+  it('points empty progress toward the first active subject when one exists', () => {
+    mockUseSubjects.mockReturnValue({
+      data: [{ id: 'subject-italian', name: 'Italian', status: 'active' }],
+    });
+    mockHooks({
+      inventory: { global: { ...baseGlobal, totalSessions: 0 }, subjects: [] },
+    });
+
+    render(<ProgressScreen />);
+
+    screen.getByText('Progress unlocks after you study Italian');
+    screen.getByText('Study a topic in Italian first.');
   });
 
   it('shows full view when totalSessions is 1 with subjects', () => {

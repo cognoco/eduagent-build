@@ -228,6 +228,7 @@ describe('QuizResultsScreen — [F-040] missed-question cards', () => {
 
     expect(screen.queryByTestId('quiz-results-missed-section')).toBeNull();
     expect(screen.queryByText('What you missed')).toBeNull();
+    screen.getByTestId('quiz-results-celebration');
   });
 
   it('opens history with Practice return target when quiz came from Practice', () => {

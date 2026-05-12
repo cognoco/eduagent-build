@@ -151,6 +151,9 @@ describe('QuizPlayScreen', () => {
         answerMode: 'free_text',
       });
     });
+    await waitFor(() => {
+      screen.getByTestId('quiz-correct-celebration');
+    });
   });
 
   // [BUG-928] Path 7 spec: "Question header: '1 of 7' + dot indicators +
