@@ -13,7 +13,7 @@
  * Regression guard: asserts that rls.ts uses SET LOCAL (not plain SET) so
  * cross-connection scope leaks are structurally impossible.
  *
- * Ref: docs/plans/2026-04-15-S06-rls-phase-0-1-preparatory.md — Phase 0.3
+ * Ref: docs/plans/done/2026-04-15-S06-rls-phase-0-1-preparatory.md — Phase 0.3
  */
 
 import { sql } from 'drizzle-orm';

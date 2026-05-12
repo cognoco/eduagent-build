@@ -129,7 +129,7 @@ These memory files are still live and indexed — but their bodies contain stale
 
 | File | Status | Recommend |
 | ---- | ------ | --------- |
-| `docs/plans/2026-04-15-S06-rls-phase-0-1-preparatory.md` | Plan's own 2026-04-27 status table says Phases 0.0/0.1/0.3 NOT DONE; `c80bb903` (driver swap) may have moved it forward. | **User: verify Phase 0 status.** If complete, archive. Otherwise keep. |
+| ~~`docs/plans/2026-04-15-S06-rls-phase-0-1-preparatory.md`~~ → `docs/plans/done/` | Phases 0.0/0.1/0.2/0.3/0.4 + 1.1 verified complete in code (PR #126, driver-swap commit `c80bb903` + follow-up). Only Phase 1.3 verification (`pg_tables.rowsecurity` query against staging/prod) residual — tracked as `AUDIT-RLS-1.3-VERIFY` in punchlist. | **DONE — archived to `docs/plans/done/` (2026-05-12).** |
 | `docs/plans/2026-04-15-S06-rls-phase-2-4-enforcement.md` | Blocked on Phase 0+1 completing. | **User: tied to row above.** Archive together if Phase 0+1 done. |
 | `docs/plans/2026-04-20-prelaunch-llm-tuning.md` | Track 1 shipped (`de9f55b3`, `235d6b8c`); Tracks 0/2/3 (probe battery, hand-edit B.1 tone, model comparison) have no commits — `apps/api/eval-llm/fixtures/probes/` doesn't exist. | **Keep** — partially done with active remaining work. |
 | `docs/plans/2026-04-22-library-wiring-and-session-debugging.md` | Parts 1-2 shipped (`2e901ac3`); Part 3 (auto-close after 2 exchanges) marked NOT YET FIXED but `855a632f` (stream-fallback guard) may resolve it. | **User: verify Part 3 status.** If fixed, archive. |

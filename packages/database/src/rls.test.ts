@@ -1,6 +1,6 @@
 // Unit tests only — these verify call order and error propagation using mocks.
 // Integration tests (context propagation, rollback, SET LOCAL guard) live in
-// rls.integration.test.ts — Phase 0.3, docs/plans/2026-04-15-S06-rls-phase-0-1-preparatory.md.
+// rls.integration.test.ts — Phase 0.3, docs/plans/done/2026-04-15-S06-rls-phase-0-1-preparatory.md.
 
 import { withProfileScope } from './rls.js';
 

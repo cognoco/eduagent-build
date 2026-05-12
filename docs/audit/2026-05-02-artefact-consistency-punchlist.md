@@ -98,7 +98,7 @@
 - **AUDIT-SPECS-2** RLS plan status-table refresh (escalated 2026-05-02 from unclassified after concrete recon)
   - Severity: YELLOW (doc consistency — plan internally contradicts itself)
   - Effort: ~30-40 min (verify each Phase row in the status table, refresh wording, archive stale "Implication" paragraph)
-  - Files: `docs/plans/2026-04-15-S06-rls-phase-0-1-preparatory.md`
+  - Files: `docs/plans/done/2026-04-15-S06-rls-phase-0-1-preparatory.md`
   - Concrete state vs plan claim:
     | Phase | Plan table says (2026-04-27) | Code reality (verified 2026-05-02) | Action |
     |---|---|---|---|
@@ -108,6 +108,13 @@
     | 1.3 deploy + verify | unverified | unverified — needs `pg_tables.rowsecurity` query against staging/prod | Run query, document |
     | "Implication" paragraph | "ticking-bomb state" | Stale — header marks it stale but body unchanged | Move paragraph into a `## Historical context` section |
   - Why it matters: plan's reconciliation in PR #131 added a "Phase 0.0 is DONE" header but didn't update the inline status table, creating an internal contradiction that confuses readers about RLS rollout state. Not security-critical (the wording is over-stated, not under-stated), but exactly the "team detects new drift, doesn't sweep backward" pattern this audit was meant to catch.
+
+- **AUDIT-RLS-1.3-VERIFY** Confirm Phase 1.3 RLS enforcement is live on staging + production (2026-05-12)
+  - Severity: YELLOW (operational confidence, not a blocker)
+  - Effort: ~10 min
+  - Files: `docs/plans/done/2026-04-15-S06-rls-phase-0-1-preparatory.md` (Phase 1.3 row)
+  - Action: run `SELECT tablename, rowsecurity FROM pg_tables WHERE schemaname = 'public' AND rowsecurity = true;` against staging and prod Neon databases; document results in plan's Phase 1.3 row and mark complete.
+  - Origin: split out from AUDIT-SPECS-2 when Phases 0.0/0.1/0.2/0.3/0.4 + 1.1 were verified complete and plan archived to `done/` (2026-05-12). Phase 1.3 remains unverified because it requires live DB access.
 
 ## Track C cleanups
 
