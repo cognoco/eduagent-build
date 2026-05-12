@@ -3,7 +3,7 @@ title: 'Practice Activity Summary Service'
 slug: 'practice-activity-summary-service'
 created: '2026-05-12'
 status: 'planned'
-stepsCompleted: [1, 2]
+stepsCompleted: []
 tech_stack: ['TypeScript', 'Hono', 'Drizzle ORM', 'PostgreSQL', 'React Native', 'Expo']
 files_to_modify:
   [

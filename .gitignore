@@ -204,6 +204,9 @@ apps/mobile/e2e/scripts/run-logs/**/*.log
 # Codex tool logs (local-only)
 .codex/
 
+# BMAD working artifacts (scratch specs, test designs — canonical docs live in docs/)
+_bmad-output/
+
 # Superpowers brainstorm tool scratch artifacts (HTML drafts, server PIDs,
 # state files — local-only, never source of truth)
 .superpowers/
