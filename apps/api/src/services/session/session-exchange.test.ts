@@ -5,6 +5,8 @@ import {
   type ExchangeHistoryEvent,
 } from './session-exchange';
 
+type ExchangeHistoryEntry = ReturnType<typeof buildExchangeHistory>[number];
+
 describe('buildExchangeHistory', () => {
   it('filters out non-conversational event types', () => {
     const events: ExchangeHistoryEvent[] = [
@@ -17,12 +19,11 @@ describe('buildExchangeHistory', () => {
 
     const history = buildExchangeHistory(events);
 
-    expect(
-      history.map(
-        (h: { role: 'user' | 'system' | 'assistant'; content: string }) =>
-          h.role,
-      ),
-    ).toEqual(['user', 'assistant', 'system']);
+    expect(history.map((h: ExchangeHistoryEntry) => h.role)).toEqual([
+      'user',
+      'assistant',
+      'system',
+    ]);
   });
 
   it('re-wraps every prior assistant turn in a JSON envelope with FULL default signals [BUG-560 / BUG-610]', () => {
@@ -41,8 +42,7 @@ describe('buildExchangeHistory', () => {
 
     const history = buildExchangeHistory(events);
     const assistantTurns = history.filter(
-      (h: { role: 'user' | 'system' | 'assistant'; content: string }) =>
-        h.role === 'assistant',
+      (h: ExchangeHistoryEntry) => h.role === 'assistant',
     );
     expect(assistantTurns).toHaveLength(2);
 
@@ -129,8 +129,7 @@ describe('buildExchangeHistory', () => {
 
     const history = buildExchangeHistory(events);
     const assistantTurn = history.find(
-      (h: { role: 'user' | 'system' | 'assistant'; content: string }) =>
-        h.role === 'assistant',
+      (h: ExchangeHistoryEntry) => h.role === 'assistant',
     );
     expect(assistantTurn).toEqual(expect.objectContaining({}));
 

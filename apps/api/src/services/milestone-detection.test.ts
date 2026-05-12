@@ -1,7 +1,7 @@
 import { detectMilestones } from './milestone-detection';
+import type { ProgressMetrics } from '@eduagent/schemas';
 
 type DetectedMilestone = ReturnType<typeof detectMilestones>[number];
-import type { ProgressMetrics } from '@eduagent/schemas';
 
 function makeMetrics(
   overrides: Partial<ProgressMetrics> = {},
