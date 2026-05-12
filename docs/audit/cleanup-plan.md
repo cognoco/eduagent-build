@@ -160,7 +160,7 @@ Consecutive numbering across all clusters. **Numbering does not imply strict seq
 | PR-20 | C8 | P3 | Sweep destructive migrations for missing rollback sections |
 | PR-21 | C8 | P4 | Memory file dedupe (~96 files) |
 | PR-22 | C8 | P5 | Resolve vendored bmad commands vs installed plugin |
-| PR-23 | C8 | P6 | EduAgent → Mentomate naming sweep (docs/code string literals, NOT `@eduagent/*` package names) |
+| PR-23 | C8 | P6 | MentoMate → Mentomate naming sweep (docs/code string literals, NOT `@eduagent/*` package names) |
 | PR-24 | C8 | P7 | Per-package READMEs |
 | PR-25 | C9 | P1 | Archive/delete 25 Cat 1 obsolete files with link redirects |
 | PR-26 | C9 | P2 | Per-file decision on 23 Cat 2 possibly-obsolete files |
@@ -189,7 +189,7 @@ PR-11, PR-12, PR-14, PR-15, PR-16, PR-18, PR-19, PR-20, PR-21, PR-22, PR-23, PR-
 These PRs need coordinator or human review beyond agent execution:
 - **PR-12** (C5 P1): ~17 dep changes (6 root duplicate deletions, 2 api orphan deletions, dotenv align, 8 mobile tilde pins, FORBIDDEN list expansion) — human review of manifest changes before merge
 - **PR-20** (C8 P3): ~~Migration rollback sections — requires reading each destructive migration and writing rollback assessment~~ — **closed 2026-05-12 as no-op:** sweep already satisfied; `scripts/check-migration-rollback.sh` passes (12/72 destructive, all covered).
-- **PR-23** (C8 P6): EduAgent→Mentomate naming sweep — broad string-literal change needs human review to avoid touching `@eduagent/*` package names
+- **PR-23** (C8 P6): ~~`EduAgent`→`MentoMate` naming sweep — broad string-literal change needs human review to avoid touching `@eduagent/*` package names~~ — **closed 2026-05-12:** 31 in-scope files swept; `@eduagent/*` package names left untouched; 8 out-of-scope files tracked in punchlist as `AUDIT-EXTREFS-2-RESIDUAL`.
 - **PR-25** (C9 P1): Obsolete file archival — human decision on link redirects
 - **PR-26** (C9 P2): Possibly-obsolete files — per-file human decision required
 
@@ -373,7 +373,7 @@ These PRs need coordinator or human review beyond agent execution:
 | P3 | AUDIT-MIGRATIONS-3-SWEEP — Sweep destructive migrations for missing rollback sections | done (no-op 2026-05-12) | | **PR-20** | `apps/api/drizzle/0*_*.sql`, `apps/api/drizzle/*.rollback.md` | [YELLOW] ~2 hr. **Governance:** `.archon/governance-constraints.md` §5 (DB — `scripts/check-migration-rollback.sh` is a CI check; rollback sections must conform to its parsing rules. Test the script locally before pushing). **Closed 2026-05-12 as no-op:** `scripts/check-migration-rollback.sh` passes — 12 of 72 migrations are destructive and all have either a sibling `*.rollback.md` or an inline `-- ## Rollback` comment. No remaining gaps. |
 | P4 | AUDIT-MEMORY-2 — Memory file dedupe (~96 files) | todo | | **PR-21** | `.claude/memory/*.md` | [YELLOW] ~1 hr. |
 | P5 | AUDIT-SKILLS-2 — Resolve vendored bmad vs installed plugin | done (misframed 2026-05-12) | | **PR-22** | `.claude/commands/bmad/`, `.claude/plugins/` | [YELLOW] ~30 min. **Closed 2026-05-12 as misframed:** No BMAD plugin is installed (verified `~/.claude/plugins/installed_plugins.json` — 14 plugins, none BMAD) and no registered marketplace publishes one. The `bmad:` skills visible in-session are the same `.claude/commands/bmad/*.md` shim files the audit asked us to reconcile — Claude Code namespaces slash commands by their parent directory, so the shims surface both as slash commands and as Skills. Current setup documented in `_bmad/README.md`. Revisit only if a marketplace BMAD plugin lands. |
-| P6 | AUDIT-EXTREFS-2 — EduAgent → Mentomate naming sweep (NOT `@eduagent/*` package names) | todo | | **PR-23** | `docs/**/*.md`, `README.md`, `apps/**/*.{ts,tsx}` (string literals only) | [YELLOW] ~1 hr. **Governance:** `.archon/governance-constraints.md` §8 (cross-cutting sweep — i18n locale files in `apps/mobile/src/i18n/locales/` MUST be kept in sync; the i18n staleness pre-commit hook fires when `en.json` is staged. Surface and update each user-facing locale key, don't just edit en.json). |
+| P6 | AUDIT-EXTREFS-2 — MentoMate → Mentomate naming sweep (NOT `@eduagent/*` package names) | done (2026-05-12) | | **PR-23** | `docs/**/*.md`, `README.md`, `apps/**/*.{ts,tsx}` (string literals only) | [YELLOW] ~1 hr. **Governance:** `.archon/governance-constraints.md` §8 (cross-cutting sweep — i18n locale files in `apps/mobile/src/i18n/locales/` MUST be kept in sync; the i18n staleness pre-commit hook fires when `en.json` is staged. Surface and update each user-facing locale key, don't just edit en.json). **Closed 2026-05-12:** Brand sweep applied to 23 docs (`docs/**/*.md` + `README.md`) and 7 i18n locale files (`apps/mobile/src/i18n/locales/{en,es,nb,pt,pl,de,ja}.json`). 0 in-scope occurrences remain. Filename `docs/analysis/product-brief-EduAgent-2025-12-11.md` deliberately NOT renamed (3 inbound links per Cat-3 keep notes). Out-of-scope `EduAgent` strings tracked in punchlist as `AUDIT-EXTREFS-2-RESIDUAL`. |
 | P7 | AUDIT-EXTREFS-3 — Per-package READMEs | todo | | **PR-24** | `apps/api/README.md`, `apps/mobile/README.md`, `packages/{database,schemas,test-utils,retention}/README.md` | [YELLOW] ~2 hr. |
 
 **Cross-coupling:** None.

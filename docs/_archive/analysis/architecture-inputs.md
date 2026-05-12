@@ -5,7 +5,7 @@ source: 'PRD review markers + Legacy documentation + Architecture phase decision
 status: 'in-progress-architecture-phase'
 ---
 
-# Architecture Inputs - EduAgent
+# Architecture Inputs - MentoMate
 
 **Purpose:** Technical decisions and preferences captured during PRD refinement. To be validated and expanded during Architecture phase.
 
@@ -143,5 +143,5 @@ _Surfaced during critical review walkthrough of UX Design Specification (2026-02
 
 - **Legacy Documentation:** `docs/Legacy/ARCHITECTURE_DECISIONS.md` (detailed technical decisions)
 - **Legacy Data Model:** `docs/Legacy/DATA_MODEL.md` (schema design)
-- **Product Brief:** `docs/analysis/product-brief-EduAgent-2025-12-11.md` (business context)
+- **Product Brief:** `docs/analysis/product-brief-MentoMate-2025-12-11.md` (business context)
 - **PRD:** `docs/prd.md` (requirements to satisfy)

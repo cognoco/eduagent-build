@@ -1,4 +1,4 @@
-# EduAgent — E2E Testing Strategy
+# MentoMate — E2E Testing Strategy
 
 **Type:** Spike (planning deliverable)
 **Date:** 2026-02-17

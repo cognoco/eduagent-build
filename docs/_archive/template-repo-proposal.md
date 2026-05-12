@@ -7,7 +7,7 @@
 
 ## The Idea
 
-The EduAgent (MentoMate) codebase contains months of battle-tested infrastructure that has nothing to do with tutoring. We want to extract this into a **reusable SaaS mobile app template** so future apps start with a fully wired stack instead of building from scratch.
+The MentoMate (MentoMate) codebase contains months of battle-tested infrastructure that has nothing to do with tutoring. We want to extract this into a **reusable SaaS mobile app template** so future apps start with a fully wired stack instead of building from scratch.
 
 ## Why a Template, Not Starting From Scratch
 
@@ -129,8 +129,8 @@ One agent at a time, commit after each step (dependency chain):
 ### Phase 3: Parallel Finalization
 Multiple agents work simultaneously (non-overlapping files):
 - **Agent A:** Rewrite CLAUDE.md for generic template use
-- **Agent B:** Adapt CI workflows, remove EduAgent-specific steps
-- **Agent C:** Clean up memories (keep Windows/tooling, strip EduAgent), update skills
+- **Agent B:** Adapt CI workflows, remove MentoMate-specific steps
+- **Agent C:** Clean up memories (keep Windows/tooling, strip MentoMate), update skills
 - **Agent D:** Write template README + "Getting Started" guide
 
 ## What the Template Ships With

@@ -1,6 +1,6 @@
 # End-User Test Report — 2026-04-18
 
-Live audit of the EduAgent mobile app via the Expo Web preview (`localhost:8081`), authenticated as the production user "Zuzana" (Free plan, owner, no child profiles).
+Live audit of the MentoMate mobile app via the Expo Web preview (`localhost:8081`), authenticated as the production user "Zuzana" (Free plan, owner, no child profiles).
 
 This report is **incremental** — each section is filled as flows are tested. The "Status" column shows where the audit currently stands so we can pick up from the same point next session.
 

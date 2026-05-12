@@ -127,8 +127,20 @@
 - **AUDIT-SKILLS-2** ~~Vendored `commands/bmad/` vs installed plugin — pick canonical~~ — **closed 2026-05-12 as misframed:** no BMAD plugin is installed or published in any registered marketplace; the `bmad:` skills visible in-session ARE the vendored shims (Claude Code namespaces slash commands by their parent directory, so the same files surface as both slash commands and Skills). Current setup documented in `_bmad/README.md`.
   - Severity: ~~YELLOW (cosmetic / maintenance)~~ N/A (no action); Effort: ~~~30 min~~ resolved
 
-- **AUDIT-EXTREFS-2** EduAgent → Mentomate naming sweep across docs/code (carefully — NOT `@eduagent/*` package names)
+- **AUDIT-EXTREFS-2** MentoMate → Mentomate naming sweep across docs/code (carefully — NOT `@eduagent/*` package names)
   - Severity: YELLOW (cosmetic); Effort: ~1 hr
+
+- **AUDIT-EXTREFS-2-RESIDUAL** (synthesized 2026-05-12) Eight out-of-scope files still contain `EduAgent` brand strings, surfaced while closing PR-23:
+  - `AGENTS.md` (root)
+  - `scripts/embedding-benchmark.ts`
+  - `apps/mobile/e2e/README.md`
+  - `design_handoff_ui_improvements/UI improvements.html`
+  - `design_handoff_ui_improvements/README.md`
+  - `docs/audit/pr-dispatch-graph.html`
+  - `docs/visual-artefacts/data/atlas-data.js`
+  - `docs/visual-artefacts/cleanup-plan-dependency-flow.html`
+  - Severity: GREEN (cosmetic; not user-facing brand surfaces); Effort: ~10 min total if anyone wants to follow up.
+  - Why excluded: PR-23's Files-claimed scope was `docs/**/*.md`, `README.md`, `apps/**/*.{ts,tsx}` plus governance-mandated i18n locale sync. These eight don't match.
 
 - **AUDIT-EXTREFS-3** Per-package READMEs for `apps/api/`, `apps/mobile/`, `packages/*`
   - Severity: YELLOW (helpful but not urgent); Effort: ~2 hr

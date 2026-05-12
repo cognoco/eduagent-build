@@ -898,13 +898,13 @@ const patchRes = await fetch(`${CLERK_API_BASE}/users/${user.id}`, {
 curl -X POST "https://api.clerk.com/v1/users" \
   -H "Authorization: Bearer sk_test_..." \
   -H "Content-Type: application/json" \
-  -d '{"email_address": ["test@example.com"], "password": "EduAgent-E2e-Kx9!2026"}'
+  -d '{"email_address": ["test@example.com"], "password": "MentoMate-E2e-Kx9!2026"}'
 
 # Verify — FAILS even though the password was just set
 curl -X POST "https://api.clerk.com/v1/users/<id>/verify_password" \
   -H "Authorization: Bearer sk_test_..." \
   -H "Content-Type: application/json" \
-  -d '{"password": "EduAgent-E2e-Kx9!2026"}'
+  -d '{"password": "MentoMate-E2e-Kx9!2026"}'
 # Returns: { "verified": false }
 ```
 
@@ -912,7 +912,7 @@ Tested passwords:
 | Password | Via POST /users | Via PATCH /users | verify_password |
 |----------|----------------|-----------------|-----------------|
 | `TestPass123!` | Created OK | — | FAILS (`verified: false`) |
-| `EduAgent-E2e-Kx9!2026` | Created OK | — | FAILS (`verified: false`) |
+| `MentoMate-E2e-Kx9!2026` | Created OK | — | FAILS (`verified: false`) |
 | `Mentomate2026xK` | Created OK | — | OK (`verified: true`) |
 | `Mentomate2026xK` | — | Patched OK | OK (`verified: true`) |
 

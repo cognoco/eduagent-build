@@ -2,7 +2,7 @@
 stepsCompleted: [1, 2, 3, 4, 5, 6, 7, 8]
 inputDocuments:
   - 'docs/prd.md'
-  - 'docs/analysis/product-brief-EduAgent-2025-12-11.md'
+  - 'docs/analysis/product-brief-MentoMate-2025-12-11.md'
   - 'docs/analysis/epics-inputs.md'
   - 'docs/analysis/architecture-inputs.md'
   - 'docs/analysis/research/market-ai-tutoring-research-2024-12-11.md'
@@ -15,7 +15,7 @@ workflowType: 'architecture'
 lastStep: 8
 status: 'complete'
 completedAt: '2026-02-15'
-project_name: 'EduAgent'
+project_name: 'MentoMate'
 user_name: 'Zuzka'
 date: '2026-02-15'
 ---

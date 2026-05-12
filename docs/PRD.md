@@ -1,7 +1,7 @@
 ---
 stepsCompleted: [1, 2]
 inputDocuments:
-  - 'docs/analysis/product-brief-EduAgent-2025-12-11.md'
+  - 'docs/analysis/product-brief-MentoMate-2025-12-11.md'
   - 'docs/analysis/research/market-ai-tutoring-research-2024-12-11.md'
   - 'docs/analysis/research/evidence based learning science.md'
   - 'docs/Legacy/AI Model pricing.md'
@@ -16,12 +16,12 @@ documentCounts:
   projectDocs: 3
 workflowType: 'prd'
 lastStep: 1
-project_name: 'EduAgent'
+project_name: 'MentoMate'
 user_name: 'Zuzka'
 date: '2025-12-11'
 ---
 
-# Product Requirements Document - EduAgent
+# Product Requirements Document - MentoMate
 
 **Author:** Zuzka
 **Date:** 2025-12-11
@@ -35,7 +35,7 @@ date: '2025-12-11'
 
 *"A teacher who grows with you."*
 
-EduAgent is a premium AI tutoring platform that teaches through conversation—using research-backed methodologies to guide motivated learners aged 11+ to understanding, remembering what they've learned across sessions, and verifying retention.
+MentoMate is a premium AI tutoring platform that teaches through conversation—using research-backed methodologies to guide motivated learners aged 11+ to understanding, remembering what they've learned across sessions, and verifying retention.
 
 ### The Problem
 
@@ -47,7 +47,7 @@ Learners don't need more information—they need guided practice, systematic ver
 
 ### The Solution
 
-EduAgent delivers personalized AI tutoring through tiered subscriptions—combining the teaching quality of human tutors with the accessibility and consistency of AI.
+MentoMate delivers personalized AI tutoring through tiered subscriptions—combining the teaching quality of human tutors with the accessibility and consistency of AI.
 
 **Four Pillars:**
 
@@ -978,7 +978,7 @@ A user can learn ANY subject through AI-powered tutoring with personalized curri
 
 **OpenAI OAuth (Exploring):**
 - Enables authentication via OpenAI account
-- Future potential: Users with ChatGPT Plus could use their own API quota, reducing EduAgent LLM costs
+- Future potential: Users with ChatGPT Plus could use their own API quota, reducing MentoMate LLM costs
 - MVP scope: Authentication only; token usage integration deferred to BYOK feature (v1.1+)
 - Implementation details TBD during Architecture phase
 
@@ -1601,7 +1601,7 @@ The EVALUATE prompt template needs access to: (a) the topic's key concepts, (b) 
 
 **BYOK (Bring Your Own Key) - Future Feature:**
 
-BYOK allows power users who already have AI subscriptions (Claude Pro, ChatGPT Plus) to use their own API keys, reducing their EduAgent cost.
+BYOK allows power users who already have AI subscriptions (Claude Pro, ChatGPT Plus) to use their own API keys, reducing their MentoMate cost.
 
 **MVP:**
 - BYOK waitlist capture (email + preferred provider)
