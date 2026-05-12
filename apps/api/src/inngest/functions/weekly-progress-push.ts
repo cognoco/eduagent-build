@@ -45,6 +45,7 @@ import {
   getLatestSnapshotOnOrBefore,
 } from '../../services/snapshot-aggregation';
 import { generateWeeklyReportData } from '../../services/weekly-report';
+import { getPracticeActivitySummary } from '../../services/practice-activity-summary';
 import { captureException } from '../../services/sentry';
 
 import {
@@ -347,11 +348,25 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
 
             // [BUG-524] Persist the weekly report before building the push summary.
             // Uses onConflictDoNothing so re-runs for the same week are idempotent.
+            const currentPracticeStart = subtractDays(weekStartDate, 7);
+            const previousPracticeStart = subtractDays(weekStartDate, 14);
+            const practiceSummary = await getPracticeActivitySummary(db, {
+              profileId: link.childProfileId,
+              period: {
+                start: currentPracticeStart,
+                endExclusive: weekStartDate,
+              },
+              previousPeriod: {
+                start: previousPracticeStart,
+                endExclusive: currentPracticeStart,
+              },
+            });
             const reportData = generateWeeklyReportData(
               name,
               reportWeek,
               latest.metrics,
               cappedPrevious?.metrics ?? null,
+              practiceSummary,
             );
             await db
               .insert(weeklyReports)

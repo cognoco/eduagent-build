@@ -1840,7 +1840,9 @@
       "monthlyReport": "Månedsrapport",
       "subtitle": "Et sammendrag av barnets læring denne måneden",
       "totalWords": "Totalt antall ord",
-      "reportGoneTitle": "Rapport ikke funnet"
+      "reportGoneTitle": "Rapport ikke funnet",
+      "testsCompleted": "Tester",
+      "testPoints": "Testpoeng"
     },
     "session": {
       "error": "Kunne ikke laste økt",
@@ -1917,7 +1919,9 @@
       "sendNudge": "Send {{name}} et dytt",
       "openChildProfile": "Åpne {{name}}s profil",
       "reportGoneTitle": "Denne rapporten er ikke lenger tilgjengelig",
-      "reportGoneBody": "Den kan ha blitt arkivert eller fjernet. Alle de andre rapportene dine er fortsatt trygge."
+      "reportGoneBody": "Den kan ha blitt arkivert eller fjernet. Alle de andre rapportene dine er fortsatt trygge.",
+      "testsCompleted": "Tester",
+      "testPoints": "Testpoeng"
     }
   },
   "tabs": {

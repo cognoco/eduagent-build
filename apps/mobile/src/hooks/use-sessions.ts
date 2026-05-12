@@ -210,7 +210,7 @@ export function useSetSessionInputMode(
       void queryClient.invalidateQueries({
         queryKey: ['session-transcript', sessionId],
       });
-      invalidateSessionDerivedQueries(queryClient);
+      void queryClient.invalidateQueries({ queryKey: ['sessions'] });
     },
   });
 }

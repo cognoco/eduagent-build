@@ -1840,7 +1840,9 @@
       "monthlyReport": "Monatsbericht",
       "subtitle": "Eine Zusammenfassung des Lernens deines Kindes diesen Monat",
       "totalWords": "Gesamtzahl Wörter",
-      "reportGoneTitle": "Bericht nicht gefunden"
+      "reportGoneTitle": "Bericht nicht gefunden",
+      "testsCompleted": "Tests",
+      "testPoints": "Testpunkte"
     },
     "session": {
       "error": "Sitzung konnte nicht geladen werden",
@@ -1917,7 +1919,9 @@
       "sendNudge": "{{name}} einen Anstoß geben",
       "openChildProfile": "{{name}}s Profil öffnen",
       "reportGoneTitle": "Dieser Bericht ist nicht mehr verfügbar",
-      "reportGoneBody": "Er wurde möglicherweise archiviert oder entfernt. Alle deine anderen Berichte sind noch sicher."
+      "reportGoneBody": "Er wurde möglicherweise archiviert oder entfernt. Alle deine anderen Berichte sind noch sicher.",
+      "testsCompleted": "Tests",
+      "testPoints": "Testpunkte"
     }
   },
   "tabs": {

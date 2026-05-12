@@ -1367,8 +1367,7 @@ export default function AppLayout() {
   }, [queryClient]);
   const handleMoreTabPress = React.useCallback(() => {
     refreshMoreTabQueries();
-    router.replace('/(app)/more' as never);
-  }, [refreshMoreTabQueries, router]);
+  }, [refreshMoreTabQueries]);
   const refreshProgressTabQueries = React.useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: ['progress'] });
     void queryClient.invalidateQueries({ queryKey: ['dashboard'] });

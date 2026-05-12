@@ -199,9 +199,103 @@ export const monthlyReportHeadlineSchema = z.object({
 });
 export type MonthlyReportHeadline = z.infer<typeof monthlyReportHeadlineSchema>;
 
+export const reportPracticeActivityTypeSchema = z.enum([
+  'quiz',
+  'review',
+  'assessment',
+  'dictation',
+  'recitation',
+  'fluency_drill',
+]);
+export type ReportPracticeActivityType = z.infer<
+  typeof reportPracticeActivityTypeSchema
+>;
+
+export const reportPracticeTotalsSchema = z.object({
+  activitiesCompleted: z.number().int().min(0).default(0),
+  reviewsCompleted: z.number().int().min(0).default(0),
+  pointsEarned: z.number().int().min(0).default(0),
+  celebrations: z.number().int().min(0).default(0),
+  distinctActivityTypes: z.number().int().min(0).default(0),
+});
+export type ReportPracticeTotals = z.infer<typeof reportPracticeTotalsSchema>;
+
+export const reportPracticeScoresSchema = z.object({
+  scoredActivities: z.number().int().min(0).default(0),
+  score: z.number().int().min(0).default(0),
+  total: z.number().int().min(0).default(0),
+  accuracy: z.number().min(0).max(1).nullable().default(null),
+});
+export type ReportPracticeScores = z.infer<typeof reportPracticeScoresSchema>;
+
+const emptyReportPracticeTotals = {
+  activitiesCompleted: 0,
+  reviewsCompleted: 0,
+  pointsEarned: 0,
+  celebrations: 0,
+  distinctActivityTypes: 0,
+};
+
+const emptyReportPracticeScores = {
+  scoredActivities: 0,
+  score: 0,
+  total: 0,
+  accuracy: null,
+};
+
+export const reportPracticeTypeBreakdownSchema = z.object({
+  activityType: reportPracticeActivityTypeSchema,
+  activitySubtype: z.string().nullable().default(null),
+  count: z.number().int().min(0).default(0),
+  pointsEarned: z.number().int().min(0).default(0),
+  scoredActivities: z.number().int().min(0).default(0),
+  score: z.number().int().min(0).default(0),
+  total: z.number().int().min(0).default(0),
+});
+export type ReportPracticeTypeBreakdown = z.infer<
+  typeof reportPracticeTypeBreakdownSchema
+>;
+
+export const reportPracticeSubjectBreakdownSchema = z.object({
+  subjectId: z.string().uuid(),
+  subjectName: z.string().nullable().default(null),
+  count: z.number().int().min(0).default(0),
+  pointsEarned: z.number().int().min(0).default(0),
+  byType: z.array(reportPracticeTypeBreakdownSchema).default([]),
+});
+export type ReportPracticeSubjectBreakdown = z.infer<
+  typeof reportPracticeSubjectBreakdownSchema
+>;
+
+export const reportPracticeTotalsDeltaSchema = z.object({
+  activitiesCompleted: z.number().int().default(0),
+  reviewsCompleted: z.number().int().default(0),
+  pointsEarned: z.number().int().default(0),
+  celebrations: z.number().int().default(0),
+  distinctActivityTypes: z.number().int().default(0),
+});
+export type ReportPracticeTotalsDelta = z.infer<
+  typeof reportPracticeTotalsDeltaSchema
+>;
+
+export const reportPracticeComparisonSchema = z.object({
+  previous: reportPracticeTotalsSchema.default(emptyReportPracticeTotals),
+  delta: reportPracticeTotalsDeltaSchema.default(emptyReportPracticeTotals),
+});
+export type ReportPracticeComparison = z.infer<
+  typeof reportPracticeComparisonSchema
+>;
+
 export const reportPracticeSummarySchema = z.object({
-  quizzesCompleted: z.number().int().min(0),
-  reviewsCompleted: z.number().int().min(0),
+  // Legacy top-level fields stay for old clients and old report JSONB. New
+  // consumers should prefer `totals` and `byType`.
+  quizzesCompleted: z.number().int().min(0).default(0),
+  reviewsCompleted: z.number().int().min(0).default(0),
+  totals: reportPracticeTotalsSchema.default(emptyReportPracticeTotals),
+  scores: reportPracticeScoresSchema.default(emptyReportPracticeScores),
+  byType: z.array(reportPracticeTypeBreakdownSchema).default([]),
+  bySubject: z.array(reportPracticeSubjectBreakdownSchema).default([]),
+  comparison: reportPracticeComparisonSchema.optional(),
 });
 export type ReportPracticeSummary = z.infer<typeof reportPracticeSummarySchema>;
 

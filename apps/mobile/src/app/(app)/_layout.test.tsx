@@ -370,7 +370,6 @@ describe('AppLayout', () => {
     });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['usage'] });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['settings'] });
-    expect(mockReplace).toHaveBeenCalledWith('/(app)/more');
   });
 
   it('remounts the tab shell when the active profile changes', () => {

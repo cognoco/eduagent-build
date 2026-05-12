@@ -1840,7 +1840,9 @@
       "monthlyReport": "Informe mensual",
       "subtitle": "Un resumen del aprendizaje de tu hijo este mes",
       "totalWords": "Total de palabras",
-      "reportGoneTitle": "Informe no encontrado"
+      "reportGoneTitle": "Informe no encontrado",
+      "testsCompleted": "Pruebas",
+      "testPoints": "Puntos de prueba"
     },
     "session": {
       "error": "No se pudo cargar la sesión",
@@ -1917,7 +1919,9 @@
       "sendNudge": "Enviar un empujón a {{name}}",
       "openChildProfile": "Abrir el perfil de {{name}}",
       "reportGoneTitle": "Este informe ya no está disponible",
-      "reportGoneBody": "Puede haber sido archivado o eliminado. Todos tus otros informes siguen a salvo."
+      "reportGoneBody": "Puede haber sido archivado o eliminado. Todos tus otros informes siguen a salvo.",
+      "testsCompleted": "Pruebas",
+      "testPoints": "Puntos de prueba"
     }
   },
   "tabs": {

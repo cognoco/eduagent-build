@@ -1,4 +1,8 @@
-import { registerProvider, type LLMProvider } from '../services/llm';
+import {
+  registerProvider,
+  unregisterProvider,
+  type LLMProvider,
+} from '../services/llm';
 import {
   makeChatStreamResult,
   type ChatMessage,
@@ -200,8 +204,13 @@ export function createLlmProviderFixture(
 
 export function registerLlmProviderFixture(
   options: LlmProviderFixtureOptions = {},
-): ReturnType<typeof createLlmProviderFixture> {
+): ReturnType<typeof createLlmProviderFixture> & { dispose(): void } {
   const fixture = createLlmProviderFixture(options);
   registerProvider(fixture.provider);
-  return fixture;
+  return {
+    ...fixture,
+    dispose() {
+      unregisterProvider(fixture.provider.id);
+    },
+  };
 }

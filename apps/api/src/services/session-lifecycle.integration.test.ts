@@ -20,7 +20,12 @@ import {
   type Database,
 } from '@eduagent/database';
 import { eq, and, like } from 'drizzle-orm';
-import { registerProvider, createMockProvider, _clearProviders } from './llm';
+import {
+  registerProvider,
+  createMockProvider,
+  _clearProviders,
+  unregisterProvider,
+} from './llm';
 import {
   startSession,
   SubjectInactiveError,
@@ -129,7 +134,7 @@ afterAll(async () => {
 
   // Reset in-process caches to avoid cross-test pollution
   resetSessionStaticContextCache();
-  _clearProviders();
+  unregisterProvider('gemini');
 });
 
 beforeEach(() => {

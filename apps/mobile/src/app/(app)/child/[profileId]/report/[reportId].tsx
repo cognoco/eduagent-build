@@ -163,6 +163,24 @@ export default function ChildReportDetailScreen(): React.ReactElement {
               />
             </View>
 
+            <View className="flex-row gap-3 mt-3">
+              <MetricCard
+                label={t('parentView.report.testsCompleted')}
+                value={String(
+                  report.reportData.practiceSummary?.totals
+                    .activitiesCompleted ?? 0,
+                )}
+                testID="child-report-metric-tests"
+              />
+              <MetricCard
+                label={t('parentView.report.testPoints')}
+                value={String(
+                  report.reportData.practiceSummary?.totals.pointsEarned ?? 0,
+                )}
+                testID="child-report-metric-test-points"
+              />
+            </View>
+
             {report.reportData.highlights.length > 0 ? (
               <View
                 className="bg-surface rounded-card p-4 mt-4"

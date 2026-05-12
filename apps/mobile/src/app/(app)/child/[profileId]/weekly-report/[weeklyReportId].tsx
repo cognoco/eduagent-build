@@ -54,12 +54,18 @@ function isEmptyWeeklyReport(reportData: {
     topicsMastered: number;
     vocabularyTotal: number;
   };
+  practiceSummary?: {
+    totals: {
+      activitiesCompleted: number;
+    };
+  };
 }): boolean {
   return (
     reportData.thisWeek.totalSessions === 0 &&
     reportData.thisWeek.totalActiveMinutes === 0 &&
     reportData.thisWeek.topicsMastered === 0 &&
-    reportData.thisWeek.vocabularyTotal === 0
+    reportData.thisWeek.vocabularyTotal === 0 &&
+    (reportData.practiceSummary?.totals.activitiesCompleted ?? 0) === 0
   );
 }
 
@@ -213,6 +219,24 @@ export default function ChildWeeklyReportDetailScreen(): React.ReactElement {
                 label={t('parentView.weeklyReport.totalWordsKnown')}
                 value={String(report.reportData.thisWeek.vocabularyTotal)}
                 testID="child-weekly-report-metric-vocabulary"
+              />
+            </View>
+
+            <View className="flex-row gap-3 mt-3">
+              <MetricCard
+                label={t('parentView.weeklyReport.testsCompleted')}
+                value={String(
+                  report.reportData.practiceSummary?.totals
+                    .activitiesCompleted ?? 0,
+                )}
+                testID="child-weekly-report-metric-tests"
+              />
+              <MetricCard
+                label={t('parentView.weeklyReport.testPoints')}
+                value={String(
+                  report.reportData.practiceSummary?.totals.pointsEarned ?? 0,
+                )}
+                testID="child-weekly-report-metric-test-points"
               />
             </View>
 

@@ -1840,7 +1840,9 @@
       "monthlyReport": "月次レポート",
       "subtitle": "今月のお子様の学習の要約",
       "totalWords": "総単語数",
-      "reportGoneTitle": "レポートが見つかりません"
+      "reportGoneTitle": "レポートが見つかりません",
+      "testsCompleted": "テスト",
+      "testPoints": "テストポイント"
     },
     "session": {
       "error": "セッションを読み込めませんでした",
@@ -1917,7 +1919,9 @@
       "sendNudge": "{{name}}さんに声かけを送る",
       "openChildProfile": "{{name}}さんのプロフィールを開く",
       "reportGoneTitle": "このレポートは利用できなくなりました",
-      "reportGoneBody": "アーカイブされたか、削除された可能性があります。他のすべてのレポートは安全です。"
+      "reportGoneBody": "アーカイブされたか、削除された可能性があります。他のすべてのレポートは安全です。",
+      "testsCompleted": "テスト",
+      "testPoints": "テストポイント"
     }
   },
   "tabs": {

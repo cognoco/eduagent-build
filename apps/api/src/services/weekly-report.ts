@@ -32,6 +32,7 @@ export function generateWeeklyReportData(
   weekStart: string,
   thisWeek: ProgressMetrics,
   lastWeek: ProgressMetrics | null,
+  practiceSummary?: ReportPracticeSummary,
 ): WeeklyReportData {
   const topicsMasteredDelta = safeDelta(
     thisWeek.topicsMastered,
@@ -123,6 +124,7 @@ export function generateWeeklyReportData(
         }
       : null,
     headlineStat: headlineMode,
+    ...(practiceSummary ? { practiceSummary } : {}),
   });
 }
 

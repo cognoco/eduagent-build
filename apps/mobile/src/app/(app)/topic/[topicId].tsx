@@ -333,6 +333,7 @@ export default function TopicDetailScreen() {
         sessionId,
         ...(subjectId ? { subjectId } : {}),
         ...(topicId ? { topicId } : {}),
+        ...(paramBookId ? { bookId: paramBookId } : {}),
       },
     } as never);
   };

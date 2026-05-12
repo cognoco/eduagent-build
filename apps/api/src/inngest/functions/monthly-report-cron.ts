@@ -33,6 +33,7 @@ import {
   generateMonthlyReportData,
   generateReportHighlights,
 } from '../../services/monthly-report';
+import { getPracticeActivitySummary } from '../../services/practice-activity-summary';
 import { listEligibleSelfReportProfileIds } from '../../services/solo-progress-reports';
 import { getSnapshotsInRange } from '../../services/snapshot-aggregation';
 import {
@@ -293,6 +294,25 @@ export const monthlyReportGenerate = inngest.createFunction(
           ? child.displayName
           : (child.displayName ?? 'Your child');
 
+        const previousMonthStart = monthRangeStart(new Date(), -2);
+        const practiceSummary = await getPracticeActivitySummary(db, {
+          profileId: childId,
+          period: {
+            start: lastMonthStart,
+            endExclusive: new Date(
+              Date.UTC(
+                lastMonthStart.getUTCFullYear(),
+                lastMonthStart.getUTCMonth() + 1,
+                1,
+              ),
+            ),
+          },
+          previousPeriod: {
+            start: previousMonthStart,
+            endExclusive: lastMonthStart,
+          },
+        });
+
         let reportData = generateMonthlyReportData(
           childDisplayName,
           lastMonthStart.toLocaleDateString(undefined, {
@@ -301,6 +321,7 @@ export const monthlyReportGenerate = inngest.createFunction(
           }),
           thisMonthMetrics,
           previousMetrics,
+          practiceSummary,
         );
 
         const llmContent = await generateReportHighlights(reportData);

@@ -1865,7 +1865,9 @@
       "monthlyReport": "Relatório mensal",
       "subtitle": "Um resumo do aprendizado do seu filho este mês",
       "totalWords": "Total de palavras",
-      "reportGoneTitle": "Relatório não encontrado"
+      "reportGoneTitle": "Relatório não encontrado",
+      "testsCompleted": "Testes",
+      "testPoints": "Pontos de teste"
     },
     "session": {
       "error": "Não foi possível carregar a sessão",
@@ -1942,7 +1944,9 @@
       "sendNudge": "Enviar um incentivo para {{name}}",
       "openChildProfile": "Abrir o perfil de {{name}}",
       "reportGoneTitle": "Este relatório não está mais disponível",
-      "reportGoneBody": "Ele pode ter sido arquivado ou removido. Todos os seus outros relatórios ainda estão seguros."
+      "reportGoneBody": "Ele pode ter sido arquivado ou removido. Todos os seus outros relatórios ainda estão seguros.",
+      "testsCompleted": "Testes",
+      "testPoints": "Pontos de teste"
     }
   },
   "tabs": {

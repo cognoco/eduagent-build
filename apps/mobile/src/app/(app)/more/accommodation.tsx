@@ -78,10 +78,11 @@ export default function AccommodationScreen(): React.ReactElement {
   const currentMode = learnerProfile?.accommodationMode ?? 'none';
 
   useEffect(() => {
+    if (!activeProfile) return;
     if (isChildMode && !canEditChildPreferences) {
       router.replace('/(app)/more' as never);
     }
-  }, [canEditChildPreferences, isChildMode, router]);
+  }, [activeProfile, canEditChildPreferences, isChildMode, router]);
 
   const handleBack = useCallback(() => {
     goBackOrReplace(router, '/(app)/more/learning-preferences' as const);

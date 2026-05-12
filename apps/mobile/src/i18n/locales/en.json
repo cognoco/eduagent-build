@@ -1896,6 +1896,8 @@
     "report": {
       "sessions": "Sessions",
       "timeOnApp": "Time on app",
+      "testsCompleted": "Tests",
+      "testPoints": "Test points",
       "topicsMastered": "Topics mastered",
       "totalWordsKnown": "Total words known",
       "highlights": "Highlights",
@@ -1981,6 +1983,8 @@
       "backToAllReports": "Back to all reports",
       "sessionsThisWeek": "Sessions this week",
       "timeOnApp": "Time on app",
+      "testsCompleted": "Tests",
+      "testPoints": "Test points",
       "topicsMastered": "Topics mastered",
       "totalWordsKnown": "Total words known",
       "noActivityNote": "No activity this week — quiet weeks happen. A short nudge often helps {{name}} get going again.",

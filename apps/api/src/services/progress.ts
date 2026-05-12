@@ -20,9 +20,11 @@ import {
 import type {
   LearningResumeScope,
   LearningResumeTarget,
+  ReportPracticeSummary,
   SubjectProgress,
   TopicProgress,
 } from '@eduagent/schemas';
+import { getPracticeActivitySummary } from './practice-activity-summary';
 import { computeDaysSinceLastReview } from './retention-data';
 
 // ---------------------------------------------------------------------------
@@ -319,13 +321,26 @@ export async function getOverallProgress(
   subjects: SubjectProgress[];
   totalTopicsCompleted: number;
   totalTopicsVerified: number;
+  practiceActivityCount: number;
+  practiceSummary: ReportPracticeSummary;
 }> {
   const repo = createScopedRepository(db, profileId);
 
   // 1. Batch all queries upfront (6 total regardless of N subjects)
   const allSubjects = await repo.subjects.findMany();
+  const practiceSummary = await getPracticeActivitySummary(db, {
+    profileId,
+    period: { start: new Date(0), endExclusive: new Date() },
+  });
+
   if (allSubjects.length === 0) {
-    return { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 };
+    return {
+      subjects: [],
+      totalTopicsCompleted: 0,
+      totalTopicsVerified: 0,
+      practiceActivityCount: practiceSummary.totals.activitiesCompleted,
+      practiceSummary,
+    };
   }
 
   const subjectIds = allSubjects.map((s) => s.id);
@@ -503,6 +518,8 @@ export async function getOverallProgress(
     subjects: subjectProgressList,
     totalTopicsCompleted: totalCompleted,
     totalTopicsVerified: totalVerified,
+    practiceActivityCount: practiceSummary.totals.activitiesCompleted,
+    practiceSummary,
   };
 }
 

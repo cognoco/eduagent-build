@@ -21,6 +21,7 @@ import {
   loadTopicTitle,
   MAX_ASSESSMENT_EXCHANGES,
   evaluateQuickCheckAnswer,
+  recordAssessmentCompletionActivity,
 } from '../services/assessments';
 import { mapEvaluateQualityToSm2 } from '../services/evaluate';
 import { updateRetentionFromSession } from '../services/retention-data';
@@ -168,6 +169,13 @@ export const assessmentRoutes = new Hono<RouteEnv>()
               assessment.subjectId,
             );
           }
+          await recordAssessmentCompletionActivity(
+            txDb,
+            profileId,
+            updatedAssessment ?? assessment,
+            newStatus,
+            evaluation,
+          );
         });
       }
 

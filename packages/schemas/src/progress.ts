@@ -8,6 +8,7 @@ import {
   monthlyReportHeadlineSchema,
   weeklyReportSummarySchema,
   weeklyReportRecordSchema,
+  reportPracticeSummarySchema,
 } from './snapshots';
 import { consentStatusSchema } from './consent';
 
@@ -617,6 +618,8 @@ export const progressOverviewResponseSchema = z.object({
   subjects: z.array(subjectProgressSchema),
   totalTopicsCompleted: z.number().int(),
   totalTopicsVerified: z.number().int(),
+  practiceActivityCount: z.number().int().min(0).default(0),
+  practiceSummary: reportPracticeSummarySchema.optional(),
 });
 export type ProgressOverviewResponse = z.infer<
   typeof progressOverviewResponseSchema

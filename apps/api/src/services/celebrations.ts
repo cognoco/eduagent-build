@@ -10,6 +10,7 @@ import {
   markHomeSurfaceCelebrationsSeen,
   writeHomeSurfacePendingCelebrations,
 } from './home-surface-cache';
+import { recordCelebrationEvent } from './celebration-events';
 
 const CELEBRATION_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -24,7 +25,7 @@ const PARENT_VISIBLE_REASONS: CelebrationReason[] = [
 
 export function filterCelebrationsByLevel(
   celebrations: PendingCelebration[],
-  celebrationLevel: CelebrationLevel
+  celebrationLevel: CelebrationLevel,
 ): PendingCelebration[] {
   if (celebrationLevel === 'off') {
     return [];
@@ -33,7 +34,7 @@ export function filterCelebrationsByLevel(
   if (celebrationLevel === 'big_only') {
     return celebrations.filter(
       (entry) =>
-        entry.celebration === 'comet' || entry.celebration === 'orions_belt'
+        entry.celebration === 'comet' || entry.celebration === 'orions_belt',
     );
   }
 
@@ -46,7 +47,7 @@ export function filterPendingCelebrations(
     viewer: 'child' | 'parent';
     seenAt?: Date | null;
     now?: Date;
-  }
+  },
 ): PendingCelebration[] {
   const now = options.now ?? new Date();
   const expiryCutoff = new Date(now.getTime() - CELEBRATION_EXPIRY_MS);
@@ -77,7 +78,7 @@ export async function queueCelebration(
   profileId: string,
   celebration: CelebrationName,
   reason: CelebrationReason,
-  detail?: string | null
+  detail?: string | null,
 ): Promise<PendingCelebration[]> {
   const row = await findHomeSurfaceCache(db, profileId);
 
@@ -94,7 +95,7 @@ export async function queueCelebration(
     (entry) =>
       entry.celebration === nextEntry.celebration &&
       entry.reason === nextEntry.reason &&
-      (entry.detail ?? null) === nextEntry.detail
+      (entry.detail ?? null) === nextEntry.detail,
   );
 
   const pendingCelebrations = hasDuplicate
@@ -103,13 +104,25 @@ export async function queueCelebration(
 
   await writeHomeSurfacePendingCelebrations(db, profileId, pendingCelebrations);
 
+  if (!hasDuplicate) {
+    await recordCelebrationEvent(db, {
+      profileId,
+      celebratedAt: new Date(nextEntry.queuedAt),
+      celebrationType: celebration,
+      reason,
+      sourceType: 'home_surface_pending_celebration',
+      sourceId: detail ?? 'none',
+      metadata: { detail: detail ?? null },
+    });
+  }
+
   return pendingCelebrations;
 }
 
 export async function getPendingCelebrations(
   db: Database,
   profileId: string,
-  viewer: 'child' | 'parent'
+  viewer: 'child' | 'parent',
 ): Promise<PendingCelebration[]> {
   const row = await findHomeSurfaceCache(db, profileId);
 
@@ -139,7 +152,7 @@ export async function getPendingCelebrations(
 export async function markCelebrationsSeen(
   db: Database,
   profileId: string,
-  viewer: 'child' | 'parent'
+  viewer: 'child' | 'parent',
 ): Promise<void> {
   await markHomeSurfaceCelebrationsSeen(db, profileId, viewer);
 }

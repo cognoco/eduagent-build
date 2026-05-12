@@ -789,9 +789,19 @@ function SessionScreenInner() {
   }, [sessionBookmarksQuery.data, activeSessionId, routeSessionId]);
 
   // '' is intentional: all consumers gate on truthiness or convert via `|| undefined`
-  // before use as a route param or API argument (see useCreateNote, ensureSession, writeSessionRecoveryMarker).
+  // before use as a route param or API argument (see ensureSession, writeSessionRecoveryMarker).
   const effectiveSubjectId = classifiedSubject?.subjectId ?? subjectId ?? '';
   const effectiveSubjectName = classifiedSubject?.subjectName ?? subjectName;
+  const noteSubjectId =
+    effectiveSubjectId ||
+    liveTranscript?.session.subjectId ||
+    activeSession.data?.subjectId ||
+    undefined;
+  const noteTopicId =
+    topicId ??
+    liveTranscript?.session.topicId ??
+    activeSession.data?.topicId ??
+    undefined;
   const activeSubject = availableSubjects.find(
     (availableSubject) => availableSubject.id === effectiveSubjectId,
   );
@@ -816,7 +826,7 @@ function SessionScreenInner() {
   const apiClient = useApiClient();
   const classifySubject = useClassifySubject();
   const resolveSubject = useResolveSubject();
-  const createNote = useCreateNote(effectiveSubjectId || undefined, undefined);
+  const createNote = useCreateNote(noteSubjectId, undefined);
   const filing = useFiling();
   const startSession = useStartSession(effectiveSubjectId);
   const closeSession = useCloseSession(activeSessionId ?? '');
@@ -1686,7 +1696,7 @@ function SessionScreenInner() {
               showNoteInput={showNoteInput}
               setShowNoteInput={setShowNoteInput}
               sessionNoteSavedRef={sessionNoteSavedRef}
-              topicId={topicId ?? undefined}
+              topicId={noteTopicId}
               sessionId={activeSessionId ?? undefined}
               createNote={createNote}
               colors={colors}

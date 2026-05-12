@@ -144,6 +144,22 @@ export default function ProgressWeeklyReportDetail(): React.ReactElement {
                 )}
               />
             </View>
+
+            <View className="flex-row gap-3 mt-3">
+              <MetricCard
+                label={t('parentView.weeklyReport.testsCompleted')}
+                value={String(
+                  report.reportData.practiceSummary?.totals
+                    .activitiesCompleted ?? 0,
+                )}
+              />
+              <MetricCard
+                label={t('parentView.weeklyReport.testPoints')}
+                value={String(
+                  report.reportData.practiceSummary?.totals.pointsEarned ?? 0,
+                )}
+              />
+            </View>
           </>
         ) : (
           <View className="bg-surface rounded-card p-5 mt-4">

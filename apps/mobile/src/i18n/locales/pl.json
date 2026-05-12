@@ -1865,7 +1865,9 @@
       "monthlyReport": "Raport miesięczny",
       "subtitle": "Podsumowanie nauki Twojego dziecka w tym miesiącu",
       "totalWords": "Całkowita liczba słów",
-      "reportGoneTitle": "Nie znaleziono raportu"
+      "reportGoneTitle": "Nie znaleziono raportu",
+      "testsCompleted": "Testy",
+      "testPoints": "Punkty za testy"
     },
     "session": {
       "error": "Nie można załadować sesji",
@@ -1942,7 +1944,9 @@
       "sendNudge": "Wyślij przypomnienie do {{name}}",
       "openChildProfile": "Otwórz profil {{name}}",
       "reportGoneTitle": "Ten raport nie jest już dostępny",
-      "reportGoneBody": "Mógł zostać zarchiwizowany lub usunięty. Wszystkie Twoje inne raporty są nadal bezpieczne."
+      "reportGoneBody": "Mógł zostać zarchiwizowany lub usunięty. Wszystkie Twoje inne raporty są nadal bezpieczne.",
+      "testsCompleted": "Testy",
+      "testPoints": "Punkty za testy"
     }
   },
   "tabs": {
