@@ -1,15 +1,6 @@
 import { render, fireEvent } from '@testing-library/react-native';
 import { CollapsibleChapter } from './CollapsibleChapter';
 
-jest.mock('../../lib/theme', () => ({
-  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
-  useThemeColors: () => ({
-    success: '#22c55e',
-    textSecondary: '#6b7280',
-    primary: '#0088cc',
-  }),
-}));
-
 const onTopicPress = jest.fn();
 
 const topics = [

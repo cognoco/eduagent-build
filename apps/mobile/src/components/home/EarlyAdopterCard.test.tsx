@@ -2,16 +2,6 @@ import { render, screen } from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { EarlyAdopterCard } from './EarlyAdopterCard';
 
-// External boundaries only
-jest.mock('../../lib/theme', () => ({
-  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
-  useThemeColors: () => ({
-    primary: '#007AFF',
-    textSecondary: '#666',
-    textMuted: '#999',
-  }),
-}));
-
 jest.mock('../../lib/profile', () => ({
   useProfile: () => ({ activeProfile: { id: 'profile-1' } }),
 }));

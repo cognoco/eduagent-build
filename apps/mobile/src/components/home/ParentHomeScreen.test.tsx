@@ -14,18 +14,6 @@ jest.mock(
 );
 
 jest.mock(
-  '../../lib/theme' /* gc1-allow: theme hook reads native ColorScheme — not available in JSDOM */,
-  () => ({
-    useThemeColors: () => ({
-      textPrimary: '#ffffff',
-      textSecondary: '#94a3b8',
-      primary: '#00b4d8',
-    }),
-    useTheme: () => ({ colorScheme: 'light' }),
-  }),
-);
-
-jest.mock(
   'react-native-safe-area-context' /* gc1-allow: native module that requires device/simulator to resolve insets */,
   () => ({
     useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),

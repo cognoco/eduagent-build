@@ -5,15 +5,6 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 34, left: 0, right: 0 }),
 }));
 
-jest.mock('../../lib/theme', () => ({
-  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
-  useThemeColors: () => ({
-    primary: '#0d9488',
-    background: '#faf5ee',
-    border: '#e8e0d4',
-  }),
-}));
-
 describe('StudyCTA', () => {
   const onPress = jest.fn();
 

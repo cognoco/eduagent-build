@@ -5,11 +5,6 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 44, bottom: 0, left: 0, right: 0 }),
 }));
 
-jest.mock('../../lib/theme', () => ({
-  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
-  useThemeColors: () => ({ background: '#ffffff' }),
-}));
-
 describe('OfflineBanner', () => {
   it('renders the offline message', () => {
     const { getByText } = render(<OfflineBanner />);
