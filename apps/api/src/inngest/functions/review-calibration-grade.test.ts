@@ -2,10 +2,14 @@ import { handleReviewCalibrationGrade } from './review-calibration-grade';
 
 async function executeHandler(eventData: unknown) {
   const mockStep = {
-    run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
-  };
+    run: jest.fn(async (_name: string, fn: () => Promise<unknown>) =>
+      fn(),
+    ) as jest.Mock & {
+      run: <T>(name: string, fn: () => T | Promise<T>) => Promise<T>;
+    },
+  } as { run: <T>(name: string, fn: () => T | Promise<T>) => Promise<T> };
   const result = await handleReviewCalibrationGrade({
-    event: { data: eventData, name: 'app/review.calibration.requested' },
+    event: { data: eventData },
     step: mockStep,
   });
   return { result, mockStep };

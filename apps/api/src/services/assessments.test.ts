@@ -4,7 +4,9 @@ import {
   type LLMProvider,
   type ChatMessage,
   type ModelConfig,
+  type StopReason,
 } from './llm';
+import { makeChatStreamResult } from './llm/types';
 import {
   generateQuickCheck,
   evaluateAssessmentAnswer,
@@ -25,14 +27,17 @@ import type { Database } from '@eduagent/database';
 function createQuickCheckMockProvider(questions: string[]): LLMProvider {
   return {
     id: 'gemini',
-    async chat(
-      _messages: ChatMessage[],
-      _config: ModelConfig
-    ): Promise<string> {
-      return JSON.stringify({ questions });
+    async chat(_messages: ChatMessage[], _config: ModelConfig) {
+      return {
+        content: JSON.stringify({ questions }),
+        stopReason: 'stop' as StopReason,
+      };
     },
-    async *chatStream(): AsyncIterable<string> {
-      yield JSON.stringify({ questions });
+    chatStream() {
+      const s = (async function* () {
+        yield JSON.stringify({ questions });
+      })();
+      return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
     },
   };
 }
@@ -47,14 +52,17 @@ function createAssessmentEvalMockProvider(evaluation: {
 }): LLMProvider {
   return {
     id: 'gemini',
-    async chat(
-      _messages: ChatMessage[],
-      _config: ModelConfig
-    ): Promise<string> {
-      return JSON.stringify(evaluation);
+    async chat(_messages: ChatMessage[], _config: ModelConfig) {
+      return {
+        content: JSON.stringify(evaluation),
+        stopReason: 'stop' as StopReason,
+      };
     },
-    async *chatStream(): AsyncIterable<string> {
-      yield JSON.stringify(evaluation);
+    chatStream() {
+      const s = (async function* () {
+        yield JSON.stringify(evaluation);
+      })();
+      return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
     },
   };
 }
@@ -97,7 +105,7 @@ describe('generateQuickCheck', () => {
         'Can you explain why we use let instead of var?',
         'What happens if you try to reassign a const variable?',
         'When would you choose let over const?',
-      ])
+      ]),
     );
 
     const result = await generateQuickCheck(quickCheckContext);
@@ -112,7 +120,7 @@ describe('generateQuickCheck', () => {
       createQuickCheckMockProvider([
         'Why is scoping important for variables?',
         'What is the difference between let and const?',
-      ])
+      ]),
     );
 
     const result = await generateQuickCheck(quickCheckContext);
@@ -122,7 +130,7 @@ describe('generateQuickCheck', () => {
 
   it('caps at 3 questions even if LLM returns more', async () => {
     registerProvider(
-      createQuickCheckMockProvider(['Q1?', 'Q2?', 'Q3?', 'Q4?', 'Q5?'])
+      createQuickCheckMockProvider(['Q1?', 'Q2?', 'Q3?', 'Q4?', 'Q5?']),
     );
 
     const result = await generateQuickCheck(quickCheckContext);
@@ -133,11 +141,17 @@ describe('generateQuickCheck', () => {
   it('falls back gracefully when LLM returns non-JSON', async () => {
     const rawProvider: LLMProvider = {
       id: 'gemini',
-      async chat(): Promise<string> {
-        return 'Here are some questions for you to think about.';
+      async chat() {
+        return {
+          content: 'Here are some questions for you to think about.',
+          stopReason: 'stop' as StopReason,
+        };
       },
-      async *chatStream(): AsyncIterable<string> {
-        yield 'Here are some questions.';
+      chatStream() {
+        const s = (async function* () {
+          yield 'Here are some questions.';
+        })();
+        return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
       },
     };
     registerProvider(rawProvider);
@@ -166,12 +180,12 @@ describe('evaluateAssessmentAnswer', () => {
         shouldEscalateDepth: true,
         rawScore: 0.9,
         qualityRating: 4,
-      })
+      }),
     );
 
     const result = await evaluateAssessmentAnswer(
       { ...assessmentContext, currentDepth: 'recall' },
-      'A variable stores data using let, const, or var.'
+      'A variable stores data using let, const, or var.',
     );
 
     expect(result.masteryScore).toBeLessThanOrEqual(0.5);
@@ -186,12 +200,12 @@ describe('evaluateAssessmentAnswer', () => {
         shouldEscalateDepth: true,
         rawScore: 0.95,
         qualityRating: 5,
-      })
+      }),
     );
 
     const result = await evaluateAssessmentAnswer(
       { ...assessmentContext, currentDepth: 'explain' },
-      'Variables are named references to memory locations where data is stored.'
+      'Variables are named references to memory locations where data is stored.',
     );
 
     expect(result.masteryScore).toBeLessThanOrEqual(0.8);
@@ -206,12 +220,12 @@ describe('evaluateAssessmentAnswer', () => {
         shouldEscalateDepth: false,
         rawScore: 1.0,
         qualityRating: 5,
-      })
+      }),
     );
 
     const result = await evaluateAssessmentAnswer(
       { ...assessmentContext, currentDepth: 'transfer' },
-      'I would use const for the config object since it should not be reassigned.'
+      'I would use const for the config object since it should not be reassigned.',
     );
 
     expect(result.masteryScore).toBeLessThanOrEqual(1.0);
@@ -226,12 +240,12 @@ describe('evaluateAssessmentAnswer', () => {
         shouldEscalateDepth: false,
         rawScore: 0.4,
         qualityRating: 3,
-      })
+      }),
     );
 
     const result = await evaluateAssessmentAnswer(
       assessmentContext,
-      'Variables store data.'
+      'Variables store data.',
     );
 
     expect(result.qualityRating).toBeGreaterThanOrEqual(0);
@@ -246,12 +260,12 @@ describe('evaluateAssessmentAnswer', () => {
         shouldEscalateDepth: true,
         rawScore: 0.45,
         qualityRating: 4,
-      })
+      }),
     );
 
     const result = await evaluateAssessmentAnswer(
       { ...assessmentContext, currentDepth: 'recall' },
-      'Good answer.'
+      'Good answer.',
     );
 
     expect(result.shouldEscalateDepth).toBe(true);
@@ -266,12 +280,12 @@ describe('evaluateAssessmentAnswer', () => {
         shouldEscalateDepth: true,
         rawScore: 0.9,
         qualityRating: 5,
-      })
+      }),
     );
 
     const result = await evaluateAssessmentAnswer(
       { ...assessmentContext, currentDepth: 'transfer' },
-      'Applied the concept correctly.'
+      'Applied the concept correctly.',
     );
 
     expect(result.nextDepth).toBeUndefined();
@@ -280,18 +294,24 @@ describe('evaluateAssessmentAnswer', () => {
   it('falls back gracefully when LLM returns non-JSON', async () => {
     const rawProvider: LLMProvider = {
       id: 'gemini',
-      async chat(): Promise<string> {
-        return 'The answer shows partial understanding.';
+      async chat() {
+        return {
+          content: 'The answer shows partial understanding.',
+          stopReason: 'stop' as StopReason,
+        };
       },
-      async *chatStream(): AsyncIterable<string> {
-        yield 'Partial understanding.';
+      chatStream() {
+        const s = (async function* () {
+          yield 'Partial understanding.';
+        })();
+        return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
       },
     };
     registerProvider(rawProvider);
 
     const result = await evaluateAssessmentAnswer(
       assessmentContext,
-      'Some answer'
+      'Some answer',
     );
 
     // [BUG-670 / S-16] Break test — raw LLM string MUST NOT leak as feedback.
@@ -300,7 +320,7 @@ describe('evaluateAssessmentAnswer', () => {
     // directly to the learner.
     expect(result.feedback).not.toContain('partial understanding');
     expect(result.feedback).toBe(
-      "We couldn't evaluate your answer right now — please try again."
+      "We couldn't evaluate your answer right now — please try again.",
     );
     expect(result.passed).toBe(false);
     expect(result.masteryScore).toBe(0);
@@ -319,28 +339,33 @@ describe('evaluateAssessmentAnswer', () => {
     // object, so trailing braces no longer break extraction.
     const messyProvider: LLMProvider = {
       id: 'gemini',
-      async chat(): Promise<string> {
-        return (
-          'Here is my evaluation:\n' +
-          JSON.stringify({
-            feedback: 'Solid recall of the key concepts.',
-            passed: true,
-            shouldEscalateDepth: false,
-            rawScore: 0.45,
-            qualityRating: 4,
-          }) +
-          '\n(See {appendix} for grading rubric — irrelevant to envelope.)'
-        );
+      async chat() {
+        return {
+          content:
+            'Here is my evaluation:\n' +
+            JSON.stringify({
+              feedback: 'Solid recall of the key concepts.',
+              passed: true,
+              shouldEscalateDepth: false,
+              rawScore: 0.45,
+              qualityRating: 4,
+            }) +
+            '\n(See {appendix} for grading rubric — irrelevant to envelope.)',
+          stopReason: 'stop' as StopReason,
+        };
       },
-      async *chatStream(): AsyncIterable<string> {
-        yield 'unused';
+      chatStream() {
+        const s = (async function* () {
+          yield 'unused';
+        })();
+        return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
       },
     };
     registerProvider(messyProvider);
 
     const result = await evaluateAssessmentAnswer(
       { ...assessmentContext, currentDepth: 'recall' },
-      'Variables store data.'
+      'Variables store data.',
     );
 
     expect(result.feedback).toBe('Solid recall of the key concepts.');
@@ -351,28 +376,33 @@ describe('evaluateAssessmentAnswer', () => {
   it('parses correctly when JSON is wrapped in markdown fence', async () => {
     const fencedProvider: LLMProvider = {
       id: 'gemini',
-      async chat(): Promise<string> {
-        return (
-          '```json\n' +
-          JSON.stringify({
-            feedback: 'Excellent explanation.',
-            passed: true,
-            shouldEscalateDepth: false,
-            rawScore: 0.7,
-            qualityRating: 4,
-          }) +
-          '\n```'
-        );
+      async chat() {
+        return {
+          content:
+            '```json\n' +
+            JSON.stringify({
+              feedback: 'Excellent explanation.',
+              passed: true,
+              shouldEscalateDepth: false,
+              rawScore: 0.7,
+              qualityRating: 4,
+            }) +
+            '\n```',
+          stopReason: 'stop' as StopReason,
+        };
       },
-      async *chatStream(): AsyncIterable<string> {
-        yield 'unused';
+      chatStream() {
+        const s = (async function* () {
+          yield 'unused';
+        })();
+        return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
       },
     };
     registerProvider(fencedProvider);
 
     const result = await evaluateAssessmentAnswer(
       { ...assessmentContext, currentDepth: 'explain' },
-      'Some answer'
+      'Some answer',
     );
 
     expect(result.feedback).toBe('Excellent explanation.');
@@ -382,29 +412,35 @@ describe('evaluateAssessmentAnswer', () => {
   it('uses canned fallback when parsed JSON is missing feedback field', async () => {
     const missingFeedbackProvider: LLMProvider = {
       id: 'gemini',
-      async chat(): Promise<string> {
+      async chat() {
         // Valid JSON, but no `feedback` field — caller used to default to
         // raw response under the old `?? response` pattern.
-        return JSON.stringify({
-          passed: false,
-          shouldEscalateDepth: false,
-          rawScore: 0.2,
-          qualityRating: 1,
-        });
+        return {
+          content: JSON.stringify({
+            passed: false,
+            shouldEscalateDepth: false,
+            rawScore: 0.2,
+            qualityRating: 1,
+          }),
+          stopReason: 'stop' as StopReason,
+        };
       },
-      async *chatStream(): AsyncIterable<string> {
-        yield 'unused';
+      chatStream() {
+        const s = (async function* () {
+          yield 'unused';
+        })();
+        return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
       },
     };
     registerProvider(missingFeedbackProvider);
 
     const result = await evaluateAssessmentAnswer(
       assessmentContext,
-      'Some answer'
+      'Some answer',
     );
 
     expect(result.feedback).toBe(
-      "We couldn't evaluate your answer right now — please try again."
+      "We couldn't evaluate your answer right now — please try again.",
     );
     expect(result.passed).toBe(false);
   });
@@ -480,7 +516,7 @@ function mockAssessmentRow(
     masteryScore: number | null;
     qualityRating: number | null;
     exchangeHistory: unknown[];
-  }>
+  }>,
 ) {
   return {
     id: overrides?.id ?? testAssessmentId,
@@ -537,7 +573,7 @@ describe('createAssessment', () => {
       db,
       testProfileId,
       testSubjectId,
-      testTopicId
+      testTopicId,
     );
 
     expect(result.id).toBe(testAssessmentId);
@@ -559,7 +595,7 @@ describe('createAssessment', () => {
       testProfileId,
       testSubjectId,
       testTopicId,
-      'session-1'
+      'session-1',
     );
 
     expect(result.sessionId).toBe('session-1');
@@ -585,7 +621,7 @@ describe('createAssessment', () => {
       db,
       testProfileId,
       testSubjectId,
-      testTopicId
+      testTopicId,
     );
 
     expect(result.createdAt).toBe('2025-01-15T10:00:00.000Z');

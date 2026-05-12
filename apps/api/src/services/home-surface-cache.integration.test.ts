@@ -120,27 +120,33 @@ describe('[BUG-859] mergeHomeSurfaceCacheData concurrent lost-update guard (inte
     // "record an interaction / add a card" operation).  After N=3 concurrent
     // merges the rankedHomeCards array must contain exactly N entries — not
     // fewer (which would happen if the last-writer-wins bug were still present).
-    const makeCard = (label: string) => ({
-      id: `card-${label}` as import('@eduagent/schemas').HomeCardId,
-      type: 'streak' as const,
-      priority: 1,
+    const makeCard = (
+      id: import('@eduagent/schemas').HomeCardId,
+      label: string,
+    ): HomeCard => ({
+      id,
       title: label,
-      body: label,
-      expiresAt: new Date(Date.now() + 86400_000).toISOString(),
+      subtitle: label,
+      primaryLabel: label,
+      priority: 1,
     });
 
     const mergeAppend =
-      (label: string) =>
+      (id: import('@eduagent/schemas').HomeCardId, label: string) =>
       (current: HomeSurfaceCacheData): HomeSurfaceCacheData => ({
         ...current,
-        rankedHomeCards: [...current.rankedHomeCards, makeCard(label)],
+        rankedHomeCards: [...current.rankedHomeCards, makeCard(id, label)],
       });
 
     // Fire 3 concurrent merges
     const results = await Promise.allSettled([
-      mergeHomeSurfaceCacheData(db, profile.id, mergeAppend('alpha')),
-      mergeHomeSurfaceCacheData(db, profile.id, mergeAppend('beta')),
-      mergeHomeSurfaceCacheData(db, profile.id, mergeAppend('gamma')),
+      mergeHomeSurfaceCacheData(db, profile.id, mergeAppend('study', 'alpha')),
+      mergeHomeSurfaceCacheData(db, profile.id, mergeAppend('review', 'beta')),
+      mergeHomeSurfaceCacheData(
+        db,
+        profile.id,
+        mergeAppend('homework', 'gamma'),
+      ),
     ]);
 
     // None should reject
@@ -148,11 +154,12 @@ describe('[BUG-859] mergeHomeSurfaceCacheData concurrent lost-update guard (inte
     expect(failures).toHaveLength(0);
 
     // Read the committed state and check the invariant
-    const { data } = await readHomeSurfaceCacheData(db, profile.id);
+    const cacheResult = await readHomeSurfaceCacheData(db, profile.id);
+    const data = cacheResult!.data;
     // With SELECT FOR UPDATE serialising merges each card must appear exactly once.
     expect(data.rankedHomeCards).toHaveLength(3);
     const labels = data.rankedHomeCards.map((c: HomeCard) => c.id).sort();
-    expect(labels).toEqual(['card-alpha', 'card-beta', 'card-gamma']);
+    expect(labels).toEqual(['homework', 'review', 'study']);
   });
 
   it('[BUG-859] first-write idempotency — concurrent merges on a non-existent row create exactly one cache row', async () => {

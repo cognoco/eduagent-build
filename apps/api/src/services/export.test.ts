@@ -313,7 +313,7 @@ describe('generateExport', () => {
 
     const result = await generateExport(db, 'account-1');
 
-    const aiRow = result.sessionEvents.find(
+    const aiRow = result.sessionEvents!.find(
       (e: Record<string, unknown>) => e['eventType'] === 'ai_response',
     ) as Record<string, unknown> | undefined;
     expect(aiRow).toEqual(expect.objectContaining({}));
@@ -322,7 +322,7 @@ describe('generateExport', () => {
     expect(aiRow!['content']).not.toContain('"ui_hints"');
 
     // user_message rows must be left untouched
-    const userRow = result.sessionEvents.find(
+    const userRow = result.sessionEvents!.find(
       (e: Record<string, unknown>) => e['eventType'] === 'user_message',
     ) as Record<string, unknown> | undefined;
     expect(userRow!['content']).toBe('What is gravity?');

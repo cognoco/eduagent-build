@@ -29,6 +29,7 @@ function llmResponse(json: Record<string, unknown>): void {
     provider: 'gemini',
     model: 'gemini-2.5-flash',
     latencyMs: 50,
+    stopReason: 'stop',
   });
 }
 
@@ -53,7 +54,7 @@ describe('extractVocabularyFromTranscript', () => {
 
     const result = await extractVocabularyFromTranscript(
       sampleTranscript,
-      'es'
+      'es',
     );
 
     expect(result).toHaveLength(2);
@@ -81,7 +82,7 @@ describe('extractVocabularyFromTranscript', () => {
   it('returns empty array for unsupported language code', async () => {
     const result = await extractVocabularyFromTranscript(
       sampleTranscript,
-      'zz'
+      'zz',
     );
 
     expect(result).toEqual([]);
@@ -94,11 +95,12 @@ describe('extractVocabularyFromTranscript', () => {
       provider: 'gemini',
       model: 'gemini-2.5-flash',
       latencyMs: 50,
+      stopReason: 'stop',
     });
 
     const result = await extractVocabularyFromTranscript(
       sampleTranscript,
-      'es'
+      'es',
     );
 
     expect(result).toEqual([]);
@@ -109,7 +111,7 @@ describe('extractVocabularyFromTranscript', () => {
 
     const result = await extractVocabularyFromTranscript(
       sampleTranscript,
-      'es'
+      'es',
     );
 
     expect(result).toEqual([]);
@@ -135,7 +137,7 @@ describe('extractVocabularyFromTranscript', () => {
           cefrLevel: 'A2',
           transcriptTurns: sampleTranscript.length,
         }),
-      })
+      }),
     );
   });
 
@@ -145,11 +147,12 @@ describe('extractVocabularyFromTranscript', () => {
       provider: 'gemini',
       model: 'gemini-2.5-flash',
       latencyMs: 50,
+      stopReason: 'stop',
     });
 
     const result = await extractVocabularyFromTranscript(
       sampleTranscript,
-      'es'
+      'es',
     );
 
     expect(result).toEqual([]);
@@ -165,7 +168,7 @@ describe('extractVocabularyFromTranscript', () => {
 
     const result = await extractVocabularyFromTranscript(
       sampleTranscript,
-      'es'
+      'es',
     );
 
     expect(result).toHaveLength(1);
@@ -188,7 +191,7 @@ describe('extractVocabularyFromTranscript', () => {
 
     const result = await extractVocabularyFromTranscript(
       sampleTranscript,
-      'es'
+      'es',
     );
 
     expect(result).toHaveLength(1);
@@ -210,7 +213,7 @@ describe('extractVocabularyFromTranscript', () => {
 
     const result = await extractVocabularyFromTranscript(
       sampleTranscript,
-      'es'
+      'es',
     );
 
     expect(result).toHaveLength(1);
@@ -233,7 +236,7 @@ describe('extractVocabularyFromTranscript', () => {
 
     const result = await extractVocabularyFromTranscript(
       sampleTranscript,
-      'es'
+      'es',
     );
 
     expect(result).toHaveLength(1);
@@ -255,7 +258,7 @@ describe('extractVocabularyFromTranscript', () => {
 
     const result = await extractVocabularyFromTranscript(
       sampleTranscript,
-      'es'
+      'es',
     );
 
     expect(result).toHaveLength(8);
@@ -268,7 +271,7 @@ describe('extractVocabularyFromTranscript', () => {
 
     const result = await extractVocabularyFromTranscript(
       sampleTranscript,
-      'es'
+      'es',
     );
 
     expect(result[0]).toEqual({
@@ -299,7 +302,7 @@ describe('extractVocabularyFromTranscript', () => {
 
     const result = await extractVocabularyFromTranscript(
       sampleTranscript,
-      'es'
+      'es',
     );
 
     expect(result).toEqual([]);
@@ -310,7 +313,7 @@ describe('extractVocabularyFromTranscript', () => {
 
     const result = await extractVocabularyFromTranscript(
       sampleTranscript,
-      'es'
+      'es',
     );
 
     expect(result).toEqual([]);
@@ -326,7 +329,7 @@ describe('extractVocabularyFromTranscript', () => {
     const result = await extractVocabularyFromTranscript(
       sampleTranscript,
       'es',
-      'A2'
+      'A2',
     );
 
     expect(result).toHaveLength(1);
@@ -353,7 +356,7 @@ describe('extractVocabularyFromTranscript', () => {
     const result = await extractVocabularyFromTranscript(
       sampleTranscript,
       'es',
-      'A2'
+      'A2',
     );
 
     expect(result).toHaveLength(1);
@@ -367,7 +370,7 @@ describe('extractVocabularyFromTranscript', () => {
 
     const result = await extractVocabularyFromTranscript(
       sampleTranscript,
-      'es'
+      'es',
     );
 
     expect(result).toHaveLength(1);

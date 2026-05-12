@@ -20,6 +20,15 @@ describe('validateProductionKeys', () => {
     API_ORIGIN: 'https://api.mentomate.com',
     LOG_LEVEL: 'info',
     EMAIL_FROM: 'noreply@mentomate.com',
+    EMPTY_REPLY_GUARD_ENABLED: 'true',
+    RETENTION_PURGE_ENABLED: 'false',
+    MEMORY_FACTS_READ_ENABLED: 'false',
+    MEMORY_FACTS_RELEVANCE_RETRIEVAL: 'false',
+    MEMORY_FACTS_DEDUP_ENABLED: 'false',
+    MEMORY_FACTS_DEDUP_THRESHOLD: 0.15,
+    MAX_DEDUP_LLM_CALLS_PER_SESSION: 10,
+    MEMORY_FACTS_DEDUP_ROLLOUT_PCT: 0,
+    MATCHER_ENABLED: 'false',
   };
 
   it('returns empty array for development environment', () => {

@@ -99,6 +99,7 @@ describe('session operations integration', () => {
 
     const session = await startSession(db, profileId, subjectId, {
       subjectId,
+      sessionType: 'learning',
       inputMode: 'text',
     });
 
@@ -122,6 +123,8 @@ describe('session operations integration', () => {
 
     const session = await startSession(db, profileId, subjectId, {
       subjectId,
+      sessionType: 'learning',
+      inputMode: 'text',
     });
 
     await db.insert(sessionEvents).values([
@@ -160,7 +163,12 @@ describe('session operations integration', () => {
     const transcript = await getSessionTranscript(db, profileId, session.id);
 
     expect(transcript).not.toBeNull();
-    expect(transcript?.session).toEqual(
+    expect(transcript !== null && !transcript.archived).toBe(true);
+    const liveTranscript = transcript as Extract<
+      typeof transcript,
+      { archived: false }
+    >;
+    expect(liveTranscript.session).toEqual(
       expect.objectContaining({
         sessionId: session.id,
         subjectId,
@@ -168,7 +176,7 @@ describe('session operations integration', () => {
         wallClockSeconds: 180,
       }),
     );
-    expect(transcript?.exchanges).toEqual([
+    expect(liveTranscript.exchanges).toEqual([
       expect.objectContaining({
         role: 'assistant',
         content: 'Use a diagram first.',
@@ -192,6 +200,8 @@ describe('session operations integration', () => {
 
     const session = await startSession(db, profileId, subjectId, {
       subjectId,
+      sessionType: 'learning',
+      inputMode: 'text',
     });
 
     await db.insert(sessionSummaries).values({
@@ -239,6 +249,7 @@ describe('session operations integration', () => {
     const session = await startSession(db, profileId, subjectId, {
       subjectId,
       sessionType: 'homework',
+      inputMode: 'text',
       metadata: {
         homework: {
           problemCount: 2,
@@ -292,11 +303,10 @@ describe('session operations integration', () => {
       where: eq(learningSessions.id, session.id),
     });
 
-    expect(firstResult.metadata.loggedCorrectionIds).toEqual(['problem-1']);
-    expect(firstResult.metadata.loggedStartedProblemIds).toEqual(['problem-1']);
-    expect(firstResult.metadata.loggedCompletedProblemIds).toEqual([
-      'problem-2',
-    ]);
+    const firstMeta = firstResult.metadata as Record<string, unknown>;
+    expect(firstMeta['loggedCorrectionIds']).toEqual(['problem-1']);
+    expect(firstMeta['loggedStartedProblemIds']).toEqual(['problem-1']);
+    expect(firstMeta['loggedCompletedProblemIds']).toEqual(['problem-2']);
     expect(secondResult.metadata).toEqual(firstResult.metadata);
     expect(
       events.map((event: typeof sessionEvents.$inferSelect) => event.eventType),
@@ -341,6 +351,8 @@ describe('session operations integration', () => {
 
     const session = await startSession(db, profileId, subjectId, {
       subjectId,
+      sessionType: 'learning',
+      inputMode: 'text',
     });
     const flaggedEventId = generateUUIDv7();
 

@@ -9,9 +9,9 @@ import {
   formatFilingFailedPush,
   formatStruggleNotificationCopy,
   MAX_DAILY_PUSH,
-  type NotificationPayload,
   type EmailPayload,
 } from './notifications';
+import type { NotificationPayload } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 
 // ---------------------------------------------------------------------------
@@ -433,7 +433,7 @@ describe('[BUG-856] sendStruggleNotification rate-limit atomicity', () => {
     const result = await sendStruggleNotification(
       dbWithFamilyLink('parent-1'),
       'child-1',
-      { type: 'struggle_noticed', topic: 'Algebra', confidence: 0.7 },
+      { type: 'struggle_noticed', topic: 'Algebra', subject: null },
     );
 
     expect(result).toEqual({ sent: false, reason: 'dedup_24h' });
@@ -459,7 +459,7 @@ describe('[BUG-856] sendStruggleNotification rate-limit atomicity', () => {
     const result = await sendStruggleNotification(
       dbWithFamilyLink('parent-1'),
       'child-1',
-      { type: 'struggle_flagged', topic: 'Geometry', confidence: 0.95 },
+      { type: 'struggle_flagged', topic: 'Geometry', subject: null },
     );
 
     expect(result).toEqual({ sent: true, ticketId: 'ticket-1' });
@@ -478,7 +478,7 @@ describe('[BUG-856] sendStruggleNotification rate-limit atomicity', () => {
       {
         type: 'struggle_noticed',
         topic: 'X',
-        confidence: 0.7,
+        subject: null,
       },
     );
 
@@ -512,7 +512,7 @@ describe('sendStruggleNotification consent gate', () => {
       const result = await sendStruggleNotification(
         dbWithFamilyLink('parent-1', blockedStatus),
         'child-1',
-        { type: 'struggle_noticed', topic: 'Algebra', confidence: 0.7 },
+        { type: 'struggle_noticed', topic: 'Algebra', subject: null },
       );
 
       expect(result).toEqual({ sent: false, reason: 'consent_not_granted' });
@@ -535,7 +535,7 @@ describe('sendStruggleNotification consent gate', () => {
     const result = await sendStruggleNotification(
       dbWithFamilyLink('parent-1', 'CONSENTED'),
       'child-1',
-      { type: 'struggle_flagged', topic: 'Geometry', confidence: 0.95 },
+      { type: 'struggle_flagged', topic: 'Geometry', subject: null },
     );
 
     expect(result).toEqual({ sent: true, ticketId: 'ticket-1' });
@@ -557,7 +557,7 @@ describe('sendStruggleNotification consent gate', () => {
     const result = await sendStruggleNotification(
       dbWithFamilyLink('parent-1', null),
       'child-1',
-      { type: 'struggle_resolved', topic: 'Fractions', confidence: 0.9 },
+      { type: 'struggle_resolved', topic: 'Fractions', subject: null },
     );
 
     expect(result).toEqual({ sent: true, ticketId: 'ticket-2' });

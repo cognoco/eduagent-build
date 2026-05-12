@@ -37,6 +37,7 @@ function llmResponse(json: Record<string, unknown>): void {
     provider: 'gemini',
     model: 'gemini-2.5-flash',
     latencyMs: 50,
+    stopReason: 'stop',
   });
 }
 
@@ -47,6 +48,7 @@ function makeSubject(id: string, name: string) {
     name,
     rawInput: null,
     status: 'active' as const,
+    pedagogyMode: 'socratic' as const,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
   };
@@ -65,7 +67,7 @@ describe('classifySubject', () => {
     const result = await classifySubject(
       FAKE_DB,
       PROFILE_ID,
-      'solve 2x + 5 = 15'
+      'solve 2x + 5 = 15',
     );
 
     expect(result.candidates).toEqual([]);
@@ -81,7 +83,7 @@ describe('classifySubject', () => {
     const result = await classifySubject(
       FAKE_DB,
       PROFILE_ID,
-      'solve 2x + 5 = 15'
+      'solve 2x + 5 = 15',
     );
 
     expect(result.candidates).toEqual([]);
@@ -106,7 +108,7 @@ describe('classifySubject', () => {
         extra: expect.objectContaining({
           site: 'classifySubject.zeroSubjectPath',
         }),
-      })
+      }),
     );
   });
 
@@ -132,7 +134,7 @@ describe('classifySubject', () => {
           site: 'classifySubject.multiSubjectPath',
           subjectCount: 2,
         }),
-      })
+      }),
     );
   });
 
@@ -144,7 +146,7 @@ describe('classifySubject', () => {
     const result = await classifySubject(
       FAKE_DB,
       PROFILE_ID,
-      'solve 2x + 5 = 15'
+      'solve 2x + 5 = 15',
     );
 
     expect(result.candidates).toHaveLength(1);
@@ -171,7 +173,7 @@ describe('classifySubject', () => {
     const result = await classifySubject(
       FAKE_DB,
       PROFILE_ID,
-      'solve 2x + 5 = 15'
+      'solve 2x + 5 = 15',
     );
 
     expect(result.candidates).toHaveLength(1);
@@ -201,7 +203,7 @@ describe('classifySubject', () => {
     const result = await classifySubject(
       FAKE_DB,
       PROFILE_ID,
-      'calculate the velocity of a ball rolling down a slope'
+      'calculate the velocity of a ball rolling down a slope',
     );
 
     expect(result.candidates).toHaveLength(2);
@@ -242,7 +244,7 @@ describe('classifySubject', () => {
     const result = await classifySubject(
       FAKE_DB,
       PROFILE_ID,
-      'when was the Battle of Hastings'
+      'when was the Battle of Hastings',
     );
 
     expect(result.candidates).toEqual([]);
@@ -271,7 +273,7 @@ describe('classifySubject', () => {
           content: expect.stringContaining('solve 2x + 5 = 15'),
         }),
       ]),
-      1
+      1,
     );
   });
 
@@ -337,6 +339,7 @@ describe('classifySubject', () => {
       provider: 'gemini',
       model: 'gemini-2.5-flash',
       latencyMs: 50,
+      stopReason: 'stop',
     });
 
     const result = await classifySubject(FAKE_DB, PROFILE_ID, 'random text');
@@ -362,7 +365,7 @@ describe('classifySubject', () => {
     const result = await classifySubject(
       FAKE_DB,
       PROFILE_ID,
-      'balance this equation'
+      'balance this equation',
     );
 
     // Chemistry is not enrolled, so only Mathematics should appear
@@ -408,7 +411,7 @@ describe('classifySubject', () => {
       const result = await classifySubject(
         FAKE_DB,
         PROFILE_ID,
-        'please teach me about Easter'
+        'please teach me about Easter',
       );
 
       expect(result.candidates).toEqual([]);
@@ -430,7 +433,7 @@ describe('classifySubject', () => {
       const result = await classifySubject(
         FAKE_DB,
         PROFILE_ID,
-        'please teach me about Easter'
+        'please teach me about Easter',
       );
 
       expect(result.candidates).toHaveLength(1);
@@ -458,12 +461,12 @@ describe('classifySubject', () => {
         const result = await classifySubject(
           FAKE_DB,
           PROFILE_ID,
-          `teach me about ${topic}`
+          `teach me about ${topic}`,
         );
 
         expect(result.suggestedSubjectName).toBe(expectedSuggestion);
         expect(result.needsConfirmation).toBe(true);
-      }
+      },
     );
 
     it('provides suggestedSubjectName when LLM returns no matches for a valid topic', async () => {
@@ -481,7 +484,7 @@ describe('classifySubject', () => {
       const result = await classifySubject(
         FAKE_DB,
         PROFILE_ID,
-        'tell me about the Roman Empire'
+        'tell me about the Roman Empire',
       );
 
       // The key assertion: suggestedSubjectName must never be null for valid topics

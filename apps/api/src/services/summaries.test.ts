@@ -4,7 +4,9 @@ import {
   type LLMProvider,
   type ChatMessage,
   type ModelConfig,
+  type StopReason,
 } from './llm';
+import { makeChatStreamResult } from './llm/types';
 import { evaluateSummary } from './summaries';
 
 // ---------------------------------------------------------------------------
@@ -20,14 +22,17 @@ function createEvalMockProvider(evaluation: {
 }): LLMProvider {
   return {
     id: 'gemini',
-    async chat(
-      _messages: ChatMessage[],
-      _config: ModelConfig
-    ): Promise<string> {
-      return JSON.stringify(evaluation);
+    async chat(_messages: ChatMessage[], _config: ModelConfig) {
+      return {
+        content: JSON.stringify(evaluation),
+        stopReason: 'stop' as StopReason,
+      };
     },
-    async *chatStream(): AsyncIterable<string> {
-      yield JSON.stringify(evaluation);
+    chatStream() {
+      const stream = (async function* () {
+        yield JSON.stringify(evaluation);
+      })();
+      return makeChatStreamResult(stream, Promise.resolve<StopReason>('stop'));
     },
   };
 }
@@ -49,13 +54,13 @@ describe('evaluateSummary', () => {
         hasUnderstandingGaps: false,
         gapAreas: [],
         isAccepted: true,
-      })
+      }),
     );
 
     const result = await evaluateSummary(
       'Variables',
       'Understanding variables in programming',
-      'Variables are containers that store data values.'
+      'Variables are containers that store data values.',
     );
 
     expect(result.feedback).toContain('Great summary');
@@ -71,13 +76,13 @@ describe('evaluateSummary', () => {
         hasUnderstandingGaps: true,
         gapAreas: ['let vs const distinction', 'block scoping'],
         isAccepted: false,
-      })
+      }),
     );
 
     const result = await evaluateSummary(
       'Variables',
       'Let, const, and var in JavaScript',
-      'Variables store data. You use var to create them.'
+      'Variables store data. You use var to create them.',
     );
 
     expect(result.hasUnderstandingGaps).toBe(true);
@@ -93,13 +98,13 @@ describe('evaluateSummary', () => {
         hasUnderstandingGaps: false,
         gapAreas: [],
         isAccepted: true,
-      })
+      }),
     );
 
     const result = await evaluateSummary(
       'Loops',
       'For and while loops',
-      'For loops repeat a block a fixed number of times. While loops repeat until a condition is false.'
+      'For loops repeat a block a fixed number of times. While loops repeat until a condition is false.',
     );
 
     expect(result.isAccepted).toBe(true);
@@ -109,11 +114,20 @@ describe('evaluateSummary', () => {
   it('falls back gracefully when LLM returns non-JSON', async () => {
     const rawProvider: LLMProvider = {
       id: 'gemini',
-      async chat(): Promise<string> {
-        return 'Your summary looks good overall!';
+      async chat() {
+        return {
+          content: 'Your summary looks good overall!',
+          stopReason: 'stop' as StopReason,
+        };
       },
-      async *chatStream(): AsyncIterable<string> {
-        yield 'Your summary looks good overall!';
+      chatStream() {
+        const stream = (async function* () {
+          yield 'Your summary looks good overall!';
+        })();
+        return makeChatStreamResult(
+          stream,
+          Promise.resolve<StopReason>('stop'),
+        );
       },
     };
     registerProvider(rawProvider);
@@ -121,7 +135,7 @@ describe('evaluateSummary', () => {
     const result = await evaluateSummary(
       'Arrays',
       'Working with arrays',
-      'Arrays are ordered collections.'
+      'Arrays are ordered collections.',
     );
 
     // Fallback: LLM returned non-JSON — show safe error message, do not accept.
@@ -135,8 +149,8 @@ describe('evaluateSummary', () => {
   it('handles JSON embedded in surrounding text', async () => {
     const embeddedProvider: LLMProvider = {
       id: 'gemini',
-      async chat(): Promise<string> {
-        return (
+      async chat() {
+        const content =
           'Here is my evaluation:\n' +
           JSON.stringify({
             feedback: 'Well done!',
@@ -144,11 +158,17 @@ describe('evaluateSummary', () => {
             gapAreas: [],
             isAccepted: true,
           }) +
-          '\nEnd of evaluation.'
-        );
+          '\nEnd of evaluation.';
+        return { content, stopReason: 'stop' as StopReason };
       },
-      async *chatStream(): AsyncIterable<string> {
-        yield 'Well done!';
+      chatStream() {
+        const stream = (async function* () {
+          yield 'Well done!';
+        })();
+        return makeChatStreamResult(
+          stream,
+          Promise.resolve<StopReason>('stop'),
+        );
       },
     };
     registerProvider(embeddedProvider);
@@ -156,7 +176,7 @@ describe('evaluateSummary', () => {
     const result = await evaluateSummary(
       'Functions',
       'Function declarations',
-      'Functions are reusable blocks of code.'
+      'Functions are reusable blocks of code.',
     );
 
     expect(result.feedback).toBe('Well done!');
@@ -170,8 +190,8 @@ describe('evaluateSummary', () => {
     // walker stops at the first balanced object, recovering correctly here.
     const messyProvider: LLMProvider = {
       id: 'gemini',
-      async chat(): Promise<string> {
-        return (
+      async chat() {
+        const content =
           'Here is the evaluation:\n' +
           JSON.stringify({
             feedback: 'Captured the main idea.',
@@ -179,11 +199,17 @@ describe('evaluateSummary', () => {
             gapAreas: [],
             isAccepted: true,
           }) +
-          '\n(rubric reference: see {section-3})'
-        );
+          '\n(rubric reference: see {section-3})';
+        return { content, stopReason: 'stop' as StopReason };
       },
-      async *chatStream(): AsyncIterable<string> {
-        yield 'unused';
+      chatStream() {
+        const stream = (async function* () {
+          yield 'unused';
+        })();
+        return makeChatStreamResult(
+          stream,
+          Promise.resolve<StopReason>('stop'),
+        );
       },
     };
     registerProvider(messyProvider);
@@ -191,7 +217,7 @@ describe('evaluateSummary', () => {
     const result = await evaluateSummary(
       'Functions',
       'Function declarations',
-      'Functions are reusable blocks of code.'
+      'Functions are reusable blocks of code.',
     );
 
     // Without the brace-walker fix, this would fall back to the canned message.
@@ -202,8 +228,8 @@ describe('evaluateSummary', () => {
   it('parses correctly when JSON is wrapped in a markdown code fence', async () => {
     const fencedProvider: LLMProvider = {
       id: 'gemini',
-      async chat(): Promise<string> {
-        return (
+      async chat() {
+        const content =
           '```json\n' +
           JSON.stringify({
             feedback: 'Solid.',
@@ -211,11 +237,17 @@ describe('evaluateSummary', () => {
             gapAreas: [],
             isAccepted: true,
           }) +
-          '\n```'
-        );
+          '\n```';
+        return { content, stopReason: 'stop' as StopReason };
       },
-      async *chatStream(): AsyncIterable<string> {
-        yield 'unused';
+      chatStream() {
+        const stream = (async function* () {
+          yield 'unused';
+        })();
+        return makeChatStreamResult(
+          stream,
+          Promise.resolve<StopReason>('stop'),
+        );
       },
     };
     registerProvider(fencedProvider);
@@ -223,7 +255,7 @@ describe('evaluateSummary', () => {
     const result = await evaluateSummary(
       'Loops',
       'For and while loops',
-      'For loops repeat n times.'
+      'For loops repeat n times.',
     );
 
     expect(result.feedback).toBe('Solid.');
@@ -234,15 +266,24 @@ describe('evaluateSummary', () => {
   it('uses canned fallback when parsed JSON is missing the feedback field', async () => {
     const missingFeedbackProvider: LLMProvider = {
       id: 'gemini',
-      async chat(): Promise<string> {
-        return JSON.stringify({
-          hasUnderstandingGaps: true,
-          gapAreas: ['x'],
-          isAccepted: false,
-        });
+      async chat() {
+        return {
+          content: JSON.stringify({
+            hasUnderstandingGaps: true,
+            gapAreas: ['x'],
+            isAccepted: false,
+          }),
+          stopReason: 'stop' as StopReason,
+        };
       },
-      async *chatStream(): AsyncIterable<string> {
-        yield 'unused';
+      chatStream() {
+        const stream = (async function* () {
+          yield 'unused';
+        })();
+        return makeChatStreamResult(
+          stream,
+          Promise.resolve<StopReason>('stop'),
+        );
       },
     };
     registerProvider(missingFeedbackProvider);
@@ -250,7 +291,7 @@ describe('evaluateSummary', () => {
     const result = await evaluateSummary(
       'Arrays',
       'Arrays',
-      'Some summary text.'
+      'Some summary text.',
     );
 
     expect(result.feedback).toContain("couldn't provide AI feedback");

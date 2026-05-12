@@ -104,10 +104,20 @@ describe('subjectPrewarmCurriculum', () => {
     persistBookTopicsSpy = jest
       .spyOn(curriculumService, 'persistBookTopics')
       .mockResolvedValue({
-        book: { id: bookId, title: 'Tea' },
+        book: {
+          id: bookId,
+          subjectId,
+          title: 'Tea',
+          description: null,
+          emoji: null,
+          sortOrder: 1,
+          topicsGenerated: false,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
         topics: [],
         connections: [],
-        status: 'not_started',
+        status: 'NOT_STARTED',
         completedTopicCount: 0,
       });
     captureExceptionSpy = jest

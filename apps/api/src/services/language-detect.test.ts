@@ -19,6 +19,7 @@ function llmResponse(json: Record<string, unknown>): void {
     provider: 'gemini',
     model: 'gemini-2.5-flash',
     latencyMs: 50,
+    stopReason: 'stop',
   });
 }
 
@@ -76,6 +77,7 @@ describe('detectLanguageSubject', () => {
       provider: 'gemini',
       model: 'gemini-2.5-flash',
       latencyMs: 50,
+      stopReason: 'stop',
     });
 
     const result = await detectLanguageSubject('German');
@@ -124,7 +126,7 @@ describe('detectLanguageSubject', () => {
           content: '<subject_text>Spanish</subject_text>',
         }),
       ]),
-      1
+      1,
     );
   });
 
