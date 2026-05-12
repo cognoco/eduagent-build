@@ -130,9 +130,9 @@ These memory files are still live and indexed — but their bodies contain stale
 | File | Status | Recommend |
 | ---- | ------ | --------- |
 | ~~`docs/plans/2026-04-15-S06-rls-phase-0-1-preparatory.md`~~ → `docs/plans/done/` | Phases 0.0/0.1/0.2/0.3/0.4 + 1.1 verified complete in code (PR #126, driver-swap commit `c80bb903` + follow-up). Only Phase 1.3 verification (`pg_tables.rowsecurity` query against staging/prod) residual — tracked as `AUDIT-RLS-1.3-VERIFY` in punchlist. | **DONE — archived to `docs/plans/done/` (2026-05-12).** |
-| `docs/plans/2026-04-15-S06-rls-phase-2-4-enforcement.md` | Blocked on Phase 0+1 completing. | **User: tied to row above.** Archive together if Phase 0+1 done. |
-| `docs/plans/2026-04-20-prelaunch-llm-tuning.md` | Track 1 shipped (`de9f55b3`, `235d6b8c`); Tracks 0/2/3 (probe battery, hand-edit B.1 tone, model comparison) have no commits — `apps/api/eval-llm/fixtures/probes/` doesn't exist. | **Keep** — partially done with active remaining work. |
-| `docs/plans/2026-04-22-library-wiring-and-session-debugging.md` | Parts 1-2 shipped (`2e901ac3`); Part 3 (auto-close after 2 exchanges) marked NOT YET FIXED but `855a632f` (stream-fallback guard) may resolve it. | **User: verify Part 3 status.** If fixed, archive. |
+| `docs/plans/2026-04-15-S06-rls-phase-2-4-enforcement.md` | Phase 0+1 prerequisite now complete (see row 1). Plan is real pending Phase 2-4 RLS enforcement security work — none of its content has shipped yet. | **KEPT in `docs/plans/` (2026-05-12).** Real pending security work; revisit when Phase 2-4 is picked up. |
+| ~~`docs/plans/2026-04-20-prelaunch-llm-tuning.md`~~ → `docs/plans/done/` | Track 1 shipped (`de9f55b3`); Tracks 0/2/3 (probe battery, hand-edit B.1 tone, model comparison) outstanding. Plan moved to `done/` before this session despite remaining work, presumably because Track 1 was the meaningful chunk. | **DONE — already in `docs/plans/done/` before 2026-05-12 cleanup pass.** |
+| ~~`docs/plans/2026-04-22-library-wiring-and-session-debugging.md`~~ → `docs/plans/done/` | Parts 1-2 shipped (`2e901ac3`); Part 3 was unblocked by `855a632f` (stream-fallback guard, 2026-04-24). | **DONE — already in `docs/plans/done/` before 2026-05-12 cleanup pass.** |
 
 ### 2E · Docs needing content updates (1)
 
