@@ -16,7 +16,6 @@
     "@eduagent/retention": "workspace:*",
     "@eduagent/schemas": "workspace:*",
     "@hono/zod-validator": "^0.5.0",
-    "@neondatabase/serverless": "^0.10.4",
     "@sentry/cloudflare": "^10.39.0",
     "drizzle-orm": "^0.39.3",
     "hono": "^4.11.0",
@@ -25,7 +24,6 @@
     "zod": "^4.1.12"
   },
   "devDependencies": {
-    "@clerk/types": "^4.40.0",
     "@cloudflare/workers-types": "^4.0.0",
     "@eduagent/test-utils": "workspace:*",
     "@inngest/test": "0.1.9",
