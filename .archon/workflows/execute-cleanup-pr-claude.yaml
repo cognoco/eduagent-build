@@ -87,9 +87,9 @@ nodes:
           "$ARTIFACTS_DIR/work-order.md" | sort -u)
         done_phases=$(
             rg --no-filename -oP '^## Phase \K[A-Z0-9]+[a-z]*(?=:)' \
-              "$ARTIFACTS_DIR/progress.md" 2>/dev/null
+              "$ARTIFACTS_DIR/progress.md" 2>/dev/null || true
             rg --no-filename -oP '^## BLOCKED:\K[A-Z0-9]+[a-z]*$' \
-              "$ARTIFACTS_DIR/blocked.md" 2>/dev/null
+              "$ARTIFACTS_DIR/blocked.md" 2>/dev/null || true
         )
         done_phases=$(echo "$done_phases" | sort -u)
         remaining=$(comm -23 <(echo "$work_order_phases") <(echo "$done_phases"))

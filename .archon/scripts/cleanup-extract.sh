@@ -25,14 +25,18 @@ PLAN="docs/audit/cleanup-plan.md"
 # Markdown-table-safe field extractor.
 # awk -F'|' splits on every literal `|`, including escaped `\|` characters
 # that appear inside cell content (e.g. type unions like `'a' \| 'b'`).
-# We substitute `\|` → \001 (SOH, won't appear in markdown) before splitting,
+# We substitute `\|` → SOH (byte 0x01, won't appear in markdown) before splitting,
 # then restore `|` in the extracted field. Caller specifies 1-based field index.
+# SOH is generated via printf for portability — BSD sed (macOS) does not interpret
+# `\x01` in s/// replacements; GNU sed does. Using $SOH avoids the divergence.
 safe_field() {
     local row="$1" field="$2"
+    local SOH
+    SOH=$(printf '\001')
     echo "$row" \
-        | sed 's/\\|/\x01/g' \
+        | sed "s/\\\\|/$SOH/g" \
         | awk -F'|' -v f="$field" '{print $f}' \
-        | tr '\001' '|' \
+        | tr "$SOH" '|' \
         | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
 }
 
