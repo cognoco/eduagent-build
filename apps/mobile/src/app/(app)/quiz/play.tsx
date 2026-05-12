@@ -132,6 +132,7 @@ export default function QuizPlayScreen(): React.ReactElement {
   );
   const answerSubmittedRef = useRef(false);
   const roundSubmittedRef = useRef(false);
+  const pendingResultsNavigateRef = useRef(false);
   // [F-Q-07] Tracks whether correctAnswer was captured via handleCheckGuessWhoAnswer
   // so the onResolved skip-path only fires a background check when needed.
   const correctAnswerCapturedRef = useRef(false);
@@ -223,6 +224,53 @@ export default function QuizPlayScreen(): React.ReactElement {
     };
   }, []);
 
+  // [CR-1] Callback for server-side answer checking, declared before the
+  // early return so the rules-of-hooks invariant is satisfied.
+  // [F-Q-07] When the answer is wrong, capture correctAnswer from the server
+  // response so it can be shown in the post-answer feedback panel.
+  const roundId = round?.id ?? '';
+  const submitRound = useCallback(
+    ({
+      results = resultsRef.current,
+      navigateOnSuccess = true,
+    }: SubmitRoundOptions = {}) => {
+      if (!roundId || results.length === 0 || roundSubmittedRef.current) {
+        return;
+      }
+
+      setCompleteError(null);
+      roundSubmittedRef.current = true;
+      if (!navigateOnSuccess) {
+        setRoundAutoSaveStarted(true);
+      }
+      completeRoundMutate(
+        { roundId, results },
+        {
+          onSuccess: (result: CompleteRoundResponse) => {
+            setCompletionResult(result);
+            setRoundAutoSaved(true);
+            setRoundAutoSaveStarted(false);
+            if (navigateOnSuccess || pendingResultsNavigateRef.current) {
+              pendingResultsNavigateRef.current = false;
+              router.replace('/(app)/quiz/results' as never);
+            }
+          },
+          onError: (err) => {
+            roundSubmittedRef.current = false;
+            setRoundAutoSaveStarted(false);
+            // [BUG-806] formatApiError handles all shapes (typed envelope, Error,
+            // string, network failure) — `err instanceof Error` returns false for
+            // server-typed error envelopes, hiding the actionable reason behind
+            // the generic fallback.
+            setCompleteError(formatApiError(err));
+            Sentry.captureException(err);
+          },
+        },
+      );
+    },
+    [completeRoundMutate, router, roundId, setCompletionResult],
+  );
+
   // [ASSUMP-F2] Confirmed exit — ensures mid-round users always have a way
   // out. Quitting routes back to the quiz home; the flow-context resets on
   // the next round launch. Declared BEFORE the early-return so React's
@@ -252,52 +300,6 @@ export default function QuizPlayScreen(): React.ReactElement {
     setRound(null);
     router.replace('/(app)/quiz/launch' as never);
   };
-
-  // [CR-1] Callback for server-side answer checking, declared before the
-  // early return so the rules-of-hooks invariant is satisfied.
-  // [F-Q-07] When the answer is wrong, capture correctAnswer from the server
-  // response so it can be shown in the post-answer feedback panel.
-  const roundId = round?.id ?? '';
-  const submitRound = useCallback(
-    ({
-      results = resultsRef.current,
-      navigateOnSuccess = true,
-    }: SubmitRoundOptions = {}) => {
-      if (!roundId || results.length === 0 || roundSubmittedRef.current) {
-        return;
-      }
-
-      setCompleteError(null);
-      roundSubmittedRef.current = true;
-      if (!navigateOnSuccess) {
-        setRoundAutoSaveStarted(true);
-      }
-      completeRoundMutate(
-        { roundId, results },
-        {
-          onSuccess: (result: CompleteRoundResponse) => {
-            setCompletionResult(result);
-            setRoundAutoSaved(true);
-            setRoundAutoSaveStarted(false);
-            if (navigateOnSuccess) {
-              router.replace('/(app)/quiz/results' as never);
-            }
-          },
-          onError: (err) => {
-            roundSubmittedRef.current = false;
-            setRoundAutoSaveStarted(false);
-            // [BUG-806] formatApiError handles all shapes (typed envelope, Error,
-            // string, network failure) — `err instanceof Error` returns false for
-            // server-typed error envelopes, hiding the actionable reason behind
-            // the generic fallback.
-            setCompleteError(formatApiError(err));
-            Sentry.captureException(err);
-          },
-        },
-      );
-    },
-    [completeRoundMutate, router, roundId, setCompletionResult],
-  );
   // [BUG-542] Use checkAnswer.mutateAsync (stable ref in TanStack Query v5)
   // instead of the whole checkAnswer object, which creates a new reference on
   // every mutation state transition (idle → pending → success → idle).
@@ -631,6 +633,10 @@ export default function QuizPlayScreen(): React.ReactElement {
         router.replace('/(app)/quiz/results' as never);
         return;
       }
+      if (roundAutoSaveStarted) {
+        pendingResultsNavigateRef.current = true;
+        return;
+      }
       submitRound();
       return;
     }
@@ -730,7 +736,7 @@ export default function QuizPlayScreen(): React.ReactElement {
           key={correctCelebrationKey}
           variant={rewardVariantForActivity(activityType)}
           intensity="answer"
-          testID="quiz-correct-celebration"
+          testID="quiz-correct-reward-burst"
           onComplete={() => setCorrectCelebrationKey(null)}
         />
       ) : null}
