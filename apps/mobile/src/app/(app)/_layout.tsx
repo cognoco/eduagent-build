@@ -1337,6 +1337,35 @@ export default function AppLayout() {
     () => computeVisibleTabs(tabShape),
     [tabShape],
   );
+  const refreshLearningTabQueries = React.useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: ['subjects'] });
+    void queryClient.invalidateQueries({ queryKey: ['progress'] });
+    void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    void queryClient.invalidateQueries({ queryKey: ['coaching-card'] });
+    void queryClient.invalidateQueries({ queryKey: ['celebrations'] });
+    void queryClient.invalidateQueries({ queryKey: ['subscription'] });
+    void queryClient.invalidateQueries({ queryKey: ['usage'] });
+  }, [queryClient]);
+  const refreshLibraryTabQueries = React.useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: ['subjects'] });
+    void queryClient.invalidateQueries({ queryKey: ['progress'] });
+    void queryClient.invalidateQueries({ queryKey: ['library'] });
+    void queryClient.invalidateQueries({ queryKey: ['books'] });
+  }, [queryClient]);
+  const refreshMoreTabQueries = React.useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: ['profiles'] });
+    void queryClient.invalidateQueries({ queryKey: ['subscription'] });
+    void queryClient.invalidateQueries({ queryKey: ['subscription-family'] });
+    void queryClient.invalidateQueries({ queryKey: ['usage'] });
+    void queryClient.invalidateQueries({ queryKey: ['settings'] });
+  }, [queryClient]);
+  const refreshProgressTabQueries = React.useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: ['progress'] });
+    void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    void queryClient.invalidateQueries({ queryKey: ['retention'] });
+    void queryClient.invalidateQueries({ queryKey: ['language-progress'] });
+    void queryClient.invalidateQueries({ queryKey: ['resume-nudge'] });
+  }, [queryClient]);
 
   // Sync Clerk auth state with RevenueCat identity (runs on auth change)
   useRevenueCatIdentity();
@@ -1677,6 +1706,9 @@ export default function AppLayout() {
         >
           <Tabs.Screen
             name="home"
+            listeners={{
+              tabPress: refreshLearningTabQueries,
+            }}
             options={{
               title: t('tabs.home'),
               tabBarButtonTestID: 'tab-home',
@@ -1693,6 +1725,9 @@ export default function AppLayout() {
           />
           <Tabs.Screen
             name="own-learning"
+            listeners={{
+              tabPress: refreshLearningTabQueries,
+            }}
             options={{
               title: t('tabs.myLearning'),
               tabBarButtonTestID: 'tab-my-learning',
@@ -1704,6 +1739,9 @@ export default function AppLayout() {
           />
           <Tabs.Screen
             name="library"
+            listeners={{
+              tabPress: refreshLibraryTabQueries,
+            }}
             options={{
               title: t('tabs.library'),
               tabBarButtonTestID: 'tab-library',
@@ -1715,6 +1753,9 @@ export default function AppLayout() {
           />
           <Tabs.Screen
             name="progress"
+            listeners={{
+              tabPress: refreshProgressTabQueries,
+            }}
             options={{
               title: t('tabs.progress'),
               tabBarButtonTestID: 'tab-progress',
@@ -1726,6 +1767,9 @@ export default function AppLayout() {
           />
           <Tabs.Screen
             name="more"
+            listeners={{
+              tabPress: refreshMoreTabQueries,
+            }}
             options={{
               title: t('tabs.more'),
               tabBarButtonTestID: 'tab-more',

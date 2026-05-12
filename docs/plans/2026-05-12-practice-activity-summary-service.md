@@ -137,7 +137,7 @@ Do not count from `coaching_card_cache.pendingCelebrations` as historical truth.
 | Celebration ledger | `celebration_events` | one row per earned/shown celebration | `celebratedAt` | `profileId` | New durable history for totals by day/week/month. Stores type, reason, source identity, and metadata. |
 | Quizzes | `quiz_rounds` | `status = 'completed'` | `completedAt` | `profileId` (scoped repo) | Split by `activityType`. `xpEarned` on row. `languageCode` null for non-vocabulary. |
 | Quiz errors | `quiz_missed_items` | linked to completed round via `sourceRoundId` | via parent round's `completedAt` | via parent round's `profileId` | `surfaced`, `convertedToTopic` flags |
-| Quiz mastery | `quiz_mastery_items` | SM-2 state per (profile, activityType, itemKey) | `lastReviewedAt` | `profileId` | Third SRS-like table. `mcSuccessCount`. |
+| Quiz mastery | `quiz_mastery_items` | SM-2 state per (profile, activityType, itemKey) | `nextReviewAt` / `updatedAt` | `profileId` | Third SRS-like table. `mcSuccessCount`. No `lastReviewedAt` column — only `nextReviewAt` and `updatedAt`. |
 | Dictation | `dictation_results` | row existence | `createdAt` (no `completedAt`) | `profileId` (scoped repo) | `sentenceCount`, `mistakeCount` (nullable), `mode` (`homework`/`surprise`), `reviewed` boolean |
 | Assessments | `assessments` | terminal status | `updatedAt` or `createdAt` | `profileId` (scoped repo) | Terminal: `passed`, `failed`, `borderline`, `failed_exhausted`. `verificationDepth`: `recall`/`explain`/`transfer`. `masteryScore` numeric(3,2). |
 | Topic retention | `retention_cards` | `lastReviewedAt` (mutable, single) | `lastReviewedAt` | `profileId` | SM-2 state. Cannot count reviews per period — only "was card reviewed in period." |

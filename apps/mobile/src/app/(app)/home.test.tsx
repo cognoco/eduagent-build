@@ -210,6 +210,11 @@ describe('HomeScreen SF-1: markCelebrationsSeen error handling', () => {
       .spyOn(console, 'warn')
       // eslint-disable-next-line @typescript-eslint/no-empty-function
       .mockImplementation(() => {});
+    // Intercept globalThis.fetch so any request that escapes the Hono
+    // mock client returns a 500 without opening a real TCP socket.
+    const fetchSpy = jest
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response('{}', { status: 500 }));
     mockFetch.setRoute(
       '/celebrations/seen',
       new Response('{}', { status: 500 }),
@@ -238,7 +243,10 @@ describe('HomeScreen SF-1: markCelebrationsSeen error handling', () => {
       );
     });
 
-    cleanupScreen(queryClient);
+    await act(async () => {
+      cleanupScreen(queryClient);
+    });
+    fetchSpy.mockRestore();
     consoleSpy.mockRestore();
   });
 });

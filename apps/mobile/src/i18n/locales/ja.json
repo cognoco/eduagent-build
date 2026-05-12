@@ -278,7 +278,8 @@
       "childScreenTitle": "{{name}}の学習設定"
     },
     "learningPreferences": {
-      "rowLabel": "学習設定",
+      "sectionHeader": "あなたの学習",
+      "rowLabel": "設定",
       "screenTitle": "学習設定"
     },
     "mentorMemory": {
@@ -301,8 +302,8 @@
       "viewPlans": "プランを見る",
       "profileLimitTitle": "プロフィールの上限に達しました",
       "profileLimitMessage": "{{plan}}プランでは、最大{{max}}個のプロフィールをサポートしています。",
-      "breakdownSharingTitle": "Share usage breakdown with family",
-      "breakdownSharingDescription": "Let everyone in your family see how each profile uses the family pool. Children only see the breakdown when this is on.",
+      "breakdownSharingTitle": "家族の利用状況を共有",
+      "breakdownSharingDescription": "プロフィール別の利用を表示。",
       "breakdownSharingError": "Couldn't update setting. Try again."
     },
     "celebrations": {

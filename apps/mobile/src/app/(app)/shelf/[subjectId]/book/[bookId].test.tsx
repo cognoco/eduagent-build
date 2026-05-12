@@ -539,7 +539,7 @@ describe('BookScreen', () => {
     fireEvent.press(getByTestId('book-start-learning'));
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/topic/[topicId]',
-      params: { topicId: 'topic-1', subjectId: 'sub-1' },
+      params: { topicId: 'topic-1', subjectId: 'sub-1', bookId: 'book-1' },
     });
   });
 

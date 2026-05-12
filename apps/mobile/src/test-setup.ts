@@ -321,9 +321,12 @@ if (typeof global.structuredClone === 'undefined') {
 const _savedFormData = (global as Record<string, unknown>).__nodeFormData as
   | typeof FormData
   | undefined;
+const testGlobal = globalThis as typeof globalThis & {
+  FormData?: typeof FormData;
+};
 if (_savedFormData) {
   beforeEach(() => {
-    global.FormData = _savedFormData;
+    testGlobal.FormData = _savedFormData;
   });
 }
 

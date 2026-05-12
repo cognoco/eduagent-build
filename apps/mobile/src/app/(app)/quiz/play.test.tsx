@@ -216,7 +216,7 @@ describe('QuizPlayScreen', () => {
     const elapsed = screen.getByTestId('quiz-play-elapsed');
     // Initial render: timer started from Date.now() in this same tick, so
     // the floored seconds value is 0.
-    expect(elapsed.props.children).toEqual([0, 's']);
+    expect(elapsed.props.children).toBe('0:00');
     // Aria-label includes a unit so screen-reader users hear "Elapsed time:
     // 0 seconds" instead of just "0s".
     expect(elapsed.props.accessibilityLabel).toBe('Elapsed time: 0 seconds');
@@ -392,7 +392,10 @@ describe('QuizPlayScreen — dispute button visibility (BUG-927)', () => {
       screen.getByText('Correct');
     });
     screen.getByTestId('quiz-correct-celebration');
-    screen.getByText('Nailed it!');
+    screen.getByText('You discovered it!');
+    expect(screen.getByTestId('quiz-revealed-answer').props.children).toBe(
+      'Bratislava',
+    );
     screen.getByText('Saved. Ready when you are.');
     screen.getByTestId('quiz-final-see-results');
     screen.getByText('Wait, just one more!');
@@ -753,7 +756,7 @@ describe('QuizPlayScreen — tap-to-continue synchronous reset (BUG-929)', () =>
   });
 
   it('does not surface the previous question banner on Q+1 first render', async () => {
-    // Symptom guard: line 821 renders 'Correct' / 'Not quite' / 'Tap anywhere
+    // Symptom guard: feedback renders 'Correct' / 'Not quite' / ready-copy
     // to continue' only when answerState is correct/wrong. If reset is not
     // synchronous, these banners briefly bleed into Q+1.
     const q1Options = ['A', 'B', 'C', 'D'];
@@ -894,6 +897,7 @@ describe('QuizPlayScreen — tap-to-continue synchronous reset (BUG-929)', () =>
     // We assert via accessibilityLabel which interpolates both values cleanly.
     const elapsedEl = screen.getByTestId('quiz-play-elapsed');
     expect(elapsedEl.props.accessibilityLabel).toBe('Elapsed time: 0 seconds');
+    expect(elapsedEl.props.children).toBe('0:00');
   });
 });
 
@@ -1063,7 +1067,10 @@ describe('QuizPlayScreen — error feedback [BUG-799 / BUG-806]', () => {
     fireEvent.press(screen.getByTestId('quiz-play-quit'));
     screen.getByTestId('quiz-quit-confirm');
     screen.getByTestId('quiz-quit-save');
-    screen.getByText('Save progress before leaving?');
+    screen.getByText('Pause here?');
+    screen.getByText(
+      "You've answered part of this round. Save it now, or jump back in for one more.",
+    );
     screen.getByTestId('quiz-quit-cancel');
     expect(mockPlatformAlert).not.toHaveBeenCalledWith(
       'Quit this round?',
@@ -1088,8 +1095,8 @@ describe('QuizPlayScreen — error feedback [BUG-799 / BUG-806]', () => {
     screen.getByTestId('quiz-quit-confirm');
     screen.getByTestId('quiz-quit-cancel');
     expect(screen.queryByTestId('quiz-quit-save')).toBeNull();
-    screen.getByText('Leave this round?');
-    screen.getByText("You haven't answered any questions yet.");
+    screen.getByText('Leave this quiz?');
+    screen.getByText('No answers yet, so there is nothing to save.');
     // Critically: platformAlert (which would hit window.confirm on web) is NOT
     // invoked for the quit-confirm flow.
     expect(mockPlatformAlert).not.toHaveBeenCalledWith(
@@ -1161,7 +1168,7 @@ describe('QuizPlayScreen — error feedback [BUG-799 / BUG-806]', () => {
     await waitFor(() => screen.getByText('Correct'));
 
     fireEvent.press(screen.getByTestId('quiz-play-quit'));
-    screen.getByText('Save progress before leaving?');
+    screen.getByText('Pause here?');
 
     fireEvent.press(screen.getByTestId('quiz-quit-save'));
 

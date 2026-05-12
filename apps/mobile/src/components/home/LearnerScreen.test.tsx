@@ -719,7 +719,7 @@ describe('LearnerScreen', () => {
     fireEvent.press(screen.getByTestId('home-subject-card-sub-1'));
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/progress/[subjectId]',
-      params: { subjectId: 'sub-1' },
+      params: { subjectId: 'sub-1', returnTo: 'learner-home' },
     });
   });
 
@@ -748,7 +748,7 @@ describe('LearnerScreen', () => {
     fireEvent.press(screen.getByTestId('home-subject-card-sub-1'));
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/progress/[subjectId]',
-      params: { subjectId: 'sub-1' },
+      params: { subjectId: 'sub-1', returnTo: 'learner-home' },
     });
   });
 
@@ -768,7 +768,10 @@ describe('LearnerScreen', () => {
 
     await waitFor(() => screen.getByTestId('home-add-first-subject'));
     fireEvent.press(screen.getByTestId('home-add-first-subject'));
-    expect(mockPush).toHaveBeenCalledWith('/create-subject');
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/create-subject',
+      params: { returnTo: 'learner-home' },
+    });
   });
 
   it('shows withdrawal-countdown-banner when a child has withdrawn consent within the grace period', async () => {
@@ -822,6 +825,9 @@ describe('LearnerScreen', () => {
 
     await waitFor(() => screen.getByTestId('home-add-subject-tile'));
     fireEvent.press(screen.getByTestId('home-add-subject-tile'));
-    expect(mockPush).toHaveBeenCalledWith('/create-subject');
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/create-subject',
+      params: { returnTo: 'learner-home' },
+    });
   });
 });

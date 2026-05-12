@@ -6,6 +6,7 @@ import {
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { RetentionStatus } from '@eduagent/schemas';
@@ -137,10 +138,12 @@ export default function TopicDetailScreen() {
   const colors = useThemeColors();
   const {
     subjectId: paramSubjectId,
+    bookId: paramBookId,
     topicId,
     chapter: paramChapter,
   } = useLocalSearchParams<{
     subjectId: string;
+    bookId?: string;
     topicId: string;
     chapter: string;
   }>();
@@ -151,6 +154,13 @@ export default function TopicDetailScreen() {
     needsResolve ? topicId : undefined,
   );
   const subjectId = paramSubjectId || resolved?.subjectId;
+  const topicBackFallback =
+    subjectId && paramBookId
+      ? ({
+          pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
+          params: { subjectId, bookId: paramBookId },
+        } as const)
+      : ('/(app)/library' as const);
 
   const { data: resumeTarget } = useLearningResumeTarget({
     subjectId: subjectId ?? undefined,
@@ -345,7 +355,7 @@ export default function TopicDetailScreen() {
           }}
           secondaryAction={{
             label: 'Go to Library',
-            onPress: () => goBackOrReplace(router, '/(app)/library'),
+            onPress: () => goBackOrReplace(router, topicBackFallback),
             testID: 'topic-resolve-timeout-library',
           }}
           testID="topic-resolve-timeout"
@@ -369,7 +379,7 @@ export default function TopicDetailScreen() {
           This topic could not be opened. Please go back and try again.
         </Text>
         <Pressable
-          onPress={() => goBackOrReplace(router, '/(app)/library' as const)}
+          onPress={() => goBackOrReplace(router, topicBackFallback)}
           className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center"
           accessibilityRole="button"
           accessibilityLabel="Go back"
@@ -410,7 +420,7 @@ export default function TopicDetailScreen() {
           </Text>
         </Pressable>
         <Pressable
-          onPress={() => goBackOrReplace(router, '/(app)/library' as const)}
+          onPress={() => goBackOrReplace(router, topicBackFallback)}
           className="bg-surface rounded-button px-6 py-3 min-h-[48px] items-center justify-center mb-3"
           accessibilityRole="button"
           accessibilityLabel="Go back"
@@ -442,13 +452,13 @@ export default function TopicDetailScreen() {
       {/* Back nav */}
       <View className="px-5 pt-4 pb-2 flex-row items-center">
         <Pressable
-          onPress={() => goBackOrReplace(router, '/(app)/library' as const)}
+          onPress={() => goBackOrReplace(router, topicBackFallback)}
           className="me-3 p-2 min-h-[44px] min-w-[44px] items-center justify-center"
           testID="topic-detail-back"
           accessibilityLabel="Go back"
           accessibilityRole="button"
         >
-          <Text className="text-primary text-h3">&larr;</Text>
+          <Ionicons name="arrow-back" size={26} color={colors.primary} />
         </Pressable>
         <Text
           className="text-body-sm text-text-secondary flex-1"
@@ -488,7 +498,7 @@ export default function TopicDetailScreen() {
             This topic may have been removed from your curriculum.
           </Text>
           <Pressable
-            onPress={() => goBackOrReplace(router, '/(app)/library' as const)}
+            onPress={() => goBackOrReplace(router, topicBackFallback)}
             className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center mt-6"
             testID="topic-detail-empty-back"
             accessibilityRole="button"

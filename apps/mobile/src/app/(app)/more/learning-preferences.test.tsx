@@ -82,13 +82,13 @@ describe('LearningPreferencesScreen', () => {
     mockLearnerProfile = { accommodationMode: 'none' };
   });
 
-  it('renders accommodation and mentor memory sections as nav rows', () => {
+  it('renders accommodation as the preferences nav row', () => {
     render(<LearningPreferencesScreen />, { wrapper: createWrapper() });
 
     screen.getByTestId('learning-accommodation-section-header');
     screen.getByTestId('accommodation-link');
-    screen.getByTestId('mentor-memory-section-header');
-    screen.getByTestId('mentor-memory-link');
+    expect(screen.queryByTestId('mentor-memory-section-header')).toBeNull();
+    expect(screen.queryByTestId('mentor-memory-link')).toBeNull();
   });
 
   it('navigates to accommodation screen when row is pressed', () => {
@@ -104,15 +104,5 @@ describe('LearningPreferencesScreen', () => {
     render(<LearningPreferencesScreen />, { wrapper: createWrapper() });
 
     expect(screen.getByText('Short-Burst')).toBeTruthy();
-  });
-
-  it('navigates to mentor memory with returnTo=learning-preferences', () => {
-    render(<LearningPreferencesScreen />, { wrapper: createWrapper() });
-
-    fireEvent.press(screen.getByTestId('mentor-memory-link'));
-
-    expect(mockPush).toHaveBeenCalledWith(
-      '/(app)/mentor-memory?returnTo=learning-preferences',
-    );
   });
 });

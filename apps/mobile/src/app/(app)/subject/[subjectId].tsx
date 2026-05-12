@@ -1,4 +1,5 @@
 import { View, Text, Pressable, ScrollView } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { goBackOrReplace } from '../../../lib/navigation';
@@ -78,7 +79,7 @@ export default function SubjectSettingsScreen() {
           accessibilityLabel={t('common.goBack')}
           accessibilityRole="button"
         >
-          <Text className="text-primary text-h3">&larr;</Text>
+          <Ionicons name="arrow-back" size={26} className="text-primary" />
         </Pressable>
         <Text
           className="text-h2 font-bold text-text-primary flex-1"

@@ -630,11 +630,12 @@ export default function BookScreen() {
         params: {
           topicId,
           subjectId,
+          bookId,
           ...(topic?.chapter ? { chapter: topic.chapter } : {}),
         },
       } as never);
     },
-    [router, subjectId, topicById],
+    [bookId, router, subjectId, topicById],
   );
 
   // --- Session list grouped by chapter ---
@@ -740,7 +741,7 @@ export default function BookScreen() {
       if (topic) {
         router.push({
           pathname: '/(app)/topic/[topicId]',
-          params: { topicId: topic.id, subjectId },
+          params: { topicId: topic.id, subjectId, bookId },
         } as never);
         return;
       }
@@ -768,7 +769,7 @@ export default function BookScreen() {
       if (topic) {
         router.push({
           pathname: '/(app)/topic/[topicId]',
-          params: { topicId: topic.id, subjectId },
+          params: { topicId: topic.id, subjectId, bookId },
         } as never);
       }
     }
@@ -780,6 +781,7 @@ export default function BookScreen() {
     resumeTargetQuery.data,
     router,
     subjectId,
+    bookId,
   ]);
 
   const handleTopicStart = useCallback(

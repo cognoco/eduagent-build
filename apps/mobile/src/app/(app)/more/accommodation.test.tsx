@@ -267,7 +267,7 @@ describe('AccommodationScreen', () => {
     it('shows the child name in the title', () => {
       render(<AccommodationScreen />, { wrapper: createWrapper() });
 
-      expect(screen.getByText(/Mia's accommodation/)).toBeTruthy();
+      expect(screen.getByText(/Mia's learning preferences/)).toBeTruthy();
     });
 
     it('passes childProfileId when changing accommodation mode', () => {

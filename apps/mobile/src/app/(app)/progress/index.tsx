@@ -9,7 +9,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { platformAlert } from '../../../lib/platform-alert';
 import { classifyApiError } from '../../../lib/format-api-error';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ErrorFallback, TrackedView } from '../../../components/common';
@@ -216,6 +216,7 @@ export default function ProgressScreen(): React.ReactElement {
   const resumeTargetQuery = useLearningResumeTarget();
   const milestonesQuery = useProgressMilestones(5);
   const refreshSnapshot = useRefreshProgressSnapshot();
+  const hasFocusedOnceRef = useRef(false);
 
   const inventory = inventoryQuery.data;
   const hero = heroCopy(
@@ -232,26 +233,55 @@ export default function ProgressScreen(): React.ReactElement {
     () => buildGrowthData(historyQuery.data ?? undefined),
     [historyQuery.data],
   );
+  const refetchInventory = inventoryQuery.refetch;
+  const refetchHistory = historyQuery.refetch;
+  const refetchMilestones = milestonesQuery.refetch;
+  const refetchMonthlyReports = monthlyReportsQuery.refetch;
+  const refetchWeeklyReports = weeklyReportsQuery.refetch;
 
-  const handleRefresh = async () => {
-    if (isViewingSelf) {
-      try {
-        await refreshSnapshot.mutateAsync();
-      } catch (err) {
-        const message =
-          err instanceof Error ? err.message : t('progress.refreshFailed');
-        platformAlert(t('progress.refreshFailedTitle'), message);
+  const handleRefresh = useCallback(
+    async (options?: { alertOnError?: boolean }) => {
+      if (isViewingSelf) {
+        try {
+          await refreshSnapshot.mutateAsync();
+        } catch (err) {
+          if (options?.alertOnError !== false) {
+            const message =
+              err instanceof Error ? err.message : t('progress.refreshFailed');
+            platformAlert(t('progress.refreshFailedTitle'), message);
+          }
+        }
       }
-    }
 
-    await Promise.all([
-      inventoryQuery.refetch(),
-      historyQuery.refetch(),
-      monthlyReportsQuery.refetch(),
-      weeklyReportsQuery.refetch(),
-      ...(isViewingSelf ? [milestonesQuery.refetch()] : []),
-    ]);
-  };
+      await Promise.all([
+        refetchInventory(),
+        refetchHistory(),
+        refetchMonthlyReports(),
+        refetchWeeklyReports(),
+        ...(isViewingSelf ? [refetchMilestones()] : []),
+      ]);
+    },
+    [
+      isViewingSelf,
+      refetchHistory,
+      refetchInventory,
+      refetchMilestones,
+      refetchMonthlyReports,
+      refetchWeeklyReports,
+      refreshSnapshot,
+      t,
+    ],
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!hasFocusedOnceRef.current) {
+        hasFocusedOnceRef.current = true;
+        return;
+      }
+      void handleRefresh({ alertOnError: false });
+    }, [handleRefresh]),
+  );
 
   const handleGlobalResume = useCallback(() => {
     if (resumeTargetQuery.data) {

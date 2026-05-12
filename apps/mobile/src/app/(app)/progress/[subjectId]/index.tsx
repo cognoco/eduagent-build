@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import {
   goBackOrReplace,
+  homeHrefForReturnTo,
   pushLearningResumeTarget,
 } from '../../../../lib/navigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -48,7 +49,13 @@ export default function ProgressSubjectScreen(): React.ReactElement {
   const register = copyRegisterFor(role);
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { subjectId } = useLocalSearchParams<{ subjectId: string }>();
+  const { subjectId, returnTo } = useLocalSearchParams<{
+    subjectId: string;
+    returnTo?: string;
+  }>();
+  const backFallback = returnTo
+    ? homeHrefForReturnTo(returnTo)
+    : ('/(app)/progress' as const);
   const inventoryQuery = useProgressInventory();
   const subjectProgressQuery = useSubjectProgress(subjectId ?? '');
   const resumeTargetQuery = useLearningResumeTarget({
@@ -57,6 +64,11 @@ export default function ProgressSubjectScreen(): React.ReactElement {
   const languageProgressQuery = useLanguageProgress(subjectId ?? '');
   const updateSubject = useUpdateSubject();
   const languageProgress = languageProgressQuery.data;
+  const hasFocusedOnceRef = useRef(false);
+  const refetchInventory = inventoryQuery.refetch;
+  const refetchLanguageProgress = languageProgressQuery.refetch;
+  const refetchResumeTarget = resumeTargetQuery.refetch;
+  const refetchSubjectProgress = subjectProgressQuery.refetch;
 
   const subject = inventoryQuery.data?.subjects.find(
     (entry) => entry.subjectId === subjectId,
@@ -89,11 +101,29 @@ export default function ProgressSubjectScreen(): React.ReactElement {
         subjectId: subject.subjectId,
         status: 'archived',
       });
-      router.replace('/(app)/progress' as never);
+      router.replace(backFallback as never);
     } catch (err: unknown) {
       platformAlert(t('progress.subject.hideErrorTitle'), formatApiError(err));
     }
   };
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!hasFocusedOnceRef.current) {
+        hasFocusedOnceRef.current = true;
+        return;
+      }
+      void refetchInventory();
+      void refetchSubjectProgress();
+      void refetchResumeTarget();
+      void refetchLanguageProgress();
+    }, [
+      refetchInventory,
+      refetchLanguageProgress,
+      refetchResumeTarget,
+      refetchSubjectProgress,
+    ]),
+  );
 
   const confirmHideSubject = (): void => {
     if (!subject) return;
@@ -144,7 +174,7 @@ export default function ProgressSubjectScreen(): React.ReactElement {
           {t('progress.subject.noSubjectSubtitle')}
         </Text>
         <Pressable
-          onPress={() => router.replace('/(app)/progress' as never)}
+          onPress={() => router.replace(backFallback as never)}
           className="bg-primary rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
           accessibilityRole="button"
           accessibilityLabel={t('progress.subject.backToProgress')}
@@ -179,7 +209,7 @@ export default function ProgressSubjectScreen(): React.ReactElement {
             }}
             secondaryAction={{
               label: t('common.goBack'),
-              onPress: () => goBackOrReplace(router, '/(app)/progress'),
+              onPress: () => goBackOrReplace(router, backFallback),
               testID: 'progress-subject-skeleton-timeout-back',
             }}
             testID="progress-subject-skeleton-timeout"
@@ -200,7 +230,7 @@ export default function ProgressSubjectScreen(): React.ReactElement {
           {t('progress.subject.loadingMessage')}
         </Text>
         <Pressable
-          onPress={() => goBackOrReplace(router, '/(app)/progress')}
+          onPress={() => goBackOrReplace(router, backFallback)}
           className="mt-6 rounded-button bg-surface-elevated px-6 py-3 min-h-[48px] items-center justify-center"
           accessibilityRole="button"
           accessibilityLabel={t('common.goBack')}
@@ -236,7 +266,7 @@ export default function ProgressSubjectScreen(): React.ReactElement {
           }}
           secondaryAction={{
             label: t('common.goBack'),
-            onPress: () => router.replace('/(app)/progress' as never),
+            onPress: () => router.replace(backFallback as never),
             testID: 'progress-subject-error-back',
           }}
           testID="progress-subject-error"
@@ -253,7 +283,7 @@ export default function ProgressSubjectScreen(): React.ReactElement {
       >
         <View className="flex-row items-center mt-4">
           <Pressable
-            onPress={() => goBackOrReplace(router, '/(app)/progress' as const)}
+            onPress={() => goBackOrReplace(router, backFallback)}
             className="me-3 py-2 pe-2"
             accessibilityRole="button"
             accessibilityLabel={t('common.goBack')}
@@ -602,7 +632,7 @@ export default function ProgressSubjectScreen(): React.ReactElement {
               {t('progress.subject.goneSubtitle')}
             </Text>
             <Pressable
-              onPress={() => router.replace('/(app)/progress' as never)}
+              onPress={() => router.replace(backFallback as never)}
               className="bg-primary rounded-button px-4 py-3 items-center mt-4 min-h-[48px] justify-center"
               accessibilityRole="button"
               accessibilityLabel={t('progress.subject.backToProgress')}

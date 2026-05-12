@@ -1,4 +1,5 @@
-import { render, screen } from '@testing-library/react-native';
+import { act, render, screen, waitFor } from '@testing-library/react-native';
+import { useFocusEffect } from 'expo-router';
 import {
   fetchLearningResumeTarget,
   useChildInventory,
@@ -153,7 +154,12 @@ jest.mock('../../lib/api-client', () => ({
 }));
 jest.mock('expo-router', () => {
   const push = jest.fn();
-  return { useRouter: () => ({ push, back: jest.fn(), replace: jest.fn() }) };
+  return {
+    useFocusEffect: jest.fn((callback: () => void) => {
+      callback();
+    }),
+    useRouter: () => ({ push, back: jest.fn(), replace: jest.fn() }),
+  };
 });
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0 }),
@@ -231,23 +237,31 @@ function mockHooks(
   } = {},
 ) {
   const { inventory, isLoading = false, isError = false } = overrides;
+  const inventoryRefetch = jest.fn();
+  const historyRefetch = jest.fn();
+  const milestonesRefetch = jest.fn();
+  const refreshSnapshot = jest.fn().mockResolvedValue(undefined);
+  const monthlyReportsRefetch = jest.fn();
+  const weeklyReportsRefetch = jest.fn();
   (useProgressInventory as jest.Mock).mockReturnValue({
     data: inventory,
     isLoading,
     isError,
     isRefetching: false,
     error: isError ? new Error('fail') : null,
-    refetch: jest.fn(),
+    refetch: inventoryRefetch,
   });
   (useProgressHistory as jest.Mock).mockReturnValue({
     data: undefined,
     isRefetching: false,
+    refetch: historyRefetch,
   });
   (useProgressMilestones as jest.Mock).mockReturnValue({
     data: [],
+    refetch: milestonesRefetch,
   });
   (useRefreshProgressSnapshot as jest.Mock).mockReturnValue({
-    mutateAsync: jest.fn(),
+    mutateAsync: refreshSnapshot,
     isPending: false,
   });
   (useProfileSessions as jest.Mock).mockReturnValue({
@@ -285,13 +299,13 @@ function mockHooks(
     data: [],
     isLoading: false,
     isError: false,
-    refetch: jest.fn(),
+    refetch: monthlyReportsRefetch,
   });
   (useProfileWeeklyReports as jest.Mock).mockReturnValue({
     data: [],
     isLoading: false,
     isError: false,
-    refetch: jest.fn(),
+    refetch: weeklyReportsRefetch,
   });
   (useChildInventory as jest.Mock).mockReturnValue({
     data: null,
@@ -309,6 +323,15 @@ function mockHooks(
     data: null,
   });
   (fetchLearningResumeTarget as jest.Mock).mockResolvedValue(null);
+
+  return {
+    historyRefetch,
+    inventoryRefetch,
+    milestonesRefetch,
+    monthlyReportsRefetch,
+    refreshSnapshot,
+    weeklyReportsRefetch,
+  };
 }
 
 describe('ProgressScreen — progressive disclosure', () => {
@@ -328,6 +351,34 @@ describe('ProgressScreen — progressive disclosure', () => {
 
     expect(screen.queryByTestId('progress-new-learner-teaser')).toBeNull();
     screen.getByText('2 sessions completed');
+  });
+
+  it('refreshes progress data when the mounted progress tab is focused again', async () => {
+    const refs = mockHooks({
+      inventory: {
+        global: { ...baseGlobal, totalSessions: 2 },
+        subjects: [fullSubject],
+      },
+    });
+    render(<ProgressScreen />);
+
+    expect(refs.inventoryRefetch).not.toHaveBeenCalled();
+
+    const focusCallback = (useFocusEffect as jest.Mock).mock.calls.at(
+      -1,
+    )?.[0] as () => void;
+    act(() => {
+      focusCallback();
+    });
+
+    await waitFor(() => {
+      expect(refs.inventoryRefetch).toHaveBeenCalled();
+    });
+    expect(refs.refreshSnapshot).toHaveBeenCalled();
+    expect(refs.historyRefetch).toHaveBeenCalled();
+    expect(refs.monthlyReportsRefetch).toHaveBeenCalled();
+    expect(refs.weeklyReportsRefetch).toHaveBeenCalled();
+    expect(refs.milestonesRefetch).toHaveBeenCalled();
   });
 
   it('shows full progress view when totalSessions >= 4', () => {

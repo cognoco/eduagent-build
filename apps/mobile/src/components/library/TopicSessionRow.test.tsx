@@ -1,12 +1,19 @@
 import { render, screen, fireEvent } from '@testing-library/react-native';
 import { TopicSessionRow } from './TopicSessionRow';
 
+jest.mock('@expo/vector-icons', () => ({
+  Ionicons: () => null,
+}));
+
 jest.mock('../../lib/theme', () => ({
   useThemeColors: () => ({
+    primary: '#0f9f8f',
     textPrimary: '#1a1a1a',
     textSecondary: '#525252',
     border: '#e8e0d4',
+    background: '#ffffff',
     surface: '#f8f5ef',
+    surfaceElevated: '#f0ebe2',
   }),
 }));
 

@@ -49,6 +49,13 @@ interface SubmitRoundOptions {
   navigateOnSuccess?: boolean;
 }
 
+function formatElapsedTime(ms: number): string {
+  const totalSeconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
 export default function QuizPlayScreen(): React.ReactElement {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -691,6 +698,19 @@ export default function QuizPlayScreen(): React.ReactElement {
     answerState !== 'checking' &&
     !completeError;
   const hasAnsweredQuestions = resultsRef.current.length > 0;
+  const isFinalQuestion = currentIndex + 1 >= totalQuestions;
+  const quizTitle =
+    question.type === 'guess_who'
+      ? "Who's who"
+      : question.type === 'capitals'
+        ? 'Capitals'
+        : 'Vocabulary';
+  const elapsedSeconds = Math.floor(elapsedMs / 1000);
+  const elapsedLabel = formatElapsedTime(elapsedMs);
+  const revealedAnswer =
+    question.type === 'guess_who'
+      ? selectedAnswer || correctAnswer
+      : selectedAnswer;
   return (
     <View
       className="flex-1 bg-background"
@@ -709,27 +729,32 @@ export default function QuizPlayScreen(): React.ReactElement {
           <Ionicons name="close" size={24} color={colors.textSecondary} />
         </Pressable>
 
-        <View className="flex-row items-center gap-3">
-          <Text className="text-body-sm font-semibold text-text-secondary">
-            {currentIndex + 1} of {totalQuestions}
+        <View className="items-center gap-1">
+          <Text className="text-caption font-semibold text-primary">
+            {quizTitle}
           </Text>
+          <View className="flex-row items-center gap-3">
+            <Text className="text-body-sm font-semibold text-text-secondary">
+              {currentIndex + 1} of {totalQuestions}
+            </Text>
 
-          <View className="flex-row gap-1">
-            {Array.from({ length: totalQuestions }, (_, index) => {
-              const state =
-                index < currentIndex
-                  ? 'past'
-                  : index === currentIndex
-                    ? 'current'
-                    : 'future';
-              const dotClass =
-                state === 'past'
-                  ? 'h-2 w-2 rounded-full bg-primary opacity-60'
-                  : state === 'current'
-                    ? 'h-2.5 w-2.5 rounded-full bg-primary'
-                    : 'h-2 w-2 rounded-full bg-surface-elevated';
-              return <View key={index} className={dotClass} />;
-            })}
+            <View className="flex-row gap-1">
+              {Array.from({ length: totalQuestions }, (_, index) => {
+                const state =
+                  index < currentIndex
+                    ? 'past'
+                    : index === currentIndex
+                      ? 'current'
+                      : 'future';
+                const dotClass =
+                  state === 'past'
+                    ? 'h-2 w-2 rounded-full bg-primary opacity-60'
+                    : state === 'current'
+                      ? 'h-2.5 w-2.5 rounded-full bg-primary'
+                      : 'h-2 w-2 rounded-full bg-surface-elevated';
+                return <View key={index} className={dotClass} />;
+              })}
+            </View>
           </View>
         </View>
 
@@ -740,12 +765,10 @@ export default function QuizPlayScreen(): React.ReactElement {
         <Text
           className="text-body-sm font-semibold text-text-secondary text-right"
           style={{ minWidth: 36 }}
-          accessibilityLabel={`Elapsed time: ${Math.floor(
-            elapsedMs / 1000,
-          )} seconds`}
+          accessibilityLabel={`Elapsed time: ${elapsedSeconds} seconds`}
           testID="quiz-play-elapsed"
         >
-          {Math.floor(elapsedMs / 1000)}s
+          {elapsedLabel}
         </Text>
       </View>
 
@@ -892,20 +915,28 @@ export default function QuizPlayScreen(): React.ReactElement {
                     ? `You found them in ${guessWhoCluesUsed} clue${
                         guessWhoCluesUsed !== 1 ? 's' : ''
                       }!`
-                    : 'Nailed it!'}
+                    : 'You discovered it!'}
                 </Text>
+                {revealedAnswer ? (
+                  <Text
+                    className="mt-1 text-center text-h2 font-bold text-text-primary"
+                    testID="quiz-revealed-answer"
+                  >
+                    {revealedAnswer}
+                  </Text>
+                ) : null}
                 <Text className="mt-1 text-center text-body-sm text-text-secondary">
-                  {currentIndex + 1 >= totalQuestions
+                  {isFinalQuestion
                     ? roundAutoSaved
                       ? 'Saved. Ready when you are.'
                       : 'Saving your result...'
-                    : 'That answer is locked in.'}
+                    : 'Locked in. Nice find.'}
                 </Text>
               </View>
             ) : question.type === 'guess_who' ? (
               <View className="mb-3">
                 <Text className="text-center text-h3 font-semibold text-text-primary">
-                  Better luck next time!
+                  Good try.
                 </Text>
                 {/* [F-Q-07] Reveal the person's name after wrong/skip */}
                 {correctAnswer ? (
@@ -930,12 +961,12 @@ export default function QuizPlayScreen(): React.ReactElement {
               testID="quiz-answer-feedback"
             >
               {showContinueHint
-                ? 'Tap anywhere to continue'
+                ? 'Ready for the next one'
                 : answerState === 'correct'
                   ? 'Correct'
                   : 'Not quite'}
             </Text>
-            {currentIndex + 1 >= totalQuestions && roundAutoSaved ? (
+            {isFinalQuestion && roundAutoSaved ? (
               <View className="mt-4 gap-3">
                 <Pressable
                   onPress={(event) => {
@@ -970,6 +1001,21 @@ export default function QuizPlayScreen(): React.ReactElement {
               <Text className="mt-4 text-center text-body-sm text-text-secondary">
                 Saving your round...
               </Text>
+            ) : !isFinalQuestion ? (
+              <Pressable
+                onPress={(event) => {
+                  event?.stopPropagation?.();
+                  handleContinue();
+                }}
+                className="mt-4 min-h-[48px] items-center justify-center rounded-button bg-primary px-5 py-3"
+                accessibilityRole="button"
+                accessibilityLabel="Next question"
+                testID="quiz-next-question"
+              >
+                <Text className="text-body font-semibold text-text-inverse">
+                  Next question
+                </Text>
+              </Pressable>
             ) : null}
             {/* [BUG-469] Dispute button — lets user flag LLM's judgment as wrong */}
             {/* [BUG-927] Only surface dispute UI on incorrect answers. There's
@@ -1066,63 +1112,53 @@ export default function QuizPlayScreen(): React.ReactElement {
             onPress={(e) => e.stopPropagation()}
           >
             <Text className="text-h3 font-bold text-text-primary text-center">
-              {hasAnsweredQuestions
-                ? 'Save progress before leaving?'
-                : 'Leave this round?'}
+              {hasAnsweredQuestions ? 'Pause here?' : 'Leave this quiz?'}
             </Text>
             <Text className="text-body-sm text-text-secondary text-center mt-3 leading-relaxed">
               {hasAnsweredQuestions
-                ? "You've answered part of this round. Save it now, or keep playing to finish all questions."
-                : "You haven't answered any questions yet."}
+                ? "You've answered part of this round. Save it now, or jump back in for one more."
+                : 'No answers yet, so there is nothing to save.'}
             </Text>
             <View className="mt-5 gap-3">
-              {hasAnsweredQuestions ? (
-                <Pressable
-                  onPress={handleSaveAndQuit}
-                  className="bg-primary rounded-button py-3 items-center min-h-[48px] justify-center"
-                  accessibilityRole="button"
-                  accessibilityLabel="Save progress and finish round"
-                  testID="quiz-quit-save"
-                >
-                  <Text className="text-body font-semibold text-text-inverse">
-                    Save and finish
-                  </Text>
-                </Pressable>
-              ) : null}
-              <Pressable
-                onPress={handleConfirmQuit}
-                className={`rounded-button py-3 items-center min-h-[48px] justify-center ${
-                  hasAnsweredQuestions ? 'bg-surface' : 'bg-danger'
-                }`}
-                accessibilityRole="button"
-                accessibilityLabel={
-                  hasAnsweredQuestions
-                    ? 'Leave without saving'
-                    : 'Confirm leave round'
-                }
-                testID="quiz-quit-confirm"
-              >
-                <Text
-                  className={`text-body font-semibold ${
-                    hasAnsweredQuestions ? 'text-danger' : 'text-text-inverse'
-                  }`}
-                >
-                  {hasAnsweredQuestions ? 'Leave without saving' : 'Leave'}
-                </Text>
-              </Pressable>
               <Pressable
                 onPress={() => setQuitConfirmVisible(false)}
-                className="bg-surface rounded-button py-3 items-center min-h-[48px] justify-center"
+                className="bg-primary rounded-button py-3 items-center min-h-[48px] justify-center"
                 accessibilityRole="button"
                 accessibilityLabel={
                   hasAnsweredQuestions ? 'Wait, just one more' : 'Keep playing'
                 }
                 testID="quiz-quit-cancel"
               >
-                <Text className="text-body font-semibold text-text-primary">
+                <Text className="text-body font-semibold text-text-inverse">
                   {hasAnsweredQuestions
                     ? 'Wait, just one more!'
                     : 'Keep playing'}
+                </Text>
+              </Pressable>
+              {hasAnsweredQuestions ? (
+                <Pressable
+                  onPress={handleSaveAndQuit}
+                  className="bg-surface rounded-button py-3 items-center min-h-[48px] justify-center"
+                  accessibilityRole="button"
+                  accessibilityLabel="Save progress and finish round"
+                  testID="quiz-quit-save"
+                >
+                  <Text className="text-body font-semibold text-text-primary">
+                    Save and finish
+                  </Text>
+                </Pressable>
+              ) : null}
+              <Pressable
+                onPress={handleConfirmQuit}
+                className="rounded-button py-3 items-center min-h-[48px] justify-center bg-surface"
+                accessibilityRole="button"
+                accessibilityLabel={
+                  hasAnsweredQuestions ? 'Leave without saving' : 'Leave quiz'
+                }
+                testID="quiz-quit-confirm"
+              >
+                <Text className="text-body font-semibold text-danger">
+                  {hasAnsweredQuestions ? 'Leave without saving' : 'Leave quiz'}
                 </Text>
               </Pressable>
             </View>

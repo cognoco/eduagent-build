@@ -16,21 +16,31 @@ This inventory separates:
 
 ## Scan Snapshot
 
-Command family used:
+Generated artifact:
 
 ```powershell
-rg -n "jest\.mock|vi\.mock|jest\.doMock|jest\.unstable_mockModule" apps packages tests --glob "*.test.*" --glob "*.spec.*"
+node --no-warnings scripts/generate-internal-mock-cleanup-inventory.ts
 ```
 
-Follow-up parsing counted `jest.mock(...)` module specifiers only. This means the numbers are directional, not an AST-perfect lint result.
+Raw rows are written to `docs/plans/2026-05-12-internal-mock-cleanup-inventory.csv`. The generator walks `apps`, `packages`, and `tests`, parses test/spec files with the TypeScript AST, and records literal targets for `jest.mock`, `jest.doMock`, `jest.unstable_mockModule`, and `vi.mock` calls.
 
 | Area | Internal-ish mocks | External mocks | Notes |
 | --- | ---: | ---: | --- |
-| Mobile tests | 400 | 242 | Mostly profile/API/query hooks, theme/navigation wrappers, and component subtree stubs. |
-| API Inngest tests | 149 | 2 | Highest concentration of service and database mocks around durable workflows. |
-| API route + top-level integration tests | 142 | 10 | Route tests heavily mock services/database; top-level integration mocks are mostly boundary wrappers. |
-| API service/middleware unit tests | 109 | 3 | Includes `@eduagent/database`, LLM router, sibling services, and Sentry/logging wrappers. |
-| **Total** | **800** | **257** | **1,057 `jest.mock(...)` calls across 288 test files.** |
+| Mobile tests | 302 | 351 | Mostly profile/API/query hooks and component subtree stubs; native/platform wrappers classify as retained boundaries. |
+| API Inngest tests | 112 | 45 | Highest concentration of service and database mocks around durable workflows; Inngest client dispatch shims classify as retained boundaries. |
+| API route + top-level integration tests | 110 | 44 | Route tests heavily mock services/database; top-level integration mocks are mostly boundary wrappers. |
+| API service/middleware unit tests | 82 | 23 | Includes `@eduagent/database`, LLM router, sibling services, and Sentry/logging wrappers. |
+| API eval-llm tests | 0 | 1 | Eval harness LLM transport mock is classified as an external boundary. |
+| **Total** | **606** | **464** | **1,070 mock call rows across 293 test files, including 1,069 `jest.mock(...)` rows and 1 `jest.doMock(...)` row.** |
+
+Risk-class counts from the CSV:
+
+| Risk class | Count |
+| --- | ---: |
+| `P0` | 2 |
+| `P1` | 302 |
+| `P2` | 302 |
+| `P3` | 464 |
 
 Top internal-ish mocked targets:
 
@@ -39,28 +49,29 @@ Top internal-ish mocked targets:
 | `@eduagent/database` | 54 | High when used above service-unit level; can hide scoped-repository and write-ownership regressions. |
 | `../lib/profile` | 27 | Medium; UI tests often bypass provider/state behavior. |
 | `../lib/api-client` | 24 | Medium-high in hooks/screens; can hide API error classification and query behavior. |
-| `../client` / `../inngest/client` | 39 combined | Boundary-like for Inngest transport, but needs explicit allowlist so behavior mocks do not sneak in. |
 | `../services/account` | 23 | High in route/middleware tests; account/profile bootstrap bugs can disappear. |
 | `../helpers` | 21 | High in Inngest tests when step/runtime behavior is replaced. |
-| `../services/profile` / `../../services/profile` | 21 combined | High for profile scoping and parent/child access paths. |
-| `./llm` / `../services/llm` / `../../services/llm` | 26 combined | High where integration behavior should use provider registration or HTTP-boundary interception. |
-| `../../services/sentry`, `./sentry` | 28 combined | Usually acceptable external boundary shim. |
+| `../services/profile` | 18 | High for profile scoping and parent/child access paths. |
+| `./llm` | 13 | High where integration/workflow behavior should use provider registration or HTTP-boundary interception. |
+| `../../services/notifications` | 10 | High where notification formatting/business behavior is replaced, acceptable only for send transport. |
+| `../../services/settings` | 9 | High where rate-limit, learning-mode, or notification settings behavior is replaced. |
 
 Top files by internal-ish mock count:
 
 | File | Count | Initial classification |
 | --- | ---: | --- |
-| `apps/api/src/inngest/functions/session-completed.test.ts` | 19 | P1 high-risk workflow orchestrator mock cluster. |
-| `apps/mobile/src/app/(app)/library.test.tsx` | 13 | P2 UI screen harness debt. |
-| `apps/mobile/src/app/(app)/session/index.test.tsx` | 12 | P2/P1 because session recovery/streaming is user-critical. |
-| `apps/mobile/src/app/(app)/shelf/[subjectId]/book/[bookId].test.tsx` | 12 | P2 UI screen harness debt. |
-| `apps/mobile/src/components/home/ParentHomeScreen.test.tsx` | 11 | P2 UI screen harness debt, already annotated with many `gc1-allow` reasons. |
-| `apps/mobile/src/app/(app)/child/[profileId]/index.test.tsx` | 11 | P2 UI screen harness debt. |
-| `apps/api/src/middleware/metering.test.ts` | 10 | P1 quota/billing correctness risk. |
-| `apps/mobile/src/app/session-summary/[sessionId].test.tsx` | 10 | P2/P1 because summary submit/parent proxy/recovery paths matter. |
-| `apps/api/src/routes/sessions.test.ts` | 9 | P1 route-service-contract risk. |
-| `apps/api/src/routes/filing.test.ts` | 9 | P1 LLM/session/filing contract risk. |
-| `apps/api/src/inngest/functions/trial-expiry.test.ts` | 9 | P1 billing lifecycle risk. |
+| `apps/api/src/inngest/functions/session-completed.test.ts` | 18 | P1 high-risk workflow orchestrator mock cluster. |
+| `apps/mobile/src/app/(app)/library.test.tsx` | 11 | P2 UI screen harness debt. |
+| `apps/mobile/src/app/(app)/session/index.test.tsx` | 11 | P2/P1 because session recovery/streaming is user-critical. |
+| `apps/mobile/src/app/(app)/shelf/[subjectId]/book/[bookId].test.tsx` | 11 | P2 UI screen harness debt. |
+| `apps/api/src/middleware/metering.test.ts` | 9 | P1 quota/billing correctness risk. |
+| `apps/mobile/src/app/(app)/child/[profileId]/index.test.tsx` | 9 | P2 UI screen harness debt. |
+| `apps/mobile/src/components/home/ParentHomeScreen.test.tsx` | 8 | P2 UI screen harness debt, already annotated with many `gc1-allow` reasons. |
+| `apps/api/src/inngest/functions/trial-expiry.test.ts` | 7 | P1 billing lifecycle risk. |
+| `apps/api/src/routes/filing.test.ts` | 7 | P1 LLM/session/filing contract risk. |
+| `apps/api/src/routes/sessions.test.ts` | 7 | P1 route-service-contract risk. |
+| `apps/api/src/services/session/session-cache.test.ts` | 7 | P1 service-contract risk. |
+| `apps/mobile/src/app/(app)/progress/[subjectId]/index.test.tsx` | 7 | P2 follow-up Batch 7 progress/report harness debt. |
 
 Mobile internal-ish groups:
 
@@ -83,6 +94,10 @@ Mobile internal-ish groups:
 ## Current Guardrails
 
 - `apps/api/src/services/llm/integration-mock-guard.test.ts` already prevents new internal LLM mocks in API integration tests, with one known offender: `apps/api/src/services/book-suggestion-generation.integration.test.ts`.
+- The raw CSV currently classifies two P0 integration rows:
+  - `apps/api/src/services/book-suggestion-generation.integration.test.ts:14` mocking `./llm`
+  - `apps/api/src/services/nudge.integration.test.ts:38` mocking `./notifications`
+  The current guard covers the LLM-specific row; the general Batch 1 guard should cover the notification row too.
 - Several top-level integration tests explicitly avoid internal service mocks and use real DB/API paths instead:
   - `tests/integration/assessments-routes.integration.test.ts`
   - `tests/integration/curriculum-routes.integration.test.ts`
@@ -167,7 +182,7 @@ These are the first concrete checks. This table should grow as each shared utili
 | Shared Inngest transport capture | `pnpm exec jest -c apps/api/jest.config.cjs apps/api/src/routes/maintenance.test.ts apps/api/src/inngest/functions/billing-trial-subscription-failed.test.ts --runInBand --no-coverage` | **Passed**: 2 suites, 5 tests | Proves `createInngestTransportCapture()` can replace per-test `inngest.send` and `createFunction` mocks when the assertion is transport dispatch/registration, not downstream function behavior. |
 | Shared LLM provider fixture | `pnpm exec jest -c apps/api/jest.config.cjs apps/api/src/test-utils/llm-provider-fixtures.test.ts apps/api/src/services/summaries.test.ts --runInBand --no-coverage` | **Passed**: 2 suites, 12 tests | Proves `registerLlmProviderFixture()` can drive the real `routeAndCall`/`routeAndStream` path with structured JSON, envelope streams, plain text, invalid JSON, call capture, and queued provider failures. |
 | DB-backed LLM integration fixture conversion | `pnpm exec jest -c tests/integration/jest.config.cjs learning-session.integration.test.ts --runInBand --no-coverage` | **Blocked by environment** | `tests/integration/learning-session.integration.test.ts` now uses the shared fixture, but local execution stops in integration setup because `DATABASE_URL` is unset. Step 4 should make this proof runnable locally. |
-| Integration mock ratchet guard | `pnpm exec jest -c apps/api/jest.config.cjs apps/api/src/services/llm/integration-mock-guard.test.ts --runInBand --no-coverage` | **Blocked in current sandbox** | Test shells out through `execSync('git ls-files ...')` and failed with `spawnSync C:\WINDOWS\system32\cmd.exe EPERM`. Pattern is valid, but the guard needs a sandbox-safe implementation or approved shell path. |
+| Integration mock ratchet guard | `pnpm exec jest -c apps/api/jest.config.cjs apps/api/src/services/llm/integration-mock-guard.test.ts --runInBand --no-coverage` | **Passed**: 1 suite, 4 tests | The LLM guard now enumerates `apps/api` and `tests/integration` with Node filesystem APIs, normalizes Windows paths, keeps the shrinking offender allowlist, and includes a detector self-check for internal vs external mock specifiers. |
 | Mobile profile/provider wrapper | `pnpm exec jest -c apps/mobile/jest.config.cjs apps/mobile/src/hooks/use-push-token-registration.test.ts --runInBand --no-coverage` | **Passed**: 9 tests | Proves controlled profile fixture/provider pattern works for hook tests. Warnings remain from Expo native module setup and React act noise. |
 | Mobile routed API fetch | `pnpm exec jest -c apps/mobile/jest.config.cjs --runTestsByPath "apps/mobile/src/app/(app)/home.test.tsx" --runInBand --no-coverage` | **Assertions passed, process timed out** | Proves route-shaped mock fetch can drive screen behavior, but the screen harness left async work/open handles. Batch 3 should include teardown/query-cache cleanup in the shared render helper. |
 | API app typecheck after shared API fixtures | `pnpm exec tsc -p apps/api/tsconfig.app.json --noEmit --pretty false` | **Passed** | Confirms the API app build graph accepts the shared Inngest and LLM test utilities. Broad spec typecheck is still noisy from pre-existing test errors and was not used as the completion gate. |

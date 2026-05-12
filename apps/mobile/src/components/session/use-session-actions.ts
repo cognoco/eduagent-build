@@ -20,6 +20,7 @@ import type {
 import { clearSessionRecoveryMarker } from '../../lib/session-recovery';
 import * as SecureStore from '../../lib/secure-storage';
 import { classifyApiError, recoveryActions } from '../../lib/format-api-error';
+import { homeHrefForReturnTo } from '../../lib/navigation';
 import { withProblemMode } from '../homework/problem-cards';
 import {
   getInputModeKey,
@@ -99,6 +100,7 @@ export interface UseSessionActionsOptions {
   fetchFastCelebrations: () => Promise<PendingCelebration[]>;
   showConfirmation: (message: string) => void;
   router: Router;
+  returnTo?: string;
 }
 
 const CLOSE_TIMEOUT_MS = 15_000;
@@ -147,6 +149,7 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
     fetchFastCelebrations,
     showConfirmation,
     router,
+    returnTo,
   } = opts;
 
   const handleInputModeChange = useCallback(
@@ -259,6 +262,7 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
                 : 'learning',
           ...(filedSubjectId ? { filedSubjectId } : {}),
           ...(filedBookId ? { filedBookId } : {}),
+          ...(returnTo ? { returnTo } : {}),
         },
       } as never);
     },
@@ -273,6 +277,7 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
       milestonesReached,
       effectiveMode,
       closedSessionRef,
+      returnTo,
     ],
   );
 
@@ -299,6 +304,7 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
               : effectiveMode === 'freeform'
                 ? 'freeform'
                 : 'learning',
+          ...(returnTo ? { returnTo } : {}),
         },
       } as never);
     },
@@ -311,6 +317,7 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
       topicId,
       milestonesReached,
       effectiveMode,
+      returnTo,
     ],
   );
 
@@ -377,7 +384,12 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
               const actions = recoveryActions(classified, {
                 retry: () => setIsClosing(false),
                 goBack: () => setIsClosing(false),
-                goHome: () => router.replace('/(app)/home' as never),
+                goHome: () =>
+                  router.replace(
+                    (returnTo
+                      ? homeHrefForReturnTo(returnTo)
+                      : '/(app)/home') as never,
+                  ),
               });
               const buttons: Array<{
                 text: string;

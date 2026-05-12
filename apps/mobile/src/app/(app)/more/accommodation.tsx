@@ -132,12 +132,12 @@ export default function AccommodationScreen(): React.ReactElement {
       <View className="px-5 pt-4 pb-2 flex-row items-center">
         <Pressable
           onPress={handleBack}
-          className="me-3 py-2 pe-2"
+          className="me-3 p-2 min-h-[44px] min-w-[44px] items-center justify-center"
           accessibilityRole="button"
           accessibilityLabel={t('common.goBack')}
           testID="accommodation-back"
         >
-          <Text className="text-primary text-body font-semibold">{'←'}</Text>
+          <Ionicons name="arrow-back" size={24} color={colors.primary} />
         </Pressable>
         <Text
           className="text-h2 font-bold text-text-primary flex-1"

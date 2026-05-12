@@ -24,13 +24,17 @@ jest.mock('../../lib/api-client', () =>
 const mockUseProfile = jest.fn();
 const mockUsePathname = jest.fn();
 const mockReplace = jest.fn();
+const mockTabScreens: Array<Record<string, unknown>> = [];
 const mockTabs = Object.assign(
   ({ children }: { children?: React.ReactNode }) => {
     const { View } = require('react-native');
     return <View testID="tabs">{children}</View>;
   },
   {
-    Screen: () => null,
+    Screen: (props: Record<string, unknown>) => {
+      mockTabScreens.push(props);
+      return null;
+    },
   },
 );
 
@@ -162,6 +166,7 @@ describe('AppLayout', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockTabScreens.length = 0;
     testQueryClient = new QueryClient({
       defaultOptions: { queries: { retry: false, gcTime: 0 } },
     });
@@ -258,6 +263,100 @@ describe('AppLayout', () => {
           headers: { 'Content-Type': 'application/json' },
         }),
     );
+  });
+
+  it('invalidates progress data when the Progress tab is pressed', () => {
+    const invalidateSpy = jest.spyOn(testQueryClient, 'invalidateQueries');
+    renderLayout();
+
+    const progressScreen = mockTabScreens.find(
+      (screen) => screen['name'] === 'progress',
+    );
+    const listeners = progressScreen?.['listeners'] as
+      | { tabPress?: () => void }
+      | undefined;
+
+    listeners?.tabPress?.();
+
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['progress'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['dashboard'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['retention'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ['language-progress'],
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['resume-nudge'] });
+  });
+
+  it('invalidates learner home data when Home or Own Learning tabs are pressed', () => {
+    const invalidateSpy = jest.spyOn(testQueryClient, 'invalidateQueries');
+    renderLayout();
+
+    for (const tabName of ['home', 'own-learning']) {
+      invalidateSpy.mockClear();
+      const tabScreen = mockTabScreens.find(
+        (screen) => screen['name'] === tabName,
+      );
+      const listeners = tabScreen?.['listeners'] as
+        | { tabPress?: () => void }
+        | undefined;
+
+      listeners?.tabPress?.();
+
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['subjects'] });
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['progress'] });
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['dashboard'] });
+      expect(invalidateSpy).toHaveBeenCalledWith({
+        queryKey: ['coaching-card'],
+      });
+      expect(invalidateSpy).toHaveBeenCalledWith({
+        queryKey: ['celebrations'],
+      });
+      expect(invalidateSpy).toHaveBeenCalledWith({
+        queryKey: ['subscription'],
+      });
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['usage'] });
+    }
+  });
+
+  it('invalidates library aggregate data when the Library tab is pressed', () => {
+    const invalidateSpy = jest.spyOn(testQueryClient, 'invalidateQueries');
+    renderLayout();
+
+    const libraryScreen = mockTabScreens.find(
+      (screen) => screen['name'] === 'library',
+    );
+    const listeners = libraryScreen?.['listeners'] as
+      | { tabPress?: () => void }
+      | undefined;
+
+    listeners?.tabPress?.();
+
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['subjects'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['progress'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['library'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['books'] });
+  });
+
+  it('invalidates account/settings data when the More tab is pressed', () => {
+    const invalidateSpy = jest.spyOn(testQueryClient, 'invalidateQueries');
+    renderLayout();
+
+    const moreScreen = mockTabScreens.find(
+      (screen) => screen['name'] === 'more',
+    );
+    const listeners = moreScreen?.['listeners'] as
+      | { tabPress?: () => void }
+      | undefined;
+
+    listeners?.tabPress?.();
+
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['profiles'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['subscription'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ['subscription-family'],
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['usage'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['settings'] });
   });
 
   afterEach(() => {

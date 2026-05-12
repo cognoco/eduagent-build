@@ -278,7 +278,8 @@
       "childScreenTitle": "Preferencias de aprendizaje de {{name}}"
     },
     "learningPreferences": {
-      "rowLabel": "Preferencias de aprendizaje",
+      "sectionHeader": "Tu aprendizaje",
+      "rowLabel": "Preferencias",
       "screenTitle": "Preferencias de aprendizaje"
     },
     "mentorMemory": {
@@ -301,8 +302,8 @@
       "viewPlans": "Ver planes",
       "profileLimitTitle": "Límite de perfiles alcanzado",
       "profileLimitMessage": "Tu plan {{plan}} admite hasta {{max}} perfiles.",
-      "breakdownSharingTitle": "Share usage breakdown with family",
-      "breakdownSharingDescription": "Let everyone in your family see how each profile uses the family pool. Children only see the breakdown when this is on.",
+      "breakdownSharingTitle": "Compartir uso familiar",
+      "breakdownSharingDescription": "Muestra uso por perfil.",
       "breakdownSharingError": "Couldn't update setting. Try again."
     },
     "celebrations": {

@@ -1,6 +1,5 @@
-import { execSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { relative, resolve } from 'node:path';
 
 // [BUG-743 / T-1] Regression guard. Per CLAUDE.md "No Internal Mocks in
 // Integration Tests": integration tests must not jest.mock internal modules
@@ -21,18 +20,49 @@ const KNOWN_OFFENDERS = new Set<string>([
   'apps/api/src/services/book-suggestion-generation.integration.test.ts',
 ]);
 
-function listIntegrationTests(): string[] {
-  const repoRoot = resolve(__dirname, '../../../../..');
-  // git ls-files is stable + fast and respects .gitignore.
-  const out = execSync('git ls-files "apps/api/**/*.integration.test.ts"', {
-    cwd: repoRoot,
-    encoding: 'utf-8',
-  });
-  return out.split('\n').filter((line) => line.trim().length > 0);
+const REPO_ROOT = resolve(__dirname, '../../../../..');
+const INTEGRATION_TEST_ROOTS = ['apps/api', 'tests/integration'];
+const SKIPPED_DIRS = new Set([
+  '.git',
+  '.nx',
+  '.turbo',
+  'coverage',
+  'dist',
+  'node_modules',
+  'out-tsc',
+]);
+
+function normalizePath(path: string): string {
+  return path.replace(/\\/g, '/');
 }
 
-function fileMocksInternalLlm(absPath: string): boolean {
-  const source = readFileSync(absPath, 'utf-8');
+function collectIntegrationTests(dir: string, files: string[]): void {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (entry.isDirectory()) {
+      if (!SKIPPED_DIRS.has(entry.name)) {
+        collectIntegrationTests(resolve(dir, entry.name), files);
+      }
+      continue;
+    }
+
+    if (entry.isFile() && entry.name.endsWith('.integration.test.ts')) {
+      files.push(normalizePath(relative(REPO_ROOT, resolve(dir, entry.name))));
+    }
+  }
+}
+
+function listIntegrationTests(): string[] {
+  const files: string[] = [];
+  for (const root of INTEGRATION_TEST_ROOTS) {
+    const absRoot = resolve(REPO_ROOT, root);
+    if (existsSync(absRoot)) {
+      collectIntegrationTests(absRoot, files);
+    }
+  }
+  return files.sort();
+}
+
+function sourceMocksInternalLlm(source: string): boolean {
   // Catches all internal-LLM mock forms:
   //   jest.mock('./llm', ...)
   //   jest.mock('../../services/llm/router', ...)
@@ -52,20 +82,37 @@ function fileMocksInternalLlm(absPath: string): boolean {
   return false;
 }
 
+function fileMocksInternalLlm(absPath: string): boolean {
+  return sourceMocksInternalLlm(readFileSync(absPath, 'utf-8'));
+}
+
+function mockCallSnippet(specifier: string): string {
+  return `jest.${'mock'}('${specifier}', () => ({}));`;
+}
+
 describe('integration tests — BUG-743 internal LLM mock guard', () => {
-  const repoRoot = resolve(__dirname, '../../../../..');
   const files = listIntegrationTests();
 
   it('finds at least one integration test (sanity)', () => {
     expect(files.length).toBeGreaterThan(0);
   });
 
+  it('detects internal LLM mock specifiers without flagging external mocks', () => {
+    expect(sourceMocksInternalLlm(mockCallSnippet('./llm'))).toBe(true);
+    expect(
+      sourceMocksInternalLlm(mockCallSnippet('../../services/llm/router')),
+    ).toBe(true);
+    expect(
+      sourceMocksInternalLlm(mockCallSnippet('../../services/stripe')),
+    ).toBe(false);
+  });
+
   it('does not introduce NEW jest.mock(...llm) calls outside the known offender allowlist', () => {
     const offenders = files.filter((f) =>
-      fileMocksInternalLlm(resolve(repoRoot, f)),
+      fileMocksInternalLlm(resolve(REPO_ROOT, f)),
     );
     // Normalize separators so the test passes on Windows + POSIX.
-    const offendersNormalized = offenders.map((f) => f.replace(/\\/g, '/'));
+    const offendersNormalized = offenders.map(normalizePath);
     const newOffenders = offendersNormalized.filter(
       (f) => !KNOWN_OFFENDERS.has(f),
     );
@@ -86,8 +133,8 @@ describe('integration tests — BUG-743 internal LLM mock guard', () => {
     // file no longer mocks LLM internals (it was migrated to HTTP-boundary
     // mocking), remove it from KNOWN_OFFENDERS — this assertion enforces that.
     const stillOffending = Array.from(KNOWN_OFFENDERS).filter((f) =>
-      files.some((g) => g.replace(/\\/g, '/') === f)
-        ? fileMocksInternalLlm(resolve(repoRoot, f))
+      files.some((g) => normalizePath(g) === f)
+        ? fileMocksInternalLlm(resolve(REPO_ROOT, f))
         : false,
     );
     expect(stillOffending.sort()).toEqual(Array.from(KNOWN_OFFENDERS).sort());

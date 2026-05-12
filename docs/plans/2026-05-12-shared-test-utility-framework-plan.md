@@ -1,15 +1,15 @@
 # Shared Test Utility Framework Plan
 
 **Date:** 2026-05-12  
-**Status:** Proposed implementation plan  
+**Status:** Framework established; follow-up cleanup remains  
 **Related:** `docs/plans/2026-05-12-internal-mock-cleanup-inventory.md`
-**Agent tracker:** `docs/plans/2026-05-12-shared-test-utilities-agent-tracker.md`
+**Archived agent tracker:** `docs/plans/done/2026-05-12-shared-test-utilities-agent-tracker.md`
 
 ## Goal
 
 Build the shared test utility architecture needed to make internal mock cleanup mechanical, safe, and repeatable.
 
-Agents implementing this plan must update the agent tracker first. The tracker is the source of truth for current order, status, blockers, and proof commands; this document explains the architecture behind those steps.
+The shared utility setup steps are complete; the archived agent tracker keeps the historical order, blockers, and proof commands. This document remains the architecture reference for follow-up mock cleanup work.
 
 The cleanup should not start by editing hundreds of tests one by one. First, establish the common harnesses that define the correct boundary for each mock type. Once those utilities exist and are proven with one representative test each, bulk cleanup becomes mostly replacing bespoke local mocks with shared helpers.
 
@@ -224,19 +224,21 @@ pnpm exec jest -c apps/mobile/jest.config.cjs --runTestsByPath "apps/mobile/src/
 
 Tasks:
 
-- Replace shell-based `git ls-files` guards with sandbox-safe file enumeration where possible.
+- **Done for the current LLM guard:** Replace shell-based `git ls-files` discovery with sandbox-safe Node filesystem enumeration.
 - Add a general integration mock guard:
   - fail on new internal mocks in `*.integration.test.ts`
   - allow only explicit external/native/transport/observability boundaries
   - require allowlist shrink when offenders are migrated
-- Add a generated raw CSV inventory:
+- **Done:** Add a generated raw CSV inventory:
   - file
+  - line
+  - mock kind
   - target
   - area
   - classification
   - retained reason
   - cleanup batch
-- Add a count summary to the inventory doc after each cleanup batch.
+- **Done for the current snapshot:** Add a count summary to the inventory doc after each cleanup batch.
 
 Done when:
 
@@ -251,7 +253,7 @@ $env:NX_DAEMON='false'; $env:NX_ISOLATE_PLUGINS='false'
 pnpm exec jest -c apps/api/jest.config.cjs apps/api/src/services/llm/integration-mock-guard.test.ts --runInBand --no-coverage
 ```
 
-Current blocker: the existing mock guard shells out via `execSync('git ls-files ...')` and failed in the current Windows sandbox with `spawnSync C:\WINDOWS\system32\cmd.exe EPERM`. Phase 4 should remove or isolate that dependency.
+Current status: `apps/api/src/services/llm/integration-mock-guard.test.ts` no longer shells through `cmd.exe`; it scans `apps/api` and `tests/integration` with Node filesystem APIs and passes in the Windows sandbox. The raw CSV inventory now lives at `docs/plans/2026-05-12-internal-mock-cleanup-inventory.csv` and can be regenerated with `node --no-warnings scripts/generate-internal-mock-cleanup-inventory.ts`. Remaining Phase 4 work is to generalize the guard beyond LLM mocks.
 
 ## Implementation Rules
 
@@ -286,4 +288,4 @@ Out of scope:
 - Session-completed chain cleanup.
 - Local DB setup.
 - Mobile screen harness.
-- Integration mock guard rewrite.
+- General integration mock guard beyond the current LLM-specific guard.
