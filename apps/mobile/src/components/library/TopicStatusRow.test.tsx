@@ -2,7 +2,7 @@ import { fireEvent, render } from '@testing-library/react-native';
 import { TopicStatusRow } from './TopicStatusRow';
 
 jest.mock(
-  '../../lib/theme' /* gc1-allow: useThemeColors requires ThemeContext provider; not runnable in unit env */,
+  '../../lib/theme' /* gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM */,
   () => ({
     useThemeColors: () => ({
       primary: '#0088cc',

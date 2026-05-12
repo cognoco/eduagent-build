@@ -24,13 +24,26 @@ jest.mock('../../lib/api-client', () =>
 const mockUseProfile = jest.fn();
 const mockUsePathname = jest.fn();
 const mockReplace = jest.fn();
+const mockTabScreens: Array<Record<string, unknown>> = [];
+let mockTabsMounts = 0;
+let mockTabsUnmounts = 0;
 const mockTabs = Object.assign(
   ({ children }: { children?: React.ReactNode }) => {
+    const ReactRuntime = require('react');
     const { View } = require('react-native');
+    ReactRuntime.useEffect(() => {
+      mockTabsMounts += 1;
+      return () => {
+        mockTabsUnmounts += 1;
+      };
+    }, []);
     return <View testID="tabs">{children}</View>;
   },
   {
-    Screen: () => null,
+    Screen: (props: Record<string, unknown>) => {
+      mockTabScreens.push(props);
+      return null;
+    },
   },
 );
 
@@ -100,18 +113,21 @@ jest.mock('../../lib/profile', () => ({
 // use-consent uses useApiClient — mocked at the fetch boundary via mockFetch.
 // Routes: GET /consent/my-status, POST /consent/request
 
-jest.mock('../../lib/theme', () => ({
-  useThemeColors: () => ({
-    accent: '#0ea5e9',
-    border: '#d4d4d8',
-    muted: '#71717a',
-    surface: '#ffffff',
-    textInverse: '#ffffff',
-    textPrimary: '#18181b',
-    textSecondary: '#52525b',
+jest.mock(
+  '../../lib/theme' /* gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM */,
+  () => ({
+    useThemeColors: () => ({
+      accent: '#0ea5e9',
+      border: '#d4d4d8',
+      muted: '#71717a',
+      surface: '#ffffff',
+      textInverse: '#ffffff',
+      textPrimary: '#18181b',
+      textSecondary: '#52525b',
+    }),
+    useTokenVars: () => ({}),
   }),
-  useTokenVars: () => ({}),
-}));
+);
 
 jest.mock('../../hooks/use-revenuecat', () => ({
   useRevenueCatIdentity: jest.fn(),
@@ -161,6 +177,9 @@ describe('AppLayout', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockTabScreens.length = 0;
+    mockTabsMounts = 0;
+    mockTabsUnmounts = 0;
     testQueryClient = new QueryClient({
       defaultOptions: { queries: { retry: false, gcTime: 0 } },
     });
@@ -257,6 +276,130 @@ describe('AppLayout', () => {
           headers: { 'Content-Type': 'application/json' },
         }),
     );
+  });
+
+  it('invalidates progress data when the Progress tab is pressed', () => {
+    const invalidateSpy = jest.spyOn(testQueryClient, 'invalidateQueries');
+    renderLayout();
+
+    const progressScreen = mockTabScreens.find(
+      (screen) => screen['name'] === 'progress',
+    );
+    const listeners = progressScreen?.['listeners'] as
+      | { tabPress?: () => void }
+      | undefined;
+
+    listeners?.tabPress?.();
+
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['progress'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['dashboard'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['retention'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ['language-progress'],
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['resume-nudge'] });
+  });
+
+  it('invalidates learner home data when Home or Own Learning tabs are pressed', () => {
+    const invalidateSpy = jest.spyOn(testQueryClient, 'invalidateQueries');
+    renderLayout();
+
+    for (const tabName of ['home', 'own-learning']) {
+      invalidateSpy.mockClear();
+      const tabScreen = mockTabScreens.find(
+        (screen) => screen['name'] === tabName,
+      );
+      const listeners = tabScreen?.['listeners'] as
+        | { tabPress?: () => void }
+        | undefined;
+
+      listeners?.tabPress?.();
+
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['subjects'] });
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['progress'] });
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['dashboard'] });
+      expect(invalidateSpy).toHaveBeenCalledWith({
+        queryKey: ['coaching-card'],
+      });
+      expect(invalidateSpy).toHaveBeenCalledWith({
+        queryKey: ['celebrations'],
+      });
+      expect(invalidateSpy).toHaveBeenCalledWith({
+        queryKey: ['subscription'],
+      });
+      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['usage'] });
+    }
+  });
+
+  it('invalidates library aggregate data when the Library tab is pressed', () => {
+    const invalidateSpy = jest.spyOn(testQueryClient, 'invalidateQueries');
+    renderLayout();
+
+    const libraryScreen = mockTabScreens.find(
+      (screen) => screen['name'] === 'library',
+    );
+    const listeners = libraryScreen?.['listeners'] as
+      | { tabPress?: () => void }
+      | undefined;
+
+    listeners?.tabPress?.();
+
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['subjects'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['progress'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['library'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['books'] });
+  });
+
+  it('invalidates account/settings data when the More tab is pressed', () => {
+    const invalidateSpy = jest.spyOn(testQueryClient, 'invalidateQueries');
+    renderLayout();
+
+    const moreScreen = mockTabScreens.find(
+      (screen) => screen['name'] === 'more',
+    );
+    const listeners = moreScreen?.['listeners'] as
+      | { tabPress?: () => void }
+      | undefined;
+
+    listeners?.tabPress?.();
+
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['profiles'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['subscription'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ['subscription-family'],
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['usage'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['settings'] });
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/more');
+  });
+
+  it('remounts the tab shell when the active profile changes', () => {
+    const { rerender } = renderLayout();
+
+    expect(mockTabsMounts).toBe(1);
+    expect(mockTabsUnmounts).toBe(0);
+
+    mockUseProfile.mockReturnValue({
+      profiles: [
+        { id: 'p1', isOwner: true, consentStatus: null, birthYear: 1990 },
+        { id: 'c1', isOwner: false, consentStatus: null, birthYear: 2014 },
+      ],
+      activeProfile: {
+        id: 'c1',
+        isOwner: false,
+        consentStatus: null,
+        birthYear: 2014,
+      },
+      isLoading: false,
+      profileWasRemoved: false,
+      acknowledgeProfileRemoval: jest.fn(),
+      switchProfile: jest.fn(),
+    });
+
+    rerender(<AppLayout />);
+
+    expect(mockTabsUnmounts).toBe(1);
+    expect(mockTabsMounts).toBe(2);
   });
 
   afterEach(() => {

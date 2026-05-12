@@ -19,23 +19,12 @@ jest.mock('../../services/sentry', () => ({
   captureException: (...args: unknown[]) => mockCaptureException(...args),
 }));
 
+import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 import {
   transcriptPurgeCron,
   transcriptPurgeHandler,
   transcriptPurgeHandlerOnFailure,
 } from './transcript-purge-cron';
-
-function createStep(overrides: Record<string, unknown> = {}) {
-  return {
-    run: jest.fn(async (name: string, fn: () => Promise<unknown>) => {
-      if (name in overrides) {
-        return overrides[name];
-      }
-      return fn();
-    }),
-    sendEvent: jest.fn().mockResolvedValue(undefined),
-  };
-}
 
 describe('transcriptPurgeCron', () => {
   beforeEach(() => {
@@ -47,32 +36,34 @@ describe('transcriptPurgeCron', () => {
   it('skips entirely while RETENTION_PURGE_ENABLED is false', async () => {
     mockGetStepRetentionPurgeEnabled.mockReturnValue(false);
 
-    const step = createStep();
+    const { step, sendEventCalls } = createInngestStepRunner();
     const handler = (transcriptPurgeCron as any).fn;
     const result = await handler({ step });
 
     expect(result).toEqual({ status: 'disabled', queued: 0 });
-    expect(step.sendEvent).not.toHaveBeenCalled();
+    expect(sendEventCalls).toHaveLength(0);
   });
 
   it('queues purge workers and emits delayed alerts for blocked rows', async () => {
     mockGetStepRetentionPurgeEnabled.mockReturnValue(true);
 
-    const step = createStep({
-      'find-purge-candidates': [
-        {
-          sessionSummaryId: 'summary-1',
-          sessionId: 'session-1',
-          profileId: 'profile-1',
-        },
-      ],
-      'find-delayed-purge-candidates': [
-        {
-          sessionSummaryId: 'summary-2',
-          sessionId: 'session-2',
-          profileId: 'profile-2',
-        },
-      ],
+    const { step, sendEventCalls } = createInngestStepRunner({
+      runResults: {
+        'find-purge-candidates': [
+          {
+            sessionSummaryId: 'summary-1',
+            sessionId: 'session-1',
+            profileId: 'profile-1',
+          },
+        ],
+        'find-delayed-purge-candidates': [
+          {
+            sessionSummaryId: 'summary-2',
+            sessionId: 'session-2',
+            profileId: 'profile-2',
+          },
+        ],
+      },
     });
 
     const handler = (transcriptPurgeCron as any).fn;
@@ -85,22 +76,26 @@ describe('transcriptPurgeCron', () => {
         delayed: 1,
       }),
     );
-    expect(step.sendEvent).toHaveBeenCalledWith(
-      'fan-out-transcript-purge',
+    expect(sendEventCalls).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ name: 'app/session.transcript.purge' }),
+        {
+          name: 'fan-out-transcript-purge',
+          payload: expect.arrayContaining([
+            expect.objectContaining({ name: 'app/session.transcript.purge' }),
+          ]),
+        },
+        {
+          name: 'notify-purge-delayed',
+          payload: expect.objectContaining({
+            name: 'app/session.purge.delayed',
+            data: expect.objectContaining({
+              delayedCount: 1,
+              sessionIds: ['session-2'],
+              missingPreconditionCount: 1,
+            }),
+          }),
+        },
       ]),
-    );
-    expect(step.sendEvent).toHaveBeenCalledWith(
-      'notify-purge-delayed',
-      expect.objectContaining({
-        name: 'app/session.purge.delayed',
-        data: expect.objectContaining({
-          delayedCount: 1,
-          sessionIds: ['session-2'],
-          missingPreconditionCount: 1,
-        }),
-      }),
     );
   });
 
@@ -112,21 +107,23 @@ describe('transcriptPurgeCron', () => {
   it('[BUG-993] calls captureException when delayed sessions are found alongside purge candidates', async () => {
     mockGetStepRetentionPurgeEnabled.mockReturnValue(true);
 
-    const step = createStep({
-      'find-purge-candidates': [
-        {
-          sessionSummaryId: 'summary-1',
-          sessionId: 'session-1',
-          profileId: 'profile-1',
-        },
-      ],
-      'find-delayed-purge-candidates': [
-        {
-          sessionSummaryId: 'summary-2',
-          sessionId: 'session-2',
-          profileId: 'profile-2',
-        },
-      ],
+    const { step } = createInngestStepRunner({
+      runResults: {
+        'find-purge-candidates': [
+          {
+            sessionSummaryId: 'summary-1',
+            sessionId: 'session-1',
+            profileId: 'profile-1',
+          },
+        ],
+        'find-delayed-purge-candidates': [
+          {
+            sessionSummaryId: 'summary-2',
+            sessionId: 'session-2',
+            profileId: 'profile-2',
+          },
+        ],
+      },
     });
 
     const handler = (transcriptPurgeCron as any).fn;
@@ -149,20 +146,22 @@ describe('transcriptPurgeCron', () => {
   it('[BUG-993] calls captureException when delayed sessions are found and no purge candidates exist', async () => {
     mockGetStepRetentionPurgeEnabled.mockReturnValue(true);
 
-    const step = createStep({
-      'find-purge-candidates': [],
-      'find-delayed-purge-candidates': [
-        {
-          sessionSummaryId: 'summary-3',
-          sessionId: 'session-3',
-          profileId: 'profile-3',
-        },
-        {
-          sessionSummaryId: 'summary-4',
-          sessionId: 'session-4',
-          profileId: 'profile-4',
-        },
-      ],
+    const { step, sendEventCalls } = createInngestStepRunner({
+      runResults: {
+        'find-purge-candidates': [],
+        'find-delayed-purge-candidates': [
+          {
+            sessionSummaryId: 'summary-3',
+            sessionId: 'session-3',
+            profileId: 'profile-3',
+          },
+          {
+            sessionSummaryId: 'summary-4',
+            sessionId: 'session-4',
+            profileId: 'profile-4',
+          },
+        ],
+      },
     });
 
     const handler = (transcriptPurgeCron as any).fn;
@@ -171,9 +170,15 @@ describe('transcriptPurgeCron', () => {
     expect(result).toEqual(
       expect.objectContaining({ status: 'completed', queued: 0, delayed: 2 }),
     );
-    expect(step.sendEvent).toHaveBeenCalledWith(
-      'notify-purge-delayed',
-      expect.objectContaining({ name: 'app/session.purge.delayed' }),
+    expect(sendEventCalls).toEqual(
+      expect.arrayContaining([
+        {
+          name: 'notify-purge-delayed',
+          payload: expect.objectContaining({
+            name: 'app/session.purge.delayed',
+          }),
+        },
+      ]),
     );
     expect(mockCaptureException).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -192,15 +197,17 @@ describe('transcriptPurgeCron', () => {
   it('[BUG-993] does NOT call captureException when there are no delayed sessions', async () => {
     mockGetStepRetentionPurgeEnabled.mockReturnValue(true);
 
-    const step = createStep({
-      'find-purge-candidates': [
-        {
-          sessionSummaryId: 'summary-1',
-          sessionId: 'session-1',
-          profileId: 'profile-1',
-        },
-      ],
-      'find-delayed-purge-candidates': [],
+    const { step } = createInngestStepRunner({
+      runResults: {
+        'find-purge-candidates': [
+          {
+            sessionSummaryId: 'summary-1',
+            sessionId: 'session-1',
+            profileId: 'profile-1',
+          },
+        ],
+        'find-delayed-purge-candidates': [],
+      },
     });
 
     const handler = (transcriptPurgeCron as any).fn;
@@ -233,7 +240,7 @@ describe('transcriptPurgeHandler', () => {
       purgedAt: new Date('2026-05-05T10:00:00.000Z'),
     });
 
-    const step = createStep();
+    const { step, sendEventCalls } = createInngestStepRunner();
     const handler = (transcriptPurgeHandler as any).fn;
     const result = await handler({
       event: {
@@ -251,18 +258,22 @@ describe('transcriptPurgeHandler', () => {
         sessionId: 'session-1',
       }),
     );
-    expect(step.sendEvent).toHaveBeenCalledWith(
-      'notify-transcript-purged',
-      expect.objectContaining({
-        name: 'app/session.transcript.purged',
-        data: expect.objectContaining({
-          profileId: '00000000-0000-7000-8000-000000000001',
-          sessionId: 'session-1',
-          sessionSummaryId: 'summary-1',
-          eventsDeleted: 3,
-          embeddingRowsReplaced: 1,
-        }),
-      }),
+    expect(sendEventCalls).toEqual(
+      expect.arrayContaining([
+        {
+          name: 'notify-transcript-purged',
+          payload: expect.objectContaining({
+            name: 'app/session.transcript.purged',
+            data: expect.objectContaining({
+              profileId: '00000000-0000-7000-8000-000000000001',
+              sessionId: 'session-1',
+              sessionSummaryId: 'summary-1',
+              eventsDeleted: 3,
+              embeddingRowsReplaced: 1,
+            }),
+          }),
+        },
+      ]),
     );
   });
 
@@ -271,7 +282,7 @@ describe('transcriptPurgeHandler', () => {
       new Error('Voyage unavailable'),
     );
 
-    const step = createStep();
+    const { step } = createInngestStepRunner();
     const handler = (transcriptPurgeHandler as any).fn;
 
     await expect(
@@ -299,7 +310,7 @@ describe('transcriptPurgeHandler', () => {
   });
 
   it('drops malformed purge payloads before touching transcript data', async () => {
-    const step = createStep();
+    const { step, runCalls } = createInngestStepRunner();
     const handler = (transcriptPurgeHandler as any).fn;
 
     const result = await handler({
@@ -309,7 +320,7 @@ describe('transcriptPurgeHandler', () => {
 
     expect(result).toEqual({ status: 'invalid_payload' });
     expect(mockPurgeSessionTranscript).not.toHaveBeenCalled();
-    expect(step.run).not.toHaveBeenCalled();
+    expect(runCalls).toHaveLength(0);
     expect(mockCaptureException).toHaveBeenCalledWith(
       expect.objectContaining({
         message: 'Invalid transcript purge payload',

@@ -187,6 +187,7 @@
         "cta": "Add your first child"
       },
       "childrenHeader": "Children",
+      "familyManagementHeader": "Familienverwaltung",
       "familyToolsHeader": "Family tools",
       "childCard": {
         "statusLine": "{{activity}} · {{focus}} · {{signal}}",
@@ -274,10 +275,11 @@
       "screenTitle": "Lernanpassung",
       "notSureWhichToPick": "Nicht sicher, welche du wählen sollst?",
       "guideActive": "Aktiv",
-      "childScreenTitle": "{{name}}s Lernanpassung"
+      "childScreenTitle": "{{name}}s Lernpräferenzen"
     },
     "learningPreferences": {
-      "rowLabel": "Lernpräferenzen",
+      "sectionHeader": "Dein Lernen",
+      "rowLabel": "Präferenzen",
       "screenTitle": "Lernpräferenzen"
     },
     "mentorMemory": {
@@ -300,8 +302,8 @@
       "viewPlans": "Pläne ansehen",
       "profileLimitTitle": "Profillimit erreicht",
       "profileLimitMessage": "Dein {{plan}}-Plan unterstützt bis zu {{max}} Profile.",
-      "breakdownSharingTitle": "Share usage breakdown with family",
-      "breakdownSharingDescription": "Let everyone in your family see how each profile uses the family pool. Children only see the breakdown when this is on.",
+      "breakdownSharingTitle": "Familiennutzung teilen",
+      "breakdownSharingDescription": "Nutzung pro Profil anzeigen.",
       "breakdownSharingError": "Couldn't update setting. Try again."
     },
     "celebrations": {
@@ -647,7 +649,8 @@
         "rateLimited": "Zu viele Anfragen – warte einen Moment und versuche es erneut.",
         "validationError": "Etwas ist schiefgelaufen. Bitte versuche eine andere Aktivität.",
         "genericShort": "Etwas ist schiefgelaufen. Versuche es erneut!"
-      }
+      },
+      "buildingRound": "Deine Runde wird erstellt"
     },
     "round": {
       "goBack": "Zurück",
@@ -684,6 +687,53 @@
         "guessWho": "Wer bin ich?",
         "vocabulary": "Vokabeln"
       }
+    },
+    "play": {
+      "noRoundTitle": "Keine Runde geladen",
+      "noRoundBody": "Beim Laden der Quiz-Runde ist etwas schiefgelaufen. Du kannst es erneut versuchen oder zur Quiz-Startseite zurückkehren.",
+      "malformedTitle": "Diese Runde konnte nicht geladen werden",
+      "malformedBody": "Wir haben die Antwortmöglichkeiten für diese Frage nicht erhalten. Versuche eine neue Runde oder komm gleich wieder.",
+      "backToQuizHome": "Zurück zur Quiz-Startseite",
+      "titleGuessWho": "Wer ist wer?",
+      "titleCapitals": "Hauptstädte",
+      "titleVocabulary": "Wortschatz",
+      "quitLabel": "Quiz beenden",
+      "answerCheckFailed": "Antwortprüfung fehlgeschlagen – Ergebnis könnte ungenau sein",
+      "capitalPrompt": "Was ist die Hauptstadt von ...",
+      "translatePrompt": "Übersetze:",
+      "guessWhoPrompt": "Wer ist diese Person?",
+      "checking": "Wird geprüft ...",
+      "typeYourAnswer": "Gib deine Antwort ein",
+      "typeYourAnswerPlaceholder": "Gib deine Antwort ein ...",
+      "submit": "Senden",
+      "foundThemClues_one": "Du hast sie mit {{count}} Hinweis gefunden!",
+      "foundThemClues_other": "Du hast sie mit {{count}} Hinweisen gefunden!",
+      "discoveredIt": "Du hast es entdeckt!",
+      "savedReady": "Gespeichert. Bereit, wenn du es bist.",
+      "savingResult": "Dein Ergebnis wird gespeichert ...",
+      "lockedIn": "Festgelegt. Gut gefunden.",
+      "goodTry": "Guter Versuch.",
+      "theAnswerWas": "Die Antwort war ",
+      "readyForNext": "Bereit für die Nächste",
+      "correct": "Richtig",
+      "notQuite": "Nicht ganz",
+      "seeResults": "Ergebnisse ansehen",
+      "oneMore": "Warte, nur noch eine!",
+      "savingRound": "Deine Runde wird gespeichert ...",
+      "nextQuestion": "Nächste Frage",
+      "notQuiteRight": "Nicht ganz richtig?",
+      "disputeNoted": "Vermerkt – wir prüfen das",
+      "scoringRound": "Deine Runde wird bewertet ...",
+      "couldNotSave": "Deine Runde konnte nicht gespeichert werden",
+      "exit": "Beenden",
+      "pauseHere": "Hier pausieren?",
+      "leaveQuiz": "Dieses Quiz verlassen?",
+      "pauseBody": "Du hast einen Teil dieser Runde beantwortet. Speichere sie jetzt oder mach gleich mit der nächsten Frage weiter.",
+      "leaveBody": "Noch keine Antworten, also gibt es nichts zu speichern.",
+      "keepPlaying": "Weiterspielen",
+      "saveAndFinish": "Speichern und beenden",
+      "leaveWithoutSaving": "Ohne Speichern verlassen",
+      "leaveQuizButton": "Quiz verlassen"
     }
   },
   "dictation": {

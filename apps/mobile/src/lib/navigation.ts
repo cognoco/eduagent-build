@@ -4,6 +4,8 @@ import type { LearningResumeTarget } from '@eduagent/schemas';
 export const FAMILY_HOME_PATH = '/(app)/home';
 export const LEARNER_HOME_RETURN_TO = 'learner-home';
 export const LEARNER_HOME_HREF = '/(app)/home';
+export const OWN_LEARNING_RETURN_TO = 'own-learning';
+export const OWN_LEARNING_HREF = '/(app)/own-learning';
 
 function firstParam(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
@@ -12,9 +14,10 @@ function firstParam(value: string | string[] | undefined): string | undefined {
 export function homeHrefForReturnTo(
   returnTo: string | string[] | undefined,
 ): Href {
-  return firstParam(returnTo) === LEARNER_HOME_RETURN_TO
-    ? (LEARNER_HOME_HREF as Href)
-    : ('/(app)/home' as Href);
+  const token = firstParam(returnTo);
+  if (token === OWN_LEARNING_RETURN_TO) return OWN_LEARNING_HREF as Href;
+  if (token === LEARNER_HOME_RETURN_TO) return LEARNER_HOME_HREF as Href;
+  return '/(app)/home' as Href;
 }
 
 export function goBackOrReplace(

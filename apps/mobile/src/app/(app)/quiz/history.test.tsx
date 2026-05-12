@@ -1,17 +1,22 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import QuizHistoryScreen from './history';
 
-const mockReplace = jest.fn();
 const mockPush = jest.fn();
-let mockSearchParams: { returnTo?: string } = {};
+const mockReplace = jest.fn();
+const mockGoBackOrReplace = jest.fn();
+let mockSearchParams: Record<string, string> = {};
 
 jest.mock('expo-router', () => ({
+  useRouter: () => ({ push: mockPush, replace: mockReplace }),
   useLocalSearchParams: () => mockSearchParams,
-  useRouter: () => ({
-    push: mockPush,
-    replace: mockReplace,
-  }),
 }));
+
+jest.mock(
+  '../../../lib/navigation' /* gc1-allow: unit test boundary */,
+  () => ({
+    goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
+  }),
+);
 
 jest.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -89,32 +94,66 @@ describe('QuizHistoryScreen', () => {
     });
   });
 
-  it('returns to the quiz index by default', () => {
+  it('navigates back to quiz index via goBackOrReplace', () => {
     render(<QuizHistoryScreen />);
-
     fireEvent.press(screen.getByTestId('quiz-history-back'));
-
-    expect(mockReplace).toHaveBeenCalledWith('/(app)/quiz');
+    expect(mockGoBackOrReplace).toHaveBeenCalledWith(
+      expect.objectContaining({ push: mockPush }),
+      '/(app)/quiz',
+    );
   });
 
-  it('returns to Practice when opened from the Practice hub', () => {
-    mockSearchParams = { returnTo: 'practice' };
+  it('navigates to round detail on row press', () => {
     render(<QuizHistoryScreen />);
-
-    fireEvent.press(screen.getByTestId('quiz-history-back'));
-
-    expect(mockReplace).toHaveBeenCalledWith('/(app)/practice');
-  });
-
-  it('keeps the Practice return target when opening a history round', () => {
-    mockSearchParams = { returnTo: 'practice' };
-    render(<QuizHistoryScreen />);
-
     fireEvent.press(screen.getByTestId('quiz-history-row-round-guess'));
-
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/quiz/[roundId]',
-      params: { roundId: 'round-guess', returnTo: 'practice' },
+      params: { roundId: 'round-guess' },
     });
+  });
+
+  it('shows loading state', () => {
+    mockUseRecentRounds.mockReturnValue({
+      data: undefined,
+      isLoading: true,
+      isError: false,
+      refetch: jest.fn(),
+    });
+    render(<QuizHistoryScreen />);
+    expect(screen.getByTestId('quiz-history-loading')).toBeTruthy();
+  });
+
+  it('shows empty state with try-quiz CTA', () => {
+    mockUseRecentRounds.mockReturnValue({
+      data: [],
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+    render(<QuizHistoryScreen />);
+    expect(screen.getByTestId('quiz-history-empty')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('quiz-history-try-quiz'));
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/quiz',
+      params: {},
+    });
+  });
+
+  it('shows error state with retry and go-back actions', () => {
+    const refetch = jest.fn();
+    mockUseRecentRounds.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      refetch,
+    });
+    render(<QuizHistoryScreen />);
+    expect(screen.getByTestId('quiz-history-error')).toBeTruthy();
+
+    fireEvent.press(screen.getByTestId('quiz-history-retry'));
+    expect(refetch).toHaveBeenCalled();
+
+    fireEvent.press(screen.getByTestId('quiz-history-go-back'));
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/quiz');
   });
 });

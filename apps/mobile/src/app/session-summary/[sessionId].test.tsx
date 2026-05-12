@@ -44,6 +44,7 @@ jest.mock('@expo/vector-icons', () => ({
 }));
 
 jest.mock('../../lib/theme', () => ({
+  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
   useThemeColors: () => ({
     muted: '#a3a3a3',
     textInverse: '#0f0f0f',

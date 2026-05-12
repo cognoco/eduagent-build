@@ -40,6 +40,17 @@ import {
   type StreamFallbackReason,
 } from '../lib/sse';
 
+function invalidateSessionDerivedQueries(
+  queryClient: ReturnType<typeof useQueryClient>,
+): void {
+  void queryClient.invalidateQueries({ queryKey: ['sessions'] });
+  void queryClient.invalidateQueries({ queryKey: ['progress'] });
+  void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+  void queryClient.invalidateQueries({ queryKey: ['retention'] });
+  void queryClient.invalidateQueries({ queryKey: ['language-progress'] });
+  void queryClient.invalidateQueries({ queryKey: ['resume-nudge'] });
+}
+
 type FilingStatus =
   | 'filing_pending'
   | 'filing_failed'
@@ -136,7 +147,7 @@ export function useStartSession(subjectId: string): UseMutationResult<
       return (await res.json()) as SessionStartResult;
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['sessions'] });
+      invalidateSessionDerivedQueries(queryClient);
     },
   });
 }
@@ -175,7 +186,7 @@ export function useStartFirstCurriculumSession(
       return (await res.json()) as SessionStartResult;
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['sessions'] });
+      invalidateSessionDerivedQueries(queryClient);
     },
   });
 }
@@ -199,7 +210,7 @@ export function useSetSessionInputMode(
       void queryClient.invalidateQueries({
         queryKey: ['session-transcript', sessionId],
       });
-      void queryClient.invalidateQueries({ queryKey: ['sessions'] });
+      invalidateSessionDerivedQueries(queryClient);
     },
   });
 }
@@ -222,7 +233,7 @@ export function useClearContinuationDepth(
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['session', sessionId] });
-      void queryClient.invalidateQueries({ queryKey: ['sessions'] });
+      invalidateSessionDerivedQueries(queryClient);
     },
   });
 }
@@ -247,7 +258,7 @@ export function useSyncHomeworkState(
       return (await res.json()) as { metadata: HomeworkSessionMetadata };
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['sessions'] });
+      invalidateSessionDerivedQueries(queryClient);
     },
   });
 }
@@ -296,7 +307,7 @@ export function useCloseSession(sessionId: string): UseMutationResult<
       return (await res.json()) as unknown as CloseResult;
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['sessions'] });
+      invalidateSessionDerivedQueries(queryClient);
     },
   });
 }
@@ -735,6 +746,7 @@ export function useSubmitSummary(
       void queryClient.invalidateQueries({
         queryKey: ['session-summary', sessionId],
       });
+      invalidateSessionDerivedQueries(queryClient);
     },
   });
 }
@@ -757,6 +769,7 @@ export function useSkipSummary(
       void queryClient.invalidateQueries({
         queryKey: ['session-summary', sessionId],
       });
+      invalidateSessionDerivedQueries(queryClient);
     },
   });
 }

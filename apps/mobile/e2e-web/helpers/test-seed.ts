@@ -16,10 +16,10 @@ export interface ResetResponse {
 }
 
 // [BUG-532] Retry config for Cloudflare rate-limit resilience.
-// Cloudflare WAF returns 403 (not 429) when rate-limiting seed requests
+// Cloudflare WAF can return 403 or 429 when rate-limiting seed requests
 // during parallel Playwright workers.
-const RETRY_MAX_ATTEMPTS = 4;
-const RETRY_BASE_DELAY_MS = 500;
+const RETRY_MAX_ATTEMPTS = 6;
+const RETRY_BASE_DELAY_MS = 1_500;
 const RETRYABLE_STATUSES = new Set([403, 429, 502, 503]);
 
 async function sleep(ms: number): Promise<void> {
@@ -33,7 +33,7 @@ async function sleep(ms: number): Promise<void> {
 async function fetchWithRetry(
   input: RequestInfo | URL,
   init: RequestInit | undefined,
-  action: string
+  action: string,
 ): Promise<Response> {
   // Initialised to a generic Error so the post-loop throw is always typed —
   // overwritten on every retryable failure with the actual status + body.
@@ -58,7 +58,7 @@ async function fetchWithRetry(
 
 async function readJsonOrThrow<T>(
   response: Response,
-  action: string
+  action: string,
 ): Promise<T> {
   if (!response.ok) {
     const detail = await response.text();
@@ -82,14 +82,14 @@ export async function seedScenario(input: {
       },
       body: JSON.stringify(input),
     },
-    `Seeding ${input.scenario}`
+    `Seeding ${input.scenario}`,
   );
 
   return readJsonOrThrow<SeedResponse>(response, `Seeding ${input.scenario}`);
 }
 
 export async function resetSeededAccounts(
-  prefix = seedEmailPrefix
+  prefix = seedEmailPrefix,
 ): Promise<ResetResponse> {
   const url = new URL(`${apiBaseUrl}/v1/__test/reset`);
   if (prefix) {
@@ -102,7 +102,7 @@ export async function resetSeededAccounts(
       method: 'POST',
       headers: buildTestSeedHeaders(),
     },
-    'Resetting seeded accounts'
+    'Resetting seeded accounts',
   );
 
   return readJsonOrThrow<ResetResponse>(response, 'Resetting seeded accounts');

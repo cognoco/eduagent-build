@@ -2,7 +2,7 @@ import { render } from '@testing-library/react-native';
 import { NoteDisplay } from './NoteDisplay';
 
 jest.mock(
-  '../../lib/theme' /* gc1-allow: useThemeColors requires ThemeContext provider; not runnable in unit env */,
+  '../../lib/theme' /* gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM */,
   () => ({
     useThemeColors: () => ({
       textSecondary: '#999',

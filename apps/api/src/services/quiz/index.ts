@@ -1,5 +1,6 @@
 export { QUIZ_CONFIG, formatActivityLabel } from './config';
 export { resolveRoundContent } from './content-resolver';
+export { buildAndGenerateRound } from './orchestrate-round';
 export {
   validateCapitalsRound,
   validateDistractors,

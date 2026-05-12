@@ -10,19 +10,12 @@ const consoleErrorSpy = jest
   .spyOn(console, 'error')
   .mockImplementation(() => undefined);
 
-jest.mock('../client', () => ({
-  inngest: {
-    createFunction: jest.fn(
-      (_opts: unknown, _trigger: unknown, fn: unknown) => {
-        return Object.assign(fn as object, {
-          opts: _opts,
-          trigger: _trigger,
-          fn,
-        });
-      }
-    ),
-  },
-}));
+const { createInngestTransportCapture } =
+  require('../../test-utils/inngest-transport-capture') as typeof import('../../test-utils/inngest-transport-capture');
+
+const mockInngestTransport = createInngestTransportCapture();
+
+jest.mock('../client', () => mockInngestTransport.module); // gc1-allow: inngest framework boundary
 
 import { billingTrialSubscriptionFailed } from './billing-trial-subscription-failed';
 
@@ -58,6 +51,13 @@ describe('billingTrialSubscriptionFailed (BUG-837 / F-SVC-003)', () => {
     expect(trigger).toEqual({
       event: 'app/billing.trial_subscription_failed',
     });
+    expect(mockInngestTransport.functions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          trigger: { event: 'app/billing.trial_subscription_failed' },
+        }),
+      ]),
+    );
   });
 
   it('returns logged status with account metadata and the deferred-retry marker', async () => {

@@ -48,7 +48,7 @@ Two production dead-code branches removed 2026-04-19 in commit `970a82a5`: `AgeB
 - [feedback_parallel_agents.md](feedback_parallel_agents.md) — Parallel agents in same tree, no worktrees. Coordinator commits sequentially.
 - [feedback_fast_iteration.md](feedback_fast_iteration.md) — 60-min feedback loops unacceptable. CI gates, but optimize speed.
 - [feedback_fix_verification_rules.md](feedback_fix_verification_rules.md) — Changed ≠ verified. Break tests, finding IDs, no silent recovery.
-- [feedback_sweep_for_same_bug.md](feedback_sweep_for_same_bug.md) — After fixing a bug, sweep codebase for same pattern. **Direct precursor of CLAUDE.md `Sweep when you fix` rule (added 2026-05-03).**
+- [feedback_sweep_for_same_bug.md](feedback_sweep_for_same_bug.md) — When a bug could be pattern-shaped, sweep the codebase for sibling instances before declaring done. **Direct precursor of CLAUDE.md `Sweep when you fix` rule (added 2026-05-03); strengthened 2026-05-12.**
 - [feedback_just_do_it.md](feedback_just_do_it.md) — Clear action commands = execute immediately, don't gate on confirmations.
 - [feedback_autonomous_speccing.md](feedback_autonomous_speccing.md) — Decide small stuff yourself, only ask on genuinely big trade-offs.
 - [feedback_agents_commit_push.md](feedback_agents_commit_push.md) — Subagents never commit by default; coordinator commits via `/commit`. Exception: user-instructed one-off subagent commits are OK.

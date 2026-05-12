@@ -104,6 +104,7 @@ jest.mock('../common', () => ({
 }));
 
 jest.mock('../../lib/theme', () => ({
+  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
   useThemeColors: () => ({
     textPrimary: '#ffffff',
     textSecondary: '#94a3b8',
@@ -345,9 +346,7 @@ describe('LearnerScreen', () => {
       screen.getByTestId('parent-home-screen');
       screen.getByTestId('parent-home-check-child-child-id');
       screen.getByText('Children');
-      screen.getByText(
-        '24 min this week · Ready to start · up from 5 last week',
-      );
+      screen.getByText('Ready to start · 24 min this week');
     });
   });
 
@@ -721,7 +720,7 @@ describe('LearnerScreen', () => {
     fireEvent.press(screen.getByTestId('home-subject-card-sub-1'));
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/progress/[subjectId]',
-      params: { subjectId: 'sub-1' },
+      params: { subjectId: 'sub-1', returnTo: 'learner-home' },
     });
   });
 
@@ -750,7 +749,7 @@ describe('LearnerScreen', () => {
     fireEvent.press(screen.getByTestId('home-subject-card-sub-1'));
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/progress/[subjectId]',
-      params: { subjectId: 'sub-1' },
+      params: { subjectId: 'sub-1', returnTo: 'learner-home' },
     });
   });
 
@@ -770,7 +769,10 @@ describe('LearnerScreen', () => {
 
     await waitFor(() => screen.getByTestId('home-add-first-subject'));
     fireEvent.press(screen.getByTestId('home-add-first-subject'));
-    expect(mockPush).toHaveBeenCalledWith('/create-subject');
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/create-subject',
+      params: { returnTo: 'learner-home' },
+    });
   });
 
   it('shows withdrawal-countdown-banner when a child has withdrawn consent within the grace period', async () => {
@@ -824,6 +826,9 @@ describe('LearnerScreen', () => {
 
     await waitFor(() => screen.getByTestId('home-add-subject-tile'));
     fireEvent.press(screen.getByTestId('home-add-subject-tile'));
-    expect(mockPush).toHaveBeenCalledWith('/create-subject');
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/create-subject',
+      params: { returnTo: 'learner-home' },
+    });
   });
 });

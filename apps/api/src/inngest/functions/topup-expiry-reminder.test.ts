@@ -60,15 +60,9 @@ interface TopupExpiryResult {
   timestamp: string;
 }
 
-interface TopupMockStep {
-  run: jest.Mock;
-  sendEvent: jest.Mock;
-  sleep: jest.Mock;
-}
-
 async function executeSteps(): Promise<{
   result: TopupExpiryResult;
-  mockStep: TopupMockStep;
+  mockStep: { run: jest.Mock; sendEvent: jest.Mock; sleep: jest.Mock };
   stepResults: Record<string, unknown>;
 }> {
   const stepResults: Record<string, unknown> = {};
@@ -221,7 +215,7 @@ describe('topupExpiryReminder', () => {
       const { result } = await executeSteps();
       // Cron must still resolve cleanly even though the clock is invalid —
       // not throw a RangeError up to Inngest.
-      expect((result as { status: string }).status).toBe('completed');
+      expect(result.status).toBe('completed');
     } finally {
       global.Date = originalDate;
     }
@@ -265,7 +259,7 @@ describe('topupExpiryReminder', () => {
       const { result } = await executeSteps();
       // Cron must still resolve cleanly even though the clock is invalid —
       // not throw a RangeError up to Inngest.
-      expect((result as { status: string }).status).toBe('completed');
+      expect(result.status).toBe('completed');
     } finally {
       global.Date = originalDate;
     }

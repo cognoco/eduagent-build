@@ -29,6 +29,7 @@ jest.mock('expo-router', () => ({
 }));
 
 jest.mock('../lib/theme', () => ({
+  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
   useThemeColors: () => ({
     muted: '#999',
   }),

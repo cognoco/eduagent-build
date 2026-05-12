@@ -1,13 +1,10 @@
 import { Pressable, ScrollView, Text, View } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useCallback } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { useQueryClient } from '@tanstack/react-query';
-import type { KnowledgeInventory } from '@eduagent/schemas';
 
-import { useProfile } from '../../../lib/profile';
-import { isNewLearner } from '../../../lib/progressive-disclosure';
 import { useLearnerProfile } from '../../../hooks/use-learner-profile';
 import { ACCOMMODATION_OPTIONS } from '../../../lib/accommodation-options';
 import { goBackOrReplace } from '../../../lib/navigation';
@@ -20,16 +17,6 @@ export default function LearningPreferencesScreen(): React.ReactElement {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { t } = useTranslation();
-  const { activeProfile } = useProfile();
-  const queryClient = useQueryClient();
-
-  const cachedInventory = queryClient.getQueryData<KnowledgeInventory>([
-    'progress',
-    'inventory',
-    activeProfile?.id,
-  ]);
-  const hideMentorMemory = isNewLearner(cachedInventory?.global.totalSessions);
-
   const { data: learnerProfile } = useLearnerProfile();
 
   const activeOption = ACCOMMODATION_OPTIONS.find(
@@ -45,12 +32,12 @@ export default function LearningPreferencesScreen(): React.ReactElement {
       <View className="px-5 pt-4 pb-2 flex-row items-center">
         <Pressable
           onPress={handleBack}
-          className="me-3 py-2 pe-2"
+          className="me-3 p-2 min-h-[44px] min-w-[44px] items-center justify-center"
           accessibilityRole="button"
           accessibilityLabel={t('common.goBack')}
           testID="learning-preferences-back"
         >
-          <Text className="text-primary text-body font-semibold">{'←'}</Text>
+          <Ionicons name="arrow-back" size={24} className="text-primary" />
         </Pressable>
         <Text className="text-h2 font-bold text-text-primary">
           {t('more.learningPreferences.screenTitle')}
@@ -72,24 +59,6 @@ export default function LearningPreferencesScreen(): React.ReactElement {
           onPress={() => router.push('/(app)/more/accommodation')}
           testID="accommodation-link"
         />
-
-        {!hideMentorMemory ? (
-          <>
-            <SectionHeader testID="mentor-memory-section-header">
-              {t('more.mentorMemory.sectionHeader')}
-            </SectionHeader>
-            <SettingsRow
-              label={t('more.mentorMemory.viewAndManage')}
-              description={t('more.mentorMemory.viewAndManageDescription')}
-              onPress={() =>
-                router.push(
-                  '/(app)/mentor-memory?returnTo=learning-preferences',
-                )
-              }
-              testID="mentor-memory-link"
-            />
-          </>
-        ) : null}
       </ScrollView>
     </View>
   );

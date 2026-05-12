@@ -80,14 +80,9 @@ interface QuotaResetResult {
   timestamp: string;
 }
 
-interface QuotaResetMockStep {
-  run: jest.Mock;
-  sleep: jest.Mock;
-}
-
 async function executeSteps(): Promise<{
   result: QuotaResetResult;
-  mockStep: QuotaResetMockStep;
+  mockStep: { run: jest.Mock; sleep: jest.Mock };
   stepResults: Record<string, unknown>;
 }> {
   const stepResults: Record<string, unknown> = {};

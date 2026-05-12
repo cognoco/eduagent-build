@@ -62,15 +62,16 @@ interface SeedInput {
 }
 
 function Seed({ round, completionResult, returnTo = null }: SeedInput): null {
-  const { setRound, setActivityType, setCompletionResult, setReturnTo } =
-    useQuizFlow();
+  const flow = useQuizFlow() as ReturnType<typeof useQuizFlow> & {
+    setReturnTo?: (value: string | null) => void;
+  };
   const seeded = React.useRef(false);
   if (!seeded.current) {
     seeded.current = true;
-    setActivityType(round.activityType);
-    setReturnTo(returnTo);
-    setRound(round);
-    setCompletionResult(completionResult);
+    flow.setActivityType(round.activityType);
+    flow.setReturnTo?.(returnTo);
+    flow.setRound(round);
+    flow.setCompletionResult(completionResult);
   }
   return null;
 }

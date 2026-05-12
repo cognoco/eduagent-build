@@ -1,11 +1,12 @@
 import { Pressable, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import type { QuotaExceededDetails } from '../../lib/api-client';
 
 export interface QuotaExceededCardProps {
   details: QuotaExceededDetails;
   isOwner: boolean;
+  homeHref?: Href;
 }
 
 /**
@@ -14,6 +15,7 @@ export interface QuotaExceededCardProps {
 export function QuotaExceededCard({
   details,
   isOwner,
+  homeHref = '/(app)/home' as Href,
 }: QuotaExceededCardProps): React.ReactElement {
   const router = useRouter();
   const { t } = useTranslation();
@@ -93,7 +95,7 @@ export function QuotaExceededCard({
 
           {/* H5: Give child a navigation escape so they're not stuck in the locked session */}
           <Pressable
-            onPress={() => router.push('/(app)/home' as never)}
+            onPress={() => router.push(homeHref as never)}
             className="bg-surface-elevated rounded-button py-3 items-center min-h-[44px] justify-center"
             accessibilityRole="button"
             accessibilityLabel={t('common.goHome')}

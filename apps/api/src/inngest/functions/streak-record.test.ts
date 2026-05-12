@@ -1,4 +1,5 @@
 import { NonRetriableError } from 'inngest';
+import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 import { streakRecord } from './streak-record';
 
 const mockGetStepDatabase = jest.fn();
@@ -16,13 +17,6 @@ jest.mock(
       mockRecordSessionActivity(...args),
   }),
 );
-
-function createMockStep() {
-  return {
-    run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
-    sendEvent: jest.fn().mockResolvedValue(undefined),
-  };
-}
 
 const handler = (streakRecord as any).fn;
 
@@ -68,7 +62,7 @@ describe('streakRecord', () => {
   });
 
   it('throws NonRetriableError on missing payload', async () => {
-    const step = createMockStep();
+    const { step } = createInngestStepRunner();
     await expect(handler({ event: { data: {} }, step })).rejects.toThrow(
       NonRetriableError,
     );
@@ -76,7 +70,7 @@ describe('streakRecord', () => {
   });
 
   it('throws NonRetriableError when profileId is not a UUID', async () => {
-    const step = createMockStep();
+    const { step } = createInngestStepRunner();
     await expect(
       handler({
         event: { data: validPayload({ profileId: 'not-a-uuid' }) },
@@ -86,7 +80,7 @@ describe('streakRecord', () => {
   });
 
   it('throws NonRetriableError when date is not YYYY-MM-DD', async () => {
-    const step = createMockStep();
+    const { step } = createInngestStepRunner();
     await expect(
       handler({
         event: {
@@ -98,7 +92,7 @@ describe('streakRecord', () => {
   });
 
   it('records activity and returns streak on valid payload', async () => {
-    const step = createMockStep();
+    const { step } = createInngestStepRunner();
     const result = await handler({
       event: { data: validPayload() },
       step,
@@ -117,12 +111,9 @@ describe('streakRecord', () => {
   });
 
   it('calls getStepDatabase inside the step.run closure', async () => {
-    const step = createMockStep();
+    const { step, runCalls } = createInngestStepRunner();
     await handler({ event: { data: validPayload() }, step });
     expect(mockGetStepDatabase).toHaveBeenCalledTimes(1);
-    expect(step.run).toHaveBeenCalledWith(
-      'record-activity',
-      expect.any(Function),
-    );
+    expect(runCalls).toEqual([{ name: 'record-activity' }]);
   });
 });

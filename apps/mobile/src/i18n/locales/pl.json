@@ -187,6 +187,7 @@
         "cta": "Add your first child"
       },
       "childrenHeader": "Children",
+      "familyManagementHeader": "Zarządzanie rodziną",
       "familyToolsHeader": "Family tools",
       "childCard": {
         "statusLine": "{{activity}} · {{focus}} · {{signal}}",
@@ -299,10 +300,11 @@
       "screenTitle": "Dostosowanie nauki",
       "notSureWhichToPick": "Nie wiesz, które wybrać?",
       "guideActive": "Aktywny",
-      "childScreenTitle": "Dostosowanie nauki — {{name}}"
+      "childScreenTitle": "Preferencje nauki — {{name}}"
     },
     "learningPreferences": {
-      "rowLabel": "Preferencje nauki",
+      "sectionHeader": "Twoja nauka",
+      "rowLabel": "Preferencje",
       "screenTitle": "Preferencje nauki"
     },
     "mentorMemory": {
@@ -325,8 +327,8 @@
       "viewPlans": "Zobacz plany",
       "profileLimitTitle": "Osiągnięto limit profili",
       "profileLimitMessage": "Twój plan {{plan}} obsługuje do {{max}} profili.",
-      "breakdownSharingTitle": "Share usage breakdown with family",
-      "breakdownSharingDescription": "Let everyone in your family see how each profile uses the family pool. Children only see the breakdown when this is on.",
+      "breakdownSharingTitle": "Udostępnij użycie rodziny",
+      "breakdownSharingDescription": "Pokaż użycie profili.",
       "breakdownSharingError": "Couldn't update setting. Try again."
     },
     "celebrations": {
@@ -672,7 +674,8 @@
         "rateLimited": "Zbyt wiele żądań — poczekaj chwilę i spróbuj ponownie.",
         "validationError": "Coś poszło nie tak. Spróbuj innej aktywności.",
         "genericShort": "Coś poszło nie tak. Spróbuj ponownie!"
-      }
+      },
+      "buildingRound": "Tworzenie rundy"
     },
     "round": {
       "goBack": "Wróć",
@@ -709,6 +712,53 @@
         "guessWho": "Zgadnij kto to",
         "vocabulary": "Słownictwo"
       }
+    },
+    "play": {
+      "noRoundTitle": "Nie wczytano rundy",
+      "noRoundBody": "Coś poszło nie tak podczas wczytywania rundy quizu. Możesz spróbować ponownie lub wrócić do strony głównej quizu.",
+      "malformedTitle": "Nie udało się wczytać tej rundy",
+      "malformedBody": "Nie otrzymaliśmy opcji odpowiedzi do tego pytania. Spróbuj nowej rundy lub wróć za chwilę.",
+      "backToQuizHome": "Powrót do quizu",
+      "titleGuessWho": "Kto jest kim",
+      "titleCapitals": "Stolice",
+      "titleVocabulary": "Słownictwo",
+      "quitLabel": "Zakończ quiz",
+      "answerCheckFailed": "Sprawdzanie odpowiedzi nie powiodło się — wynik może być niedokładny",
+      "capitalPrompt": "Jaka jest stolica...",
+      "translatePrompt": "Przetłumacz:",
+      "guessWhoPrompt": "Kto to jest?",
+      "checking": "Sprawdzam...",
+      "typeYourAnswer": "Wpisz swoją odpowiedź",
+      "typeYourAnswerPlaceholder": "Wpisz swoją odpowiedź...",
+      "submit": "Wyślij",
+      "foundThemClues_one": "Zgadłeś po {{count}} wskazówce!",
+      "foundThemClues_other": "Zgadłeś po {{count}} wskazówkach!",
+      "discoveredIt": "Odkryłeś to!",
+      "savedReady": "Zapisano. Gotowe, kiedy chcesz.",
+      "savingResult": "Zapisuję Twój wynik...",
+      "lockedIn": "Zatwierdzone. Dobre znalezisko.",
+      "goodTry": "Dobra próba.",
+      "theAnswerWas": "Prawidłowa odpowiedź to ",
+      "readyForNext": "Gotowy na następne",
+      "correct": "Prawidłowo",
+      "notQuite": "Niezupełnie",
+      "seeResults": "Zobacz wyniki",
+      "oneMore": "Czekaj, jeszcze jedno!",
+      "savingRound": "Zapisuję rundę...",
+      "nextQuestion": "Następne pytanie",
+      "notQuiteRight": "Nie do końca dobrze?",
+      "disputeNoted": "Zanotowano — sprawdzimy to",
+      "scoringRound": "Oceniam rundę...",
+      "couldNotSave": "Nie udało się zapisać rundy",
+      "exit": "Wyjdź",
+      "pauseHere": "Wstrzymać?",
+      "leaveQuiz": "Opuścić ten quiz?",
+      "pauseBody": "Odpowiedziałeś na część pytań w tej rundzie. Zapisz ją teraz lub wróć, by odpowiedzieć na jeszcze jedno.",
+      "leaveBody": "Brak odpowiedzi, więc nie ma czego zapisywać.",
+      "keepPlaying": "Graj dalej",
+      "saveAndFinish": "Zapisz i zakończ",
+      "leaveWithoutSaving": "Wyjdź bez zapisywania",
+      "leaveQuizButton": "Opuść quiz"
     }
   },
   "dictation": {

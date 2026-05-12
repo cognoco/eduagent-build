@@ -9,7 +9,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { platformAlert } from '../../../lib/platform-alert';
 import { classifyApiError } from '../../../lib/format-api-error';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ErrorFallback, TrackedView } from '../../../components/common';
@@ -156,61 +156,6 @@ function LoadingBlock(): React.ReactElement {
   );
 }
 
-function ProgressLoadingFallback({
-  onRetry,
-  onGoHome,
-}: {
-  onRetry: () => void;
-  onGoHome: () => void;
-}): React.ReactElement {
-  const { t } = useTranslation();
-  const [loadTimedOut, setLoadTimedOut] = useState(false);
-
-  useEffect(() => {
-    const timeout = setTimeout(() => setLoadTimedOut(true), 15000);
-    return () => clearTimeout(timeout);
-  }, []);
-
-  if (loadTimedOut) {
-    return (
-      <ErrorFallback
-        title={t('progress.loadTimeout.title')}
-        message={t('progress.loadTimeout.message')}
-        primaryAction={{
-          label: t('common.tryAgain'),
-          onPress: onRetry,
-          testID: 'progress-loading-retry',
-        }}
-        secondaryAction={{
-          label: t('common.goHome'),
-          onPress: onGoHome,
-          testID: 'progress-loading-home',
-        }}
-        testID="progress-loading-timeout"
-      />
-    );
-  }
-
-  return (
-    <>
-      <View
-        className="bg-coaching-card rounded-card p-5"
-        testID="progress-loading-state"
-      >
-        <Text className="text-h3 font-semibold text-text-primary">
-          {t('progress.loadingTitle')}
-        </Text>
-        <Text className="text-body text-text-secondary mt-2">
-          {t('common.loading')}
-        </Text>
-      </View>
-      <View className="mt-4">
-        <LoadingBlock />
-      </View>
-    </>
-  );
-}
-
 export default function ProgressScreen(): React.ReactElement {
   const { t } = useTranslation();
   const role = useActiveProfileRole();
@@ -273,6 +218,7 @@ export default function ProgressScreen(): React.ReactElement {
   const milestonesQuery = useProgressMilestones(5);
   const subjectsQuery = useSubjects();
   const refreshSnapshot = useRefreshProgressSnapshot();
+  const hasFocusedOnceRef = useRef(false);
 
   const inventory = inventoryQuery.data;
   const hero = heroCopy(
@@ -289,26 +235,55 @@ export default function ProgressScreen(): React.ReactElement {
     () => buildGrowthData(historyQuery.data ?? undefined),
     [historyQuery.data],
   );
+  const refetchInventory = inventoryQuery.refetch;
+  const refetchHistory = historyQuery.refetch;
+  const refetchMilestones = milestonesQuery.refetch;
+  const refetchMonthlyReports = monthlyReportsQuery.refetch;
+  const refetchWeeklyReports = weeklyReportsQuery.refetch;
 
-  const handleRefresh = async () => {
-    if (isViewingSelf) {
-      try {
-        await refreshSnapshot.mutateAsync();
-      } catch (err) {
-        const message =
-          err instanceof Error ? err.message : t('progress.refreshFailed');
-        platformAlert(t('progress.refreshFailedTitle'), message);
+  const handleRefresh = useCallback(
+    async (options?: { alertOnError?: boolean }) => {
+      if (isViewingSelf) {
+        try {
+          await refreshSnapshot.mutateAsync();
+        } catch (err) {
+          if (options?.alertOnError !== false) {
+            const message =
+              err instanceof Error ? err.message : t('progress.refreshFailed');
+            platformAlert(t('progress.refreshFailedTitle'), message);
+          }
+        }
       }
-    }
 
-    await Promise.all([
-      inventoryQuery.refetch(),
-      historyQuery.refetch(),
-      monthlyReportsQuery.refetch(),
-      weeklyReportsQuery.refetch(),
-      ...(isViewingSelf ? [milestonesQuery.refetch()] : []),
-    ]);
-  };
+      await Promise.all([
+        refetchInventory(),
+        refetchHistory(),
+        refetchMonthlyReports(),
+        refetchWeeklyReports(),
+        ...(isViewingSelf ? [refetchMilestones()] : []),
+      ]);
+    },
+    [
+      isViewingSelf,
+      refetchHistory,
+      refetchInventory,
+      refetchMilestones,
+      refetchMonthlyReports,
+      refetchWeeklyReports,
+      refreshSnapshot,
+      t,
+    ],
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!hasFocusedOnceRef.current) {
+        hasFocusedOnceRef.current = true;
+        return;
+      }
+      void handleRefresh({ alertOnError: false });
+    }, [handleRefresh]),
+  );
 
   const handleGlobalResume = useCallback(() => {
     if (resumeTargetQuery.data) {
@@ -325,6 +300,16 @@ export default function ProgressScreen(): React.ReactElement {
   // defaults below render "You've mastered 0 topics" as if the user had
   // a clean slate, which is indistinguishable from an offline/500 error.
   const isError = inventoryQuery.isError;
+
+  const [loadTimedOut, setLoadTimedOut] = useState(false);
+  useEffect(() => {
+    if (!isLoading) {
+      setLoadTimedOut(false);
+      return;
+    }
+    const timer = setTimeout(() => setLoadTimedOut(true), 15_000);
+    return () => clearTimeout(timer);
+  }, [isLoading]);
   const isEmpty =
     !!inventory &&
     inventory.global.totalSessions === 0 &&
@@ -416,10 +401,25 @@ export default function ProgressScreen(): React.ReactElement {
         ) : null}
 
         {isLoading ? (
-          <ProgressLoadingFallback
-            onRetry={() => void inventoryQuery.refetch()}
-            onGoHome={() => router.push('/(app)/home' as never)}
-          />
+          loadTimedOut ? (
+            <ErrorFallback
+              title={t('progress.error.loadTitle')}
+              message={t('progress.error.loadMessageNetwork')}
+              primaryAction={{
+                label: t('common.tryAgain'),
+                onPress: () => void inventoryQuery.refetch(),
+                testID: 'progress-loading-retry',
+              }}
+              secondaryAction={{
+                label: t('progress.error.goHome'),
+                onPress: () => router.push('/(app)/home' as never),
+                testID: 'progress-loading-home',
+              }}
+              testID="progress-loading-timeout"
+            />
+          ) : (
+            <LoadingBlock />
+          )
         ) : isError && !inventory ? (
           <ErrorFallback
             title={t('progress.error.loadTitle')}
