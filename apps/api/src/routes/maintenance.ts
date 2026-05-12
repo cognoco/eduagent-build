@@ -37,9 +37,8 @@ async function verifyMaintenanceSecret(c: {
   return constantTimeEqual(provided, expected);
 }
 
-export const maintenanceRoutes = new Hono<MaintenanceEnv>().post(
-  '/maintenance/memory-facts-backfill',
-  async (c) => {
+export const maintenanceRoutes = new Hono<MaintenanceEnv>()
+  .post('/maintenance/memory-facts-backfill', async (c) => {
     if (!(await verifyMaintenanceSecret(c))) {
       return c.json(
         {
@@ -59,5 +58,25 @@ export const maintenanceRoutes = new Hono<MaintenanceEnv>().post(
     });
 
     return c.json({ queued: true });
-  },
-);
+  })
+  .post('/maintenance/progress-self-reports-backfill', async (c) => {
+    if (!(await verifyMaintenanceSecret(c))) {
+      return c.json(
+        {
+          code: ERROR_CODES.FORBIDDEN,
+          message: 'Maintenance secret required',
+        },
+        403,
+      );
+    }
+
+    await inngest.send({
+      name: 'admin/progress-self-reports-backfill.requested',
+      data: {
+        requestedAt: new Date().toISOString(),
+        environment: c.env.ENVIRONMENT ?? 'unknown',
+      },
+    });
+
+    return c.json({ queued: true });
+  });

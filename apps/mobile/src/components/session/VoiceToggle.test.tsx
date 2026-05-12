@@ -5,12 +5,15 @@ import { VoiceToggle } from './VoiceToggle';
 // Mocks — external boundaries only
 // ---------------------------------------------------------------------------
 
-jest.mock('../../lib/theme', () => ({
-  useThemeColors: () => ({
-    muted: '#888',
-    primary: '#007AFF',
+jest.mock(
+  '../../lib/theme' /* gc1-allow: useThemeColors requires ThemeContext provider; not runnable in unit env */,
+  () => ({
+    useThemeColors: () => ({
+      muted: '#888',
+      primary: '#007AFF',
+    }),
   }),
-}));
+);
 
 jest.mock('@expo/vector-icons', () => {
   const { Text } = require('react-native');

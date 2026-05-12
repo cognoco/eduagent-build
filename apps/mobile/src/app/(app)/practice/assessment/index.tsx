@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { View, Text } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -18,6 +18,8 @@ import { goBackOrReplace } from '../../../../lib/navigation';
 import { platformAlert } from '../../../../lib/platform-alert';
 import { Button } from '../../../../components/common/Button';
 import { ErrorFallback } from '../../../../components/common/ErrorFallback';
+import { RewardBurst } from '../../../../components/common/RewardBurst';
+import { hapticSuccess } from '../../../../lib/haptics';
 import { isAssessmentReadinessReply } from './assessment-readiness';
 
 export default function AssessmentScreen() {
@@ -122,6 +124,14 @@ export default function AssessmentScreen() {
       t,
     ],
   );
+
+  const passedAssessment = terminalResult?.status === 'passed';
+
+  useEffect(() => {
+    if (passedAssessment) {
+      hapticSuccess();
+    }
+  }, [passedAssessment]);
 
   if (!subjectId || !topicId) {
     return (
@@ -255,40 +265,50 @@ export default function AssessmentScreen() {
   ) : null;
 
   return (
-    <ChatShell
-      title={t('assessment.title')}
-      messages={messages}
-      onSend={handleSend}
-      isStreaming={isStreaming}
-      inputDisabled={!!terminalResult}
-      footer={
-        resultCard ??
-        (lastError ? (
-          <ErrorFallback
-            variant="card"
-            message={lastError}
-            primaryAction={{
-              label: t('common.tryAgain'),
-              testID: 'assessment-error-retry',
-              // [UX-DE-H3] Disable retry while streaming to prevent double-submit
-              // on rapid taps during an in-flight answer check.
-              disabled: isStreaming,
-              onPress: () => {
-                if (lastUserText) {
-                  void handleSend(lastUserText);
-                } else {
-                  setLastError(null);
-                }
-              },
-            }}
-            secondaryAction={{
-              label: t('common.goHome'),
-              testID: 'assessment-error-home',
-              onPress: () => goBackOrReplace(router, '/(app)/home' as const),
-            }}
-          />
-        ) : undefined)
-      }
-    />
+    <View className="flex-1">
+      <ChatShell
+        title={t('assessment.title')}
+        messages={messages}
+        onSend={handleSend}
+        isStreaming={isStreaming}
+        inputDisabled={!!terminalResult}
+        footer={
+          resultCard ??
+          (lastError ? (
+            <ErrorFallback
+              variant="card"
+              message={lastError}
+              primaryAction={{
+                label: t('common.tryAgain'),
+                testID: 'assessment-error-retry',
+                // [UX-DE-H3] Disable retry while streaming to prevent double-submit
+                // on rapid taps during an in-flight answer check.
+                disabled: isStreaming,
+                onPress: () => {
+                  if (lastUserText) {
+                    void handleSend(lastUserText);
+                  } else {
+                    setLastError(null);
+                  }
+                },
+              }}
+              secondaryAction={{
+                label: t('common.goHome'),
+                testID: 'assessment-error-home',
+                onPress: () => goBackOrReplace(router, '/(app)/home' as const),
+              }}
+            />
+          ) : undefined)
+        }
+      />
+      {passedAssessment ? (
+        <RewardBurst
+          variant="assessment"
+          intensity="hero"
+          message={t('assessment.passedMessage', { mastery: masteryPercent })}
+          testID="assessment-pass-celebration"
+        />
+      ) : null}
+    </View>
   );
 }

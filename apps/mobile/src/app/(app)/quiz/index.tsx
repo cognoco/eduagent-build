@@ -107,6 +107,7 @@ export default function QuizIndexScreen(): React.ReactElement {
     setActivityType,
     setSubjectId,
     setLanguageName,
+    setReturnTo,
     setRound,
     setPrefetchedRoundId,
     setCompletionResult,
@@ -118,6 +119,7 @@ export default function QuizIndexScreen(): React.ReactElement {
         subject.languageCode &&
         subject.status === 'active',
     ) ?? [];
+  const isPracticeReturn = returnTo === 'practice';
 
   const capitalsStats = stats?.find((stat) => stat.activityType === 'capitals');
   const capitalsSubtitle =
@@ -153,12 +155,18 @@ export default function QuizIndexScreen(): React.ReactElement {
     setActivityType('vocabulary');
     setSubjectId(subjectId);
     setLanguageName(languageName);
+    setReturnTo(isPracticeReturn ? 'practice' : null);
     setRound(null);
     setPrefetchedRoundId(null);
     setCompletionResult(null);
     router.push('/(app)/quiz/launch' as never);
   };
   const handleBack = () => {
+    if (isPracticeReturn) {
+      router.replace('/(app)/practice' as never);
+      return;
+    }
+
     if (returnTo) {
       router.replace(homeHrefForReturnTo(returnTo) as never);
       return;
@@ -243,6 +251,7 @@ export default function QuizIndexScreen(): React.ReactElement {
               setActivityType('capitals');
               setSubjectId(null);
               setLanguageName(null);
+              setReturnTo(isPracticeReturn ? 'practice' : null);
               setRound(null);
               setPrefetchedRoundId(null);
               setCompletionResult(null);
@@ -293,6 +302,7 @@ export default function QuizIndexScreen(): React.ReactElement {
               setActivityType('guess_who');
               setSubjectId(null);
               setLanguageName(null);
+              setReturnTo(isPracticeReturn ? 'practice' : null);
               setRound(null);
               setPrefetchedRoundId(null);
               setCompletionResult(null);

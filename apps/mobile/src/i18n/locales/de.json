@@ -199,7 +199,7 @@
         "needsEncouragement": "needs encouragement",
         "steady": "steady",
         "progressAction": "Progress",
-        "recapAction": "Recap",
+        "reportsAction": "Berichte",
         "nudgeAction": "Nudge"
       }
     }
@@ -897,6 +897,12 @@
       "title": "Notizoptionen",
       "deleteTitle": "Notiz löschen",
       "deleteMessage": "Bist du sicher, dass du diese Notiz löschen möchtest?"
+    },
+    "nextAction": {
+      "title": "Mit {{subject}} weitermachen",
+      "message": "Öffne das Regal, wähle das nächste Buch oder wiederhole, was fällig ist.",
+      "cta": "Öffnen",
+      "accessibilityLabel": "Mit {{subject}} weitermachen"
     }
   },
   "topic": {
@@ -1117,7 +1123,10 @@
     "studiedToday": "Heute gelernt",
     "studiedYesterday": "Gestern gelernt",
     "studiedDaysAgo": "Vor {{count}} Tagen gelernt",
-    "topicPassedNote": "Gut gemacht - dieses Thema ist als bestanden markiert, und Schwachstellen kommen in der Wiederholung zurück, wenn sie Aufmerksamkeit brauchen."
+    "topicPassedNote": "Gut gemacht - dieses Thema ist als bestanden markiert, und Schwachstellen kommen in der Wiederholung zurück, wenn sie Aufmerksamkeit brauchen.",
+    "pickerLoadingBody": "Wir prüfen, welche Themen für einen fairen Test bereit sind.",
+    "pickerLoadTimeoutTitle": "Das Laden der Testthemen dauert zu lange",
+    "pickerLoadTimeoutMessage": "Prüfe deine Verbindung, versuche es erneut oder gehe zurück."
   },
   "homework": {
     "permissionTitle": "Kamerazugriff benötigt",
@@ -1290,7 +1299,9 @@
     },
     "empty": {
       "title": "Starte deine erste Sitzung",
-      "subtitle": "Starte deine erste Sitzung, um hier deinen Fortschritt zu sehen"
+      "subtitle": "Starte deine erste Sitzung, um hier deinen Fortschritt zu sehen",
+      "withSubjectTitle": "Lerne {{subject}}, um deinen Fortschritt freizuschalten",
+      "withSubjectSubtitle": "Lerne zuerst ein Thema in {{subject}}. Sitzungen, Meisterschaft und Wiederholungen werden hier angezeigt, sobald es etwas zu messen gibt."
     },
     "error": {
       "loadTitle": "Wir konnten deinen Fortschritt nicht laden",
@@ -1439,7 +1450,9 @@
       "title": "Vergangene Gespräche",
       "empty": "Noch keine Gespräche",
       "untitledTopic": "Unbenanntes Thema",
-      "openSessionFrom": "Sitzung von {{date}} öffnen"
+      "openSessionFrom": "Sitzung von {{date}} öffnen",
+      "loadingTooLong": "Das Laden der Konversationen dauert zu lange",
+      "loadingMessage": "Prüfe deine Verbindung und versuche es erneut oder gehe zurück zum Fachfortschritt."
     },
     "retention": {
       "strong": {
@@ -1477,6 +1490,11 @@
       "title": "Previous reports",
       "subtitle": "Weekly and monthly snapshots from your learning.",
       "viewAll": "View all reports"
+    },
+    "loadingTitle": "Deine Lernreise wird geladen",
+    "loadTimeout": {
+      "title": "Das Laden des Fortschritts dauert zu lange",
+      "message": "Prüfe deine Verbindung, versuche es erneut oder gehe zur Startseite."
     }
   },
   "onboarding": {
@@ -2159,6 +2177,10 @@
       "purchaseConfirmedBody": "Your subscription is being activated. It usually appears within a minute — pull down to refresh.",
       "topUpTitle": "Top-up",
       "topUpBody": "500 additional credits have been added!"
+    },
+    "web": {
+      "plansOnMobile": "Abonnements sind in der mobilen App verfügbar",
+      "storePurchaseUnavailable": "Store-Käufe sind auf diesem Gerät nicht verfügbar."
     }
   },
   "sessionSummary": {
@@ -2241,7 +2263,8 @@
       "afterFinishTopic": "Verfügbar, nachdem du ein Thema abgeschlossen hast",
       "hintOpenPicker": "Öffnet die Testauswahl",
       "hintOpenLibrary": "Öffnet die Bibliothek",
-      "couldNotLoad": "Testthemen konnten nicht geladen werden"
+      "couldNotLoad": "Testthemen konnten nicht geladen werden",
+      "studySubjectFirst": "Lerne zuerst {{subject}}, um dies freizuschalten"
     },
     "quiz": {
       "title": "Schnellquiz",

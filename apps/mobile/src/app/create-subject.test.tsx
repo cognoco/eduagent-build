@@ -214,35 +214,37 @@ describe('CreateSubjectScreen', () => {
 
     screen.getByTestId('subject-options');
 
-    // "Math" starter row is present and tappable
-    const mathChip = screen.getByTestId('subject-start-math');
-    expect(mathChip).toBeTruthy();
+    // Concrete starter rows are present and tappable.
+    const fractionsChip = screen.getByTestId('subject-start-fractions');
+    expect(fractionsChip).toBeTruthy();
 
     // Tapping fills the name input
-    fireEvent.press(mathChip);
-    expect(screen.getByTestId('create-subject-name').props.value).toBe('Math');
+    fireEvent.press(fractionsChip);
+    expect(screen.getByTestId('create-subject-name').props.value).toBe(
+      'Fractions',
+    );
   });
 
   it('tapping a chip immediately triggers resolveInput', async () => {
     setResolveResponse({
       status: 'direct_match',
-      resolvedName: 'Math',
+      resolvedName: 'Fractions',
       suggestions: [],
-      displayMessage: 'Math it is.',
+      displayMessage: 'Fractions it is.',
     });
     createSubjectResponse = {
-      subject: { id: 'subject-math', name: 'Math' },
+      subject: { id: 'subject-fractions', name: 'Fractions' },
     };
 
     render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
-    fireEvent.press(screen.getByTestId('subject-start-math'));
+    fireEvent.press(screen.getByTestId('subject-start-fractions'));
 
     await waitFor(() => {
       const resolveCalls = fetchCallsMatching(mockFetch, '/subjects/resolve');
       expect(resolveCalls.length).toBeGreaterThanOrEqual(1);
       const body = extractJsonBody<{ rawInput: string }>(resolveCalls[0]?.init);
-      expect(body?.rawInput).toBe('Math');
+      expect(body?.rawInput).toBe('Fractions');
     });
   });
 
@@ -626,7 +628,7 @@ describe('CreateSubjectScreen', () => {
 
     render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
-    fireEvent.press(screen.getByTestId('subject-start-science'));
+    fireEvent.press(screen.getByTestId('subject-start-how plants grow'));
 
     await waitFor(() => {
       screen.getByTestId('subject-suggestion-option-0');

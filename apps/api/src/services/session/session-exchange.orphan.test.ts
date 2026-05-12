@@ -28,8 +28,8 @@ describe('orphan persistence — unit/boundary tests [INTERACTION-DUR-L2]', () =
           'attacker-profile',
           'sess-victim',
           'injected message',
-          { clientId: 'c-1', orphanReason: 'llm_stream_error' }
-        )
+          { clientId: 'c-1', orphanReason: 'llm_stream_error' },
+        ),
       ).rejects.toBeInstanceOf(ForbiddenError);
       expect(mockDb.insert).not.toHaveBeenCalled();
     });
@@ -47,7 +47,7 @@ describe('orphan persistence — unit/boundary tests [INTERACTION-DUR-L2]', () =
         persistUserMessageOnly(mockDb, 'p', 'nonexistent', 'msg', {
           clientId: 'c-1',
           orphanReason: 'llm_stream_error',
-        })
+        }),
       ).rejects.toBeInstanceOf(ForbiddenError);
       expect(mockDb.insert).not.toHaveBeenCalled();
     });
@@ -61,7 +61,7 @@ describe('orphan persistence — unit/boundary tests [INTERACTION-DUR-L2]', () =
         persistUserMessageOnly(mockDb, 'p', 's', 'msg', {
           clientId: '',
           orphanReason: 'llm_stream_error',
-        })
+        }),
       ).rejects.toBeInstanceOf(BadRequestError);
     });
   });
@@ -69,22 +69,22 @@ describe('orphan persistence — unit/boundary tests [INTERACTION-DUR-L2]', () =
   describe('classifyOrphanError — typed dispatch (no regex)', () => {
     it('classifies LlmStreamError', () => {
       expect(classifyOrphanError(new LlmStreamError('x'))).toBe(
-        'llm_stream_error'
+        'llm_stream_error',
       );
     });
     it('classifies LlmEnvelopeError', () => {
       expect(classifyOrphanError(new LlmEnvelopeError('x'))).toBe(
-        'llm_empty_or_unparseable'
+        'llm_empty_or_unparseable',
       );
     });
     it('classifies PersistCurriculumError', () => {
       expect(classifyOrphanError(new PersistCurriculumError('x'))).toBe(
-        'persist_curriculum_failed'
+        'persist_curriculum_failed',
       );
     });
     it('classifies unknown errors', () => {
       expect(classifyOrphanError(new Error('random'))).toBe(
-        'unknown_post_stream'
+        'unknown_post_stream',
       );
       expect(classifyOrphanError(null)).toBe('unknown_post_stream');
       expect(classifyOrphanError('string')).toBe('unknown_post_stream');
@@ -102,7 +102,7 @@ describe('orphan persistence — unit/boundary tests [INTERACTION-DUR-L2]', () =
           role: string;
           content: string;
           orphan_reason?: string;
-        }>
+        }>,
       ): string {
         const recentOrphans: typeof history = [];
         for (let i = history.length - 1; i >= 0; i--) {
@@ -118,7 +118,7 @@ describe('orphan persistence — unit/boundary tests [INTERACTION-DUR-L2]', () =
           recentOrphans
             .map(
               (t) =>
-                `<server_note kind="orphan_user_turn" reason="${t.orphan_reason}"/>`
+                `<server_note kind="orphan_user_turn" reason="${t.orphan_reason}"/>`,
             )
             .join('\n')
         );
@@ -132,7 +132,7 @@ describe('orphan persistence — unit/boundary tests [INTERACTION-DUR-L2]', () =
           { role: 'user', content: 'hi' },
           { role: 'assistant', content: 'hello' },
           { role: 'user', content: 'explain' },
-        ])
+        ]),
       ).toBe('');
     });
 
@@ -166,7 +166,7 @@ describe('orphan persistence — unit/boundary tests [INTERACTION-DUR-L2]', () =
 
     it('strips opening and closing server_note tags', () => {
       expect(sanitize('hello <server_note kind="test"/> world')).toBe(
-        'hello  world'
+        'hello  world',
       );
     });
     it('strips case-insensitively', () => {
