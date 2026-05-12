@@ -5,9 +5,9 @@
 - [project_implementation_phase.md](_archive/project_implementation_phase.md) — Epics 0-16 COMPLETE. LLM tuning phase COMPLETE (all 4 agents merged).
 - [project_session_lifecycle_decisions.md](project_session_lifecycle_decisions.md) — Wall-clock for users, active time internal. Adaptive silence. Hard caps removed.
 
-## Active Work (2026-05-04)
+## Active Work (2026-05-12)
 
-- Active branch: **`consistency`**. Stage 2 decision burndown COMPLETE (13/13). Stage 3 execution next.
+- Active branch: **`consistency`**. Stage 2 decision burndown COMPLETE (13/13). Stage 3 execution IN PROGRESS.
 - Consistency cleanup plan: `docs/audit/cleanup-plan.md` (single source of truth).
 
 ## Product Constraint — Strictly 11+
@@ -114,7 +114,7 @@ Two production dead-code branches removed 2026-04-19 in commit `970a82a5`: `AgeB
 - [feedback_spec_failure_modes.md](feedback_spec_failure_modes.md) — Every spec needs Failure Modes table.
 - [feedback_five_root_causes.md](feedback_five_root_causes.md) — 5 systemic root causes.
 - [feedback_comment_not_delete.md](feedback_comment_not_delete.md) — Comment out, don't delete unreleased UI features.
-- [feedback_testing_no_mocks.md](feedback_testing_no_mocks.md) — Prefer real solutions; don't add new `jest.mock()` unless existing pattern requires it. External-boundary mocks (LLM API, Inngest framework) OK.
+- [feedback_testing_no_mocks.md](feedback_testing_no_mocks.md) — No new internal `jest.mock()` (GC1 ratchet). External-boundary mocks (Stripe, Clerk JWKS, Inngest, LLM providers) OK per CLAUDE.md.
 - [feedback_precommit_typecheck.md](feedback_precommit_typecheck.md) — Run tsc + lint before committing.
 - [feedback_e2e_never_skip.md](feedback_e2e_never_skip.md) — Never skip E2E tests.
 - [feedback_batch_pr_fixes.md](feedback_batch_pr_fixes.md) — Batch PR fixes, validate locally, push once.
