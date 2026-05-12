@@ -24,9 +24,9 @@ jobs:
     timeout-minutes: 20
     env:
       CI: true
-      EXPO_PUBLIC_API_URL: ${{ vars.E2E_API_URL || 'https://api-stg.mentomate.com' }}
+      EXPO_PUBLIC_API_URL: ${{ vars.E2E_API_URL || 'https://mentomate-api-stg.zwizzly.workers.dev' }}
       EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY_PREVIEW }}
-      PLAYWRIGHT_API_URL: ${{ vars.E2E_API_URL || 'https://api-stg.mentomate.com' }}
+      PLAYWRIGHT_API_URL: ${{ vars.E2E_API_URL || 'https://mentomate-api-stg.zwizzly.workers.dev' }}
       PLAYWRIGHT_SKIP_LOCAL_API: '1'
       PLAYWRIGHT_TEST_SEED_SECRET: ${{ secrets.TEST_SEED_SECRET }}
       CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
@@ -70,7 +70,7 @@ jobs:
       - name: Reset seeded staging accounts (always)
         if: always()
         env:
-          PLAYWRIGHT_API_URL: ${{ vars.E2E_API_URL || 'https://api-stg.mentomate.com' }}
+          PLAYWRIGHT_API_URL: ${{ vars.E2E_API_URL || 'https://mentomate-api-stg.zwizzly.workers.dev' }}
           PLAYWRIGHT_TEST_SEED_SECRET: ${{ secrets.TEST_SEED_SECRET }}
           PLAYWRIGHT_RUN_ID: ${{ env.PLAYWRIGHT_RUN_ID }}
         run: |
