@@ -87,13 +87,15 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
-jest.mock('../lib/theme', () => ({
-  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
-  useThemeColors: () => ({
-    muted: '#94a3b8',
-    primary: '#2563eb',
+jest.mock(
+  '../lib/theme' /* gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM */,
+  () => ({
+    useThemeColors: () => ({
+      muted: '#94a3b8',
+      primary: '#2563eb',
+    }),
   }),
-}));
+);
 
 jest.mock(
   '../lib/format-api-error',

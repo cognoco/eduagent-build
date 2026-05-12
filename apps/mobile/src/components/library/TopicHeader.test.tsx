@@ -1,17 +1,19 @@
 import { render, screen } from '@testing-library/react-native';
 import { TopicHeader } from './TopicHeader';
 
-jest.mock('../../lib/theme', () => ({
-  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
-  useThemeColors: () => ({
-    textPrimary: '#1a1a1a',
-    textSecondary: '#525252',
-    retentionStrong: '#22c55e',
-    retentionFading: '#eab308',
-    retentionWeak: '#f97316',
-    retentionForgotten: '#737373',
+jest.mock(
+  '../../lib/theme' /* gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM */,
+  () => ({
+    useThemeColors: () => ({
+      textPrimary: '#1a1a1a',
+      textSecondary: '#525252',
+      retentionStrong: '#22c55e',
+      retentionFading: '#eab308',
+      retentionWeak: '#f97316',
+      retentionForgotten: '#737373',
+    }),
   }),
-}));
+);
 
 describe('TopicHeader', () => {
   it('renders the topic name', () => {

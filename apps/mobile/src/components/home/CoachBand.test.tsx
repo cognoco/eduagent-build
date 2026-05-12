@@ -1,17 +1,19 @@
 import { render, fireEvent } from '@testing-library/react-native';
 import { CoachBand, type CoachBandProps } from './CoachBand';
 
-jest.mock('../../lib/theme', () => ({
-  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
-  useThemeColors: () => ({
-    primarySoft: 'rgba(45,212,191,0.16)',
-    primary: '#2dd4bf',
-    secondary: '#a78bfa',
-    textTertiary: '#94a3b8',
-    textInverse: '#ffffff',
-    border: '#2a2a54',
+jest.mock(
+  '../../lib/theme' /* gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM */,
+  () => ({
+    useThemeColors: () => ({
+      primarySoft: 'rgba(45,212,191,0.16)',
+      primary: '#2dd4bf',
+      secondary: '#a78bfa',
+      textTertiary: '#94a3b8',
+      textInverse: '#ffffff',
+      border: '#2a2a54',
+    }),
   }),
-}));
+);
 
 describe('CoachBand', () => {
   const baseProps: CoachBandProps = {

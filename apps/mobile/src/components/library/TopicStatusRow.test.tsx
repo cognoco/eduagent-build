@@ -1,17 +1,19 @@
 import { fireEvent, render } from '@testing-library/react-native';
 import { TopicStatusRow } from './TopicStatusRow';
 
-jest.mock('../../lib/theme', () => ({
-  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
-  useThemeColors: () => ({
-    primary: '#0088cc',
-    accent: '#d97706',
-    success: '#22c55e',
-    textSecondary: '#6b7280',
-    border: '#e5e7eb',
-    surface: '#ffffff',
+jest.mock(
+  '../../lib/theme' /* gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM */,
+  () => ({
+    useThemeColors: () => ({
+      primary: '#0088cc',
+      accent: '#d97706',
+      success: '#22c55e',
+      textSecondary: '#6b7280',
+      border: '#e5e7eb',
+      surface: '#ffffff',
+    }),
   }),
-}));
+);
 
 describe('TopicStatusRow', () => {
   const onPress = jest.fn();

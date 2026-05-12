@@ -113,21 +113,25 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
-jest.mock('../../../lib/theme', () => ({
-  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
-  useThemeColors: () => ({
-    primary: '#00b4d8',
-    textPrimary: '#111827',
-    textSecondary: '#6b7280',
-    textInverse: '#ffffff',
-    danger: '#ef4444',
+jest.mock(
+  '../../../lib/theme' /* gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM */,
+  () => ({
+    useThemeColors: () => ({
+      primary: '#00b4d8',
+      textPrimary: '#111827',
+      textSecondary: '#6b7280',
+      textInverse: '#ffffff',
+      danger: '#ef4444',
+    }),
   }),
-}));
+);
 
-jest.mock('../../../lib/navigation', () => ({
-  // gc1-allow: navigation helper mock keeps screen unit-scoped
-  goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
-}));
+jest.mock(
+  '../../../lib/navigation' /* gc1-allow: navigation helper mock keeps screen unit-scoped */,
+  () => ({
+    goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
+  }),
+);
 
 jest.mock(
   '../../../components/common/DeskLampAnimation' /* gc1-allow: DeskLampAnimation is native-animated SVG; stub prevents native module crash */,

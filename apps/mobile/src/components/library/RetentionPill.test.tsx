@@ -1,16 +1,18 @@
 import { render, screen } from '@testing-library/react-native';
 import { RetentionPill } from './RetentionPill';
 
-jest.mock('../../lib/theme', () => ({
-  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
-  useThemeColors: () => ({
-    retentionStrong: '#22c55e',
-    retentionFading: '#eab308',
-    retentionWeak: '#f97316',
-    retentionForgotten: '#737373',
-    textSecondary: '#525252',
+jest.mock(
+  '../../lib/theme' /* gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM */,
+  () => ({
+    useThemeColors: () => ({
+      retentionStrong: '#22c55e',
+      retentionFading: '#eab308',
+      retentionWeak: '#f97316',
+      retentionForgotten: '#737373',
+      textSecondary: '#525252',
+    }),
   }),
-}));
+);
 
 describe('RetentionPill', () => {
   it('renders still-remembered status with green dot and label', () => {

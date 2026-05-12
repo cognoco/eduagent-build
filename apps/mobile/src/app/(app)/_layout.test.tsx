@@ -114,19 +114,21 @@ jest.mock('../../lib/profile', () => ({
 // use-consent uses useApiClient — mocked at the fetch boundary via mockFetch.
 // Routes: GET /consent/my-status, POST /consent/request
 
-jest.mock('../../lib/theme', () => ({
-  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
-  useThemeColors: () => ({
-    accent: '#0ea5e9',
-    border: '#d4d4d8',
-    muted: '#71717a',
-    surface: '#ffffff',
-    textInverse: '#ffffff',
-    textPrimary: '#18181b',
-    textSecondary: '#52525b',
+jest.mock(
+  '../../lib/theme' /* gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM */,
+  () => ({
+    useThemeColors: () => ({
+      accent: '#0ea5e9',
+      border: '#d4d4d8',
+      muted: '#71717a',
+      surface: '#ffffff',
+      textInverse: '#ffffff',
+      textPrimary: '#18181b',
+      textSecondary: '#52525b',
+    }),
+    useTokenVars: () => ({}),
   }),
-  useTokenVars: () => ({}),
-}));
+);
 
 jest.mock('../../hooks/use-revenuecat', () => ({
   useRevenueCatIdentity: jest.fn(),
