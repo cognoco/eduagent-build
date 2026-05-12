@@ -1,7 +1,17 @@
-import { render, screen, act, fireEvent } from '@testing-library/react-native';
+import {
+  render,
+  screen,
+  act,
+  fireEvent,
+  waitFor,
+} from '@testing-library/react-native';
 import React from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { createRoutedMockFetch } from '../../test-utils/mock-api-routes';
+import {
+  createRoutedMockFetch,
+  createScreenWrapper,
+  createTestProfile,
+  cleanupScreen,
+} from '../../test-utils/screen-render-harness';
 
 const mockFetch = createRoutedMockFetch({
   '/celebrations/pending': { pendingCelebrations: [] },
@@ -13,46 +23,7 @@ jest.mock('../../lib/api-client', () =>
   require('../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch),
 );
 
-type MockProfile = {
-  id: string;
-  displayName: string;
-  isOwner: boolean;
-};
-
-type MockActiveProfile = {
-  id: string;
-  accountId: string;
-  displayName: string;
-  isOwner: boolean;
-  hasPremiumLlm: boolean;
-  conversationLanguage: string;
-  pronouns: string | null;
-  consentStatus: string | null;
-};
-
-function makeActiveProfile(partial: MockProfile): MockActiveProfile {
-  return {
-    accountId: 'test-account-id',
-    hasPremiumLlm: false,
-    conversationLanguage: 'en',
-    pronouns: null,
-    consentStatus: null,
-    ...partial,
-  };
-}
-
-let mockProfiles: MockProfile[] = [];
-let mockActiveProfile: MockActiveProfile | null = null;
-let mockIsLoading = false;
 let mockOnAllComplete: (() => void) | null = null;
-jest.mock('../../lib/profile', () => ({
-  useProfile: () => ({
-    profiles: mockProfiles,
-    activeProfile: mockActiveProfile,
-    switchProfile: jest.fn(),
-    isLoading: mockIsLoading,
-  }),
-}));
 
 jest.mock('../../hooks/use-celebration', () => ({
   useCelebration: ({ onAllComplete }: { onAllComplete: () => void }) => {
@@ -60,17 +31,6 @@ jest.mock('../../hooks/use-celebration', () => ({
     return { CelebrationOverlay: null };
   },
 }));
-
-function createWrapper() {
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false, gcTime: 0 } },
-  });
-  return function Wrapper({ children }: { children: React.ReactNode }) {
-    return (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-    );
-  };
-}
 
 const mockRouterPush = jest.fn();
 const mockRouterReplace = jest.fn();
@@ -94,16 +54,21 @@ const HomeScreen = require('./home').default;
 describe('HomeScreen intent router', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockIsLoading = false;
     mockOnAllComplete = null;
   });
 
   it('renders LearnerScreen for owner with no children [BUG-522]', () => {
-    mockProfiles = [{ id: 'p1', displayName: 'Alex', isOwner: true }];
-    mockActiveProfile = makeActiveProfile(mockProfiles[0]!);
-    const Wrapper = createWrapper();
+    const owner = createTestProfile({
+      id: 'p1',
+      displayName: 'Alex',
+      isOwner: true,
+    });
+    const { wrapper } = createScreenWrapper({
+      activeProfile: owner,
+      profiles: [owner],
+    });
 
-    render(<HomeScreen />, { wrapper: Wrapper });
+    render(<HomeScreen />, { wrapper });
 
     // BUG-522: owners without children always see LearnerScreen — no forced
     // add-child gate regardless of subscription tier
@@ -111,38 +76,55 @@ describe('HomeScreen intent router', () => {
   });
 
   it('renders LearnerScreen directly for owner with linked children', () => {
-    mockProfiles = [
-      { id: 'p1', displayName: 'Maria', isOwner: true },
-      { id: 'c1', displayName: 'Emma', isOwner: false },
-    ];
-    mockActiveProfile = makeActiveProfile(mockProfiles[0]!);
-    const Wrapper = createWrapper();
+    const parent = createTestProfile({
+      id: 'p1',
+      displayName: 'Maria',
+      isOwner: true,
+    });
+    const child = createTestProfile({
+      id: 'c1',
+      displayName: 'Emma',
+      isOwner: false,
+    });
+    const { wrapper } = createScreenWrapper({
+      activeProfile: parent,
+      profiles: [parent, child],
+    });
 
-    render(<HomeScreen />, { wrapper: Wrapper });
+    render(<HomeScreen />, { wrapper });
 
     screen.getByTestId('learner-screen');
   });
 
   it('renders LearnerScreen when active profile is a child (non-owner)', () => {
-    mockProfiles = [
-      { id: 'p1', displayName: 'Maria', isOwner: true },
-      { id: 'c1', displayName: 'Emma', isOwner: false },
-    ];
-    mockActiveProfile = makeActiveProfile(mockProfiles[1]!);
-    const Wrapper = createWrapper();
+    const parent = createTestProfile({
+      id: 'p1',
+      displayName: 'Maria',
+      isOwner: true,
+    });
+    const child = createTestProfile({
+      id: 'c1',
+      displayName: 'Emma',
+      isOwner: false,
+    });
+    const { wrapper } = createScreenWrapper({
+      activeProfile: child,
+      profiles: [parent, child],
+    });
 
-    render(<HomeScreen />, { wrapper: Wrapper });
+    render(<HomeScreen />, { wrapper });
 
     screen.getByTestId('learner-screen');
   });
 
   it('renders loading placeholder when profiles are still loading', () => {
-    mockProfiles = [];
-    mockActiveProfile = null;
-    mockIsLoading = true;
-    const Wrapper = createWrapper();
+    const { wrapper } = createScreenWrapper({
+      activeProfile: null,
+      profiles: [],
+      isLoading: true,
+    });
 
-    render(<HomeScreen />, { wrapper: Wrapper });
+    render(<HomeScreen />, { wrapper });
 
     expect(screen.queryByTestId('learner-screen')).toBeNull();
   });
@@ -154,10 +136,11 @@ describe('HomeScreen 3B.11: timeout error state secondary navigation', () => {
   beforeEach(() => {
     jest.useFakeTimers();
     jest.clearAllMocks();
-    mockIsLoading = true;
-    mockProfiles = [];
-    mockActiveProfile = null;
-    Wrapper = createWrapper();
+    ({ wrapper: Wrapper } = createScreenWrapper({
+      activeProfile: null,
+      profiles: [],
+      isLoading: true,
+    }));
   });
 
   afterEach(() => {
@@ -219,9 +202,6 @@ describe('HomeScreen 3B.11: timeout error state secondary navigation', () => {
 describe('HomeScreen SF-1: markCelebrationsSeen error handling', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockIsLoading = false;
-    mockProfiles = [{ id: 'p1', displayName: 'Alex', isOwner: true }];
-    mockActiveProfile = makeActiveProfile(mockProfiles[0]!);
     mockOnAllComplete = null;
   });
 
@@ -230,28 +210,35 @@ describe('HomeScreen SF-1: markCelebrationsSeen error handling', () => {
       .spyOn(console, 'warn')
       // eslint-disable-next-line @typescript-eslint/no-empty-function
       .mockImplementation(() => {});
-    // Make the /celebrations/seen endpoint return a server error so the real
-    // useMarkCelebrationsSeen mutation rejects.
     mockFetch.setRoute(
       '/celebrations/seen',
       new Response('{}', { status: 500 }),
     );
-    const Wrapper = createWrapper();
+    const owner = createTestProfile({
+      id: 'p1',
+      displayName: 'Alex',
+      isOwner: true,
+    });
+    const { wrapper, queryClient } = createScreenWrapper({
+      activeProfile: owner,
+      profiles: [owner],
+    });
 
-    render(<HomeScreen />, { wrapper: Wrapper });
+    render(<HomeScreen />, { wrapper });
 
-    // Trigger the onAllComplete callback to simulate celebration completion
     expect(mockOnAllComplete).not.toBeNull();
     await act(async () => {
       mockOnAllComplete?.();
     });
 
-    // The error must be logged — not silently swallowed
-    expect(consoleSpy).toHaveBeenCalledWith(
-      '[Celebrations] Failed to mark as seen, will retry on next visit:',
-      expect.any(Error),
-    );
+    await waitFor(() => {
+      expect(consoleSpy).toHaveBeenCalledWith(
+        '[Celebrations] Failed to mark as seen, will retry on next visit:',
+        expect.objectContaining({ message: expect.any(String) }),
+      );
+    });
 
+    cleanupScreen(queryClient);
     consoleSpy.mockRestore();
   });
 });

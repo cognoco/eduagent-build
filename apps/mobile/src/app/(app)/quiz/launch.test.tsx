@@ -118,6 +118,16 @@ jest.mock('../../../lib/navigation', () => ({
   goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
 }));
 
+jest.mock(
+  '../../../components/common' /* gc1-allow: DeskLampAnimation is native-animated SVG; stub prevents native module crash */,
+  () => ({
+    DeskLampAnimation: ({ testID }: { testID?: string }) => {
+      const { Text } = require('react-native');
+      return <Text testID={testID}>thinking lamp</Text>;
+    },
+  }),
+);
+
 jest.mock('../../../hooks/use-quiz', () => ({
   useGenerateRound: () => mockGenerateRound,
 }));
@@ -210,6 +220,9 @@ describe('QuizLaunchScreen', () => {
 
     it('does NOT show the error panel before 30s elapses', () => {
       render(<QuizLaunchScreen />);
+
+      screen.getByTestId('quiz-launch-thinking-lamp');
+      screen.getByText('Building your round');
 
       act(() => {
         jest.advanceTimersByTime(29_999);

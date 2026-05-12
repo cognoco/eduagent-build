@@ -168,6 +168,7 @@
         "cta": "Add your first child"
       },
       "childrenHeader": "Children",
+      "familyManagementHeader": "Family management",
       "familyToolsHeader": "Family tools",
       "encouragementNote": "Nudges are gentle one-way encouragements.",
       "transitionNoticeTitle": "You're now mentoring {{childNames}}",
@@ -274,7 +275,7 @@
       "screenTitle": "Learning accommodation",
       "notSureWhichToPick": "Not sure which to pick?",
       "guideActive": "Active",
-      "childScreenTitle": "{{name}}'s accommodation"
+      "childScreenTitle": "{{name}}'s learning preferences"
     },
     "learningPreferences": {
       "rowLabel": "Your learning preferences",

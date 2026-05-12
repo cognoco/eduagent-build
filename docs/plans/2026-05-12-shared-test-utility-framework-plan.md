@@ -119,15 +119,8 @@ Utilities:
 
 Tasks:
 
-- Create a short local DB runbook:
-  - start PostgreSQL
-  - set `DATABASE_URL`
-  - apply migrations
-  - run one integration suite
-  - reset/cleanup
-- Decide pgvector handling:
-  - install extension locally, or
-  - mark vector suites Neon-only.
+- Create a short local DB runbook: **Done.** `docs/runbooks/local-db-testing.md` + `docker-compose.test.yml`.
+- Decide pgvector handling: **Done.** Use `pgvector/pgvector:pg16` image (pgvector pre-installed, matches Neon). All suites run locally without modification.
 - Add LLM provider fixtures:
   - valid envelope
   - invalid envelope

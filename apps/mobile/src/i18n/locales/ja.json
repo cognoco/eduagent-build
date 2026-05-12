@@ -187,6 +187,7 @@
         "cta": "Add your first child"
       },
       "childrenHeader": "Children",
+      "familyManagementHeader": "ファミリー管理",
       "familyToolsHeader": "Family tools",
       "childCard": {
         "statusLine": "{{activity}} · {{focus}} · {{signal}}",
@@ -274,7 +275,7 @@
       "screenTitle": "学習サポート設定",
       "notSureWhichToPick": "どれを選べばいいかわからない？",
       "guideActive": "アクティブ",
-      "childScreenTitle": "{{name}}の学習サポート"
+      "childScreenTitle": "{{name}}の学習設定"
     },
     "learningPreferences": {
       "rowLabel": "学習設定",

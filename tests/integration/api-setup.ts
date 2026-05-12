@@ -33,15 +33,25 @@ let _pool: InstanceType<typeof import('pg').Pool> | null = null;
 
 jest.mock('@eduagent/database', () => {
   const actual = jest.requireActual('@eduagent/database');
+  let driverLogged = false;
 
   return {
     ...actual,
     createDatabase: (databaseUrl: string) => {
       if (isNeonUrl(databaseUrl)) {
+        if (!driverLogged) {
+          console.log('[api-setup] Using Neon HTTP driver');
+          driverLogged = true;
+        }
         return actual.createDatabase(databaseUrl);
       }
 
       // Standard pg driver for CI / local PostgreSQL
+      if (!driverLogged) {
+        console.log('[api-setup] Using pg wire-protocol driver (local/CI)');
+        driverLogged = true;
+      }
+
       const { Pool } = require('pg');
       const { drizzle } = require('drizzle-orm/node-postgres');
       const schema = require('../../packages/database/src/schema/index');

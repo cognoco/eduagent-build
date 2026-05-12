@@ -4,17 +4,19 @@ const mockBack = jest.fn();
 const mockReplace = jest.fn();
 const mockCanGoBack = jest.fn();
 
-jest.mock('expo-router', () => ({
-  useRouter: () => ({
+jest.mock('expo-router', () =>
+  // native-boundary
+  require('../test-utils/native-shims').expoRouterShim({
     back: mockBack,
     replace: mockReplace,
     canGoBack: mockCanGoBack,
   }),
-}));
+);
 
-jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
-}));
+jest.mock('react-native-safe-area-context', () =>
+  // native-boundary
+  require('../test-utils/native-shims').safeAreaShim(),
+);
 
 jest.mock('../lib/theme', () => ({
   useThemeColors: () => ({ textPrimary: '#111111' }),

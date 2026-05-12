@@ -17,12 +17,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { hapticError, hapticLight, hapticSuccess } from '../../../lib/haptics';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { ClientQuizQuestion, QuestionResult } from '@eduagent/schemas';
+import type {
+  ClientQuizQuestion,
+  CompleteRoundResponse,
+  QuestionResult,
+} from '@eduagent/schemas';
 import {
   useCheckAnswer,
   useCompleteRound,
   usePrefetchRound,
 } from '../../../hooks/use-quiz';
+import { PolarStar } from '../../../components/common';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { platformAlert } from '../../../lib/platform-alert';
 // platformAlert maps to window.confirm on web for 2-button prompts, which
@@ -39,6 +44,11 @@ import {
 
 type AnswerState = 'unanswered' | 'checking' | 'correct' | 'wrong';
 
+interface SubmitRoundOptions {
+  results?: QuestionResult[];
+  navigateOnSuccess?: boolean;
+}
+
 export default function QuizPlayScreen(): React.ReactElement {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -48,9 +58,11 @@ export default function QuizPlayScreen(): React.ReactElement {
     activityType,
     subjectId,
     setPrefetchedRoundId,
+    setRound,
     setCompletionResult,
   } = useQuizFlow();
   const completeRound = useCompleteRound();
+  const completeRoundMutate = completeRound.mutate;
   const prefetchRound = usePrefetchRound();
   // [BUG-542] Extract .mutate so the useEffect dep array references a stable
   // variable rather than a member-access expression. ESLint exhaustive-deps
@@ -73,6 +85,8 @@ export default function QuizPlayScreen(): React.ReactElement {
   // [BUG-892] Quit confirmation rendered as an in-app Modal so web doesn't
   // hit window.confirm via Alert.alert mapping (which blocks the renderer).
   const [quitConfirmVisible, setQuitConfirmVisible] = useState(false);
+  const [roundAutoSaveStarted, setRoundAutoSaveStarted] = useState(false);
+  const [roundAutoSaved, setRoundAutoSaved] = useState(false);
 
   const questions = (round?.questions ?? []) as ClientQuizQuestion[];
   const totalQuestions = round?.total ?? 0;
@@ -102,6 +116,7 @@ export default function QuizPlayScreen(): React.ReactElement {
     null,
   );
   const answerSubmittedRef = useRef(false);
+  const roundSubmittedRef = useRef(false);
   // [F-Q-07] Tracks whether correctAnswer was captured via handleCheckGuessWhoAnswer
   // so the onResolved skip-path only fires a background check when needed.
   const correctAnswerCapturedRef = useRef(false);
@@ -208,12 +223,66 @@ export default function QuizPlayScreen(): React.ReactElement {
     setQuitConfirmVisible(false);
     goBackOrReplace(router, '/(app)/quiz');
   };
+  const handleSaveAndQuit = () => {
+    if (resultsRef.current.length === 0) return;
+    setQuitConfirmVisible(false);
+    submitRound();
+  };
+  const handleSeeResults = () => {
+    if (!roundAutoSaved) return;
+    router.replace('/(app)/quiz/results' as never);
+  };
+  const handleOneMore = () => {
+    if (!roundAutoSaved) return;
+    setRound(null);
+    router.replace('/(app)/quiz/launch' as never);
+  };
 
   // [CR-1] Callback for server-side answer checking, declared before the
   // early return so the rules-of-hooks invariant is satisfied.
   // [F-Q-07] When the answer is wrong, capture correctAnswer from the server
   // response so it can be shown in the post-answer feedback panel.
   const roundId = round?.id ?? '';
+  const submitRound = useCallback(
+    ({
+      results = resultsRef.current,
+      navigateOnSuccess = true,
+    }: SubmitRoundOptions = {}) => {
+      if (!roundId || results.length === 0 || roundSubmittedRef.current) {
+        return;
+      }
+
+      setCompleteError(null);
+      roundSubmittedRef.current = true;
+      if (!navigateOnSuccess) {
+        setRoundAutoSaveStarted(true);
+      }
+      completeRoundMutate(
+        { roundId, results },
+        {
+          onSuccess: (result: CompleteRoundResponse) => {
+            setCompletionResult(result);
+            setRoundAutoSaved(true);
+            setRoundAutoSaveStarted(false);
+            if (navigateOnSuccess) {
+              router.replace('/(app)/quiz/results' as never);
+            }
+          },
+          onError: (err) => {
+            roundSubmittedRef.current = false;
+            setRoundAutoSaveStarted(false);
+            // [BUG-806] formatApiError handles all shapes (typed envelope, Error,
+            // string, network failure) — `err instanceof Error` returns false for
+            // server-typed error envelopes, hiding the actionable reason behind
+            // the generic fallback.
+            setCompleteError(formatApiError(err));
+            Sentry.captureException(err);
+          },
+        },
+      );
+    },
+    [completeRoundMutate, router, roundId, setCompletionResult],
+  );
   // [BUG-542] Use checkAnswer.mutateAsync (stable ref in TanStack Query v5)
   // instead of the whole checkAnswer object, which creates a new reference on
   // every mutation state transition (idle → pending → success → idle).
@@ -253,7 +322,7 @@ export default function QuizPlayScreen(): React.ReactElement {
   const handleGuessWhoResolved = useCallback(
     (result: GuessWhoResolvedResult) => {
       const timeMs = Date.now() - questionStartTimeRef.current;
-      resultsRef.current = [
+      const nextResults: QuestionResult[] = [
         ...resultsRef.current,
         {
           questionIndex: currentIndex,
@@ -264,6 +333,7 @@ export default function QuizPlayScreen(): React.ReactElement {
           answerMode: result.answerMode,
         },
       ];
+      resultsRef.current = nextResults;
       setGuessWhoCluesUsed(result.cluesUsed);
       setSelectedAnswer(result.answerGiven);
       setAnswerState(result.correct ? 'correct' : 'wrong');
@@ -279,6 +349,12 @@ export default function QuizPlayScreen(): React.ReactElement {
         hapticSuccess();
       } else {
         hapticError();
+      }
+      if (currentIndex + 1 >= totalQuestions) {
+        submitRound({
+          results: nextResults,
+          navigateOnSuccess: false,
+        });
       }
       // [F-Q-07] If the answer was wrong and we don't already have the
       // correct answer (e.g. skip path bypasses onCheckAnswer), fire a
@@ -307,7 +383,13 @@ export default function QuizPlayScreen(): React.ReactElement {
           });
       }
     },
-    [checkAnswerMutateAsync, currentIndex, roundId],
+    [
+      checkAnswerMutateAsync,
+      currentIndex,
+      roundId,
+      submitRound,
+      totalQuestions,
+    ],
   );
 
   if (!round || !currentQuestion) {
@@ -430,30 +512,6 @@ export default function QuizPlayScreen(): React.ReactElement {
     hapticLight();
   }
 
-  // [ASSUMP-F10] Shared submit path so Retry re-uses the same success/error
-  // handlers. Previously the onError branch faked a completion result and
-  // navigated — violating "silent recovery without escalation is banned".
-  function submitRound() {
-    setCompleteError(null);
-    completeRound.mutate(
-      { roundId: activeRound.id, results: resultsRef.current },
-      {
-        onSuccess: (result) => {
-          setCompletionResult(result);
-          router.replace('/(app)/quiz/results' as never);
-        },
-        onError: (err) => {
-          // [BUG-806] formatApiError handles all shapes (typed envelope, Error,
-          // string, network failure) — `err instanceof Error` returns false for
-          // server-typed error envelopes, hiding the actionable reason behind
-          // the generic fallback.
-          setCompleteError(formatApiError(err));
-          Sentry.captureException(err);
-        },
-      },
-    );
-  }
-
   // [CR-1] Answer checking is now async — the server validates via
   // POST /quiz/rounds/:id/check. A ref prevents double-submission during
   // the network round-trip.
@@ -510,7 +568,8 @@ export default function QuizPlayScreen(): React.ReactElement {
       answerMode,
     };
 
-    resultsRef.current = [...resultsRef.current, nextResult];
+    const nextResults = [...resultsRef.current, nextResult];
+    resultsRef.current = nextResults;
     setAnswerState(correct ? 'correct' : 'wrong');
     setShowContinueHint(false);
     continueEnabledAtRef.current = Date.now() + 250;
@@ -526,6 +585,13 @@ export default function QuizPlayScreen(): React.ReactElement {
       hapticSuccess();
     } else {
       hapticError();
+    }
+
+    if (questionIndex + 1 >= totalQuestions) {
+      submitRound({
+        results: nextResults,
+        navigateOnSuccess: false,
+      });
     }
   }
 
@@ -547,6 +613,10 @@ export default function QuizPlayScreen(): React.ReactElement {
     }
 
     if (currentIndex + 1 >= totalQuestions) {
+      if (roundAutoSaved) {
+        router.replace('/(app)/quiz/results' as never);
+        return;
+      }
       submitRound();
       return;
     }
@@ -620,6 +690,7 @@ export default function QuizPlayScreen(): React.ReactElement {
     answerState !== 'unanswered' &&
     answerState !== 'checking' &&
     !completeError;
+  const hasAnsweredQuestions = resultsRef.current.length > 0;
   return (
     <View
       className="flex-1 bg-background"
@@ -811,29 +882,40 @@ export default function QuizPlayScreen(): React.ReactElement {
 
         {answerState !== 'unanswered' && answerState !== 'checking' ? (
           <View className="mt-6 px-5">
-            {question.type === 'guess_who' ? (
+            {answerState === 'correct' ? (
+              <View className="mb-4 items-center">
+                <View className="-mb-8 -mt-10">
+                  <PolarStar testID="quiz-correct-celebration" />
+                </View>
+                <Text className="mt-3 text-center text-h3 font-bold text-success">
+                  {question.type === 'guess_who'
+                    ? `You found them in ${guessWhoCluesUsed} clue${
+                        guessWhoCluesUsed !== 1 ? 's' : ''
+                      }!`
+                    : 'Nailed it!'}
+                </Text>
+                <Text className="mt-1 text-center text-body-sm text-text-secondary">
+                  {currentIndex + 1 >= totalQuestions
+                    ? roundAutoSaved
+                      ? 'Saved. Ready when you are.'
+                      : 'Saving your result...'
+                    : 'That answer is locked in.'}
+                </Text>
+              </View>
+            ) : question.type === 'guess_who' ? (
               <View className="mb-3">
-                {answerState === 'correct' ? (
-                  <Text className="text-center text-body-lg font-semibold text-success">
-                    You got it in {guessWhoCluesUsed} clue
-                    {guessWhoCluesUsed !== 1 ? 's' : ''}!
-                  </Text>
-                ) : (
-                  <>
-                    <Text className="text-center text-body-lg text-text-primary">
-                      Better luck next time!
+                <Text className="text-center text-h3 font-semibold text-text-primary">
+                  Better luck next time!
+                </Text>
+                {/* [F-Q-07] Reveal the person's name after wrong/skip */}
+                {correctAnswer ? (
+                  <Text className="mt-1 text-center text-body-sm text-text-secondary">
+                    The answer was{' '}
+                    <Text className="font-bold text-success">
+                      {correctAnswer}
                     </Text>
-                    {/* [F-Q-07] Reveal the person's name after wrong/skip */}
-                    {correctAnswer ? (
-                      <Text className="mt-1 text-center text-body-sm text-text-secondary">
-                        The answer was{' '}
-                        <Text className="font-bold text-success">
-                          {correctAnswer}
-                        </Text>
-                      </Text>
-                    ) : null}
-                  </>
-                )}
+                  </Text>
+                ) : null}
               </View>
             ) : null}
             {currentQuestion.funFact ? (
@@ -853,6 +935,42 @@ export default function QuizPlayScreen(): React.ReactElement {
                   ? 'Correct'
                   : 'Not quite'}
             </Text>
+            {currentIndex + 1 >= totalQuestions && roundAutoSaved ? (
+              <View className="mt-4 gap-3">
+                <Pressable
+                  onPress={(event) => {
+                    event?.stopPropagation?.();
+                    handleSeeResults();
+                  }}
+                  className="min-h-[48px] items-center justify-center rounded-button bg-primary px-5 py-3"
+                  accessibilityRole="button"
+                  accessibilityLabel="See quiz results"
+                  testID="quiz-final-see-results"
+                >
+                  <Text className="text-body font-semibold text-text-inverse">
+                    See results
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={(event) => {
+                    event?.stopPropagation?.();
+                    handleOneMore();
+                  }}
+                  className="min-h-[48px] items-center justify-center rounded-button bg-surface px-5 py-3"
+                  accessibilityRole="button"
+                  accessibilityLabel="Start one more quiz"
+                  testID="quiz-final-one-more"
+                >
+                  <Text className="text-body font-semibold text-text-primary">
+                    Wait, just one more!
+                  </Text>
+                </Pressable>
+              </View>
+            ) : roundAutoSaveStarted ? (
+              <Text className="mt-4 text-center text-body-sm text-text-secondary">
+                Saving your round...
+              </Text>
+            ) : null}
             {/* [BUG-469] Dispute button — lets user flag LLM's judgment as wrong */}
             {/* [BUG-927] Only surface dispute UI on incorrect answers. There's
                 nothing to dispute on a correct response, and showing the link
@@ -900,7 +1018,7 @@ export default function QuizPlayScreen(): React.ReactElement {
               </Text>
               <View className="mt-3 flex-row gap-3">
                 <Pressable
-                  onPress={submitRound}
+                  onPress={() => submitRound()}
                   className="flex-1 min-h-[44px] items-center justify-center rounded-button bg-primary px-4 py-2"
                   accessibilityRole="button"
                   accessibilityLabel="Retry"
@@ -948,32 +1066,63 @@ export default function QuizPlayScreen(): React.ReactElement {
             onPress={(e) => e.stopPropagation()}
           >
             <Text className="text-h3 font-bold text-text-primary text-center">
-              Quit this round?
+              {hasAnsweredQuestions
+                ? 'Save progress before leaving?'
+                : 'Leave this round?'}
             </Text>
             <Text className="text-body-sm text-text-secondary text-center mt-3 leading-relaxed">
-              Your progress will not be saved.
+              {hasAnsweredQuestions
+                ? "You've answered part of this round. Save it now, or keep playing to finish all questions."
+                : "You haven't answered any questions yet."}
             </Text>
             <View className="mt-5 gap-3">
+              {hasAnsweredQuestions ? (
+                <Pressable
+                  onPress={handleSaveAndQuit}
+                  className="bg-primary rounded-button py-3 items-center min-h-[48px] justify-center"
+                  accessibilityRole="button"
+                  accessibilityLabel="Save progress and finish round"
+                  testID="quiz-quit-save"
+                >
+                  <Text className="text-body font-semibold text-text-inverse">
+                    Save and finish
+                  </Text>
+                </Pressable>
+              ) : null}
               <Pressable
                 onPress={handleConfirmQuit}
-                className="bg-danger rounded-button py-3 items-center min-h-[48px] justify-center"
+                className={`rounded-button py-3 items-center min-h-[48px] justify-center ${
+                  hasAnsweredQuestions ? 'bg-surface' : 'bg-danger'
+                }`}
                 accessibilityRole="button"
-                accessibilityLabel="Confirm quit round"
+                accessibilityLabel={
+                  hasAnsweredQuestions
+                    ? 'Leave without saving'
+                    : 'Confirm leave round'
+                }
                 testID="quiz-quit-confirm"
               >
-                <Text className="text-body font-semibold text-text-inverse">
-                  Quit
+                <Text
+                  className={`text-body font-semibold ${
+                    hasAnsweredQuestions ? 'text-danger' : 'text-text-inverse'
+                  }`}
+                >
+                  {hasAnsweredQuestions ? 'Leave without saving' : 'Leave'}
                 </Text>
               </Pressable>
               <Pressable
                 onPress={() => setQuitConfirmVisible(false)}
                 className="bg-surface rounded-button py-3 items-center min-h-[48px] justify-center"
                 accessibilityRole="button"
-                accessibilityLabel="Keep playing"
+                accessibilityLabel={
+                  hasAnsweredQuestions ? 'Wait, just one more' : 'Keep playing'
+                }
                 testID="quiz-quit-cancel"
               >
                 <Text className="text-body font-semibold text-text-primary">
-                  Keep playing
+                  {hasAnsweredQuestions
+                    ? 'Wait, just one more!'
+                    : 'Keep playing'}
                 </Text>
               </Pressable>
             </View>

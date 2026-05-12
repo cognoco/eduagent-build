@@ -37,6 +37,7 @@ jest.mock('../../../lib/theme', () => ({
     textSecondary: '#6b7280',
     textInverse: '#ffffff',
     danger: '#ef4444',
+    success: '#22c55e',
   }),
 }));
 
@@ -48,6 +49,16 @@ jest.mock('../../../lib/navigation', () => ({
 jest.mock('../../../components/quiz/GuessWhoQuestion', () => ({
   GuessWhoQuestion: () => null,
 }));
+
+jest.mock(
+  '../../../components/common' /* gc1-allow: PolarStar is native-animated celebration component; stub prevents native module crash */,
+  () => ({
+    PolarStar: ({ testID }: { testID?: string }) => {
+      const { Text } = require('react-native');
+      return <Text testID={testID}>success animation</Text>;
+    },
+  }),
+);
 
 jest.mock('../../../hooks/use-quiz', () => ({
   useCheckAnswer: () => ({
@@ -339,6 +350,9 @@ describe('QuizPlayScreen — dispute button visibility (BUG-927)', () => {
     await waitFor(() => {
       screen.getByText('Correct');
     });
+    screen.getByTestId('quiz-correct-celebration');
+    screen.getByText('Nailed it!');
+    screen.getByText('That answer is locked in.');
     expect(screen.queryByTestId('quiz-dispute-button')).toBeNull();
     expect(screen.queryByText('Not quite right?')).toBeNull();
   });
@@ -355,6 +369,7 @@ describe('QuizPlayScreen — dispute button visibility (BUG-927)', () => {
     await waitFor(() => {
       screen.getByText('Not quite');
     });
+    expect(screen.queryByTestId('quiz-correct-celebration')).toBeNull();
     screen.getByTestId('quiz-dispute-button');
   });
 });
@@ -928,6 +943,8 @@ describe('QuizPlayScreen — error feedback [BUG-799 / BUG-806]', () => {
     // NOT submit the round (which would mean handleContinue also fired).
     fireEvent.press(screen.getByTestId('quiz-play-quit'));
     screen.getByTestId('quiz-quit-confirm');
+    screen.getByTestId('quiz-quit-save');
+    screen.getByText('Save progress before leaving?');
     expect(mockPlatformAlert).not.toHaveBeenCalledWith(
       'Quit this round?',
       expect.any(String),
@@ -950,6 +967,9 @@ describe('QuizPlayScreen — error feedback [BUG-799 / BUG-806]', () => {
 
     screen.getByTestId('quiz-quit-confirm');
     screen.getByTestId('quiz-quit-cancel');
+    expect(screen.queryByTestId('quiz-quit-save')).toBeNull();
+    screen.getByText('Leave this round?');
+    screen.getByText("You haven't answered any questions yet.");
     // Critically: platformAlert (which would hit window.confirm on web) is NOT
     // invoked for the quit-confirm flow.
     expect(mockPlatformAlert).not.toHaveBeenCalledWith(
@@ -988,6 +1008,36 @@ describe('QuizPlayScreen — error feedback [BUG-799 / BUG-806]', () => {
     expect(mockGoBackOrReplace).toHaveBeenCalledWith(
       expect.anything(),
       '/(app)/quiz',
+    );
+  });
+
+  it('saves answered progress from the quit modal', async () => {
+    mockCheckAnswer.mockResolvedValueOnce({ correct: true });
+    render(<QuizPlayScreen />);
+
+    fireEvent.press(screen.getByTestId('quiz-option-0'));
+    await waitFor(() => screen.getByText('Correct'));
+
+    fireEvent.press(screen.getByTestId('quiz-play-quit'));
+    screen.getByText('Save progress before leaving?');
+
+    fireEvent.press(screen.getByTestId('quiz-quit-save'));
+
+    expect(mockCompleteRoundMutate).toHaveBeenCalledWith(
+      {
+        roundId: 'round-err',
+        results: [
+          expect.objectContaining({
+            questionIndex: 0,
+            correct: true,
+            answerGiven: 'Bratislava',
+          }),
+        ],
+      },
+      expect.objectContaining({
+        onSuccess: expect.any(Function),
+        onError: expect.any(Function),
+      }),
     );
   });
 });

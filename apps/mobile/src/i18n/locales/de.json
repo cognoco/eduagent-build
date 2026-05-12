@@ -187,6 +187,7 @@
         "cta": "Add your first child"
       },
       "childrenHeader": "Children",
+      "familyManagementHeader": "Familienverwaltung",
       "familyToolsHeader": "Family tools",
       "childCard": {
         "statusLine": "{{activity}} · {{focus}} · {{signal}}",
@@ -274,7 +275,7 @@
       "screenTitle": "Lernanpassung",
       "notSureWhichToPick": "Nicht sicher, welche du wählen sollst?",
       "guideActive": "Aktiv",
-      "childScreenTitle": "{{name}}s Lernanpassung"
+      "childScreenTitle": "{{name}}s Lernpräferenzen"
     },
     "learningPreferences": {
       "rowLabel": "Lernpräferenzen",

@@ -565,7 +565,13 @@ export function ParentHomeScreen({
               t={t}
             />
           ))}
+        </View>
 
+        <Text className="text-h3 font-bold text-text-primary mt-5 mb-3">
+          {t('home.parent.familyManagementHeader')}
+        </Text>
+
+        <View style={{ gap: 10 }}>
           {linkedChildren.map((child) => (
             <ChildAccommodationRow
               key={`accommodation-${child.id}`}
@@ -577,7 +583,7 @@ export function ParentHomeScreen({
           {showAddChild ? (
             <Pressable
               onPress={handleAddChild}
-              className="flex-row items-center bg-surface rounded-card px-4 py-3 mt-4"
+              className="flex-row items-center bg-surface rounded-card px-4 py-3"
               style={Platform.OS === 'web' ? { cursor: 'pointer' } : undefined}
               accessibilityRole="button"
               accessibilityLabel={t('more.family.addChild')}

@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { i18next } from '../../../i18n';
 import type { QuizRoundResponse } from '@eduagent/schemas';
+import { DeskLampAnimation } from '../../../components/common';
 import { ErrorFallback } from '../../../components/common/ErrorFallback';
 import { useGenerateRound } from '../../../hooks/use-quiz';
 import { goBackOrReplace } from '../../../lib/navigation';
@@ -286,8 +287,15 @@ export default function QuizLaunchScreen(): React.ReactElement {
       style={{ paddingTop: insets.top, paddingBottom: insets.bottom + 16 }}
       testID="quiz-launch-loading"
     >
-      <ActivityIndicator size="large" color={colors.primary} />
-      <Text className="mt-4 text-body text-text-secondary">
+      <DeskLampAnimation
+        size={150}
+        color={colors.textSecondary}
+        testID="quiz-launch-thinking-lamp"
+      />
+      <Text className="mt-5 text-center text-h3 font-bold text-text-primary">
+        Building your round
+      </Text>
+      <Text className="mt-2 text-center text-body text-text-secondary">
         {t(
           LOADING_MESSAGE_KEYS[loadingMessageIndex] ?? LOADING_MESSAGE_KEYS[0],
         )}
