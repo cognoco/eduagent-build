@@ -9,6 +9,8 @@
   "files": ["src/test-setup.ts"],
   "include": [
     "jest.config.cjs",
+    "test-utils/**/*.ts",
+    "test-utils/**/*.tsx",
     "src/**/*.test.ts",
     "src/**/*.spec.ts",
     "src/**/*.test.tsx",

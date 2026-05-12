@@ -19,19 +19,17 @@ import {
   ProfileContext,
   type Profile,
   type ProfileContextValue,
-} from '../lib/profile';
-import { createTestProfile } from './app-hook-test-utils';
+} from '../src/lib/profile';
+import { createTestProfile } from '../src/test-utils/app-hook-test-utils';
 
-export { createTestProfile } from './app-hook-test-utils';
+export { createTestProfile } from '../src/test-utils/app-hook-test-utils';
 export {
   createRoutedMockFetch,
   mockApiClientFactory,
   fetchCallsMatching,
   extractJsonBody,
-} from './mock-api-routes';
-export type { RoutedMockFetch } from './mock-api-routes';
-
-// ─── Named Profile Fixtures ────────────────────────────────────────
+} from '../src/test-utils/mock-api-routes';
+export type { RoutedMockFetch } from '../src/test-utils/mock-api-routes';
 
 export const profileFixtures = {
   soloLearner: createTestProfile({
@@ -67,8 +65,6 @@ export const guardianProfiles: readonly Profile[] = [
 
 export const soloProfiles: readonly Profile[] = [profileFixtures.soloLearner];
 
-// ─── Error Response Helpers ─────────────────────────────────────────
-
 export const errorResponses = {
   quotaExhausted: (details?: unknown) =>
     new Response(
@@ -102,8 +98,6 @@ export const errorResponses = {
 
   serverError: () => new Response(JSON.stringify({}), { status: 500 }),
 };
-
-// ─── Screen Wrapper ─────────────────────────────────────────────────
 
 export interface ScreenWrapperOptions {
   activeProfile?: Profile | null;
@@ -160,8 +154,6 @@ export function createScreenWrapper(options: ScreenWrapperOptions = {}) {
   return { queryClient, wrapper: Wrapper, profileContext };
 }
 
-// ─── Render Helper ──────────────────────────────────────────────────
-
 interface RenderScreenOptions extends ScreenWrapperOptions {
   renderOptions?: Omit<RenderOptions, 'wrapper'>;
 }
@@ -176,8 +168,6 @@ export function renderScreen(
   const result = render(ui, { wrapper, ...renderOptions });
   return { ...result, queryClient, profileContext };
 }
-
-// ─── Teardown ───────────────────────────────────────────────────────
 
 export function cleanupScreen(queryClient: QueryClient): void {
   queryClient.cancelQueries();

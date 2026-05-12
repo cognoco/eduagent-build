@@ -11,7 +11,7 @@ import {
   createScreenWrapper,
   createTestProfile,
   cleanupScreen,
-} from '../../test-utils/screen-render-harness';
+} from '../../../test-utils/screen-render-harness';
 
 const mockFetch = createRoutedMockFetch({
   '/celebrations/pending': { pendingCelebrations: [] },
