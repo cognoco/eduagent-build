@@ -10,7 +10,6 @@ import { resolve } from 'node:path';
 
 const KNOWN_SITES = new Set<string>([
   'apps/mobile/src/app/create-profile.test.tsx',
-  'apps/mobile/src/app/(app)/topic/relearn.tsx',
 ]);
 
 const FOSSIL_PATTERNS: RegExp[] = [

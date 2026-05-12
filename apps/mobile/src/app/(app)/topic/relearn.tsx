@@ -136,9 +136,9 @@ export default function RelearnScreen() {
     activeProfile?.birthYear != null
       ? computeAgeBracket(activeProfile.birthYear)
       : 'adolescent';
-  const isLearner = ageBracket !== 'adult';
-  const methods = isLearner ? TEACHING_METHODS_LEARNER : TEACHING_METHODS;
-  const copy = isLearner ? COPY_LEARNER : COPY_DEFAULT;
+  const isMinor = ageBracket !== 'adult';
+  const methods = isMinor ? TEACHING_METHODS_LEARNER : TEACHING_METHODS;
+  const copy = isMinor ? COPY_LEARNER : COPY_DEFAULT;
 
   const [phase, setPhase] = useState<Phase>(directEntry ? 'method' : 'topics');
   const [selectedSubject, setSelectedSubject] = useState<OverdueSubject | null>(

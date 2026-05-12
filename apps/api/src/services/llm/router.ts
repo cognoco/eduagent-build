@@ -121,12 +121,21 @@ const CONVERSATION_LANGUAGE_NAMES: Record<ConversationLanguage, string> = {
 };
 
 function getSafetyPreamble(ageBracket?: AgeBracket): string {
-  if (ageBracket === 'adult') {
-    return `You are an educational AI assistant. The current learner is an adult. ${SAFETY_RULES}`;
+  // Defence-in-depth: undefined (unknown age) takes the minor-safe path.
+  if (ageBracket === undefined) {
+    return `You are an educational AI assistant for young learners. ${SAFETY_RULES}`;
   }
-  // 'child', 'adolescent', and unknown (undefined) all use minor-safe framing.
-  // Defence-in-depth: absence of age data defaults to the stricter framing.
-  return `You are an educational AI assistant for young learners. ${SAFETY_RULES}`;
+  switch (ageBracket) {
+    case 'adult':
+      return `You are an educational AI assistant. The current learner is an adult. ${SAFETY_RULES}`;
+    case 'child':
+    case 'adolescent':
+      return `You are an educational AI assistant for young learners. ${SAFETY_RULES}`;
+    default: {
+      const exhaustive: never = ageBracket;
+      throw new Error(`Unexpected ageBracket: ${String(exhaustive)}`);
+    }
+  }
 }
 
 // BKT-C.1 — build the personalization lines that prepend the safety preamble.

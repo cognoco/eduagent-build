@@ -113,7 +113,7 @@ export default function ConsentScreen() {
     [fadeAnim, reduceMotion],
   );
 
-  // Hand-off copy uses the learner's bracket (consent screen is always shown to children).
+  // Hand-off copy adapts to the active profile's age bracket.
   const copy = getConsentHandOffCopy(ageBracket);
 
   // Regulation text uses adult variant since the PARENT reads it.
