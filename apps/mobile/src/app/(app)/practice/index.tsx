@@ -18,6 +18,7 @@ import { useTranslation } from 'react-i18next';
 import type { QuizActivityType, QuizStats } from '@eduagent/schemas';
 
 import { useQuizStats } from '../../../hooks/use-quiz';
+import { useSubjects } from '../../../hooks/use-subjects';
 import { goBackOrReplace, homeHrefForReturnTo } from '../../../lib/navigation';
 import { useReviewSummary } from '../../../hooks/use-progress';
 import { useParentProxy } from '../../../hooks/use-parent-proxy';
@@ -109,6 +110,48 @@ function getActivityCue(
   return null;
 }
 
+function getQuizStatCue(
+  stats: QuizStats | undefined,
+  t: (key: string, opts?: Record<string, unknown>) => string,
+): string | null {
+  if (!stats) return null;
+
+  if (
+    stats.bestScore != null &&
+    stats.bestTotal != null &&
+    stats.bestTotal > 0
+  ) {
+    return t('practiceHub.quiz.bestFraction', {
+      score: stats.bestScore,
+      total: stats.bestTotal,
+    });
+  }
+
+  if ((stats.roundsPlayed ?? 0) > 0) {
+    return t('practiceHub.quiz.playedFraction', {
+      count: stats.roundsPlayed,
+    });
+  }
+
+  return null;
+}
+
+function getLanguageDisplayName(
+  code: string | null | undefined,
+): string | null {
+  if (!code) return null;
+
+  try {
+    return (
+      new Intl.DisplayNames(['en'], { type: 'language' }).of(
+        code.toLowerCase(),
+      ) ?? null
+    );
+  } catch {
+    return null;
+  }
+}
+
 function SectionLabel({ children }: { children: string }): React.ReactElement {
   return (
     <Text
@@ -197,10 +240,15 @@ const styles = StyleSheet.create({
   },
   practiceModeCard: {
     minHeight: 142,
+    width: 168,
     borderRadius: 20,
     borderWidth: 1,
     paddingHorizontal: 14,
     paddingVertical: 14,
+  },
+  practiceSliderContent: {
+    gap: 12,
+    paddingRight: 20,
   },
   historyRow: {
     borderRadius: 20,
@@ -246,6 +294,7 @@ export default function PracticeScreen(): React.ReactElement {
   const colors = usePracticeColors();
   const { data: reviewSummary, isError: reviewError } = useReviewSummary();
   const { data: quizStats, isError: statsError } = useQuizStats();
+  const { data: allSubjects } = useSubjects();
   const { data: assessmentTopics, isError: assessmentTopicsError } =
     useAssessmentEligibleTopics();
 
@@ -303,30 +352,80 @@ export default function PracticeScreen(): React.ReactElement {
           ].join(' · ')
         : t('practiceHub.quiz.defaultSubtitle', { xp: totalXp });
   const assessmentCount = assessmentTopics?.length ?? 0;
+  const nextStudySubject = allSubjects?.find(
+    (subject) => subject.status === 'active',
+  );
   const assessmentSubtitle = assessmentTopicsError
     ? t('practiceHub.assessment.couldNotLoad')
     : assessmentCount > 0
       ? t('practiceHub.assessment.topicsReady', { count: assessmentCount })
-      : t('practiceHub.assessment.afterFinishTopic');
+      : nextStudySubject
+        ? t('practiceHub.assessment.studySubjectFirst', {
+            subject: nextStudySubject.name,
+          })
+        : t('practiceHub.assessment.afterFinishTopic');
   const capitalsCue = getActivityCue(quizStats, 'capitals', t);
   const guessWhoCue = getActivityCue(quizStats, 'guess_who', t);
+  const languageSubjects =
+    allSubjects?.filter(
+      (subject) =>
+        subject.pedagogyMode === 'four_strands' &&
+        subject.languageCode &&
+        subject.status === 'active',
+    ) ?? [];
   const progressCue =
     totalRoundsPlayed > 0
       ? t('practiceHub.history.roundsPlayed', { count: totalRoundsPlayed })
       : t('practiceHub.history.noRoundsYet');
+  const practiceReturnParams = { returnTo: 'practice' } as const;
 
   const handleBack = () => {
     goBackOrReplace(router, homeHrefForReturnTo(returnTo));
   };
 
-  const openQuiz = () => router.push('/(app)/quiz' as never);
+  const openQuiz = () =>
+    router.push({
+      pathname: '/(app)/quiz',
+      params: practiceReturnParams,
+    } as never);
+
+  const openQuizActivity = (activityType: 'capitals' | 'guess_who') => {
+    router.push({
+      pathname: '/(app)/quiz/launch',
+      params: { activityType, ...practiceReturnParams },
+    } as never);
+  };
+
+  const openVocabularyQuiz = (
+    subjectId: string,
+    languageName: string,
+  ): void => {
+    router.push({
+      pathname: '/(app)/quiz/launch',
+      params: {
+        activityType: 'vocabulary',
+        subjectId,
+        languageName,
+        ...practiceReturnParams,
+      },
+    } as never);
+  };
 
   const openAssessment = () => {
-    router.push(
-      assessmentCount > 0
-        ? ('/(app)/practice/assessment-picker' as never)
-        : ('/(app)/library' as never),
-    );
+    if (assessmentCount > 0) {
+      router.push('/(app)/practice/assessment-picker' as never);
+      return;
+    }
+
+    if (nextStudySubject) {
+      router.push({
+        pathname: '/(app)/shelf/[subjectId]',
+        params: { subjectId: nextStudySubject.id },
+      } as never);
+      return;
+    }
+
+    router.push('/(app)/library' as never);
   };
 
   if (isParentProxy) return <Redirect href="/(app)/home" />;
@@ -590,7 +689,10 @@ export default function PracticeScreen(): React.ReactElement {
                     },
                     pointerStyle(),
                   ]}
-                  onPress={openQuiz}
+                  onPress={(event) => {
+                    event?.stopPropagation?.();
+                    openQuizActivity('capitals');
+                  }}
                   accessibilityRole="button"
                   accessibilityLabel={t('practiceHub.quiz.capitals')}
                   testID="practice-quiz-capitals"
@@ -629,7 +731,10 @@ export default function PracticeScreen(): React.ReactElement {
                     },
                     pointerStyle(),
                   ]}
-                  onPress={openQuiz}
+                  onPress={(event) => {
+                    event?.stopPropagation?.();
+                    openQuizActivity('guess_who');
+                  }}
                   accessibilityRole="button"
                   accessibilityLabel={t('practiceHub.quiz.guessWho')}
                   testID="practice-quiz-guess-who"
@@ -666,9 +771,76 @@ export default function PracticeScreen(): React.ReactElement {
             <SectionLabel>
               {t('practiceHub.sections.otherPractice')}
             </SectionLabel>
-            <View className="flex-row gap-3">
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.practiceSliderContent}
+              testID="practice-other-practice-slider"
+            >
+              {languageSubjects.map((subject) => {
+                const displayLanguage =
+                  getLanguageDisplayName(subject.languageCode) ??
+                  subject.name ??
+                  'Language';
+                const vocabCue = getQuizStatCue(
+                  quizStats?.find(
+                    (stat) =>
+                      stat.activityType === 'vocabulary' &&
+                      stat.languageCode === subject.languageCode,
+                  ),
+                  t,
+                );
+                return (
+                  <Pressable
+                    key={subject.id}
+                    className="active:opacity-80"
+                    style={[
+                      styles.practiceModeCard,
+                      {
+                        borderColor: colors.quizBorder,
+                        backgroundColor: colors.quizBg,
+                      },
+                      pointerStyle(),
+                    ]}
+                    onPress={() =>
+                      openVocabularyQuiz(subject.id, displayLanguage)
+                    }
+                    accessibilityRole="button"
+                    accessibilityLabel={t('quiz.index.vocabBasicsTitle', {
+                      language: displayLanguage,
+                    })}
+                    testID={`practice-vocabulary-${subject.id}`}
+                  >
+                    <View className="flex-row items-start justify-between">
+                      <View
+                        style={[
+                          styles.smallIconCircle,
+                          { backgroundColor: colors.quiz },
+                        ]}
+                      >
+                        <Text className="text-body font-bold text-text-inverse">
+                          V
+                        </Text>
+                      </View>
+                      {vocabCue ? (
+                        <CueChip colors={colors}>{vocabCue}</CueChip>
+                      ) : null}
+                    </View>
+                    <View className="mt-4">
+                      <Text className="text-body font-bold text-text-primary">
+                        {t('quiz.index.vocabBasicsTitle', {
+                          language: displayLanguage,
+                        })}
+                      </Text>
+                      <Text className="mt-1 text-caption text-text-secondary">
+                        {t('quiz.index.vocabPlayedSubtitleDefault')}
+                      </Text>
+                    </View>
+                  </Pressable>
+                );
+              })}
               <Pressable
-                className="flex-1 active:opacity-80"
+                className="active:opacity-80"
                 style={[
                   styles.practiceModeCard,
                   {
@@ -704,7 +876,7 @@ export default function PracticeScreen(): React.ReactElement {
                 </View>
               </Pressable>
               <Pressable
-                className="flex-1 active:opacity-80"
+                className="active:opacity-80"
                 style={[
                   styles.practiceModeCard,
                   {
@@ -747,7 +919,7 @@ export default function PracticeScreen(): React.ReactElement {
                   </Text>
                 </View>
               </Pressable>
-            </View>
+            </ScrollView>
           </View>
 
           <View className="gap-3">
@@ -764,7 +936,12 @@ export default function PracticeScreen(): React.ReactElement {
                 },
                 pointerStyle(),
               ]}
-              onPress={() => router.push('/(app)/quiz/history' as never)}
+              onPress={() =>
+                router.push({
+                  pathname: '/(app)/quiz/history',
+                  params: practiceReturnParams,
+                } as never)
+              }
               accessibilityRole="button"
               accessibilityLabel={t('practiceHub.history.title')}
               accessibilityHint={t('practiceHub.history.hintOpenHistory')}

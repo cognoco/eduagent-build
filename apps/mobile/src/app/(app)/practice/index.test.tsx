@@ -9,6 +9,7 @@ const mockPush = jest.fn();
 const mockGoBackOrReplace = jest.fn();
 const mockUseReviewSummary = jest.fn();
 const mockUseQuizStats = jest.fn();
+const mockUseSubjects = jest.fn();
 const mockUseAssessmentEligibleTopics = jest.fn();
 const mockUseParentProxy = jest.fn();
 let mockSearchParams: Record<string, string> = {};
@@ -61,6 +62,13 @@ jest.mock('../../../hooks/use-quiz', () => ({
   useQuizStats: () => mockUseQuizStats(),
 }));
 
+jest.mock(
+  '../../../hooks/use-subjects' /* gc1-allow: hook requires QueryClientProvider; not runnable in unit env */,
+  () => ({
+    useSubjects: () => mockUseSubjects(),
+  }),
+);
+
 jest.mock('../../../hooks/use-assessments', () => ({
   useAssessmentEligibleTopics: () => mockUseAssessmentEligibleTopics(),
 }));
@@ -89,6 +97,18 @@ describe('PracticeScreen', () => {
       isError: false,
     });
     mockUseQuizStats.mockReturnValue({ data: [], isError: false });
+    mockUseSubjects.mockReturnValue({
+      data: [
+        {
+          id: 'subject-it',
+          name: 'Italian',
+          pedagogyMode: 'four_strands',
+          languageCode: 'it',
+          status: 'active',
+        },
+      ],
+      isError: false,
+    });
     mockUseAssessmentEligibleTopics.mockReturnValue({
       data: [
         {
@@ -116,6 +136,7 @@ describe('PracticeScreen', () => {
     screen.getByText('Quick quiz');
     screen.getByText('Capitals');
     screen.getByText("Who's who");
+    screen.getByText('Italian basics');
     screen.getByText('Recite from memory');
     screen.getByText('Beta');
     screen.getByText('Dictation');
@@ -224,6 +245,10 @@ describe('PracticeScreen', () => {
   });
 
   it('routes the assessment row to library when no topics are ready', () => {
+    mockUseSubjects.mockReturnValue({
+      data: [],
+      isError: false,
+    });
     mockUseAssessmentEligibleTopics.mockReturnValue({
       data: [],
       isError: false,
@@ -236,7 +261,23 @@ describe('PracticeScreen', () => {
     expect(mockPush).toHaveBeenCalledWith('/(app)/library');
   });
 
-  it('routes every quiz entry point to the quiz index', () => {
+  it('routes the assessment row to the active subject when a topic must be studied first', () => {
+    mockUseAssessmentEligibleTopics.mockReturnValue({
+      data: [],
+      isError: false,
+    });
+
+    render(<PracticeScreen />);
+
+    screen.getByText('Study Italian first to unlock this');
+    fireEvent.press(screen.getByTestId('practice-assessment'));
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/shelf/[subjectId]',
+      params: { subjectId: 'subject-it' },
+    });
+  });
+
+  it('routes the quiz parent to index and nested options to direct launch', () => {
     render(<PracticeScreen />);
 
     fireEvent.press(screen.getByTestId('practice-quiz'));
@@ -244,13 +285,33 @@ describe('PracticeScreen', () => {
     fireEvent.press(screen.getByTestId('practice-quiz-guess-who'));
 
     expect(mockPush).toHaveBeenCalledTimes(3);
-    expect(mockPush).toHaveBeenNthCalledWith(1, '/(app)/quiz');
-    expect(mockPush).toHaveBeenNthCalledWith(2, '/(app)/quiz');
-    expect(mockPush).toHaveBeenNthCalledWith(3, '/(app)/quiz');
+    expect(mockPush).toHaveBeenNthCalledWith(1, {
+      pathname: '/(app)/quiz',
+      params: { returnTo: 'practice' },
+    });
+    expect(mockPush).toHaveBeenNthCalledWith(2, {
+      pathname: '/(app)/quiz/launch',
+      params: { activityType: 'capitals', returnTo: 'practice' },
+    });
+    expect(mockPush).toHaveBeenNthCalledWith(3, {
+      pathname: '/(app)/quiz/launch',
+      params: { activityType: 'guess_who', returnTo: 'practice' },
+    });
   });
 
-  it('routes recitation, dictation, and quiz history to their flows', () => {
+  it('routes vocabulary, recitation, dictation, and quiz history to their flows', () => {
     render(<PracticeScreen />);
+
+    fireEvent.press(screen.getByTestId('practice-vocabulary-subject-it'));
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/quiz/launch',
+      params: {
+        activityType: 'vocabulary',
+        subjectId: 'subject-it',
+        languageName: 'Italian',
+        returnTo: 'practice',
+      },
+    });
 
     fireEvent.press(screen.getByTestId('practice-recitation'));
     expect(mockPush).toHaveBeenCalledWith({
@@ -262,7 +323,10 @@ describe('PracticeScreen', () => {
     expect(mockPush).toHaveBeenCalledWith('/(app)/dictation');
 
     fireEvent.press(screen.getByTestId('practice-quiz-history'));
-    expect(mockPush).toHaveBeenCalledWith('/(app)/quiz/history');
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/quiz/history',
+      params: { returnTo: 'practice' },
+    });
   });
 
   it('shows per-option quiz cues from activity stats', () => {
@@ -320,6 +384,7 @@ describe('PracticeScreen', () => {
           'practice-review',
           'practice-assessment',
           'practice-quiz',
+          'practice-vocabulary-subject-it',
           'practice-recitation',
           'practice-dictation',
           'practice-quiz-history',
@@ -331,6 +396,7 @@ describe('PracticeScreen', () => {
       'practice-review',
       'practice-assessment',
       'practice-quiz',
+      'practice-vocabulary-subject-it',
       'practice-dictation',
       'practice-recitation',
       'practice-quiz-history',

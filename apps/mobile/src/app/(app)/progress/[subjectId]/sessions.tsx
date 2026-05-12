@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -22,6 +23,16 @@ export default function SubjectSessionsScreen(): React.ReactElement {
     (entry) => entry.subjectId === subjectId,
   );
   const sessions = sessionsQuery.data ?? [];
+  const [loadTimedOut, setLoadTimedOut] = useState(false);
+
+  useEffect(() => {
+    if (!sessionsQuery.isLoading) {
+      setLoadTimedOut(false);
+      return;
+    }
+    const timer = setTimeout(() => setLoadTimedOut(true), 15_000);
+    return () => clearTimeout(timer);
+  }, [sessionsQuery.isLoading]);
 
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
@@ -56,7 +67,30 @@ export default function SubjectSessionsScreen(): React.ReactElement {
           </View>
         </View>
 
-        {sessionsQuery.isLoading ? (
+        {sessionsQuery.isLoading && loadTimedOut ? (
+          <View className="mt-6">
+            <ErrorFallback
+              variant="card"
+              title={t('progress.subjectSessions.loadingTooLong')}
+              message={t('progress.subjectSessions.loadingMessage')}
+              primaryAction={{
+                label: t('common.tryAgain'),
+                onPress: () => void sessionsQuery.refetch(),
+                testID: 'subject-sessions-timeout-retry',
+              }}
+              secondaryAction={{
+                label: t('common.goBack'),
+                onPress: () =>
+                  goBackOrReplace(
+                    router,
+                    `/(app)/progress/${subjectId ?? ''}` as never,
+                  ),
+                testID: 'subject-sessions-timeout-back',
+              }}
+              testID="subject-sessions-timeout"
+            />
+          </View>
+        ) : sessionsQuery.isLoading ? (
           <View className="mt-6" testID="subject-sessions-loading">
             {[0, 1, 2].map((i) => (
               <View

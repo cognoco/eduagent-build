@@ -1197,6 +1197,10 @@ function SubscriptionContent(): React.ReactElement {
   const subscriptionPackages = availablePackages.filter(
     (pkg) => !isTopUpPackage(pkg),
   );
+  const storePurchaseUnavailable =
+    Platform.OS === 'web' &&
+    subscriptionPackages.length === 0 &&
+    !offeringsLoading;
 
   return (
     <View
@@ -1343,36 +1347,52 @@ function SubscriptionContent(): React.ReactElement {
                     })}`}
               </Text>
             )}
-            {!isPaidTier && (
-              <Pressable
-                onPress={() => {
-                  // BUG-403: Scroll to the offerings section.
-                  // BUG-[NOTION-3468bce9]: Always scroll — the Plans section
-                  // renders a static tier comparison when RevenueCat offerings
-                  // are unavailable (e.g. Expo Web, store-publishing blocked),
-                  // so the ref target exists regardless of availablePackages.
-                  // Without this the button was a silent no-op on web.
-                  scrollViewRef.current?.scrollTo({
-                    y: offeringsYRef.current,
-                    animated: true,
-                  });
-                  // Background retry if offerings failed to load — the user
-                  // is now looking at the Plans section; a fresh fetch can
-                  // swap in real packages without a second button press.
-                  if (subscriptionPackages.length === 0 && !offeringsLoading) {
-                    void refetchOfferings();
-                  }
-                }}
-                className="bg-primary rounded-button py-2.5 px-4 mt-3 items-center"
-                testID="free-upgrade-button"
-                accessibilityLabel="Upgrade plan"
-                accessibilityRole="button"
-              >
-                <Text className="text-body font-semibold text-text-inverse">
-                  Upgrade
-                </Text>
-              </Pressable>
-            )}
+            {!isPaidTier &&
+              (storePurchaseUnavailable ? (
+                <View
+                  className="bg-surface-elevated rounded-card px-4 py-3 mt-3"
+                  testID="free-upgrade-unavailable"
+                >
+                  <Text className="text-body-sm font-semibold text-text-primary">
+                    {t('subscription.web.plansOnMobile')}
+                  </Text>
+                  <Text className="text-caption text-text-secondary mt-1">
+                    {t('subscription.web.storePurchaseUnavailable')}
+                  </Text>
+                </View>
+              ) : (
+                <Pressable
+                  onPress={() => {
+                    // BUG-403: Scroll to the offerings section.
+                    // BUG-[NOTION-3468bce9]: Always scroll — the Plans section
+                    // renders a static tier comparison when RevenueCat offerings
+                    // are unavailable (e.g. Expo Web, store-publishing blocked),
+                    // so the ref target exists regardless of availablePackages.
+                    // Without this the button was a silent no-op on web.
+                    scrollViewRef.current?.scrollTo({
+                      y: offeringsYRef.current,
+                      animated: true,
+                    });
+                    // Background retry if offerings failed to load — the user
+                    // is now looking at the Plans section; a fresh fetch can
+                    // swap in real packages without a second button press.
+                    if (
+                      subscriptionPackages.length === 0 &&
+                      !offeringsLoading
+                    ) {
+                      void refetchOfferings();
+                    }
+                  }}
+                  className="bg-primary rounded-button py-2.5 px-4 mt-3 items-center"
+                  testID="free-upgrade-button"
+                  accessibilityLabel="Upgrade plan"
+                  accessibilityRole="button"
+                >
+                  <Text className="text-body font-semibold text-text-inverse">
+                    Upgrade
+                  </Text>
+                </Pressable>
+              ))}
           </View>
 
           {/* Cancellation notice */}

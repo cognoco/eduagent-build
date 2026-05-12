@@ -302,35 +302,11 @@ describe('ChildDetailScreen — new sections', () => {
     expect(screen.queryByTestId('child-weekly-headline-card')).toBeNull();
   });
 
-  // Monthly highlights card
-  it('shows child-latest-monthly-card when a monthly report exists', () => {
-    mockUseProfileReports.mockReturnValue({
-      data: [
-        {
-          id: 'report-1',
-          reportMonth: '2026-04-01',
-          viewedAt: null,
-          createdAt: '2026-04-30T00:00:00Z',
-          headlineStat: {
-            label: 'Topics mastered',
-            value: 5,
-            comparison: 'up from 3 last month',
-          },
-          highlights: ['Made great progress this month!'],
-          nextSteps: ['Try the next chapter.'],
-        },
-      ],
-    });
-
+  // Reports button
+  it('shows reports button that navigates to reports list', () => {
     render(<ChildDetailScreen />);
 
-    expect(screen.getByTestId('child-latest-monthly-card')).toBeTruthy();
-  });
-
-  it('hides child-latest-monthly-card when no reports exist', () => {
-    render(<ChildDetailScreen />);
-
-    expect(screen.queryByTestId('child-latest-monthly-card')).toBeNull();
+    expect(screen.getByTestId('child-reports-button')).toBeTruthy();
   });
 
   // Currently-working-on card

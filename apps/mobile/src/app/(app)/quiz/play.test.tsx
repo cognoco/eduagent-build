@@ -40,11 +40,6 @@ jest.mock('../../../lib/theme', () => ({
   }),
 }));
 
-const mockGoBackOrReplace = jest.fn();
-jest.mock('../../../lib/navigation', () => ({
-  goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
-}));
-
 jest.mock('../../../components/quiz/GuessWhoQuestion', () => ({
   GuessWhoQuestion: () => null,
 }));
@@ -96,11 +91,13 @@ let mockRound: object | null = {
     },
   ],
 };
+let mockReturnTo: string | null = null;
 
 jest.mock('./_layout', () => ({
   useQuizFlow: () => ({
     round: mockRound,
     activityType: mockRound ? 'capitals' : null,
+    returnTo: mockReturnTo,
     subjectId: null,
     setPrefetchedRoundId: mockSetPrefetchedRoundId,
     setCompletionResult: mockSetCompletionResult,
@@ -112,6 +109,7 @@ const { default: QuizPlayScreen } = require('./play');
 describe('QuizPlayScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockReturnTo = null;
     mockCheckAnswer.mockResolvedValue({ correct: true });
     // Reset to a valid round for each test
     mockRound = {
@@ -151,6 +149,11 @@ describe('QuizPlayScreen', () => {
         questionIndex: 0,
         answerGiven: 'Bratislava',
         answerMode: 'free_text',
+      });
+    });
+    await waitFor(() => {
+      screen.getByTestId('quiz-correct-celebration', {
+        includeHiddenElements: true,
       });
     });
   });
@@ -976,18 +979,25 @@ describe('QuizPlayScreen — error feedback [BUG-799 / BUG-806]', () => {
         transparent: true,
       }),
     ).not.toBeNull();
-    expect(mockGoBackOrReplace).not.toHaveBeenCalled();
+    expect(mockReplace).not.toHaveBeenCalled();
   });
 
-  it('[BUG-892] Confirming the quit modal navigates back to /quiz', () => {
+  it('[BUG-892] Confirming the quit modal replaces to /quiz', () => {
     render(<QuizPlayScreen />);
 
     fireEvent.press(screen.getByTestId('quiz-play-quit'));
     fireEvent.press(screen.getByTestId('quiz-quit-confirm'));
 
-    expect(mockGoBackOrReplace).toHaveBeenCalledWith(
-      expect.anything(),
-      '/(app)/quiz',
-    );
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/quiz');
+  });
+
+  it('confirming quit replaces to Practice when launched from Practice', () => {
+    mockReturnTo = 'practice';
+    render(<QuizPlayScreen />);
+
+    fireEvent.press(screen.getByTestId('quiz-play-quit'));
+    fireEvent.press(screen.getByTestId('quiz-quit-confirm'));
+
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/practice');
   });
 });

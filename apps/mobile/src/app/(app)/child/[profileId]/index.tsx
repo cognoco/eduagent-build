@@ -1,4 +1,11 @@
-import { View, Text, Pressable, ScrollView, Modal } from 'react-native';
+import {
+  View,
+  Text,
+  Pressable,
+  ScrollView,
+  Modal,
+  Platform,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, type Href } from 'expo-router';
 import { platformAlert } from '../../../../lib/platform-alert';
@@ -11,7 +18,6 @@ import {
   CurrentlyWorkingOnCard,
   RecentSessionsList,
   RetentionSignal,
-  ReportsListCard,
   SubjectCard,
   hasSubjectActivity,
   type RetentionStatus,
@@ -20,7 +26,6 @@ import { useChildDetail } from '../../../../hooks/use-dashboard';
 import {
   useChildInventory,
   useChildProgressHistory,
-  useProfileReports,
 } from '../../../../hooks/use-progress';
 import { useCelebration } from '../../../../hooks/use-celebration';
 import {
@@ -36,7 +41,7 @@ import { useChildLearnerProfile } from '../../../../hooks/use-learner-profile';
 import { ACCOMMODATION_OPTIONS } from '../../../../lib/accommodation-options';
 import { getGracePeriodDaysRemaining } from '../../../../lib/consent-grace';
 import { FAMILY_HOME_PATH, goBackOrReplace } from '../../../../lib/navigation';
-import { buildGrowthData, formatMonthLabel } from '../../../../lib/progress';
+import { buildGrowthData } from '../../../../lib/progress';
 import { useThemeColors } from '../../../../lib/theme';
 
 function SubjectSkeleton(): React.ReactNode {
@@ -91,7 +96,6 @@ export default function ChildDetailScreen() {
   const { data: inventory } = useChildInventory(profileId, {
     enabled: canLoadLearningSurfaces,
   });
-  const monthlyReports = useProfileReports(profileId);
   const { data: history } = useChildProgressHistory(
     profileId,
     {
@@ -381,8 +385,6 @@ export default function ChildDetailScreen() {
     );
   }
 
-  const latestMonthlyReport = monthlyReports.data?.[0];
-
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
       <View className="px-5 pt-4 pb-2 flex-row items-center">
@@ -468,46 +470,6 @@ export default function ChildDetailScreen() {
             <Text className="text-body-sm text-text-secondary mt-1">
               {child.weeklyHeadline.comparison}
             </Text>
-          </Pressable>
-        ) : null}
-
-        {latestMonthlyReport ? (
-          <Pressable
-            onPress={() => {
-              if (!profileId) return;
-              router.push({
-                pathname: '/(app)/child/[profileId]/report/[reportId]',
-                params: { profileId, reportId: latestMonthlyReport.id },
-              } as never);
-            }}
-            className="bg-surface rounded-card p-4 mt-4"
-            accessibilityRole="button"
-            accessibilityLabel={t('parentView.reports.openReport', {
-              month: latestMonthlyReport.reportMonth,
-            })}
-            testID="child-latest-monthly-card"
-          >
-            <Text className="text-body font-semibold text-text-primary">
-              {t('parentView.reports.monthlyReport')}
-            </Text>
-            <Text className="text-caption text-text-secondary mt-1">
-              {formatMonthLabel(latestMonthlyReport.reportMonth)}
-            </Text>
-            <View className="mt-3 gap-2">
-              {latestMonthlyReport.highlights.slice(0, 3).map((highlight) => (
-                <Text
-                  key={highlight}
-                  className="text-body-sm text-text-secondary"
-                >
-                  - {highlight}
-                </Text>
-              ))}
-              {latestMonthlyReport.nextSteps.slice(0, 2).map((step) => (
-                <Text key={step} className="text-body-sm text-text-secondary">
-                  - {step}
-                </Text>
-              ))}
-            </View>
           </Pressable>
         ) : null}
 
@@ -600,9 +562,37 @@ export default function ChildDetailScreen() {
           </View>
         ) : null}
 
-        {/* Reports card — always visible */}
+        {/* Reports — single button that opens the full list */}
         {profileId ? (
-          <ReportsListCard profileId={profileId} interactive />
+          <Pressable
+            onPress={() =>
+              router.push({
+                pathname: '/(app)/child/[profileId]/reports',
+                params: { profileId },
+              } as never)
+            }
+            className="flex-row items-center justify-between bg-surface rounded-card px-4 py-3.5 mt-4"
+            style={Platform.OS === 'web' ? { cursor: 'pointer' } : undefined}
+            accessibilityRole="button"
+            accessibilityLabel={t('progress.previousReports.title')}
+            testID="child-reports-button"
+          >
+            <View className="flex-row items-center flex-1">
+              <Ionicons
+                name="document-text-outline"
+                size={20}
+                color={colors.textSecondary}
+              />
+              <Text className="text-body font-semibold text-text-primary ms-3">
+                {t('progress.previousReports.title')}
+              </Text>
+            </View>
+            <Ionicons
+              name="chevron-forward"
+              size={18}
+              color={colors.textSecondary}
+            />
+          </Pressable>
         ) : null}
 
         {history ? (
