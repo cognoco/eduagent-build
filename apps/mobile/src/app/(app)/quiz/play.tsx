@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { hapticError, hapticLight, hapticSuccess } from '../../../lib/haptics';
+import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type {
@@ -57,6 +58,7 @@ function formatElapsedTime(ms: number): string {
 }
 
 export default function QuizPlayScreen(): React.ReactElement {
+  const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
@@ -409,33 +411,32 @@ export default function QuizPlayScreen(): React.ReactElement {
         testID="quiz-play-no-round"
       >
         <Text className="text-h3 font-semibold text-text-primary text-center mb-2">
-          No round loaded
+          {t('quiz.play.noRoundTitle')}
         </Text>
         <Text className="text-body text-text-secondary text-center mb-6">
-          Something went wrong loading the quiz round. You can try again or go
-          back to the quiz home.
+          {t('quiz.play.noRoundBody')}
         </Text>
         <View className="flex-row gap-3 w-full">
           <Pressable
             onPress={() => router.replace('/(app)/quiz' as never)}
             className="flex-1 bg-primary rounded-button px-4 py-3 min-h-[48px] items-center justify-center"
             accessibilityRole="button"
-            accessibilityLabel="Retry"
+            accessibilityLabel={t('common.retry')}
             testID="quiz-play-no-round-retry"
           >
             <Text className="text-body font-semibold text-text-inverse">
-              Retry
+              {t('common.retry')}
             </Text>
           </Pressable>
           <Pressable
             onPress={() => goBackOrReplace(router, '/(app)/quiz')}
             className="flex-1 bg-surface-elevated rounded-button px-4 py-3 min-h-[48px] items-center justify-center"
             accessibilityRole="button"
-            accessibilityLabel="Go Home"
+            accessibilityLabel={t('common.goHome')}
             testID="quiz-play-no-round-home"
           >
             <Text className="text-body font-semibold text-text-primary">
-              Go Home
+              {t('common.goHome')}
             </Text>
           </Pressable>
         </View>
@@ -477,7 +478,7 @@ export default function QuizPlayScreen(): React.ReactElement {
             onPress={handleQuit}
             className="min-h-[44px] min-w-[44px] items-center justify-center"
             accessibilityRole="button"
-            accessibilityLabel="Quit quiz"
+            accessibilityLabel={t('quiz.play.quitLabel')}
             testID="quiz-play-quit"
             hitSlop={8}
           >
@@ -486,21 +487,20 @@ export default function QuizPlayScreen(): React.ReactElement {
         </View>
         <View className="flex-1 items-center justify-center">
           <Text className="text-h3 font-semibold text-text-primary text-center mb-2">
-            This round couldn&apos;t load
+            {t('quiz.play.malformedTitle')}
           </Text>
           <Text className="text-body text-text-secondary text-center mb-6">
-            We didn&apos;t get the answer choices for this question. Try a fresh
-            round, or come back in a moment.
+            {t('quiz.play.malformedBody')}
           </Text>
           <Pressable
             onPress={handleQuit}
             className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center"
             accessibilityRole="button"
-            accessibilityLabel="Back to quiz home"
+            accessibilityLabel={t('quiz.play.backToQuizHome')}
             testID="quiz-play-malformed-back"
           >
             <Text className="text-body font-semibold text-text-inverse">
-              Back to quiz home
+              {t('quiz.play.backToQuizHome')}
             </Text>
           </Pressable>
         </View>
@@ -701,10 +701,10 @@ export default function QuizPlayScreen(): React.ReactElement {
   const isFinalQuestion = currentIndex + 1 >= totalQuestions;
   const quizTitle =
     question.type === 'guess_who'
-      ? "Who's who"
+      ? t('quiz.play.titleGuessWho')
       : question.type === 'capitals'
-        ? 'Capitals'
-        : 'Vocabulary';
+        ? t('quiz.play.titleCapitals')
+        : t('quiz.play.titleVocabulary');
   const elapsedSeconds = Math.floor(elapsedMs / 1000);
   const elapsedLabel = formatElapsedTime(elapsedMs);
   const revealedAnswer =
@@ -722,7 +722,7 @@ export default function QuizPlayScreen(): React.ReactElement {
           onPress={handleQuit}
           className="min-h-[44px] min-w-[44px] items-center justify-center"
           accessibilityRole="button"
-          accessibilityLabel="Quit quiz"
+          accessibilityLabel={t('quiz.play.quitLabel')}
           testID="quiz-play-quit"
           hitSlop={8}
         >
@@ -782,7 +782,7 @@ export default function QuizPlayScreen(): React.ReactElement {
           know so they don't think their connection is fine. */}
         {answerCheckFailed ? (
           <Text className="text-caption text-warning text-center mb-2 px-5">
-            Answer check failed — result may be inaccurate
+            {t('quiz.play.answerCheckFailed')}
           </Text>
         ) : null}
 
@@ -790,7 +790,7 @@ export default function QuizPlayScreen(): React.ReactElement {
           {currentQuestion.type === 'capitals' ? (
             <>
               <Text className="mb-2 text-body text-text-secondary">
-                What is the capital of...
+                {t('quiz.play.capitalPrompt')}
               </Text>
               <Text className="text-display font-bold text-text-primary">
                 {currentQuestion.country}?
@@ -799,7 +799,7 @@ export default function QuizPlayScreen(): React.ReactElement {
           ) : currentQuestion.type === 'vocabulary' ? (
             <>
               <Text className="mb-2 text-body text-text-secondary">
-                Translate:
+                {t('quiz.play.translatePrompt')}
               </Text>
               <Text className="text-display font-bold text-text-primary">
                 {currentQuestion.term}
@@ -807,7 +807,7 @@ export default function QuizPlayScreen(): React.ReactElement {
             </>
           ) : answerState === 'unanswered' ? (
             <Text className="text-center text-h3 font-semibold text-text-primary">
-              Who is this person?
+              {t('quiz.play.guessWhoPrompt')}
             </Text>
           ) : null}
         </View>
@@ -816,7 +816,7 @@ export default function QuizPlayScreen(): React.ReactElement {
           <View className="mt-6 items-center gap-2 px-5">
             <ActivityIndicator size="small" color={colors.primary} />
             <Text className="text-center text-body-sm text-text-secondary">
-              Checking...
+              {t('quiz.play.checking')}
             </Text>
           </View>
         ) : null}
@@ -826,12 +826,12 @@ export default function QuizPlayScreen(): React.ReactElement {
             {question.freeTextEligible ? (
               <View testID="quiz-free-text-input">
                 <Text className="mb-2 text-body-sm text-text-secondary">
-                  Type your answer
+                  {t('quiz.play.typeYourAnswer')}
                 </Text>
                 <TextInput
                   testID="quiz-free-text-field"
                   className="rounded-card bg-surface-elevated px-4 py-4 text-body text-text-primary"
-                  placeholder="Type your answer..."
+                  placeholder={t('quiz.play.typeYourAnswerPlaceholder')}
                   placeholderTextColor={colors.textSecondary}
                   value={freeTextAnswer}
                   onChangeText={setFreeTextAnswer}
@@ -861,7 +861,7 @@ export default function QuizPlayScreen(): React.ReactElement {
                         : 'text-text-secondary'
                     }`}
                   >
-                    Submit
+                    {t('quiz.play.submit')}
                   </Text>
                 </Pressable>
               </View>
@@ -912,10 +912,10 @@ export default function QuizPlayScreen(): React.ReactElement {
                 </View>
                 <Text className="mt-3 text-center text-h3 font-bold text-success">
                   {question.type === 'guess_who'
-                    ? `You found them in ${guessWhoCluesUsed} clue${
-                        guessWhoCluesUsed !== 1 ? 's' : ''
-                      }!`
-                    : 'You discovered it!'}
+                    ? t('quiz.play.foundThemClues', {
+                        count: guessWhoCluesUsed,
+                      })
+                    : t('quiz.play.discoveredIt')}
                 </Text>
                 {revealedAnswer ? (
                   <Text
@@ -928,20 +928,20 @@ export default function QuizPlayScreen(): React.ReactElement {
                 <Text className="mt-1 text-center text-body-sm text-text-secondary">
                   {isFinalQuestion
                     ? roundAutoSaved
-                      ? 'Saved. Ready when you are.'
-                      : 'Saving your result...'
-                    : 'Locked in. Nice find.'}
+                      ? t('quiz.play.savedReady')
+                      : t('quiz.play.savingResult')
+                    : t('quiz.play.lockedIn')}
                 </Text>
               </View>
             ) : question.type === 'guess_who' ? (
               <View className="mb-3">
                 <Text className="text-center text-h3 font-semibold text-text-primary">
-                  Good try.
+                  {t('quiz.play.goodTry')}
                 </Text>
                 {/* [F-Q-07] Reveal the person's name after wrong/skip */}
                 {correctAnswer ? (
                   <Text className="mt-1 text-center text-body-sm text-text-secondary">
-                    The answer was{' '}
+                    {t('quiz.play.theAnswerWas')}
                     <Text className="font-bold text-success">
                       {correctAnswer}
                     </Text>
@@ -961,10 +961,10 @@ export default function QuizPlayScreen(): React.ReactElement {
               testID="quiz-answer-feedback"
             >
               {showContinueHint
-                ? 'Ready for the next one'
+                ? t('quiz.play.readyForNext')
                 : answerState === 'correct'
-                  ? 'Correct'
-                  : 'Not quite'}
+                  ? t('quiz.play.correct')
+                  : t('quiz.play.notQuite')}
             </Text>
             {isFinalQuestion && roundAutoSaved ? (
               <View className="mt-4 gap-3">
@@ -979,7 +979,7 @@ export default function QuizPlayScreen(): React.ReactElement {
                   testID="quiz-final-see-results"
                 >
                   <Text className="text-body font-semibold text-text-inverse">
-                    See results
+                    {t('quiz.play.seeResults')}
                   </Text>
                 </Pressable>
                 <Pressable
@@ -993,13 +993,13 @@ export default function QuizPlayScreen(): React.ReactElement {
                   testID="quiz-final-one-more"
                 >
                   <Text className="text-body font-semibold text-text-primary">
-                    Wait, just one more!
+                    {t('quiz.play.oneMore')}
                   </Text>
                 </Pressable>
               </View>
             ) : roundAutoSaveStarted ? (
               <Text className="mt-4 text-center text-body-sm text-text-secondary">
-                Saving your round...
+                {t('quiz.play.savingRound')}
               </Text>
             ) : !isFinalQuestion ? (
               <Pressable
@@ -1013,7 +1013,7 @@ export default function QuizPlayScreen(): React.ReactElement {
                 testID="quiz-next-question"
               >
                 <Text className="text-body font-semibold text-text-inverse">
-                  Next question
+                  {t('quiz.play.nextQuestion')}
                 </Text>
               </Pressable>
             ) : null}
@@ -1030,7 +1030,7 @@ export default function QuizPlayScreen(): React.ReactElement {
                 accessibilityLabel="Dispute this answer"
               >
                 <Text className="text-caption text-text-secondary underline">
-                  Not quite right?
+                  {t('quiz.play.notQuiteRight')}
                 </Text>
               </Pressable>
             ) : answerState === 'wrong' && disputedIndices.has(currentIndex) ? (
@@ -1038,7 +1038,7 @@ export default function QuizPlayScreen(): React.ReactElement {
                 className="mt-2 text-center text-caption text-text-secondary"
                 testID="quiz-dispute-noted"
               >
-                Noted — we'll review this
+                {t('quiz.play.disputeNoted')}
               </Text>
             ) : null}
           </View>
@@ -1048,7 +1048,7 @@ export default function QuizPlayScreen(): React.ReactElement {
           <View className="mt-6 items-center gap-2 px-5">
             <ActivityIndicator size="small" color={colors.primary} />
             <Text className="text-center text-body-sm text-text-secondary">
-              Scoring your round...
+              {t('quiz.play.scoringRound')}
             </Text>
           </View>
         ) : null}
@@ -1057,7 +1057,7 @@ export default function QuizPlayScreen(): React.ReactElement {
           <View className="mt-6 px-5" testID="quiz-play-error">
             <View className="rounded-card bg-surface p-4">
               <Text className="text-body-sm font-semibold text-text-primary">
-                Couldn&apos;t save your round
+                {t('quiz.play.couldNotSave')}
               </Text>
               <Text className="mt-1 text-body-sm text-text-secondary">
                 {completeError}
@@ -1067,22 +1067,22 @@ export default function QuizPlayScreen(): React.ReactElement {
                   onPress={() => submitRound()}
                   className="flex-1 min-h-[44px] items-center justify-center rounded-button bg-primary px-4 py-2"
                   accessibilityRole="button"
-                  accessibilityLabel="Retry"
+                  accessibilityLabel={t('common.retry')}
                   testID="quiz-play-retry"
                 >
                   <Text className="text-body-sm font-semibold text-text-inverse">
-                    Retry
+                    {t('common.retry')}
                   </Text>
                 </Pressable>
                 <Pressable
                   onPress={handleQuit}
                   className="flex-1 min-h-[44px] items-center justify-center rounded-button bg-surface-elevated px-4 py-2"
                   accessibilityRole="button"
-                  accessibilityLabel="Exit without saving"
+                  accessibilityLabel={t('quiz.play.exit')}
                   testID="quiz-play-exit"
                 >
                   <Text className="text-body-sm font-semibold text-text-primary">
-                    Exit
+                    {t('quiz.play.exit')}
                   </Text>
                 </Pressable>
               </View>
@@ -1112,12 +1112,14 @@ export default function QuizPlayScreen(): React.ReactElement {
             onPress={(e) => e.stopPropagation()}
           >
             <Text className="text-h3 font-bold text-text-primary text-center">
-              {hasAnsweredQuestions ? 'Pause here?' : 'Leave this quiz?'}
+              {hasAnsweredQuestions
+                ? t('quiz.play.pauseHere')
+                : t('quiz.play.leaveQuiz')}
             </Text>
             <Text className="text-body-sm text-text-secondary text-center mt-3 leading-relaxed">
               {hasAnsweredQuestions
-                ? "You've answered part of this round. Save it now, or jump back in for one more."
-                : 'No answers yet, so there is nothing to save.'}
+                ? t('quiz.play.pauseBody')
+                : t('quiz.play.leaveBody')}
             </Text>
             <View className="mt-5 gap-3">
               <Pressable
@@ -1125,14 +1127,16 @@ export default function QuizPlayScreen(): React.ReactElement {
                 className="bg-primary rounded-button py-3 items-center min-h-[48px] justify-center"
                 accessibilityRole="button"
                 accessibilityLabel={
-                  hasAnsweredQuestions ? 'Wait, just one more' : 'Keep playing'
+                  hasAnsweredQuestions
+                    ? t('quiz.play.oneMore')
+                    : t('quiz.play.keepPlaying')
                 }
                 testID="quiz-quit-cancel"
               >
                 <Text className="text-body font-semibold text-text-inverse">
                   {hasAnsweredQuestions
-                    ? 'Wait, just one more!'
-                    : 'Keep playing'}
+                    ? t('quiz.play.oneMore')
+                    : t('quiz.play.keepPlaying')}
                 </Text>
               </Pressable>
               {hasAnsweredQuestions ? (
@@ -1144,7 +1148,7 @@ export default function QuizPlayScreen(): React.ReactElement {
                   testID="quiz-quit-save"
                 >
                   <Text className="text-body font-semibold text-text-primary">
-                    Save and finish
+                    {t('quiz.play.saveAndFinish')}
                   </Text>
                 </Pressable>
               ) : null}
@@ -1153,12 +1157,16 @@ export default function QuizPlayScreen(): React.ReactElement {
                 className="rounded-button py-3 items-center min-h-[48px] justify-center bg-surface"
                 accessibilityRole="button"
                 accessibilityLabel={
-                  hasAnsweredQuestions ? 'Leave without saving' : 'Leave quiz'
+                  hasAnsweredQuestions
+                    ? t('quiz.play.leaveWithoutSaving')
+                    : t('quiz.play.leaveQuizButton')
                 }
                 testID="quiz-quit-confirm"
               >
                 <Text className="text-body font-semibold text-danger">
-                  {hasAnsweredQuestions ? 'Leave without saving' : 'Leave quiz'}
+                  {hasAnsweredQuestions
+                    ? t('quiz.play.leaveWithoutSaving')
+                    : t('quiz.play.leaveQuizButton')}
                 </Text>
               </Pressable>
             </View>

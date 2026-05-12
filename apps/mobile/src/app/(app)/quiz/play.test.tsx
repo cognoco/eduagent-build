@@ -32,6 +32,7 @@ jest.mock('expo-haptics', () => ({
 }));
 
 jest.mock('../../../lib/theme', () => ({
+  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
   useThemeColors: () => ({
     primary: '#00b4d8',
     textPrimary: '#111827',
@@ -78,7 +79,7 @@ jest.mock('../../../components/quiz/GuessWhoQuestion', () => ({
 }));
 
 jest.mock(
-  '../../../components/common' /* gc1-allow: PolarStar is native-animated celebration component; stub prevents native module crash */,
+  '../../../components/common/celebrations/PolarStar' /* gc1-allow: PolarStar is native-animated celebration component; stub prevents native module crash */,
   () => ({
     PolarStar: ({ testID }: { testID?: string }) => {
       const { Text } = require('react-native');

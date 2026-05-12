@@ -102,7 +102,10 @@ describe('QuizHistoryScreen', () => {
   it('navigates to round detail on row press', () => {
     render(<QuizHistoryScreen />);
     fireEvent.press(screen.getByTestId('quiz-history-row-round-guess'));
-    expect(mockPush).toHaveBeenCalledWith('/(app)/quiz/round-guess');
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/quiz/[roundId]',
+      params: { roundId: 'round-guess' },
+    });
   });
 
   it('shows loading state', () => {

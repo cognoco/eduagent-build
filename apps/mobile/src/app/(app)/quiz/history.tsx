@@ -166,7 +166,12 @@ export default function QuizHistoryScreen() {
                   key={round.id}
                   testID={`quiz-history-row-${round.id}`}
                   className="bg-surface-elevated mx-4 mb-2 rounded-xl p-4"
-                  onPress={() => router.push(`/(app)/quiz/${round.id}`)}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/(app)/quiz/[roundId]',
+                      params: { roundId: round.id },
+                    } as never)
+                  }
                   accessibilityRole="button"
                   accessibilityLabel={t('quiz.history.rowLabel', {
                     label,

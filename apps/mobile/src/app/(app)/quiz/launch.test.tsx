@@ -105,6 +105,7 @@ jest.mock('react-native-safe-area-context', () => ({
 }));
 
 jest.mock('../../../lib/theme', () => ({
+  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
   useThemeColors: () => ({
     primary: '#00b4d8',
     textPrimary: '#111827',
@@ -119,7 +120,7 @@ jest.mock('../../../lib/navigation', () => ({
 }));
 
 jest.mock(
-  '../../../components/common' /* gc1-allow: DeskLampAnimation is native-animated SVG; stub prevents native module crash */,
+  '../../../components/common/DeskLampAnimation' /* gc1-allow: DeskLampAnimation is native-animated SVG; stub prevents native module crash */,
   () => ({
     DeskLampAnimation: ({ testID }: { testID?: string }) => {
       const { Text } = require('react-native');
@@ -222,7 +223,7 @@ describe('QuizLaunchScreen', () => {
       render(<QuizLaunchScreen />);
 
       screen.getByTestId('quiz-launch-thinking-lamp');
-      screen.getByText('Building your round');
+      screen.getByText('quiz.launch.buildingRound');
 
       act(() => {
         jest.advanceTimersByTime(29_999);

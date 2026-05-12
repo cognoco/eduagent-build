@@ -293,7 +293,7 @@ export default function QuizLaunchScreen(): React.ReactElement {
         testID="quiz-launch-thinking-lamp"
       />
       <Text className="mt-5 text-center text-h3 font-bold text-text-primary">
-        Building your round
+        {t('quiz.launch.buildingRound')}
       </Text>
       <Text className="mt-2 text-center text-body text-text-secondary">
         {t(

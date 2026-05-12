@@ -649,7 +649,8 @@
         "rateLimited": "For mange forespørsler – vent et øyeblikk og prøv igjen.",
         "validationError": "Noe gikk galt. Prøv en annen aktivitet.",
         "genericShort": "Noe gikk galt. Prøv igjen!"
-      }
+      },
+      "buildingRound": "Lager runden din"
     },
     "round": {
       "goBack": "Gå tilbake",
@@ -686,6 +687,53 @@
         "guessWho": "Gjett hvem",
         "vocabulary": "Vokabular"
       }
+    },
+    "play": {
+      "noRoundTitle": "Ingen runde lastet",
+      "noRoundBody": "Noe gikk galt under lasting av quiz-runden. Du kan prøve igjen eller gå tilbake til quiz-hjemmesiden.",
+      "malformedTitle": "Denne runden kunne ikke lastes",
+      "malformedBody": "Vi fikk ikke svaralternativene for dette spørsmålet. Prøv en ny runde, eller kom tilbake om et øyeblikk.",
+      "backToQuizHome": "Tilbake til quiz-hjem",
+      "titleGuessWho": "Hvem er hvem",
+      "titleCapitals": "Hovedsteder",
+      "titleVocabulary": "Vokabular",
+      "quitLabel": "Avslutt quiz",
+      "answerCheckFailed": "Sjekking av svar mislyktes – resultatet kan være unøyaktig",
+      "capitalPrompt": "Hva er hovedstaden i ...",
+      "translatePrompt": "Oversett:",
+      "guessWhoPrompt": "Hvem er denne personen?",
+      "checking": "Sjekker ...",
+      "typeYourAnswer": "Skriv inn svaret ditt",
+      "typeYourAnswerPlaceholder": "Skriv inn svaret ditt ...",
+      "submit": "Send inn",
+      "foundThemClues_one": "Du fant dem på {{count}} hint!",
+      "foundThemClues_other": "Du fant dem på {{count}} hint!",
+      "discoveredIt": "Du oppdaget det!",
+      "savedReady": "Lagret. Klar når du er det.",
+      "savingResult": "Lagrer resultatet ditt ...",
+      "lockedIn": "Låst. Godt funnet.",
+      "goodTry": "Godt forsøk.",
+      "theAnswerWas": "Svaret var ",
+      "readyForNext": "Klar for neste",
+      "correct": "Riktig",
+      "notQuite": "Ikke helt",
+      "seeResults": "Se resultater",
+      "oneMore": "Vent, bare én til!",
+      "savingRound": "Lagrer runden din ...",
+      "nextQuestion": "Neste spørsmål",
+      "notQuiteRight": "Ikke helt riktig?",
+      "disputeNoted": "Notert – vi skal se på det",
+      "scoringRound": "Poengsetter runden din ...",
+      "couldNotSave": "Kunne ikke lagre runden din",
+      "exit": "Avslutt",
+      "pauseHere": "Pause her?",
+      "leaveQuiz": "Forlate denne quizen?",
+      "pauseBody": "Du har svart på en del av denne runden. Lagre den nå, eller hopp tilbake for én til.",
+      "leaveBody": "Ingen svar ennå, så det er ingenting å lagre.",
+      "keepPlaying": "Fortsett å spille",
+      "saveAndFinish": "Lagre og avslutt",
+      "leaveWithoutSaving": "Forlat uten å lagre",
+      "leaveQuizButton": "Forlat quiz"
     }
   },
   "dictation": {

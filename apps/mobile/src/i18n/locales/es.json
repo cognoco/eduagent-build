@@ -649,7 +649,8 @@
         "rateLimited": "Demasiadas solicitudes — espera un momento e inténtalo de nuevo.",
         "validationError": "Algo salió mal. Prueba una actividad diferente.",
         "genericShort": "Algo salió mal. ¡Inténtalo de nuevo!"
-      }
+      },
+      "buildingRound": "Creando tu ronda"
     },
     "round": {
       "goBack": "Volver",
@@ -686,6 +687,53 @@
         "guessWho": "Adivina Quién",
         "vocabulary": "Vocabulario"
       }
+    },
+    "play": {
+      "noRoundTitle": "No se cargó la ronda",
+      "noRoundBody": "Algo salió mal al cargar la ronda del quiz. Puedes intentarlo de nuevo o volver al inicio del quiz.",
+      "malformedTitle": "No se pudo cargar esta ronda",
+      "malformedBody": "No recibimos las opciones de respuesta para esta pregunta. Prueba una nueva ronda o vuelve en un momento.",
+      "backToQuizHome": "Volver al inicio del quiz",
+      "titleGuessWho": "¿Quién es quién?",
+      "titleCapitals": "Capitales",
+      "titleVocabulary": "Vocabulario",
+      "quitLabel": "Salir del quiz",
+      "answerCheckFailed": "Fallo al comprobar la respuesta. El resultado puede no ser exacto.",
+      "capitalPrompt": "¿Cuál es la capital de...?",
+      "translatePrompt": "Traduce:",
+      "guessWhoPrompt": "¿Quién es esta persona?",
+      "checking": "Comprobando...",
+      "typeYourAnswer": "Escribe tu respuesta",
+      "typeYourAnswerPlaceholder": "Escribe tu respuesta...",
+      "submit": "Enviar",
+      "foundThemClues_one": "¡Lo encontraste con {{count}} pista!",
+      "foundThemClues_other": "¡Lo encontraste con {{count}} pistas!",
+      "discoveredIt": "¡Lo descubriste!",
+      "savedReady": "Guardado. Listo cuando quieras.",
+      "savingResult": "Guardando tu resultado...",
+      "lockedIn": "Confirmado. Buen hallazgo.",
+      "goodTry": "Buen intento.",
+      "theAnswerWas": "La respuesta era ",
+      "readyForNext": "Listo para la siguiente",
+      "correct": "Correcto",
+      "notQuite": "Casi",
+      "seeResults": "Ver resultados",
+      "oneMore": "¡Espera, solo una más!",
+      "savingRound": "Guardando tu ronda...",
+      "nextQuestion": "Siguiente pregunta",
+      "notQuiteRight": "¿No es del todo correcto?",
+      "disputeNoted": "Anotado, lo revisaremos",
+      "scoringRound": "Puntuando tu ronda...",
+      "couldNotSave": "No se pudo guardar tu ronda",
+      "exit": "Salir",
+      "pauseHere": "¿Pausar aquí?",
+      "leaveQuiz": "¿Salir de este quiz?",
+      "pauseBody": "Has respondido parte de esta ronda. Guárdala ahora o vuelve a jugar una más.",
+      "leaveBody": "Aún no hay respuestas, así que no hay nada que guardar.",
+      "keepPlaying": "Seguir jugando",
+      "saveAndFinish": "Guardar y terminar",
+      "leaveWithoutSaving": "Salir sin guardar",
+      "leaveQuizButton": "Salir del quiz"
     }
   },
   "dictation": {
