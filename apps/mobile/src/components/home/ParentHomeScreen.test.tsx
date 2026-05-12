@@ -240,7 +240,7 @@ describe('ParentHomeScreen', () => {
 
     screen.getByTestId('parent-home-tonight-section');
     screen.getByText('Ask Emma: what made Fractions click today?');
-    screen.getByText('18 min this week · Fractions · confidence improving');
+    screen.getByText('Fractions · 18 min this week');
   });
 
   it('ranks multi-child tonight prompts by sessions — most active child appears first', () => {

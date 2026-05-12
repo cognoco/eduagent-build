@@ -15,7 +15,6 @@ import {
   activeRoundDetailResponseSchema,
   completedRoundDetailResponseSchema,
   type ClientQuizQuestion,
-  type CefrLevel,
   type GenerateRoundInput,
   type QuizQuestion,
 } from '@eduagent/schemas';
@@ -30,17 +29,11 @@ import {
   completeQuizRound,
   formatActivityLabel,
   getCelebrationTier,
-  getVocabularyRoundContext,
-  getGuessWhoRoundContext,
+  buildAndGenerateRound,
   computeRoundStats,
-  generateQuizRound,
-  getRecentAnswers,
-  getRecentCompletedByActivity,
   getRoundByIdOrThrow,
   listRecentCompletedRounds,
   markMissedItemsSurfaced,
-  getDueMasteryItems,
-  shouldApplyDifficultyBump,
 } from '../services/quiz';
 import { inngest } from '../inngest/client';
 
@@ -111,91 +104,6 @@ function toClientSafeQuestions(
       isLibraryItem: q.isLibraryItem,
       topicId: q.topicId,
     };
-  });
-}
-
-/**
- * Route-layer orchestration only. Every read goes through
- * `services/quiz/queries.ts`, every mutation through `generate-round.ts` or
- * `complete-round.ts`. This file must not import `drizzle-orm`,
- * `@eduagent/database` schema tables, or `createScopedRepository` directly.
- */
-async function buildAndGenerateRound(
-  db: Database,
-  profileId: string,
-  profileMeta: ProfileMeta,
-  input: GenerateRoundInput,
-) {
-  const recentAnswers = await getRecentAnswers(
-    db,
-    profileId,
-    input.activityType,
-  );
-  let languageCode: string | undefined;
-  let cefrCeiling: CefrLevel | undefined;
-  let allVocabulary: Array<{ term: string; translation: string }> | undefined;
-  let libraryItems: Array<{
-    id: string;
-    question: string;
-    answer: string;
-    topicId?: string;
-    vocabularyId?: string;
-    cefrLevel?: string | null;
-  }> = [];
-  let topicTitles: string[] | undefined;
-
-  if (input.activityType === 'vocabulary') {
-    if (!input.subjectId) {
-      throw new VocabularyContextError(
-        'subjectId is required for vocabulary rounds',
-      );
-    }
-
-    const context = await getVocabularyRoundContext(
-      db,
-      profileId,
-      input.subjectId,
-    );
-    languageCode = context.languageCode;
-    cefrCeiling = context.cefrCeiling;
-    allVocabulary = context.allVocabulary;
-    libraryItems = context.libraryItems;
-  } else if (input.activityType === 'guess_who') {
-    const context = await getGuessWhoRoundContext(db, profileId);
-    topicTitles = context.topicTitles;
-    libraryItems = await getDueMasteryItems(db, profileId, 'guess_who');
-  } else if (input.activityType === 'capitals') {
-    libraryItems = await getDueMasteryItems(db, profileId, 'capitals');
-  }
-
-  const recentForBump = await getRecentCompletedByActivity(
-    db,
-    profileId,
-    input.activityType,
-    3,
-  );
-  const completedForBump = recentForBump
-    .filter((r) => r.status === 'completed')
-    .map((r) => ({
-      score: r.score,
-      total: r.total,
-      completedAt: r.completedAt,
-    }));
-  const difficultyBump = shouldApplyDifficultyBump(completedForBump);
-
-  return generateQuizRound({
-    db,
-    profileId,
-    activityType: input.activityType,
-    birthYear: profileMeta.birthYear,
-    themePreference: input.themePreference,
-    libraryItems,
-    recentAnswers,
-    languageCode,
-    cefrCeiling,
-    allVocabulary,
-    topicTitles,
-    difficultyBump,
   });
 }
 

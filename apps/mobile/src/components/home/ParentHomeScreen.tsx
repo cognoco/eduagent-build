@@ -80,43 +80,13 @@ function formatFocusLabel(
   return focus ?? t('home.parent.childCard.readyToStart');
 }
 
-function formatSignalLabel(
-  dashboardChild: DashboardChild | undefined,
-  t: (key: string, opts?: Record<string, unknown>) => string,
-): string {
-  if (!dashboardChild) return t('home.parent.childCard.statusUpdating');
-  const headline = dashboardChild.weeklyHeadline;
-  if (
-    headline &&
-    typeof headline.value === 'number' &&
-    typeof headline.label === 'string'
-  ) {
-    return headline.comparison ?? headline.label.toLowerCase();
-  }
-  if (
-    dashboardChild.retentionTrend === 'improving' ||
-    dashboardChild.trend === 'up'
-  ) {
-    return t('home.parent.childCard.confidenceImproving');
-  }
-  if (
-    dashboardChild.retentionTrend === 'declining' ||
-    dashboardChild.trend === 'down'
-  ) {
-    return t('home.parent.childCard.needsEncouragement');
-  }
-  return t('home.parent.childCard.steady');
-}
-
 function formatChildSnapshot(
   dashboardChild: DashboardChild | undefined,
   t: (key: string, opts?: Record<string, unknown>) => string,
 ): string {
-  return t('home.parent.childCard.statusLine', {
-    activity: formatActivityLabel(dashboardChild, t),
-    focus: formatFocusLabel(dashboardChild, t),
-    signal: formatSignalLabel(dashboardChild, t),
-  });
+  const focus = formatFocusLabel(dashboardChild, t);
+  const activity = formatActivityLabel(dashboardChild, t);
+  return `${focus} · ${activity}`;
 }
 
 interface TonightPrompt {
@@ -325,8 +295,8 @@ function ChildCommandCard({
           testID={`parent-home-child-progress-${child.id}`}
         />
         <ChildActionButton
-          icon="calendar-outline"
-          label={t('home.parent.childCard.recapAction')}
+          icon="document-text-outline"
+          label={t('home.parent.childCard.reportsAction')}
           onPress={onOpenReports}
           testID={`parent-home-weekly-report-${child.id}`}
         />
@@ -589,7 +559,7 @@ export function ParentHomeScreen({
               child={child}
               dashboardChild={findDashboardChild(dashboard, child.id)}
               highlight={index === 0}
-              onOpenProgress={() => pushChildDetail(child.id)}
+              onOpenProgress={() => pushChildReports(child.id)}
               onOpenReports={() => pushChildReports(child.id)}
               onOpenNudge={() => setSheetChildId(child.id)}
               t={t}

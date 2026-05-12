@@ -1,11 +1,11 @@
-jest.mock('../inngest/client', () => ({
-  inngest: {
-    send: jest.fn().mockResolvedValue(undefined),
-  },
-}));
+const { createInngestTransportCapture } =
+  require('../test-utils/inngest-transport-capture') as typeof import('../test-utils/inngest-transport-capture');
+
+const mockInngestTransport = createInngestTransportCapture();
+
+jest.mock('../inngest/client', () => mockInngestTransport.module); // gc1-allow: inngest framework boundary
 
 import { Hono } from 'hono';
-import { inngest } from '../inngest/client';
 import { maintenanceRoutes } from './maintenance';
 
 type TestEnv = {
@@ -27,7 +27,7 @@ function createTestApp(bindings: TestEnv['Bindings']) {
 
 describe('maintenanceRoutes', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    mockInngestTransport.clear();
   });
 
   it('rejects memory facts backfill without the maintenance secret', async () => {
@@ -38,7 +38,7 @@ describe('maintenanceRoutes', () => {
     });
 
     expect(res.status).toBe(403);
-    expect(inngest.send).not.toHaveBeenCalled();
+    expect(mockInngestTransport.sentEvents).toHaveLength(0);
   });
 
   it('dispatches the memory facts backfill event with a valid secret', async () => {
@@ -54,12 +54,14 @@ describe('maintenanceRoutes', () => {
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ queued: true });
-    expect(inngest.send).toHaveBeenCalledWith({
-      name: 'admin/memory-facts-backfill.requested',
-      data: {
-        requestedAt: expect.any(String),
-        environment: 'staging',
+    expect(mockInngestTransport.sentPayloads()).toEqual([
+      {
+        name: 'admin/memory-facts-backfill.requested',
+        data: {
+          requestedAt: expect.any(String),
+          environment: 'staging',
+        },
       },
-    });
+    ]);
   });
 });
