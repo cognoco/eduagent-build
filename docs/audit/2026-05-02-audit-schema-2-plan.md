@@ -8,7 +8,7 @@
 
 36 of 41 API route files (88%) call `c.json(result)` without runtime validation against a Zod response schema. This violates the CLAUDE.md non-negotiable: "`@eduagent/schemas` is the shared contract."
 
-The contract is **not missing** — `@eduagent/schemas` already exports ~50 response schemas (e.g., `bookmarkListResponseSchema`, `checkoutResponseSchema`, `filingResponseSchema`, `quickCheckResponseSchema`). They go unused. Only `bookmarks.ts` calls `responseSchema.parse(...)` before `c.json(...)`. Several files (`assessments.ts`, `consent.ts`, `billing.ts`) **import** response schemas but never call `.parse()` on them — strong evidence that a migration was started and abandoned.
+The contract is **not missing** — `@eduagent/schemas` already exports **22 response schemas across 13 schema files** (not ~50 as this plan originally stated; TYPES-1 recon 2026-05-02 enumerated all exports). Of those 22: 9 fit their target routes and are ready to wire, 3 billing response schemas also fit but are orphaned, 1 drifted (`feedbackResponseSchema` was missing `queued` — fixed in C1 P1/PR-01), and 6 have no matching route (LLM output or non-existent endpoints). Only `bookmarks.ts` calls `responseSchema.parse(...)` before `c.json(...)`. `assessments.ts` and `consent.ts` **import** schemas named `*ResponseSchema` but use them as input validators — the schemas are actually request-shaped (TYPES-1 F2; fixed by rename in C1 P4/PR-03). **Corrected PR scope (TYPES-2 2026-05-03):** PR 1 = 12 wraps (9 orphan-fit + 3 billing); PR 2 = schema renames for assessments+consent + author missing response schemas + SSE `streamErrorFrameSchema`.
 
 TypeScript types still flow correctly via return-type inference and `satisfies` clauses, which is why this stayed invisible: the type-system report says "fine"; only runtime validation is missing.
 
@@ -16,10 +16,10 @@ TypeScript types still flow correctly via return-type inference and `satisfies` 
 
 | File | c.json count | Class | Notes |
 |---|---|---|---|
-| learner-profile.ts | 22 | RAW | Core profile data; impacts mobile home screen |
+| learner-profile.ts | 22 | RAW | Core profile data; impacts mobile home screen. **No matching response schema exists in `@eduagent/schemas`** — PR 1 must author one (TYPES-1 F3) |
 | sessions.ts | 18 | RAW | Core learning flow; `.parse()` exists but only for Inngest events |
 | dashboard.ts | 16 | RAW | Parent-facing analytics |
-| billing.ts | 15 | RAW | Imports schemas but never uses |
+| billing.ts | 15 | RAW | Imports only **request** schemas (`checkoutRequestSchema`, `topUpRequestSchema`, `byokWaitlistSchema`, `familyAddProfileSchema`). The three **response** schemas (`checkoutResponseSchema`, `portalResponseSchema`, `cancelResponseSchema`) are in the package but orphaned (never imported) — all 3 fit and are ready to wire (TYPES-1 F5, TYPES-2 F1) |
 | test-seed.ts | 13 | RAW | Test surface — lower priority |
 | settings.ts | 12 | RAW | |
 | retention.ts | 11 | RAW | |
