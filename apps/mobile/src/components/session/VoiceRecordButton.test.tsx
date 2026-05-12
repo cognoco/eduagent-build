@@ -15,16 +15,6 @@ jest.mock('../../lib/haptics', () => ({
   hapticSuccess: () => mockHapticSuccess(),
 }));
 
-jest.mock('../../lib/theme', () => ({
-  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
-  useThemeColors: () => ({
-    muted: '#888',
-    primary: '#007AFF',
-    textInverse: '#fff',
-    textSecondary: '#666',
-  }),
-}));
-
 jest.mock('@expo/vector-icons', () => {
   const { Text } = require('react-native');
   return {

@@ -4,29 +4,22 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react-native';
+import { Alert } from 'react-native';
 import { SessionFooter } from './SessionFooter';
 
 jest.mock('../session', () => ({
+  // gc1-allow: footer tests isolate prompt/button behavior from sibling session components
   QuestionCounter: () => null,
   LibraryPrompt: () => null,
 }));
 
 jest.mock('../../lib/format-api-error', () => ({
+  // gc1-allow: error formatting is covered separately; this test asserts footer recovery behavior
   formatApiError: (e: unknown) => String(e),
 }));
 
-jest.mock('../../lib/theme', () => ({
-  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
-  useThemeColors: () => ({
-    primary: '#00b4d8',
-    textSecondary: '#999',
-    error: '#f44',
-    warning: '#ff9800',
-    success: '#4caf50',
-  }),
-}));
-
 jest.mock('../../hooks/use-speech-recognition', () => ({
+  // gc1-allow: native speech recognition is an external device boundary for NoteInput rendering
   useSpeechRecognition: () => ({
     status: 'idle',
     transcript: '',
@@ -73,7 +66,10 @@ function createProps(overrides: Record<string, unknown> = {}) {
 
 describe('SessionFooter', () => {
   beforeEach(() => {
+    jest.restoreAllMocks();
     jest.clearAllMocks();
+    // platformAlert delegates to Alert.alert on non-web platforms in Jest.
+    jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
   });
 
   it('shows filing prompt with accept/dismiss for freeform sessions', () => {
@@ -138,6 +134,45 @@ describe('SessionFooter', () => {
         onSuccess: expect.any(Function),
         onError: expect.any(Function),
       }),
+    );
+  });
+
+  it('keeps the note editor open when note saving fails', () => {
+    const setShowNoteInput = jest.fn();
+    const createNote = {
+      mutate: jest.fn(
+        (_vars: unknown, options?: { onError?: (error: Error) => void }) => {
+          options?.onError?.(new Error('network down'));
+        },
+      ),
+      isPending: false,
+    };
+    const props = createProps({
+      showFilingPrompt: false,
+      notePromptOffered: true,
+      showNoteInput: true,
+      setShowNoteInput,
+      topicId: 'topic-1',
+      sessionId: 'session-1',
+      createNote,
+    });
+    render(<SessionFooter {...(props as any)} />);
+
+    fireEvent.changeText(
+      screen.getByTestId('note-text-input'),
+      'This took a while to write',
+    );
+    fireEvent.press(screen.getByText('Save'));
+
+    expect(setShowNoteInput).not.toHaveBeenCalled();
+    expect(screen.getByTestId('note-text-input').props.value).toBe(
+      'This took a while to write',
+    );
+    expect(Alert.alert).toHaveBeenCalledWith(
+      'Could not save note',
+      'Error: network down',
+      undefined,
+      undefined,
     );
   });
 });

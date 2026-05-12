@@ -127,6 +127,7 @@ Two production dead-code branches removed 2026-04-19 in commit `970a82a5`: `AgeB
 - [feedback_adversarial_review_patterns.md](feedback_adversarial_review_patterns.md) — Body double-consumption, classify-before-format, dead code cleanup.
 - [feedback_llm_prompt_injection_surfacing.md](feedback_llm_prompt_injection_surfacing.md) — LLM reads user A → surfaces to user B = injection vector.
 - [feedback_verify_full_ci.md](feedback_verify_full_ci.md) — On CI failure, run full validation.
+- [feedback_pr_required_checks.md](feedback_pr_required_checks.md) — Missing required PR checks can be branch-protection/workflow-trigger drift; diagnose before changing product tests.
 - [feedback_thorough_investigation.md](feedback_thorough_investigation.md) — NEVER take shortcuts in codebase analysis.
 - [feedback_verify_before_declaring_done.md](feedback_verify_before_declaring_done.md) — Never declare a fix done without testing it first.
 - [feedback_verify_before_marking_done.md](feedback_verify_before_marking_done.md) — Never mark bugs Done in Notion unless 100% confident.

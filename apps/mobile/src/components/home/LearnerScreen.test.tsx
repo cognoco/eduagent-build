@@ -41,6 +41,9 @@ const mockFetch = createRoutedMockFetch({
     pendingNotices: [],
     demoMode: false,
   },
+  '/learner-profile': {
+    profile: { accommodationMode: 'none' },
+  },
   '/subjects': { subjects: [] },
   '/usage': {
     usage: {
@@ -103,19 +106,12 @@ jest.mock('../common', () => ({
   BookPageFlipAnimation: () => null,
 }));
 
-jest.mock('../../lib/theme', () => ({
-  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
-  useThemeColors: () => ({
-    textPrimary: '#ffffff',
-    textSecondary: '#94a3b8',
-    textTertiary: '#94a3b8',
-    primary: '#00b4d8',
-    primarySoft: 'rgba(0,180,216,0.16)',
-    border: '#2a2a54',
-    muted: '#94a3b8',
+jest.mock(
+  '../feedback/FeedbackProvider' /* gc1-allow: native feedback modal/i18n subtree is outside LearnerScreen's contract */,
+  () => ({
+    useFeedbackContext: () => ({ openFeedback: jest.fn() }),
   }),
-  useTheme: () => ({ colorScheme: 'dark' }),
-}));
+);
 
 jest.mock('../../lib/greeting', () => ({
   getGreeting: (_name: string) => ({
@@ -220,6 +216,9 @@ describe('LearnerScreen', () => {
       children: [],
       pendingNotices: [],
       demoMode: false,
+    });
+    mockFetch.setRoute('/learner-profile', {
+      profile: { accommodationMode: 'none' },
     });
     mockFetch.setRoute('/subjects', { subjects: [] });
     mockFetch.setRoute('/usage', {

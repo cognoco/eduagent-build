@@ -11,29 +11,39 @@
  * 3. POST /v1/subjects — 201 creates subject
  * 4. POST /v1/subjects — 400 with invalid body
  * 5. GET /v1/subjects/:id — 200 returns subject
- * 6. GET /v1/subjects/:id — 404 when not found
+ * 6. GET /v1/subjects/:id — 404 when not found/cross-profile
  * 7. PATCH /v1/subjects/:id — 200 updates subject
- * 8. PATCH /v1/subjects/:id — 404 when not found
+ * 8. PATCH /v1/subjects/:id — 404 when not found/cross-profile
  * 9. GET /v1/subjects — 401 without auth
  */
 
 import { buildIntegrationEnv, cleanupAccounts } from './helpers';
 import { buildAuthHeaders, createProfileViaRoute } from './route-fixtures';
+import {
+  createSubjectWithStructureResponseSchema,
+  subjectListResponseSchema,
+  subjectResponseSchema,
+} from '@eduagent/schemas';
 
 import { app } from '../../apps/api/src/index';
 
 const TEST_ENV = buildIntegrationEnv();
 const SUBJECT_AUTH_USER_ID = 'integration-subject-user';
 const SUBJECT_AUTH_EMAIL = 'integration-subjects@integration.test';
+const OTHER_SUBJECT_AUTH_USER_ID = 'integration-subject-other-user';
+const OTHER_SUBJECT_AUTH_EMAIL = 'integration-subjects-other@integration.test';
 
 const SUBJECT_ID = '00000000-0000-4000-8000-000000000040';
 
-async function createOwnerProfile(): Promise<string> {
+async function createOwnerProfile(
+  user = { userId: SUBJECT_AUTH_USER_ID, email: SUBJECT_AUTH_EMAIL },
+  displayName = 'Integration Learner',
+): Promise<string> {
   const profile = await createProfileViaRoute({
     app,
     env: TEST_ENV,
-    user: { userId: SUBJECT_AUTH_USER_ID, email: SUBJECT_AUTH_EMAIL },
-    displayName: 'Integration Learner',
+    user,
+    displayName,
     birthYear: 2000,
   });
   return profile.id;
@@ -41,7 +51,8 @@ async function createOwnerProfile(): Promise<string> {
 
 async function createSubject(
   profileId: string,
-  name: string
+  name: string,
+  user = { userId: SUBJECT_AUTH_USER_ID, email: SUBJECT_AUTH_EMAIL },
 ): Promise<{
   id: string;
   name: string;
@@ -51,16 +62,16 @@ async function createSubject(
     {
       method: 'POST',
       headers: buildAuthHeaders(
-        { sub: SUBJECT_AUTH_USER_ID, email: SUBJECT_AUTH_EMAIL },
-        profileId
+        { sub: user.userId, email: user.email },
+        profileId,
       ),
       body: JSON.stringify({ name }),
     },
-    TEST_ENV
+    TEST_ENV,
   );
 
   expect(res.status).toBe(201);
-  const body = await res.json();
+  const body = createSubjectWithStructureResponseSchema.parse(await res.json());
   expect(body.subject).toMatchObject({ id: expect.any(String), name });
   return body.subject as { id: string; name: string };
 }
@@ -68,15 +79,15 @@ async function createSubject(
 beforeEach(async () => {
   jest.clearAllMocks();
   await cleanupAccounts({
-    emails: [SUBJECT_AUTH_EMAIL],
-    clerkUserIds: [SUBJECT_AUTH_USER_ID],
+    emails: [SUBJECT_AUTH_EMAIL, OTHER_SUBJECT_AUTH_EMAIL],
+    clerkUserIds: [SUBJECT_AUTH_USER_ID, OTHER_SUBJECT_AUTH_USER_ID],
   });
 });
 
 afterAll(async () => {
   await cleanupAccounts({
-    emails: [SUBJECT_AUTH_EMAIL],
-    clerkUserIds: [SUBJECT_AUTH_USER_ID],
+    emails: [SUBJECT_AUTH_EMAIL, OTHER_SUBJECT_AUTH_EMAIL],
+    clerkUserIds: [SUBJECT_AUTH_USER_ID, OTHER_SUBJECT_AUTH_USER_ID],
   });
 });
 
@@ -95,14 +106,14 @@ describe('Integration: GET /v1/subjects', () => {
         method: 'GET',
         headers: buildAuthHeaders(
           { sub: SUBJECT_AUTH_USER_ID, email: SUBJECT_AUTH_EMAIL },
-          profileId
+          profileId,
         ),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = subjectListResponseSchema.parse(await res.json());
     expect(body.subjects).toHaveLength(1);
     expect(body.subjects[0].id).toBe(subject.id);
     expect(body.subjects[0].name).toBe('Mathematics');
@@ -119,11 +130,11 @@ describe('Integration: GET /v1/subjects', () => {
         method: 'PATCH',
         headers: buildAuthHeaders(
           { sub: SUBJECT_AUTH_USER_ID, email: SUBJECT_AUTH_EMAIL },
-          profileId
+          profileId,
         ),
         body: JSON.stringify({ status: 'archived' }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
     expect(archiveRes.status).toBe(200);
 
@@ -133,17 +144,17 @@ describe('Integration: GET /v1/subjects', () => {
         method: 'GET',
         headers: buildAuthHeaders(
           { sub: SUBJECT_AUTH_USER_ID, email: SUBJECT_AUTH_EMAIL },
-          profileId
+          profileId,
         ),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = subjectListResponseSchema.parse(await res.json());
     expect(body.subjects).toHaveLength(2);
     expect(body.subjects.map((row: { id: string }) => row.id)).toEqual(
-      expect.arrayContaining([active.id, archived.id])
+      expect.arrayContaining([active.id, archived.id]),
     );
   });
 
@@ -168,15 +179,17 @@ describe('Integration: POST /v1/subjects', () => {
         method: 'POST',
         headers: buildAuthHeaders(
           { sub: SUBJECT_AUTH_USER_ID, email: SUBJECT_AUTH_EMAIL },
-          profileId
+          profileId,
         ),
         body: JSON.stringify({ name: 'Mathematics' }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(201);
-    const body = await res.json();
+    const body = createSubjectWithStructureResponseSchema.parse(
+      await res.json(),
+    );
     expect(body.subject).toMatchObject({
       id: expect.any(String),
       name: 'Mathematics',
@@ -193,11 +206,11 @@ describe('Integration: POST /v1/subjects', () => {
         method: 'POST',
         headers: buildAuthHeaders(
           { sub: SUBJECT_AUTH_USER_ID, email: SUBJECT_AUTH_EMAIL },
-          profileId
+          profileId,
         ),
         body: JSON.stringify({ name: '' }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(400);
@@ -219,15 +232,67 @@ describe('Integration: GET /v1/subjects/:id', () => {
         method: 'GET',
         headers: buildAuthHeaders(
           { sub: SUBJECT_AUTH_USER_ID, email: SUBJECT_AUTH_EMAIL },
-          profileId
+          profileId,
         ),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = subjectResponseSchema.parse(await res.json());
     expect(body.subject).toMatchObject({ id: subject.id, name: 'Mathematics' });
+  });
+
+  it('does not expose a subject across two seeded profiles', async () => {
+    const ownerProfileId = await createOwnerProfile();
+    const otherProfileId = await createOwnerProfile(
+      {
+        userId: OTHER_SUBJECT_AUTH_USER_ID,
+        email: OTHER_SUBJECT_AUTH_EMAIL,
+      },
+      'Other Integration Learner',
+    );
+    const subject = await createSubject(ownerProfileId, 'Private Mathematics');
+    const otherHeaders = buildAuthHeaders(
+      {
+        sub: OTHER_SUBJECT_AUTH_USER_ID,
+        email: OTHER_SUBJECT_AUTH_EMAIL,
+      },
+      otherProfileId,
+    );
+
+    const detailRes = await app.request(
+      `/v1/subjects/${subject.id}`,
+      {
+        method: 'GET',
+        headers: otherHeaders,
+      },
+      TEST_ENV,
+    );
+    expect(detailRes.status).toBe(404);
+
+    const patchRes = await app.request(
+      `/v1/subjects/${subject.id}`,
+      {
+        method: 'PATCH',
+        headers: otherHeaders,
+        body: JSON.stringify({ name: 'Hijacked Mathematics' }),
+      },
+      TEST_ENV,
+    );
+    expect(patchRes.status).toBe(404);
+
+    const listRes = await app.request(
+      '/v1/subjects?includeInactive=true',
+      {
+        method: 'GET',
+        headers: otherHeaders,
+      },
+      TEST_ENV,
+    );
+    expect(listRes.status).toBe(200);
+    const listBody = subjectListResponseSchema.parse(await listRes.json());
+    expect(listBody.subjects).toEqual([]);
   });
 
   it('returns 404 when not found', async () => {
@@ -239,10 +304,10 @@ describe('Integration: GET /v1/subjects/:id', () => {
         method: 'GET',
         headers: buildAuthHeaders(
           { sub: SUBJECT_AUTH_USER_ID, email: SUBJECT_AUTH_EMAIL },
-          profileId
+          profileId,
         ),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(404);
@@ -266,15 +331,15 @@ describe('Integration: PATCH /v1/subjects/:id', () => {
         method: 'PATCH',
         headers: buildAuthHeaders(
           { sub: SUBJECT_AUTH_USER_ID, email: SUBJECT_AUTH_EMAIL },
-          profileId
+          profileId,
         ),
         body: JSON.stringify({ name: 'Advanced Mathematics' }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body = subjectResponseSchema.parse(await res.json());
     expect(body.subject).toMatchObject({
       id: subject.id,
       name: 'Advanced Mathematics',
@@ -290,11 +355,11 @@ describe('Integration: PATCH /v1/subjects/:id', () => {
         method: 'PATCH',
         headers: buildAuthHeaders(
           { sub: SUBJECT_AUTH_USER_ID, email: SUBJECT_AUTH_EMAIL },
-          profileId
+          profileId,
         ),
         body: JSON.stringify({ name: 'Updated Name' }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(404);

@@ -1,17 +1,26 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
+import { ThemeContext } from '../../lib/theme';
 import { LibrarySearchBar } from './LibrarySearchBar';
 
-jest.mock('../../lib/theme', () => ({
-  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
-  useThemeColors: () => ({
-    textSecondary: '#525252',
-    muted: '#a3a3a3',
-  }),
-}));
+// renderWithTheme is only needed when a test asserts theme-derived style props.
+function renderWithTheme(ui: Parameters<typeof render>[0]) {
+  return render(
+    <ThemeContext.Provider
+      value={{
+        colorScheme: 'light',
+        setColorScheme: jest.fn(),
+        accentPresetId: null,
+        setAccentPresetId: jest.fn(),
+      }}
+    >
+      {ui}
+    </ThemeContext.Provider>,
+  );
+}
 
 describe('LibrarySearchBar', () => {
   it('renders with placeholder', () => {
-    render(
+    renderWithTheme(
       <LibrarySearchBar
         value=""
         onChangeText={jest.fn()}
@@ -24,7 +33,7 @@ describe('LibrarySearchBar', () => {
 
   it('calls onChangeText when typing', () => {
     const onChangeText = jest.fn();
-    render(
+    renderWithTheme(
       <LibrarySearchBar
         value=""
         onChangeText={onChangeText}
@@ -37,7 +46,7 @@ describe('LibrarySearchBar', () => {
 
   it('shows clear button when value is non-empty and clears on press', () => {
     const onChangeText = jest.fn();
-    render(
+    renderWithTheme(
       <LibrarySearchBar
         value="math"
         onChangeText={onChangeText}
@@ -50,7 +59,7 @@ describe('LibrarySearchBar', () => {
   });
 
   it('hides clear button when value is empty', () => {
-    render(
+    renderWithTheme(
       <LibrarySearchBar
         value=""
         onChangeText={jest.fn()}
@@ -63,7 +72,7 @@ describe('LibrarySearchBar', () => {
   // [a11y sweep] Break tests: the clear-search icon must be a11y-hidden —
   // the Pressable accessibilityLabel "Clear search" already conveys the action.
   it('marks the clear icon wrapper as accessibility-hidden [a11y sweep]', () => {
-    const { getByTestId } = render(
+    const { getByTestId } = renderWithTheme(
       <LibrarySearchBar
         value="math"
         onChangeText={jest.fn()}
@@ -80,7 +89,7 @@ describe('LibrarySearchBar', () => {
   });
 
   it('clear icon is excluded from default visible-only queries [a11y sweep]', () => {
-    const { queryByTestId } = render(
+    const { queryByTestId } = renderWithTheme(
       <LibrarySearchBar
         value="math"
         onChangeText={jest.fn()}

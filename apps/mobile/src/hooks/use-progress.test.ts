@@ -1,6 +1,8 @@
 import { renderHook, waitFor } from '@testing-library/react-native';
 import { QueryClient } from '@tanstack/react-query';
-import { createQueryWrapper } from '../test-utils/app-hook-test-utils';
+import { setActiveProfileId } from '../lib/api-client';
+import { ForbiddenError, UpstreamError } from '../lib/api-errors';
+import { createHookWrapper } from '../test-utils/app-hook-test-utils';
 import {
   useSubjectProgress,
   useOverallProgress,
@@ -12,49 +14,29 @@ import {
 } from './use-progress';
 
 const mockFetch = jest.fn();
-jest.mock('../lib/api-client', () => ({
-  useApiClient: () => {
-    const { hc } = require('hono/client');
-    return hc('http://localhost', {
-      fetch: async (...args: unknown[]) => {
-        const res = await mockFetch(...(args as Parameters<typeof fetch>));
-        if (!res.ok) {
-          const text = await res
-            .clone()
-            .text()
-            .catch(() => res.statusText);
-          throw new Error(`API error ${res.status}: ${text}`);
-        }
-        return res;
-      },
-    });
-  },
-}));
-
-jest.mock('../lib/profile', () => ({
-  useProfile: () => ({
-    activeProfile: { id: 'test-profile-id' },
-  }),
-}));
+const originalFetch = globalThis.fetch;
 
 let queryClient: QueryClient;
 
 function createWrapper() {
-  const w = createQueryWrapper();
+  const w = createHookWrapper();
   queryClient = w.queryClient;
   return w.wrapper;
 }
 
+beforeEach(() => {
+  mockFetch.mockReset();
+  globalThis.fetch = mockFetch as unknown as typeof globalThis.fetch;
+  setActiveProfileId('test-profile-id');
+});
+
+afterEach(() => {
+  queryClient?.clear();
+  setActiveProfileId(undefined);
+  globalThis.fetch = originalFetch;
+});
+
 describe('useSubjectProgress', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   it('fetches subject progress from API', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
@@ -87,9 +69,15 @@ describe('useSubjectProgress', () => {
     expect(result.current.data?.topicsTotal).toBe(10);
   });
 
-  it('handles API errors', async () => {
+  it('classifies forbidden API responses through the real client boundary', async () => {
     mockFetch.mockResolvedValueOnce(
-      new Response('Network error', { status: 500 }),
+      new Response(
+        JSON.stringify({
+          code: 'SUBJECT_INACTIVE',
+          message: 'This subject is archived',
+        }),
+        { status: 403 },
+      ),
     );
 
     const { result } = renderHook(() => useSubjectProgress('sub-1'), {
@@ -100,20 +88,42 @@ describe('useSubjectProgress', () => {
       expect(result.current.isError).toBe(true);
     });
 
-    expect(result.current.error).toBeInstanceOf(Error);
+    expect(result.current.error).toBeInstanceOf(ForbiddenError);
+    expect(result.current.error).toMatchObject({
+      apiCode: 'SUBJECT_INACTIVE',
+      message: 'This subject is archived',
+    });
+  });
+
+  it('classifies server errors through the real client boundary', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          code: 'INTERNAL_ERROR',
+          message: 'Internal Server Error',
+        }),
+        { status: 500 },
+      ),
+    );
+
+    const { result } = renderHook(() => useSubjectProgress('sub-1'), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isError).toBe(true);
+    });
+
+    expect(result.current.error).toBeInstanceOf(UpstreamError);
+    expect(result.current.error).toMatchObject({
+      code: 'INTERNAL_ERROR',
+      message: 'Internal Server Error',
+      status: 500,
+    });
   });
 });
 
 describe('useOverallProgress', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   it('fetches overall progress from API', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
@@ -151,15 +161,6 @@ describe('useOverallProgress', () => {
 });
 
 describe('useContinueSuggestion', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   it('fetches continue suggestion from API', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
@@ -205,15 +206,6 @@ describe('useContinueSuggestion', () => {
 });
 
 describe('useLearningResumeTarget', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   it('fetches resume target with optional scope', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
@@ -254,15 +246,6 @@ describe('useLearningResumeTarget', () => {
 });
 
 describe('useReviewSummary', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   it('fetches review summary from API', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({ totalOverdue: 6 }), { status: 200 }),
@@ -282,15 +265,6 @@ describe('useReviewSummary', () => {
 });
 
 describe('useOverdueTopics', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   it('fetches overdue topics grouped by subject from API', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
@@ -330,15 +304,6 @@ describe('useOverdueTopics', () => {
 });
 
 describe('useTopicProgress', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   it('fetches topic progress from API', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
