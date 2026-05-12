@@ -9,13 +9,14 @@
  *   5. IDOR BREAK: markNudgeRead with wrong profileId returns 0
  *   6. IDOR BREAK: markAllNudgesRead with wrong profileId returns 0
  *
- * Only sendPushNotification is mocked — it is the true external boundary
- * (Expo Push API). All DB operations hit the real test database.
+ * Expo Push API is intercepted at the fetch boundary. All service modules and
+ * DB operations run through the real integration path.
  *
  * CLAUDE.md rule: no internal jest.mock() in integration tests.
  */
 
 import { resolve } from 'path';
+
 import { and, eq, gt, inArray, isNull } from 'drizzle-orm';
 import {
   accounts,
@@ -24,27 +25,20 @@ import {
   familyLinks,
   generateUUIDv7,
   nudges,
+  notificationPreferences,
   profiles,
   type Database,
 } from '@eduagent/database';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import { RateLimitedError } from '@eduagent/schemas';
 
-// ---------------------------------------------------------------------------
-// External boundary mock — Expo push notification API.
-// Must be declared before imports that resolve the module.
-// ---------------------------------------------------------------------------
-
-jest.mock(
-  './notifications' /* gc1-allow: external push notification boundary (Expo Push API) */,
-  () => ({
-    ...jest.requireActual('./notifications'),
-    sendPushNotification: jest
-      .fn()
-      .mockResolvedValue({ sent: false, reason: 'mocked' }),
-  }),
-);
-
+import {
+  clearFetchCalls,
+  getFetchCalls,
+  installFetchInterceptor,
+  restoreFetch,
+} from '../../../../tests/integration/fetch-interceptor';
+import { mockExpoPush } from '../../../../tests/integration/external-mocks';
 import { createNudge, markNudgeRead, markAllNudgesRead } from './nudge';
 
 // ---------------------------------------------------------------------------
@@ -94,6 +88,14 @@ async function seedConsent(childProfileId: string): Promise<void> {
   });
 }
 
+async function seedPushToken(profileId: string): Promise<void> {
+  await db.insert(notificationPreferences).values({
+    profileId,
+    pushEnabled: true,
+    expoPushToken: `ExponentPushToken[nudge-${RUN_ID}]`,
+  });
+}
+
 async function seedFamilyLink(
   parentProfileId: string,
   childProfileId: string,
@@ -123,6 +125,8 @@ async function cleanup(): Promise<void> {
 
 describeIfDb('nudge service (integration)', () => {
   beforeAll(async () => {
+    installFetchInterceptor();
+    mockExpoPush();
     db = createDatabase(process.env.DATABASE_URL!);
 
     const [accA] = await db
@@ -199,13 +203,16 @@ describeIfDb('nudge service (integration)', () => {
 
     await seedConsent(childXProfileId);
     await seedConsent(childYProfileId);
+    await seedPushToken(childXProfileId);
   });
 
   afterAll(async () => {
     await cleanup();
+    restoreFetch();
   });
 
   beforeEach(async () => {
+    clearFetchCalls();
     await db
       .delete(nudges)
       .where(inArray(nudges.toProfileId, [childXProfileId, childYProfileId]));
@@ -225,12 +232,14 @@ describeIfDb('nudge service (integration)', () => {
     expect(result.nudge.template).toBe('you_got_this');
     expect(result.nudge.readAt).toBeNull();
     expect(typeof result.nudge.id).toBe('string');
+    expect(result.pushSent).toBe(true);
 
     const rows = await db.query.nudges.findMany({
       where: eq(nudges.id, result.nudge.id),
     });
     expect(rows).toHaveLength(1);
     expect(rows[0]!.fromProfileId).toBe(parentAProfileId);
+    expect(getFetchCalls('exp.host/--/api/v2/push/send')).toHaveLength(1);
   });
 
   // ── 2. Rate-limit BREAK test ───────────────────────────────────────────────

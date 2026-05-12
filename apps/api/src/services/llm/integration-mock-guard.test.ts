@@ -4,21 +4,16 @@ import { relative, resolve } from 'node:path';
 // [BUG-743 / T-1] Regression guard. Per CLAUDE.md "No Internal Mocks in
 // Integration Tests": integration tests must not jest.mock internal modules
 // (database, services, middleware) — only true external boundaries (Stripe,
-// Clerk JWKS, email providers, push notifications). Internal mocks hide real
-// prompt drift, envelope contract drift, and shape-of-response bugs.
-//
-// This guard fails if ANY new *.integration.test.ts file adds a jest.mock for
-// the internal LLM router (`./llm`, `../llm`, `services/llm`). The right
-// pattern is to intercept globalThis.fetch for HTTP SDKs, or register a
-// provider in the LLM provider registry when the service boundary is the router.
+// Sentry, Clerk JWKS, email providers, push notifications, Inngest transport).
+// Internal mocks hide real prompt drift, envelope contract drift, ownership,
+// event-chain, and shape-of-response bugs.
 
-const KNOWN_OFFENDERS = new Set<string>([
-  // PR #211: book-suggestion generation mocks `./llm` to stub routeAndCall.
-  // The inline `gc1-allow` annotation exempts it from the GC1 ratchet but not
-  // BUG-743 — that's deliberate; BUG-743's invariant is HTTP-boundary mocking
-  // specifically. Convert in a follow-up PR.
-  'apps/api/src/services/book-suggestion-generation.integration.test.ts',
-]);
+const KNOWN_OFFENDERS = new Set<string>();
+const ALLOWED_INTERNAL_BOUNDARY_MOCKS = [
+  /(?:^|\/)services\/sentry$/,
+  /(?:^|\/)services\/stripe$/,
+  /(?:^|\/)inngest\/client$/,
+];
 
 const REPO_ROOT = resolve(__dirname, '../../../../..');
 const INTEGRATION_TEST_ROOTS = ['apps/api', 'tests/integration'];
@@ -62,79 +57,111 @@ function listIntegrationTests(): string[] {
   return files.sort();
 }
 
-function sourceMocksInternalLlm(source: string): boolean {
-  // Catches all internal-LLM mock forms:
-  //   jest.mock('./llm', ...)
-  //   jest.mock('../../services/llm/router', ...)
-  //   jest.mock('@eduagent/llm-router', ...)        ← package name
-  //   jest.mock('@/services/llm', ...)              ← TS path alias
-  // A specifier is internal-LLM if any '/'-separated segment is `llm` or
-  // contains `llm` as a hyphen-or-edge token (`llm-router`, `eval-llm`).
-  const matches = source.matchAll(/jest\.mock\(\s*['"]([^'"]+)['"]/g);
-  for (const match of matches) {
-    const specifier = match[1];
-    if (!specifier) continue;
-    const segments = specifier.split('/');
-    if (segments.some((seg) => /(?:^|-)llm(?:-|$)/.test(seg))) {
-      return true;
-    }
-  }
-  return false;
+function normalizeSpecifier(specifier: string): string {
+  return normalizePath(specifier).replace(/\/index$/, '');
 }
 
-function fileMocksInternalLlm(absPath: string): boolean {
-  return sourceMocksInternalLlm(readFileSync(absPath, 'utf-8'));
+function isAllowedInternalBoundaryMock(specifier: string): boolean {
+  const normalized = normalizeSpecifier(specifier);
+  return ALLOWED_INTERNAL_BOUNDARY_MOCKS.some((pattern) =>
+    pattern.test(normalized),
+  );
+}
+
+function isInternalMockSpecifier(specifier: string): boolean {
+  const normalized = normalizeSpecifier(specifier);
+  if (isAllowedInternalBoundaryMock(normalized)) return false;
+
+  return (
+    normalized.startsWith('.') ||
+    normalized.startsWith('@/') ||
+    normalized.includes('/apps/api/src/') ||
+    normalized.includes('apps/api/src/') ||
+    normalized === '@eduagent/database' ||
+    normalized.startsWith('@eduagent/database/')
+  );
+}
+
+function sourceInternalMockSpecifiers(source: string): string[] {
+  const matches = source.matchAll(/jest\.mock\(\s*['"]([^'"]+)['"]/g);
+  const specifiers: string[] = [];
+  for (const match of matches) {
+    const specifier = match[1];
+    if (specifier && isInternalMockSpecifier(specifier)) {
+      specifiers.push(specifier);
+    }
+  }
+  return specifiers;
+}
+
+function fileInternalMockSpecifiers(absPath: string): string[] {
+  return sourceInternalMockSpecifiers(readFileSync(absPath, 'utf-8'));
 }
 
 function mockCallSnippet(specifier: string): string {
   return `jest.${'mock'}('${specifier}', () => ({}));`;
 }
 
-describe('integration tests — BUG-743 internal LLM mock guard', () => {
+describe('integration tests — BUG-743 internal mock guard', () => {
   const files = listIntegrationTests();
 
   it('finds at least one integration test (sanity)', () => {
     expect(files.length).toBeGreaterThan(0);
   });
 
-  it('detects internal LLM mock specifiers without flagging external mocks', () => {
-    expect(sourceMocksInternalLlm(mockCallSnippet('./llm'))).toBe(true);
+  it('detects internal mock specifiers without flagging allowed boundaries', () => {
+    expect(sourceInternalMockSpecifiers(mockCallSnippet('./llm'))).toEqual([
+      './llm',
+    ]);
     expect(
-      sourceMocksInternalLlm(mockCallSnippet('../../services/llm/router')),
-    ).toBe(true);
+      sourceInternalMockSpecifiers(
+        mockCallSnippet('../../services/notifications'),
+      ),
+    ).toEqual(['../../services/notifications']);
     expect(
-      sourceMocksInternalLlm(mockCallSnippet('../../services/stripe')),
-    ).toBe(false);
+      sourceInternalMockSpecifiers(
+        mockCallSnippet('../../services/llm/router'),
+      ),
+    ).toEqual(['../../services/llm/router']);
+    expect(
+      sourceInternalMockSpecifiers(mockCallSnippet('../../services/stripe')),
+    ).toEqual([]);
+    expect(
+      sourceInternalMockSpecifiers(mockCallSnippet('../../services/sentry')),
+    ).toEqual([]);
+    expect(
+      sourceInternalMockSpecifiers(mockCallSnippet('../../inngest/client')),
+    ).toEqual([]);
   });
 
-  it('does not introduce NEW jest.mock(...llm) calls outside the known offender allowlist', () => {
-    const offenders = files.filter((f) =>
-      fileMocksInternalLlm(resolve(REPO_ROOT, f)),
+  it('does not introduce non-allowlisted internal jest.mock calls in integration tests', () => {
+    const offenders = files.flatMap((f) =>
+      fileInternalMockSpecifiers(resolve(REPO_ROOT, f)).map((specifier) => ({
+        file: normalizePath(f),
+        specifier,
+      })),
     );
-    // Normalize separators so the test passes on Windows + POSIX.
-    const offendersNormalized = offenders.map(normalizePath);
-    const newOffenders = offendersNormalized.filter(
-      (f) => !KNOWN_OFFENDERS.has(f),
-    );
+    const newOffenders = offenders.filter((o) => !KNOWN_OFFENDERS.has(o.file));
     if (newOffenders.length > 0) {
       throw new Error(
-        `[BUG-743] New internal LLM mock(s) found in integration tests:\n` +
-          newOffenders.map((f) => `  - ${f}`).join('\n') +
+        `[BUG-743] New internal mock(s) found in integration tests:\n` +
+          newOffenders
+            .map((o) => `  - ${o.file}: jest.mock('${o.specifier}')`)
+            .join('\n') +
           `\n\nIntegration tests must mock at the HTTP boundary (intercept ` +
-          `globalThis.fetch for provider URLs) — not jest.mock internal ` +
-          `services. See weekly-progress-push.integration.test.ts for the ` +
-          `right pattern.`,
+          `globalThis.fetch for provider URLs), the provider registry, or a ` +
+          `documented transport sink — not jest.mock internal services.`,
       );
     }
   });
 
   it('shrinks the offender allowlist as files are migrated', () => {
     // The allowlist is a punch list, not an indefinite carve-out. If a listed
-    // file no longer mocks LLM internals (it was migrated to HTTP-boundary
-    // mocking), remove it from KNOWN_OFFENDERS — this assertion enforces that.
+    // file no longer mocks internals, remove it from KNOWN_OFFENDERS — this
+    // assertion enforces that.
     const stillOffending = Array.from(KNOWN_OFFENDERS).filter((f) =>
       files.some((g) => normalizePath(g) === f)
-        ? fileMocksInternalLlm(resolve(REPO_ROOT, f))
+        ? fileInternalMockSpecifiers(resolve(REPO_ROOT, f)).length > 0
         : false,
     );
     expect(stillOffending.sort()).toEqual(Array.from(KNOWN_OFFENDERS).sort());

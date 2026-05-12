@@ -19,6 +19,10 @@ files_to_modify:
     'apps/api/src/services/vocabulary.ts',
     'apps/api/src/services/celebrations.ts',
     'apps/api/src/services/milestone-detection.ts',
+    'apps/api/src/services/dashboard.ts',
+    'apps/api/src/services/assessments.ts',
+    'apps/api/src/routes/assessments.ts',
+    'apps/api/src/services/session/session-exchange.ts',
     'apps/api/src/services/weekly-report.ts',
     'apps/api/src/services/monthly-report.ts',
     'apps/api/src/services/progress.ts',
@@ -77,7 +81,7 @@ Weekly and monthly report visuals must keep their existing learning metrics row 
 - Aggregate normalized practice/testing points from `practice_activity_events.pointsEarned`. Quiz XP (`quiz_rounds.xpEarned`) and topic XP (`xp_ledger`) are disconnected today; the summary should not have to join multiple XP stores after ledger adoption.
 - Aggregate `quiz_missed_items` per activity type — items the learner got wrong, with `surfaced` and `convertedToTopic` flags. This is the pedagogically useful error-rate signal.
 - Aggregate fluency drill scores from ledger events emitted when `session_events.drillCorrect` and `session_events.drillTotal` are populated (integer columns, populated from LLM envelope `ui_hints.fluency_drill.score` during sessions).
-- Count recitation activity from ledger events emitted for `learning_sessions.metadata->>'effectiveMode' = 'recitation'`. Note: `effectiveMode` is an untyped JSONB key (not a DB enum), with known values: `learning`, `freeform`, `homework`, `recitation`, `practice`, `review`. Decide whether `practice` and `review` mode sessions should also emit practice activity events.
+- Count recitation activity from ledger events emitted for `learning_sessions.metadata->>'effectiveMode' = 'recitation'`. Note: `effectiveMode` is an untyped JSONB key (not a DB enum), with known values: `learning`, `freeform`, `homework`, `recitation`, `practice`, `review`, `relearn`, `gap_fill`. Decide whether `practice`, `review`, `relearn`, and `gap_fill` mode sessions should also emit practice activity events. `relearn` sessions are created directly by `retention-data.ts` (bypassing `startSession`) and go through the `session-completed` Inngest path.
 - Provide consolidated period totals: total completed tests/reviews, total practice/testing points, score totals/accuracy where available, and total celebrations.
 - Provide breakdowns by activity type (`quiz`, `review`, `assessment`, `dictation`, `recitation`, `fluency_drill`) and by subject (`subjectId`/subject name when available), including counts and points.
 - Count total distinct testing/practice activity types used in the period.
@@ -143,7 +147,7 @@ Do not count from `coaching_card_cache.pendingCelebrations` as historical truth.
 | Topic retention | `retention_cards` | `lastReviewedAt` (mutable, single) | `lastReviewedAt` | `profileId` | SM-2 state. Cannot count reviews per period — only "was card reviewed in period." |
 | Vocabulary retention | `vocabulary_retention_cards` | `lastReviewedAt` (mutable, single) | `lastReviewedAt` | via `vocabulary.profileId` join | Separate SRS pipeline. Per-word, not per-topic. No `xpStatus`. |
 | Fluency drills | `session_events` | `drillCorrect`/`drillTotal` not null | `createdAt` | via `learning_sessions.profileId` join | Populated from LLM envelope `ui_hints.fluency_drill.score`. |
-| Recitation | `learning_sessions` | `metadata->>'effectiveMode' = 'recitation'` | `startedAt` / `endedAt` | `profileId` | Untyped JSONB key. Other modes: `learning`, `freeform`, `homework`, `practice`, `review`. |
+| Recitation | `learning_sessions` | `metadata->>'effectiveMode' = 'recitation'` | `startedAt` / `endedAt` | `profileId` | Untyped JSONB key. Other modes: `learning`, `freeform`, `homework`, `practice`, `review`, `relearn`, `gap_fill`. `relearn` sessions are created directly by `retention-data.ts` bypassing `startSession`. |
 | Milestones | `milestones` | `celebratedAt IS NOT NULL` | `celebratedAt` | `profileId` | `milestoneType` is free text, not DB enum. 9 known types. `cefr_level_up` is dead. |
 | Celebrations | `coaching_card_cache.pendingCelebrations` | JSONB array entries | unclear — entries cleared after viewing | `profileId` | Opaque blob. Fragile for counting. |
 
@@ -172,7 +176,9 @@ Do not count from `coaching_card_cache.pendingCelebrations` as historical truth.
 | `apps/mobile/src/components/progress/MonthlyReportCard.tsx` | Renders `ReportBars` (sessions/time/topics) + highlights. **Zero** `practiceSummary` rendering — new JSX required. |
 | `apps/mobile/src/app/(app)/quiz/history.tsx` | Quiz history screen exists. Dictation has NO equivalent history screen. |
 | `apps/api/src/services/celebrations.ts` | `queueCelebration()` writes into `coaching_card_cache.pendingCelebrations` JSONB. |
-| `apps/api/src/services/milestone-detection.ts` | `detectMilestones()` handles 8 of 9 milestone types. `cefr_level_up` is never detected (dead code). |
+| `apps/api/src/services/milestone-detection.ts` | `detectMilestones()` handles 8 of 9 milestone types. `cefr_level_up` is never detected (dead in detection), but `snapshot-aggregation.ts:1106,1214` has `case 'cefr_level_up':` handling branches. |
+| `apps/api/src/services/dashboard.ts` | Already computes weekly/monthly drill stats from `session_events.drillCorrect`/`drillTotal` (lines 1371–1397, 1505–1525). Overlaps with the new ledger-based fluency drill aggregation — must decide whether dashboard migrates to the ledger or continues reading `session_events` directly. |
+| `apps/api/src/routes/assessments.ts` | Terminal-status logic (`newStatus` computation, lines 112–123) lives in the route handler, not in a service. Business logic must be extracted to `services/assessments.ts` before adding ledger emission. |
 
 ### Technical Decisions
 
@@ -186,7 +192,10 @@ Do not count from `coaching_card_cache.pendingCelebrations` as historical truth.
 - Store normalized practice/testing points on the ledger event (`pointsEarned`) so summaries do not join quiz XP and topic XP stores.
 - Treat review counts as exact only for ledger-emitted review events. Do not derive review counts from `retention_cards.lastReviewedAt` or `vocabularyRetentionCards.lastReviewedAt`.
 - Treat celebration counts as exact only from `celebration_events` after rollout. Do not count from `pendingCelebrations` as durable history.
-- `metadata.effectiveMode` is untyped JSONB. Known values: `learning`, `freeform`, `homework`, `recitation`, `practice`, `review`. Decide which modes count as "practice activity."
+- `metadata.effectiveMode` is untyped JSONB. Known values: `learning`, `freeform`, `homework`, `recitation`, `practice`, `review`, `relearn`, `gap_fill`. Decide which modes count as "practice activity." `relearn` sessions are created directly by `retention-data.ts:884` and bypass `startSession` — if they should emit practice events, the emission must be in the `session-completed` Inngest handler or in `retention-data.ts` itself.
+- `dashboard.ts` already computes weekly/monthly fluency drill stats directly from `session_events` (lines 1371–1397, 1505–1525). The new ledger-based aggregation overlaps. In v1, the dashboard continues reading `session_events` directly and reports read the ledger. Long-term, dashboard should migrate to the ledger to avoid divergent totals. Document this as a known dual-source gap.
+- Assessment terminal-status logic currently lives in `routes/assessments.ts:112–123` (route handler), not in a service. Phase 3 must extract this into `services/assessments.ts` before wiring ledger emission — adding more business logic to the route would compound the existing G1/G5 violation.
+- Ledger event writers must accept both `Database` and `PgTransaction` (`db | tx`) so they can participate in existing transactions. Paths without transactions (`dictation/result.ts`, `retention-data.ts`) must add wrapping transactions as part of Phase 3.
 
 ## Failure Modes
 
@@ -200,6 +209,11 @@ Do not count from `coaching_card_cache.pendingCelebrations` as historical truth.
 | `dictation_results.mistakeCount` is NULL | Dictation completed but mistakes not counted (legacy rows?) | Summary shows dictation count but no accuracy metric | Handle nullable `mistakeCount` — show count without accuracy, or show "—" for accuracy. |
 | `quiz_rounds.xpEarned` is NULL | Round completed before XP calculation was added | XP total undercounted | Treat NULL as 0 in SUM aggregation (`COALESCE`). |
 | Schema expansion breaks existing report consumers | `reportPracticeSummarySchema` fields added, old mobile clients receive unknown keys | Old clients ignore unknown keys (Zod `.passthrough()` or `.strip()`) | Verify Zod parse mode in mobile report consumption. New fields must be `.optional()` for backwards compatibility. |
+| Ledger event written but source write fails (non-atomic paths) | Dictation or retention-data path crashes after ledger insert but before source insert/update | Phantom activity counted in reports that never actually completed | **Must wrap both writes in a transaction.** This is why Phase 3 requires adding `db.transaction()` to `dictation/result.ts` and `retention-data.ts`. |
+| Ledger event lost on retry (source written, ledger not) | Inngest retry replays the source write (idempotent via DB constraint) but ledger insert was never attempted | Activity undercounted in reports — source table shows completion but ledger has no row | Dedup key + `onConflictDoNothing` means retries are safe. But the transaction wrapper ensures both succeed or both fail on the first attempt. For paths where wrapping is impractical, accept eventual consistency and consider a periodic reconciliation job. |
+| `dedupeKey` format collision across activity types | Two different activity types generate the same dedupeKey string | One event silently dropped, incorrect count | Prefix all dedupeKeys with `{activityType}:{sourceType}:` to namespace. The canonical format prevents cross-type collisions. |
+| `dashboard.ts` and ledger disagree on drill totals | Dashboard reads `session_events.drillCorrect/drillTotal` directly; ledger aggregation reads `practice_activity_events` | Two surfaces show different drill counts for the same period | Decide ownership: either migrate dashboard to the ledger (preferred long-term) or document that dashboard reads source-of-record while reports read the ledger. Do not leave both active without a documented decision. |
+| `celebration_events` and `queueCelebration()` dedup disagree | Durable ledger uses a different identity tuple than the in-memory dedup in `celebrations.ts:93–98` | Celebration counted once in reports but queued twice for display, or vice versa | Align dedup key format: `{celebrationType}:{reason}:{sourceId}` mirrors the existing `(celebration, reason, detail)` tuple. |
 
 ## Implementation Plan
 
@@ -213,7 +227,7 @@ Use these v1 assumptions unless product explicitly changes them before build:
 - Quiz subtypes: `capitals`, `guess_who`, `vocabulary`. Vocabulary events carry `languageCode` in metadata; v1 reports can aggregate vocabulary flat while preserving language detail in the payload.
 - Review subtypes: `topic_recall`, `vocabulary_srs`, `quiz_mastery`.
 - Assessment completion: count all terminal statuses (`passed`, `failed`, `borderline`, `failed_exhausted`) as completed attempts. Store status and depth in metadata so the UI can separate "passed" later.
-- Recitation completion: count only explicit `effectiveMode = 'recitation'` in v1. Do not count vague `practice` / `review` session modes until those modes have clearer completion semantics.
+- Recitation completion: count only explicit `effectiveMode = 'recitation'` in v1. Do not count `practice`, `review`, `relearn`, or `gap_fill` session modes until those modes have clearer completion semantics. `relearn` sessions are created by `retention-data.ts` bypassing `startSession` — they must be explicitly excluded from v1 recitation counts.
 - Celebration completion: record durable events in `celebration_events`; report UI uses only total count in v1.
 - Historical behavior: no exact review or coaching-card celebration backfill. Optional backfill may cover only source rows with trustworthy completion timestamps (`quiz_rounds`, `dictation_results`, terminal `assessments`).
 
@@ -241,42 +255,63 @@ Add small service helpers so source paths do not hand-roll ledger inserts.
 
 - Create `apps/api/src/services/practice-activity-events.ts`.
   - Export `recordPracticeActivityEvent(db, input)`.
-  - Build `dedupeKey` from source identity plus activity type/subtype.
-  - Use insert-on-conflict-ignore or equivalent so retries do not double-count.
+  - Build `dedupeKey` from source identity plus activity type/subtype. **Canonical format:** `{activityType}:{sourceType}:{sourceId}` — e.g., `quiz:quiz_round:uuid`, `review:topic_recall:retentionCardId`, `review:vocabulary_srs:vocabRetentionCardId:{timestamp}`, `review:quiz_mastery:masteryItemId:{timestamp}`, `assessment:assessment:uuid`, `dictation:dictation_result:uuid`, `fluency_drill:session_event:sessionEventId`, `recitation:session:sessionId`. For review events (which can recur for the same card), append a timestamp or sequence counter to prevent dedup from swallowing legitimate repeated reviews.
+  - Use insert-on-conflict-ignore or equivalent so retries do not double-count. Follow the existing `xp_ledger` pattern: unique constraint on `(profileId, dedupeKey)` + `onConflictDoNothing`.
+  - The `db` parameter must accept both `Database` and `PgTransaction` so callers inside transactions can pass `tx` directly — this is how atomicity is achieved.
   - Keep the helper profile-scoped and explicit about source identity.
 - Create `apps/api/src/services/celebration-events.ts`.
   - Export `recordCelebrationEvent(db, input)`.
   - Use the same idempotency pattern.
+  - **`dedupeKey` must mirror the existing `queueCelebration()` dedup tuple** (`celebrations.ts:93–98` deduplicates on `(celebration, reason, detail)`). Use format: `{celebrationType}:{reason}:{sourceId}` — e.g., `polar_star:topic_mastered:topicId`. If the durable ledger uses a different identity than `queueCelebration`, the two systems will disagree on "same celebration."
   - Allow source identity to point to either milestone rows or coaching-card celebration reasons.
 
 #### Phase 3 — Emit events from completion paths
 
-Wire emitters into the places where completion already happens. Prefer writing the event in the same logical operation as the source update when possible.
+Wire emitters into the places where completion already happens. **The ledger event MUST be written atomically with the source update** — inside the same `db.transaction()`. Paths that currently lack a transaction must have one added. The `recordPracticeActivityEvent` / `recordCelebrationEvent` helpers accept `db | tx` for this reason.
+
+**Transaction status of each path (verified from code):**
+
+| Path | Current transaction? | Action required |
+| --- | --- | --- |
+| `quiz/complete-round.ts` | Yes (`db.transaction()` line 293) | Emit inside existing `tx` — safe |
+| `dictation/result.ts` | **No** — single INSERT, no transaction | **Wrap** result insert + ledger event in a new `db.transaction()` |
+| `routes/assessments.ts` | Has `db.transaction` for retention/XP, but terminal-status logic is in the route handler | **Extract** terminal-status logic to `services/assessments.ts`, wrap status update + ledger event in a transaction |
+| `retention-data.ts` (`processRecallTest`) | **No** — single `db.update()`, no transaction | **Wrap** retention card update + ledger event in a new `db.transaction()` |
+| `vocabulary.ts` (`reviewVocabulary`) | Yes (`db.transaction()` line 271) | Emit inside existing `tx` — safe |
+| `session-exchange.ts` (drill scores) | Yes (batch insert inside session event persistence) | Emit inside existing write path — safe |
+| `celebrations.ts` (`queueCelebration`) | Yes (`SELECT FOR UPDATE` in `mergeHomeSurfaceCacheData`) | Emit inside existing transaction — safe |
 
 - Quiz completion: `apps/api/src/services/quiz/complete-round.ts`
-  - Emit `quiz` events after a round is marked completed.
+  - Emit `quiz` events after a round is marked completed, **inside the existing `tx`** (after missed items insert, before return).
   - Use subtype from `activityType`; include `languageCode`, `score`, `total`, and `xpEarned` as `pointsEarned`.
   - For quiz mastery review updates in this same service, emit `review` / `quiz_mastery` events when mastery review attempts are completed.
 - Dictation completion: `apps/api/src/services/dictation/result.ts`
+  - **Add a `db.transaction()` wrapper** around the result insert + ledger event. Currently `recordDictationResult()` is a bare `repo.dictationResults.insert()` with no transaction — the ledger event would not be atomic without wrapping.
   - Emit `dictation` events when a result row is created.
   - Include sentence count, mistake count, and mode in metadata.
-- Assessment completion: assessment completion route/service path
+- Assessment completion: **prerequisite — extract terminal-status logic from `routes/assessments.ts:112–123` into `services/assessments.ts`**
+  - Currently, the route handler computes `newStatus` inline (the `mapEvaluateQualityToSm2` ternary, `db.transaction` for retention/XP). This violates the service boundary rule (eslint G1/G5) and adding ledger emission there would compound the violation.
+  - Create a service function (e.g., `completeAssessment(db, assessmentId, evaluationResult)`) that owns the terminal-status transition, retention card update, XP entry, and ledger event emission — all inside a single transaction.
   - Emit `assessment` events when status transitions into a terminal status.
   - Include terminal status, verification depth, mastery score, and topic/subject context when available.
 - Topic recall reviews: `apps/api/src/services/retention-data.ts`
+  - **Add a `db.transaction()` wrapper** around the retention card update + ledger event. Currently `processRecallTest()` uses a bare `db.update()` with only a WHERE-clause cooldown guard — no transaction.
   - Emit `review` / `topic_recall` events from the recall-test completion path.
   - Do not emit for due-card calculations or card reads.
 - Vocabulary reviews: `apps/api/src/services/vocabulary.ts`
-  - Emit `review` / `vocabulary_srs` events from `reviewVocabulary`.
+  - Emit `review` / `vocabulary_srs` events from `reviewVocabulary`, **inside the existing `tx`**.
   - Include vocabulary id, subject id, quality, and language metadata if available.
-- Fluency drills: session event persistence path
-  - Emit `fluency_drill` events when `drillCorrect` and `drillTotal` are persisted.
+- Fluency drills: `apps/api/src/services/session/session-exchange.ts`
+  - Emit `fluency_drill` events when `drillCorrect` and `drillTotal` are persisted (inside the `ai_response` event row insert).
   - Include correct/total as score fields.
+  - **Dedup key must derive from `sessionEventId` or `(sessionId, clientId)`** to match the existing `session_events` dedup constraint and prevent double-counting on Inngest retry.
+  - Note: `dashboard.ts:1371–1397` already reads drill stats directly from `session_events`. Decide whether dashboard migrates to the ledger in a follow-up or continues reading `session_events` directly. Both surfaces should not diverge on totals.
 - Recitation: session completion path
   - Emit `recitation` events for sessions whose effective mode is `recitation`.
   - Include session id, duration if available, and subject/topic metadata if available.
+  - **Decision needed for `relearn` mode:** `retention-data.ts:884` creates sessions with `effectiveMode: 'relearn'` that bypass `startSession` and go through the `session-completed` Inngest handler. Should `relearn` sessions emit practice events? If yes, the emission point is the `session-completed` Inngest function, not the session start path. If no, document the exclusion explicitly.
 - Celebrations:
-  - In `apps/api/src/services/celebrations.ts`, emit `celebration_events` when `queueCelebration()` adds a new pending celebration.
+  - In `apps/api/src/services/celebrations.ts`, emit `celebration_events` when `queueCelebration()` adds a new pending celebration, **inside the existing `SELECT FOR UPDATE` transaction** in `mergeHomeSurfaceCacheData`.
   - In milestone storage/detection paths, attach milestone source identity when available.
 
 #### Phase 4 — Summary service
