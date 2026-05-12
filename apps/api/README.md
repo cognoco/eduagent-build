@@ -10,7 +10,7 @@ Hono REST API running on Cloudflare Workers. Provides all backend endpoints for 
 | Runtime | Cloudflare Workers |
 | Database | Neon (PostgreSQL) via `@eduagent/database` |
 | Auth | Clerk JWKS verification |
-| Background jobs | Inngest v3 (45 functions) |
+| Background jobs | Inngest v3 |
 | LLM | Multi-provider via `services/llm/router.ts` |
 
 ## Structure

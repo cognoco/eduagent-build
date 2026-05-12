@@ -41,8 +41,8 @@ For multi-table joins through a parent chain, use `db.select()` directly and enf
 ```typescript
 // Correct: profile enforced via subjects.profileId (parent chain)
 await db.select()
-  .from(learningSession)
-  .innerJoin(curriculumTopics, eq(learningSession.topicId, curriculumTopics.id))
+  .from(learningSessions)
+  .innerJoin(curriculumTopics, eq(learningSessions.topicId, curriculumTopics.id))
   .innerJoin(subjects, eq(curriculumTopics.subjectId, subjects.id))
   .where(eq(subjects.profileId, profileId));
 ```

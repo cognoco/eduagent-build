@@ -42,7 +42,10 @@ Loads `DATABASE_URL` and related vars from `.env.test` for integration tests:
 
 ```typescript
 import { loadDatabaseEnv } from '@eduagent/test-utils';
-loadDatabaseEnv();
+import { resolve } from 'path';
+
+// Pass the monorepo root so .env.test.local / .env.development.local resolve correctly.
+loadDatabaseEnv(resolve(__dirname, '../..'));
 ```
 
 ## Rules
