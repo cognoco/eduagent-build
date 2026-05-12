@@ -1354,10 +1354,10 @@ function SubscriptionContent(): React.ReactElement {
                   testID="free-upgrade-unavailable"
                 >
                   <Text className="text-body-sm font-semibold text-text-primary">
-                    Plans available on the mobile app
+                    {t('subscription.web.plansOnMobile')}
                   </Text>
                   <Text className="text-caption text-text-secondary mt-1">
-                    Store purchasing is not available on this device.
+                    {t('subscription.web.storePurchaseUnavailable')}
                   </Text>
                 </View>
               ) : (

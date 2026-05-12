@@ -199,7 +199,7 @@
         "needsEncouragement": "needs encouragement",
         "steady": "steady",
         "progressAction": "Progress",
-        "recapAction": "Recap",
+        "reportsAction": "Reports",
         "nudgeAction": "Nudge"
       }
     }
@@ -2247,6 +2247,10 @@
       "purchaseConfirmedBody": "Your subscription is being activated. It usually appears within a minute — pull down to refresh.",
       "topUpTitle": "Top-up",
       "topUpBody": "500 additional credits have been added!"
+    },
+    "web": {
+      "plansOnMobile": "Plans available on the mobile app",
+      "storePurchaseUnavailable": "Store purchasing is not available on this device."
     }
   },
   "sessionSummary": {

@@ -199,7 +199,7 @@
         "needsEncouragement": "needs encouragement",
         "steady": "steady",
         "progressAction": "Progress",
-        "recapAction": "Recap",
+        "reportsAction": "レポート",
         "nudgeAction": "Nudge"
       }
     }
@@ -2177,6 +2177,10 @@
       "purchaseConfirmedBody": "Your subscription is being activated. It usually appears within a minute — pull down to refresh.",
       "topUpTitle": "Top-up",
       "topUpBody": "500 additional credits have been added!"
+    },
+    "web": {
+      "plansOnMobile": "プランはモバイルアプリでご利用いただけます",
+      "storePurchaseUnavailable": "このデバイスではストア購入はご利用いただけません。"
     }
   },
   "sessionSummary": {

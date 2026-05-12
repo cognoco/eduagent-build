@@ -35,20 +35,10 @@ import {
   GuessWhoQuestion,
   type GuessWhoResolvedResult,
 } from '../../../components/quiz/GuessWhoQuestion';
-import {
-  RewardBurst,
-  type RewardBurstVariant,
-} from '../../../components/common/RewardBurst';
+import { RewardBurst } from '../../../components/common/RewardBurst';
+import { rewardVariantForActivity } from './_quiz-utils';
 
 type AnswerState = 'unanswered' | 'checking' | 'correct' | 'wrong';
-
-function rewardVariantForActivity(
-  activityType: 'capitals' | 'guess_who' | 'vocabulary' | null,
-): RewardBurstVariant {
-  if (activityType === 'guess_who') return 'guess_who';
-  if (activityType === 'vocabulary') return 'vocabulary';
-  return 'capitals';
-}
 
 export default function QuizPlayScreen(): React.ReactElement {
   const router = useRouter();

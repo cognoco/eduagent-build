@@ -3,22 +3,12 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import {
-  RewardBurst,
-  type RewardBurstVariant,
-} from '../../../components/common/RewardBurst';
+import { RewardBurst } from '../../../components/common/RewardBurst';
 import { useFetchRound } from '../../../hooks/use-quiz';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { useThemeColors } from '../../../lib/theme';
 import { useQuizFlow } from './_layout';
-
-function rewardVariantForActivity(
-  activityType: 'capitals' | 'guess_who' | 'vocabulary' | null,
-): RewardBurstVariant {
-  if (activityType === 'guess_who') return 'guess_who';
-  if (activityType === 'vocabulary') return 'vocabulary';
-  return 'capitals';
-}
+import { rewardVariantForActivity } from './_quiz-utils';
 
 export default function QuizResultsScreen(): React.ReactElement {
   const router = useRouter();
