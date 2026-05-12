@@ -171,12 +171,12 @@ describe('buildSystemPrompt', () => {
       sessionType: 'learning',
     });
     expect(prompt).toContain(
-      'Teach the concept clearly using a concrete example'
+      'Teach the concept clearly using a concrete example',
     );
     expect(prompt).toContain('explain → verify → next concept');
     // Old guidance should be gone
     expect(prompt).not.toContain(
-      'Default to asking a question before explaining'
+      'Default to asking a question before explaining',
     );
   });
 
@@ -244,6 +244,17 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('Teens want speed');
   });
 
+  it('uses youth brevity in homework mode for child learners', () => {
+    const prompt = buildSystemPrompt({
+      ...baseContext,
+      birthYear: currentYear - 11,
+      sessionType: 'homework',
+      homeworkMode: 'check_answer',
+    });
+    expect(prompt).toContain('1-2 sentences');
+    expect(prompt).toContain('Teens want speed');
+  });
+
   it('uses standard brevity in homework mode for adult learners', () => {
     const prompt = buildSystemPrompt({
       ...baseContext,
@@ -266,7 +277,7 @@ describe('buildSystemPrompt', () => {
       });
       expect(prompt).toContain('Scope (homework)');
       expect(prompt).toContain(
-        'The homework problem the learner is working on IS the scope'
+        'The homework problem the learner is working on IS the scope',
       );
       expect(prompt).toContain('routing metadata, not a content gate');
     });
@@ -278,7 +289,7 @@ describe('buildSystemPrompt', () => {
       });
       expect(prompt).not.toContain('Stay within the loaded topic and subject');
       expect(prompt).not.toContain(
-        "that's a different topic. Let's finish this one first"
+        "that's a different topic. Let's finish this one first",
       );
     });
 
@@ -387,10 +398,10 @@ describe('buildSystemPrompt', () => {
       ],
     });
     expect(prompt).toContain(
-      'Topics for this interleaved session (cycle between them):'
+      'Topics for this interleaved session (cycle between them):',
     );
     expect(prompt).toContain(
-      '1. Algebra Basics \u2014 Solving linear equations'
+      '1. Algebra Basics \u2014 Solving linear equations',
     );
     expect(prompt).toContain('2. Probability \u2014 Independent events');
     expect(prompt).toContain('3. Geometry \u2014 Angle relationships');
@@ -423,7 +434,7 @@ describe('buildSystemPrompt', () => {
       interleavedTopics: [],
     });
     expect(prompt).toContain(
-      'Current topic: <topic_title>Quadratic Equations</topic_title>'
+      'Current topic: <topic_title>Quadratic Equations</topic_title>',
     );
     expect(prompt).not.toContain('interleaved session');
   });
@@ -765,7 +776,7 @@ describe('processExchange', () => {
   it('returns a response from the LLM', async () => {
     const result = await processExchange(
       baseContext,
-      'What is a quadratic equation?'
+      'What is a quadratic equation?',
     );
 
     expect(typeof result.response).toBe('string');
@@ -814,7 +825,7 @@ describe('processExchange', () => {
       id: 'gemini',
       async chat(
         _messages: ChatMessage[],
-        _config: ModelConfig
+        _config: ModelConfig,
       ): Promise<string> {
         return 'Great work! Does that make sense so far?';
       },
@@ -905,7 +916,7 @@ describe('classifyExchangeOutcome', () => {
 
       expect(result.fallback?.reason).toBe('empty_reply');
       expect(result.fallback?.fallbackText).toMatch(/try again/i);
-    }
+    },
   );
 
   it('returns malformed_envelope fallback on parse failure', () => {
@@ -966,7 +977,7 @@ describe('classifyExchangeOutcome', () => {
     expect(result.fallback).toBeUndefined();
     // cleanResponse must be the reply text, never the raw JSON blob.
     expect(result.parsed.cleanResponse).toContain(
-      "Very close! The letters 'gi' together make a 'j' sound"
+      "Very close! The letters 'gi' together make a 'j' sound",
     );
     expect(result.parsed.cleanResponse).not.toContain('"reply"');
     expect(result.parsed.cleanResponse).not.toContain('"signals"');
@@ -1063,7 +1074,7 @@ describe('buildUserContent', () => {
 
   it('returns the plain string when imageData is undefined', () => {
     expect(buildUserContent('Help me with this problem', undefined)).toBe(
-      'Help me with this problem'
+      'Help me with this problem',
     );
   });
 
@@ -1095,7 +1106,7 @@ describe('buildUserContent', () => {
 
     const parts = result as MessagePart[];
     expect(parts[0]).toEqual(
-      expect.objectContaining({ mimeType: 'image/png' })
+      expect.objectContaining({ mimeType: 'image/png' }),
     );
   });
 });

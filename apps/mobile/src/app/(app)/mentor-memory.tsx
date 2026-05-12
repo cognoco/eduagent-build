@@ -97,7 +97,7 @@ export default function MentorMemoryScreen() {
     const ageBracket =
       activeProfile?.birthYear != null
         ? computeAgeBracket(activeProfile.birthYear)
-        : 'adult';
+        : 'adolescent';
     const modeLabels: Record<
       string,
       { young: string; mid: string; older: string }

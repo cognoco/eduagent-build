@@ -2,6 +2,7 @@ import {
   getConsentRequestCopy,
   getConsentPendingCopy,
   getConsentWithdrawnCopy,
+  getConsentHandOffCopy,
 } from './consent-copy';
 import type { AgeBracket } from '@eduagent/schemas';
 
@@ -164,5 +165,32 @@ describe('getConsentWithdrawnCopy', () => {
     const child = getConsentWithdrawnCopy('child');
     const adolescent = getConsentWithdrawnCopy('adolescent');
     expect(child).toEqual(adolescent);
+  });
+});
+
+// ── getConsentHandOffCopy ────────────────────────────────────────────
+
+describe('getConsentHandOffCopy', () => {
+  it.each<AgeBracket>(['child', 'adolescent'])(
+    'returns learner hand-off copy for %s bracket',
+    (bracket) => {
+      const copy = getConsentHandOffCopy(bracket);
+      expect(copy.childTitle).toBe('Almost there!');
+      expect(copy.successMessage).toBe('Link sent!');
+      expect(copy.handBackButton).toBe('Got it');
+    },
+  );
+
+  it('returns default hand-off copy for adult bracket', () => {
+    const copy = getConsentHandOffCopy('adult');
+    expect(copy.childTitle).toBe('Parental consent required');
+    expect(copy.successMessage).toBe('Consent link sent!');
+    expect(copy.handBackButton).toBe('Done');
+  });
+
+  it('child and adolescent return identical copy', () => {
+    expect(getConsentHandOffCopy('child')).toEqual(
+      getConsentHandOffCopy('adolescent'),
+    );
   });
 });

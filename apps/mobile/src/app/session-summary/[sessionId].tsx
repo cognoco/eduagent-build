@@ -122,7 +122,7 @@ export default function SessionSummaryScreen() {
   const ageBracket =
     activeProfile?.birthYear != null
       ? computeAgeBracket(activeProfile.birthYear)
-      : 'adult';
+      : 'adolescent';
   const recallBridge = useRecallBridge(sessionId ?? '');
   const depthEvaluation = useDepthEvaluation();
   const progressInventory = useProgressInventory();

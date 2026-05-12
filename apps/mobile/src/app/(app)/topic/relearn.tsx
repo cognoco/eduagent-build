@@ -135,7 +135,7 @@ export default function RelearnScreen() {
   const ageBracket =
     activeProfile?.birthYear != null
       ? computeAgeBracket(activeProfile.birthYear)
-      : 'adult';
+      : 'adolescent';
   const isLearner = ageBracket !== 'adult';
   const methods = isLearner ? TEACHING_METHODS_LEARNER : TEACHING_METHODS;
   const copy = isLearner ? COPY_LEARNER : COPY_DEFAULT;

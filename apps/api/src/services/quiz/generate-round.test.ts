@@ -34,6 +34,16 @@ describe('buildCapitalsPrompt', () => {
 
     expect(prompt).toContain('Choose an age-appropriate theme');
   });
+
+  it('includes age description for child bracket', () => {
+    const prompt = buildCapitalsPrompt({
+      discoveryCount: 6,
+      ageBracket: 'child',
+      recentAnswers: [],
+    });
+
+    expect(prompt).toContain('under 13');
+  });
 });
 
 describe('injectAtRandomPositions', () => {

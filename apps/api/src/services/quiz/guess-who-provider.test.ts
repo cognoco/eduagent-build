@@ -24,6 +24,17 @@ describe('buildGuessWhoPrompt', () => {
     expect(prompt).toContain('History and science');
   });
 
+  it('includes age description for child bracket', () => {
+    const prompt = buildGuessWhoPrompt({
+      discoveryCount: 4,
+      ageBracket: 'child',
+      recentAnswers: [],
+      topicTitles: ['Animals'],
+    });
+
+    expect(prompt).toContain('under 13');
+  });
+
   it('uses generic fallback when no topics are available', () => {
     const prompt = buildGuessWhoPrompt({
       discoveryCount: 4,

@@ -98,7 +98,7 @@ export function getSessionTypeGuidance(
   ageBracket: AgeBracket = 'adult',
 ): string {
   if (sessionType === 'homework') {
-    const isYouth = ageBracket === 'adolescent';
+    const isYouth = ageBracket !== 'adult';
     const brevity = isYouth
       ? 'Be very brief: 1-2 sentences plus an example. Teens want speed, not essays.'
       : 'Be brief: usually 2-6 sentences, focused on the exact problem in front of the learner.';
