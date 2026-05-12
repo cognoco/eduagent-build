@@ -42,7 +42,7 @@ Always use `/commit` for all commits in this repo. Never use `/zdx:commit`, `/my
 Key rules:
 - Use `resolveTabShape()` for tab visibility. Use `isOwner` / `role` for content gating inside screens.
 - `isGuardianProfile()` requires `isOwner` AND at least one non-owner in profiles[].
-- `personaFromBirthYear()` is for theming only, never for feature gating (returns `parent` for all 18+).
+- `computeAgeBracket()` (from `@eduagent/schemas`) is the canonical age-bracket function — use it for theming and age-appropriate copy, never for feature gating. The removed `personaFromBirthYear()` must not be re-introduced.
 - A solo owner and a child on a parent's account see the **same tabs** — they differ only in what's inside More/Progress.
 
 ## Non-Negotiable Engineering Rules
@@ -184,6 +184,7 @@ cd apps/mobile && pnpm exec tsc --noEmit
 pnpm run db:push:dev
 pnpm run db:generate:dev
 pnpm run db:migrate:dev
+pnpm run db:studio:dev
 
 # LLM Eval Harness
 pnpm eval:llm                    # Tier 1: snapshot prompts (no LLM call)

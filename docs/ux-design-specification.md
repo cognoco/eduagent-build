@@ -1975,7 +1975,7 @@ _These sections address UX gaps identified during persona walkthroughs. Each fol
 2. **AsyncStorage write fails:** Fallback: show normal Home. Worst case: user sees the celebratory screen twice. Acceptable degradation.
 
 **Implementation Notes:**
-- Location: `apps/mobile/src/app/(learner)/_layout.tsx` — inserted between consent gate check and normal Tabs rendering.
+- Location: `apps/mobile/src/app/(app)/_layout.tsx` — inserted between consent gate check and normal Tabs rendering.
 - Component: `PostApprovalLanding` (inline in layout or separate component file).
 - State tracking: AsyncStorage, not DB — this is transient one-time UI state.
 - Accessibility: celebration text has `accessibilityRole="header"`, CTA button meets 44px minimum touch target.
@@ -2099,7 +2099,7 @@ _This is a server-rendered HTML page, not a mobile screen. Served by the API or 
 | Already notified (within 24h) | CTA changes to "Parent notified ✓" (disabled). Show time until re-send: "You can remind them again in X hours." |
 | Notification success | Toast: "We let your parent know!" |
 | While waiting | Read-only access to Library, progress/achievements. Sessions and write operations blocked. |
-| "Browse Library" tap | Navigate to `/(learner)/library`. |
+| "Browse Library" tap | Navigate to `/(app)/library`. |
 | Parent subscribes | Paywall disappears on next API call. TanStack Query invalidation refreshes subscription status. |
 
 **Parent Notification Content:**
@@ -2119,7 +2119,7 @@ _This is a server-rendered HTML page, not a mobile screen. Served by the API or 
 - **No dark patterns.** No urgency countdowns, no "your progress will be lost" threats. The child's Library data persists regardless.
 
 **Implementation Notes:**
-- Location: `apps/mobile/src/app/(learner)/subscription.tsx` — add child detection at top of component. If `isChild`, render `ChildPaywall` variant instead of standard `SubscriptionScreen`.
+- Location: `apps/mobile/src/app/(app)/subscription.tsx` — add child detection at top of component. If `isChild`, render `ChildPaywall` variant instead of standard `SubscriptionScreen`.
 - Child detection: `activeProfile.accountOwnerId !== activeProfile.id` (child profiles have a parent account owner).
 - Notification endpoint: New `POST /v1/notifications/parent-subscribe` (or extend existing notification service).
 - Rate limiting: Check `notification_preferences` or a new `parent_notifications` table for last sent timestamp.
@@ -2308,7 +2308,7 @@ _This is a server-rendered HTML page, not a mobile screen. Served by the API or 
 2. **Child tries to navigate past preview:** All preview screens are modal/sheet — no tab navigation, no route changes. Dismissing returns to consent gate.
 
 **Implementation Notes:**
-- Location: `apps/mobile/src/app/(learner)/_layout.tsx` — enhance existing `ConsentPendingGate` component.
+- Location: `apps/mobile/src/app/(app)/_layout.tsx` — enhance existing `ConsentPendingGate` component.
 - Preview content is static/hardcoded — no API calls needed for curriculum browser preview. This keeps it fast and independent of auth state.
 - Sample coaching card: reuse `CoachingCard` component with hardcoded props (headline, subtext, actions that show "Available after approval" toast).
 - The "Browse subjects" feature can use a simple `ScrollView` with hardcoded subject categories, not the real API.
@@ -2454,7 +2454,7 @@ _Prerequisite-aware learning — visual knowledge graph, topological ordering, a
 3. **Prerequisite data loading fails:** Show standard Library list. Concept Map is progressive enhancement.
 
 **Implementation Notes:**
-- Location: `apps/mobile/src/app/(learner)/library/concept-map.tsx` (new screen) or toggle within existing library.tsx
+- Location: `apps/mobile/src/app/(app)/library/concept-map.tsx` (new screen) or toggle within existing library.tsx
 - Layout: Custom Sugiyama layout algorithm (~100 LOC for small DAGs) or validated RN graph library — evaluate at implementation time
 - Rendering: `react-native-svg` for nodes, edges, and labels
 - Data: new API endpoint `GET /v1/curriculum/:subjectId/graph` returning topics + edges
@@ -2512,7 +2512,7 @@ _Prerequisite-aware learning — visual knowledge graph, topological ordering, a
 | "Map toggle" tap | Switch to Concept Map visualization |
 
 **Implementation Notes:**
-- Location: `apps/mobile/src/app/(learner)/library/index.tsx` (extend existing)
+- Location: `apps/mobile/src/app/(app)/library/index.tsx` (extend existing)
 - Sort: topological sort utility function, fallback to `sortOrder`
 - Locked state: check retention status of REQUIRED prerequisites via API
 
