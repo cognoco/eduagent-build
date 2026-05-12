@@ -1,6 +1,9 @@
 name: Deploy
 
 on:
+  pull_request:
+    branches:
+      - main
   push:
     branches:
       - main
@@ -49,11 +52,11 @@ jobs:
   # API: Cloudflare Workers deployment
   # ---------------------------------------------------------------------------
 
-  # Push-to-main: lightweight lint+typecheck (CI ran full suite on PR).
+  # PR / push-to-main: lightweight lint+typecheck (CI ran full suite on PR).
   # Dispatch: full quality gate with unit + integration tests.
   api-quality-gate:
     name: API Quality Gate
-    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.api_environment != 'skip')
+    if: github.event_name == 'pull_request' || github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.api_environment != 'skip')
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -122,11 +125,12 @@ jobs:
         run: echo "Production deployment approved via GitHub Environment protection rules."
 
   api-deploy:
-    name: Deploy API (${{ github.event_name == 'push' && 'staging' || inputs.api_environment }})
+    name: Deploy API (${{ github.event_name == 'push' && 'staging' || github.event_name == 'workflow_dispatch' && inputs.api_environment || 'skip' }})
     needs: [api-quality-gate, api-confirm-production]
     # Always require quality gate to pass before deploying.
     if: |
       always() &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
       needs.api-quality-gate.result == 'success' &&
       (github.event_name == 'push' ||
        (needs.api-confirm-production.result == 'success' || needs.api-confirm-production.result == 'skipped'))

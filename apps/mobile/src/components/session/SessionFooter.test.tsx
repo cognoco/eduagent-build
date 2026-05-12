@@ -67,6 +67,7 @@ function createProps(overrides: Record<string, unknown> = {}) {
 describe('SessionFooter', () => {
   beforeEach(() => {
     jest.restoreAllMocks();
+    // platformAlert delegates to Alert.alert on non-web platforms in Jest.
     jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
   });
 

@@ -24,6 +24,8 @@ jobs:
     timeout-minutes: 20
     env:
       CI: true
+      # Keep the fallback aligned with the committed staging worker mapping in
+      # docs/deployment-and-secrets.md; repos can override with E2E_API_URL.
       EXPO_PUBLIC_API_URL: ${{ vars.E2E_API_URL || 'https://mentomate-api-stg.zwizzly.workers.dev' }}
       EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY_PREVIEW }}
       PLAYWRIGHT_API_URL: ${{ vars.E2E_API_URL || 'https://mentomate-api-stg.zwizzly.workers.dev' }}

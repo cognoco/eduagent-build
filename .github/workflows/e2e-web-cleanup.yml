@@ -41,6 +41,7 @@ jobs:
     steps:
       - name: Reset seeded staging accounts
         env:
+          # Match the web smoke fallback; repos can override with E2E_API_URL.
           API_URL: ${{ vars.E2E_API_URL || 'https://mentomate-api-stg.zwizzly.workers.dev' }}
           TEST_SEED_SECRET: ${{ secrets.TEST_SEED_SECRET }}
           DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}

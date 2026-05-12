@@ -11,9 +11,9 @@
  * 3. POST /v1/subjects — 201 creates subject
  * 4. POST /v1/subjects — 400 with invalid body
  * 5. GET /v1/subjects/:id — 200 returns subject
- * 6. GET /v1/subjects/:id — 404 when not found
+ * 6. GET /v1/subjects/:id — 404 when not found/cross-profile
  * 7. PATCH /v1/subjects/:id — 200 updates subject
- * 8. PATCH /v1/subjects/:id — 404 when not found
+ * 8. PATCH /v1/subjects/:id — 404 when not found/cross-profile
  * 9. GET /v1/subjects — 401 without auth
  */
 
@@ -270,6 +270,17 @@ describe('Integration: GET /v1/subjects/:id', () => {
       TEST_ENV,
     );
     expect(detailRes.status).toBe(404);
+
+    const patchRes = await app.request(
+      `/v1/subjects/${subject.id}`,
+      {
+        method: 'PATCH',
+        headers: otherHeaders,
+        body: JSON.stringify({ name: 'Hijacked Mathematics' }),
+      },
+      TEST_ENV,
+    );
+    expect(patchRes.status).toBe(404);
 
     const listRes = await app.request(
       '/v1/subjects?includeInactive=true',

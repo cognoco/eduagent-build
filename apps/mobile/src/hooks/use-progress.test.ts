@@ -1,7 +1,7 @@
 import { renderHook, waitFor } from '@testing-library/react-native';
 import { QueryClient } from '@tanstack/react-query';
 import { setActiveProfileId } from '../lib/api-client';
-import { ForbiddenError } from '../lib/api-errors';
+import { ForbiddenError, UpstreamError } from '../lib/api-errors';
 import { createHookWrapper } from '../test-utils/app-hook-test-utils';
 import {
   useSubjectProgress,
@@ -28,7 +28,6 @@ beforeEach(() => {
   mockFetch.mockReset();
   globalThis.fetch = mockFetch as unknown as typeof globalThis.fetch;
   setActiveProfileId('test-profile-id');
-  jest.clearAllMocks();
 });
 
 afterEach(() => {
@@ -93,6 +92,33 @@ describe('useSubjectProgress', () => {
     expect(result.current.error).toMatchObject({
       apiCode: 'SUBJECT_INACTIVE',
       message: 'This subject is archived',
+    });
+  });
+
+  it('classifies server errors through the real client boundary', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          code: 'INTERNAL_ERROR',
+          message: 'Internal Server Error',
+        }),
+        { status: 500 },
+      ),
+    );
+
+    const { result } = renderHook(() => useSubjectProgress('sub-1'), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isError).toBe(true);
+    });
+
+    expect(result.current.error).toBeInstanceOf(UpstreamError);
+    expect(result.current.error).toMatchObject({
+      code: 'INTERNAL_ERROR',
+      message: 'Internal Server Error',
+      status: 500,
     });
   });
 });
