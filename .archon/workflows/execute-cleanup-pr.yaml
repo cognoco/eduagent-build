@@ -1,4 +1,4 @@
-name: execute-cleanup-pr-merged
+name: execute-cleanup-pr
 description: |
   Execute a cleanup-plan.md work package by PR number.
   Usage: archon workflow run execute-cleanup-pr-merged --branch cleanup-pr-XX "PR-16"

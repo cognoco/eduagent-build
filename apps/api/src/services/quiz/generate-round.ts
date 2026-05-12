@@ -239,9 +239,6 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
     recentAnswers,
     libraryItems,
   });
-  // Shared schemas AgeBracket is now { 'adolescent' | 'adult' } and matches
-  // the quiz-local AgeBracket exactly (product is 11+, so the historical
-  // 'child' member was removed in BUG-642 [P-2]).
   const ageBracket: AgeBracket =
     birthYear == null ? 'adult' : computeAgeBracket(birthYear);
 

@@ -91,7 +91,6 @@ jest.mock('expo-speech-recognition', () => ({
 
 jest.mock('../../lib/profile', () => ({
   useProfile: () => mockUseProfile(),
-  personaFromBirthYear: () => 'learner',
   isGuardianProfile: (
     profile: { isOwner: boolean } | null | undefined,
     profiles: ReadonlyArray<{ isOwner: boolean }>,

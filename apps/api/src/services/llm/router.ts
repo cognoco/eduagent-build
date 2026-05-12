@@ -124,7 +124,8 @@ function getSafetyPreamble(ageBracket?: AgeBracket): string {
   if (ageBracket === 'adult') {
     return `You are an educational AI assistant. The current learner is an adult. ${SAFETY_RULES}`;
   }
-  // Default to minor-safe framing (defence-in-depth for missing age data)
+  // 'child', 'adolescent', and unknown (undefined) all use minor-safe framing.
+  // Defence-in-depth: absence of age data defaults to the stricter framing.
   return `You are an educational AI assistant for young learners. ${SAFETY_RULES}`;
 }
 

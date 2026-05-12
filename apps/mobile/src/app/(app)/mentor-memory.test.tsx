@@ -63,7 +63,6 @@ jest.mock('../../lib/profile', () => ({
       consentStatus: null,
     },
   }),
-  personaFromBirthYear: () => 'learner',
   ProfileContext: {
     Provider: ({ children }: { children: React.ReactNode }) => children,
   },

@@ -12,7 +12,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { InterestContext } from '@eduagent/schemas';
-import { personaFromBirthYear, useProfile } from '../../lib/profile';
+import { useProfile } from '../../lib/profile';
+import { computeAgeBracket } from '@eduagent/schemas';
 import { formatApiError } from '../../lib/format-api-error';
 import { Sentry } from '../../lib/sentry';
 import {
@@ -93,7 +94,10 @@ export default function MentorMemoryScreen() {
 
   const accommodationBadgeText = useMemo(() => {
     if (accommodationMode === 'none') return null;
-    const persona = personaFromBirthYear(activeProfile?.birthYear);
+    const ageBracket =
+      activeProfile?.birthYear != null
+        ? computeAgeBracket(activeProfile.birthYear)
+        : 'adult';
     const modeLabels: Record<
       string,
       { young: string; mid: string; older: string }
@@ -116,9 +120,8 @@ export default function MentorMemoryScreen() {
     };
     const labels = modeLabels[accommodationMode];
     if (!labels) return null;
-    // personaFromBirthYear returns: 'teen' (under 13), 'learner' (13-17), 'parent' (18+)
-    if (persona === 'teen') return labels.young;
-    if (persona === 'learner') return labels.mid;
+    if (ageBracket === 'child') return labels.young;
+    if (ageBracket === 'adolescent') return labels.mid;
     return labels.older;
   }, [accommodationMode, activeProfile?.birthYear, t]);
 

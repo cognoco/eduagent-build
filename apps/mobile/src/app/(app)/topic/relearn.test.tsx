@@ -15,7 +15,6 @@ let mockSearchParams: Record<string, string> = {};
 let mockOverdueTopicsReturn: Record<string, unknown> = {};
 let mockTeachingPreferenceReturn: Record<string, unknown> = {};
 let mockIsParentProxy = false;
-let mockPersona = 'teen';
 
 jest.mock('expo-router', () => ({
   Redirect: () => null,
@@ -52,7 +51,6 @@ jest.mock('../../../lib/profile', () => ({
   useProfile: () => ({
     activeProfile: { id: 'owner-id', isOwner: true, birthYear: null },
   }),
-  personaFromBirthYear: () => mockPersona,
 }));
 
 jest.mock('../../../lib/navigation', () => ({
@@ -113,7 +111,6 @@ describe('RelearnScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockSearchParams = {};
-    mockPersona = 'teen';
     mockIsParentProxy = false;
     mockOverdueTopicsReturn = {
       data: makeOverdueData(),

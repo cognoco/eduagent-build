@@ -28,10 +28,12 @@ export function resolveAgeBracket(birthYear?: number | null): AgeBracket {
 }
 
 /**
- * Four-tier age-voice mapping. Coarser `AgeBracket` (safety/routing) stays as-is;
- * this registry reads the raw `birthYear` when available to distinguish
- * early teens from older teens, and young adults from mature adults.
- * Falls back to the bracket-based split when birthYear is missing.
+ * Four-tier age-voice mapping. When birthYear is available the function uses
+ * fine-grained age bands; when only the bracket is known it falls back to the
+ * bracket-based split. Bracket→voice decisions:
+ *   'child'      → EARLY_TEEN_VOICE (under-13 learners use the youngest voice)
+ *   'adolescent' → TEEN_VOICE       (defence-in-depth: youngest plausible)
+ *   'adult'      → ADULT_VOICE      (honours explicit bracket from family_links etc.)
  */
 export function getAgeVoice(
   ageBracket: AgeBracket,
@@ -75,17 +77,15 @@ export function getAgeVoice(
   }
 
   // Fallback path — bracket-only callers (birthYear unknown).
-  // adolescent → TEEN_VOICE (defense-in-depth: youngest plausible).
-  // adult → ADULT_VOICE (honour explicit bracket signal from family_links etc.).
   // Known users with birthYear still reach the fine-grained branch above. [B.5]
   switch (ageBracket) {
+    case 'child':
+      return EARLY_TEEN_VOICE;
     case 'adolescent':
       return TEEN_VOICE;
     case 'adult':
       return ADULT_VOICE;
     default: {
-      // Exhaustive guard — if a new AgeBracket variant is added the
-      // compile will fail here rather than silently returning undefined.
       const exhaustive: never = ageBracket;
       throw new Error(`Unexpected ageBracket: ${exhaustive}`);
     }

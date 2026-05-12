@@ -14,7 +14,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '../../lib/theme';
-import { useProfile, personaFromBirthYear } from '../../lib/profile';
+import { useProfile } from '../../lib/profile';
+import { computeAgeBracket } from '@eduagent/schemas';
 import { useActiveProfileRole } from '../../hooks/use-active-profile-role';
 import { useParentProxy } from '../../hooks/use-parent-proxy';
 import { useRatingPrompt } from '../../hooks/use-rating-prompt';
@@ -118,7 +119,10 @@ export default function SessionSummaryScreen() {
   const { activeProfile } = useProfile();
   const { isParentProxy, childProfile } = useParentProxy();
   const activeProfileRole = useActiveProfileRole();
-  const persona = personaFromBirthYear(activeProfile?.birthYear);
+  const ageBracket =
+    activeProfile?.birthYear != null
+      ? computeAgeBracket(activeProfile.birthYear)
+      : 'adult';
   const recallBridge = useRecallBridge(sessionId ?? '');
   const depthEvaluation = useDepthEvaluation();
   const progressInventory = useProgressInventory();
@@ -566,7 +570,7 @@ export default function SessionSummaryScreen() {
         message: 'summary_submitted',
         data: {
           sessionId,
-          persona,
+          ageBracket,
           exchangeCount: exchanges,
           charCount: summaryText.trim().length,
         },
@@ -678,7 +682,7 @@ export default function SessionSummaryScreen() {
       Sentry.addBreadcrumb({
         category: 'summary',
         message: 'summary_skipped',
-        data: { sessionId, persona, exchangeCount: exchanges },
+        data: { sessionId, ageBracket, exchangeCount: exchanges },
         level: 'info',
       });
 

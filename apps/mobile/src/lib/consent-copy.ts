@@ -1,4 +1,4 @@
-import type { Persona } from './profile';
+import type { AgeBracket } from '@eduagent/schemas';
 
 // ── Consent Hand-Off Screen ──────────────────────────────────────────
 
@@ -56,8 +56,10 @@ const defaultConsentHandOff: ConsentHandOffCopy = {
   handBackButton: 'Done',
 };
 
-export function getConsentHandOffCopy(persona: Persona): ConsentHandOffCopy {
-  return persona === 'learner' ? learnerConsentHandOff : defaultConsentHandOff;
+export function getConsentHandOffCopy(
+  ageBracket: AgeBracket,
+): ConsentHandOffCopy {
+  return ageBracket !== 'adult' ? learnerConsentHandOff : defaultConsentHandOff;
 }
 
 // ── Consent Request Screen ─────────────────────────────────────────────
@@ -87,8 +89,10 @@ const learnerConsentRequest: ConsentRequestCopy = {
     "Once they say yes, you're all set to start learning! You can close this screen.",
 };
 
-export function getConsentRequestCopy(persona: Persona): ConsentRequestCopy {
-  return persona === 'learner' ? learnerConsentRequest : defaultConsentRequest;
+export function getConsentRequestCopy(
+  ageBracket: AgeBracket,
+): ConsentRequestCopy {
+  return ageBracket !== 'adult' ? learnerConsentRequest : defaultConsentRequest;
 }
 
 // ── Consent Pending Gate ───────────────────────────────────────────────
@@ -149,8 +153,10 @@ const learnerConsentPending: ConsentPendingCopy = {
     "That's your own email! Enter your parent or guardian's email instead.",
 };
 
-export function getConsentPendingCopy(persona: Persona): ConsentPendingCopy {
-  return persona === 'learner' ? learnerConsentPending : defaultConsentPending;
+export function getConsentPendingCopy(
+  ageBracket: AgeBracket,
+): ConsentPendingCopy {
+  return ageBracket !== 'adult' ? learnerConsentPending : defaultConsentPending;
 }
 
 // ── Consent Withdrawn Gate ─────────────────────────────────────────────
@@ -177,9 +183,9 @@ const learnerConsentWithdrawn: ConsentWithdrawnCopy = {
 };
 
 export function getConsentWithdrawnCopy(
-  persona: Persona,
+  ageBracket: AgeBracket,
 ): ConsentWithdrawnCopy {
-  return persona === 'learner'
+  return ageBracket !== 'adult'
     ? learnerConsentWithdrawn
     : defaultConsentWithdrawn;
 }
