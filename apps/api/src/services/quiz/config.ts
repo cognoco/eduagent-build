@@ -57,8 +57,8 @@ export function formatActivityLabel(activityType: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-export type { AgeBracket } from '@eduagent/schemas';
 import type { AgeBracket } from '@eduagent/schemas';
+export type { AgeBracket };
 
 export function describeAgeBracket(ageBracket: AgeBracket): string {
   switch (ageBracket) {

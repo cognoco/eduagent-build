@@ -240,7 +240,7 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
     libraryItems,
   });
   const ageBracket: AgeBracket =
-    birthYear == null ? 'adult' : computeAgeBracket(birthYear);
+    birthYear == null ? 'adolescent' : computeAgeBracket(birthYear);
 
   // Compute fine-grained ageYears from birthYear when available.
   const currentYear = new Date().getFullYear();

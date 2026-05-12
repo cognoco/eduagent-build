@@ -1,12 +1,12 @@
 name: execute-cleanup-pr
 description: |
   Execute a cleanup-plan.md work package by PR number.
-  Usage: archon workflow run execute-cleanup-pr-merged --branch cleanup-pr-XX "PR-16"
+  Usage: archon workflow run execute-cleanup-pr --branch cleanup-pr-XX "PR-16"
   Input: PR identifier (e.g. "PR-08", "PR-15", "08", "15")
   Output: GitHub PR ready for human review.
 
-  DRAFT — not yet replacing execute-cleanup-pr-{claude,codex}.yaml.
-  Replaces the dual-flavor bake-off with a single merged flow.
+  Canonical cleanup-PR workflow. Replaced the earlier dual-flavor
+  execute-cleanup-pr-{claude,codex}.yaml variants with a single merged flow.
   Audit + rationale: .archon/workflow-audit.md (Phase D).
 
   Provider/model selection (verify with audit doc):
@@ -54,7 +54,7 @@ nodes:
   # ── PHASE 0: INIT ────────────────────────────────────────────────────
 
   - id: init-tracing
-    bash: ./.archon/scripts/init-tracing.sh --workflow execute-cleanup-pr-merged "$ARGUMENTS"
+    bash: ./.archon/scripts/init-tracing.sh --workflow execute-cleanup-pr "$ARGUMENTS"
 
   # ── PHASE 1: EXTRACT ─────────────────────────────────────────────────
   # Deterministic shell parser. Produces work-order.md, patterns.md,
