@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react-native';
 import { LivingBook } from './LivingBook';
 
 jest.mock('../../lib/theme', () => ({
+  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
   useThemeColors: () => ({
     primary: '#6366f1',
     textSecondary: '#9ca3af',

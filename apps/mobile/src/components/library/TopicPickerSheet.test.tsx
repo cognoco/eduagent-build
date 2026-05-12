@@ -6,6 +6,7 @@ import { TopicPickerSheet } from './TopicPickerSheet';
 // ---------------------------------------------------------------------------
 
 jest.mock('../../lib/theme', () => ({
+  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
   useThemeColors: () => ({
     primarySoft: '#d1fae5',
     surface: '#f5f0e8',

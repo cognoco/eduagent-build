@@ -6,6 +6,7 @@ jest.mock('@expo/vector-icons', () => ({
 }));
 
 jest.mock('../../lib/theme', () => ({
+  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
   useThemeColors: () => ({
     primary: '#0f9f8f',
     textPrimary: '#1a1a1a',

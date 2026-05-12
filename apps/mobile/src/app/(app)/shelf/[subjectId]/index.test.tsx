@@ -73,6 +73,7 @@ jest.mock('expo-router', () => ({
 let mockSearchParams = () => ({ subjectId: 'sub-1' });
 
 jest.mock('../../../../lib/theme', () => ({
+  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
   useThemeColors: () => ({
     accent: '#00bfa5',
     textSecondary: '#888',

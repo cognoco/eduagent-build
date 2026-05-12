@@ -36,6 +36,7 @@ jest.mock('react-native-safe-area-context', () => ({
 }));
 
 jest.mock('../../../lib/theme', () => ({
+  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
   useTheme: () => ({ colorScheme: 'light' }),
   useThemeColors: () => ({
     textPrimary: '#ffffff',

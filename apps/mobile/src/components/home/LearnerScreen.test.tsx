@@ -104,6 +104,7 @@ jest.mock('../common', () => ({
 }));
 
 jest.mock('../../lib/theme', () => ({
+  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
   useThemeColors: () => ({
     textPrimary: '#ffffff',
     textSecondary: '#94a3b8',

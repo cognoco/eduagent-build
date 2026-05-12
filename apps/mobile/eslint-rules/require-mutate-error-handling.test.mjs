@@ -22,5 +22,10 @@ ruleTester.run('require-mutate-error-handling', rule, {
       code: 'foo.mutateAsync(args).then(onOk);',
       errors: [{ messageId: 'missingErrorHandling' }],
     },
+    // [BUG-37] .catch property access without calling it
+    {
+      code: 'const ref = foo.mutateAsync(args).catch;',
+      errors: [{ messageId: 'missingErrorHandling' }],
+    },
   ],
 });

@@ -95,6 +95,7 @@ jest.mock('../../../../../hooks/use-move-topic', () => ({
 }));
 
 jest.mock('../../../../../lib/theme', () => ({
+  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
   useThemeColors: () => ({
     accent: '#00bfa5',
     primary: '#0d9488',

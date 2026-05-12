@@ -6,6 +6,7 @@ import { VoiceToggle } from './VoiceToggle';
 // ---------------------------------------------------------------------------
 
 jest.mock('../../lib/theme', () => ({
+  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
   useThemeColors: () => ({
     muted: '#888',
     primary: '#007AFF',

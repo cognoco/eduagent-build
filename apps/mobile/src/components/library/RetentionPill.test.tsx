@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react-native';
 import { RetentionPill } from './RetentionPill';
 
 jest.mock('../../lib/theme', () => ({
+  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
   useThemeColors: () => ({
     retentionStrong: '#22c55e',
     retentionFading: '#eab308',

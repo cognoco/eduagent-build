@@ -2,6 +2,7 @@ import { render, screen, fireEvent } from '@testing-library/react-native';
 import { InlineNoteCard } from './InlineNoteCard';
 
 jest.mock('../../lib/theme', () => ({
+  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
   useThemeColors: () => ({
     textPrimary: '#1a1a1a',
     textSecondary: '#525252',
