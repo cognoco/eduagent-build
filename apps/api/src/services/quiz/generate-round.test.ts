@@ -72,7 +72,9 @@ describe('injectMasteryQuestions', () => {
     const round = injectMasteryQuestions(discovery, mastery, 'capitals');
 
     expect(round.length).toBe(7);
-    const libraryQuestions = round.filter((question) => question.isLibraryItem);
+    const libraryQuestions = round.filter(
+      (question: CapitalsQuestion) => question.isLibraryItem,
+    );
     expect(libraryQuestions).toHaveLength(1);
     expect(libraryQuestions[0]?.country).toBe('France');
     expect(libraryQuestions[0]?.correctAnswer).toBe('Paris');
@@ -171,7 +173,7 @@ describe('extractJsonObject', () => {
 
   it('throws UpstreamLlmError when no JSON object is found', () => {
     expect(() => extractJsonObject('No JSON here')).toThrow(
-      'Quiz LLM returned no JSON object'
+      'Quiz LLM returned no JSON object',
     );
   });
 });

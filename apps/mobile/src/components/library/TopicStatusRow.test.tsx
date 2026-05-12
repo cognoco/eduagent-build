@@ -11,7 +11,7 @@ jest.mock('../../lib/theme', () => ({
     border: '#e5e7eb',
     surface: '#ffffff',
   }),
-}));
+);
 
 describe('TopicStatusRow', () => {
   const onPress = jest.fn();

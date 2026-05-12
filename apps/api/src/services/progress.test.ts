@@ -10,6 +10,7 @@ const mockDatabaseModule = createDatabaseModuleMock({
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
 import type { Database } from '@eduagent/database';
+import type { SubjectProgress } from '@eduagent/schemas';
 import { createScopedRepository } from '@eduagent/database';
 import {
   getSubjectProgress,
@@ -651,8 +652,12 @@ describe('getOverallProgress', () => {
     expect(result.totalTopicsCompleted).toBe(2); // 1 verified + 1 passed
     expect(result.totalTopicsVerified).toBe(1);
 
-    const math = result.subjects.find((s) => s.name === 'Math');
-    const science = result.subjects.find((s) => s.name === 'Science');
+    const math = result.subjects.find(
+      (s: SubjectProgress) => s.name === 'Math',
+    );
+    const science = result.subjects.find(
+      (s: SubjectProgress) => s.name === 'Science',
+    );
     expect(math).toEqual(expect.objectContaining({}));
     expect(math!.topicsTotal).toBe(1);
     expect(math!.topicsCompleted).toBe(1);

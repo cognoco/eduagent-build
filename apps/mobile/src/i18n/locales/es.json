@@ -947,6 +947,12 @@
       "title": "Opciones de nota",
       "deleteTitle": "Eliminar nota",
       "deleteMessage": "¿Seguro que quieres eliminar esta nota?"
+    },
+    "nextAction": {
+      "title": "Continuar {{subject}}",
+      "message": "Abre la estantería, elige el siguiente libro o repasa lo que tienes pendiente.",
+      "cta": "Abrir",
+      "accessibilityLabel": "Continuar {{subject}}"
     }
   },
   "topic": {
@@ -1167,7 +1173,10 @@
     "studiedToday": "Estudiado hoy",
     "studiedYesterday": "Estudiado ayer",
     "studiedDaysAgo": "Estudiado hace {{count}} días",
-    "topicPassedNote": "Buen trabajo: este tema queda marcado como aprobado, y los puntos débiles volverán en el repaso cuando necesiten atención."
+    "topicPassedNote": "Buen trabajo: este tema queda marcado como aprobado, y los puntos débiles volverán en el repaso cuando necesiten atención.",
+    "pickerLoadingBody": "Estamos comprobando qué temas están listos para una prueba justa.",
+    "pickerLoadTimeoutTitle": "Los temas de la evaluación tardan mucho en cargarse",
+    "pickerLoadTimeoutMessage": "Comprueba tu conexión y vuelve a intentarlo o regresa."
   },
   "homework": {
     "permissionTitle": "Se necesita acceso a la cámara",
@@ -1340,7 +1349,9 @@
     },
     "empty": {
       "title": "Inicia tu primera sesión",
-      "subtitle": "Inicia tu primera sesión para ver tu progreso aquí"
+      "subtitle": "Inicia tu primera sesión para ver tu progreso aquí",
+      "withSubjectTitle": "El progreso se desbloquea después de estudiar {{subject}}",
+      "withSubjectSubtitle": "Estudia primero un tema de {{subject}}. Las sesiones, el dominio y los repasos aparecerán aquí cuando haya algo que medir."
     },
     "error": {
       "loadTitle": "No pudimos cargar tu progreso",
@@ -1489,7 +1500,9 @@
       "title": "Conversaciones anteriores",
       "empty": "Aún no hay conversaciones",
       "untitledTopic": "Tema sin título",
-      "openSessionFrom": "Abrir sesión del {{date}}"
+      "openSessionFrom": "Abrir sesión del {{date}}",
+      "loadingTooLong": "Las conversaciones tardan mucho en cargarse",
+      "loadingMessage": "Comprueba tu conexión y vuelve a intentarlo, o regresa al progreso de la materia."
     },
     "retention": {
       "strong": {
@@ -1527,6 +1540,11 @@
       "title": "Previous reports",
       "subtitle": "Weekly and monthly snapshots from your learning.",
       "viewAll": "View all reports"
+    },
+    "loadingTitle": "Cargando tu ruta de aprendizaje",
+    "loadTimeout": {
+      "title": "El progreso tarda mucho en cargarse",
+      "message": "Comprueba tu conexión, vuelve a intentarlo o ve al inicio."
     }
   },
   "onboarding": {
@@ -2209,6 +2227,10 @@
       "purchaseConfirmedBody": "Your subscription is being activated. It usually appears within a minute — pull down to refresh.",
       "topUpTitle": "Top-up",
       "topUpBody": "500 additional credits have been added!"
+    },
+    "web": {
+      "plansOnMobile": "Los planes están disponibles en la aplicación móvil",
+      "storePurchaseUnavailable": "Las compras en la tienda no están disponibles en este dispositivo."
     }
   },
   "sessionSummary": {
@@ -2291,7 +2313,8 @@
       "afterFinishTopic": "Disponible después de completar un tema",
       "hintOpenPicker": "Abre el selector de evaluación",
       "hintOpenLibrary": "Abre la biblioteca",
-      "couldNotLoad": "Error al cargar temas de evaluación"
+      "couldNotLoad": "Error al cargar temas de evaluación",
+      "studySubjectFirst": "Estudia {{subject}} primero para desbloquear esto"
     },
     "quiz": {
       "title": "Quiz rápido",

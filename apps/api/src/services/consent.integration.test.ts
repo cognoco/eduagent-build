@@ -63,7 +63,7 @@ async function cleanup() {
     await db.delete(accounts).where(
       inArray(
         accounts.id,
-        accs.map((a) => a.id),
+        accs.map((a: typeof accounts.$inferSelect) => a.id),
       ),
     );
   }
@@ -191,7 +191,7 @@ async function cleanupRevokeTests() {
     await db.delete(accounts).where(
       inArray(
         accounts.id,
-        accs.map((a) => a.id),
+        accs.map((a: typeof accounts.$inferSelect) => a.id),
       ),
     );
   }
@@ -306,7 +306,9 @@ describe('revokeConsent nudge-suppression (integration)', () => {
 
     const respondedAt = new Date(result.respondedAt!);
     for (const nudgeId of nudgeIds) {
-      const nudge = rows.find((r) => r.id === nudgeId);
+      const nudge = rows.find(
+        (r: typeof nudges.$inferSelect) => r.id === nudgeId,
+      );
       expect(nudge).toBeDefined();
       expect(
         Math.abs(nudge!.readAt!.getTime() - respondedAt.getTime()),
@@ -327,14 +329,18 @@ describe('revokeConsent nudge-suppression (integration)', () => {
     const afterFirst = await db.query.nudges.findMany({
       where: eq(nudges.toProfileId, childId),
     });
-    const firstReadAts = afterFirst.map((r) => r.readAt!.getTime());
+    const firstReadAts = afterFirst.map((r: typeof nudges.$inferSelect) =>
+      r.readAt!.getTime(),
+    );
 
     await revokeConsent(db, childId, parentId);
 
     const afterSecond = await db.query.nudges.findMany({
       where: eq(nudges.toProfileId, childId),
     });
-    const secondReadAts = afterSecond.map((r) => r.readAt!.getTime());
+    const secondReadAts = afterSecond.map((r: typeof nudges.$inferSelect) =>
+      r.readAt!.getTime(),
+    );
 
     expect(secondReadAts).toEqual(firstReadAts);
   });

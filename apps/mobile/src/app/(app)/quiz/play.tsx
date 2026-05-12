@@ -42,6 +42,8 @@ import {
   GuessWhoQuestion,
   type GuessWhoResolvedResult,
 } from '../../../components/quiz/GuessWhoQuestion';
+import { RewardBurst } from '../../../components/common/RewardBurst';
+import { rewardVariantForActivity } from './_quiz-utils';
 
 type AnswerState = 'unanswered' | 'checking' | 'correct' | 'wrong';
 
@@ -65,11 +67,13 @@ export default function QuizPlayScreen(): React.ReactElement {
   const {
     round,
     activityType,
+    returnTo,
     subjectId,
     setPrefetchedRoundId,
     setRound,
     setCompletionResult,
   } = useQuizFlow();
+  const exitHref = returnTo === 'practice' ? '/(app)/practice' : '/(app)/quiz';
   const completeRound = useCompleteRound();
   const completeRoundMutate = completeRound.mutate;
   const prefetchRound = usePrefetchRound();
@@ -148,9 +152,9 @@ export default function QuizPlayScreen(): React.ReactElement {
 
   useEffect(() => {
     if (!round || !currentQuestion) {
-      router.replace('/(app)/quiz' as never);
+      router.replace(exitHref as never);
     }
-  }, [currentQuestion, round, router]);
+  }, [currentQuestion, exitHref, round, router]);
 
   useEffect(() => {
     if (!currentQuestion) return;
@@ -230,7 +234,7 @@ export default function QuizPlayScreen(): React.ReactElement {
   };
   const handleConfirmQuit = () => {
     setQuitConfirmVisible(false);
-    goBackOrReplace(router, '/(app)/quiz');
+    router.replace(exitHref as never);
   };
   const handleSaveAndQuit = () => {
     if (resultsRef.current.length === 0) return;
@@ -429,7 +433,7 @@ export default function QuizPlayScreen(): React.ReactElement {
             </Text>
           </Pressable>
           <Pressable
-            onPress={() => goBackOrReplace(router, '/(app)/quiz')}
+            onPress={() => router.replace(exitHref as never)}
             className="flex-1 bg-surface-elevated rounded-button px-4 py-3 min-h-[48px] items-center justify-center"
             accessibilityRole="button"
             accessibilityLabel={t('common.goHome')}
@@ -589,6 +593,7 @@ export default function QuizPlayScreen(): React.ReactElement {
     }, 4000);
 
     if (correct) {
+      setCorrectCelebrationKey(Date.now());
       hapticSuccess();
     } else {
       hapticError();
@@ -644,6 +649,7 @@ export default function QuizPlayScreen(): React.ReactElement {
     setAnswerState('unanswered');
     setSelectedAnswer(null);
     setCorrectAnswer(null);
+    setCorrectCelebrationKey(null);
     setShowContinueHint(false);
     setAnswerCheckFailed(false);
     // [BUG-929] Also reset freeTextAnswer and guessWhoCluesUsed in the same
@@ -717,6 +723,15 @@ export default function QuizPlayScreen(): React.ReactElement {
       style={{ paddingTop: insets.top + 12, paddingBottom: insets.bottom + 20 }}
       testID="quiz-play-screen"
     >
+      {correctCelebrationKey != null ? (
+        <RewardBurst
+          key={correctCelebrationKey}
+          variant={rewardVariantForActivity(activityType)}
+          intensity="answer"
+          testID="quiz-correct-celebration"
+          onComplete={() => setCorrectCelebrationKey(null)}
+        />
+      ) : null}
       <View className="mb-6 flex-row items-center justify-between px-5">
         <Pressable
           onPress={handleQuit}

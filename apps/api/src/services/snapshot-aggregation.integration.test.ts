@@ -27,6 +27,7 @@ import {
   type Database,
 } from '@eduagent/database';
 import { like } from 'drizzle-orm';
+import type { SubjectInventory } from '@eduagent/schemas';
 import { buildKnowledgeInventory } from './snapshot-aggregation';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
@@ -75,7 +76,7 @@ async function seedSubject(profileId: string, name: string): Promise<string> {
 async function seedStaleSnapshot(
   profileId: string,
   staleSubjectId: string,
-  staleSubjectName: string
+  staleSubjectName: string,
 ): Promise<void> {
   // Snapshot persisted BEFORE the second subject was added. metrics.subjects
   // therefore only mentions the original subject — exactly the state
@@ -149,7 +150,9 @@ describe('[BUG-872] buildKnowledgeInventory includes subjects added after the ca
 
     const inventory = await buildKnowledgeInventory(db, profileId);
 
-    const returnedIds = inventory.subjects.map((s) => s.subjectId).sort();
+    const returnedIds = inventory.subjects
+      .map((s: SubjectInventory) => s.subjectId)
+      .sort();
     const expectedIds = [mathId, biologyId].sort();
 
     // Both must be present. Before the fix, only Math appears — Biology is
@@ -157,7 +160,9 @@ describe('[BUG-872] buildKnowledgeInventory includes subjects added after the ca
     expect(returnedIds).toEqual(expectedIds);
     expect(inventory.subjects.length).toBe(2);
 
-    const biology = inventory.subjects.find((s) => s.subjectId === biologyId);
+    const biology = inventory.subjects.find(
+      (s: SubjectInventory) => s.subjectId === biologyId,
+    );
     expect(biology).toEqual(expect.objectContaining({}));
     expect(biology?.subjectName).toBe('Biology');
   });
@@ -169,6 +174,8 @@ describe('[BUG-872] buildKnowledgeInventory includes subjects added after the ca
     // No new subjects — cache is current.
 
     const inventory = await buildKnowledgeInventory(db, profileId);
-    expect(inventory.subjects.map((s) => s.subjectId)).toEqual([mathId]);
+    expect(
+      inventory.subjects.map((s: SubjectInventory) => s.subjectId),
+    ).toEqual([mathId]);
   });
 });

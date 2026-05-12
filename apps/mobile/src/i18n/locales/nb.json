@@ -947,6 +947,12 @@
       "shelfActionExpand": "utvide",
       "shelfActionCollapse": "lukke",
       "shelfActionOpen": "åpne"
+    },
+    "nextAction": {
+      "title": "Fortsett med {{subject}}",
+      "message": "Åpne hyllen, velg neste bok, eller repeter det som er forfalt.",
+      "cta": "Åpne",
+      "accessibilityLabel": "Fortsett med {{subject}}"
     }
   },
   "topic": {
@@ -1167,7 +1173,10 @@
     "studiedToday": "Studert i dag",
     "studiedYesterday": "Studert i går",
     "studiedDaysAgo": "Studert for {{count}} dager siden",
-    "topicPassedNote": "Bra jobbet - dette emnet er markert som bestått, og svake punkter kommer tilbake i repetisjon når de trenger oppmerksomhet."
+    "topicPassedNote": "Bra jobbet - dette emnet er markert som bestått, og svake punkter kommer tilbake i repetisjon når de trenger oppmerksomhet.",
+    "pickerLoadingBody": "Vi sjekker hvilke emner som er klare for en rettferdig test.",
+    "pickerLoadTimeoutTitle": "Vurderingsemner tar for lang tid å laste",
+    "pickerLoadTimeoutMessage": "Sjekk tilkoblingen din, prøv igjen eller gå tilbake."
   },
   "homework": {
     "permissionTitle": "Kameratilgang nødvendig",
@@ -1340,7 +1349,9 @@
     },
     "empty": {
       "title": "Start din første økt",
-      "subtitle": "Start din første økt for å se fremgangen din her"
+      "subtitle": "Start din første økt for å se fremgangen din her",
+      "withSubjectTitle": "Fremdrift låses opp etter at du har studert {{subject}}",
+      "withSubjectSubtitle": "Studer et emne i {{subject}} først. Økter, mestring og repetisjoner vil vises her når det er noe å måle."
     },
     "error": {
       "loadTitle": "Vi kunne ikke laste fremgangen din",
@@ -1489,7 +1500,9 @@
       "title": "Tidligere samtaler",
       "empty": "Ingen samtaler ennå",
       "untitledTopic": "Tema uten navn",
-      "openSessionFrom": "Åpne økt fra {{date}}"
+      "openSessionFrom": "Åpne økt fra {{date}}",
+      "loadingTooLong": "Samtaler tar for lang tid å laste",
+      "loadingMessage": "Sjekk tilkoblingen din og prøv igjen, eller gå tilbake til emnefremdriften."
     },
     "retention": {
       "strong": {
@@ -1527,6 +1540,11 @@
       "title": "Previous reports",
       "subtitle": "Weekly and monthly snapshots from your learning.",
       "viewAll": "View all reports"
+    },
+    "loadingTitle": "Laster læringsreisen din",
+    "loadTimeout": {
+      "title": "Fremdriften tar for lang tid å laste",
+      "message": "Sjekk tilkoblingen din, prøv igjen eller gå hjem."
     }
   },
   "onboarding": {
@@ -2209,6 +2227,10 @@
       "purchaseConfirmedBody": "Your subscription is being activated. It usually appears within a minute — pull down to refresh.",
       "topUpTitle": "Top-up",
       "topUpBody": "500 additional credits have been added!"
+    },
+    "web": {
+      "plansOnMobile": "Abonnementer er tilgjengelige i mobilappen",
+      "storePurchaseUnavailable": "Butikkjøp er ikke tilgjengelig på denne enheten."
     }
   },
   "sessionSummary": {
@@ -2291,7 +2313,8 @@
       "afterFinishTopic": "Tilgjengelig etter at du fullfører et tema",
       "hintOpenPicker": "Åpner vurderingsvelgeren",
       "hintOpenLibrary": "Åpner biblioteket",
-      "couldNotLoad": "Kunne ikke laste vurderingsemner"
+      "couldNotLoad": "Kunne ikke laste vurderingsemner",
+      "studySubjectFirst": "Studer {{subject}} først for å låse opp dette"
     },
     "quiz": {
       "title": "Hurtigquiz",

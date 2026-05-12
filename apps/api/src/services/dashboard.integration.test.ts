@@ -21,7 +21,7 @@ import {
   type Database,
   xpLedger,
 } from '@eduagent/database';
-import type { ProgressMetrics } from '@eduagent/schemas';
+import type { ProgressMetrics, TopicProgress } from '@eduagent/schemas';
 import { like } from 'drizzle-orm';
 import { ForbiddenError } from '../errors';
 import {
@@ -210,7 +210,7 @@ async function seedCurriculum(
 
   return {
     curriculumId: curriculum!.id,
-    topicIds: topics.map((topic) => topic.id),
+    topicIds: topics.map((topic: { id: string }) => topic.id),
   };
 }
 
@@ -1079,8 +1079,12 @@ describe('dashboard service integration', () => {
       subjectId,
     );
 
-    const plantCells = topics.find((topic) => topic.topicId === topicId1);
-    const animalCells = topics.find((topic) => topic.topicId === topicId2);
+    const plantCells = topics.find(
+      (topic: TopicProgress) => topic.topicId === topicId1,
+    );
+    const animalCells = topics.find(
+      (topic: TopicProgress) => topic.topicId === topicId2,
+    );
 
     expect(plantCells).toEqual(
       expect.objectContaining({

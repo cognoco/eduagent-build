@@ -179,22 +179,22 @@ describe('feedback-delivery-failed Inngest function [BUG-767 / A-24]', () => {
 
       await executeHandler(
         { profileId: 'profile-xyz-99999999', category: 'bug' },
-        'evt-feedback-123'
+        'evt-feedback-123',
       );
 
       expect(mockSendEmail).toHaveBeenCalledTimes(1);
       const [, optsArg] = mockSendEmail.mock.calls[0] as [
         unknown,
-        { idempotencyKey?: string }
+        { idempotencyKey?: string },
       ];
       expect(optsArg.idempotencyKey).toEqual(
-        expect.stringContaining('profile-xyz-99999999')
+        expect.stringContaining('profile-xyz-99999999'),
       );
       expect(optsArg.idempotencyKey).toEqual(
-        expect.stringContaining('evt-feedback-123')
+        expect.stringContaining('evt-feedback-123'),
       );
       expect(optsArg.idempotencyKey).toEqual(
-        expect.stringContaining('retry-delivery')
+        expect.stringContaining('retry-delivery'),
       );
     });
 
@@ -259,14 +259,14 @@ describe('feedback-delivery-failed Inngest function [BUG-767 / A-24]', () => {
       // No eventId — simulates Inngest replay without an event id.
       await executeHandler(
         { profileId: 'profile-no-id-visibility', category: 'suggestion' },
-        undefined
+        undefined,
       );
 
       // logger.warn must fire with the queryable surface + reason tags.
       expect(mockLoggerWarn).toHaveBeenCalledTimes(1);
       const [warnMsg, warnCtx] = mockLoggerWarn.mock.calls[0] as [
         string,
-        Record<string, unknown>
+        Record<string, unknown>,
       ];
       expect(warnMsg).toContain('event.id missing');
       expect(warnCtx.surface).toBe('feedback-delivery-failed');
@@ -278,7 +278,7 @@ describe('feedback-delivery-failed Inngest function [BUG-767 / A-24]', () => {
       expect(mockCaptureException).toHaveBeenCalledTimes(1);
       const [sentryErr, sentryCtx] = mockCaptureException.mock.calls[0] as [
         Error,
-        { extra: Record<string, unknown> }
+        { extra: Record<string, unknown> },
       ];
       expect(sentryErr).toBeInstanceOf(Error);
       expect(sentryCtx.extra.surface).toBe('feedback-delivery-failed');
@@ -297,11 +297,11 @@ describe('feedback-delivery-failed Inngest function [BUG-767 / A-24]', () => {
 
       await executeHandler(
         { profileId: 'profile-shared', category: 'bug' },
-        'evt-A'
+        'evt-A',
       );
       await executeHandler(
         { profileId: 'profile-shared', category: 'bug' },
-        'evt-B'
+        'evt-B',
       );
 
       expect(mockSendEmail).toHaveBeenCalledTimes(2);
@@ -323,7 +323,7 @@ describe('feedback-delivery-failed Inngest function [BUG-767 / A-24]', () => {
 
       await expect(
         // Pass an eventId so the missing-event-id visibility path doesn't fire.
-        executeHandler({ profileId: 'p-1', category: 'bug' }, 'evt-retry-1')
+        executeHandler({ profileId: 'p-1', category: 'bug' }, 'evt-retry-1'),
       ).rejects.toThrow(/feedback-delivery-failed retry unsuccessful/);
     });
 
@@ -336,7 +336,7 @@ describe('feedback-delivery-failed Inngest function [BUG-767 / A-24]', () => {
       await expect(
         // Pass an eventId so the missing-event-id visibility path doesn't fire,
         // keeping captureException call count at exactly 1 (the retry failure).
-        executeHandler({ profileId: 'p-1', category: 'bug' }, 'evt-retry-2')
+        executeHandler({ profileId: 'p-1', category: 'bug' }, 'evt-retry-2'),
       ).rejects.toThrow();
 
       expect(mockCaptureException).toHaveBeenCalledTimes(1);
@@ -414,7 +414,7 @@ describe('[BUG-767 / A-24] handler is registered with serve()', () => {
       }));
       const { functions } = require('../index');
       const ids = functions.map(
-        (f: { _config?: { id?: string } }) => f._config?.id
+        (f: { _config?: { id?: string } }) => f._config?.id,
       );
       expect(ids).toContain('feedback-delivery-failed');
     });

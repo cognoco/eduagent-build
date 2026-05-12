@@ -66,7 +66,7 @@ async function executeSteps(): Promise<{
   stepResults: Record<string, unknown>;
 }> {
   const stepResults: Record<string, unknown> = {};
-  const mockStep = {
+  const mockStep: TopupMockStep = {
     run: jest.fn(async (name: string, fn: () => Promise<unknown>) => {
       const result = await fn();
       stepResults[name] = result;
@@ -79,10 +79,10 @@ async function executeSteps(): Promise<{
   };
 
   const handler = (topupExpiryReminder as any).fn ?? topupExpiryReminder;
-  const result = await handler({
+  const result = (await handler({
     event: { name: 'inngest/function.invoked' },
     step: mockStep,
-  });
+  })) as TopupExpiryResult;
 
   return { result, mockStep, stepResults };
 }

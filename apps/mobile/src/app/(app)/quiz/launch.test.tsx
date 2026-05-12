@@ -68,8 +68,15 @@ jest.mock('../../../i18n', () => {
 
 const mockReplace = jest.fn();
 const mockSetRound = jest.fn();
+const mockSetActivityType = jest.fn();
+const mockSetSubjectId = jest.fn();
+const mockSetLanguageName = jest.fn();
+const mockSetReturnTo = jest.fn();
 const mockMutate = jest.fn();
-const mockGoBackOrReplace = jest.fn();
+let mockSearchParams: Record<string, string> = {};
+let mockFlowActivityType: 'capitals' | 'guess_who' | 'vocabulary' | null =
+  'capitals';
+let mockFlowReturnTo: string | null = null;
 
 // Mutable so timeout tests can flip isPending to true without rerendering.
 let mockGenerateRound = {
@@ -98,6 +105,7 @@ const challengeRound = {
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ replace: mockReplace }),
+  useLocalSearchParams: () => mockSearchParams,
 }));
 
 jest.mock('react-native-safe-area-context', () => ({
@@ -135,8 +143,13 @@ jest.mock('../../../hooks/use-quiz', () => ({
 
 jest.mock('./_layout', () => ({
   useQuizFlow: () => ({
-    activityType: 'capitals',
+    activityType: mockFlowActivityType,
+    returnTo: mockFlowReturnTo,
     subjectId: null,
+    setActivityType: mockSetActivityType,
+    setSubjectId: mockSetSubjectId,
+    setLanguageName: mockSetLanguageName,
+    setReturnTo: mockSetReturnTo,
     setRound: mockSetRound,
   }),
 }));
@@ -165,6 +178,9 @@ describe('friendlyErrorMessage', () => {
 describe('QuizLaunchScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockSearchParams = {};
+    mockFlowActivityType = 'capitals';
+    mockFlowReturnTo = null;
     mockGenerateRound = {
       mutate: mockMutate,
       isPending: false,
@@ -197,6 +213,57 @@ describe('QuizLaunchScreen', () => {
 
     expect(mockSetRound).toHaveBeenCalledWith(challengeRound);
     expect(mockReplace).toHaveBeenCalledWith('/(app)/quiz/play');
+  });
+
+  it('starts a round from a valid route activityType when context is empty', async () => {
+    mockFlowActivityType = null;
+    mockSearchParams = { activityType: 'guess_who', returnTo: 'practice' };
+
+    render(<QuizLaunchScreen />);
+
+    await waitFor(() => {
+      expect(mockMutate).toHaveBeenCalledWith(
+        { activityType: 'guess_who', subjectId: undefined },
+        expect.any(Object),
+      );
+    });
+  });
+
+  it('starts a vocabulary round from route params with subject context', async () => {
+    mockFlowActivityType = null;
+    mockSearchParams = {
+      activityType: 'vocabulary',
+      subjectId: 'subject-it',
+      languageName: 'Italian',
+      returnTo: 'practice',
+    };
+
+    render(<QuizLaunchScreen />);
+
+    await waitFor(() => {
+      expect(mockMutate).toHaveBeenCalledWith(
+        { activityType: 'vocabulary', subjectId: 'subject-it' },
+        expect.any(Object),
+      );
+    });
+  });
+
+  it('sends launch cancel back to Practice when launched from Practice', () => {
+    mockGenerateRound = {
+      mutate: mockMutate,
+      isPending: true,
+      isError: false,
+      error: null,
+    };
+    mockMutate.mockImplementation(() => {
+      // Keep launch on the loading screen.
+    });
+    mockFlowReturnTo = 'practice';
+
+    render(<QuizLaunchScreen />);
+
+    fireEvent.press(screen.getByTestId('quiz-launch-cancel'));
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/practice');
   });
 
   // [BUG-UX-QUIZ-TIMEOUT] 30s hard UI-level timeout on round generation.

@@ -2,6 +2,7 @@ import {
   detectLanguageHint,
   getLanguageByCode,
   SUPPORTED_LANGUAGES,
+  type LanguageEntry,
 } from './languages';
 
 describe('language registry', () => {
@@ -42,7 +43,9 @@ describe('language registry', () => {
 
   it('has all Category I and II languages', () => {
     expect(SUPPORTED_LANGUAGES.length).toBeGreaterThanOrEqual(13);
-    const codes = SUPPORTED_LANGUAGES.map((language) => language.code);
+    const codes = SUPPORTED_LANGUAGES.map(
+      (language: LanguageEntry) => language.code,
+    );
     expect(codes).toContain('es');
     expect(codes).toContain('fr');
     expect(codes).toContain('de');

@@ -199,10 +199,11 @@ describe('subject-prewarm-curriculum integration', () => {
     const topics = await db.query.curriculumTopics.findMany({
       where: eq(curriculumTopics.bookId, bookId),
     });
-    expect(topics.map((topic) => topic.title).sort()).toEqual([
-      'Leaves and Processing',
-      'Tea Plant Basics',
-    ]);
+    expect(
+      topics
+        .map((topic: typeof curriculumTopics.$inferSelect) => topic.title)
+        .sort(),
+    ).toEqual(['Leaves and Processing', 'Tea Plant Basics']);
     expect(step.sendEvent).toHaveBeenCalledWith('emit-topics-generated', {
       name: 'app/book.topics-generated',
       data: { subjectId, bookId, profileId },

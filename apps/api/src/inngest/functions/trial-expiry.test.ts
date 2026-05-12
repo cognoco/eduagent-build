@@ -123,10 +123,10 @@ async function executeSteps(): Promise<{
   };
 
   const handler = (trialExpiry as any).fn;
-  const result = await handler({
+  const result = (await handler({
     event: { name: 'inngest/function.invoked' },
     step: mockStep,
-  });
+  })) as TrialExpiryResult;
 
   return { result, mockStep };
 }

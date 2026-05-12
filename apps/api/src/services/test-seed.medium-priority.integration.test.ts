@@ -23,7 +23,7 @@ beforeAll(async () => {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
     throw new Error(
-      'DATABASE_URL is not set for medium-priority seed integration tests'
+      'DATABASE_URL is not set for medium-priority seed integration tests',
     );
   }
 
@@ -48,14 +48,14 @@ describe('medium-priority seed scenarios integration', () => {
       .where(
         and(
           eq(vocabulary.profileId, result.profileId),
-          eq(vocabulary.subjectId, result.ids.subjectId)
-        )
+          eq(vocabulary.subjectId, result.ids.subjectId),
+        ),
       );
 
     expect(vocabRows).toHaveLength(5);
-    expect(vocabRows.map((row) => row.cefrLevel)).toEqual(
-      expect.arrayContaining(['A1', 'A2', 'B1'])
-    );
+    expect(
+      vocabRows.map((row: typeof vocabulary.$inferSelect) => row.cefrLevel),
+    ).toEqual(expect.arrayContaining(['A1', 'A2', 'B1']));
 
     const sessions = await db
       .select()
@@ -64,8 +64,8 @@ describe('medium-priority seed scenarios integration', () => {
         and(
           eq(learningSessions.profileId, result.profileId),
           eq(learningSessions.subjectId, result.ids.subjectId),
-          eq(learningSessions.status, 'completed')
-        )
+          eq(learningSessions.status, 'completed'),
+        ),
       );
 
     expect(sessions).toHaveLength(5);
@@ -90,7 +90,7 @@ describe('medium-priority seed scenarios integration', () => {
         profileId: result.ids.parentProfileId,
         childProfileId: result.ids.childProfileId,
         reportMonth: '2026-03-01',
-      })
+      }),
     );
     expect((report?.reportData as { month?: string }).month).toBe('March 2026');
   });
@@ -114,7 +114,7 @@ describe('medium-priority seed scenarios integration', () => {
         memoryConsentStatus: 'granted',
         memoryCollectionEnabled: true,
         memoryInjectionEnabled: true,
-      })
+      }),
     );
     expect(profile?.interests).toEqual(['Soccer', 'History']);
 
@@ -124,8 +124,8 @@ describe('medium-priority seed scenarios integration', () => {
       .where(
         and(
           eq(learningSessions.profileId, result.ids.childProfileId),
-          eq(learningSessions.status, 'completed')
-        )
+          eq(learningSessions.status, 'completed'),
+        ),
       );
 
     expect(sessions.length).toBeGreaterThanOrEqual(4);

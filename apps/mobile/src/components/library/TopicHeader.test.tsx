@@ -11,7 +11,7 @@ jest.mock('../../lib/theme', () => ({
     retentionWeak: '#f97316',
     retentionForgotten: '#737373',
   }),
-}));
+);
 
 describe('TopicHeader', () => {
   it('renders the topic name', () => {

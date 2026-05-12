@@ -39,15 +39,15 @@ const SCREEN_HEIGHT =
     : Dimensions.get('screen').height;
 
 const STARTER_CHIPS = [
-  'Math',
-  'Science',
-  'English',
-  'History',
-  'Spanish',
-  'Geography',
-  'Art',
-  'Music',
-  'Programming',
+  'Ancient Egypt',
+  'Fractions',
+  'How plants grow',
+  'Python basics',
+  'World capitals',
+  'Drawing faces',
+  'Spanish travel phrases',
+  'Music theory',
+  'Volcanoes',
 ] as const;
 
 function isStarterChipInput(input: string): boolean {

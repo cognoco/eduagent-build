@@ -11,7 +11,7 @@ jest.mock('../../lib/theme', () => ({
     textInverse: '#ffffff',
     border: '#2a2a54',
   }),
-}));
+);
 
 describe('CoachBand', () => {
   const baseProps: CoachBandProps = {

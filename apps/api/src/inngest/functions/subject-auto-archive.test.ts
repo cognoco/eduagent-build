@@ -40,10 +40,10 @@ async function executeSteps(): Promise<{
   };
 
   const handler = (subjectAutoArchive as any).fn;
-  const result = await handler({
+  const result = (await handler({
     event: { name: 'inngest/function.invoked' },
     step: mockStep,
-  });
+  })) as SubjectAutoArchiveResult;
 
   return { result, mockStep };
 }

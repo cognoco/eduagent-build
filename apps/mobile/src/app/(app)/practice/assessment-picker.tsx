@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -30,6 +31,16 @@ export default function AssessmentPickerScreen(): React.ReactElement {
     isError,
     refetch,
   } = useAssessmentEligibleTopics();
+  const [loadTimedOut, setLoadTimedOut] = useState(false);
+
+  useEffect(() => {
+    if (!isLoading) {
+      setLoadTimedOut(false);
+      return;
+    }
+    const timer = setTimeout(() => setLoadTimedOut(true), 15_000);
+    return () => clearTimeout(timer);
+  }, [isLoading]);
 
   return (
     <ScrollView
@@ -78,10 +89,37 @@ export default function AssessmentPickerScreen(): React.ReactElement {
             onPress: () => router.back(),
           }}
         />
+      ) : isLoading && loadTimedOut ? (
+        <ErrorFallback
+          variant="card"
+          title={t('assessment.pickerLoadTimeoutTitle')}
+          message={t('assessment.pickerLoadTimeoutMessage')}
+          primaryAction={{
+            label: t('common.tryAgain', 'Try again'),
+            testID: 'assessment-picker-timeout-retry',
+            onPress: () => {
+              void refetch();
+            },
+          }}
+          secondaryAction={{
+            label: t('common.goBack', 'Go back'),
+            testID: 'assessment-picker-timeout-back',
+            onPress: () => router.back(),
+          }}
+          testID="assessment-picker-timeout"
+        />
       ) : isLoading ? (
-        <Text className="text-body text-text-secondary">
-          {t('assessment.pickerLoading')}
-        </Text>
+        <View
+          className="bg-surface-elevated rounded-card px-4 py-5"
+          testID="assessment-picker-loading"
+        >
+          <Text className="text-body font-semibold text-text-primary">
+            {t('assessment.pickerLoading')}
+          </Text>
+          <Text className="text-body-sm text-text-secondary mt-1">
+            {t('assessment.pickerLoadingBody')}
+          </Text>
+        </View>
       ) : topics.length === 0 ? (
         <View
           testID="assessment-picker-empty"

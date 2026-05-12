@@ -10,7 +10,7 @@ jest.mock('../../lib/theme', () => ({
     warning: '#ff9800',
     success: '#4caf50',
   }),
-}));
+);
 
 describe('NoteDisplay', () => {
   it('shows note content', () => {

@@ -147,6 +147,7 @@ jest.mock('./_layout', () => ({
     setActivityType: jest.fn(),
     setSubjectId: jest.fn(),
     setLanguageName: jest.fn(),
+    setReturnTo: jest.fn(),
     setRound: jest.fn(),
     setPrefetchedRoundId: jest.fn(),
     setCompletionResult: jest.fn(),
@@ -200,6 +201,17 @@ describe('QuizIndexScreen', () => {
     fireEvent.press(screen.getByTestId('quiz-back'));
 
     expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
+    expect(mockBack).not.toHaveBeenCalled();
+  });
+
+  it('returns to Practice when opened from the Practice hub', () => {
+    mockSearchParams = { returnTo: 'practice' };
+
+    render(<QuizIndexScreen />, { wrapper: Wrapper });
+
+    fireEvent.press(screen.getByTestId('quiz-back'));
+
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/practice');
     expect(mockBack).not.toHaveBeenCalled();
   });
 
