@@ -12,8 +12,11 @@ jest.mock('stripe', () => {
   const StripeMock = jest.fn().mockReturnValue(mockStripeInstance);
 
   // Static methods
-  StripeMock.createFetchHttpClient = jest.fn().mockReturnValue({});
-  StripeMock.createSubtleCryptoProvider = jest.fn().mockReturnValue({});
+  (StripeMock as unknown as Record<string, jest.Mock>).createFetchHttpClient =
+    jest.fn().mockReturnValue({});
+  (
+    StripeMock as unknown as Record<string, jest.Mock>
+  ).createSubtleCryptoProvider = jest.fn().mockReturnValue({});
 
   return {
     __esModule: true,
@@ -44,7 +47,9 @@ describe('createStripeClient', () => {
   it('uses the fetch HTTP client for Workers compatibility', () => {
     createStripeClient('sk_test_456');
 
-    expect(Stripe.createFetchHttpClient).toHaveBeenCalled();
+    expect(
+      (Stripe as unknown as Record<string, jest.Mock>).createFetchHttpClient,
+    ).toHaveBeenCalled();
   });
 });
 
@@ -61,7 +66,8 @@ describe('verifyWebhookSignature', () => {
     const result = await verifyWebhookSignature(
       '{"test": true}',
       'sig_header',
-      'whsec_secret'
+      'whsec_secret',
+      'sk_test_unused',
     );
 
     expect(result).toEqual(mockEvent);
@@ -75,9 +81,12 @@ describe('verifyWebhookSignature', () => {
       id: 'evt_1',
     });
 
-    await verifyWebhookSignature('payload', 'sig', 'secret');
+    await verifyWebhookSignature('payload', 'sig', 'secret', 'sk_test_unused');
 
-    expect(Stripe.createSubtleCryptoProvider).toHaveBeenCalled();
+    expect(
+      (Stripe as unknown as Record<string, jest.Mock>)
+        .createSubtleCryptoProvider,
+    ).toHaveBeenCalled();
   });
 
   it('propagates errors from signature verification', async () => {
@@ -85,11 +94,11 @@ describe('verifyWebhookSignature', () => {
     const latestInstance =
       StripeMock.mock.results[StripeMock.mock.results.length - 1].value;
     latestInstance.webhooks.constructEventAsync.mockRejectedValue(
-      new Error('Signature verification failed')
+      new Error('Signature verification failed'),
     );
 
     await expect(
-      verifyWebhookSignature('payload', 'bad_sig', 'secret')
+      verifyWebhookSignature('payload', 'bad_sig', 'secret', 'sk_test_unused'),
     ).rejects.toThrow('Signature verification failed');
   });
 });

@@ -304,9 +304,9 @@ describe('drift guard — every MemoryProjection field is wired or opted out', (
 
     for (const key of allProjectionKeys) {
       if (PROJECTION_OPT_OUT.has(key)) continue; // explicitly opted out
-      if (selfViewKeys.has(key)) continue; // present in self-view
+      if (selfViewKeys.has(String(key))) continue; // present in self-view
       // Not in self-view and not opted out → drift
-      unwired.push(key);
+      unwired.push(String(key));
     }
 
     expect(unwired).toEqual([]);

@@ -2,6 +2,10 @@
 // Workers KV Helpers — Tests
 // ---------------------------------------------------------------------------
 
+// KVNamespace is a Cloudflare Workers type absent from tsconfig.spec.json.
+// Use Record<string, unknown> as a structural stand-in so return-type annotations compile.
+type KVNamespace = Record<string, unknown>;
+
 import {
   writeSubscriptionStatus,
   readSubscriptionStatus,
@@ -38,7 +42,7 @@ describe('writeSubscriptionStatus', () => {
     expect(kv.put).toHaveBeenCalledWith(
       'sub:acc-123',
       JSON.stringify(sampleStatus),
-      { expirationTtl: 86400 }
+      { expirationTtl: 86400 },
     );
   });
 

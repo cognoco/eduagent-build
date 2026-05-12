@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { accountMiddleware } from './account';
+import type { AppVariables } from '../types/hono';
 
 // Mock the account service
 jest.mock('../services/account', () => ({
@@ -20,14 +21,14 @@ beforeEach(() => {
 
 describe('accountMiddleware', () => {
   it('sets account in context for authenticated requests', async () => {
-    const app = new Hono();
+    const app = new Hono<{ Variables: AppVariables }>();
 
     // Simulate auth middleware setting user
     app.use('*', async (c, next) => {
-      c.set('user' as never, {
+      c.set('user', {
         userId: 'user_test',
         email: 'test@example.com',
-      });
+      } as AppVariables['user']);
       await next();
     });
     app.use('*', accountMiddleware);
@@ -44,7 +45,7 @@ describe('accountMiddleware', () => {
   });
 
   it('skips for unauthenticated requests', async () => {
-    const app = new Hono();
+    const app = new Hono<{ Variables: AppVariables }>();
 
     // No auth middleware — user is not set
     app.use('*', accountMiddleware);
@@ -61,11 +62,11 @@ describe('accountMiddleware', () => {
   });
 
   it('rejects with 401 when email is missing from JWT claims', async () => {
-    const app = new Hono();
+    const app = new Hono<{ Variables: AppVariables }>();
 
     app.use('*', async (c, next) => {
-      c.set('user' as never, { userId: 'clerk_no_email' });
-      c.set('db' as never, {});
+      c.set('user', { userId: 'clerk_no_email' } as AppVariables['user']);
+      c.set('db', {} as AppVariables['db']);
       await next();
     });
     app.use('*', accountMiddleware);
@@ -80,11 +81,14 @@ describe('accountMiddleware', () => {
   });
 
   it('passes correct clerkUserId and email to findOrCreateAccount', async () => {
-    const app = new Hono();
+    const app = new Hono<{ Variables: AppVariables }>();
 
     app.use('*', async (c, next) => {
-      c.set('user' as never, { userId: 'clerk_abc', email: 'user@test.com' });
-      c.set('db' as never, {});
+      c.set('user', {
+        userId: 'clerk_abc',
+        email: 'user@test.com',
+      } as AppVariables['user']);
+      c.set('db', {} as AppVariables['db']);
       await next();
     });
     app.use('*', accountMiddleware);
@@ -95,7 +99,7 @@ describe('accountMiddleware', () => {
     expect(findOrCreateAccount).toHaveBeenCalledWith(
       {},
       'clerk_abc',
-      'user@test.com'
+      'user@test.com',
     );
   });
 });

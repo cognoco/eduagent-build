@@ -29,14 +29,12 @@ jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
 jest.mock('../client', () => ({
   inngest: {
-    createFunction: jest.fn(
-      (_opts: unknown, _trigger: unknown, fn: unknown) => {
-        return Object.assign(fn, {
-          opts: _opts,
-          fn,
-        });
-      },
-    ),
+    createFunction: jest.fn((_opts: unknown, _trigger: unknown, fn: object) => {
+      return Object.assign(fn, {
+        opts: _opts,
+        fn,
+      });
+    }),
     send: (...args: unknown[]) => mockInngestSend(...args),
   },
 }));
@@ -206,7 +204,7 @@ describe('topupExpiryReminder', () => {
     const originalDate = global.Date;
     class BrokenDate extends originalDate {
       constructor(...args: ConstructorParameters<typeof Date>) {
-        if (args.length === 0) {
+        if ((args.length as number) === 0) {
           super(NaN);
           return;
         }
@@ -250,7 +248,7 @@ describe('topupExpiryReminder', () => {
     const originalDate = global.Date;
     class BrokenDate extends originalDate {
       constructor(...args: ConstructorParameters<typeof Date>) {
-        if (args.length === 0) {
+        if ((args.length as number) === 0) {
           super(NaN);
           return;
         }

@@ -268,7 +268,7 @@ async function executeWeeklyGenerate(
 async function executeMonthlyGenerate(
   parentId: string,
   childId: string,
-  db: ReturnType<typeof buildMockDb>,
+  db: ReturnType<typeof buildMonthlyMockDb>,
 ): Promise<unknown> {
   (getStepDatabase as jest.Mock).mockReturnValue(db);
 

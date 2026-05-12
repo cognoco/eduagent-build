@@ -2,6 +2,10 @@
 // Metering Middleware Tests
 // ---------------------------------------------------------------------------
 
+// KVNamespace is a Cloudflare Workers type absent from tsconfig.spec.json.
+// Use Record<string, unknown> as a structural stand-in so `{} as KVNamespace` compiles.
+type KVNamespace = Record<string, unknown>;
+
 // Mock JWT so auth middleware passes
 jest.mock('./jwt', () =>
   require('../test-utils/auth-fixture').createJwtModuleMock(),

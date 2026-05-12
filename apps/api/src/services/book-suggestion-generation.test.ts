@@ -4,12 +4,12 @@
 
 import { jest } from '@jest/globals';
 
-const routeAndCallMock = jest.fn();
+const routeAndCallMock = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 jest.mock('./llm' /* gc1-allow: LLM external boundary */, () => ({
   routeAndCall: (...args: unknown[]) => routeAndCallMock(...args),
 }));
 
-const loggerWarnMock = jest.fn();
+const loggerWarnMock = jest.fn<(...args: unknown[]) => void>();
 jest.mock('./logger' /* gc1-allow: metric verification */, () => ({
   createLogger: () => ({
     warn: (...args: unknown[]) => loggerWarnMock(...args),
@@ -99,7 +99,9 @@ function makeTx(opts: {
 
   const buildSelectChain = (result: unknown[]) => {
     const chain: Record<string, jest.Mock> = {};
-    const terminal = jest.fn().mockResolvedValue(result);
+    const terminal = jest
+      .fn<() => Promise<unknown[]>>()
+      .mockResolvedValue(result);
     chain['from'] = jest.fn().mockReturnValue(chain);
     chain['where'] = jest.fn().mockReturnValue(chain);
     chain['innerJoin'] = jest.fn().mockReturnValue(chain);
@@ -107,9 +109,16 @@ function makeTx(opts: {
     chain['limit'] = terminal;
     // Make the chain itself thenable so awaiting it resolves the result.
     // Some calls are awaited directly (no .limit()), others via .limit().
-    (chain as unknown as Promise<unknown[]>)['then'] = (
-      onFulfilled: (v: unknown[]) => unknown,
-      onRejected?: (e: unknown) => unknown,
+    (chain as unknown as Promise<unknown[]>)['then'] = <
+      TResult1 = unknown[],
+      TResult2 = never,
+    >(
+      onFulfilled?:
+        | ((value: unknown[]) => TResult1 | PromiseLike<TResult1>)
+        | null,
+      onRejected?:
+        | ((reason: unknown) => TResult2 | PromiseLike<TResult2>)
+        | null,
     ) => Promise.resolve(result).then(onFulfilled, onRejected);
     return chain;
   };
@@ -122,16 +131,22 @@ function makeTx(opts: {
 
   const updateChain = {
     set: jest.fn().mockReturnThis(),
-    where: jest.fn().mockResolvedValue(undefined),
+    where: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
   };
   const updateMock = jest.fn().mockReturnValue(updateChain);
 
   const insertChain = insertRejects
-    ? { values: jest.fn().mockRejectedValue(insertRejects) }
-    : { values: jest.fn().mockResolvedValue(undefined) };
+    ? {
+        values: jest
+          .fn<() => Promise<never>>()
+          .mockRejectedValue(insertRejects),
+      }
+    : { values: jest.fn<() => Promise<void>>().mockResolvedValue(undefined) };
   const insertMock = jest.fn().mockReturnValue(insertChain);
 
-  const executeMock = jest.fn().mockResolvedValue({ rows: [{ got: lockGot }] });
+  const executeMock = jest
+    .fn<() => Promise<{ rows: Array<{ got: boolean }> }>>()
+    .mockResolvedValue({ rows: [{ got: lockGot }] });
 
   return {
     tx: {
@@ -157,14 +172,16 @@ function makeDb(
 ) {
   const transactionMock =
     txCallback != null
-      ? jest.fn().mockImplementation(txCallback)
-      : jest.fn().mockResolvedValue(undefined);
+      ? jest.fn<typeof txCallback>().mockImplementation(txCallback)
+      : jest.fn<() => Promise<void>>().mockResolvedValue(undefined);
 
   return {
     db: {
       query: {
         subjects: {
-          findFirst: jest.fn().mockResolvedValue(subject),
+          findFirst: jest
+            .fn<() => Promise<Record<string, unknown> | null>>()
+            .mockResolvedValue(subject),
         },
       },
       transaction: transactionMock,
@@ -327,7 +344,7 @@ describe('generateCategorizedBookSuggestions', () => {
       const { tx } = makeTx({ lockGot: false });
       // Override execute to return array directly (not wrapped in .rows)
       (tx as never as { execute: jest.Mock }).execute = jest
-        .fn()
+        .fn<() => Promise<Array<{ got: boolean }>>>()
         .mockResolvedValue([{ got: false }]);
 
       const { db } = makeDb(subject, async (cb) => cb(tx));
@@ -343,7 +360,7 @@ describe('generateCategorizedBookSuggestions', () => {
       // Return a shape that is neither { rows: [...] } nor a plain array
       // — simulates a future Drizzle driver upgrade changing the result shape.
       (tx as never as { execute: jest.Mock }).execute = jest
-        .fn()
+        .fn<() => Promise<{ result: boolean }>>()
         .mockResolvedValue({ result: true });
 
       const { db } = makeDb(subject, async (cb) => cb(tx));

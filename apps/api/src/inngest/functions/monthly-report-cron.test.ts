@@ -156,19 +156,24 @@ jest.mock('../../services/snapshot-aggregation', () => ({
 
 const mockSendPushNotification = jest.fn().mockResolvedValue({ sent: true });
 const mockSendEmail = jest.fn().mockResolvedValue({ sent: true });
-const mockFormatMonthlyProgressEmail = jest.fn((to: string, body: string) => ({
-  to,
-  subject: "This month's learning report",
-  body,
-  type: 'monthly_progress',
-}));
+const mockFormatMonthlyProgressEmail = jest.fn(
+  (to: string, body: string, struggleLines: unknown[]) => ({
+    to,
+    subject: "This month's learning report",
+    body,
+    type: 'monthly_progress',
+  }),
+);
 
 jest.mock('../../services/notifications', () => ({
   sendPushNotification: (...args: unknown[]) =>
     mockSendPushNotification(...args),
   sendEmail: (...args: unknown[]) => mockSendEmail(...args),
-  formatMonthlyProgressEmail: (...args: unknown[]) =>
-    mockFormatMonthlyProgressEmail(...args),
+  formatMonthlyProgressEmail: (
+    to: string,
+    body: string,
+    struggleLines: unknown[],
+  ) => mockFormatMonthlyProgressEmail(to, body, struggleLines),
 }));
 
 // [BUG-699-FOLLOWUP] 24h dedup gate. Default 0 so existing tests keep sending;

@@ -174,9 +174,6 @@ function buildProgressMetrics(
     topicsMastered: 0,
     topicsInProgress: 0,
     booksCompleted: 0,
-    weeklyDeltaTopicsMastered: null,
-    weeklyDeltaVocabularyTotal: null,
-    weeklyDeltaTopicsExplored: null,
     vocabularyTotal: 0,
     vocabularyMastered: 0,
     vocabularyLearning: 0,
@@ -312,7 +309,9 @@ async function executeCronSteps(): Promise<{
   };
 
   const handler = (
-    weeklyProgressPushCron as { fn: (ctx: unknown) => Promise<unknown> }
+    weeklyProgressPushCron as unknown as {
+      fn: (ctx: unknown) => Promise<unknown>;
+    }
   ).fn;
   const result = (await handler({
     event: { name: 'inngest/function.invoked' },
@@ -328,7 +327,9 @@ async function executeGenerateHandler(parentId: string): Promise<unknown> {
   };
 
   const handler = (
-    weeklyProgressPushGenerate as { fn: (ctx: unknown) => Promise<unknown> }
+    weeklyProgressPushGenerate as unknown as {
+      fn: (ctx: unknown) => Promise<unknown>;
+    }
   ).fn;
   return handler({
     event: { name: 'app/weekly-progress-push.generate', data: { parentId } },

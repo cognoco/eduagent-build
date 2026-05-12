@@ -104,9 +104,6 @@ function buildProgressMetrics(
     topicsMastered: 0,
     topicsInProgress: 0,
     booksCompleted: 0,
-    weeklyDeltaTopicsMastered: null,
-    weeklyDeltaVocabularyTotal: null,
-    weeklyDeltaTopicsExplored: null,
     vocabularyTotal: 0,
     vocabularyMastered: 0,
     vocabularyLearning: 0,
@@ -1049,7 +1046,7 @@ describe('dashboard service integration', () => {
       subjectId,
       topicId: topicId1!,
       status: 'passed',
-      masteryScore: '0.80',
+      masteryScore: 0.8,
     });
     await seedRetentionCard({
       profileId: childProfileId,

@@ -18,7 +18,7 @@ function jaccard(left: string[], right: string[]): number {
 function presentAnchorPhrases(text: string, anchors: string[]): string[] {
   const normalized = normalizeText(text);
   return anchors.filter((anchor) =>
-    normalized.includes(normalizeText(anchor).trim())
+    normalized.includes(normalizeText(anchor).trim()),
   );
 }
 
@@ -37,6 +37,11 @@ describe('session summary embedding overlap regression', () => {
       }
 
       const input = sessionSummaryFlow.buildPromptInput(profile);
+      if (input === null) {
+        throw new Error(
+          `buildPromptInput returned null for profile: ${profileId}`,
+        );
+      }
       const topic = input.topicTitle ?? 'the topic';
       const struggle = profile.struggles[0]?.topic ?? topic;
       const summary = llmSummarySchema.parse({
@@ -48,12 +53,12 @@ describe('session summary embedding overlap regression', () => {
 
       const embeddingText = buildSummaryEmbeddingText(
         summary,
-        `You linked ${topic} back to ${struggle} and explained the pattern clearly.`
+        `You linked ${topic} back to ${struggle} and explained the pattern clearly.`,
       );
       const anchors = summary.topicsCovered.slice(0, 3);
       const transcriptTokens = presentAnchorPhrases(
         input.transcriptText,
-        anchors
+        anchors,
       );
       const embeddingTokens = presentAnchorPhrases(embeddingText, anchors);
 

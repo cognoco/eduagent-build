@@ -365,7 +365,9 @@ describe('vocabulary quiz round lifecycle (integration)', () => {
     expect(afterCards).toHaveLength(3);
 
     for (const card of afterCards) {
-      const before = beforeById.get(card.vocabularyId);
+      const before = beforeById.get(card.vocabularyId) as
+        | typeof vocabularyRetentionCards.$inferSelect
+        | undefined;
       expect(before).toEqual(expect.objectContaining({}));
 
       const expected = sm2({
