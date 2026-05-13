@@ -39,7 +39,9 @@ const rule = {
         if (
           parent &&
           parent.type === 'MemberExpression' &&
-          parent.property.name === 'catch'
+          parent.property.name === 'catch' &&
+          parent.parent &&
+          parent.parent.type === 'CallExpression'
         ) {
           return; // has .catch() — OK
         }

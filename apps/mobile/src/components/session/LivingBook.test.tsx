@@ -1,17 +1,6 @@
 import { render, screen } from '@testing-library/react-native';
 import { LivingBook } from './LivingBook';
 
-jest.mock(
-  '../../lib/theme' /* gc1-allow: useThemeColors requires ThemeContext provider; not runnable in unit env */,
-  () => ({
-    useThemeColors: () => ({
-      primary: '#6366f1',
-      textSecondary: '#9ca3af',
-      warning: '#f59e0b',
-    }),
-  }),
-);
-
 describe('LivingBook', () => {
   it('renders with zero exchanges (no counter text)', () => {
     render(<LivingBook exchangeCount={0} isComplete={false} isExpressive />);

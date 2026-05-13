@@ -37,8 +37,8 @@ function loadSnapshot(tag: string): DrizzleSnapshot {
 
 function snapshotTags(): string[] {
   return readdirSync(META_DIR)
-    .filter((f) => f.endsWith('_snapshot.json'))
-    .map((f) => f.slice(0, 4))
+    .filter((f) => /^\d{4}_snapshot\.json$/.test(f))
+    .map((f) => f.replace('_snapshot.json', ''))
     .sort();
 }
 

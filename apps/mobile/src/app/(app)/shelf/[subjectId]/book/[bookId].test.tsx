@@ -95,6 +95,7 @@ jest.mock('../../../../../hooks/use-move-topic', () => ({
 }));
 
 jest.mock('../../../../../lib/theme', () => ({
+  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
   useThemeColors: () => ({
     accent: '#00bfa5',
     primary: '#0d9488',
@@ -539,7 +540,7 @@ describe('BookScreen', () => {
     fireEvent.press(getByTestId('book-start-learning'));
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/topic/[topicId]',
-      params: { topicId: 'topic-1', subjectId: 'sub-1' },
+      params: { topicId: 'topic-1', subjectId: 'sub-1', bookId: 'book-1' },
     });
   });
 

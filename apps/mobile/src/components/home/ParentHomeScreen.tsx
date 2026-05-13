@@ -80,43 +80,13 @@ function formatFocusLabel(
   return focus ?? t('home.parent.childCard.readyToStart');
 }
 
-function formatSignalLabel(
-  dashboardChild: DashboardChild | undefined,
-  t: (key: string, opts?: Record<string, unknown>) => string,
-): string {
-  if (!dashboardChild) return t('home.parent.childCard.statusUpdating');
-  const headline = dashboardChild.weeklyHeadline;
-  if (
-    headline &&
-    typeof headline.value === 'number' &&
-    typeof headline.label === 'string'
-  ) {
-    return headline.comparison ?? headline.label.toLowerCase();
-  }
-  if (
-    dashboardChild.retentionTrend === 'improving' ||
-    dashboardChild.trend === 'up'
-  ) {
-    return t('home.parent.childCard.confidenceImproving');
-  }
-  if (
-    dashboardChild.retentionTrend === 'declining' ||
-    dashboardChild.trend === 'down'
-  ) {
-    return t('home.parent.childCard.needsEncouragement');
-  }
-  return t('home.parent.childCard.steady');
-}
-
 function formatChildSnapshot(
   dashboardChild: DashboardChild | undefined,
   t: (key: string, opts?: Record<string, unknown>) => string,
 ): string {
-  return t('home.parent.childCard.statusLine', {
-    activity: formatActivityLabel(dashboardChild, t),
-    focus: formatFocusLabel(dashboardChild, t),
-    signal: formatSignalLabel(dashboardChild, t),
-  });
+  const focus = formatFocusLabel(dashboardChild, t);
+  const activity = formatActivityLabel(dashboardChild, t);
+  return `${focus} · ${activity}`;
 }
 
 interface TonightPrompt {
@@ -595,7 +565,13 @@ export function ParentHomeScreen({
               t={t}
             />
           ))}
+        </View>
 
+        <Text className="text-h3 font-bold text-text-primary mt-5 mb-3">
+          {t('home.parent.familyManagementHeader')}
+        </Text>
+
+        <View style={{ gap: 10 }}>
           {linkedChildren.map((child) => (
             <ChildAccommodationRow
               key={`accommodation-${child.id}`}
@@ -607,7 +583,7 @@ export function ParentHomeScreen({
           {showAddChild ? (
             <Pressable
               onPress={handleAddChild}
-              className="flex-row items-center bg-surface rounded-card px-4 py-3 mt-4"
+              className="flex-row items-center bg-surface rounded-card px-4 py-3"
               style={Platform.OS === 'web' ? { cursor: 'pointer' } : undefined}
               accessibilityRole="button"
               accessibilityLabel={t('more.family.addChild')}

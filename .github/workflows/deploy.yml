@@ -127,6 +127,7 @@ jobs:
     # Always require quality gate to pass before deploying.
     if: |
       always() &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
       needs.api-quality-gate.result == 'success' &&
       (github.event_name == 'push' ||
        (needs.api-confirm-production.result == 'success' || needs.api-confirm-production.result == 'skipped'))

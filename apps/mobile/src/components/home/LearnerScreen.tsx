@@ -20,8 +20,8 @@ import { useSubjects } from '../../hooks/use-subjects';
 import { getGreeting } from '../../lib/greeting';
 import { useHasLinkedChildren } from '../../lib/profile';
 import {
-  LEARNER_HOME_HREF,
   LEARNER_HOME_RETURN_TO,
+  homeHrefForReturnTo,
   pushLearningResumeTarget,
 } from '../../lib/navigation';
 import {
@@ -42,7 +42,6 @@ import { EarlyAdopterCard } from './EarlyAdopterCard';
 import { ParentHomeScreen } from './ParentHomeScreen';
 import { SubjectCard } from './SubjectCard';
 
-const HOME_RETURN_PARAMS = { returnTo: LEARNER_HOME_RETURN_TO } as const;
 const CREATE_SUBJECT_FROM_HOME_HREF = '/create-subject' as const;
 
 const DEFAULT_SUBJECT_ICON: React.ComponentProps<typeof Ionicons>['name'] =
@@ -98,6 +97,7 @@ export interface LearnerScreenProps {
   activeProfile: Profile | null;
   now?: Date;
   showParentHome?: boolean;
+  returnToTab?: string;
 }
 
 export function LearnerScreen({
@@ -105,6 +105,7 @@ export function LearnerScreen({
   activeProfile,
   now,
   showParentHome = true,
+  returnToTab = LEARNER_HOME_RETURN_TO,
 }: LearnerScreenProps): React.ReactElement {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
@@ -127,6 +128,14 @@ export function LearnerScreen({
     activeProfile && !activeProfile.isOwner && profiles.some((p) => p.isOwner),
   );
   const [coachBandDismissed, setCoachBandDismissed] = useState(false);
+  const returnParams = useMemo(
+    () => ({ returnTo: returnToTab }),
+    [returnToTab],
+  );
+  const homeHref = useMemo(
+    () => homeHrefForReturnTo(returnToTab),
+    [returnToTab],
+  );
 
   const dismissCoachBand = useCallback(() => {
     setCoachBandDismissed(true);
@@ -271,7 +280,7 @@ export function LearnerScreen({
               ...(recoveryMarker.topicName && {
                 topicName: recoveryMarker.topicName,
               }),
-              ...HOME_RETURN_PARAMS,
+              ...returnParams,
             },
           } as never);
         },
@@ -284,11 +293,7 @@ export function LearnerScreen({
           resumeTarget.topicTitle ?? resumeTarget.subjectName
         }.`,
         onContinue: () =>
-          pushLearningResumeTarget(
-            router,
-            resumeTarget,
-            LEARNER_HOME_RETURN_TO,
-          ),
+          pushLearningResumeTarget(router, resumeTarget, returnToTab),
       };
     }
 
@@ -303,7 +308,7 @@ export function LearnerScreen({
         onContinue: () =>
           router.push({
             pathname: '/(app)/topic/relearn',
-            params: HOME_RETURN_PARAMS,
+            params: returnParams,
           } as never),
       };
     }
@@ -317,7 +322,7 @@ export function LearnerScreen({
             pathname: '/(app)/quiz',
             params: {
               activityType: quizDiscovery.activityType,
-              ...HOME_RETURN_PARAMS,
+              ...returnParams,
             },
           } as never);
         },
@@ -339,20 +344,18 @@ export function LearnerScreen({
   const openIntentAction = useCallback(
     (route: HomeIntentAction['route']): void => {
       if (route === '/(app)/homework/camera') {
-        // Seed the back stack before the nested camera route. There is no
-        // homework index screen, so Home is the clear return target.
-        router.push(LEARNER_HOME_HREF as never);
+        router.push(homeHref as never);
       }
 
       router.push({
         pathname: route,
         params:
           route === '/(app)/session'
-            ? { mode: 'freeform', ...HOME_RETURN_PARAMS }
-            : HOME_RETURN_PARAMS,
+            ? { mode: 'freeform', ...returnParams }
+            : returnParams,
       } as never);
     },
-    [],
+    [homeHref, returnParams],
   );
 
   if (isLoading) {
@@ -385,7 +388,7 @@ export function LearnerScreen({
               </Text>
             </Pressable>
             <Pressable
-              onPress={() => router.replace('/(app)/home' as never)}
+              onPress={() => router.replace(homeHref as never)}
               className="mt-2 min-h-[44px] items-center justify-center px-6 py-2"
               testID="learner-loading-go-home"
             >
@@ -558,14 +561,12 @@ export function LearnerScreen({
                       card.isPreparing
                         ? undefined
                         : () => {
-                            // Two-push pattern (CLAUDE.md cross-tab rule):
-                            // unstable_settings only seeds one level deep, so push
-                            // the progress index first then the subject child to
-                            // keep router.back() landing on the progress tab root.
-                            router.push('/(app)/progress' as never);
                             router.push({
                               pathname: '/(app)/progress/[subjectId]',
-                              params: { subjectId: card.subjectId },
+                              params: {
+                                subjectId: card.subjectId,
+                                returnTo: returnToTab,
+                              },
                             } as never);
                           }
                     }
@@ -575,7 +576,10 @@ export function LearnerScreen({
                   <Pressable
                     testID="home-add-subject-tile"
                     onPress={() =>
-                      router.push(CREATE_SUBJECT_FROM_HOME_HREF as never)
+                      router.push({
+                        pathname: CREATE_SUBJECT_FROM_HOME_HREF,
+                        params: { returnTo: returnToTab },
+                      } as never)
                     }
                     className="rounded-2xl border border-dashed border-border items-center justify-center"
                     style={{ width: 96, height: 150, gap: 8 }}
@@ -612,7 +616,10 @@ export function LearnerScreen({
                 <Pressable
                   testID="home-add-first-subject"
                   onPress={() =>
-                    router.push(CREATE_SUBJECT_FROM_HOME_HREF as never)
+                    router.push({
+                      pathname: CREATE_SUBJECT_FROM_HOME_HREF,
+                      params: { returnTo: returnToTab },
+                    } as never)
                   }
                   className="bg-primary rounded-xl px-5 py-2.5 mt-1"
                   accessibilityRole="button"

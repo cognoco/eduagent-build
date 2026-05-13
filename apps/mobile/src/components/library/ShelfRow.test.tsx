@@ -5,26 +5,6 @@ import { ShelfRow } from './ShelfRow';
 // Mocks
 // ---------------------------------------------------------------------------
 
-jest.mock('../../lib/theme', () => ({
-  useThemeColors: () => ({
-    textPrimary: '#1a1a1a',
-    textSecondary: '#525252',
-    surfaceElevated: '#f3ede4',
-    warning: '#a16207',
-    muted: '#a3a3a3',
-    retentionStrong: '#15803d',
-    retentionFading: '#a16207',
-    retentionWeak: '#ea580c',
-    retentionForgotten: '#737373',
-    success: '#15803d',
-  }),
-  useSubjectTint: () => ({
-    name: 'teal',
-    solid: '#0f766e',
-    soft: 'rgba(15,118,110,0.14)',
-  }),
-}));
-
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------

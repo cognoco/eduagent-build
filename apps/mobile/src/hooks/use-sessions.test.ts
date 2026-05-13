@@ -371,6 +371,37 @@ describe('useCloseSession', () => {
     const body = JSON.parse(fetchInit.body as string);
     expect(body.milestonesReached).toEqual(['polar_star', 'comet']);
   });
+
+  it('invalidates progress-derived queries after closing a session', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          message: 'Session closed',
+          sessionId: 'session-1',
+          wallClockSeconds: 600,
+        }),
+        { status: 200 },
+      ),
+    );
+
+    const { result } = renderHook(() => useCloseSession('session-1'), {
+      wrapper: createWrapper(),
+    });
+    const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries');
+
+    await act(async () => {
+      await result.current.mutateAsync({ reason: 'user_ended' });
+    });
+
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['sessions'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['progress'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['dashboard'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['retention'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ['language-progress'],
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['resume-nudge'] });
+  });
 });
 
 describe('useSyncHomeworkState', () => {
@@ -566,6 +597,39 @@ describe('useSubmitSummary', () => {
     expect(result.current.data?.summary.status).toBe('accepted');
   });
 
+  it('invalidates progress after accepting a summary', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          summary: {
+            id: 'summary-1',
+            sessionId: 'session-1',
+            content: 'Gravity pulls objects toward Earth',
+            aiFeedback: 'Clear and accurate summary.',
+            status: 'accepted',
+          },
+        }),
+        { status: 200 },
+      ),
+    );
+
+    const { result } = renderHook(() => useSubmitSummary('session-1'), {
+      wrapper: createWrapper(),
+    });
+    const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries');
+
+    await act(async () => {
+      await result.current.mutateAsync({
+        content: 'Gravity pulls objects toward Earth',
+      });
+    });
+
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ['session-summary', 'session-1'],
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['progress'] });
+  });
+
   it('handles submission error', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response('API error 422', {
@@ -629,6 +693,38 @@ describe('useSkipSummary', () => {
     await waitFor(() => {
       expect(result.current.data?.summary.status).toBe('skipped');
     });
+  });
+
+  it('invalidates progress after skipping a summary', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          summary: {
+            id: 'summary-1',
+            sessionId: 'session-1',
+            content: '',
+            aiFeedback: null,
+            status: 'skipped',
+          },
+          consecutiveSummarySkips: 1,
+        }),
+        { status: 200 },
+      ),
+    );
+
+    const { result } = renderHook(() => useSkipSummary('session-1'), {
+      wrapper: createWrapper(),
+    });
+    const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries');
+
+    await act(async () => {
+      await result.current.mutateAsync();
+    });
+
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ['session-summary', 'session-1'],
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['progress'] });
   });
 });
 

@@ -48,10 +48,18 @@ jest.mock('../../../lib/profile', () => ({
 const mockPush = jest.fn();
 const mockGoBackOrReplace = jest.fn();
 const mockPushLearningResumeTarget = jest.fn();
-const mockUseLocalSearchParams = jest.fn(() => ({
-  subjectId: 's1',
-  topicId: 't1',
-}));
+type TopicRouteParams = {
+  subjectId: string;
+  topicId: string;
+  bookId?: string;
+  chapter?: string;
+};
+const mockUseLocalSearchParams = jest.fn(
+  (): TopicRouteParams => ({
+    subjectId: 's1',
+    topicId: 't1',
+  }),
+);
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({
@@ -67,7 +75,12 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
+jest.mock('@expo/vector-icons', () => ({
+  Ionicons: () => null,
+}));
+
 jest.mock('../../../lib/theme', () => ({
+  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
   useThemeColors: () => ({
     primary: '#00b4d8',
     accent: '#00b4d8',
@@ -579,6 +592,26 @@ describe('TopicDetailScreen rendering details', () => {
     });
     fireEvent.press(screen.getByTestId('topic-detail-back'));
     expect(mockGoBackOrReplace).toHaveBeenCalled();
+  });
+
+  it('falls back to the parent book when opened from a book route', async () => {
+    mockUseLocalSearchParams.mockReturnValue({
+      subjectId: 's1',
+      bookId: 'book-1',
+      topicId: 't1',
+    });
+    setupRoutes({ completionStatus: 'completed' });
+
+    render(<TopicDetailScreen />, { wrapper: TestWrapper });
+
+    await waitFor(() => {
+      screen.getByTestId('topic-detail-back');
+    });
+    fireEvent.press(screen.getByTestId('topic-detail-back'));
+    expect(mockGoBackOrReplace).toHaveBeenCalledWith(expect.anything(), {
+      pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
+      params: { subjectId: 's1', bookId: 'book-1' },
+    });
   });
 
   it('shows "No sessions yet. Start one below!" when sessions are empty', async () => {

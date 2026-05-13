@@ -15,14 +15,20 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { hapticError, hapticLight, hapticSuccess } from '../../../lib/haptics';
+import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { ClientQuizQuestion, QuestionResult } from '@eduagent/schemas';
+import type {
+  ClientQuizQuestion,
+  CompleteRoundResponse,
+  QuestionResult,
+} from '@eduagent/schemas';
 import {
   useCheckAnswer,
   useCompleteRound,
   usePrefetchRound,
 } from '../../../hooks/use-quiz';
+import { PolarStar } from '../../../components/common';
 import { platformAlert } from '../../../lib/platform-alert';
 // platformAlert maps to window.confirm on web for 2-button prompts, which
 // blocks the renderer (BUG-892). For the quit-quiz confirmation we use a
@@ -40,7 +46,20 @@ import { rewardVariantForActivity } from './_quiz-utils';
 
 type AnswerState = 'unanswered' | 'checking' | 'correct' | 'wrong';
 
+interface SubmitRoundOptions {
+  results?: QuestionResult[];
+  navigateOnSuccess?: boolean;
+}
+
+function formatElapsedTime(ms: number): string {
+  const totalSeconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
 export default function QuizPlayScreen(): React.ReactElement {
+  const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
@@ -50,10 +69,12 @@ export default function QuizPlayScreen(): React.ReactElement {
     returnTo,
     subjectId,
     setPrefetchedRoundId,
+    setRound,
     setCompletionResult,
   } = useQuizFlow();
   const exitHref = returnTo === 'practice' ? '/(app)/practice' : '/(app)/quiz';
   const completeRound = useCompleteRound();
+  const completeRoundMutate = completeRound.mutate;
   const prefetchRound = usePrefetchRound();
   // [BUG-542] Extract .mutate so the useEffect dep array references a stable
   // variable rather than a member-access expression. ESLint exhaustive-deps
@@ -76,6 +97,8 @@ export default function QuizPlayScreen(): React.ReactElement {
   // [BUG-892] Quit confirmation rendered as an in-app Modal so web doesn't
   // hit window.confirm via Alert.alert mapping (which blocks the renderer).
   const [quitConfirmVisible, setQuitConfirmVisible] = useState(false);
+  const [roundAutoSaveStarted, setRoundAutoSaveStarted] = useState(false);
+  const [roundAutoSaved, setRoundAutoSaved] = useState(false);
   const [correctCelebrationKey, setCorrectCelebrationKey] = useState<
     number | null
   >(null);
@@ -108,6 +131,8 @@ export default function QuizPlayScreen(): React.ReactElement {
     null,
   );
   const answerSubmittedRef = useRef(false);
+  const roundSubmittedRef = useRef(false);
+  const pendingResultsNavigateRef = useRef(false);
   // [F-Q-07] Tracks whether correctAnswer was captured via handleCheckGuessWhoAnswer
   // so the onResolved skip-path only fires a background check when needed.
   const correctAnswerCapturedRef = useRef(false);
@@ -199,6 +224,53 @@ export default function QuizPlayScreen(): React.ReactElement {
     };
   }, []);
 
+  // [CR-1] Callback for server-side answer checking, declared before the
+  // early return so the rules-of-hooks invariant is satisfied.
+  // [F-Q-07] When the answer is wrong, capture correctAnswer from the server
+  // response so it can be shown in the post-answer feedback panel.
+  const roundId = round?.id ?? '';
+  const submitRound = useCallback(
+    ({
+      results = resultsRef.current,
+      navigateOnSuccess = true,
+    }: SubmitRoundOptions = {}) => {
+      if (!roundId || results.length === 0 || roundSubmittedRef.current) {
+        return;
+      }
+
+      setCompleteError(null);
+      roundSubmittedRef.current = true;
+      if (!navigateOnSuccess) {
+        setRoundAutoSaveStarted(true);
+      }
+      completeRoundMutate(
+        { roundId, results },
+        {
+          onSuccess: (result: CompleteRoundResponse) => {
+            setCompletionResult(result);
+            setRoundAutoSaved(true);
+            setRoundAutoSaveStarted(false);
+            if (navigateOnSuccess || pendingResultsNavigateRef.current) {
+              pendingResultsNavigateRef.current = false;
+              router.replace('/(app)/quiz/results' as never);
+            }
+          },
+          onError: (err) => {
+            roundSubmittedRef.current = false;
+            setRoundAutoSaveStarted(false);
+            // [BUG-806] formatApiError handles all shapes (typed envelope, Error,
+            // string, network failure) — `err instanceof Error` returns false for
+            // server-typed error envelopes, hiding the actionable reason behind
+            // the generic fallback.
+            setCompleteError(formatApiError(err));
+            Sentry.captureException(err);
+          },
+        },
+      );
+    },
+    [completeRoundMutate, router, roundId, setCompletionResult],
+  );
+
   // [ASSUMP-F2] Confirmed exit — ensures mid-round users always have a way
   // out. Quitting routes back to the quiz home; the flow-context resets on
   // the next round launch. Declared BEFORE the early-return so React's
@@ -214,12 +286,20 @@ export default function QuizPlayScreen(): React.ReactElement {
     setQuitConfirmVisible(false);
     router.replace(exitHref as never);
   };
-
-  // [CR-1] Callback for server-side answer checking, declared before the
-  // early return so the rules-of-hooks invariant is satisfied.
-  // [F-Q-07] When the answer is wrong, capture correctAnswer from the server
-  // response so it can be shown in the post-answer feedback panel.
-  const roundId = round?.id ?? '';
+  const handleSaveAndQuit = () => {
+    if (resultsRef.current.length === 0) return;
+    setQuitConfirmVisible(false);
+    submitRound();
+  };
+  const handleSeeResults = () => {
+    if (!roundAutoSaved) return;
+    router.replace('/(app)/quiz/results' as never);
+  };
+  const handleOneMore = () => {
+    if (!roundAutoSaved) return;
+    setRound(null);
+    router.replace('/(app)/quiz/launch' as never);
+  };
   // [BUG-542] Use checkAnswer.mutateAsync (stable ref in TanStack Query v5)
   // instead of the whole checkAnswer object, which creates a new reference on
   // every mutation state transition (idle → pending → success → idle).
@@ -259,7 +339,7 @@ export default function QuizPlayScreen(): React.ReactElement {
   const handleGuessWhoResolved = useCallback(
     (result: GuessWhoResolvedResult) => {
       const timeMs = Date.now() - questionStartTimeRef.current;
-      resultsRef.current = [
+      const nextResults: QuestionResult[] = [
         ...resultsRef.current,
         {
           questionIndex: currentIndex,
@@ -270,6 +350,7 @@ export default function QuizPlayScreen(): React.ReactElement {
           answerMode: result.answerMode,
         },
       ];
+      resultsRef.current = nextResults;
       setGuessWhoCluesUsed(result.cluesUsed);
       setSelectedAnswer(result.answerGiven);
       setAnswerState(result.correct ? 'correct' : 'wrong');
@@ -285,6 +366,12 @@ export default function QuizPlayScreen(): React.ReactElement {
         hapticSuccess();
       } else {
         hapticError();
+      }
+      if (currentIndex + 1 >= totalQuestions) {
+        submitRound({
+          results: nextResults,
+          navigateOnSuccess: false,
+        });
       }
       // [F-Q-07] If the answer was wrong and we don't already have the
       // correct answer (e.g. skip path bypasses onCheckAnswer), fire a
@@ -313,7 +400,13 @@ export default function QuizPlayScreen(): React.ReactElement {
           });
       }
     },
-    [checkAnswerMutateAsync, currentIndex, roundId],
+    [
+      checkAnswerMutateAsync,
+      currentIndex,
+      roundId,
+      submitRound,
+      totalQuestions,
+    ],
   );
 
   if (!round || !currentQuestion) {
@@ -326,33 +419,32 @@ export default function QuizPlayScreen(): React.ReactElement {
         testID="quiz-play-no-round"
       >
         <Text className="text-h3 font-semibold text-text-primary text-center mb-2">
-          No round loaded
+          {t('quiz.play.noRoundTitle')}
         </Text>
         <Text className="text-body text-text-secondary text-center mb-6">
-          Something went wrong loading the quiz round. You can try again or go
-          back to the quiz home.
+          {t('quiz.play.noRoundBody')}
         </Text>
         <View className="flex-row gap-3 w-full">
           <Pressable
             onPress={() => router.replace('/(app)/quiz' as never)}
             className="flex-1 bg-primary rounded-button px-4 py-3 min-h-[48px] items-center justify-center"
             accessibilityRole="button"
-            accessibilityLabel="Retry"
+            accessibilityLabel={t('common.retry')}
             testID="quiz-play-no-round-retry"
           >
             <Text className="text-body font-semibold text-text-inverse">
-              Retry
+              {t('common.retry')}
             </Text>
           </Pressable>
           <Pressable
             onPress={() => router.replace(exitHref as never)}
             className="flex-1 bg-surface-elevated rounded-button px-4 py-3 min-h-[48px] items-center justify-center"
             accessibilityRole="button"
-            accessibilityLabel="Go Home"
+            accessibilityLabel={t('common.goHome')}
             testID="quiz-play-no-round-home"
           >
             <Text className="text-body font-semibold text-text-primary">
-              Go Home
+              {t('common.goHome')}
             </Text>
           </Pressable>
         </View>
@@ -394,7 +486,7 @@ export default function QuizPlayScreen(): React.ReactElement {
             onPress={handleQuit}
             className="min-h-[44px] min-w-[44px] items-center justify-center"
             accessibilityRole="button"
-            accessibilityLabel="Quit quiz"
+            accessibilityLabel={t('quiz.play.quitLabel')}
             testID="quiz-play-quit"
             hitSlop={8}
           >
@@ -403,21 +495,20 @@ export default function QuizPlayScreen(): React.ReactElement {
         </View>
         <View className="flex-1 items-center justify-center">
           <Text className="text-h3 font-semibold text-text-primary text-center mb-2">
-            This round couldn&apos;t load
+            {t('quiz.play.malformedTitle')}
           </Text>
           <Text className="text-body text-text-secondary text-center mb-6">
-            We didn&apos;t get the answer choices for this question. Try a fresh
-            round, or come back in a moment.
+            {t('quiz.play.malformedBody')}
           </Text>
           <Pressable
             onPress={handleQuit}
             className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center"
             accessibilityRole="button"
-            accessibilityLabel="Back to quiz home"
+            accessibilityLabel={t('quiz.play.backToQuizHome')}
             testID="quiz-play-malformed-back"
           >
             <Text className="text-body font-semibold text-text-inverse">
-              Back to quiz home
+              {t('quiz.play.backToQuizHome')}
             </Text>
           </Pressable>
         </View>
@@ -434,30 +525,6 @@ export default function QuizPlayScreen(): React.ReactElement {
       r.questionIndex === currentIndex ? { ...r, disputed: true } : r,
     );
     hapticLight();
-  }
-
-  // [ASSUMP-F10] Shared submit path so Retry re-uses the same success/error
-  // handlers. Previously the onError branch faked a completion result and
-  // navigated — violating "silent recovery without escalation is banned".
-  function submitRound() {
-    setCompleteError(null);
-    completeRound.mutate(
-      { roundId: activeRound.id, results: resultsRef.current },
-      {
-        onSuccess: (result) => {
-          setCompletionResult(result);
-          router.replace('/(app)/quiz/results' as never);
-        },
-        onError: (err) => {
-          // [BUG-806] formatApiError handles all shapes (typed envelope, Error,
-          // string, network failure) — `err instanceof Error` returns false for
-          // server-typed error envelopes, hiding the actionable reason behind
-          // the generic fallback.
-          setCompleteError(formatApiError(err));
-          Sentry.captureException(err);
-        },
-      },
-    );
   }
 
   // [CR-1] Answer checking is now async — the server validates via
@@ -516,7 +583,8 @@ export default function QuizPlayScreen(): React.ReactElement {
       answerMode,
     };
 
-    resultsRef.current = [...resultsRef.current, nextResult];
+    const nextResults = [...resultsRef.current, nextResult];
+    resultsRef.current = nextResults;
     setAnswerState(correct ? 'correct' : 'wrong');
     setShowContinueHint(false);
     continueEnabledAtRef.current = Date.now() + 250;
@@ -533,6 +601,13 @@ export default function QuizPlayScreen(): React.ReactElement {
       hapticSuccess();
     } else {
       hapticError();
+    }
+
+    if (questionIndex + 1 >= totalQuestions) {
+      submitRound({
+        results: nextResults,
+        navigateOnSuccess: false,
+      });
     }
   }
 
@@ -554,6 +629,14 @@ export default function QuizPlayScreen(): React.ReactElement {
     }
 
     if (currentIndex + 1 >= totalQuestions) {
+      if (roundAutoSaved) {
+        router.replace('/(app)/quiz/results' as never);
+        return;
+      }
+      if (roundAutoSaveStarted) {
+        pendingResultsNavigateRef.current = true;
+        return;
+      }
       submitRound();
       return;
     }
@@ -628,6 +711,20 @@ export default function QuizPlayScreen(): React.ReactElement {
     answerState !== 'unanswered' &&
     answerState !== 'checking' &&
     !completeError;
+  const hasAnsweredQuestions = resultsRef.current.length > 0;
+  const isFinalQuestion = currentIndex + 1 >= totalQuestions;
+  const quizTitle =
+    question.type === 'guess_who'
+      ? t('quiz.play.titleGuessWho')
+      : question.type === 'capitals'
+        ? t('quiz.play.titleCapitals')
+        : t('quiz.play.titleVocabulary');
+  const elapsedSeconds = Math.floor(elapsedMs / 1000);
+  const elapsedLabel = formatElapsedTime(elapsedMs);
+  const revealedAnswer =
+    question.type === 'guess_who'
+      ? selectedAnswer || correctAnswer
+      : selectedAnswer;
   return (
     <View
       className="flex-1 bg-background"
@@ -639,7 +736,7 @@ export default function QuizPlayScreen(): React.ReactElement {
           key={correctCelebrationKey}
           variant={rewardVariantForActivity(activityType)}
           intensity="answer"
-          testID="quiz-correct-celebration"
+          testID="quiz-correct-reward-burst"
           onComplete={() => setCorrectCelebrationKey(null)}
         />
       ) : null}
@@ -648,34 +745,39 @@ export default function QuizPlayScreen(): React.ReactElement {
           onPress={handleQuit}
           className="min-h-[44px] min-w-[44px] items-center justify-center"
           accessibilityRole="button"
-          accessibilityLabel="Quit quiz"
+          accessibilityLabel={t('quiz.play.quitLabel')}
           testID="quiz-play-quit"
           hitSlop={8}
         >
           <Ionicons name="close" size={24} color={colors.textSecondary} />
         </Pressable>
 
-        <View className="flex-row items-center gap-3">
-          <Text className="text-body-sm font-semibold text-text-secondary">
-            {currentIndex + 1} of {totalQuestions}
+        <View className="items-center gap-1">
+          <Text className="text-caption font-semibold text-primary">
+            {quizTitle}
           </Text>
+          <View className="flex-row items-center gap-3">
+            <Text className="text-body-sm font-semibold text-text-secondary">
+              {currentIndex + 1} of {totalQuestions}
+            </Text>
 
-          <View className="flex-row gap-1">
-            {Array.from({ length: totalQuestions }, (_, index) => {
-              const state =
-                index < currentIndex
-                  ? 'past'
-                  : index === currentIndex
-                    ? 'current'
-                    : 'future';
-              const dotClass =
-                state === 'past'
-                  ? 'h-2 w-2 rounded-full bg-primary opacity-60'
-                  : state === 'current'
-                    ? 'h-2.5 w-2.5 rounded-full bg-primary'
-                    : 'h-2 w-2 rounded-full bg-surface-elevated';
-              return <View key={index} className={dotClass} />;
-            })}
+            <View className="flex-row gap-1">
+              {Array.from({ length: totalQuestions }, (_, index) => {
+                const state =
+                  index < currentIndex
+                    ? 'past'
+                    : index === currentIndex
+                      ? 'current'
+                      : 'future';
+                const dotClass =
+                  state === 'past'
+                    ? 'h-2 w-2 rounded-full bg-primary opacity-60'
+                    : state === 'current'
+                      ? 'h-2.5 w-2.5 rounded-full bg-primary'
+                      : 'h-2 w-2 rounded-full bg-surface-elevated';
+                return <View key={index} className={dotClass} />;
+              })}
+            </View>
           </View>
         </View>
 
@@ -686,12 +788,10 @@ export default function QuizPlayScreen(): React.ReactElement {
         <Text
           className="text-body-sm font-semibold text-text-secondary text-right"
           style={{ minWidth: 36 }}
-          accessibilityLabel={`Elapsed time: ${Math.floor(
-            elapsedMs / 1000,
-          )} seconds`}
+          accessibilityLabel={`Elapsed time: ${elapsedSeconds} seconds`}
           testID="quiz-play-elapsed"
         >
-          {Math.floor(elapsedMs / 1000)}s
+          {elapsedLabel}
         </Text>
       </View>
 
@@ -705,7 +805,7 @@ export default function QuizPlayScreen(): React.ReactElement {
           know so they don't think their connection is fine. */}
         {answerCheckFailed ? (
           <Text className="text-caption text-warning text-center mb-2 px-5">
-            Answer check failed — result may be inaccurate
+            {t('quiz.play.answerCheckFailed')}
           </Text>
         ) : null}
 
@@ -713,7 +813,7 @@ export default function QuizPlayScreen(): React.ReactElement {
           {currentQuestion.type === 'capitals' ? (
             <>
               <Text className="mb-2 text-body text-text-secondary">
-                What is the capital of...
+                {t('quiz.play.capitalPrompt')}
               </Text>
               <Text className="text-display font-bold text-text-primary">
                 {currentQuestion.country}?
@@ -722,7 +822,7 @@ export default function QuizPlayScreen(): React.ReactElement {
           ) : currentQuestion.type === 'vocabulary' ? (
             <>
               <Text className="mb-2 text-body text-text-secondary">
-                Translate:
+                {t('quiz.play.translatePrompt')}
               </Text>
               <Text className="text-display font-bold text-text-primary">
                 {currentQuestion.term}
@@ -730,7 +830,7 @@ export default function QuizPlayScreen(): React.ReactElement {
             </>
           ) : answerState === 'unanswered' ? (
             <Text className="text-center text-h3 font-semibold text-text-primary">
-              Who is this person?
+              {t('quiz.play.guessWhoPrompt')}
             </Text>
           ) : null}
         </View>
@@ -739,7 +839,7 @@ export default function QuizPlayScreen(): React.ReactElement {
           <View className="mt-6 items-center gap-2 px-5">
             <ActivityIndicator size="small" color={colors.primary} />
             <Text className="text-center text-body-sm text-text-secondary">
-              Checking...
+              {t('quiz.play.checking')}
             </Text>
           </View>
         ) : null}
@@ -749,12 +849,12 @@ export default function QuizPlayScreen(): React.ReactElement {
             {question.freeTextEligible ? (
               <View testID="quiz-free-text-input">
                 <Text className="mb-2 text-body-sm text-text-secondary">
-                  Type your answer
+                  {t('quiz.play.typeYourAnswer')}
                 </Text>
                 <TextInput
                   testID="quiz-free-text-field"
                   className="rounded-card bg-surface-elevated px-4 py-4 text-body text-text-primary"
-                  placeholder="Type your answer..."
+                  placeholder={t('quiz.play.typeYourAnswerPlaceholder')}
                   placeholderTextColor={colors.textSecondary}
                   value={freeTextAnswer}
                   onChangeText={setFreeTextAnswer}
@@ -784,7 +884,7 @@ export default function QuizPlayScreen(): React.ReactElement {
                         : 'text-text-secondary'
                     }`}
                   >
-                    Submit
+                    {t('quiz.play.submit')}
                   </Text>
                 </Pressable>
               </View>
@@ -828,29 +928,48 @@ export default function QuizPlayScreen(): React.ReactElement {
 
         {answerState !== 'unanswered' && answerState !== 'checking' ? (
           <View className="mt-6 px-5">
-            {question.type === 'guess_who' ? (
-              <View className="mb-3">
-                {answerState === 'correct' ? (
-                  <Text className="text-center text-body-lg font-semibold text-success">
-                    You got it in {guessWhoCluesUsed} clue
-                    {guessWhoCluesUsed !== 1 ? 's' : ''}!
+            {answerState === 'correct' ? (
+              <View className="mb-4 items-center">
+                <View className="-mb-8 -mt-10">
+                  <PolarStar testID="quiz-correct-celebration" />
+                </View>
+                <Text className="mt-3 text-center text-h3 font-bold text-success">
+                  {question.type === 'guess_who'
+                    ? t('quiz.play.foundThemClues', {
+                        count: guessWhoCluesUsed,
+                      })
+                    : t('quiz.play.discoveredIt')}
+                </Text>
+                {revealedAnswer ? (
+                  <Text
+                    className="mt-1 text-center text-h2 font-bold text-text-primary"
+                    testID="quiz-revealed-answer"
+                  >
+                    {revealedAnswer}
                   </Text>
-                ) : (
-                  <>
-                    <Text className="text-center text-body-lg text-text-primary">
-                      Better luck next time!
+                ) : null}
+                <Text className="mt-1 text-center text-body-sm text-text-secondary">
+                  {isFinalQuestion
+                    ? roundAutoSaved
+                      ? t('quiz.play.savedReady')
+                      : t('quiz.play.savingResult')
+                    : t('quiz.play.lockedIn')}
+                </Text>
+              </View>
+            ) : question.type === 'guess_who' ? (
+              <View className="mb-3">
+                <Text className="text-center text-h3 font-semibold text-text-primary">
+                  {t('quiz.play.goodTry')}
+                </Text>
+                {/* [F-Q-07] Reveal the person's name after wrong/skip */}
+                {correctAnswer ? (
+                  <Text className="mt-1 text-center text-body-sm text-text-secondary">
+                    {t('quiz.play.theAnswerWas')}
+                    <Text className="font-bold text-success">
+                      {correctAnswer}
                     </Text>
-                    {/* [F-Q-07] Reveal the person's name after wrong/skip */}
-                    {correctAnswer ? (
-                      <Text className="mt-1 text-center text-body-sm text-text-secondary">
-                        The answer was{' '}
-                        <Text className="font-bold text-success">
-                          {correctAnswer}
-                        </Text>
-                      </Text>
-                    ) : null}
-                  </>
-                )}
+                  </Text>
+                ) : null}
               </View>
             ) : null}
             {currentQuestion.funFact ? (
@@ -865,11 +984,62 @@ export default function QuizPlayScreen(): React.ReactElement {
               testID="quiz-answer-feedback"
             >
               {showContinueHint
-                ? 'Tap anywhere to continue'
+                ? t('quiz.play.readyForNext')
                 : answerState === 'correct'
-                  ? 'Correct'
-                  : 'Not quite'}
+                  ? t('quiz.play.correct')
+                  : t('quiz.play.notQuite')}
             </Text>
+            {isFinalQuestion && roundAutoSaved ? (
+              <View className="mt-4 gap-3">
+                <Pressable
+                  onPress={(event) => {
+                    event?.stopPropagation?.();
+                    handleSeeResults();
+                  }}
+                  className="min-h-[48px] items-center justify-center rounded-button bg-primary px-5 py-3"
+                  accessibilityRole="button"
+                  accessibilityLabel="See quiz results"
+                  testID="quiz-final-see-results"
+                >
+                  <Text className="text-body font-semibold text-text-inverse">
+                    {t('quiz.play.seeResults')}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={(event) => {
+                    event?.stopPropagation?.();
+                    handleOneMore();
+                  }}
+                  className="min-h-[48px] items-center justify-center rounded-button bg-surface px-5 py-3"
+                  accessibilityRole="button"
+                  accessibilityLabel="Start one more quiz"
+                  testID="quiz-final-one-more"
+                >
+                  <Text className="text-body font-semibold text-text-primary">
+                    {t('quiz.play.oneMore')}
+                  </Text>
+                </Pressable>
+              </View>
+            ) : roundAutoSaveStarted ? (
+              <Text className="mt-4 text-center text-body-sm text-text-secondary">
+                {t('quiz.play.savingRound')}
+              </Text>
+            ) : !isFinalQuestion ? (
+              <Pressable
+                onPress={(event) => {
+                  event?.stopPropagation?.();
+                  handleContinue();
+                }}
+                className="mt-4 min-h-[48px] items-center justify-center rounded-button bg-primary px-5 py-3"
+                accessibilityRole="button"
+                accessibilityLabel="Next question"
+                testID="quiz-next-question"
+              >
+                <Text className="text-body font-semibold text-text-inverse">
+                  {t('quiz.play.nextQuestion')}
+                </Text>
+              </Pressable>
+            ) : null}
             {/* [BUG-469] Dispute button — lets user flag LLM's judgment as wrong */}
             {/* [BUG-927] Only surface dispute UI on incorrect answers. There's
                 nothing to dispute on a correct response, and showing the link
@@ -883,7 +1053,7 @@ export default function QuizPlayScreen(): React.ReactElement {
                 accessibilityLabel="Dispute this answer"
               >
                 <Text className="text-caption text-text-secondary underline">
-                  Not quite right?
+                  {t('quiz.play.notQuiteRight')}
                 </Text>
               </Pressable>
             ) : answerState === 'wrong' && disputedIndices.has(currentIndex) ? (
@@ -891,7 +1061,7 @@ export default function QuizPlayScreen(): React.ReactElement {
                 className="mt-2 text-center text-caption text-text-secondary"
                 testID="quiz-dispute-noted"
               >
-                Noted — we'll review this
+                {t('quiz.play.disputeNoted')}
               </Text>
             ) : null}
           </View>
@@ -901,7 +1071,7 @@ export default function QuizPlayScreen(): React.ReactElement {
           <View className="mt-6 items-center gap-2 px-5">
             <ActivityIndicator size="small" color={colors.primary} />
             <Text className="text-center text-body-sm text-text-secondary">
-              Scoring your round...
+              {t('quiz.play.scoringRound')}
             </Text>
           </View>
         ) : null}
@@ -910,32 +1080,32 @@ export default function QuizPlayScreen(): React.ReactElement {
           <View className="mt-6 px-5" testID="quiz-play-error">
             <View className="rounded-card bg-surface p-4">
               <Text className="text-body-sm font-semibold text-text-primary">
-                Couldn&apos;t save your round
+                {t('quiz.play.couldNotSave')}
               </Text>
               <Text className="mt-1 text-body-sm text-text-secondary">
                 {completeError}
               </Text>
               <View className="mt-3 flex-row gap-3">
                 <Pressable
-                  onPress={submitRound}
+                  onPress={() => submitRound()}
                   className="flex-1 min-h-[44px] items-center justify-center rounded-button bg-primary px-4 py-2"
                   accessibilityRole="button"
-                  accessibilityLabel="Retry"
+                  accessibilityLabel={t('common.retry')}
                   testID="quiz-play-retry"
                 >
                   <Text className="text-body-sm font-semibold text-text-inverse">
-                    Retry
+                    {t('common.retry')}
                   </Text>
                 </Pressable>
                 <Pressable
                   onPress={handleQuit}
                   className="flex-1 min-h-[44px] items-center justify-center rounded-button bg-surface-elevated px-4 py-2"
                   accessibilityRole="button"
-                  accessibilityLabel="Exit without saving"
+                  accessibilityLabel={t('quiz.play.exit')}
                   testID="quiz-play-exit"
                 >
                   <Text className="text-body-sm font-semibold text-text-primary">
-                    Exit
+                    {t('quiz.play.exit')}
                   </Text>
                 </Pressable>
               </View>
@@ -965,32 +1135,61 @@ export default function QuizPlayScreen(): React.ReactElement {
             onPress={(e) => e.stopPropagation()}
           >
             <Text className="text-h3 font-bold text-text-primary text-center">
-              Quit this round?
+              {hasAnsweredQuestions
+                ? t('quiz.play.pauseHere')
+                : t('quiz.play.leaveQuiz')}
             </Text>
             <Text className="text-body-sm text-text-secondary text-center mt-3 leading-relaxed">
-              Your progress will not be saved.
+              {hasAnsweredQuestions
+                ? t('quiz.play.pauseBody')
+                : t('quiz.play.leaveBody')}
             </Text>
             <View className="mt-5 gap-3">
               <Pressable
-                onPress={handleConfirmQuit}
-                className="bg-danger rounded-button py-3 items-center min-h-[48px] justify-center"
-                accessibilityRole="button"
-                accessibilityLabel="Confirm quit round"
-                testID="quiz-quit-confirm"
-              >
-                <Text className="text-body font-semibold text-text-inverse">
-                  Quit
-                </Text>
-              </Pressable>
-              <Pressable
                 onPress={() => setQuitConfirmVisible(false)}
-                className="bg-surface rounded-button py-3 items-center min-h-[48px] justify-center"
+                className="bg-primary rounded-button py-3 items-center min-h-[48px] justify-center"
                 accessibilityRole="button"
-                accessibilityLabel="Keep playing"
+                accessibilityLabel={
+                  hasAnsweredQuestions
+                    ? t('quiz.play.oneMore')
+                    : t('quiz.play.keepPlaying')
+                }
                 testID="quiz-quit-cancel"
               >
-                <Text className="text-body font-semibold text-text-primary">
-                  Keep playing
+                <Text className="text-body font-semibold text-text-inverse">
+                  {hasAnsweredQuestions
+                    ? t('quiz.play.oneMore')
+                    : t('quiz.play.keepPlaying')}
+                </Text>
+              </Pressable>
+              {hasAnsweredQuestions ? (
+                <Pressable
+                  onPress={handleSaveAndQuit}
+                  className="bg-surface rounded-button py-3 items-center min-h-[48px] justify-center"
+                  accessibilityRole="button"
+                  accessibilityLabel="Save progress and finish round"
+                  testID="quiz-quit-save"
+                >
+                  <Text className="text-body font-semibold text-text-primary">
+                    {t('quiz.play.saveAndFinish')}
+                  </Text>
+                </Pressable>
+              ) : null}
+              <Pressable
+                onPress={handleConfirmQuit}
+                className="rounded-button py-3 items-center min-h-[48px] justify-center bg-surface"
+                accessibilityRole="button"
+                accessibilityLabel={
+                  hasAnsweredQuestions
+                    ? t('quiz.play.leaveWithoutSaving')
+                    : t('quiz.play.leaveQuizButton')
+                }
+                testID="quiz-quit-confirm"
+              >
+                <Text className="text-body font-semibold text-danger">
+                  {hasAnsweredQuestions
+                    ? t('quiz.play.leaveWithoutSaving')
+                    : t('quiz.play.leaveQuizButton')}
                 </Text>
               </Pressable>
             </View>

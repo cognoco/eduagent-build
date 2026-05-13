@@ -7,13 +7,6 @@ jest.mock(
   () => require('../../test-utils/mock-i18n').i18nMock,
 );
 
-jest.mock(
-  '../../lib/theme' /* gc1-allow: theme hook reads native ColorScheme — not available in JSDOM */,
-  () => ({
-    useThemeColors: () => ({ primary: '#00b4d8', textPrimary: '#ffffff' }),
-  }),
-);
-
 const mockMarkAllRead = jest.fn();
 
 jest.mock(

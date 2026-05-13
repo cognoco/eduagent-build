@@ -267,7 +267,7 @@ describe('AccommodationScreen', () => {
     it('shows the child name in the title', () => {
       render(<AccommodationScreen />, { wrapper: createWrapper() });
 
-      expect(screen.getByText(/Mia's accommodation/)).toBeTruthy();
+      expect(screen.getByText(/Mia's learning preferences/)).toBeTruthy();
     });
 
     it('passes childProfileId when changing accommodation mode', () => {
@@ -292,6 +292,29 @@ describe('AccommodationScreen', () => {
         expect.objectContaining({ onError: expect.any(Function) }),
       );
       expect(mockCelebrationLevelMutate).not.toHaveBeenCalled();
+    });
+
+    it('returns to the learner More root when a cached child-editing route opens outside parent mode', () => {
+      mockActiveProfile = {
+        id: 'child-1',
+        displayName: 'Mia',
+        isOwner: false,
+        birthYear: 2014,
+      };
+      mockProfiles = [
+        {
+          id: 'profile-1',
+          displayName: 'Alex',
+          isOwner: true,
+          birthYear: 1990,
+        },
+        mockActiveProfile,
+      ];
+
+      render(<AccommodationScreen />, { wrapper: createWrapper() });
+
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/more');
+      expect(screen.queryByText(/Mia's learning preferences/)).toBeNull();
     });
   });
 

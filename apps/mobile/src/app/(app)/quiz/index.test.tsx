@@ -135,6 +135,7 @@ function createWrapper() {
 }
 
 jest.mock('../../../lib/theme', () => ({
+  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
   useThemeColors: () => ({
     primary: '#2563eb',
     textPrimary: '#111827',

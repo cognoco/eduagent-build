@@ -1,14 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react-native';
 import { InlineNoteCard } from './InlineNoteCard';
 
-jest.mock('../../lib/theme', () => ({
-  useThemeColors: () => ({
-    textPrimary: '#1a1a1a',
-    textSecondary: '#525252',
-    accent: '#a78bfa',
-  }),
-}));
-
 describe('InlineNoteCard', () => {
   const baseProps = {
     noteId: 'note-1',

@@ -9,13 +9,13 @@ import {
 } from '../../../components/more/settings-rows';
 import { useExportData } from '../../../hooks/use-account';
 import { useActiveProfileRole } from '../../../hooks/use-active-profile-role';
+import { useLinkedChildren } from '../../../lib/profile';
 import {
   useUpdateWithdrawalArchivePreference,
   useWithdrawalArchivePreference,
 } from '../../../hooks/use-settings';
 import { formatApiError } from '../../../lib/format-api-error';
 import { platformAlert } from '../../../lib/platform-alert';
-import { useLinkedChildren } from '../../../lib/profile';
 
 export default function PrivacyScreen(): React.ReactElement {
   const router = useRouter();
@@ -27,8 +27,6 @@ export default function PrivacyScreen(): React.ReactElement {
     useWithdrawalArchivePreference();
   const updateWithdrawalArchivePreference =
     useUpdateWithdrawalArchivePreference();
-  const showFamilyConsentControls =
-    role === 'owner' && linkedChildren.length > 0;
 
   const withdrawalArchiveOptions = [
     {
@@ -95,7 +93,7 @@ export default function PrivacyScreen(): React.ReactElement {
         testID="more-privacy-scroll"
       >
         <SectionHeader>{t('more.privacy.privacyAndData')}</SectionHeader>
-        {showFamilyConsentControls ? (
+        {role === 'owner' && linkedChildren.length > 0 ? (
           <>
             <Text className="text-body font-semibold text-text-primary mb-2">
               {t('more.privacy.withdrawalArchiveTitle')}

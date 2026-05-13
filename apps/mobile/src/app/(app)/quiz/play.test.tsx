@@ -8,6 +8,7 @@ import {
 const mockReplace = jest.fn();
 const mockSetPrefetchedRoundId = jest.fn();
 const mockSetCompletionResult = jest.fn();
+const mockSetRound = jest.fn();
 const mockCheckAnswer = jest.fn();
 const mockPrefetchMutate = jest.fn();
 const mockCompleteRoundMutate = jest.fn();
@@ -31,18 +32,56 @@ jest.mock('expo-haptics', () => ({
 }));
 
 jest.mock('../../../lib/theme', () => ({
+  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
   useThemeColors: () => ({
     primary: '#00b4d8',
     textPrimary: '#111827',
     textSecondary: '#6b7280',
     textInverse: '#ffffff',
     danger: '#ef4444',
+    success: '#22c55e',
   }),
 }));
 
 jest.mock('../../../components/quiz/GuessWhoQuestion', () => ({
-  GuessWhoQuestion: () => null,
+  GuessWhoQuestion: ({
+    onResolved,
+  }: {
+    onResolved: (result: {
+      correct: boolean;
+      answerGiven: string;
+      cluesUsed: number;
+      answerMode: 'free_text' | 'multiple_choice';
+    }) => void;
+  }) => {
+    const { Pressable, Text } = require('react-native');
+    return (
+      <Pressable
+        onPress={() =>
+          onResolved({
+            correct: true,
+            answerGiven: 'Nikola Tesla',
+            cluesUsed: 3,
+            answerMode: 'free_text',
+          })
+        }
+        testID="guess-who-resolve-correct"
+      >
+        <Text>Resolve Guess Who</Text>
+      </Pressable>
+    );
+  },
 }));
+
+jest.mock(
+  '../../../components/common/celebrations/PolarStar' /* gc1-allow: PolarStar is native-animated celebration component; stub prevents native module crash */,
+  () => ({
+    PolarStar: ({ testID }: { testID?: string }) => {
+      const { Text } = require('react-native');
+      return <Text testID={testID}>success animation</Text>;
+    },
+  }),
+);
 
 jest.mock('../../../hooks/use-quiz', () => ({
   useCheckAnswer: () => ({
@@ -96,15 +135,29 @@ let mockReturnTo: string | null = null;
 jest.mock('./_layout', () => ({
   useQuizFlow: () => ({
     round: mockRound,
-    activityType: mockRound ? 'capitals' : null,
+    activityType:
+      mockRound && 'activityType' in mockRound ? mockRound.activityType : null,
     returnTo: mockReturnTo,
     subjectId: null,
     setPrefetchedRoundId: mockSetPrefetchedRoundId,
+    setRound: mockSetRound,
     setCompletionResult: mockSetCompletionResult,
   }),
 }));
 
 const { default: QuizPlayScreen } = require('./play');
+
+beforeEach(() => {
+  mockCompleteRoundMutate.mockImplementation((_input, opts) => {
+    opts.onSuccess({
+      score: 1,
+      total: 1,
+      xpEarned: 10,
+      celebrationTier: 'perfect',
+      questionResults: [],
+    });
+  });
+});
 
 describe('QuizPlayScreen', () => {
   beforeEach(() => {
@@ -167,7 +220,7 @@ describe('QuizPlayScreen', () => {
     const elapsed = screen.getByTestId('quiz-play-elapsed');
     // Initial render: timer started from Date.now() in this same tick, so
     // the floored seconds value is 0.
-    expect(elapsed.props.children).toEqual([0, 's']);
+    expect(elapsed.props.children).toBe('0:00');
     // Aria-label includes a unit so screen-reader users hear "Elapsed time:
     // 0 seconds" instead of just "0s".
     expect(elapsed.props.accessibilityLabel).toBe('Elapsed time: 0 seconds');
@@ -342,6 +395,14 @@ describe('QuizPlayScreen — dispute button visibility (BUG-927)', () => {
     await waitFor(() => {
       screen.getByText('Correct');
     });
+    screen.getByTestId('quiz-correct-celebration');
+    screen.getByText('You discovered it!');
+    expect(screen.getByTestId('quiz-revealed-answer').props.children).toBe(
+      'Bratislava',
+    );
+    screen.getByText('Saved. Ready when you are.');
+    screen.getByTestId('quiz-final-see-results');
+    screen.getByText('Wait, just one more!');
     expect(screen.queryByTestId('quiz-dispute-button')).toBeNull();
     expect(screen.queryByText('Not quite right?')).toBeNull();
   });
@@ -358,7 +419,84 @@ describe('QuizPlayScreen — dispute button visibility (BUG-927)', () => {
     await waitFor(() => {
       screen.getByText('Not quite');
     });
+    expect(screen.queryByTestId('quiz-correct-celebration')).toBeNull();
     screen.getByTestId('quiz-dispute-button');
+  });
+});
+
+describe('QuizPlayScreen — Guess Who finish autosave', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockRound = {
+      id: 'round-guess-who',
+      activityType: 'guess_who' as const,
+      theme: 'Inventors',
+      total: 1,
+      questions: [
+        {
+          type: 'guess_who' as const,
+          clues: [
+            'He imagined many inventions before building them.',
+            'He worked with electricity.',
+            'He has a unit of magnetic flux density named after him.',
+          ],
+          mcFallbackOptions: [
+            'Nikola Tesla',
+            'Thomas Edison',
+            'Albert Einstein',
+            'Isaac Newton',
+          ],
+          funFact: 'Tesla held hundreds of patents.',
+        },
+      ],
+    };
+  });
+
+  it('celebrates and autosaves when a person guess finishes the round', async () => {
+    render(<QuizPlayScreen />);
+
+    fireEvent.press(screen.getByTestId('guess-who-resolve-correct'));
+
+    await waitFor(() => {
+      screen.getByTestId('quiz-correct-celebration');
+    });
+    screen.getByText('You found them in 3 clues!');
+    screen.getByText('Saved. Ready when you are.');
+    screen.getByTestId('quiz-final-see-results');
+    screen.getByText('Wait, just one more!');
+
+    expect(mockCompleteRoundMutate).toHaveBeenCalledWith(
+      {
+        roundId: 'round-guess-who',
+        results: [
+          expect.objectContaining({
+            questionIndex: 0,
+            correct: true,
+            answerGiven: 'Nikola Tesla',
+            cluesUsed: 3,
+            answerMode: 'free_text',
+          }),
+        ],
+      },
+      expect.objectContaining({
+        onSuccess: expect.any(Function),
+        onError: expect.any(Function),
+      }),
+    );
+    expect(mockSetCompletionResult).toHaveBeenCalled();
+    expect(mockReplace).not.toHaveBeenCalledWith('/(app)/quiz/results');
+  });
+
+  it('can start one more round after the final autosave', async () => {
+    render(<QuizPlayScreen />);
+
+    fireEvent.press(screen.getByTestId('guess-who-resolve-correct'));
+    await waitFor(() => screen.getByTestId('quiz-final-one-more'));
+
+    fireEvent.press(screen.getByTestId('quiz-final-one-more'));
+
+    expect(mockSetRound).toHaveBeenCalledWith(null);
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/quiz/launch');
   });
 });
 
@@ -622,7 +760,7 @@ describe('QuizPlayScreen — tap-to-continue synchronous reset (BUG-929)', () =>
   });
 
   it('does not surface the previous question banner on Q+1 first render', async () => {
-    // Symptom guard: line 821 renders 'Correct' / 'Not quite' / 'Tap anywhere
+    // Symptom guard: feedback renders 'Correct' / 'Not quite' / ready-copy
     // to continue' only when answerState is correct/wrong. If reset is not
     // synchronous, these banners briefly bleed into Q+1.
     const q1Options = ['A', 'B', 'C', 'D'];
@@ -763,6 +901,7 @@ describe('QuizPlayScreen — tap-to-continue synchronous reset (BUG-929)', () =>
     // We assert via accessibilityLabel which interpolates both values cleanly.
     const elapsedEl = screen.getByTestId('quiz-play-elapsed');
     expect(elapsedEl.props.accessibilityLabel).toBe('Elapsed time: 0 seconds');
+    expect(elapsedEl.props.children).toBe('0:00');
   });
 });
 
@@ -931,12 +1070,18 @@ describe('QuizPlayScreen — error feedback [BUG-799 / BUG-806]', () => {
     // NOT submit the round (which would mean handleContinue also fired).
     fireEvent.press(screen.getByTestId('quiz-play-quit'));
     screen.getByTestId('quiz-quit-confirm');
+    screen.getByTestId('quiz-quit-save');
+    screen.getByText('Pause here?');
+    screen.getByText(
+      "You've answered part of this round. Save it now, or jump back in for one more.",
+    );
+    screen.getByTestId('quiz-quit-cancel');
     expect(mockPlatformAlert).not.toHaveBeenCalledWith(
       'Quit this round?',
       expect.any(String),
       expect.any(Array),
     );
-    expect(mockCompleteRoundMutate).not.toHaveBeenCalled();
+    expect(mockCompleteRoundMutate).toHaveBeenCalledTimes(1);
   });
 
   // [BUG-892] On Expo Web, platformAlert routes through window.confirm for
@@ -953,6 +1098,9 @@ describe('QuizPlayScreen — error feedback [BUG-799 / BUG-806]', () => {
 
     screen.getByTestId('quiz-quit-confirm');
     screen.getByTestId('quiz-quit-cancel');
+    expect(screen.queryByTestId('quiz-quit-save')).toBeNull();
+    screen.getByText('Leave this quiz?');
+    screen.getByText('No answers yet, so there is nothing to save.');
     // Critically: platformAlert (which would hit window.confirm on web) is NOT
     // invoked for the quit-confirm flow.
     expect(mockPlatformAlert).not.toHaveBeenCalledWith(
@@ -999,5 +1147,57 @@ describe('QuizPlayScreen — error feedback [BUG-799 / BUG-806]', () => {
     fireEvent.press(screen.getByTestId('quiz-quit-confirm'));
 
     expect(mockReplace).toHaveBeenCalledWith('/(app)/practice');
+  });
+
+  it('saves answered progress from the quit modal', async () => {
+    mockRound = {
+      id: 'round-err',
+      activityType: 'capitals' as const,
+      theme: 'Europe',
+      total: 2,
+      questions: [
+        {
+          type: 'capitals' as const,
+          country: 'Slovakia',
+          options: ['Bratislava', 'Prague', 'Warsaw', 'Budapest'],
+          isLibraryItem: true,
+          freeTextEligible: false,
+        },
+        {
+          type: 'capitals' as const,
+          country: 'France',
+          options: ['Paris', 'Lyon', 'Madrid', 'Rome'],
+          isLibraryItem: true,
+          freeTextEligible: false,
+        },
+      ],
+    };
+    mockCheckAnswer.mockResolvedValueOnce({ correct: true });
+    render(<QuizPlayScreen />);
+
+    fireEvent.press(screen.getByTestId('quiz-option-0'));
+    await waitFor(() => screen.getByText('Correct'));
+
+    fireEvent.press(screen.getByTestId('quiz-play-quit'));
+    screen.getByText('Pause here?');
+
+    fireEvent.press(screen.getByTestId('quiz-quit-save'));
+
+    expect(mockCompleteRoundMutate).toHaveBeenCalledWith(
+      {
+        roundId: 'round-err',
+        results: [
+          expect.objectContaining({
+            questionIndex: 0,
+            correct: true,
+            answerGiven: 'Bratislava',
+          }),
+        ],
+      },
+      expect.objectContaining({
+        onSuccess: expect.any(Function),
+        onError: expect.any(Function),
+      }),
+    );
   });
 });

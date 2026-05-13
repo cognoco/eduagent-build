@@ -1,41 +1,10 @@
-import {
-  registerProvider,
-  createMockProvider,
-  type LLMProvider,
-  type ChatMessage,
-  type ModelConfig,
-  type StopReason,
-} from './llm';
-import { makeChatStreamResult } from './llm/types';
+import { registerProvider, createMockProvider, _resetCircuits } from './llm';
 import { evaluateSummary } from './summaries';
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/** Creates a mock provider that returns a specific JSON evaluation response */
-function createEvalMockProvider(evaluation: {
-  feedback: string;
-  hasUnderstandingGaps: boolean;
-  gapAreas?: string[];
-  isAccepted: boolean;
-}): LLMProvider {
-  return {
-    id: 'gemini',
-    async chat(_messages: ChatMessage[], _config: ModelConfig) {
-      return {
-        content: JSON.stringify(evaluation),
-        stopReason: 'stop' as StopReason,
-      };
-    },
-    chatStream() {
-      const stream = (async function* () {
-        yield JSON.stringify(evaluation);
-      })();
-      return makeChatStreamResult(stream, Promise.resolve<StopReason>('stop'));
-    },
-  };
-}
+import {
+  llmPlainText,
+  llmStructuredJson,
+  registerLlmProviderFixture,
+} from '../test-utils/llm-provider-fixtures';
 
 // ---------------------------------------------------------------------------
 // evaluateSummary
@@ -43,19 +12,19 @@ function createEvalMockProvider(evaluation: {
 
 describe('evaluateSummary', () => {
   afterEach(() => {
-    // Restore generic mock after each test
+    _resetCircuits();
     registerProvider(createMockProvider('gemini'));
   });
 
   it('returns a SummaryEvaluation with feedback', async () => {
-    registerProvider(
-      createEvalMockProvider({
+    registerLlmProviderFixture({
+      chatResponse: {
         feedback: 'Great summary! You captured the key ideas well.',
         hasUnderstandingGaps: false,
         gapAreas: [],
         isAccepted: true,
-      }),
-    );
+      },
+    });
 
     const result = await evaluateSummary(
       'Variables',
@@ -69,15 +38,15 @@ describe('evaluateSummary', () => {
   });
 
   it('detects understanding gaps', async () => {
-    registerProvider(
-      createEvalMockProvider({
+    registerLlmProviderFixture({
+      chatResponse: {
         feedback:
           "You have a good start! You haven't quite captured the difference between let and const yet.",
         hasUnderstandingGaps: true,
         gapAreas: ['let vs const distinction', 'block scoping'],
         isAccepted: false,
-      }),
-    );
+      },
+    });
 
     const result = await evaluateSummary(
       'Variables',
@@ -92,14 +61,14 @@ describe('evaluateSummary', () => {
   });
 
   it('accepts a good summary', async () => {
-    registerProvider(
-      createEvalMockProvider({
+    registerLlmProviderFixture({
+      chatResponse: {
         feedback: 'Excellent work — you nailed it!',
         hasUnderstandingGaps: false,
         gapAreas: [],
         isAccepted: true,
-      }),
-    );
+      },
+    });
 
     const result = await evaluateSummary(
       'Loops',
@@ -112,25 +81,9 @@ describe('evaluateSummary', () => {
   });
 
   it('falls back gracefully when LLM returns non-JSON', async () => {
-    const rawProvider: LLMProvider = {
-      id: 'gemini',
-      async chat() {
-        return {
-          content: 'Your summary looks good overall!',
-          stopReason: 'stop' as StopReason,
-        };
-      },
-      chatStream() {
-        const stream = (async function* () {
-          yield 'Your summary looks good overall!';
-        })();
-        return makeChatStreamResult(
-          stream,
-          Promise.resolve<StopReason>('stop'),
-        );
-      },
-    };
-    registerProvider(rawProvider);
+    registerLlmProviderFixture({
+      chatResponse: llmPlainText('Your summary looks good overall!'),
+    });
 
     const result = await evaluateSummary(
       'Arrays',
@@ -147,31 +100,17 @@ describe('evaluateSummary', () => {
   });
 
   it('handles JSON embedded in surrounding text', async () => {
-    const embeddedProvider: LLMProvider = {
-      id: 'gemini',
-      async chat() {
-        const content =
-          'Here is my evaluation:\n' +
-          JSON.stringify({
-            feedback: 'Well done!',
-            hasUnderstandingGaps: false,
-            gapAreas: [],
-            isAccepted: true,
-          }) +
-          '\nEnd of evaluation.';
-        return { content, stopReason: 'stop' as StopReason };
-      },
-      chatStream() {
-        const stream = (async function* () {
-          yield 'Well done!';
-        })();
-        return makeChatStreamResult(
-          stream,
-          Promise.resolve<StopReason>('stop'),
-        );
-      },
-    };
-    registerProvider(embeddedProvider);
+    registerLlmProviderFixture({
+      chatResponse:
+        'Here is my evaluation:\n' +
+        llmStructuredJson({
+          feedback: 'Well done!',
+          hasUnderstandingGaps: false,
+          gapAreas: [],
+          isAccepted: true,
+        }) +
+        '\nEnd of evaluation.',
+    });
 
     const result = await evaluateSummary(
       'Functions',
@@ -188,31 +127,17 @@ describe('evaluateSummary', () => {
     // The original regex matched first `{` to LAST `}`, so trailing prose
     // braces would corrupt the substring fed to JSON.parse. The brace-depth
     // walker stops at the first balanced object, recovering correctly here.
-    const messyProvider: LLMProvider = {
-      id: 'gemini',
-      async chat() {
-        const content =
-          'Here is the evaluation:\n' +
-          JSON.stringify({
-            feedback: 'Captured the main idea.',
-            hasUnderstandingGaps: false,
-            gapAreas: [],
-            isAccepted: true,
-          }) +
-          '\n(rubric reference: see {section-3})';
-        return { content, stopReason: 'stop' as StopReason };
-      },
-      chatStream() {
-        const stream = (async function* () {
-          yield 'unused';
-        })();
-        return makeChatStreamResult(
-          stream,
-          Promise.resolve<StopReason>('stop'),
-        );
-      },
-    };
-    registerProvider(messyProvider);
+    registerLlmProviderFixture({
+      chatResponse:
+        'Here is the evaluation:\n' +
+        llmStructuredJson({
+          feedback: 'Captured the main idea.',
+          hasUnderstandingGaps: false,
+          gapAreas: [],
+          isAccepted: true,
+        }) +
+        '\n(rubric reference: see {section-3})',
+    });
 
     const result = await evaluateSummary(
       'Functions',
@@ -226,31 +151,17 @@ describe('evaluateSummary', () => {
   });
 
   it('parses correctly when JSON is wrapped in a markdown code fence', async () => {
-    const fencedProvider: LLMProvider = {
-      id: 'gemini',
-      async chat() {
-        const content =
-          '```json\n' +
-          JSON.stringify({
-            feedback: 'Solid.',
-            hasUnderstandingGaps: false,
-            gapAreas: [],
-            isAccepted: true,
-          }) +
-          '\n```';
-        return { content, stopReason: 'stop' as StopReason };
-      },
-      chatStream() {
-        const stream = (async function* () {
-          yield 'unused';
-        })();
-        return makeChatStreamResult(
-          stream,
-          Promise.resolve<StopReason>('stop'),
-        );
-      },
-    };
-    registerProvider(fencedProvider);
+    registerLlmProviderFixture({
+      chatResponse:
+        '```json\n' +
+        llmStructuredJson({
+          feedback: 'Solid.',
+          hasUnderstandingGaps: false,
+          gapAreas: [],
+          isAccepted: true,
+        }) +
+        '\n```',
+    });
 
     const result = await evaluateSummary(
       'Loops',
@@ -264,29 +175,13 @@ describe('evaluateSummary', () => {
 
   // [BUG-670 / S-16] Break test — never leak raw LLM string as feedback.
   it('uses canned fallback when parsed JSON is missing the feedback field', async () => {
-    const missingFeedbackProvider: LLMProvider = {
-      id: 'gemini',
-      async chat() {
-        return {
-          content: JSON.stringify({
-            hasUnderstandingGaps: true,
-            gapAreas: ['x'],
-            isAccepted: false,
-          }),
-          stopReason: 'stop' as StopReason,
-        };
+    registerLlmProviderFixture({
+      chatResponse: {
+        hasUnderstandingGaps: true,
+        gapAreas: ['x'],
+        isAccepted: false,
       },
-      chatStream() {
-        const stream = (async function* () {
-          yield 'unused';
-        })();
-        return makeChatStreamResult(
-          stream,
-          Promise.resolve<StopReason>('stop'),
-        );
-      },
-    };
-    registerProvider(missingFeedbackProvider);
+    });
 
     const result = await evaluateSummary(
       'Arrays',

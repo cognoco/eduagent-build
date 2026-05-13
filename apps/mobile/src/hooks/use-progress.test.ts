@@ -1,6 +1,15 @@
 import { renderHook, waitFor } from '@testing-library/react-native';
 import { QueryClient } from '@tanstack/react-query';
-import { createQueryWrapper } from '../test-utils/app-hook-test-utils';
+import { act } from 'react';
+import {
+  createHookWrapper,
+  createTestProfile,
+} from '../test-utils/app-hook-test-utils';
+import {
+  ForbiddenError,
+  setActiveProfileId,
+  UpstreamError,
+} from '../lib/api-client';
 import {
   useSubjectProgress,
   useOverallProgress,
@@ -9,52 +18,52 @@ import {
   useReviewSummary,
   useOverdueTopics,
   useTopicProgress,
+  useProfileWeeklyReports,
+  useRefreshProgressSnapshot,
 } from './use-progress';
 
 const mockFetch = jest.fn();
-jest.mock('../lib/api-client', () => ({
-  useApiClient: () => {
-    const { hc } = require('hono/client');
-    return hc('http://localhost', {
-      fetch: async (...args: unknown[]) => {
-        const res = await mockFetch(...(args as Parameters<typeof fetch>));
-        if (!res.ok) {
-          const text = await res
-            .clone()
-            .text()
-            .catch(() => res.statusText);
-          throw new Error(`API error ${res.status}: ${text}`);
-        }
-        return res;
-      },
-    });
-  },
-}));
-
-jest.mock('../lib/profile', () => ({
-  useProfile: () => ({
-    activeProfile: { id: 'test-profile-id' },
-  }),
-}));
 
 let queryClient: QueryClient;
+const originalFetch = globalThis.fetch;
+
+beforeEach(() => {
+  mockFetch.mockReset();
+  jest.clearAllMocks();
+  globalThis.fetch = mockFetch as typeof fetch;
+  setActiveProfileId('test-profile-id');
+});
+
+afterEach(() => {
+  queryClient?.clear();
+  setActiveProfileId(undefined);
+});
+
+afterAll(() => {
+  globalThis.fetch = originalFetch;
+});
+
+function getMockFetchUrl(callIndex = 0): string {
+  const input = mockFetch.mock.calls[callIndex]?.[0] as RequestInfo | URL;
+  if (typeof input === 'string') return input;
+  if (input instanceof URL) return input.toString();
+  return input.url;
+}
+
+function getMockFetchHeaders(callIndex = 0): Headers {
+  const init = mockFetch.mock.calls[callIndex]?.[1] as RequestInit | undefined;
+  return new Headers(init?.headers);
+}
 
 function createWrapper() {
-  const w = createQueryWrapper();
+  const w = createHookWrapper({
+    activeProfile: createTestProfile({ id: 'test-profile-id' }),
+  });
   queryClient = w.queryClient;
   return w.wrapper;
 }
 
 describe('useSubjectProgress', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   it('fetches subject progress from API', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
@@ -70,7 +79,7 @@ describe('useSubjectProgress', () => {
             lastSessionAt: null,
           },
         }),
-        { status: 200 },
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
       ),
     );
 
@@ -83,13 +92,20 @@ describe('useSubjectProgress', () => {
     });
 
     expect(mockFetch).toHaveBeenCalled();
+    expect(getMockFetchHeaders().get('X-Profile-Id')).toBe('test-profile-id');
     expect(result.current.data?.name).toBe('Mathematics');
     expect(result.current.data?.topicsTotal).toBe(10);
   });
 
-  it('handles API errors', async () => {
+  it('classifies HTTP errors through the real API client', async () => {
     mockFetch.mockResolvedValueOnce(
-      new Response('Network error', { status: 500 }),
+      new Response(
+        JSON.stringify({
+          code: 'SUBJECT_INACTIVE',
+          message: 'Subject is archived',
+        }),
+        { status: 403, headers: { 'Content-Type': 'application/json' } },
+      ),
     );
 
     const { result } = renderHook(() => useSubjectProgress('sub-1'), {
@@ -100,20 +116,41 @@ describe('useSubjectProgress', () => {
       expect(result.current.isError).toBe(true);
     });
 
-    expect(result.current.error).toBeInstanceOf(Error);
+    expect(result.current.error).toBeInstanceOf(ForbiddenError);
+    expect((result.current.error as ForbiddenError).apiCode).toBe(
+      'SUBJECT_INACTIVE',
+    );
+  });
+
+  it('classifies server errors through the real API client', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          code: 'INTERNAL_ERROR',
+          message: 'Internal Server Error',
+        }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+
+    const { result } = renderHook(() => useSubjectProgress('sub-1'), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isError).toBe(true);
+    });
+
+    expect(result.current.error).toBeInstanceOf(UpstreamError);
+    expect(result.current.error).toMatchObject({
+      code: 'INTERNAL_ERROR',
+      message: 'Internal Server Error',
+      status: 500,
+    });
   });
 });
 
 describe('useOverallProgress', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   it('fetches overall progress from API', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
@@ -133,7 +170,7 @@ describe('useOverallProgress', () => {
           totalTopicsCompleted: 2,
           totalTopicsVerified: 1,
         }),
-        { status: 200 },
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
       ),
     );
 
@@ -151,15 +188,6 @@ describe('useOverallProgress', () => {
 });
 
 describe('useContinueSuggestion', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   it('fetches continue suggestion from API', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
@@ -171,7 +199,7 @@ describe('useContinueSuggestion', () => {
             topicTitle: 'Algebra',
           },
         }),
-        { status: 200 },
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
       ),
     );
 
@@ -189,7 +217,10 @@ describe('useContinueSuggestion', () => {
 
   it('returns null when no suggestion', async () => {
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ suggestion: null }), { status: 200 }),
+      new Response(JSON.stringify({ suggestion: null }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
     );
 
     const { result } = renderHook(() => useContinueSuggestion(), {
@@ -205,15 +236,6 @@ describe('useContinueSuggestion', () => {
 });
 
 describe('useLearningResumeTarget', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   it('fetches resume target with optional scope', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
@@ -230,7 +252,7 @@ describe('useLearningResumeTarget', () => {
             reason: 'Pick up Photosynthesis',
           },
         }),
-        { status: 200 },
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
       ),
     );
 
@@ -246,7 +268,7 @@ describe('useLearningResumeTarget', () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    const url = String(mockFetch.mock.calls[0]?.[0]);
+    const url = getMockFetchUrl();
     expect(url).toContain('/progress/resume-target');
     expect(url).toContain('subjectId=550e8400-e29b-41d4-a716-446655440000');
     expect(result.current.data?.topicTitle).toBe('Photosynthesis');
@@ -254,18 +276,12 @@ describe('useLearningResumeTarget', () => {
 });
 
 describe('useReviewSummary', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   it('fetches review summary from API', async () => {
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ totalOverdue: 6 }), { status: 200 }),
+      new Response(JSON.stringify({ totalOverdue: 6 }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
     );
 
     const { result } = renderHook(() => useReviewSummary(), {
@@ -282,15 +298,6 @@ describe('useReviewSummary', () => {
 });
 
 describe('useOverdueTopics', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   it('fetches overdue topics grouped by subject from API', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
@@ -312,7 +319,7 @@ describe('useOverdueTopics', () => {
             },
           ],
         }),
-        { status: 200 },
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
       ),
     );
 
@@ -330,15 +337,6 @@ describe('useOverdueTopics', () => {
 });
 
 describe('useTopicProgress', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   it('fetches topic progress from API', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
@@ -355,7 +353,7 @@ describe('useTopicProgress', () => {
             xpStatus: 'pending',
           },
         }),
-        { status: 200 },
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
       ),
     );
 
@@ -369,5 +367,101 @@ describe('useTopicProgress', () => {
 
     expect(mockFetch).toHaveBeenCalled();
     expect(result.current.data?.title).toBe('Algebra Basics');
+  });
+});
+
+describe('useProfileWeeklyReports', () => {
+  it('parses weekly report responses through the shared schema', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          reports: [
+            {
+              id: '550e8400-e29b-41d4-a716-446655440020',
+              reportWeek: '2026-W19',
+              viewedAt: null,
+              createdAt: '2026-05-12T09:00:00.000Z',
+              headlineStat: {
+                label: 'Study time',
+                value: 42,
+                comparison: '+10 min',
+              },
+            },
+          ],
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+
+    const { result } = renderHook(
+      () => useProfileWeeklyReports('test-profile-id'),
+      { wrapper: createWrapper() },
+    );
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    expect(result.current.data?.[0]?.id).toBe(
+      '550e8400-e29b-41d4-a716-446655440020',
+    );
+  });
+
+  it('fails when a response violates the shared weekly report schema', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ reports: [{ id: 'not-a-uuid' }] }), {
+        status: 200,
+      }),
+    );
+
+    const { result } = renderHook(
+      () => useProfileWeeklyReports('test-profile-id'),
+      { wrapper: createWrapper() },
+    );
+
+    await waitFor(() => {
+      expect(result.current.isError).toBe(true);
+    });
+
+    expect(result.current.error).toBeInstanceOf(Error);
+  });
+});
+
+describe('useRefreshProgressSnapshot', () => {
+  it('posts to refresh and invalidates progress/dashboard caches', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          snapshotDate: '2026-05-12',
+          metrics: {},
+          milestones: [],
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+
+    const { result } = renderHook(() => useRefreshProgressSnapshot(), {
+      wrapper: createWrapper(),
+    });
+
+    const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries');
+
+    await act(async () => {
+      await result.current.mutateAsync();
+    });
+
+    expect(getMockFetchUrl()).toContain('/progress/refresh');
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ['progress', 'inventory', 'test-profile-id'],
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ['progress', 'history', 'test-profile-id'],
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ['progress', 'milestones', 'test-profile-id'],
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ['dashboard'],
+    });
   });
 });

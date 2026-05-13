@@ -28,12 +28,6 @@ jest.mock('expo-router', () => ({
   useRouter: () => ({ replace: mockReplace }),
 }));
 
-jest.mock('../lib/theme', () => ({
-  useThemeColors: () => ({
-    muted: '#999',
-  }),
-}));
-
 // Stub useProfile so the centralized signOutWithCleanup has profileIds to
 // pass to SecureStore cleanup without needing a full ProfileProvider tree.
 // The real useProfile transitively pulls in SecureStore, api-client, and

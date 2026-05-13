@@ -187,6 +187,7 @@
         "cta": "Add your first child"
       },
       "childrenHeader": "Children",
+      "familyManagementHeader": "ファミリー管理",
       "familyToolsHeader": "Family tools",
       "childCard": {
         "statusLine": "{{activity}} · {{focus}} · {{signal}}",
@@ -274,10 +275,11 @@
       "screenTitle": "学習サポート設定",
       "notSureWhichToPick": "どれを選べばいいかわからない？",
       "guideActive": "アクティブ",
-      "childScreenTitle": "{{name}}の学習サポート"
+      "childScreenTitle": "{{name}}の学習設定"
     },
     "learningPreferences": {
-      "rowLabel": "学習設定",
+      "sectionHeader": "あなたの学習",
+      "rowLabel": "設定",
       "screenTitle": "学習設定"
     },
     "mentorMemory": {
@@ -300,8 +302,8 @@
       "viewPlans": "プランを見る",
       "profileLimitTitle": "プロフィールの上限に達しました",
       "profileLimitMessage": "{{plan}}プランでは、最大{{max}}個のプロフィールをサポートしています。",
-      "breakdownSharingTitle": "Share usage breakdown with family",
-      "breakdownSharingDescription": "Let everyone in your family see how each profile uses the family pool. Children only see the breakdown when this is on.",
+      "breakdownSharingTitle": "家族の利用状況を共有",
+      "breakdownSharingDescription": "プロフィール別の利用を表示。",
       "breakdownSharingError": "Couldn't update setting. Try again."
     },
     "celebrations": {
@@ -647,7 +649,8 @@
         "rateLimited": "リクエストが多すぎます — しばらく待ってからもう一度お試しください。",
         "validationError": "問題が発生しました。別のアクティビティをお試しください。",
         "genericShort": "問題が発生しました。もう一度お試しください！"
-      }
+      },
+      "buildingRound": "ラウンドを作成中"
     },
     "round": {
       "goBack": "戻る",
@@ -684,6 +687,53 @@
         "guessWho": "誰でしょう",
         "vocabulary": "語彙"
       }
+    },
+    "play": {
+      "noRoundTitle": "ラウンドを読み込めません",
+      "noRoundBody": "クイズラウンドの読み込み中に問題が発生しました。もう一度試すか、クイズのホームに戻ることができます。",
+      "malformedTitle": "このラウンドは読み込めませんでした",
+      "malformedBody": "この問題の選択肢を取得できませんでした。新しいラウンドを試すか、少し時間をおいてからもう一度試してください。",
+      "backToQuizHome": "クイズのホームに戻る",
+      "titleGuessWho": "人物当て",
+      "titleCapitals": "首都",
+      "titleVocabulary": "単語",
+      "quitLabel": "クイズをやめる",
+      "answerCheckFailed": "解答のチェックに失敗しました — 結果が不正確な場合があります",
+      "capitalPrompt": "〜の首都は？",
+      "translatePrompt": "翻訳：",
+      "guessWhoPrompt": "この人物はだれ？",
+      "checking": "チェック中...",
+      "typeYourAnswer": "答えを入力",
+      "typeYourAnswerPlaceholder": "答えを入力...",
+      "submit": "提出",
+      "foundThemClues_one": "ヒント{{count}}つで見つけました！",
+      "foundThemClues_other": "ヒント{{count}}つで見つけました！",
+      "discoveredIt": "発見しました！",
+      "savedReady": "保存しました。準備ができたら始めましょう。",
+      "savingResult": "結果を保存中...",
+      "lockedIn": "確定しました。お見事。",
+      "goodTry": "おしい。",
+      "theAnswerWas": "正解は ",
+      "readyForNext": "次へ進む",
+      "correct": "正解",
+      "notQuite": "不正解",
+      "seeResults": "結果を見る",
+      "oneMore": "待って、あと一問だけ！",
+      "savingRound": "ラウンドを保存中...",
+      "nextQuestion": "次の問題",
+      "notQuiteRight": "答えが違いますか？",
+      "disputeNoted": "報告を受け付けました。内容を確認します。",
+      "scoringRound": "ラウンドを採点中...",
+      "couldNotSave": "ラウンドを保存できませんでした",
+      "exit": "終了",
+      "pauseHere": "ここで中断しますか？",
+      "leaveQuiz": "このクイズを中断しますか？",
+      "pauseBody": "ラウンドの途中まで解答しました。今すぐ保存するか、もう一問続けますか？",
+      "leaveBody": "まだ解答していないため、保存するものはありません。",
+      "keepPlaying": "続ける",
+      "saveAndFinish": "保存して終了",
+      "leaveWithoutSaving": "保存せずに終了",
+      "leaveQuizButton": "クイズをやめる"
     }
   },
   "dictation": {

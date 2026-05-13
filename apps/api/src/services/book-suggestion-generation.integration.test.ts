@@ -1,4 +1,5 @@
-import { jest } from '@jest/globals';
+import { resolve } from 'path';
+
 import { eq, and, isNull, like } from 'drizzle-orm';
 import {
   accounts,
@@ -8,13 +9,9 @@ import {
   createDatabase,
 } from '@eduagent/database';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
-import { resolve } from 'path';
 
-const routeAndCallMock = jest.fn<(...args: unknown[]) => Promise<unknown>>();
-jest.mock('./llm' /* gc1-allow: LLM external boundary */, () => ({
-  routeAndCall: (...args: unknown[]) => routeAndCallMock(...args),
-}));
-
+import { registerLlmProviderFixture } from '../test-utils/llm-provider-fixtures';
+import { _clearProviders, _resetCircuits } from './llm';
 import { generateCategorizedBookSuggestions } from './book-suggestion-generation';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
@@ -33,6 +30,7 @@ const PREFIX = 'integ-bsg';
 let counter = 0;
 
 const db = createIntegrationDb();
+const llmFixture = registerLlmProviderFixture();
 
 async function seedProfile() {
   counter++;
@@ -111,13 +109,17 @@ const FOUR_SUGGESTIONS = {
 
 describe('generateCategorizedBookSuggestions — integration', () => {
   beforeEach(async () => {
-    routeAndCallMock.mockReset();
-    routeAndCallMock.mockResolvedValue(FOUR_SUGGESTIONS);
+    _resetCircuits();
+    llmFixture.clearCalls();
+    llmFixture.clearChatError();
+    llmFixture.setChatResponse(JSON.parse(FOUR_SUGGESTIONS.response));
     await cleanup();
   });
 
   afterAll(async () => {
     await cleanup();
+    _clearProviders();
+    _resetCircuits();
   });
 
   it('two parallel calls produce exactly one LLM call and 4 inserts', async () => {
@@ -129,7 +131,7 @@ describe('generateCategorizedBookSuggestions — integration', () => {
       generateCategorizedBookSuggestions(db, profile.id, subject.id),
     ]);
 
-    expect(routeAndCallMock).toHaveBeenCalledTimes(1);
+    expect(llmFixture.chatCalls).toHaveLength(1);
 
     const rows = await db
       .select()
@@ -147,16 +149,15 @@ describe('generateCategorizedBookSuggestions — integration', () => {
     const profile = await seedProfile();
     const subject = await seedSubject(profile.id, 'Biology');
 
-    routeAndCallMock.mockRejectedValueOnce(new Error('quota exceeded'));
+    llmFixture.setChatError(new Error('quota exceeded'));
     await generateCategorizedBookSuggestions(db, profile.id, subject.id);
 
-    routeAndCallMock.mockReset();
-    routeAndCallMock.mockResolvedValue({
-      response: JSON.stringify({ suggestions: [] }),
-    });
+    llmFixture.clearCalls();
+    llmFixture.clearChatError();
+    llmFixture.setChatResponse({ suggestions: [] });
     await generateCategorizedBookSuggestions(db, profile.id, subject.id);
 
-    expect(routeAndCallMock).not.toHaveBeenCalled();
+    expect(llmFixture.chatCalls).toHaveLength(0);
   });
 
   it('does not generate or insert for a subject owned by another profile', async () => {
@@ -166,7 +167,7 @@ describe('generateCategorizedBookSuggestions — integration', () => {
 
     await generateCategorizedBookSuggestions(db, other.id, subject.id);
 
-    expect(routeAndCallMock).not.toHaveBeenCalled();
+    expect(llmFixture.chatCalls).toHaveLength(0);
     const rows = await db
       .select()
       .from(bookSuggestions)

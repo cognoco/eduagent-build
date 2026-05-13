@@ -31,13 +31,7 @@ import {
   sessionSummaryCreate,
   sessionSummaryRegenerate,
 } from './summary-regenerate';
-
-function createStep() {
-  return {
-    run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
-    sendEvent: jest.fn().mockResolvedValue(undefined),
-  };
-}
+import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 
 describe('summary-regenerate handlers', () => {
   beforeEach(() => {
@@ -56,7 +50,7 @@ describe('summary-regenerate handlers', () => {
         'Start with one more one-step equation and ask the learner to narrate each move.',
     });
 
-    const step = createStep();
+    const { step, sendEventCalls } = createInngestStepRunner();
     const handler = (sessionSummaryCreate as any).fn;
     const result = await handler({
       event: {
@@ -71,23 +65,27 @@ describe('summary-regenerate handlers', () => {
     });
 
     expect(result).toEqual({ status: 'completed', summaryId: 'summary-1' });
-    expect(step.sendEvent).toHaveBeenCalledWith(
-      'notify-session-summary-created',
-      expect.objectContaining({
-        name: 'app/session.summary.generated',
-        data: expect.objectContaining({
-          sessionSummaryId: 'summary-1',
-          profileId: 'profile-1',
-          sessionId: 'session-1',
-        }),
-      })
+    expect(sendEventCalls).toEqual(
+      expect.arrayContaining([
+        {
+          name: 'notify-session-summary-created',
+          payload: expect.objectContaining({
+            name: 'app/session.summary.generated',
+            data: expect.objectContaining({
+              sessionSummaryId: 'summary-1',
+              profileId: 'profile-1',
+              sessionId: 'session-1',
+            }),
+          }),
+        },
+      ]),
     );
   });
 
   it('emits app/session.summary.failed when regeneration returns null', async () => {
     mockGenerateAndStoreLlmSummary.mockResolvedValue(null);
 
-    const step = createStep();
+    const { step, sendEventCalls } = createInngestStepRunner();
     const handler = (sessionSummaryRegenerate as any).fn;
     const result = await handler({
       event: {
@@ -106,16 +104,20 @@ describe('summary-regenerate handlers', () => {
       status: 'skipped_no_summary',
       regenerated: false,
     });
-    expect(step.sendEvent).toHaveBeenCalledWith(
-      'notify-session-summary-regenerate-failed',
-      expect.objectContaining({
-        name: 'app/session.summary.failed',
-        data: expect.objectContaining({
-          sessionSummaryId: 'summary-1',
-          profileId: 'profile-1',
-          sessionId: 'session-1',
-        }),
-      })
+    expect(sendEventCalls).toEqual(
+      expect.arrayContaining([
+        {
+          name: 'notify-session-summary-regenerate-failed',
+          payload: expect.objectContaining({
+            name: 'app/session.summary.failed',
+            data: expect.objectContaining({
+              sessionSummaryId: 'summary-1',
+              profileId: 'profile-1',
+              sessionId: 'session-1',
+            }),
+          }),
+        },
+      ]),
     );
   });
 });

@@ -1212,6 +1212,7 @@ function SessionScreenInner() {
     fetchFastCelebrations,
     showConfirmation,
     router,
+    returnTo: returnTo ?? undefined,
   });
 
   const latestAiMessageId = useMemo(
@@ -1679,6 +1680,7 @@ function SessionScreenInner() {
               setFilingDismissed={setFilingDismissed}
               navigateToSessionSummary={navigateToSessionSummary}
               router={router}
+              homeHref={homeBackHref}
               sessionExpired={sessionExpired}
               notePromptOffered={notePromptOffered}
               showNoteInput={showNoteInput}

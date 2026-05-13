@@ -29,15 +29,6 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
-jest.mock('../../lib/theme', () => ({
-  useTheme: () => ({ colorScheme: 'dark' }),
-  useThemeColors: () => ({
-    muted: '#888',
-    primary: '#007AFF',
-    textInverse: '#fff',
-  }),
-}));
-
 jest.mock('../../lib/math-format', () => ({
   formatMathContent: (s: string) => s,
 }));

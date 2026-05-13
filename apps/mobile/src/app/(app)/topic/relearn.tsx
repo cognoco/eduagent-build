@@ -6,6 +6,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
@@ -328,12 +329,12 @@ export default function RelearnScreen() {
     <View className="px-5 pt-4 pb-3 flex-row items-center">
       <Pressable
         onPress={handleBack}
-        className="me-3 min-h-[44px] min-w-[44px] items-center justify-center"
+        className="me-3 p-2 min-h-[44px] min-w-[44px] items-center justify-center"
         testID="relearn-back"
         accessibilityRole="button"
         accessibilityLabel="Go back"
       >
-        <Text className="text-primary text-h3">&larr;</Text>
+        <Ionicons name="arrow-back" size={26} className="text-primary" />
       </Pressable>
       <Text className="text-h2 font-bold text-text-primary">Relearn Topic</Text>
     </View>

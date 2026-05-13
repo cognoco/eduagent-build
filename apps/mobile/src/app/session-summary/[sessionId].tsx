@@ -31,7 +31,7 @@ import { useSessionBookmarks } from '../../hooks/use-bookmarks';
 import { useDepthEvaluation } from '../../hooks/use-depth-evaluation';
 import { useProgressInventory } from '../../hooks/use-progress';
 import { usePostSessionNotificationAsk } from '../../hooks/use-post-session-notification-ask';
-import { goBackOrReplace } from '../../lib/navigation';
+import { goBackOrReplace, homeHrefForReturnTo } from '../../lib/navigation';
 import { platformAlert } from '../../lib/platform-alert';
 import { formatApiError } from '../../lib/format-api-error';
 import { Sentry } from '../../lib/sentry';
@@ -67,6 +67,7 @@ export default function SessionSummaryScreen() {
     sessionType: sessionTypeParam,
     filedSubjectId,
     filedBookId,
+    returnTo,
   } = useLocalSearchParams<{
     sessionId: string;
     subjectName?: string;
@@ -80,9 +81,11 @@ export default function SessionSummaryScreen() {
     sessionType?: string;
     filedSubjectId?: string;
     filedBookId?: string;
+    returnTo?: string;
   }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const summaryHomeHref = homeHrefForReturnTo(returnTo);
   const colors = useThemeColors();
   const { t } = useTranslation();
 
@@ -395,7 +398,7 @@ export default function SessionSummaryScreen() {
       return;
     }
 
-    goBackOrReplace(router, '/(app)/home');
+    goBackOrReplace(router, summaryHomeHref);
   };
 
   if (!sessionId) {
@@ -406,7 +409,7 @@ export default function SessionSummaryScreen() {
         message="We couldn't find this session. Head home to start a new one."
         primaryAction={{
           label: 'Go Home',
-          onPress: () => goBackOrReplace(router, '/(app)/home'),
+          onPress: () => goBackOrReplace(router, summaryHomeHref),
           testID: 'session-summary-missing-param',
         }}
       />
@@ -430,7 +433,7 @@ export default function SessionSummaryScreen() {
           This session is no longer available. Head home to start a new one.
         </Text>
         <Pressable
-          onPress={() => goBackOrReplace(router, '/(app)/home')}
+          onPress={() => goBackOrReplace(router, summaryHomeHref)}
           className="bg-primary rounded-button py-3 px-8 items-center"
           testID="expired-session-go-home"
           accessibilityLabel="Go home"
@@ -456,7 +459,7 @@ export default function SessionSummaryScreen() {
           We couldn&apos;t load this session. It may no longer exist.
         </Text>
         <Pressable
-          onPress={() => goBackOrReplace(router, '/(app)/home')}
+          onPress={() => goBackOrReplace(router, summaryHomeHref)}
           className="bg-primary rounded-button py-3 px-8 items-center"
           testID="session-not-found-go-home"
           accessibilityLabel="Go home"
@@ -492,7 +495,7 @@ export default function SessionSummaryScreen() {
           }}
           secondaryAction={{
             label: 'Go Home',
-            onPress: () => goBackOrReplace(router, '/(app)/home'),
+            onPress: () => goBackOrReplace(router, summaryHomeHref),
           }}
         />
       );
@@ -525,7 +528,7 @@ export default function SessionSummaryScreen() {
           This session could not be loaded. Head home to start a new one.
         </Text>
         <Pressable
-          onPress={() => router.replace('/(app)/home')}
+          onPress={() => router.replace(summaryHomeHref as never)}
           className="bg-primary rounded-button py-3 px-8 items-center"
           testID="session-not-found-go-home"
           accessibilityLabel="Go home"

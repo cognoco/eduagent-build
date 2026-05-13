@@ -1,18 +1,10 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
+import { tokens } from '../../lib/design-tokens';
 import { TopicPickerSheet } from './TopicPickerSheet';
 
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
-
-jest.mock('../../lib/theme', () => ({
-  useThemeColors: () => ({
-    primarySoft: '#d1fae5',
-    surface: '#f5f0e8',
-    textPrimary: '#1a1a1a',
-    textSecondary: '#525252',
-  }),
-}));
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -69,7 +61,7 @@ describe('TopicPickerSheet', () => {
     render(<TopicPickerSheet {...defaultProps} defaultTopicId="topic-2" />);
     const selectedRow = screen.getByTestId('topic-picker-topic-2');
     expect(selectedRow.props.style).toMatchObject({
-      backgroundColor: '#d1fae5',
+      backgroundColor: tokens.light.colors.primarySoft,
     });
   });
 
@@ -77,7 +69,7 @@ describe('TopicPickerSheet', () => {
     render(<TopicPickerSheet {...defaultProps} defaultTopicId="topic-2" />);
     const unselectedRow = screen.getByTestId('topic-picker-topic-1');
     expect(unselectedRow.props.style).toMatchObject({
-      backgroundColor: '#f5f0e8',
+      backgroundColor: tokens.light.colors.surface,
     });
   });
 

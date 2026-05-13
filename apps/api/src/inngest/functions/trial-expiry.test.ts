@@ -109,17 +109,11 @@ interface TrialExpiryResult {
   softLandingSent: number;
 }
 
-interface TrialExpiryMockStep {
-  run: jest.Mock;
-  sendEvent: jest.Mock;
-  sleep: jest.Mock;
-}
-
 async function executeSteps(): Promise<{
   result: TrialExpiryResult;
-  mockStep: TrialExpiryMockStep;
+  mockStep: { run: jest.Mock; sendEvent: jest.Mock; sleep: jest.Mock };
 }> {
-  const mockStep: TrialExpiryMockStep = {
+  const mockStep = {
     run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
     // [SWEEP-J7] Per-trial escalation events now batched and dispatched via
     // memoized step.sendEvent OUTSIDE the per-trial step.run loop. Bare
@@ -269,10 +263,7 @@ describe('trialExpiry', () => {
         .mockResolvedValueOnce(undefined)
         .mockRejectedValueOnce(new Error('DB constraint violation'));
 
-      const { result, mockStep } = (await executeSteps()) as unknown as {
-        result: { expiredCount: number };
-        mockStep: { sendEvent: jest.Mock };
-      };
+      const { result, mockStep } = await executeSteps();
 
       // Survivor counted; failing trial dropped from the count.
       expect(result.expiredCount).toBe(1);

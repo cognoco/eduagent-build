@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTranslation } from 'react-i18next';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -48,12 +49,12 @@ export default function SubjectSessionsScreen(): React.ReactElement {
                 `/(app)/progress/${subjectId ?? ''}` as never,
               )
             }
-            className="me-3 py-2 pe-2"
+            className="me-3 p-2 min-h-[44px] min-w-[44px] items-center justify-center"
             accessibilityRole="button"
             accessibilityLabel={t('common.goBack')}
             testID="subject-sessions-back"
           >
-            <Text className="text-body font-semibold text-primary">{'←'}</Text>
+            <Ionicons name="arrow-back" size={24} className="text-primary" />
           </Pressable>
           <View className="flex-1">
             <Text className="text-h2 font-bold text-text-primary">

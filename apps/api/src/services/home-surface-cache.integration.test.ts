@@ -30,7 +30,7 @@ import {
   readHomeSurfaceCacheData,
 } from './home-surface-cache';
 import type { HomeSurfaceCacheData } from './home-surface-cache';
-import type { HomeCard } from '@eduagent/schemas';
+import type { HomeCard, HomeCardId } from '@eduagent/schemas';
 
 // ---------------------------------------------------------------------------
 // DB setup — real connection
@@ -120,10 +120,7 @@ describe('[BUG-859] mergeHomeSurfaceCacheData concurrent lost-update guard (inte
     // "record an interaction / add a card" operation).  After N=3 concurrent
     // merges the rankedHomeCards array must contain exactly N entries — not
     // fewer (which would happen if the last-writer-wins bug were still present).
-    const makeCard = (
-      id: import('@eduagent/schemas').HomeCardId,
-      label: string,
-    ): HomeCard => ({
+    const makeCard = (id: HomeCardId, label: string): HomeCard => ({
       id,
       title: label,
       subtitle: label,
@@ -132,7 +129,7 @@ describe('[BUG-859] mergeHomeSurfaceCacheData concurrent lost-update guard (inte
     });
 
     const mergeAppend =
-      (id: import('@eduagent/schemas').HomeCardId, label: string) =>
+      (id: HomeCardId, label: string) =>
       (current: HomeSurfaceCacheData): HomeSurfaceCacheData => ({
         ...current,
         rankedHomeCards: [...current.rankedHomeCards, makeCard(id, label)],

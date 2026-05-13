@@ -27,17 +27,6 @@ jest.mock(
   }),
 );
 
-jest.mock(
-  '../../lib/theme' /* gc1-allow: theme hook reads native ColorScheme — not available in JSDOM */,
-  () => ({
-    useThemeColors: () => ({
-      textPrimary: '#ffffff',
-      textSecondary: '#94a3b8',
-      primary: '#00b4d8',
-    }),
-  }),
-);
-
 const mockPlatformAlert = jest.fn();
 jest.mock(
   '../../lib/platform-alert' /* gc1-allow: wraps Alert.alert which is unavailable in JSDOM */,

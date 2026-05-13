@@ -48,7 +48,7 @@ Two production dead-code branches removed 2026-04-19 in commit `970a82a5`: `AgeB
 - [feedback_parallel_agents.md](feedback_parallel_agents.md) — Parallel agents in same tree, no worktrees. Coordinator commits sequentially.
 - [feedback_fast_iteration.md](feedback_fast_iteration.md) — 60-min feedback loops unacceptable. CI gates, but optimize speed.
 - [feedback_fix_verification_rules.md](feedback_fix_verification_rules.md) — Changed ≠ verified. Break tests, finding IDs, no silent recovery.
-- [feedback_sweep_for_same_bug.md](feedback_sweep_for_same_bug.md) — After fixing a bug, sweep codebase for same pattern. **Direct precursor of CLAUDE.md `Sweep when you fix` rule (added 2026-05-03).**
+- [feedback_sweep_for_same_bug.md](feedback_sweep_for_same_bug.md) — When a bug could be pattern-shaped, sweep the codebase for sibling instances before declaring done. **Direct precursor of CLAUDE.md `Sweep when you fix` rule (added 2026-05-03); strengthened 2026-05-12.**
 - [feedback_just_do_it.md](feedback_just_do_it.md) — Clear action commands = execute immediately, don't gate on confirmations.
 - [feedback_autonomous_speccing.md](feedback_autonomous_speccing.md) — Decide small stuff yourself, only ask on genuinely big trade-offs.
 - [feedback_agents_commit_push.md](feedback_agents_commit_push.md) — Subagents never commit by default; coordinator commits via `/commit`. Exception: user-instructed one-off subagent commits are OK.
@@ -127,6 +127,7 @@ Two production dead-code branches removed 2026-04-19 in commit `970a82a5`: `AgeB
 - [feedback_adversarial_review_patterns.md](feedback_adversarial_review_patterns.md) — Body double-consumption, classify-before-format, dead code cleanup.
 - [feedback_llm_prompt_injection_surfacing.md](feedback_llm_prompt_injection_surfacing.md) — LLM reads user A → surfaces to user B = injection vector.
 - [feedback_verify_full_ci.md](feedback_verify_full_ci.md) — On CI failure, run full validation.
+- [feedback_pr_required_checks.md](feedback_pr_required_checks.md) — Missing required PR checks can be branch-protection/workflow-trigger drift; diagnose before changing product tests.
 - [feedback_thorough_investigation.md](feedback_thorough_investigation.md) — NEVER take shortcuts in codebase analysis.
 - [feedback_verify_before_declaring_done.md](feedback_verify_before_declaring_done.md) — Never declare a fix done without testing it first.
 - [feedback_verify_before_marking_done.md](feedback_verify_before_marking_done.md) — Never mark bugs Done in Notion unless 100% confident.
