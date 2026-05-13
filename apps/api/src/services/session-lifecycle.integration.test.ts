@@ -23,7 +23,6 @@ import { eq, and, like } from 'drizzle-orm';
 import {
   registerProvider,
   createMockProvider,
-  _clearProviders,
   unregisterProvider,
 } from './llm';
 import {
@@ -117,7 +116,7 @@ beforeAll(async () => {
   db = createDatabase(dbUrl);
 
   // Register mock LLM provider — the ONLY mocked external boundary
-  _clearProviders();
+  unregisterProvider('gemini');
   registerProvider(createMockProvider('gemini'));
 });
 

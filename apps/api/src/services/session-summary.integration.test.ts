@@ -12,12 +12,7 @@ import {
 } from '@eduagent/database';
 import { and, eq, like } from 'drizzle-orm';
 import type { ChatMessage, LLMProvider, ModelConfig } from './llm';
-import {
-  _clearProviders,
-  _resetCircuits,
-  registerProvider,
-  unregisterProvider,
-} from './llm';
+import { _resetCircuits, registerProvider, unregisterProvider } from './llm';
 
 import {
   closeSession,
@@ -101,7 +96,7 @@ beforeAll(async () => {
   }
 
   db = createDatabase(databaseUrl);
-  _clearProviders();
+  unregisterProvider('gemini');
   _resetCircuits();
   registerProvider(createSessionSummaryProvider());
 });

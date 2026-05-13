@@ -24,7 +24,6 @@ import { like } from 'drizzle-orm';
 import {
   registerProvider,
   createMockProvider,
-  _clearProviders,
   unregisterProvider,
 } from './llm';
 import { generateRecallBridge } from './recall-bridge';
@@ -167,7 +166,7 @@ describe('generateRecallBridge (integration)', () => {
     db = createDatabase(requireDatabaseUrl());
 
     // Register mock LLM provider — the ONLY mocked external boundary
-    _clearProviders();
+    unregisterProvider('gemini');
     registerProvider(createMockProvider('gemini'));
   });
 
