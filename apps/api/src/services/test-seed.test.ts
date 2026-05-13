@@ -128,9 +128,9 @@ describe('SEED_CLERK_PREFIX', () => {
 // ---------------------------------------------------------------------------
 
 describe('seedScenario', () => {
-  it.each(VALID_SCENARIOS)(
+  it.each(VALID_SCENARIOS as SeedScenario[])(
     'dispatches "%s" and returns SeedResult',
-    async (scenario) => {
+    async (scenario: SeedScenario) => {
       const db = createMockDb();
       const result = await seedScenario(db, scenario, 'test@example.com');
 
@@ -142,18 +142,18 @@ describe('seedScenario', () => {
           email: 'test@example.com',
           password: expect.any(String),
           ids: expect.any(Object),
-        })
+        }),
       );
 
       // Every seed calls db.insert() at least once (account + profile)
       expect(db.insert).toHaveBeenCalled();
-    }
+    },
   );
 
   it('throws for unknown scenario', async () => {
     const db = createMockDb();
     await expect(
-      seedScenario(db, 'nonexistent' as SeedScenario, 'test@example.com')
+      seedScenario(db, 'nonexistent' as SeedScenario, 'test@example.com'),
     ).rejects.toThrow('Unknown scenario: nonexistent');
   });
 
@@ -162,7 +162,7 @@ describe('seedScenario', () => {
     const result = await seedScenario(
       db,
       'onboarding-complete',
-      'test@example.com'
+      'test@example.com',
     );
 
     // The first insert call should be for the accounts table
@@ -332,6 +332,6 @@ describe('new Stage-0 scenarios return required IDs', () => {
       }
 
       expect(mockDb.insert).toHaveBeenCalled();
-    }
+    },
   );
 });

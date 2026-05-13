@@ -1,11 +1,10 @@
 /// <reference types="jest" />
 
 // Internal mock to be replaced by real-DB integration tests under the C1
-// mock-inventory plan (docs/plans/c1-mock-inventory). When touching: extend
+// mock-inventory plan (docs/_archive/plans/done/2026-05-04-c1-mock-inventory/). When touching: extend
 // in-memory state rather than stubbing additional services, and surface
 // contract drift loudly (see fallback branches below) instead of silently
 // returning empty rows.
-
 
 type BillingTier = 'free' | 'plus' | 'family' | 'pro';
 type BillingStatus = 'trial' | 'active' | 'past_due' | 'cancelled' | 'expired';
@@ -72,10 +71,10 @@ function buildDefaultState(options: RouteMeteringFixtureOptions): FixtureState {
 
 export function createRouteMeteringFixture(
   db: MutableDb,
-  options: RouteMeteringFixtureOptions
+  options: RouteMeteringFixtureOptions,
 ) {
   const actualDb = jest.requireActual(
-    '@eduagent/database'
+    '@eduagent/database',
   ) as typeof import('@eduagent/database');
 
   const originalQuery = db.query;
@@ -106,7 +105,6 @@ export function createRouteMeteringFixture(
     createdAt: new Date('2026-05-01T00:00:00.000Z'),
     updatedAt: new Date('2026-05-01T00:00:00.000Z'),
   });
-
 
   const subscriptionAccessor = {
     findFirst: jest.fn(async () => ({
@@ -178,7 +176,7 @@ export function createRouteMeteringFixture(
     chain.limit = jest.fn().mockImplementation(() => resolveRows());
     (chain as Record<string, unknown>).then = (
       onfulfilled?: (value: unknown) => unknown,
-      onrejected?: (reason: unknown) => unknown
+      onrejected?: (reason: unknown) => unknown,
     ) => resolveRows().then(onfulfilled, onrejected);
 
     return chain;
@@ -253,9 +251,9 @@ export function createRouteMeteringFixture(
               // a divergence between this fixture and the real helper.
               throw new Error(
                 `route-metering-fixture: unrecognised quotaPools update shape — keys=[${Object.keys(
-                  setValues
+                  setValues,
                 ).join(', ')}]. ` +
-                  'Either extend the fixture to handle this case or update the production helper.'
+                  'Either extend the fixture to handle this case or update the production helper.',
               );
             };
 
@@ -298,7 +296,7 @@ export function createRouteMeteringFixture(
         insert: insertImpl,
         update: updateImpl,
         execute: jest.fn().mockResolvedValue([]),
-      })
+      }),
     );
 
   return {

@@ -99,6 +99,7 @@ describe('session operations integration', () => {
 
     const session = await startSession(db, profileId, subjectId, {
       subjectId,
+      sessionType: 'learning',
       inputMode: 'text',
     });
 
@@ -122,6 +123,8 @@ describe('session operations integration', () => {
 
     const session = await startSession(db, profileId, subjectId, {
       subjectId,
+      sessionType: 'learning',
+      inputMode: 'text',
     });
 
     await db.insert(sessionEvents).values([
@@ -159,8 +162,13 @@ describe('session operations integration', () => {
 
     const transcript = await getSessionTranscript(db, profileId, session.id);
 
-    expect(transcript).not.toBeNull();
-    expect(transcript?.session).toEqual(
+    if (!transcript || transcript.archived) {
+      throw new Error(
+        `Expected a live (non-archived) transcript, got: ${JSON.stringify(transcript)}`,
+      );
+    }
+    const liveTranscript = transcript;
+    expect(liveTranscript.session).toEqual(
       expect.objectContaining({
         sessionId: session.id,
         subjectId,
@@ -168,7 +176,7 @@ describe('session operations integration', () => {
         wallClockSeconds: 180,
       }),
     );
-    expect(transcript?.exchanges).toEqual([
+    expect(liveTranscript.exchanges).toEqual([
       expect.objectContaining({
         role: 'assistant',
         content: 'Use a diagram first.',
@@ -192,6 +200,8 @@ describe('session operations integration', () => {
 
     const session = await startSession(db, profileId, subjectId, {
       subjectId,
+      sessionType: 'learning',
+      inputMode: 'text',
     });
 
     await db.insert(sessionSummaries).values({
@@ -239,6 +249,7 @@ describe('session operations integration', () => {
     const session = await startSession(db, profileId, subjectId, {
       subjectId,
       sessionType: 'homework',
+      inputMode: 'text',
       metadata: {
         homework: {
           problemCount: 2,
@@ -292,11 +303,18 @@ describe('session operations integration', () => {
       where: eq(learningSessions.id, session.id),
     });
 
-    expect(firstResult.metadata.loggedCorrectionIds).toEqual(['problem-1']);
-    expect(firstResult.metadata.loggedStartedProblemIds).toEqual(['problem-1']);
-    expect(firstResult.metadata.loggedCompletedProblemIds).toEqual([
-      'problem-2',
-    ]);
+    // The return type annotation `Promise<{ metadata: HomeworkSessionMetadata }>`
+    // is narrower than the actual runtime shape, which also includes
+    // loggedCorrectionIds / loggedStartedProblemIds / loggedCompletedProblemIds.
+    // Widen the source annotation in `services/session/session-homework.ts` and
+    // remove this cast. Tracked in Notion bug tracker:
+    // https://www.notion.so/35f8bce91f7c8104bc43f77e0627032c
+    // (Verified 2026-05-13: no other callers read these three fields, so this
+    // is the only test site affected.)
+    const firstMeta = firstResult.metadata as Record<string, unknown>;
+    expect(firstMeta['loggedCorrectionIds']).toEqual(['problem-1']);
+    expect(firstMeta['loggedStartedProblemIds']).toEqual(['problem-1']);
+    expect(firstMeta['loggedCompletedProblemIds']).toEqual(['problem-2']);
     expect(secondResult.metadata).toEqual(firstResult.metadata);
     expect(
       events.map((event: typeof sessionEvents.$inferSelect) => event.eventType),
@@ -341,6 +359,8 @@ describe('session operations integration', () => {
 
     const session = await startSession(db, profileId, subjectId, {
       subjectId,
+      sessionType: 'learning',
+      inputMode: 'text',
     });
     const flaggedEventId = generateUUIDv7();
 

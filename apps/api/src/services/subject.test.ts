@@ -327,7 +327,7 @@ describe('createSubjectWithStructure focused_book prewarm', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    sendSpy = jest.spyOn(inngest, 'send').mockResolvedValue(undefined);
+    sendSpy = jest.spyOn(inngest, 'send').mockResolvedValue({ ids: [] });
     captureSpy = jest
       .spyOn(sentry, 'captureException')
       .mockImplementation(() => undefined);

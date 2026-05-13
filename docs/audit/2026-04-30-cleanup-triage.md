@@ -25,6 +25,8 @@ For every active in-scope file: read the file → verify referenced state via `g
 
 These are inbound references to files marked Cat 1. They don't change the categorization, but they are loose threads the execution plan must address in the same commit (or risk leaving broken links).
 
+> **DONE — 2026-05-13.** All 8 conflicts below resolved by prior cleanup passes (PR-23 brand sweep + PR-26 individual moves) and verified during PR-27 closure. C5 became moot when `e2e-emulator-issues.md` itself was vaulted (intentional pattern per `docs/_vault/emulator-2026-04-30/README.md`). One additional live stale reference outside the original 8 — `.claude/memory/feedback_e2e_cascade_root_cause.md:9` — was repointed to the vault path in the same PR. The original prescriptions are kept below for archaeology.
+
 | # | Pointer (must update) | Points at (Cat 1) | Co-change required |
 | - | --------------------- | ----------------- | ------------------ |
 | C1 | `.claude/memory/MEMORY.md` indexes 5 Cat 1 memory files (project_cr_124_scope, project_epic15_code_review, project_expo_router_pollution, project_implementation_phase, project_web_flow_bugs) | 5 of 6 Cat 1 memory files | Remove or repoint those 5 lines in MEMORY.md to `_archive/` paths |
@@ -44,6 +46,8 @@ Additional weak references that are NOT blocking but worth knowing:
 ---
 
 ## Category 1 — Definitely obsolete / stale (25 files)
+
+> **DONE — 2026-05-13.** All 25 Cat-1 actions resolved by prior cleanup passes plus one residual archive in the PR-25/27/29 closure work. 1A (8 deletes): 5 truly resolved (some never tracked on this branch); 3 superseded by the intentional `docs/_vault/emulator-2026-04-30/` snapshot vault — see `docs/_vault/emulator-2026-04-30/README.md` for the vault rationale. 1B (17 archives): 16 already at `_archive/` paths from prior passes; `docs/plans/2026-04-07-epic-17-phase-a-voice-input_NS.md` archived in the closure PR. Per-file evidence preserved below.
 
 ### 1A · Delete (8 files)
 
@@ -129,10 +133,10 @@ These memory files are still live and indexed — but their bodies contain stale
 
 | File | Status | Recommend |
 | ---- | ------ | --------- |
-| `docs/plans/2026-04-15-S06-rls-phase-0-1-preparatory.md` | Plan's own 2026-04-27 status table says Phases 0.0/0.1/0.3 NOT DONE; `c80bb903` (driver swap) may have moved it forward. | **User: verify Phase 0 status.** If complete, archive. Otherwise keep. |
-| `docs/plans/2026-04-15-S06-rls-phase-2-4-enforcement.md` | Blocked on Phase 0+1 completing. | **User: tied to row above.** Archive together if Phase 0+1 done. |
-| `docs/plans/2026-04-20-prelaunch-llm-tuning.md` | Track 1 shipped (`de9f55b3`, `235d6b8c`); Tracks 0/2/3 (probe battery, hand-edit B.1 tone, model comparison) have no commits — `apps/api/eval-llm/fixtures/probes/` doesn't exist. | **Keep** — partially done with active remaining work. |
-| `docs/plans/2026-04-22-library-wiring-and-session-debugging.md` | Parts 1-2 shipped (`2e901ac3`); Part 3 (auto-close after 2 exchanges) marked NOT YET FIXED but `855a632f` (stream-fallback guard) may resolve it. | **User: verify Part 3 status.** If fixed, archive. |
+| ~~`docs/plans/2026-04-15-S06-rls-phase-0-1-preparatory.md`~~ → `docs/plans/done/` | Phases 0.0/0.1/0.2/0.3/0.4 + 1.1 verified complete in code (PR #126, driver-swap commit `c80bb903` + follow-up). Only Phase 1.3 verification (`pg_tables.rowsecurity` query against staging/prod) residual — tracked as `AUDIT-RLS-1.3-VERIFY` in punchlist. | **DONE — archived to `docs/plans/done/` (2026-05-12).** |
+| `docs/plans/2026-04-15-S06-rls-phase-2-4-enforcement.md` | Phase 0+1 prerequisite now complete (see row 1). Plan is real pending Phase 2-4 RLS enforcement security work — none of its content has shipped yet. | **KEPT in `docs/plans/` (2026-05-12).** Real pending security work; revisit when Phase 2-4 is picked up. |
+| ~~`docs/plans/2026-04-20-prelaunch-llm-tuning.md`~~ → `docs/plans/done/` | Track 1 shipped (`de9f55b3`); Tracks 0/2/3 (probe battery, hand-edit B.1 tone, model comparison) outstanding. Plan moved to `done/` before this session despite remaining work, presumably because Track 1 was the meaningful chunk. | **DONE — already in `docs/plans/done/` before 2026-05-12 cleanup pass.** |
+| ~~`docs/plans/2026-04-22-library-wiring-and-session-debugging.md`~~ → `docs/plans/done/` | Parts 1-2 shipped (`2e901ac3`); Part 3 was unblocked by `855a632f` (stream-fallback guard, 2026-04-24). | **DONE — already in `docs/plans/done/` before 2026-05-12 cleanup pass.** |
 
 ### 2E · Docs needing content updates (1)
 

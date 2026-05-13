@@ -37,6 +37,7 @@ function llmResponse(json: Record<string, unknown>): void {
     provider: 'gemini',
     model: 'gemini-2.5-flash',
     latencyMs: 50,
+    stopReason: 'stop',
   });
 }
 
@@ -47,6 +48,7 @@ function makeSubject(id: string, name: string) {
     name,
     rawInput: null,
     status: 'active' as const,
+    pedagogyMode: 'socratic' as const,
     createdAt: '2026-01-01T00:00:00.000Z',
     updatedAt: '2026-01-01T00:00:00.000Z',
   };
@@ -337,6 +339,7 @@ describe('classifySubject', () => {
       provider: 'gemini',
       model: 'gemini-2.5-flash',
       latencyMs: 50,
+      stopReason: 'stop',
     });
 
     const result = await classifySubject(FAKE_DB, PROFILE_ID, 'random text');

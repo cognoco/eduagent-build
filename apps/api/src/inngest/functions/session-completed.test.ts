@@ -55,6 +55,11 @@ const mockSessionCompletedDb = createTransactionalMockDb({
     },
   },
   select: chainable,
+  update: jest.fn().mockReturnValue({
+    set: jest.fn().mockReturnValue({
+      where: jest.fn().mockResolvedValue([]),
+    }),
+  }),
 });
 const mockDatabaseModule = createDatabaseModuleMock({
   db: mockSessionCompletedDb,
@@ -303,7 +308,7 @@ import type { Database } from '@eduagent/database';
 
 /** Simulates Inngest step.run by capturing step handlers */
 async function executeSteps(
-  eventData: Record<string, unknown>
+  eventData: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
   const steps: Record<string, () => Promise<unknown>> = {};
 
@@ -331,7 +336,7 @@ async function executeSteps(
 }
 
 function createEventData(
-  overrides: Record<string, unknown> = {}
+  overrides: Record<string, unknown> = {},
 ): Record<string, unknown> {
   return {
     profileId: PROFILE_ID,
@@ -385,13 +390,13 @@ describe('sessionCompleted', () => {
     expect(triggers).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ event: 'app/session.completed' }),
-      ])
+      ]),
     );
   });
 
   it('does not wait for filing when the session was auto-closed', async () => {
     const { mockStep } = (await executeSteps(
-      createEventData({ topicId: null, summaryStatus: 'auto_closed' })
+      createEventData({ topicId: null, summaryStatus: 'auto_closed' }),
     )) as any;
 
     expect(mockStep.waitForEvent).not.toHaveBeenCalled();
@@ -414,21 +419,21 @@ describe('sessionCompleted', () => {
         sessionId: validSessionId,
         topicId: null,
         sessionType: 'homework',
-      })
+      }),
     )) as any;
 
     expect(mockStep.waitForEvent).toHaveBeenCalledWith(
       'wait-for-filing',
-      expect.objectContaining({ event: 'app/filing.completed' })
+      expect.objectContaining({ event: 'app/filing.completed' }),
     );
     expect(mockCaptureException).toHaveBeenCalledWith(
       expect.objectContaining({
         message: expect.stringContaining('waitForEvent timed out'),
       }),
-      expect.objectContaining({ profileId: validProfileId })
+      expect.objectContaining({ profileId: validProfileId }),
     );
     expect(consoleWarnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('filing waitForEvent timed out')
+      expect.stringContaining('filing waitForEvent timed out'),
     );
     // [SWEEP-SILENT-RECOVERY] Filing-timeout must also dispatch an Inngest
     // event for non-Sentry observability (oncall pages on rate spikes).
@@ -442,7 +447,7 @@ describe('sessionCompleted', () => {
           sessionType: 'homework',
           timeoutMs: 60000,
         }),
-      })
+      }),
     );
 
     consoleWarnSpy.mockRestore();
@@ -475,7 +480,7 @@ describe('sessionCompleted', () => {
       expect.objectContaining({
         message: expect.stringContaining('waitForEvent timed out'),
       }),
-      expect.anything()
+      expect.anything(),
     );
   });
 
@@ -486,7 +491,7 @@ describe('sessionCompleted', () => {
         status: 'completed',
         sessionId: SESSION_ID,
         outcomes: expect.any(Array),
-      })
+      }),
     );
   });
 
@@ -517,7 +522,7 @@ describe('sessionCompleted', () => {
 
   it('marks all steps as ok on success (verification step skipped for standard)', async () => {
     const { result } = (await executeSteps(
-      createEventData({ qualityRating: 4 })
+      createEventData({ qualityRating: 4 }),
     )) as any;
     const statuses = result.outcomes
       .filter((o: any) => o.status !== 'skipped')
@@ -541,7 +546,7 @@ describe('sessionCompleted', () => {
     ]);
     // verification-completion step should be skipped for standard sessions
     const verificationOutcome = result.outcomes.find(
-      (o: any) => o.step === 'process-verification-completion'
+      (o: any) => o.step === 'process-verification-completion',
     );
     expect(verificationOutcome.status).toBe('skipped');
   });
@@ -555,30 +560,30 @@ describe('sessionCompleted', () => {
         PROFILE_ID,
         TOPIC_ID,
         4,
-        '2026-02-17T10:00:00.000Z' // timestamp from event data
+        '2026-02-17T10:00:00.000Z', // timestamp from event data
       );
     });
 
     it('skips retention update when no topicId', async () => {
       const { result } = (await executeSteps(
-        createEventData({ topicId: null })
+        createEventData({ topicId: null }),
       )) as any;
 
       expect(mockUpdateRetentionFromSession).not.toHaveBeenCalled();
       const retentionOutcome = result.outcomes.find(
-        (o: any) => o.step === 'update-retention'
+        (o: any) => o.step === 'update-retention',
       );
       expect(retentionOutcome.status).toBe('skipped');
     });
 
     it('skips retention update when qualityRating not provided and reason is silence_timeout (F-8)', async () => {
       const { result } = (await executeSteps(
-        createEventData({ reason: 'silence_timeout' })
+        createEventData({ reason: 'silence_timeout' }),
       )) as any;
 
       expect(mockUpdateRetentionFromSession).not.toHaveBeenCalled();
       const retentionOutcome = result.outcomes.find(
-        (o: any) => o.step === 'update-retention'
+        (o: any) => o.step === 'update-retention',
       );
       expect(retentionOutcome.status).toBe('skipped');
     });
@@ -591,7 +596,7 @@ describe('sessionCompleted', () => {
         PROFILE_ID,
         TOPIC_ID,
         3,
-        '2026-02-17T10:00:00.000Z'
+        '2026-02-17T10:00:00.000Z',
       );
     });
 
@@ -603,18 +608,18 @@ describe('sessionCompleted', () => {
         PROFILE_ID,
         TOPIC_ID,
         3,
-        '2026-02-17T10:00:00.000Z'
+        '2026-02-17T10:00:00.000Z',
       );
     });
 
     it('skips retention update when no qualityRating and no topicId and no reason (F-8)', async () => {
       const { result } = (await executeSteps(
-        createEventData({ topicId: null })
+        createEventData({ topicId: null }),
       )) as any;
 
       expect(mockUpdateRetentionFromSession).not.toHaveBeenCalled();
       const retentionOutcome = result.outcomes.find(
-        (o: any) => o.step === 'update-retention'
+        (o: any) => o.step === 'update-retention',
       );
       expect(retentionOutcome.status).toBe('skipped');
     });
@@ -624,7 +629,7 @@ describe('sessionCompleted', () => {
         createEventData({
           interleavedTopicIds: ['topic-a', 'topic-b', 'topic-c'],
           qualityRating: 4,
-        })
+        }),
       );
 
       expect(mockUpdateRetentionFromSession).toHaveBeenCalledTimes(3);
@@ -633,21 +638,21 @@ describe('sessionCompleted', () => {
         PROFILE_ID,
         'topic-a',
         4,
-        '2026-02-17T10:00:00.000Z'
+        '2026-02-17T10:00:00.000Z',
       );
       expect(mockUpdateRetentionFromSession).toHaveBeenCalledWith(
         expect.anything(),
         PROFILE_ID,
         'topic-b',
         4,
-        '2026-02-17T10:00:00.000Z'
+        '2026-02-17T10:00:00.000Z',
       );
       expect(mockUpdateRetentionFromSession).toHaveBeenCalledWith(
         expect.anything(),
         PROFILE_ID,
         'topic-c',
         4,
-        '2026-02-17T10:00:00.000Z'
+        '2026-02-17T10:00:00.000Z',
       );
     });
 
@@ -657,7 +662,7 @@ describe('sessionCompleted', () => {
           topicId: TOPIC_ID,
           interleavedTopicIds: ['topic-a', 'topic-b'],
           qualityRating: 4,
-        })
+        }),
       );
 
       // Should call for each interleaved topic, NOT for single topicId
@@ -667,7 +672,7 @@ describe('sessionCompleted', () => {
         PROFILE_ID,
         TOPIC_ID,
         expect.anything(),
-        expect.anything()
+        expect.anything(),
       );
     });
   });
@@ -679,11 +684,11 @@ describe('sessionCompleted', () => {
           mode: 'relearn',
           exchangeCount: 3,
           qualityRating: 4,
-        })
+        }),
       )) as any;
 
       const resetOutcome = result.outcomes.find(
-        (o: any) => o.step === 'relearn-retention-reset'
+        (o: any) => o.step === 'relearn-retention-reset',
       );
       expect(resetOutcome.status).toBe('ok');
       expect(mockSessionCompletedDb.update).toHaveBeenCalled();
@@ -695,11 +700,11 @@ describe('sessionCompleted', () => {
           mode: 'relearn',
           exchangeCount: 0,
           qualityRating: 4,
-        })
+        }),
       )) as any;
 
       const resetOutcome = result.outcomes.find(
-        (o: any) => o.step === 'relearn-retention-reset'
+        (o: any) => o.step === 'relearn-retention-reset',
       );
       expect(resetOutcome.status).toBe('skipped');
     });
@@ -710,11 +715,11 @@ describe('sessionCompleted', () => {
           mode: 'learning',
           exchangeCount: 3,
           qualityRating: 4,
-        })
+        }),
       )) as any;
 
       const resetOutcome = result.outcomes.find(
-        (o: any) => o.step === 'relearn-retention-reset'
+        (o: any) => o.step === 'relearn-retention-reset',
       );
       expect(resetOutcome.status).toBe('skipped');
     });
@@ -728,18 +733,18 @@ describe('sessionCompleted', () => {
         expect.anything(), // db
         PROFILE_ID,
         TOPIC_ID,
-        4
+        4,
       );
     });
 
     it('skips needs-deepening update when no topicId', async () => {
       const { result } = (await executeSteps(
-        createEventData({ topicId: null })
+        createEventData({ topicId: null }),
       )) as any;
 
       expect(mockUpdateNeedsDeepeningProgress).not.toHaveBeenCalled();
       const outcome = result.outcomes.find(
-        (o: any) => o.step === 'update-needs-deepening'
+        (o: any) => o.step === 'update-needs-deepening',
       );
       expect(outcome.status).toBe('skipped');
     });
@@ -749,7 +754,7 @@ describe('sessionCompleted', () => {
 
       expect(mockUpdateNeedsDeepeningProgress).not.toHaveBeenCalled();
       const outcome = result.outcomes.find(
-        (o: any) => o.step === 'update-needs-deepening'
+        (o: any) => o.step === 'update-needs-deepening',
       );
       expect(outcome.status).toBe('skipped');
     });
@@ -759,7 +764,7 @@ describe('sessionCompleted', () => {
         createEventData({
           interleavedTopicIds: ['topic-a', 'topic-b', 'topic-c'],
           qualityRating: 5,
-        })
+        }),
       );
 
       expect(mockUpdateNeedsDeepeningProgress).toHaveBeenCalledTimes(3);
@@ -767,19 +772,19 @@ describe('sessionCompleted', () => {
         expect.anything(),
         PROFILE_ID,
         'topic-a',
-        5
+        5,
       );
       expect(mockUpdateNeedsDeepeningProgress).toHaveBeenCalledWith(
         expect.anything(),
         PROFILE_ID,
         'topic-b',
-        5
+        5,
       );
       expect(mockUpdateNeedsDeepeningProgress).toHaveBeenCalledWith(
         expect.anything(),
         PROFILE_ID,
         'topic-c',
-        5
+        5,
       );
     });
   });
@@ -841,11 +846,11 @@ describe('sessionCompleted', () => {
 
     it('skips when subjectId is not provided', async () => {
       const { result } = (await executeSteps(
-        createEventData({ subjectId: null })
+        createEventData({ subjectId: null }),
       )) as any;
 
       const outcome = result.outcomes.find(
-        (o: any) => o.step === 'update-vocabulary-retention'
+        (o: any) => o.step === 'update-vocabulary-retention',
       );
       expect(outcome.status).toBe('skipped');
       expect(mockExtractVocabularyFromTranscript).not.toHaveBeenCalled();
@@ -854,11 +859,11 @@ describe('sessionCompleted', () => {
 
     it('skips when subjectId is undefined', async () => {
       const { result } = (await executeSteps(
-        createEventData({ subjectId: undefined })
+        createEventData({ subjectId: undefined }),
       )) as any;
 
       const outcome = result.outcomes.find(
-        (o: any) => o.step === 'update-vocabulary-retention'
+        (o: any) => o.step === 'update-vocabulary-retention',
       );
       expect(outcome.status).toBe('skipped');
       expect(mockExtractVocabularyFromTranscript).not.toHaveBeenCalled();
@@ -870,7 +875,7 @@ describe('sessionCompleted', () => {
       const { result } = (await executeSteps(createEventData())) as any;
 
       const outcome = result.outcomes.find(
-        (o: any) => o.step === 'update-vocabulary-retention'
+        (o: any) => o.step === 'update-vocabulary-retention',
       );
       expect(outcome.status).toBe('ok');
       expect(mockExtractVocabularyFromTranscript).not.toHaveBeenCalled();
@@ -887,7 +892,7 @@ describe('sessionCompleted', () => {
       const { result } = (await executeSteps(createEventData())) as any;
 
       const outcome = result.outcomes.find(
-        (o: any) => o.step === 'update-vocabulary-retention'
+        (o: any) => o.step === 'update-vocabulary-retention',
       );
       expect(outcome.status).toBe('ok');
       expect(mockExtractVocabularyFromTranscript).not.toHaveBeenCalled();
@@ -904,7 +909,7 @@ describe('sessionCompleted', () => {
       const { result } = (await executeSteps(createEventData())) as any;
 
       const outcome = result.outcomes.find(
-        (o: any) => o.step === 'update-vocabulary-retention'
+        (o: any) => o.step === 'update-vocabulary-retention',
       );
       expect(outcome.status).toBe('ok');
       expect(mockExtractVocabularyFromTranscript).not.toHaveBeenCalled();
@@ -921,7 +926,7 @@ describe('sessionCompleted', () => {
       expect(mockExtractVocabularyFromTranscript).toHaveBeenCalledWith(
         expect.any(Array), // transcript
         'es', // languageCode
-        null // cefrLevel (no language progress in this test)
+        null, // cefrLevel (no language progress in this test)
       );
     });
 
@@ -965,7 +970,7 @@ describe('sessionCompleted', () => {
             milestoneId: 'milestone-1',
             quality: 4,
           }),
-        ])
+        ]),
       );
     });
 
@@ -982,7 +987,7 @@ describe('sessionCompleted', () => {
         expect.anything(),
         PROFILE_ID,
         SUBJECT_ID,
-        expect.arrayContaining([expect.objectContaining({ quality: 5 })])
+        expect.arrayContaining([expect.objectContaining({ quality: 5 })]),
       );
     });
 
@@ -999,7 +1004,7 @@ describe('sessionCompleted', () => {
         expect.anything(),
         PROFILE_ID,
         SUBJECT_ID,
-        expect.arrayContaining([expect.objectContaining({ quality: 3 })])
+        expect.arrayContaining([expect.objectContaining({ quality: 3 })]),
       );
     });
 
@@ -1018,7 +1023,7 @@ describe('sessionCompleted', () => {
         SUBJECT_ID,
         expect.arrayContaining([
           expect.objectContaining({ milestoneId: undefined }),
-        ])
+        ]),
       );
     });
 
@@ -1041,7 +1046,7 @@ describe('sessionCompleted', () => {
         SUBJECT_ID,
         expect.arrayContaining([
           expect.objectContaining({ term: 'hola', cefrLevel: 'A2' }),
-        ])
+        ]),
       );
     });
 
@@ -1064,7 +1069,7 @@ describe('sessionCompleted', () => {
         SUBJECT_ID,
         expect.arrayContaining([
           expect.objectContaining({ term: 'hola', cefrLevel: 'B1' }),
-        ])
+        ]),
       );
     });
 
@@ -1084,12 +1089,12 @@ describe('sessionCompleted', () => {
       expect(mockGetCurrentLanguageProgress).toHaveBeenCalledWith(
         expect.anything(), // db
         PROFILE_ID,
-        SUBJECT_ID
+        SUBJECT_ID,
       );
       // Called at least twice: once for previousLanguageProgress, once for nextLanguageProgress
       const vocabRetentionCalls =
         mockGetCurrentLanguageProgress.mock.calls.filter(
-          (call: unknown[]) => call[1] === PROFILE_ID && call[2] === SUBJECT_ID
+          (call: unknown[]) => call[1] === PROFILE_ID && call[2] === SUBJECT_ID,
         );
       expect(vocabRetentionCalls.length).toBeGreaterThanOrEqual(2);
     });
@@ -1097,16 +1102,16 @@ describe('sessionCompleted', () => {
     it('isolates errors without blocking other steps', async () => {
       setupSubjectMock(fourStrandsSubject);
       mockExtractVocabularyFromTranscript.mockRejectedValueOnce(
-        new Error('LLM extraction failed')
+        new Error('LLM extraction failed'),
       );
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
 
       const { result } = (await executeSteps(
-        createEventData({ qualityRating: 4 })
+        createEventData({ qualityRating: 4 }),
       )) as any;
 
       const outcome = result.outcomes.find(
-        (o: any) => o.step === 'update-vocabulary-retention'
+        (o: any) => o.step === 'update-vocabulary-retention',
       );
       expect(outcome.status).toBe('failed');
       expect(outcome.error).toContain('LLM extraction failed');
@@ -1126,11 +1131,11 @@ describe('sessionCompleted', () => {
       mockGetCurrentLanguageProgress.mockResolvedValue(null);
 
       const { result } = (await executeSteps(
-        createEventData({ qualityRating: 4 })
+        createEventData({ qualityRating: 4 }),
       )) as any;
 
       const outcome = result.outcomes.find(
-        (o: any) => o.step === 'update-vocabulary-retention'
+        (o: any) => o.step === 'update-vocabulary-retention',
       );
       expect(outcome.status).toBe('ok');
     });
@@ -1145,7 +1150,7 @@ describe('sessionCompleted', () => {
         SESSION_ID,
         PROFILE_ID,
         TOPIC_ID,
-        'pending'
+        'pending',
       );
     });
 
@@ -1154,12 +1159,12 @@ describe('sessionCompleted', () => {
 
       expect(mockPrecomputeCoachingCard).toHaveBeenCalledWith(
         expect.anything(),
-        PROFILE_ID
+        PROFILE_ID,
       );
       expect(mockWriteCoachingCardCache).toHaveBeenCalledWith(
         expect.anything(),
         PROFILE_ID,
-        expect.objectContaining({ type: expect.any(String) })
+        expect.objectContaining({ type: expect.any(String) }),
       );
     });
   });
@@ -1171,7 +1176,7 @@ describe('sessionCompleted', () => {
       expect(mockRecordSessionActivity).toHaveBeenCalledWith(
         expect.anything(), // db
         PROFILE_ID,
-        '2026-02-17'
+        '2026-02-17',
       );
     });
 
@@ -1184,7 +1189,7 @@ describe('sessionCompleted', () => {
       expect(mockRecordSessionActivity).toHaveBeenCalledWith(
         expect.anything(),
         PROFILE_ID,
-        '2026-02-17'
+        '2026-02-17',
       );
     });
 
@@ -1194,20 +1199,20 @@ describe('sessionCompleted', () => {
       expect(mockRecordSessionActivity).toHaveBeenCalledWith(
         expect.anything(),
         PROFILE_ID,
-        '2026-02-17'
+        '2026-02-17',
       );
     });
 
     it('uses current date when no timestamp provided', async () => {
       const today = new Date().toISOString().slice(0, 10);
       await executeSteps(
-        createEventData({ timestamp: undefined, qualityRating: 4 })
+        createEventData({ timestamp: undefined, qualityRating: 4 }),
       );
 
       expect(mockRecordSessionActivity).toHaveBeenCalledWith(
         expect.anything(),
         PROFILE_ID,
-        today
+        today,
       );
     });
 
@@ -1218,7 +1223,7 @@ describe('sessionCompleted', () => {
         expect.anything(), // db
         PROFILE_ID,
         TOPIC_ID,
-        SUBJECT_ID
+        SUBJECT_ID,
       );
     });
 
@@ -1229,7 +1234,7 @@ describe('sessionCompleted', () => {
         expect.anything(),
         PROFILE_ID,
         null,
-        SUBJECT_ID
+        SUBJECT_ID,
       );
     });
   });
@@ -1241,7 +1246,7 @@ describe('sessionCompleted', () => {
       expect(mockExtractSessionContent).toHaveBeenCalledWith(
         expect.anything(),
         SESSION_ID,
-        PROFILE_ID
+        PROFILE_ID,
       );
     });
 
@@ -1254,7 +1259,7 @@ describe('sessionCompleted', () => {
         PROFILE_ID,
         TOPIC_ID,
         'User: What is algebra?\n\nAI: Algebra is...',
-        'pa-test-key-123'
+        'pa-test-key-123',
       );
     });
   });
@@ -1271,7 +1276,7 @@ describe('sessionCompleted', () => {
           subjectId: SUBJECT_ID,
           topicId: TOPIC_ID,
           summaryId: 'summary-1',
-        })
+        }),
       );
     });
 
@@ -1290,7 +1295,7 @@ describe('sessionCompleted', () => {
             sessionState: 'completed',
             narrativeLength: expect.any(Number),
           }),
-        })
+        }),
       );
     });
 
@@ -1308,7 +1313,7 @@ describe('sessionCompleted', () => {
             sessionId: SESSION_ID,
             sessionSummaryId: 'summary-1',
           }),
-        })
+        }),
       );
     });
   });
@@ -1319,23 +1324,23 @@ describe('sessionCompleted', () => {
 
       expect(mockExtractAndStoreHomeworkSummary).not.toHaveBeenCalled();
       const outcome = result.outcomes.find(
-        (o: any) => o.step === 'extract-homework-summary'
+        (o: any) => o.step === 'extract-homework-summary',
       );
       expect(outcome.status).toBe('skipped');
     });
 
     it('extracts and stores summary for homework sessions', async () => {
       const { result } = (await executeSteps(
-        createEventData({ sessionType: 'homework' })
+        createEventData({ sessionType: 'homework' }),
       )) as any;
 
       expect(mockExtractAndStoreHomeworkSummary).toHaveBeenCalledWith(
         expect.anything(),
         PROFILE_ID,
-        SESSION_ID
+        SESSION_ID,
       );
       const outcome = result.outcomes.find(
-        (o: any) => o.step === 'extract-homework-summary'
+        (o: any) => o.step === 'extract-homework-summary',
       );
       expect(outcome.status).toBe('ok');
     });
@@ -1345,7 +1350,7 @@ describe('sessionCompleted', () => {
     it('skips when verificationType is not set', async () => {
       const { result } = (await executeSteps(createEventData())) as any;
       const outcome = result.outcomes.find(
-        (o: any) => o.step === 'process-verification-completion'
+        (o: any) => o.step === 'process-verification-completion',
       );
       expect(outcome.status).toBe('skipped');
       expect(mockProcessEvaluateCompletion).not.toHaveBeenCalled();
@@ -1360,47 +1365,47 @@ describe('sessionCompleted', () => {
 
     it('calls processEvaluateCompletion for evaluate sessions', async () => {
       const { result } = (await executeSteps(
-        createEventData({ verificationType: 'evaluate' })
+        createEventData({ verificationType: 'evaluate' }),
       )) as any;
 
       expect(mockProcessEvaluateCompletion).toHaveBeenCalledWith(
         expect.anything(), // db
         PROFILE_ID,
         SESSION_ID,
-        TOPIC_ID
+        TOPIC_ID,
       );
       expect(mockProcessTeachBackCompletion).not.toHaveBeenCalled();
       const outcome = result.outcomes.find(
-        (o: any) => o.step === 'process-verification-completion'
+        (o: any) => o.step === 'process-verification-completion',
       );
       expect(outcome.status).toBe('ok');
     });
 
     it('calls processTeachBackCompletion for teach_back sessions (FR138-143)', async () => {
       const { result } = (await executeSteps(
-        createEventData({ verificationType: 'teach_back' })
+        createEventData({ verificationType: 'teach_back' }),
       )) as any;
 
       expect(mockProcessTeachBackCompletion).toHaveBeenCalledWith(
         expect.anything(), // db
         PROFILE_ID,
-        SESSION_ID
+        SESSION_ID,
       );
       expect(mockProcessEvaluateCompletion).not.toHaveBeenCalled();
       const outcome = result.outcomes.find(
-        (o: any) => o.step === 'process-verification-completion'
+        (o: any) => o.step === 'process-verification-completion',
       );
       expect(outcome.status).toBe('ok');
     });
 
     it('skips when topicId is null (no topic to assess)', async () => {
       const { result } = (await executeSteps(
-        createEventData({ verificationType: 'teach_back', topicId: null })
+        createEventData({ verificationType: 'teach_back', topicId: null }),
       )) as any;
 
       expect(mockProcessTeachBackCompletion).not.toHaveBeenCalled();
       const outcome = result.outcomes.find(
-        (o: any) => o.step === 'process-verification-completion'
+        (o: any) => o.step === 'process-verification-completion',
       );
       expect(outcome.status).toBe('skipped');
     });
@@ -1409,17 +1414,17 @@ describe('sessionCompleted', () => {
       const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
 
       const { result } = (await executeSteps(
-        createEventData({ verificationType: 'unknown_future_type' })
+        createEventData({ verificationType: 'unknown_future_type' }),
       )) as any;
 
       const outcome = result.outcomes.find(
-        (o: any) => o.step === 'process-verification-completion'
+        (o: any) => o.step === 'process-verification-completion',
       );
       expect(outcome.status).toBe('skipped');
       expect(mockProcessEvaluateCompletion).not.toHaveBeenCalled();
       expect(mockProcessTeachBackCompletion).not.toHaveBeenCalled();
       expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Unknown verificationType')
+        expect.stringContaining('Unknown verificationType'),
       );
 
       consoleSpy.mockRestore();
@@ -1429,16 +1434,16 @@ describe('sessionCompleted', () => {
       const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
 
       const { result } = (await executeSteps(
-        createEventData({ verificationType: null })
+        createEventData({ verificationType: null }),
       )) as any;
 
       const outcome = result.outcomes.find(
-        (o: any) => o.step === 'process-verification-completion'
+        (o: any) => o.step === 'process-verification-completion',
       );
       expect(outcome.status).toBe('skipped');
       // null is expected — no "Unknown verificationType" warning should be logged
       const verificationWarnings = consoleSpy.mock.calls.filter((call) =>
-        String(call[0]).includes('Unknown verificationType')
+        String(call[0]).includes('Unknown verificationType'),
       );
       expect(verificationWarnings).toHaveLength(0);
 
@@ -1447,16 +1452,16 @@ describe('sessionCompleted', () => {
 
     it('isolates errors without blocking other steps', async () => {
       mockProcessTeachBackCompletion.mockRejectedValueOnce(
-        new Error('Assessment parse error')
+        new Error('Assessment parse error'),
       );
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
 
       const { result } = (await executeSteps(
-        createEventData({ verificationType: 'teach_back', qualityRating: 4 })
+        createEventData({ verificationType: 'teach_back', qualityRating: 4 }),
       )) as any;
 
       const outcome = result.outcomes.find(
-        (o: any) => o.step === 'process-verification-completion'
+        (o: any) => o.step === 'process-verification-completion',
       );
       expect(outcome.status).toBe('failed');
       expect(outcome.error).toContain('Assessment parse error');
@@ -1488,14 +1493,14 @@ describe('sessionCompleted', () => {
       });
 
       const { result } = (await executeSteps(
-        createEventData({ qualityRating: 4 })
+        createEventData({ qualityRating: 4 }),
       )) as any;
 
       expect(mockAnalyzeSessionTranscript).not.toHaveBeenCalled();
       expect(mockApplyAnalysis).not.toHaveBeenCalled();
       // Step still runs and completes ok — the early return is success.
       const outcome = result.outcomes.find(
-        (o: any) => o.step === 'analyze-learner-profile'
+        (o: any) => o.step === 'analyze-learner-profile',
       );
       expect(outcome.status).toBe('ok');
     });
@@ -1541,7 +1546,7 @@ describe('sessionCompleted', () => {
         expect.objectContaining({ interests: ['space'] }),
         null,
         'inferred',
-        SUBJECT_ID
+        SUBJECT_ID,
       );
     });
 
@@ -1566,7 +1571,7 @@ describe('sessionCompleted', () => {
 
       expect(mockIncrementSummarySkips).toHaveBeenCalledWith(
         expect.anything(),
-        PROFILE_ID
+        PROFILE_ID,
       );
       expect(mockResetSummarySkips).not.toHaveBeenCalled();
     });
@@ -1576,7 +1581,7 @@ describe('sessionCompleted', () => {
 
       expect(mockResetSummarySkips).toHaveBeenCalledWith(
         expect.anything(),
-        PROFILE_ID
+        PROFILE_ID,
       );
       expect(mockIncrementSummarySkips).not.toHaveBeenCalled();
     });
@@ -1586,7 +1591,7 @@ describe('sessionCompleted', () => {
 
       expect(mockResetSummarySkips).toHaveBeenCalledWith(
         expect.anything(),
-        PROFILE_ID
+        PROFILE_ID,
       );
       expect(mockIncrementSummarySkips).not.toHaveBeenCalled();
     });
@@ -1622,19 +1627,19 @@ describe('sessionCompleted', () => {
 
       // First invocation — embedding step fails
       const { result: result1 } = (await executeSteps(
-        createEventData({ qualityRating: 4 })
+        createEventData({ qualityRating: 4 }),
       )) as any;
       const embeddingOutcome1 = result1.outcomes.find(
-        (o: any) => o.step === 'generate-embeddings'
+        (o: any) => o.step === 'generate-embeddings',
       );
       expect(embeddingOutcome1.status).toBe('failed');
 
       // Second invocation (simulating Inngest retry) — embedding step succeeds
       const { result: result2 } = (await executeSteps(
-        createEventData({ qualityRating: 4 })
+        createEventData({ qualityRating: 4 }),
       )) as any;
       const embeddingOutcome2 = result2.outcomes.find(
-        (o: any) => o.step === 'generate-embeddings'
+        (o: any) => o.step === 'generate-embeddings',
       );
       expect(embeddingOutcome2.status).toBe('ok');
 
@@ -1643,24 +1648,24 @@ describe('sessionCompleted', () => {
 
     it('[FIX-INNGEST-1] update-retention is critical: first call throws so Inngest retries', async () => {
       mockUpdateRetentionFromSession.mockRejectedValueOnce(
-        new Error('DB connection reset')
+        new Error('DB connection reset'),
       );
       await expect(
-        executeSteps(createEventData({ qualityRating: 4 }))
+        executeSteps(createEventData({ qualityRating: 4 })),
       ).rejects.toThrow('DB connection reset');
       mockUpdateRetentionFromSession.mockResolvedValueOnce(undefined);
       const { result: result2 } = (await executeSteps(
-        createEventData({ qualityRating: 4 })
+        createEventData({ qualityRating: 4 }),
       )) as any;
       const retentionOutcome2 = result2.outcomes.find(
-        (o: any) => o.step === 'update-retention'
+        (o: any) => o.step === 'update-retention',
       );
       expect(retentionOutcome2.status).toBe('ok');
     });
 
     it('[FIX-INNGEST-1] soft step failures include structured extra.step and extra.surface tags', async () => {
       mockPrecomputeCoachingCard.mockRejectedValueOnce(
-        new Error('Redis timeout')
+        new Error('Redis timeout'),
       );
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
 
@@ -1674,7 +1679,7 @@ describe('sessionCompleted', () => {
             step: 'write-coaching-card',
             surface: 'session-completed',
           }),
-        })
+        }),
       );
 
       consoleSpy.mockRestore();
@@ -1688,12 +1693,12 @@ describe('sessionCompleted', () => {
   describe('error isolation', () => {
     it('continues chain when embedding step fails', async () => {
       mockStoreSessionEmbedding.mockRejectedValueOnce(
-        new Error('Voyage AI rate limit')
+        new Error('Voyage AI rate limit'),
       );
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
 
       const { result } = (await executeSteps(
-        createEventData({ summaryStatus: 'skipped', qualityRating: 4 })
+        createEventData({ summaryStatus: 'skipped', qualityRating: 4 }),
       )) as any;
 
       // Embedding failed, but other steps ran
@@ -1705,13 +1710,13 @@ describe('sessionCompleted', () => {
       // Sentry captured the error
       expect(mockCaptureException).toHaveBeenCalledWith(
         expect.any(Error),
-        expect.objectContaining({ profileId: PROFILE_ID })
+        expect.objectContaining({ profileId: PROFILE_ID }),
       );
 
       // Status reflects partial failure
       expect(result.status).toBe('completed-with-errors');
       const embeddingOutcome = result.outcomes.find(
-        (o: any) => o.step === 'generate-embeddings'
+        (o: any) => o.step === 'generate-embeddings',
       );
       expect(embeddingOutcome.status).toBe('failed');
       expect(embeddingOutcome.error).toContain('Voyage AI rate limit');
@@ -1721,12 +1726,12 @@ describe('sessionCompleted', () => {
 
     it('continues chain when coaching card step fails', async () => {
       mockPrecomputeCoachingCard.mockRejectedValueOnce(
-        new Error('DB connection timeout')
+        new Error('DB connection timeout'),
       );
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
 
       const { result } = (await executeSteps(
-        createEventData({ qualityRating: 4 })
+        createEventData({ qualityRating: 4 }),
       )) as any;
 
       // Steps after coaching card still ran
@@ -1735,7 +1740,7 @@ describe('sessionCompleted', () => {
 
       expect(result.status).toBe('completed-with-errors');
       const cardOutcome = result.outcomes.find(
-        (o: any) => o.step === 'write-coaching-card'
+        (o: any) => o.step === 'write-coaching-card',
       );
       expect(cardOutcome.status).toBe('failed');
 
@@ -1744,11 +1749,11 @@ describe('sessionCompleted', () => {
 
     it('[FIX-INNGEST-1] retention step failure throws — stops pipeline (critical step)', async () => {
       mockUpdateRetentionFromSession.mockRejectedValueOnce(
-        new Error('SM-2 calculation error')
+        new Error('SM-2 calculation error'),
       );
 
       await expect(
-        executeSteps(createEventData({ qualityRating: 4 }))
+        executeSteps(createEventData({ qualityRating: 4 })),
       ).rejects.toThrow('SM-2 calculation error');
 
       // No downstream steps ran — DB error stopped the pipeline
@@ -1763,13 +1768,13 @@ describe('sessionCompleted', () => {
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
 
       const { result } = (await executeSteps(
-        createEventData({ qualityRating: 4 })
+        createEventData({ qualityRating: 4 }),
       )) as any;
 
       const failed = result.outcomes.filter((o: any) => o.status === 'failed');
       expect(failed).toHaveLength(2);
       expect(failed.map((f: any) => f.step)).toEqual(
-        expect.arrayContaining(['write-coaching-card', 'generate-embeddings'])
+        expect.arrayContaining(['write-coaching-card', 'generate-embeddings']),
       );
 
       expect(mockCaptureException).toHaveBeenCalledTimes(2);
@@ -1796,7 +1801,7 @@ describe('sessionCompleted', () => {
         expect.anything(),
         PROFILE_ID,
         'comet',
-        'streak_7'
+        'streak_7',
       );
     });
 
@@ -1812,7 +1817,7 @@ describe('sessionCompleted', () => {
         expect.anything(),
         PROFILE_ID,
         'orions_belt',
-        'streak_30'
+        'streak_30',
       );
     });
 
@@ -1828,13 +1833,13 @@ describe('sessionCompleted', () => {
         expect.anything(),
         expect.anything(),
         expect.anything(),
-        'streak_7'
+        'streak_7',
       );
       expect(mockQueueCelebration).not.toHaveBeenCalledWith(
         expect.anything(),
         expect.anything(),
         expect.anything(),
-        'streak_30'
+        'streak_30',
       );
     });
 
@@ -1845,7 +1850,7 @@ describe('sessionCompleted', () => {
         expect.anything(),
         expect.anything(),
         expect.anything(),
-        'streak_7'
+        'streak_7',
       );
     });
   });
@@ -1866,7 +1871,7 @@ describe('sessionCompleted', () => {
         {
           rawInput: null,
           topicId: null,
-        }
+        },
       );
     });
 
@@ -1878,13 +1883,13 @@ describe('sessionCompleted', () => {
         .mockResolvedValueOnce({ rawInput: null, topicId: null });
 
       const { mockStep } = (await executeSteps(
-        createEventData({ topicId: null, qualityRating: 4 })
+        createEventData({ topicId: null, qualityRating: 4 }),
       )) as any;
 
       // re-read-session step must have been invoked
       expect(mockStep.run).toHaveBeenCalledWith(
         're-read-session',
-        expect.any(Function)
+        expect.any(Function),
       );
     });
 
@@ -1903,7 +1908,7 @@ describe('sessionCompleted', () => {
         SESSION_ID,
         PROFILE_ID,
         'topic-from-db',
-        'pending'
+        'pending',
       );
     });
 
@@ -1921,7 +1926,7 @@ describe('sessionCompleted', () => {
         SESSION_ID,
         PROFILE_ID,
         null,
-        'pending'
+        'pending',
       );
     });
 
@@ -1937,18 +1942,18 @@ describe('sessionCompleted', () => {
         SESSION_ID,
         PROFILE_ID,
         null,
-        'pending'
+        'pending',
       );
     });
 
     it('skips re-read-session step when topicId is already set', async () => {
       const { mockStep } = (await executeSteps(
-        createEventData({ topicId: TOPIC_ID })
+        createEventData({ topicId: TOPIC_ID }),
       )) as any;
 
       // re-read-session must NOT be called when topicId is already known
       const reReadCall = (mockStep.run as jest.Mock).mock.calls.find(
-        ([name]: [string]) => name === 're-read-session'
+        ([name]: [string]) => name === 're-read-session',
       );
       expect(reReadCall).toBeUndefined();
     });
@@ -1983,7 +1988,7 @@ describe('sessionCompleted', () => {
         expect.any(Object),
         null, // subjectName (null when DB lookup returns no name)
         'inferred',
-        SUBJECT_ID // subjectId threaded from event data
+        SUBJECT_ID, // subjectId threaded from event data
       );
     });
   });
@@ -1999,21 +2004,21 @@ describe('sessionCompleted', () => {
       // update-dashboard has no try/catch — DB errors must propagate to Inngest.
       // Silently absorbing would mean XP or streak is permanently lost.
       mockRecordSessionActivity.mockRejectedValueOnce(
-        new Error('Streak DB write failed')
+        new Error('Streak DB write failed'),
       );
 
       await expect(
-        executeSteps(createEventData({ qualityRating: 4 }))
+        executeSteps(createEventData({ qualityRating: 4 })),
       ).rejects.toThrow('Streak DB write failed');
     });
 
     it('update-dashboard throws on insertSessionXpEntry failure (critical)', async () => {
       mockInsertSessionXpEntry.mockRejectedValueOnce(
-        new Error('XP insert constraint violation')
+        new Error('XP insert constraint violation'),
       );
 
       await expect(
-        executeSteps(createEventData({ qualityRating: 4 }))
+        executeSteps(createEventData({ qualityRating: 4 })),
       ).rejects.toThrow('XP insert constraint violation');
     });
 
@@ -2021,24 +2026,24 @@ describe('sessionCompleted', () => {
       // Verifies the two-tier isolation: soft steps return { status: 'failed' }
       // instead of throwing, so the overall function still resolves.
       mockStoreSessionEmbedding.mockRejectedValueOnce(
-        new Error('Voyage rate limit')
+        new Error('Voyage rate limit'),
       );
       mockPrecomputeCoachingCard.mockRejectedValueOnce(
-        new Error('Card LLM error')
+        new Error('Card LLM error'),
       );
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
 
       // Must NOT throw
       const { result } = (await executeSteps(
-        createEventData({ qualityRating: 4 })
+        createEventData({ qualityRating: 4 }),
       )) as any;
 
       expect(result.status).toBe('completed-with-errors');
       const embeddingOutcome = result.outcomes.find(
-        (o: any) => o.step === 'generate-embeddings'
+        (o: any) => o.step === 'generate-embeddings',
       );
       const cardOutcome = result.outcomes.find(
-        (o: any) => o.step === 'write-coaching-card'
+        (o: any) => o.step === 'write-coaching-card',
       );
       expect(embeddingOutcome.status).toBe('failed');
       expect(cardOutcome.status).toBe('failed');
@@ -2050,7 +2055,7 @@ describe('sessionCompleted', () => {
       // [FIX-INNGEST-1] Soft-step failures must emit a queryable Inngest event
       // so on-call can page on volume spikes without Sentry access.
       mockStoreSessionEmbedding.mockRejectedValueOnce(
-        new Error('Voyage error')
+        new Error('Voyage error'),
       );
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
       const mockStep = {
@@ -2080,7 +2085,7 @@ describe('sessionCompleted', () => {
               expect.objectContaining({ step: 'generate-embeddings' }),
             ]),
           }),
-        })
+        }),
       );
 
       consoleSpy.mockRestore();
@@ -2146,7 +2151,7 @@ describe('embedNewFactsForProfile', () => {
     const result = await embedNewFactsForProfile(
       mockDb,
       PROFILE_ID_EMB,
-      mockEmbedder
+      mockEmbedder,
     );
 
     // Embedder was called once for the unembedded row.
@@ -2165,7 +2170,9 @@ describe('embedNewFactsForProfile', () => {
     // PgDialect.sqlToQuery converts the drizzle condition to a SQL string with
     // positional params, e.g. "($1 = $2 and $3 = $4 and $5 is null)".
     const dialect = new PgDialect();
-    const whereCondition = capturedWhereArg[0] as { getSQL: () => unknown };
+    const whereCondition = capturedWhereArg[0] as {
+      getSQL: () => import('drizzle-orm').SQL;
+    };
     expect(typeof whereCondition?.getSQL).toBe('function');
 
     const { sql: sqlString } = dialect.sqlToQuery(whereCondition.getSQL());
@@ -2195,7 +2202,7 @@ describe('embedNewFactsForProfile', () => {
     const result = await embedNewFactsForProfile(
       mockDb,
       PROFILE_ID_EMB,
-      mockEmbedder
+      mockEmbedder,
     );
 
     expect(mockEmbedder).not.toHaveBeenCalled();

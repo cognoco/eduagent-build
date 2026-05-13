@@ -6,7 +6,7 @@
  * unwrap in every handler. Routes that need additional variables (e.g.
  * `account` on /account routes) extend `RouteVariables` locally.
  *
- * See docs/plans/2026-05-03-governance-audit.md item H4.
+ * See docs/_archive/plans/done/2026-05-03-governance-audit.md item H4.
  */
 
 import type { Context } from 'hono';

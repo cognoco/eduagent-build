@@ -15,7 +15,7 @@
  *
  * See CLAUDE.md > Code Quality Guards > "No internal mocks in
  * integration tests" and the governance audit
- * docs/plans/2026-05-03-governance-audit.md (item GC1).
+ * docs/_archive/plans/done/2026-05-03-governance-audit.md (item GC1).
  *
  * Works with ESLint v9 flat config as a local plugin rule.
  */

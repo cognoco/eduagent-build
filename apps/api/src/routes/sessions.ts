@@ -359,7 +359,8 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       return sum + exchange.content.split(/\s+/).filter(Boolean).length;
     }, 0);
 
-    // [A-1] Observability events — no Inngest handler; awaited per CLAUDE.md rule.
+    // [A-1] Observability events — consumed by ask-gate-observe.ts (decision +
+    // timeout); awaited per CLAUDE.md "Silent recovery without escalation" rule.
     // [BUG-653] Inngest events are observability-only — never fail the request
     // when their delivery hiccups (network blip, rate-limit, partial outage).
     // The depth result is already in hand and is what the client asked for.

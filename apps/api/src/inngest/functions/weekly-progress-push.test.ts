@@ -37,7 +37,11 @@ const mockDb = {
   insert: jest.fn().mockReturnValue({ values: mockWeeklyReportInsertValues }),
   select: jest.fn(() => ({
     from: () => ({
-      innerJoin: () => ({ where: async () => [] }),
+      innerJoin: () => ({
+        where: async (): Promise<
+          Array<{ profileId: string; timezone: string }>
+        > => [],
+      }),
     }),
   })),
 };

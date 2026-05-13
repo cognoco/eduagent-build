@@ -125,7 +125,11 @@ describe('session summary integration', () => {
     const { profileId } = await seedProfile();
     const subjectId = await seedSubject(profileId);
 
-    const session = await startSession(db, profileId, subjectId, { subjectId });
+    const session = await startSession(db, profileId, subjectId, {
+      subjectId,
+      sessionType: 'learning',
+      inputMode: 'text',
+    });
     const summary = await getSessionSummary(db, profileId, session.id);
 
     expect(summary).toBeNull();
@@ -134,7 +138,11 @@ describe('session summary integration', () => {
   it('creates a skipped summary and increments consecutive skip tracking once', async () => {
     const { profileId } = await seedProfile();
     const subjectId = await seedSubject(profileId);
-    const session = await startSession(db, profileId, subjectId, { subjectId });
+    const session = await startSession(db, profileId, subjectId, {
+      subjectId,
+      sessionType: 'learning',
+      inputMode: 'text',
+    });
 
     await closeSession(db, profileId, session.id, {
       reason: 'user_ended',
@@ -155,7 +163,11 @@ describe('session summary integration', () => {
   it('returns an existing submitted summary unchanged when skipping later', async () => {
     const { profileId } = await seedProfile();
     const subjectId = await seedSubject(profileId);
-    const session = await startSession(db, profileId, subjectId, { subjectId });
+    const session = await startSession(db, profileId, subjectId, {
+      subjectId,
+      sessionType: 'learning',
+      inputMode: 'text',
+    });
 
     await db.insert(sessionSummaries).values({
       sessionId: session.id,
@@ -185,7 +197,11 @@ describe('session summary integration', () => {
   it('evaluates and stores a submitted summary, then resets consecutive skips', async () => {
     const { profileId } = await seedProfile();
     const subjectId = await seedSubject(profileId);
-    const session = await startSession(db, profileId, subjectId, { subjectId });
+    const session = await startSession(db, profileId, subjectId, {
+      subjectId,
+      sessionType: 'learning',
+      inputMode: 'text',
+    });
 
     await closeSession(db, profileId, session.id, {
       reason: 'user_ended',

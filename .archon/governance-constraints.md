@@ -75,7 +75,7 @@ Organized by change kind. When a section's trigger applies, treat the listed con
 
 **Constraints:**
 
-- **CI requires a `## Rollback` section** for any plan (`docs/plans/*.md`, excluding `docs/plans/done/`) or SQL migration that contains `DROP`, `ALTER`, `DELETE`, or `TRUNCATE`. The rollback section must specify reversibility, data loss, and recovery procedure. If rollback is impossible, say so explicitly.
+- **CI requires a `## Rollback` section** for any plan (`docs/plans/*.md` — active plans only; archived plans under `docs/_archive/plans/done/` are not scanned) or SQL migration that contains `DROP`, `ALTER`, `DELETE`, or `TRUNCATE`. The rollback section must specify reversibility, data loss, and recovery procedure. If rollback is impossible, say so explicitly.
 - **Never run `drizzle-kit push` against staging or production.** Dev iteration uses push; staging/prod uses committed migration SQL plus `drizzle-kit migrate`.
 - **A worker deploy does not migrate Neon.** Apply the target migration before shipping code that reads new columns.
 - **Reads must use `createScopedRepository(profileId)`** when the query operates on a single scoped table. Multi-table joins through a parent chain (e.g. `learning_sessions → curriculum_topics → curriculum_books → subjects`) use direct `db.select()` and enforce `profileId` via the parent ancestor. Don't write a route handler that calls `db.select()` directly — G5 will block it.

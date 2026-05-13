@@ -1,6 +1,6 @@
 # Learning Path Flows — End-User Perspective
 
-Complete trace of every learning path in EduAgent, from the learner's first tap to post-session recording. Last updated 2026-05-04.
+Complete trace of every learning path in MentoMate, from the learner's first tap to post-session recording. Last updated 2026-05-04.
 
 > **What changed since 2026-04-14**
 > - The five tutoring-session paths below are unchanged in shape; only their **entry points** moved. The intermediate `/(app)/learn-new` screen was deleted in the home IA simplification (commit 55ddcbdb). Learners now tap a quick action or the Ask Anything bar directly on `/(app)/home` to start any path.

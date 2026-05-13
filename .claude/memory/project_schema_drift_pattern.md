@@ -26,3 +26,12 @@ The dev and staging databases both had missing columns (has_premium_llm, birth_y
 - Likely also: topic_notes, book_suggestions, topic_suggestions, milestones, monthly_reports, progress_snapshots, filed_from/session_id on curriculum_topics, weekly_progress_push on notification_preferences
 
 **Prevention:** Any new migration that adds columns should use ADD COLUMN IF NOT EXISTS when possible, so a future push→migrate transition can't silently skip it.
+
+## Predecessor notes
+
+This file is the canonical home for the schema-drift pattern. Two prior memory entries were folded into it and are now gone:
+
+- `project_neon_transaction_facts.md` — neon-http driver session-context constraints (no per-transaction RLS context). Acted on in commit `c80bb903` (RLS-driver-swap to neon-serverless WebSocket Pool). Architectural facts retain reference value through that commit and the surviving migrations (e.g. `apps/api/drizzle/0058_memory_facts_enable_rls.sql`).
+- `project_schema_drift_staging_fix.md` — one-time 2026-04-15 incident note. The generic pattern lives above; the incident-specific details are in the git log around 2026-04-14/15.
+
+If you searched for either filename and landed here, this file is what you wanted.

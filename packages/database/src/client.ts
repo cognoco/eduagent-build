@@ -15,7 +15,7 @@ import * as schema from './schema/index';
 // false inside Workers (where the runtime provides a native WebSocket) and
 // true inside Jest / Node.js processes.
 //
-// Ref: docs/plans/2026-04-15-S06-rls-phase-0-1-preparatory.md — Phase 0.0
+// Ref: docs/_archive/plans/done/2026-04-15-S06-rls-phase-0-1-preparatory.md — Phase 0.0
 // ---------------------------------------------------------------------------
 if (typeof WebSocket === 'undefined') {
   neonConfig.webSocketConstructor = require('ws');

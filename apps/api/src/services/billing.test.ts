@@ -73,7 +73,7 @@ function mockSubscriptionRow(
     lastStripeEventTimestamp: Date | null;
     lastRevenuecatEventId: string | null;
     lastRevenuecatEventTimestampMs: string | null;
-  }>
+  }>,
 ) {
   return {
     id: overrides?.id ?? subscriptionId,
@@ -104,7 +104,7 @@ function mockQuotaPoolRow(
     dailyLimit: number | null;
     usedToday: number;
     cycleResetAt: Date;
-  }>
+  }>,
 ) {
   return {
     id: overrides?.id ?? 'qp-1',
@@ -127,7 +127,7 @@ function mockTopUpRow(
     remaining: number;
     expiresAt: Date;
     purchasedAt: Date;
-  }>
+  }>,
 ) {
   return {
     id: overrides?.id ?? 'tu-1',
@@ -146,7 +146,7 @@ function mockProfileRow(
     accountId: string;
     displayName: string;
     isOwner: boolean;
-  }>
+  }>,
 ) {
   return {
     id: overrides?.id ?? 'profile-1',
@@ -198,7 +198,7 @@ function createMockDb({
       limit: jest.fn().mockResolvedValue(selectResult),
       then: (
         onfulfilled?: (value: unknown[]) => unknown,
-        onrejected?: (reason: unknown) => unknown
+        onrejected?: (reason: unknown) => unknown,
       ) => Promise.resolve(selectResult).then(onfulfilled, onrejected),
     };
     const chain = {
@@ -233,7 +233,7 @@ function createMockDb({
       from: jest.fn().mockReturnValue(createSelectChain()),
     }),
   };
-  (db as { transaction: jest.Mock }).transaction = jest
+  (db as unknown as { transaction: jest.Mock }).transaction = jest
     .fn()
     .mockImplementation(async (fn: (tx: unknown) => unknown) => fn(db));
 
@@ -704,7 +704,7 @@ describe('safeRefundQuota [BUG-661]', () => {
           subscriptionId,
           sessionId: 'sess-1',
         }),
-      })
+      }),
     );
   });
 });
@@ -897,7 +897,7 @@ describe('activateSubscriptionFromCheckout', () => {
       accountId,
       stripeSubId,
       'plus',
-      eventTs
+      eventTs,
     );
 
     expect(result).not.toBeNull();
@@ -921,7 +921,7 @@ describe('activateSubscriptionFromCheckout', () => {
       accountId,
       stripeSubId,
       'plus',
-      eventTs
+      eventTs,
     );
 
     expect(result).not.toBeNull();
@@ -942,7 +942,7 @@ describe('activateSubscriptionFromCheckout', () => {
       accountId,
       stripeSubId,
       'family',
-      eventTs
+      eventTs,
     );
 
     expect(result).not.toBeNull();
@@ -966,7 +966,7 @@ describe('activateSubscriptionFromCheckout', () => {
       accountId,
       stripeSubId,
       'plus',
-      eventTs
+      eventTs,
     );
 
     expect(result).not.toBeNull();
@@ -995,7 +995,7 @@ describe('activateSubscriptionFromCheckout', () => {
       accountId,
       stripeSubId,
       'family',
-      eventTs
+      eventTs,
     );
 
     // update called twice: subscription + quota pool
@@ -1084,7 +1084,7 @@ describe('findExpiredTrialsByDaysSinceEnd', () => {
     expect(findManyMock).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.anything(),
-      })
+      }),
     );
   });
 
@@ -1204,7 +1204,7 @@ describe('purchaseTopUpCredits', () => {
       db,
       subscriptionId,
       500,
-      purchaseDate
+      purchaseDate,
     );
 
     expect(result).not.toBeNull();
@@ -1276,7 +1276,7 @@ describe('countTopUpPurchasesSinceCycleStart', () => {
     const result = await countTopUpPurchasesSinceCycleStart(
       db,
       subscriptionId,
-      cycleStart
+      cycleStart,
     );
 
     expect(result).toBe(3);
@@ -1288,7 +1288,7 @@ describe('countTopUpPurchasesSinceCycleStart', () => {
     const result = await countTopUpPurchasesSinceCycleStart(
       db,
       subscriptionId,
-      cycleStart
+      cycleStart,
     );
 
     expect(result).toBe(0);
@@ -1728,7 +1728,7 @@ describe('removeProfileFromSubscription', () => {
       db,
       subscriptionId,
       'p-1',
-      newAccountId
+      newAccountId,
     );
 
     expect(result).toBeNull();
@@ -1745,7 +1745,7 @@ describe('removeProfileFromSubscription', () => {
     const result = await removeProfileFromSubscription(
       db,
       subscriptionId,
-      'p-child'
+      'p-child',
     );
 
     expect(result).toBeNull();
@@ -1765,7 +1765,7 @@ describe('removeProfileFromSubscription', () => {
       db,
       subscriptionId,
       'p-unknown',
-      newAccountId
+      newAccountId,
     );
 
     expect(result).toBeNull();
@@ -1783,7 +1783,7 @@ describe('removeProfileFromSubscription', () => {
       db,
       subscriptionId,
       'p-owner',
-      newAccountId
+      newAccountId,
     );
 
     expect(result).toBeNull();
@@ -1801,7 +1801,7 @@ describe('removeProfileFromSubscription', () => {
     const result = await removeProfileFromSubscription(
       db,
       subscriptionId,
-      'p-child'
+      'p-child',
     );
 
     expect(result).toEqual({ removedProfileId: 'p-child' });
@@ -1819,7 +1819,12 @@ describe('removeProfileFromSubscription', () => {
     });
 
     await expect(
-      removeProfileFromSubscription(db, subscriptionId, 'p-child', newAccountId)
+      removeProfileFromSubscription(
+        db,
+        subscriptionId,
+        'p-child',
+        newAccountId,
+      ),
     ).rejects.toThrow('Profile removal requires an invite/claim flow');
     expect(db.update).not.toHaveBeenCalled();
     expect(db.insert).not.toHaveBeenCalled();
@@ -1838,14 +1843,14 @@ describe('removeProfileFromSubscription', () => {
         db,
         subscriptionId,
         'p-child',
-        newAccountId
+        newAccountId,
       );
       // Should not reach here
       expect(true).toBe(false);
     } catch (err) {
       expect(err).toBeInstanceOf(ProfileRemovalNotImplementedError);
       expect((err as ProfileRemovalNotImplementedError).name).toBe(
-        'ProfileRemovalNotImplementedError'
+        'ProfileRemovalNotImplementedError',
       );
     }
   });
@@ -1861,7 +1866,7 @@ describe('downgradeAllFamilyProfiles', () => {
     const result = await downgradeAllFamilyProfiles(
       db,
       subscriptionId,
-      new Map()
+      new Map(),
     );
 
     expect(result).toEqual([]);
@@ -1914,7 +1919,7 @@ describe('downgradeAllFamilyProfiles', () => {
     const result = await downgradeAllFamilyProfiles(
       db,
       subscriptionId,
-      profileToAccountMap
+      profileToAccountMap,
     );
 
     expect(result).toEqual(['p-child1', 'p-child2']);
@@ -1938,7 +1943,7 @@ describe('downgradeAllFamilyProfiles', () => {
     const result = await downgradeAllFamilyProfiles(
       db,
       subscriptionId,
-      new Map([['p-owner', 'acc-owner']])
+      new Map([['p-owner', 'acc-owner']]),
     );
 
     // Owner is not in the result — only the subscription tier change happens
@@ -1964,7 +1969,7 @@ describe('downgradeAllFamilyProfiles', () => {
     const result = await downgradeAllFamilyProfiles(
       db,
       subscriptionId,
-      new Map()
+      new Map(),
     );
 
     expect(result).toEqual([]);
@@ -2261,7 +2266,7 @@ describe('purchaseTopUpCredits — idempotency [4C.5]', () => {
       subscriptionId,
       500,
       NOW,
-      'txn_duplicate_123'
+      'txn_duplicate_123',
     );
 
     // Duplicate transaction — returns null (already granted)
@@ -2305,7 +2310,7 @@ describe('purchaseTopUpCredits — idempotency [4C.5]', () => {
       subscriptionId,
       500,
       NOW,
-      'txn_new_123'
+      'txn_new_123',
     );
 
     expect(result).not.toBeNull();
@@ -2321,7 +2326,7 @@ describe('purchaseTopUpCredits — idempotency [4C.5]', () => {
       subscriptionId,
       500,
       NOW,
-      'txn_free_attempt'
+      'txn_free_attempt',
     );
 
     // Free tier cannot purchase — returns null without inserting
@@ -2337,7 +2342,7 @@ describe('purchaseTopUpCredits — idempotency [4C.5]', () => {
       subscriptionId,
       500,
       NOW,
-      'txn_no_sub'
+      'txn_no_sub',
     );
 
     expect(result).toBeNull();
@@ -2391,7 +2396,7 @@ describe('getTopUpCreditsRemaining — expiry edge [4C.6]', () => {
     const result = await getTopUpCreditsRemaining(
       db,
       subscriptionId,
-      queryTime
+      queryTime,
     );
 
     expect(result).toBe(100);
@@ -2447,7 +2452,7 @@ describe('updateSubscriptionFromRevenuecatWebhook — invalid transition', () =>
       {
         status: 'active', // expired -> active is invalid
         eventId: 'new-event',
-      }
+      },
     );
 
     // Should return existing subscription without updating
@@ -2490,7 +2495,7 @@ describe('activateSubscriptionFromRevenuecat — trial fallback', () => {
       {
         isTrial: true,
         // trialEndsAt deliberately omitted — corrupted data
-      }
+      },
     );
 
     expect(result).not.toBeNull();
@@ -2516,7 +2521,7 @@ describe('isRevenuecatEventProcessed', () => {
       db,
       accountId,
       'evt-1',
-      1000
+      1000,
     );
 
     expect(result).toBe(false);
@@ -2533,7 +2538,7 @@ describe('isRevenuecatEventProcessed', () => {
       db,
       accountId,
       'evt-1',
-      5000
+      5000,
     );
 
     expect(result).toBe(true);
@@ -2550,7 +2555,7 @@ describe('isRevenuecatEventProcessed', () => {
       db,
       accountId,
       'evt-3', // different event ID
-      3000 // older timestamp
+      3000, // older timestamp
     );
 
     expect(result).toBe(true);
@@ -2567,7 +2572,7 @@ describe('isRevenuecatEventProcessed', () => {
       db,
       accountId,
       'evt-3', // different event ID
-      7000 // newer timestamp
+      7000, // newer timestamp
     );
 
     expect(result).toBe(false);
@@ -2584,7 +2589,7 @@ describe('isRevenuecatEventProcessed', () => {
       db,
       accountId,
       'evt-2', // different event ID
-      3000
+      3000,
     );
 
     // No timestamp to compare against, and event IDs don't match
@@ -2602,7 +2607,7 @@ describe('isRevenuecatEventProcessed', () => {
       db,
       accountId,
       'evt-2', // different event ID
-      undefined // no timestamp provided
+      undefined, // no timestamp provided
     );
 
     // Cannot compare timestamps, event IDs don't match
@@ -2639,7 +2644,7 @@ describe('updateSubscriptionFromRevenuecatWebhook — partial updates and idempo
         status: 'active',
         eventId: 'evt-new',
         eventTimestampMs: 1000,
-      }
+      },
     );
 
     expect(result).not.toBeNull();
@@ -2656,7 +2661,7 @@ describe('updateSubscriptionFromRevenuecatWebhook — partial updates and idempo
         status: 'active',
         eventId: 'evt-1',
         eventTimestampMs: 1000,
-      }
+      },
     );
 
     expect(result).toBeNull();
@@ -2687,7 +2692,7 @@ describe('updateSubscriptionFromRevenuecatWebhook — partial updates and idempo
         currentPeriodEnd: '2025-03-15T00:00:00.000Z',
         eventId: 'evt-period',
         eventTimestampMs: 2000,
-      }
+      },
     );
 
     expect(result).not.toBeNull();
@@ -2717,7 +2722,7 @@ describe('updateSubscriptionFromRevenuecatWebhook — partial updates and idempo
         tier: 'family',
         eventId: 'evt-upgrade',
         eventTimestampMs: 2000,
-      }
+      },
     );
 
     expect(result).not.toBeNull();
@@ -2747,7 +2752,7 @@ describe('updateSubscriptionFromRevenuecatWebhook — partial updates and idempo
         cancelledAt: null,
         eventId: 'evt-reactivate',
         eventTimestampMs: 3000,
-      }
+      },
     );
 
     expect(result).not.toBeNull();

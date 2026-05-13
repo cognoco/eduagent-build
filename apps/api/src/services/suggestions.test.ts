@@ -5,7 +5,7 @@
 
 import { jest } from '@jest/globals';
 
-const generateMock = jest.fn();
+const generateMock = jest.fn<(...args: unknown[]) => Promise<void>>();
 jest.mock(
   './book-suggestion-generation' /* gc1-allow: LLM dependency */,
   () => ({
@@ -62,7 +62,8 @@ function makeDb(options: {
     bookCount,
     unpickedRowsAfterTopup,
   } = options;
-  const resolvedSubject = subject === SUBJECT_NOT_FOUND ? undefined : subject;
+  const resolvedSubject: object | undefined =
+    subject === SUBJECT_NOT_FOUND ? undefined : (subject as object);
 
   const selectMock = jest.fn();
 
@@ -99,7 +100,9 @@ function makeDb(options: {
   return {
     query: {
       subjects: {
-        findFirst: jest.fn().mockResolvedValue(resolvedSubject),
+        findFirst: jest
+          .fn<() => Promise<object | undefined>>()
+          .mockResolvedValue(resolvedSubject),
       },
     },
     select: selectMock,

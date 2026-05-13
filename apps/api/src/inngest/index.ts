@@ -18,6 +18,11 @@ import {
   askClassificationSkippedObserve,
   askClassificationFailedObserve,
 } from './functions/ask-classification-observe';
+import {
+  askGateDecisionObserve,
+  askGateTimeoutObserve,
+} from './functions/ask-gate-observe';
+import { emailBouncedObserve } from './functions/email-bounced-observe';
 import { subjectAutoArchive } from './functions/subject-auto-archive';
 import { bookPreGeneration } from './functions/book-pre-generation';
 import { recallNudge } from './functions/recall-nudge';
@@ -100,6 +105,9 @@ export {
   askClassificationCompletedObserve,
   askClassificationSkippedObserve,
   askClassificationFailedObserve,
+  askGateDecisionObserve,
+  askGateTimeoutObserve,
+  emailBouncedObserve,
   subjectAutoArchive,
   bookPreGeneration,
   recallNudge,
@@ -162,6 +170,9 @@ export const functions = [
   askClassificationCompletedObserve,
   askClassificationSkippedObserve,
   askClassificationFailedObserve,
+  askGateDecisionObserve,
+  askGateTimeoutObserve,
+  emailBouncedObserve,
   subjectAutoArchive,
   bookPreGeneration,
   recallNudge,

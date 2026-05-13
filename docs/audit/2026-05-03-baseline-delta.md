@@ -11,7 +11,7 @@
 
 ## TL;DR
 
-Of the eight clusters, **all eight remain materially live at HEAD**, but the picture has shifted: zero clusters are silently resolved; **C2 is now partially addressed by a forward-only regression guard** (`integration-mock-guard.test.ts`, BUG-743 / T-1) that was added in commit `35fd074a` — exactly the "introduce a guard then sweep" pattern the consolidated overview's meta-pattern critique implicitly recommends. **C4 is materially worse** than estimated: 252 hex-code occurrences across 67 mobile `.tsx` files (estimate was ~50-80); `session/index.tsx` shrank from 10 to 7 hex codes — a partial fix without sweep, the cluster's own meta-pattern playing out in real time. **C1 grew slightly**: `auth.ts` added 2 new `c.json` calls (501 stubs) without schemas, plus a *new* mobile-side mechanism (`contract-drift-check.ts`) that catches deploy-SHA drift but not response-shape drift, so it doesn't substitute for SCHEMA-2. C3, C5, C6, C7, C8 are unchanged at the level of the cluster framing. **One genuinely surprising thing**: the same commit that hardened consent (`35fd074a`) did *not* fix `consent.ts:215` — the `consentResponseSchema` misuse called out by TYPES-1 F2 — even though the commit's blast radius reached the file's neighborhood. That is the meta-pattern caught on a fresh commit, on the cluster the audit explicitly named.
+Of the eight clusters, **all eight remain materially live at HEAD**, but the picture has shifted: zero clusters are silently resolved; **C2 is now partially addressed by a forward-only regression guard** (`integration-mock-guard.test.ts`, BUG-743 / T-1) that was added in commit `35fd074a` — exactly the "introduce a guard then sweep" pattern the consolidated overview's meta-pattern critique implicitly recommends. **C4 is materially worse** than estimated: 252 hex-code occurrences across 67 mobile `.tsx` files (estimate was ~50-80). *(Correction: the original claim that `session/index.tsx` shrank from 10 to 7 hex codes was a grep measurement artifact — 6-digit-only grep missed 3 three-digit hits; file still has 10 at HEAD. See C4 section below. AUDIT-MOBILE-2d.)* **C1 grew slightly**: `auth.ts` added 2 new `c.json` calls (501 stubs) without schemas, plus a *new* mobile-side mechanism (`contract-drift-check.ts`) that catches deploy-SHA drift but not response-shape drift, so it doesn't substitute for SCHEMA-2. C3, C5, C6, C7, C8 are unchanged at the level of the cluster framing. **One genuinely surprising thing**: the same commit that hardened consent (`35fd074a`) did *not* fix `consent.ts:215` — the `consentResponseSchema` misuse called out by TYPES-1 F2 — even though the commit's blast radius reached the file's neighborhood. That is the meta-pattern caught on a fresh commit, on the cluster the audit explicitly named.
 
 ---
 
@@ -88,7 +88,7 @@ Of the eight clusters, **all eight remain materially live at HEAD**, but the pic
 ### C4 — Mobile design drift
 
 **Still true at HEAD:**
-- `apps/mobile/src/app/(app)/session/index.tsx` still contains hardcoded hex codes — but the count dropped from MOBILE-1's "10 hex codes" to **7 at HEAD**. *Partial fix without sweep — the cluster's own meta-pattern playing out on the cluster's own example file.* Worth flagging in the deepening as evidence the meta-pattern is empirically real even within work that's actively being touched.
+- `apps/mobile/src/app/(app)/session/index.tsx` still contains hardcoded hex codes. **Correction (MOBILE-2 F3 / AUDIT-MOBILE-2d):** the original baseline-delta claim that the count "dropped from 10 to 7" was a measurement artifact — this recon's grep matched only 6-digit hex codes (`#[0-9A-Fa-f]{6}`), silently dropping 3 three-digit hits at L191/211/238. The file still has **10 occurrences** at HEAD; there has been zero churn since the MOBILE-1 baseline. The meta-pattern claim (partial fix without sweep) still holds generally — the `35fd074a` consent example is solid evidence — but `session/index.tsx` is NOT a confirmed instance of it.
 - `RemediationCard` persona-keyed-strings governance question (MOBILE-1 F4) — not touched in window per stat survey.
 
 **Newly drifted (significant):**
@@ -143,7 +143,7 @@ Of the eight clusters, **all eight remain materially live at HEAD**, but the pic
 
 **Still true at HEAD:** Item-level static state (10 missing migration snapshots, ~96 memory files, vendored bmad, EduAgent → MentoMate sweep, 4 orphan deps, Prettier upgrade) — not exhaustively re-verified in this delta. Each is a static file-system claim and unlikely to have shifted. Trusting the original recon at HEAD pending the eventual execution check.
 
-**No longer true at HEAD:** Unverified — but worth noting that `aa041ca0` archive activity may have absorbed some of the EduAgent→MentoMate or stale-doc work indirectly.
+**No longer true at HEAD:** Unverified — but worth noting that `aa041ca0` archive activity may have absorbed some of the EduAgent → MentoMate or stale-doc work indirectly.
 
 **Newly drifted:** None expected.
 

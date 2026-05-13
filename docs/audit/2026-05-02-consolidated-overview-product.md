@@ -4,7 +4,7 @@
 
 ## The picture in one paragraph
 
-Six independent audits over the past two days surveyed different parts of the MentoMate codebase looking for consistency drift — places where the code, conventions, configs, or docs have fallen out of sync with each other. The audits were read-only; nothing has been changed. Across them, around 30 distinct findings emerged, falling into eight thematic groups. Two of those groups represent significant, interconnected work; five are smaller, mostly independent fixes; one is accumulated hygiene. Nothing in the corpus is currently breaking the product. Several findings, though, represent latent traps that would surface as user-visible problems under specific conditions — a fresh-environment deploy, a refactor, certain navigation paths.
+Six independent audits over the past two days surveyed different parts of the Mentomate codebase looking for consistency drift — places where the code, conventions, configs, or docs have fallen out of sync with each other. The audits were read-only; nothing has been changed. Across them, around 30 distinct findings emerged, falling into eight thematic groups. Two of those groups represent significant, interconnected work; five are smaller, mostly independent fixes; one is accumulated hygiene. Nothing in the corpus is currently breaking the product. Several findings, though, represent latent traps that would surface as user-visible problems under specific conditions — a fresh-environment deploy, a refactor, certain navigation paths.
 
 ## What was checked and how
 
@@ -81,7 +81,7 @@ Each contradiction is small and quick to fix. The cumulative effect, though, is 
 
 ### Hygiene backlog (GREEN-leaning)
 
-Ten missing database-migration snapshot files. A directory of internal AI memory files that needs deduplication. Vendored copies of a tool plugin alongside the installed version, with no decision on which to keep. A naming sweep (the project was renamed from EduAgent to MentoMate; pockets of the old name remain). Four dependencies declared but unused. A formatter that's a major version behind. Each item is small. None blocks anything. The category exists because there is genuinely accumulated work, and naming it explicitly is more honest than pretending it isn't there.
+Ten missing database-migration snapshot files. A directory of internal AI memory files that needs deduplication. Vendored copies of a tool plugin alongside the installed version, with no decision on which to keep. A naming sweep (the project was renamed from MentoMate to Mentomate; pockets of the old name remain). Four dependencies declared but unused. A formatter that's a major version behind. Each item is small. None blocks anything. The category exists because there is genuinely accumulated work, and naming it explicitly is more honest than pretending it isn't there.
 
 ### Parallel: the cleanup-triage backlog
 

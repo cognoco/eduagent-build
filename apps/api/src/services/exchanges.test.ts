@@ -5,7 +5,9 @@ import {
   type ChatMessage,
   type MessagePart,
   type ModelConfig,
+  type StopReason,
 } from './llm';
+import { makeChatStreamResult } from './llm/types';
 import {
   buildSystemPrompt,
   classifyExchangeOutcome,
@@ -824,14 +826,17 @@ describe('processExchange', () => {
     // Register a provider that includes an understanding check phrase
     const checkProvider: LLMProvider = {
       id: 'gemini',
-      async chat(
-        _messages: ChatMessage[],
-        _config: ModelConfig,
-      ): Promise<string> {
-        return 'Great work! Does that make sense so far?';
+      async chat(_messages: ChatMessage[], _config: ModelConfig) {
+        return {
+          content: 'Great work! Does that make sense so far?',
+          stopReason: 'stop' as StopReason,
+        };
       },
-      async *chatStream(): AsyncIterable<string> {
-        yield 'Does that make sense?';
+      chatStream() {
+        const s = (async function* () {
+          yield 'Does that make sense?';
+        })();
+        return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
       },
     };
     registerProvider(checkProvider);

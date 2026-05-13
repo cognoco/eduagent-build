@@ -8,6 +8,14 @@
 
 ---
 
+## ⚠ D-MEM-1 Supersession Notice (2026-05-04)
+
+**Decision D-MEM-1 (2026-05-04)** resolved the conflict between this document and the `2026-05-03-memory-drift-audit.md` in favour of the **drift audit**. The drift audit classified the entries flagged below as REINFORCES or COMPATIBLE — meaning leave as-is. Deleting paraphrase memories is only appropriate if the corresponding CLAUDE.md rule they paraphrase is *more* visible and discoverable; currently `MEMORY.md`'s index makes the memories easier to find than the raw CLAUDE.md sections, so deleting them would reduce discoverability. The Step 2 "delete" and "reduce" recommendations in this document are **SUPERSEDED for all entries flagged by the drift audit at `docs/audit/2026-05-03-memory-drift-audit.md` line ~146**. See that file for the per-entry classification. Do NOT act on the "delete" recommendations below without first consulting the drift audit.
+
+The `feedback_testing_no_mocks.md` divergence flag (stricter-than-CLAUDE.md claim) is **not resolved** by D-MEM-1 and remains open for Step 2.
+
+---
+
 ## Classification legend
 
 - **PURE PARAPHRASE** — restates a CLAUDE.md rule with no new context. Action: reduce to a one-line pointer at the authoritative source, or delete.
@@ -58,7 +66,7 @@ These are not flagged as overlap candidates — listed for completeness so the a
 - Architectural stack notes: `feedback_drizzle_transaction_cast.md`, `feedback_persona_vs_role.md`, `feedback_doppler_secrets.md`, `feedback_ota_env_vars.md`
 - Tooling/process: `feedback_emulator_issues_doc.md`, `feedback_eas_no_retry.md`, `feedback_build_dedup.md`, `feedback_nx_reset_before_commit.md`, `feedback_git_pathspec_literal_brackets.md`, `feedback_git_stash_pop_kept.md`, `feedback_comment_not_delete.md`, `feedback_notion_rest_for_queries.md`, `feedback_notion_resolution_recording.md`, `feedback_llm_prompt_injection_surfacing.md`, `feedback_spec_before_code.md`, `feedback_five_root_causes.md`
 - User profile / device: `user_device_small_phone.md`
-- Critical decisions: `billing-payments.md`, `pricing_dual_cap.md`, `market_language_pivot.md`, `project_themekey_removed.md`, `project_neon_transaction_facts.md`
+- Critical decisions: `billing-payments.md`, `pricing_dual_cap.md`, `market_language_pivot.md`, `project_themekey_removed.md`
 - Reference: `reference_notion_workspace.md`, `nativewind-windows.md`, `project_template_repo.md`
 
 ---
@@ -67,9 +75,9 @@ These are not flagged as overlap candidates — listed for completeness so the a
 
 | Bucket | Count | Notes |
 |---|---|---|
-| Likely PURE PARAPHRASE — strong delete candidates | ~7 | Pending body verification: `feedback_fix_verification_rules.md`, `feedback_adversarial_review_patterns.md`, `feedback_spec_failure_modes.md`, `feedback_thorough_investigation.md`, `feedback_fix_root_cause.md`, `feedback_run_integration_tests.md`, `feedback_precommit_typecheck.md` |
-| Likely PARAPHRASE + CONTEXT — reduce to pointer | ~5 | Keep context, replace rule restatement with pointer |
-| **Active divergence — must resolve first** | **1** | `feedback_testing_no_mocks.md` is stricter than CLAUDE.md. Pick one as canonical. |
+| ~~Likely PURE PARAPHRASE — strong delete candidates~~ **SUPERSEDED by D-MEM-1** | ~7 | `feedback_fix_verification_rules.md`, `feedback_adversarial_review_patterns.md`, `feedback_spec_failure_modes.md`, `feedback_thorough_investigation.md`, `feedback_fix_root_cause.md`, `feedback_run_integration_tests.md`, `feedback_precommit_typecheck.md` — drift audit classifies as REINFORCES/COMPATIBLE; leave as-is. |
+| ~~Likely PARAPHRASE + CONTEXT — reduce to pointer~~ **SUPERSEDED by D-MEM-1** | ~5 | `feedback_e2e_never_skip.md`, `feedback_verify_full_ci.md`, `feedback_batch_pr_fixes.md`, `feedback_no_suppression.md`, `feedback_e2e_cascade_root_cause.md` — drift audit classifies as COMPATIBLE; leave as-is. |
+| **Active divergence — must resolve first (OPEN)** | **1** | `feedback_testing_no_mocks.md` is stricter than CLAUDE.md. **Not resolved by D-MEM-1.** Still open for Step 2. |
 | Project decisions / preferences / state — keep | ~50 | Out of scope for this audit |
 
 ## Open questions for Step 2

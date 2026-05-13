@@ -1,14 +1,13 @@
-# EduAgent Project Memory
+# Mentomate Project Memory
 
 ## Implementation Status
 
 - [project_implementation_phase.md](_archive/project_implementation_phase.md) — Epics 0-16 COMPLETE. LLM tuning phase COMPLETE (all 4 agents merged).
 - [project_session_lifecycle_decisions.md](project_session_lifecycle_decisions.md) — Wall-clock for users, active time internal. Adaptive silence. Hard caps removed.
 
-## Active Work (2026-05-12)
+## Consistency Cleanup
 
-- Active branch: **`consistency`**. Stage 2 decision burndown COMPLETE (13/13). Stage 3 execution IN PROGRESS.
-- Consistency cleanup plan: `docs/audit/cleanup-plan.md` (single source of truth).
+- `docs/audit/cleanup-plan.md` is the single source of truth for the consistency cleanup track. Status per PR lives there; do not duplicate state into memory.
 
 ## Product Constraint — Strictly 11+
 

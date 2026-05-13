@@ -1,5 +1,5 @@
 ---
-project_name: 'EduAgent'
+project_name: 'MentoMate'
 user_name: 'Zuzka'
 date: '2026-02-15'
 sections_completed: ['technology_stack', 'language_rules', 'framework_rules', 'testing_rules', 'quality_rules', 'workflow_rules', 'anti_patterns']
@@ -11,7 +11,7 @@ source: 'docs/architecture.md'
 
 # Project Context for AI Agents
 
-_Critical rules and patterns for implementing code in EduAgent. Focus on unobvious details that agents might otherwise miss. Read `docs/architecture.md` for full architectural decisions._
+_Critical rules and patterns for implementing code in MentoMate. Focus on unobvious details that agents might otherwise miss. Read `docs/architecture.md` for full architectural decisions._
 
 ---
 

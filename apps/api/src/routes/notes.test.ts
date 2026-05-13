@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type { Database } from '@eduagent/database';
 import { noteRoutes } from './notes';
+import type { AppVariables } from '../types/hono';
 
 const PROFILE_ID = 'a0000000-0000-4000-a000-000000000001';
 const SUBJECT_ID = 'a0000000-0000-4000-a000-000000000010';
@@ -71,12 +72,12 @@ function makeFakeDb({
 }
 
 function makeApp(db: FakeDb) {
-  const app = new Hono();
+  const app = new Hono<{ Variables: AppVariables }>();
 
   app.use('*', async (c, next) => {
-    c.set('db', db);
+    c.set('db', db as AppVariables['db']);
     c.set('profileId', PROFILE_ID);
-    c.set('profileMeta', { isOwner: true });
+    c.set('profileMeta', { isOwner: true } as AppVariables['profileMeta']);
     await next();
   });
 

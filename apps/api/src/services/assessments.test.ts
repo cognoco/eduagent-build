@@ -4,7 +4,9 @@ import {
   type LLMProvider,
   type ChatMessage,
   type ModelConfig,
+  type StopReason,
 } from './llm';
+import { makeChatStreamResult } from './llm/types';
 import {
   generateQuickCheck,
   evaluateAssessmentAnswer,
@@ -31,14 +33,17 @@ import type { Database } from '@eduagent/database';
 function createQuickCheckMockProvider(questions: string[]): LLMProvider {
   return {
     id: 'gemini',
-    async chat(
-      _messages: ChatMessage[],
-      _config: ModelConfig,
-    ): Promise<string> {
-      return JSON.stringify({ questions });
+    async chat(_messages: ChatMessage[], _config: ModelConfig) {
+      return {
+        content: JSON.stringify({ questions }),
+        stopReason: 'stop' as StopReason,
+      };
     },
-    async *chatStream(): AsyncIterable<string> {
-      yield JSON.stringify({ questions });
+    chatStream() {
+      const s = (async function* () {
+        yield JSON.stringify({ questions });
+      })();
+      return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
     },
   };
 }
@@ -53,14 +58,17 @@ function createAssessmentEvalMockProvider(evaluation: {
 }): LLMProvider {
   return {
     id: 'gemini',
-    async chat(
-      _messages: ChatMessage[],
-      _config: ModelConfig,
-    ): Promise<string> {
-      return JSON.stringify(evaluation);
+    async chat(_messages: ChatMessage[], _config: ModelConfig) {
+      return {
+        content: JSON.stringify(evaluation),
+        stopReason: 'stop' as StopReason,
+      };
     },
-    async *chatStream(): AsyncIterable<string> {
-      yield JSON.stringify(evaluation);
+    chatStream() {
+      const s = (async function* () {
+        yield JSON.stringify(evaluation);
+      })();
+      return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
     },
   };
 }
@@ -139,11 +147,17 @@ describe('generateQuickCheck', () => {
   it('falls back gracefully when LLM returns non-JSON', async () => {
     const rawProvider: LLMProvider = {
       id: 'gemini',
-      async chat(): Promise<string> {
-        return 'Here are some questions for you to think about.';
+      async chat() {
+        return {
+          content: 'Here are some questions for you to think about.',
+          stopReason: 'stop' as StopReason,
+        };
       },
-      async *chatStream(): AsyncIterable<string> {
-        yield 'Here are some questions.';
+      chatStream() {
+        const s = (async function* () {
+          yield 'Here are some questions.';
+        })();
+        return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
       },
     };
     registerProvider(rawProvider);
@@ -286,11 +300,17 @@ describe('evaluateAssessmentAnswer', () => {
   it('falls back gracefully when LLM returns non-JSON', async () => {
     const rawProvider: LLMProvider = {
       id: 'gemini',
-      async chat(): Promise<string> {
-        return 'The answer shows partial understanding.';
+      async chat() {
+        return {
+          content: 'The answer shows partial understanding.',
+          stopReason: 'stop' as StopReason,
+        };
       },
-      async *chatStream(): AsyncIterable<string> {
-        yield 'Partial understanding.';
+      chatStream() {
+        const s = (async function* () {
+          yield 'Partial understanding.';
+        })();
+        return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
       },
     };
     registerProvider(rawProvider);
@@ -325,21 +345,26 @@ describe('evaluateAssessmentAnswer', () => {
     // object, so trailing braces no longer break extraction.
     const messyProvider: LLMProvider = {
       id: 'gemini',
-      async chat(): Promise<string> {
-        return (
-          'Here is my evaluation:\n' +
-          JSON.stringify({
-            feedback: 'Solid recall of the key concepts.',
-            passed: true,
-            shouldEscalateDepth: false,
-            rawScore: 0.45,
-            qualityRating: 4,
-          }) +
-          '\n(See {appendix} for grading rubric — irrelevant to envelope.)'
-        );
+      async chat() {
+        return {
+          content:
+            'Here is my evaluation:\n' +
+            JSON.stringify({
+              feedback: 'Solid recall of the key concepts.',
+              passed: true,
+              shouldEscalateDepth: false,
+              rawScore: 0.45,
+              qualityRating: 4,
+            }) +
+            '\n(See {appendix} for grading rubric — irrelevant to envelope.)',
+          stopReason: 'stop' as StopReason,
+        };
       },
-      async *chatStream(): AsyncIterable<string> {
-        yield 'unused';
+      chatStream() {
+        const s = (async function* () {
+          yield 'unused';
+        })();
+        return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
       },
     };
     registerProvider(messyProvider);
@@ -357,21 +382,26 @@ describe('evaluateAssessmentAnswer', () => {
   it('parses correctly when JSON is wrapped in markdown fence', async () => {
     const fencedProvider: LLMProvider = {
       id: 'gemini',
-      async chat(): Promise<string> {
-        return (
-          '```json\n' +
-          JSON.stringify({
-            feedback: 'Excellent explanation.',
-            passed: true,
-            shouldEscalateDepth: false,
-            rawScore: 0.7,
-            qualityRating: 4,
-          }) +
-          '\n```'
-        );
+      async chat() {
+        return {
+          content:
+            '```json\n' +
+            JSON.stringify({
+              feedback: 'Excellent explanation.',
+              passed: true,
+              shouldEscalateDepth: false,
+              rawScore: 0.7,
+              qualityRating: 4,
+            }) +
+            '\n```',
+          stopReason: 'stop' as StopReason,
+        };
       },
-      async *chatStream(): AsyncIterable<string> {
-        yield 'unused';
+      chatStream() {
+        const s = (async function* () {
+          yield 'unused';
+        })();
+        return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
       },
     };
     registerProvider(fencedProvider);
@@ -388,18 +418,24 @@ describe('evaluateAssessmentAnswer', () => {
   it('uses canned fallback when parsed JSON is missing feedback field', async () => {
     const missingFeedbackProvider: LLMProvider = {
       id: 'gemini',
-      async chat(): Promise<string> {
+      async chat() {
         // Valid JSON, but no `feedback` field — caller used to default to
         // raw response under the old `?? response` pattern.
-        return JSON.stringify({
-          passed: false,
-          shouldEscalateDepth: false,
-          rawScore: 0.2,
-          qualityRating: 1,
-        });
+        return {
+          content: JSON.stringify({
+            passed: false,
+            shouldEscalateDepth: false,
+            rawScore: 0.2,
+            qualityRating: 1,
+          }),
+          stopReason: 'stop' as StopReason,
+        };
       },
-      async *chatStream(): AsyncIterable<string> {
-        yield 'unused';
+      chatStream() {
+        const s = (async function* () {
+          yield 'unused';
+        })();
+        return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
       },
     };
     registerProvider(missingFeedbackProvider);

@@ -4,7 +4,9 @@ import {
   type LLMProvider,
   type ChatMessage,
   type ModelConfig,
+  type StopReason,
 } from './llm';
+import { makeChatStreamResult } from './llm/types';
 import {
   generateCurriculum,
   getCurriculum,
@@ -56,17 +58,17 @@ const sampleTopicPreview = JSON.stringify({
 function createCurriculumMockProvider(): LLMProvider {
   return {
     id: 'gemini',
-    async chat(
-      _messages: ChatMessage[],
-      _config: ModelConfig,
-    ): Promise<string> {
-      return `Here is your curriculum:\n${sampleTopics}`;
+    async chat(_messages: ChatMessage[], _config: ModelConfig) {
+      return {
+        content: `Here is your curriculum:\n${sampleTopics}`,
+        stopReason: 'stop' as StopReason,
+      };
     },
-    async *chatStream(
-      _messages: ChatMessage[],
-      _config: ModelConfig,
-    ): AsyncIterable<string> {
-      yield sampleTopics;
+    chatStream(_messages: ChatMessage[], _config: ModelConfig) {
+      const s = (async function* () {
+        yield sampleTopics;
+      })();
+      return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
     },
   };
 }
@@ -74,11 +76,14 @@ function createCurriculumMockProvider(): LLMProvider {
 function createAddTopicMockProvider(): LLMProvider {
   return {
     id: 'gemini',
-    async chat(): Promise<string> {
-      return sampleTopicPreview;
+    async chat() {
+      return { content: sampleTopicPreview, stopReason: 'stop' as StopReason };
     },
-    async *chatStream(): AsyncIterable<string> {
-      yield sampleTopicPreview;
+    chatStream() {
+      const s = (async function* () {
+        yield sampleTopicPreview;
+      })();
+      return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
     },
   };
 }
@@ -267,11 +272,17 @@ describe('generateCurriculum', () => {
     // Temporarily register a provider that returns non-JSON
     const badProvider: LLMProvider = {
       id: 'gemini',
-      async chat(): Promise<string> {
-        return 'Sorry, I cannot generate a curriculum right now.';
+      async chat() {
+        return {
+          content: 'Sorry, I cannot generate a curriculum right now.',
+          stopReason: 'stop' as StopReason,
+        };
       },
-      async *chatStream(): AsyncIterable<string> {
-        yield 'nope';
+      chatStream() {
+        const s = (async function* () {
+          yield 'nope';
+        })();
+        return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
       },
     };
     registerProvider(badProvider);
@@ -468,12 +479,20 @@ describe('addCurriculumTopic', () => {
   it('falls back to default preview when LLM fails', async () => {
     const failProvider: LLMProvider = {
       id: 'gemini',
-      async chat(): Promise<string> {
+      async chat() {
         throw new Error('LLM unavailable');
       },
-      // eslint-disable-next-line require-yield
-      async *chatStream(): AsyncIterable<string> {
-        throw new Error('LLM unavailable');
+      chatStream() {
+        const s: AsyncIterable<string> = {
+          [Symbol.asyncIterator]() {
+            return {
+              next(): Promise<IteratorResult<string>> {
+                return Promise.reject(new Error('LLM unavailable'));
+              },
+            };
+          },
+        };
+        return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
       },
     };
     registerProvider(failProvider);
@@ -671,12 +690,15 @@ describe('challengeCurriculum', () => {
     let capturedMessages: ChatMessage[] = [];
     registerProvider({
       id: 'gemini',
-      async chat(messages: ChatMessage[]): Promise<string> {
+      async chat(messages: ChatMessage[]) {
         capturedMessages = messages;
-        return sampleTopics;
+        return { content: sampleTopics, stopReason: 'stop' as StopReason };
       },
-      async *chatStream(): AsyncIterable<string> {
-        yield sampleTopics;
+      chatStream() {
+        const s = (async function* () {
+          yield sampleTopics;
+        })();
+        return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
       },
     });
 
