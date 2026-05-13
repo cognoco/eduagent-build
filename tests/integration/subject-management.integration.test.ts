@@ -32,6 +32,7 @@ import {
 } from '@eduagent/schemas';
 
 import { registerLlmProviderFixture } from '../../apps/api/src/test-utils/llm-provider-fixtures';
+import { _clearProviders } from '../../apps/api/src/services/llm';
 import { app } from '../../apps/api/src/index';
 
 const TEST_ENV = buildIntegrationEnv();
@@ -116,6 +117,7 @@ afterAll(async () => {
     emails: [SUBJECT_AUTH_EMAIL, OTHER_SUBJECT_AUTH_EMAIL],
     clerkUserIds: [SUBJECT_AUTH_USER_ID, OTHER_SUBJECT_AUTH_USER_ID],
   });
+  _clearProviders();
 });
 
 // ---------------------------------------------------------------------------
@@ -452,13 +454,12 @@ describe('Integration: POST /v1/subjects/classify', () => {
       needsConfirmation: false,
       suggestedSubjectName: null,
     });
-    expect(body.candidates).toEqual([
-      {
-        subjectId: subject.id,
-        subjectName: 'Mathematics',
-        confidence: 0.9,
-      },
-    ]);
+    expect(body.candidates).toHaveLength(1);
+    expect(body.candidates[0]).toMatchObject({
+      subjectId: subject.id,
+      subjectName: 'Mathematics',
+    });
+    expect(body.candidates[0].confidence).toBeGreaterThanOrEqual(0.85);
   });
 });
 

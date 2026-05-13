@@ -28,11 +28,14 @@ let queryClient: QueryClient;
 const originalFetch = globalThis.fetch;
 
 beforeEach(() => {
+  mockFetch.mockReset();
+  jest.clearAllMocks();
   globalThis.fetch = mockFetch as typeof fetch;
   setActiveProfileId('test-profile-id');
 });
 
 afterEach(() => {
+  queryClient?.clear();
   setActiveProfileId(undefined);
 });
 
@@ -61,18 +64,6 @@ function createWrapper() {
 }
 
 describe('useSubjectProgress', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-    globalThis.fetch = mockFetch as typeof fetch;
-    setActiveProfileId('test-profile-id');
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-    setActiveProfileId(undefined);
-  });
-
   it('fetches subject progress from API', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
@@ -160,15 +151,6 @@ describe('useSubjectProgress', () => {
 });
 
 describe('useOverallProgress', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   it('fetches overall progress from API', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
@@ -206,15 +188,6 @@ describe('useOverallProgress', () => {
 });
 
 describe('useContinueSuggestion', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   it('fetches continue suggestion from API', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
@@ -260,15 +233,6 @@ describe('useContinueSuggestion', () => {
 });
 
 describe('useLearningResumeTarget', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   it('fetches resume target with optional scope', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
@@ -309,15 +273,6 @@ describe('useLearningResumeTarget', () => {
 });
 
 describe('useReviewSummary', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   it('fetches review summary from API', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({ totalOverdue: 6 }), { status: 200 }),
@@ -337,15 +292,6 @@ describe('useReviewSummary', () => {
 });
 
 describe('useOverdueTopics', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   it('fetches overdue topics grouped by subject from API', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
@@ -385,15 +331,6 @@ describe('useOverdueTopics', () => {
 });
 
 describe('useTopicProgress', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   it('fetches topic progress from API', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
@@ -428,18 +365,6 @@ describe('useTopicProgress', () => {
 });
 
 describe('useProfileWeeklyReports', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-    globalThis.fetch = mockFetch as typeof fetch;
-    setActiveProfileId('test-profile-id');
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-    setActiveProfileId(undefined);
-  });
-
   it('parses weekly report responses through the shared schema', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
@@ -497,18 +422,6 @@ describe('useProfileWeeklyReports', () => {
 });
 
 describe('useRefreshProgressSnapshot', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-    globalThis.fetch = mockFetch as typeof fetch;
-    setActiveProfileId('test-profile-id');
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-    setActiveProfileId(undefined);
-  });
-
   it('posts to refresh and invalidates progress/dashboard caches', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
