@@ -24,11 +24,14 @@ export function buildEmailIdempotencyKey(
   return segments.map((s) => encodeOptionalDedupeSegment(s)).join(':');
 }
 
-// LEGACY FORMAT ONLY — preserves the pre-PR-243 Resend idempotency key format
-// (weekly|monthly)-{parentId}-{date}. Do not use for new email types; use
-// buildEmailIdempotencyKey() instead.
+/**
+ * @deprecated LEGACY FORMAT ONLY — preserves the pre-PR-243 Resend
+ * idempotency key format `(weekly|monthly)-{parentId}-{date}`. Segments are
+ * NOT URI-encoded; keys are opaque to Resend and are never parsed back. Do not
+ * use for new email types; use buildEmailIdempotencyKey() instead.
+ */
 export function buildLegacyEmailIdempotencyKey(
-  prefix: string,
+  prefix: 'weekly' | 'monthly',
   ...segments: string[]
 ): string {
   return joinDedupeKey([prefix, ...segments], '-');

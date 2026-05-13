@@ -37,9 +37,9 @@ export function buildAppHelpPromptBlock(): string {
 // Specific multi-word phrases that are unambiguously about app navigation,
 // plus possessive/navigational frames that anchor common nouns to app-help.
 const APP_HELP_SPECIFIC =
-  /\b(explorer mode|challenge mode|change mode|learning preferences|help section|mentor memory|delete.*account|export.*data|notification settings)\b/i;
+  /\b(explorer mode|challenge mode|change mode|learning preferences|help section|help (&|and) feedback|progress (tab|page|screen|section)|mentor memory|delete.*account|export.*data|notification settings)\b/i;
 const APP_HELP_FRAMED =
-  /\b(where (do i|are my|can i|is the) (find|see|change|access|get to) (my |the )?(notes|saved|settings|preferences|bookmarks?|notifications?|profile|account|mode|app|help|progress)\b|how do i (find|change|see|access|get to) (my |the )?(notes|saved|settings|preferences|bookmarks?|notifications?|profile|account|mode|progress)|my (notes|saved|settings|preferences|bookmarks?|notifications?|profile|account|progress)\b|(where are|where is|where can i find) (my )?(notes|saved|settings|preferences|bookmarks?|notifications?|profile|help|mentor memory|progress)|where can i see what you remember|what you remember about me)/i;
+  /\b(where (do i|are my|can i|is the) (find|see|change|access|get to) (my |the )?(notes|saved|settings|preferences|bookmarks?|notifications?|profile|account|mode|app)\b|how do i (find|change|see|access|get to) (my |the )?(notes|saved|settings|preferences|bookmarks?|notifications?|profile|account|mode)|my (notes|saved|settings|preferences|bookmarks?|notifications?|profile|account)\b|(where are|where is|where can i find) (my )?(notes|saved|settings|preferences|bookmarks?|notifications?|profile|mentor memory)|where can i see what you remember|what you remember about me)/i;
 
 export function isAppHelpQuery(userMessage: string): boolean {
   if (!userMessage || userMessage.length < 5) return false;
