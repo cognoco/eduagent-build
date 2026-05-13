@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,6 +19,7 @@ import {
   useChildWeeklyReportDetail,
   useMarkWeeklyReportViewed,
 } from '../../../../../hooks/use-progress';
+import { NudgeActionSheet } from '../../../../../components/nudge/NudgeActionSheet';
 
 /**
  * BUG-903 (c): Render a "Apr 27 – May 3, 2026" date range so the parent sees
@@ -93,6 +94,7 @@ export default function ChildWeeklyReportDetailScreen(): React.ReactElement {
     ? (`/(app)/child/${profileId}/reports` as const)
     : FAMILY_HOME_PATH;
   const markViewed = useMarkWeeklyReportViewed();
+  const [showNudge, setShowNudge] = useState(false);
   const markViewedRef = useRef(markViewed);
   markViewedRef.current = markViewed;
   const viewedRef = useRef(false);
@@ -270,6 +272,10 @@ export default function ChildWeeklyReportDetailScreen(): React.ReactElement {
               <Pressable
                 onPress={() => {
                   if (!profileId) return;
+                  if (isEmptyWeeklyReport(report.reportData)) {
+                    setShowNudge(true);
+                    return;
+                  }
                   router.push(`/(app)/child/${profileId}` as Href);
                 }}
                 className="bg-primary rounded-button px-4 py-3 items-center min-h-[48px] justify-center"
@@ -334,6 +340,13 @@ export default function ChildWeeklyReportDetailScreen(): React.ReactElement {
           </View>
         )}
       </ScrollView>
+      {showNudge && profileId && report ? (
+        <NudgeActionSheet
+          childName={report.reportData.childName}
+          childProfileId={profileId}
+          onClose={() => setShowNudge(false)}
+        />
+      ) : null}
     </View>
   );
 }

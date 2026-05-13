@@ -1560,6 +1560,19 @@
     "loadTimeout": {
       "title": "El progreso tarda mucho en cargarse",
       "message": "Comprueba tu conexión, vuelve a intentarlo o ve al inicio."
+    },
+    "guardian": {
+      "sessionCount_one": "{{count}} sesión",
+      "sessionCount_other": "{{count}} sesiones",
+      "lastStudied": "Última sesión: {{date}}",
+      "topicsMastered": "{{mastered}}/{{total}} temas dominados",
+      "summaryFallback": "Aún no hay resumen disponible. Aparecerá uno después de la próxima sesión.",
+      "noRecentSessions": "No hay sesiones nuevas desde el {{date}}.",
+      "noRecentSessionsFallback": "No hay sesiones nuevas desde hace un tiempo.",
+      "staleSummary": "Puede que el resumen aún no refleje la actividad más reciente.",
+      "nudgeCta": "Un recordatorio podría ayudar a {{name}} a retomar.",
+      "nudgeA11y": "Enviar un recordatorio a {{name}}",
+      "viewAllReports": "Ver todos los informes"
     }
   },
   "onboarding": {

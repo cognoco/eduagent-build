@@ -1560,6 +1560,19 @@
     "loadTimeout": {
       "title": "進捗の読み込みに時間がかかりすぎています",
       "message": "接続を確認して再試行するか、ホームに戻ってください。"
+    },
+    "guardian": {
+      "sessionCount_one": "{{count}} セッション",
+      "sessionCount_other": "{{count}} セッション",
+      "lastStudied": "最終学習日: {{date}}",
+      "topicsMastered": "習得済みトピック: {{mastered}}/{{total}}",
+      "summaryFallback": "概要はまだありません。次のセッションの後に表示されます。",
+      "noRecentSessions": "{{date}}以降、新しいセッションはありません。",
+      "noRecentSessionsFallback": "しばらく新しいセッションはありません。",
+      "staleSummary": "概要には、最新のアクティビティがまだ反映されていない場合があります。",
+      "nudgeCta": "{{name}}さんにリマインダーを送って再開を促しましょう。",
+      "nudgeA11y": "{{name}}さんにリマインダーを送信",
+      "viewAllReports": "すべてのレポートを表示"
     }
   },
   "onboarding": {

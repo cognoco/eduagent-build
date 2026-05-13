@@ -7,14 +7,19 @@ import {
   View,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import type { ProgressSummary, SubjectInventory } from '@eduagent/schemas';
+import type { Translate } from '../../../i18n';
 import { platformAlert } from '../../../lib/platform-alert';
 import { classifyApiError } from '../../../lib/format-api-error';
-import type { TranslateKey } from '../../../i18n';
 import { useFocusEffect, useRouter, type Href } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ErrorFallback, TrackedView } from '../../../components/common';
-import { formatMinutes } from '../../../lib/format-relative-date';
+import {
+  formatMinutes,
+  formatRelativeDate,
+} from '../../../lib/format-relative-date';
+import { NudgeActionSheet } from '../../../components/nudge/NudgeActionSheet';
 import {
   CurrentlyWorkingOnCard,
   GrowthChart,
@@ -30,6 +35,7 @@ import { useActiveProfileRole } from '../../../hooks/use-active-profile-role';
 import {
   useChildInventory,
   useChildProgressHistory,
+  useChildProgressSummary,
   useLearningResumeTarget,
   useProgressHistory,
   useProgressInventory,
@@ -53,7 +59,7 @@ function heroCopy(
     totalSessions: number;
   },
   register: CopyRegister,
-  t: (key: TranslateKey, opts?: Record<string, unknown>) => string,
+  t: Translate,
 ): {
   title: string;
   subtitle: string;
@@ -128,7 +134,7 @@ const MILESTONE_THRESHOLDS = [1, 3, 5, 10, 25, 50, 100];
 
 export function getNextMilestoneLabel(
   totalSessions: number,
-  t: (key: TranslateKey, opts?: Record<string, unknown>) => string,
+  t: Translate,
 ): string {
   const next = MILESTONE_THRESHOLDS.find(
     (threshold) => threshold > totalSessions,
@@ -157,6 +163,88 @@ function LoadingBlock(): React.ReactElement {
   );
 }
 
+function SubjectBreakdownCard({
+  subject,
+}: {
+  subject: SubjectInventory;
+}): React.ReactElement {
+  const { t } = useTranslation();
+  return (
+    <View
+      testID={`progress-subject-card-${subject.subjectId}`}
+      className="bg-surface rounded-card p-4 mt-3"
+    >
+      <Text className="text-body font-semibold text-text-primary">
+        {subject.subjectName}
+      </Text>
+      <Text className="text-body-sm text-text-secondary mt-1">
+        {t('progress.guardian.sessionCount', { count: subject.sessionsCount })}{' '}
+        · {formatMinutes(subject.wallClockMinutes ?? subject.activeMinutes)}
+      </Text>
+      {subject.lastSessionAt ? (
+        <Text className="text-caption text-text-secondary mt-1">
+          {t('progress.guardian.lastStudied', {
+            date: formatRelativeDate(subject.lastSessionAt),
+          })}
+        </Text>
+      ) : null}
+      {subject.topics.total != null ? (
+        <Text className="text-caption text-text-secondary mt-1">
+          {t('progress.guardian.topicsMastered', {
+            mastered: subject.topics.mastered,
+            total: subject.topics.total,
+          })}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
+function ProgressSummaryHeader({
+  summary,
+}: {
+  summary: ProgressSummary;
+}): React.ReactElement {
+  const { t } = useTranslation();
+  if (summary.summary == null) {
+    return (
+      <View
+        testID="progress-summary-fallback"
+        className="bg-coaching-card rounded-card p-5 mt-4"
+      >
+        <Text className="text-body text-text-secondary">
+          {t('progress.guardian.summaryFallback')}
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <View
+      testID="progress-summary-header"
+      className="bg-coaching-card rounded-card p-5 mt-4"
+    >
+      <Text className="text-body text-text-primary">{summary.summary}</Text>
+      {summary.activityState === 'no_recent_activity' ? (
+        <View testID="progress-summary-no-recent">
+          <Text className="text-body-sm text-text-secondary mt-2">
+            {summary.basedOnLastSessionAt
+              ? t('progress.guardian.noRecentSessions', {
+                  date: formatRelativeDate(summary.basedOnLastSessionAt),
+                })
+              : t('progress.guardian.noRecentSessionsFallback')}
+          </Text>
+        </View>
+      ) : null}
+      {summary.activityState === 'stale' ? (
+        <Text className="text-body-sm text-text-secondary mt-2">
+          {t('progress.guardian.staleSummary')}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
 export default function ProgressScreen(): React.ReactElement {
   const { t } = useTranslation();
   const role = useActiveProfileRole();
@@ -170,6 +258,7 @@ export default function ProgressScreen(): React.ReactElement {
   const [selectedProfileId, setSelectedProfileId] = useState<string>(
     () => (hasLinked ? linkedChildren[0]?.id : activeProfile?.id) ?? '',
   );
+  const [showProgressNudge, setShowProgressNudge] = useState(false);
 
   // Re-seed when linked children load after mount (query-cache race).
   const mountedWithoutChildren = useRef(!hasLinked);
@@ -205,6 +294,10 @@ export default function ProgressScreen(): React.ReactElement {
     { enabled: !isViewingSelf },
   );
   const historyQuery = isViewingSelf ? ownHistoryQuery : childHistoryQuery;
+  const childSummaryQuery = useChildProgressSummary(
+    isViewingSelf ? undefined : selectedProfileId,
+    { enabled: !isViewingSelf },
+  );
 
   const profileSessionsQuery = useProfileSessions(
     selectedProfileId || activeProfile?.id,
@@ -241,6 +334,7 @@ export default function ProgressScreen(): React.ReactElement {
   const refetchMilestones = milestonesQuery.refetch;
   const refetchMonthlyReports = monthlyReportsQuery.refetch;
   const refetchWeeklyReports = weeklyReportsQuery.refetch;
+  const refetchChildSummary = childSummaryQuery.refetch;
 
   const handleRefresh = useCallback(
     async (options?: { alertOnError?: boolean }) => {
@@ -261,6 +355,7 @@ export default function ProgressScreen(): React.ReactElement {
         refetchHistory(),
         refetchMonthlyReports(),
         refetchWeeklyReports(),
+        ...(!isViewingSelf ? [refetchChildSummary()] : []),
         ...(isViewingSelf ? [refetchMilestones()] : []),
       ]);
     },
@@ -271,6 +366,7 @@ export default function ProgressScreen(): React.ReactElement {
       refetchMilestones,
       refetchMonthlyReports,
       refetchWeeklyReports,
+      refetchChildSummary,
       refreshSnapshot,
       t,
     ],
@@ -334,7 +430,11 @@ export default function ProgressScreen(): React.ReactElement {
   // TODO: D-RP-18 Phase 2 — add 'ineligible' once API provides the discriminator.
   // Until then, no-reports-yet and truly-ineligible both collapse to 'awaiting'.
   const progressSurfaceState: 'empty' | 'awaiting' | 'ready' =
-    isEmpty || isStale ? 'empty' : hasAnyReports ? 'ready' : 'awaiting';
+    isEmpty || (isViewingSelf && isStale)
+      ? 'empty'
+      : hasAnyReports
+        ? 'ready'
+        : 'awaiting';
 
   const hasLanguageSubject = inventory?.subjects?.some(
     (s) => s.pedagogyMode === 'four_strands',
@@ -345,6 +445,10 @@ export default function ProgressScreen(): React.ReactElement {
   const targetProfileHash = selectedProfileId
     ? hashProfileId(selectedProfileId)
     : null;
+  const selectedChild = linkedChildren.find(
+    (child) => child.id === selectedProfileId,
+  );
+  const selectedChildName = selectedChild?.displayName;
 
   const handleEmptyProgressAction = () => {
     if (activeProfile) {
@@ -553,7 +657,7 @@ export default function ProgressScreen(): React.ReactElement {
               ) : null}
             </View>
 
-            {selectedProfileId ? (
+            {selectedProfileId && isViewingSelf ? (
               <>
                 <TrackedView
                   eventName="progress_report_viewed"
@@ -567,13 +671,9 @@ export default function ProgressScreen(): React.ReactElement {
                 >
                   <WeeklyReportCard
                     profileId={selectedProfileId}
-                    title={t(
-                      `progress.register.${isViewingSelf ? register : 'child'}.weekTitle`,
-                    )}
-                    register={isViewingSelf ? register : 'child'}
-                    thisWeekMini={
-                      isViewingSelf ? inventory?.thisWeekMini : undefined
-                    }
+                    title={t(`progress.register.${register}.weekTitle`)}
+                    register={register}
+                    thisWeekMini={inventory?.thisWeekMini}
                   />
                 </TrackedView>
                 <TrackedView
@@ -588,21 +688,74 @@ export default function ProgressScreen(): React.ReactElement {
                 >
                   <MonthlyReportCard
                     profileId={selectedProfileId}
-                    title={t(
-                      `progress.register.${isViewingSelf ? register : 'child'}.monthTitle`,
-                    )}
-                    register={isViewingSelf ? register : 'child'}
+                    title={t(`progress.register.${register}.monthTitle`)}
+                    register={register}
                   />
                 </TrackedView>
               </>
             ) : null}
 
-            {selectedProfileId && progressSurfaceState === 'ready' ? (
+            {selectedProfileId &&
+            isViewingSelf &&
+            progressSurfaceState === 'ready' ? (
               <ReportsListCard
                 profileId={selectedProfileId}
                 interactive
                 selfView={isViewingSelf}
               />
+            ) : null}
+
+            {!isViewingSelf ? (
+              <>
+                {childSummaryQuery.data ? (
+                  <ProgressSummaryHeader summary={childSummaryQuery.data} />
+                ) : null}
+                {childSummaryQuery.data?.nudgeRecommended &&
+                selectedChildName ? (
+                  <Pressable
+                    testID="progress-nudge-cta"
+                    onPress={() => setShowProgressNudge(true)}
+                    className="bg-primary rounded-button px-4 py-3 mt-3 items-center min-h-[48px] justify-center"
+                    accessibilityRole="button"
+                    accessibilityLabel={t('progress.guardian.nudgeA11y', {
+                      name: selectedChildName,
+                    })}
+                  >
+                    <Text className="text-body font-semibold text-text-inverse">
+                      {t('progress.guardian.nudgeCta', {
+                        name: selectedChildName,
+                      })}
+                    </Text>
+                  </Pressable>
+                ) : null}
+                {inventory?.subjects?.length ? (
+                  <View testID="progress-subject-breakdown" className="mt-3">
+                    {inventory.subjects.map((subject) => (
+                      <SubjectBreakdownCard
+                        key={subject.subjectId}
+                        subject={subject}
+                      />
+                    ))}
+                  </View>
+                ) : null}
+                {selectedProfileId ? (
+                  <Pressable
+                    testID="progress-view-all-reports"
+                    onPress={() =>
+                      router.push(
+                        `/(app)/child/${selectedProfileId}/reports` as Href,
+                      )
+                    }
+                    className="bg-surface rounded-button px-4 py-3 mt-4 items-center min-h-[48px] justify-center"
+                    accessibilityRole="button"
+                    accessibilityLabel={t('progress.guardian.viewAllReports')}
+                  >
+                    <Text className="text-body font-semibold text-primary">
+                      {t('progress.guardian.viewAllReports')}
+                    </Text>
+                  </Pressable>
+                ) : null}
+              </>
             ) : null}
 
             {inventory?.currentlyWorkingOn?.length ? (
@@ -732,6 +885,13 @@ export default function ProgressScreen(): React.ReactElement {
           </>
         )}
       </ScrollView>
+      {showProgressNudge && selectedProfileId && selectedChildName ? (
+        <NudgeActionSheet
+          childName={selectedChildName}
+          childProfileId={selectedProfileId}
+          onClose={() => setShowProgressNudge(false)}
+        />
+      ) : null}
     </View>
   );
 }

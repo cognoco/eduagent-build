@@ -1390,6 +1390,19 @@
     "currentlyWorkingOn": {
       "andNMore": "and {{count}} more"
     },
+    "guardian": {
+      "sessionCount_one": "{{count}} session",
+      "sessionCount_other": "{{count}} sessions",
+      "lastStudied": "Last studied {{date}}",
+      "topicsMastered": "{{mastered}}/{{total}} topics mastered",
+      "summaryFallback": "No summary available yet. One will appear after the next session.",
+      "noRecentSessions": "No new sessions since {{date}}.",
+      "noRecentSessionsFallback": "No new sessions since a while ago.",
+      "staleSummary": "Summary may not reflect the latest activity yet.",
+      "nudgeCta": "A short nudge might help {{name}} restart",
+      "nudgeA11y": "Send {{name}} a nudge",
+      "viewAllReports": "View all reports"
+    },
     "weeklyReport": {
       "thisWeekSoFar": "This week so far",
       "practiceTitle": "Practice highlights",

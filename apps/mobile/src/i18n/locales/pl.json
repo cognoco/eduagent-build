@@ -1585,6 +1585,19 @@
     "loadTimeout": {
       "title": "Ładowanie postępów trwa zbyt długo",
       "message": "Sprawdź połączenie, spróbuj ponownie lub wróć do strony głównej."
+    },
+    "guardian": {
+      "sessionCount_one": "{{count}} sesja",
+      "sessionCount_other": "{{count}} sesji",
+      "lastStudied": "Ostatnia nauka: {{date}}",
+      "topicsMastered": "{{mastered}}/{{total}} opanowanych tematów",
+      "summaryFallback": "Brak podsumowania. Pojawi się po następnej sesji.",
+      "noRecentSessions": "Brak nowych sesji od {{date}}.",
+      "noRecentSessionsFallback": "Brak nowych sesji od jakiegoś czasu.",
+      "staleSummary": "Podsumowanie może nie uwzględniać ostatniej aktywności.",
+      "nudgeCta": "Krótka zachęta może pomóc {{name}} wrócić do nauki.",
+      "nudgeA11y": "Wyślij {{name}} zachętę",
+      "viewAllReports": "Zobacz wszystkie raporty"
     }
   },
   "onboarding": {

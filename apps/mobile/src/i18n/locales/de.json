@@ -1560,6 +1560,19 @@
     "loadTimeout": {
       "title": "Das Laden des Fortschritts dauert zu lange",
       "message": "Prüfe deine Verbindung, versuche es erneut oder gehe zur Startseite."
+    },
+    "guardian": {
+      "sessionCount_one": "{{count}} Sitzung",
+      "sessionCount_other": "{{count}} Sitzungen",
+      "lastStudied": "Zuletzt gelernt am {{date}}",
+      "topicsMastered": "{{mastered}}/{{total}} Themen gemeistert",
+      "summaryFallback": "Noch keine Zusammenfassung verfügbar. Eine erscheint nach der nächsten Sitzung.",
+      "noRecentSessions": "Keine neuen Sitzungen seit {{date}}.",
+      "noRecentSessionsFallback": "Keine neuen Sitzungen seit Längerem.",
+      "staleSummary": "Die Zusammenfassung ist möglicherweise noch nicht auf dem neuesten Stand.",
+      "nudgeCta": "Ein Anstupser könnte {{name}} helfen, neu zu starten.",
+      "nudgeA11y": "{{name}} einen Anstupser senden",
+      "viewAllReports": "Alle Berichte ansehen"
     }
   },
   "onboarding": {

@@ -1560,6 +1560,19 @@
     "loadTimeout": {
       "title": "Fremdriften tar for lang tid å laste",
       "message": "Sjekk tilkoblingen din, prøv igjen eller gå hjem."
+    },
+    "guardian": {
+      "sessionCount_one": "{{count}} økt",
+      "sessionCount_other": "{{count}} økter",
+      "lastStudied": "Sist studert {{date}}",
+      "topicsMastered": "{{mastered}}/{{total}} emner mestret",
+      "summaryFallback": "Ingen oppsummering tilgjengelig ennå. En vil vises etter neste økt.",
+      "noRecentSessions": "Ingen nye økter siden {{date}}.",
+      "noRecentSessionsFallback": "Ingen nye økter på en stund.",
+      "staleSummary": "Oppsummeringen gjenspeiler kanskje ikke den siste aktiviteten ennå.",
+      "nudgeCta": "Et lite dytt kan hjelpe {{name}} i gang igjen",
+      "nudgeA11y": "Send {{name}} et dytt",
+      "viewAllReports": "Se alle rapporter"
     }
   },
   "onboarding": {
