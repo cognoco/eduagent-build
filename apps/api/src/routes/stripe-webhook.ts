@@ -20,7 +20,6 @@ import { getTierConfig } from '../services/subscription';
 
 import { inngest } from '../inngest/client';
 import { captureException } from '../services/sentry';
-import { safeSend } from '../services/safe-non-core';
 import { createLogger } from '../services/logger';
 import type { Database } from '@eduagent/database';
 import type Stripe from 'stripe';
@@ -338,21 +337,18 @@ async function handlePaymentFailed(
   if (updated) {
     await refreshKvCache(kv, db, updated.accountId);
 
-    await safeSend(
-      () =>
-        inngest.send({
-          name: 'app/payment.failed',
-          data: {
-            subscriptionId: updated.id,
-            stripeSubscriptionId,
-            accountId: updated.accountId,
-            attempt: invoice.attempt_count ?? 1,
-            timestamp: new Date().toISOString(),
-          },
-        }),
-      'stripe-webhook.payment-failed',
-      { accountId: updated.accountId },
-    );
+    // Observed by payment-failed-observe.ts. Keep this direct so Stripe retries
+    // the webhook if Inngest dispatch is temporarily unavailable.
+    await inngest.send({
+      name: 'app/payment.failed',
+      data: {
+        subscriptionId: updated.id,
+        stripeSubscriptionId,
+        accountId: updated.accountId,
+        attempt: invoice.attempt_count ?? 1,
+        timestamp: new Date().toISOString(),
+      },
+    });
   }
 }
 

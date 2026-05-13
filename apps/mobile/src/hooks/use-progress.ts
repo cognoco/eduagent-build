@@ -686,6 +686,8 @@ export function useChildProgressSummary(
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
+        // Hono RPC does not type hyphenated path segments, so the route segment
+        // is cast to the handler shape used by /progress-summary.
         const progressSummaryClient = (
           client.dashboard.children[':profileId'] as unknown as {
             'progress-summary': {

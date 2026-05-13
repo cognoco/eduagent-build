@@ -9,7 +9,6 @@ import {
 } from '@eduagent/schemas';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
-import { safeSend } from '../services/safe-non-core';
 import {
   buildLibraryIndex,
   fileToLibrary,
@@ -52,15 +51,10 @@ export const filingRoutes = new Hono<FilingRouteEnv>()
     async (c) => {
       const profileId = requireProfileId(c.get('profileId'));
       const { sessionId, sessionMode } = c.req.valid('json');
-      await safeSend(
-        () =>
-          inngest.send({
-            name: 'app/filing.retry',
-            data: { sessionId, sessionMode, profileId },
-          }),
-        'filing.request-retry',
-        { profileId, sessionId },
-      );
+      await inngest.send({
+        name: 'app/filing.retry',
+        data: { sessionId, sessionMode, profileId },
+      });
       return c.json(filingQueuedResponseSchema.parse({ queued: true }));
     },
   )

@@ -60,6 +60,7 @@ export const progressSummaries = pgTable(
     basedOnLastSessionAt: timestamp('based_on_last_session_at', {
       withTimezone: true,
     }),
+    // Informational only; scoped queries and activity-state logic use profileId.
     latestSessionId: uuid('latest_session_id'),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()

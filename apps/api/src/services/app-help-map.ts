@@ -57,7 +57,6 @@ interface ParsedSignals {
   notePromptPostSession: boolean;
   fluencyDrill: unknown;
   readyToFinish: boolean;
-  [key: string]: unknown;
 }
 
 export function applyAppHelpSignalGuard<T extends ParsedSignals>(parsed: T): T {

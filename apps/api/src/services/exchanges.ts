@@ -441,7 +441,6 @@ export interface ParsedExchangeEnvelope {
    * don't have to re-parse the envelope a second time.
    */
   readyToFinish: boolean;
-  [key: string]: unknown;
 }
 
 const EMPTY_PARSED_ENVELOPE: ParsedExchangeEnvelope = {

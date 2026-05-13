@@ -5,6 +5,7 @@ import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
 import { buildKnowledgeInventory } from '../../services/snapshot-aggregation';
 import {
+  deterministicProgressSummaryFallback,
   findLatestCompletedLearningSession,
   generateProgressSummary,
   upsertProgressSummary,
@@ -57,6 +58,7 @@ export const progressSummaryGeneration = inngest.createFunction(
           .where(
             and(
               eq(learningSessions.id, sessionId),
+              eq(learningSessions.profileId, profileId),
               eq(learningSessions.status, 'completed'),
             ),
           )
@@ -94,7 +96,10 @@ export const progressSummaryGeneration = inngest.createFunction(
             sessionId,
           },
         });
-        throw error;
+        return deterministicProgressSummaryFallback(
+          context.childName,
+          new Date(context.latestSessionAt),
+        );
       }
     });
 
