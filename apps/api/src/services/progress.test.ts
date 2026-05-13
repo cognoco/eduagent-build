@@ -697,6 +697,9 @@ describe('getOverallProgress', () => {
 
     const db = createMockDb();
     const resultPromise = getOverallProgress(db, profileId);
+    // This probe intentionally uses one microtask tick to prove both loads were
+    // started before the unresolved subjects query settles. If the service adds
+    // awaits before Promise.all(), this brittle ordering guard should fail.
     await Promise.resolve();
 
     expect(order).toEqual(['subjects-start', 'practice-start']);

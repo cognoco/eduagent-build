@@ -155,7 +155,10 @@ import { resolveSubjectName } from '../services/subject-resolve';
 import { classifySubject } from '../services/subject-classify';
 import { captureException } from '../services/sentry';
 import { UpstreamLlmError, SubjectNotFoundError } from '@eduagent/schemas';
-import { SubjectNotLanguageLearningError } from '../services/subject';
+import {
+  getSubject,
+  SubjectNotLanguageLearningError,
+} from '../services/subject';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 
 const TEST_ENV = { ...BASE_AUTH_ENV };
@@ -664,6 +667,27 @@ describe('subject routes', () => {
 
       const body = await res.json();
       expect(body).toHaveProperty('subject');
+    });
+
+    it('returns 404 for a subject owned by another profile', async () => {
+      const foreignSubjectId = 'foreign-subject-id';
+      (getSubject as jest.Mock).mockImplementationOnce(
+        (_db: unknown, activeProfileId: string, subjectId: string) => {
+          expect(activeProfileId).toBe('test-profile-id');
+          expect(subjectId).toBe(foreignSubjectId);
+          return null;
+        },
+      );
+
+      const res = await app.request(
+        `/v1/subjects/${foreignSubjectId}`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(404);
+      const body = await res.json();
+      expect(body).toHaveProperty('code', 'NOT_FOUND');
     });
 
     it('returns 404 when subject not found', async () => {

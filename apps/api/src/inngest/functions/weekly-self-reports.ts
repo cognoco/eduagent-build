@@ -162,6 +162,9 @@ export const weeklySelfReportGenerate = inngest.createFunction(
     const reportWeekStart =
       parsed.data.reportWeekStart ?? isoDate(startOfCurrentWeek(new Date()));
     const reportWeekStartDate = new Date(`${reportWeekStart}T00:00:00.000Z`);
+    // Self-reports are delivered at the start of the new week and summarize
+    // the trailing seven days. Parent weekly progress push intentionally
+    // writes the in-progress report week for parent/child digest rows.
     const activityWindowStart = subtractDays(reportWeekStartDate, 7);
     const reportWindowEnd = subtractDays(reportWeekStartDate, 1);
     const previousWindowEnd = subtractDays(reportWeekStartDate, 8);

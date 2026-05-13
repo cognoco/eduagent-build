@@ -85,7 +85,10 @@ import {
 } from './session-context-builders';
 import { projectAiResponseContent } from '../llm/project-response';
 import { isSubstantiveCalibrationAnswer } from './review-calibration';
-import { recordPracticeActivityEvent } from '../practice-activity-events';
+import {
+  recordPracticeActivityEvent,
+  type RecordPracticeActivityEventInput,
+} from '../practice-activity-events';
 
 const BANNED_FILLER_OPENERS = [
   "i'm so proud",
@@ -107,6 +110,25 @@ const BANNED_FILLER_OPENERS = [
  */
 const LANGUAGE_REGEX =
   /\b(how do (you|i) say|translate|in (french|spanish|german|czech|italian|portuguese|japanese|chinese|korean|arabic|russian|hindi|dutch|polish|swedish|norwegian|danish|finnish|greek|turkish|hungarian|romanian|thai|vietnamese|indonesian|malay|tagalog|swahili|hebrew|ukrainian|croatian|serbian|slovak|slovenian|bulgarian|latvian|lithuanian|estonian)|what('s| is) .+ in \w+)\b/i;
+
+async function recordSessionPracticeActivityEvent(
+  db: Database,
+  input: RecordPracticeActivityEventInput,
+): Promise<void> {
+  try {
+    await recordPracticeActivityEvent(db, input);
+  } catch (err) {
+    captureException(err, {
+      profileId: input.profileId,
+      extra: {
+        surface: 'session-exchange.practice-activity-event',
+        activityType: input.activityType,
+        sourceType: input.sourceType,
+        sourceId: input.sourceId,
+      },
+    });
+  }
+}
 
 const logger = createLogger();
 
@@ -1691,7 +1713,7 @@ export async function persistExchangeResult(
   const effectiveMode = sessionMetadata?.['effectiveMode'];
 
   if (aiEventId && effectiveMode === 'recitation') {
-    await recordPracticeActivityEvent(db, {
+    await recordSessionPracticeActivityEvent(db, {
       profileId,
       subjectId: session.subjectId,
       activityType: 'recitation',
@@ -1708,7 +1730,7 @@ export async function persistExchangeResult(
   }
 
   if (aiEventId && drillCorrect != null && drillTotal != null) {
-    await recordPracticeActivityEvent(db, {
+    await recordSessionPracticeActivityEvent(db, {
       profileId,
       subjectId: session.subjectId,
       activityType: 'fluency_drill',

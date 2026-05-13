@@ -1,4 +1,5 @@
 import {
+  check,
   index,
   integer,
   jsonb,
@@ -9,6 +10,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 import { generateUUIDv7 } from '../utils/uuid';
 import { profiles } from './profiles';
 import { subjects } from './subjects';
@@ -102,6 +104,10 @@ export const celebrationEvents = pgTable(
     index('celebration_events_profile_celebrated_idx').on(
       table.profileId,
       table.celebratedAt,
+    ),
+    check(
+      'celebration_events_source_type_known',
+      sql`${table.sourceType} IS NULL OR ${table.sourceType} IN ('assessment', 'dictation_result', 'home_surface_pending_celebration', 'quiz_mastery_item', 'quiz_round', 'session_event', 'vocabulary_retention_card')`,
     ),
   ],
 );

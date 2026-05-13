@@ -113,23 +113,31 @@ export async function queueCelebration(
     ? existing
     : [...existing, nextEntry];
 
-  await writeHomeSurfacePendingCelebrations(db, profileId, pendingCelebrations);
+  await db.transaction(async (tx) => {
+    const txDb = tx as unknown as Database;
 
-  if (!hasDuplicate) {
-    await recordCelebrationEvent(db, {
+    await writeHomeSurfacePendingCelebrations(
+      txDb,
       profileId,
-      celebratedAt: new Date(nextEntry.queuedAt),
-      celebrationType: celebration,
-      reason,
-      sourceType: 'home_surface_pending_celebration',
-      sourceId: detail ?? null,
-      dedupeKey:
-        detail === null || detail === undefined
-          ? `${celebration}:${reason}:${nextEntry.queuedAt}`
-          : undefined,
-      metadata: { detail: detail ?? null },
-    });
-  }
+      pendingCelebrations,
+    );
+
+    if (!hasDuplicate) {
+      await recordCelebrationEvent(txDb, {
+        profileId,
+        celebratedAt: new Date(nextEntry.queuedAt),
+        celebrationType: celebration,
+        reason,
+        sourceType: 'home_surface_pending_celebration',
+        sourceId: detail ?? null,
+        dedupeKey:
+          detail === null || detail === undefined
+            ? `${celebration}:${reason}:${nextEntry.queuedAt}`
+            : undefined,
+        metadata: { detail: detail ?? null },
+      });
+    }
+  });
 
   return pendingCelebrations;
 }

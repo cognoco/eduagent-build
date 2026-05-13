@@ -88,3 +88,39 @@ CREATE INDEX IF NOT EXISTS "celebration_events_profile_celebrated_idx"
 
 ALTER TABLE "practice_activity_events" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "celebration_events" ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename = 'practice_activity_events'
+      AND policyname = 'practice_activity_events_profile_isolation'
+  ) THEN
+    CREATE POLICY "practice_activity_events_profile_isolation"
+      ON "practice_activity_events"
+      USING (
+        "profile_id" = NULLIF(current_setting('app.current_profile_id', true), '')::uuid
+      )
+      WITH CHECK (
+        "profile_id" = NULLIF(current_setting('app.current_profile_id', true), '')::uuid
+      );
+  END IF;
+END $$;
+
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = 'public'
+      AND tablename = 'celebration_events'
+      AND policyname = 'celebration_events_profile_isolation'
+  ) THEN
+    CREATE POLICY "celebration_events_profile_isolation"
+      ON "celebration_events"
+      USING (
+        "profile_id" = NULLIF(current_setting('app.current_profile_id', true), '')::uuid
+      )
+      WITH CHECK (
+        "profile_id" = NULLIF(current_setting('app.current_profile_id', true), '')::uuid
+      );
+  END IF;
+END $$;
