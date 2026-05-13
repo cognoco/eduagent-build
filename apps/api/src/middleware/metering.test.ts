@@ -28,6 +28,7 @@ jest.mock('../services/account', () => ({
 
 // Mock session service (to prevent actual session operations)
 jest.mock('../services/session', () => ({
+  // gc1-allow: processMessage/streamMessage/evaluateSessionDepth call LLM
   processMessage: jest
     .fn()
     .mockResolvedValue({ reply: 'test', exchangeCount: 1 }),
@@ -74,12 +75,17 @@ jest.mock('../services/session', () => ({
   syncHomeworkState: jest.fn(),
   setSessionInputMode: jest.fn(),
   getResumeNudgeCandidate: jest.fn(),
-  SubjectInactiveError: class extends Error {},
-  SessionExchangeLimitError: class extends Error {},
+  SubjectInactiveError: (
+    jest.requireActual('../services/session') as Record<string, unknown>
+  ).SubjectInactiveError,
+  SessionExchangeLimitError: (
+    jest.requireActual('../services/session') as Record<string, unknown>
+  ).SessionExchangeLimitError,
 }));
 
 // Mock recall bridge service so we can exercise the route without an LLM call.
 jest.mock('../services/recall-bridge', () => ({
+  // gc1-allow: LLM external boundary (routeAndCall)
   generateRecallBridge: jest
     .fn()
     .mockResolvedValue({ questions: ['Q?'], generated: true }),
@@ -144,6 +150,7 @@ const mockLoggerError = jest.fn();
 const mockLoggerDebug = jest.fn();
 
 jest.mock('../services/logger', () => ({
+  ...jest.requireActual('../services/logger'),
   createLogger: () => ({
     info: mockLoggerInfo,
     warn: mockLoggerWarn,
