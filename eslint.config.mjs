@@ -65,7 +65,7 @@ export default [
       // allowed: the call's callee is a ConditionalExpression, not a
       // MemberExpression, so it does not match these selectors.
       // .todo() is also banned; create a tracked ticket instead.
-      // See docs/plans/2026-05-03-governance-audit.md.
+      // See docs/_archive/plans/done/2026-05-03-governance-audit.md.
       // ---------------------------------------------------------------------
       'no-restricted-syntax': [
         'error',

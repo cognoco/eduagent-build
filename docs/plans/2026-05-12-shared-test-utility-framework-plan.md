@@ -3,7 +3,7 @@
 **Date:** 2026-05-12  
 **Status:** Framework established; follow-up cleanup remains  
 **Related:** `docs/plans/2026-05-12-internal-mock-cleanup-inventory.md`
-**Archived agent tracker:** `docs/plans/done/2026-05-12-shared-test-utilities-agent-tracker.md`
+**Archived agent tracker:** `docs/_archive/plans/done/2026-05-12-shared-test-utilities-agent-tracker.md`
 
 ## Goal
 
