@@ -25,6 +25,8 @@ For every active in-scope file: read the file → verify referenced state via `g
 
 These are inbound references to files marked Cat 1. They don't change the categorization, but they are loose threads the execution plan must address in the same commit (or risk leaving broken links).
 
+> **DONE — 2026-05-13.** All 8 conflicts below resolved by prior cleanup passes (PR-23 brand sweep + PR-26 individual moves) and verified during PR-27 closure. C5 became moot when `e2e-emulator-issues.md` itself was vaulted (intentional pattern per `docs/_vault/emulator-2026-04-30/README.md`). One additional live stale reference outside the original 8 — `.claude/memory/feedback_e2e_cascade_root_cause.md:9` — was repointed to the vault path in the same PR. The original prescriptions are kept below for archaeology.
+
 | # | Pointer (must update) | Points at (Cat 1) | Co-change required |
 | - | --------------------- | ----------------- | ------------------ |
 | C1 | `.claude/memory/MEMORY.md` indexes 5 Cat 1 memory files (project_cr_124_scope, project_epic15_code_review, project_expo_router_pollution, project_implementation_phase, project_web_flow_bugs) | 5 of 6 Cat 1 memory files | Remove or repoint those 5 lines in MEMORY.md to `_archive/` paths |
@@ -44,6 +46,8 @@ Additional weak references that are NOT blocking but worth knowing:
 ---
 
 ## Category 1 — Definitely obsolete / stale (25 files)
+
+> **DONE — 2026-05-13.** All 25 Cat-1 actions resolved by prior cleanup passes plus one residual archive in the PR-25/27/29 closure work. 1A (8 deletes): 5 truly resolved (some never tracked on this branch); 3 superseded by the intentional `docs/_vault/emulator-2026-04-30/` snapshot vault — see `docs/_vault/emulator-2026-04-30/README.md` for the vault rationale. 1B (17 archives): 16 already at `_archive/` paths from prior passes; `docs/plans/2026-04-07-epic-17-phase-a-voice-input_NS.md` archived in the closure PR. Per-file evidence preserved below.
 
 ### 1A · Delete (8 files)
 

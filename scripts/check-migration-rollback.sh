@@ -9,8 +9,9 @@
 #
 # Scope:
 #   - Top-level docs/plans/*.md (the active plan dir).
-#   - docs/plans/done/ is intentionally NOT scanned — historical plans, no longer
-#     subject to enforcement.
+#   - docs/_archive/plans/done/ is intentionally NOT scanned — historical plans
+#     under the archive root, no longer subject to enforcement. (Prior to
+#     2026-05-13 these lived at docs/plans/done/; same exemption applies.)
 #
 # Detection:
 #   - DROP COLUMN, DROP TABLE, DROP TYPE, ALTER TABLE ... DROP inside a fenced
