@@ -28,6 +28,21 @@ export interface ThemeTokens {
     homeworkLane: string;
     practiceMint: string;
     practiceDarkTeal: string;
+    practiceReviewBg: string;
+    practiceReviewBorder: string;
+    practiceQuizBg: string;
+    practiceQuizBorder: string;
+    practiceQuiz: string;
+    practiceQuizOptionBg: string;
+    practiceDictationBg: string;
+    practiceDictationBorder: string;
+    practiceDictation: string;
+    practiceReciteBg: string;
+    practiceReciteBorder: string;
+    practiceRecite: string;
+    practiceHistory: string;
+    practiceHistoryBorder: string;
+    practiceChipBg: string;
     reward: string;
     rewardSoft: string;
   };
@@ -77,6 +92,21 @@ export const tokens: Record<ColorScheme, ThemeTokens> = {
       homeworkLane: '#d97706',
       practiceMint: '#2f9c6a',
       practiceDarkTeal: '#12352a',
+      practiceReviewBg: '#effcf5',
+      practiceReviewBorder: '#b9ddc8',
+      practiceQuizBg: '#f2f7ff',
+      practiceQuizBorder: '#b8ccec',
+      practiceQuiz: '#386dbe',
+      practiceQuizOptionBg: 'rgba(255,255,255,0.76)',
+      practiceDictationBg: '#fff6df',
+      practiceDictationBorder: '#e6c883',
+      practiceDictation: '#b46f00',
+      practiceReciteBg: '#f4efff',
+      practiceReciteBorder: '#c7bdf1',
+      practiceRecite: '#7058c8',
+      practiceHistory: '#b64a62',
+      practiceHistoryBorder: '#edbdc7',
+      practiceChipBg: 'rgba(255,255,255,0.86)',
       reward: '#d97706',
       rewardSoft: 'rgba(217, 119, 6, 0.12)',
     },
@@ -111,6 +141,21 @@ export const tokens: Record<ColorScheme, ThemeTokens> = {
       homeworkLane: '#f59e0b',
       practiceMint: '#2f9c6a',
       practiceDarkTeal: '#12352a',
+      practiceReviewBg: '#1a2e24',
+      practiceReviewBorder: '#2a5040',
+      practiceQuizBg: '#1a2030',
+      practiceQuizBorder: '#2a3a58',
+      practiceQuiz: '#5b8fd6',
+      practiceQuizOptionBg: 'rgba(255,255,255,0.08)',
+      practiceDictationBg: '#2a2518',
+      practiceDictationBorder: '#5a4a2a',
+      practiceDictation: '#d89830',
+      practiceReciteBg: '#221a30',
+      practiceReciteBorder: '#3a2a58',
+      practiceRecite: '#9080e0',
+      practiceHistory: '#d06a82',
+      practiceHistoryBorder: '#4a2a34',
+      practiceChipBg: 'rgba(255,255,255,0.12)',
       reward: '#fbbf24',
       rewardSoft: 'rgba(251, 191, 36, 0.15)',
     },
@@ -290,6 +335,21 @@ export function tokensToCssVars(t: ThemeTokens): Record<`--${string}`, string> {
     '--color-homework-lane': t.colors.homeworkLane,
     '--color-practice-mint': t.colors.practiceMint,
     '--color-practice-dark-teal': t.colors.practiceDarkTeal,
+    '--color-practice-review-bg': t.colors.practiceReviewBg,
+    '--color-practice-review-border': t.colors.practiceReviewBorder,
+    '--color-practice-quiz-bg': t.colors.practiceQuizBg,
+    '--color-practice-quiz-border': t.colors.practiceQuizBorder,
+    '--color-practice-quiz': t.colors.practiceQuiz,
+    '--color-practice-quiz-option-bg': t.colors.practiceQuizOptionBg,
+    '--color-practice-dictation-bg': t.colors.practiceDictationBg,
+    '--color-practice-dictation-border': t.colors.practiceDictationBorder,
+    '--color-practice-dictation': t.colors.practiceDictation,
+    '--color-practice-recite-bg': t.colors.practiceReciteBg,
+    '--color-practice-recite-border': t.colors.practiceReciteBorder,
+    '--color-practice-recite': t.colors.practiceRecite,
+    '--color-practice-history': t.colors.practiceHistory,
+    '--color-practice-history-border': t.colors.practiceHistoryBorder,
+    '--color-practice-chip-bg': t.colors.practiceChipBg,
     '--color-reward': t.colors.reward,
     '--color-reward-soft': t.colors.rewardSoft,
     '--radius-card': t.radii.card,

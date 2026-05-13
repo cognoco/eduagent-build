@@ -245,7 +245,7 @@ function ChildCommandCard({
   child,
   dashboardChild,
   highlight,
-  onOpenProgress,
+  onOpenProfile,
   onOpenReports,
   onOpenNudge,
   t,
@@ -253,7 +253,7 @@ function ChildCommandCard({
   child: Profile;
   dashboardChild: DashboardChild | undefined;
   highlight: boolean;
-  onOpenProgress: () => void;
+  onOpenProfile: () => void;
   onOpenReports: () => void;
   onOpenNudge: () => void;
   t: Translate;
@@ -265,7 +265,7 @@ function ChildCommandCard({
       }`}
     >
       <Pressable
-        onPress={onOpenProgress}
+        onPress={onOpenProfile}
         className="flex-row items-start"
         style={Platform.OS === 'web' ? { cursor: 'pointer' } : undefined}
         accessibilityRole="button"
@@ -291,12 +291,6 @@ function ChildCommandCard({
       </Pressable>
 
       <View className="flex-row gap-2 mt-4">
-        <ChildActionButton
-          icon="stats-chart-outline"
-          label={t('home.parent.childCard.progressAction')}
-          onPress={onOpenProgress}
-          testID={`parent-home-child-progress-${child.id}`}
-        />
         <ChildActionButton
           icon="document-text-outline"
           label={t('home.parent.childCard.reportsAction')}
@@ -470,6 +464,16 @@ export function ParentHomeScreen({
     navigateToSubscription,
   ]);
 
+  const pushChildProfile = useCallback(
+    (childProfileId: string): void => {
+      router.push({
+        pathname: '/(app)/child/[profileId]',
+        params: { profileId: childProfileId },
+      } as Href);
+    },
+    [router],
+  );
+
   const pushChildProgress = useCallback(
     (childProfileId: string): void => {
       router.push({
@@ -608,7 +612,7 @@ export function ParentHomeScreen({
               child={child}
               dashboardChild={findDashboardChild(dashboard, child.id)}
               highlight={index === 0}
-              onOpenProgress={() => pushChildProgress(child.id)}
+              onOpenProfile={() => pushChildProfile(child.id)}
               onOpenReports={() => pushChildReports(child.id)}
               onOpenNudge={() => setSheetChildId(child.id)}
               t={t}

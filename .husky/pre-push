@@ -1,0 +1,10 @@
+#!/usr/bin/env sh
+# Advisory change-class checklist — prints what you should validate
+# beyond what pre-commit already enforces. Non-blocking: never fails the push.
+
+if [ -f scripts/check-change-class.sh ]; then
+  echo ""
+  echo "── Change Class Checklist (advisory) ──────────────────────────"
+  bash scripts/check-change-class.sh --branch 2>/dev/null || true
+  echo ""
+fi
