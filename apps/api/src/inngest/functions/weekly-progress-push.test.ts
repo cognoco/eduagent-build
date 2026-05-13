@@ -545,12 +545,12 @@ describe('weekly progress generate practice summary', () => {
     expect(mockGetPracticeActivitySummary).toHaveBeenCalledWith(mockDb, {
       profileId: CHILD_ID,
       period: {
-        start: new Date('2026-05-04T00:00:00.000Z'),
-        endExclusive: new Date('2026-05-11T00:00:00.000Z'),
+        start: new Date('2026-05-11T00:00:00.000Z'),
+        endExclusive: new Date('2026-05-18T00:00:00.000Z'),
       },
       previousPeriod: {
-        start: new Date('2026-04-27T00:00:00.000Z'),
-        endExclusive: new Date('2026-05-04T00:00:00.000Z'),
+        start: new Date('2026-05-04T00:00:00.000Z'),
+        endExclusive: new Date('2026-05-11T00:00:00.000Z'),
       },
     });
     expect(mockGenerateWeeklyReportData).toHaveBeenCalledWith(
