@@ -1,5 +1,7 @@
 # Handover — PR-25 / PR-27 / PR-29 (Cluster C9 follow-on)
 
+> **Status: CLOSED 2026-05-13.** All three PRs addressed in [PR #239 `cleanup: close C9 cluster PR-25 / PR-27 / PR-29 (scope-shrunk to residuals)`](https://github.com/cognoco/eduagent-build/pull/239). The remaining content below is kept for archaeology — it describes scope and conventions, not active work.
+
 **For**: agent picking up the remaining C9 cluster work (Cat-1 obsolete files, 8 inbound-link conflicts, folder-level archive moves).
 
 **From**: session that closed PR-15d, PR-20, PR-22, PR-23, PR-26, PR-28 on 2026-05-12/13.
@@ -14,7 +16,7 @@ Six cleanup-plan PRs closed last session — they shared file scope with PR-25/2
 
 **Open PR with last session's work**: [#237 `cleanup: close PR-15d, PR-20, PR-22, PR-23, PR-26, PR-28 + RLS Phase 0+1 archival`](https://github.com/cognoco/eduagent-build/pull/237) (against `main`, branch `cleanup/2026-05-13-session`). Land or rebase against it; do not duplicate its closure edits.
 
-**Working tree**: `/Users/vetinari/_dev/eduagent-build` on branch `consistency2`. The Archon worktree (`~/.archon/workspaces/cognoco/eduagent-build/worktrees/archon/thread-*`) is **not** where to commit — `/commit` skill picks cwd from the invoking process, and committing from a worktree lands on the worktree's private branch instead of `consistency2`. Fall back to `git -C /Users/vetinari/_dev/eduagent-build …` for any commit that's not happening from `_dev/eduagent-build`'s own cwd.
+**Working tree**: use the `consistency2` checkout of `cognoco/eduagent-build` directly. Do **not** commit from an Archon worktree (`.archon/workspaces/.../worktrees/archon/thread-*/`) — the `/commit` skill resolves cwd from the invoking process, and committing from a worktree lands on that worktree's private branch instead of `consistency2`. Fall back to `git -C <consistency2-checkout-path> …` for any commit that's not happening from the main checkout's own cwd.
 
 ---
 
@@ -32,8 +34,9 @@ Cat-1 splits into:
 
 **Quick recon command** (lists which Cat-1 paths still need action vs. are already moved/deleted):
 
-```
-cd /Users/vetinari/_dev/eduagent-build && {
+```bash
+# Run from the repo root of your consistency2 checkout
+{
   awk '/^## Category 1/,/^## Category 2/' docs/audit/2026-04-30-cleanup-triage.md \
     | rg -o '`[^`]+\.(md|html|svg|yaml|json)`' | sort -u | tr -d '`' \
     | while read -r p; do
@@ -196,12 +199,12 @@ bash .archon/scripts/cleanup-extract.sh <PR-id> /tmp/verify-<pr>
 ## Pitfalls (learned the hard way last session)
 
 ### Worktree cwd resets between `Bash` calls in the harness
-The shell cwd resets to the harness's working directory between every `Bash` invocation. **Always prefix with `cd /Users/vetinari/_dev/eduagent-build && …`** or use `git -C /Users/vetinari/_dev/eduagent-build …`. Relative paths land in the wrong tree.
+The shell cwd resets to the harness's working directory between every `Bash` invocation. **Always prefix with `cd <consistency2-checkout> && …`** or use `git -C <consistency2-checkout> …`. Relative paths land in the wrong tree.
 
 ### `/commit` skill picks cwd from the invoking process
-The `/commit` skill is a subagent (`context: fork`) that inherits cwd from the launching agent. If you launch it from the Archon worktree (`~/.archon/workspaces/cognoco/eduagent-build/worktrees/archon/thread-*`), the commit lands on `archon/thread-<uuid>`, NOT on `consistency2`. We had orphan commits on the Archon worktree's private branch as a result. Two safe paths:
-- Spawn a subagent whose Bash session starts with `cd /Users/vetinari/_dev/eduagent-build`, then invoke `/commit` from inside that subagent (its child process inherits the right cwd).
-- Fall back to direct `git -C /Users/vetinari/_dev/eduagent-build add …` + `git -C … commit …`. Husky pre-commit hooks (`tsc --build`, lint-staged, surgical tests, i18n staleness) still run on every `git commit`, so this is safe.
+The `/commit` skill is a subagent (`context: fork`) that inherits cwd from the launching agent. If you launch it from an Archon worktree path (`.../worktrees/archon/thread-*/`), the commit lands on `archon/thread-<uuid>`, NOT on `consistency2`. We had orphan commits on the Archon worktree's private branch as a result. Two safe paths:
+- Spawn a subagent whose Bash session starts with `cd <consistency2-checkout>`, then invoke `/commit` from inside that subagent (its child process inherits the right cwd).
+- Fall back to direct `git -C <consistency2-checkout> add …` + `git -C <consistency2-checkout> commit …`. Husky pre-commit hooks (`tsc --build`, lint-staged, surgical tests, i18n staleness) still run on every `git commit`, so this is safe.
 
 ### Drizzle-kit content-hash sensitivity (do NOT edit applied migrations)
 `drizzle-kit ^0.31.0` hashes SQL file content and stores those hashes in the `__drizzle_migrations` table at apply-time. **Editing any already-applied `apps/api/drizzle/*.sql` file (even a comment-only change) changes the file hash, which will make the next `drizzle-kit migrate` against staging/prod try to re-apply the migration.** The dangling SQL comment in `apps/api/drizzle/0058_memory_facts_enable_rls.sql` line 4 references a ghost file (`project_neon_transaction_facts.md`) — we left it intact for this reason. If you encounter similar in your work, leave the SQL file alone and add a breadcrumb elsewhere.
