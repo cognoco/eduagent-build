@@ -9,6 +9,7 @@ import {
 } from '@eduagent/schemas';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
+import { safeSend } from '../services/safe-non-core';
 import {
   buildLibraryIndex,
   fileToLibrary,
@@ -51,12 +52,17 @@ export const filingRoutes = new Hono<FilingRouteEnv>()
     async (c) => {
       const profileId = requireProfileId(c.get('profileId'));
       const { sessionId, sessionMode } = c.req.valid('json');
-      await inngest.send({
-        name: 'app/filing.retry',
-        data: { sessionId, sessionMode, profileId },
-      });
+      await safeSend(
+        () =>
+          inngest.send({
+            name: 'app/filing.retry',
+            data: { sessionId, sessionMode, profileId },
+          }),
+        'filing.request-retry',
+        { profileId, sessionId },
+      );
       return c.json(filingQueuedResponseSchema.parse({ queued: true }));
-    }
+    },
   )
   .post('/filing', zValidator('json', filingRequestSchema), async (c) => {
     const profileId = requireProfileId(c.get('profileId'));
@@ -70,12 +76,12 @@ export const filingRoutes = new Hono<FilingRouteEnv>()
       const transcript = await getSessionTranscript(
         db,
         profileId,
-        body.sessionId
+        body.sessionId,
       );
       if (transcript?.archived === false) {
         sessionTranscript = transcript.exchanges
           .map(
-            (e) => `${e.role === 'user' ? 'Learner' : 'Tutor'}: ${e.content}`
+            (e) => `${e.role === 'user' ? 'Learner' : 'Tutor'}: ${e.content}`,
           )
           .join('\n');
       }
@@ -96,7 +102,7 @@ export const filingRoutes = new Hono<FilingRouteEnv>()
           sessionMode: body.sessionMode,
         },
         libraryIndex,
-        routeAndCall
+        routeAndCall,
       );
     } catch (err) {
       // [FIX-API-2] Capture primary fileToLibrary failure to Sentry BEFORE
@@ -143,13 +149,13 @@ export const filingRoutes = new Hono<FilingRouteEnv>()
         filingResponse = buildFallbackFilingResponse(
           body.subjectId,
           body.rawInput,
-          body.selectedSuggestion
+          body.selectedSuggestion,
         );
         usedFallback = true;
       } else {
         return c.json(
           { code: 'FILING_FAILED', message: "Couldn't organize this topic." },
-          500
+          500,
         );
       }
     }
@@ -209,7 +215,7 @@ export const filingRoutes = new Hono<FilingRouteEnv>()
           code: 'FILING_RESOLUTION_FAILED',
           message: "Couldn't organize this topic. Please try again.",
         },
-        500
+        500,
       );
     }
 
@@ -219,7 +225,7 @@ export const filingRoutes = new Hono<FilingRouteEnv>()
         db,
         profileId,
         body.sessionId,
-        result.topicId
+        result.topicId,
       );
     }
 
@@ -253,8 +259,8 @@ export const filingRoutes = new Hono<FilingRouteEnv>()
 
     return c.json(
       filingResultSchema.parse(
-        usedFallback ? { ...result, fallback: true } : result
+        usedFallback ? { ...result, fallback: true } : result,
       ),
-      200
+      200,
     );
   });

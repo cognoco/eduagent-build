@@ -20,6 +20,7 @@ import { getTierConfig } from '../services/subscription';
 
 import { inngest } from '../inngest/client';
 import { captureException } from '../services/sentry';
+import { safeSend } from '../services/safe-non-core';
 import { createLogger } from '../services/logger';
 import type { Database } from '@eduagent/database';
 import type Stripe from 'stripe';
@@ -51,7 +52,7 @@ function extractPeriodEnd(sub: Stripe.Subscription): number | undefined {
  * In Stripe SDK v20, `subscription` moved to `parent.subscription_details`.
  */
 function extractSubscriptionIdFromInvoice(
-  invoice: Stripe.Invoice
+  invoice: Stripe.Invoice,
 ): string | undefined {
   const parentSub = invoice.parent?.subscription_details?.subscription;
   if (typeof parentSub === 'string') return parentSub;
@@ -69,7 +70,7 @@ const PAID_TIERS = new Set<string>(['plus', 'family', 'pro']);
 
 /** Validates and extracts a paid tier from metadata. */
 function extractPaidTier(
-  metadata: Record<string, string> | undefined | null
+  metadata: Record<string, string> | undefined | null,
 ): ('plus' | 'family' | 'pro') | null {
   const tier = metadata?.tier;
   if (!tier || !PAID_TIERS.has(tier)) return null;
@@ -78,7 +79,7 @@ function extractPaidTier(
 
 /** Maps a Stripe subscription status to our internal status. */
 function mapStripeStatus(
-  stripeStatus: string
+  stripeStatus: string,
 ): 'active' | 'past_due' | 'cancelled' | 'expired' | null {
   switch (stripeStatus) {
     case 'active':
@@ -103,7 +104,7 @@ function mapStripeStatus(
 async function refreshKvCache(
   kv: KVNamespace | undefined,
   db: Database,
-  accountId: string
+  accountId: string,
 ): Promise<void> {
   if (!kv) return;
 
@@ -133,7 +134,7 @@ async function handleSubscriptionEvent(
   db: Database,
   kv: KVNamespace | undefined,
   stripeSubscription: Stripe.Subscription,
-  eventTimestamp: string
+  eventTimestamp: string,
 ): Promise<void> {
   const status = mapStripeStatus(stripeSubscription.status);
   if (!status) return;
@@ -146,7 +147,7 @@ async function handleSubscriptionEvent(
 
   // Extract tier from subscription metadata (stamped during checkout)
   const tier = extractPaidTier(
-    stripeSubscription.metadata as Record<string, string> | undefined
+    stripeSubscription.metadata as Record<string, string> | undefined,
   );
   if (isExpired) {
     updates.tier = 'free';
@@ -164,7 +165,7 @@ async function handleSubscriptionEvent(
   }
   if (stripeSubscription.canceled_at) {
     updates.cancelledAt = new Date(
-      stripeSubscription.canceled_at * 1000
+      stripeSubscription.canceled_at * 1000,
     ).toISOString();
   } else {
     updates.cancelledAt = null;
@@ -173,7 +174,7 @@ async function handleSubscriptionEvent(
   const updated = await updateSubscriptionFromWebhook(
     db,
     stripeSubscription.id,
-    updates
+    updates,
   );
 
   if (updated) {
@@ -183,7 +184,7 @@ async function handleSubscriptionEvent(
         db,
         updated.id,
         freeTier.monthlyQuota,
-        freeTier.dailyLimit
+        freeTier.dailyLimit,
       );
     } else if (tier) {
       // If tier metadata present, sync quota pool limit to new tier
@@ -192,7 +193,7 @@ async function handleSubscriptionEvent(
         db,
         updated.id,
         tierConfig.monthlyQuota,
-        tierConfig.dailyLimit
+        tierConfig.dailyLimit,
       );
     }
     await refreshKvCache(kv, db, updated.accountId);
@@ -203,7 +204,7 @@ async function handleSubscriptionDeleted(
   db: Database,
   kv: KVNamespace | undefined,
   stripeSubscription: Stripe.Subscription,
-  eventTimestamp: string
+  eventTimestamp: string,
 ): Promise<void> {
   const updates: WebhookSubscriptionUpdate = {
     status: 'expired',
@@ -215,7 +216,7 @@ async function handleSubscriptionDeleted(
   const updated = await updateSubscriptionFromWebhook(
     db,
     stripeSubscription.id,
-    updates
+    updates,
   );
 
   if (updated) {
@@ -224,7 +225,7 @@ async function handleSubscriptionDeleted(
       db,
       updated.id,
       freeTier.monthlyQuota,
-      freeTier.dailyLimit
+      freeTier.dailyLimit,
     );
     await refreshKvCache(kv, db, updated.accountId);
   }
@@ -234,7 +235,7 @@ async function handleCheckoutCompleted(
   db: Database,
   kv: KVNamespace | undefined,
   session: Stripe.Checkout.Session,
-  eventTimestamp: string
+  eventTimestamp: string,
 ): Promise<void> {
   const metadata = session.metadata as Record<string, string> | undefined;
   const accountId = metadata?.accountId;
@@ -253,7 +254,7 @@ async function handleCheckoutCompleted(
     logger.warn(
       `[stripe-webhook] checkout.completed dropped — missing metadata (accountId=${!!accountId}, tier=${!!tier}, subscriptionId=${!!stripeSubscriptionId}, sessionId=${
         session.id
-      })`
+      })`,
     );
     captureException(
       new Error('Stripe checkout.session.completed missing required metadata'),
@@ -269,7 +270,7 @@ async function handleCheckoutCompleted(
               ? session.customer
               : session.customer?.id,
         },
-      }
+      },
     );
     return;
   }
@@ -279,7 +280,7 @@ async function handleCheckoutCompleted(
     accountId,
     stripeSubscriptionId,
     tier,
-    eventTimestamp
+    eventTimestamp,
   );
 
   if (activated) {
@@ -291,7 +292,7 @@ async function handlePaymentFailed(
   db: Database,
   kv: KVNamespace | undefined,
   invoice: Stripe.Invoice,
-  eventTimestamp: string
+  eventTimestamp: string,
 ): Promise<void> {
   const stripeSubscriptionId = extractSubscriptionIdFromInvoice(invoice);
 
@@ -303,11 +304,11 @@ async function handlePaymentFailed(
   // schema drift before users are silently kept on a tier they can't pay for.
   if (!stripeSubscriptionId) {
     logger.warn(
-      `[stripe-webhook] invoice.payment_failed dropped — could not extract subscription id (invoiceId=${invoice.id})`
+      `[stripe-webhook] invoice.payment_failed dropped — could not extract subscription id (invoiceId=${invoice.id})`,
     );
     captureException(
       new Error(
-        'Stripe invoice.payment_failed missing subscription id (possible Stripe schema change)'
+        'Stripe invoice.payment_failed missing subscription id (possible Stripe schema change)',
       ),
       {
         extra: {
@@ -319,7 +320,7 @@ async function handlePaymentFailed(
               : invoice.customer?.id,
           billingReason: invoice.billing_reason,
         },
-      }
+      },
     );
     return;
   }
@@ -331,23 +332,27 @@ async function handlePaymentFailed(
     {
       status: 'past_due',
       lastStripeEventTimestamp: eventTimestamp,
-    }
+    },
   );
 
   if (updated) {
     await refreshKvCache(kv, db, updated.accountId);
 
-    // Observed by payment-failed-observe.ts (queryable terminus for billing alerts).
-    await inngest.send({
-      name: 'app/payment.failed',
-      data: {
-        subscriptionId: updated.id,
-        stripeSubscriptionId,
-        accountId: updated.accountId,
-        attempt: invoice.attempt_count ?? 1,
-        timestamp: new Date().toISOString(),
-      },
-    });
+    await safeSend(
+      () =>
+        inngest.send({
+          name: 'app/payment.failed',
+          data: {
+            subscriptionId: updated.id,
+            stripeSubscriptionId,
+            accountId: updated.accountId,
+            attempt: invoice.attempt_count ?? 1,
+            timestamp: new Date().toISOString(),
+          },
+        }),
+      'stripe-webhook.payment-failed',
+      { accountId: updated.accountId },
+    );
   }
 }
 
@@ -355,7 +360,7 @@ async function handlePaymentSucceeded(
   db: Database,
   kv: KVNamespace | undefined,
   invoice: Stripe.Invoice,
-  eventTimestamp: string
+  eventTimestamp: string,
 ): Promise<void> {
   const stripeSubscriptionId = extractSubscriptionIdFromInvoice(invoice);
 
@@ -367,11 +372,11 @@ async function handlePaymentSucceeded(
   // we detect the schema drift before users notice.
   if (!stripeSubscriptionId) {
     logger.warn(
-      `[stripe-webhook] invoice.payment_succeeded dropped — could not extract subscription id (invoiceId=${invoice.id})`
+      `[stripe-webhook] invoice.payment_succeeded dropped — could not extract subscription id (invoiceId=${invoice.id})`,
     );
     captureException(
       new Error(
-        'Stripe invoice.payment_succeeded missing subscription id (possible Stripe schema change)'
+        'Stripe invoice.payment_succeeded missing subscription id (possible Stripe schema change)',
       ),
       {
         extra: {
@@ -383,7 +388,7 @@ async function handlePaymentSucceeded(
               : invoice.customer?.id,
           billingReason: invoice.billing_reason,
         },
-      }
+      },
     );
     return;
   }
@@ -394,7 +399,7 @@ async function handlePaymentSucceeded(
     {
       status: 'active',
       lastStripeEventTimestamp: eventTimestamp,
-    }
+    },
   );
 
   if (updated) {
@@ -423,7 +428,7 @@ export const stripeWebhookRoute = new Hono<{
       c,
       400,
       ERROR_CODES.MISSING_SIGNATURE,
-      'Missing Stripe-Signature header'
+      'Missing Stripe-Signature header',
     );
   }
 
@@ -433,7 +438,7 @@ export const stripeWebhookRoute = new Hono<{
       c,
       500,
       ERROR_CODES.INTERNAL_ERROR,
-      'Webhook secret not configured'
+      'Webhook secret not configured',
     );
   }
 
@@ -446,14 +451,14 @@ export const stripeWebhookRoute = new Hono<{
       rawBody,
       signature,
       webhookSecret,
-      c.env.STRIPE_SECRET_KEY ?? 'sk_webhook_verification_only'
+      c.env.STRIPE_SECRET_KEY ?? 'sk_webhook_verification_only',
     );
   } catch {
     return apiError(
       c,
       400,
       ERROR_CODES.MISSING_SIGNATURE,
-      'Invalid webhook signature'
+      'Invalid webhook signature',
     );
   }
 
@@ -482,7 +487,7 @@ export const stripeWebhookRoute = new Hono<{
       c,
       400,
       ERROR_CODES.STALE_EVENT,
-      'Event too old — rejected to prevent replay'
+      'Event too old — rejected to prevent replay',
     );
   }
 
@@ -492,7 +497,7 @@ export const stripeWebhookRoute = new Hono<{
         db,
         kv,
         event.data.object as Stripe.Checkout.Session,
-        eventTimestamp
+        eventTimestamp,
       );
       break;
 
@@ -502,7 +507,7 @@ export const stripeWebhookRoute = new Hono<{
         db,
         kv,
         event.data.object as Stripe.Subscription,
-        eventTimestamp
+        eventTimestamp,
       );
       break;
 
@@ -511,7 +516,7 @@ export const stripeWebhookRoute = new Hono<{
         db,
         kv,
         event.data.object as Stripe.Subscription,
-        eventTimestamp
+        eventTimestamp,
       );
       break;
 
@@ -520,7 +525,7 @@ export const stripeWebhookRoute = new Hono<{
         db,
         kv,
         event.data.object as Stripe.Invoice,
-        eventTimestamp
+        eventTimestamp,
       );
       break;
 
@@ -529,7 +534,7 @@ export const stripeWebhookRoute = new Hono<{
         db,
         kv,
         event.data.object as Stripe.Invoice,
-        eventTimestamp
+        eventTimestamp,
       );
       break;
   }

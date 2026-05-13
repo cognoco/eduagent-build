@@ -9,6 +9,7 @@ import { isGuessWhoFuzzyMatch } from '@eduagent/schemas';
 import { BadRequestError, ConflictError, NotFoundError } from '../../errors';
 import { createLogger } from '../logger';
 import { recordPracticeActivityEvent } from '../practice-activity-events';
+import { safeWrite, type DeferredActivityEvent } from '../safe-non-core';
 import { reviewVocabulary } from '../vocabulary';
 import { QUIZ_CONFIG } from './config';
 import { applyQuizSm2 } from './mastery-provider';
@@ -291,7 +292,9 @@ export async function completeQuizRound(
   roundId: string,
   results: QuestionResult[],
 ): Promise<CompleteRoundResponse> {
-  return db.transaction(async (tx) => {
+  const deferredEvents: DeferredActivityEvent[] = [];
+
+  const response = await db.transaction(async (tx) => {
     // Scoped repository bound to the transaction connection: read, update,
     // and missed-items insert all run in the same transactional snapshot.
     // Cast through `unknown` because Drizzle's PgTransaction type doesn't
@@ -357,22 +360,26 @@ export async function completeQuizRound(
       throw new ConflictError('Round already completed');
     }
 
-    await recordPracticeActivityEvent(tx as unknown as Database, {
-      profileId,
-      subjectId: round.subjectId ?? null,
-      activityType: 'quiz',
-      activitySubtype: round.activityType,
-      completedAt,
-      pointsEarned: xpEarned,
-      score,
-      total,
-      sourceType: 'quiz_round',
-      sourceId: roundId,
-      metadata: {
-        celebrationTier,
-        droppedResults,
-        questionCount: total,
+    deferredEvents.push({
+      input: {
+        profileId,
+        subjectId: round.subjectId ?? null,
+        activityType: 'quiz',
+        activitySubtype: round.activityType,
+        completedAt,
+        pointsEarned: xpEarned,
+        score,
+        total,
+        sourceType: 'quiz_round',
+        sourceId: roundId,
+        metadata: {
+          celebrationTier,
+          droppedResults,
+          questionCount: total,
+        },
       },
+      surface: 'quiz.round-completion',
+      context: { profileId, roundId },
     });
 
     if (round.activityType === 'vocabulary') {
@@ -394,6 +401,8 @@ export async function completeQuizRound(
           profileId,
           question.vocabularyId,
           { quality: getVocabSm2Quality(result.correct) },
+          undefined,
+          deferredEvents,
         );
       }
     }
@@ -457,22 +466,26 @@ export async function completeQuizRound(
             round.activityType as 'capitals' | 'guess_who',
             sm2Result,
           );
-          await recordPracticeActivityEvent(tx as unknown as Database, {
-            profileId,
-            activityType: 'review',
-            activitySubtype: round.activityType,
-            completedAt,
-            score: quality,
-            total: 5,
-            sourceType: 'quiz_mastery_item',
-            sourceId: existing.id,
-            occurrenceKey: `round:${roundId}:question:${index}`,
-            metadata: {
-              itemKey,
-              questionIndex: index,
-              answerMode: result.answerMode ?? null,
-              correct: result.correct,
+          deferredEvents.push({
+            input: {
+              profileId,
+              activityType: 'review',
+              activitySubtype: round.activityType,
+              completedAt,
+              score: quality,
+              total: 5,
+              sourceType: 'quiz_mastery_item',
+              sourceId: existing.id,
+              occurrenceKey: `round:${roundId}:question:${index}`,
+              metadata: {
+                itemKey,
+                questionIndex: index,
+                answerMode: result.answerMode ?? null,
+                correct: result.correct,
+              },
             },
+            surface: 'quiz.mastery-review',
+            context: { profileId, roundId, itemKey },
           });
         }
       }
@@ -596,4 +609,14 @@ export async function completeQuizRound(
       questionResults,
     };
   });
+
+  for (const evt of deferredEvents) {
+    await safeWrite(
+      () => recordPracticeActivityEvent(db, evt.input),
+      evt.surface,
+      evt.context,
+    );
+  }
+
+  return response;
 }

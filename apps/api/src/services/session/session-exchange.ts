@@ -48,6 +48,7 @@ import {
   buildCrossSubjectContext,
 } from '../prior-learning';
 import { buildMemoryBlock, buildAccommodationBlock } from '../learner-profile';
+import { applyAppHelpSignalGuard, isAppHelpQuery } from '../app-help-map';
 import { generateEmbedding } from '../embeddings';
 import { retrieveRelevantMemory } from '../memory';
 import { makeEmbedderFromEnv } from '../memory/embed-fact';
@@ -79,6 +80,7 @@ import {
 } from './session-crud';
 import { createLogger } from '../logger';
 import { captureException } from '../sentry';
+import { safeWrite } from '../safe-non-core';
 import {
   buildResumeContext,
   loadPriorSessionMeta,
@@ -1752,14 +1754,19 @@ export async function persistExchangeResult(
   }
 
   if (previousRung !== effectiveRung) {
-    await db.insert(sessionEvents).values({
-      sessionId,
-      profileId,
-      subjectId: session.subjectId,
-      eventType: 'escalation' as const,
-      content: `Escalated from rung ${previousRung} to ${effectiveRung}`,
-      metadata: { fromRung: previousRung, toRung: effectiveRung },
-    });
+    await safeWrite(
+      () =>
+        db.insert(sessionEvents).values({
+          sessionId,
+          profileId,
+          subjectId: session.subjectId,
+          eventType: 'escalation' as const,
+          content: `Escalated from rung ${previousRung} to ${effectiveRung}`,
+          metadata: { fromRung: previousRung, toRung: effectiveRung },
+        }),
+      'session-exchange.escalation-audit',
+      { profileId, sessionId },
+    );
   }
 
   // B.1 monitoring: tone check — detect banned filler openers
@@ -1912,7 +1919,12 @@ export async function processMessage(
     options?.clientId,
   );
 
-  await applyContinuationScore(db, profileId, sessionId, result.retrievalScore);
+  await safeWrite(
+    () =>
+      applyContinuationScore(db, profileId, sessionId, result.retrievalScore),
+    'session-exchange.continuation-score',
+    { profileId, sessionId },
+  );
   if (persisted.persistedUserMessage) {
     await maybeDispatchTopicProbeExtraction(
       db,
@@ -2110,7 +2122,9 @@ export async function streamMessage(
         };
       }
 
-      const parsed = outcome.parsed;
+      const parsed = isAppHelpQuery(input.message)
+        ? applyAppHelpSignalGuard(outcome.parsed)
+        : outcome.parsed;
       const expectedResponseMinutes = estimateExpectedResponseMinutes(
         parsed.cleanResponse,
         context,
@@ -2138,11 +2152,16 @@ export async function streamMessage(
         },
         options?.clientId,
       );
-      await applyContinuationScore(
-        db,
-        profileId,
-        sessionId,
-        parsed.retrievalScore,
+      await safeWrite(
+        () =>
+          applyContinuationScore(
+            db,
+            profileId,
+            sessionId,
+            parsed.retrievalScore,
+          ),
+        'session-exchange.continuation-score',
+        { profileId, sessionId },
       );
       if (persisted.persistedUserMessage) {
         await maybeDispatchTopicProbeExtraction(

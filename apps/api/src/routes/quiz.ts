@@ -36,6 +36,7 @@ import {
   markMissedItemsSurfaced,
 } from '../services/quiz';
 import { inngest } from '../inngest/client';
+import { safeSend } from '../services/safe-non-core';
 
 type QuizRouteEnv = {
   Bindings: {
@@ -323,10 +324,15 @@ export const quizRoutes = new Hono<QuizRouteEnv>()
       const result = await completeQuizRound(db, profileId, roundId, results);
 
       const today = new Date().toISOString().slice(0, 10);
-      await inngest.send({
-        name: 'app/streak.record',
-        data: { profileId, date: today },
-      });
+      await safeSend(
+        () =>
+          inngest.send({
+            name: 'app/streak.record',
+            data: { profileId, date: today },
+          }),
+        'quiz.streak-record',
+        { profileId, roundId },
+      );
 
       return c.json(completeRoundResponseSchema.parse(result), 200);
     },

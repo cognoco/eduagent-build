@@ -61,6 +61,7 @@ import {
 import type { LLMTier } from '../services/subscription';
 import { notFound, apiError } from '../errors';
 import { inngest } from '../inngest/client';
+import { safeSend } from '../services/safe-non-core';
 import { safeRefundQuota } from '../services/billing';
 import {
   startInterleavedSession,
@@ -254,7 +255,11 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         sessionMode:
           session.sessionType === 'homework' ? 'homework' : 'freeform',
       });
-      await inngest.send({ name: 'app/filing.retry', data: retryPayload });
+      await safeSend(
+        () => inngest.send({ name: 'app/filing.retry', data: retryPayload }),
+        'sessions.filing-retry',
+        { profileId, sessionId },
+      );
 
       const updatedSession = await getSession(db, profileId, sessionId);
       if (!updatedSession) return notFound(c, 'Session not found');

@@ -9,6 +9,7 @@ import type { AuthUser } from '../middleware/auth';
 import type { Database } from '@eduagent/database';
 import { sendEmail } from '../services/notifications';
 import { inngest } from '../inngest/client';
+import { safeSend } from '../services/safe-non-core';
 import { apiError } from '../errors';
 
 type FeedbackRouteEnv = {
@@ -41,7 +42,7 @@ function isFeedbackRateLimited(userId: string): boolean {
   const now = Date.now();
   const cutoff = now - FEEDBACK_RATE_LIMIT_WINDOW_MS;
   const timestamps = (feedbackTimestamps.get(userId) ?? []).filter(
-    (t) => t > cutoff
+    (t) => t > cutoff,
   );
   // Prune stale Map entry to prevent unbounded growth in long-lived isolates
   if (timestamps.length === 0 && feedbackTimestamps.has(userId)) {
@@ -74,7 +75,7 @@ export const feedbackRoutes = new Hono<FeedbackRouteEnv>().post(
         c,
         429,
         ERROR_CODES.RATE_LIMITED,
-        'Too many submissions. Please try again later.'
+        'Too many submissions. Please try again later.',
       );
     }
 
@@ -87,8 +88,8 @@ export const feedbackRoutes = new Hono<FeedbackRouteEnv>().post(
       body.category === 'bug'
         ? 'Bug Report'
         : body.category === 'suggestion'
-        ? 'Suggestion'
-        : 'Feedback';
+          ? 'Suggestion'
+          : 'Feedback';
 
     const metaLines = [
       `Profile ID: ${profileId}`,
@@ -113,22 +114,26 @@ export const feedbackRoutes = new Hono<FeedbackRouteEnv>().post(
       {
         resendApiKey: env.RESEND_API_KEY,
         emailFrom: env.EMAIL_FROM,
-      }
+      },
     );
 
     if (!emailResult.sent) {
-      // [A-1] Awaited per CLAUDE.md — no silent fire-and-forget from route handlers.
-      await inngest.send({
-        name: 'app/feedback.delivery_failed',
-        data: { profileId, category: body.category },
-      });
+      await safeSend(
+        () =>
+          inngest.send({
+            name: 'app/feedback.delivery_failed',
+            data: { profileId, category: body.category },
+          }),
+        'feedback.delivery-failed',
+        { profileId },
+      );
       return c.json(
-        feedbackResponseSchema.parse({ success: true, queued: true })
+        feedbackResponseSchema.parse({ success: true, queued: true }),
       );
     }
 
     return c.json(
-      feedbackResponseSchema.parse({ success: true, queued: false })
+      feedbackResponseSchema.parse({ success: true, queued: false }),
     );
-  }
+  },
 );
