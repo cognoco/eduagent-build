@@ -27,6 +27,14 @@ if (typeof WebSocket === 'undefined') {
  */
 export type CreateDatabaseOptions = Record<string, never>;
 
+// Module-level pool cache — survives across requests within the same Cloudflare
+// Worker isolate. Without this, every request creates a fresh NeonPool and
+// negotiates a new WebSocket to Neon, which compounds cold-start latency when
+// Neon auto-suspends the compute (3 parallel library queries × cold WebSocket
+// handshake = 3× the wake-up load). Keyed by connection string so different
+// environments get isolated pools.
+const neonPoolCache = new Map<string, NeonPool>();
+
 // [BUG-MIGRATE-0014 / RLS-PHASE-0] CI runs integration tests against a vanilla
 // Postgres container at localhost:5432 (cheap, fast, in-job). Production runs
 // against Neon, which requires a WebSocket tunnel. @neondatabase/serverless's
@@ -67,7 +75,14 @@ export function createDatabase(
   _options: CreateDatabaseOptions = {},
 ) {
   if (looksLikeNeon(databaseUrl)) {
-    const pool = new NeonPool({ connectionString: databaseUrl });
+    let pool = neonPoolCache.get(databaseUrl);
+    if (!pool) {
+      pool = new NeonPool({
+        connectionString: databaseUrl,
+        connectionTimeoutMillis: 10_000,
+      });
+      neonPoolCache.set(databaseUrl, pool);
+    }
     return drizzleNeon(pool, { schema });
   }
   // drizzle-orm/node-postgres builds the underlying pg Pool internally when
