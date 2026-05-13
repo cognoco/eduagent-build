@@ -1,7 +1,7 @@
 ---
 stepsCompleted: [1, 2]
 inputDocuments:
-  - 'docs/analysis/product-brief-MentoMate-2025-12-11.md'
+  - 'docs/analysis/product-brief-EduAgent-2025-12-11.md'
   - 'docs/analysis/research/market-ai-tutoring-research-2024-12-11.md'
   - 'docs/analysis/research/evidence based learning science.md'
   - 'docs/Legacy/AI Model pricing.md'

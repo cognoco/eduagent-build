@@ -1,5 +1,5 @@
 ---
-project_name: 'eduagent'
+project_name: 'MentoMate'
 user_name: 'Zuzka'
 date: '2026-02-15'
 sections_completed: ['technology_stack', 'language_rules', 'framework_rules', 'testing_rules', 'quality_rules', 'workflow_rules', 'anti_patterns']

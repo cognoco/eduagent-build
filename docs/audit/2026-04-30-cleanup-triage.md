@@ -175,7 +175,7 @@ Per-file evidence is brief ("active workflow rule", "active architecture fact");
 | `docs/flows/flow-improvments.md` (typo in filename — keep filename for now) | Rolling UX audit; many items still open. |
 | `docs/flows/learning-path-flows.md` | Updated 2026-04-18; current learning-path IA. |
 | `docs/flows/mobile-app-flow-inventory.md` | Master flow inventory; source of truth for E2E coverage. **Note co-change C6.** |
-| `docs/analysis/product-brief-MentoMate-2025-12-11.md` | Foundation brief; cited by 3 docs. |
+| `docs/analysis/product-brief-EduAgent-2025-12-11.md` | Foundation brief; cited by 3 docs. |
 | `docs/analysis/research/evidence based learning science.md` | Pedagogy research input; no superseding doc. |
 | `docs/analysis/research/market-ai-tutoring-research-2024-12-11.md` | Market research baseline; cited by PRD. |
 | `docs/audit/claude-optimization/inherited-rules-skill-mapping.md` | Active 2026-04-30 working doc for ongoing CLAUDE.md cleanup. (Relocated 2026-05-02 from `docs/claude-optimization/`.) |

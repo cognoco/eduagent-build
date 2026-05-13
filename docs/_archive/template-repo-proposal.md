@@ -7,7 +7,7 @@
 
 ## The Idea
 
-The MentoMate (MentoMate) codebase contains months of battle-tested infrastructure that has nothing to do with tutoring. We want to extract this into a **reusable SaaS mobile app template** so future apps start with a fully wired stack instead of building from scratch.
+The MentoMate (project name EduAgent) codebase contains months of battle-tested infrastructure that has nothing to do with tutoring. We want to extract this into a **reusable SaaS mobile app template** so future apps start with a fully wired stack instead of building from scratch.
 
 ## Why a Template, Not Starting From Scratch
 

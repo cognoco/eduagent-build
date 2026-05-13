@@ -2,7 +2,7 @@
 stepsCompleted: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
 inputDocuments:
   - 'docs/prd.md'
-  - 'docs/analysis/product-brief-MentoMate-2025-12-11.md'
+  - 'docs/analysis/product-brief-EduAgent-2025-12-11.md'
   - 'docs/analysis/research/market-ai-tutoring-research-2024-12-11.md'
   - 'docs/analysis/epics-inputs.md'
   - 'docs/_archive/factory-briefs/FB-Run023-parents.yaml'

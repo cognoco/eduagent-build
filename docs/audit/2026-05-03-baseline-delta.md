@@ -141,9 +141,9 @@ Of the eight clusters, **all eight remain materially live at HEAD**, but the pic
 
 ### C8 — Track C archeology
 
-**Still true at HEAD:** Item-level static state (10 missing migration snapshots, ~96 memory files, vendored bmad, MentoMate → Mentomate sweep, 4 orphan deps, Prettier upgrade) — not exhaustively re-verified in this delta. Each is a static file-system claim and unlikely to have shifted. Trusting the original recon at HEAD pending the eventual execution check.
+**Still true at HEAD:** Item-level static state (10 missing migration snapshots, ~96 memory files, vendored bmad, EduAgent → MentoMate sweep, 4 orphan deps, Prettier upgrade) — not exhaustively re-verified in this delta. Each is a static file-system claim and unlikely to have shifted. Trusting the original recon at HEAD pending the eventual execution check.
 
-**No longer true at HEAD:** Unverified — but worth noting that `aa041ca0` archive activity may have absorbed some of the MentoMate→Mentomate or stale-doc work indirectly.
+**No longer true at HEAD:** Unverified — but worth noting that `aa041ca0` archive activity may have absorbed some of the EduAgent → MentoMate or stale-doc work indirectly.
 
 **Newly drifted:** None expected.
 
