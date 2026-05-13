@@ -53,9 +53,7 @@ export function WeeklyReportCard({
     topicsTouched: 0,
   };
   const practiceTests = latest?.practiceSummary
-    ? (latest.practiceSummary.totals?.activitiesCompleted ??
-      latest.practiceSummary.quizzesCompleted +
-        latest.practiceSummary.reviewsCompleted)
+    ? latest.practiceSummary.totals.activitiesCompleted
     : 0;
   const practicePoints = latest?.practiceSummary?.totals?.pointsEarned ?? 0;
   const hasMiniSummary =

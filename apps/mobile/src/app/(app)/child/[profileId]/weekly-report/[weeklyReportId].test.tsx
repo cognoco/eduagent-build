@@ -76,6 +76,7 @@ function makeReport(
       vocabularyTotal: number;
     };
     headlineStat: { label: string; value: number; comparison: string };
+    practiceSummary: typeof PRACTICE_SUMMARY;
   }>,
 ) {
   return {
@@ -101,9 +102,30 @@ function makeReport(
         value: 2,
         comparison: 'up from 1 last week',
       },
+      practiceSummary: overrides?.practiceSummary,
     },
   };
 }
+
+const PRACTICE_SUMMARY = {
+  quizzesCompleted: 2,
+  reviewsCompleted: 1,
+  totals: {
+    activitiesCompleted: 3,
+    reviewsCompleted: 1,
+    pointsEarned: 20,
+    celebrations: 1,
+    distinctActivityTypes: 2,
+  },
+  scores: {
+    scoredActivities: 0,
+    score: 0,
+    total: 0,
+    accuracy: null,
+  },
+  byType: [],
+  bySubject: [],
+};
 
 describe('ChildWeeklyReportDetailScreen', () => {
   beforeEach(() => {
@@ -134,6 +156,34 @@ describe('ChildWeeklyReportDetailScreen', () => {
     expect(
       screen.getByTestId('child-weekly-report-metric-vocabulary'),
     ).toBeTruthy();
+  });
+
+  it('renders the practice summary card when practice data is present', () => {
+    mockUseChildWeeklyReportDetail.mockReturnValue({
+      data: makeReport({ practiceSummary: PRACTICE_SUMMARY }),
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+
+    render(<ChildWeeklyReportDetailScreen />);
+
+    screen.getByTestId('child-weekly-report-practice-summary');
+  });
+
+  it('hides the practice summary card when practice data is absent', () => {
+    mockUseChildWeeklyReportDetail.mockReturnValue({
+      data: makeReport(),
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+
+    render(<ChildWeeklyReportDetailScreen />);
+
+    expect(
+      screen.queryByTestId('child-weekly-report-practice-summary'),
+    ).toBeNull();
   });
 
   // BUG-903 (c): Heading must show the full date range, not just weekStart.

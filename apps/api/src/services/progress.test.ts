@@ -1,4 +1,5 @@
 import { createDatabaseModuleMock } from '../test-utils/database-module';
+import { emptyPracticeActivitySummary } from './practice-activity-summary.fixture';
 
 const mockDatabaseModule = createDatabaseModuleMock({
   includeActual: true,
@@ -10,24 +11,19 @@ const mockDatabaseModule = createDatabaseModuleMock({
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
 const mockGetPracticeActivitySummary = jest.fn().mockResolvedValue({
-  quizzesCompleted: 0,
-  reviewsCompleted: 0,
-  totals: {
-    activitiesCompleted: 0,
-    reviewsCompleted: 0,
-    pointsEarned: 0,
-    celebrations: 0,
-    distinctActivityTypes: 0,
-  },
-  scores: {
-    scoredActivities: 0,
-    score: 0,
-    total: 0,
-    accuracy: null,
-  },
-  byType: [],
-  bySubject: [],
+  ...emptyPracticeActivitySummary,
 });
+
+function mockPracticeSummary(
+  overrides?: Partial<
+    Awaited<ReturnType<typeof mockGetPracticeActivitySummary>>
+  >,
+) {
+  return {
+    ...emptyPracticeActivitySummary,
+    ...overrides,
+  };
+}
 
 jest.mock(
   './practice-activity-summary' /* gc1-allow: unit test boundary */,
@@ -625,6 +621,16 @@ describe('getTopicProgress', () => {
 
 describe('getOverallProgress', () => {
   it('returns empty when no subjects', async () => {
+    const practiceSummary = mockPracticeSummary({
+      totals: {
+        activitiesCompleted: 4,
+        reviewsCompleted: 1,
+        pointsEarned: 25,
+        celebrations: 2,
+        distinctActivityTypes: 2,
+      },
+    });
+    mockGetPracticeActivitySummary.mockResolvedValueOnce(practiceSummary);
     setupScopedRepo({ subjectsFindMany: [] });
     const db = createMockDb();
     const result = await getOverallProgress(db, profileId);
@@ -632,6 +638,8 @@ describe('getOverallProgress', () => {
     expect(result.subjects).toEqual([]);
     expect(result.totalTopicsCompleted).toBe(0);
     expect(result.totalTopicsVerified).toBe(0);
+    expect(result.practiceActivityCount).toBe(4);
+    expect(result.practiceSummary).toBe(practiceSummary);
   });
 
   it('limits practice activity summary to a rolling 90-day window', async () => {

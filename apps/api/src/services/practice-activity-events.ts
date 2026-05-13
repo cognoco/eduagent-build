@@ -3,19 +3,12 @@ import {
   type Database,
   type PracticeActivityEvent,
 } from '@eduagent/database';
-
-export type PracticeActivityType =
-  | 'quiz'
-  | 'review'
-  | 'assessment'
-  | 'dictation'
-  | 'recitation'
-  | 'fluency_drill';
+import type { ReportPracticeActivityType } from '@eduagent/schemas';
 
 export interface RecordPracticeActivityEventInput {
   profileId: string;
   subjectId?: string | null;
-  activityType: PracticeActivityType;
+  activityType: ReportPracticeActivityType;
   activitySubtype?: string | null;
   completedAt?: Date;
   pointsEarned?: number | null;

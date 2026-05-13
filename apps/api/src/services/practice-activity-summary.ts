@@ -1,4 +1,4 @@
-import { and, eq, gte, lt } from 'drizzle-orm';
+import { and, count, eq, gte, lt } from 'drizzle-orm';
 import {
   celebrationEvents,
   practiceActivityEvents,
@@ -125,8 +125,8 @@ async function loadCelebrationCount(
   profileId: string,
   period: PracticeActivityPeriod,
 ): Promise<number> {
-  const rows = await db
-    .select({ id: celebrationEvents.id })
+  const [{ count: celebrationCount } = { count: 0 }] = await db
+    .select({ count: count() })
     .from(celebrationEvents)
     .where(
       and(
@@ -135,7 +135,7 @@ async function loadCelebrationCount(
         lt(celebrationEvents.celebratedAt, period.endExclusive),
       ),
     );
-  return rows.length;
+  return celebrationCount;
 }
 
 export function buildSummaryFromRows(
@@ -265,14 +265,14 @@ export async function getPracticeActivitySummary(
   db: Database,
   input: GetPracticeActivitySummaryInput,
 ): Promise<ReportPracticeSummary> {
-  const current = await buildPeriodSummary(db, input.profileId, input.period);
-  if (!input.previousPeriod) return current;
+  if (!input.previousPeriod) {
+    return buildPeriodSummary(db, input.profileId, input.period);
+  }
 
-  const previous = await buildPeriodSummary(
-    db,
-    input.profileId,
-    input.previousPeriod,
-  );
+  const [current, previous] = await Promise.all([
+    buildPeriodSummary(db, input.profileId, input.period),
+    buildPeriodSummary(db, input.profileId, input.previousPeriod),
+  ]);
   return {
     ...current,
     comparison: {

@@ -131,4 +131,51 @@ describe('PracticeActivitySummaryCard', () => {
 
     expect(queryByTestId('practice-summary')).toBeNull();
   });
+
+  it('hides comparison detail when the delta is zero', () => {
+    render(
+      <PracticeActivitySummaryCard
+        summary={{
+          quizzesCompleted: 1,
+          reviewsCompleted: 0,
+          totals: {
+            activitiesCompleted: 1,
+            reviewsCompleted: 0,
+            pointsEarned: 5,
+            celebrations: 0,
+            distinctActivityTypes: 1,
+          },
+          scores: {
+            scoredActivities: 1,
+            score: 1,
+            total: 1,
+            accuracy: 1,
+          },
+          byType: [],
+          bySubject: [],
+          comparison: {
+            previous: {
+              activitiesCompleted: 1,
+              reviewsCompleted: 0,
+              pointsEarned: 5,
+              celebrations: 0,
+              distinctActivityTypes: 1,
+            },
+            delta: {
+              activitiesCompleted: 0,
+              reviewsCompleted: 0,
+              pointsEarned: 0,
+              celebrations: 0,
+              distinctActivityTypes: 0,
+            },
+          },
+        }}
+        testID="practice-summary"
+      />,
+    );
+
+    expect(
+      screen.queryByText('0 tests · 0 points · 0 celebrations'),
+    ).toBeNull();
+  });
 });

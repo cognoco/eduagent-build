@@ -93,6 +93,11 @@ export function PracticeActivitySummaryCard({
 
   const accuracy = formatAccuracy(summary.scores.accuracy);
   const comparison = summary.comparison?.delta;
+  const hasComparisonDelta =
+    !!comparison &&
+    (comparison.activitiesCompleted !== 0 ||
+      comparison.pointsEarned !== 0 ||
+      comparison.celebrations !== 0);
   const visibleTypes = summary.byType.slice(0, 6);
   const visibleSubjects = summary.bySubject.slice(0, 4);
 
@@ -141,7 +146,7 @@ export function PracticeActivitySummaryCard({
         />
       </View>
 
-      {comparison ? (
+      {hasComparisonDelta ? (
         <Text className="text-caption text-text-secondary mt-3">
           {t('parentView.practiceSummary.comparison', {
             tests: formatSigned(comparison.activitiesCompleted),

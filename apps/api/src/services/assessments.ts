@@ -544,8 +544,6 @@ export async function recordAssessmentCompletionActivity(
   status: AssessmentStatus,
   evaluation: AssessmentEvaluation,
 ): Promise<void> {
-  if (status === 'in_progress') return;
-
   const completedAt = new Date(assessment.updatedAt);
   await recordPracticeActivityEvent(db, {
     profileId,

@@ -55,8 +55,6 @@ jest.mock('../client' /* gc1-allow: unit test boundary */, () => ({
 // and sendEmail are both stubbed via jest.mock on the service barrel.
 // This is acceptable for Inngest handler control-flow tests because the
 // services themselves are tested in isolation in notifications.test.ts.
-// gc1-allow: handler control-flow test; services tested in their own unit suites
-
 const mockSendPushNotification = jest.fn().mockResolvedValue({ sent: true });
 const mockSendEmail = jest
   .fn()
@@ -127,25 +125,11 @@ jest.mock( // gc1-allow: handler control-flow test; services tested in own suite
   }),
 );
 
-const mockGetPracticeActivitySummary = jest.fn().mockResolvedValue({
-  quizzesCompleted: 0,
-  reviewsCompleted: 0,
-  totals: {
-    activitiesCompleted: 0,
-    reviewsCompleted: 0,
-    pointsEarned: 0,
-    celebrations: 0,
-    distinctActivityTypes: 0,
-  },
-  scores: {
-    scoredActivities: 0,
-    score: 0,
-    total: 0,
-    accuracy: null,
-  },
-  byType: [],
-  bySubject: [],
-});
+import { emptyPracticeActivitySummary } from '../../services/practice-activity-summary.fixture';
+
+const mockGetPracticeActivitySummary = jest
+  .fn()
+  .mockResolvedValue(emptyPracticeActivitySummary);
 // prettier-ignore
 jest.mock( // gc1-allow: handler control-flow test; service tested separately
   '../../services/practice-activity-summary',

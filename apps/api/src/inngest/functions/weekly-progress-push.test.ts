@@ -58,28 +58,11 @@ jest.mock('../client' /* gc1-allow: unit test boundary */, () => ({
   },
 }));
 
-const emptyPracticeSummary = {
-  quizzesCompleted: 0,
-  reviewsCompleted: 0,
-  totals: {
-    activitiesCompleted: 0,
-    reviewsCompleted: 0,
-    pointsEarned: 0,
-    celebrations: 0,
-    distinctActivityTypes: 0,
-  },
-  scores: {
-    scoredActivities: 0,
-    score: 0,
-    total: 0,
-    accuracy: null,
-  },
-  byType: [],
-  bySubject: [],
-};
+import { emptyPracticeActivitySummary } from '../../services/practice-activity-summary.fixture';
+
 const mockGetPracticeActivitySummary = jest
   .fn()
-  .mockResolvedValue(emptyPracticeSummary);
+  .mockResolvedValue(emptyPracticeActivitySummary);
 jest.mock(
   '../../services/practice-activity-summary' /* gc1-allow: unit test boundary for Inngest handler; full DB path covered by practice-activity-summary tests */,
   () => ({
@@ -116,7 +99,7 @@ const mockGenerateWeeklyReportData = jest.fn().mockReturnValue({
     label: 'Topics mastered',
     comparison: '+1 this week',
   },
-  practiceSummary: emptyPracticeSummary,
+  practiceSummary: emptyPracticeActivitySummary,
 });
 jest.mock(
   '../../services/weekly-report' /* gc1-allow: unit test boundary */,
@@ -258,7 +241,9 @@ beforeEach(() => {
     onConflictDoNothing: mockWeeklyReportOnConflictDoNothing,
   });
   mockWeeklyReportOnConflictDoNothing.mockResolvedValue(undefined);
-  mockGetPracticeActivitySummary.mockResolvedValue(emptyPracticeSummary);
+  mockGetPracticeActivitySummary.mockResolvedValue(
+    emptyPracticeActivitySummary,
+  );
   mockGetLatestSnapshot.mockResolvedValue(null);
   mockGetLatestSnapshotOnOrBefore.mockResolvedValue(null);
   mockGenerateWeeklyReportData.mockReturnValue({
@@ -278,7 +263,7 @@ beforeEach(() => {
       label: 'Topics mastered',
       comparison: '+1 this week',
     },
-    practiceSummary: emptyPracticeSummary,
+    practiceSummary: emptyPracticeActivitySummary,
   });
   mockSendPushNotification.mockResolvedValue({ sent: true });
   mockSendEmail.mockResolvedValue({ sent: true });
@@ -558,7 +543,7 @@ describe('weekly progress generate practice summary', () => {
       '2026-05-11',
       CURRENT_METRICS,
       PREVIOUS_METRICS,
-      emptyPracticeSummary,
+      emptyPracticeActivitySummary,
     );
     expect(mockWeeklyReportInsertValues).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -566,7 +551,7 @@ describe('weekly progress generate practice summary', () => {
         childProfileId: CHILD_ID,
         reportWeek: '2026-05-11',
         reportData: expect.objectContaining({
-          practiceSummary: emptyPracticeSummary,
+          practiceSummary: emptyPracticeActivitySummary,
         }),
       }),
     );
