@@ -10,6 +10,7 @@ Wherever possible, test the real solution — do not use mocks.
 
 **How to apply:**
 - When writing new tests or fixing existing ones, prefer testing real functions/components with real inputs
+- If a test file you touch already has mocks, rewrite the touched coverage to mirror the real implementation instead of adding new shape-only mocks or making the mock graph more elaborate
 - Do NOT add new `jest.mock()` calls for internal modules (relative paths `./` or `../`). GC1 ratchet blocks these in CI.
 - External boundary mocks (Stripe, Clerk JWKS, Inngest framework, LLM providers via `routeAndCall`) are allowed per CLAUDE.md — these are not "internal" mocks.
 - Do NOT modify existing test assertions just to make code changes pass — if tests fail, that's a signal to investigate

@@ -11,8 +11,7 @@ test('J-16 parent drill-down reaches topic detail and unwinds cleanly', async ({
 }) => {
   const seed = await readSeedData('owner-with-children');
   const childProfileId = seed.ids.child1ProfileId;
-  const subjectId = seed.ids.subject1Id;
-  const topicId = seed.ids.child1TopicId;
+  const sessionId = seed.ids.session1Id;
 
   await page.goto('/home', { waitUntil: 'commit' });
   await expect(page.getByTestId('parent-home-screen')).toBeVisible({
@@ -20,29 +19,39 @@ test('J-16 parent drill-down reaches topic detail and unwinds cleanly', async ({
   });
 
   await pressableClick(
-    page.getByTestId(`parent-home-check-child-${childProfileId}`),
+    page.getByTestId(`parent-home-child-progress-${childProfileId}`),
   );
-  await expect(page.getByTestId('child-detail-scroll')).toBeVisible({
+  await expect(page.getByTestId('progress-screen')).toBeVisible({
+    timeout: 30_000,
+  });
+  await expect(page.getByTestId(`progress-pill-${childProfileId}`)).toBeVisible(
+    {
+      timeout: 30_000,
+    },
+  );
+
+  const sessionCard = page
+    .getByTestId('progress-screen')
+    .getByTestId(`session-card-${sessionId}`);
+  await expect(sessionCard).toBeVisible({
+    timeout: 30_000,
+  });
+  await pressableClick(sessionCard);
+  await expect(page.getByTestId('session-detail-ctas')).toBeVisible({
     timeout: 30_000,
   });
 
-  await pressableClick(page.getByTestId(`subject-card-${subjectId}`));
-  const topicLink = page.getByTestId(`accordion-topic-${topicId}`);
-  await expect(topicLink).toBeVisible({
-    timeout: 30_000,
-  });
-
-  await pressableClick(topicLink);
-  await expect(page.getByTestId('topic-detail-screen')).toBeVisible({
+  await pressableClick(page.getByTestId('session-detail-continue-topic'));
+  await expect(page.getByTestId('topic-status-card')).toBeVisible({
     timeout: 30_000,
   });
 
   await pressableClick(page.getByRole('button', { name: /go back/i }));
-  await expect(page.getByTestId('child-detail-scroll')).toBeVisible({
+  await expect(page.getByTestId('session-metadata')).toBeVisible({
     timeout: 30_000,
   });
   await pressableClick(page.getByRole('button', { name: /go back/i }));
-  await expect(page.getByTestId('parent-home-screen')).toBeVisible({
+  await expect(page.getByTestId('progress-screen')).toBeVisible({
     timeout: 30_000,
   });
 });

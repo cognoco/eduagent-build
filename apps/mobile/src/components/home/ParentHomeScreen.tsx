@@ -391,8 +391,32 @@ export function ParentHomeScreen({
     role,
     birthYear: activeProfile?.birthYear,
   });
+  const hasNoLinkedChildren = linkedChildren.length === 0;
+
+  const navigateToCreateChildProfile = useCallback(() => {
+    if (Platform.OS === 'web') {
+      const webLocation = globalThis as typeof globalThis & {
+        location?: { assign: (url: string) => void };
+      };
+
+      if (webLocation.location) {
+        webLocation.location.assign('/create-profile?for=child');
+        return;
+      }
+    }
+
+    router.push({
+      pathname: '/create-profile',
+      params: { for: 'child' },
+    } as never);
+  }, [router]);
 
   const handleAddChild = useCallback(() => {
+    if (hasNoLinkedChildren) {
+      navigateToCreateChildProfile();
+      return;
+    }
+
     if (!subscription) {
       platformAlert(t('common.loading'), t('more.errors.tryAgainMoment'));
       return;
@@ -431,14 +455,25 @@ export function ParentHomeScreen({
       );
       return;
     }
-    router.push({
-      pathname: '/create-profile',
-      params: { for: 'child' },
-    } as never);
-  }, [subscription, familyData, router, t]);
+    navigateToCreateChildProfile();
+  }, [
+    hasNoLinkedChildren,
+    subscription,
+    familyData,
+    router,
+    t,
+    navigateToCreateChildProfile,
+  ]);
 
   function pushChildDetail(childProfileId: string): void {
     router.push(`/(app)/child/${childProfileId}` as Href);
+  }
+
+  function pushChildProgress(childProfileId: string): void {
+    router.push({
+      pathname: '/(app)/progress',
+      params: { profileId: childProfileId },
+    } as Href);
   }
 
   function pushChildReports(childProfileId: string): void {
@@ -486,10 +521,12 @@ export function ParentHomeScreen({
         <View className="mt-4">
           <WithdrawalCountdownBanner />
         </View>
-        <ParentTransitionNotice
-          profileId={activeProfile?.id}
-          childNames={childNames}
-        />
+        {linkedChildren.length > 0 ? (
+          <ParentTransitionNotice
+            profileId={activeProfile?.id}
+            childNames={childNames}
+          />
+        ) : null}
 
         {linkedChildren.length > 0 ? (
           <View className="mt-5" testID="parent-home-tonight-section">
@@ -564,7 +601,7 @@ export function ParentHomeScreen({
               child={child}
               dashboardChild={findDashboardChild(dashboard, child.id)}
               highlight={index === 0}
-              onOpenProgress={() => pushChildDetail(child.id)}
+              onOpenProgress={() => pushChildProgress(child.id)}
               onOpenReports={() => pushChildReports(child.id)}
               onOpenNudge={() => setSheetChildId(child.id)}
               t={t}
