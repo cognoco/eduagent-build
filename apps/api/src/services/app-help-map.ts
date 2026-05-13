@@ -68,5 +68,6 @@ export function applyAppHelpSignalGuard<T extends ParsedSignals>(parsed: T): T {
     notePrompt: false,
     notePromptPostSession: false,
     readyToFinish: false,
+    fluencyDrill: null,
   };
 }

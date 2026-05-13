@@ -4933,6 +4933,15 @@
           "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
+        },
+        "progress_summaries_latest_session_id_learning_sessions_id_fk": {
+          "name": "progress_summaries_latest_session_id_learning_sessions_id_fk",
+          "tableFrom": "progress_summaries",
+          "tableTo": "learning_sessions",
+          "columnsFrom": ["latest_session_id"],
+          "columnsTo": ["id"],
+          "onDelete": "set null",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},

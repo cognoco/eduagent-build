@@ -171,7 +171,12 @@ export async function getProgressSummary(
       startedAt: learningSessions.startedAt,
     })
     .from(learningSessions)
-    .where(eq(learningSessions.profileId, childProfileId))
+    .where(
+      and(
+        eq(learningSessions.profileId, childProfileId),
+        eq(learningSessions.status, 'completed'),
+      ),
+    )
     .orderBy(desc(learningSessions.startedAt), desc(learningSessions.id))
     .limit(1);
 

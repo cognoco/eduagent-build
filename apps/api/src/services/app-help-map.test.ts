@@ -234,4 +234,13 @@ describe('applyAppHelpSignalGuard', () => {
     expect(guarded.cleanResponse).toBe('You can find your notes in Library.');
     expect(guarded.fluencyDrill).toBeNull();
   });
+
+  it('suppresses fluency drills for app-help turns', () => {
+    const guarded = applyAppHelpSignalGuard({
+      ...baseParsed,
+      fluencyDrill: { prompt: 'say it again' },
+    });
+
+    expect(guarded.fluencyDrill).toBeNull();
+  });
 });

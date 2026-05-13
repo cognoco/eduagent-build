@@ -749,7 +749,7 @@ export const progressSummarySchema = z.object({
   summary: z.string().max(500).nullable(),
   generatedAt: z.string().datetime().nullable(),
   basedOnLastSessionAt: z.string().datetime().nullable(),
-  latestSessionId: z.string().nullable(),
+  latestSessionId: z.string().uuid().nullable(),
   activityState: z.enum(['fresh', 'no_recent_activity', 'stale']),
   nudgeRecommended: z.boolean(),
 });

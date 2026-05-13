@@ -12,6 +12,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { generateUUIDv7 } from '../utils/uuid';
 import { profiles } from './profiles';
+import { learningSessions } from './sessions';
 import { curriculumBooks, subjects } from './subjects';
 
 export const progressSnapshots = pgTable(
@@ -60,8 +61,10 @@ export const progressSummaries = pgTable(
     basedOnLastSessionAt: timestamp('based_on_last_session_at', {
       withTimezone: true,
     }),
-    // Informational only; scoped queries and activity-state logic use profileId.
-    latestSessionId: uuid('latest_session_id'),
+    latestSessionId: uuid('latest_session_id').references(
+      () => learningSessions.id,
+      { onDelete: 'set null' },
+    ),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),
