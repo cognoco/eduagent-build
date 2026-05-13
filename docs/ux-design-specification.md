@@ -17,12 +17,12 @@ documentCounts:
 workflowType: 'ux-design'
 lastStep: 14
 status: 'complete'
-project_name: 'EduAgent'
+project_name: 'MentoMate'
 user_name: 'Zuzka'
 date: '2026-02-14'
 ---
 
-# UX Design Specification EduAgent
+# UX Design Specification MentoMate
 
 **Author:** Zuzka
 **Date:** 2026-02-14
@@ -33,7 +33,7 @@ date: '2026-02-14'
 
 ### Product Vision
 
-EduAgent is an AI-powered personal tutoring platform targeting children aged 11-17 and adult learners. It transforms homework help into genuine understanding through four pillars: Memory (spaced repetition, knowledge retention), Structure (curriculum alignment, learning paths), Verification (understanding checks, not answer-giving), and Relationship (adaptive personality, emotional awareness).
+MentoMate is an AI-powered personal tutoring platform targeting children aged 11-17 and adult learners. It transforms homework help into genuine understanding through four pillars: Memory (spaced repetition, knowledge retention), Structure (curriculum alignment, learning paths), Verification (understanding checks, not answer-giving), and Relationship (adaptive personality, emotional awareness).
 
 ### Target User Segments (Priority Order)
 
@@ -43,9 +43,9 @@ EduAgent is an AI-powered personal tutoring platform targeting children aged 11-
 
 ### Primary UX Challenge: The Homework-to-Learning Bridge
 
-The core UX challenge is that **the child is the user but the parent is the customer.** Children don't choose EduAgent — parents impose it as a ChatGPT alternative. This is a **forced adoption product** for the child segment.
+The core UX challenge is that **the child is the user but the parent is the customer.** Children don't choose MentoMate — parents impose it as a ChatGPT alternative. This is a **forced adoption product** for the child segment.
 
-The child's default preference is ChatGPT: instant answers, no teaching, no oversight, no friction. EduAgent must survive this comparison not by being "better for learning" (children don't value this) but by being **fast enough that it's not worth switching.**
+The child's default preference is ChatGPT: instant answers, no teaching, no oversight, no friction. MentoMate must survive this comparison not by being "better for learning" (children don't value this) but by being **fast enough that it's not worth switching.**
 
 ### Key UX Design Decisions
 
@@ -57,14 +57,14 @@ The child's default preference is ChatGPT: instant answers, no teaching, no over
 | 4 | **2-3 Question Limit** | Maximum 2-3 Socratic questions before switching approach. Never interrogate a stuck child. |
 | 5 | **Parallel Example Pattern** | When child is stuck: demonstrate the method on a *different but similar* problem, then return to homework. Preserves integrity (homework answer not revealed) while preventing frustration. |
 | 6 | **Invisible Bridge to Learning** | After homework, AI plants seeds: "You struggled with X — want me to explain the pattern?" No pressure, no lecture. |
-| 7 | **Speed is Survival** | If EduAgent is slower than struggling alone, child will cheat around it. Speed is the only metric that matters for child retention. |
+| 7 | **Speed is Survival** | If MentoMate is slower than struggling alone, child will cheat around it. Speed is the only metric that matters for child retention. |
 | 8 | **Parent/Teacher Preview at Setup** | Quick trust-building demo before handing phone to child. Same demo serves both parents and teachers. |
 | 9 | **Teacher Channel (Light)** | "Teacher recommended" onboarding path. Teachers may not universally embrace AI tools, but the channel costs nothing to maintain and provides social normalization for children who receive the recommendation. |
 
 ### Design Opportunities
 
 1. **Dual-mode teaching** — "Serious Learner" (mastery gates) vs "Casual Explorer" (no gates) allows the same app to serve motivated and reluctant users.
-2. **Memory as differentiator** — EduAgent remembers what ChatGPT forgets. Cross-session continuity ("You made this same mistake last week") is genuine value even for reluctant users.
+2. **Memory as differentiator** — MentoMate remembers what ChatGPT forgets. Cross-session continuity ("You made this same mistake last week") is genuine value even for reluctant users.
 3. **Reverse trial (14 days full + 14 days soft landing)** — Lets the homework loop establish before asking for payment.
 4. **Topic Status Model** — Retention (Strong/Fading/Weak/Forgotten) + Struggle (Normal/Needs Deepening/Blocked) as orthogonal dimensions creates nuanced, actionable progress visibility for parents.
 
@@ -91,7 +91,7 @@ _To be applied after UX Design workflow completes:_
 
 ### Defining Experience: Coach, Not Tool
 
-EduAgent is a learning coach, not a Q&A chatbot. Every time the user opens the app, the AI has already done the thinking — it knows what's fading from memory, what's next in the learning path, and how much time the user probably has. The user's only job is to show up.
+MentoMate is a learning coach, not a Q&A chatbot. Every time the user opens the app, the AI has already done the thinking — it knows what's fading from memory, what's next in the learning path, and how much time the user probably has. The user's only job is to show up.
 
 ### The Core Learning Loop: Recall → Build → Apply → Close
 
@@ -227,9 +227,9 @@ The hardest emotional problem isn't the first session — it's the 15th, when no
 
 ### The Lock-In Emotion: "Wait, I Actually Remember This"
 
-The genuine surprise of knowing something you didn't used to know. Not streaks, not points, not badges. The moment the learner retrieves knowledge they assumed they'd forgotten — that's the emotional moment that makes EduAgent irreplaceable. This is the emotional expression of "making it STICK."
+The genuine surprise of knowing something you didn't used to know. Not streaks, not points, not badges. The moment the learner retrieves knowledge they assumed they'd forgotten — that's the emotional moment that makes MentoMate irreplaceable. This is the emotional expression of "making it STICK."
 
-Competitors fail here emotionally: Duolingo feels productive in the moment but hollow over time because people sense it's not working. EduAgent must deliver the opposite — genuine proof of retained knowledge that surprises even the learner.
+Competitors fail here emotionally: Duolingo feels productive in the moment but hollow over time because people sense it's not working. MentoMate must deliver the opposite — genuine proof of retained knowledge that surprises even the learner.
 
 ### Emotional Journey Mapping
 
@@ -295,7 +295,7 @@ Competitors fail here emotionally: Duolingo feels productive in the moment but h
 
 **ChatGPT** — Conversational with zero learning curve. Type anything, get something back. Versatile without mode-switching. Fails at: no memory (starts blank), no plan (reactive), no structure (no recall/verification), doesn't tell you when to stop. Transferable: "Just ask something" entry point feels familiar; zero learning curve; BUT our AI talks first and remembers.
 
-**Photomath** — Camera → instant math solution with visual step-by-step breakdown. Multiple solving methods shown. Fails at: gives direct answers (zero integrity), no retention, math only. Transferable: Camera → problem recognition UX flow; visual step-by-step presentation; EduAgent = "Photomath that actually makes you learn and works for every subject."
+**Photomath** — Camera → instant math solution with visual step-by-step breakdown. Multiple solving methods shown. Fails at: gives direct answers (zero integrity), no retention, math only. Transferable: Camera → problem recognition UX flow; visual step-by-step presentation; MentoMate = "Photomath that actually makes you learn and works for every subject."
 
 **Duolingo** — Micro-sessions (5 minutes feels achievable), visible progression (skill tree), placement onboarding, daily habit formation, playful tone. Fails at: hollow retention (users complete exercises but can't speak), guilt mechanics (streak-shame, passive-aggressive notifications), recognition over production (multiple choice, not producing language), patronizing at higher levels. Transferable: Micro-session format; placement/onboarding that meets you at your level; progression visibility for Library.
 
@@ -361,7 +361,7 @@ Competitors fail here emotionally: Duolingo feels productive in the moment but h
 | Factor | Decision Driver |
 |--------|----------------|
 | **LLM-codability** | Tailwind CSS is the most LLM-friendly styling approach in the JS ecosystem. For a team using AI code generation, this compounds on every feature, every screen. |
-| **Visual freedom** | EduAgent needs a teen-friendly look (Snapchat/TikTok-inspired), not Material Design corporate. Utility-first CSS gives maximum design flexibility. |
+| **Visual freedom** | MentoMate needs a teen-friendly look (Snapchat/TikTok-inspired), not Material Design corporate. Utility-first CSS gives maximum design flexibility. |
 | **Three-persona theming** | CSS variables via `vars()` — define a variable set per persona (teen/adult/parent), swap at login. Components stay identical; only tokens change. |
 | **Component ownership** | shadcn/ui copy-paste model means full code ownership. Critical when building highly custom components (coaching card, homework camera, Library). |
 | **Stability** | NativeWind v4 is stable and widely used (~400K weekly downloads). React Native Reusables has 7.9K stars and active growth. |
@@ -467,7 +467,7 @@ This is the experience that no competitor delivers. The AI has already done the 
 
 > **ChatGPT answers but doesn't remember.**
 > **Duolingo remembers but doesn't adapt.**
-> **EduAgent remembers you and adapts to you.**
+> **MentoMate remembers you and adapts to you.**
 
 This triangle is both positioning and a feature evaluation framework. For every design and feature decision: *"Does this make the app more personal, more adaptive, more aware of the individual learner?"* If no, question whether it belongs.
 
@@ -1078,7 +1078,7 @@ _Collected for the Architecture phase. These are hard technical requirements sur
 
 ## UX Consistency Patterns
 
-_Rules for how EduAgent behaves in every common situation. These patterns ensure the app feels like one coach across all journeys, personas, and states._
+_Rules for how MentoMate behaves in every common situation. These patterns ensure the app feels like one coach across all journeys, personas, and states._
 
 ### AI Coaching Interaction Patterns
 
@@ -1219,7 +1219,7 @@ Consistent structure: acknowledge problem → offer recovery action → never bl
 
 **Minimal Navigation — The Coach Leads.**
 
-EduAgent is not a menu-driven app. The primary navigation is the coaching card. Secondary navigation exists but is never the default path.
+MentoMate is not a menu-driven app. The primary navigation is the coaching card. Secondary navigation exists but is never the default path.
 
 **Navigation Structure:**
 
@@ -1435,7 +1435,7 @@ These cover ~80% of standard UI needs. All use semantic tokens (`bg-surface`, `t
 
 ### Custom Components
 
-Domain-specific components that make EduAgent, EduAgent. Refined based on code review: components sharing structure merged into hierarchies, monolithic components decomposed.
+Domain-specific components that make MentoMate, MentoMate. Refined based on code review: components sharing structure merged into hierarchies, monolithic components decomposed.
 
 #### BaseCoachingCard (Component Hierarchy)
 
@@ -1673,7 +1673,7 @@ _Party Mode revision: Profile Switcher removed from Phase 1. Parent uses separat
 
 ## Responsive Design & Accessibility
 
-_EduAgent is built with Expo (React Native) for iOS, Android, and Web. Mobile is the primary platform. This section defines how the app adapts across devices and ensures accessibility for all learners, including those with disabilities._
+_MentoMate is built with Expo (React Native) for iOS, Android, and Web. Mobile is the primary platform. This section defines how the app adapts across devices and ensures accessibility for all learners, including those with disabilities._
 
 ### Responsive Strategy
 
@@ -1719,7 +1719,7 @@ Post-MVP: tablet/desktop could show Library as a side panel alongside conversati
 
 ### Breakpoint Strategy
 
-NativeWind v4 responsive breakpoints for EduAgent:
+NativeWind v4 responsive breakpoints for MentoMate:
 
 | Breakpoint | Range | Layout |
 |------------|-------|--------|
@@ -1805,7 +1805,7 @@ These cost zero extra development time — they're good design decisions already
 
 #### Visual Accessibility
 
-| Requirement | Standard | EduAgent Implementation |
+| Requirement | Standard | MentoMate Implementation |
 |-------------|----------|------------------------|
 | **Text contrast** | 4.5:1 (normal), 3:1 (large text) | All persona themes must pass. Critical for teen dark mode and parent dashboard status colors. |
 | **Retention signals** | Never color alone | Color + text label always. Colorblind-safe by design. |
@@ -1816,7 +1816,7 @@ These cost zero extra development time — they're good design decisions already
 
 #### Cognitive Accessibility
 
-The most important accessibility dimension for EduAgent.
+The most important accessibility dimension for MentoMate.
 
 | Requirement | Implementation |
 |-------------|---------------|
@@ -2000,7 +2000,7 @@ _This is a server-rendered HTML page, not a mobile screen. Served by the API or 
 
 ```
 ┌─────────────────────────────────────┐
-│  EduAgent logo                      │
+│  MentoMate logo                      │
 │                                     │
 │  Family account ready!              │
 │                                     │

@@ -6,12 +6,12 @@ inputDocuments:
   - 'docs/Legacy/MVP_DEFINITION.md'
 workflowType: 'product-brief'
 lastStep: 5
-project_name: 'EduAgent'
+project_name: 'MentoMate'
 user_name: 'Zuzka'
 date: '2025-12-11'
 ---
 
-# Product Brief: EduAgent
+# Product Brief: MentoMate
 
 **Date:** 2025-12-11
 **Author:** Zuzka
@@ -20,11 +20,11 @@ date: '2025-12-11'
 
 ## Executive Summary
 
-EduAgent is a premium AI tutoring platform designed for motivated learners aged 11+ who need structured, verified learning outcomes—not passive content consumption. We address a critical gap: while video courses, gamified drills, and generic AI chatbots flood the market, none combine affordability with actual teaching that produces lasting results.
+MentoMate is a premium AI tutoring platform designed for motivated learners aged 11+ who need structured, verified learning outcomes—not passive content consumption. We address a critical gap: while video courses, gamified drills, and generic AI chatbots flood the market, none combine affordability with actual teaching that produces lasting results.
 
 **The Opportunity:** The AI tutoring market is growing at 30.5% CAGR ($1.6-3.5B in 2024 → $6.5-8.0B by 2030), driven by proven effectiveness (25-30% academic performance gains) and massive cost arbitrage (€30/month vs €60-100/hour for human tutors). However, the market window is narrowing rapidly—OpenAI, Google, and Anthropic launched free tutoring modes in mid-2025, commoditizing core features.
 
-**Our Approach:** Position as a craft-scale business serving a focused segment willing to pay €30/month for depth over breadth. Target: €50K ARR with 280 paying users. Unlike free alternatives that lack structure and verification, EduAgent provides persistent curricula, systematic assessment, and learning continuity—features that create switching costs and defensibility.
+**Our Approach:** Position as a craft-scale business serving a focused segment willing to pay €30/month for depth over breadth. Target: €50K ARR with 280 paying users. Unlike free alternatives that lack structure and verification, MentoMate provides persistent curricula, systematic assessment, and learning continuity—features that create switching costs and defensibility.
 
 **Key Metrics:** 15%+ trial-to-paid conversion, 40%+ 30-day retention, with validation through beta users. The window for differentiated entry is 6-12 months before free platforms add structured learning features.
 
@@ -81,7 +81,7 @@ The critical insight: learners don't need more information—they need guided pr
 
 **"A teacher who grows with you."**
 
-EduAgent is an AI-powered personal tutoring platform that teaches through conversation—using research-backed methodologies to guide learners to understanding, remembering what they've learned across sessions, and verifying retention.
+MentoMate is an AI-powered personal tutoring platform that teaches through conversation—using research-backed methodologies to guide learners to understanding, remembering what they've learned across sessions, and verifying retention.
 
 **Four Pillars:**
 
@@ -95,17 +95,17 @@ EduAgent is an AI-powered personal tutoring platform that teaches through conver
 
 **The Solution Approach:**
 
-Rather than competing with free AI on breadth, EduAgent focuses on depth for motivated learners. We serve the segment willing to pay €30/month for structured learning that produces verified outcomes—parents paying for children's education, career changers investing in earning potential, and certification seekers who need results.
+Rather than competing with free AI on breadth, MentoMate focuses on depth for motivated learners. We serve the segment willing to pay €30/month for structured learning that produces verified outcomes—parents paying for children's education, career changers investing in earning potential, and certification seekers who need results.
 
 **Positioning:** Premium AI tutoring at 1/10th the cost of human tutors. We create defensibility through persistent learning infrastructure—curricula that follow learners across sessions, progress visibility for families, and regulatory compliance that respects young learners' privacy.
 
-Unlike answer-giving bots, EduAgent requires learners to demonstrate understanding before progressing, creating verified learning outcomes rather than passive consumption.
+Unlike answer-giving bots, MentoMate requires learners to demonstrate understanding before progressing, creating verified learning outcomes rather than passive consumption.
 
 ### Key Differentiators
 
 **What Big Tech Lacks (Our Moat):**
 
-| Gap in Free AI | EduAgent Solution | Switching Cost |
+| Gap in Free AI | MentoMate Solution | Switching Cost |
 |----------------|-------------------|----------------|
 | No persistent curriculum | Structured syllabus across sessions | HIGH (lose learning path) |
 | No verification of learning | Systematic mastery demonstration requirements | HIGH (no proof of mastery) |
@@ -128,7 +128,7 @@ Unlike answer-giving bots, EduAgent requires learners to demonstrate understandi
 
 ### The Motivation Filter
 
-EduAgent serves **high-motivation learners aged 11+**—people who really want to learn, not casual browsers.
+MentoMate serves **high-motivation learners aged 11+**—people who really want to learn, not casual browsers.
 
 **The Critical Distinction:**
 
@@ -261,7 +261,7 @@ The tutor adapts based on learner age:
 
 ### Tier 2: Established EdTech
 
-| Player | Price | Users | Gap/Opportunity for EduAgent |
+| Player | Price | Users | Gap/Opportunity for MentoMate |
 |--------|-------|-------|------------------------------|
 | **Khanmigo** (Khan Academy) | $4/month | 700K students | K-12 focus; adult learners underserved |
 | **Duolingo Max** | $30/month | 545K users | Vertical-specific (languages only) |
@@ -287,7 +287,7 @@ The tutor adapts based on learner age:
 | **Wyzant** | €25-80/hour | Human tutors, all subjects |
 | **Varsity Tutors** | €40-80/hour | Human + AI hybrid |
 
-**Value Proposition:** EduAgent at €30/month = 6 hours of human tutoring annually.
+**Value Proposition:** MentoMate at €30/month = 6 hours of human tutoring annually.
 
 ### Competitive Casualties (Cautionary Tales)
 
@@ -352,7 +352,7 @@ The tutor adapts based on learner age:
 
 ### Pricing Rationale
 
-| Competitor | Price | EduAgent Advantage |
+| Competitor | Price | MentoMate Advantage |
 |------------|-------|-------------------|
 | Human tutor | €40-80/hr | 24/7, fraction of cost, remembers everything |
 | Duolingo Super | €13/mo | Any subject (not just languages) |
@@ -487,7 +487,7 @@ For **motivated learners aged 11+** (and parents paying for their children)
 
 Who **need to actually learn something** (not just browse content)
 
-**EduAgent** is a **personal AI tutor**
+**MentoMate** is a **personal AI tutor**
 
 That **remembers you, structures your learning, and verifies you understood**
 
@@ -503,7 +503,7 @@ We offer **a teacher who grows with you—grounded in real teaching science, at 
 
 **Authentication & Onboarding:**
 - Email + Google + Apple + OpenAI Sign-In
-- OpenAI auth option (exploring): enables user-funded LLM token usage, reducing EduAgent API costs—implementation details TBD
+- OpenAI auth option (exploring): enables user-funded LLM token usage, reducing MentoMate API costs—implementation details TBD
 - Age verification (11+ minimum)
 - GDPR parental consent flow (ages 11-15 in EU)
 - COPPA parental consent flow (ages 11-12 in US)

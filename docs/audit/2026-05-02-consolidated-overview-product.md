@@ -81,7 +81,7 @@ Each contradiction is small and quick to fix. The cumulative effect, though, is 
 
 ### Hygiene backlog (GREEN-leaning)
 
-Ten missing database-migration snapshot files. A directory of internal AI memory files that needs deduplication. Vendored copies of a tool plugin alongside the installed version, with no decision on which to keep. A naming sweep (the project was renamed from EduAgent to Mentomate; pockets of the old name remain). Four dependencies declared but unused. A formatter that's a major version behind. Each item is small. None blocks anything. The category exists because there is genuinely accumulated work, and naming it explicitly is more honest than pretending it isn't there.
+Ten missing database-migration snapshot files. A directory of internal AI memory files that needs deduplication. Vendored copies of a tool plugin alongside the installed version, with no decision on which to keep. A naming sweep (the project was renamed from MentoMate to Mentomate; pockets of the old name remain). Four dependencies declared but unused. A formatter that's a major version behind. Each item is small. None blocks anything. The category exists because there is genuinely accumulated work, and naming it explicitly is more honest than pretending it isn't there.
 
 ### Parallel: the cleanup-triage backlog
 
