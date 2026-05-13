@@ -72,10 +72,13 @@ jest.mock('@eduagent/database', () => ({
 // ---------------------------------------------------------------------------
 
 const mockGetSessionTranscript = jest.fn();
-jest.mock('../../services/session', () => ({
-  getSessionTranscript: (...args: unknown[]) =>
-    mockGetSessionTranscript(...args),
-}));
+jest.mock(
+  '../../services/session' /* gc1-allow: isolates unit test from DB-backed transcript service */,
+  () => ({
+    getSessionTranscript: (...args: unknown[]) =>
+      mockGetSessionTranscript(...args),
+  }),
+);
 
 const mockBuildLibraryIndex = jest.fn().mockResolvedValue({ shelves: [] });
 const mockFileToLibrary = jest.fn().mockResolvedValue({
@@ -96,11 +99,15 @@ const mockResolveFilingResult = jest.fn().mockResolvedValue({
   isNew: { shelf: false, book: false, chapter: false },
 });
 
-jest.mock('../../services/filing', () => ({
-  buildLibraryIndex: (...args: unknown[]) => mockBuildLibraryIndex(...args),
-  fileToLibrary: (...args: unknown[]) => mockFileToLibrary(...args),
-  resolveFilingResult: (...args: unknown[]) => mockResolveFilingResult(...args),
-}));
+jest.mock(
+  '../../services/filing' /* gc1-allow: isolates unit test from DB-backed filing service */,
+  () => ({
+    buildLibraryIndex: (...args: unknown[]) => mockBuildLibraryIndex(...args),
+    fileToLibrary: (...args: unknown[]) => mockFileToLibrary(...args),
+    resolveFilingResult: (...args: unknown[]) =>
+      mockResolveFilingResult(...args),
+  }),
+);
 
 jest.mock('../../services/llm', () => ({
   routeAndCall: jest.fn().mockResolvedValue({ text: 'mocked' }),
@@ -111,6 +118,8 @@ jest.mock('../../services/llm', () => ({
 // ---------------------------------------------------------------------------
 
 import { freeformFilingRetry } from './freeform-filing';
+import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
+import type { InngestStepSendEventCall } from '../../test-utils/inngest-step-runner';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -121,19 +130,16 @@ const testSessionId = '00000000-0000-4000-8000-000000000002';
 
 async function executeSteps(
   eventData: Record<string, unknown>,
-): Promise<{ result: unknown; mockStep: Record<string, unknown> }> {
-  const mockStep = {
-    run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
-    sendEvent: jest.fn().mockResolvedValue(undefined),
-  };
+): Promise<{ result: unknown; sendEventCalls: InngestStepSendEventCall[] }> {
+  const { step, sendEventCalls } = createInngestStepRunner();
 
   const handler = (freeformFilingRetry as any).fn;
   const result = await handler({
     event: { data: eventData, name: 'app/filing.retry' },
-    step: mockStep,
+    step,
   });
 
-  return { result, mockStep };
+  return { result, sendEventCalls };
 }
 
 function createEventData(
@@ -314,18 +320,22 @@ describe('freeformFilingRetry', () => {
       ],
     });
 
-    const { mockStep } = await executeSteps(createEventData());
+    const { sendEventCalls } = await executeSteps(createEventData());
 
-    expect(mockStep.sendEvent).toHaveBeenCalledWith(
-      'notify-filing-completed',
-      expect.objectContaining({
-        name: 'app/filing.completed',
-        data: expect.objectContaining({
-          bookId: 'book-001',
-          sessionId: testSessionId,
-          profileId: testProfileId,
+    expect(sendEventCalls).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: 'notify-filing-completed',
+          payload: expect.objectContaining({
+            name: 'app/filing.completed',
+            data: expect.objectContaining({
+              bookId: 'book-001',
+              sessionId: testSessionId,
+              profileId: testProfileId,
+            }),
+          }),
         }),
-      }),
+      ]),
     );
   });
 
@@ -338,17 +348,21 @@ describe('freeformFilingRetry', () => {
       ],
     });
 
-    const { mockStep } = await executeSteps(createEventData());
+    const { sendEventCalls } = await executeSteps(createEventData());
 
-    expect(mockStep.sendEvent).toHaveBeenCalledWith(
-      'notify-filing-retry-completed',
-      expect.objectContaining({
-        name: 'app/filing.retry_completed',
-        data: expect.objectContaining({
-          sessionId: testSessionId,
-          profileId: testProfileId,
+    expect(sendEventCalls).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: 'notify-filing-retry-completed',
+          payload: expect.objectContaining({
+            name: 'app/filing.retry_completed',
+            data: expect.objectContaining({
+              sessionId: testSessionId,
+              profileId: testProfileId,
+            }),
+          }),
         }),
-      }),
+      ]),
     );
   });
 
@@ -384,13 +398,13 @@ describe('freeformFilingRetry', () => {
     });
 
     it('emits app/filing.completed with the same key set as the success path [CR-FIL-CONSISTENCY-02]', async () => {
-      const { mockStep } = await executeSteps(createEventData());
+      const { sendEventCalls } = await executeSteps(createEventData());
 
-      const completedCall = (mockStep.sendEvent as jest.Mock).mock.calls.find(
-        (c: unknown[]) => (c[0] as string) === 'notify-filing-completed',
+      const completedCall = sendEventCalls.find(
+        (c) => c.name === 'notify-filing-completed',
       );
       expect(completedCall).not.toBeUndefined();
-      const payload = (completedCall as unknown[])[1] as {
+      const payload = completedCall!.payload as {
         name: string;
         data: Record<string, unknown>;
       };
@@ -412,12 +426,12 @@ describe('freeformFilingRetry', () => {
         topicId: null,
       });
 
-      const { mockStep } = await executeSteps(createEventData());
+      const { sendEventCalls } = await executeSteps(createEventData());
 
-      const completedCall = (mockStep.sendEvent as jest.Mock).mock.calls.find(
-        (c: unknown[]) => (c[0] as string) === 'notify-filing-completed',
+      const completedCall = sendEventCalls.find(
+        (c) => c.name === 'notify-filing-completed',
       );
-      const payload = (completedCall as unknown[])[1] as {
+      const payload = completedCall!.payload as {
         data: Record<string, unknown>;
       };
       // Keys must exist even when values are undefined (structure matches success path)
@@ -447,12 +461,12 @@ describe('freeformFilingRetry', () => {
       // prove the new code path doesn't depend on it.
       mockCurriculumBooksFindFirst.mockResolvedValue(null);
 
-      const { mockStep } = await executeSteps(createEventData());
+      const { sendEventCalls } = await executeSteps(createEventData());
 
-      const completedCall = (mockStep.sendEvent as jest.Mock).mock.calls.find(
-        (c: unknown[]) => (c[0] as string) === 'notify-filing-completed',
+      const completedCall = sendEventCalls.find(
+        (c) => c.name === 'notify-filing-completed',
       );
-      const payload = (completedCall as unknown[])[1] as {
+      const payload = completedCall!.payload as {
         data: Record<string, unknown>;
       };
       expect(payload.data.bookId).toBe(filedBookId);

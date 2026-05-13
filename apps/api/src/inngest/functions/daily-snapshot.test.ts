@@ -6,6 +6,7 @@ import {
   createDatabaseModuleMock,
   createTransactionalMockDb,
 } from '../../test-utils/database-module';
+import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 
 const col = (name: string) => ({ name });
 
@@ -59,44 +60,38 @@ jest.mock('../helpers', () => {
 import { dailySnapshotCron, dailySnapshotRefresh } from './daily-snapshot';
 
 // ---------------------------------------------------------------------------
-// Helpers — manual step extraction (same rationale as session-completed.test.ts:
-// these functions use step.run callbacks; testing them directly through the
-// Inngest SDK is fragile; instead we capture and invoke the handlers manually).
+// Helpers — step extraction using shared createInngestStepRunner.
+// These functions use step.run callbacks; testing them directly through the
+// Inngest SDK is fragile; instead we capture and invoke the handlers manually.
 // ---------------------------------------------------------------------------
 
 async function executeCronSteps(): Promise<{
   result: unknown;
-  mockStep: Record<string, jest.Mock>;
+  runner: ReturnType<typeof createInngestStepRunner>;
 }> {
-  const sentEvents: unknown[][] = [];
-
-  const mockStep = {
-    run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
-    sendEvent: jest.fn(async (_name: string, events: unknown) => {
-      sentEvents.push(events as unknown[]);
-    }),
-  };
+  const runner = createInngestStepRunner();
 
   const handler = (dailySnapshotCron as any).fn;
-  const result = await handler({ step: mockStep });
+  const result = await handler({ step: runner.step });
 
-  return { result, mockStep: mockStep as Record<string, jest.Mock> };
+  return { result, runner };
 }
 
 async function executeRefreshSteps(
   eventData: Record<string, unknown>,
-): Promise<{ result: unknown; mockStep: Record<string, jest.Mock> }> {
-  const mockStep = {
-    run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
-  };
+): Promise<{
+  result: unknown;
+  runner: ReturnType<typeof createInngestStepRunner>;
+}> {
+  const runner = createInngestStepRunner();
 
   const handler = (dailySnapshotRefresh as any).fn;
   const result = await handler({
     event: { data: eventData, name: 'app/progress.snapshot.refresh' },
-    step: mockStep,
+    step: runner.step,
   });
 
-  return { result, mockStep: mockStep as Record<string, jest.Mock> };
+  return { result, runner };
 }
 
 // ---------------------------------------------------------------------------
@@ -145,10 +140,13 @@ describe('dailySnapshotCron', () => {
       { profileId: 'profile-003' },
     ]);
 
-    const { mockStep, result } = await executeCronSteps();
+    const { runner, result } = await executeCronSteps();
 
-    expect(mockStep['sendEvent']).toHaveBeenCalledWith(
-      'fan-out-progress-refresh-0',
+    const call = runner.sendEventCalls.find(
+      (c) => c.name === 'fan-out-progress-refresh-0',
+    );
+    expect(call).toBeDefined();
+    expect(call!.payload).toEqual(
       expect.arrayContaining([
         {
           name: 'app/progress.snapshot.refresh',
@@ -188,21 +186,18 @@ describe('dailySnapshotCron', () => {
     }));
     mockSnapshotDb.query.learningSessions.findMany.mockResolvedValue(rows);
 
-    const { mockStep, result } = await executeCronSteps();
+    const { runner, result } = await executeCronSteps();
 
-    expect(mockStep['sendEvent']).toHaveBeenCalledTimes(2);
-    expect(mockStep['sendEvent']).toHaveBeenNthCalledWith(
-      1,
-      'fan-out-progress-refresh-0',
-      expect.any(Array),
-    );
-    expect(mockStep['sendEvent']).toHaveBeenNthCalledWith(
-      2,
-      'fan-out-progress-refresh-200',
-      expect.any(Array),
-    );
-    const firstBatch = mockStep['sendEvent']!.mock.calls[0]![1]! as unknown[];
-    const secondBatch = mockStep['sendEvent']!.mock.calls[1]![1]! as unknown[];
+    expect(runner.sendEventCalls).toHaveLength(2);
+
+    const firstCall = runner.sendEventCalls[0]!;
+    const secondCall = runner.sendEventCalls[1]!;
+
+    expect(firstCall.name).toBe('fan-out-progress-refresh-0');
+    expect(secondCall.name).toBe('fan-out-progress-refresh-200');
+
+    const firstBatch = firstCall.payload as unknown[];
+    const secondBatch = secondCall.payload as unknown[];
     expect(firstBatch).toHaveLength(200);
     expect(firstBatch[0]).toEqual(
       expect.objectContaining({ name: 'app/progress.snapshot.refresh' }),
@@ -215,12 +210,9 @@ describe('dailySnapshotCron', () => {
   });
 
   it('runs find-active-profiles as a named step', async () => {
-    const { mockStep } = await executeCronSteps();
+    const { runner } = await executeCronSteps();
 
-    expect(mockStep['run']).toHaveBeenCalledWith(
-      'find-active-profiles',
-      expect.any(Function),
-    );
+    expect(runner.runNames()).toContain('find-active-profiles');
   });
 });
 
@@ -320,14 +312,11 @@ describe('dailySnapshotRefresh', () => {
   });
 
   it('runs refresh logic inside a named step', async () => {
-    const { mockStep } = await executeRefreshSteps({
+    const { runner } = await executeRefreshSteps({
       profileId: 'profile-001',
     });
 
-    expect(mockStep['run']).toHaveBeenCalledWith(
-      'refresh-snapshot',
-      expect.any(Function),
-    );
+    expect(runner.runNames()).toContain('refresh-snapshot');
   });
 
   it('returns milestone count of 0 when snapshot has no milestones', async () => {

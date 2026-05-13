@@ -15,51 +15,60 @@
 
 const mockGetStepDatabase = jest.fn();
 
-jest.mock('../helpers', () => ({
-  getStepDatabase: () => mockGetStepDatabase(),
-}));
+jest.mock(
+  '../helpers' /* gc1-allow: isolates DB connection from unit test */,
+  () => ({
+    getStepDatabase: () => mockGetStepDatabase(),
+  }),
+);
 
-jest.mock('../client', () => ({
-  inngest: {
-    createFunction: jest.fn(
-      (
-        _config: unknown,
-        _trigger: unknown,
-        handler: (...args: unknown[]) => unknown,
-      ) => ({ fn: handler, _config, _trigger }),
-    ),
-  },
-}));
+import { createInngestTransportCapture } from '../../test-utils/inngest-transport-capture';
+import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
+
+const mockInngestTransport = createInngestTransportCapture();
+jest.mock('../client', () => mockInngestTransport.module); // gc1-allow: inngest framework boundary
 
 const mockCaptureException = jest.fn();
-jest.mock('../../services/sentry', () => ({
-  captureException: (...args: unknown[]) => mockCaptureException(...args),
-}));
+jest.mock(
+  '../../services/sentry' /* gc1-allow: isolates Sentry external boundary */,
+  () => ({
+    captureException: (...args: unknown[]) => mockCaptureException(...args),
+  }),
+);
 
 const mockFormatFilingFailedPush = jest.fn().mockReturnValue({
   title: 'Filing failed',
   body: 'We could not save your session.',
 });
 const mockSendPushNotification = jest.fn().mockResolvedValue({ sent: true });
-jest.mock('../../services/notifications', () => ({
-  formatFilingFailedPush: () => mockFormatFilingFailedPush(),
-  sendPushNotification: (...args: unknown[]) =>
-    mockSendPushNotification(...args),
-}));
+jest.mock(
+  '../../services/notifications' /* gc1-allow: isolates push notification external boundary */,
+  () => ({
+    formatFilingFailedPush: () => mockFormatFilingFailedPush(),
+    sendPushNotification: (...args: unknown[]) =>
+      mockSendPushNotification(...args),
+  }),
+);
 
 const mockGetRecentNotificationCount = jest.fn().mockResolvedValue(0);
-jest.mock('../../services/settings', () => ({
-  getRecentNotificationCount: (...args: unknown[]) =>
-    mockGetRecentNotificationCount(...args),
-}));
-
-jest.mock('../../services/logger', () => ({
-  createLogger: () => ({
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
+jest.mock(
+  '../../services/settings' /* gc1-allow: isolates notification settings service */,
+  () => ({
+    getRecentNotificationCount: (...args: unknown[]) =>
+      mockGetRecentNotificationCount(...args),
   }),
-}));
+);
+
+jest.mock(
+  '../../services/logger' /* gc1-allow: isolates logger to prevent console noise in tests */,
+  () => ({
+    createLogger: () => ({
+      info: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
+    }),
+  }),
+);
 
 // Import AFTER mocks are set up
 import { filingTimedOutObserve } from './filing-timed-out-observe';
@@ -118,16 +127,17 @@ async function executeHandler(
     filingStatus: 'filing_recovered',
   },
 ) {
-  const mockStep = {
-    run: jest.fn(async (name: string, fn: () => Promise<unknown>) => {
-      if (name in stepRunOverrides) {
-        return stepRunOverrides[name]!();
-      }
-      return fn();
-    }),
-    sendEvent: jest.fn().mockResolvedValue(undefined),
-    waitForEvent: jest.fn().mockResolvedValue(waitForEventResult),
-  };
+  // Convert stepRunOverrides (callback-per-name) into runResults for the step runner.
+  // createInngestStepRunner accepts function values in runResults and calls them.
+  const runResults: Record<string, () => Promise<unknown>> = {};
+  for (const [name, fn] of Object.entries(stepRunOverrides)) {
+    runResults[name] = fn;
+  }
+
+  const runner = createInngestStepRunner({
+    runResults,
+    waitForEventResult,
+  });
 
   // Default db: query returns the snapshot session, update chains resolve [].
   // mark-failed is the only step that runs db.update() when mark-pending-and-
@@ -173,8 +183,8 @@ async function executeHandler(
   mockGetStepDatabase.mockReturnValue(mockDb);
 
   const handler = (filingTimedOutObserve as any).fn;
-  const result = await handler({ event: makeEvent(), step: mockStep });
-  return { result, mockStep, mockDb, mockUpdateChain };
+  const result = await handler({ event: makeEvent(), step: runner.step });
+  return { result, runner, mockDb, mockUpdateChain };
 }
 
 // ---------------------------------------------------------------------------
@@ -184,6 +194,7 @@ async function executeHandler(
 describe('filing-timed-out-observe [CR-FIL-RACE-01]', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockInngestTransport.clear();
   });
 
   // -------------------------------------------------------------------------
@@ -221,7 +232,7 @@ describe('filing-timed-out-observe [CR-FIL-RACE-01]', () => {
     // markFailedRows defaults to [] (0 rows) — real mark-failed step body runs
     // and sees the DB returning 0 rows, simulating the race where
     // filing-completed-observe already set the status to filing_recovered.
-    const { result, mockStep } = await executeHandler(
+    const { result, runner } = await executeHandler(
       {
         // Only override the slot-claim; mark-failed runs its real step body.
         'mark-pending-and-claim-retry-slot': claimRetrySlotReturns1,
@@ -234,24 +245,25 @@ describe('filing-timed-out-observe [CR-FIL-RACE-01]', () => {
     expect(result.resolution).toBe('recovered_after_window');
 
     // The emit-resolved (unrecoverable) sendEvent must NOT be called.
-    const emitResolvedCalls = mockStep.sendEvent.mock.calls.filter(
-      ([name]: [string]) => name === 'emit-resolved',
+    const emitResolvedCalls = runner.sendEventCalls.filter(
+      (c) => c.name === 'emit-resolved',
     );
     // Only dispatch-filing-retry and emit-auto-retry-attempted are expected.
     // emit-resolved for the unrecoverable path must NOT be among them.
     const unrecoverableEmit = emitResolvedCalls.find(
-      ([, payload]: [string, { data?: { resolution?: string } }]) =>
-        payload?.data?.resolution === 'unrecoverable',
+      (c) =>
+        (c.payload as { data?: { resolution?: string } })?.data?.resolution ===
+        'unrecoverable',
     );
     expect(unrecoverableEmit).toBeUndefined();
 
     // [CR-FIL-SILENT-01] emit-resolved-recovered-after-window MUST be called
     // with name 'app/session.filing_resolved' and resolution 'recovered_after_window'.
-    const recoveredAfterWindowEmit = mockStep.sendEvent.mock.calls.find(
-      ([name]: [string]) => name === 'emit-resolved-recovered-after-window',
+    const recoveredAfterWindowEmit = runner.sendEventCalls.find(
+      (c) => c.name === 'emit-resolved-recovered-after-window',
     );
     expect(recoveredAfterWindowEmit).not.toBeUndefined();
-    expect(recoveredAfterWindowEmit[1]).toMatchObject({
+    expect(recoveredAfterWindowEmit!.payload).toMatchObject({
       name: 'app/session.filing_resolved',
       data: expect.objectContaining({
         resolution: 'recovered_after_window',
@@ -261,8 +273,8 @@ describe('filing-timed-out-observe [CR-FIL-RACE-01]', () => {
     });
 
     // send-failure-push step must NOT be invoked.
-    const sendFailurePushCalls = mockStep.run.mock.calls.filter(
-      ([name]) => name === 'send-failure-push',
+    const sendFailurePushCalls = runner.runCalls.filter(
+      (c) => c.name === 'send-failure-push',
     );
     expect(sendFailurePushCalls).toHaveLength(0);
 
@@ -280,7 +292,7 @@ describe('filing-timed-out-observe [CR-FIL-RACE-01]', () => {
     // markFailedRows = [{ id: SESSION_ID }] (1 row) — real mark-failed step body
     // runs and sees the DB returning 1 row, meaning the CAS guard matched and
     // the status was successfully flipped to filing_failed.
-    const { result, mockStep } = await executeHandler(
+    const { result, runner } = await executeHandler(
       {
         'mark-pending-and-claim-retry-slot': claimRetrySlotReturns1,
       },
@@ -293,15 +305,16 @@ describe('filing-timed-out-observe [CR-FIL-RACE-01]', () => {
     expect(result.resolution).toBe('unrecoverable');
 
     // emit-resolved (unrecoverable) MUST be called.
-    const unrecoverableEmit = mockStep.sendEvent.mock.calls.find(
-      ([, payload]: [string, { data?: { resolution?: string } }]) =>
-        payload?.data?.resolution === 'unrecoverable',
+    const unrecoverableEmit = runner.sendEventCalls.find(
+      (c) =>
+        (c.payload as { data?: { resolution?: string } })?.data?.resolution ===
+        'unrecoverable',
     );
     expect(unrecoverableEmit).not.toBeUndefined();
 
     // send-failure-push step MUST be invoked.
-    const sendFailurePushCalls = mockStep.run.mock.calls.filter(
-      ([name]) => name === 'send-failure-push',
+    const sendFailurePushCalls = runner.runCalls.filter(
+      (c) => c.name === 'send-failure-push',
     );
     expect(sendFailurePushCalls).toHaveLength(1);
 
@@ -320,7 +333,7 @@ describe('filing-timed-out-observe [CR-FIL-RACE-01]', () => {
 
     // markFailedRows defaults to [] (0 rows) — real mark-failed step body runs
     // and sees the DB returning 0 rows (status already advanced to filing_recovered).
-    const { result, mockStep } = await executeHandler(
+    const { result, runner } = await executeHandler(
       {
         'mark-pending-and-claim-retry-slot': claimRetrySlotExhausted,
       },
@@ -330,18 +343,18 @@ describe('filing-timed-out-observe [CR-FIL-RACE-01]', () => {
     expect(result.resolution).toBe('recovered_after_window');
     expect(mockCaptureException).not.toHaveBeenCalled();
 
-    const sendFailurePushCalls = mockStep.run.mock.calls.filter(
-      ([name]) => name === 'send-failure-push',
+    const sendFailurePushCalls = runner.runCalls.filter(
+      (c) => c.name === 'send-failure-push',
     );
     expect(sendFailurePushCalls).toHaveLength(0);
 
     // [CR-FIL-SILENT-01] structured event must be emitted even when no retry
     // slot was claimed — ops must be able to query this path.
-    const recoveredAfterWindowEmit = mockStep.sendEvent.mock.calls.find(
-      ([name]: [string]) => name === 'emit-resolved-recovered-after-window',
+    const recoveredAfterWindowEmit = runner.sendEventCalls.find(
+      (c) => c.name === 'emit-resolved-recovered-after-window',
     );
     expect(recoveredAfterWindowEmit).not.toBeUndefined();
-    expect(recoveredAfterWindowEmit[1]).toMatchObject({
+    expect(recoveredAfterWindowEmit!.payload).toMatchObject({
       name: 'app/session.filing_resolved',
       data: expect.objectContaining({
         resolution: 'recovered_after_window',
@@ -365,7 +378,7 @@ describe('filing-timed-out-observe [CR-FIL-RACE-01]', () => {
       updatedAt: new Date(),
     };
 
-    const { result, mockStep } = await executeHandler(
+    const { result, runner } = await executeHandler(
       {},
       null,
       sessionWithFiledAt,
@@ -373,8 +386,8 @@ describe('filing-timed-out-observe [CR-FIL-RACE-01]', () => {
 
     expect(result.resolution).toBe('late_completion');
 
-    const markFailedCalls = mockStep.run.mock.calls.filter(
-      ([name]) => name === 'mark-failed',
+    const markFailedCalls = runner.runCalls.filter(
+      (c) => c.name === 'mark-failed',
     );
     expect(markFailedCalls).toHaveLength(0);
   });
@@ -393,7 +406,7 @@ describe('filing-timed-out-observe [CR-FIL-RACE-01]', () => {
       },
     };
 
-    const { result, mockStep } = await executeHandler(
+    const { result, runner } = await executeHandler(
       {
         'mark-pending-and-claim-retry-slot': claimRetrySlotReturns1,
       },
@@ -402,8 +415,8 @@ describe('filing-timed-out-observe [CR-FIL-RACE-01]', () => {
 
     expect(result.resolution).toBe('retry_succeeded');
 
-    const markFailedCalls = mockStep.run.mock.calls.filter(
-      ([name]) => name === 'mark-failed',
+    const markFailedCalls = runner.runCalls.filter(
+      (c) => c.name === 'mark-failed',
     );
     expect(markFailedCalls).toHaveLength(0);
 
@@ -422,6 +435,7 @@ describe('filing-timed-out-observe [CR-FIL-RACE-01]', () => {
 describe('[BUG-699-FOLLOWUP] filing-timed-out-observe 24h push dedup', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockInngestTransport.clear();
     // Default: mark-failed returns true (0→failed transition succeeded),
     // retry slot returns null (no retry claimed), so the function reaches
     // send-failure-push.
@@ -482,6 +496,7 @@ describe('[BUG-699-FOLLOWUP] filing-timed-out-observe 24h push dedup', () => {
 describe('[H-2] filing-timed-out-observe — new step.run safety guards', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockInngestTransport.clear();
   });
 
   // -------------------------------------------------------------------------
@@ -549,7 +564,7 @@ describe('[H-2] filing-timed-out-observe — new step.run safety guards', () => 
   // -------------------------------------------------------------------------
   it('[H-2] CAS recheck: row not in filing_recovered → no event emitted', async () => {
     // recheckRow is null (row deleted)
-    const { result, mockStep } = await executeHandler(
+    const { result, runner } = await executeHandler(
       {
         'mark-pending-and-claim-retry-slot': async () => null,
       },
@@ -562,14 +577,14 @@ describe('[H-2] filing-timed-out-observe — new step.run safety guards', () => 
     expect(result.resolution).toBe('recovered_after_window');
 
     // No 'emit-resolved-recovered-after-window' sendEvent should have fired.
-    const recoveredEmit = mockStep.sendEvent.mock.calls.find(
-      ([name]: [string]) => name === 'emit-resolved-recovered-after-window',
+    const recoveredEmit = runner.sendEventCalls.find(
+      (c) => c.name === 'emit-resolved-recovered-after-window',
     );
     expect(recoveredEmit).toBeUndefined();
   });
 
   it('[H-2] CAS recheck: row in filing_failed (not recovered) → no event emitted', async () => {
-    const { result, mockStep } = await executeHandler(
+    const { result, runner } = await executeHandler(
       {
         'mark-pending-and-claim-retry-slot': async () => null,
       },
@@ -581,8 +596,8 @@ describe('[H-2] filing-timed-out-observe — new step.run safety guards', () => 
 
     expect(result.resolution).toBe('recovered_after_window');
 
-    const recoveredEmit = mockStep.sendEvent.mock.calls.find(
-      ([name]: [string]) => name === 'emit-resolved-recovered-after-window',
+    const recoveredEmit = runner.sendEventCalls.find(
+      (c) => c.name === 'emit-resolved-recovered-after-window',
     );
     expect(recoveredEmit).toBeUndefined();
   });
