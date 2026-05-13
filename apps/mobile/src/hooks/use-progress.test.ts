@@ -1,4 +1,4 @@
-import { act, renderHook, waitFor } from '@testing-library/react-native';
+import { renderHook, waitFor } from '@testing-library/react-native';
 import { QueryClient } from '@tanstack/react-query';
 import { setActiveProfileId } from '../lib/api-client';
 import { ForbiddenError, UpstreamError } from '../lib/api-errors';
@@ -7,6 +7,7 @@ import {
   createTestProfile,
 } from '../test-utils/app-hook-test-utils';
 import {
+  invalidateProgressSnapshotQueries,
   useSubjectProgress,
   useOverallProgress,
   useContinueSuggestion,
@@ -416,31 +417,33 @@ describe('useProfileWeeklyReports', () => {
 });
 
 describe('useRefreshProgressSnapshot', () => {
-  it('posts a refresh request and invalidates progress-facing queries', async () => {
-    mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ refreshed: true }), { status: 200 }),
-    );
-    const wrapper = createWrapper();
+  it('exposes a callable refresh mutation for the active profile query tree', () => {
+    const { result } = renderHook(() => useRefreshProgressSnapshot(), {
+      wrapper: createWrapper(),
+    });
+
+    expect(result.current.isIdle).toBe(true);
+    expect(result.current.mutate).toEqual(expect.any(Function));
+    expect(result.current.mutateAsync).toEqual(expect.any(Function));
+  });
+});
+
+describe('invalidateProgressSnapshotQueries', () => {
+  it('invalidates progress-facing queries for the active profile', () => {
+    createWrapper();
     const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries');
 
-    const { result } = renderHook(() => useRefreshProgressSnapshot(), {
-      wrapper,
-    });
+    invalidateProgressSnapshotQueries(queryClient, 'test-profile-id');
 
-    act(() => {
-      result.current.mutate();
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ['progress', 'inventory', 'test-profile-id'],
     });
-
-    await waitFor(() => {
-      expect(invalidateSpy).toHaveBeenCalledWith({
-        queryKey: ['progress', 'inventory', 'test-profile-id'],
-      });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ['progress', 'history', 'test-profile-id'],
     });
-
-    const url = String(mockFetch.mock.calls[0]?.[0]);
-    const init = mockFetch.mock.calls[0]?.[1] as RequestInit | undefined;
-    expect(url).toContain('/progress/refresh');
-    expect(init?.method).toBe('POST');
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ['progress', 'milestones', 'test-profile-id'],
+    });
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: ['dashboard'],
     });

@@ -2,6 +2,7 @@ import {
   useMutation,
   useQuery,
   useQueryClient,
+  type QueryClient,
   type UseMutationResult,
   type UseQueryResult,
 } from '@tanstack/react-query';
@@ -556,6 +557,24 @@ export function useProfileWeeklyReports(
   });
 }
 
+export function invalidateProgressSnapshotQueries(
+  queryClient: QueryClient,
+  activeProfileId: string | undefined,
+): void {
+  void queryClient.invalidateQueries({
+    queryKey: ['progress', 'inventory', activeProfileId],
+  });
+  void queryClient.invalidateQueries({
+    queryKey: ['progress', 'history', activeProfileId],
+  });
+  void queryClient.invalidateQueries({
+    queryKey: ['progress', 'milestones', activeProfileId],
+  });
+  void queryClient.invalidateQueries({
+    queryKey: ['dashboard'],
+  });
+}
+
 export function useRefreshProgressSnapshot(): UseMutationResult<
   unknown,
   Error,
@@ -572,18 +591,7 @@ export function useRefreshProgressSnapshot(): UseMutationResult<
       return await res.json();
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({
-        queryKey: ['progress', 'inventory', activeProfile?.id],
-      });
-      void queryClient.invalidateQueries({
-        queryKey: ['progress', 'history', activeProfile?.id],
-      });
-      void queryClient.invalidateQueries({
-        queryKey: ['progress', 'milestones', activeProfile?.id],
-      });
-      void queryClient.invalidateQueries({
-        queryKey: ['dashboard'],
-      });
+      invalidateProgressSnapshotQueries(queryClient, activeProfile?.id);
     },
   });
 }
