@@ -8,6 +8,7 @@ import {
   useSubmitRecallTest,
   useTeachingPreference,
 } from './use-retention';
+import { queryKeys } from '../lib/query-keys';
 
 const mockFetch = jest.fn();
 jest.mock('../lib/api-client', () => ({
@@ -297,5 +298,36 @@ describe('useTeachingPreference', () => {
     });
 
     expect(result.current.data?.method).toBe('visual_diagrams');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Profile-switch cache isolation
+// ---------------------------------------------------------------------------
+
+describe('profile-switch cache isolation', () => {
+  it('retention.subject — same subject, different profiles produce different keys', () => {
+    const keyA = queryKeys.retention.subject('sub-1', 'profile-A');
+    const keyB = queryKeys.retention.subject('sub-1', 'profile-B');
+    expect(keyA).not.toEqual(keyB);
+    expect(keyA).toEqual(['retention', 'subject', 'sub-1', 'profile-A']);
+  });
+
+  it('retention.topic — same topic, different profiles are isolated', () => {
+    const keyA = queryKeys.retention.topic('topic-1', 'profile-A');
+    const keyB = queryKeys.retention.topic('topic-1', 'profile-B');
+    expect(keyA).not.toEqual(keyB);
+  });
+
+  it('retention.evaluateEligibility — same topic, undefined vs defined profile', () => {
+    const keyDefined = queryKeys.retention.evaluateEligibility(
+      'topic-1',
+      'profile-A',
+    );
+    const keyUndefined = queryKeys.retention.evaluateEligibility(
+      'topic-1',
+      undefined,
+    );
+    expect(keyDefined).not.toEqual(keyUndefined);
   });
 });

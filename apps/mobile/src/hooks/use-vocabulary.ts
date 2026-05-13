@@ -8,13 +8,14 @@ import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
+import { queryKeys } from '../lib/query-keys';
 
 export function useVocabulary(subjectId: string) {
   const client = useApiClient();
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['vocabulary', activeProfile?.id, subjectId],
+    queryKey: queryKeys.vocabulary.subject(activeProfile?.id, subjectId),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {

@@ -34,6 +34,8 @@ import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
 import { getApiUrl } from '../lib/api';
+import { UpstreamError } from '../lib/api-errors';
+import { queryKeys } from '../lib/query-keys';
 import {
   streamSSEViaXHR,
   type FluencyDrillEvent,
@@ -469,12 +471,11 @@ export function useStreamMessage(sessionId: string): {
               fallback,
             });
           } else if (event.type === 'error') {
-            const streamError = new Error(event.message) as Error & {
-              status?: number;
-            };
-            streamError.name = 'UpstreamError';
-            streamError.status = 502;
-            throw streamError;
+            throw new UpstreamError(
+              event.message,
+              event.code ?? 'UPSTREAM_ERROR',
+              502,
+            );
           }
         }
       } finally {
@@ -501,7 +502,7 @@ export function useSessionTranscript(
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['session-transcript', sessionId, activeProfile?.id],
+    queryKey: queryKeys.sessions.transcript(sessionId, activeProfile?.id),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -534,7 +535,7 @@ export function useSession(
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['session', sessionId, activeProfile?.id],
+    queryKey: queryKeys.sessions.detail(sessionId, activeProfile?.id),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -628,7 +629,7 @@ export function useParkingLot(
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['parking-lot', sessionId, activeProfile?.id],
+    queryKey: queryKeys.sessions.parkingLot(sessionId, activeProfile?.id),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -655,7 +656,11 @@ export function useTopicParkingLot(
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['parking-lot', 'topic', subjectId, topicId, activeProfile?.id],
+    queryKey: queryKeys.sessions.topicParkingLot(
+      subjectId,
+      topicId,
+      activeProfile?.id,
+    ),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -708,7 +713,7 @@ export function useSessionSummary(
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['session-summary', sessionId, activeProfile?.id],
+    queryKey: queryKeys.sessions.summary(sessionId, activeProfile?.id),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {

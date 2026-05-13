@@ -15,6 +15,7 @@ import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
+import { queryKeys } from '../lib/query-keys';
 
 // Mirror of api/services/dashboard.ts:ChildSession used by the
 // `/dashboard/children/:profileId/sessions/:sessionId` route response. Hono's
@@ -54,7 +55,7 @@ export function useDashboard(): UseQueryResult<DashboardData> {
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['dashboard', activeProfile?.id],
+    queryKey: queryKeys.dashboard.root(activeProfile?.id),
     queryFn: async ({ signal: querySignal }): Promise<DashboardData> => {
       // Bug #7 fix: combine TanStack Query's cancellation signal with a
       // 10s timeout so the request aborts if the API is unreachable,
@@ -113,7 +114,7 @@ export function useAckNotice(): UseMutationResult<
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({
-        queryKey: ['dashboard', activeProfile?.id],
+        queryKey: queryKeys.dashboard.root(activeProfile?.id),
       });
     },
   });
@@ -126,7 +127,7 @@ export function useChildDetail(
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['dashboard', 'child', childProfileId],
+    queryKey: queryKeys.dashboard.childDetail(childProfileId),
     queryFn: async ({ signal: querySignal }) => {
       if (!childProfileId) throw new Error('childProfileId is required');
       const { signal, cleanup } = combinedSignal(querySignal);
@@ -155,7 +156,7 @@ export function useChildSubjectTopics(
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['dashboard', 'child', childProfileId, 'subject', subjectId],
+    queryKey: queryKeys.dashboard.childSubject(childProfileId, subjectId),
     queryFn: async ({ signal: querySignal }) => {
       if (!childProfileId) throw new Error('childProfileId is required');
       if (!subjectId) throw new Error('subjectId is required');
@@ -187,7 +188,7 @@ export function useChildSessions(childProfileId: string | undefined) {
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['dashboard', 'children', childProfileId, 'sessions'],
+    queryKey: queryKeys.dashboard.childSessions(childProfileId),
     queryFn: async ({ signal: querySignal }) => {
       if (!childProfileId) throw new Error('childProfileId is required');
       const { signal, cleanup } = combinedSignal(querySignal);
@@ -216,7 +217,7 @@ export function useChildSessionDetail(
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['dashboard', 'children', childProfileId, 'session', sessionId],
+    queryKey: queryKeys.dashboard.childSessionDetail(childProfileId, sessionId),
     queryFn: async ({ signal: querySignal }) => {
       if (!childProfileId) throw new Error('childProfileId is required');
       if (!sessionId) throw new Error('sessionId is required');
@@ -254,7 +255,7 @@ export function useChildMemory(childProfileId: string | undefined) {
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['dashboard', 'children', childProfileId, 'memory'],
+    queryKey: queryKeys.dashboard.childMemory(childProfileId),
     queryFn: async ({ signal: querySignal }) => {
       if (!childProfileId) throw new Error('childProfileId is required');
       const { signal, cleanup } = combinedSignal(querySignal);

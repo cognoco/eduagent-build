@@ -80,6 +80,7 @@ export interface StreamDoneEvent {
 export interface StreamErrorEvent {
   type: 'error';
   message: string;
+  code?: string;
 }
 
 export type StreamEvent =
