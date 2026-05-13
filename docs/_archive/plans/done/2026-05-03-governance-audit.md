@@ -79,10 +79,11 @@ Applied in `eslint.config.mjs` (root) and `apps/mobile/eslint.config.mjs` as app
 ### Custom ESLint rules
 
 - **GC1** — Flag relative `jest.mock('./...' \| '../...')` not on adapter allowlist. ✅ Shipped (#148) as `gov/no-internal-jest-mock` at `warn`.
-- **GC2** — Flag string-literal SecureStore keys containing chars outside `[a-zA-Z0-9._-]`. Partially mitigated: mobile config bans direct `expo-secure-store` import, forcing all writes through `lib/secure-storage` which sanitizes via `sanitizeSecureStoreKey`. A literal-scanning rule is still TODO.
+- **GC2** — Flag string-literal SecureStore keys containing chars outside `[a-zA-Z0-9._-]`. ✅ Shipped as `local/securestore-safe-key` at `error`. Covers Literal and TemplateLiteral static parts. Zero existing violations (C4 cleanup `6b559da4`).
 - **GC3** — Flag `#[0-9a-fA-F]{3,6}` literals in mobile component JSX/TSX. ✅ Shipped as the mobile hex-color rule (Property > Literal selector; `error` severity; preventive).
-- **GC4** — Flag `router.push(` calls with two `[param]` segments and no intermediate push. Not started.
-- **GC5** — Enforce the `// @inngest-admin: cross-profile` tag on every Inngest function that bypasses `createScopedRepository`. Tag added to 7 functions in `a48d0123`; enforcing rule still TODO.
+- **GC4** — Flag `router.push(` calls with two `[param]` segments and no intermediate push. ✅ Shipped as `local/router-push-ancestor-chain` at `error`. Three escape paths: prior parent push in same function, file already inside parent stack, or `// gc4-allow: <reason>` annotation. Zero existing violations.
+- **GC5** — Enforce the `// @inngest-admin: <reason>` tag on every Inngest function that bypasses `createScopedRepository`. ✅ Shipped as `gov/inngest-admin-tag` at `warn`. Surfaces a 17-file backlog; severity stays at `warn` until each file gets an accurate reason (`cross-profile` vs `parent-chain`) or refactors to use the scoped repo.
+- **GC6** — Boy-scout internal-mock sweep on test-file edits. ✅ Shipped as the strengthened `~/.claude/hooks/post-edit-jest-mock-check.sh` PostToolUse hook plus a CLAUDE.md rule under Code Quality Guards. The hook surfaces `jest.mock('./...')` and `jest.mock('@eduagent/...')` lines after any test-file Edit/Write/MultiEdit, directing the agent at `/my:mockfix`.
 
 ### Claude Code drift-catcher hooks
 

@@ -1,5 +1,6 @@
 import nx from '@nx/eslint-plugin';
 import noInternalJestMock from './eslint-rules/no-internal-jest-mock.mjs';
+import inngestAdminTag from './eslint-rules/inngest-admin-tag.mjs';
 
 // Filter out jsx-a11y/accessible-emoji rule from react config
 // (deprecated in eslint-plugin-jsx-a11y v6.6.0, removed in later versions)
@@ -18,6 +19,7 @@ const govPlugin = {
   meta: { name: 'gov' },
   rules: {
     'no-internal-jest-mock': noInternalJestMock,
+    'inngest-admin-tag': inngestAdminTag,
   },
 };
 
@@ -408,6 +410,27 @@ export default [
             'Default exports are reserved for the Worker entrypoint (apps/api/src/index.ts). Use a named export elsewhere. See CLAUDE.md.',
         },
       ],
+    },
+  },
+  // -------------------------------------------------------------------------
+  // GC5 — Inngest functions that bypass createScopedRepository must declare
+  // their profile-scoping intent via a file-level `// @inngest-admin: <reason>`
+  // annotation. The annotation forces conscious review whenever a function
+  // touches the DB without scoped-repo isolation. Severity `warn` until the
+  // existing untagged backlog (~11 files) is reviewed individually — each
+  // one needs an accurate reason (cross-profile vs. parent-chain) or a
+  // refactor to use createScopedRepository.
+  // See docs/_archive/plans/done/2026-05-03-governance-audit.md (item GC5).
+  // -------------------------------------------------------------------------
+  {
+    files: ['apps/api/src/inngest/functions/**/*.ts'],
+    ignores: [
+      'apps/api/src/inngest/functions/**/*.test.ts',
+      'apps/api/src/inngest/functions/**/*.integration.test.ts',
+    ],
+    plugins: { gov: govPlugin },
+    rules: {
+      'gov/inngest-admin-tag': 'warn',
     },
   },
 ];
