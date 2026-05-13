@@ -17,9 +17,9 @@ describe('BookCard', () => {
         book={book}
         status="NOT_STARTED"
         tint={{
-          name: 'emerald',
-          solid: '#047857',
-          soft: 'rgba(4,120,87,0.14)',
+          name: 'rose',
+          solid: '#db2777',
+          soft: 'rgba(219,39,119,0.14)',
         }}
         onPress={jest.fn()}
       />,
@@ -30,14 +30,14 @@ describe('BookCard', () => {
 
     expect(card.props.style).toEqual(
       expect.objectContaining({
-        borderColor: 'rgba(4,120,87,0.14)',
+        borderColor: 'rgba(219,39,119,0.14)',
         borderWidth: 1,
       }),
     );
     expect(icon.props.style).toEqual(
       expect.objectContaining({
-        backgroundColor: 'rgba(4,120,87,0.14)',
-        borderColor: '#047857',
+        backgroundColor: 'rgba(219,39,119,0.14)',
+        borderColor: '#db2777',
         borderWidth: 1,
       }),
     );
