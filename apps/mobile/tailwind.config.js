@@ -30,6 +30,8 @@ module.exports = {
         'coaching-card': 'var(--color-coaching-card)',
         'coach-bubble': 'var(--color-coach-bubble)',
         'homework-lane': 'var(--color-homework-lane)',
+        reward: 'var(--color-reward)',
+        'reward-soft': 'var(--color-reward-soft)',
       },
       borderRadius: {
         card: 'var(--radius-card)',
