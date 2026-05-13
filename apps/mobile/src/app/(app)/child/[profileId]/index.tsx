@@ -112,7 +112,7 @@ function InfoRow({
 }): React.ReactElement {
   return (
     <View className="bg-surface rounded-card px-4 py-3.5 mt-3" testID={testID}>
-      <Text className="text-caption font-semibold text-text-secondary uppercase">
+      <Text className="text-caption font-semibold text-text-secondary">
         {label}
       </Text>
       <Text className="text-body font-semibold text-text-primary mt-1">
