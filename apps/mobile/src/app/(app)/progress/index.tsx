@@ -9,6 +9,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { platformAlert } from '../../../lib/platform-alert';
 import { classifyApiError } from '../../../lib/format-api-error';
+import type { TranslateKey } from '../../../i18n';
 import { useFocusEffect, useRouter, type Href } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -52,7 +53,7 @@ function heroCopy(
     totalSessions: number;
   },
   register: CopyRegister,
-  t: (key: string, opts?: Record<string, unknown>) => string,
+  t: (key: TranslateKey, opts?: Record<string, unknown>) => string,
 ): {
   title: string;
   subtitle: string;
@@ -127,7 +128,7 @@ const MILESTONE_THRESHOLDS = [1, 3, 5, 10, 25, 50, 100];
 
 export function getNextMilestoneLabel(
   totalSessions: number,
-  t: (key: string, opts?: Record<string, unknown>) => string,
+  t: (key: TranslateKey, opts?: Record<string, unknown>) => string,
 ): string {
   const next = MILESTONE_THRESHOLDS.find(
     (threshold) => threshold > totalSessions,
