@@ -4,6 +4,8 @@
 
 // KVNamespace is a Cloudflare Workers type absent from tsconfig.spec.json.
 // Use Record<string, unknown> as a structural stand-in so `{} as KVNamespace` compiles.
+// Proper fix: add @cloudflare/workers-types to tsconfig.spec.json.
+// Tracked in Notion: https://www.notion.so/35f8bce91f7c81b5b944ee47fad6fc9e
 type KVNamespace = Record<string, unknown>;
 
 // Mock JWT so auth middleware passes
