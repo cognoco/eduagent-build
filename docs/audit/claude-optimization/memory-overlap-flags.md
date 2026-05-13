@@ -58,7 +58,7 @@ These are not flagged as overlap candidates — listed for completeness so the a
 - Architectural stack notes: `feedback_drizzle_transaction_cast.md`, `feedback_persona_vs_role.md`, `feedback_doppler_secrets.md`, `feedback_ota_env_vars.md`
 - Tooling/process: `feedback_emulator_issues_doc.md`, `feedback_eas_no_retry.md`, `feedback_build_dedup.md`, `feedback_nx_reset_before_commit.md`, `feedback_git_pathspec_literal_brackets.md`, `feedback_git_stash_pop_kept.md`, `feedback_comment_not_delete.md`, `feedback_notion_rest_for_queries.md`, `feedback_notion_resolution_recording.md`, `feedback_llm_prompt_injection_surfacing.md`, `feedback_spec_before_code.md`, `feedback_five_root_causes.md`
 - User profile / device: `user_device_small_phone.md`
-- Critical decisions: `billing-payments.md`, `pricing_dual_cap.md`, `market_language_pivot.md`, `project_themekey_removed.md`, `project_neon_transaction_facts.md`
+- Critical decisions: `billing-payments.md`, `pricing_dual_cap.md`, `market_language_pivot.md`, `project_themekey_removed.md`
 - Reference: `reference_notion_workspace.md`, `nativewind-windows.md`, `project_template_repo.md`
 
 ---

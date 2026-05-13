@@ -1,4 +1,4 @@
-# EduAgent — E2E Tech Spec
+# MentoMate — E2E Tech Spec
 
 **Type:** Implementation Specification
 **Date:** 2026-02-22

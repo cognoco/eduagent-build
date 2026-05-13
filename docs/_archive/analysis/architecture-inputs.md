@@ -5,7 +5,7 @@ source: 'PRD review markers + Legacy documentation + Architecture phase decision
 status: 'in-progress-architecture-phase'
 ---
 
-# Architecture Inputs - EduAgent
+# Architecture Inputs - MentoMate
 
 **Purpose:** Technical decisions and preferences captured during PRD refinement. To be validated and expanded during Architecture phase.
 

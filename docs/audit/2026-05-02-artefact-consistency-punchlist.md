@@ -98,7 +98,7 @@
 - **AUDIT-SPECS-2** RLS plan status-table refresh (escalated 2026-05-02 from unclassified after concrete recon)
   - Severity: YELLOW (doc consistency — plan internally contradicts itself)
   - Effort: ~30-40 min (verify each Phase row in the status table, refresh wording, archive stale "Implication" paragraph)
-  - Files: `docs/plans/2026-04-15-S06-rls-phase-0-1-preparatory.md`
+  - Files: `docs/plans/done/2026-04-15-S06-rls-phase-0-1-preparatory.md`
   - Concrete state vs plan claim:
     | Phase | Plan table says (2026-04-27) | Code reality (verified 2026-05-02) | Action |
     |---|---|---|---|
@@ -108,6 +108,13 @@
     | 1.3 deploy + verify | unverified | unverified — needs `pg_tables.rowsecurity` query against staging/prod | Run query, document |
     | "Implication" paragraph | "ticking-bomb state" | Stale — header marks it stale but body unchanged | Move paragraph into a `## Historical context` section |
   - Why it matters: plan's reconciliation in PR #131 added a "Phase 0.0 is DONE" header but didn't update the inline status table, creating an internal contradiction that confuses readers about RLS rollout state. Not security-critical (the wording is over-stated, not under-stated), but exactly the "team detects new drift, doesn't sweep backward" pattern this audit was meant to catch.
+
+- **AUDIT-RLS-1.3-VERIFY** Confirm Phase 1.3 RLS enforcement is live on staging + production (2026-05-12)
+  - Severity: YELLOW (operational confidence, not a blocker)
+  - Effort: ~10 min
+  - Files: `docs/plans/done/2026-04-15-S06-rls-phase-0-1-preparatory.md` (Phase 1.3 row)
+  - Action: run `SELECT tablename, rowsecurity FROM pg_tables WHERE schemaname = 'public' AND rowsecurity = true;` against staging and prod Neon databases; document results in plan's Phase 1.3 row and mark complete.
+  - Origin: split out from AUDIT-SPECS-2 when Phases 0.0/0.1/0.2/0.3/0.4 + 1.1 were verified complete and plan archived to `done/` (2026-05-12). Phase 1.3 remains unverified because it requires live DB access.
 
 ## Track C cleanups
 
@@ -124,11 +131,26 @@
 - **AUDIT-MEMORY-2** `.claude/memory/` ~96-file dedupe
   - Severity: YELLOW (low-impact); Effort: ~1 hr
 
-- **AUDIT-SKILLS-2** Vendored `commands/bmad/` vs installed plugin — pick canonical
-  - Severity: YELLOW (cosmetic / maintenance); Effort: ~30 min
+- **AUDIT-SKILLS-2** ~~Vendored `commands/bmad/` vs installed plugin — pick canonical~~ — **closed 2026-05-12 as misframed:** no BMAD plugin is installed or published in any registered marketplace; the `bmad:` skills visible in-session ARE the vendored shims (Claude Code namespaces slash commands by their parent directory, so the same files surface as both slash commands and Skills). Current setup documented in `_bmad/README.md`.
+  - Severity: ~~YELLOW (cosmetic / maintenance)~~ N/A (no action); Effort: ~~~30 min~~ resolved
 
-- **AUDIT-EXTREFS-2** EduAgent → Mentomate naming sweep across docs/code (carefully — NOT `@eduagent/*` package names)
+- **AUDIT-EXTREFS-2** EduAgent → MentoMate naming sweep across docs/code (carefully — NOT `@eduagent/*` package names)
   - Severity: YELLOW (cosmetic); Effort: ~1 hr
+
+- **AUDIT-EXTREFS-2-RESIDUAL** (synthesized 2026-05-12) Eight out-of-scope files still contain `EduAgent` brand strings, surfaced while closing PR-23:
+  - `AGENTS.md` (root)
+  - `scripts/embedding-benchmark.ts`
+  - `apps/mobile/e2e/README.md`
+  - `design_handoff_ui_improvements/UI improvements.html`
+  - `design_handoff_ui_improvements/README.md`
+  - `docs/audit/pr-dispatch-graph.html`
+  - `docs/visual-artefacts/data/atlas-data.js`
+  - `docs/visual-artefacts/cleanup-plan-dependency-flow.html`
+  - Severity: GREEN (cosmetic; not user-facing brand surfaces); Effort: ~10 min total if anyone wants to follow up.
+  - Why excluded: PR-23's Files-claimed scope was `docs/**/*.md`, `README.md`, `apps/**/*.{ts,tsx}` plus governance-mandated i18n locale sync. These eight don't match.
+  - **Surfaced 2026-05-13 by claude-bot review of PR #237 (additional residuals to track):**
+    - **App Store / Play Store product SKUs** (e.g. `com.eduagent.plus.monthly`, `com.eduagent.pro.monthly` in `docs/specs/epics.md` and the corresponding store configuration). Unlike `@eduagent/*` npm package names, these are user-facing store identifiers. **Severity: YELLOW** (launch-blocking if SKUs need renaming and stores haven't locked them; not blocking if already submitted/live). Action: confirm with the launch team whether SKU rename is required pre-launch. If yes, this becomes a coordinated rename across `docs/specs/epics.md`, App Store Connect, Play Console, and the RevenueCat product mapping. If no, document the lock state inline so future audits don't re-litigate.
+    - **i18n locale `lastUpdated` fields on Privacy/Terms blocks** were not bumped when the brand name changed. All 7 locale files (`apps/mobile/src/i18n/locales/{en,de,es,ja,nb,pl,pt}.json`) still show pre-rename `lastUpdated` strings (e.g. `"Last updated: May 2025"`) alongside the new "MentoMate" brand text. **Severity: YELLOW** (legal/UX — users who previously accepted the EduAgent version see same-date document with different company name; legal may require a fresh acceptance flow). Action: legal review whether brand rename triggers a "policy update" requiring fresh user consent; if yes, bump `lastUpdated` fields and run the consent re-acceptance flow. Coordinates with the separate Notion issue tracking i18n locale Privacy/Terms divergence from canonical `legal.*` block.
 
 - **AUDIT-EXTREFS-3** Per-package READMEs for `apps/api/`, `apps/mobile/`, `packages/*`
   - Severity: YELLOW (helpful but not urgent); Effort: ~2 hr

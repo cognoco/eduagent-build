@@ -1,9 +1,9 @@
-# AI Tutoring Market Research: EduAgent Viability Assessment
+# AI Tutoring Market Research: MentoMate Viability Assessment
 
 **Date:** 2024-12-11
 **Research Type:** Market Research
 **Geographic Focus:** EU + USA
-**Product:** EduAgent — AI-powered personal tutoring app
+**Product:** MentoMate — AI-powered personal tutoring app
 **Prepared for:** Zuzka
 
 ---
@@ -24,7 +24,7 @@ The AI tutoring market is **real, growing rapidly, and experiencing massive disr
 | Timing | **Critical** — 6-12 month window before commoditization | High |
 | Defensibility | Possible via memory/personalization, but fragile | Medium |
 
-**Bottom Line:** EduAgent can succeed as a **craft-scale business** (€50K ARR / 280 users) but faces existential risk from free alternatives. Success requires **speed to market** and **differentiation through depth** (Socratic method + memory + verification), not breadth.
+**Bottom Line:** MentoMate can succeed as a **craft-scale business** (€50K ARR / 280 users) but faces existential risk from free alternatives. Success requires **speed to market** and **differentiation through depth** (Socratic method + memory + verification), not breadth.
 
 ---
 
@@ -79,7 +79,7 @@ The AI tutoring segment is growing **2-3x faster** than overall EdTech. However,
 | **$4/month** | Khanmigo | Mass market, subsidized by Khan Academy mission |
 | **$10-12/month** | Gauth (Chinese apps) | Value tier, high volume |
 | **$20-30/month** | Quality AI tutoring platforms | Premium tier for serious learners |
-| **$30/month (€30)** | EduAgent target | High-end, requires clear value proposition |
+| **$30/month (€30)** | MentoMate target | High-end, requires clear value proposition |
 | **$60-100/hour** | Human tutors | Traditional alternative |
 
 **Source:** [Khanmigo Pricing](https://www.khanmigo.ai/pricing), [TechCrunch](https://techcrunch.com/2024/05/25/ai-tutors-are-quietly-changing-how-kids-in-the-us-study-and-the-leading-apps-are-from-china/)
@@ -88,7 +88,7 @@ The AI tutoring segment is growing **2-3x faster** than overall EdTech. However,
 
 **Key quote:** "The tutor's hourly cost is about the same as Answer AI's whole year of subscription" — Houston student comparing $60/hr tutoring to AI app
 
-**Implication for EduAgent:** At €30/month (€360/year), EduAgent costs roughly 6 human tutoring hours annually. This is compelling IF users perceive equivalent value.
+**Implication for MentoMate:** At €30/month (€360/year), MentoMate costs roughly 6 human tutoring hours annually. This is compelling IF users perceive equivalent value.
 
 ### Customer Segments & Buying Triggers
 
@@ -100,7 +100,7 @@ The AI tutoring segment is growing **2-3x faster** than overall EdTech. However,
 | **Serious student** | University course struggle | HIGH | MEDIUM |
 | **Lifelong learner** | Passion project | LOW | HIGH |
 
-**Source:** EduAgent USER_MOTIVATION.md analysis
+**Source:** MentoMate USER_MOTIVATION.md analysis
 
 ### AI Adoption in Education (2024)
 
@@ -186,15 +186,15 @@ In mid-2025, all three major AI providers launched **free tutoring features**:
 | **Availability** | Global | 40+ countries | Global |
 
 **Why This Matters:**
-- EduAgent's core value props (Socratic method, memory, personalization) are now **table stakes**
+- MentoMate's core value props (Socratic method, memory, personalization) are now **table stakes**
 - Google claims "Gemini 2.5 Pro outperformed competitors on every category of learning science principles"
 - OpenAI reports "One in three college-aged people use ChatGPT" with learning as top use case
 
 **Source:** [OpenAI](https://openai.com/index/chatgpt-study-mode/), [Google Blog](https://blog.google/outreach-initiatives/education/google-gemini-learnlm-update/), [VentureBeat](https://venturebeat.com/ai/anthropic-flips-the-script-on-ai-in-education-claude-learning-mode-makes-students-do-the-thinking)
 
-### What Big Tech Lacks (Potential EduAgent Advantages)
+### What Big Tech Lacks (Potential MentoMate Advantages)
 
-| Gap | EduAgent Opportunity |
+| Gap | MentoMate Opportunity |
 |-----|---------------------|
 | **Structured curriculum** | ChatGPT/Gemini don't build syllabi or track topic mastery |
 | **Verification/Assessment** | Big tech doesn't test understanding systematically |
@@ -208,7 +208,7 @@ In mid-2025, all three major AI providers launched **free tutoring features**:
 
 ### The Window is Narrowing
 
-| Timeline | Event | Impact on EduAgent |
+| Timeline | Event | Impact on MentoMate |
 |----------|-------|-------------------|
 | **2023** | ChatGPT launches | Chegg collapses; AI tutoring becomes mainstream |
 | **2024** | Chinese apps dominate US App Store | Low-price competition established |
@@ -258,7 +258,7 @@ In mid-2025, all three major AI providers launched **free tutoring features**:
 
 | Opportunity | Rationale |
 |-------------|-----------|
-| **"Premium tutoring" positioning** | Human tutors cost €30-80/hr; EduAgent is €30/month |
+| **"Premium tutoring" positioning** | Human tutors cost €30-80/hr; MentoMate is €30/month |
 | **Parents as decision makers** | Parents pay for results; less price-sensitive than students |
 | **European GDPR advantage** | Complex compliance is barrier to entry; you've solved it |
 | **Career changers / adult learners** | Less served by Khanmigo (K-12 focus) and Chinese apps (homework) |
@@ -322,7 +322,7 @@ In mid-2025, all three major AI providers launched **free tutoring features**:
 
 #### 5. Defensibility Building
 
-| Moat Type | EduAgent Implementation | Switching Cost |
+| Moat Type | MentoMate Implementation | Switching Cost |
 |-----------|------------------------|----------------|
 | **Data/personalization** | Learning history, mastery scores, style preferences | HIGH — lose all progress |
 | **Curriculum investment** | User's custom syllabus, bookmarked topics | MEDIUM |
@@ -332,7 +332,7 @@ In mid-2025, all three major AI providers launched **free tutoring features**:
 ### If NO-GO or PIVOT: Alternatives
 
 1. **B2B/Schools:** License to schools; Khanmigo model (700K students via district deals)
-2. **Niche vertical:** One subject deeply (e.g., "EduAgent for Python" or "EduAgent for German")
+2. **Niche vertical:** One subject deeply (e.g., "MentoMate for Python" or "MentoMate for German")
 3. **White-label:** Provide tutoring infrastructure to other EdTech companies
 4. **Wait and see:** Pause development; re-evaluate in 6 months as market clarifies
 

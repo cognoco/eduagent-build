@@ -5,7 +5,7 @@ inputDocuments:
   - 'docs/ux-design-specification.md'
 ---
 
-# EduAgent - Epic Breakdown
+# MentoMate - Epic Breakdown
 
 ## Overview
 
@@ -779,7 +779,7 @@ Removes the `personaType` enum entirely. Profile stores `birthYear` (integer). A
 - The layout reshuffles based on behavior: a teen who does homework 4/5 weekday evenings sees homework as the primary card; on Saturdays, review floats to the top.
 - **Parent dashboard is a card**, not a tab or mode. It shows real data ("Emma: 45min today") and only appears when `familyLinks` exist. A parent who also learns sees both family and learning cards.
 - **Cold start (new user):** All cards equal-sized, no AI bet. After 2-3 sessions, cards start ranking by usage.
-- **Signup question for adults:** "Do you have children who'll use EduAgent?" → Yes triggers child-linking flow → Family card appears on home.
+- **Signup question for adults:** "Do you have children who'll use MentoMate?" → Yes triggers child-linking flow → Family card appears on home.
 
 **Stories:**
 - 12.1: Age-based LLM voice (replace `getPersonaVoice()` → `getAgeVoice(birthYear)`, `computeAgeBracket()` utility)
@@ -3888,7 +3888,7 @@ So that we can test and deploy native in-app purchases.
   - `com.eduagent.pro.monthly` (€48.99/mo)
   - `com.eduagent.pro.yearly`
 **And** matching subscription products created in Google Play Console with identical pricing
-**And** Apple subscription group created ("EduAgent Plans") for upgrade/downgrade paths
+**And** Apple subscription group created ("MentoMate Plans") for upgrade/downgrade paths
 **And** Google base plans configured with equivalent upgrade/downgrade behavior
 **And** sandbox/test accounts configured for both stores (Apple Sandbox testers, Google license testers)
 **And** 14-day free trial configured as introductory offer on both stores

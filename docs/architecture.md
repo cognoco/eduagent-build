@@ -15,7 +15,7 @@ workflowType: 'architecture'
 lastStep: 8
 status: 'complete'
 completedAt: '2026-02-15'
-project_name: 'EduAgent'
+project_name: 'MentoMate'
 user_name: 'Zuzka'
 date: '2026-02-15'
 ---
