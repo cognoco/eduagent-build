@@ -162,12 +162,12 @@ describe('session operations integration', () => {
 
     const transcript = await getSessionTranscript(db, profileId, session.id);
 
-    expect(transcript).not.toBeNull();
-    expect(transcript !== null && !transcript.archived).toBe(true);
-    const liveTranscript = transcript as Extract<
-      typeof transcript,
-      { archived: false }
-    >;
+    if (!transcript || transcript.archived) {
+      throw new Error(
+        `Expected a live (non-archived) transcript, got: ${JSON.stringify(transcript)}`,
+      );
+    }
+    const liveTranscript = transcript;
     expect(liveTranscript.session).toEqual(
       expect.objectContaining({
         sessionId: session.id,
@@ -303,12 +303,14 @@ describe('session operations integration', () => {
       where: eq(learningSessions.id, session.id),
     });
 
-    // TODO(syncHomeworkState-return-type): The return type annotation
-    // `Promise<{ metadata: HomeworkSessionMetadata }>` is narrower than the
-    // actual runtime shape, which also includes loggedCorrectionIds /
-    // loggedStartedProblemIds / loggedCompletedProblemIds. Widen the source
-    // annotation in `services/session/session-homework.ts` and remove this
-    // cast. Tracked in Notion (see PR #235 claude[bot] review finding H2).
+    // The return type annotation `Promise<{ metadata: HomeworkSessionMetadata }>`
+    // is narrower than the actual runtime shape, which also includes
+    // loggedCorrectionIds / loggedStartedProblemIds / loggedCompletedProblemIds.
+    // Widen the source annotation in `services/session/session-homework.ts` and
+    // remove this cast. Tracked in Notion bug tracker:
+    // https://www.notion.so/35f8bce91f7c8104bc43f77e0627032c
+    // (Verified 2026-05-13: no other callers read these three fields, so this
+    // is the only test site affected.)
     const firstMeta = firstResult.metadata as Record<string, unknown>;
     expect(firstMeta['loggedCorrectionIds']).toEqual(['problem-1']);
     expect(firstMeta['loggedStartedProblemIds']).toEqual(['problem-1']);
