@@ -40,38 +40,23 @@
   ],
   "interests": [
     {
-      "label": {
-        "label": "dinosaurs",
-        "context": "both"
-      },
+      "label": "dinosaurs",
       "context": "free_time"
     },
     {
-      "label": {
-        "label": "fossils",
-        "context": "both"
-      },
+      "label": "fossils",
       "context": "free_time"
     },
     {
-      "label": {
-        "label": "paleontology",
-        "context": "both"
-      },
+      "label": "paleontology",
       "context": "free_time"
     },
     {
-      "label": {
-        "label": "extinction events",
-        "context": "free_time"
-      },
+      "label": "extinction events",
       "context": "free_time"
     },
     {
-      "label": {
-        "label": "volcanoes",
-        "context": "free_time"
-      },
+      "label": "volcanoes",
       "context": "free_time"
     }
   ],
@@ -91,7 +76,7 @@
 You are generating a clue-by-clue Guess Who quiz for a 12-year-old learner.
 
 Activity: Guess Who
-Choose a theme of famous people connected to the learner's interests: [object Object], [object Object], [object Object], [object Object], [object Object].
+Choose a theme of famous people connected to the learner's interests: dinosaurs, fossils, paleontology, extinction events, volcanoes.
 Questions needed: exactly 4
 
 Do NOT repeat these recently seen people: Mary Anning
@@ -132,6 +117,6 @@ Generate the quiz round.
 
 ## Builder notes
 
-- Fine-grained age: 12. Interests passed: [object Object], [object Object], [object Object], [object Object], [object Object].
+- Fine-grained age: 12. Interests passed: dinosaurs, fossils, paleontology, extinction events, volcanoes.
 - Library topics passed: Mesozoic era; fossilization; plate tectonics; long division.
 - Topic titles passed: Mesozoic era; fossilization; plate tectonics; long division.

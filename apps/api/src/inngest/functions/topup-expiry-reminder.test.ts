@@ -66,7 +66,7 @@ interface TopupMockStep {
 
 async function executeSteps(): Promise<{
   result: TopupExpiryResult;
-  mockStep: { run: jest.Mock; sendEvent: jest.Mock; sleep: jest.Mock };
+  mockStep: TopupMockStep;
   stepResults: Record<string, unknown>;
 }> {
   const stepResults: Record<string, unknown> = {};

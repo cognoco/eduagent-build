@@ -24,10 +24,9 @@ export const dictationGenerateFlow: FlowDefinition<GenerateContext> = {
     return {
       nativeLanguage: profile.nativeLanguage,
       ageYears: profile.ageYears,
-      // Map profile interests to the GenerateContext shape.
-      // All profile interests are treated as 'free_time' context here —
-      // the fixture does not distinguish context, so we default to free_time
-      // which is the context that themes the literary passage.
+      // Dictation theming always uses 'free_time' context — extract only the
+      // label from each InterestEntry and override context for this flow,
+      // since 'free_time' is the context that themes the literary passage.
       interests: profile.interests.map(({ label }) => ({
         label,
         context: 'free_time' as const,

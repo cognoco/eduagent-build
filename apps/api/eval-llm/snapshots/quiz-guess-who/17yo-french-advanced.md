@@ -41,31 +41,19 @@
   ],
   "interests": [
     {
-      "label": {
-        "label": "French literature",
-        "context": "both"
-      },
+      "label": "French literature",
       "context": "free_time"
     },
     {
-      "label": {
-        "label": "philosophy",
-        "context": "both"
-      },
+      "label": "philosophy",
       "context": "free_time"
     },
     {
-      "label": {
-        "label": "existentialism",
-        "context": "free_time"
-      },
+      "label": "existentialism",
       "context": "free_time"
     },
     {
-      "label": {
-        "label": "creative writing",
-        "context": "free_time"
-      },
+      "label": "creative writing",
       "context": "free_time"
     }
   ],
@@ -85,7 +73,7 @@
 You are generating a clue-by-clue Guess Who quiz for a 17-year-old learner.
 
 Activity: Guess Who
-Choose a theme of famous people connected to the learner's interests: [object Object], [object Object], [object Object], [object Object].
+Choose a theme of famous people connected to the learner's interests: French literature, philosophy, existentialism, creative writing.
 Questions needed: exactly 4
 
 Do NOT repeat these recently seen people: Jean-Paul Sartre, Albert Camus
@@ -126,6 +114,6 @@ Generate the quiz round.
 
 ## Builder notes
 
-- Fine-grained age: 17. Interests passed: [object Object], [object Object], [object Object], [object Object].
+- Fine-grained age: 17. Interests passed: French literature, philosophy, existentialism, creative writing.
 - Library topics passed: Camus — L'Étranger; French subjunctive; essay structure; Enlightenment thinkers.
 - Topic titles passed: Camus — L'Étranger; French subjunctive; essay structure; Enlightenment thinkers.
