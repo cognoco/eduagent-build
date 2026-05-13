@@ -5,6 +5,7 @@ import { app } from '../../apps/api/src/index';
 import { QUIZ_CONFIG } from '../../apps/api/src/services/quiz/config';
 import {
   _resetCircuits,
+  CircuitOpenError,
   createMockProvider,
   registerProvider,
 } from '../../apps/api/src/services/llm';
@@ -183,6 +184,42 @@ describe('Integration: POST /v1/quiz/rounds', () => {
     const llmFixture = registerLlmProviderFixture({
       id: 'gemini',
       chatError: abortError,
+    });
+
+    try {
+      const res = await app.request(
+        '/v1/quiz/rounds',
+        {
+          method: 'POST',
+          headers: buildAuthHeaders(
+            { sub: QUIZ_AUTH_USER_ID, email: QUIZ_AUTH_EMAIL },
+            profileId,
+          ),
+          body: JSON.stringify({
+            activityType: 'vocabulary',
+            subjectId,
+          }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(502);
+      expect(await res.json()).toMatchObject({
+        code: ERROR_CODES.UPSTREAM_ERROR,
+      });
+      expect(llmFixture.chatCalls.length).toBeGreaterThanOrEqual(1);
+    } finally {
+      llmFixture.dispose();
+      restoreDefaultLlmProvider();
+    }
+  });
+
+  it('returns 502 UPSTREAM_ERROR when an LLM-backed quiz circuit is open [BUG-990]', async () => {
+    const profileId = await createQuizProfile();
+    const subjectId = await seedLanguageSubject(profileId);
+    const llmFixture = registerLlmProviderFixture({
+      id: 'gemini',
+      chatError: new CircuitOpenError('gemini'),
     });
 
     try {

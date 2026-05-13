@@ -408,7 +408,7 @@ export function ParentHomeScreen({
     router.push({
       pathname: '/create-profile',
       params: { for: 'child' },
-    } as never);
+    } as Href);
   }, [router]);
 
   const handleAddChild = useCallback(() => {
@@ -460,14 +460,9 @@ export function ParentHomeScreen({
     hasNoLinkedChildren,
     subscription,
     familyData,
-    router,
     t,
     navigateToCreateChildProfile,
   ]);
-
-  function pushChildDetail(childProfileId: string): void {
-    router.push(`/(app)/child/${childProfileId}` as Href);
-  }
 
   function pushChildProgress(childProfileId: string): void {
     router.push({
@@ -538,7 +533,7 @@ export function ParentHomeScreen({
                 (prompt) => (
                   <Pressable
                     key={`tonight-${prompt.key}`}
-                    onPress={() => pushChildDetail(prompt.childId)}
+                    onPress={() => pushChildProgress(prompt.childId)}
                     className="flex-row items-center py-2.5"
                     style={
                       Platform.OS === 'web' ? { cursor: 'pointer' } : undefined
