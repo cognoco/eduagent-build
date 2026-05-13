@@ -459,7 +459,7 @@ src/app/
 │   └── forgot-password.tsx
 ├── (app)/                     # All authenticated screens — single group
 │   ├── _layout.tsx            # Tab bar + auth guard
-│   ├── home.tsx               # Coaching card entry (view differs by age via personaFromBirthYear)
+│   ├── home.tsx               # Coaching card entry (view differs by age via computeAgeBracket)
 │   ├── library.tsx            # Library — all subjects
 │   ├── dashboard.tsx          # Parent dashboard
 │   ├── subscription.tsx
@@ -826,7 +826,7 @@ Both client and server import the same Zod schemas — single source of truth pr
 2. Use the scoped repository (`createScopedRepository(profileId)`), never write raw `WHERE profile_id =` clauses
 3. Include `correlationId` in every log statement
 4. Use Inngest for any async work that should survive a request lifecycle
-5. Keep components persona-unaware — no conditional rendering based on persona type. Exception: `(app)/home.tsx` reads age (from `birthYear` via `personaFromBirthYear`) for adaptive entry card routing (page-level routing logic that doesn't fit in layout)
+5. Keep components persona-unaware — no conditional rendering based on persona type. Exception: `(app)/home.tsx` reads age (from `birthYear` via `computeAgeBracket` from `@eduagent/schemas`) for adaptive entry card routing (page-level routing logic that doesn't fit in layout)
 6. Write co-located tests for every new route handler and component
 7. Use Drizzle relational queries for CRUD, `sql` template tag for complex aggregations
 8. Return typed `ApiError` envelope for all error responses, never ad-hoc JSON
