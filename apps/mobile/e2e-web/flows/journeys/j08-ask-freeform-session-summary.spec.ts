@@ -2,6 +2,7 @@ import path from 'node:path';
 import { expect, test } from '@playwright/test';
 import { pressableClick } from '../../helpers/pressable';
 import { authStateDir } from '../../helpers/runtime';
+import { fillTextInput } from '../../helpers/text-input';
 
 test.use({ storageState: path.join(authStateDir, 'solo-learner.json') });
 
@@ -18,7 +19,10 @@ test('J-08 learner → Ask → freeform chat → end session → summary → hom
   await expect(page.getByTestId('chat-input')).toBeVisible({ timeout: 30_000 });
 
   // Send a freeform question — real API classifies, creates session, streams
-  await page.getByTestId('chat-input').fill('How do volcanoes erupt?');
+  await fillTextInput(
+    page.getByTestId('chat-input'),
+    'How do volcanoes erupt?',
+  );
   await pressableClick(page.getByTestId('send-button'));
 
   // Wait for any streamed assistant response to appear in chat.
@@ -48,11 +52,10 @@ test('J-08 learner → Ask → freeform chat → end session → summary → hom
   await expect(page.getByTestId('summary-input')).toBeVisible({
     timeout: 30_000,
   });
-  await page
-    .getByTestId('summary-input')
-    .fill(
-      'I learned that pressure builds up under the ground before the eruption.',
-    );
+  await fillTextInput(
+    page.getByTestId('summary-input'),
+    'I learned that pressure builds up under the ground before the eruption.',
+  );
   await pressableClick(page.getByTestId('submit-summary-button'));
 
   // After submission, wait for the continue button (AI feedback is generated

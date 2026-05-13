@@ -1,5 +1,6 @@
 import { act, render, screen, waitFor } from '@testing-library/react-native';
 import { useFocusEffect } from 'expo-router';
+import type { Profile } from '@eduagent/schemas';
 import {
   fetchLearningResumeTarget,
   useChildInventory,
@@ -145,6 +146,7 @@ const mockUseActiveProfileRole = jest.fn();
 jest.mock('../../hooks/use-active-profile-role' /* gc1-allow */, () => ({
   useActiveProfileRole: () => mockUseActiveProfileRole(),
 }));
+let mockLinkedChildren: Profile[] = [];
 jest.mock('../../lib/profile', () => ({
   useProfile: () => ({
     activeProfile: {
@@ -155,7 +157,7 @@ jest.mock('../../lib/profile', () => ({
     },
     profiles: [],
   }),
-  useLinkedChildren: () => [],
+  useLinkedChildren: () => mockLinkedChildren,
 }));
 jest.mock('../../lib/analytics', () => ({
   bucketAccountAge: jest.fn(() => '91+'),
@@ -165,12 +167,15 @@ jest.mock('../../lib/analytics', () => ({
 jest.mock('../../lib/api-client', () => ({
   useApiClient: () => ({}),
 }));
+let mockSearchParams: { profileId?: string | string[] } = {};
 jest.mock('expo-router', () => {
+  const ReactReq = jest.requireActual<typeof import('react')>('react');
   const push = jest.fn();
   return {
     useFocusEffect: jest.fn((callback: () => void) => {
-      callback();
+      ReactReq.useEffect(() => callback(), [callback]);
     }),
+    useLocalSearchParams: () => mockSearchParams,
     useRouter: () => ({ push, back: jest.fn(), replace: jest.fn() }),
   };
 });
@@ -245,11 +250,28 @@ function mockHooks(
           };
         }
       | undefined;
+    childInventory?:
+      | {
+          global: typeof baseGlobal;
+          subjects: unknown[];
+          currentlyWorkingOn?: string[];
+          thisWeekMini?: {
+            sessions: number;
+            wordsLearned: number;
+            topicsTouched: number;
+          };
+        }
+      | undefined;
     isLoading?: boolean;
     isError?: boolean;
   } = {},
 ) {
-  const { inventory, isLoading = false, isError = false } = overrides;
+  const {
+    childInventory,
+    inventory,
+    isLoading = false,
+    isError = false,
+  } = overrides;
   const inventoryRefetch = jest.fn();
   const historyRefetch = jest.fn();
   const milestonesRefetch = jest.fn();
@@ -321,7 +343,7 @@ function mockHooks(
     refetch: weeklyReportsRefetch,
   });
   (useChildInventory as jest.Mock).mockReturnValue({
-    data: null,
+    data: childInventory ?? null,
     isLoading: false,
     isError: false,
     isRefetching: false,
@@ -352,6 +374,8 @@ describe('ProgressScreen — progressive disclosure', () => {
     jest.clearAllMocks();
     mockUseActiveProfileRole.mockReturnValue('owner');
     mockUseSubjects.mockReturnValue({ data: [] });
+    mockLinkedChildren = [];
+    mockSearchParams = {};
   });
 
   it('shows full progress view when totalSessions < 4', () => {
@@ -393,6 +417,25 @@ describe('ProgressScreen — progressive disclosure', () => {
     expect(refs.monthlyReportsRefetch).toHaveBeenCalled();
     expect(refs.weeklyReportsRefetch).toHaveBeenCalled();
     expect(refs.milestonesRefetch).toHaveBeenCalled();
+  });
+
+  it('keeps the focus refresh callback stable across render updates', () => {
+    mockHooks({
+      inventory: {
+        global: { ...baseGlobal, totalSessions: 2 },
+        subjects: [fullSubject],
+      },
+    });
+    const view = render(<ProgressScreen />);
+
+    const initialCallback = (useFocusEffect as jest.Mock).mock.calls.at(
+      -1,
+    )?.[0];
+    view.rerender(<ProgressScreen />);
+
+    expect((useFocusEffect as jest.Mock).mock.calls.at(-1)?.[0]).toBe(
+      initialCallback,
+    );
   });
 
   it('shows full progress view when totalSessions >= 4', () => {
@@ -519,6 +562,45 @@ describe('ProgressScreen — progressive disclosure', () => {
 
     screen.getByText('Progress unlocks after you study Italian');
     screen.getByText('Study a topic in Italian first.');
+  });
+
+  it('opens the requested child progress profile from route params', () => {
+    mockLinkedChildren = [
+      {
+        id: 'child-1',
+        accountId: 'account-1',
+        displayName: 'Emma',
+        isOwner: false,
+        hasPremiumLlm: false,
+        consentStatus: null,
+        linkCreatedAt: null,
+        conversationLanguage: 'en',
+        pronouns: null,
+        birthYear: 2015,
+        avatarUrl: null,
+        location: null,
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+      },
+    ];
+    mockSearchParams = { profileId: 'child-1' };
+    mockHooks({
+      inventory: {
+        global: { ...baseGlobal, totalSessions: 0 },
+        subjects: [],
+      },
+      childInventory: {
+        global: { ...baseGlobal, totalSessions: 6, topicsMastered: 2 },
+        subjects: [fullSubject],
+      },
+    });
+
+    render(<ProgressScreen />);
+
+    screen.getByTestId('progress-pill-child-1');
+    expect(useChildInventory).toHaveBeenCalledWith('child-1', {
+      enabled: true,
+    });
   });
 
   it('shows full view when totalSessions is 1 with subjects', () => {

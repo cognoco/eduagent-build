@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { seedAndSignIn } from '../../helpers/seed-and-sign-in';
 import { pressableClick } from '../../helpers/pressable';
+import { fillTextInput } from '../../helpers/text-input';
 
 /**
  * J-09 — empty home → Add a subject → first session screen
@@ -42,7 +43,7 @@ test('J-09 learner → Add a subject → language setup → session chat', async
 
   // Type "Italian" — resolves to a language (four_strands) subject which
   // routes through the language-setup calibration screen.
-  await page.getByTestId('create-subject-name').fill('Italian');
+  await fillTextInput(page.getByTestId('create-subject-name'), 'Italian');
   // The TextInput has no onSubmitEditing handler — submission must go
   // through the explicit Start Learning button (testID create-subject-submit).
   await pressableClick(page.getByTestId('create-subject-submit'));

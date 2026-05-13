@@ -137,6 +137,12 @@ const CHILD_B = makeProfile({
   isOwner: false,
 });
 
+async function waitForParentTransitionNotice(): Promise<void> {
+  await waitFor(() => {
+    screen.getByTestId('parent-transition-notice');
+  });
+}
+
 describe('ParentHomeScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -154,10 +160,11 @@ describe('ParentHomeScreen', () => {
     screen.getByText('Hey Alex');
   });
 
-  it('renders one command card per linked child with actions inside it', () => {
+  it('renders one command card per linked child with actions inside it', async () => {
     mockLinkedChildren = [CHILD_A, CHILD_B];
 
     render(<ParentHomeScreen activeProfile={makeProfile()} />);
+    await waitForParentTransitionNotice();
 
     screen.getByTestId('parent-home-check-child-child-a');
     screen.getByTestId('parent-home-check-child-child-b');
@@ -168,22 +175,30 @@ describe('ParentHomeScreen', () => {
     screen.getByText('Children');
   });
 
-  it('routes the child card header and progress action to child progress', () => {
+  it('routes the child card header and progress action to child progress', async () => {
     mockLinkedChildren = [CHILD_A];
 
     render(<ParentHomeScreen activeProfile={makeProfile()} />);
+    await waitForParentTransitionNotice();
 
     fireEvent.press(screen.getByTestId('parent-home-check-child-child-a'));
-    expect(mockPush).toHaveBeenLastCalledWith('/(app)/child/child-a');
+    expect(mockPush).toHaveBeenLastCalledWith({
+      pathname: '/(app)/progress',
+      params: { profileId: 'child-a' },
+    });
 
     fireEvent.press(screen.getByTestId('parent-home-child-progress-child-a'));
-    expect(mockPush).toHaveBeenLastCalledWith('/(app)/child/child-a');
+    expect(mockPush).toHaveBeenLastCalledWith({
+      pathname: '/(app)/progress',
+      params: { profileId: 'child-a' },
+    });
   });
 
-  it('routes the reports action to the child reports list', () => {
+  it('routes the reports action to the child reports list', async () => {
     mockLinkedChildren = [CHILD_A];
 
     render(<ParentHomeScreen activeProfile={makeProfile()} />);
+    await waitForParentTransitionNotice();
 
     fireEvent.press(screen.getByTestId('parent-home-weekly-report-child-a'));
 
@@ -202,6 +217,7 @@ describe('ParentHomeScreen', () => {
     render(<ParentHomeScreen activeProfile={makeProfile()} />);
 
     screen.getByTestId('add-first-child-screen');
+    expect(screen.queryByTestId('parent-transition-notice')).toBeNull();
     screen.getByText('Your family dashboard starts here');
     screen.getByText(
       'Add your first child profile and this screen will turn into tonight prompts, weekly recaps, nudges, and progress cards.',
@@ -215,7 +231,7 @@ describe('ParentHomeScreen', () => {
     });
   });
 
-  it('shows tonight prompts and compact status from dashboard data', () => {
+  it('shows tonight prompts and compact status from dashboard data', async () => {
     mockLinkedChildren = [CHILD_A];
     mockDashboardData = {
       children: [
@@ -251,13 +267,14 @@ describe('ParentHomeScreen', () => {
     };
 
     render(<ParentHomeScreen activeProfile={makeProfile()} />);
+    await waitForParentTransitionNotice();
 
     screen.getByTestId('parent-home-tonight-section');
     screen.getByText('Ask Emma: what made Fractions click today?');
     screen.getByText('Fractions · 18 min this week');
   });
 
-  it('ranks multi-child tonight prompts by sessions — most active child appears first', () => {
+  it('ranks multi-child tonight prompts by sessions — most active child appears first', async () => {
     mockLinkedChildren = [CHILD_B, CHILD_A]; // intentionally reversed to verify sort
     mockDashboardData = {
       children: [
@@ -317,6 +334,7 @@ describe('ParentHomeScreen', () => {
     };
 
     render(<ParentHomeScreen activeProfile={makeProfile()} />);
+    await waitForParentTransitionNotice();
 
     const emmaPrompt = screen.getByTestId(
       'parent-home-tonight-child-a-primary',
@@ -331,22 +349,23 @@ describe('ParentHomeScreen', () => {
     );
   });
 
-  it('shows ParentTransitionNotice', async () => {
+  it('shows ParentTransitionNotice after at least one child is linked', async () => {
+    mockLinkedChildren = [CHILD_A];
+
     render(
       <ParentHomeScreen
         activeProfile={makeProfile({ id: 'profile-transition' })}
       />,
     );
 
-    await waitFor(() => {
-      screen.getByTestId('parent-transition-notice');
-    });
+    await waitForParentTransitionNotice();
   });
 
-  it('pressing nudge card opens NudgeActionSheet for that child', () => {
+  it('pressing nudge card opens NudgeActionSheet for that child', async () => {
     mockLinkedChildren = [CHILD_A];
 
     render(<ParentHomeScreen activeProfile={makeProfile()} />);
+    await waitForParentTransitionNotice();
 
     expect(screen.queryByTestId('nudge-action-sheet-close')).toBeNull();
 
