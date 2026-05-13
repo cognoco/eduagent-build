@@ -148,6 +148,9 @@ describe('isAppHelpQuery', () => {
     'what is challenge mode',
     'where can I see what you remember',
     'how do I delete my account',
+    'Where can I see my progress?',
+    'Where do I find the app settings?',
+    'Where can I see help?',
   ])('classifies "%s" as app-help', (msg) => {
     expect(isAppHelpQuery(msg)).toBe(true);
   });
@@ -175,6 +178,9 @@ describe('isAppHelpQuery', () => {
     'How to calculate the area of a triangle',
     "What's the difference between mitosis and meiosis?",
     'Where did the Vikings settle?',
+    'Where do I find the quadratic formula?',
+    'Where can I see the Pacific Ocean on a map?',
+    'Where do I change the subject in this sentence?',
     'I need to find the derivative',
     'How do I know if my answer is correct?',
     'Explain the concept of privacy in law',

@@ -17,19 +17,10 @@ const consoleErrorSpy = jest
   .spyOn(console, 'error')
   .mockImplementation(() => undefined);
 
-jest.mock('../client', () => ({
-  inngest: {
-    createFunction: jest.fn(
-      (_opts: unknown, _trigger: unknown, fn: unknown) => {
-        return Object.assign(fn as object, {
-          opts: _opts,
-          trigger: _trigger,
-          fn,
-        });
-      },
-    ),
-  },
-}));
+import { createInngestTransportCapture } from '../../test-utils/inngest-transport-capture';
+
+const mockInngestTransport = createInngestTransportCapture();
+jest.mock('../client', () => mockInngestTransport.module); // gc1-allow: inngest framework boundary
 
 import {
   askClassificationCompletedObserve,
@@ -41,6 +32,7 @@ beforeEach(() => {
   consoleLogSpy.mockClear();
   consoleErrorSpy.mockClear();
   mockCaptureException.mockClear();
+  mockInngestTransport.clear();
 });
 
 afterAll(() => {

@@ -10,6 +10,8 @@
 // ---------------------------------------------------------------------------
 
 import { createDatabaseModuleMock } from '../../test-utils/database-module';
+import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
+import { createInngestTransportCapture } from '../../test-utils/inngest-transport-capture';
 
 const col = (name: string) => ({ name });
 
@@ -35,36 +37,12 @@ const mockDatabaseModule = createDatabaseModuleMock({
 });
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
-jest.mock('../client', () => ({
-  inngest: {
-    createFunction: jest.fn((_config, _trigger, handler) => ({
-      fn: handler,
-      _config,
-      _trigger,
-    })),
-    send: jest.fn(),
-  },
-}));
+const mockInngestTransport = createInngestTransportCapture();
+jest.mock('../client', () => mockInngestTransport.module); // gc1-allow: inngest framework boundary
 
-jest.mock('../helpers', () => ({
-  getStepDatabase: () => mockDb,
-}));
+jest.mock('../helpers', () => ({ getStepDatabase: () => mockDb })); // gc1-allow: replaces DB helper at framework boundary — no real DB in unit tests
 
 import { filingStrandedBackfill } from './filing-stranded-backfill';
-
-interface MockStep {
-  run: jest.Mock;
-  sendEvent: jest.Mock;
-  sleep: jest.Mock;
-}
-
-function makeStep(): MockStep {
-  return {
-    run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
-    sendEvent: jest.fn().mockResolvedValue(undefined),
-    sleep: jest.fn().mockResolvedValue(undefined),
-  };
-}
 
 // filingTimedOutEventSchema validates sessionId/profileId as UUIDs, so the
 // fixture must produce real UUID-shaped strings, not synthetic "s-0" labels.
@@ -87,7 +65,7 @@ function makeStrandedRows(
 
 type HandlerFn = (ctx: {
   event: { data: Record<string, unknown> };
-  step: MockStep;
+  step: ReturnType<typeof createInngestStepRunner>['step'];
 }) => Promise<{ dispatched: number; capped: boolean; selfReinvoked: boolean }>;
 
 function getHandler(): HandlerFn {
@@ -97,24 +75,28 @@ function getHandler(): HandlerFn {
 describe('filingStrandedBackfill', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockInngestTransport.clear();
   });
 
   it('has concurrency limit of 1 to prevent duplicate concurrent backfill runs [BUG-TEMP-42]', () => {
     const config = (
       filingStrandedBackfill as unknown as {
-        _config: { concurrency: { limit: number } };
+        opts: { concurrency: { limit: number } };
       }
-    )._config;
+    ).opts;
     expect(config.concurrency).toEqual(expect.objectContaining({ limit: 1 }));
   });
 
   it('dispatches one synthetic-timeout event per stranded session', async () => {
     mockFindMany.mockResolvedValue(makeStrandedRows(3));
-    const step = makeStep();
+    const { step, sendEventCalls } = createInngestStepRunner();
 
     const result = await getHandler()({ event: { data: {} }, step });
 
-    expect(step.sendEvent).toHaveBeenCalledTimes(3);
+    // 3 synthetic-timeout sends; no self-reinvoke
+    expect(
+      sendEventCalls.filter((c) => c.name.startsWith('synthetic-timeout-')),
+    ).toHaveLength(3);
     expect(result).toEqual({
       dispatched: 3,
       capped: false,
@@ -124,17 +106,15 @@ describe('filingStrandedBackfill', () => {
 
   it('returns capped:false and does NOT self-trigger when below the 500 limit', async () => {
     mockFindMany.mockResolvedValue(makeStrandedRows(499));
-    const step = makeStep();
+    const { step, sendEventCalls, sleepCalls } = createInngestStepRunner();
 
     const result = await getHandler()({ event: { data: {} }, step });
 
     expect(result.capped).toBe(false);
     expect(result.selfReinvoked).toBe(false);
-    expect(step.sleep).not.toHaveBeenCalled();
+    expect(sleepCalls).toHaveLength(0);
     // 499 synthetic-timeout sends; no continue-stranded-backfill
-    const eventNames = step.sendEvent.mock.calls.map(
-      (call: unknown[]) => (call[1] as { name: string }).name,
-    );
+    const eventNames = sendEventCalls.map((c) => c.name);
     expect(eventNames).not.toContain(
       'app/maintenance.filing_stranded_backfill',
     );
@@ -148,7 +128,7 @@ describe('filingStrandedBackfill', () => {
   describe('[CR-FIL-LIMIT-AUTORESUME-09] auto-resume when capped', () => {
     it('self-triggers another stranded-backfill event when exactly 500 stranded sessions are found', async () => {
       mockFindMany.mockResolvedValue(makeStrandedRows(500));
-      const step = makeStep();
+      const { step, sendEventCalls, sleepCalls } = createInngestStepRunner();
 
       const result = await getHandler()({ event: { data: {} }, step });
 
@@ -157,19 +137,22 @@ describe('filingStrandedBackfill', () => {
 
       // Self-trigger must be one of the sendEvent calls — and crucially,
       // it must come AFTER a sleep so observers have time to clear status.
-      const continueCall = step.sendEvent.mock.calls.find(
-        (call: unknown[]) =>
-          (call[1] as { name: string }).name ===
+      const continueCall = sendEventCalls.find(
+        (c) =>
+          (c.payload as { name: string }).name ===
           'app/maintenance.filing_stranded_backfill',
       );
       expect(continueCall).not.toBeUndefined();
-      expect(step.sleep).toHaveBeenCalledTimes(1);
-      expect(step.sleep).toHaveBeenCalledWith('backfill-cooldown', '5m');
+      expect(sleepCalls).toHaveLength(1);
+      expect(sleepCalls[0]).toEqual({
+        name: 'backfill-cooldown',
+        duration: '5m',
+      });
     });
 
     it('does not sleep or self-trigger when stranded.length is 0', async () => {
       mockFindMany.mockResolvedValue([]);
-      const step = makeStep();
+      const { step, sendEventCalls, sleepCalls } = createInngestStepRunner();
 
       const result = await getHandler()({ event: { data: {} }, step });
 
@@ -178,8 +161,8 @@ describe('filingStrandedBackfill', () => {
         capped: false,
         selfReinvoked: false,
       });
-      expect(step.sleep).not.toHaveBeenCalled();
-      expect(step.sendEvent).not.toHaveBeenCalled();
+      expect(sleepCalls).toHaveLength(0);
+      expect(sendEventCalls).toHaveLength(0);
     });
   });
 
@@ -187,7 +170,7 @@ describe('filingStrandedBackfill', () => {
   describe('[CR-PR129-M9] deterministic (createdAt, id) ordering and cursor', () => {
     it('passes orderBy with both createdAt and id columns to findMany', async () => {
       mockFindMany.mockResolvedValue(makeStrandedRows(3));
-      const step = makeStep();
+      const { step } = createInngestStepRunner();
 
       await getHandler()({ event: { data: {} }, step });
 
@@ -220,31 +203,25 @@ describe('filingStrandedBackfill', () => {
       // Both runs return the same deterministic order — this is what we assert.
       mockFindMany.mockResolvedValue([rowA, rowB]);
 
-      const step1 = makeStep();
-      await getHandler()({ event: { data: {} }, step: step1 });
+      const runner1 = createInngestStepRunner();
+      await getHandler()({ event: { data: {} }, step: runner1.step });
 
       mockFindMany.mockResolvedValue([rowA, rowB]);
 
-      const step2 = makeStep();
-      await getHandler()({ event: { data: {} }, step: step2 });
+      const runner2 = createInngestStepRunner();
+      await getHandler()({ event: { data: {} }, step: runner2.step });
 
       // Extract dispatched session IDs from both runs.
-      const idsRun1 = step1.sendEvent.mock.calls
-        .filter((c: unknown[]) =>
-          (c[0] as string).startsWith('synthetic-timeout-'),
-        )
+      const idsRun1 = runner1.sendEventCalls
+        .filter((c) => c.name.startsWith('synthetic-timeout-'))
         .map(
-          (c: unknown[]) =>
-            (c[1] as { data: { sessionId: string } }).data.sessionId,
+          (c) => (c.payload as { data: { sessionId: string } }).data.sessionId,
         );
 
-      const idsRun2 = step2.sendEvent.mock.calls
-        .filter((c: unknown[]) =>
-          (c[0] as string).startsWith('synthetic-timeout-'),
-        )
+      const idsRun2 = runner2.sendEventCalls
+        .filter((c) => c.name.startsWith('synthetic-timeout-'))
         .map(
-          (c: unknown[]) =>
-            (c[1] as { data: { sessionId: string } }).data.sessionId,
+          (c) => (c.payload as { data: { sessionId: string } }).data.sessionId,
         );
 
       // Same order across both runs — deterministic.
@@ -255,18 +232,20 @@ describe('filingStrandedBackfill', () => {
     it('self-reinvoke event data carries lastCreatedAt and lastId cursor from the last row', async () => {
       const rows = makeStrandedRows(500);
       mockFindMany.mockResolvedValue(rows);
-      const step = makeStep();
+      const { step, sendEventCalls } = createInngestStepRunner();
 
       await getHandler()({ event: { data: {} }, step });
 
-      const continueCall = step.sendEvent.mock.calls.find(
-        (call: unknown[]) =>
-          (call[1] as { name: string }).name ===
+      const continueCall = sendEventCalls.find(
+        (c) =>
+          (c.payload as { name: string }).name ===
           'app/maintenance.filing_stranded_backfill',
       );
       expect(continueCall).not.toBeUndefined();
       const eventData = (
-        continueCall![1] as { data: { lastCreatedAt: string; lastId: string } }
+        continueCall!.payload as {
+          data: { lastCreatedAt: string; lastId: string };
+        }
       ).data;
       const lastRow = rows[499]!;
       expect(eventData.lastCreatedAt).toBe(
@@ -279,7 +258,7 @@ describe('filingStrandedBackfill', () => {
       const ts = '2026-04-20T00:00:00.000Z';
       const lastId = uuid('aaaaaaaa', 499);
       mockFindMany.mockResolvedValue(makeStrandedRows(3));
-      const step = makeStep();
+      const { step } = createInngestStepRunner();
 
       await getHandler()({
         event: { data: { lastCreatedAt: ts, lastId } },
@@ -297,7 +276,7 @@ describe('filingStrandedBackfill', () => {
 
     it('first run (no cursor in event.data) does NOT include cursor filter', async () => {
       mockFindMany.mockResolvedValue(makeStrandedRows(3));
-      const step = makeStep();
+      const { step } = createInngestStepRunner();
 
       await getHandler()({ event: { data: {} }, step });
 
