@@ -10,6 +10,6 @@ export type AppVariables = {
   account: Account;
   profileId: string | undefined;
   profileMeta: ProfileMeta | undefined;
-  subscriptionId: string;
-  llmTier: LLMTier;
+  subscriptionId: string | undefined;
+  llmTier: LLMTier | undefined;
 };
