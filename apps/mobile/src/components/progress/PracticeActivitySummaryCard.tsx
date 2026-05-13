@@ -149,7 +149,7 @@ export function PracticeActivitySummaryCard({
       {hasComparisonDelta ? (
         <Text className="text-caption text-text-secondary mt-3">
           {t('parentView.practiceSummary.comparison', {
-            tests: formatSigned(comparison.activitiesCompleted),
+            activities: formatSigned(comparison.activitiesCompleted),
             points: formatSigned(comparison.pointsEarned),
             celebrations: formatSigned(comparison.celebrations),
           })}

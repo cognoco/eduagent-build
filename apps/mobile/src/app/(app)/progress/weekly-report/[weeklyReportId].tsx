@@ -80,7 +80,7 @@ export default function ProgressWeeklyReportDetail(): React.ReactElement {
         <View className="flex-row items-center mt-4">
           <Pressable
             onPress={() => goBackOrReplace(router, '/(app)/progress/reports')}
-            className="me-3 py-2 pe-2"
+            className="me-3 min-h-[44px] min-w-[44px] items-center justify-center"
             accessibilityRole="button"
             accessibilityLabel={t('common.goBack')}
             testID="progress-weekly-report-back"

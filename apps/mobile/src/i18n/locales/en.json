@@ -960,6 +960,9 @@
         "sessions": "Sessions"
       }
     },
+    "bookmarkCard": {
+      "accessibilityLabel": "Saved from chat. {{sourceLine}}."
+    },
     "manage": {
       "button": "Manage",
       "accessibilityLabel": "Manage subjects",
@@ -1389,8 +1392,8 @@
         "streak": "{{count}}-day streak"
       },
       "practice": {
-        "tests": "tests",
-        "points": "points"
+        "quizzes": "Quizzes",
+        "reviews": "Reviews"
       },
       "mini": {
         "sessions": "{{count}} session",
@@ -1920,18 +1923,18 @@
     },
     "practiceSummary": {
       "title": "Test detail",
-      "subtitle": "{{count}} tests finished, including {{reviews}} reviews",
+      "subtitle": "{{count}} activities finished, including {{reviews}} reviews",
       "accuracy": "Accuracy",
       "reviews": "Reviews",
       "points": "Points",
       "celebrations": "Celebrations",
       "activityKinds": "Kinds",
-      "comparison": "{{tests}} tests · {{points}} points · {{celebrations}} celebrations",
+      "comparison": "{{activities}} activities · {{points}} points · {{celebrations}} celebrations",
       "byType": "By type",
       "bySubject": "By subject",
       "typeDetail": "{{count}} finished · {{points}} points",
       "typeDetailWithScore": "{{count}} finished · {{points}} points · {{accuracy}}%",
-      "subjectDetail": "{{count}} tests · {{points}} points · {{types}}",
+      "subjectDetail": "{{count}} activities · {{points}} points · {{types}}",
       "unknownSubject": "Unassigned",
       "activityTypes": {
         "quiz": "Quiz",

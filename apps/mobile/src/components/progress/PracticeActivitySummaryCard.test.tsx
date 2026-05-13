@@ -93,14 +93,14 @@ describe('PracticeActivitySummaryCard', () => {
 
     screen.getByTestId('practice-summary');
     screen.getByText('Test detail');
-    screen.getByText('3 tests finished, including 1 reviews');
-    screen.getByText('+2 tests · +15 points · +2 celebrations');
+    screen.getByText('3 activities finished, including 1 reviews');
+    screen.getByText('+2 activities · +15 points · +2 celebrations');
     screen.getByText('Capitals');
     screen.getByText('2 finished · 12 points · 75%');
     screen.getByText('Vocabulary');
     screen.getByText('1 finished · 8 points');
     screen.getByText('Math');
-    screen.getByText('3 tests · 20 points · Capitals 2 · Vocabulary 1');
+    screen.getByText('3 activities · 20 points · Capitals 2 · Vocabulary 1');
   });
 
   it('does not render when the report has no test activity', () => {
@@ -175,7 +175,7 @@ describe('PracticeActivitySummaryCard', () => {
     );
 
     expect(
-      screen.queryByText('0 tests · 0 points · 0 celebrations'),
+      screen.queryByText('0 activities · 0 points · 0 celebrations'),
     ).toBeNull();
   });
 });

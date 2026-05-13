@@ -133,7 +133,7 @@ export default function ChildWeeklyReportDetailScreen(): React.ReactElement {
                   : FAMILY_HOME_PATH,
               )
             }
-            className="me-3 py-2 pe-2"
+            className="me-3 min-h-[44px] min-w-[44px] items-center justify-center"
             accessibilityRole="button"
             accessibilityLabel={t('common.goBack')}
             testID="child-weekly-report-back"

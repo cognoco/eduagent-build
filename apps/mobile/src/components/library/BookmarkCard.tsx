@@ -1,5 +1,6 @@
 import { Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 
 interface BookmarkCardProps {
   bookmarkId: string;
@@ -16,6 +17,7 @@ export function BookmarkCard({
   onPress,
   testID,
 }: BookmarkCardProps): React.ReactElement {
+  const { t } = useTranslation();
   const cardTestID = testID ?? `bookmark-card-${bookmarkId}`;
 
   return (
@@ -24,7 +26,9 @@ export function BookmarkCard({
       disabled={!onPress}
       testID={cardTestID}
       accessibilityRole={onPress ? 'button' : undefined}
-      accessibilityLabel={`Saved from chat. ${sourceLine}.`}
+      accessibilityLabel={t('library.bookmarkCard.accessibilityLabel', {
+        sourceLine,
+      })}
       className="mx-5 mb-2 rounded-card bg-surface px-4 py-3 border border-surface-elevated"
     >
       <View className="flex-row items-start">

@@ -1,8 +1,11 @@
-import { renderHook, waitFor } from '@testing-library/react-native';
+import { act, renderHook, waitFor } from '@testing-library/react-native';
 import { QueryClient } from '@tanstack/react-query';
 import { setActiveProfileId } from '../lib/api-client';
 import { ForbiddenError, UpstreamError } from '../lib/api-errors';
-import { createHookWrapper } from '../test-utils/app-hook-test-utils';
+import {
+  createHookWrapper,
+  createTestProfile,
+} from '../test-utils/app-hook-test-utils';
 import {
   useSubjectProgress,
   useOverallProgress,
@@ -11,6 +14,8 @@ import {
   useReviewSummary,
   useOverdueTopics,
   useTopicProgress,
+  useProfileWeeklyReports,
+  useRefreshProgressSnapshot,
 } from './use-progress';
 
 const mockFetch = jest.fn();
@@ -334,5 +339,107 @@ describe('useTopicProgress', () => {
 
     expect(mockFetch).toHaveBeenCalled();
     expect(result.current.data?.title).toBe('Algebra Basics');
+  });
+});
+
+describe('useProfileWeeklyReports', () => {
+  it('fetches weekly reports for the active profile', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          reports: [
+            {
+              id: '550e8400-e29b-41d4-a716-446655440001',
+              reportWeek: '2026-W19',
+              viewedAt: null,
+              createdAt: '2026-05-11T00:00:00.000Z',
+              headlineStat: {
+                label: 'sessions',
+                value: 4,
+                comparison: '+1',
+              },
+              thisWeek: {
+                totalSessions: 4,
+                totalActiveMinutes: 42,
+                topicsMastered: 1,
+                topicsExplored: 3,
+                vocabularyTotal: 12,
+                streakBest: 5,
+              },
+            },
+          ],
+        }),
+        { status: 200 },
+      ),
+    );
+
+    const { result } = renderHook(
+      () => useProfileWeeklyReports('test-profile-id'),
+      { wrapper: createWrapper() },
+    );
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    const url = String(mockFetch.mock.calls[0]?.[0]);
+    expect(url).toContain('/progress/weekly-reports');
+    expect(result.current.data?.[0]?.reportWeek).toBe('2026-W19');
+  });
+
+  it('fetches child weekly reports when the active profile is an owner', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ reports: [] }), { status: 200 }),
+    );
+
+    const ownerProfile = createTestProfile({
+      id: 'owner-profile-id',
+      isOwner: true,
+    });
+    const { result } = renderHook(
+      () => useProfileWeeklyReports('child-profile-id'),
+      {
+        wrapper: createHookWrapper({ activeProfile: ownerProfile }).wrapper,
+      },
+    );
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    const url = String(mockFetch.mock.calls[0]?.[0]);
+    expect(url).toContain(
+      '/dashboard/children/child-profile-id/weekly-reports',
+    );
+    expect(result.current.data).toEqual([]);
+  });
+});
+
+describe('useRefreshProgressSnapshot', () => {
+  it('posts a refresh request and invalidates progress-facing queries', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ refreshed: true }), { status: 200 }),
+    );
+    const wrapper = createWrapper();
+    const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries');
+
+    const { result } = renderHook(() => useRefreshProgressSnapshot(), {
+      wrapper,
+    });
+
+    await act(async () => {
+      await result.current.mutateAsync();
+    });
+
+    const url = String(mockFetch.mock.calls[0]?.[0]);
+    const init = mockFetch.mock.calls[0]?.[1] as RequestInit | undefined;
+    expect(url).toContain('/progress/refresh');
+    expect(init?.method).toBe('POST');
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ['progress', 'inventory', 'test-profile-id'],
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ['dashboard'],
+    });
   });
 });

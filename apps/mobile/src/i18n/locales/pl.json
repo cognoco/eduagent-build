@@ -909,6 +909,9 @@
         "sessions": "Sesje"
       }
     },
+    "bookmarkCard": {
+      "accessibilityLabel": "Zapisano z czatu. {{sourceLine}}."
+    },
     "manage": {
       "button": "Zarządzaj",
       "accessibilityLabel": "Zarządzaj przedmiotami",
@@ -1351,8 +1354,8 @@
         "streak": "{{count}} dni z rzędu"
       },
       "practice": {
-        "tests": "testy",
-        "points": "punkty"
+        "quizzes": "Quizy",
+        "reviews": "Powtórki"
       }
     },
     "monthlyReport": {
@@ -1875,18 +1878,18 @@
     },
     "practiceSummary": {
       "title": "Szczegóły testów",
-      "subtitle": "{{count}} ukończonych testów, w tym {{reviews}} powtórek",
+      "subtitle": "{{count}} ukończonych aktywności, w tym {{reviews}} powtórek",
       "accuracy": "Trafność",
       "reviews": "Powtórki",
       "points": "Punkty",
       "celebrations": "Świętowania",
       "activityKinds": "Rodzaje",
-      "comparison": "{{tests}} testów · {{points}} punktów · {{celebrations}} świętowań",
+      "comparison": "{{activities}} aktywności · {{points}} punktów · {{celebrations}} świętowań",
       "byType": "Według typu",
       "bySubject": "Według przedmiotu",
       "typeDetail": "{{count}} ukończono · {{points}} punktów",
       "typeDetailWithScore": "{{count}} ukończono · {{points}} punktów · {{accuracy}}%",
-      "subjectDetail": "{{count}} testów · {{points}} punktów · {{types}}",
+      "subjectDetail": "{{count}} aktywności · {{points}} punktów · {{types}}",
       "unknownSubject": "Nieprzypisane",
       "activityTypes": {
         "quiz": "Quiz",

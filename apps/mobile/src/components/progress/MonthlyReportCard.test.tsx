@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen } from '@testing-library/react-native';
 import { MonthlyReportCard } from './MonthlyReportCard';
 import { useProfileReports } from '../../hooks/use-progress';
 
@@ -22,6 +22,7 @@ jest.mock('react-i18next', () => ({
         return `Your first monthly summary lands at the end of ${opts?.month}.`;
       if (key === 'progress.monthlyReport.empty.adult')
         return `Your first monthly summary lands at the end of ${opts?.month}.`;
+      if (key === 'common.retry') return 'Retry';
       return key;
     },
   }),
@@ -155,5 +156,22 @@ describe('MonthlyReportCard', () => {
     render(<MonthlyReportCard profileId="profile-1" register="child" />);
 
     screen.getByText(/Your first monthly summary lands at the end of/);
+  });
+
+  it('shows a retry button on error that calls refetch', () => {
+    const refetch = jest.fn();
+    (useProfileReports as jest.Mock).mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      refetch,
+    });
+
+    render(<MonthlyReportCard profileId="profile-1" />);
+
+    screen.getByTestId('monthly-report-error');
+    const retryButton = screen.getByTestId('monthly-report-retry');
+    fireEvent.press(retryButton);
+    expect(refetch).toHaveBeenCalled();
   });
 });

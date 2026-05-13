@@ -24,7 +24,6 @@ jest.mock('react-i18next', () => ({
     t: (key: string) => {
       if (key === 'progress.previousReports.title') return 'Previous reports';
       if (key === 'progress.previousReports.viewAll') return 'View all reports';
-      if (key === 'progress.milestones.seeAllLink') return 'See all';
       if (key === 'parentView.reports.weekOf') return 'Week of';
       return key;
     },
@@ -100,5 +99,14 @@ describe('ReportsListCard', () => {
       pathname: '/(app)/progress/reports/[reportId]',
       params: { reportId: 'monthly-1' },
     });
+  });
+
+  it('uses self-view reports link copy and testID', () => {
+    render(<ReportsListCard profileId="profile-1" interactive selfView />);
+
+    expect(screen.getByTestId('progress-reports-link')).toHaveTextContent(
+      'View all reports',
+    );
+    expect(screen.queryByTestId('child-reports-link')).toBeNull();
   });
 });

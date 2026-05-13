@@ -909,6 +909,9 @@
         "sessions": "Sessões"
       }
     },
+    "bookmarkCard": {
+      "accessibilityLabel": "Salvo do chat. {{sourceLine}}."
+    },
     "manage": {
       "button": "Gerenciar",
       "accessibilityLabel": "Gerenciar matérias",
@@ -1351,8 +1354,8 @@
         "streak": "Sequência de {{count}} dias"
       },
       "practice": {
-        "tests": "testes",
-        "points": "pontos"
+        "quizzes": "Questionários",
+        "reviews": "Revisões"
       }
     },
     "monthlyReport": {
@@ -1875,18 +1878,18 @@
     },
     "practiceSummary": {
       "title": "Detalhes dos testes",
-      "subtitle": "{{count}} testes concluídos, incluindo {{reviews}} revisões",
+      "subtitle": "{{count}} atividades concluídas, incluindo {{reviews}} revisões",
       "accuracy": "Precisão",
       "reviews": "Revisões",
       "points": "Pontos",
       "celebrations": "Celebrações",
       "activityKinds": "Tipos",
-      "comparison": "{{tests}} testes · {{points}} pontos · {{celebrations}} celebrações",
+      "comparison": "{{activities}} atividades · {{points}} pontos · {{celebrations}} celebrações",
       "byType": "Por tipo",
       "bySubject": "Por matéria",
       "typeDetail": "{{count}} concluídos · {{points}} pontos",
       "typeDetailWithScore": "{{count}} concluídos · {{points}} pontos · {{accuracy}}%",
-      "subjectDetail": "{{count}} testes · {{points}} pontos · {{types}}",
+      "subjectDetail": "{{count}} atividades · {{points}} pontos · {{types}}",
       "unknownSubject": "Sem matéria",
       "activityTypes": {
         "quiz": "Quiz",

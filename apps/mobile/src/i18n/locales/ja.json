@@ -884,6 +884,9 @@
         "sessions": "セッション"
       }
     },
+    "bookmarkCard": {
+      "accessibilityLabel": "チャットから保存。{{sourceLine}}。"
+    },
     "manage": {
       "button": "管理",
       "accessibilityLabel": "科目を管理",
@@ -1326,8 +1329,8 @@
         "streak": "{{count}}日連続"
       },
       "practice": {
-        "tests": "テスト",
-        "points": "ポイント"
+        "quizzes": "クイズ",
+        "reviews": "復習"
       }
     },
     "monthlyReport": {
@@ -1850,18 +1853,18 @@
     },
     "practiceSummary": {
       "title": "テスト詳細",
-      "subtitle": "{{count}}件のテスト完了（復習{{reviews}}件を含む）",
+      "subtitle": "{{count}}件のアクティビティ完了（復習{{reviews}}件を含む）",
       "accuracy": "正答率",
       "reviews": "復習",
       "points": "ポイント",
       "celebrations": "お祝い",
       "activityKinds": "種類",
-      "comparison": "{{tests}}件のテスト · {{points}}ポイント · {{celebrations}}回のお祝い",
+      "comparison": "{{activities}}件のアクティビティ · {{points}}ポイント · {{celebrations}}回のお祝い",
       "byType": "タイプ別",
       "bySubject": "科目別",
       "typeDetail": "{{count}}件完了 · {{points}}ポイント",
       "typeDetailWithScore": "{{count}}件完了 · {{points}}ポイント · {{accuracy}}%",
-      "subjectDetail": "{{count}}件のテスト · {{points}}ポイント · {{types}}",
+      "subjectDetail": "{{count}}件のアクティビティ · {{points}}ポイント · {{types}}",
       "unknownSubject": "未割り当て",
       "activityTypes": {
         "quiz": "クイズ",

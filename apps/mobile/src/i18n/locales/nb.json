@@ -884,6 +884,9 @@
         "sessions": "Økter"
       }
     },
+    "bookmarkCard": {
+      "accessibilityLabel": "Lagret fra chatten. {{sourceLine}}."
+    },
     "manage": {
       "button": "Administrer",
       "accessibilityLabel": "Administrer emner",
@@ -1326,8 +1329,8 @@
         "streak": "{{count}} dager på rad"
       },
       "practice": {
-        "tests": "tester",
-        "points": "poeng"
+        "quizzes": "Quizer",
+        "reviews": "Repetisjoner"
       }
     },
     "monthlyReport": {
@@ -1850,18 +1853,18 @@
     },
     "practiceSummary": {
       "title": "Testdetaljer",
-      "subtitle": "{{count}} tester fullført, inkludert {{reviews}} repetisjoner",
+      "subtitle": "{{count}} aktiviteter fullført, inkludert {{reviews}} repetisjoner",
       "accuracy": "Treffprosent",
       "reviews": "Repetisjoner",
       "points": "Poeng",
       "celebrations": "Feiringer",
       "activityKinds": "Typer",
-      "comparison": "{{tests}} tester · {{points}} poeng · {{celebrations}} feiringer",
+      "comparison": "{{activities}} aktiviteter · {{points}} poeng · {{celebrations}} feiringer",
       "byType": "Etter type",
       "bySubject": "Etter fag",
       "typeDetail": "{{count}} fullført · {{points}} poeng",
       "typeDetailWithScore": "{{count}} fullført · {{points}} poeng · {{accuracy}}%",
-      "subjectDetail": "{{count}} tester · {{points}} poeng · {{types}}",
+      "subjectDetail": "{{count}} aktiviteter · {{points}} poeng · {{types}}",
       "unknownSubject": "Ikke tilordnet",
       "activityTypes": {
         "quiz": "Quiz",

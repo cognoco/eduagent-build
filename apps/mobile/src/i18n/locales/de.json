@@ -884,6 +884,9 @@
         "sessions": "Sitzungen"
       }
     },
+    "bookmarkCard": {
+      "accessibilityLabel": "Aus dem Chat gespeichert. {{sourceLine}}."
+    },
     "manage": {
       "button": "Verwalten",
       "accessibilityLabel": "Fächer verwalten",
@@ -1326,8 +1329,8 @@
         "streak": "{{count}} Tage in Folge"
       },
       "practice": {
-        "tests": "Tests",
-        "points": "Punkte"
+        "quizzes": "Quizze",
+        "reviews": "Wiederholungen"
       }
     },
     "monthlyReport": {
@@ -1850,18 +1853,18 @@
     },
     "practiceSummary": {
       "title": "Testdetails",
-      "subtitle": "{{count}} Tests abgeschlossen, davon {{reviews}} Wiederholungen",
+      "subtitle": "{{count}} Aktivitäten abgeschlossen, davon {{reviews}} Wiederholungen",
       "accuracy": "Genauigkeit",
       "reviews": "Wiederholungen",
       "points": "Punkte",
       "celebrations": "Feiern",
       "activityKinds": "Arten",
-      "comparison": "{{tests}} Tests · {{points}} Punkte · {{celebrations}} Feiern",
+      "comparison": "{{activities}} Aktivitäten · {{points}} Punkte · {{celebrations}} Feiern",
       "byType": "Nach Typ",
       "bySubject": "Nach Fach",
       "typeDetail": "{{count}} abgeschlossen · {{points}} Punkte",
       "typeDetailWithScore": "{{count}} abgeschlossen · {{points}} Punkte · {{accuracy}}%",
-      "subjectDetail": "{{count}} Tests · {{points}} Punkte · {{types}}",
+      "subjectDetail": "{{count}} Aktivitäten · {{points}} Punkte · {{types}}",
       "unknownSubject": "Nicht zugeordnet",
       "activityTypes": {
         "quiz": "Quiz",

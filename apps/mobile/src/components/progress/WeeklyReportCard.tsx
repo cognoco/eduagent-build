@@ -52,10 +52,8 @@ export function WeeklyReportCard({
     wordsLearned: 0,
     topicsTouched: 0,
   };
-  const practiceTests = latest?.practiceSummary
-    ? latest.practiceSummary.totals.activitiesCompleted
-    : 0;
-  const practicePoints = latest?.practiceSummary?.totals?.pointsEarned ?? 0;
+  const practiceQuizzes = latest?.practiceSummary?.quizzesCompleted ?? 0;
+  const practiceReviews = latest?.practiceSummary?.reviewsCompleted ?? 0;
   const hasMiniSummary =
     mini.sessions > 0 || mini.wordsLearned > 0 || mini.topicsTouched > 0;
 
@@ -130,24 +128,24 @@ export function WeeklyReportCard({
               <View className="flex-row gap-2 mt-2">
                 <View
                   className="bg-surface rounded-card px-3 py-2 flex-1"
-                  testID="weekly-report-tests"
+                  testID="weekly-report-quizzes"
                 >
                   <Text className="text-h3 font-semibold text-text-primary">
-                    {practiceTests}
+                    {practiceQuizzes}
                   </Text>
                   <Text className="text-caption text-text-secondary mt-1">
-                    {t('progress.weeklyReport.practice.tests')}
+                    {t('progress.weeklyReport.practice.quizzes')}
                   </Text>
                 </View>
                 <View
                   className="bg-surface rounded-card px-3 py-2 flex-1"
-                  testID="weekly-report-points"
+                  testID="weekly-report-reviews"
                 >
                   <Text className="text-h3 font-semibold text-text-primary">
-                    {practicePoints}
+                    {practiceReviews}
                   </Text>
                   <Text className="text-caption text-text-secondary mt-1">
-                    {t('progress.weeklyReport.practice.points')}
+                    {t('progress.weeklyReport.practice.reviews')}
                   </Text>
                 </View>
               </View>

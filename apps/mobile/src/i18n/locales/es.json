@@ -884,6 +884,9 @@
         "sessions": "Sesiones"
       }
     },
+    "bookmarkCard": {
+      "accessibilityLabel": "Guardado del chat. {{sourceLine}}."
+    },
     "manage": {
       "button": "Gestionar",
       "accessibilityLabel": "Gestionar materias",
@@ -1326,8 +1329,8 @@
         "streak": "{{count}} días seguidos"
       },
       "practice": {
-        "tests": "pruebas",
-        "points": "puntos"
+        "quizzes": "Cuestionarios",
+        "reviews": "Repasos"
       }
     },
     "monthlyReport": {
@@ -1850,18 +1853,18 @@
     },
     "practiceSummary": {
       "title": "Detalle de pruebas",
-      "subtitle": "{{count}} pruebas terminadas, incluidas {{reviews}} revisiones",
+      "subtitle": "{{count}} actividades terminadas, incluidas {{reviews}} revisiones",
       "accuracy": "Precisión",
       "reviews": "Revisiones",
       "points": "Puntos",
       "celebrations": "Celebraciones",
       "activityKinds": "Tipos",
-      "comparison": "{{tests}} pruebas · {{points}} puntos · {{celebrations}} celebraciones",
+      "comparison": "{{activities}} actividades · {{points}} puntos · {{celebrations}} celebraciones",
       "byType": "Por tipo",
       "bySubject": "Por asignatura",
       "typeDetail": "{{count}} terminadas · {{points}} puntos",
       "typeDetailWithScore": "{{count}} terminadas · {{points}} puntos · {{accuracy}}%",
-      "subjectDetail": "{{count}} pruebas · {{points}} puntos · {{types}}",
+      "subjectDetail": "{{count}} actividades · {{points}} puntos · {{types}}",
       "unknownSubject": "Sin asignar",
       "activityTypes": {
         "quiz": "Quiz",
