@@ -662,6 +662,10 @@ describe('ProgressScreen — progressive disclosure', () => {
 
     const view = render(<ProgressScreen />);
 
+    expect(useChildInventory).toHaveBeenLastCalledWith(undefined, {
+      enabled: false,
+    });
+
     mockLinkedChildren = [childProgressProfile];
     view.rerender(<ProgressScreen />);
 
