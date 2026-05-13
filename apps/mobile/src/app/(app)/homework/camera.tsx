@@ -28,6 +28,7 @@ import {
   initialCameraState,
 } from '../../../components/homework/camera-reducer';
 import { useHomeworkOcr } from '../../../hooks/use-homework-ocr';
+import { useSpeechRecognition } from '../../../hooks/use-speech-recognition';
 import { useCreateSubject, useSubjects } from '../../../hooks/use-subjects';
 import { useClassifySubject } from '../../../hooks/use-classify-subject';
 import { CelebrationAnimation } from '../../../components/common';
@@ -61,11 +62,13 @@ export default function CameraScreen(): React.ReactNode {
   const cameraRef = useRef<CameraView>(null);
   const { data: subjects, isLoading: subjectsLoading } = useSubjects();
   const createSubject = useCreateSubject();
+  const speech = useSpeechRecognition();
 
   const [ocrText, setOcrText] = useState('');
   const [draftProblems, setDraftProblems] = useState<HomeworkProblem[]>([]);
   const [droppedProblems, setDroppedProblems] = useState<HomeworkProblem[]>([]);
   const [manualText, setManualText] = useState('');
+  const [voiceProblemId, setVoiceProblemId] = useState<string | null>(null);
   const [flash, setFlash] = useState<FlashMode>('off');
   const [showCelebration, setShowCelebration] = useState(true);
   // [IMP-1] Track MIME type from the image source for reliable detection.
@@ -81,6 +84,7 @@ export default function CameraScreen(): React.ReactNode {
   const [showSubjectPicker, setShowSubjectPicker] = useState(false);
   const classifyTriggeredRef = useRef(false);
   const [manualSubjectName, setManualSubjectName] = useState('');
+  const lastAppliedTranscriptRef = useRef('');
 
   // BUG-366: Track phase via ref so useFocusEffect can check it without
   // adding it as a dependency (which would cause spurious re-runs).
@@ -98,6 +102,8 @@ export default function CameraScreen(): React.ReactNode {
       setDraftProblems([]);
       setDroppedProblems([]);
       setManualText('');
+      setVoiceProblemId(null);
+      lastAppliedTranscriptRef.current = '';
       setManualSubjectName('');
       setShowCelebration(true);
       setFlash('off');
@@ -135,6 +141,36 @@ export default function CameraScreen(): React.ReactNode {
   useEffect(() => {
     classifyTriggeredRef.current = false;
   }, [state.imageUri]);
+
+  useEffect(() => {
+    if (!voiceProblemId || speech.isListening || !speech.transcript.trim()) {
+      return;
+    }
+
+    const transcript = speech.transcript.trim();
+    if (transcript === lastAppliedTranscriptRef.current) {
+      return;
+    }
+
+    lastAppliedTranscriptRef.current = transcript;
+    setDraftProblems((prev) =>
+      prev.map((problem) => {
+        if (problem.id !== voiceProblemId) {
+          return problem;
+        }
+        const separator = problem.text.trim() ? '\n' : '';
+        return {
+          ...problem,
+          text: `${problem.text}${separator}${transcript}`,
+        };
+      }),
+    );
+  }, [speech.isListening, speech.transcript, voiceProblemId]);
+
+  useEffect(() => {
+    if (!speech.error) return;
+    platformAlert('Microphone unavailable', speech.error);
+  }, [speech.error]);
 
   // Sync OCR hook status into reducer
   useEffect(() => {
@@ -345,6 +381,11 @@ export default function CameraScreen(): React.ReactNode {
   }, [state.imageUri, ocr]);
 
   const handleRetake = useCallback(() => {
+    if (speech.isListening) {
+      void speech.stopListening();
+    }
+    setVoiceProblemId(null);
+    lastAppliedTranscriptRef.current = '';
     setOcrText('');
     setDraftProblems([]);
     setDroppedProblems([]);
@@ -355,7 +396,7 @@ export default function CameraScreen(): React.ReactNode {
     setShowCelebration(true);
     classifyTriggeredRef.current = false;
     dispatch({ type: 'RETAKE' });
-  }, []);
+  }, [speech]);
 
   const handleRetryOcr = useCallback(async () => {
     dispatch({ type: 'RETRY_OCR' });
@@ -682,7 +723,25 @@ export default function CameraScreen(): React.ReactNode {
     setDraftProblems((prev) =>
       prev.filter((problem) => problem.id !== problemId),
     );
+    setVoiceProblemId((prev) => (prev === problemId ? null : prev));
   }, []);
+
+  const handleProblemMicPress = useCallback(
+    async (problemId: string) => {
+      if (speech.isListening) {
+        await speech.stopListening();
+        if (voiceProblemId === problemId) {
+          return;
+        }
+      }
+
+      setVoiceProblemId(problemId);
+      lastAppliedTranscriptRef.current = '';
+      speech.clearTranscript();
+      await speech.startListening();
+    },
+    [speech, voiceProblemId],
+  );
 
   // ---- Permission phase ----
   if (state.phase === 'permission') {
@@ -1024,6 +1083,46 @@ export default function CameraScreen(): React.ReactNode {
                   number: index + 1,
                 })}
               />
+              <View className="mt-3 flex-row items-center justify-between">
+                <Text className="text-body-sm text-text-secondary">
+                  {voiceProblemId === problem.id && speech.isListening
+                    ? t('homework.listening')
+                    : t('homework.voiceHint')}
+                </Text>
+                <Pressable
+                  testID={`problem-mic-${index}`}
+                  onPress={() => void handleProblemMicPress(problem.id)}
+                  className={`w-12 h-12 rounded-full items-center justify-center ${
+                    voiceProblemId === problem.id && speech.isListening
+                      ? 'bg-primary'
+                      : 'bg-surface-elevated'
+                  }`}
+                  accessibilityLabel={
+                    voiceProblemId === problem.id && speech.isListening
+                      ? t('homework.stopDictatingProblemLabel', {
+                          number: index + 1,
+                        })
+                      : t('homework.dictateProblemLabel', {
+                          number: index + 1,
+                        })
+                  }
+                  accessibilityRole="button"
+                >
+                  <Ionicons
+                    name={
+                      voiceProblemId === problem.id && speech.isListening
+                        ? 'stop'
+                        : 'mic-outline'
+                    }
+                    size={22}
+                    color={
+                      voiceProblemId === problem.id && speech.isListening
+                        ? colors.textInverse
+                        : colors.textSecondary
+                    }
+                  />
+                </Pressable>
+              </View>
             </View>
           ))}
         </View>
