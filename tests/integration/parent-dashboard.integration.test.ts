@@ -12,11 +12,17 @@
  * 5. GET /v1/dashboard/children/:profileId/sessions/:sessionId/transcript — returns 404 (removed)
  * 8. GET /v1/dashboard/children/:profileId/memory — returns curated memory categories
  * 9. GET /v1/dashboard/children/:profileId/sessions/:sessionId — returns session detail
+ * 10. GET /v1/dashboard/children/:profileId/progress-summary — auth + consent gated
  * 6. GET /v1/dashboard/demo — returns hardcoded demo data
  * 7. GET /v1/dashboard — 401 without auth
  */
 
-import { familyLinks, learningSessions } from '@eduagent/database';
+import {
+  familyLinks,
+  learningSessions,
+  consentStates,
+} from '@eduagent/database';
+import { eq } from 'drizzle-orm';
 
 import {
   buildIntegrationEnv,
@@ -38,7 +44,7 @@ async function createProfile(
   userId: string,
   email: string,
   displayName: string,
-  birthYear: number
+  birthYear: number,
 ): Promise<string> {
   const res = await app.request(
     '/v1/profiles',
@@ -47,7 +53,7 @@ async function createProfile(
       headers: buildAuthHeaders({ sub: userId, email }),
       body: JSON.stringify({ displayName, birthYear }),
     },
-    TEST_ENV
+    TEST_ENV,
   );
 
   expect(res.status).toBe(201);
@@ -59,7 +65,7 @@ async function createSubjectForProfile(
   userId: string,
   email: string,
   profileId: string,
-  subjectName: string
+  subjectName: string,
 ): Promise<string> {
   const res = await app.request(
     '/v1/subjects',
@@ -68,7 +74,7 @@ async function createSubjectForProfile(
       headers: buildAuthHeaders({ sub: userId, email }, profileId),
       body: JSON.stringify({ name: subjectName }),
     },
-    TEST_ENV
+    TEST_ENV,
   );
 
   expect(res.status).toBe(201);
@@ -96,7 +102,7 @@ afterAll(async () => {
 
 async function seedFamilyLink(
   parentProfileId: string,
-  childProfileId: string
+  childProfileId: string,
 ): Promise<void> {
   const db = createIntegrationDb();
   await db
@@ -108,7 +114,7 @@ async function seedFamilyLink(
 async function seedSession(
   profileId: string,
   subjectId: string,
-  overrides: Partial<typeof learningSessions.$inferInsert> = {}
+  overrides: Partial<typeof learningSessions.$inferInsert> = {},
 ): Promise<string> {
   const db = createIntegrationDb();
   const [row] = await db
@@ -141,7 +147,7 @@ describe('Integration: GET /v1/dashboard', () => {
       PARENT_USER_ID,
       PARENT_EMAIL,
       'Test Parent',
-      1985
+      1985,
     );
     // birthYear 2004 avoids GDPR consent block (age 22) while still
     // being a valid "child" in the family-link sense.
@@ -149,7 +155,7 @@ describe('Integration: GET /v1/dashboard', () => {
       CHILD_USER_ID,
       CHILD_EMAIL,
       'Test Child',
-      2004
+      2004,
     );
     await seedFamilyLink(parentProfileId, childProfileId);
 
@@ -158,7 +164,7 @@ describe('Integration: GET /v1/dashboard', () => {
       CHILD_USER_ID,
       CHILD_EMAIL,
       childProfileId,
-      'Mathematics'
+      'Mathematics',
     );
 
     // Seed a session so session counts are non-zero
@@ -171,10 +177,10 @@ describe('Integration: GET /v1/dashboard', () => {
         method: 'GET',
         headers: buildAuthHeaders(
           { sub: PARENT_USER_ID, email: PARENT_EMAIL },
-          parentProfileId
+          parentProfileId,
         ),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -193,7 +199,7 @@ describe('Integration: GET /v1/dashboard', () => {
       PARENT_USER_ID,
       PARENT_EMAIL,
       'Lonely Parent',
-      1985
+      1985,
     );
 
     const res = await app.request(
@@ -202,10 +208,10 @@ describe('Integration: GET /v1/dashboard', () => {
         method: 'GET',
         headers: buildAuthHeaders(
           { sub: PARENT_USER_ID, email: PARENT_EMAIL },
-          parentProfileId
+          parentProfileId,
         ),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -227,13 +233,13 @@ describe('Integration: GET /v1/dashboard/children/:profileId', () => {
       PARENT_USER_ID,
       PARENT_EMAIL,
       'Test Parent',
-      1985
+      1985,
     );
     const childProfileId = await createProfile(
       CHILD_USER_ID,
       CHILD_EMAIL,
       'Test Child',
-      2004
+      2004,
     );
     await seedFamilyLink(parentProfileId, childProfileId);
 
@@ -243,10 +249,10 @@ describe('Integration: GET /v1/dashboard/children/:profileId', () => {
         method: 'GET',
         headers: buildAuthHeaders(
           { sub: PARENT_USER_ID, email: PARENT_EMAIL },
-          parentProfileId
+          parentProfileId,
         ),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -261,13 +267,13 @@ describe('Integration: GET /v1/dashboard/children/:profileId', () => {
       PARENT_USER_ID,
       PARENT_EMAIL,
       'Test Parent',
-      1985
+      1985,
     );
     const childProfileId = await createProfile(
       CHILD_USER_ID,
       CHILD_EMAIL,
       'Test Child',
-      2004
+      2004,
     );
     // No family link — assertParentAccess rejects with 403
 
@@ -277,10 +283,10 @@ describe('Integration: GET /v1/dashboard/children/:profileId', () => {
         method: 'GET',
         headers: buildAuthHeaders(
           { sub: PARENT_USER_ID, email: PARENT_EMAIL },
-          parentProfileId
+          parentProfileId,
         ),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(403);
@@ -293,13 +299,13 @@ describe('Integration: GET /v1/dashboard/children/:profileId/sessions', () => {
       PARENT_USER_ID,
       PARENT_EMAIL,
       'Test Parent',
-      1985
+      1985,
     );
     const childProfileId = await createProfile(
       CHILD_USER_ID,
       CHILD_EMAIL,
       'Test Child',
-      2004
+      2004,
     );
     await seedFamilyLink(parentProfileId, childProfileId);
 
@@ -307,7 +313,7 @@ describe('Integration: GET /v1/dashboard/children/:profileId/sessions', () => {
       CHILD_USER_ID,
       CHILD_EMAIL,
       childProfileId,
-      'Science'
+      'Science',
     );
 
     const sessionId = await seedSession(childProfileId, subjectId, {
@@ -321,10 +327,10 @@ describe('Integration: GET /v1/dashboard/children/:profileId/sessions', () => {
         method: 'GET',
         headers: buildAuthHeaders(
           { sub: PARENT_USER_ID, email: PARENT_EMAIL },
-          parentProfileId
+          parentProfileId,
         ),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -341,13 +347,13 @@ describe('Integration: GET /v1/dashboard/children/:profileId/sessions', () => {
       PARENT_USER_ID,
       PARENT_EMAIL,
       'Test Parent',
-      1985
+      1985,
     );
     const childProfileId = await createProfile(
       CHILD_USER_ID,
       CHILD_EMAIL,
       'Test Child',
-      2004
+      2004,
     );
     // No family link — assertParentAccess rejects with 403
 
@@ -357,10 +363,10 @@ describe('Integration: GET /v1/dashboard/children/:profileId/sessions', () => {
         method: 'GET',
         headers: buildAuthHeaders(
           { sub: PARENT_USER_ID, email: PARENT_EMAIL },
-          parentProfileId
+          parentProfileId,
         ),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(403);
@@ -370,7 +376,7 @@ describe('Integration: GET /v1/dashboard/children/:profileId/sessions', () => {
     const res = await app.request(
       '/v1/dashboard/children/00000000-0000-4000-8000-000000000020/sessions',
       { method: 'GET' },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(401);
@@ -387,13 +393,13 @@ describe('Parent Visibility break tests', () => {
       PARENT_USER_ID,
       PARENT_EMAIL,
       'Test Parent',
-      1985
+      1985,
     );
     const childProfileId = await createProfile(
       CHILD_USER_ID,
       CHILD_EMAIL,
       'Test Child',
-      2004
+      2004,
     );
     await seedFamilyLink(parentProfileId, childProfileId);
 
@@ -401,7 +407,7 @@ describe('Parent Visibility break tests', () => {
       CHILD_USER_ID,
       CHILD_EMAIL,
       childProfileId,
-      'Science'
+      'Science',
     );
 
     const sessionId = await seedSession(childProfileId, subjectId, {
@@ -414,10 +420,10 @@ describe('Parent Visibility break tests', () => {
         method: 'GET',
         headers: buildAuthHeaders(
           { sub: PARENT_USER_ID, email: PARENT_EMAIL },
-          parentProfileId
+          parentProfileId,
         ),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(404);
@@ -428,13 +434,13 @@ describe('Parent Visibility break tests', () => {
       PARENT_USER_ID,
       PARENT_EMAIL,
       'Test Parent',
-      1985
+      1985,
     );
     const childProfileId = await createProfile(
       CHILD_USER_ID,
       CHILD_EMAIL,
       'Test Child',
-      2004
+      2004,
     );
     // No family link — assertParentAccess rejects with 403
 
@@ -444,10 +450,10 @@ describe('Parent Visibility break tests', () => {
         method: 'GET',
         headers: buildAuthHeaders(
           { sub: PARENT_USER_ID, email: PARENT_EMAIL },
-          parentProfileId
+          parentProfileId,
         ),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(403);
@@ -460,13 +466,13 @@ describe('Parent Visibility functional tests', () => {
       PARENT_USER_ID,
       PARENT_EMAIL,
       'Test Parent',
-      1985
+      1985,
     );
     const childProfileId = await createProfile(
       CHILD_USER_ID,
       CHILD_EMAIL,
       'Test Child',
-      2004
+      2004,
     );
     await seedFamilyLink(parentProfileId, childProfileId);
 
@@ -476,10 +482,10 @@ describe('Parent Visibility functional tests', () => {
         method: 'GET',
         headers: buildAuthHeaders(
           { sub: PARENT_USER_ID, email: PARENT_EMAIL },
-          parentProfileId
+          parentProfileId,
         ),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -493,13 +499,13 @@ describe('Parent Visibility functional tests', () => {
       PARENT_USER_ID,
       PARENT_EMAIL,
       'Test Parent',
-      1985
+      1985,
     );
     const childProfileId = await createProfile(
       CHILD_USER_ID,
       CHILD_EMAIL,
       'Test Child',
-      2004
+      2004,
     );
     await seedFamilyLink(parentProfileId, childProfileId);
 
@@ -507,7 +513,7 @@ describe('Parent Visibility functional tests', () => {
       CHILD_USER_ID,
       CHILD_EMAIL,
       childProfileId,
-      'Mathematics'
+      'Mathematics',
     );
     await seedSession(childProfileId, subjectId);
 
@@ -517,10 +523,10 @@ describe('Parent Visibility functional tests', () => {
         method: 'GET',
         headers: buildAuthHeaders(
           { sub: PARENT_USER_ID, email: PARENT_EMAIL },
-          parentProfileId
+          parentProfileId,
         ),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -536,13 +542,13 @@ describe('Parent Visibility functional tests', () => {
       PARENT_USER_ID,
       PARENT_EMAIL,
       'Test Parent',
-      1985
+      1985,
     );
     const childProfileId = await createProfile(
       CHILD_USER_ID,
       CHILD_EMAIL,
       'Test Child',
-      2004
+      2004,
     );
     await seedFamilyLink(parentProfileId, childProfileId);
 
@@ -550,7 +556,7 @@ describe('Parent Visibility functional tests', () => {
       CHILD_USER_ID,
       CHILD_EMAIL,
       childProfileId,
-      'Science'
+      'Science',
     );
     const sessionId = await seedSession(childProfileId, subjectId, {
       exchangeCount: 5,
@@ -562,10 +568,10 @@ describe('Parent Visibility functional tests', () => {
         method: 'GET',
         headers: buildAuthHeaders(
           { sub: PARENT_USER_ID, email: PARENT_EMAIL },
-          parentProfileId
+          parentProfileId,
         ),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -576,13 +582,141 @@ describe('Parent Visibility functional tests', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Progress-summary endpoint
+// ---------------------------------------------------------------------------
+
+describe('Integration: GET /v1/dashboard/children/:profileId/progress-summary', () => {
+  it('returns 200 with progress summary when family link exists', async () => {
+    const parentProfileId = await createProfile(
+      PARENT_USER_ID,
+      PARENT_EMAIL,
+      'Test Parent',
+      1985,
+    );
+    const childProfileId = await createProfile(
+      CHILD_USER_ID,
+      CHILD_EMAIL,
+      'Test Child',
+      2004,
+    );
+    await seedFamilyLink(parentProfileId, childProfileId);
+
+    const res = await app.request(
+      `/v1/dashboard/children/${childProfileId}/progress-summary`,
+      {
+        method: 'GET',
+        headers: buildAuthHeaders(
+          { sub: PARENT_USER_ID, email: PARENT_EMAIL },
+          parentProfileId,
+        ),
+      },
+      TEST_ENV,
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toHaveProperty('activityState');
+    expect(['fresh', 'no_recent_activity', 'stale']).toContain(
+      body.activityState,
+    );
+    expect(typeof body.nudgeRecommended).toBe('boolean');
+    expect(body).toHaveProperty('summary');
+    expect(body).toHaveProperty('generatedAt');
+    expect(body).toHaveProperty('latestSessionId');
+  });
+
+  it('returns 403 when no family link exists (assertParentAccess)', async () => {
+    const parentProfileId = await createProfile(
+      PARENT_USER_ID,
+      PARENT_EMAIL,
+      'Test Parent',
+      1985,
+    );
+    const childProfileId = await createProfile(
+      CHILD_USER_ID,
+      CHILD_EMAIL,
+      'Test Child',
+      2004,
+    );
+
+    const res = await app.request(
+      `/v1/dashboard/children/${childProfileId}/progress-summary`,
+      {
+        method: 'GET',
+        headers: buildAuthHeaders(
+          { sub: PARENT_USER_ID, email: PARENT_EMAIL },
+          parentProfileId,
+        ),
+      },
+      TEST_ENV,
+    );
+
+    expect(res.status).toBe(403);
+  });
+
+  it('returns 403 when consent is withdrawn (assertChildDashboardDataVisible)', async () => {
+    const parentProfileId = await createProfile(
+      PARENT_USER_ID,
+      PARENT_EMAIL,
+      'Test Parent',
+      1985,
+    );
+    const childProfileId = await createProfile(
+      CHILD_USER_ID,
+      CHILD_EMAIL,
+      'Test Child',
+      2004,
+    );
+    await seedFamilyLink(parentProfileId, childProfileId);
+
+    const db = createIntegrationDb();
+    await db
+      .delete(consentStates)
+      .where(eq(consentStates.profileId, childProfileId));
+    await db.insert(consentStates).values({
+      profileId: childProfileId,
+      consentType: 'GDPR',
+      status: 'WITHDRAWN',
+      parentEmail: PARENT_EMAIL,
+      consentToken: `test-consent-${childProfileId}`,
+      respondedAt: new Date(),
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    });
+
+    const res = await app.request(
+      `/v1/dashboard/children/${childProfileId}/progress-summary`,
+      {
+        method: 'GET',
+        headers: buildAuthHeaders(
+          { sub: PARENT_USER_ID, email: PARENT_EMAIL },
+          parentProfileId,
+        ),
+      },
+      TEST_ENV,
+    );
+
+    expect(res.status).toBe(403);
+  });
+
+  it('returns 401 without auth', async () => {
+    const res = await app.request(
+      '/v1/dashboard/children/00000000-0000-4000-8000-000000000020/progress-summary',
+      { method: 'GET' },
+      TEST_ENV,
+    );
+
+    expect(res.status).toBe(401);
+  });
+});
+
 describe('Integration: GET /v1/dashboard/demo', () => {
   it('returns 200 with demo data', async () => {
     const parentProfileId = await createProfile(
       PARENT_USER_ID,
       PARENT_EMAIL,
       'Test Parent',
-      1985
+      1985,
     );
 
     const res = await app.request(
@@ -591,10 +725,10 @@ describe('Integration: GET /v1/dashboard/demo', () => {
         method: 'GET',
         headers: buildAuthHeaders(
           { sub: PARENT_USER_ID, email: PARENT_EMAIL },
-          parentProfileId
+          parentProfileId,
         ),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);

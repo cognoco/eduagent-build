@@ -745,6 +745,16 @@ export type ChildProgressHistoryResponse = z.infer<
   typeof childProgressHistoryResponseSchema
 >;
 
+export const progressSummarySchema = z.object({
+  summary: z.string().max(500).nullable(),
+  generatedAt: z.string().datetime().nullable(),
+  basedOnLastSessionAt: z.string().datetime().nullable(),
+  latestSessionId: z.string().nullable(),
+  activityState: z.enum(['fresh', 'no_recent_activity', 'stale']),
+  nudgeRecommended: z.boolean(),
+});
+export type ProgressSummary = z.infer<typeof progressSummarySchema>;
+
 // GET /dashboard/children/:profileId/subjects/:subjectId
 export const childSubjectTopicsResponseSchema = z.object({
   topics: z.array(topicProgressSchema),
