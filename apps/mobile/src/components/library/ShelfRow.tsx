@@ -33,7 +33,7 @@ export function ShelfRow({
 }: ShelfRowProps): React.ReactElement {
   const { t } = useTranslation();
   const colors = useThemeColors();
-  const tint = useSubjectTint(name || subjectId);
+  const tint = useSubjectTint(subjectId);
   const rowStatus = status ?? (isPaused ? 'paused' : 'active');
   const isInactive = rowStatus !== 'active';
   const statusSuffix =

@@ -35,7 +35,7 @@ export default function ShelfScreen() {
   // than an array. The ?? operator only catches null/undefined, not objects.
   const books = Array.isArray(booksQuery.data) ? booksQuery.data : [];
   const subject = subjectsQuery.data?.find((s) => s.id === subjectId);
-  const shelfTint = useSubjectTint(subject?.name ?? subjectId ?? 'shelf');
+  const shelfTint = useSubjectTint(subjectId ?? 'shelf');
 
   const { data: suggestionsData } = useBookSuggestions(subjectId);
   const bookSuggestions = suggestionsData?.suggestions ?? [];

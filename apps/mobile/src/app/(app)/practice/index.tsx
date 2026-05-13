@@ -29,6 +29,7 @@ import { useReviewSummary } from '../../../hooks/use-progress';
 import { useParentProxy } from '../../../hooks/use-parent-proxy';
 import { useAssessmentEligibleTopics } from '../../../hooks/use-assessments';
 import { useTheme, useThemeColors } from '../../../lib/theme';
+import { getSubjectTint } from '../../../lib/subject-tints';
 
 const PRACTICE_WEB_MAX_WIDTH = 560;
 
@@ -296,6 +297,7 @@ export default function PracticeScreen(): React.ReactElement {
   const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
   const insets = useSafeAreaInsets();
   const { isParentProxy } = useParentProxy();
+  const { colorScheme } = useTheme();
   const colors = usePracticeColors();
   const { data: reviewSummary, isError: reviewError } = useReviewSummary();
   const { data: quizStats, isError: statsError } = useQuizStats();
@@ -795,6 +797,7 @@ export default function PracticeScreen(): React.ReactElement {
                   ),
                   t,
                 );
+                const tint = getSubjectTint(subject.id, colorScheme);
                 return (
                   <Pressable
                     key={subject.id}
@@ -802,8 +805,8 @@ export default function PracticeScreen(): React.ReactElement {
                     style={[
                       styles.practiceModeCard,
                       {
-                        borderColor: colors.quizBorder,
-                        backgroundColor: colors.quizBg,
+                        borderColor: tint.solid + '33',
+                        backgroundColor: tint.soft,
                       },
                       pointerStyle(),
                     ]}
@@ -820,7 +823,7 @@ export default function PracticeScreen(): React.ReactElement {
                       <View
                         style={[
                           styles.smallIconCircle,
-                          { backgroundColor: colors.quiz },
+                          { backgroundColor: tint.solid },
                         ]}
                       >
                         <Text className="text-body font-bold text-text-inverse">
