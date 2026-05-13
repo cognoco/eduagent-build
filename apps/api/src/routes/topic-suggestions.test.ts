@@ -20,6 +20,7 @@ import {
 } from '../test-utils/database-module';
 
 const mockDatabaseModule = createDatabaseModuleMock({
+  includeActual: true,
   db: createTransactionalMockDb({
     execute: jest.fn().mockResolvedValue(undefined),
   }),
@@ -32,6 +33,7 @@ jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 // ---------------------------------------------------------------------------
 
 jest.mock('../services/account', () => ({
+  ...jest.requireActual('../services/account'),
   findOrCreateAccount: jest.fn().mockResolvedValue({
     id: 'test-account-id',
     clerkUserId: 'user_test',
@@ -46,6 +48,7 @@ jest.mock('../services/account', () => ({
 // ---------------------------------------------------------------------------
 
 jest.mock('../services/profile', () => ({
+  ...jest.requireActual('../services/profile'),
   findOwnerProfile: jest.fn().mockResolvedValue({
     id: 'test-profile-id',
     accountId: 'test-account-id',
@@ -71,6 +74,7 @@ jest.mock('../services/profile', () => ({
 // ---------------------------------------------------------------------------
 
 jest.mock('../services/suggestions', () => ({
+  ...jest.requireActual('../services/suggestions'),
   getUnusedTopicSuggestions: jest.fn().mockResolvedValue([
     {
       id: TEST_TOPIC_ID,
@@ -87,6 +91,7 @@ jest.mock('../services/suggestions', () => ({
 // ---------------------------------------------------------------------------
 
 jest.mock('../services/llm', () => ({
+  // gc1-allow: LLM routeAndCall external boundary
   routeAndCall: jest.fn(),
   registerProvider: jest.fn(),
   getRegisteredProviders: jest.fn().mockReturnValue([]),
@@ -99,6 +104,7 @@ jest.mock('../services/llm', () => ({
 // ---------------------------------------------------------------------------
 
 jest.mock('../services/sentry', () => ({
+  // gc1-allow: @sentry/cloudflare external boundary
   captureException: jest.fn(),
 }));
 
@@ -143,7 +149,7 @@ describe('topic-suggestions routes', () => {
       const res = await app.request(
         '/v1/subjects/some-subject-id/books/some-book-id/topic-suggestions',
         {},
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);
@@ -153,7 +159,7 @@ describe('topic-suggestions routes', () => {
       const res = await app.request(
         '/v1/subjects/some-subject-id/books/some-book-id/topic-suggestions',
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);

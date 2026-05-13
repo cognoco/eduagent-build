@@ -3,14 +3,17 @@
 // ---------------------------------------------------------------------------
 
 jest.mock('../services/stripe', () => ({
+  // gc1-allow: Stripe SDK external boundary
   verifyWebhookSignature: jest.fn(),
 }));
 
 jest.mock('../services/kv', () => ({
+  ...jest.requireActual('../services/kv'),
   writeSubscriptionStatus: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock('../services/billing', () => ({
+  ...jest.requireActual('../services/billing'),
   updateSubscriptionFromWebhook: jest.fn(),
   getSubscriptionByAccountId: jest.fn(),
   ensureFreeSubscription: jest.fn(),
@@ -20,6 +23,7 @@ jest.mock('../services/billing', () => ({
 }));
 
 jest.mock('../services/subscription', () => ({
+  ...jest.requireActual('../services/subscription'),
   getTierConfig: jest.fn((tier: string) =>
     tier === 'free'
       ? {
@@ -44,12 +48,14 @@ jest.mock('../services/subscription', () => ({
 }));
 
 jest.mock('../inngest/client', () => ({
+  // gc1-allow: Inngest SDK external boundary
   inngest: {
     send: jest.fn().mockResolvedValue(undefined),
   },
 }));
 
 jest.mock('../services/sentry', () => ({
+  // gc1-allow: @sentry/cloudflare external boundary
   captureException: jest.fn(),
 }));
 
