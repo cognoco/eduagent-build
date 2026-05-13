@@ -863,6 +863,9 @@
     "loadError": {
       "message": "No se pudo cargar tu biblioteca. Inténtalo de nuevo."
     },
+    "staleBanner": {
+      "message": "Mostrando tu biblioteca guardada. Toca para actualizar."
+    },
     "empty": {
       "title": "Tu biblioteca está vacía",
       "message": "Inicia una sesión de estudio y tus materias aparecerán aquí.",

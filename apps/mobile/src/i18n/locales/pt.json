@@ -888,6 +888,9 @@
     "loadError": {
       "message": "Não foi possível carregar sua biblioteca. Tente novamente."
     },
+    "staleBanner": {
+      "message": "Mostrando sua biblioteca salva. Toque para atualizar."
+    },
     "empty": {
       "title": "Sua biblioteca está vazia",
       "message": "Inicie uma sessão de estudo e suas matérias aparecerão aqui.",

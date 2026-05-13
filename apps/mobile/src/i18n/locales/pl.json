@@ -888,6 +888,9 @@
     "loadError": {
       "message": "Nie można załadować Twojej biblioteki. Spróbuj ponownie."
     },
+    "staleBanner": {
+      "message": "Wyświetlanie zapisanej biblioteki. Dotknij, aby odświeżyć."
+    },
     "empty": {
       "title": "Twoja biblioteka jest pusta",
       "message": "Rozpocznij sesję nauki, a Twoje przedmioty pojawią się tutaj.",

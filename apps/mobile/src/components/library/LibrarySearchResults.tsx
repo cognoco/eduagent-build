@@ -9,6 +9,7 @@ import type {
 } from '@eduagent/schemas';
 
 import { useSubjectTint, useThemeColors } from '../../lib/theme';
+import type { LearningSubjectTint } from '../../lib/learning-subject-tints';
 import { ShelfRow } from './ShelfRow';
 
 export interface EnrichedSubjectResult {
@@ -29,6 +30,7 @@ interface LibrarySearchResultsProps {
   isError: boolean;
   query: string;
   enrichedSubjects: EnrichedSubjectResult[];
+  subjectTintsById?: Map<string, LearningSubjectTint>;
   onSubjectPress: (subjectId: string) => void;
   onBookPress: (subjectId: string, bookId: string) => void;
   onTopicPress: (topicId: string) => void;
@@ -304,6 +306,7 @@ export function LibrarySearchResults({
   isError,
   query,
   enrichedSubjects,
+  subjectTintsById,
   onSubjectPress,
   onBookPress,
   onTopicPress,
@@ -416,6 +419,7 @@ export function LibrarySearchResults({
               status={
                 subject.status ?? (subject.isPaused ? 'paused' : 'active')
               }
+              tint={subjectTintsById?.get(subject.id)}
               onPress={onSubjectPress}
             />
           ))}

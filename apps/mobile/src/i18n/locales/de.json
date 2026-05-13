@@ -863,6 +863,9 @@
     "loadError": {
       "message": "Deine Bibliothek konnte nicht geladen werden. Bitte versuche es erneut."
     },
+    "staleBanner": {
+      "message": "Gespeicherte Bibliothek wird angezeigt. Tippe zum Aktualisieren."
+    },
     "empty": {
       "title": "Deine Bibliothek ist leer",
       "message": "Starte eine Lernsitzung und deine Fächer werden hier erscheinen.",

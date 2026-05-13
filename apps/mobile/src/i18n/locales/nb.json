@@ -863,6 +863,9 @@
     "loadError": {
       "message": "Kunne ikke laste biblioteket ditt. Prøv igjen."
     },
+    "staleBanner": {
+      "message": "Viser lagret bibliotek. Trykk for å oppdatere."
+    },
     "empty": {
       "title": "Biblioteket ditt er tomt",
       "message": "Start en studieøkt, så vil emnene dine vises her.",
