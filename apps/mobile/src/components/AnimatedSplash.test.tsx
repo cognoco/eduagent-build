@@ -97,4 +97,17 @@ describe('AnimatedSplash', () => {
 
     expect(getByTestId('animated-splash').props.pointerEvents).toBe('none');
   });
+
+  it('delivers completion from the watchdog when animation callbacks are dropped', () => {
+    jest.useFakeTimers();
+    require('react-native-reanimated').withTiming = (value: unknown) => value;
+
+    const onComplete = jest.fn();
+    render(<AnimatedSplash onComplete={onComplete} />);
+
+    act(() => {
+      jest.advanceTimersByTime(3300);
+    });
+    expect(onComplete).toHaveBeenCalledTimes(1);
+  });
 });

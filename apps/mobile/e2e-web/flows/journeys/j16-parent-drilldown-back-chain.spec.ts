@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
+import { pressableClick } from '../../helpers/pressable';
 import { authStateDir } from '../../helpers/runtime';
 import { readSeedData } from '../../helpers/seed-data';
 
@@ -17,29 +18,29 @@ test('J-16 parent drill-down reaches topic detail and unwinds cleanly', async ({
     timeout: 60_000,
   });
 
-  await page.getByTestId(`parent-home-check-child-${childProfileId}`).click();
+  await pressableClick(
+    page.getByTestId(`parent-home-check-child-${childProfileId}`),
+  );
   await expect(page.getByTestId('child-detail-scroll')).toBeVisible({
     timeout: 30_000,
   });
 
-  await page.getByTestId(`subject-card-${subjectId}`).click();
-  const topicLink = page.getByRole('link', {
-    name: /view mathematics topic 1 details/i,
-  });
+  await pressableClick(page.getByTestId(`subject-card-${subjectId}`));
+  const topicLink = page.locator('[data-testid^="accordion-topic-"]').first();
   await expect(topicLink).toBeVisible({
     timeout: 30_000,
   });
 
-  await topicLink.click();
+  await pressableClick(topicLink);
   await expect(page.getByTestId('topic-detail-screen')).toBeVisible({
     timeout: 30_000,
   });
 
-  await page.goBack();
+  await pressableClick(page.getByRole('button', { name: /go back/i }));
   await expect(page.getByTestId('child-detail-scroll')).toBeVisible({
     timeout: 30_000,
   });
-  await page.goBack();
+  await pressableClick(page.getByRole('button', { name: /go back/i }));
   await expect(page.getByTestId('parent-home-screen')).toBeVisible({
     timeout: 30_000,
   });

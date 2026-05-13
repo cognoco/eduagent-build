@@ -264,7 +264,14 @@ export function AnimatedSplash({ onComplete }: AnimatedSplashProps) {
     const touchRelease = setTimeout(() => {
       setAcceptsTouches(false);
     }, 2500);
-    return () => clearTimeout(touchRelease);
+    const completionWatchdog = setTimeout(() => {
+      setAcceptsTouches(false);
+      done();
+    }, 3200);
+    return () => {
+      clearTimeout(touchRelease);
+      clearTimeout(completionWatchdog);
+    };
     // The reanimated SharedValues below are listed for the linter; their
     // identity is stable across renders (useSharedValue), so including them
     // does not change the effect's run cadence — it still fires only when

@@ -1,9 +1,8 @@
 import { expect, test } from '@playwright/test';
+import { pressableClick } from '../../helpers/pressable';
 import { readSeedData } from '../../helpers/seed-data';
 
-test('J-05 parent switches to child profile → child detail (proxy mode)', async ({
-  page,
-}) => {
+test('J-05 parent opens a linked child detail from home', async ({ page }) => {
   const seed = await readSeedData('owner-with-children');
   const childProfileId = seed.ids.child1ProfileId;
 
@@ -13,10 +12,11 @@ test('J-05 parent switches to child profile → child detail (proxy mode)', asyn
     timeout: 60_000,
   });
 
-  await page.getByTestId(`parent-home-check-child-${childProfileId}`).click();
+  await pressableClick(
+    page.getByTestId(`parent-home-check-child-${childProfileId}`),
+  );
   await expect(page.getByTestId('child-detail-scroll')).toBeVisible({
     timeout: 30_000,
   });
-
-  await expect(page.getByTestId('proxy-banner')).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`/child/${childProfileId}`));
 });

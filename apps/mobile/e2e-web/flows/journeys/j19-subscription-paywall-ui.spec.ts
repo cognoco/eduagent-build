@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
+import { pressableClick } from '../../helpers/pressable';
 import { authStateDir } from '../../helpers/runtime';
 
 // J-19: Subscription paywall UI
@@ -27,11 +28,16 @@ test('J-19 free-tier learner sees subscription paywall with static tier comparis
   // ── 1. Navigate to More tab and open Subscription via the nav row ──────────
   await page.goto('/more', { waitUntil: 'commit' });
   await expect(
-    page.getByRole('button', { name: 'Profile', exact: true })
+    page.getByRole('button', { name: 'Profile', exact: true }),
   ).toBeVisible({ timeout: 60_000 });
 
+  await pressableClick(page.getByTestId('more-row-account'));
+  await expect(page.getByTestId('more-account-scroll')).toBeVisible({
+    timeout: 30_000,
+  });
+
   // Tap the Subscription row
-  await page.getByTestId('more-row-subscription').click();
+  await pressableClick(page.getByTestId('more-row-subscription'));
 
   // ── 2. Verify subscription screen loaded ───────────────────────────────────
   await expect(page.getByTestId('subscription-screen')).toBeVisible({
@@ -49,7 +55,7 @@ test('J-19 free-tier learner sees subscription paywall with static tier comparis
 
   // Clicking the upgrade button should scroll to the plans section without
   // navigating away — verify the screen is still present after the click
-  await page.getByTestId('free-upgrade-button').click();
+  await pressableClick(page.getByTestId('free-upgrade-button'));
   await expect(page.getByTestId('subscription-screen')).toBeVisible();
 
   // ── 5. Verify no-offerings static fallback renders ─────────────────────────
@@ -61,7 +67,7 @@ test('J-19 free-tier learner sees subscription paywall with static tier comparis
 
   // Fallback disclaimer copy — asserted against the actual text in subscription.tsx:1406
   await expect(page.getByTestId('no-offerings')).toContainText(
-    "store purchasing isn't available on this device yet"
+    "store purchasing isn't available on this device yet",
   );
 
   // ── 6. Verify static Free and Plus tier cards are visible ──────────────────
@@ -74,10 +80,10 @@ test('J-19 free-tier learner sees subscription paywall with static tier comparis
 
   // ── 7. Verify pricing text is present in the tier cards ───────────────────
   await expect(page.getByTestId('static-tier-free')).toContainText(
-    '10 questions per day, 100 per month'
+    '10 questions per day, 100 per month',
   );
   await expect(page.getByTestId('static-tier-plus')).toContainText(
-    '700 questions per month'
+    '700 questions per month',
   );
 
   // ── 8. Verify Restore Purchases button is present ─────────────────────────
@@ -88,6 +94,6 @@ test('J-19 free-tier learner sees subscription paywall with static tier comparis
   await expect(page.getByTestId('byok-waitlist-section')).toBeVisible();
 
   // ── 10. Back navigation returns to the More tab ───────────────────────────
-  await page.getByRole('button', { name: 'Go back' }).click();
+  await pressableClick(page.getByRole('button', { name: 'Go back' }));
   await expect(page).toHaveURL(/\/more(?:\?.*)?$/);
 });

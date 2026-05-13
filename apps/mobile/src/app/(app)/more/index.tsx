@@ -103,7 +103,10 @@ export default function MoreScreen() {
       return;
     }
 
-    router.push('/create-profile?for=child');
+    router.push({
+      pathname: '/create-profile',
+      params: { for: 'child' },
+    } as never);
   }, [subscription, familyData, router, t]);
 
   const linkedChildren = activeProfile?.isOwner

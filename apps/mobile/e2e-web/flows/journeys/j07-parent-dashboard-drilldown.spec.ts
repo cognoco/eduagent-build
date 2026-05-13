@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { pressableClick } from '../../helpers/pressable';
 import { readSeedData } from '../../helpers/seed-data';
 
 test('J-07 parent → child detail → subject card → back to parent home', async ({
@@ -13,12 +14,14 @@ test('J-07 parent → child detail → subject card → back to parent home', as
     timeout: 60_000,
   });
 
-  await page.getByTestId(`parent-home-check-child-${childProfileId}`).click();
+  await pressableClick(
+    page.getByTestId(`parent-home-check-child-${childProfileId}`),
+  );
   await expect(page.getByTestId('child-detail-scroll')).toBeVisible({
     timeout: 30_000,
   });
 
-  await page.goBack();
+  await pressableClick(page.getByRole('button', { name: /go back/i }));
   await expect(page.getByTestId('parent-home-screen')).toBeVisible({
     timeout: 30_000,
   });

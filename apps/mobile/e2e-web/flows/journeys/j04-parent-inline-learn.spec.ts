@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { pressableClick } from '../../helpers/pressable';
 
 test('J-04 parent taps child card to navigate to Family', async ({ page }) => {
   await page.goto('/home', { waitUntil: 'commit' });
@@ -10,10 +11,7 @@ test('J-04 parent taps child card to navigate to Family', async ({ page }) => {
     page.getByTestId(/^parent-home-check-child-/).first(),
   ).toBeVisible();
 
-  await page
-    .getByTestId(/^parent-home-check-child-/)
-    .first()
-    .click();
+  await pressableClick(page.getByTestId(/^parent-home-check-child-/).first());
   await expect(page.getByTestId('child-detail-scroll')).toBeVisible({
     timeout: 30_000,
   });

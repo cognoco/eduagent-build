@@ -11,7 +11,7 @@ test('J-12 new user → create profile → lands on learner home', async ({
     landingPath: '/home',
   });
 
-  await page.getByTestId('create-profile-cta').click();
+  await page.getByRole('link', { name: /get started/i }).click();
   await expect(page.getByTestId('create-profile-name')).toBeVisible({
     timeout: 30_000,
   });
