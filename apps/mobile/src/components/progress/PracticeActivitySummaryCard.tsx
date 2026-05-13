@@ -1,6 +1,7 @@
 import type React from 'react';
 import { Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import type { Translate, TranslateKey } from '../../i18n';
 
 import type {
   ReportPracticeSummary,
@@ -30,17 +31,19 @@ function formatActivityLabel(
     ReportPracticeTypeBreakdown,
     'activityType' | 'activitySubtype'
   >,
-  t: (key: string) => string,
+  t: Translate,
 ): string {
   const subtype = activity.activitySubtype;
   if (subtype) {
-    const subtypeKey = `parentView.practiceSummary.activitySubtypes.${subtype}`;
+    const subtypeKey =
+      `parentView.practiceSummary.activitySubtypes.${subtype}` as TranslateKey;
     const subtypeLabel = t(subtypeKey);
     if (subtypeLabel !== subtypeKey) return subtypeLabel;
     return fallbackLabel(subtype);
   }
 
-  const typeKey = `parentView.practiceSummary.activityTypes.${activity.activityType}`;
+  const typeKey =
+    `parentView.practiceSummary.activityTypes.${activity.activityType}` as TranslateKey;
   const typeLabel = t(typeKey);
   if (typeLabel !== typeKey) return typeLabel;
   return fallbackLabel(activity.activityType);
@@ -48,7 +51,7 @@ function formatActivityLabel(
 
 function buildTypeDetail(
   activity: ReportPracticeTypeBreakdown,
-  t: (key: string, options?: Record<string, number>) => string,
+  t: Translate,
 ): string {
   if (activity.scoredActivities > 0 && activity.total > 0) {
     return t('parentView.practiceSummary.typeDetailWithScore', {
@@ -66,7 +69,7 @@ function buildTypeDetail(
 
 function buildSubjectTypeSummary(
   byType: ReportPracticeTypeBreakdown[],
-  t: (key: string) => string,
+  t: Translate,
 ): string {
   return byType
     .slice(0, 3)

@@ -502,7 +502,7 @@ describe('Email digest channel — weekly', () => {
   });
 
   // Break test 6: Resend Idempotency-Key set per parentId + reportWeek
-  it('(T6) sets Resend Idempotency-Key as weekly-{parentId}-{reportWeek}', async () => {
+  it('(T6) sets Resend Idempotency-Key from weekly + parentId + reportWeek', async () => {
     const db = buildMockDb();
     db.query.consentStates.findFirst = jest.fn().mockResolvedValue({
       status: 'CONSENTED',
@@ -516,7 +516,9 @@ describe('Email digest channel — weekly', () => {
     expect(emailCallArgs).toBeDefined();
     const options = emailCallArgs![1] as { idempotencyKey?: string };
     expect(options.idempotencyKey).toMatch(
-      new RegExp(`^weekly-${PARENT_ID}-\\d{4}-\\d{2}-\\d{2}$`),
+      new RegExp(
+        `^value\\(weekly\\):value\\(${PARENT_ID}\\):value\\(\\d{4}-\\d{2}-\\d{2}\\)$`,
+      ),
     );
   });
 
@@ -549,7 +551,9 @@ describe('Email digest channel — weekly', () => {
       mockSendEmail.mock.calls[1]![1] as { idempotencyKey?: string }
     ).idempotencyKey;
     expect(key1).toBe(key2);
-    expect(key1).toMatch(new RegExp(`^weekly-${PARENT_ID}-`));
+    expect(key1).toMatch(
+      new RegExp(`^value\\(weekly\\):value\\(${PARENT_ID}\\):`),
+    );
   });
 
   // Break test 8: Restricted-consent child's row is redacted from push + email
@@ -833,7 +837,7 @@ describe('Email digest channel — monthly', () => {
   });
 
   // Break test 6 (monthly): Resend Idempotency-Key set per parentId + reportMonth
-  it('(T6-monthly) sets Resend Idempotency-Key as monthly-{parentId}-{reportMonth}', async () => {
+  it('(T6-monthly) sets Resend Idempotency-Key from monthly + parentId + reportMonth', async () => {
     const db = buildMonthlyMockDb();
 
     await executeMonthlyGenerate('parent-xyz', 'child-001', db);
@@ -842,7 +846,7 @@ describe('Email digest channel — monthly', () => {
     expect(emailCallArgs).toBeDefined();
     const options = emailCallArgs![1] as { idempotencyKey?: string };
     expect(options.idempotencyKey).toMatch(
-      /^monthly-parent-xyz-\d{4}-\d{2}-\d{2}$/,
+      /^value\(monthly\):value\(parent-xyz\):value\(\d{4}-\d{2}-\d{2}\)$/,
     );
   });
 

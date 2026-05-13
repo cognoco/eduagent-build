@@ -1,6 +1,7 @@
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import type { WeeklyReportSummary } from '@eduagent/schemas';
 import { useChildDetail } from '../../../../hooks/use-dashboard';
 import {
   useChildReports,
@@ -41,6 +42,57 @@ export function getNextReportInfo(now = new Date()): {
       : `arrives in about ${daysUntil} days`;
 
   return { date: formattedDate, timeContext };
+}
+
+function formatReportWeek(reportWeek: string): string {
+  const start = new Date(`${reportWeek}T00:00:00Z`);
+  if (Number.isNaN(start.getTime())) return 'Latest week';
+  const end = new Date(start.getTime());
+  end.setUTCDate(end.getUTCDate() + 6);
+  const startLabel = start.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  });
+  const endLabel = end.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+  return `${startLabel} – ${endLabel}`;
+}
+
+function ReportsHeaderSummary({
+  latestReport,
+}: {
+  latestReport: WeeklyReportSummary | undefined;
+}): React.ReactElement | null {
+  if (!latestReport?.headlineStat) return null;
+  const { headlineStat, thisWeek } = latestReport;
+  return (
+    <View
+      testID="reports-header-summary"
+      className="bg-coaching-card rounded-card p-5 mt-4"
+    >
+      <Text className="text-caption text-text-secondary">
+        {formatReportWeek(latestReport.reportWeek)}
+      </Text>
+      <Text className="text-h3 font-semibold text-text-primary mt-2">
+        {headlineStat.label}: {headlineStat.value}
+      </Text>
+      {headlineStat.comparison ? (
+        <Text className="text-body-sm text-text-secondary mt-1">
+          {headlineStat.comparison}
+        </Text>
+      ) : null}
+      {thisWeek ? (
+        <Text className="text-caption text-text-secondary mt-2">
+          {thisWeek.totalSessions} sessions · {thisWeek.totalActiveMinutes} min
+        </Text>
+      ) : null}
+    </View>
+  );
 }
 
 export default function ChildReportsScreen(): React.ReactElement {
@@ -103,6 +155,8 @@ export default function ChildReportsScreen(): React.ReactElement {
             </Text>
           </View>
         </View>
+
+        <ReportsHeaderSummary latestReport={weeklyReports?.[0]} />
 
         {weeklyLoading ? (
           <View className="bg-surface rounded-card p-4 mt-4">

@@ -5,6 +5,7 @@ import {
   type HomeworkMode,
   type LearningMode,
 } from '@eduagent/schemas';
+import { buildAppHelpPromptBlock } from './app-help-map';
 import { getEscalationPromptGuidance } from './escalation';
 import { getEvaluateRungDescription } from './evaluate';
 import { buildFourStrandsPrompt } from './language-prompts';
@@ -436,6 +437,10 @@ export function buildSystemPrompt(context: ExchangeContext): string {
     );
   }
 
+  // App-help map lets the mentor answer "where do I find X?" questions.
+  // Placed early so it is available for all session types.
+  sections.push(buildAppHelpPromptBlock());
+
   // Learning mode — adjusts pacing and tone
   if (context.learningMode) {
     sections.push(getLearningModeGuidance(context.learningMode));
@@ -778,7 +783,8 @@ export function buildSystemPrompt(context: ExchangeContext): string {
       'Scope (homework):\n' +
         '- The homework problem the learner is working on IS the scope. Help them solve it whatever it touches on — history, geography, foreign places, unfamiliar names, vocabulary, formulas, etc. are all fair game when they appear in the problem.\n' +
         '- Do NOT refuse, redirect, or apologise based on the bound subject. The subject is routing metadata, not a content gate. A worksheet about Spain inside a Geography-of-Africa subject is still in scope; a maths word problem inside an English subject is still in scope.\n' +
-        '- The only valid redirect is when the learner clearly steps away from homework into unrelated chat (e.g. "what\'s for lunch?", "tell me a joke"). In that case, briefly say you\'re here for the homework and offer to come back to the problem.',
+        '- The only valid redirect is when the learner clearly steps away from homework into unrelated chat (e.g. "what\'s for lunch?", "tell me a joke"). In that case, briefly say you\'re here for the homework and offer to come back to the problem.\n' +
+        '- Exception: if the learner asks how to find, change, or understand something in the app itself, answer from the APP HELP map above. This is not off-topic — it is a valid in-context question.',
     );
   } else {
     sections.push(
@@ -786,7 +792,8 @@ export function buildSystemPrompt(context: ExchangeContext): string {
         '- Stay within the loaded topic and subject. Do not teach unrelated material even if the learner asks about it.\n' +
         '- If the learner asks a question outside the current topic, acknowledge it briefly and redirect: ' +
         '"Good question — that\'s a different topic. Let\'s finish this one first, then you can start a session on that."\n' +
-        '- Do not introduce concepts from future topics in the curriculum unless they are prerequisites for the current topic.',
+        '- Do not introduce concepts from future topics in the curriculum unless they are prerequisites for the current topic.\n' +
+        '- Exception: if the learner asks how to find, change, or understand something in the app itself, answer from the APP HELP map above. This is not off-topic — it is a valid in-context question.',
     );
   }
 

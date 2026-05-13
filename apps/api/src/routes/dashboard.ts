@@ -17,6 +17,7 @@ import {
   weeklyReportsResponseSchema,
   weeklyReportDetailResponseSchema,
   demoDashboardDataSchema,
+  progressSummarySchema,
 } from '@eduagent/schemas';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
@@ -47,6 +48,7 @@ import {
   getMemoryProjection,
   toCuratedView,
 } from '../services/memory/projection';
+import { getProgressSummary } from '../services/progress-summary';
 
 type DashboardRouteEnv = {
   Bindings: {
@@ -111,6 +113,18 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
       childProfileId,
     );
     return c.json(childInventoryResponseSchema.parse({ inventory }));
+  })
+
+  .get('/dashboard/children/:profileId/progress-summary', async (c) => {
+    const db = c.get('db');
+    const parentProfileId = requireProfileId(c.get('profileId'));
+    const childProfileId = c.req.param('profileId');
+
+    await assertParentAccess(db, parentProfileId, childProfileId);
+    await assertChildDashboardDataVisible(db, childProfileId);
+
+    const summary = await getProgressSummary(db, childProfileId);
+    return c.json(progressSummarySchema.parse(summary));
   })
 
   .get(

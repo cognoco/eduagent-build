@@ -47,6 +47,7 @@ import {
 import { generateWeeklyReportData } from '../../services/weekly-report';
 import { getPracticeActivitySummary } from '../../services/practice-activity-summary';
 import { captureException } from '../../services/sentry';
+import { buildEmailIdempotencyKey } from '../../services/dedupe-key';
 
 import {
   isoDate,
@@ -532,7 +533,11 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
             );
             return sendEmail(emailPayload, {
               resendApiKey: getStepResendApiKey(),
-              idempotencyKey: `weekly-${parentId}-${prepared.reportWeek}`,
+              idempotencyKey: buildEmailIdempotencyKey(
+                'weekly',
+                parentId,
+                prepared.reportWeek,
+              ),
             });
           },
         );

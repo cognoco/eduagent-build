@@ -49,7 +49,7 @@ import type { SubscriptionStatus } from '@eduagent/schemas';
 async function constantTimeCompare(
   a: string,
   b: string,
-  secret: string
+  secret: string,
 ): Promise<boolean> {
   const encoder = new TextEncoder();
   const hmacKey = await crypto.subtle.importKey(
@@ -57,7 +57,7 @@ async function constantTimeCompare(
     encoder.encode(secret),
     { name: 'HMAC', hash: 'SHA-256' },
     false,
-    ['sign']
+    ['sign'],
   );
 
   const [digestA, digestB] = await Promise.all([
@@ -142,7 +142,7 @@ const CONSUMABLE_PRODUCT_CREDITS: Record<string, number> = {
  * Returns the credit amount for a consumable product ID, or null if not a top-up product.
  */
 function getTopUpCreditsForProduct(
-  productId: string | undefined
+  productId: string | undefined,
 ): number | null {
   if (!productId) return null;
   return CONSUMABLE_PRODUCT_CREDITS[productId] ?? null;
@@ -153,7 +153,7 @@ function getTopUpCreditsForProduct(
  * Falls back to parsing `com.eduagent.<tier>.<interval>` format.
  */
 function extractTierFromProductId(
-  productId: string | undefined
+  productId: string | undefined,
 ): ('plus' | 'family' | 'pro') | null {
   if (!productId) return null;
 
@@ -182,7 +182,7 @@ function extractTierFromProductId(
 async function refreshKvCache(
   kv: KVNamespace | undefined,
   db: Database,
-  accountId: string
+  accountId: string,
 ): Promise<void> {
   if (!kv) return;
 
@@ -210,7 +210,7 @@ async function refreshKvCache(
  */
 async function resolveAccountId(
   db: Database,
-  appUserId: string
+  appUserId: string,
 ): Promise<string | null> {
   // RevenueCat anonymous IDs start with $ — skip them
   if (appUserId.startsWith('$')) return null;
@@ -226,7 +226,7 @@ async function resolveAccountId(
 async function handleInitialPurchase(
   db: Database,
   kv: KVNamespace | undefined,
-  event: RevenueCatWebhookPayload['event']
+  event: RevenueCatWebhookPayload['event'],
 ): Promise<void> {
   const accountId = await resolveAccountId(db, event.app_user_id);
   if (!accountId) return;
@@ -240,7 +240,7 @@ async function handleInitialPurchase(
       new Error('Unknown RevenueCat product_id in INITIAL_PURCHASE'),
       {
         extra: { productId: event.product_id, eventId: event.id },
-      }
+      },
     );
     return;
   }
@@ -267,7 +267,7 @@ async function handleInitialPurchase(
           ? new Date(event.expiration_at_ms).toISOString()
           : undefined,
       eventTimestampMs: event.event_timestamp_ms,
-    }
+    },
   );
 
   await refreshKvCache(kv, db, sub.accountId);
@@ -276,7 +276,7 @@ async function handleInitialPurchase(
 async function handleRenewal(
   db: Database,
   kv: KVNamespace | undefined,
-  event: RevenueCatWebhookPayload['event']
+  event: RevenueCatWebhookPayload['event'],
 ): Promise<void> {
   const accountId = await resolveAccountId(db, event.app_user_id);
   if (!accountId) return;
@@ -306,7 +306,7 @@ async function handleRenewal(
       db,
       updated.id,
       tierConfig.monthlyQuota,
-      tierConfig.dailyLimit
+      tierConfig.dailyLimit,
     );
   }
 
@@ -318,7 +318,7 @@ async function handleRenewal(
 async function handleCancellation(
   db: Database,
   kv: KVNamespace | undefined,
-  event: RevenueCatWebhookPayload['event']
+  event: RevenueCatWebhookPayload['event'],
 ): Promise<void> {
   const accountId = await resolveAccountId(db, event.app_user_id);
   if (!accountId) return;
@@ -340,7 +340,7 @@ async function handleCancellation(
 async function handleExpiration(
   db: Database,
   kv: KVNamespace | undefined,
-  event: RevenueCatWebhookPayload['event']
+  event: RevenueCatWebhookPayload['event'],
 ): Promise<void> {
   const accountId = await resolveAccountId(db, event.app_user_id);
   if (!accountId) return;
@@ -360,7 +360,7 @@ async function handleExpiration(
     await transitionToExtendedTrial(
       db,
       existingSub.id,
-      EXTENDED_TRIAL_MONTHLY_EQUIVALENT
+      EXTENDED_TRIAL_MONTHLY_EQUIVALENT,
     );
 
     // Record the event for idempotency
@@ -390,7 +390,7 @@ async function handleExpiration(
       db,
       updated.id,
       freeConfig.monthlyQuota,
-      freeConfig.dailyLimit
+      freeConfig.dailyLimit,
     );
     await refreshKvCache(kv, db, updated.accountId);
   }
@@ -399,7 +399,7 @@ async function handleExpiration(
 async function handleBillingIssue(
   db: Database,
   kv: KVNamespace | undefined,
-  event: RevenueCatWebhookPayload['event']
+  event: RevenueCatWebhookPayload['event'],
 ): Promise<void> {
   const accountId = await resolveAccountId(db, event.app_user_id);
   if (!accountId) return;
@@ -413,7 +413,6 @@ async function handleBillingIssue(
   if (updated) {
     await refreshKvCache(kv, db, updated.accountId);
 
-    // Observed by payment-failed-observe.ts (queryable terminus for billing alerts).
     await inngest.send({
       name: 'app/payment.failed',
       data: {
@@ -429,7 +428,7 @@ async function handleBillingIssue(
 async function handleSubscriberAlias(
   _db: Database,
   _kv: KVNamespace | undefined,
-  event: RevenueCatWebhookPayload['event']
+  event: RevenueCatWebhookPayload['event'],
 ): Promise<void> {
   // SUBSCRIBER_ALIAS: RevenueCat merged two subscriber records.
   // [BUG-728 / SEC-12] Routed through the structured logger so the Clerk
@@ -446,7 +445,7 @@ async function handleSubscriberAlias(
 async function handleProductChange(
   db: Database,
   kv: KVNamespace | undefined,
-  event: RevenueCatWebhookPayload['event']
+  event: RevenueCatWebhookPayload['event'],
 ): Promise<void> {
   const accountId = await resolveAccountId(db, event.app_user_id);
   if (!accountId) return;
@@ -459,7 +458,7 @@ async function handleProductChange(
       new Error('Unknown RevenueCat new_product_id in PRODUCT_CHANGE'),
       {
         extra: { newProductId: event.new_product_id, eventId: event.id },
-      }
+      },
     );
     return;
   }
@@ -477,7 +476,7 @@ async function handleProductChange(
       db,
       updated.id,
       tierConfig.monthlyQuota,
-      tierConfig.dailyLimit
+      tierConfig.dailyLimit,
     );
     await refreshKvCache(kv, db, updated.accountId);
   }
@@ -486,7 +485,7 @@ async function handleProductChange(
 async function handleNonRenewingPurchase(
   db: Database,
   kv: KVNamespace | undefined,
-  event: RevenueCatWebhookPayload['event']
+  event: RevenueCatWebhookPayload['event'],
 ): Promise<{ status: number; body: Record<string, unknown> } | null> {
   const accountId = await resolveAccountId(db, event.app_user_id);
   if (!accountId) return null;
@@ -532,7 +531,7 @@ async function handleNonRenewingPurchase(
     sub.id,
     credits,
     new Date(),
-    transactionId
+    transactionId,
   );
 
   if (!granted) {
@@ -540,7 +539,7 @@ async function handleNonRenewingPurchase(
     // Log with eventId + transactionId so ops can query how often this fires.
     logger.info(
       '[revenuecat] NON_RENEWING_PURCHASE duplicate skipped — credits already granted',
-      { eventId: event.id, transactionId, accountId }
+      { eventId: event.id, transactionId, accountId },
     );
     return null;
   }
@@ -553,7 +552,7 @@ async function handleNonRenewingPurchase(
 async function handleUncancellation(
   db: Database,
   kv: KVNamespace | undefined,
-  event: RevenueCatWebhookPayload['event']
+  event: RevenueCatWebhookPayload['event'],
 ): Promise<void> {
   const accountId = await resolveAccountId(db, event.app_user_id);
   if (!accountId) return;
@@ -591,7 +590,7 @@ export const revenuecatWebhookRoute = new Hono<{
       c,
       401,
       ERROR_CODES.UNAUTHORIZED,
-      'Missing or invalid Authorization header'
+      'Missing or invalid Authorization header',
     );
   }
 
@@ -601,13 +600,13 @@ export const revenuecatWebhookRoute = new Hono<{
   if (!webhookSecret) {
     // [CR-2E.8] Structured log for missing credential — queryable in Logpush
     logger.error(
-      '[revenuecat] REVENUECAT_WEBHOOK_SECRET is not configured — webhook rejected'
+      '[revenuecat] REVENUECAT_WEBHOOK_SECRET is not configured — webhook rejected',
     );
     return apiError(
       c,
       401,
       ERROR_CODES.UNAUTHORIZED,
-      'Invalid webhook authorization'
+      'Invalid webhook authorization',
     );
   }
 
@@ -615,14 +614,14 @@ export const revenuecatWebhookRoute = new Hono<{
     !(await constantTimeCompare(
       token,
       webhookSecret,
-      'eduagent-revenuecat-hmac-comparison-v1'
+      'eduagent-revenuecat-hmac-comparison-v1',
     ))
   ) {
     return apiError(
       c,
       401,
       ERROR_CODES.UNAUTHORIZED,
-      'Invalid webhook authorization'
+      'Invalid webhook authorization',
     );
   }
 
@@ -636,7 +635,7 @@ export const revenuecatWebhookRoute = new Hono<{
       400,
       ERROR_CODES.VALIDATION_ERROR,
       'Invalid webhook payload',
-      parsed.error.flatten()
+      parsed.error.flatten(),
     );
   }
 
@@ -669,7 +668,7 @@ export const revenuecatWebhookRoute = new Hono<{
     db,
     accountId,
     event.id,
-    event.event_timestamp_ms
+    event.event_timestamp_ms,
   );
   if (alreadyProcessed) {
     return c.json({ received: true, skipped: true });
@@ -692,7 +691,7 @@ export const revenuecatWebhookRoute = new Hono<{
           eventType: event.type,
           eventId: event.id,
           accountId,
-        }
+        },
       );
       return c.json({
         received: true,
@@ -706,7 +705,7 @@ export const revenuecatWebhookRoute = new Hono<{
         eventType: event.type,
         eventId: event.id,
         accountId,
-      }
+      },
     );
   }
 

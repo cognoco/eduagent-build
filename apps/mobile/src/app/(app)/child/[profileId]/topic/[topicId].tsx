@@ -8,6 +8,7 @@ import {
 import { useRouter, useLocalSearchParams, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
+import type { Translate, TranslateKey } from '../../../../../i18n';
 import { useProfileSessions } from '../../../../../hooks/use-progress';
 import { goBackOrReplace } from '../../../../../lib/navigation';
 import {
@@ -18,7 +19,7 @@ import {
 import { useThemeColors } from '../../../../../lib/theme';
 import { MetricInfoDot } from '../../../../../components/parent/MetricInfoDot';
 
-const COMPLETION_STATUS_KEYS: Record<string, string> = {
+const COMPLETION_STATUS_KEYS: Record<string, TranslateKey> = {
   not_started: 'parentView.topic.completionStatus.notStarted',
   in_progress: 'parentView.topic.completionStatus.inProgress',
   completed: 'parentView.topic.completionStatus.completed',
@@ -43,10 +44,7 @@ function formatDuration(seconds: number | null): string {
   return `${mins} min`;
 }
 
-function formatTimeOnApp(
-  seconds: number | null,
-  t: (key: string, opts?: Record<string, unknown>) => string,
-): string {
+function formatTimeOnApp(seconds: number | null, t: Translate): string {
   const duration = formatDuration(seconds);
   return duration === '--'
     ? t('parentView.topic.timeOnAppUnavailable')

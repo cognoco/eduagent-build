@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { ERROR_CODES } from '@eduagent/schemas';
 import { inngest } from '../inngest/client';
+import { safeSend } from '../services/safe-non-core';
 
 type MaintenanceEnv = {
   Bindings: {
@@ -49,13 +50,17 @@ export const maintenanceRoutes = new Hono<MaintenanceEnv>()
       );
     }
 
-    await inngest.send({
-      name: 'admin/memory-facts-backfill.requested',
-      data: {
-        requestedAt: new Date().toISOString(),
-        environment: c.env.ENVIRONMENT ?? 'unknown',
-      },
-    });
+    await safeSend(
+      () =>
+        inngest.send({
+          name: 'admin/memory-facts-backfill.requested',
+          data: {
+            requestedAt: new Date().toISOString(),
+            environment: c.env.ENVIRONMENT ?? 'unknown',
+          },
+        }),
+      'maintenance.memory-facts-backfill',
+    );
 
     return c.json({ queued: true });
   })
@@ -70,13 +75,17 @@ export const maintenanceRoutes = new Hono<MaintenanceEnv>()
       );
     }
 
-    await inngest.send({
-      name: 'admin/progress-self-reports-backfill.requested',
-      data: {
-        requestedAt: new Date().toISOString(),
-        environment: c.env.ENVIRONMENT ?? 'unknown',
-      },
-    });
+    await safeSend(
+      () =>
+        inngest.send({
+          name: 'admin/progress-self-reports-backfill.requested',
+          data: {
+            requestedAt: new Date().toISOString(),
+            environment: c.env.ENVIRONMENT ?? 'unknown',
+          },
+        }),
+      'maintenance.progress-self-reports-backfill',
+    );
 
     return c.json({ queued: true });
   });

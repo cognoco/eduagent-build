@@ -66,14 +66,15 @@ Top files by internal-ish mock count:
 | `apps/mobile/src/app/(app)/library.test.tsx` | 11 | P2 UI screen harness debt. |
 | `apps/mobile/src/app/(app)/session/index.test.tsx` | 11 | P2/P1 because session recovery/streaming is user-critical. |
 | `apps/mobile/src/app/(app)/shelf/[subjectId]/book/[bookId].test.tsx` | 11 | P2 UI screen harness debt. |
-| `apps/api/src/middleware/metering.test.ts` | 9 | P1 quota/billing correctness risk. |
+| `apps/api/src/middleware/metering.test.ts` | 9 | ✅ Done (2 internal mocks removed: JWT → JWKS interceptor, KV → fake KV). P1 quota/billing correctness risk. |
 | `apps/mobile/src/app/(app)/child/[profileId]/index.test.tsx` | 9 | P2 UI screen harness debt. |
 | `apps/mobile/src/components/home/LearnerScreen.test.tsx` | 8 | P2 UI harness debt; real theme path restored, remaining mocks are API/profile/subtree follow-up debt. |
 | `apps/mobile/src/components/home/ParentHomeScreen.test.tsx` | 8 | P2 UI screen harness debt, already annotated with many `gc1-allow` reasons. |
-| `apps/api/src/inngest/functions/monthly-report-cron.test.ts` | 7 | P1 durable report workflow risk. |
-| `apps/api/src/inngest/functions/trial-expiry.test.ts` | 7 | P1 billing lifecycle risk. |
+| `apps/api/src/inngest/functions/monthly-report-cron.test.ts` | 7 | ✅ Done. P1 durable report workflow risk. |
+| `apps/api/src/inngest/functions/trial-expiry.test.ts` | 7 | ✅ Done (2 internal mocks removed: subscription → real getTierConfig, trial → real exports; manual step mock → inngest-step-runner). P1 billing lifecycle risk. |
 | `apps/api/src/routes/filing.test.ts` | 7 | P1 LLM/session/filing contract risk. |
-| `apps/api/src/routes/sessions.test.ts` | 7 | P1 route-service-contract risk. |
+| `apps/api/src/routes/sessions.test.ts` | 7 | ✅ Done. P1 route-service-contract risk. |
+| `apps/api/src/inngest/functions/consent-revocation.test.ts` | — | ✅ Done. P1 durable consent-revocation workflow risk. |
 
 Mobile internal-ish groups:
 
@@ -296,7 +297,7 @@ Verified by:
 | Batch | Target | Rationale |
 | --- | --- | --- |
 | 4 | API route tests for `sessions`, `filing`, `subjects`, `quiz`, `billing`, `settings` | Replace service-mock route tests with app-level request tests that use real services and test DB where contracts matter. |
-| 5 | Billing/quota lifecycle tests: `metering`, `trial-expiry`, `revenuecat-webhook`, `stripe-webhook`, `quota-reset` | High data-integrity risk; mocks can hide quota decrement, fallback observability, and subscription state drift. |
+| 5 | Billing/quota lifecycle tests: `metering` ✅, `trial-expiry` ✅, `revenuecat-webhook`, `stripe-webhook`, `quota-reset` ✅ (subscription mock) | High data-integrity risk; mocks can hide quota decrement, fallback observability, and subscription state drift. Partial: metering (JWT+KV), trial-expiry (subscription+trial+step-runner), quota-reset (subscription+step-runner) done 2026-05-13. |
 | 6 | LLM service tests using provider registry/fetch interception | Avoid mocking `./llm` where response envelopes, schema parsing, and routing decisions are the real contract. |
 | 7 | Progress/report mobile screens | Recent plans touch this area; convert after product shape settles to avoid repeated harness churn. |
 

@@ -3,15 +3,12 @@
 // ---------------------------------------------------------------------------
 
 // KVNamespace is a Cloudflare Workers type absent from tsconfig.spec.json.
-// Use Record<string, unknown> as a structural stand-in so `{} as KVNamespace` compiles.
+// Use Record<string, unknown> as a structural stand-in so `fakeKV.namespace` compiles.
 // Proper fix: add @cloudflare/workers-types to tsconfig.spec.json.
 // Tracked in Notion: https://www.notion.so/35f8bce91f7c81b5b944ee47fad6fc9e
 type KVNamespace = Record<string, unknown>;
 
-// Mock JWT so auth middleware passes
-jest.mock('./jwt', () =>
-  require('../test-utils/auth-fixture').createJwtModuleMock(),
-);
+// JWT: use real verification via JWKS interceptor (installed in describe block).
 
 import { createDatabaseModuleMock } from '../test-utils/database-module';
 
@@ -136,19 +133,7 @@ jest.mock('../services/billing', () => ({
   linkStripeCustomer: jest.fn(),
 }));
 
-// ---------------------------------------------------------------------------
-// Mock KV helpers
-// ---------------------------------------------------------------------------
-
-const mockReadSubscriptionStatus = jest.fn();
-const mockWriteSubscriptionStatus = jest.fn();
-
-jest.mock('../services/kv', () => ({
-  readSubscriptionStatus: (...args: unknown[]) =>
-    mockReadSubscriptionStatus(...args),
-  writeSubscriptionStatus: (...args: unknown[]) =>
-    mockWriteSubscriptionStatus(...args),
-}));
+// KV: use in-memory fake that exercises real services/kv Zod parsing.
 
 // [T-11 / BUG-753] Spy on logger so we can assert KV-failure observability.
 // safeReadKV/safeWriteKV must emit structured warns when they swallow an
@@ -168,7 +153,52 @@ jest.mock('../services/logger', () => ({
 }));
 
 import { app } from '../index';
-import { AUTH_HEADERS, BASE_AUTH_ENV } from '../test-utils/test-env';
+import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
+import {
+  installTestJwksInterceptor,
+  restoreTestFetch,
+} from '../test-utils/jwks-interceptor';
+
+// ---------------------------------------------------------------------------
+// Fake KV — in-memory Map that exercises real services/kv Zod parsing
+// ---------------------------------------------------------------------------
+
+function createFakeKV() {
+  const store = new Map<string, string>();
+  const ns = {
+    get: jest.fn(async (key: string) => store.get(key) ?? null),
+    put: jest.fn(
+      async (key: string, value: string, _opts?: Record<string, unknown>) => {
+        store.set(key, value);
+      },
+    ),
+  } as unknown as KVNamespace;
+  return {
+    store,
+    namespace: ns,
+    seed(accountId: string, data: Record<string, unknown>) {
+      store.set(`sub:${accountId}`, JSON.stringify(data));
+    },
+    storedData(accountId: string): Record<string, unknown> | null {
+      const raw = store.get(`sub:${accountId}`);
+      return raw ? (JSON.parse(raw) as Record<string, unknown>) : null;
+    },
+    reset() {
+      store.clear();
+      (ns.get as jest.Mock)
+        .mockReset()
+        .mockImplementation(async (key: string) => store.get(key) ?? null);
+      (ns.put as jest.Mock)
+        .mockReset()
+        .mockImplementation(async (key: string, value: string) => {
+          store.set(key, value);
+        });
+    },
+  };
+}
+
+const fakeKV = createFakeKV();
+const AUTH_HEADERS = makeAuthHeaders();
 
 const TEST_ENV = {
   DATABASE_URL: 'postgresql://test:test@localhost:5432/test',
@@ -211,6 +241,7 @@ function mockQuota(overrides?: Record<string, unknown>) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  fakeKV.reset();
   // Default: ensureFreeSubscription returns a plus subscription
   mockEnsureFreeSubscription.mockResolvedValue(mockSubscription());
   mockGetQuotaPool.mockResolvedValue(null);
@@ -222,11 +253,16 @@ beforeEach(() => {
     remainingDaily: null,
   });
   mockGetTopUpCreditsRemaining.mockResolvedValue(0);
-  mockReadSubscriptionStatus.mockResolvedValue(null);
-  mockWriteSubscriptionStatus.mockResolvedValue(undefined);
 });
 
 describe('metering middleware', () => {
+  beforeAll(() => {
+    installTestJwksInterceptor();
+  });
+  afterAll(() => {
+    restoreTestFetch();
+  });
+
   // -----------------------------------------------------------------------
   // Non-LLM routes should pass through
   // -----------------------------------------------------------------------
@@ -734,7 +770,7 @@ describe('metering middleware', () => {
 
   describe('KV cache integration', () => {
     it('uses KV-cached subscription status when available (CR3 fix: includes subscriptionId)', async () => {
-      mockReadSubscriptionStatus.mockResolvedValue({
+      fakeKV.seed('test-account-id', {
         subscriptionId: 'sub-1',
         tier: 'plus',
         status: 'active',
@@ -758,17 +794,17 @@ describe('metering middleware', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ message: 'hello' }),
         },
-        { ...TEST_ENV, SUBSCRIPTION_KV: {} as KVNamespace },
+        { ...TEST_ENV, SUBSCRIPTION_KV: fakeKV.namespace },
       );
 
       expect(res.status).toBe(200);
-      expect(mockReadSubscriptionStatus).toHaveBeenCalled();
+      expect(fakeKV.namespace.get).toHaveBeenCalled();
       // CR3: ensureFreeSubscription NOT called when KV has the data
       expect(mockEnsureFreeSubscription).not.toHaveBeenCalled();
     });
 
     it('backfills KV on cache miss (includes subscriptionId + daily fields)', async () => {
-      mockReadSubscriptionStatus.mockResolvedValue(null);
+      // No seed — empty store = cache miss
       mockEnsureFreeSubscription.mockResolvedValue(mockSubscription());
       mockGetQuotaPool.mockResolvedValue(mockQuota());
       mockDecrementQuota.mockResolvedValue({
@@ -786,26 +822,25 @@ describe('metering middleware', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ message: 'hello' }),
         },
-        { ...TEST_ENV, SUBSCRIPTION_KV: {} as KVNamespace },
+        { ...TEST_ENV, SUBSCRIPTION_KV: fakeKV.namespace },
       );
 
       // I7: writeSubscriptionStatus called twice — backfill + post-decrement update
-      expect(mockWriteSubscriptionStatus).toHaveBeenCalledWith(
-        expect.anything(),
-        'test-account-id',
-        expect.objectContaining({
-          subscriptionId: 'sub-1',
-          tier: 'plus',
-          status: 'active',
-          monthlyLimit: 500,
-          dailyLimit: null,
-        }),
-      );
+      const stored = fakeKV.storedData('test-account-id');
+      expect(stored).toMatchObject({
+        subscriptionId: 'sub-1',
+        tier: 'plus',
+        status: 'active',
+        monthlyLimit: 500,
+        dailyLimit: null,
+      });
     });
 
     it('tolerates KV read failure (I4 fix) AND emits observability metric [BUG-753]', async () => {
       mockLoggerWarn.mockClear();
-      mockReadSubscriptionStatus.mockRejectedValue(new Error('KV unavailable'));
+      (fakeKV.namespace.get as jest.Mock).mockRejectedValueOnce(
+        new Error('KV unavailable'),
+      );
       mockEnsureFreeSubscription.mockResolvedValue(mockSubscription());
       mockGetQuotaPool.mockResolvedValue(mockQuota());
       mockDecrementQuota.mockResolvedValue({
@@ -823,7 +858,7 @@ describe('metering middleware', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ message: 'hello' }),
         },
-        { ...TEST_ENV, SUBSCRIPTION_KV: {} as KVNamespace },
+        { ...TEST_ENV, SUBSCRIPTION_KV: fakeKV.namespace },
       );
 
       // Should fall through to DB, not crash
@@ -845,8 +880,8 @@ describe('metering middleware', () => {
 
     it('tolerates KV write failure (I4 fix) AND emits observability metric [BUG-753]', async () => {
       mockLoggerWarn.mockClear();
-      mockReadSubscriptionStatus.mockResolvedValue(null);
-      mockWriteSubscriptionStatus.mockRejectedValue(
+      // No seed — cache miss. Make put throw on every call.
+      (fakeKV.namespace.put as jest.Mock).mockRejectedValue(
         new Error('KV write timeout'),
       );
       mockEnsureFreeSubscription.mockResolvedValue(mockSubscription());
@@ -866,7 +901,7 @@ describe('metering middleware', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ message: 'hello' }),
         },
-        { ...TEST_ENV, SUBSCRIPTION_KV: {} as KVNamespace },
+        { ...TEST_ENV, SUBSCRIPTION_KV: fakeKV.namespace },
       );
 
       // Should still succeed — KV is best-effort
@@ -888,9 +923,8 @@ describe('metering middleware', () => {
     });
 
     it('falls back to DB path when KV backfill write fails [4C.7]', async () => {
-      // KV read returns null (cache miss), KV write throws on backfill
-      mockReadSubscriptionStatus.mockResolvedValue(null);
-      mockWriteSubscriptionStatus.mockRejectedValue(
+      // No seed — cache miss. Make put throw on every call.
+      (fakeKV.namespace.put as jest.Mock).mockRejectedValue(
         new Error('KV write timeout'),
       );
       mockEnsureFreeSubscription.mockResolvedValue(mockSubscription());
@@ -912,7 +946,7 @@ describe('metering middleware', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ message: 'hello' }),
         },
-        { ...TEST_ENV, SUBSCRIPTION_KV: {} as KVNamespace },
+        { ...TEST_ENV, SUBSCRIPTION_KV: fakeKV.namespace },
       );
 
       // Request succeeds — DB path is used for quota enforcement
@@ -932,7 +966,7 @@ describe('metering middleware', () => {
       // Simulates the bug: daily cron reset used_today in DB but KV still
       // shows usedToday=10 (24h TTL). Middleware must not trust stale KV
       // for daily exhaustion — it should fall through to DB.
-      mockReadSubscriptionStatus.mockResolvedValue({
+      fakeKV.seed('test-account-id', {
         subscriptionId: 'sub-free',
         tier: 'free',
         status: 'active',
@@ -970,7 +1004,7 @@ describe('metering middleware', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ message: 'hello' }),
         },
-        { ...TEST_ENV, SUBSCRIPTION_KV: {} as KVNamespace },
+        { ...TEST_ENV, SUBSCRIPTION_KV: fakeKV.namespace },
       );
 
       // Must NOT return 402 — DB says quota is available
@@ -983,7 +1017,7 @@ describe('metering middleware', () => {
 
     it('falls back to DB for quota data when KV write fails after post-decrement update [4C.7]', async () => {
       // KV read succeeds (cache hit), but KV write fails on post-decrement update
-      mockReadSubscriptionStatus.mockResolvedValue({
+      fakeKV.seed('test-account-id', {
         subscriptionId: 'sub-1',
         tier: 'plus',
         status: 'active',
@@ -992,8 +1026,8 @@ describe('metering middleware', () => {
         dailyLimit: null,
         usedToday: 0,
       });
-      // First call is post-decrement update — it will fail
-      mockWriteSubscriptionStatus.mockRejectedValue(
+      // Post-decrement update — make put throw
+      (fakeKV.namespace.put as jest.Mock).mockRejectedValue(
         new Error('KV network error'),
       );
       mockDecrementQuota.mockResolvedValue({
@@ -1011,7 +1045,7 @@ describe('metering middleware', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ message: 'hello' }),
         },
-        { ...TEST_ENV, SUBSCRIPTION_KV: {} as KVNamespace },
+        { ...TEST_ENV, SUBSCRIPTION_KV: fakeKV.namespace },
       );
 
       // Request succeeds even though post-decrement KV update failed
@@ -1124,18 +1158,17 @@ describe('metering middleware', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ message: 'hello' }),
         },
-        { ...TEST_ENV, SUBSCRIPTION_KV: {} as KVNamespace },
+        { ...TEST_ENV, SUBSCRIPTION_KV: fakeKV.namespace },
       );
 
       expect(res.status).toBe(200);
       expect(res.headers.get('X-Quota-Remaining')).toBe('499');
-      expect(mockWriteSubscriptionStatus).toHaveBeenCalledWith(
-        expect.anything(),
-        'test-account-id',
-        expect.objectContaining({
-          usedThisMonth: 500,
-        }),
-      );
+      // Post-decrement KV update is the final write — atomic formula:
+      // monthlyLimit(500) - remainingMonthly(0) - remainingTopUp(499) = 1
+      const stored = fakeKV.storedData('test-account-id');
+      expect(stored).toMatchObject({
+        usedThisMonth: 1,
+      });
     });
   });
 

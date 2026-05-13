@@ -18,6 +18,7 @@ import {
   VocabularyNotFoundError,
 } from '@eduagent/schemas';
 import { recordPracticeActivityEvent } from './practice-activity-events';
+import { safeWrite, type DeferredActivityEvent } from './safe-non-core';
 
 function mapVocabularyRow(row: typeof vocabulary.$inferSelect): Vocabulary {
   return {
@@ -248,6 +249,7 @@ export async function reviewVocabulary(
   vocabularyId: string,
   input: VocabularyReviewInput,
   subjectId?: string,
+  deferredEvents?: DeferredActivityEvent[],
 ): Promise<{
   vocabulary: Vocabulary;
   retention: VocabularyRetentionCard;
@@ -269,7 +271,7 @@ export async function reviewVocabulary(
   // Wrap read-compute-write in a transaction to prevent SM-2 race conditions:
   // concurrent reviews reading the same consecutiveSuccesses would silently
   // overwrite each other's SM-2 parameters without serialization.
-  return db.transaction(async (tx) => {
+  const txResult = await db.transaction(async (tx) => {
     const txDb = tx as unknown as Database;
     const card = await ensureVocabularyRetentionCard(
       txDb,
@@ -331,30 +333,50 @@ export async function reviewVocabulary(
     if (!updatedCard)
       throw new Error('Update vocabulary retention card did not return a row');
 
-    await recordPracticeActivityEvent(txDb, {
-      profileId,
-      subjectId: (updatedVocab ?? vocabRow).subjectId,
-      activityType: 'review',
-      activitySubtype: 'vocabulary',
-      completedAt: new Date(now),
-      score: input.quality,
-      total: 5,
-      sourceType: 'vocabulary_retention_card',
-      sourceId: updatedCard.id,
-      occurrenceKey: `vocabulary:${vocabularyId}:reviewed:${now}`,
-      metadata: {
-        vocabularyId,
-        mastered,
-        repetitions: result.card.repetitions,
-        intervalDays: result.card.interval,
-      },
-    });
-
     return {
       vocabulary: mapVocabularyRow(updatedVocab ?? vocabRow),
       retention: mapVocabularyRetentionCard(updatedCard),
+      activityInput: {
+        profileId,
+        subjectId: (updatedVocab ?? vocabRow).subjectId,
+        activityType: 'review' as const,
+        activitySubtype: 'vocabulary',
+        completedAt: new Date(now),
+        score: input.quality,
+        total: 5,
+        sourceType: 'vocabulary_retention_card',
+        sourceId: updatedCard.id,
+        occurrenceKey: `vocabulary:${vocabularyId}:reviewed:${now}`,
+        metadata: {
+          vocabularyId,
+          mastered,
+          repetitions: result.card.repetitions,
+          intervalDays: result.card.interval,
+        },
+      },
     };
   });
+
+  const event: DeferredActivityEvent = {
+    input: txResult.activityInput,
+    surface: 'vocabulary.review',
+    context: { profileId, vocabularyId },
+  };
+
+  if (deferredEvents) {
+    deferredEvents.push(event);
+  } else {
+    await safeWrite(
+      () => recordPracticeActivityEvent(db, event.input),
+      event.surface,
+      event.context,
+    );
+  }
+
+  return {
+    vocabulary: txResult.vocabulary,
+    retention: txResult.retention,
+  };
 }
 
 export async function upsertExtractedVocabulary(

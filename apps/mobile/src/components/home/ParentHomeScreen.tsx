@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { isAdultOwner } from '@eduagent/schemas';
 import type { DashboardChild, DashboardData, Profile } from '@eduagent/schemas';
+import type { Translate, TranslateKey } from '../../i18n';
 
 import { useActiveProfileRole } from '../../hooks/use-active-profile-role';
 import { useDashboard } from '../../hooks/use-dashboard';
@@ -55,7 +56,7 @@ function firstNameOf(name: string): string {
 
 function formatActivityLabel(
   dashboardChild: DashboardChild | undefined,
-  t: (key: string, opts?: Record<string, unknown>) => string,
+  t: Translate,
 ): string {
   if (!dashboardChild) return t('home.parent.childCard.statusPending');
   if (dashboardChild.totalTimeThisWeek > 0) {
@@ -73,7 +74,7 @@ function formatActivityLabel(
 
 function formatFocusLabel(
   dashboardChild: DashboardChild | undefined,
-  t: (key: string, opts?: Record<string, unknown>) => string,
+  t: Translate,
 ): string {
   const focus =
     dashboardChild?.currentlyWorkingOn[0] ?? dashboardChild?.subjects[0]?.name;
@@ -82,7 +83,7 @@ function formatFocusLabel(
 
 function formatChildSnapshot(
   dashboardChild: DashboardChild | undefined,
-  t: (key: string, opts?: Record<string, unknown>) => string,
+  t: Translate,
 ): string {
   const focus = formatFocusLabel(dashboardChild, t);
   const activity = formatActivityLabel(dashboardChild, t);
@@ -98,7 +99,7 @@ interface TonightPrompt {
 function primaryPromptFor(
   child: Profile,
   dashboardChild: DashboardChild | undefined,
-  t: (key: string, opts?: Record<string, unknown>) => string,
+  t: Translate,
 ): string {
   const childName = firstNameOf(child.displayName);
   const focus =
@@ -121,7 +122,7 @@ function primaryPromptFor(
 function buildSingleChildPrompts(
   child: Profile,
   dashboardChild: DashboardChild | undefined,
-  t: (key: string, opts?: Record<string, unknown>) => string,
+  t: Translate,
 ): TonightPrompt[] {
   const childName = firstNameOf(child.displayName);
   const focus =
@@ -168,7 +169,7 @@ function buildSingleChildPrompts(
 function buildTonightPrompts(
   children: Profile[],
   dashboard: DashboardData | undefined,
-  t: (key: string, opts?: Record<string, unknown>) => string,
+  t: Translate,
 ): TonightPrompt[] {
   const first = children[0];
   if (!first) return [];
@@ -195,7 +196,7 @@ function buildTonightPrompts(
   }));
 }
 
-function tonightTitleKey(now?: Date): string {
+function tonightTitleKey(now?: Date): TranslateKey {
   const tod = getTimeOfDay(now ?? new Date());
   if (tod === 'morning') return 'home.parent.tonight.titleMorning';
   if (tod === 'afternoon') return 'home.parent.tonight.titleAfternoon';
@@ -255,7 +256,7 @@ function ChildCommandCard({
   onOpenProgress: () => void;
   onOpenReports: () => void;
   onOpenNudge: () => void;
-  t: (key: string, opts?: Record<string, unknown>) => string;
+  t: Translate;
 }): React.ReactElement {
   return (
     <View

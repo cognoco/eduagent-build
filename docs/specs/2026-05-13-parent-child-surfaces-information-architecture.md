@@ -223,6 +223,16 @@ Separate the parent child surfaces by intent. Parent home remains the launcher f
 9. Given no generated summary exists, when Progress or Reports loads, then the UI shows a deterministic fallback and does not trigger a live LLM call from the mobile screen.
 10. Given a new learning session completes, when background processing finishes, then Progress summary freshness metadata reflects the latest session.
 
+### Failure Modes
+
+| State | Trigger | User sees | Recovery |
+| ---- | ------- | --------- | -------- |
+| LLM summary generation fails | The Inngest progress-summary function exhausts retries after `app/session.completed`. | Progress shows the deterministic fallback or the last cached summary with stale messaging. | Inngest failure is observable; next completed session retries generation, and support can replay the event if needed. |
+| Consent withdrawn after summary exists | Parent opens Progress after the child dashboard visibility gate is no longer satisfied. | The parent sees the standard unavailable/error state instead of cached child learning data. | Restore consent through the consent flow, then reload Progress. |
+| Empty inventory at generation time | A session completes before inventory/snapshot data is populated enough for a useful summary. | Progress shows a gentle fallback that a summary will appear after more learning data exists. | The next session completion regenerates with richer inventory context. |
+| Concurrent session completions | Multiple `app/session.completed` events arrive for the same child inside the debounce window. | Progress may briefly show stale metadata until the debounced generation completes. | Debounced Inngest generation writes one current summary based on the latest session. |
+| Dashboard visibility rejected | `assertChildDashboardDataVisible` rejects after consent revocation or archive state changes. | Progress summary endpoint returns the same protected-data failure as inventory/reports. | Parent must resolve consent/access state; no cached summary is served while blocked. |
+
 ## Additional Context
 
 ### Dependencies

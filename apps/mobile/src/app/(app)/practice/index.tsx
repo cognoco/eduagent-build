@@ -19,6 +19,7 @@ import {
 } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
+import type { Translate } from '../../../i18n';
 
 import type { QuizActivityType, QuizStats } from '@eduagent/schemas';
 
@@ -71,10 +72,7 @@ function pointerStyle(): StyleProp<ViewStyle> {
   return Platform.OS === 'web' ? ({ cursor: 'pointer' } as ViewStyle) : null;
 }
 
-function formatTimeUntil(
-  isoDate: string,
-  t: (key: string, opts?: Record<string, unknown>) => string,
-): string {
+function formatTimeUntil(isoDate: string, t: Translate): string {
   const diff = new Date(isoDate).getTime() - Date.now();
 
   if (diff <= 0) return t('practiceHub.review.timeSoon');
@@ -90,7 +88,7 @@ function formatTimeUntil(
 function getActivityCue(
   quizStats: QuizStats[] | undefined,
   activityType: QuizActivityType,
-  t: (key: string, opts?: Record<string, unknown>) => string,
+  t: Translate,
 ): string | null {
   const stats = quizStats?.find((stat) => stat.activityType === activityType);
 
@@ -118,7 +116,7 @@ function getActivityCue(
 
 function getQuizStatCue(
   stats: QuizStats | undefined,
-  t: (key: string, opts?: Record<string, unknown>) => string,
+  t: Translate,
 ): string | null {
   if (!stats) return null;
 

@@ -2,6 +2,7 @@ import type { DictationMode } from '@eduagent/schemas';
 import { createScopedRepository } from '@eduagent/database';
 import type { Database } from '@eduagent/database';
 import { recordPracticeActivityEvent } from '../practice-activity-events';
+import { safeWrite } from '../safe-non-core';
 import type { GenerateContext } from './generate';
 
 // ---------------------------------------------------------------------------
@@ -25,41 +26,47 @@ export async function recordDictationResult(
   profileId: string,
   input: RecordResultInput,
 ) {
-  return db.transaction(async (tx) => {
-    // Known Drizzle pattern: PgTransaction -> Database cast (see docs/plans/2026-05-12-practice-activity-summary-service.md Phase 3).
+  const completedAt = new Date();
+  const row = await db.transaction(async (tx) => {
     const txDb = tx as unknown as Database;
     const repo = createScopedRepository(txDb, profileId);
-    const completedAt = new Date();
-    const row = await repo.dictationResults.insert({
+    const inserted = await repo.dictationResults.insert({
       date: input.localDate,
       sentenceCount: input.sentenceCount,
       mistakeCount: input.mistakeCount,
       mode: input.mode,
       reviewed: input.reviewed,
     });
-    if (!row) throw new Error('Dictation result insert did not return a row');
-
-    await recordPracticeActivityEvent(txDb, {
-      profileId,
-      subjectId: input.subjectId ?? null,
-      activityType: 'dictation',
-      activitySubtype: input.mode,
-      completedAt,
-      score:
-        input.mistakeCount == null
-          ? null
-          : Math.max(0, input.sentenceCount - input.mistakeCount),
-      total: input.sentenceCount,
-      sourceType: 'dictation_result',
-      sourceId: row.id,
-      metadata: {
-        reviewed: input.reviewed,
-        mistakeCount: input.mistakeCount,
-      },
-    });
-
-    return row;
+    if (!inserted)
+      throw new Error('Dictation result insert did not return a row');
+    return inserted;
   });
+
+  await safeWrite(
+    () =>
+      recordPracticeActivityEvent(db, {
+        profileId,
+        subjectId: input.subjectId ?? null,
+        activityType: 'dictation',
+        activitySubtype: input.mode,
+        completedAt,
+        score:
+          input.mistakeCount == null
+            ? null
+            : Math.max(0, input.sentenceCount - input.mistakeCount),
+        total: input.sentenceCount,
+        sourceType: 'dictation_result',
+        sourceId: row.id,
+        metadata: {
+          reviewed: input.reviewed,
+          mistakeCount: input.mistakeCount,
+        },
+      }),
+    'dictation.practice-activity-event',
+    { profileId },
+  );
+
+  return row;
 }
 
 export interface StreakResult {

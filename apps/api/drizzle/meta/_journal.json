@@ -526,6 +526,13 @@
       "when": 1779000023000,
       "tag": "0074_celebration_events_source_type_check",
       "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "7",
+      "when": 1779000024000,
+      "tag": "0075_lame_magus",
+      "breakpoints": true
     }
   ]
 }

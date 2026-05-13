@@ -10,6 +10,7 @@ import { ERROR_CODES } from '@eduagent/schemas';
 import { apiError } from '../errors';
 import { inngest } from '../inngest/client';
 import { createLogger } from '../services/logger';
+import { safeSend } from '../services/safe-non-core';
 
 const logger = createLogger();
 
@@ -195,15 +196,20 @@ async function handleEmailBounced(
   // dashboard (third-party processor). Recipient email is bystander PII for
   // bounce/complaint observability — mask it before crossing the trust boundary.
   // emailId still uniquely identifies the message for support investigation.
-  await inngest.send({
-    name: 'app/email.bounced',
-    data: {
-      type: eventType,
-      to: maskEmail(data.to),
-      emailId: data.email_id ?? null,
-      timestamp: new Date().toISOString(),
-    },
-  });
+  await safeSend(
+    () =>
+      inngest.send({
+        name: 'app/email.bounced',
+        data: {
+          type: eventType,
+          to: maskEmail(data.to),
+          emailId: data.email_id ?? null,
+          timestamp: new Date().toISOString(),
+        },
+      }),
+    'resend-webhook.email-bounced',
+    { emailId: data.email_id },
+  );
 }
 
 /** email.delivered — log for delivery confirmation audit trail */

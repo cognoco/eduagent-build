@@ -5,6 +5,7 @@ import {
   fetchLearningResumeTarget,
   useChildInventory,
   useChildProgressHistory,
+  useChildProgressSummary,
   useLearningResumeTarget,
   useProgressInventory,
   useProgressHistory,
@@ -123,6 +124,28 @@ jest.mock('react-i18next', () => ({
         const count = opts?.count as number;
         return `+${count} topic${count === 1 ? '' : 's'} explored this week`;
       }
+      // Guardian view
+      if (key === 'progress.guardian.sessionCount') {
+        const count = opts?.count as number;
+        return `${count} ${count === 1 ? 'session' : 'sessions'}`;
+      }
+      if (key === 'progress.guardian.lastStudied')
+        return `Last studied ${opts?.date ?? ''}`;
+      if (key === 'progress.guardian.topicsMastered')
+        return `${opts?.mastered ?? ''}/${opts?.total ?? ''} topics mastered`;
+      if (key === 'progress.guardian.summaryFallback')
+        return 'No summary available yet. One will appear after the next session.';
+      if (key === 'progress.guardian.noRecentSessions')
+        return `No new sessions since ${opts?.date ?? ''}.`;
+      if (key === 'progress.guardian.noRecentSessionsFallback')
+        return 'No new sessions since a while ago.';
+      if (key === 'progress.guardian.staleSummary')
+        return 'Summary may not reflect the latest activity yet.';
+      if (key === 'progress.guardian.nudgeCta')
+        return `A short nudge might help ${opts?.name ?? ''} restart`;
+      if (key === 'progress.guardian.nudgeA11y')
+        return `Send ${opts?.name ?? ''} a nudge`;
+      if (key === 'progress.guardian.viewAllReports') return 'View all reports';
       // Common fallbacks
       if (key === 'common.tryAgain') return 'Try again';
       if (key === 'common.goBack') return 'Go Back';
@@ -210,6 +233,26 @@ const baseGlobal: {
   currentStreak: 0,
   longestStreak: 0,
 };
+
+function makeLinkedChild(overrides?: Partial<Profile>): Profile {
+  return {
+    id: 'child-1',
+    accountId: 'account-1',
+    displayName: 'Emma',
+    isOwner: false,
+    hasPremiumLlm: false,
+    consentStatus: null,
+    linkCreatedAt: null,
+    conversationLanguage: 'en',
+    pronouns: null,
+    birthYear: 2015,
+    avatarUrl: null,
+    location: null,
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
+    ...overrides,
+  };
+}
 
 const fullSubject = {
   subjectId: 's1',
@@ -369,6 +412,12 @@ function mockHooks(
   (useChildProgressHistory as jest.Mock).mockReturnValue({
     data: null,
     isRefetching: false,
+    refetch: jest.fn(),
+  });
+  (useChildProgressSummary as jest.Mock).mockReturnValue({
+    data: null,
+    isLoading: false,
+    isError: false,
     refetch: jest.fn(),
   });
   (useLearningResumeTarget as jest.Mock).mockReturnValue({
@@ -744,5 +793,139 @@ describe('ProgressScreen — progressive disclosure', () => {
 
     // No teaser and no empty state — just the loading/empty fallthrough
     expect(screen.queryByTestId('progress-new-learner-teaser')).toBeNull();
+  });
+
+  it('renders subject breakdown for parent viewing child', () => {
+    mockLinkedChildren = [makeLinkedChild()];
+    mockHooks({
+      inventory: {
+        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 3 },
+        subjects: [fullSubject],
+      },
+    });
+    (useChildInventory as jest.Mock).mockReturnValue({
+      data: {
+        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 3 },
+        subjects: [fullSubject],
+        currentlyWorkingOn: [],
+      },
+      isLoading: false,
+      isError: false,
+      isRefetching: false,
+      refetch: jest.fn(),
+    });
+
+    render(<ProgressScreen />);
+
+    screen.getByTestId('progress-subject-breakdown');
+    screen.getByTestId('progress-subject-card-s1');
+    screen.getByText('Math');
+    screen.getByText('5 sessions · 30 min');
+  });
+
+  it('does not render report cards for parent viewing child', () => {
+    mockLinkedChildren = [makeLinkedChild()];
+    mockHooks({
+      inventory: {
+        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 3 },
+        subjects: [fullSubject],
+      },
+    });
+    (useChildInventory as jest.Mock).mockReturnValue({
+      data: {
+        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 3 },
+        subjects: [fullSubject],
+        currentlyWorkingOn: [],
+      },
+      isLoading: false,
+      isError: false,
+      isRefetching: false,
+      refetch: jest.fn(),
+    });
+
+    render(<ProgressScreen />);
+
+    expect(screen.queryByTestId('progress-weekly-report-tracker')).toBeNull();
+    expect(screen.queryByTestId('progress-monthly-report-tracker')).toBeNull();
+    screen.getByTestId('progress-view-all-reports');
+  });
+
+  it('renders progress summary freshness states for parent viewing child', () => {
+    mockLinkedChildren = [makeLinkedChild()];
+    mockHooks({
+      inventory: {
+        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 3 },
+        subjects: [fullSubject],
+      },
+    });
+    (useChildInventory as jest.Mock).mockReturnValue({
+      data: {
+        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 3 },
+        subjects: [fullSubject],
+        currentlyWorkingOn: [],
+      },
+      isLoading: false,
+      isError: false,
+      isRefetching: false,
+      refetch: jest.fn(),
+    });
+    (useChildProgressSummary as jest.Mock).mockReturnValue({
+      data: {
+        summary: 'Emma explored fractions and mastered 3 new topics this week.',
+        generatedAt: '2026-05-13T10:00:00Z',
+        basedOnLastSessionAt: '2026-05-10T09:00:00Z',
+        latestSessionId: 'session-1',
+        activityState: 'no_recent_activity',
+        nudgeRecommended: true,
+      },
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+
+    render(<ProgressScreen />);
+
+    screen.getByTestId('progress-summary-header');
+    screen.getByText(/Emma explored fractions/);
+    screen.getByTestId('progress-summary-no-recent');
+    screen.getByTestId('progress-nudge-cta');
+  });
+
+  it('renders deterministic fallback when no progress summary exists', () => {
+    mockLinkedChildren = [makeLinkedChild()];
+    mockHooks({
+      inventory: {
+        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 3 },
+        subjects: [fullSubject],
+      },
+    });
+    (useChildInventory as jest.Mock).mockReturnValue({
+      data: {
+        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 3 },
+        subjects: [fullSubject],
+        currentlyWorkingOn: [],
+      },
+      isLoading: false,
+      isError: false,
+      isRefetching: false,
+      refetch: jest.fn(),
+    });
+    (useChildProgressSummary as jest.Mock).mockReturnValue({
+      data: {
+        summary: null,
+        generatedAt: null,
+        basedOnLastSessionAt: null,
+        latestSessionId: null,
+        activityState: 'no_recent_activity',
+      },
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+
+    render(<ProgressScreen />);
+
+    screen.getByTestId('progress-summary-fallback');
+    expect(screen.queryByTestId('progress-summary-header')).toBeNull();
   });
 });

@@ -16,6 +16,7 @@ import type {
   OverdueSubject,
   OverdueTopic,
   OverdueTopicsResponse,
+  ProgressSummary,
   ProgressHistory,
   ChildSession,
   SubjectProgress,
@@ -27,6 +28,7 @@ import {
   childReportDetailResponseSchema,
   childReportsResponseSchema,
   childSessionsResponseSchema,
+  progressSummarySchema,
   weeklyReportDetailResponseSchema,
   weeklyReportsResponseSchema,
 } from '@eduagent/schemas';
@@ -660,6 +662,48 @@ export function useChildProgressHistory(
         await assertOk(res);
         const data = (await res.json()) as { history: ProgressHistory | null };
         return data.history;
+      } finally {
+        cleanup();
+      }
+    },
+    enabled:
+      (options?.enabled ?? true) &&
+      !!activeProfile &&
+      activeProfile.isOwner === true &&
+      !!childProfileId,
+  });
+}
+
+export function useChildProgressSummary(
+  childProfileId: string | undefined,
+  options?: { enabled?: boolean },
+): UseQueryResult<ProgressSummary | null> {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+
+  return useQuery({
+    queryKey: ['dashboard', 'child', childProfileId, 'progress-summary'],
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        // Hono RPC does not type hyphenated path segments, so the route segment
+        // is cast to the handler shape used by /progress-summary.
+        const progressSummaryClient = (
+          client.dashboard.children[':profileId'] as unknown as {
+            'progress-summary': {
+              $get: (
+                args: { param: { profileId: string } },
+                options?: { init?: RequestInit },
+              ) => Promise<Response>;
+            };
+          }
+        )['progress-summary'];
+        const res = await progressSummaryClient.$get(
+          { param: { profileId: childProfileId ?? '' } },
+          { init: { signal } },
+        );
+        await assertOk(res);
+        return progressSummarySchema.parse(await res.json());
       } finally {
         cleanup();
       }

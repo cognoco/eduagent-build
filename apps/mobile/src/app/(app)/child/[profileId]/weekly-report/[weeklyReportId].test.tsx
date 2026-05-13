@@ -51,6 +51,14 @@ jest.mock('../../../../../components/common', () => ({
   ErrorFallback: () => null,
 }));
 
+// prettier-ignore
+jest.mock('../../../../../components/nudge/NudgeActionSheet', () => ({ // gc1-allow: screen test verifies sheet invocation without native sheet behavior
+  NudgeActionSheet: ({ childName }: { childName: string }) => {
+    const { Text } = require('react-native');
+    return <Text testID="nudge-action-sheet">Nudge {childName}</Text>;
+  },
+}));
+
 const mockUseChildWeeklyReportDetail = jest.fn();
 const mockMarkViewedMutateAsync = jest.fn();
 
@@ -248,6 +256,33 @@ describe('ChildWeeklyReportDetailScreen', () => {
 
     screen.getByTestId('child-weekly-report-empty-note');
     screen.getByText('parentView.weeklyReport.sendNudge:{"name":"Emma"}');
+  });
+
+  it('[BUG-903] empty week CTA opens the nudge sheet instead of navigating', () => {
+    mockUseChildWeeklyReportDetail.mockReturnValue({
+      data: makeReport({
+        thisWeek: {
+          totalSessions: 0,
+          totalActiveMinutes: 0,
+          topicsMastered: 0,
+          vocabularyTotal: 0,
+        },
+        headlineStat: {
+          label: 'Topics mastered',
+          value: 0,
+          comparison: "No activity this week — that's OK. A nudge can help.",
+        },
+      }),
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+
+    render(<ChildWeeklyReportDetailScreen />);
+    fireEvent.press(screen.getByTestId('child-weekly-report-open-child'));
+
+    screen.getByTestId('nudge-action-sheet');
+    expect(mockPush).not.toHaveBeenCalled();
   });
 
   // BUG-903 (b): "Open child" CTA navigates to /(app)/child/[id].

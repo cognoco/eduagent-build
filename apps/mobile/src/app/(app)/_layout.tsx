@@ -10,6 +10,7 @@ import {
   Platform,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import type { Translate } from '../../i18n';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth, useClerk, useUser } from '@clerk/clerk-expo';
 import { useQueryClient } from '@tanstack/react-query';
@@ -251,7 +252,7 @@ function canSwitchFromConsentGate(
 export function buildSwitchProfileConfirmation(params: {
   activeProfile: { id: string } | null;
   profiles: ReadonlyArray<{ id: string; displayName: string }>;
-  t: (key: string, options?: Record<string, string>) => string;
+  t: Translate;
 }): {
   target: { id: string; displayName: string };
   title: string;
