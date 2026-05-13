@@ -327,9 +327,9 @@ describe('createSubscription', () => {
       stripeSubscriptionId: 'sub_456',
     });
 
-    const insertCall = (db.insert as jest.Mock).mock.results[0].value;
+    const insertCall = (db.insert as jest.Mock).mock.results[0]!.value;
     const valuesCall = insertCall.values as jest.Mock;
-    const values = valuesCall.mock.calls[0][0];
+    const values = valuesCall.mock.calls[0]![0];
     expect(values.stripeCustomerId).toBe('cus_123');
     expect(values.stripeSubscriptionId).toBe('sub_456');
   });
@@ -339,9 +339,9 @@ describe('createSubscription', () => {
     const db = createMockDb({ insertReturning: [row] });
     await createSubscription(db, accountId, 'plus', 500);
 
-    const insertCall = (db.insert as jest.Mock).mock.results[0].value;
+    const insertCall = (db.insert as jest.Mock).mock.results[0]!.value;
     const valuesCall = insertCall.values as jest.Mock;
-    const values = valuesCall.mock.calls[0][0];
+    const values = valuesCall.mock.calls[0]![0];
     expect(values.status).toBe('trial');
   });
 });
@@ -618,10 +618,10 @@ describe('incrementQuota', () => {
     expect(db.update).toHaveBeenCalledTimes(1);
 
     // .set() payload must include both counters and updatedAt
-    const updateSetMock = (db.update as jest.Mock).mock.results[0].value
+    const updateSetMock = (db.update as jest.Mock).mock.results[0]!.value
       .set as jest.Mock;
     expect(updateSetMock).toHaveBeenCalledTimes(1);
-    const setPayload = updateSetMock.mock.calls[0][0] as Record<
+    const setPayload = updateSetMock.mock.calls[0]![0] as Record<
       string,
       unknown
     >;
@@ -631,7 +631,7 @@ describe('incrementQuota', () => {
     expect(setPayload).toHaveProperty('updatedAt');
 
     // .where() must be called — ensures the update is scoped to the subscription
-    const whereMock = updateSetMock.mock.results[0].value.where as jest.Mock;
+    const whereMock = updateSetMock.mock.results[0]!.value.where as jest.Mock;
     expect(whereMock).toHaveBeenCalledTimes(1);
   });
 
@@ -1079,7 +1079,7 @@ describe('findExpiredTrialsByDaysSinceEnd', () => {
     const results = await findExpiredTrialsByDaysSinceEnd(db, now, 14);
 
     expect(results).toHaveLength(1);
-    expect(results[0].status).toBe('expired');
+    expect(results[0]!.status).toBe('expired');
     // Should query for trials that ended 14 days ago (2025-01-01)
     expect(findManyMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -1239,7 +1239,7 @@ describe('findExpiringTopUpCredits', () => {
     const results = await findExpiringTopUpCredits(db, rangeStart, rangeEnd);
 
     expect(results).toHaveLength(1);
-    expect(results[0].remaining).toBe(100);
+    expect(results[0]!.remaining).toBe(100);
   });
 
   it('returns empty array when no expiring credits found', async () => {

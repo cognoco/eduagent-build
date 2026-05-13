@@ -16,7 +16,6 @@
 // Valid UUID constants (weekly handler validates parentId via z.string().uuid())
 // ---------------------------------------------------------------------------
 const PARENT_ID = 'aaaaaaaa-0000-4000-8000-000000000001';
-const _PARENT_ID_2 = 'aaaaaaaa-0000-4000-8000-000000000002';
 const CHILD_ID_A = 'bbbbbbbb-0000-4000-8000-000000000001';
 const CHILD_ID_B = 'bbbbbbbb-0000-4000-8000-000000000002';
 const CHILD_ID_RESTRICTED = 'cccccccc-0000-4000-8000-000000000001';

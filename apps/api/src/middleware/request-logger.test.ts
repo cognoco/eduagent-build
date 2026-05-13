@@ -82,7 +82,7 @@ describe('requestLogger middleware', () => {
     await app.request('/v1/ok', {}, TEST_ENV);
 
     expect(captured.logs).toHaveLength(1);
-    const entry = parseEntry(captured.logs[0]);
+    const entry = parseEntry(captured.logs[0]!);
     expect(entry.level).toBe('info');
     expect(entry.message).toBe('Request completed');
     expect(entry.context?.method).toBe('GET');
@@ -98,7 +98,7 @@ describe('requestLogger middleware', () => {
     await app.request('/v1/missing', {}, TEST_ENV);
 
     expect(captured.warns).toHaveLength(1);
-    const entry = parseEntry(captured.warns[0]);
+    const entry = parseEntry(captured.warns[0]!);
     expect(entry.level).toBe('warn');
     expect(entry.message).toBe('Client error');
     expect(entry.context?.status).toBe(404);
@@ -111,7 +111,7 @@ describe('requestLogger middleware', () => {
     await app.request('/v1/fail', {}, TEST_ENV);
 
     expect(captured.errors).toHaveLength(1);
-    const entry = parseEntry(captured.errors[0]);
+    const entry = parseEntry(captured.errors[0]!);
     expect(entry.level).toBe('error');
     expect(entry.message).toBe('Request failed');
     expect(entry.context?.status).toBe(500);
@@ -136,7 +136,7 @@ describe('requestLogger middleware', () => {
     await app.request('/v1/authed', {}, TEST_ENV);
 
     expect(captured.logs).toHaveLength(1);
-    const entry = parseEntry(captured.logs[0]);
+    const entry = parseEntry(captured.logs[0]!);
     expect(entry.context?.profileId).toBe('p1');
   });
 
@@ -150,7 +150,7 @@ describe('requestLogger middleware', () => {
     await app.request('/v1/no-profile', {}, TEST_ENV);
 
     expect(captured.logs).toHaveLength(1);
-    const entry = parseEntry(captured.logs[0]);
+    const entry = parseEntry(captured.logs[0]!);
     expect(entry.context?.profileId).toBeUndefined();
   });
 
@@ -161,7 +161,7 @@ describe('requestLogger middleware', () => {
     await app.request('/v1/public', {}, TEST_ENV);
 
     expect(captured.logs).toHaveLength(1);
-    const entry = parseEntry(captured.logs[0]);
+    const entry = parseEntry(captured.logs[0]!);
     expect(entry.context?.profileId).toBeUndefined();
   });
 
@@ -188,7 +188,7 @@ describe('requestLogger middleware', () => {
     await app.request('/v1/default', {}, { ENVIRONMENT: 'test' });
 
     expect(captured.logs).toHaveLength(1);
-    const entry = parseEntry(captured.logs[0]);
+    const entry = parseEntry(captured.logs[0]!);
     expect(entry.level).toBe('info');
   });
 });

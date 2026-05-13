@@ -58,7 +58,7 @@ function mockAccountRow(
     clerkUserId: string;
     email: string;
     timezone: string | null;
-  }>
+  }>,
 ) {
   return {
     id: overrides?.id ?? 'acc-1',
@@ -139,7 +139,7 @@ describe('findOrCreateAccount', () => {
     const result = await findOrCreateAccount(
       db,
       'clerk_user_456',
-      'other@example.com'
+      'other@example.com',
     );
 
     expect(result.clerkUserId).toBe('clerk_user_456');
@@ -162,7 +162,7 @@ describe('findOrCreateAccount', () => {
     const result = await findOrCreateAccount(
       db,
       'clerk_user_789',
-      'new@example.com'
+      'new@example.com',
     );
 
     expect(result.id).toBe('new-acc');
@@ -193,7 +193,7 @@ describe('findOrCreateAccount', () => {
       expect.objectContaining({
         status: 'trial',
         trialEndsAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
-      })
+      }),
     );
   });
 
@@ -212,12 +212,12 @@ describe('findOrCreateAccount', () => {
       db,
       'clerk_user_789',
       'new@example.com',
-      'Europe/Prague'
+      'Europe/Prague',
     );
 
     expect(mockComputeTrialEndDate).toHaveBeenCalledWith(
       expect.any(Date),
-      'Europe/Prague'
+      'Europe/Prague',
     );
   });
 
@@ -236,7 +236,7 @@ describe('findOrCreateAccount', () => {
 
     expect(mockComputeTrialEndDate).toHaveBeenCalledWith(
       expect.any(Date),
-      undefined
+      undefined,
     );
   });
 
@@ -256,13 +256,13 @@ describe('findOrCreateAccount', () => {
       db,
       'clerk_user_789',
       'new@example.com',
-      'America/New_York'
+      'America/New_York',
     );
 
     // Verify insert was called with timezone
-    const insertCall = (db.insert as jest.Mock).mock.results[0].value;
+    const insertCall = (db.insert as jest.Mock).mock.results[0]!.value;
     const valuesCall = insertCall.values as jest.Mock;
-    const values = valuesCall.mock.calls[0][0];
+    const values = valuesCall.mock.calls[0]![0];
     expect(values.timezone).toBe('America/New_York');
   });
 
@@ -279,9 +279,9 @@ describe('findOrCreateAccount', () => {
 
     await findOrCreateAccount(db, 'clerk_user_789', 'new@example.com');
 
-    const insertCall = (db.insert as jest.Mock).mock.results[0].value;
+    const insertCall = (db.insert as jest.Mock).mock.results[0]!.value;
     const valuesCall = insertCall.values as jest.Mock;
-    const values = valuesCall.mock.calls[0][0];
+    const values = valuesCall.mock.calls[0]![0];
     expect(values.timezone).toBeNull();
   });
 
@@ -291,7 +291,7 @@ describe('findOrCreateAccount', () => {
     const result = await findOrCreateAccount(
       db,
       'clerk_user_123',
-      'user@example.com'
+      'user@example.com',
     );
 
     expect(result).toHaveProperty('id');
@@ -309,7 +309,7 @@ describe('findOrCreateAccount', () => {
     const result = await findOrCreateAccount(
       db,
       'clerk_user_123',
-      'user@example.com'
+      'user@example.com',
     );
 
     expect(() => new Date(result.createdAt)).not.toThrow();
@@ -326,7 +326,7 @@ describe('findOrCreateAccount', () => {
   describe('[BUG-837] trial subscription failure escalation', () => {
     it('[BREAK] account is still returned when createSubscription throws (lazy-provision contract)', async () => {
       mockCreateSubscription.mockRejectedValueOnce(
-        new Error('DB constraint violation')
+        new Error('DB constraint violation'),
       );
       const newRow = mockAccountRow({
         id: 'new-acc',
@@ -341,7 +341,7 @@ describe('findOrCreateAccount', () => {
       const result = await findOrCreateAccount(
         db,
         'clerk_user_789',
-        'new@example.com'
+        'new@example.com',
       );
 
       expect(result.id).toBe('new-acc');
@@ -349,7 +349,7 @@ describe('findOrCreateAccount', () => {
 
     it('[BREAK] silent recovery is banned: subscription failure dispatches app/billing.trial_subscription_failed', async () => {
       mockCreateSubscription.mockRejectedValueOnce(
-        new Error('DB constraint violation')
+        new Error('DB constraint violation'),
       );
       const newRow = mockAccountRow({
         id: 'new-acc',
@@ -372,13 +372,13 @@ describe('findOrCreateAccount', () => {
             reason: 'DB constraint violation',
             timestamp: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
           }),
-        })
+        }),
       );
     });
 
     it('[BREAK] subscription failure also calls captureException with billing context', async () => {
       mockCreateSubscription.mockRejectedValueOnce(
-        new Error('DB constraint violation')
+        new Error('DB constraint violation'),
       );
       const newRow = mockAccountRow({
         id: 'new-acc',
@@ -400,13 +400,13 @@ describe('findOrCreateAccount', () => {
             accountId: 'new-acc',
             clerkUserId: 'clerk_user_789',
           }),
-        })
+        }),
       );
     });
 
     it('account creation still succeeds when the inngest dispatch itself fails (defense-in-depth)', async () => {
       mockCreateSubscription.mockRejectedValueOnce(
-        new Error('DB constraint violation')
+        new Error('DB constraint violation'),
       );
       mockInngestSend.mockRejectedValueOnce(new Error('Inngest unavailable'));
       const newRow = mockAccountRow({
@@ -424,7 +424,7 @@ describe('findOrCreateAccount', () => {
       const result = await findOrCreateAccount(
         db,
         'clerk_user_789',
-        'new@example.com'
+        'new@example.com',
       );
 
       expect(result.id).toBe('new-acc');
@@ -464,7 +464,7 @@ describe('findOrCreateAccount', () => {
     const result = await findOrCreateAccount(
       db,
       'clerk_new_reregistered',
-      'returning@example.com'
+      'returning@example.com',
     );
 
     expect(result.id).toBe('acc-existing');

@@ -1670,10 +1670,10 @@ describe('analyzeSessionTranscript', () => {
     );
 
     expect(mockRouteAndCall).toHaveBeenCalledTimes(1);
-    const [messages] = mockRouteAndCall.mock.calls[0] as [
+    const [messages] = mockRouteAndCall.mock.calls[0]! as [
       { role: string; content: string }[],
     ];
-    const systemPrompt = messages[0].content;
+    const systemPrompt = messages[0]!.content;
 
     expect(systemPrompt).toContain('<learner_raw_input>');
     expect(systemPrompt).toContain('</learner_raw_input>');
@@ -1697,10 +1697,10 @@ describe('analyzeSessionTranscript', () => {
 
     await analyzeSessionTranscript(events, 'Math', 'Fractions', malicious);
 
-    const [messages] = mockRouteAndCall.mock.calls[0] as [
+    const [messages] = mockRouteAndCall.mock.calls[0]! as [
       { role: string; content: string }[],
     ];
-    const systemPrompt = messages[0].content;
+    const systemPrompt = messages[0]!.content;
 
     // [PROMPT-INJECT-8] Upgraded defense: rawInput is now entity-encoded
     // (escapeXml) before substitution, so a crafted </learner_raw_input>
@@ -1739,12 +1739,12 @@ describe('analyzeSessionTranscript', () => {
 
     await analyzeSessionTranscript(events, 'Biology', 'Cells', null);
 
-    const [messages] = mockRouteAndCall.mock.calls[0] as [
+    const [messages] = mockRouteAndCall.mock.calls[0]! as [
       { role: string; content: string }[],
     ];
     // The transcript body is sent as the user message (messages[1]), not
     // the system prompt (messages[0]).
-    const userMessage = messages[1].content;
+    const userMessage = messages[1]!.content;
 
     // The plain reply text must appear in the transcript block.
     expect(userMessage).toContain(

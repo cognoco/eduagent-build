@@ -268,7 +268,7 @@ describe('filingStrandedBackfill', () => {
       const eventData = (
         continueCall![1] as { data: { lastCreatedAt: string; lastId: string } }
       ).data;
-      const lastRow = rows[499];
+      const lastRow = rows[499]!;
       expect(eventData.lastCreatedAt).toBe(
         new Date(lastRow.createdAt).toISOString(),
       );

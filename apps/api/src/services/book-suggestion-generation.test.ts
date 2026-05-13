@@ -642,8 +642,8 @@ describe('generateCategorizedBookSuggestions', () => {
         ]),
       );
       const insertedTitles = (
-        mocks.insertValues.mock.calls[0] as Array<Array<{ title: string }>>
-      )[0].map((s) => s.title);
+        mocks.insertValues.mock.calls[0]! as Array<Array<{ title: string }>>
+      )[0]!.map((s) => s.title);
       expect(insertedTitles).toHaveLength(2);
       expect(insertedTitles).not.toContain('Ancient History Guide');
       expect(insertedTitles).not.toContain('Roman Empire Overview');
@@ -684,8 +684,8 @@ describe('generateCategorizedBookSuggestions', () => {
       await generateCategorizedBookSuggestions(db, PROFILE_ID, SUBJECT_ID);
 
       const insertedTitles = (
-        mocks.insertValues.mock.calls[0] as Array<Array<{ title: string }>>
-      )[0].map((s) => s.title);
+        mocks.insertValues.mock.calls[0]! as Array<Array<{ title: string }>>
+      )[0]!.map((s) => s.title);
       expect(insertedTitles).not.toContain('Ancient Rome History');
       expect(insertedTitles).toContain('Brand New Topic Here');
     });

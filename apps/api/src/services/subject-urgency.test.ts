@@ -9,7 +9,7 @@ import {
 // ---------------------------------------------------------------------------
 
 function createSubject(
-  overrides: Partial<SubjectUrgencyInput> & { subjectId: string }
+  overrides: Partial<SubjectUrgencyInput> & { subjectId: string },
 ): SubjectUrgencyInput {
   return {
     overdueRecallCount: 0,
@@ -88,9 +88,9 @@ describe('rankSubjectsByUrgency', () => {
 
     const ranked = rankSubjectsByUrgency(subjects);
 
-    expect(ranked[0].subjectId).toBe('high');
-    expect(ranked[1].subjectId).toBe('mid');
-    expect(ranked[2].subjectId).toBe('low');
+    expect(ranked[0]!.subjectId).toBe('high');
+    expect(ranked[1]!.subjectId).toBe('mid');
+    expect(ranked[2]!.subjectId).toBe('low');
   });
 
   it('breaks ties by totalTopics (larger first)', () => {
@@ -109,8 +109,8 @@ describe('rankSubjectsByUrgency', () => {
 
     const ranked = rankSubjectsByUrgency(subjects);
 
-    expect(ranked[0].subjectId).toBe('large');
-    expect(ranked[1].subjectId).toBe('small');
+    expect(ranked[0]!.subjectId).toBe('large');
+    expect(ranked[1]!.subjectId).toBe('small');
   });
 
   it('returns empty array for empty input', () => {
@@ -128,8 +128,8 @@ describe('rankSubjectsByUrgency', () => {
     const original = [...subjects];
     rankSubjectsByUrgency(subjects);
 
-    expect(subjects[0].subjectId).toBe(original[0].subjectId);
-    expect(subjects[1].subjectId).toBe(original[1].subjectId);
+    expect(subjects[0]!.subjectId).toBe(original[0]!.subjectId);
+    expect(subjects[1]!.subjectId).toBe(original[1]!.subjectId);
   });
 
   it('handles single subject', () => {
@@ -140,6 +140,6 @@ describe('rankSubjectsByUrgency', () => {
     const ranked = rankSubjectsByUrgency(subjects);
 
     expect(ranked).toHaveLength(1);
-    expect(ranked[0].subjectId).toBe('only');
+    expect(ranked[0]!.subjectId).toBe('only');
   });
 });

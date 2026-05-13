@@ -312,7 +312,7 @@ describe('trialExpiry', () => {
         .filter((e): e is Record<string, unknown> => e !== null)
         .filter((e) => e.message === 'billing.trial_expiry_failed');
       expect(errorEntries).toHaveLength(1);
-      const ctx = errorEntries[0].context as Record<string, unknown>;
+      const ctx = errorEntries[0]!.context as Record<string, unknown>;
       expect(ctx).toMatchObject({
         step: 'process-expired-trials',
         trialId: 'sub-fail',

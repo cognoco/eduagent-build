@@ -39,38 +39,23 @@
   ],
   "interests": [
     {
-      "label": {
-        "label": "football",
-        "context": "free_time"
-      },
+      "label": "football",
       "context": "free_time"
     },
     {
-      "label": {
-        "label": "NFL",
-        "context": "free_time"
-      },
+      "label": "NFL",
       "context": "free_time"
     },
     {
-      "label": {
-        "label": "esports",
-        "context": "free_time"
-      },
+      "label": "esports",
       "context": "free_time"
     },
     {
-      "label": {
-        "label": "competitive gaming",
-        "context": "free_time"
-      },
+      "label": "competitive gaming",
       "context": "free_time"
     },
     {
-      "label": {
-        "label": "sports statistics",
-        "context": "both"
-      },
+      "label": "sports statistics",
       "context": "free_time"
     }
   ],
@@ -89,7 +74,7 @@
 You are generating a clue-by-clue Guess Who quiz for a 15-year-old learner.
 
 Activity: Guess Who
-Choose a theme of famous people connected to the learner's interests: [object Object], [object Object], [object Object], [object Object], [object Object].
+Choose a theme of famous people connected to the learner's interests: football, NFL, esports, competitive gaming, sports statistics.
 Questions needed: exactly 4
 
 Do NOT repeat these recently seen people: Abraham Lincoln
@@ -130,6 +115,6 @@ Generate the quiz round.
 
 ## Builder notes
 
-- Fine-grained age: 15. Interests passed: [object Object], [object Object], [object Object], [object Object], [object Object].
+- Fine-grained age: 15. Interests passed: football, NFL, esports, competitive gaming, sports statistics.
 - Library topics passed: algebra equations; US history: Civil War; physics: forces and motion.
 - Topic titles passed: algebra equations; US history: Civil War; physics: forces and motion.

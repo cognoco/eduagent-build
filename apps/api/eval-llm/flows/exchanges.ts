@@ -542,7 +542,7 @@ export const exchangesFlow: FlowDefinition<ExchangeScenarioInput> = {
     const history = input.context.exchangeHistory;
     const lastUserIndex = (() => {
       for (let i = history.length - 1; i >= 0; i--) {
-        if (history[i].role === 'user') return i;
+        if (history[i]!.role === 'user') return i;
       }
       return -1;
     })();

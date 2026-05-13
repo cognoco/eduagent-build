@@ -64,7 +64,7 @@ describe('createLogger', () => {
       logger.info('hello');
 
       expect(captured.logs).toHaveLength(1);
-      const entry = parseEntry(captured.logs[0]);
+      const entry = parseEntry(captured.logs[0]!);
       expect(entry.level).toBe('info');
       expect(entry.message).toBe('hello');
       expect(typeof entry.timestamp).toBe('string');
@@ -77,7 +77,7 @@ describe('createLogger', () => {
 
       logger.info('with context', { userId: 'u1', action: 'login' });
 
-      const entry = parseEntry(captured.logs[0]);
+      const entry = parseEntry(captured.logs[0]!);
       expect(entry.context).toEqual({ userId: 'u1', action: 'login' });
     });
 
@@ -86,7 +86,7 @@ describe('createLogger', () => {
 
       logger.info('no context', {});
 
-      const entry = parseEntry(captured.logs[0]);
+      const entry = parseEntry(captured.logs[0]!);
       expect(entry.context).toBeUndefined();
     });
 
@@ -95,7 +95,7 @@ describe('createLogger', () => {
 
       logger.info('bare message');
 
-      const entry = parseEntry(captured.logs[0]);
+      const entry = parseEntry(captured.logs[0]!);
       expect(entry.context).toBeUndefined();
     });
   });
@@ -181,7 +181,7 @@ describe('createLogger', () => {
         } else {
           expect(totalEmitted).toBe(0);
         }
-      }
+      },
     );
   });
 });

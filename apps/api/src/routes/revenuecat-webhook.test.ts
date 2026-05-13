@@ -885,7 +885,7 @@ describe('SUBSCRIBER_ALIAS', () => {
         );
       expect(aliasLog.length).toBeGreaterThan(0);
 
-      const parsed = JSON.parse(aliasLog[0]) as {
+      const parsed = JSON.parse(aliasLog[0]!) as {
         level: string;
         message: string;
         context?: { appUserId?: unknown; transferredFrom?: unknown };

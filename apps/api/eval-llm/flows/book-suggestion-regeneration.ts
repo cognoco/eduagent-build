@@ -1,4 +1,5 @@
 import { buildPrompt } from '../../src/services/book-suggestion-generation';
+import { getTextContent } from '../../src/services/llm/types';
 import type { EvalProfile } from '../fixtures/profiles';
 import type { FlowDefinition, PromptMessages } from '../runner/types';
 import { callLlm } from '../runner/llm-bootstrap';
@@ -48,8 +49,8 @@ export const bookSuggestionRegenerationFlow: FlowDefinition<BookSuggestionRegene
       const userMsg = messages.find((m) => m.role === 'user');
 
       return {
-        system: systemMsg?.content ?? '',
-        user: userMsg?.content,
+        system: getTextContent(systemMsg?.content ?? ''),
+        user: userMsg ? getTextContent(userMsg.content) : undefined,
         notes: [
           `subjectName: ${input.subjectName}`,
           `studiedTopics: ${input.studiedTopics.length} (${input.studiedTopics.length === 0 ? 'all-explore path' : '2+2 split path'})`,
