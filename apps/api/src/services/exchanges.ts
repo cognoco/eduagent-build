@@ -7,6 +7,7 @@ import {
   KNOWN_MARKER_KEYS,
   teeEnvelopeStream,
 } from './llm';
+import { applyAppHelpSignalGuard, isAppHelpQuery } from './app-help-map';
 import { normalizeReplyText } from './llm/envelope';
 import type {
   ChatMessage,
@@ -340,25 +341,28 @@ export async function processExchange(
     profileId: context.profileId,
     flow: 'processExchange',
   });
+  const finalParsed = isAppHelpQuery(userMessage)
+    ? applyAppHelpSignalGuard(parsed)
+    : parsed;
 
   return {
-    response: parsed.cleanResponse,
+    response: finalParsed.cleanResponse,
     newEscalationRung: context.escalationRung,
-    isUnderstandingCheck: parsed.understandingCheck,
+    isUnderstandingCheck: finalParsed.understandingCheck,
     expectedResponseMinutes: estimateExpectedResponseMinutes(
-      parsed.cleanResponse,
+      finalParsed.cleanResponse,
       context,
     ),
-    needsDeepening: parsed.needsDeepening,
-    partialProgress: parsed.partialProgress,
+    needsDeepening: finalParsed.needsDeepening,
+    partialProgress: finalParsed.partialProgress,
     provider: result.provider,
     model: result.model,
     latencyMs: result.latencyMs,
-    notePrompt: parsed.notePrompt || undefined,
-    notePromptPostSession: parsed.notePromptPostSession || undefined,
-    fluencyDrill: parsed.fluencyDrill ?? undefined,
-    confidence: parsed.confidence,
-    retrievalScore: parsed.retrievalScore,
+    notePrompt: finalParsed.notePrompt || undefined,
+    notePromptPostSession: finalParsed.notePromptPostSession || undefined,
+    fluencyDrill: finalParsed.fluencyDrill ?? undefined,
+    confidence: finalParsed.confidence,
+    retrievalScore: finalParsed.retrievalScore,
   };
 }
 
@@ -437,6 +441,7 @@ export interface ParsedExchangeEnvelope {
    * don't have to re-parse the envelope a second time.
    */
   readyToFinish: boolean;
+  [key: string]: unknown;
 }
 
 const EMPTY_PARSED_ENVELOPE: ParsedExchangeEnvelope = {

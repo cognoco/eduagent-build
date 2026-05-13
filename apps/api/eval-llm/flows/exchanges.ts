@@ -22,6 +22,12 @@ import {
   substituteHistory,
   type HistoryTurn,
 } from '../fixtures/exchange-histories';
+import {
+  HISTORY_APP_HELP_MEMORY,
+  HISTORY_APP_HELP_MODES,
+  HISTORY_APP_HELP_NOTES,
+  HISTORY_APP_HELP_PREFERENCES,
+} from '../fixtures/exchange-histories-app-help';
 import type { FlowDefinition, PromptMessages, Scenario } from '../runner/types';
 
 // ---------------------------------------------------------------------------
@@ -314,6 +320,66 @@ const SCENARIO_SPECS: readonly ScenarioSpec[] = [
       exchangeCount: 0,
       effectiveMode: 'review',
       retentionStatus: { status: 'fading', daysSinceLastReview: 7 },
+    },
+    appliesTo: () => true,
+  },
+  {
+    id: 'S16-app-help-notes',
+    purpose: 'App-help: user asks where to find notes mid-session',
+    history: HISTORY_APP_HELP_NOTES,
+    contextOverrides: {
+      escalationRung: 1,
+      sessionType: 'learning',
+      verificationType: 'standard',
+      exchangeCount: 1,
+      isFirstEncounter: false,
+      isFirstSessionOfSubject: false,
+      retentionStatus: { status: 'new' },
+    },
+    appliesTo: () => true,
+  },
+  {
+    id: 'S17-app-help-preferences',
+    purpose: 'App-help: user asks how to change learning preferences',
+    history: HISTORY_APP_HELP_PREFERENCES,
+    contextOverrides: {
+      escalationRung: 1,
+      sessionType: 'learning',
+      verificationType: 'standard',
+      exchangeCount: 1,
+      isFirstEncounter: false,
+      isFirstSessionOfSubject: false,
+      retentionStatus: { status: 'new' },
+    },
+    appliesTo: () => true,
+  },
+  {
+    id: 'S18-app-help-modes',
+    purpose: 'App-help: user asks about Explorer vs Challenge mode',
+    history: HISTORY_APP_HELP_MODES,
+    contextOverrides: {
+      escalationRung: 1,
+      sessionType: 'learning',
+      verificationType: 'standard',
+      exchangeCount: 1,
+      isFirstEncounter: false,
+      isFirstSessionOfSubject: false,
+      retentionStatus: { status: 'new' },
+    },
+    appliesTo: () => true,
+  },
+  {
+    id: 'S19-app-help-memory',
+    purpose: 'App-help: user asks where to see mentor memory',
+    history: HISTORY_APP_HELP_MEMORY,
+    contextOverrides: {
+      escalationRung: 1,
+      sessionType: 'learning',
+      verificationType: 'standard',
+      exchangeCount: 1,
+      isFirstEncounter: false,
+      isFirstSessionOfSubject: false,
+      retentionStatus: { status: 'new' },
     },
     appliesTo: () => true,
   },
