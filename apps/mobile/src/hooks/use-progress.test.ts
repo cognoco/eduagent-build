@@ -411,6 +411,7 @@ describe('useProfileWeeklyReports', () => {
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({ reports: [{ id: 'not-a-uuid' }] }), {
         status: 200,
+        headers: { 'Content-Type': 'application/json' },
       }),
     );
 
