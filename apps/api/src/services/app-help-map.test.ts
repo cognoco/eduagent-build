@@ -148,9 +148,10 @@ describe('isAppHelpQuery', () => {
     'what is challenge mode',
     'where can I see what you remember',
     'how do I delete my account',
-    'Where can I see my progress?',
+    'Where can I find the progress tab?',
+    'How do I get to the progress screen?',
     'Where do I find the app settings?',
-    'Where can I see help?',
+    'Where is the Help & feedback section?',
   ])('classifies "%s" as app-help', (msg) => {
     expect(isAppHelpQuery(msg)).toBe(true);
   });
@@ -188,6 +189,9 @@ describe('isAppHelpQuery', () => {
     'Can you help me find the answer?',
     'How to use the formula',
     'What is the Explorer age of discovery?',
+    'Where can I see progress on this topic?',
+    'Where can I see my progress in the textbook?',
+    'Where can I find help with this calculus problem?',
   ])('does NOT classify "%s" as app-help', (msg) => {
     expect(isAppHelpQuery(msg)).toBe(false);
   });
