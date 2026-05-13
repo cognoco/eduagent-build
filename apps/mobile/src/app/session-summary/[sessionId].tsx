@@ -1173,11 +1173,11 @@ export default function SessionSummaryScreen() {
 
         {hasXpIncentive && showSubmittedView && reflectionBonusXp != null ? (
           <View
-            className="bg-success/10 rounded-card p-4 mb-4 flex-row items-center"
+            className="bg-reward-soft rounded-card p-4 mb-4 flex-row items-center"
             testID="xp-bonus-earned"
           >
             <Text className="text-body-sm mr-2">+</Text>
-            <Text className="text-body-sm font-semibold text-success">
+            <Text className="text-body-sm font-semibold text-reward">
               +{reflectionBonusXp} bonus XP earned!
             </Text>
           </View>
