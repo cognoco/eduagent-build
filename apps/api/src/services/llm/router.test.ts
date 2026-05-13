@@ -9,7 +9,7 @@ import {
   ANTHROPIC_SONNET_MODEL,
 } from './router';
 import { createMockProvider } from './providers/mock';
-import { makeChatStreamResult } from './types';
+import { getTextContent, makeChatStreamResult } from './types';
 import type {
   LLMProvider,
   ChatMessage,
@@ -899,7 +899,7 @@ describe('LLM Router', () => {
         pronouns: 'she/her',
       });
 
-      const system = receivedMessages[0]![0]!.content as string;
+      const system = getTextContent(receivedMessages[0]![0]!.content);
       expect(system).toContain(
         'Respond in Spanish unless the learner switches.',
       );

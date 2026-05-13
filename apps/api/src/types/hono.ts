@@ -13,7 +13,3 @@ export type AppVariables = {
   subscriptionId: string;
   llmTier: LLMTier;
 };
-
-export type AppEnv = {
-  Variables: AppVariables;
-};
