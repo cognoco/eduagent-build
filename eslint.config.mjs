@@ -417,7 +417,7 @@ export default [
   // their profile-scoping intent via a file-level `// @inngest-admin: <reason>`
   // annotation. The annotation forces conscious review whenever a function
   // touches the DB without scoped-repo isolation. Severity `warn` until the
-  // existing untagged backlog (~11 files) is reviewed individually — each
+  // existing untagged backlog (17 files) is reviewed individually — each
   // one needs an accurate reason (cross-profile vs. parent-chain) or a
   // refactor to use createScopedRepository.
   // See docs/_archive/plans/done/2026-05-03-governance-audit.md (item GC5).

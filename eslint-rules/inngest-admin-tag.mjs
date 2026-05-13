@@ -57,12 +57,18 @@ function isRawDbAccess(node) {
 }
 
 function hasAdminTagInLeadingComments(sourceCode) {
-  // Scan every comment in the file. The canonical placement is a line-1
-  // single-line comment (see daily-reminder-scan.ts), but legitimate files
-  // may have a copyright / JSDoc block above the tag. Comment counts are
-  // small and getAllComments() is O(n) — no reason to gate this by line.
-  const comments = sourceCode.getAllComments();
-  for (const c of comments) {
+  // Only count comments that sit at file-header scope — i.e. before the
+  // first top-level AST node. A tag buried inside a function body or an
+  // if-branch must not satisfy the rule; the canonical placement is a
+  // visible preamble (see daily-reminder-scan.ts:1).
+  //
+  // Empty file: no top-level node to anchor against. Treat as untagged —
+  // the rule will not fire because there are no raw-db sites either.
+  const firstNode = sourceCode.ast?.body?.[0];
+  const headerComments = firstNode
+    ? sourceCode.getCommentsBefore(firstNode)
+    : [];
+  for (const c of headerComments) {
     if (/@inngest-admin:\s*\S/.test(c.value)) return true;
   }
   return false;

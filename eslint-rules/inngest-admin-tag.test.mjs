@@ -140,6 +140,18 @@ const fn = async () => {
       ...nestedInngestFile,
       errors: [{ messageId: 'missingAdminTag' }],
     },
+    // Regression: a tag buried inside a function body must NOT count as
+    // a file-level declaration. The annotation has to be a visible
+    // preamble — anything inside top-level statement bodies is too hidden
+    // to act as documentation for the scoping decision.
+    {
+      code: `const fn = async () => {
+  // @inngest-admin: cross-profile
+  const x = await db.query.profiles.findFirst({});
+};`,
+      ...inngestFile,
+      errors: [{ messageId: 'missingAdminTag' }],
+    },
     // Regression: raw-db call lives inside a NESTED function body, not the
     // top-level arrow. The rule walks MemberExpression nodes globally, so
     // depth must not change the verdict.
