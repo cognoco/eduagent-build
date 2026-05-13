@@ -44,6 +44,7 @@ import {
 } from '../../services/notifications';
 import { getRecentNotificationCount } from '../../services/settings';
 import { captureException } from '../../services/sentry';
+import { buildEmailIdempotencyKey } from '../../services/dedupe-key';
 import { progressMetricsSchema } from '@eduagent/schemas';
 
 // [BUG-848] Validate the JSONB `metrics` column at runtime instead of casting.
@@ -471,7 +472,11 @@ export const monthlyReportGenerate = inngest.createFunction(
           );
           await sendEmail(emailPayload, {
             resendApiKey: getStepResendApiKey(),
-            idempotencyKey: `monthly-${parentId}-${reportResult.reportMonth}`,
+            idempotencyKey: buildEmailIdempotencyKey(
+              'monthly',
+              parentId,
+              reportResult.reportMonth,
+            ),
           });
         } else {
           // Expected: OAuth-only accounts or Clerk not exposing email field.

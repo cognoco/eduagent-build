@@ -85,6 +85,7 @@ import {
 } from './session-context-builders';
 import { projectAiResponseContent } from '../llm/project-response';
 import { isSubstantiveCalibrationAnswer } from './review-calibration';
+import { encodeDedupeSegment, joinDedupeKey } from '../dedupe-key';
 import {
   recordPracticeActivityEvent,
   type RecordPracticeActivityEventInput,
@@ -1721,7 +1722,10 @@ export async function persistExchangeResult(
       completedAt: now,
       sourceType: 'session_event',
       sourceId: aiEventId,
-      dedupeKey: `recitation:session_event:${aiEventId}`,
+      dedupeKey: joinDedupeKey(
+        ['recitation', 'session_event', encodeDedupeSegment(aiEventId)],
+        ':',
+      ),
       metadata: {
         sessionId,
         exchangeCount: updated.exchangeCount,

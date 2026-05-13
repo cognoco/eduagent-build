@@ -16,6 +16,7 @@ import {
 import { sendEmail } from '../../services/notifications';
 import { captureException } from '../../services/sentry';
 import { createLogger } from '../../services/logger';
+import { buildEmailIdempotencyKey } from '../../services/dedupe-key';
 
 const logger = createLogger();
 
@@ -102,14 +103,24 @@ export const feedbackDeliveryFailed = inngest.createFunction(
       // surfaces it in Sentry alerts if the rate becomes significant.
       let idempotencyKey: string;
       if (event.id) {
-        idempotencyKey = `feedback-delivery-failed:${profileId}:${event.id}:retry-delivery`;
+        idempotencyKey = buildEmailIdempotencyKey(
+          'feedback-delivery-failed',
+          profileId,
+          event.id,
+          'retry-delivery',
+        );
       } else {
         const hashInput = JSON.stringify({ profileId, category });
         const hash = createHash('sha256')
           .update(hashInput)
           .digest('hex')
           .slice(0, 16);
-        idempotencyKey = `feedback-delivery-failed:hash:${hash}:retry-delivery`;
+        idempotencyKey = buildEmailIdempotencyKey(
+          'feedback-delivery-failed',
+          'hash',
+          hash,
+          'retry-delivery',
+        );
         logger.warn(
           '[feedback-delivery-failed] event.id missing — falling back to payload hash idempotency key',
           {

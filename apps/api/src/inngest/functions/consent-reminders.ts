@@ -17,6 +17,7 @@ import {
   type EmailOptions,
 } from '../../services/notifications';
 import { deleteProfileIfNoConsent } from '../../services/deletion';
+import { buildEmailIdempotencyKey } from '../../services/dedupe-key';
 
 export const consentReminder = inngest.createFunction(
   { id: 'consent-reminder', name: 'Send consent reminder' },
@@ -33,9 +34,12 @@ export const consentReminder = inngest.createFunction(
     const emailOpts = (stepId: string): EmailOptions => ({
       resendApiKey: getStepResendApiKey(),
       emailFrom: getStepEmailFrom(),
-      idempotencyKey: `consent-reminder:${profileId}:${
-        event.id ?? 'no-event'
-      }:${stepId}`,
+      idempotencyKey: buildEmailIdempotencyKey(
+        'consent-reminder',
+        profileId,
+        event.id ?? 'no-event',
+        stepId,
+      ),
     });
 
     /** Look up parentEmail and consentToken from the DB (never from event payload — PII). */
