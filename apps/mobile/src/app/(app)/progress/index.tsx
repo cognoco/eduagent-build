@@ -177,19 +177,21 @@ export default function ProgressScreen(): React.ReactElement {
     ? rawRequestedProfileId[0]
     : rawRequestedProfileId;
 
-  const [selectedProfileId, setSelectedProfileId] = useState<string>(
-    () =>
-      requestedProfileId ??
-      (hasLinked ? linkedChildren[0]?.id : activeProfile?.id) ??
-      '',
-  );
+  const [selectedProfileId, setSelectedProfileId] = useState<string>(() => {
+    const knownRequestedProfileId =
+      requestedProfileId &&
+      (requestedProfileId === activeProfile?.id ||
+        linkedChildren.some((child) => child.id === requestedProfileId));
+    if (knownRequestedProfileId) return requestedProfileId;
+    return (hasLinked ? linkedChildren[0]?.id : activeProfile?.id) ?? '';
+  });
 
   useEffect(() => {
     if (!requestedProfileId) return;
     const knownTarget =
       requestedProfileId === activeProfile?.id ||
       linkedChildren.some((child) => child.id === requestedProfileId);
-    if (knownTarget || linkedChildren.length === 0) {
+    if (knownTarget) {
       setSelectedProfileId(requestedProfileId);
     }
   }, [requestedProfileId, activeProfile?.id, linkedChildren]);

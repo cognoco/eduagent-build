@@ -603,6 +603,23 @@ describe('ProgressScreen — progressive disclosure', () => {
     });
   });
 
+  it('ignores an unknown requested child profile when no child link is known', () => {
+    mockSearchParams = { profileId: 'foreign-child' };
+    mockHooks({
+      inventory: {
+        global: { ...baseGlobal, totalSessions: 2 },
+        subjects: [fullSubject],
+      },
+    });
+
+    render(<ProgressScreen />);
+
+    expect(useChildInventory).toHaveBeenCalledWith(undefined, {
+      enabled: false,
+    });
+    screen.getByText('2 sessions completed');
+  });
+
   it('shows full view when totalSessions is 1 with subjects', () => {
     mockHooks({
       inventory: {
