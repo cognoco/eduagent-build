@@ -246,6 +246,7 @@ function ChildCommandCard({
   dashboardChild,
   highlight,
   onOpenProfile,
+  onOpenProgress,
   onOpenReports,
   onOpenNudge,
   t,
@@ -254,6 +255,7 @@ function ChildCommandCard({
   dashboardChild: DashboardChild | undefined;
   highlight: boolean;
   onOpenProfile: () => void;
+  onOpenProgress: () => void;
   onOpenReports: () => void;
   onOpenNudge: () => void;
   t: Translate;
@@ -291,6 +293,12 @@ function ChildCommandCard({
       </Pressable>
 
       <View className="flex-row gap-2 mt-4">
+        <ChildActionButton
+          icon="stats-chart-outline"
+          label={t('home.parent.childCard.progressAction')}
+          onPress={onOpenProgress}
+          testID={`parent-home-child-progress-${child.id}`}
+        />
         <ChildActionButton
           icon="document-text-outline"
           label={t('home.parent.childCard.reportsAction')}
@@ -613,6 +621,7 @@ export function ParentHomeScreen({
               dashboardChild={findDashboardChild(dashboard, child.id)}
               highlight={index === 0}
               onOpenProfile={() => pushChildProfile(child.id)}
+              onOpenProgress={() => pushChildProgress(child.id)}
               onOpenReports={() => pushChildReports(child.id)}
               onOpenNudge={() => setSheetChildId(child.id)}
               t={t}
