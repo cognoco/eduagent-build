@@ -1,6 +1,6 @@
 # Consistency Cleanup Plan
 
-**Last updated:** 2026-05-12 UTC (post-bake-off Archon runs PR-14/PR-15a partial-delivered; PR-11 closed unmerged; governance-constraints doc now drives plan annotations — see DEV-007)
+**Last updated:** 2026-05-13 UTC (post-bake-off Archon runs PR-14/PR-15a partial-delivered; PR-11 closed unmerged; governance-constraints doc now drives plan annotations — see DEV-007; C9 cluster PR-25/PR-27/PR-29 closed 2026-05-13)
 **Branch:** `consistency2`
 **Replaces:** `docs/audit/2026-05-02-artefact-consistency-punchlist.md` (superseded; preserved as historical record only)
 **Maintained by:** `/my:audit-status` skill (read mode refreshes PR/file claims; deviation mode appends to Deviations Log)

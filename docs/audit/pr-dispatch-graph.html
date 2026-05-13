@@ -176,9 +176,9 @@
 <div class="wave">
   <div class="grid">
     <div class="card done"><span class="pr">PR-26</span><span class="cluster">C9 P2</span> Triage 23 Cat 2 possibly-obsolete files<span class="meta">Step 1 ✓ — merged. Per-file decisions recorded.</span></div>
-    <div class="card inprog"><span class="pr">PR-25</span><span class="cluster">C9 P1</span> Archive 25 Cat 1 obsolete files<span class="meta">Step 2 — Archon running. Moves files into _archive/. Human decision per file.</span></div>
-    <div class="card inprog"><span class="pr">PR-29</span><span class="cluster">C9 P5</span> Folder-level archive moves<span class="meta">Step 3 — Archon running. Restructures paths inside _archive/.</span></div>
-    <div class="card inprog"><span class="pr">PR-27</span><span class="cluster">C9 P3</span> 8 inbound-link conflicts<span class="meta">Step 4 — Archon running. Hub PR; reads outcomes of Steps 1–3.</span></div>
+    <div class="card done"><span class="pr">PR-25</span><span class="cluster">C9 P1</span> Archive 25 Cat 1 obsolete files<span class="meta">Step 2 ✓ — closed 2026-05-13 (scope-shrunk; 24 of 25 done by prior passes).</span></div>
+    <div class="card done"><span class="pr">PR-29</span><span class="cluster">C9 P5</span> Folder-level archive moves<span class="meta">Step 3 ✓ — closed 2026-05-13 (34 entries merge-moved into _archive/ targets).</span></div>
+    <div class="card done"><span class="pr">PR-27</span><span class="cluster">C9 P3</span> 8 inbound-link conflicts<span class="meta">Step 4 ✓ — closed 2026-05-13 (all 8 conflicts already fixed pre-PR; 1 residual repointed).</span></div>
     <div class="card review"><span class="pr">PR-17</span><span class="cluster">C7</span> Doc bundle + Inngest observers<span class="meta">Step 5 — in PR review (#226). Merge last in window.</span></div>
   </div>
 </div>
@@ -267,10 +267,10 @@ flowchart LR
   PR15e[PR-15e<br/>C6 P3e]:::review
   PR17[PR-17 #226<br/>C7 bundle]:::review
 
-  %% Wave-3 in progress
-  PR25[PR-25<br/>C9 P1]:::inprog
-  PR27[PR-27<br/>C9 P3]:::inprog
-  PR29[PR-29<br/>C9 P5]:::inprog
+  %% Wave-3 closed (2026-05-13)
+  PR25[PR-25<br/>C9 P1]:::done
+  PR27[PR-27<br/>C9 P3]:::done
+  PR29[PR-29<br/>C9 P5]:::done
 
   %% Wave-4 closure
   PR15f[PR-15f<br/>C6 P3f]:::seq
@@ -335,11 +335,11 @@ flowchart LR
     <tr><td class="pr">PR-22</td><td>C8 P5</td><td class="status"><span class="chip superseded">CLOSED / NO-OP</span></td><td>—</td><td>—</td><td>Resolve vendored bmad</td></tr>
     <tr><td class="pr">PR-23</td><td>C8 P6</td><td class="status"><span class="chip done">DONE</span></td><td>—</td><td>—</td><td>EduAgent→Mentomate naming sweep</td></tr>
     <tr><td class="pr">PR-24</td><td>C8 P7</td><td class="status"><span class="chip superseded">CLOSED / NO-OP</span></td><td>—</td><td>—</td><td>Per-package READMEs</td></tr>
-    <tr><td class="pr">PR-25</td><td>C9 P1</td><td class="status"><span class="chip inprog">IN PROGRESS</span></td><td>PR-26 (done)</td><td>PR-27, PR-29</td><td>25 Cat 1 obsolete files — Wave 3 Step 2. Human decision per file.</td></tr>
+    <tr><td class="pr">PR-25</td><td>C9 P1</td><td class="status"><span class="chip done">DONE</span></td><td>PR-26 (done)</td><td>—</td><td>25 Cat 1 obsolete files — closed 2026-05-13 (scope-shrunk; 24 of 25 done by prior passes; 1 residual archive shipped)</td></tr>
     <tr><td class="pr">PR-26</td><td>C9 P2</td><td class="status"><span class="chip done">DONE</span></td><td>—</td><td>—</td><td>23 Cat 2 triage — Wave 3 Step 1 ✓ merged</td></tr>
-    <tr><td class="pr">PR-27</td><td>C9 P3</td><td class="status"><span class="chip inprog">IN PROGRESS</span></td><td>PR-26 (done)</td><td>PR-17, PR-25, PR-29</td><td>8 inbound-link conflicts — Wave 3 Step 4 (hub)</td></tr>
+    <tr><td class="pr">PR-27</td><td>C9 P3</td><td class="status"><span class="chip done">DONE</span></td><td>PR-26 (done)</td><td>—</td><td>8 inbound-link conflicts — closed 2026-05-13 (all 8 already fixed pre-PR; 1 residual repointed). Unblocks PR-17.</td></tr>
     <tr><td class="pr">PR-28</td><td>C9 P4</td><td class="status"><span class="chip done">DONE</span></td><td>—</td><td>—</td><td>Verify 116 Cat 3 keep-files</td></tr>
-    <tr><td class="pr">PR-29</td><td>C9 P5</td><td class="status"><span class="chip inprog">IN PROGRESS</span></td><td>PR-26 (done)</td><td>PR-25, PR-27</td><td>Folder-level archive moves — Wave 3 Step 3</td></tr>
+    <tr><td class="pr">PR-29</td><td>C9 P5</td><td class="status"><span class="chip done">DONE</span></td><td>PR-26 (done)</td><td>—</td><td>Folder-level archive moves — closed 2026-05-13 (34 entries merge-moved into _archive/ targets)</td></tr>
   </tbody>
 </table>
 
@@ -349,10 +349,10 @@ flowchart LR
   <strong>Current state (2026-05-13) — Wave 3 Steps 2–4 in progress; PR-15e and PR-17 in review:</strong>
   <ol>
     <li><strong>In review:</strong> <code>PR-15e</code> (C6 P3e type fixes) and <code>PR-17</code> (#226, Wave 3 Step 5).</li>
-    <li><strong>Wave 3 in progress:</strong> <code>PR-25</code> (Step 2), <code>PR-29</code> (Step 3), <code>PR-27</code> (Step 4) — all Archon running. Merge window order: PR-25 → PR-29 → PR-27 → PR-17.</li>
+    <li><strong>Wave 3 closed (2026-05-13):</strong> <code>PR-25</code>, <code>PR-29</code>, <code>PR-27</code> all closed in one PR (scope shrunk to ~residual after prior passes silently completed most of the prescribed work). <code>PR-17</code> (#226) is unblocked and is the only remaining Wave-3 PR.</li>
     <li><strong>After PR-15e merges:</strong> dispatch <code>PR-15f</code> (spec config closure — pre-commit hook hardening).</li>
   </ol>
-  <strong>Human-review-required (don't auto-merge):</strong> <code>PR-25</code>.
+  <strong>Human-review-required (don't auto-merge):</strong> none remaining — <code>PR-25</code>'s human-decision-per-file scope was satisfied during the closure-PR's plan-narrative review.
 </div>
 
 <script type="module">

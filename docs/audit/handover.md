@@ -132,9 +132,9 @@ PR #237 contains the same set, cherry-picked clean off `origin/main`.
 - `.claude/memory/project_schema_drift_pattern.md` — new "Predecessor notes" section
 - `docs/audit/claude-optimization/memory-overlap-flags.md` — ghost reference removed
 - `_bmad/README.md` — new (documents shim → `_bmad/` source architecture)
-- `docs/plans/2026-04-15-S06-rls-phase-0-1-preparatory.md` → `docs/plans/done/2026-04-15-S06-rls-phase-0-1-preparatory.md` (rename)
-- `docs/plans/2026-04-15-S06-rls-phase-2-4-enforcement.md` — Prerequisite line updated to `done/` path
-- `packages/database/src/{client,rls.test,rls.integration.test}.ts` — three `Ref:` comments updated to `done/` path
+- `docs/plans/2026-04-15-S06-rls-phase-0-1-preparatory.md` → `docs/_archive/plans/done/2026-04-15-S06-rls-phase-0-1-preparatory.md` (rename; first to `done/` in #237, then to `_archive/plans/done/` in C9-closure PR)
+- `docs/plans/2026-04-15-S06-rls-phase-2-4-enforcement.md` — Prerequisite line updated (now points at `_archive/plans/done/` path post-C9-closure)
+- `packages/database/src/{client,rls.test,rls.integration.test}.ts` — three `Ref:` comments first updated to `done/` path in #237, then repointed to `_archive/plans/done/` in the C9-closure PR
 - 30 files swept for `EduAgent` → `MentoMate` (PR-23) — includes most active docs under `docs/**`
 
 **If your work touches any of the above, expect the file to already contain closure notes from last session. Strikethrough/append patterns are documented under "Conventions" below.**
