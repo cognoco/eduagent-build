@@ -409,7 +409,11 @@ export function ParentHomeScreen({
     router.push({
       pathname: '/create-profile',
       params: { for: 'child' },
-    } as never);
+    } as Href);
+  }, [router]);
+
+  const navigateToSubscription = useCallback(() => {
+    router.push('/(app)/subscription' as Href);
   }, [router]);
 
   const handleAddChild = useCallback(() => {
@@ -430,7 +434,7 @@ export function ParentHomeScreen({
         [
           {
             text: t('more.family.viewPlans'),
-            onPress: () => router.push('/(app)/subscription'),
+            onPress: navigateToSubscription,
           },
           { text: t('common.cancel'), style: 'cancel' },
         ],
@@ -448,7 +452,7 @@ export function ParentHomeScreen({
           ? [
               {
                 text: t('more.family.viewPlans'),
-                onPress: () => router.push('/(app)/subscription'),
+                onPress: navigateToSubscription,
               },
               { text: t('common.cancel'), style: 'cancel' },
             ]
@@ -461,25 +465,27 @@ export function ParentHomeScreen({
     hasNoLinkedChildren,
     subscription,
     familyData,
-    router,
     t,
     navigateToCreateChildProfile,
+    navigateToSubscription,
   ]);
 
-  function pushChildDetail(childProfileId: string): void {
-    router.push(`/(app)/child/${childProfileId}` as Href);
-  }
+  const pushChildProgress = useCallback(
+    (childProfileId: string): void => {
+      router.push({
+        pathname: '/(app)/progress',
+        params: { profileId: childProfileId },
+      } as Href);
+    },
+    [router],
+  );
 
-  function pushChildProgress(childProfileId: string): void {
-    router.push({
-      pathname: '/(app)/progress',
-      params: { profileId: childProfileId },
-    } as Href);
-  }
-
-  function pushChildReports(childProfileId: string): void {
-    router.push(`/(app)/child/${childProfileId}/reports` as Href);
-  }
+  const pushChildReports = useCallback(
+    (childProfileId: string): void => {
+      router.push(`/(app)/child/${childProfileId}/reports` as Href);
+    },
+    [router],
+  );
 
   const parentInitial = initialOf(activeProfile?.displayName ?? firstName);
 
@@ -539,7 +545,7 @@ export function ParentHomeScreen({
                 (prompt) => (
                   <Pressable
                     key={`tonight-${prompt.key}`}
-                    onPress={() => pushChildDetail(prompt.childId)}
+                    onPress={() => pushChildProgress(prompt.childId)}
                     className="flex-row items-center py-2.5"
                     style={
                       Platform.OS === 'web' ? { cursor: 'pointer' } : undefined

@@ -103,7 +103,9 @@ test('J-10 learner → Practice → Quiz → launch → play → results → hom
       continue;
     }
 
-    await pressableClick(quizScreen);
+    throw new Error(
+      'None of quiz-results-screen, quiz-final-see-results, or quiz-next-question were visible after answer feedback.',
+    );
   }
 
   // Results screen
