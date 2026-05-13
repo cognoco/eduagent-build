@@ -46,6 +46,19 @@ const fn = async () => {
 };`,
       ...inngestFile,
     },
+    // Inngest file with the canonical real-world layout: tag on line 1,
+    // imports follow. The first AST node is the import statement, so
+    // getCommentsBefore(firstNode) must still find the line-1 comment.
+    {
+      code: `// @inngest-admin: cross-profile
+import { inngest } from '../client';
+import { getStepDatabase } from '../helpers';
+const fn = async () => {
+  const db = getStepDatabase();
+  const x = await db.query.profiles.findFirst({});
+};`,
+      ...inngestFile,
+    },
     // Inngest file that imports createScopedRepository (uses scoped pattern)
     {
       code: `import { createScopedRepository } from '../../services/scope';

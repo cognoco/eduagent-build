@@ -41,6 +41,13 @@ const RAW_DB_METHODS = new Set([
   'transaction',
 ]);
 
+// KNOWN LIMITATION: only the literal `db` identifier name is detected.
+// An aliased import like `import { db as database }` followed by
+// `database.select(...)` is a silent false-negative. The repo convention
+// is `const db = getStepDatabase()` (no aliasing); breaking that convention
+// would also bypass several other governance rules, so this gap is
+// acceptable for now. If aliasing becomes common, swap this for an
+// ImportDeclaration walk that resolves the local name of @eduagent/database.
 function isRawDbAccess(node) {
   // Pattern A: db.<method>(...)  or  db.<method>.<chain>
   // node is MemberExpression with object `db` and property in RAW_DB_METHODS.

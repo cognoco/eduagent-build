@@ -134,6 +134,12 @@ function commentHasGc4Allow(sourceCode, node) {
   return false;
 }
 
+// KNOWN LIMITATION: only `router.push(...)` is detected. Destructured
+// (`const { push } = useRouter(); push(...)`) and chained (`useRouter().push(...)`)
+// forms are silent false-negatives. The repo convention is the
+// `router.push` member-call form (see the H7 typed-navigate effort in the
+// 2026-05-03 governance audit). Widening this check would require scope
+// analysis; defer until the H7 sweep replaces these call sites entirely.
 function isRouterPush(callee) {
   return (
     callee &&
