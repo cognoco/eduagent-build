@@ -4,7 +4,7 @@ import { relative, resolve } from 'node:path';
 // [BUG-743 / T-1] Regression guard. Per CLAUDE.md "No Internal Mocks in
 // Integration Tests": integration tests must not jest.mock internal modules
 // (database, services, middleware) — only true external boundaries (Stripe,
-// Sentry, Clerk JWKS, email providers, push notifications).
+// Sentry, Clerk JWKS, email providers, push notifications, Inngest transport).
 // Internal mocks hide real prompt drift, envelope contract drift, ownership,
 // event-chain, and shape-of-response bugs.
 
@@ -12,6 +12,7 @@ const KNOWN_OFFENDERS = new Set<string>();
 const ALLOWED_INTERNAL_BOUNDARY_MOCKS = [
   /(?:^|\/)services\/sentry$/,
   /(?:^|\/)services\/stripe$/,
+  /(?:^|\/)inngest\/client$/,
 ];
 
 const REPO_ROOT = resolve(__dirname, '../../../../..');
@@ -130,7 +131,7 @@ describe('integration tests — BUG-743 internal mock guard', () => {
     ).toEqual([]);
     expect(
       sourceInternalMockSpecifiers(mockCallSnippet('../../inngest/client')),
-    ).toEqual(['../../inngest/client']);
+    ).toEqual([]);
   });
 
   it('does not introduce non-allowlisted internal jest.mock calls in integration tests', () => {

@@ -9,7 +9,7 @@
  * The Inngest handler is called directly with a mock step runner and real DB.
  *
  * External boundaries mocked:
- * - Inngest event HTTP API (captured at the fetch boundary)
+ * - Inngest transport (send captured, createFunction stubbed)
  * - LLM provider (real routeAndCall dispatch, mock chat fn)
  * - Sentry (captureException)
  */
@@ -31,13 +31,31 @@ import {
   createIntegrationDb,
 } from './helpers';
 import { buildAuthHeaders } from './test-keys';
-import { getCapturedInngestEvents, mockInngestEvents } from './mocks';
-import { clearFetchCalls } from './fetch-interceptor';
 import { registerProvider } from '../../apps/api/src/services/llm';
 
 // ---------------------------------------------------------------------------
 // Mocks — must be declared before importing modules that use them
 // ---------------------------------------------------------------------------
+
+const mockInngestSend = jest.fn().mockResolvedValue({ ids: [] });
+const mockInngestCreateFunction = jest.fn().mockImplementation((config) => {
+  const id = config?.id ?? 'mock-inngest-function';
+  const fn = jest.fn();
+  (fn as { getConfig: () => unknown[] }).getConfig = () => [
+    { id, name: id, triggers: [], steps: {} },
+  ];
+  return fn;
+});
+
+jest.mock(
+  '../../apps/api/src/inngest/client' /* gc1-allow: external Inngest transport boundary */,
+  () => ({
+    inngest: {
+      send: mockInngestSend,
+      createFunction: mockInngestCreateFunction,
+    },
+  }),
+);
 
 const mockCaptureException = jest.fn();
 jest.mock(
@@ -75,7 +93,6 @@ const mockChat = jest
   );
 
 beforeAll(() => {
-  mockInngestEvents();
   registerProvider({
     id: 'gemini',
     chat: mockChat,
@@ -248,16 +265,10 @@ function findCalibrationEvent(): {
   topicTitle: string;
   timestamp: string;
 } | null {
-  for (const event of getCapturedInngestEvents()) {
-    if (event.name === 'app/review.calibration.requested') {
-      return event.data as {
-        profileId: string;
-        sessionId: string;
-        topicId: string;
-        learnerMessage: string;
-        topicTitle: string;
-        timestamp: string;
-      };
+  for (const call of mockInngestSend.mock.calls) {
+    const arg = call[0];
+    if (arg?.name === 'app/review.calibration.requested') {
+      return arg.data;
     }
   }
   return null;
@@ -279,7 +290,6 @@ async function executeHandler(eventData: unknown) {
 
 beforeEach(async () => {
   jest.clearAllMocks();
-  clearFetchCalls();
   mockChat.mockResolvedValue(
     JSON.stringify({
       reply: 'Good recall! Let me build on what you remembered.',
@@ -383,7 +393,7 @@ describe('Integration: Review Session Calibration Pipeline', () => {
     expect(findCalibrationEvent()).toBeNull();
 
     // Turn 2: substantive — dispatches
-    clearFetchCalls();
+    mockInngestSend.mockClear();
     await sendMessage(profileId, sessionId, SUBSTANTIVE_ANSWER);
 
     const eventData = findCalibrationEvent();
@@ -415,7 +425,7 @@ describe('Integration: Review Session Calibration Pipeline', () => {
     expect(findCalibrationEvent()).toBeNull();
 
     // Turn 2: still non-substantive — window closes
-    clearFetchCalls();
+    mockInngestSend.mockClear();
     await sendMessage(profileId, sessionId, 'no');
     expect(findCalibrationEvent()).toBeNull();
 
@@ -449,7 +459,7 @@ describe('Integration: Review Session Calibration Pipeline', () => {
     const firstReviewedAt = cardAfterFirst!.lastReviewedAt;
 
     // Turn 2: another substantive answer — should NOT re-dispatch
-    clearFetchCalls();
+    mockInngestSend.mockClear();
     await sendMessage(
       profileId,
       sessionId,

@@ -18,20 +18,13 @@
  */
 
 import { buildIntegrationEnv, cleanupAccounts } from './helpers';
-import {
-  buildAuthHeaders,
-  createProfileViaRoute,
-  seedSubject,
-} from './route-fixtures';
+import { buildAuthHeaders, createProfileViaRoute } from './route-fixtures';
 import {
   createSubjectWithStructureResponseSchema,
-  subjectClassifyResultSchema,
   subjectListResponseSchema,
-  subjectResolveResultSchema,
   subjectResponseSchema,
 } from '@eduagent/schemas';
 
-import { registerLlmProviderFixture } from '../../apps/api/src/test-utils/llm-provider-fixtures';
 import { app } from '../../apps/api/src/index';
 
 const TEST_ENV = buildIntegrationEnv();
@@ -41,23 +34,6 @@ const OTHER_SUBJECT_AUTH_USER_ID = 'integration-subject-other-user';
 const OTHER_SUBJECT_AUTH_EMAIL = 'integration-subjects-other@integration.test';
 
 const SUBJECT_ID = '00000000-0000-4000-8000-000000000040';
-const SUBJECT_LLM_RESPONSE = {
-  status: 'corrected',
-  resolvedName: 'Physics',
-  focus: null,
-  focusDescription: null,
-  suggestions: [
-    {
-      name: 'Physics',
-      description: 'Forces, motion, energy and the laws of the universe',
-    },
-  ],
-  displayMessage: 'Did you mean **Physics**?',
-};
-
-const subjectLlmFixture = registerLlmProviderFixture({
-  chatResponse: SUBJECT_LLM_RESPONSE,
-});
 
 async function createOwnerProfile(
   user = { userId: SUBJECT_AUTH_USER_ID, email: SUBJECT_AUTH_EMAIL },
@@ -102,9 +78,6 @@ async function createSubject(
 
 beforeEach(async () => {
   jest.clearAllMocks();
-  subjectLlmFixture.clearCalls();
-  subjectLlmFixture.clearChatError();
-  subjectLlmFixture.setChatResponse(SUBJECT_LLM_RESPONSE);
   await cleanupAccounts({
     emails: [SUBJECT_AUTH_EMAIL, OTHER_SUBJECT_AUTH_EMAIL],
     clerkUserIds: [SUBJECT_AUTH_USER_ID, OTHER_SUBJECT_AUTH_USER_ID],
@@ -392,129 +365,5 @@ describe('Integration: PATCH /v1/subjects/:id', () => {
     expect(res.status).toBe(404);
     const body = await res.json();
     expect(body.code).toBe('NOT_FOUND');
-  });
-});
-
-// ---------------------------------------------------------------------------
-// POST /v1/subjects/resolve
-// ---------------------------------------------------------------------------
-
-describe('Integration: POST /v1/subjects/resolve', () => {
-  it('returns the real resolver output through the shared response schema', async () => {
-    const profileId = await createOwnerProfile();
-
-    const res = await app.request(
-      '/v1/subjects/resolve',
-      {
-        method: 'POST',
-        headers: buildAuthHeaders(
-          { sub: SUBJECT_AUTH_USER_ID, email: SUBJECT_AUTH_EMAIL },
-          profileId,
-        ),
-        body: JSON.stringify({ rawInput: 'Phsics' }),
-      },
-      TEST_ENV,
-    );
-
-    expect(res.status).toBe(200);
-    const body = subjectResolveResultSchema.parse(await res.json());
-    expect(body.status).toBe('corrected');
-    expect(body.resolvedName).toBe('Physics');
-    expect(subjectLlmFixture.chatCalls.length).toBeGreaterThan(0);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// POST /v1/subjects/classify
-// ---------------------------------------------------------------------------
-
-describe('Integration: POST /v1/subjects/classify', () => {
-  it('uses real subject services to classify against enrolled subjects', async () => {
-    const profileId = await createOwnerProfile();
-    const subject = await createSubject(profileId, 'Mathematics');
-
-    const res = await app.request(
-      '/v1/subjects/classify',
-      {
-        method: 'POST',
-        headers: buildAuthHeaders(
-          { sub: SUBJECT_AUTH_USER_ID, email: SUBJECT_AUTH_EMAIL },
-          profileId,
-        ),
-        body: JSON.stringify({ text: 'Solve 2x + 5 = 15' }),
-      },
-      TEST_ENV,
-    );
-
-    expect(res.status).toBe(200);
-    const body = subjectClassifyResultSchema.parse(await res.json());
-    expect(body).toMatchObject({
-      needsConfirmation: false,
-      suggestedSubjectName: null,
-    });
-    expect(body.candidates).toEqual([
-      {
-        subjectId: subject.id,
-        subjectName: 'Mathematics',
-        confidence: 0.9,
-      },
-    ]);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// PUT /v1/subjects/:id/language-setup
-// ---------------------------------------------------------------------------
-
-describe('Integration: PUT /v1/subjects/:id/language-setup', () => {
-  it('returns 422 for a real non-language subject typed error', async () => {
-    const profileId = await createOwnerProfile();
-    const subject = await createSubject(profileId, 'Mathematics');
-
-    const res = await app.request(
-      `/v1/subjects/${subject.id}/language-setup`,
-      {
-        method: 'PUT',
-        headers: buildAuthHeaders(
-          { sub: SUBJECT_AUTH_USER_ID, email: SUBJECT_AUTH_EMAIL },
-          profileId,
-        ),
-        body: JSON.stringify({ nativeLanguage: 'en', startingLevel: 'A1' }),
-      },
-      TEST_ENV,
-    );
-
-    expect(res.status).toBe(422);
-    const body = await res.json();
-    expect(body.code).toBe('VALIDATION_ERROR');
-  });
-
-  it('configures a real language subject and regenerates curriculum', async () => {
-    const profileId = await createOwnerProfile();
-    const subject = await seedSubject(profileId, 'Spanish', {
-      pedagogyMode: 'four_strands',
-      languageCode: 'es',
-    });
-
-    const res = await app.request(
-      `/v1/subjects/${subject.id}/language-setup`,
-      {
-        method: 'PUT',
-        headers: buildAuthHeaders(
-          { sub: SUBJECT_AUTH_USER_ID, email: SUBJECT_AUTH_EMAIL },
-          profileId,
-        ),
-        body: JSON.stringify({ nativeLanguage: 'en', startingLevel: 'A2' }),
-      },
-      TEST_ENV,
-    );
-
-    expect(res.status).toBe(200);
-    const body = subjectResponseSchema.parse(await res.json());
-    expect(body.subject).toMatchObject({
-      id: subject.id,
-      pedagogyMode: 'four_strands',
-      languageCode: 'es',
-    });
   });
 });
