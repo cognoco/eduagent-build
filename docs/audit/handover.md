@@ -150,7 +150,7 @@ Added by last session:
 
 - **AUDIT-TS6307-EVAL-LLM-FLOWS** — cosmetic TS6307 noise on `apps/api/eval-llm/flows/*` includes. Fix only if it ever becomes annoying; extend `apps/api/tsconfig.spec.json` `include` to cover `eval-llm/**` and re-grep.
 - **AUDIT-EXTREFS-2-RESIDUAL** — 8 out-of-scope files still contain `EduAgent` brand strings (not in PR-23's scope): `AGENTS.md`, `scripts/embedding-benchmark.ts`, `apps/mobile/e2e/README.md`, `design_handoff_ui_improvements/{UI improvements.html,README.md}`, `docs/audit/pr-dispatch-graph.html`, `docs/visual-artefacts/{data/atlas-data.js,cleanup-plan-dependency-flow.html}`. Not user-facing brand surfaces.
-- **AUDIT-RLS-1.3-VERIFY** — Phase 1.3 of `docs/plans/done/2026-04-15-S06-rls-phase-0-1-preparatory.md` was never re-run after the PR #126 driver swap. Run `SELECT tablename, rowsecurity FROM pg_tables WHERE schemaname = 'public'` against staging and prod, confirm all RLS-enabled tables show `t`, document inline.
+- **AUDIT-RLS-1.3-VERIFY** — Phase 1.3 of `docs/_archive/plans/done/2026-04-15-S06-rls-phase-0-1-preparatory.md` was never re-run after the PR #126 driver swap. Run `SELECT tablename, rowsecurity FROM pg_tables WHERE schemaname = 'public'` against staging and prod, confirm all RLS-enabled tables show `t`, document inline.
 
 ---
 
