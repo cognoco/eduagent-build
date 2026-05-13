@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { i18next } from '../../../i18n';
@@ -118,7 +118,7 @@ export default function QuizLaunchScreen(): React.ReactElement {
     (round: QuizRoundResponse) => {
       setRound(round);
       setChallengeRound(null);
-      router.replace('/(app)/quiz/play' as never);
+      router.replace('/(app)/quiz/play' as Href);
     },
     [router, setRound],
   );
@@ -173,7 +173,7 @@ export default function QuizLaunchScreen(): React.ReactElement {
 
   useEffect(() => {
     if (!effectiveActivityType) {
-      router.replace('/(app)/quiz' as never);
+      router.replace('/(app)/quiz' as Href);
       return;
     }
     if (startedRef.current) return;
@@ -285,7 +285,7 @@ export default function QuizLaunchScreen(): React.ReactElement {
           }}
           secondaryAction={{
             label: t('common.goBack'),
-            onPress: () => router.replace(exitHref as never),
+            onPress: () => router.replace(exitHref as Href),
             testID: 'quiz-launch-back',
           }}
           testID="quiz-launch-error-fallback"
@@ -340,7 +340,7 @@ export default function QuizLaunchScreen(): React.ReactElement {
           }
           secondaryAction={{
             label: t('common.goBack'),
-            onPress: () => router.replace(exitHref as never),
+            onPress: () => router.replace(exitHref as Href),
             testID: 'quiz-launch-back',
           }}
           testID="quiz-launch-error-fallback"
@@ -380,7 +380,7 @@ export default function QuizLaunchScreen(): React.ReactElement {
         </Text>
       ) : null}
       <Pressable
-        onPress={() => router.replace(exitHref as never)}
+        onPress={() => router.replace(exitHref as Href)}
         className="mt-10 min-h-[44px] items-center justify-center rounded-button px-6 py-3"
         testID="quiz-launch-cancel"
         accessibilityRole="button"

@@ -1,7 +1,7 @@
 import { View, Text, Pressable, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AnalogyDomainPicker, ErrorFallback } from '../../../components/common';
@@ -72,7 +72,7 @@ export default function SubjectSettingsScreen() {
             router.replace({
               pathname: '/(app)/shelf/[subjectId]',
               params: { subjectId },
-            } as never)
+            } as Href)
           }
           className="me-3 p-2 min-h-[44px] min-w-[44px] items-center justify-center"
           testID="subject-settings-back"

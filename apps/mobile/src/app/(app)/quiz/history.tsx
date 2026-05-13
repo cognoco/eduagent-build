@@ -1,6 +1,6 @@
 import { View, Text, Pressable, FlatList } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { i18next } from '../../../i18n';
 import { useRecentRounds } from '../../../hooks/use-quiz';
@@ -70,7 +70,7 @@ export default function QuizHistoryScreen() {
         }}
         secondaryAction={{
           label: t('common.goBack'),
-          onPress: () => router.replace(backHref as never),
+          onPress: () => router.replace(backHref as Href),
           testID: 'quiz-history-go-back',
         }}
         testID="quiz-history-error"
@@ -97,7 +97,7 @@ export default function QuizHistoryScreen() {
             router.push({
               pathname: '/(app)/quiz',
               params: returnParams,
-            } as never)
+            } as Href)
           }
         >
           <Text className="text-on-primary font-semibold">
@@ -179,7 +179,7 @@ export default function QuizHistoryScreen() {
                     router.push({
                       pathname: '/(app)/quiz/[roundId]',
                       params: { roundId: round.id },
-                    } as never)
+                    } as Href)
                   }
                   accessibilityRole="button"
                   accessibilityLabel={t('quiz.history.rowLabel', {

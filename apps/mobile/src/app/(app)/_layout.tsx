@@ -1,5 +1,5 @@
 import React from 'react';
-import { Tabs, Redirect, usePathname, useRouter } from 'expo-router';
+import { Tabs, Redirect, usePathname, useRouter, type Href } from 'expo-router';
 import {
   View,
   Text,
@@ -1449,7 +1449,7 @@ export default function AppLayout() {
     }
 
     replayedAuthRedirectRef.current = pendingAuthRedirect;
-    router.replace(pendingAuthRedirect as never);
+    router.replace(pendingAuthRedirect as Href);
   }, [currentAppPath, pendingAuthRedirect, router]);
 
   // Auto-dismiss profile-switched toast after 5 seconds

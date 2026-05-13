@@ -5,7 +5,7 @@ import {
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useChildSessions } from '../../../../../hooks/use-dashboard';
@@ -288,7 +288,7 @@ export default function TopicDetailScreen() {
                     profileId: profileId ?? '',
                     sessionId: session.sessionId,
                   },
-                } as never)
+                } as Href)
               }
               className="bg-surface rounded-card p-4 mt-2"
               accessibilityLabel={t('parentView.topic.viewSessionFrom', {

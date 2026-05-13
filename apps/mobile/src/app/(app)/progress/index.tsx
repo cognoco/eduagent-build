@@ -9,7 +9,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { platformAlert } from '../../../lib/platform-alert';
 import { classifyApiError } from '../../../lib/format-api-error';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useRouter, type Href } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ErrorFallback, TrackedView } from '../../../components/common';
@@ -290,7 +290,7 @@ export default function ProgressScreen(): React.ReactElement {
       pushLearningResumeTarget(router, resumeTargetQuery.data);
       return;
     }
-    router.push('/(app)/home' as never);
+    router.push('/(app)/home' as Href);
   }, [resumeTargetQuery.data, router]);
 
   // [EP15-M2] Gate on primary query only so secondary queries don't cause
@@ -357,11 +357,11 @@ export default function ProgressScreen(): React.ReactElement {
       router.push({
         pathname: '/(app)/shelf/[subjectId]',
         params: { subjectId: firstActiveSubject.id },
-      } as never);
+      } as Href);
       return;
     }
 
-    router.push('/(app)/library' as never);
+    router.push('/(app)/library' as Href);
   };
 
   return (
@@ -412,7 +412,7 @@ export default function ProgressScreen(): React.ReactElement {
               }}
               secondaryAction={{
                 label: t('progress.error.goHome'),
-                onPress: () => router.push('/(app)/home' as never),
+                onPress: () => router.push('/(app)/home' as Href),
                 testID: 'progress-loading-home',
               }}
               testID="progress-loading-timeout"
@@ -435,7 +435,7 @@ export default function ProgressScreen(): React.ReactElement {
             }}
             secondaryAction={{
               label: t('progress.error.goHome'),
-              onPress: () => router.push('/(app)/home' as never),
+              onPress: () => router.push('/(app)/home' as Href),
               testID: 'progress-error-home',
             }}
             testID="progress-error-state"
@@ -510,7 +510,7 @@ export default function ProgressScreen(): React.ReactElement {
                   {hasLanguageSubject ? (
                     <Pressable
                       onPress={() =>
-                        router.push('/(app)/progress/vocabulary' as never)
+                        router.push('/(app)/progress/vocabulary' as Href)
                       }
                       className="bg-background rounded-full px-3 py-1.5"
                       accessibilityRole="button"
@@ -646,7 +646,7 @@ export default function ProgressScreen(): React.ReactElement {
                   {milestonesQuery.data ? (
                     <Pressable
                       onPress={() =>
-                        router.push('/(app)/progress/milestones' as never)
+                        router.push('/(app)/progress/milestones' as Href)
                       }
                       accessibilityRole="button"
                       accessibilityLabel={t('progress.milestones.seeAll')}
@@ -690,7 +690,7 @@ export default function ProgressScreen(): React.ReactElement {
                 )}
 
                 <Pressable
-                  onPress={() => router.push('/(app)/progress/saved' as never)}
+                  onPress={() => router.push('/(app)/progress/saved' as Href)}
                   className="bg-surface rounded-card p-4 mt-6 flex-row items-center justify-between"
                   accessibilityRole="button"
                   accessibilityLabel={t('progress.saved.viewLabel')}

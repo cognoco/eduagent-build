@@ -9,7 +9,7 @@ import {
   Dimensions,
   Pressable,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -149,7 +149,7 @@ export default function CreateSubjectScreen() {
               sessionId: data.session.id,
               topicId: data.session.topicId ?? undefined,
             },
-          } as never);
+          } as Href);
           return;
         } catch (err) {
           if (
@@ -235,7 +235,7 @@ export default function CreateSubjectScreen() {
               ...(chatTopic ? { topicName: chatTopic } : {}),
               ...(rawInput ? { rawInput } : {}),
             },
-          } as never);
+          } as Href);
           return;
         }
 
@@ -254,7 +254,7 @@ export default function CreateSubjectScreen() {
             params: {
               subjectId: result.subject.id,
             },
-          } as never);
+          } as Href);
           return;
         }
 
@@ -273,7 +273,7 @@ export default function CreateSubjectScreen() {
               step: '1',
               totalSteps: '1',
             },
-          } as never);
+          } as Href);
           return;
         }
 
@@ -462,24 +462,24 @@ export default function CreateSubjectScreen() {
       // [BUG-633 / M-1] Bare router.back() silently no-ops when the modal was
       // opened via deep link / push notification — no prior stack entry to go
       // back to. Fall back to the home tab so cancel is never a dead button.
-      goBackOrReplace(router, '/(app)/home' as never);
+      goBackOrReplace(router, '/(app)/home' as Href);
       return;
     }
 
     if (returnTo === 'library') {
-      router.replace('/(app)/library' as never);
+      router.replace('/(app)/library' as Href);
       return;
     }
 
-    router.replace(homeHrefForReturnTo(returnTo) as never);
+    router.replace(homeHrefForReturnTo(returnTo) as Href);
   }, [returnTo, router]);
 
   const handleSubjectLimitPress = useCallback(() => {
     if (returnTo === 'chat') {
       // [BUG-633 / M-1] Same defensive fallback as handleCancel.
-      goBackOrReplace(router, '/(app)/home' as never);
+      goBackOrReplace(router, '/(app)/home' as Href);
     } else {
-      router.replace('/(app)/library' as never);
+      router.replace('/(app)/library' as Href);
     }
   }, [returnTo, router]);
 
@@ -681,7 +681,7 @@ export default function CreateSubjectScreen() {
                             subjectId: subject.id,
                             subjectName: subject.name,
                           },
-                        } as never)
+                        } as Href)
                       }
                       className="rounded-card bg-surface-elevated px-4 py-3 flex-row items-center"
                       accessibilityRole="button"

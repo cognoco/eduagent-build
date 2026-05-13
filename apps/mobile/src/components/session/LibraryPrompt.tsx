@@ -1,5 +1,5 @@
 import { Text, Pressable } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
 export function LibraryPrompt(): React.JSX.Element {
@@ -8,7 +8,7 @@ export function LibraryPrompt(): React.JSX.Element {
 
   return (
     <Pressable
-      onPress={() => router.push('/(app)/library' as never)}
+      onPress={() => router.push('/(app)/library' as Href)}
       testID="session-library-link"
       accessibilityRole="link"
       accessibilityLabel={t('session.libraryPrompt.goToLibrary')}

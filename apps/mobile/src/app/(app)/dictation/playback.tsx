@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { BackHandler, Modal, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useDictationPlayback } from '../../../hooks/use-dictation-playback';
@@ -50,7 +50,7 @@ export default function PlaybackScreen(): React.ReactElement {
   // Navigate to complete screen when done
   useEffect(() => {
     if (playback.state === 'complete') {
-      router.replace('/(app)/dictation/complete' as never);
+      router.replace('/(app)/dictation/complete' as Href);
     }
   }, [playback.state, router]);
 
@@ -64,7 +64,7 @@ export default function PlaybackScreen(): React.ReactElement {
 
   const handleConfirmExit = useCallback(() => {
     setExitConfirmVisible(false);
-    router.replace('/(app)/practice' as never);
+    router.replace('/(app)/practice' as Href);
   }, [router]);
 
   useEffect(() => {

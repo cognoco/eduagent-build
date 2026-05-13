@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAssessmentEligibleTopics } from '../../../hooks/use-assessments';
@@ -136,7 +136,7 @@ export default function AssessmentPickerScreen(): React.ReactElement {
               variant="primary"
               label={t('assessment.pickerBrowseTopics')}
               testID="assessment-picker-browse"
-              onPress={() => router.push('/(app)/library' as never)}
+              onPress={() => router.push('/(app)/library' as Href)}
             />
           </View>
         </View>
@@ -158,7 +158,7 @@ export default function AssessmentPickerScreen(): React.ReactElement {
                     subjectId: topic.subjectId,
                     topicId: topic.topicId,
                   },
-                } as never)
+                } as Href)
               }
             >
               <View className="flex-1">

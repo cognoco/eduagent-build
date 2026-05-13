@@ -174,7 +174,7 @@ export default function LanguageSetup() {
           topicId: result.session.topicId ?? undefined,
           subjectName: subjectName ?? languageName ?? '',
         },
-      } as never);
+      } as Href);
     } catch (err: unknown) {
       // BUG-692-FOLLOWUP: Don't surface error if user already navigated away.
       if (cancelledRef.current) return;

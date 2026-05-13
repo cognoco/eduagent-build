@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useCallback, useEffect, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import type { AccommodationMode, CelebrationLevel } from '@eduagent/schemas';
 
@@ -80,7 +80,7 @@ export default function AccommodationScreen(): React.ReactElement {
   useEffect(() => {
     if (!activeProfile) return;
     if (isChildMode && !canEditChildPreferences) {
-      router.replace('/(app)/more' as never);
+      router.replace('/(app)/more' as Href);
     }
   }, [activeProfile, canEditChildPreferences, isChildMode, router]);
 

@@ -10,7 +10,12 @@ import {
   AppState,
   ActivityIndicator,
 } from 'react-native';
-import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
+import {
+  useRouter,
+  useLocalSearchParams,
+  useFocusEffect,
+  type Href,
+} from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
@@ -454,7 +459,7 @@ export default function CameraScreen(): React.ReactNode {
           ...(captureSource ? { captureSource } : {}),
           ...(returnTo ? { returnTo } : {}),
         },
-      } as never);
+      } as Href);
     },
     [imageMimeType, returnTo, router],
   );

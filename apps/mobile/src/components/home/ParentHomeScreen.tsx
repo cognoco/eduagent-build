@@ -8,7 +8,7 @@ import {
   type GestureResponderEvent,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { isAdultOwner } from '@eduagent/schemas';
@@ -433,11 +433,11 @@ export function ParentHomeScreen({
   }, [subscription, familyData, router, t]);
 
   function pushChildDetail(childProfileId: string): void {
-    router.push(`/(app)/child/${childProfileId}` as never);
+    router.push(`/(app)/child/${childProfileId}` as Href);
   }
 
   function pushChildReports(childProfileId: string): void {
-    router.push(`/(app)/child/${childProfileId}/reports` as never);
+    router.push(`/(app)/child/${childProfileId}/reports` as Href);
   }
 
   const parentInitial = initialOf(activeProfile?.displayName ?? firstName);
@@ -448,7 +448,7 @@ export function ParentHomeScreen({
         <View className="flex-row items-center justify-between mb-3">
           <MentomateLogo size="sm" orientation="horizontal" />
           <Pressable
-            onPress={() => router.push('/(app)/more/account' as never)}
+            onPress={() => router.push('/(app)/more/account' as Href)}
             className="w-10 h-10 rounded-full bg-primary-soft items-center justify-center"
             style={Platform.OS === 'web' ? { cursor: 'pointer' } : undefined}
             accessibilityRole="button"

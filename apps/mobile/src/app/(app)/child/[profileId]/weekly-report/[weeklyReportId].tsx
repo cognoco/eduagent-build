@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import * as Sentry from '@sentry/react-native';
@@ -270,7 +270,7 @@ export default function ChildWeeklyReportDetailScreen(): React.ReactElement {
               <Pressable
                 onPress={() => {
                   if (!profileId) return;
-                  router.push(`/(app)/child/${profileId}` as never);
+                  router.push(`/(app)/child/${profileId}` as Href);
                 }}
                 className="bg-primary rounded-button px-4 py-3 items-center min-h-[48px] justify-center"
                 accessibilityRole="button"

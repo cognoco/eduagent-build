@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { View, Text, ScrollView, Pressable } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -76,7 +76,7 @@ export default function QuizRoundDetailScreen() {
         }}
         secondaryAction={{
           label: t('common.goBack'),
-          onPress: () => router.replace(backHref as never),
+          onPress: () => router.replace(backHref as Href),
         }}
       />
     );
@@ -92,7 +92,7 @@ export default function QuizRoundDetailScreen() {
         <Pressable
           testID="round-detail-back"
           className="mt-4 min-h-[44px] min-w-[44px] items-center justify-center"
-          onPress={() => router.replace(backHref as never)}
+          onPress={() => router.replace(backHref as Href)}
           accessibilityRole="button"
           accessibilityLabel={t('quiz.round.goBack')}
         >
@@ -113,7 +113,7 @@ export default function QuizRoundDetailScreen() {
       <View className="px-4 pb-4" style={{ paddingTop: insets.top + 16 }}>
         <Pressable
           testID="round-detail-back-btn"
-          onPress={() => router.replace(backHref as never)}
+          onPress={() => router.replace(backHref as Href)}
           className="min-h-[44px] min-w-[44px] items-center justify-center self-start"
           accessibilityRole="button"
           accessibilityLabel={t('quiz.round.goBack')}

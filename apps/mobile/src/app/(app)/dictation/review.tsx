@@ -8,7 +8,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '../../../lib/theme';
@@ -60,7 +60,7 @@ export default function DictationReviewScreen(): React.ReactElement {
         reviewed: true,
       });
       // [CRIT-2] Navigate only after successful save — guarded per CLAUDE.md
-      router.replace('/(app)/practice' as never);
+      router.replace('/(app)/practice' as Href);
     } catch (err) {
       // [CRIT-2] Show user-visible feedback on failure — bare catch {} is forbidden.
       // Pattern matches complete.tsx [ASSUMP-F11].
@@ -77,14 +77,14 @@ export default function DictationReviewScreen(): React.ReactElement {
         {
           text: t('dictation.review.continueWithoutSaving'),
           style: 'cancel',
-          onPress: () => router.replace('/(app)/practice' as never),
+          onPress: () => router.replace('/(app)/practice' as Href),
         },
       ]);
     }
   };
 
   const handleBack = () => {
-    goBackOrReplace(router, '/(app)/practice' as never);
+    goBackOrReplace(router, '/(app)/practice' as Href);
   };
 
   // No review data guard — should not happen in normal flow

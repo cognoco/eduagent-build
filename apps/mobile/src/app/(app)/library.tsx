@@ -11,7 +11,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { platformAlert } from '../../lib/platform-alert';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Subject, RetentionStatus } from '@eduagent/schemas';
 import {
@@ -325,7 +325,7 @@ export default function LibraryScreen() {
       router.push({
         pathname: '/(app)/shelf/[subjectId]',
         params: { subjectId },
-      } as never);
+      } as Href);
     },
     [router],
   );
@@ -335,11 +335,11 @@ export default function LibraryScreen() {
       router.push({
         pathname: '/(app)/shelf/[subjectId]',
         params: { subjectId },
-      } as never);
+      } as Href);
       router.push({
         pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
         params: { subjectId, bookId },
-      } as never);
+      } as Href);
     },
     [router],
   );
@@ -349,7 +349,7 @@ export default function LibraryScreen() {
       router.push({
         pathname: '/(app)/topic/[topicId]',
         params: { topicId },
-      } as never);
+      } as Href);
     },
     [router],
   );
@@ -359,7 +359,7 @@ export default function LibraryScreen() {
       router.push({
         pathname: '/(app)/topic/[topicId]',
         params: { topicId },
-      } as never);
+      } as Href);
     },
     [router],
   );
@@ -373,7 +373,7 @@ export default function LibraryScreen() {
           subjectId,
           ...(topicId ? { topicId } : {}),
         },
-      } as never);
+      } as Href);
     },
     [router],
   );
@@ -602,7 +602,7 @@ export default function LibraryScreen() {
                   router.push({
                     pathname: '/create-subject',
                     params: { returnTo: 'library' },
-                  } as never)
+                  } as Href)
                 }
                 className="bg-primary rounded-button py-3 mt-4 items-center"
                 testID="library-add-subject"

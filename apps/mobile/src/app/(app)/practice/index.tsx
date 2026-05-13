@@ -11,7 +11,12 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
+import {
+  Redirect,
+  useLocalSearchParams,
+  useRouter,
+  type Href,
+} from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
@@ -387,13 +392,13 @@ export default function PracticeScreen(): React.ReactElement {
     router.push({
       pathname: '/(app)/quiz',
       params: practiceReturnParams,
-    } as never);
+    } as Href);
 
   const openQuizActivity = (activityType: 'capitals' | 'guess_who') => {
     router.push({
       pathname: '/(app)/quiz/launch',
       params: { activityType, ...practiceReturnParams },
-    } as never);
+    } as Href);
   };
 
   const openVocabularyQuiz = (
@@ -408,12 +413,12 @@ export default function PracticeScreen(): React.ReactElement {
         languageName,
         ...practiceReturnParams,
       },
-    } as never);
+    } as Href);
   };
 
   const openAssessment = () => {
     if (assessmentCount > 0) {
-      router.push('/(app)/practice/assessment-picker' as never);
+      router.push('/(app)/practice/assessment-picker' as Href);
       return;
     }
 
@@ -421,11 +426,11 @@ export default function PracticeScreen(): React.ReactElement {
       router.push({
         pathname: '/(app)/shelf/[subjectId]',
         params: { subjectId: nextStudySubject.id },
-      } as never);
+      } as Href);
       return;
     }
 
-    router.push('/(app)/library' as never);
+    router.push('/(app)/library' as Href);
   };
 
   if (isParentProxy) return <Redirect href="/(app)/home" />;
@@ -497,7 +502,7 @@ export default function PracticeScreen(): React.ReactElement {
                   params: {
                     ...(returnTo ? { returnTo } : {}),
                   },
-                } as never)
+                } as Href)
               }
               accessibilityRole="button"
               accessibilityLabel={t('practiceHub.review.title')}
@@ -590,7 +595,7 @@ export default function PracticeScreen(): React.ReactElement {
                 <Pressable
                   testID="review-empty-browse"
                   className="mt-3"
-                  onPress={() => router.push('/(app)/library' as never)}
+                  onPress={() => router.push('/(app)/library' as Href)}
                 >
                   <Text className="text-body-sm text-primary font-semibold">
                     {t('practiceHub.review.browseTopics')}
@@ -849,7 +854,7 @@ export default function PracticeScreen(): React.ReactElement {
                   },
                   pointerStyle(),
                 ]}
-                onPress={() => router.push('/(app)/dictation' as never)}
+                onPress={() => router.push('/(app)/dictation' as Href)}
                 accessibilityRole="button"
                 accessibilityLabel={t('practiceHub.dictation.title')}
                 testID="practice-dictation"
@@ -889,7 +894,7 @@ export default function PracticeScreen(): React.ReactElement {
                   router.push({
                     pathname: '/(app)/session',
                     params: { mode: 'recitation' },
-                  } as never)
+                  } as Href)
                 }
                 accessibilityRole="button"
                 accessibilityLabel={t('practiceHub.recitation.title')}
@@ -940,7 +945,7 @@ export default function PracticeScreen(): React.ReactElement {
                 router.push({
                   pathname: '/(app)/quiz/history',
                   params: practiceReturnParams,
-                } as never)
+                } as Href)
               }
               accessibilityRole="button"
               accessibilityLabel={t('practiceHub.history.title')}

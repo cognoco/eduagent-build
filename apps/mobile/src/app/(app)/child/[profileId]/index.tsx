@@ -180,7 +180,7 @@ export default function ChildDetailScreen() {
           {t('parentView.index.unableToLoadChildDetails')}
         </Text>
         <Pressable
-          onPress={() => router.replace('/(app)/home' as never)}
+          onPress={() => router.replace('/(app)/home' as Href)}
           className="bg-primary rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
           accessibilityRole="button"
           accessibilityLabel={t('common.goHome')}
@@ -454,7 +454,7 @@ export default function ChildDetailScreen() {
               router.push({
                 pathname: '/(app)/child/[profileId]/reports',
                 params: { profileId },
-              } as never);
+              } as Href);
             }}
             className="bg-coaching-card rounded-card p-4 mt-4"
             accessibilityRole="button"
@@ -569,7 +569,7 @@ export default function ChildDetailScreen() {
               router.push({
                 pathname: '/(app)/child/[profileId]/reports',
                 params: { profileId },
-              } as never)
+              } as Href)
             }
             className="flex-row items-center justify-between bg-surface rounded-card px-4 py-3.5 mt-4"
             style={Platform.OS === 'web' ? { cursor: 'pointer' } : undefined}
@@ -665,7 +665,7 @@ export default function ChildDetailScreen() {
                       subjectId: subject.subjectId,
                       subjectName: subject.name,
                     },
-                  } as never);
+                  } as Href);
                 }}
                 className={`bg-surface rounded-card p-4 mt-3 flex-row items-center justify-between${
                   !subject.subjectId ? ' opacity-50' : ''
@@ -723,7 +723,7 @@ export default function ChildDetailScreen() {
               router.push({
                 pathname: '/(app)/child/[profileId]/mentor-memory',
                 params: { profileId },
-              } as never)
+              } as Href)
             }
             className="bg-primary/10 rounded-card p-4 mb-3"
             accessibilityRole="button"
@@ -746,7 +746,7 @@ export default function ChildDetailScreen() {
             router.push({
               pathname: '/(app)/child/[profileId]/mentor-memory',
               params: { profileId },
-            } as never);
+            } as Href);
           }}
           className="bg-surface rounded-card p-4 mt-1"
           accessibilityRole="button"
