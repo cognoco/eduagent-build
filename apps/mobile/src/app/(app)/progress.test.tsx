@@ -236,6 +236,23 @@ const fullSubject = {
   sessionsCount: 5,
 };
 
+const childProgressProfile: Profile = {
+  id: 'child-1',
+  accountId: 'account-1',
+  displayName: 'Emma',
+  isOwner: false,
+  hasPremiumLlm: false,
+  consentStatus: null,
+  linkCreatedAt: null,
+  conversationLanguage: 'en',
+  pronouns: null,
+  birthYear: 2015,
+  avatarUrl: null,
+  location: null,
+  createdAt: '2026-01-01T00:00:00Z',
+  updatedAt: '2026-01-01T00:00:00Z',
+};
+
 function mockHooks(
   overrides: {
     inventory?:
@@ -565,24 +582,7 @@ describe('ProgressScreen — progressive disclosure', () => {
   });
 
   it('opens the requested child progress profile from route params', () => {
-    mockLinkedChildren = [
-      {
-        id: 'child-1',
-        accountId: 'account-1',
-        displayName: 'Emma',
-        isOwner: false,
-        hasPremiumLlm: false,
-        consentStatus: null,
-        linkCreatedAt: null,
-        conversationLanguage: 'en',
-        pronouns: null,
-        birthYear: 2015,
-        avatarUrl: null,
-        location: null,
-        createdAt: '2026-01-01T00:00:00Z',
-        updatedAt: '2026-01-01T00:00:00Z',
-      },
-    ];
+    mockLinkedChildren = [childProgressProfile];
     mockSearchParams = { profileId: 'child-1' };
     mockHooks({
       inventory: {
@@ -604,22 +604,6 @@ describe('ProgressScreen — progressive disclosure', () => {
   });
 
   it('opens a valid requested child profile after child links load', async () => {
-    const childProfile: Profile = {
-      id: 'child-1',
-      accountId: 'account-1',
-      displayName: 'Emma',
-      isOwner: false,
-      hasPremiumLlm: false,
-      consentStatus: null,
-      linkCreatedAt: null,
-      conversationLanguage: 'en',
-      pronouns: null,
-      birthYear: 2015,
-      avatarUrl: null,
-      location: null,
-      createdAt: '2026-01-01T00:00:00Z',
-      updatedAt: '2026-01-01T00:00:00Z',
-    };
     mockSearchParams = { profileId: 'child-1' };
     mockHooks({
       inventory: {
@@ -638,15 +622,16 @@ describe('ProgressScreen — progressive disclosure', () => {
       enabled: false,
     });
 
-    mockLinkedChildren = [childProfile];
+    mockLinkedChildren = [childProgressProfile];
     view.rerender(<ProgressScreen />);
 
     await waitFor(() => {
       expect(useChildInventory).toHaveBeenLastCalledWith('child-1', {
         enabled: true,
       });
+      screen.getByTestId('progress-pill-child-1');
+      screen.getByText('6 sessions');
     });
-    screen.getByText('6 sessions');
   });
 
   it('ignores an unknown requested child profile when no child link is known', () => {
