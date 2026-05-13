@@ -512,6 +512,13 @@
       "when": 1779000021000,
       "tag": "0072_practice_activity_events",
       "breakpoints": true
+    },
+    {
+      "idx": 73,
+      "version": "7",
+      "when": 1779000022000,
+      "tag": "0073_open_shadow_king",
+      "breakpoints": true
     }
   ]
 }

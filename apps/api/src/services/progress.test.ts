@@ -1,5 +1,5 @@
 import { createDatabaseModuleMock } from '../test-utils/database-module';
-import { emptyPracticeActivitySummary } from './practice-activity-summary.fixture';
+import { emptyPracticeActivitySummary } from '../test-utils/practice-activity-summary-fixture';
 
 const mockDatabaseModule = createDatabaseModuleMock({
   includeActual: true,
@@ -26,7 +26,8 @@ function mockPracticeSummary(
 }
 
 jest.mock(
-  './practice-activity-summary' /* gc1-allow: unit test boundary */,
+  // gc1-allow: unit test boundary
+  './practice-activity-summary',
   () => ({
     getPracticeActivitySummary: (...args: unknown[]) =>
       mockGetPracticeActivitySummary(...args),
@@ -663,6 +664,48 @@ describe('getOverallProgress', () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+
+  it('starts subject loading and practice summary in parallel', async () => {
+    const order: string[] = [];
+    let resolveSubjects: (
+      subjects: ReturnType<typeof mockSubjectRow>[],
+    ) => void;
+    const subjectsPromise = new Promise<ReturnType<typeof mockSubjectRow>[]>(
+      (resolve) => {
+        resolveSubjects = resolve;
+      },
+    );
+    (createScopedRepository as jest.Mock).mockReturnValue({
+      subjects: {
+        findMany: jest.fn(() => {
+          order.push('subjects-start');
+          return subjectsPromise;
+        }),
+      },
+      retentionCards: { findMany: jest.fn().mockResolvedValue([]) },
+      assessments: { findMany: jest.fn().mockResolvedValue([]) },
+      sessions: { findMany: jest.fn().mockResolvedValue([]) },
+      needsDeepeningTopics: { findMany: jest.fn().mockResolvedValue([]) },
+      xpLedger: { findMany: jest.fn().mockResolvedValue([]) },
+      sessionSummaries: { findFirst: jest.fn().mockResolvedValue(undefined) },
+    });
+    mockGetPracticeActivitySummary.mockImplementationOnce(() => {
+      order.push('practice-start');
+      return Promise.resolve(emptyPracticeActivitySummary);
+    });
+
+    const db = createMockDb();
+    const resultPromise = getOverallProgress(db, profileId);
+    await Promise.resolve();
+
+    expect(order).toEqual(['subjects-start', 'practice-start']);
+
+    resolveSubjects!([]);
+    await expect(resultPromise).resolves.toMatchObject({
+      subjects: [],
+      practiceActivityCount: 0,
+    });
   });
 
   it('aggregates across multiple subjects with batch queries', async () => {

@@ -91,12 +91,23 @@ export async function queueCelebration(
 
   const existing = ((row?.pendingCelebrations as PendingCelebration[] | null) ??
     []) as PendingCelebration[];
-  const hasDuplicate = existing.some(
-    (entry) =>
-      entry.celebration === nextEntry.celebration &&
-      entry.reason === nextEntry.reason &&
-      (entry.detail ?? null) === nextEntry.detail,
-  );
+  const seenByChildAt = row?.celebrationsSeenByChild ?? null;
+  const hasDuplicate = existing.some((entry) => {
+    if (
+      entry.celebration !== nextEntry.celebration ||
+      entry.reason !== nextEntry.reason ||
+      (entry.detail ?? null) !== nextEntry.detail
+    ) {
+      return false;
+    }
+
+    if (nextEntry.detail !== null || !seenByChildAt) {
+      return true;
+    }
+
+    const queuedAt = new Date(entry.queuedAt);
+    return Number.isNaN(queuedAt.getTime()) || queuedAt > seenByChildAt;
+  });
 
   const pendingCelebrations = hasDuplicate
     ? existing
@@ -111,9 +122,11 @@ export async function queueCelebration(
       celebrationType: celebration,
       reason,
       sourceType: 'home_surface_pending_celebration',
-      // Null detail intentionally maps to "none" in the dedupe key, so
-      // no-detail celebrations dedupe by profile + celebration + reason.
-      sourceId: detail ?? 'none',
+      sourceId: detail ?? null,
+      dedupeKey:
+        detail === null || detail === undefined
+          ? `${celebration}:${reason}:${nextEntry.queuedAt}`
+          : undefined,
       metadata: { detail: detail ?? null },
     });
   }

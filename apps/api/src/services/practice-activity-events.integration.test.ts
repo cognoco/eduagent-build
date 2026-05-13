@@ -32,13 +32,22 @@ const TEST_ACCOUNT = {
   clerkUserId: `${PREFIX}-user`,
   email: `${PREFIX}@integration.test`,
 };
+const OTHER_TEST_ACCOUNT = {
+  clerkUserId: `${PREFIX}-other-user`,
+  email: `${PREFIX}-other@integration.test`,
+};
 
 async function cleanupTestAccount(): Promise<void> {
   const db = createIntegrationDb();
   const rows = await db
     .select({ id: accounts.id })
     .from(accounts)
-    .where(inArray(accounts.clerkUserId, [TEST_ACCOUNT.clerkUserId]));
+    .where(
+      inArray(accounts.clerkUserId, [
+        TEST_ACCOUNT.clerkUserId,
+        OTHER_TEST_ACCOUNT.clerkUserId,
+      ]),
+    );
 
   if (rows.length > 0) {
     await db.delete(accounts).where(
@@ -50,9 +59,9 @@ async function cleanupTestAccount(): Promise<void> {
   }
 }
 
-async function seedProfile(): Promise<string> {
+async function seedProfile(accountInput = TEST_ACCOUNT): Promise<string> {
   const db = createIntegrationDb();
-  const [account] = await db.insert(accounts).values(TEST_ACCOUNT).returning();
+  const [account] = await db.insert(accounts).values(accountInput).returning();
   const [profile] = await db
     .insert(profiles)
     .values({
@@ -103,5 +112,51 @@ describe('recordPracticeActivityEvent (integration)', () => {
       .from(practiceActivityEvents)
       .where(inArray(practiceActivityEvents.profileId, [profileId]));
     expect(rows).toHaveLength(1);
+  });
+
+  it('isolates dedupe keys by profile so one learner cannot suppress another learner activity', async () => {
+    const profileId = await seedProfile();
+    const otherProfileId = await seedProfile(OTHER_TEST_ACCOUNT);
+    const db = createIntegrationDb();
+    const sharedInput = {
+      activityType: 'review' as const,
+      activitySubtype: 'spaced_repetition',
+      completedAt: new Date('2026-05-13T12:00:00.000Z'),
+      pointsEarned: 6,
+      score: 2,
+      total: 3,
+      sourceType: 'integration_test',
+      sourceId: 'shared-source-id',
+      dedupeKey: 'integration-practice-activity-events:shared-key',
+      metadata: { test: true },
+    };
+
+    const first = await recordPracticeActivityEvent(db, {
+      ...sharedInput,
+      profileId,
+    });
+    const secondProfile = await recordPracticeActivityEvent(db, {
+      ...sharedInput,
+      profileId: otherProfileId,
+    });
+    const duplicateFirst = await recordPracticeActivityEvent(db, {
+      ...sharedInput,
+      profileId,
+    });
+
+    expect(first).not.toBeNull();
+    expect(secondProfile).not.toBeNull();
+    expect(duplicateFirst).toBeNull();
+
+    const rows = await db
+      .select({ profileId: practiceActivityEvents.profileId })
+      .from(practiceActivityEvents)
+      .where(
+        inArray(practiceActivityEvents.profileId, [profileId, otherProfileId]),
+      );
+    expect(rows).toEqual(
+      expect.arrayContaining([{ profileId }, { profileId: otherProfileId }]),
+    );
+    expect(rows).toHaveLength(2);
   });
 });

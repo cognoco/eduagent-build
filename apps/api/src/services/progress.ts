@@ -332,22 +332,26 @@ export async function getOverallProgress(
 }> {
   const repo = createScopedRepository(db, profileId);
 
-  // 1. Batch all queries upfront (6 total regardless of N subjects)
-  const allSubjects = await repo.subjects.findMany();
   const practiceSummaryEnd = new Date();
-  const practiceSummary = await getPracticeActivitySummary(db, {
-    profileId,
-    // Overview is loaded on every Progress tab visit, so keep the practice
-    // activity scan bounded. Long-range/all-time reporting belongs on report
-    // detail endpoints that are opened intentionally.
-    period: {
-      start: subtractDays(
-        practiceSummaryEnd,
-        PROGRESS_OVERVIEW_PRACTICE_WINDOW_DAYS,
-      ),
-      endExclusive: practiceSummaryEnd,
-    },
-  });
+  // 1. Batch independent overview queries upfront (constant count regardless
+  // of N subjects). The practice activity summary does not depend on subjects,
+  // so keep it off the subject/curriculum critical path.
+  const [allSubjects, practiceSummary] = await Promise.all([
+    repo.subjects.findMany(),
+    getPracticeActivitySummary(db, {
+      profileId,
+      // Overview is loaded on every Progress tab visit, so keep the practice
+      // activity scan bounded. Long-range/all-time reporting belongs on report
+      // detail endpoints that are opened intentionally.
+      period: {
+        start: subtractDays(
+          practiceSummaryEnd,
+          PROGRESS_OVERVIEW_PRACTICE_WINDOW_DAYS,
+        ),
+        endExclusive: practiceSummaryEnd,
+      },
+    }),
+  ]);
 
   if (allSubjects.length === 0) {
     return {

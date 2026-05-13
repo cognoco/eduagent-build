@@ -125,7 +125,7 @@ jest.mock( // gc1-allow: handler control-flow test; services tested in own suite
   }),
 );
 
-import { emptyPracticeActivitySummary } from '../../services/practice-activity-summary.fixture';
+import { emptyPracticeActivitySummary } from '../../test-utils/practice-activity-summary-fixture';
 
 const mockGetPracticeActivitySummary = jest
   .fn()

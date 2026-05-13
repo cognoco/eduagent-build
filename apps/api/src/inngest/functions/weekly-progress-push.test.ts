@@ -58,7 +58,7 @@ jest.mock('../client' /* gc1-allow: unit test boundary */, () => ({
   },
 }));
 
-import { emptyPracticeActivitySummary } from '../../services/practice-activity-summary.fixture';
+import { emptyPracticeActivitySummary } from '../../test-utils/practice-activity-summary-fixture';
 
 const mockGetPracticeActivitySummary = jest
   .fn()

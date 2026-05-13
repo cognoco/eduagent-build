@@ -3,6 +3,7 @@ import {
   accounts,
   createDatabase,
   profiles,
+  practiceActivityEvents,
   quizMissedItems,
   quizRounds,
   subjects,
@@ -255,6 +256,7 @@ describe('vocabulary quiz round lifecycle (integration)', () => {
     const round = await generateQuizRound({
       db,
       profileId: profile.id,
+      subjectId: subject.id,
       activityType: 'vocabulary',
       birthYear: profile.birthYear,
       themePreference: undefined,
@@ -401,6 +403,21 @@ describe('vocabulary quiz round lifecycle (integration)', () => {
       ),
     });
     expect(storedRound?.status).toBe('completed');
+    expect(storedRound?.subjectId).toBe(subject.id);
+
+    const [practiceEvent] = await db
+      .select({
+        subjectId: practiceActivityEvents.subjectId,
+        activityType: practiceActivityEvents.activityType,
+        activitySubtype: practiceActivityEvents.activitySubtype,
+      })
+      .from(practiceActivityEvents)
+      .where(eq(practiceActivityEvents.sourceId, round.id));
+    expect(practiceEvent).toEqual({
+      subjectId: subject.id,
+      activityType: 'quiz',
+      activitySubtype: 'vocabulary',
+    });
 
     const missedItems = await db.query.quizMissedItems.findMany({
       where: eq(quizMissedItems.sourceRoundId, round.id),

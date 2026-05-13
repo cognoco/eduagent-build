@@ -1,4 +1,7 @@
-import { buildSummaryFromRows } from './practice-activity-summary';
+import {
+  buildSummaryFromRows,
+  getPracticeActivitySummary,
+} from './practice-activity-summary';
 
 describe('buildSummaryFromRows', () => {
   it('returns empty summary for empty rows and zero celebrations', () => {
@@ -268,5 +271,42 @@ describe('buildSummaryFromRows', () => {
     );
     expect(result.bySubject[0].subjectName).toBe('Algebra');
     expect(result.bySubject[1].subjectName).toBe('Zoology');
+  });
+});
+
+describe('getPracticeActivitySummary', () => {
+  it('guards the subject name join with subjects.profileId', async () => {
+    const leftJoin = jest.fn().mockReturnValue({
+      where: jest.fn().mockResolvedValue([]),
+    });
+    const db = {
+      select: jest
+        .fn()
+        .mockReturnValueOnce({
+          from: jest.fn().mockReturnValue({ leftJoin }),
+        })
+        .mockReturnValueOnce({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue([{ count: 0 }]),
+          }),
+        }),
+    };
+
+    await getPracticeActivitySummary(db as never, {
+      profileId: '00000000-0000-4000-8000-000000000123',
+      period: {
+        start: new Date('2026-05-01T00:00:00.000Z'),
+        endExclusive: new Date('2026-06-01T00:00:00.000Z'),
+      },
+    });
+
+    const joinCondition = leftJoin.mock.calls[0]?.[1];
+    const { inspect } = await import('util');
+    const rendered = inspect(joinCondition, {
+      depth: 10,
+      breakLength: Infinity,
+    });
+    expect(rendered).toContain('profile_id');
+    expect(rendered).toContain('00000000-0000-4000-8000-000000000123');
   });
 });

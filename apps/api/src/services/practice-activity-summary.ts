@@ -108,7 +108,13 @@ async function loadPracticeRows(
       total: practiceActivityEvents.total,
     })
     .from(practiceActivityEvents)
-    .leftJoin(subjects, eq(subjects.id, practiceActivityEvents.subjectId))
+    .leftJoin(
+      subjects,
+      and(
+        eq(subjects.id, practiceActivityEvents.subjectId),
+        eq(subjects.profileId, profileId),
+      ),
+    )
     .where(
       and(
         eq(practiceActivityEvents.profileId, profileId),

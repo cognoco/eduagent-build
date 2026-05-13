@@ -132,7 +132,7 @@ const mockGenerateReportHighlights = jest.fn().mockResolvedValue({
   comparison: null,
 });
 const mockListEligibleSelfReportProfileIds = jest.fn().mockResolvedValue([]);
-import { emptyPracticeActivitySummary } from '../../services/practice-activity-summary.fixture';
+import { emptyPracticeActivitySummary } from '../../test-utils/practice-activity-summary-fixture';
 
 const mockGetPracticeActivitySummary = jest
   .fn()
@@ -735,6 +735,25 @@ describe('monthlyReportGenerate', () => {
         expect.objectContaining({
           totals: expect.objectContaining({ activitiesCompleted: 0 }),
         }),
+      );
+    });
+
+    it('loads practice summary for the prior month and adjacent previous month', async () => {
+      await executeGenerateSteps(makeGenerateEvent());
+
+      expect(mockGetPracticeActivitySummary).toHaveBeenCalledWith(
+        mockMonthlyReportDb,
+        {
+          profileId: 'child-001',
+          period: {
+            start: new Date('2026-03-01T00:00:00.000Z'),
+            endExclusive: new Date('2026-04-01T00:00:00.000Z'),
+          },
+          previousPeriod: {
+            start: new Date('2026-02-01T00:00:00.000Z'),
+            endExclusive: new Date('2026-03-01T00:00:00.000Z'),
+          },
+        },
       );
     });
 

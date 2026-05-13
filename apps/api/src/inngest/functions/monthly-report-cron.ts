@@ -294,7 +294,7 @@ export const monthlyReportGenerate = inngest.createFunction(
           ? child.displayName
           : (child.displayName ?? 'Your child');
 
-        const previousMonthStart = monthRangeStart(new Date(), -2);
+        const previousMonthStart = monthRangeStart(lastMonthStart, -1);
         const practiceSummary = await getPracticeActivitySummary(db, {
           profileId: childId,
           period: {

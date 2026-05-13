@@ -22,115 +22,133 @@ jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 // Mock account + subject services — no DB interaction
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/account', () => ({
-  findOrCreateAccount: jest.fn().mockResolvedValue({
-    id: 'test-account-id',
-    clerkUserId: 'user_test',
-    email: 'test@example.com',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+jest.mock(
+  '../services/account' /* gc1-allow: route unit test boundary */,
+  () => ({
+    findOrCreateAccount: jest.fn().mockResolvedValue({
+      id: 'test-account-id',
+      clerkUserId: 'user_test',
+      email: 'test@example.com',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }),
   }),
-}));
+);
 
-jest.mock('../services/profile', () => ({
-  findOwnerProfile: jest.fn().mockResolvedValue(null),
-  getProfile: jest.fn().mockResolvedValue({
-    id: 'test-profile-id',
-    birthYear: null,
-    location: null,
-    consentStatus: 'CONSENTED',
+jest.mock(
+  '../services/profile' /* gc1-allow: route unit test boundary */,
+  () => ({
+    findOwnerProfile: jest.fn().mockResolvedValue(null),
+    getProfile: jest.fn().mockResolvedValue({
+      id: 'test-profile-id',
+      birthYear: null,
+      location: null,
+      consentStatus: 'CONSENTED',
+    }),
   }),
-}));
+);
 
-jest.mock('../services/subject-resolve', () => ({
-  resolveSubjectName: jest.fn().mockResolvedValue({
-    status: 'corrected',
-    resolvedName: 'Physics',
-    suggestions: [],
-    displayMessage: 'Did you mean **Physics**?',
+jest.mock(
+  '../services/subject-resolve' /* gc1-allow: route unit test boundary */,
+  () => ({
+    resolveSubjectName: jest.fn().mockResolvedValue({
+      status: 'corrected',
+      resolvedName: 'Physics',
+      suggestions: [],
+      displayMessage: 'Did you mean **Physics**?',
+    }),
   }),
-}));
+);
 
-jest.mock('../services/subject-classify', () => ({
-  classifySubject: jest.fn().mockResolvedValue({
-    candidates: [],
-    needsConfirmation: false,
-    suggestedSubjectName: 'Mathematics',
+jest.mock(
+  '../services/subject-classify' /* gc1-allow: route unit test boundary */,
+  () => ({
+    classifySubject: jest.fn().mockResolvedValue({
+      candidates: [],
+      needsConfirmation: false,
+      suggestedSubjectName: 'Mathematics',
+    }),
   }),
-}));
+);
 
-jest.mock('../services/sentry', () => ({
-  captureException: jest.fn(),
-  addBreadcrumb: jest.fn(),
-}));
+jest.mock(
+  '../services/sentry' /* gc1-allow: route unit test boundary */,
+  () => ({
+    captureException: jest.fn(),
+    addBreadcrumb: jest.fn(),
+  }),
+);
 
-jest.mock('../services/subject', () => ({
-  SubjectNotLanguageLearningError: class SubjectNotLanguageLearningError extends Error {
-    constructor() {
-      super('Subject is not configured for language learning');
-      this.name = 'SubjectNotLanguageLearningError';
-    }
-  },
-  listSubjects: jest.fn().mockResolvedValue([]),
-  createSubject: jest.fn().mockImplementation((_db, _profileId, input) => ({
-    id: 'a0000000-0000-4000-a000-000000000001',
-    profileId: 'a0000000-0000-4000-a000-000000000002',
-    name: input.name,
-    rawInput: input.rawInput ?? null,
-    status: 'active',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  })),
-  createSubjectWithStructure: jest
-    .fn()
-    .mockImplementation((_db, _profileId, input) => ({
-      subject: {
-        id: 'a0000000-0000-4000-a000-000000000001',
-        profileId: 'a0000000-0000-4000-a000-000000000002',
-        name: input.name,
-        rawInput: input.rawInput ?? null,
-        status: 'active',
-        pedagogyMode: 'socratic',
-        languageCode: null,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      },
-      structureType: 'narrow',
+jest.mock(
+  '../services/subject' /* gc1-allow: route unit test boundary */,
+  () => ({
+    SubjectNotLanguageLearningError: class SubjectNotLanguageLearningError extends Error {
+      constructor() {
+        super('Subject is not configured for language learning');
+        this.name = 'SubjectNotLanguageLearningError';
+      }
+    },
+    listSubjects: jest.fn().mockResolvedValue([]),
+    createSubject: jest.fn().mockImplementation((_db, _profileId, input) => ({
+      id: 'a0000000-0000-4000-a000-000000000001',
+      profileId: 'a0000000-0000-4000-a000-000000000002',
+      name: input.name,
+      rawInput: input.rawInput ?? null,
+      status: 'active',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     })),
-  configureLanguageSubject: jest.fn().mockResolvedValue({
-    id: 'a0000000-0000-4000-a000-000000000001',
-    profileId: 'a0000000-0000-4000-a000-000000000002',
-    name: 'Spanish',
-    rawInput: 'Learn Spanish',
-    status: 'active',
-    pedagogyMode: 'four_strands',
-    languageCode: 'es',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    createSubjectWithStructure: jest
+      .fn()
+      .mockImplementation((_db, _profileId, input) => ({
+        subject: {
+          id: 'a0000000-0000-4000-a000-000000000001',
+          profileId: 'a0000000-0000-4000-a000-000000000002',
+          name: input.name,
+          rawInput: input.rawInput ?? null,
+          status: 'active',
+          pedagogyMode: 'socratic',
+          languageCode: null,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+        structureType: 'narrow',
+      })),
+    configureLanguageSubject: jest.fn().mockResolvedValue({
+      id: 'a0000000-0000-4000-a000-000000000001',
+      profileId: 'a0000000-0000-4000-a000-000000000002',
+      name: 'Spanish',
+      rawInput: 'Learn Spanish',
+      status: 'active',
+      pedagogyMode: 'four_strands',
+      languageCode: 'es',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }),
+    getSubject: jest.fn().mockResolvedValue({
+      id: 'a0000000-0000-4000-a000-000000000001',
+      profileId: 'a0000000-0000-4000-a000-000000000002',
+      name: 'Mathematics',
+      rawInput: null,
+      status: 'active',
+      pedagogyMode: 'socratic',
+      languageCode: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }),
+    updateSubject: jest.fn().mockResolvedValue({
+      id: 'a0000000-0000-4000-a000-000000000001',
+      profileId: 'a0000000-0000-4000-a000-000000000002',
+      name: 'Updated Subject',
+      rawInput: null,
+      status: 'active',
+      pedagogyMode: 'socratic',
+      languageCode: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }),
   }),
-  getSubject: jest.fn().mockResolvedValue({
-    id: 'a0000000-0000-4000-a000-000000000001',
-    profileId: 'a0000000-0000-4000-a000-000000000002',
-    name: 'Mathematics',
-    rawInput: null,
-    status: 'active',
-    pedagogyMode: 'socratic',
-    languageCode: null,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  }),
-  updateSubject: jest.fn().mockResolvedValue({
-    id: 'a0000000-0000-4000-a000-000000000001',
-    profileId: 'a0000000-0000-4000-a000-000000000002',
-    name: 'Updated Subject',
-    rawInput: null,
-    status: 'active',
-    pedagogyMode: 'socratic',
-    languageCode: null,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  }),
-}));
+);
 
 import { app } from '../index';
 import { resolveSubjectName } from '../services/subject-resolve';
@@ -169,7 +187,7 @@ describe('subject routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ rawInput: 'Phsics' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -188,7 +206,7 @@ describe('subject routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ rawInput: '' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -202,7 +220,7 @@ describe('subject routes', () => {
           body: JSON.stringify({ rawInput: 'Physics' }),
           headers: { 'Content-Type': 'application/json' },
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);
@@ -214,7 +232,7 @@ describe('subject routes', () => {
     // silently with a generic 500.
     it('[CR-650] classifies UpstreamLlmError as 502 LLM_UNAVAILABLE and captures Sentry', async () => {
       (resolveSubjectName as jest.Mock).mockRejectedValueOnce(
-        new UpstreamLlmError('LLM provider down')
+        new UpstreamLlmError('LLM provider down'),
       );
       (captureException as jest.Mock).mockClear();
 
@@ -225,7 +243,7 @@ describe('subject routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ rawInput: 'Physics' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(502);
@@ -234,7 +252,7 @@ describe('subject routes', () => {
 
     it('[CR-650] captures generic errors to Sentry and returns 500 (no silent swallow)', async () => {
       (resolveSubjectName as jest.Mock).mockRejectedValueOnce(
-        new Error('unexpected boom')
+        new Error('unexpected boom'),
       );
       (captureException as jest.Mock).mockClear();
 
@@ -245,7 +263,7 @@ describe('subject routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ rawInput: 'Physics' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(500);
@@ -266,7 +284,7 @@ describe('subject routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ text: 'Newton laws of motion' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -278,7 +296,7 @@ describe('subject routes', () => {
     // [CR-651] Same fix as resolve — UpstreamLlmError must surface as 502 with Sentry capture.
     it('[CR-651] classifies UpstreamLlmError as 502 and captures Sentry', async () => {
       (classifySubject as jest.Mock).mockRejectedValueOnce(
-        new UpstreamLlmError('LLM provider down')
+        new UpstreamLlmError('LLM provider down'),
       );
       (captureException as jest.Mock).mockClear();
 
@@ -289,7 +307,7 @@ describe('subject routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ text: 'Photosynthesis lesson' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(502);
@@ -298,7 +316,7 @@ describe('subject routes', () => {
 
     it('[CR-651] captures generic classify errors to Sentry and returns 500', async () => {
       (classifySubject as jest.Mock).mockRejectedValueOnce(
-        new Error('unexpected boom')
+        new Error('unexpected boom'),
       );
       (captureException as jest.Mock).mockClear();
 
@@ -309,7 +327,7 @@ describe('subject routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ text: 'Photosynthesis lesson' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(500);
@@ -326,7 +344,7 @@ describe('subject routes', () => {
       const res = await app.request(
         '/v1/subjects',
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -356,7 +374,7 @@ describe('subject routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ name: 'Mathematics' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(201);
@@ -389,7 +407,7 @@ describe('subject routes', () => {
           },
           structureType: 'broad',
           bookCount: 4,
-        })
+        }),
       );
 
       const res = await app.request(
@@ -399,7 +417,7 @@ describe('subject routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ name: 'World History' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(201);
@@ -416,7 +434,7 @@ describe('subject routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ name: '' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -433,7 +451,7 @@ describe('subject routes', () => {
             rawInput: 'ants',
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(201);
@@ -452,7 +470,7 @@ describe('subject routes', () => {
           body: JSON.stringify({ name: 'Mathematics' }),
           headers: { 'Content-Type': 'application/json' },
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);
@@ -475,7 +493,7 @@ describe('subject routes', () => {
             startingLevel: 'A2',
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -488,10 +506,10 @@ describe('subject routes', () => {
 
     it('[FIX-API-6] returns 404 when SubjectNotFoundError is thrown (typed instanceof)', async () => {
       const { configureLanguageSubject } = jest.requireMock(
-        '../services/subject'
+        '../services/subject',
       );
       configureLanguageSubject.mockRejectedValueOnce(
-        new SubjectNotFoundError()
+        new SubjectNotFoundError(),
       );
 
       const res = await app.request(
@@ -504,7 +522,7 @@ describe('subject routes', () => {
             startingLevel: 'A1',
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(404);
@@ -514,10 +532,10 @@ describe('subject routes', () => {
 
     it('returns 422 when subject is not a language subject (typed SubjectNotLanguageLearningError)', async () => {
       const { configureLanguageSubject } = jest.requireMock(
-        '../services/subject'
+        '../services/subject',
       );
       configureLanguageSubject.mockRejectedValueOnce(
-        new SubjectNotLanguageLearningError()
+        new SubjectNotLanguageLearningError(),
       );
 
       const res = await app.request(
@@ -530,7 +548,7 @@ describe('subject routes', () => {
             startingLevel: 'A1',
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(422);
@@ -543,10 +561,10 @@ describe('subject routes', () => {
     // route uses instanceof and not string-matching.
     it('[BUG-SUBJ-LANG] generic Error with matching message text does NOT map to 422 (falls through to 500)', async () => {
       const { configureLanguageSubject } = jest.requireMock(
-        '../services/subject'
+        '../services/subject',
       );
       configureLanguageSubject.mockRejectedValueOnce(
-        new Error('Subject is not configured for language learning')
+        new Error('Subject is not configured for language learning'),
       );
 
       const res = await app.request(
@@ -559,7 +577,7 @@ describe('subject routes', () => {
             startingLevel: 'A1',
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(500);
@@ -576,7 +594,7 @@ describe('subject routes', () => {
             startingLevel: 'Z9',
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -590,7 +608,7 @@ describe('subject routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({}),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -606,7 +624,7 @@ describe('subject routes', () => {
             nativeLanguage: 'en',
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -623,7 +641,7 @@ describe('subject routes', () => {
             startingLevel: 'A1',
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);
@@ -639,7 +657,7 @@ describe('subject routes', () => {
       const res = await app.request(
         '/v1/subjects/some-id',
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -655,7 +673,7 @@ describe('subject routes', () => {
       const res = await app.request(
         '/v1/subjects/nonexistent-id',
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(404);
@@ -683,7 +701,7 @@ describe('subject routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ name: 'Updated Subject' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -703,7 +721,7 @@ describe('subject routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ name: 'Nope' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(404);
@@ -719,7 +737,7 @@ describe('subject routes', () => {
           body: JSON.stringify({ name: 'Updated Subject' }),
           headers: { 'Content-Type': 'application/json' },
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);

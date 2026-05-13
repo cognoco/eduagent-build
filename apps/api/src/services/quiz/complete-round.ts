@@ -359,6 +359,7 @@ export async function completeQuizRound(
 
     await recordPracticeActivityEvent(tx as unknown as Database, {
       profileId,
+      subjectId: round.subjectId ?? null,
       activityType: 'quiz',
       activitySubtype: round.activityType,
       completedAt,
