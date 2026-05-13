@@ -185,7 +185,7 @@ describe('SessionFooter', () => {
     render(<SessionFooter {...(props as any)} />);
 
     expect(screen.getByTestId('note-text-input').props.placeholder).toBe(
-      'Summarize this in your own words...',
+      'What should we remember from this session?',
     );
   });
 });

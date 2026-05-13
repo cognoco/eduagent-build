@@ -33,23 +33,31 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
-jest.mock('../../../../lib/navigation', () => ({
-  goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
-}));
-
-jest.mock('../../../../lib/platform-alert', () => ({
-  platformAlert: jest.fn(),
-}));
+jest.mock(
+  '../../../../lib/navigation' /* gc1-allow: route fallback helper is asserted through focused route behavior here */,
+  () => ({
+    goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
+  }),
+);
 
 // ---------------------------------------------------------------------------
 // Profile (IDOR guard — profiles must include child-001)
 // ---------------------------------------------------------------------------
 
-jest.mock('../../../../lib/profile', () => ({
-  useProfile: () => ({
-    profiles: [{ id: 'child-001' }],
+jest.mock(
+  '../../../../lib/profile' /* gc1-allow: profile context requires app provider setup; this test controls the owned child profile only */,
+  () => ({
+    useProfile: () => ({
+      profiles: [
+        {
+          id: 'child-001',
+          displayName: 'Emma',
+          createdAt: '2026-01-01T00:00:00.000Z',
+        },
+      ],
+    }),
   }),
-}));
+);
 
 // ---------------------------------------------------------------------------
 // Dashboard hooks
@@ -58,97 +66,27 @@ jest.mock('../../../../lib/profile', () => ({
 const mockUseChildDetail = jest.fn();
 const mockUseChildSessions = jest.fn();
 
-jest.mock('../../../../hooks/use-dashboard', () => ({
-  useChildDetail: (...args: unknown[]) => mockUseChildDetail(...args),
-  useChildSessions: (...args: unknown[]) => mockUseChildSessions(...args),
-}));
-
-// ---------------------------------------------------------------------------
-// Progress hooks
-// ---------------------------------------------------------------------------
-
-const mockUseChildInventory = jest.fn();
-const mockUseChildProgressHistory = jest.fn();
-const mockUseChildReports = jest.fn();
-const mockUseProfileReports = jest.fn();
-
-jest.mock('../../../../hooks/use-progress', () => ({
-  useChildInventory: (...args: unknown[]) => mockUseChildInventory(...args),
-  useChildProgressHistory: (...args: unknown[]) =>
-    mockUseChildProgressHistory(...args),
-  useChildReports: (...args: unknown[]) => mockUseChildReports(...args),
-  useProfileReports: (...args: unknown[]) => mockUseProfileReports(...args),
-}));
-
-// ---------------------------------------------------------------------------
-// Celebration hooks
-// ---------------------------------------------------------------------------
-
-jest.mock('../../../../hooks/use-celebration', () => ({
-  useCelebration: () => ({ CelebrationOverlay: null }),
-}));
-
-jest.mock('../../../../hooks/use-celebrations', () => ({
-  usePendingCelebrations: () => ({ data: [] }),
-  useMarkCelebrationsSeen: () => ({ mutateAsync: jest.fn() }),
-}));
-
-// ---------------------------------------------------------------------------
-// Consent hooks
-// ---------------------------------------------------------------------------
-
-const mockUseChildConsentStatus = jest.fn();
-const mockUseRevokeConsent = jest.fn();
-const mockUseRestoreConsent = jest.fn();
-
-jest.mock('../../../../hooks/use-consent', () => ({
-  useChildConsentStatus: (...args: unknown[]) =>
-    mockUseChildConsentStatus(...args),
-  useRevokeConsent: (...args: unknown[]) => mockUseRevokeConsent(...args),
-  useRestoreConsent: (...args: unknown[]) => mockUseRestoreConsent(...args),
-}));
+jest.mock(
+  '../../../../hooks/use-dashboard' /* gc1-allow: query hooks require API client and QueryClientProvider; route rendering owns response handling */,
+  () => ({
+    useChildDetail: (...args: unknown[]) => mockUseChildDetail(...args),
+    useChildSessions: (...args: unknown[]) => mockUseChildSessions(...args),
+  }),
+);
 
 // ---------------------------------------------------------------------------
 // Learner-profile hooks
 // ---------------------------------------------------------------------------
 
 const mockUseChildLearnerProfile = jest.fn();
-const mockUseUpdateAccommodationMode = jest.fn();
-
-jest.mock('../../../../hooks/use-learner-profile', () => ({
-  useChildLearnerProfile: (...args: unknown[]) =>
-    mockUseChildLearnerProfile(...args),
-  useUpdateAccommodationMode: (...args: unknown[]) =>
-    mockUseUpdateAccommodationMode(...args),
-}));
 
 jest.mock(
-  '../../../../hooks/use-settings' /* gc1-allow: query-hook stub at unit-test boundary; real hooks need QueryClientProvider + API client */,
+  '../../../../hooks/use-learner-profile' /* gc1-allow: query hook requires API client and QueryClientProvider; row rendering only needs the selected preference */,
   () => ({
-    useChildCelebrationLevel: () => ({ data: 'big_only' }),
-    useUpdateChildCelebrationLevel: () => ({
-      mutate: jest.fn(),
-      isPending: false,
-    }),
+    useChildLearnerProfile: (...args: unknown[]) =>
+      mockUseChildLearnerProfile(...args),
   }),
 );
-
-// ---------------------------------------------------------------------------
-// Progress components (avoid rendering complex chart internals)
-// ---------------------------------------------------------------------------
-
-const mockCurrentlyWorkingOnCard = jest.fn();
-
-jest.mock('../../../../components/progress', () => ({
-  GrowthChart: () => null,
-  CurrentlyWorkingOnCard: (...args: unknown[]) =>
-    mockCurrentlyWorkingOnCard(...args),
-  RecentSessionsList: () => null,
-  ReportsListCard: () => null,
-  RetentionSignal: () => null,
-  SubjectCard: () => null,
-  hasSubjectActivity: () => false,
-}));
 
 // ---------------------------------------------------------------------------
 // Module under test (required AFTER all mocks are set up)
@@ -184,17 +122,6 @@ function setupDefaultMocks() {
     refetch: jest.fn(),
   });
 
-  mockUseChildInventory.mockReturnValue({ data: undefined });
-  mockUseChildProgressHistory.mockReturnValue({ data: undefined });
-  mockUseChildReports.mockReturnValue({ data: [] });
-  mockUseProfileReports.mockReturnValue({ data: [] });
-
-  mockUseChildConsentStatus.mockReturnValue({
-    data: { consentStatus: 'CONSENTED', respondedAt: null },
-    isError: false,
-    refetch: jest.fn(),
-  });
-
   mockUseChildLearnerProfile.mockReturnValue({
     data: {
       accommodationMode: 'none',
@@ -202,20 +129,6 @@ function setupDefaultMocks() {
       updatedAt: null,
     },
   });
-
-  mockUseRevokeConsent.mockReturnValue({
-    mutateAsync: jest.fn(),
-    isPending: false,
-  });
-  mockUseRestoreConsent.mockReturnValue({
-    mutateAsync: jest.fn(),
-    isPending: false,
-  });
-  mockUseUpdateAccommodationMode.mockReturnValue({
-    mutate: jest.fn(),
-    isPending: false,
-  });
-  mockCurrentlyWorkingOnCard.mockReturnValue(null);
 }
 
 // ---------------------------------------------------------------------------
@@ -263,29 +176,19 @@ describe('ChildDetailScreen — accommodation nav row', () => {
   });
 });
 
-describe('ChildDetailScreen — new sections', () => {
+describe('ChildDetailScreen — profile overview', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     setupDefaultMocks();
   });
 
-  // Weekly headline card
-  it('shows child-weekly-headline-card when weeklyHeadline is set', () => {
-    mockUseChildDetail.mockReturnValue({
-      data: {
-        displayName: 'Emma',
-        summary: 'Year 6',
-        currentStreak: 0,
-        totalXp: 0,
-        progress: null,
-        subjects: [],
-        weeklyHeadline: {
-          label: 'Topics mastered',
-          value: 5,
-          comparison: 'up from 3 last week',
+  it('shows a last-session signal in the header when sessions exist', () => {
+    mockUseChildSessions.mockReturnValue({
+      data: [
+        {
+          startedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
         },
-        currentlyWorkingOn: [],
-      },
+      ],
       isLoading: false,
       isError: false,
       refetch: jest.fn(),
@@ -293,32 +196,56 @@ describe('ChildDetailScreen — new sections', () => {
 
     render(<ChildDetailScreen />);
 
-    expect(screen.getByTestId('child-weekly-headline-card')).toBeTruthy();
+    screen.getByText(/2 hours ago/);
   });
 
-  it('hides child-weekly-headline-card when weeklyHeadline is absent', () => {
+  it('shows a no-sessions-yet header signal when there is no session history', () => {
     render(<ChildDetailScreen />);
 
-    expect(screen.queryByTestId('child-weekly-headline-card')).toBeNull();
+    screen.getByText(/No sessions yet|parentView\.index\.noSessionsYet/);
   });
 
-  // Reports button
-  it('shows reports button that navigates to reports list', () => {
+  it('links to the child mentor memory management screen', () => {
     render(<ChildDetailScreen />);
 
-    expect(screen.getByTestId('child-reports-button')).toBeTruthy();
+    fireEvent.press(screen.getByTestId('mentor-memory-link'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/child/[profileId]/mentor-memory',
+      params: { profileId: 'child-001' },
+    });
   });
 
-  // Currently-working-on card
-  it('mounts CurrentlyWorkingOnCard with child-currently-working-on testID when items exist', () => {
+  it('shows profile details when the profile already has a created date', () => {
+    render(<ChildDetailScreen />);
+
+    screen.getByTestId('child-profile-details');
+  });
+
+  it('does not duplicate progress, reports, subjects, recent sessions, or consent sections', () => {
     mockUseChildDetail.mockReturnValue({
       data: {
         displayName: 'Emma',
         summary: 'Year 6',
         currentStreak: 0,
         totalXp: 0,
-        progress: null,
-        subjects: [],
+        progress: {
+          snapshotDate: '2026-05-13',
+          topicsMastered: 3,
+          vocabularyTotal: 10,
+          minutesThisWeek: 20,
+          weeklyDeltaTopicsMastered: 1,
+          weeklyDeltaVocabularyTotal: 2,
+          weeklyDeltaTopicsExplored: 3,
+          engagementTrend: 'stable',
+          guidance: 'Keep going',
+        },
+        subjects: [{ name: 'Math', retentionStatus: 'strong' }],
+        weeklyHeadline: {
+          label: 'Topics mastered',
+          value: 5,
+          comparison: 'up from 3 last week',
+        },
         currentlyWorkingOn: ['Algebra'],
       },
       isLoading: false,
@@ -328,93 +255,9 @@ describe('ChildDetailScreen — new sections', () => {
 
     render(<ChildDetailScreen />);
 
-    expect(mockCurrentlyWorkingOnCard).toHaveBeenCalledWith(
-      expect.objectContaining({ testID: 'child-currently-working-on' }),
-      undefined,
-    );
-  });
-
-  it('does not mount CurrentlyWorkingOnCard when currentlyWorkingOn is empty', () => {
-    render(<ChildDetailScreen />);
-
-    expect(mockCurrentlyWorkingOnCard).not.toHaveBeenCalled();
-  });
-});
-
-describe('ChildDetailScreen — restricted consent', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    setupDefaultMocks();
-  });
-
-  it('shows a consent-focused page instead of learning controls while consent is pending', () => {
-    mockUseChildDetail.mockReturnValue({
-      data: {
-        displayName: 'Emma',
-        summary:
-          'Emma: consent is pending. Learning metrics are hidden until consent is active.',
-        consentStatus: 'PENDING',
-        currentStreak: 0,
-        totalXp: 0,
-        progress: null,
-        subjects: [],
-      },
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
-    });
-    mockUseChildConsentStatus.mockReturnValue({
-      data: { consentStatus: 'PENDING', respondedAt: null },
-      isError: false,
-      refetch: jest.fn(),
-    });
-
-    render(<ChildDetailScreen />);
-
-    screen.getByTestId('consent-required-panel');
-    screen.getByTestId('check-consent-status-button');
-    expect(
-      screen.queryByTestId('child-accommodation-row-child-001'),
-    ).toBeNull();
-    expect(mockUseChildInventory).toHaveBeenCalledWith('child-001', {
-      enabled: false,
-    });
-  });
-
-  it('makes restore consent the single primary action for withdrawn consent', () => {
-    const mutateAsync = jest.fn();
-    mockUseRestoreConsent.mockReturnValue({
-      mutateAsync,
-      isPending: false,
-    });
-    mockUseChildDetail.mockReturnValue({
-      data: {
-        displayName: 'Emma',
-        summary:
-          'Emma: consent has been withdrawn. Learning metrics are hidden.',
-        consentStatus: 'WITHDRAWN',
-        currentStreak: 0,
-        totalXp: 0,
-        progress: null,
-        subjects: [],
-      },
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
-    });
-    mockUseChildConsentStatus.mockReturnValue({
-      data: {
-        consentStatus: 'WITHDRAWN',
-        respondedAt: new Date().toISOString(),
-      },
-      isError: false,
-      refetch: jest.fn(),
-    });
-
-    render(<ChildDetailScreen />);
-
-    fireEvent.press(screen.getByTestId('cancel-deletion-button'));
-    expect(mutateAsync).toHaveBeenCalled();
-    expect(screen.queryByTestId('check-consent-status-button')).toBeNull();
+    expect(screen.queryByTestId('child-weekly-headline-card')).toBeNull();
+    expect(screen.queryByTestId('child-reports-button')).toBeNull();
+    expect(screen.queryByTestId('growth-teaser')).toBeNull();
+    expect(screen.queryByTestId('consent-section')).toBeNull();
   });
 });
