@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import { createDatabaseModuleMock } from '../../test-utils/database-module';
+import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 
 const mockDatabaseModule = createDatabaseModuleMock();
 
@@ -10,10 +11,13 @@ jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
 const mockArchiveInactiveSubjects = jest.fn().mockResolvedValue([]);
 
-jest.mock('../../services/subject', () => ({
-  archiveInactiveSubjects: (...args: unknown[]) =>
-    mockArchiveInactiveSubjects(...args),
-}));
+jest.mock(
+  '../../services/subject' /* gc1-allow: prevents real DB subject archival from running in unit tests */,
+  () => ({
+    archiveInactiveSubjects: (...args: unknown[]) =>
+      mockArchiveInactiveSubjects(...args),
+  }),
+);
 
 import { subjectAutoArchive } from './subject-auto-archive';
 
@@ -32,20 +36,16 @@ interface SubjectAutoArchiveResult {
 
 async function executeSteps(): Promise<{
   result: SubjectAutoArchiveResult;
-  mockStep: { run: jest.Mock; sleep: jest.Mock };
 }> {
-  const mockStep = {
-    run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
-    sleep: jest.fn(),
-  };
+  const { step } = createInngestStepRunner();
 
   const handler = (subjectAutoArchive as any).fn;
   const result = (await handler({
     event: { name: 'inngest/function.invoked' },
-    step: mockStep,
+    step,
   })) as SubjectAutoArchiveResult;
 
-  return { result, mockStep };
+  return { result };
 }
 
 beforeEach(() => {

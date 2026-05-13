@@ -1,26 +1,27 @@
 import { scheduledDeletion } from './account-deletion';
+import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 
 const mockGetStepDatabase = jest.fn();
 const mockAccountExists = jest.fn();
 const mockIsDeletionCancelled = jest.fn();
 const mockExecuteDeletion = jest.fn();
 
-jest.mock('../helpers', () => ({
-  getStepDatabase: () => mockGetStepDatabase(),
-}));
+jest.mock(
+  '../helpers' /* gc1-allow: getStepDatabase wraps Inngest step-level DB acquisition; must be intercepted to inject mockDb without a real Neon connection */,
+  () => ({
+    getStepDatabase: () => mockGetStepDatabase(),
+  }),
+);
 
-jest.mock('../../services/deletion', () => ({
-  accountExists: (...args: unknown[]) => mockAccountExists(...args),
-  isDeletionCancelled: (...args: unknown[]) => mockIsDeletionCancelled(...args),
-  executeDeletion: (...args: unknown[]) => mockExecuteDeletion(...args),
-}));
-
-function createMockStep() {
-  return {
-    sleep: jest.fn().mockResolvedValue(undefined),
-    run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
-  };
-}
+jest.mock(
+  '../../services/deletion' /* gc1-allow: prevents destructive account deletion in unit tests */,
+  () => ({
+    accountExists: (...args: unknown[]) => mockAccountExists(...args),
+    isDeletionCancelled: (...args: unknown[]) =>
+      mockIsDeletionCancelled(...args),
+    executeDeletion: (...args: unknown[]) => mockExecuteDeletion(...args),
+  }),
+);
 
 describe('scheduledDeletion', () => {
   const mockDb = { query: {} };
@@ -46,12 +47,12 @@ describe('scheduledDeletion', () => {
     expect(triggers).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ event: 'app/account.deletion-scheduled' }),
-      ])
+      ]),
     );
   });
 
   it('sleeps for 7-day grace period before checking cancellation', async () => {
-    const step = createMockStep();
+    const { step, sleepCalls } = createInngestStepRunner();
     mockIsDeletionCancelled.mockResolvedValue(false);
     mockExecuteDeletion.mockResolvedValue(undefined);
 
@@ -61,11 +62,11 @@ describe('scheduledDeletion', () => {
       step,
     });
 
-    expect(step.sleep).toHaveBeenCalledWith('grace-period', '7d');
+    expect(sleepCalls).toContainEqual({ name: 'grace-period', duration: '7d' });
   });
 
   it('returns cancelled status when deletion was cancelled during grace period', async () => {
-    const step = createMockStep();
+    const { step } = createInngestStepRunner();
     mockIsDeletionCancelled.mockResolvedValue(true);
 
     const handler = (scheduledDeletion as any).fn;
@@ -80,7 +81,7 @@ describe('scheduledDeletion', () => {
   });
 
   it('executes deletion when not cancelled', async () => {
-    const step = createMockStep();
+    const { step } = createInngestStepRunner();
     mockIsDeletionCancelled.mockResolvedValue(false);
     mockExecuteDeletion.mockResolvedValue(undefined);
 
@@ -95,7 +96,7 @@ describe('scheduledDeletion', () => {
   });
 
   it('calls getStepDatabase inside each step.run closure', async () => {
-    const step = createMockStep();
+    const { step } = createInngestStepRunner();
     mockIsDeletionCancelled.mockResolvedValue(false);
     mockExecuteDeletion.mockResolvedValue(undefined);
 
@@ -117,7 +118,7 @@ describe('scheduledDeletion', () => {
   // completions, and so we don't issue a no-op DELETE that misleadingly
   // reports 'deleted'.
   it('[BREAK / BUG-844] returns already_deleted without running cancellation/deletion when account is gone', async () => {
-    const step = createMockStep();
+    const { step } = createInngestStepRunner();
     mockAccountExists.mockResolvedValue(false);
 
     const handler = (scheduledDeletion as any).fn;
@@ -135,17 +136,38 @@ describe('scheduledDeletion', () => {
   });
 
   it('[BUG-844] still sleeps 7d before checking accountExists (no instant fast-path)', async () => {
-    const step = createMockStep();
+    // Use a shared call-order log to verify sleep precedes all step.run calls.
+    const callOrder: Array<{ kind: 'sleep' | 'run'; name: string }> = [];
+    const { step, sleepCalls } = createInngestStepRunner();
+
+    // Wrap the step to record interleaved call order.
+    const trackedStep = {
+      run: async (name: string, fn: () => Promise<unknown>) => {
+        callOrder.push({ kind: 'run', name });
+        return step.run(name, fn);
+      },
+      sleep: async (name: string, duration: string) => {
+        callOrder.push({ kind: 'sleep', name });
+        return step.sleep(name, duration);
+      },
+    };
+
     mockAccountExists.mockResolvedValue(false);
 
     const handler = (scheduledDeletion as any).fn;
-    await handler({ event: { data: { accountId: 'acc-1' } }, step });
+    await handler({
+      event: { data: { accountId: 'acc-1' } },
+      step: trackedStep,
+    });
 
-    expect(step.sleep).toHaveBeenCalledWith('grace-period', '7d');
-    // Order check: sleep must have been called before any step.run.
-    const sleepOrder = step.sleep.mock.invocationCallOrder[0]!;
-    const firstRunOrder = step.run.mock.invocationCallOrder[0]!;
-    expect(sleepOrder).toBeLessThan(firstRunOrder);
+    expect(sleepCalls).toContainEqual({ name: 'grace-period', duration: '7d' });
+    // Order check: sleep must appear before any step.run in the interleaved log.
+    const sleepIdx = callOrder.findIndex(
+      (c) => c.kind === 'sleep' && c.name === 'grace-period',
+    );
+    const firstRunIdx = callOrder.findIndex((c) => c.kind === 'run');
+    expect(sleepIdx).toBeGreaterThanOrEqual(0);
+    expect(firstRunIdx).toBeGreaterThan(sleepIdx);
   });
 });
 
