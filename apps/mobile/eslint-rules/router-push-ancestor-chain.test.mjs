@@ -58,9 +58,17 @@ ruleTester.run('router-push-ancestor-chain', rule, {
       code: "router.push({ pathname: '/(app)/shelf/[subjectId]/note/[noteId]', params: { subjectId, noteId } });",
       ...fileInsideShelfStack,
     },
-    // gc4-allow annotation (case c)
+    // gc4-allow annotation (case c) — trailing form
     {
       code: "router.push('/(app)/shelf/[subjectId]/book/[bookId]'); // gc4-allow: parent already on stack via app state",
+      ...fileUnderLibrary,
+    },
+    // gc4-allow annotation — leading-line form (developer writes the
+    // annotation ABOVE the call). Locks behavior so a future ESLint upgrade
+    // that changes comment attachment cannot silently break this path.
+    {
+      code: `// gc4-allow: parent already on stack
+router.push('/(app)/shelf/[subjectId]/book/[bookId]');`,
       ...fileUnderLibrary,
     },
     // Non-router callees ignored

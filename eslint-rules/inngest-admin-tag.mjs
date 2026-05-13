@@ -18,14 +18,18 @@
  *
  * Rule scope: `apps/api/src/inngest/functions/*.ts` (non-test).
  *
- * Severity: `warn` for now — there is a known backlog of ~11 untagged
+ * Severity: `warn` for now — there is a known backlog of ~17 untagged
  * functions whose annotation value depends on case-by-case review
  * (cross-profile vs. single-profile parent-chain). The rule's
  * primary job is to stop NEW untagged functions; the backlog can be
  * worked down in a dedicated sweep.
  *
- * See docs/_archive/plans/done/2026-05-03-governance-audit.md (item GC5)
- * and CLAUDE.md > Non-Negotiable Engineering Rules.
+ * Deferred sweep tracked in
+ *   docs/_archive/plans/done/2026-05-03-governance-audit.md  (item GC5)
+ * — that doc records the 17-file count and the promotion-to-`error`
+ * gating condition. Promotion happens after the sweep PR lands.
+ *
+ * See CLAUDE.md > Non-Negotiable Engineering Rules.
  */
 
 const RAW_DB_METHODS = new Set([
@@ -53,26 +57,34 @@ function isRawDbAccess(node) {
 }
 
 function hasAdminTagInLeadingComments(sourceCode) {
-  // Look at the first ~25 lines of comments at the top of the file. The
-  // canonical placement (per existing tagged functions like
-  // daily-reminder-scan.ts) is line 1 as a single-line comment.
+  // Scan every comment in the file. The canonical placement is a line-1
+  // single-line comment (see daily-reminder-scan.ts), but legitimate files
+  // may have a copyright / JSDoc block above the tag. Comment counts are
+  // small and getAllComments() is O(n) — no reason to gate this by line.
   const comments = sourceCode.getAllComments();
   for (const c of comments) {
-    if (c.loc && c.loc.start.line > 25) break;
     if (/@inngest-admin:\s*\S/.test(c.value)) return true;
   }
   return false;
 }
 
 function importsCreateScopedRepository(sourceCode) {
-  // Scan tokens (not raw text) so `createScopedRepository` mentions inside
-  // comments or string literals don't cause the rule to skip a file that
-  // genuinely bypasses the scoped repo. Identifier tokens are the only way
-  // the name appears in real code (imports, references, call callees).
-  const tokens = sourceCode.ast?.tokens ?? [];
-  for (const t of tokens) {
-    if (t.type === 'Identifier' && t.value === 'createScopedRepository') {
-      return true;
+  // Walk top-level ImportDeclaration nodes — parser-agnostic and immune to
+  // `createScopedRepository` mentions inside comments or string literals.
+  // (A token-based scan also works on espree but breaks under TS-aware
+  // parsers that drop the tokens array.)
+  const body = sourceCode.ast?.body ?? [];
+  for (const n of body) {
+    if (n.type !== 'ImportDeclaration') continue;
+    for (const spec of n.specifiers ?? []) {
+      const local = spec.local?.name;
+      const imported =
+        spec.type === 'ImportSpecifier'
+          ? spec.imported?.name ?? spec.imported?.value
+          : null;
+      if (local === 'createScopedRepository' || imported === 'createScopedRepository') {
+        return true;
+      }
     }
   }
   return false;

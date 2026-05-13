@@ -36,6 +36,14 @@ const WRAPPER_FUNCTIONS = new Set([
   'deleteItemAsync',
 ]);
 
+// Intentional scope: we match on function NAME only (`getItemAsync`,
+// `setItemAsync`, `deleteItemAsync`) regardless of import source. This is
+// safe in practice because the mobile config bans direct `expo-secure-store`
+// imports outside `lib/secure-storage` (see G2 in apps/mobile/eslint.config.mjs),
+// so any call with these names in mobile source code is a SecureStore
+// wrapper call. A third-party library that exposed an object with one of
+// these method names could create a false positive, but no such library is
+// currently in scope — accept that trade-off for rule simplicity.
 function isWrapperCall(node) {
   const callee = node.callee;
   if (!callee) return false;
