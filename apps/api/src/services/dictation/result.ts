@@ -26,8 +26,10 @@ export async function recordDictationResult(
   input: RecordResultInput,
 ) {
   return db.transaction(async (tx) => {
+    // Known Drizzle pattern: PgTransaction -> Database cast (see docs/plans/2026-05-12-practice-activity-summary-service.md Phase 3).
     const txDb = tx as unknown as Database;
     const repo = createScopedRepository(txDb, profileId);
+    const completedAt = new Date();
     const row = await repo.dictationResults.insert({
       date: input.localDate,
       sentenceCount: input.sentenceCount,
@@ -42,7 +44,7 @@ export async function recordDictationResult(
       subjectId: input.subjectId ?? null,
       activityType: 'dictation',
       activitySubtype: input.mode,
-      completedAt: new Date(`${input.localDate}T00:00:00.000Z`),
+      completedAt,
       score:
         input.mistakeCount == null
           ? null

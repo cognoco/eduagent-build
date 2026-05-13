@@ -7,7 +7,9 @@ describe('buildPracticeActivityDedupeKey', () => {
       sourceType: 'topic',
       sourceId: 'topic-123',
     });
-    expect(key).toBe('quiz:topic:topic-123');
+    expect(key).toBe(
+      'activity=quiz|sourceType=topic|subtype=null|sourceId=topic-123|occurrence=null',
+    );
   });
 
   it('appends subtype when activitySubtype is provided', () => {
@@ -17,7 +19,9 @@ describe('buildPracticeActivityDedupeKey', () => {
       sourceType: 'topic',
       sourceId: 'topic-123',
     });
-    expect(key).toBe('quiz:topic:multiple_choice:topic-123');
+    expect(key).toBe(
+      'activity=quiz|sourceType=topic|subtype=value(multiple_choice)|sourceId=topic-123|occurrence=null',
+    );
   });
 
   it('omits subtype segment when activitySubtype is null', () => {
@@ -27,7 +31,9 @@ describe('buildPracticeActivityDedupeKey', () => {
       sourceType: 'topic',
       sourceId: 'topic-123',
     });
-    expect(key).toBe('quiz:topic:topic-123');
+    expect(key).toBe(
+      'activity=quiz|sourceType=topic|subtype=null|sourceId=topic-123|occurrence=null',
+    );
   });
 
   it('appends occurrenceKey when provided', () => {
@@ -37,7 +43,9 @@ describe('buildPracticeActivityDedupeKey', () => {
       sourceId: 'book-456',
       occurrenceKey: 'session-789',
     });
-    expect(key).toBe('review:book:book-456:session-789');
+    expect(key).toBe(
+      'activity=review|sourceType=book|subtype=null|sourceId=book-456|occurrence=value(session-789)',
+    );
   });
 
   it('includes both subtype and occurrenceKey when both are provided', () => {
@@ -48,7 +56,9 @@ describe('buildPracticeActivityDedupeKey', () => {
       sourceId: 'topic-abc',
       occurrenceKey: 'occ-1',
     });
-    expect(key).toBe('dictation:topic:sentence:topic-abc:occ-1');
+    expect(key).toBe(
+      'activity=dictation|sourceType=topic|subtype=value(sentence)|sourceId=topic-abc|occurrence=value(occ-1)',
+    );
   });
 
   it('omits occurrenceKey segment when occurrenceKey is null', () => {
@@ -58,6 +68,21 @@ describe('buildPracticeActivityDedupeKey', () => {
       sourceId: 'topic-123',
       occurrenceKey: null,
     });
-    expect(key).toBe('quiz:topic:topic-123');
+    expect(key).toBe(
+      'activity=quiz|sourceType=topic|subtype=null|sourceId=topic-123|occurrence=null',
+    );
+  });
+
+  it('keeps sourceType and subtype boundaries explicit when values contain colons', () => {
+    const key = buildPracticeActivityDedupeKey({
+      activityType: 'quiz',
+      activitySubtype: 'b:c',
+      sourceType: 'a:b',
+      sourceId: 'topic-123',
+    });
+
+    expect(key).toBe(
+      'activity=quiz|sourceType=a%3Ab|subtype=value(b%3Ac)|sourceId=topic-123|occurrence=null',
+    );
   });
 });

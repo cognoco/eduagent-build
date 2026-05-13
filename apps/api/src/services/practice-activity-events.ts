@@ -27,9 +27,17 @@ export function buildPracticeActivityDedupeKey(
     'activityType' | 'sourceType' | 'sourceId' | 'activitySubtype'
   > & { occurrenceKey?: string | null },
 ): string {
-  const subtype = input.activitySubtype ? `:${input.activitySubtype}` : '';
-  const occurrence = input.occurrenceKey ? `:${input.occurrenceKey}` : '';
-  return `${input.activityType}:${input.sourceType}${subtype}:${input.sourceId}${occurrence}`;
+  const encodeSegment = (value: string) => encodeURIComponent(value);
+  const encodeOptionalSegment = (value?: string | null) =>
+    value == null ? 'null' : `value(${encodeSegment(value)})`;
+
+  return [
+    `activity=${encodeSegment(input.activityType)}`,
+    `sourceType=${encodeSegment(input.sourceType)}`,
+    `subtype=${encodeOptionalSegment(input.activitySubtype)}`,
+    `sourceId=${encodeSegment(input.sourceId)}`,
+    `occurrence=${encodeOptionalSegment(input.occurrenceKey)}`,
+  ].join('|');
 }
 
 export async function recordPracticeActivityEvent(

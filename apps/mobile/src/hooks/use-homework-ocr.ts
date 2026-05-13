@@ -99,7 +99,7 @@ function hasHomeworkCue(text: string): boolean {
     return true;
   }
 
-  if (/[?!.:]/.test(text)) {
+  if (/[?!:]/.test(text)) {
     return true;
   }
 
@@ -374,16 +374,6 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
       }
 
       try {
-        const serverResult = await tryServerFallback(uri, controller.signal);
-        if (controller.signal.aborted) return;
-        if (serverResult && resolveSuccess(serverResult, 'server')) {
-          return;
-        }
-        if (serverResult?.text) {
-          finishAsError(NON_HOMEWORK_ERROR_MESSAGE);
-          return;
-        }
-
         const recognized = await recognizeText(uri);
         // [BUG-681] The native ML Kit call cannot be aborted, so the only
         // defense is to drop its result if the user cancelled while it ran.
@@ -419,6 +409,24 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
             recognized.confidence,
           );
           trackHomeworkOcrGateShortcircuit(rejectedMetrics);
+          const serverResult = await tryServerFallback(uri, controller.signal);
+          if (controller.signal.aborted) return;
+          if (serverResult && resolveSuccess(serverResult, 'server')) {
+            return;
+          }
+          if (serverResult?.text) {
+            finishAsError(NON_HOMEWORK_ERROR_MESSAGE);
+            return;
+          }
+          finishAsError(NON_HOMEWORK_ERROR_MESSAGE);
+          return;
+        }
+        const serverResult = await tryServerFallback(uri, controller.signal);
+        if (controller.signal.aborted) return;
+        if (serverResult && resolveSuccess(serverResult, 'server')) {
+          return;
+        }
+        if (serverResult?.text) {
           finishAsError(NON_HOMEWORK_ERROR_MESSAGE);
           return;
         }

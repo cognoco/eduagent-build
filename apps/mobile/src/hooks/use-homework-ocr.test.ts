@@ -57,6 +57,9 @@ jest.mock('expo-file-system/legacy', () => ({
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockFetch.mockReset();
+  mockRecognize.mockReset();
+  mockManipulateAsync.mockReset();
   mockManipulateAsync.mockResolvedValue({ uri: 'file:///cache/resized.jpg' });
   global.fetch = mockFetch as typeof fetch;
 });
@@ -154,7 +157,11 @@ describe('useHomeworkOcr', () => {
         confidence: 0.88,
       }),
     );
-    expect(mockTrackHomeworkOcrGateRejected).not.toHaveBeenCalled();
+    expect(mockTrackHomeworkOcrGateRejected).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: 'local',
+      }),
+    );
   });
 
   it('escalates short cue-less OCR fragments instead of accepting them as problems', async () => {
@@ -197,20 +204,22 @@ describe('useHomeworkOcr', () => {
     );
   });
 
-  it('uses server vision OCR before local OCR when the server can read the photo', async () => {
+  it('does not treat abbreviation periods as homework cues', async () => {
     mockRecognize.mockResolvedValue({
-      text: 'Radissen\nCryiy\nan\nWhal',
+      text: 'Dr. Smith',
       confidence: 0.9,
     });
-    mockFetch.mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({
-          text: 'What is chasing you',
-          confidence: 0.9,
+    mockFetch
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ text: null, confidence: null }), {
+          status: 200,
         }),
-        { status: 200 },
-      ),
-    );
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ text: null, confidence: null }), {
+          status: 200,
+        }),
+      );
 
     const { result } = renderHook(() => useHomeworkOcr());
 
@@ -218,22 +227,23 @@ describe('useHomeworkOcr', () => {
       await result.current.process('file:///tmp/photo.jpg');
     });
 
-    expect(result.current.status).toBe('done');
-    expect(result.current.text).toBe('What is chasing you');
-    expect(mockRecognize).not.toHaveBeenCalled();
-    expect(mockTrackHomeworkOcrGateAccepted).toHaveBeenCalledWith(
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(result.current.status).toBe('error');
+    expect(result.current.error).toBe(
+      "We couldn't read that clearly. Try taking the photo again with better lighting.",
+    );
+    expect(mockTrackHomeworkOcrGateShortcircuit).toHaveBeenCalledWith(
       expect.objectContaining({
-        source: 'server',
+        confidence: 0.9,
       }),
     );
   });
 
-  it('falls back to local OCR when server vision OCR is unavailable', async () => {
+  it('does not call server OCR when local ML Kit reads clear homework', async () => {
     mockRecognize.mockResolvedValue({
-      text: 'What is chasing you',
+      text: 'Solve for x: 2x + 5 = 13',
       confidence: 0.9,
     });
-    mockFetch.mockRejectedValueOnce(new Error('server unavailable'));
 
     const { result } = renderHook(() => useHomeworkOcr());
 
@@ -241,9 +251,32 @@ describe('useHomeworkOcr', () => {
       await result.current.process('file:///tmp/photo.jpg');
     });
 
-    expect(mockFetch).toHaveBeenCalled();
+    expect(result.current.status).toBe('done');
+    expect(result.current.text).toBe('Solve for x: 2x + 5 = 13');
+    expect(mockRecognize).toHaveBeenCalled();
+    expect(mockFetch).not.toHaveBeenCalled();
+    expect(mockTrackHomeworkOcrGateAccepted).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: 'local',
+      }),
+    );
+  });
+
+  it('does not call server OCR before local OCR on a normal local success', async () => {
+    mockRecognize.mockResolvedValue({
+      text: 'What is chasing you',
+      confidence: 0.9,
+    });
+
+    const { result } = renderHook(() => useHomeworkOcr());
+
+    await act(async () => {
+      await result.current.process('file:///tmp/photo.jpg');
+    });
+
     expect(result.current.status).toBe('done');
     expect(result.current.text).toBe('What is chasing you');
+    expect(mockFetch).not.toHaveBeenCalled();
     expect(mockTrackHomeworkOcrGateAccepted).toHaveBeenCalledWith(
       expect.objectContaining({
         source: 'local',
