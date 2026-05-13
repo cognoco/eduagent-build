@@ -427,17 +427,20 @@ describe('useRefreshProgressSnapshot', () => {
       wrapper,
     });
 
-    await act(async () => {
-      await result.current.mutateAsync();
+    act(() => {
+      result.current.mutate();
+    });
+
+    await waitFor(() => {
+      expect(invalidateSpy).toHaveBeenCalledWith({
+        queryKey: ['progress', 'inventory', 'test-profile-id'],
+      });
     });
 
     const url = String(mockFetch.mock.calls[0]?.[0]);
     const init = mockFetch.mock.calls[0]?.[1] as RequestInit | undefined;
     expect(url).toContain('/progress/refresh');
     expect(init?.method).toBe('POST');
-    expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: ['progress', 'inventory', 'test-profile-id'],
-    });
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: ['dashboard'],
     });
