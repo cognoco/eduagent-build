@@ -75,7 +75,7 @@ Severity recalibration applied per plan: C1 promoted to RED (gates C2 paired tes
 
 **Drift between sources of truth (C7).** Plans claim things the code has done (RLS plan), CLAUDE.md hardcodes machine-specific paths, the SCHEMA-2 plan claims ~50 schemas where actually 22 exist, the cleanup-triage doc has 8 inbound-link conflicts requiring co-changes. Each item is small; the cluster is the meta-issue: docs and code don't agree on what's true.
 
-**Accumulated low-stakes hygiene (C8).** 10 missing Drizzle snapshot files, ~96 memory files for dedupe, vendored bmad commands vs. installed plugin, EduAgent → Mentomate rename sweep, 4 orphan deps, Prettier-3 upgrade. None of it is urgent; all of it accrues entropy if ignored indefinitely.
+**Accumulated low-stakes hygiene (C8).** 10 missing Drizzle snapshot files, ~96 memory files for dedupe, vendored bmad commands vs. installed plugin, EduAgent → MentoMate rename sweep, 4 orphan deps, Prettier-3 upgrade. None of it is urgent; all of it accrues entropy if ignored indefinitely.
 
 ---
 

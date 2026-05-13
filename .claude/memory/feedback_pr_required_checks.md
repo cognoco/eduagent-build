@@ -13,3 +13,5 @@ When a PR shows an expected required check stuck on "Waiting for status to be re
 For Playwright web smoke failures, inspect `error-context.md` plus the trace network log before changing selectors. If the UI shows offline/profile fallbacks and `0-trace.network` has `net::ERR_FAILED`/CORS failures, fix the staging/API target or workflow configuration instead of weakening the assertion.
 
 After pushing a PR fix, `gh pr checks --watch` may briefly say no checks are reported. Wait a few seconds or inspect `gh pr view --json statusCheckRollup` before assuming the push failed to trigger workflows.
+
+Automated review comments can arrive after checks turn green. Before calling a PR ready, do the fresh review/comment sweep required by `CLAUDE.md` / `AGENTS.md` PR Review & CI Protocol (`gh api repos/{owner}/{repo}/pulls/<number>/reviews` and `/comments`), not checks alone.
