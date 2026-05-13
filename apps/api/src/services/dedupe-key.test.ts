@@ -3,6 +3,7 @@ import {
   encodeOptionalDedupeSegment,
   joinDedupeKey,
   buildEmailIdempotencyKey,
+  buildLegacyEmailIdempotencyKey,
 } from './dedupe-key';
 
 describe('encodeDedupeSegment', () => {
@@ -110,5 +111,16 @@ describe('buildEmailIdempotencyKey', () => {
     expect(key).toBe(
       'value(feedback-delivery-failed):value(profile_abc):value(evt_123):value(retry-delivery)',
     );
+  });
+});
+
+describe('buildLegacyEmailIdempotencyKey', () => {
+  it('preserves existing weekly/monthly Resend idempotency format', () => {
+    expect(
+      buildLegacyEmailIdempotencyKey('weekly', 'parent_123', '2026-05-12'),
+    ).toBe('weekly-parent_123-2026-05-12');
+    expect(
+      buildLegacyEmailIdempotencyKey('monthly', 'parent_123', '2026-05'),
+    ).toBe('monthly-parent_123-2026-05');
   });
 });

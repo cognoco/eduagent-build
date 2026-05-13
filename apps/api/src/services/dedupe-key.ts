@@ -23,3 +23,10 @@ export function buildEmailIdempotencyKey(
 ): string {
   return segments.map((s) => encodeOptionalDedupeSegment(s)).join(':');
 }
+
+export function buildLegacyEmailIdempotencyKey(
+  prefix: string,
+  ...segments: string[]
+): string {
+  return joinDedupeKey([prefix, ...segments], '-');
+}

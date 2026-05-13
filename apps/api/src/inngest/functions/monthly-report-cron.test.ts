@@ -847,9 +847,7 @@ describe('monthlyReportGenerate', () => {
         }),
         expect.objectContaining({
           resendApiKey: 'resend-test-key',
-          idempotencyKey: expect.stringContaining(
-            'value(monthly):value(parent-001):',
-          ),
+          idempotencyKey: expect.stringContaining('monthly-parent-001-'),
         }),
       );
     });

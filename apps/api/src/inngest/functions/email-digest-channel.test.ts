@@ -516,9 +516,7 @@ describe('Email digest channel — weekly', () => {
     expect(emailCallArgs).toBeDefined();
     const options = emailCallArgs![1] as { idempotencyKey?: string };
     expect(options.idempotencyKey).toMatch(
-      new RegExp(
-        `^value\\(weekly\\):value\\(${PARENT_ID}\\):value\\(\\d{4}-\\d{2}-\\d{2}\\)$`,
-      ),
+      new RegExp(`^weekly-${PARENT_ID}-\\d{4}-\\d{2}-\\d{2}$`),
     );
   });
 
@@ -551,9 +549,7 @@ describe('Email digest channel — weekly', () => {
       mockSendEmail.mock.calls[1]![1] as { idempotencyKey?: string }
     ).idempotencyKey;
     expect(key1).toBe(key2);
-    expect(key1).toMatch(
-      new RegExp(`^value\\(weekly\\):value\\(${PARENT_ID}\\):`),
-    );
+    expect(key1).toMatch(new RegExp(`^weekly-${PARENT_ID}-`));
   });
 
   // Break test 8: Restricted-consent child's row is redacted from push + email
@@ -846,7 +842,7 @@ describe('Email digest channel — monthly', () => {
     expect(emailCallArgs).toBeDefined();
     const options = emailCallArgs![1] as { idempotencyKey?: string };
     expect(options.idempotencyKey).toMatch(
-      /^value\(monthly\):value\(parent-xyz\):value\(\d{4}-\d{2}-\d{2}\)$/,
+      /^monthly-parent-xyz-\d{4}-\d{2}-\d{2}$/,
     );
   });
 
