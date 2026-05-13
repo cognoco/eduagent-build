@@ -1,12 +1,5 @@
 import React from 'react';
-import {
-  Link,
-  Tabs,
-  Redirect,
-  usePathname,
-  useRouter,
-  type Href,
-} from 'expo-router';
+import { Tabs, Redirect, usePathname, useRouter, type Href } from 'expo-router';
 import {
   View,
   Text,
@@ -571,6 +564,7 @@ function PreviewSampleCoaching({
  */
 function CreateProfileGate(): React.ReactElement {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { signOut } = useClerk();
   const queryClient = useQueryClient();
   const { profiles } = useProfile();
@@ -592,6 +586,21 @@ function CreateProfileGate(): React.ReactElement {
     }
   };
 
+  const handleGetStarted = React.useCallback(() => {
+    if (Platform.OS === 'web') {
+      const webLocation = globalThis as typeof globalThis & {
+        location?: { assign: (url: string) => void };
+      };
+
+      if (webLocation.location) {
+        webLocation.location.assign('/create-profile');
+        return;
+      }
+    }
+
+    router.push('/create-profile');
+  }, [router]);
+
   return (
     <View
       className="flex-1 bg-background items-center justify-center px-6"
@@ -605,19 +614,18 @@ function CreateProfileGate(): React.ReactElement {
         <Text className="text-body text-text-secondary text-center mb-8">
           {t('tabs.createProfile.setupProfile')}
         </Text>
-        <Link href="/create-profile" asChild>
-          <Pressable
-            className="bg-primary rounded-button py-3.5 px-8 items-center w-full"
-            style={{ minHeight: 48 }}
-            testID="create-profile-cta"
-            accessibilityRole="button"
-            accessibilityLabel={t('tabs.createProfile.getStarted')}
-          >
-            <Text className="text-body font-semibold text-text-inverse">
-              {t('tabs.createProfile.getStarted')}
-            </Text>
-          </Pressable>
-        </Link>
+        <Pressable
+          onPress={handleGetStarted}
+          className="bg-primary rounded-button py-3.5 px-8 items-center w-full"
+          style={{ minHeight: 48 }}
+          testID="create-profile-cta"
+          accessibilityRole="button"
+          accessibilityLabel={t('tabs.createProfile.getStarted')}
+        >
+          <Text className="text-body font-semibold text-text-inverse">
+            {t('tabs.createProfile.getStarted')}
+          </Text>
+        </Pressable>
         <Pressable
           onPress={() => void handleSignOut()}
           className="mt-6 py-2 items-center"

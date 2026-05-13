@@ -10,7 +10,7 @@ import { authStateDir } from '../../helpers/runtime';
 // the screen renders the static tier-comparison fallback (`no-offerings`)
 // instead of live RevenueCat packages. This test covers:
 //   - subscription-screen renders and shows the correct free-tier plan
-//   - free-upgrade-button (scroll-to-plans CTA) is visible and tappable
+//   - mobile-only upgrade notice replaces the native purchase CTA on web
 //   - no-offerings static fallback renders (expected on web)
 //   - static-tier-free and static-tier-plus cards are present
 //   - restore-purchases-button is present (required by App Store 3.1.1)
@@ -49,14 +49,12 @@ test('J-19 free-tier learner sees subscription paywall with static tier comparis
   // Free tier label is "Free" per TIER_LABELS constant in subscription.tsx
   await expect(page.getByTestId('current-plan')).toContainText('Free');
 
-  // ── 4. Verify Upgrade CTA is present for free-tier users ──────────────────
-  // free-upgrade-button appears only when tier === 'free' (subscription.tsx:1213)
-  await expect(page.getByTestId('free-upgrade-button')).toBeVisible();
-
-  // Clicking the upgrade button should scroll to the plans section without
-  // navigating away — verify the screen is still present after the click
-  await pressableClick(page.getByTestId('free-upgrade-button'));
-  await expect(page.getByTestId('subscription-screen')).toBeVisible();
+  // ── 4. Verify web users see the mobile-purchase notice ────────────────────
+  await expect(page.getByTestId('free-upgrade-unavailable')).toBeVisible();
+  await expect(page.getByTestId('free-upgrade-unavailable')).toContainText(
+    'Plans available on the mobile app',
+  );
+  await expect(page.getByTestId('free-upgrade-button')).toHaveCount(0);
 
   // ── 5. Verify no-offerings static fallback renders ─────────────────────────
   // RevenueCat packages are not available on web (mobile SDK only), so the

@@ -12,6 +12,7 @@ test('J-17 parent opens a session recap and copies the conversation prompt', asy
   const seed = await readSeedData('owner-with-children');
   const childProfileId = seed.ids.child1ProfileId;
   const subjectId = seed.ids.subject1Id;
+  const topicId = seed.ids.child1TopicId;
   const sessionId = seed.ids.session1Id;
 
   await page.goto('/home', { waitUntil: 'commit' });
@@ -26,9 +27,11 @@ test('J-17 parent opens a session recap and copies the conversation prompt', asy
     timeout: 30_000,
   });
   await pressableClick(page.getByTestId(`subject-card-${subjectId}`));
-  await pressableClick(
-    page.locator('[data-testid^="accordion-topic-"]').first(),
-  );
+  const topicLink = page.getByTestId(`accordion-topic-${topicId}`);
+  await expect(topicLink).toBeVisible({
+    timeout: 30_000,
+  });
+  await pressableClick(topicLink);
   const topicDetail = page.getByTestId('topic-detail-screen');
   await expect(
     topicDetail.getByTestId(`session-card-${sessionId}`),

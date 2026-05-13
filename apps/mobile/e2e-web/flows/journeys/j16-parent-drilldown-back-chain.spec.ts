@@ -12,6 +12,7 @@ test('J-16 parent drill-down reaches topic detail and unwinds cleanly', async ({
   const seed = await readSeedData('owner-with-children');
   const childProfileId = seed.ids.child1ProfileId;
   const subjectId = seed.ids.subject1Id;
+  const topicId = seed.ids.child1TopicId;
 
   await page.goto('/home', { waitUntil: 'commit' });
   await expect(page.getByTestId('parent-home-screen')).toBeVisible({
@@ -26,7 +27,7 @@ test('J-16 parent drill-down reaches topic detail and unwinds cleanly', async ({
   });
 
   await pressableClick(page.getByTestId(`subject-card-${subjectId}`));
-  const topicLink = page.locator('[data-testid^="accordion-topic-"]').first();
+  const topicLink = page.getByTestId(`accordion-topic-${topicId}`);
   await expect(topicLink).toBeVisible({
     timeout: 30_000,
   });

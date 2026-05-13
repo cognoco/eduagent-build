@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { pressableClick } from '../../helpers/pressable';
 import { seedAndSignIn } from '../../helpers/seed-and-sign-in';
 
 test('J-12 new user → create profile → lands on learner home', async ({
@@ -11,7 +12,7 @@ test('J-12 new user → create profile → lands on learner home', async ({
     landingPath: '/home',
   });
 
-  await page.getByRole('link', { name: /get started/i }).click();
+  await pressableClick(page.getByTestId('create-profile-cta'));
   await expect(page.getByTestId('create-profile-name')).toBeVisible({
     timeout: 30_000,
   });
