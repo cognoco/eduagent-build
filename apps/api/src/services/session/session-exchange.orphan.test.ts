@@ -93,10 +93,6 @@ describe('orphan persistence — unit/boundary tests [INTERACTION-DUR-L2]', () =
 
   describe('orphan note context builder', () => {
     const { buildOrphanSystemAddendum } = (() => {
-      const SERVER_NOTE_RE = /<\/?server_note[^>]*>/gi;
-      function sanitizeUserContent(content: string): string {
-        return content.replace(SERVER_NOTE_RE, '');
-      }
       function buildOrphanSystemAddendum(
         history: Array<{
           role: string;

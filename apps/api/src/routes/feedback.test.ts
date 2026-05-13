@@ -34,7 +34,7 @@ type FeedbackEnv = {
 
 function createTestApp(
   bindings?: Partial<FeedbackEnv['Bindings']>,
-  userOverride?: { userId: string; profileId?: string }
+  userOverride?: { userId: string; profileId?: string },
 ) {
   const app = new Hono<FeedbackEnv>();
   app.use('*', async (c, next) => {
@@ -66,8 +66,8 @@ beforeEach(() => {
         typeof input === 'string'
           ? input
           : input instanceof URL
-          ? input.toString()
-          : (input as Request).url;
+            ? input.toString()
+            : (input as Request).url;
       if (url === RESEND_API_URL) {
         return new Response(JSON.stringify({ id: 'test-message-id' }), {
           status: 200,
@@ -109,13 +109,13 @@ describe('POST /feedback', () => {
         typeof input === 'string'
           ? input
           : input instanceof URL
-          ? input.toString()
-          : (input as Request).url;
+            ? input.toString()
+            : (input as Request).url;
       return url === RESEND_API_URL;
     });
     expect(resendCalls).toHaveLength(1);
 
-    const [, init] = resendCalls[0];
+    const [, init] = resendCalls[0]!;
     const sentBody = JSON.parse(init?.body as string) as {
       to: string[];
       subject: string;
@@ -127,7 +127,7 @@ describe('POST /feedback', () => {
     expect(init?.headers).toEqual(
       expect.objectContaining({
         Authorization: `Bearer ${TEST_API_KEY}`,
-      })
+      }),
     );
   });
 
@@ -262,8 +262,8 @@ describe('POST /feedback', () => {
         typeof input === 'string'
           ? input
           : input instanceof URL
-          ? input.toString()
-          : (input as Request).url;
+            ? input.toString()
+            : (input as Request).url;
       return url === RESEND_API_URL;
     });
     expect(resendCalls).toHaveLength(0);

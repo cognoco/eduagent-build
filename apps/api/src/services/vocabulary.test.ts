@@ -35,7 +35,7 @@ function mockVocabRow(
     cefrLevel: string | null;
     milestoneId: string | null;
     mastered: boolean;
-  }> = {}
+  }> = {},
 ) {
   return {
     id: overrides.id ?? VOCAB_ID,
@@ -64,7 +64,7 @@ function mockRetentionCardRow(
     nextReviewAt: Date | null;
     failureCount: number;
     consecutiveSuccesses: number;
-  }> = {}
+  }> = {},
 ) {
   return {
     vocabularyId: overrides.vocabularyId ?? VOCAB_ID,
@@ -153,7 +153,7 @@ function createMockDb({
     transaction: jest
       .fn()
       .mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) =>
-        fn(db)
+        fn(db),
       ),
   } as unknown as Database;
 
@@ -199,7 +199,7 @@ describe('listVocabulary', () => {
     const db = createMockDb({ subjectFindFirst: null });
 
     await expect(listVocabulary(db, PROFILE_ID, SUBJECT_ID)).rejects.toThrow(
-      'Subject not found'
+      'Subject not found',
     );
   });
 
@@ -213,10 +213,10 @@ describe('listVocabulary', () => {
     const result = await listVocabulary(db, PROFILE_ID, SUBJECT_ID);
 
     expect(result).toHaveLength(2);
-    expect(result[0].id).toBe('v1');
-    expect(result[0].term).toBe('hola');
-    expect(result[0].translation).toBe('hello');
-    expect(result[0].createdAt).toBe('2026-01-15T10:00:00.000Z');
+    expect(result[0]!.id).toBe('v1');
+    expect(result[0]!.term).toBe('hola');
+    expect(result[0]!.translation).toBe('hello');
+    expect(result[0]!.createdAt).toBe('2026-01-15T10:00:00.000Z');
   });
 
   it('returns empty array when no vocabulary exists', async () => {
@@ -241,7 +241,7 @@ describe('createVocabulary', () => {
         term: 'hola',
         translation: 'hello',
         type: 'word',
-      })
+      }),
     ).rejects.toThrow('Subject not found');
   });
 
@@ -351,7 +351,7 @@ describe('ensureVocabularyRetentionCard', () => {
     const result = await ensureVocabularyRetentionCard(
       db,
       PROFILE_ID,
-      VOCAB_ID
+      VOCAB_ID,
     );
 
     expect(result.vocabularyId).toBe(VOCAB_ID);
@@ -367,7 +367,7 @@ describe('ensureVocabularyRetentionCard', () => {
     });
 
     await expect(
-      ensureVocabularyRetentionCard(db, PROFILE_ID, VOCAB_ID)
+      ensureVocabularyRetentionCard(db, PROFILE_ID, VOCAB_ID),
     ).rejects.toThrow('Failed to ensure retention card');
   });
 });
@@ -381,7 +381,7 @@ describe('reviewVocabulary', () => {
     const db = createMockDb({ vocabFindFirst: null });
 
     await expect(
-      reviewVocabulary(db, PROFILE_ID, VOCAB_ID, { quality: 4 })
+      reviewVocabulary(db, PROFILE_ID, VOCAB_ID, { quality: 4 }),
     ).rejects.toThrow('Vocabulary item not found');
   });
 
@@ -532,8 +532,8 @@ describe('upsertExtractedVocabulary', () => {
     ]);
 
     expect(result).toHaveLength(2);
-    expect(result[0].term).toBe('hola');
-    expect(result[1].term).toBe('adiós');
+    expect(result[0]!.term).toBe('hola');
+    expect(result[1]!.term).toBe('adiós');
   });
 
   it('returns empty array for empty items list', async () => {
@@ -543,7 +543,7 @@ describe('upsertExtractedVocabulary', () => {
       db,
       PROFILE_ID,
       SUBJECT_ID,
-      []
+      [],
     );
 
     expect(result).toEqual([]);
@@ -571,8 +571,8 @@ describe('getVocabularyDueForReview', () => {
     const result = await getVocabularyDueForReview(db, PROFILE_ID, SUBJECT_ID);
 
     expect(result).toHaveLength(1);
-    expect(result[0].id).toBe('v1');
-    expect(result[0].nextReviewAt).toBe('2026-01-20T10:00:00.000Z');
+    expect(result[0]!.id).toBe('v1');
+    expect(result[0]!.nextReviewAt).toBe('2026-01-20T10:00:00.000Z');
   });
 
   it('returns null nextReviewAt when no retention card exists', async () => {
@@ -587,7 +587,7 @@ describe('getVocabularyDueForReview', () => {
     const result = await getVocabularyDueForReview(db, PROFILE_ID, SUBJECT_ID);
 
     expect(result).toHaveLength(1);
-    expect(result[0].nextReviewAt).toBeNull();
+    expect(result[0]!.nextReviewAt).toBeNull();
   });
 
   it('returns empty array when no vocabulary exists', async () => {

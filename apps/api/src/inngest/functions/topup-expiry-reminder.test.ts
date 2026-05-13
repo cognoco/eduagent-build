@@ -58,6 +58,12 @@ interface TopupExpiryResult {
   timestamp: string;
 }
 
+interface TopupMockStep {
+  run: jest.Mock;
+  sendEvent: jest.Mock;
+  sleep: jest.Mock;
+}
+
 async function executeSteps(): Promise<{
   result: TopupExpiryResult;
   mockStep: { run: jest.Mock; sendEvent: jest.Mock; sleep: jest.Mock };

@@ -84,7 +84,7 @@ async function executeCronSteps(): Promise<{
 }
 
 async function executeRefreshSteps(
-  eventData: Record<string, unknown>
+  eventData: Record<string, unknown>,
 ): Promise<{ result: unknown; mockStep: Record<string, jest.Mock> }> {
   const mockStep = {
     run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
@@ -126,7 +126,7 @@ describe('dailySnapshotCron', () => {
   it('should be triggered on a daily cron schedule', () => {
     const triggers = (dailySnapshotCron as any).opts?.triggers;
     expect(triggers).toEqual(
-      expect.arrayContaining([expect.objectContaining({ cron: '0 3 * * *' })])
+      expect.arrayContaining([expect.objectContaining({ cron: '0 3 * * *' })]),
     );
   });
 
@@ -162,7 +162,7 @@ describe('dailySnapshotCron', () => {
           name: 'app/progress.snapshot.refresh',
           data: { profileId: 'profile-003' },
         },
-      ])
+      ]),
     );
     expect(result).toEqual({ status: 'completed', queuedProfiles: 3 });
   });
@@ -194,16 +194,16 @@ describe('dailySnapshotCron', () => {
     expect(mockStep['sendEvent']).toHaveBeenNthCalledWith(
       1,
       'fan-out-progress-refresh-0',
-      expect.any(Array)
+      expect.any(Array),
     );
     expect(mockStep['sendEvent']).toHaveBeenNthCalledWith(
       2,
       'fan-out-progress-refresh-200',
-      expect.any(Array)
+      expect.any(Array),
     );
     // First batch has 200 events, second has 50
-    const firstBatch = mockStep['sendEvent'].mock.calls[0][1] as unknown[];
-    const secondBatch = mockStep['sendEvent'].mock.calls[1][1] as unknown[];
+    const firstBatch = mockStep['sendEvent']!.mock.calls[0]![1]! as unknown[];
+    const secondBatch = mockStep['sendEvent']!.mock.calls[1]![1]! as unknown[];
     expect(firstBatch).toHaveLength(200);
     expect(secondBatch).toHaveLength(50);
     expect(result).toEqual({ status: 'completed', queuedProfiles: 250 });
@@ -214,7 +214,7 @@ describe('dailySnapshotCron', () => {
 
     expect(mockStep['run']).toHaveBeenCalledWith(
       'find-active-profiles',
-      expect.any(Function)
+      expect.any(Function),
     );
   });
 });
@@ -253,7 +253,7 @@ describe('dailySnapshotRefresh', () => {
     expect(triggers).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ event: 'app/progress.snapshot.refresh' }),
-      ])
+      ]),
     );
   });
 
@@ -268,7 +268,7 @@ describe('dailySnapshotRefresh', () => {
 
     expect(mockRefreshProgressSnapshot).toHaveBeenCalledWith(
       mockSnapshotDb,
-      'profile-001'
+      'profile-001',
     );
     expect(result).toEqual({
       status: 'completed',
@@ -297,7 +297,7 @@ describe('dailySnapshotRefresh', () => {
     mockRefreshProgressSnapshot.mockRejectedValue(error);
 
     await expect(
-      executeRefreshSteps({ profileId: 'profile-001' })
+      executeRefreshSteps({ profileId: 'profile-001' }),
     ).rejects.toThrow('Snapshot computation failed');
 
     expect(mockCaptureException).toHaveBeenCalledWith(error, {
@@ -310,7 +310,7 @@ describe('dailySnapshotRefresh', () => {
     mockSnapshotDb.query.profiles.findFirst.mockRejectedValue(error);
 
     await expect(
-      executeRefreshSteps({ profileId: 'profile-001' })
+      executeRefreshSteps({ profileId: 'profile-001' }),
     ).rejects.toThrow('DB connection error');
   });
 
@@ -321,7 +321,7 @@ describe('dailySnapshotRefresh', () => {
 
     expect(mockStep['run']).toHaveBeenCalledWith(
       'refresh-snapshot',
-      expect.any(Function)
+      expect.any(Function),
     );
   });
 
@@ -335,7 +335,7 @@ describe('dailySnapshotRefresh', () => {
     const { result } = await executeRefreshSteps({ profileId: 'profile-001' });
 
     expect(result).toEqual(
-      expect.objectContaining({ status: 'completed', milestones: 0 })
+      expect.objectContaining({ status: 'completed', milestones: 0 }),
     );
   });
 });

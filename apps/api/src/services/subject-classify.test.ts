@@ -208,10 +208,10 @@ describe('classifySubject', () => {
 
     expect(result.candidates).toHaveLength(2);
     // Sorted by confidence descending
-    expect(result.candidates[0].subjectName).toBe('Mathematics');
-    expect(result.candidates[0].confidence).toBe(0.7);
-    expect(result.candidates[1].subjectName).toBe('Physics');
-    expect(result.candidates[1].confidence).toBe(0.6);
+    expect(result.candidates[0]!.subjectName).toBe('Mathematics');
+    expect(result.candidates[0]!.confidence).toBe(0.7);
+    expect(result.candidates[1]!.subjectName).toBe('Physics');
+    expect(result.candidates[1]!.confidence).toBe(0.6);
     expect(result.needsConfirmation).toBe(true);
   });
 
@@ -370,7 +370,7 @@ describe('classifySubject', () => {
 
     // Chemistry is not enrolled, so only Mathematics should appear
     expect(result.candidates).toHaveLength(1);
-    expect(result.candidates[0].subjectName).toBe('Mathematics');
+    expect(result.candidates[0]!.subjectName).toBe('Mathematics');
     expect(result.needsConfirmation).toBe(false);
   });
 
@@ -390,8 +390,8 @@ describe('classifySubject', () => {
 
     const result = await classifySubject(FAKE_DB, PROFILE_ID, 'some text');
 
-    expect(result.candidates[0].confidence).toBe(1);
-    expect(result.candidates[1].confidence).toBe(0);
+    expect(result.candidates[0]!.confidence).toBe(1);
+    expect(result.candidates[1]!.confidence).toBe(0);
   });
 
   // BUG-233: Cultural topics should not be rejected — they must either match
@@ -437,7 +437,7 @@ describe('classifySubject', () => {
       );
 
       expect(result.candidates).toHaveLength(1);
-      expect(result.candidates[0].subjectName).toBe('History');
+      expect(result.candidates[0]!.subjectName).toBe('History');
     });
 
     it.each([

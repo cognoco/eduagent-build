@@ -288,13 +288,13 @@ describe('extractVocabularyFromTranscript', () => {
     await extractVocabularyFromTranscript(sampleTranscript, 'fr');
 
     expect(mockRouteAndCall).toHaveBeenCalledTimes(1);
-    const [messages, rung] = mockRouteAndCall.mock.calls[0];
+    const [messages, rung] = mockRouteAndCall.mock.calls[0]!;
     expect(rung).toBe(1);
     expect(messages).toHaveLength(2);
-    expect(messages[0].role).toBe('system');
-    expect(messages[1].role).toBe('user');
+    expect(messages[0]!.role).toBe('system');
+    expect(messages[1]!.role).toBe('user');
     // The user message contains the language name (lowercase from data)
-    expect(messages[1].content).toMatch(/french/i);
+    expect(messages[1]!.content).toMatch(/french/i);
   });
 
   it('handles LLM response with missing items array', async () => {
@@ -360,7 +360,7 @@ describe('extractVocabularyFromTranscript', () => {
     );
 
     expect(result).toHaveLength(1);
-    expect(result[0].cefrLevel).toBeNull();
+    expect(result[0]!.cefrLevel).toBeNull();
   });
 
   it('works without cefrLevel argument (backward compatible)', async () => {
@@ -387,8 +387,8 @@ describe('extractVocabularyFromTranscript', () => {
 
     await extractVocabularyFromTranscript(sampleTranscript, 'es', 'B1');
 
-    const [messages] = mockRouteAndCall.mock.calls[0];
-    expect(messages[1].content).toMatch(/CEFR target level: B1/);
+    const [messages] = mockRouteAndCall.mock.calls[0]!;
+    expect(messages[1]!.content).toMatch(/CEFR target level: B1/);
   });
 
   it('does not include CEFR target level in user message when cefrLevel is not provided', async () => {
@@ -396,7 +396,7 @@ describe('extractVocabularyFromTranscript', () => {
 
     await extractVocabularyFromTranscript(sampleTranscript, 'es');
 
-    const [messages] = mockRouteAndCall.mock.calls[0];
-    expect(messages[1].content).not.toMatch(/CEFR target level/);
+    const [messages] = mockRouteAndCall.mock.calls[0]!;
+    expect(messages[1]!.content).not.toMatch(/CEFR target level/);
   });
 });

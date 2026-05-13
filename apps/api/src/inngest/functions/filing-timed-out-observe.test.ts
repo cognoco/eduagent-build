@@ -25,8 +25,8 @@ jest.mock('../client', () => ({
       (
         _config: unknown,
         _trigger: unknown,
-        handler: (...args: unknown[]) => unknown
-      ) => ({ fn: handler, _config, _trigger })
+        handler: (...args: unknown[]) => unknown,
+      ) => ({ fn: handler, _config, _trigger }),
     ),
   },
 }));
@@ -116,12 +116,12 @@ async function executeHandler(
   // filing_recovered row so existing CAS no-op tests keep passing.
   recheckRow: Partial<Record<string, unknown>> | null = {
     filingStatus: 'filing_recovered',
-  }
+  },
 ) {
   const mockStep = {
     run: jest.fn(async (name: string, fn: () => Promise<unknown>) => {
       if (name in stepRunOverrides) {
-        return stepRunOverrides[name]();
+        return stepRunOverrides[name]!();
       }
       return fn();
     }),
@@ -227,7 +227,7 @@ describe('filing-timed-out-observe [CR-FIL-RACE-01]', () => {
         'mark-pending-and-claim-retry-slot': claimRetrySlotReturns1,
       },
       // waitForEvent returns null → 60 s window expired
-      null
+      null,
     );
 
     // Primary assertion: function exits via the recovered_after_window path.
@@ -235,20 +235,20 @@ describe('filing-timed-out-observe [CR-FIL-RACE-01]', () => {
 
     // The emit-resolved (unrecoverable) sendEvent must NOT be called.
     const emitResolvedCalls = mockStep.sendEvent.mock.calls.filter(
-      ([name]: [string]) => name === 'emit-resolved'
+      ([name]: [string]) => name === 'emit-resolved',
     );
     // Only dispatch-filing-retry and emit-auto-retry-attempted are expected.
     // emit-resolved for the unrecoverable path must NOT be among them.
     const unrecoverableEmit = emitResolvedCalls.find(
       ([, payload]: [string, { data?: { resolution?: string } }]) =>
-        payload?.data?.resolution === 'unrecoverable'
+        payload?.data?.resolution === 'unrecoverable',
     );
     expect(unrecoverableEmit).toBeUndefined();
 
     // [CR-FIL-SILENT-01] emit-resolved-recovered-after-window MUST be called
     // with name 'app/session.filing_resolved' and resolution 'recovered_after_window'.
     const recoveredAfterWindowEmit = mockStep.sendEvent.mock.calls.find(
-      ([name]: [string]) => name === 'emit-resolved-recovered-after-window'
+      ([name]: [string]) => name === 'emit-resolved-recovered-after-window',
     );
     expect(recoveredAfterWindowEmit).not.toBeUndefined();
     expect(recoveredAfterWindowEmit[1]).toMatchObject({
@@ -262,7 +262,7 @@ describe('filing-timed-out-observe [CR-FIL-RACE-01]', () => {
 
     // send-failure-push step must NOT be invoked.
     const sendFailurePushCalls = mockStep.run.mock.calls.filter(
-      ([name]) => name === 'send-failure-push'
+      ([name]) => name === 'send-failure-push',
     );
     expect(sendFailurePushCalls).toHaveLength(0);
 
@@ -287,7 +287,7 @@ describe('filing-timed-out-observe [CR-FIL-RACE-01]', () => {
       // waitForEvent returns null → window expired, retry did not complete in time
       null,
       undefined,
-      [{ id: SESSION_ID }]
+      [{ id: SESSION_ID }],
     );
 
     expect(result.resolution).toBe('unrecoverable');
@@ -295,13 +295,13 @@ describe('filing-timed-out-observe [CR-FIL-RACE-01]', () => {
     // emit-resolved (unrecoverable) MUST be called.
     const unrecoverableEmit = mockStep.sendEvent.mock.calls.find(
       ([, payload]: [string, { data?: { resolution?: string } }]) =>
-        payload?.data?.resolution === 'unrecoverable'
+        payload?.data?.resolution === 'unrecoverable',
     );
     expect(unrecoverableEmit).not.toBeUndefined();
 
     // send-failure-push step MUST be invoked.
     const sendFailurePushCalls = mockStep.run.mock.calls.filter(
-      ([name]) => name === 'send-failure-push'
+      ([name]) => name === 'send-failure-push',
     );
     expect(sendFailurePushCalls).toHaveLength(1);
 
@@ -324,21 +324,21 @@ describe('filing-timed-out-observe [CR-FIL-RACE-01]', () => {
       {
         'mark-pending-and-claim-retry-slot': claimRetrySlotExhausted,
       },
-      null
+      null,
     );
 
     expect(result.resolution).toBe('recovered_after_window');
     expect(mockCaptureException).not.toHaveBeenCalled();
 
     const sendFailurePushCalls = mockStep.run.mock.calls.filter(
-      ([name]) => name === 'send-failure-push'
+      ([name]) => name === 'send-failure-push',
     );
     expect(sendFailurePushCalls).toHaveLength(0);
 
     // [CR-FIL-SILENT-01] structured event must be emitted even when no retry
     // slot was claimed — ops must be able to query this path.
     const recoveredAfterWindowEmit = mockStep.sendEvent.mock.calls.find(
-      ([name]: [string]) => name === 'emit-resolved-recovered-after-window'
+      ([name]: [string]) => name === 'emit-resolved-recovered-after-window',
     );
     expect(recoveredAfterWindowEmit).not.toBeUndefined();
     expect(recoveredAfterWindowEmit[1]).toMatchObject({
@@ -368,13 +368,13 @@ describe('filing-timed-out-observe [CR-FIL-RACE-01]', () => {
     const { result, mockStep } = await executeHandler(
       {},
       null,
-      sessionWithFiledAt
+      sessionWithFiledAt,
     );
 
     expect(result.resolution).toBe('late_completion');
 
     const markFailedCalls = mockStep.run.mock.calls.filter(
-      ([name]) => name === 'mark-failed'
+      ([name]) => name === 'mark-failed',
     );
     expect(markFailedCalls).toHaveLength(0);
   });
@@ -397,13 +397,13 @@ describe('filing-timed-out-observe [CR-FIL-RACE-01]', () => {
       {
         'mark-pending-and-claim-retry-slot': claimRetrySlotReturns1,
       },
-      retryCompletedEvent // waitForEvent returns this → retry succeeded
+      retryCompletedEvent, // waitForEvent returns this → retry succeeded
     );
 
     expect(result.resolution).toBe('retry_succeeded');
 
     const markFailedCalls = mockStep.run.mock.calls.filter(
-      ([name]) => name === 'mark-failed'
+      ([name]) => name === 'mark-failed',
     );
     expect(markFailedCalls).toHaveLength(0);
 
@@ -449,7 +449,7 @@ describe('[BUG-699-FOLLOWUP] filing-timed-out-observe 24h push dedup', () => {
       expect.anything(),
       PROFILE_ID,
       'session_filing_failed',
-      24
+      24,
     );
     expect(mockSendPushNotification).not.toHaveBeenCalled();
   });
@@ -530,13 +530,13 @@ describe('[H-2] filing-timed-out-observe — new step.run safety guards', () => 
       },
       null,
       undefined,
-      [] // markFailedRows = [] → CAS no-op → enters recovered_after_window branch
+      [], // markFailedRows = [] → CAS no-op → enters recovered_after_window branch
     );
 
     expect(result.resolution).toBe('recovered_after_window');
     expect(mockCaptureException).toHaveBeenCalledWith(
       zodError,
-      expect.objectContaining({ profileId: PROFILE_ID })
+      expect.objectContaining({ profileId: PROFILE_ID }),
     );
   });
 
@@ -556,14 +556,14 @@ describe('[H-2] filing-timed-out-observe — new step.run safety guards', () => 
       null,
       undefined,
       [], // markFailedRows = [] → CAS no-op
-      null // recheckRow = null (row missing after CAS no-op)
+      null, // recheckRow = null (row missing after CAS no-op)
     );
 
     expect(result.resolution).toBe('recovered_after_window');
 
     // No 'emit-resolved-recovered-after-window' sendEvent should have fired.
     const recoveredEmit = mockStep.sendEvent.mock.calls.find(
-      ([name]: [string]) => name === 'emit-resolved-recovered-after-window'
+      ([name]: [string]) => name === 'emit-resolved-recovered-after-window',
     );
     expect(recoveredEmit).toBeUndefined();
   });
@@ -576,13 +576,13 @@ describe('[H-2] filing-timed-out-observe — new step.run safety guards', () => 
       null,
       undefined,
       [], // markFailedRows = [] → CAS no-op
-      { filingStatus: 'filing_failed' } // recheckRow has wrong status
+      { filingStatus: 'filing_failed' }, // recheckRow has wrong status
     );
 
     expect(result.resolution).toBe('recovered_after_window');
 
     const recoveredEmit = mockStep.sendEvent.mock.calls.find(
-      ([name]: [string]) => name === 'emit-resolved-recovered-after-window'
+      ([name]: [string]) => name === 'emit-resolved-recovered-after-window',
     );
     expect(recoveredEmit).toBeUndefined();
   });
@@ -613,7 +613,7 @@ describe('[H-2] filing-timed-out-observe — new step.run safety guards', () => 
 
     // captureException must have been called at least once for the push error.
     const pushCapture = mockCaptureException.mock.calls.find(
-      ([err]: [Error]) => err === pushError
+      ([err]: [Error]) => err === pushError,
     );
     expect(pushCapture).not.toBeUndefined();
   });

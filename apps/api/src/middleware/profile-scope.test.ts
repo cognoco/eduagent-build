@@ -114,7 +114,7 @@ describe('profileScopeMiddleware', () => {
     });
 
     expect(warnSpy).toHaveBeenCalledTimes(1);
-    const loggedJson = warnSpy.mock.calls[0][0] as string;
+    const loggedJson = warnSpy.mock.calls[0]![0] as string;
     const logged = JSON.parse(loggedJson);
     expect(logged.level).toBe('warn');
     expect(logged.message).toBe('profile_scope.ownership_mismatch');
@@ -177,7 +177,7 @@ describe('profileScopeMiddleware', () => {
 
     // Structured log: JSON-encoded entry with the documented event name
     expect(errorSpy).toHaveBeenCalledTimes(1);
-    const loggedJson = errorSpy.mock.calls[0][0] as string;
+    const loggedJson = errorSpy.mock.calls[0]![0] as string;
     const logged = JSON.parse(loggedJson);
     expect(logged.level).toBe('error');
     expect(logged.message).toBe('profile_scope.auto_resolve_failed');

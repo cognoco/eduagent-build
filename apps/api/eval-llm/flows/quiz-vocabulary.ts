@@ -51,7 +51,7 @@ export const vocabularyFlow: FlowDefinition<VocabularyPromptParams> = {
       languageCode: profile.targetLanguage,
       cefrCeiling: cefr,
       themePreference: undefined,
-      interests: toInterests(profile.interests),
+      interests: toInterests(profile.interests.map((e) => e.label)),
       libraryTopics: profile.libraryTopics,
       ageYears: profile.ageYears,
       learnerNativeLanguage: profile.nativeLanguage,
@@ -82,14 +82,14 @@ export const vocabularyFlow: FlowDefinition<VocabularyPromptParams> = {
 
   async runLive(
     _input: VocabularyPromptParams,
-    messages: PromptMessages
+    messages: PromptMessages,
   ): Promise<string> {
     return callLlm(
       [
         { role: 'system', content: messages.system },
         { role: 'user', content: messages.user ?? 'Generate the quiz round.' },
       ],
-      { flow: 'quiz-vocabulary', rung: 1 }
+      { flow: 'quiz-vocabulary', rung: 1 },
     );
   },
 };

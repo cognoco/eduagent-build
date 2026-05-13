@@ -175,8 +175,6 @@ const TEST_ENV = {
   ...BASE_AUTH_ENV,
 };
 
-const _SUBJECT_ID = 'subject-1';
-
 function mockSubscription(overrides?: Record<string, unknown>) {
   return {
     id: 'sub-1',
