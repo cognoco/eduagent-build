@@ -236,6 +236,14 @@ const emptyReportPracticeTotals = {
   distinctActivityTypes: 0,
 };
 
+const emptyReportPracticeTotalsDelta = {
+  activitiesCompleted: 0,
+  reviewsCompleted: 0,
+  pointsEarned: 0,
+  celebrations: 0,
+  distinctActivityTypes: 0,
+};
+
 const emptyReportPracticeScores = {
   scoredActivities: 0,
   score: 0,
@@ -280,7 +288,9 @@ export type ReportPracticeTotalsDelta = z.infer<
 
 export const reportPracticeComparisonSchema = z.object({
   previous: reportPracticeTotalsSchema.default(emptyReportPracticeTotals),
-  delta: reportPracticeTotalsDeltaSchema.default(emptyReportPracticeTotals),
+  delta: reportPracticeTotalsDeltaSchema.default(
+    emptyReportPracticeTotalsDelta,
+  ),
 });
 export type ReportPracticeComparison = z.infer<
   typeof reportPracticeComparisonSchema

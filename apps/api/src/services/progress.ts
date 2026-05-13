@@ -31,6 +31,12 @@ import { computeDaysSinceLastReview } from './retention-data';
 // Helpers
 // ---------------------------------------------------------------------------
 
+const PROGRESS_OVERVIEW_PRACTICE_WINDOW_DAYS = 90;
+
+function subtractDays(date: Date, days: number): Date {
+  return new Date(date.getTime() - days * 24 * 60 * 60 * 1000);
+}
+
 function computeRetentionStatus(
   nextReviewAt: Date | null,
 ): 'strong' | 'fading' | 'weak' | 'forgotten' {
@@ -328,9 +334,19 @@ export async function getOverallProgress(
 
   // 1. Batch all queries upfront (6 total regardless of N subjects)
   const allSubjects = await repo.subjects.findMany();
+  const practiceSummaryEnd = new Date();
   const practiceSummary = await getPracticeActivitySummary(db, {
     profileId,
-    period: { start: new Date(0), endExclusive: new Date() },
+    // Overview is loaded on every Progress tab visit, so keep the practice
+    // activity scan bounded. Long-range/all-time reporting belongs on report
+    // detail endpoints that are opened intentionally.
+    period: {
+      start: subtractDays(
+        practiceSummaryEnd,
+        PROGRESS_OVERVIEW_PRACTICE_WINDOW_DAYS,
+      ),
+      endExclusive: practiceSummaryEnd,
+    },
   });
 
   if (allSubjects.length === 0) {

@@ -553,7 +553,9 @@ export async function recordAssessmentCompletionActivity(
     activityType: 'assessment',
     activitySubtype: status,
     completedAt,
-    pointsEarned: Math.round(evaluation.masteryScore * 100),
+    // Assessment mastery is recorded in score/total below. Do not award
+    // activity points until product defines an assessment XP formula.
+    pointsEarned: 0,
     score: Math.round(evaluation.masteryScore * 100),
     total: 100,
     sourceType: 'assessment',

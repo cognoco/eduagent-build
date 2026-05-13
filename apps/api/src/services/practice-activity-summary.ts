@@ -138,7 +138,7 @@ async function loadCelebrationCount(
   return rows.length;
 }
 
-function buildSummaryFromRows(
+export function buildSummaryFromRows(
   rows: PracticeEventRow[],
   celebrationCount: number,
   comparison?: ReportPracticeComparison,

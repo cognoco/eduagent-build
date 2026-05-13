@@ -634,6 +634,29 @@ describe('getOverallProgress', () => {
     expect(result.totalTopicsVerified).toBe(0);
   });
 
+  it('limits practice activity summary to a rolling 90-day window', async () => {
+    jest.useFakeTimers({ now: new Date('2026-05-13T12:00:00.000Z') });
+    try {
+      setupScopedRepo({ subjectsFindMany: [] });
+      const db = createMockDb();
+
+      await getOverallProgress(db, profileId);
+
+      expect(mockGetPracticeActivitySummary).toHaveBeenCalledWith(
+        db,
+        expect.objectContaining({
+          profileId,
+          period: {
+            start: new Date('2026-02-12T12:00:00.000Z'),
+            endExclusive: new Date('2026-05-13T12:00:00.000Z'),
+          },
+        }),
+      );
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('aggregates across multiple subjects with batch queries', async () => {
     const subject1 = mockSubjectRow({ id: 'sub-1', name: 'Math' });
     const subject2 = mockSubjectRow({ id: 'sub-2', name: 'Science' });

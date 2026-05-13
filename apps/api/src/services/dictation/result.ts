@@ -17,6 +17,7 @@ export interface RecordResultInput {
   mistakeCount: number | null;
   mode: DictationMode;
   reviewed: boolean;
+  subjectId?: string | null;
 }
 
 export async function recordDictationResult(
@@ -38,6 +39,7 @@ export async function recordDictationResult(
 
     await recordPracticeActivityEvent(txDb, {
       profileId,
+      subjectId: input.subjectId ?? null,
       activityType: 'dictation',
       activitySubtype: input.mode,
       completedAt: new Date(`${input.localDate}T00:00:00.000Z`),

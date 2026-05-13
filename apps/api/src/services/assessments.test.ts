@@ -12,9 +12,15 @@ import {
   calculateMasteryScore,
   createAssessment,
   getAssessment,
+  recordAssessmentCompletionActivity,
   updateAssessment,
 } from './assessments';
-import type { QuickCheckContext, AssessmentContext } from '@eduagent/schemas';
+import type {
+  QuickCheckContext,
+  AssessmentContext,
+  AssessmentEvaluation,
+  AssessmentRecord,
+} from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 
 // ---------------------------------------------------------------------------
@@ -27,7 +33,7 @@ function createQuickCheckMockProvider(questions: string[]): LLMProvider {
     id: 'gemini',
     async chat(
       _messages: ChatMessage[],
-      _config: ModelConfig
+      _config: ModelConfig,
     ): Promise<string> {
       return JSON.stringify({ questions });
     },
@@ -49,7 +55,7 @@ function createAssessmentEvalMockProvider(evaluation: {
     id: 'gemini',
     async chat(
       _messages: ChatMessage[],
-      _config: ModelConfig
+      _config: ModelConfig,
     ): Promise<string> {
       return JSON.stringify(evaluation);
     },
@@ -97,7 +103,7 @@ describe('generateQuickCheck', () => {
         'Can you explain why we use let instead of var?',
         'What happens if you try to reassign a const variable?',
         'When would you choose let over const?',
-      ])
+      ]),
     );
 
     const result = await generateQuickCheck(quickCheckContext);
@@ -112,7 +118,7 @@ describe('generateQuickCheck', () => {
       createQuickCheckMockProvider([
         'Why is scoping important for variables?',
         'What is the difference between let and const?',
-      ])
+      ]),
     );
 
     const result = await generateQuickCheck(quickCheckContext);
@@ -122,7 +128,7 @@ describe('generateQuickCheck', () => {
 
   it('caps at 3 questions even if LLM returns more', async () => {
     registerProvider(
-      createQuickCheckMockProvider(['Q1?', 'Q2?', 'Q3?', 'Q4?', 'Q5?'])
+      createQuickCheckMockProvider(['Q1?', 'Q2?', 'Q3?', 'Q4?', 'Q5?']),
     );
 
     const result = await generateQuickCheck(quickCheckContext);
@@ -166,12 +172,12 @@ describe('evaluateAssessmentAnswer', () => {
         shouldEscalateDepth: true,
         rawScore: 0.9,
         qualityRating: 4,
-      })
+      }),
     );
 
     const result = await evaluateAssessmentAnswer(
       { ...assessmentContext, currentDepth: 'recall' },
-      'A variable stores data using let, const, or var.'
+      'A variable stores data using let, const, or var.',
     );
 
     expect(result.masteryScore).toBeLessThanOrEqual(0.5);
@@ -186,12 +192,12 @@ describe('evaluateAssessmentAnswer', () => {
         shouldEscalateDepth: true,
         rawScore: 0.95,
         qualityRating: 5,
-      })
+      }),
     );
 
     const result = await evaluateAssessmentAnswer(
       { ...assessmentContext, currentDepth: 'explain' },
-      'Variables are named references to memory locations where data is stored.'
+      'Variables are named references to memory locations where data is stored.',
     );
 
     expect(result.masteryScore).toBeLessThanOrEqual(0.8);
@@ -206,12 +212,12 @@ describe('evaluateAssessmentAnswer', () => {
         shouldEscalateDepth: false,
         rawScore: 1.0,
         qualityRating: 5,
-      })
+      }),
     );
 
     const result = await evaluateAssessmentAnswer(
       { ...assessmentContext, currentDepth: 'transfer' },
-      'I would use const for the config object since it should not be reassigned.'
+      'I would use const for the config object since it should not be reassigned.',
     );
 
     expect(result.masteryScore).toBeLessThanOrEqual(1.0);
@@ -226,12 +232,12 @@ describe('evaluateAssessmentAnswer', () => {
         shouldEscalateDepth: false,
         rawScore: 0.4,
         qualityRating: 3,
-      })
+      }),
     );
 
     const result = await evaluateAssessmentAnswer(
       assessmentContext,
-      'Variables store data.'
+      'Variables store data.',
     );
 
     expect(result.qualityRating).toBeGreaterThanOrEqual(0);
@@ -246,12 +252,12 @@ describe('evaluateAssessmentAnswer', () => {
         shouldEscalateDepth: true,
         rawScore: 0.45,
         qualityRating: 4,
-      })
+      }),
     );
 
     const result = await evaluateAssessmentAnswer(
       { ...assessmentContext, currentDepth: 'recall' },
-      'Good answer.'
+      'Good answer.',
     );
 
     expect(result.shouldEscalateDepth).toBe(true);
@@ -266,12 +272,12 @@ describe('evaluateAssessmentAnswer', () => {
         shouldEscalateDepth: true,
         rawScore: 0.9,
         qualityRating: 5,
-      })
+      }),
     );
 
     const result = await evaluateAssessmentAnswer(
       { ...assessmentContext, currentDepth: 'transfer' },
-      'Applied the concept correctly.'
+      'Applied the concept correctly.',
     );
 
     expect(result.nextDepth).toBeUndefined();
@@ -291,7 +297,7 @@ describe('evaluateAssessmentAnswer', () => {
 
     const result = await evaluateAssessmentAnswer(
       assessmentContext,
-      'Some answer'
+      'Some answer',
     );
 
     // [BUG-670 / S-16] Break test — raw LLM string MUST NOT leak as feedback.
@@ -300,7 +306,7 @@ describe('evaluateAssessmentAnswer', () => {
     // directly to the learner.
     expect(result.feedback).not.toContain('partial understanding');
     expect(result.feedback).toBe(
-      "We couldn't evaluate your answer right now — please try again."
+      "We couldn't evaluate your answer right now — please try again.",
     );
     expect(result.passed).toBe(false);
     expect(result.masteryScore).toBe(0);
@@ -340,7 +346,7 @@ describe('evaluateAssessmentAnswer', () => {
 
     const result = await evaluateAssessmentAnswer(
       { ...assessmentContext, currentDepth: 'recall' },
-      'Variables store data.'
+      'Variables store data.',
     );
 
     expect(result.feedback).toBe('Solid recall of the key concepts.');
@@ -372,7 +378,7 @@ describe('evaluateAssessmentAnswer', () => {
 
     const result = await evaluateAssessmentAnswer(
       { ...assessmentContext, currentDepth: 'explain' },
-      'Some answer'
+      'Some answer',
     );
 
     expect(result.feedback).toBe('Excellent explanation.');
@@ -400,11 +406,11 @@ describe('evaluateAssessmentAnswer', () => {
 
     const result = await evaluateAssessmentAnswer(
       assessmentContext,
-      'Some answer'
+      'Some answer',
     );
 
     expect(result.feedback).toBe(
-      "We couldn't evaluate your answer right now — please try again."
+      "We couldn't evaluate your answer right now — please try again.",
     );
     expect(result.passed).toBe(false);
   });
@@ -480,7 +486,7 @@ function mockAssessmentRow(
     masteryScore: number | null;
     qualityRating: number | null;
     exchangeHistory: unknown[];
-  }>
+  }>,
 ) {
   return {
     id: overrides?.id ?? testAssessmentId,
@@ -537,7 +543,7 @@ describe('createAssessment', () => {
       db,
       testProfileId,
       testSubjectId,
-      testTopicId
+      testTopicId,
     );
 
     expect(result.id).toBe(testAssessmentId);
@@ -559,7 +565,7 @@ describe('createAssessment', () => {
       testProfileId,
       testSubjectId,
       testTopicId,
-      'session-1'
+      'session-1',
     );
 
     expect(result.sessionId).toBe('session-1');
@@ -585,7 +591,7 @@ describe('createAssessment', () => {
       db,
       testProfileId,
       testSubjectId,
-      testTopicId
+      testTopicId,
     );
 
     expect(result.createdAt).toBe('2025-01-15T10:00:00.000Z');
@@ -676,5 +682,55 @@ describe('updateAssessment', () => {
     const setCall = updateCall.set as jest.Mock;
     const setValues = setCall.mock.calls[0][0];
     expect(setValues.masteryScore).toBe(0.65);
+  });
+});
+
+describe('recordAssessmentCompletionActivity', () => {
+  it('records assessment score without awarding undefined assessment XP', async () => {
+    const returning = jest.fn().mockResolvedValue([]);
+    const onConflictDoNothing = jest.fn().mockReturnValue({ returning });
+    const values = jest.fn().mockReturnValue({ onConflictDoNothing });
+    const db = {
+      insert: jest.fn().mockReturnValue({ values }),
+    } as unknown as Database;
+    const assessment: AssessmentRecord = {
+      id: testAssessmentId,
+      profileId: testProfileId,
+      subjectId: testSubjectId,
+      topicId: testTopicId,
+      sessionId: null,
+      verificationDepth: 'transfer',
+      status: 'passed',
+      masteryScore: 0.92,
+      qualityRating: 5,
+      exchangeHistory: [],
+      createdAt: '2025-01-15T10:00:00.000Z',
+      updatedAt: '2025-01-15T10:30:00.000Z',
+    };
+    const evaluation: AssessmentEvaluation = {
+      feedback: 'Strong transfer answer.',
+      passed: true,
+      shouldEscalateDepth: false,
+      masteryScore: 0.92,
+      qualityRating: 5,
+    };
+
+    await recordAssessmentCompletionActivity(
+      db,
+      testProfileId,
+      assessment,
+      'passed',
+      evaluation,
+    );
+
+    expect(values).toHaveBeenCalledWith(
+      expect.objectContaining({
+        activityType: 'assessment',
+        activitySubtype: 'passed',
+        pointsEarned: 0,
+        score: 92,
+        total: 100,
+      }),
+    );
   });
 });

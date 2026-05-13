@@ -1699,6 +1699,7 @@ export async function persistExchangeResult(
       completedAt: now,
       sourceType: 'session_event',
       sourceId: aiEventId,
+      dedupeKey: `recitation:session:${sessionId}`,
       metadata: {
         sessionId,
         exchangeCount: updated.exchangeCount,

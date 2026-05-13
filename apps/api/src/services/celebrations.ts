@@ -111,6 +111,8 @@ export async function queueCelebration(
       celebrationType: celebration,
       reason,
       sourceType: 'home_surface_pending_celebration',
+      // Null detail intentionally maps to "none" in the dedupe key, so
+      // no-detail celebrations dedupe by profile + celebration + reason.
       sourceId: detail ?? 'none',
       metadata: { detail: detail ?? null },
     });
