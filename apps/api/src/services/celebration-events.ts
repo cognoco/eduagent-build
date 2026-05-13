@@ -22,7 +22,13 @@ export function buildCelebrationDedupeKey(
     'celebrationType' | 'reason' | 'sourceId'
   >,
 ): string {
-  return `${input.celebrationType}:${input.reason}:${input.sourceId ?? 'none'}`;
+  const encodeSegment = (value: string) => encodeURIComponent(value);
+
+  return [
+    encodeSegment(input.celebrationType),
+    encodeSegment(input.reason),
+    encodeSegment(input.sourceId ?? 'none'),
+  ].join(':');
 }
 
 export async function recordCelebrationEvent(
