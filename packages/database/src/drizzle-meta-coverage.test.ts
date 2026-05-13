@@ -26,7 +26,7 @@ interface DrizzleSnapshot {
 }
 
 interface DrizzleJournal {
-  entries: Array<{ idx: number; tag: string }>;
+  entries: Array<{ idx: number; tag: string; when: number }>;
 }
 
 function loadSnapshot(tag: string): DrizzleSnapshot {
@@ -92,5 +92,38 @@ describe('drizzle migration snapshots [BUG-789]', () => {
     const latest = journal.entries.at(-1);
     expect(latest).toBeDefined();
     expect(snapshotTags()).toContain(String(latest?.idx).padStart(4, '0'));
+  });
+
+  it('journal "when" timestamps are monotonically non-decreasing [BUG-1040]', () => {
+    const journal = JSON.parse(
+      readFileSync(resolve(META_DIR, '_journal.json'), 'utf8'),
+    ) as DrizzleJournal;
+
+    const entries = journal.entries;
+    expect(entries.length).toBeGreaterThan(0);
+
+    const invalid: string[] = [];
+    for (const e of entries) {
+      if (typeof e.when !== 'number' || e.when <= 0) {
+        invalid.push(
+          `entry ${e.idx} (${e.tag}): when=${e.when} is not a positive number`,
+        );
+      }
+    }
+    expect(invalid).toEqual([]);
+
+    const outOfOrder: string[] = [];
+    for (let i = 1; i < entries.length; i++) {
+      const current = entries[i];
+      const previous = entries[i - 1];
+      if (!current || !previous) continue;
+
+      if (current.when < previous.when) {
+        outOfOrder.push(
+          `entry ${current.idx} (${current.tag}): when=${current.when} < entry ${previous.idx} (${previous.tag}): when=${previous.when}`,
+        );
+      }
+    }
+    expect(outOfOrder).toEqual([]);
   });
 });
