@@ -1,10 +1,7 @@
 import { renderHook, act } from '@testing-library/react-native';
 import { useSubjectClassification } from './use-subject-classification';
 
-// Mock animateResponse from the session components barrel
-jest.mock('../session', () => ({
-  animateResponse: jest.fn(() => jest.fn()),
-}));
+const mockAnimateResponse = jest.fn(() => jest.fn());
 
 function createMockOpts(overrides: Record<string, unknown> = {}) {
   return {
@@ -31,7 +28,7 @@ function createMockOpts(overrides: Record<string, unknown> = {}) {
     continueWithMessage: jest.fn().mockResolvedValue(undefined),
     createLocalMessageId: jest.fn((prefix: string) => `${prefix}-1`),
     showConfirmation: jest.fn(),
-    animateResponse: require('../session').animateResponse,
+    animateResponse: mockAnimateResponse,
     userMessageCount: 0,
     sessionExperience: 0,
     animationCleanupRef: { current: null },
@@ -53,9 +50,8 @@ describe('useSubjectClassification — greeting guard', () => {
       await result.current.handleSend('hi');
     });
 
-    const { animateResponse } = require('../session');
-    expect(animateResponse).toHaveBeenCalledTimes(1);
-    expect(animateResponse).toHaveBeenCalledWith(
+    expect(mockAnimateResponse).toHaveBeenCalledTimes(1);
+    expect(mockAnimateResponse).toHaveBeenCalledWith(
       'Hi! Ask me anything.',
       opts.setMessages,
       opts.setIsStreaming,
@@ -72,8 +68,7 @@ describe('useSubjectClassification — greeting guard', () => {
       await result.current.handleSend('hey');
     });
 
-    const { animateResponse } = require('../session');
-    expect(animateResponse).toHaveBeenCalledWith(
+    expect(mockAnimateResponse).toHaveBeenCalledWith(
       'Hey again — what are you curious about?',
       opts.setMessages,
       opts.setIsStreaming,
@@ -82,8 +77,7 @@ describe('useSubjectClassification — greeting guard', () => {
 
   it('stores cleanup function in animationCleanupRef', async () => {
     const cleanup = jest.fn();
-    const { animateResponse } = require('../session');
-    animateResponse.mockReturnValueOnce(cleanup);
+    mockAnimateResponse.mockReturnValueOnce(cleanup);
 
     const opts = createMockOpts();
     const { result } = renderHook(() => useSubjectClassification(opts as any));
@@ -112,8 +106,7 @@ describe('useSubjectClassification — greeting guard', () => {
       await result.current.handleSend('help me with quadratic equations');
     });
 
-    const { animateResponse } = require('../session');
-    expect(animateResponse).not.toHaveBeenCalled();
+    expect(mockAnimateResponse).not.toHaveBeenCalled();
     expect(opts.classifySubject.mutateAsync).toHaveBeenCalledWith({
       text: 'help me with quadratic equations',
     });
@@ -138,9 +131,8 @@ describe('useSubjectClassification — greeting guard', () => {
       await result.current.handleSend('hi');
     });
 
-    const { animateResponse } = require('../session');
     // classifySubject is not called (subjectId provided), but continueWithMessage IS
-    expect(animateResponse).not.toHaveBeenCalled();
+    expect(mockAnimateResponse).not.toHaveBeenCalled();
     expect(opts.continueWithMessage).toHaveBeenCalled();
   });
 
@@ -154,8 +146,7 @@ describe('useSubjectClassification — greeting guard', () => {
       await result.current.handleSend('hello');
     });
 
-    const { animateResponse } = require('../session');
-    expect(animateResponse).not.toHaveBeenCalled();
+    expect(mockAnimateResponse).not.toHaveBeenCalled();
     expect(opts.continueWithMessage).toHaveBeenCalled();
   });
 
@@ -177,8 +168,7 @@ describe('useSubjectClassification — greeting guard', () => {
       await result.current.handleSend('hi');
     });
 
-    const { animateResponse } = require('../session');
-    expect(animateResponse).not.toHaveBeenCalled();
+    expect(mockAnimateResponse).not.toHaveBeenCalled();
     // Classification or continueWithMessage must have been called
     expect(
       opts.classifySubject.mutateAsync.mock.calls.length +
@@ -312,6 +302,142 @@ describe('useSubjectClassification — freeform fallback removal [F-1]', () => {
         ]),
       }),
     );
+    expect(opts.continueWithMessage).not.toHaveBeenCalled();
+  });
+});
+
+describe('useSubjectClassification — typed subject override', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('resolves a misspelled typed subject to an existing enrolled subject', async () => {
+    const pendingSubjectResolution = {
+      originalText: 'tell me about the war of currents',
+      prompt: "I couldn't figure out the subject. Which one fits?",
+      candidates: [{ subjectId: 's1', subjectName: 'English' }],
+    };
+    const opts = createMockOpts({
+      pendingSubjectResolution,
+      availableSubjects: [
+        { id: 's1', name: 'English' },
+        { id: 's2', name: 'Physics' },
+      ],
+      resolveSubject: {
+        mutateAsync: jest.fn().mockResolvedValue({
+          status: 'corrected',
+          resolvedName: 'Physics',
+          focus: null,
+          focusDescription: null,
+          suggestions: [{ name: 'Physics', description: 'Forces and energy' }],
+          displayMessage: 'Did you mean **Physics**?',
+        }),
+      },
+    });
+    const { result } = renderHook(() => useSubjectClassification(opts as any));
+
+    await act(async () => {
+      await result.current.handleTypeSubject('fysic');
+    });
+
+    expect(opts.resolveSubject.mutateAsync).toHaveBeenCalledWith({
+      rawInput: 'fysic',
+    });
+    expect(opts.setPendingSubjectResolution).toHaveBeenCalledWith(null);
+    expect(opts.setClassifiedSubject).toHaveBeenCalledWith({
+      subjectId: 's2',
+      subjectName: 'Physics',
+    });
+    expect(opts.continueWithMessage).toHaveBeenCalledWith(
+      'tell me about the war of currents',
+      { sessionSubjectId: 's2', sessionSubjectName: 'Physics' },
+    );
+  });
+
+  it('creates the resolved typed subject when it is not enrolled yet', async () => {
+    const pendingSubjectResolution = {
+      originalText: 'tell me about the war of currents',
+      prompt: "I couldn't figure out the subject. Which one fits?",
+      candidates: [{ subjectId: 's1', subjectName: 'English' }],
+    };
+    const opts = createMockOpts({
+      pendingSubjectResolution,
+      availableSubjects: [{ id: 's1', name: 'English' }],
+      resolveSubject: {
+        mutateAsync: jest.fn().mockResolvedValue({
+          status: 'corrected',
+          resolvedName: 'Physics',
+          focus: null,
+          focusDescription: null,
+          suggestions: [{ name: 'Physics', description: 'Forces and energy' }],
+          displayMessage: 'Did you mean **Physics**?',
+        }),
+      },
+      createSubject: {
+        mutateAsync: jest.fn().mockResolvedValue({
+          subject: { id: 's2', name: 'Physics' },
+        }),
+        isPending: false,
+      },
+    });
+    const { result } = renderHook(() => useSubjectClassification(opts as any));
+
+    await act(async () => {
+      await result.current.handleTypeSubject('fysic');
+    });
+
+    expect(opts.createSubject.mutateAsync).toHaveBeenCalledWith({
+      name: 'Physics',
+      rawInput: 'fysic',
+    });
+    expect(opts.setClassifiedSubject).toHaveBeenCalledWith({
+      subjectId: 's2',
+      subjectName: 'Physics',
+    });
+    expect(opts.continueWithMessage).toHaveBeenCalledWith(
+      'tell me about the war of currents',
+      { sessionSubjectId: 's2', sessionSubjectName: 'Physics' },
+    );
+  });
+
+  it('shows rich suggestions when the typed subject is ambiguous', async () => {
+    const pendingSubjectResolution = {
+      originalText: 'tell me about water',
+      prompt: "I couldn't figure out the subject. Which one fits?",
+      candidates: [{ subjectId: 's1', subjectName: 'English' }],
+    };
+    const suggestions = [
+      {
+        name: 'Chemistry',
+        description: 'Water molecules and reactions',
+        focus: 'Water',
+      },
+    ];
+    const opts = createMockOpts({
+      pendingSubjectResolution,
+      resolveSubject: {
+        mutateAsync: jest.fn().mockResolvedValue({
+          status: 'ambiguous',
+          resolvedName: null,
+          suggestions,
+          displayMessage: '**Water** can fit a few subjects.',
+        }),
+      },
+    });
+    const { result } = renderHook(() => useSubjectClassification(opts as any));
+
+    await act(async () => {
+      await result.current.handleTypeSubject('water');
+    });
+
+    const updater = opts.setPendingSubjectResolution.mock.calls[0][0] as (
+      current: typeof pendingSubjectResolution,
+    ) => unknown;
+    expect(updater(pendingSubjectResolution)).toEqual({
+      ...pendingSubjectResolution,
+      prompt: '**Water** can fit a few subjects.',
+      resolveSuggestions: suggestions,
+    });
     expect(opts.continueWithMessage).not.toHaveBeenCalled();
   });
 });

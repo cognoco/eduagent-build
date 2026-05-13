@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, Pressable, ScrollView } from 'react-native';
+import { View, Text, Pressable, ScrollView, TextInput } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
 import type { HomeworkProblem } from '@eduagent/schemas';
@@ -104,6 +104,7 @@ export interface SubjectResolutionAccessoryProps {
     description: string;
     focus?: string;
   }) => Promise<void>;
+  handleTypeSubject: (typedSubject: string) => Promise<void>;
   setPendingSubjectResolution: React.Dispatch<
     React.SetStateAction<PendingSubjectResolution | null>
   >;
@@ -118,11 +119,22 @@ export function SubjectResolutionAccessory({
   handleResolveSubject,
   handleCreateSuggestedSubject,
   handleCreateResolveSuggestion,
+  handleTypeSubject,
   setPendingSubjectResolution,
   router,
 }: SubjectResolutionAccessoryProps) {
   const { t } = useTranslation();
+  const [typedSubject, setTypedSubject] = useState('');
   if (!pendingSubjectResolution) return null;
+
+  const submitTypedSubject = () => {
+    const trimmed = typedSubject.trim();
+    if (!trimmed) return;
+    setTypedSubject('');
+    void handleTypeSubject(trimmed);
+  };
+  const typedSubjectDisabled =
+    isStreaming || pendingClassification || createSubject.isPending;
 
   return (
     <View
@@ -262,6 +274,44 @@ export function SubjectResolutionAccessory({
           </Text>
         </Pressable>
       )}
+      <View className="mt-3 flex-row items-center gap-2">
+        <TextInput
+          value={typedSubject}
+          onChangeText={setTypedSubject}
+          onSubmitEditing={submitTypedSubject}
+          editable={!typedSubjectDisabled}
+          placeholder={t('session.accessories.typeSubjectPlaceholder')}
+          className="min-h-[44px] flex-1 rounded-button border border-border bg-surface px-3 text-body-sm text-text-primary"
+          accessibilityLabel={t('session.accessories.typeSubjectLabel')}
+          returnKeyType="done"
+          testID="subject-resolution-custom-input"
+        />
+        <Pressable
+          onPress={submitTypedSubject}
+          disabled={typedSubjectDisabled || typedSubject.trim().length === 0}
+          className={`min-h-[44px] rounded-button px-4 items-center justify-center ${
+            typedSubjectDisabled || typedSubject.trim().length === 0
+              ? 'bg-surface-elevated'
+              : 'bg-primary'
+          }`}
+          accessibilityRole="button"
+          accessibilityLabel={t('session.accessories.useTypedSubjectLabel')}
+          accessibilityState={{
+            disabled: typedSubjectDisabled || typedSubject.trim().length === 0,
+          }}
+          testID="subject-resolution-custom-submit"
+        >
+          <Text
+            className={`text-body-sm font-semibold ${
+              typedSubjectDisabled || typedSubject.trim().length === 0
+                ? 'text-text-secondary'
+                : 'text-text-inverse'
+            }`}
+          >
+            {t('session.accessories.useTypedSubject')}
+          </Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -463,6 +513,7 @@ export function SessionAccessory(props: SessionAccessoryProps) {
         handleResolveSubject={props.handleResolveSubject}
         handleCreateSuggestedSubject={props.handleCreateSuggestedSubject}
         handleCreateResolveSuggestion={props.handleCreateResolveSuggestion}
+        handleTypeSubject={props.handleTypeSubject}
         setPendingSubjectResolution={props.setPendingSubjectResolution}
         router={props.router}
       />

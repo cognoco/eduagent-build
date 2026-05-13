@@ -1108,6 +1108,7 @@ function SessionScreenInner() {
     handleResolveSubject,
     handleCreateResolveSuggestion,
     handleCreateSuggestedSubject,
+    handleTypeSubject,
     handleSend,
   } = useSubjectClassification({
     isStreaming,
@@ -1502,6 +1503,7 @@ function SessionScreenInner() {
       handleResolveSubject={handleResolveSubject}
       handleCreateSuggestedSubject={handleCreateSuggestedSubject}
       handleCreateResolveSuggestion={handleCreateResolveSuggestion}
+      handleTypeSubject={handleTypeSubject}
       setPendingSubjectResolution={setPendingSubjectResolution}
       router={router}
       effectiveMode={effectiveMode}
