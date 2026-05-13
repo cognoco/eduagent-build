@@ -65,7 +65,7 @@ describe('classifySubject', () => {
     const result = await classifySubject(
       FAKE_DB,
       PROFILE_ID,
-      'solve 2x + 5 = 15'
+      'solve 2x + 5 = 15',
     );
 
     expect(result.candidates).toEqual([]);
@@ -74,19 +74,19 @@ describe('classifySubject', () => {
     expect(mockRouteAndCall).toHaveBeenCalledTimes(1);
   });
 
-  it('returns null suggestedSubjectName when LLM fails with no subjects', async () => {
+  it('uses a deterministic suggestion when LLM fails with no subjects', async () => {
     mockListSubjects.mockResolvedValueOnce([]);
     mockRouteAndCall.mockRejectedValueOnce(new Error('LLM unavailable'));
 
     const result = await classifySubject(
       FAKE_DB,
       PROFILE_ID,
-      'solve 2x + 5 = 15'
+      'solve 2x + 5 = 15',
     );
 
     expect(result.candidates).toEqual([]);
     expect(result.needsConfirmation).toBe(true);
-    expect(result.suggestedSubjectName).toBeNull();
+    expect(result.suggestedSubjectName).toBe('Mathematics');
   });
 
   // [AUDIT-SILENT-FAIL] Break test — a silent fallback in the zero-subject
@@ -106,7 +106,7 @@ describe('classifySubject', () => {
         extra: expect.objectContaining({
           site: 'classifySubject.zeroSubjectPath',
         }),
-      })
+      }),
     );
   });
 
@@ -132,7 +132,7 @@ describe('classifySubject', () => {
           site: 'classifySubject.multiSubjectPath',
           subjectCount: 2,
         }),
-      })
+      }),
     );
   });
 
@@ -144,7 +144,7 @@ describe('classifySubject', () => {
     const result = await classifySubject(
       FAKE_DB,
       PROFILE_ID,
-      'solve 2x + 5 = 15'
+      'solve 2x + 5 = 15',
     );
 
     expect(result.candidates).toHaveLength(1);
@@ -171,7 +171,7 @@ describe('classifySubject', () => {
     const result = await classifySubject(
       FAKE_DB,
       PROFILE_ID,
-      'solve 2x + 5 = 15'
+      'solve 2x + 5 = 15',
     );
 
     expect(result.candidates).toHaveLength(1);
@@ -201,7 +201,7 @@ describe('classifySubject', () => {
     const result = await classifySubject(
       FAKE_DB,
       PROFILE_ID,
-      'calculate the velocity of a ball rolling down a slope'
+      'calculate the velocity of a ball rolling down a slope',
     );
 
     expect(result.candidates).toHaveLength(2);
@@ -242,7 +242,7 @@ describe('classifySubject', () => {
     const result = await classifySubject(
       FAKE_DB,
       PROFILE_ID,
-      'when was the Battle of Hastings'
+      'when was the Battle of Hastings',
     );
 
     expect(result.candidates).toEqual([]);
@@ -271,7 +271,7 @@ describe('classifySubject', () => {
           content: expect.stringContaining('solve 2x + 5 = 15'),
         }),
       ]),
-      1
+      1,
     );
   });
 
@@ -362,7 +362,7 @@ describe('classifySubject', () => {
     const result = await classifySubject(
       FAKE_DB,
       PROFILE_ID,
-      'balance this equation'
+      'balance this equation',
     );
 
     // Chemistry is not enrolled, so only Mathematics should appear
@@ -408,7 +408,7 @@ describe('classifySubject', () => {
       const result = await classifySubject(
         FAKE_DB,
         PROFILE_ID,
-        'please teach me about Easter'
+        'please teach me about Easter',
       );
 
       expect(result.candidates).toEqual([]);
@@ -430,7 +430,7 @@ describe('classifySubject', () => {
       const result = await classifySubject(
         FAKE_DB,
         PROFILE_ID,
-        'please teach me about Easter'
+        'please teach me about Easter',
       );
 
       expect(result.candidates).toHaveLength(1);
@@ -458,12 +458,12 @@ describe('classifySubject', () => {
         const result = await classifySubject(
           FAKE_DB,
           PROFILE_ID,
-          `teach me about ${topic}`
+          `teach me about ${topic}`,
         );
 
         expect(result.suggestedSubjectName).toBe(expectedSuggestion);
         expect(result.needsConfirmation).toBe(true);
-      }
+      },
     );
 
     it('provides suggestedSubjectName when LLM returns no matches for a valid topic', async () => {
@@ -481,12 +481,59 @@ describe('classifySubject', () => {
       const result = await classifySubject(
         FAKE_DB,
         PROFILE_ID,
-        'tell me about the Roman Empire'
+        'tell me about the Roman Empire',
       );
 
       // The key assertion: suggestedSubjectName must never be null for valid topics
       expect(result.suggestedSubjectName).not.toBeNull();
       expect(result.suggestedSubjectName).toBe('World History');
+    });
+
+    it('suggests Physics for War of Currents when the LLM response is unparseable', async () => {
+      mockListSubjects.mockResolvedValueOnce([
+        makeSubject('sub-001', 'English'),
+        makeSubject('sub-002', 'Chemistry'),
+        makeSubject('sub-003', 'Italian'),
+        makeSubject('sub-004', 'Biology'),
+      ]);
+
+      mockRouteAndCall.mockResolvedValueOnce({
+        response: 'I cannot classify this text.',
+        provider: 'gemini',
+        model: 'gemini-2.5-flash',
+        latencyMs: 50,
+      });
+
+      const result = await classifySubject(
+        FAKE_DB,
+        PROFILE_ID,
+        'Tell me about the war of currents',
+      );
+
+      expect(result.candidates).toEqual([]);
+      expect(result.needsConfirmation).toBe(true);
+      expect(result.suggestedSubjectName).toBe('Physics');
+    });
+
+    it('suggests Physics for War of Currents when the LLM call fails', async () => {
+      mockListSubjects.mockResolvedValueOnce([
+        makeSubject('sub-001', 'English'),
+        makeSubject('sub-002', 'Chemistry'),
+        makeSubject('sub-003', 'Italian'),
+        makeSubject('sub-004', 'Biology'),
+      ]);
+      mockRouteAndCall.mockRejectedValueOnce(new Error('LLM unavailable'));
+
+      const result = await classifySubject(
+        FAKE_DB,
+        PROFILE_ID,
+        'Tell me about the war of currents',
+      );
+
+      expect(result.candidates).toEqual([]);
+      expect(result.needsConfirmation).toBe(true);
+      expect(result.suggestedSubjectName).toBe('Physics');
+      expect(mockCaptureException).toHaveBeenCalledTimes(1);
     });
 
     it('sends the updated prompt with cross-disciplinary matching guidance', async () => {

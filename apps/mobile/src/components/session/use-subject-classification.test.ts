@@ -304,6 +304,42 @@ describe('useSubjectClassification — freeform fallback removal [F-1]', () => {
     );
     expect(opts.continueWithMessage).not.toHaveBeenCalled();
   });
+
+  it('offers the classifier suggested subject in freeform when no enrolled subject matches', async () => {
+    const classifyResult = {
+      needsConfirmation: true,
+      candidates: [],
+      suggestedSubjectName: 'Physics',
+    };
+    const opts = createMockOpts({
+      classifySubject: {
+        mutateAsync: jest.fn().mockResolvedValue(classifyResult),
+      },
+      availableSubjects: [
+        { id: 's1', name: 'English' },
+        { id: 's2', name: 'Chemistry' },
+      ],
+    });
+    const { result } = renderHook(() => useSubjectClassification(opts as any));
+
+    await act(async () => {
+      await result.current.handleSend('Tell me about the war of currents');
+    });
+
+    expect(opts.setPendingSubjectResolution).toHaveBeenCalledWith(
+      expect.objectContaining({
+        originalText: 'Tell me about the war of currents',
+        prompt:
+          'This sounds like Physics. Pick a subject below, or tap "+ Physics" to add it.',
+        candidates: [
+          { subjectId: 's1', subjectName: 'English' },
+          { subjectId: 's2', subjectName: 'Chemistry' },
+        ],
+        suggestedSubjectName: 'Physics',
+      }),
+    );
+    expect(opts.continueWithMessage).not.toHaveBeenCalled();
+  });
 });
 
 describe('useSubjectClassification — typed subject override', () => {
