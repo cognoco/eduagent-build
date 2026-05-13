@@ -122,6 +122,7 @@ jest.mock('../../../../../lib/format-api-error', () => ({
 }));
 
 jest.mock('../../../../../components/common', () => ({
+  // gc1-allow: Reanimated worklets + react-native-svg cannot run in JSDOM
   BookPageFlipAnimation: () => null,
   MagicPenAnimation: () => null,
   CelebrationAnimation: () => null,
