@@ -272,6 +272,12 @@ describe('ParentHomeScreen', () => {
     screen.getByTestId('parent-home-tonight-section');
     screen.getByText('Ask Emma: what made Fractions click today?');
     screen.getByText('Fractions · 18 min this week');
+
+    fireEvent.press(screen.getByTestId('parent-home-tonight-child-a-primary'));
+    expect(mockPush).toHaveBeenLastCalledWith({
+      pathname: '/(app)/progress',
+      params: { profileId: 'child-a' },
+    });
   });
 
   it('ranks multi-child tonight prompts by sessions — most active child appears first', async () => {

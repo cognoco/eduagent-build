@@ -411,6 +411,10 @@ export function ParentHomeScreen({
     } as Href);
   }, [router]);
 
+  const navigateToSubscription = useCallback(() => {
+    router.push('/(app)/subscription' as Href);
+  }, [router]);
+
   const handleAddChild = useCallback(() => {
     if (hasNoLinkedChildren) {
       navigateToCreateChildProfile();
@@ -429,7 +433,7 @@ export function ParentHomeScreen({
         [
           {
             text: t('more.family.viewPlans'),
-            onPress: () => router.push('/(app)/subscription'),
+            onPress: navigateToSubscription,
           },
           { text: t('common.cancel'), style: 'cancel' },
         ],
@@ -447,7 +451,7 @@ export function ParentHomeScreen({
           ? [
               {
                 text: t('more.family.viewPlans'),
-                onPress: () => router.push('/(app)/subscription'),
+                onPress: navigateToSubscription,
               },
               { text: t('common.cancel'), style: 'cancel' },
             ]
@@ -462,18 +466,25 @@ export function ParentHomeScreen({
     familyData,
     t,
     navigateToCreateChildProfile,
+    navigateToSubscription,
   ]);
 
-  function pushChildProgress(childProfileId: string): void {
-    router.push({
-      pathname: '/(app)/progress',
-      params: { profileId: childProfileId },
-    } as Href);
-  }
+  const pushChildProgress = useCallback(
+    (childProfileId: string): void => {
+      router.push({
+        pathname: '/(app)/progress',
+        params: { profileId: childProfileId },
+      } as Href);
+    },
+    [router],
+  );
 
-  function pushChildReports(childProfileId: string): void {
-    router.push(`/(app)/child/${childProfileId}/reports` as Href);
-  }
+  const pushChildReports = useCallback(
+    (childProfileId: string): void => {
+      router.push(`/(app)/child/${childProfileId}/reports` as Href);
+    },
+    [router],
+  );
 
   const parentInitial = initialOf(activeProfile?.displayName ?? firstName);
 
