@@ -8,7 +8,7 @@ export type AppVariables = {
   user: AuthUser;
   db: Database;
   account: Account;
-  profileId: string;
+  profileId: string | undefined;
   profileMeta: ProfileMeta | undefined;
   subscriptionId: string;
   llmTier: LLMTier;

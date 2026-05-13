@@ -313,18 +313,22 @@ describe('generateExport', () => {
 
     const result = await generateExport(db, 'account-1');
 
-    const aiRow = result.sessionEvents!.find(
+    expect(result.sessionEvents).toBeDefined();
+    const events = result.sessionEvents as Record<string, unknown>[];
+
+    const aiRow = events.find(
       (e: Record<string, unknown>) => e['eventType'] === 'ai_response',
-    ) as Record<string, unknown> | undefined;
-    expect(aiRow).toEqual(expect.objectContaining({}));
+    );
+    expect(aiRow).toBeDefined();
     expect(aiRow!['content']).toBe('Great job today!');
     expect(aiRow!['content']).not.toContain('"signals"');
     expect(aiRow!['content']).not.toContain('"ui_hints"');
 
     // user_message rows must be left untouched
-    const userRow = result.sessionEvents!.find(
+    const userRow = events.find(
       (e: Record<string, unknown>) => e['eventType'] === 'user_message',
-    ) as Record<string, unknown> | undefined;
+    );
+    expect(userRow).toBeDefined();
     expect(userRow!['content']).toBe('What is gravity?');
   });
 

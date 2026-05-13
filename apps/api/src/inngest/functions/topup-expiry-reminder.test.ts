@@ -198,7 +198,7 @@ describe('topupExpiryReminder', () => {
     const originalDate = global.Date;
     class BrokenDate extends originalDate {
       constructor(...args: ConstructorParameters<typeof Date>) {
-        if ((args.length as number) === 0) {
+        if (!args.length) {
           super(NaN);
           return;
         }
@@ -242,7 +242,7 @@ describe('topupExpiryReminder', () => {
     const originalDate = global.Date;
     class BrokenDate extends originalDate {
       constructor(...args: ConstructorParameters<typeof Date>) {
-        if ((args.length as number) === 0) {
+        if (!args.length) {
           super(NaN);
           return;
         }
