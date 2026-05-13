@@ -148,6 +148,9 @@ describe('isAppHelpQuery', () => {
     'what is challenge mode',
     'where can I see what you remember',
     'how do I delete my account',
+    'Where can I see my progress?',
+    'Where do I find the app settings?',
+    'Where can I see help?',
   ])('classifies "%s" as app-help', (msg) => {
     expect(isAppHelpQuery(msg)).toBe(true);
   });

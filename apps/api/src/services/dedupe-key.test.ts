@@ -117,10 +117,18 @@ describe('buildEmailIdempotencyKey', () => {
 describe('buildLegacyEmailIdempotencyKey', () => {
   it('preserves existing weekly/monthly Resend idempotency format', () => {
     expect(
-      buildLegacyEmailIdempotencyKey('weekly', 'parent_123', '2026-05-12'),
-    ).toBe('weekly-parent_123-2026-05-12');
+      buildLegacyEmailIdempotencyKey(
+        'weekly',
+        '550e8400-e29b-41d4-a716-446655440000',
+        '2026-05-12',
+      ),
+    ).toBe('weekly-550e8400-e29b-41d4-a716-446655440000-2026-05-12');
     expect(
-      buildLegacyEmailIdempotencyKey('monthly', 'parent_123', '2026-05'),
-    ).toBe('monthly-parent_123-2026-05');
+      buildLegacyEmailIdempotencyKey(
+        'monthly',
+        '550e8400-e29b-41d4-a716-446655440000',
+        '2026-05',
+      ),
+    ).toBe('monthly-550e8400-e29b-41d4-a716-446655440000-2026-05');
   });
 });
