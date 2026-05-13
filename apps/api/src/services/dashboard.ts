@@ -34,19 +34,15 @@ import {
 } from '@eduagent/database';
 import {
   ForbiddenError,
-  engagementSignalSchema,
   NEW_LEARNER_SESSION_THRESHOLD,
 } from '@eduagent/schemas';
 import type {
   DashboardChild,
   DemoDashboardData,
-  EngagementSignal,
-  HomeworkSummary,
   KnowledgeInventory,
   MonthlyReportRecord,
   MonthlyReportSummary,
   ProgressHistory,
-  SessionMetadata,
   ConsentStatus,
   ProgressMetrics,
   TopicProgress,
@@ -72,7 +68,26 @@ import {
   subtractDays,
   computeWeeklyDeltas,
   getActiveSubjectsByRecency,
+  calculateTrend,
+  calculateRetentionTrend,
+  calculateGuidedRatio,
+  buildProgressGuidance,
+  MIN_TREND_SESSIONS,
 } from './progress-helpers';
+import {
+  countGuidedMetrics,
+  countGuidedMetricsBatch,
+} from './session/session-analytics';
+import {
+  getProfileSessions,
+  getSessionMetadata,
+  formatSessionDisplayTitle,
+  parseEngagementSignal,
+} from './session/session-crud';
+import type {
+  ChildSession,
+  ChildSessionDrillScore,
+} from './session/session-crud';
 
 /** Returns today's date as an ISO-8601 date string (YYYY-MM-DD, UTC). */
 function todayIso(): string {
@@ -177,60 +192,9 @@ export function generateChildSummary(input: DashboardInput): string {
   return `${input.displayName}: ${parts.join('. ')}.`;
 }
 
-/** Minimum completed sessions before trend signals carry meaning. [F-PV-03] */
-const MIN_TREND_SESSIONS = 3;
-
-/**
- * Calculates retention trend as a snapshot heuristic.
- * Compares strong count vs weak+fading count across all subjects.
- * Returns 'stable' when totalSessions < MIN_TREND_SESSIONS — the signal is
- * noise at low N.
- */
-export function calculateRetentionTrend(
-  subjectRetentionData: Array<{
-    status: 'strong' | 'fading' | 'weak' | 'forgotten';
-  }>,
-  totalSessions?: number,
-): 'improving' | 'declining' | 'stable' {
-  if (
-    subjectRetentionData.length === 0 ||
-    (totalSessions ?? 0) < MIN_TREND_SESSIONS
-  )
-    return 'stable';
-  const strongCount = subjectRetentionData.filter(
-    (s) => s.status === 'strong',
-  ).length;
-  const weakCount = subjectRetentionData.filter(
-    (s) =>
-      s.status === 'weak' || s.status === 'fading' || s.status === 'forgotten',
-  ).length;
-  if (strongCount > weakCount) return 'improving';
-  if (strongCount < weakCount) return 'declining';
-  return 'stable';
-}
-
-/**
- * Calculates the trend between current and previous values.
- */
-export function calculateTrend(
-  current: number,
-  previous: number,
-): 'up' | 'down' | 'stable' {
-  if (current > previous) return 'up';
-  if (current < previous) return 'down';
-  return 'stable';
-}
-
-/**
- * Calculates the guided-vs-immediate ratio.
- *
- * Returns 0-1 ratio where 1 means all problems were guided.
- * Returns 0 if totalCount is 0.
- */
-export function calculateGuidedRatio(guided: number, total: number): number {
-  if (total === 0) return 0;
-  return Math.min(1, Math.max(0, guided / total));
-}
+// calculateRetentionTrend, calculateTrend, calculateGuidedRatio moved to
+// ./progress-helpers (PR-2 surface-ownership-boundaries). Re-exported below
+// for backward compatibility.
 
 function isChildLearningDataVisible(
   status: ConsentStatus | null | undefined,
@@ -338,101 +302,8 @@ export async function assertChildDashboardDataVisible(
   }
 }
 
-export interface GuidedMetrics {
-  guidedCount: number;
-  totalProblemCount: number;
-}
-
-/**
- * Counts AI-response events in sessionEvents for a child within a date range,
- * classifying those with escalationRung >= 3 as "guided".
- *
- * Rung 1-2 = Socratic (child thinking independently)
- * Rung 3+ = Parallel Example / Transfer Bridge / Teaching Mode (AI had to demonstrate)
- */
-export async function countGuidedMetrics(
-  db: Database,
-  childProfileId: string,
-  startDate: Date,
-): Promise<GuidedMetrics> {
-  // BUG-731 [PERF-1]: previously loaded every ai_response event into JS to
-  // count one JSONB field. Now aggregated in SQL: a single round-trip
-  // returns COUNT(*) plus a conditional COUNT for rung >= 3.
-  //
-  // Rungs are stored on `metadata->>'escalationRung'` as JSON-encoded
-  // numbers; the `->>` operator returns text, which casts cleanly to int
-  // (Postgres rejects non-numeric text and we filter to ai_response rows
-  // that always set the field, so the cast is safe in practice).
-  const [row] = await db
-    .select({
-      guidedCount: sql<number>`COUNT(*) FILTER (WHERE (${sessionEvents.metadata}->>'escalationRung')::int >= 3)`,
-      totalProblemCount: sql<number>`COUNT(*)`,
-    })
-    .from(sessionEvents)
-    .where(
-      and(
-        eq(sessionEvents.profileId, childProfileId),
-        eq(sessionEvents.eventType, 'ai_response'),
-        gte(sessionEvents.createdAt, startDate),
-      ),
-    );
-
-  // drizzle returns aggregate counts as string from the pg driver. Coerce
-  // to number so callers stay JSON-clean.
-  return {
-    guidedCount: Number(row?.guidedCount ?? 0),
-    totalProblemCount: Number(row?.totalProblemCount ?? 0),
-  };
-}
-
-/**
- * Batched variant of countGuidedMetrics for dashboards covering multiple
- * children. Replaces N parallel round-trips (one per child) with a single
- * GROUP BY query.
- *
- * [BUG-734 / PERF-4] The parent dashboard previously called
- * countGuidedMetrics inside Promise.all over every child link, which made
- * one connection-bound round-trip per child. For a parent of 4 children
- * that is 4× the latency tax with identical SQL shape on every call. This
- * variant collapses them into a single aggregate query keyed by profileId
- * and returns a Map so callers can index by child ID without losing the
- * "0 events" case (children with no events appear in the map with zeros).
- */
-export async function countGuidedMetricsBatch(
-  db: Database,
-  childProfileIds: string[],
-  startDate: Date,
-): Promise<Map<string, GuidedMetrics>> {
-  const result = new Map<string, GuidedMetrics>();
-  for (const id of childProfileIds) {
-    result.set(id, { guidedCount: 0, totalProblemCount: 0 });
-  }
-  if (childProfileIds.length === 0) return result;
-
-  const rows = await db
-    .select({
-      profileId: sessionEvents.profileId,
-      guidedCount: sql<number>`COUNT(*) FILTER (WHERE (${sessionEvents.metadata}->>'escalationRung')::int >= 3)`,
-      totalProblemCount: sql<number>`COUNT(*)`,
-    })
-    .from(sessionEvents)
-    .where(
-      and(
-        inArray(sessionEvents.profileId, childProfileIds),
-        eq(sessionEvents.eventType, 'ai_response'),
-        gte(sessionEvents.createdAt, startDate),
-      ),
-    )
-    .groupBy(sessionEvents.profileId);
-
-  for (const row of rows) {
-    result.set(row.profileId, {
-      guidedCount: Number(row.guidedCount ?? 0),
-      totalProblemCount: Number(row.totalProblemCount ?? 0),
-    });
-  }
-  return result;
-}
+// GuidedMetrics, countGuidedMetrics, countGuidedMetricsBatch moved to
+// ./session/session-analytics (PR-2 surface-ownership-boundaries). Re-exported below.
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -448,30 +319,8 @@ function getStartOfWeek(date: Date): Date {
   return d;
 }
 
-function getSessionMetadata(metadata: unknown): SessionMetadata {
-  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
-    return {};
-  }
-  return metadata as SessionMetadata;
-}
-
-function formatSessionDisplayTitle(
-  sessionType: string,
-  homeworkSummary?: HomeworkSummary | null,
-): string {
-  if (homeworkSummary?.displayTitle) {
-    return homeworkSummary.displayTitle;
-  }
-
-  switch (sessionType) {
-    case 'homework':
-      return 'Homework';
-    case 'interleaved':
-      return 'Interleaved Practice';
-    default:
-      return 'Learning';
-  }
-}
+// getSessionMetadata, formatSessionDisplayTitle moved to ./session/session-crud
+// and imported above for use by getChildSessionDetail.
 
 /**
  * @deprecated For new code, use `getActiveSubjectsByRecency` from
@@ -513,32 +362,7 @@ export function sortSubjectsByActivityPriority<
   });
 }
 
-export function buildProgressGuidance(
-  childName: string,
-  subjectNames: string[],
-  sessionsThisWeek: number,
-  previousSessions: number,
-  currentStreak?: number,
-): string | null {
-  const primarySubject = subjectNames[0];
-
-  if (sessionsThisWeek === 0 && primarySubject) {
-    // [BUG-523] A non-zero streak proves recent activity — "Quiet week" would
-    // contradict the visible streak badge. Show an encouraging nudge instead.
-    if ((currentStreak ?? 0) > 0) {
-      return `${childName} has a ${
-        currentStreak ?? 0
-      }-day streak — keep it going with ${primarySubject}!`;
-    }
-    return `Quiet week — maybe suggest a quick session on ${primarySubject}?`;
-  }
-
-  if (sessionsThisWeek < previousSessions && primarySubject) {
-    return `${childName} is still building knowledge. ${primarySubject} might be a good next nudge.`;
-  }
-
-  return null;
-}
+// buildProgressGuidance moved to ./progress-helpers (PR-2). Re-exported below.
 
 async function buildChildProgressSummary(
   db: Database,
@@ -1276,160 +1100,9 @@ export async function getChildSubjectTopics(
 
 // ---------------------------------------------------------------------------
 // Child session list + transcript (parent trust feature)
+// ChildSessionDrillScore, ChildSession, getProfileSessions moved to
+// ./session/session-crud (PR-2 surface-ownership-boundaries). Re-exported below.
 // ---------------------------------------------------------------------------
-
-export interface ChildSessionDrillScore {
-  correct: number;
-  total: number;
-  createdAt: string;
-}
-
-export interface ChildSession {
-  sessionId: string;
-  subjectId: string;
-  subjectName: string | null;
-  topicId: string | null;
-  topicTitle: string | null;
-  sessionType: string;
-  startedAt: string;
-  endedAt: string | null;
-  exchangeCount: number;
-  escalationRung: number;
-  durationSeconds: number | null;
-  wallClockSeconds: number | null;
-  displayTitle: string;
-  displaySummary: string | null;
-  homeworkSummary: HomeworkSummary | null;
-  highlight: string | null;
-  narrative: string | null;
-  conversationPrompt: string | null;
-  engagementSignal: EngagementSignal | null;
-  /**
-   * Fluency-drill outcomes recorded during this session, oldest first.
-   * Empty when no scored drill happened. Used by per-topic detail to render
-   * a "Recent drills: 4/5, 3/5, 5/5" strip without a separate endpoint.
-   */
-  drills: ChildSessionDrillScore[];
-}
-
-/**
- * Lists recent sessions for a child, with parent access check.
- * Returns up to 50 most recent sessions ordered by startedAt descending.
- */
-export async function getProfileSessions(
-  db: Database,
-  profileId: string,
-): Promise<ChildSession[]> {
-  const scoped = createScopedRepository(db, profileId);
-  const sessions = await scoped.sessions.findMany(
-    gte(learningSessions.exchangeCount, 1),
-    50,
-    desc(learningSessions.startedAt),
-  );
-
-  if (sessions.length === 0) return [];
-
-  // Batch-fetch highlights from session_summaries for all sessions
-  const sessionIds = sessions.map((s) => s.id);
-
-  // [BUG-526] Batch-fetch subject names and topic titles so the mobile
-  // client can render structured context instead of relying on the highlight string.
-  const uniqueSubjectIds = [...new Set(sessions.map((s) => s.subjectId))];
-  const uniqueTopicIds = [
-    ...new Set(sessions.map((s) => s.topicId).filter(Boolean) as string[]),
-  ];
-
-  const [summaries, subjectRows, topicRows, drillRows] = await Promise.all([
-    db.query.sessionSummaries.findMany({
-      where: inArray(sessionSummaries.sessionId, sessionIds),
-      columns: {
-        sessionId: true,
-        highlight: true,
-        narrative: true,
-        conversationPrompt: true,
-        engagementSignal: true,
-      },
-    }),
-    uniqueSubjectIds.length > 0
-      ? db.query.subjects.findMany({
-          where: inArray(subjects.id, uniqueSubjectIds),
-          columns: { id: true, name: true },
-        })
-      : Promise.resolve([]),
-    uniqueTopicIds.length > 0
-      ? db.query.curriculumTopics.findMany({
-          where: inArray(curriculumTopics.id, uniqueTopicIds),
-          columns: { id: true, title: true },
-        })
-      : Promise.resolve([]),
-    // Fluency-drill outcomes for each session, oldest first. Sparse: most
-    // ai_response rows have null drill columns, so the IS NOT NULL filter
-    // keeps the row count small even on the 50-session window.
-    db
-      .select({
-        sessionId: sessionEvents.sessionId,
-        drillCorrect: sessionEvents.drillCorrect,
-        drillTotal: sessionEvents.drillTotal,
-        createdAt: sessionEvents.createdAt,
-      })
-      .from(sessionEvents)
-      .where(
-        and(
-          inArray(sessionEvents.sessionId, sessionIds),
-          eq(sessionEvents.eventType, 'ai_response'),
-          isNotNull(sessionEvents.drillTotal),
-        ),
-      )
-      .orderBy(asc(sessionEvents.createdAt)),
-  ]);
-
-  const summaryBySession = new Map(
-    summaries.map((summary) => [summary.sessionId, summary]),
-  );
-  const subjectNameById = new Map(subjectRows.map((s) => [s.id, s.name]));
-  const topicTitleById = new Map(topicRows.map((t) => [t.id, t.title]));
-  const drillsBySession = new Map<string, ChildSessionDrillScore[]>();
-  for (const row of drillRows) {
-    if (row.drillCorrect == null || row.drillTotal == null) continue;
-    const list = drillsBySession.get(row.sessionId) ?? [];
-    list.push({
-      correct: row.drillCorrect,
-      total: row.drillTotal,
-      createdAt: row.createdAt.toISOString(),
-    });
-    drillsBySession.set(row.sessionId, list);
-  }
-
-  return sessions.map((s) => {
-    const metadata = getSessionMetadata(s.metadata);
-    const homeworkSummary = metadata.homeworkSummary ?? null;
-
-    const summary = summaryBySession.get(s.id);
-
-    return {
-      sessionId: s.id,
-      subjectId: s.subjectId,
-      subjectName: subjectNameById.get(s.subjectId) ?? null,
-      topicId: s.topicId,
-      topicTitle: s.topicId ? (topicTitleById.get(s.topicId) ?? null) : null,
-      sessionType: s.sessionType,
-      startedAt: s.startedAt.toISOString(),
-      endedAt: s.endedAt?.toISOString() ?? null,
-      exchangeCount: s.exchangeCount,
-      escalationRung: s.escalationRung,
-      durationSeconds: s.durationSeconds,
-      wallClockSeconds: s.wallClockSeconds,
-      displayTitle: formatSessionDisplayTitle(s.sessionType, homeworkSummary),
-      displaySummary: homeworkSummary?.summary ?? null,
-      homeworkSummary,
-      highlight: summary?.highlight ?? null,
-      narrative: summary?.narrative ?? null,
-      conversationPrompt: summary?.conversationPrompt ?? null,
-      engagementSignal: parseEngagementSignal(summary?.engagementSignal),
-      drills: drillsBySession.get(s.id) ?? [],
-    };
-  });
-}
 
 export async function getChildSessions(
   db: Database,
@@ -1448,13 +1121,7 @@ export async function getChildSessions(
   return getProfileSessions(db, childProfileId);
 }
 
-function parseEngagementSignal(
-  raw: string | null | undefined,
-): EngagementSignal | null {
-  if (!raw) return null;
-  const parsed = engagementSignalSchema.safeParse(raw);
-  return parsed.success ? parsed.data : null;
-}
+// parseEngagementSignal moved to ./session/session-crud and imported above.
 
 export async function getChildSessionDetail(
   db: Database,
@@ -1734,3 +1401,34 @@ export function buildDemoDashboard(): DemoDashboardData {
     ],
   };
 }
+
+// ---------------------------------------------------------------------------
+// Re-export shims — PR-2 surface-ownership-boundaries
+// Functions have moved to better-fitting homes. These shims keep all existing
+// internal consumers compiling without a sweep in this PR. Remove once call
+// sites are updated.
+// ---------------------------------------------------------------------------
+
+export {
+  calculateTrend,
+  calculateRetentionTrend,
+  calculateGuidedRatio,
+  buildProgressGuidance,
+} from './progress-helpers';
+
+export {
+  countGuidedMetrics,
+  countGuidedMetricsBatch,
+} from './session/session-analytics';
+export type { GuidedMetrics } from './session/session-analytics';
+
+export {
+  getProfileSessions,
+  getSessionMetadata,
+  formatSessionDisplayTitle,
+  parseEngagementSignal,
+} from './session/session-crud';
+export type {
+  ChildSession,
+  ChildSessionDrillScore,
+} from './session/session-crud';
