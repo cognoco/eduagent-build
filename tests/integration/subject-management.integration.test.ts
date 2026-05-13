@@ -434,6 +434,12 @@ describe('Integration: POST /v1/subjects/classify', () => {
   it('uses real subject services to classify against enrolled subjects', async () => {
     const profileId = await createOwnerProfile();
     const subject = await createSubject(profileId, 'Mathematics');
+    await createSubject(profileId, 'History');
+    subjectLlmFixture.clearCalls();
+    subjectLlmFixture.setChatResponse({
+      matches: [{ subjectName: 'Mathematics', confidence: 0.92 }],
+      suggestedSubjectName: null,
+    });
 
     const res = await app.request(
       '/v1/subjects/classify',
@@ -459,7 +465,8 @@ describe('Integration: POST /v1/subjects/classify', () => {
       subjectId: subject.id,
       subjectName: 'Mathematics',
     });
-    expect(body.candidates[0].confidence).toBeGreaterThanOrEqual(0.85);
+    expect(body.candidates[0].confidence).toBeGreaterThanOrEqual(0.9);
+    expect(subjectLlmFixture.chatCalls.length).toBeGreaterThan(0);
   });
 });
 

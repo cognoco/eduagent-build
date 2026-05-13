@@ -79,7 +79,7 @@ describe('useSubjectProgress', () => {
             lastSessionAt: null,
           },
         }),
-        { status: 200 },
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
       ),
     );
 
@@ -170,7 +170,7 @@ describe('useOverallProgress', () => {
           totalTopicsCompleted: 2,
           totalTopicsVerified: 1,
         }),
-        { status: 200 },
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
       ),
     );
 
@@ -199,7 +199,7 @@ describe('useContinueSuggestion', () => {
             topicTitle: 'Algebra',
           },
         }),
-        { status: 200 },
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
       ),
     );
 
@@ -217,7 +217,10 @@ describe('useContinueSuggestion', () => {
 
   it('returns null when no suggestion', async () => {
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ suggestion: null }), { status: 200 }),
+      new Response(JSON.stringify({ suggestion: null }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
     );
 
     const { result } = renderHook(() => useContinueSuggestion(), {
@@ -249,7 +252,7 @@ describe('useLearningResumeTarget', () => {
             reason: 'Pick up Photosynthesis',
           },
         }),
-        { status: 200 },
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
       ),
     );
 
@@ -275,7 +278,10 @@ describe('useLearningResumeTarget', () => {
 describe('useReviewSummary', () => {
   it('fetches review summary from API', async () => {
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ totalOverdue: 6 }), { status: 200 }),
+      new Response(JSON.stringify({ totalOverdue: 6 }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
     );
 
     const { result } = renderHook(() => useReviewSummary(), {
@@ -313,7 +319,7 @@ describe('useOverdueTopics', () => {
             },
           ],
         }),
-        { status: 200 },
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
       ),
     );
 
@@ -347,7 +353,7 @@ describe('useTopicProgress', () => {
             xpStatus: 'pending',
           },
         }),
-        { status: 200 },
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
       ),
     );
 
@@ -383,7 +389,7 @@ describe('useProfileWeeklyReports', () => {
             },
           ],
         }),
-        { status: 200 },
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
       ),
     );
 
@@ -430,7 +436,7 @@ describe('useRefreshProgressSnapshot', () => {
           metrics: {},
           milestones: [],
         }),
-        { status: 200 },
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
       ),
     );
 

@@ -1,13 +1,16 @@
-jest.mock('../services/subject' /* gc1-allow: typed throw path */, () => {
-  const actual = jest.requireActual('../services/subject') as Record<
-    string,
-    unknown
-  >;
-  return {
-    ...actual,
-    configureLanguageSubject: jest.fn(),
-  };
-});
+jest.mock(
+  '../services/subject' /* gc1-allow: unit route classification regression; integration covers real service */,
+  () => {
+    const actual = jest.requireActual('../services/subject') as Record<
+      string,
+      unknown
+    >;
+    return {
+      ...actual,
+      configureLanguageSubject: jest.fn(),
+    };
+  },
+);
 
 import { Hono } from 'hono';
 import { ERROR_CODES } from '@eduagent/schemas';
