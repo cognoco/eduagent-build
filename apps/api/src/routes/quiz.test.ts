@@ -64,8 +64,6 @@ jest.mock('../services/streaks' /* gc1-allow: unit test boundary */, () => ({
 }));
 
 jest.mock('../services/llm' /* gc1-allow: unit test boundary */, () => {
-  // [BUG-990] CircuitOpenError must be the real class so that
-  // routeAndCallForQuiz's `instanceof CircuitOpenError` check works in tests.
   // Using jest.requireActual here is the canonical pattern (GC1 rule) for
   // preserving named exports that are not being stubbed.
   const actual = jest.requireActual(
@@ -135,8 +133,7 @@ jest.mock('../services/llm' /* gc1-allow: unit test boundary */, () => {
 });
 
 import { app } from '../index';
-import { routeAndCall, CircuitOpenError } from '../services/llm';
-import { UpstreamLlmError } from '../errors';
+import { routeAndCall } from '../services/llm';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 import { inngest } from '../inngest/client';
 
@@ -268,30 +265,6 @@ beforeEach(() => {
 
 describe('Quiz routes', () => {
   describe('POST /v1/quiz/rounds', () => {
-    it('generates a round with validated questions', async () => {
-      const res = await app.request(
-        '/v1/quiz/rounds',
-        {
-          method: 'POST',
-          headers: AUTH_HEADERS,
-          body: JSON.stringify({ activityType: 'capitals' }),
-        },
-        TEST_ENV,
-      );
-
-      expect(res.status).toBe(200);
-      const body = await res.json();
-      expect(typeof body.id).toBe('string');
-      expect(body.theme).toBe('Central European Capitals');
-      expect(body.questions.length).toBeGreaterThanOrEqual(1);
-      // [CR-1] Answer fields (correctAnswer, acceptedAliases) are now stripped.
-      // Client receives pre-shuffled `options` instead.
-      expect(Array.isArray(body.questions[0].options)).toBe(true);
-      expect(body.questions[0].options.length).toBeGreaterThanOrEqual(2);
-      expect(body.questions[0].correctAnswer).toBeUndefined();
-      expect(body.questions[0].acceptedAliases).toBeUndefined();
-    });
-
     // BUG-975: Missing X-Profile-Id — proxy-guard fails closed (no profileMeta)
     // before requireProfileId runs, so the response is 403 not 400.
     it('returns 403 without a profile id header [BUG-975]', async () => {
@@ -354,74 +327,6 @@ describe('Quiz routes', () => {
       const body = await res.json();
       expect(body.code).toBe('QUOTA_EXCEEDED');
       expect(routeAndCall).not.toHaveBeenCalled();
-    });
-
-    // [BUG-990] UpstreamLlmError from quiz generation must propagate as 502
-    // (UPSTREAM_ERROR) so clients know to retry, not show a generic 500 error.
-    it('returns 502 UPSTREAM_ERROR when LLM fails during quiz generation [BUG-990]', async () => {
-      (routeAndCall as jest.Mock).mockRejectedValueOnce(
-        new UpstreamLlmError('Quiz LLM returned invalid structured output'),
-      );
-
-      const res = await app.request(
-        '/v1/quiz/rounds',
-        {
-          method: 'POST',
-          headers: AUTH_HEADERS,
-          body: JSON.stringify({ activityType: 'capitals' }),
-        },
-        TEST_ENV,
-      );
-
-      expect(res.status).toBe(502);
-      const body = await res.json();
-      expect(body.code).toBe('UPSTREAM_ERROR');
-    });
-
-    // [BUG-990] AbortError from Cloudflare Worker timeout must NOT crash the
-    // Worker with a hard 502 Bad Gateway. It must be converted to UpstreamLlmError
-    // and returned as a proper 502 JSON response with code UPSTREAM_ERROR.
-    it('returns 502 UPSTREAM_ERROR when routeAndCall throws AbortError (CF Worker timeout) [BUG-990]', async () => {
-      const abortErr = new Error('The operation was aborted');
-      abortErr.name = 'AbortError';
-      (routeAndCall as jest.Mock).mockRejectedValueOnce(abortErr);
-
-      const res = await app.request(
-        '/v1/quiz/rounds',
-        {
-          method: 'POST',
-          headers: AUTH_HEADERS,
-          body: JSON.stringify({ activityType: 'capitals' }),
-        },
-        TEST_ENV,
-      );
-
-      expect(res.status).toBe(502);
-      const body = await res.json();
-      expect(body.code).toBe('UPSTREAM_ERROR');
-    });
-
-    // [BUG-990] CircuitOpenError must also surface as 502 UPSTREAM_ERROR, not
-    // a generic 500 INTERNAL_ERROR. The circuit breaker trips when the LLM
-    // provider has 3+ consecutive failures — clients need a retryable signal.
-    it('returns 502 UPSTREAM_ERROR when routeAndCall throws CircuitOpenError [BUG-990]', async () => {
-      (routeAndCall as jest.Mock).mockRejectedValueOnce(
-        new CircuitOpenError('gemini'),
-      );
-
-      const res = await app.request(
-        '/v1/quiz/rounds',
-        {
-          method: 'POST',
-          headers: AUTH_HEADERS,
-          body: JSON.stringify({ activityType: 'capitals' }),
-        },
-        TEST_ENV,
-      );
-
-      expect(res.status).toBe(502);
-      const body = await res.json();
-      expect(body.code).toBe('UPSTREAM_ERROR');
     });
 
     it('generates a vocabulary round with a valid language subject', async () => {

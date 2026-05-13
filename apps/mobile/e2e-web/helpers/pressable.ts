@@ -1,4 +1,4 @@
-import type { Locator, Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 
 /**
  * Click a React Native Web Pressable reliably.
@@ -15,6 +15,16 @@ import type { Locator, Page } from '@playwright/test';
  * exact path React Native Web listens on. Equivalent UX, reliable in e2e.
  */
 export async function pressableClick(target: Locator): Promise<void> {
+  const page = target.page();
+  const splash = page.getByTestId('animated-splash');
+
+  await splash.waitFor({ state: 'hidden', timeout: 15_000 }).catch(() => {
+    // Most app states do not render the splash at all. If it is still visible,
+    // the post-click assertion in the calling test will catch the blocked UI.
+  });
+
+  await expect(target).toBeVisible({ timeout: 15_000 });
+  await target.scrollIntoViewIfNeeded();
   await target.dispatchEvent('pointerdown');
   await target.dispatchEvent('pointerup');
   await target.dispatchEvent('click');

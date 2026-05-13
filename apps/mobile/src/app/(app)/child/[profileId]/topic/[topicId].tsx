@@ -9,7 +9,7 @@ import { useRouter, useLocalSearchParams, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import type { Translate, TranslateKey } from '../../../../../i18n';
-import { useChildSessions } from '../../../../../hooks/use-dashboard';
+import { useProfileSessions } from '../../../../../hooks/use-progress';
 import { goBackOrReplace } from '../../../../../lib/navigation';
 import {
   getParentRetentionInfo,
@@ -104,7 +104,7 @@ export default function TopicDetailScreen() {
   const masteryPercent = mastery !== null ? Math.round(mastery * 100) : null;
 
   const { data: sessions, isLoading: sessionsLoading } =
-    useChildSessions(profileId);
+    useProfileSessions(profileId);
   const topicSessions = sessions?.filter((s) => s.topicId === topicId) ?? [];
 
   // Most recent fluency-drill outcomes for this topic. Flat-mapped across

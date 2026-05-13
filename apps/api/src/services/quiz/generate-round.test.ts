@@ -2,6 +2,7 @@ import type { CapitalsQuestion, VocabularyQuestion } from '@eduagent/schemas';
 import type { LibraryItem } from './content-resolver';
 import {
   assembleRound,
+  buildCapitalsDiscoveryRound,
   buildVocabularyDiscoveryQuestions,
   buildCapitalsPrompt,
   extractJsonObject,
@@ -107,6 +108,71 @@ describe('injectMasteryQuestions', () => {
 
     expect(round).toHaveLength(1);
     expect(round[0]?.isLibraryItem).toBe(false);
+  });
+});
+
+describe('buildCapitalsDiscoveryRound', () => {
+  it('builds a full capitals round from reference data without an LLM response', () => {
+    const round = buildCapitalsDiscoveryRound({
+      discoveryCount: 8,
+      recentAnswers: [],
+    });
+
+    expect(round.theme).toBeTruthy();
+    expect(round.questions).toHaveLength(8);
+    for (const question of round.questions) {
+      expect(question.type).toBe('capitals');
+      expect(question.isLibraryItem).toBe(false);
+      expect(question.acceptedAliases).toContain(question.correctAnswer);
+      expect(question.distractors).toHaveLength(3);
+      expect(question.distractors).not.toContain(question.correctAnswer);
+    }
+  });
+
+  it('avoids recently answered capitals and existing mastery items', () => {
+    const round = buildCapitalsDiscoveryRound({
+      discoveryCount: 8,
+      recentAnswers: ['Paris', 'Berlin'],
+      excludedCountries: ['Austria'],
+      excludedAnswers: ['Vienna'],
+    });
+
+    const countries = round.questions.map((question) => question.country);
+    const answers = round.questions.map((question) => question.correctAnswer);
+
+    expect(countries).not.toContain('Austria');
+    expect(answers).not.toContain('Paris');
+    expect(answers).not.toContain('Berlin');
+    expect(answers).not.toContain('Vienna');
+  });
+
+  it('prioritizes recently missed capitals even when they were seen recently', () => {
+    const round = buildCapitalsDiscoveryRound({
+      discoveryCount: 4,
+      recentAnswers: ['Paris'],
+      recentlyMissedItems: ['France'],
+    });
+
+    expect(round.questions[0]).toMatchObject({
+      country: 'France',
+      correctAnswer: 'Paris',
+    });
+  });
+
+  it('uses same-region distractors on difficulty bump rounds', () => {
+    const round = buildCapitalsDiscoveryRound({
+      discoveryCount: 4,
+      recentAnswers: [],
+      themePreference: 'Central Europe',
+      difficultyBump: true,
+    });
+
+    expect(round.theme).toBe('Central Europe Capitals');
+    for (const question of round.questions) {
+      expect(question.distractors).toHaveLength(3);
+      expect(new Set(question.distractors).size).toBe(3);
+      expect(question.distractors).not.toContain(question.correctAnswer);
+    }
   });
 });
 

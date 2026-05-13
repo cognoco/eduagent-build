@@ -11,7 +11,12 @@ import type { ProgressSummary, SubjectInventory } from '@eduagent/schemas';
 import type { Translate } from '../../../i18n';
 import { platformAlert } from '../../../lib/platform-alert';
 import { classifyApiError } from '../../../lib/format-api-error';
-import { useFocusEffect, useRouter, type Href } from 'expo-router';
+import {
+  useFocusEffect,
+  useLocalSearchParams,
+  useRouter,
+  type Href,
+} from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ErrorFallback, TrackedView } from '../../../components/common';
@@ -250,33 +255,56 @@ export default function ProgressScreen(): React.ReactElement {
   const role = useActiveProfileRole();
   const register = copyRegisterFor(role);
   const router = useRouter();
+  const { profileId: rawRequestedProfileId } = useLocalSearchParams<{
+    profileId?: string;
+  }>();
   const insets = useSafeAreaInsets();
   const { activeProfile } = useProfile();
   const linkedChildren = useLinkedChildren();
   const hasLinked = linkedChildren.length > 0;
+  const requestedProfileId = Array.isArray(rawRequestedProfileId)
+    ? rawRequestedProfileId[0]
+    : rawRequestedProfileId;
 
   const [selectedProfileId, setSelectedProfileId] = useState<string>(
-    () => (hasLinked ? linkedChildren[0]?.id : activeProfile?.id) ?? '',
+    () =>
+      requestedProfileId ??
+      (hasLinked ? linkedChildren[0]?.id : activeProfile?.id) ??
+      '',
   );
   const [showProgressNudge, setShowProgressNudge] = useState(false);
+
+  useEffect(() => {
+    if (!requestedProfileId) return;
+    const knownTarget =
+      requestedProfileId === activeProfile?.id ||
+      linkedChildren.some((child) => child.id === requestedProfileId);
+    if (knownTarget || linkedChildren.length === 0) {
+      setSelectedProfileId(requestedProfileId);
+    }
+  }, [requestedProfileId, activeProfile?.id, linkedChildren]);
 
   // Re-seed when linked children load after mount (query-cache race).
   const mountedWithoutChildren = useRef(!hasLinked);
   useEffect(() => {
+    if (requestedProfileId) return;
     if (mountedWithoutChildren.current && hasLinked && linkedChildren[0]?.id) {
       mountedWithoutChildren.current = false;
       setSelectedProfileId(linkedChildren[0].id);
     }
-  }, [hasLinked, linkedChildren]);
+  }, [hasLinked, linkedChildren, requestedProfileId]);
 
   // Re-seed when activeProfile loads after mount (no linked children path).
   useEffect(() => {
+    if (requestedProfileId) return;
     if (!hasLinked && !selectedProfileId && activeProfile?.id) {
       setSelectedProfileId(activeProfile.id);
     }
-  }, [hasLinked, selectedProfileId, activeProfile?.id]);
+  }, [hasLinked, selectedProfileId, activeProfile?.id, requestedProfileId]);
 
-  const isViewingSelf = !hasLinked || selectedProfileId === activeProfile?.id;
+  const isViewingSelf =
+    selectedProfileId === activeProfile?.id ||
+    (!hasLinked && !selectedProfileId);
 
   const ownInventoryQuery = useProgressInventory();
   const childInventoryQuery = useChildInventory(
@@ -311,7 +339,10 @@ export default function ProgressScreen(): React.ReactElement {
   const resumeTargetQuery = useLearningResumeTarget();
   const milestonesQuery = useProgressMilestones(5);
   const subjectsQuery = useSubjects();
-  const refreshSnapshot = useRefreshProgressSnapshot();
+  const {
+    mutateAsync: refreshProgressSnapshot,
+    isPending: isRefreshingSnapshot,
+  } = useRefreshProgressSnapshot();
   const hasFocusedOnceRef = useRef(false);
 
   const inventory = inventoryQuery.data;
@@ -340,7 +371,7 @@ export default function ProgressScreen(): React.ReactElement {
     async (options?: { alertOnError?: boolean }) => {
       if (isViewingSelf) {
         try {
-          await refreshSnapshot.mutateAsync();
+          await refreshProgressSnapshot();
         } catch (err) {
           if (options?.alertOnError !== false) {
             const message =
@@ -367,10 +398,15 @@ export default function ProgressScreen(): React.ReactElement {
       refetchMonthlyReports,
       refetchWeeklyReports,
       refetchChildSummary,
-      refreshSnapshot,
+      refreshProgressSnapshot,
       t,
     ],
   );
+  const handleRefreshRef = useRef(handleRefresh);
+
+  useEffect(() => {
+    handleRefreshRef.current = handleRefresh;
+  }, [handleRefresh]);
 
   useFocusEffect(
     useCallback(() => {
@@ -378,8 +414,8 @@ export default function ProgressScreen(): React.ReactElement {
         hasFocusedOnceRef.current = true;
         return;
       }
-      void handleRefresh({ alertOnError: false });
-    }, [handleRefresh]),
+      void handleRefreshRef.current({ alertOnError: false });
+    }, []),
   );
 
   const handleGlobalResume = useCallback(() => {
@@ -481,7 +517,7 @@ export default function ProgressScreen(): React.ReactElement {
         refreshControl={
           <RefreshControl
             refreshing={
-              refreshSnapshot.isPending ||
+              isRefreshingSnapshot ||
               inventoryQuery.isRefetching ||
               historyQuery.isRefetching
             }

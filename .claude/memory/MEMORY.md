@@ -116,6 +116,7 @@ Two production dead-code branches removed 2026-04-19 in commit `970a82a5`: `AgeB
 - [feedback_testing_no_mocks.md](feedback_testing_no_mocks.md) — No new internal `jest.mock()` (GC1 ratchet). External-boundary mocks (Stripe, Clerk JWKS, Inngest, LLM providers) OK per CLAUDE.md.
 - [feedback_precommit_typecheck.md](feedback_precommit_typecheck.md) — Run tsc + lint before committing.
 - [feedback_e2e_never_skip.md](feedback_e2e_never_skip.md) — Never skip E2E tests.
+- [feedback_e2e_release_gate.md](feedback_e2e_release_gate.md) — Release-blocking E2E means full suite, failure ledger, investigate each failure, fix real bugs or stale tests, repeat until green.
 - [feedback_batch_pr_fixes.md](feedback_batch_pr_fixes.md) — Batch PR fixes, validate locally, push once.
 - [feedback_emulator_issues_doc.md](feedback_emulator_issues_doc.md) — ALWAYS read e2e-emulator-issues.md before emulator work.
 - [feedback_eas_no_retry.md](feedback_eas_no_retry.md) — NEVER retry eas build without checking dashboard first.
