@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>PR Dispatch Graph — Cleanup Plan (2026-05-12)</title>
+<title>PR Dispatch Graph — Cleanup Plan (2026-05-13)</title>
 <style>
   :root {
     --done-bg: #1f3d1f;
@@ -78,20 +78,6 @@
     padding: 12px 16px 16px 16px;
     margin-bottom: 16px;
   }
-  .wave-title {
-    display: flex;
-    align-items: baseline;
-    gap: 12px;
-    margin-bottom: 8px;
-  }
-  .wave-title h2 {
-    margin: 0;
-    border: none;
-    padding: 0;
-    font-size: 16px;
-  }
-  .wave-title .meta { color: var(--muted); font-size: 12px; }
-
   .grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -145,7 +131,6 @@
   td.pr { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 600; white-space: nowrap; }
   td.status { white-space: nowrap; }
 
-  /* Mermaid container */
   .mermaid-wrap {
     background: var(--panel);
     border: 1px solid var(--border);
@@ -163,78 +148,46 @@
 <body>
 
 <h1>PR Dispatch Graph — Cleanup Plan</h1>
-<div class="timestamp">Generated 2026-05-12 from <code>docs/audit/cleanup-plan.md</code> (HEAD <code>be969776</code>) · branch <code>consistency2</code></div>
+<div class="timestamp">Updated 2026-05-13 · branch <code>consistency2</code></div>
 
 <div class="legend">
   <span class="chip done">DONE / MERGED</span>
   <span class="chip inprog">IN PROGRESS (Archon running)</span>
   <span class="chip review">IN PR REVIEW</span>
-  <span class="chip ready">READY NOW (dispatch in parallel)</span>
+  <span class="chip ready">READY NOW</span>
   <span class="chip seq">SEQUENCED (waits on upstream PR)</span>
-  <span class="chip coland">CO-LAND (must merge together)</span>
-  <span class="chip blocked">BLOCKED (decision required)</span>
-  <span class="chip superseded">SUPERSEDED</span>
-</div>
-
-<h2>In Progress — Archon currently running</h2>
-
-<div class="wave">
-  <div class="grid">
-    <div class="card inprog"><span class="pr">PR-18</span><span class="cluster">C8 P1</span> Regenerate 11 drizzle snapshots</div>
-    <div class="card inprog"><span class="pr">PR-19</span><span class="cluster">C8 P2</span> Fix non-monotonic _journal.json timestamps</div>
-    <div class="card inprog"><span class="pr">PR-21</span><span class="cluster">C8 P4</span> Memory file dedupe (~96 files)</div>
-    <div class="card inprog"><span class="pr">PR-24</span><span class="cluster">C8 P7</span> Per-package READMEs</div>
-  </div>
+  <span class="chip coland">CO-LAND (sequence label only)</span>
+  <span class="chip blocked">BLOCKED</span>
+  <span class="chip superseded">SUPERSEDED / CLOSED NO-OP</span>
 </div>
 
 <h2>In PR Review</h2>
 
 <div class="wave">
   <div class="grid">
-    <div class="card review"><span class="pr">PR-11</span><span class="cluster">C4 P7</span> AgeBracket migration<span class="meta">On merge → unlocks PR-17 P3 sub-phase.</span></div>
-    <div class="card review"><span class="pr">PR-17</span><span class="cluster">C7 P1-P5,P7</span> Doc bundle + 2 Inngest observers <span class="chip" style="font-size:10px;padding:1px 5px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:3px;">#226</span><span class="meta">P3 doc edits read better after PR-11 merges, but CI-safe now. Co-land with PR-27.</span></div>
+    <div class="card review"><span class="pr">PR-15e</span><span class="cluster">C6 P3e</span> Heterogeneous test type fixes (~95 errors / ~30 files)<span class="meta">D-C6-4 resolved here. On merge → unlocks PR-15f.</span></div>
+    <div class="card review"><span class="pr">PR-17</span><span class="cluster">C7 P1-P5,P7</span> Doc bundle + 2 Inngest observers <span class="chip" style="font-size:10px;padding:1px 5px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);border-radius:3px;">#226</span><span class="meta">Wave 3 Step 5 — merge last in co-land window. ↔ PR-27.</span></div>
   </div>
 </div>
 
-<h2>Wave 1 — Ready to dispatch right now (parallel)</h2>
-<p class="footnote">No upstream PR dependencies. Spawn as many Archon runs as your budget allows. Order within the wave doesn't matter.</p>
+<h2>Wave 3 — Co-land merge sequence (Steps 2–4 in progress)</h2>
+<p class="footnote">All five PRs share overlapping file references. Merge in step order. Card colour = current status.</p>
 
 <div class="wave">
   <div class="grid">
-    <div class="card ready"><span class="pr">PR-15d</span><span class="cluster">C6 P3d</span> eval-llm/flows — ~3 errors / 2 files<span class="meta">Scope shrank from 5 files. Touches LLM production code → eval:llm --live if input shape changes.</span></div>
-    <div class="card ready"><span class="pr">PR-20</span><span class="cluster">C8 P3</span> Sweep destructive migrations for rollback<span class="meta">Human involvement: rollback assessment per migration.</span></div>
-    <div class="card ready"><span class="pr">PR-22</span><span class="cluster">C8 P5</span> Resolve vendored bmad vs installed plugin</div>
-    <div class="card ready"><span class="pr">PR-23</span><span class="cluster">C8 P6</span> EduAgent → Mentomate naming sweep<span class="meta">Human review required — keep <code>@eduagent/*</code> package names.</span></div>
-    <div class="card ready"><span class="pr">PR-26</span><span class="cluster">C9 P2</span> Triage 23 Cat 2 possibly-obsolete files<span class="meta">Per-file human decision.</span></div>
-    <div class="card ready"><span class="pr">PR-28</span><span class="cluster">C9 P4</span> Verify 116 Cat 3 keep-files</div>
+    <div class="card done"><span class="pr">PR-26</span><span class="cluster">C9 P2</span> Triage 23 Cat 2 possibly-obsolete files<span class="meta">Step 1 ✓ — merged. Per-file decisions recorded.</span></div>
+    <div class="card inprog"><span class="pr">PR-25</span><span class="cluster">C9 P1</span> Archive 25 Cat 1 obsolete files<span class="meta">Step 2 — Archon running. Moves files into _archive/. Human decision per file.</span></div>
+    <div class="card inprog"><span class="pr">PR-29</span><span class="cluster">C9 P5</span> Folder-level archive moves<span class="meta">Step 3 — Archon running. Restructures paths inside _archive/.</span></div>
+    <div class="card inprog"><span class="pr">PR-27</span><span class="cluster">C9 P3</span> 8 inbound-link conflicts<span class="meta">Step 4 — Archon running. Hub PR; reads outcomes of Steps 1–3.</span></div>
+    <div class="card review"><span class="pr">PR-17</span><span class="cluster">C7</span> Doc bundle + Inngest observers<span class="meta">Step 5 — in PR review (#226). Merge last in window.</span></div>
   </div>
 </div>
 
-<h2>Wave 2 — Sequenced (waits on in-progress / wave-1 PRs)</h2>
+<h2>Wave 4 — Closure (waits on PR-15e)</h2>
 
 <div class="wave">
   <div class="grid">
-    <div class="card seq"><span class="pr">PR-15e</span><span class="cluster">C6 P3e</span> Heterogeneous test type fixes (~95 errors / ~30 files)<span class="meta">→ Waits for PR-15d (ready — last remaining precondition). PR-15b (#222) + PR-15c merged. Scope grew from PR #211/#215. <strong>D-C6-4 resolved here</strong>.</span></div>
-  </div>
-</div>
-
-<h2>Wave 3 — Co-land coordination (merge together)</h2>
-<p class="footnote">These PRs touch overlapping files (inbound links + archive paths). Land them in the same merge window or sequence carefully.</p>
-
-<div class="wave">
-  <div class="grid">
-    <div class="card coland"><span class="pr">PR-17</span><span class="cluster">C7</span> Doc reconciliation<span class="meta">↔ PR-27 (inbound link conflicts)</span></div>
-    <div class="card coland"><span class="pr">PR-25</span><span class="cluster">C9 P1</span> Archive 25 Cat 1 obsolete files<span class="meta">↔ PR-27 (link redirects). Human decision per file.</span></div>
-    <div class="card coland"><span class="pr">PR-27</span><span class="cluster">C9 P3</span> 8 inbound-link conflicts<span class="meta">↔ PR-17, PR-25, PR-29 (the hub of the co-land cluster)</span></div>
-    <div class="card coland"><span class="pr">PR-29</span><span class="cluster">C9 P5</span> Folder-level archive moves<span class="meta">↔ PR-25 + PR-27 (creates new archive paths the link fixes target)</span></div>
-  </div>
-</div>
-
-<h2>Wave 4 — Closure (waits on entire Wave 2 chain)</h2>
-
-<div class="wave">
-  <div class="grid">
-    <div class="card seq"><span class="pr">PR-15f</span><span class="cluster">C6 P3f</span> Wire spec config + re-tighten flags<span class="meta">→ Waits for PR-15b + PR-15c + PR-15d + PR-15e all merged. Pre-commit hook runs <code>tsc --build</code> — if any test still fails, every commit on every branch fails.</span></div>
+    <div class="card seq"><span class="pr">PR-15f</span><span class="cluster">C6 P3f</span> Wire spec config + re-tighten flags<span class="meta">→ Waits for PR-15e. (PR-15a/b/c merged; PR-15d closed no-op.) Pre-commit hook runs <code>tsc --build</code> — if any test still fails, every commit on every branch fails.</span></div>
   </div>
 </div>
 
@@ -242,7 +195,7 @@
 
 <div class="wave">
   <div class="grid">
-    <div class="card blocked"><span class="pr">C6 P2</span><span class="cluster">D-C6-3</span> apps/api/eslint.config.mjs disposition<span class="meta">No PR until D-C6-3 resolved. Recommendation in plan: drop as wontfix (root config already covers via <code>nx run api:lint</code>).</span></div>
+    <div class="card blocked"><span class="pr">C6 P2</span><span class="cluster">D-C6-3</span> apps/api/eslint.config.mjs disposition<span class="meta">No PR until D-C6-3 resolved. Recommendation: drop as wontfix.</span></div>
   </div>
 </div>
 
@@ -259,14 +212,25 @@
     <div class="card done"><span class="pr">PR-08</span><span class="cluster">C3 P1+P2</span> Quiz unstable_settings + AccordionTopicList (#196)</div>
     <div class="card done"><span class="pr">PR-09</span><span class="cluster">C4 P1+P2</span> Hex literals + brand carve-out (#208)</div>
     <div class="card done"><span class="pr">PR-10</span><span class="cluster">C4 P3+P4+P6</span> RemediationCard + persona sweep + guard (#206)</div>
+    <div class="card done"><span class="pr">PR-11</span><span class="cluster">C4 P7</span> AgeBracket migration</div>
     <div class="card done"><span class="pr">PR-12</span><span class="cluster">C5 P1</span> Manifest cleanup (~17 deps)</div>
     <div class="card done"><span class="pr">PR-13</span><span class="cluster">C5 P3+P7</span> Small dep adds</div>
-    <div class="card done"><span class="pr">PR-16</span><span class="cluster">C6 P4+P5</span> nx e2e drop + db:generate rename</div>
-    <div class="card done"><span class="pr">PR-14</span><span class="cluster">C6 P1b</span> Drizzle import guard test (#212) <span class="meta" style="color: var(--seq-fg)">⚠ partial — P2 reverted, blocked on D-C6-3</span></div>
+    <div class="card done"><span class="pr">PR-14</span><span class="cluster">C6 P1b</span> Drizzle import guard test (#212)<span class="meta" style="font-style:normal;opacity:1;color:var(--seq-fg)"> ⚠ partial — P2 reverted, blocked on D-C6-3</span></div>
     <div class="card done"><span class="pr">PR-15a</span><span class="cluster">C6 P3a</span> tsconfig.spec.json plumbing (#214)</div>
     <div class="card done"><span class="pr">PR-15b</span><span class="cluster">C6 P3b</span> TS18046 type fixes (37 errors / 6 files)</div>
     <div class="card done"><span class="pr">PR-15c</span><span class="cluster">C6 P3c</span> TS7006 — 129 errors / 42 files (#222)</div>
+    <div class="card done"><span class="pr">PR-16</span><span class="cluster">C6 P4+P5</span> nx e2e drop + db:generate rename</div>
+    <div class="card done"><span class="pr">PR-18</span><span class="cluster">C8 P1</span> Regenerate 11 drizzle snapshots</div>
+    <div class="card done"><span class="pr">PR-19</span><span class="cluster">C8 P2</span> Fix non-monotonic _journal.json timestamps</div>
+    <div class="card done"><span class="pr">PR-21</span><span class="cluster">C8 P4</span> Memory file dedupe (~96 files)</div>
+    <div class="card done"><span class="pr">PR-23</span><span class="cluster">C8 P6</span> EduAgent → Mentomate naming sweep</div>
+    <div class="card done"><span class="pr">PR-26</span><span class="cluster">C9 P2</span> Triage 23 Cat 2 files — Wave 3 Step 1 ✓</div>
+    <div class="card done"><span class="pr">PR-28</span><span class="cluster">C9 P4</span> Verify 116 Cat 3 keep-files</div>
     <div class="card superseded"><span class="pr">PR-05</span><span class="cluster">C2 P1+P2</span> Per-channel mock guard — replaced by GC1 ratchet (#171)</div>
+    <div class="card superseded"><span class="pr">PR-15d</span><span class="cluster">C6 P3d</span> eval-llm/flows type fixes — closed no-op (scope became empty)</div>
+    <div class="card superseded"><span class="pr">PR-20</span><span class="cluster">C8 P3</span> Sweep destructive migrations — closed no-op</div>
+    <div class="card superseded"><span class="pr">PR-22</span><span class="cluster">C8 P5</span> Resolve vendored bmad — closed no-op</div>
+    <div class="card superseded"><span class="pr">PR-24</span><span class="cluster">C8 P7</span> Per-package READMEs — closed no-op</div>
   </div>
 </div>
 
@@ -284,34 +248,29 @@ flowchart LR
   classDef blocked    fill:#4d1f1f,stroke:#a85a5a,color:#ffb6b6;
   classDef superseded fill:#2a2a2a,stroke:#444,color:#888;
 
-  %% In progress
+  %% Done
+  PR11[PR-11 ✓<br/>C4 P7]:::done
+  PR12[PR-12 ✓]:::done
+  PR13[PR-13 ✓<br/>C5 P3+P7]:::done
+  PR15a[PR-15a #214 ✓]:::done
+  PR15b[PR-15b ✓]:::done
+  PR15c[PR-15c #222 ✓<br/>C6 P3c]:::done
   PR16[PR-16 ✓<br/>C6 P4+5]:::done
-  PR17[PR-17 #226<br/>C7 bundle]:::review
+  PR18[PR-18 ✓]:::done
+  PR19[PR-19 ✓]:::done
+  PR21[PR-21 ✓]:::done
+  PR23[PR-23 ✓<br/>C8 P6]:::done
+  PR26[PR-26 ✓<br/>C9 P2]:::done
+  PR28[PR-28 ✓<br/>C9 P4]:::done
 
   %% In PR review
-  PR11[PR-11<br/>C4 P7]:::review
-  PR13[PR-13 ✓<br/>C5 P3+P7]:::done
-  PR15c[PR-15c #222 ✓<br/>C6 P3c]:::done
+  PR15e[PR-15e<br/>C6 P3e]:::review
+  PR17[PR-17 #226<br/>C7 bundle]:::review
 
-  %% Wave-1 ready
-  PR15d[PR-15d<br/>C6 P3d]:::ready
-  PR18[PR-18]:::inprog
-  PR19[PR-19]:::inprog
-  PR20[PR-20]:::ready
-  PR21[PR-21]:::inprog
-  PR22[PR-22]:::ready
-  PR23[PR-23]:::ready
-  PR24[PR-24]:::inprog
-  PR26[PR-26]:::ready
-  PR28[PR-28]:::ready
-
-  %% Wave-2 sequenced
-  PR15e[PR-15e<br/>C6 P3e]:::seq
-
-  %% Wave-3 co-land
-  PR25[PR-25<br/>C9 P1]:::coland
-  PR27[PR-27<br/>C9 P3]:::coland
-  PR29[PR-29<br/>C9 P5]:::coland
+  %% Wave-3 in progress
+  PR25[PR-25<br/>C9 P1]:::inprog
+  PR27[PR-27<br/>C9 P3]:::inprog
+  PR29[PR-29<br/>C9 P5]:::inprog
 
   %% Wave-4 closure
   PR15f[PR-15f<br/>C6 P3f]:::seq
@@ -319,27 +278,23 @@ flowchart LR
   %% Blocked
   C6P2[C6 P2<br/>D-C6-3]:::blocked
 
-  %% Done
-  PR12[PR-12 ✓]:::done
-  PR15a[PR-15a #214]:::done
-  PR15b[PR-15b ✓]:::done
-
   %% Dependencies
   PR15a --> PR15b
   PR15a --> PR15c
-  PR15a --> PR15d
   PR15b --> PR15e
   PR15c --> PR15e
-  PR15d --> PR15e
   PR15e --> PR15f
 
   PR12 --> PR13
-  PR11 -- "P3 sub-phase only" --> PR17
+  PR11 -- "P3 ✓ merged" --> PR17
 
-  PR17 -.co-land.- PR27
+  PR26 -- "Step 1 ✓" --> PR25
+  PR26 -- "Step 1 ✓" --> PR29
+  PR26 -- "Step 1 ✓" --> PR27
   PR25 -.co-land.- PR27
   PR29 -.co-land.- PR27
   PR29 -.co-land.- PR25
+  PR27 -.co-land.- PR17
 </pre>
 </div>
 
@@ -360,47 +315,44 @@ flowchart LR
     <tr><td class="pr">PR-08</td><td>C3 P1+P2</td><td class="status"><span class="chip done">DONE #196</span></td><td>—</td><td>—</td><td>Mobile nav safety nets</td></tr>
     <tr><td class="pr">PR-09</td><td>C4 P1+P2</td><td class="status"><span class="chip done">DONE #208</span></td><td>—</td><td>—</td><td>Hex literals + brand carve-out</td></tr>
     <tr><td class="pr">PR-10</td><td>C4 P3+P4+P6</td><td class="status"><span class="chip done">DONE #206</span></td><td>—</td><td>—</td><td>RemediationCard + persona sweep</td></tr>
-    <tr><td class="pr">PR-11</td><td>C4 P7</td><td class="status"><span class="chip review">IN PR REVIEW</span></td><td>—</td><td>—</td><td>Re-dispatch with expanded Files-claimed; unlocks PR-17 P3 on merge</td></tr>
-    <tr><td class="pr">PR-12</td><td>C5 P1</td><td class="status"><span class="chip done">DONE</span></td><td>—</td><td>—</td><td>Manifest cleanup merged</td></tr>
-    <tr><td class="pr">PR-13</td><td>C5 P3+P7</td><td class="status"><span class="chip done">DONE</span></td><td>PR-12 (done)</td><td>—</td><td>Small dep adds — merged</td></tr>
+    <tr><td class="pr">PR-11</td><td>C4 P7</td><td class="status"><span class="chip done">DONE</span></td><td>—</td><td>—</td><td>AgeBracket migration — merged; unlocked PR-17 P3</td></tr>
+    <tr><td class="pr">PR-12</td><td>C5 P1</td><td class="status"><span class="chip done">DONE</span></td><td>—</td><td>—</td><td>Manifest cleanup</td></tr>
+    <tr><td class="pr">PR-13</td><td>C5 P3+P7</td><td class="status"><span class="chip done">DONE</span></td><td>PR-12</td><td>—</td><td>Small dep adds</td></tr>
     <tr><td class="pr">PR-14</td><td>C6 P1b</td><td class="status"><span class="chip done">DONE #212</span></td><td>—</td><td>—</td><td>Partial — C6 P2 reverted, blocked on D-C6-3</td></tr>
     <tr><td class="pr">—</td><td>C6 P2</td><td class="status"><span class="chip blocked">BLOCKED</span></td><td>D-C6-3</td><td>—</td><td>Recommendation: drop as wontfix</td></tr>
     <tr><td class="pr">PR-15a</td><td>C6 P3a</td><td class="status"><span class="chip done">DONE #214</span></td><td>—</td><td>—</td><td>tsconfig.spec.json plumbing</td></tr>
-    <tr><td class="pr">PR-15b</td><td>C6 P3b</td><td class="status"><span class="chip done">DONE</span></td><td>—</td><td>—</td><td>TS18046 fixes merged</td></tr>
-    <tr><td class="pr">PR-15c</td><td>C6 P3c</td><td class="status"><span class="chip done">DONE #222</span></td><td>PR-15a (done)</td><td>—</td><td>TS7006 fixes merged — PR-15e now only waiting on PR-15d</td></tr>
-    <tr><td class="pr">PR-15d</td><td>C6 P3d</td><td class="status"><span class="chip ready">READY</span></td><td>PR-15a (done)</td><td>—</td><td>Scope shrank to 2 files</td></tr>
-    <tr><td class="pr">PR-15e</td><td>C6 P3e</td><td class="status"><span class="chip seq">SEQUENCED</span></td><td>PR-15d (ready — last precondition)</td><td>—</td><td>Scope grew (~95 errors / ~30 files); D-C6-4 resolved here. PR-15c #222 merged.</td></tr>
-    <tr><td class="pr">PR-15f</td><td>C6 P3f</td><td class="status"><span class="chip seq">SEQUENCED</span></td><td>PR-15c/d/e all merged</td><td>—</td><td>Pre-commit hook gate hardened</td></tr>
-    <tr><td class="pr">PR-16</td><td>C6 P4+P5</td><td class="status"><span class="chip done">DONE</span></td><td>—</td><td>—</td><td>nx e2e drop + db:generate rename — merged</td></tr>
-    <tr><td class="pr">PR-17</td><td>C7 P1-P5,P7</td><td class="status"><span class="chip review">IN PR REVIEW #226</span> <span class="chip coland">CO-LAND</span></td><td>—</td><td>PR-27</td><td>Doc bundle + 2 new Inngest observers. P3 doc edits read better after PR-11, but all sub-phases are CI-safe now.</td></tr>
-    <tr><td class="pr">PR-18</td><td>C8 P1</td><td class="status"><span class="chip inprog">IN PROGRESS</span></td><td>—</td><td>—</td><td>Drizzle snapshots</td></tr>
-    <tr><td class="pr">PR-19</td><td>C8 P2</td><td class="status"><span class="chip inprog">IN PROGRESS</span></td><td>—</td><td>—</td><td>_journal.json timestamps</td></tr>
-    <tr><td class="pr">PR-20</td><td>C8 P3</td><td class="status"><span class="chip ready">READY</span></td><td>—</td><td>—</td><td>Migration rollback sweep — human review</td></tr>
-    <tr><td class="pr">PR-21</td><td>C8 P4</td><td class="status"><span class="chip inprog">IN PROGRESS</span></td><td>—</td><td>—</td><td>Memory file dedupe</td></tr>
-    <tr><td class="pr">PR-22</td><td>C8 P5</td><td class="status"><span class="chip ready">READY</span></td><td>—</td><td>—</td><td>bmad commands resolution</td></tr>
-    <tr><td class="pr">PR-23</td><td>C8 P6</td><td class="status"><span class="chip ready">READY</span></td><td>—</td><td>—</td><td>EduAgent→Mentomate sweep — human review</td></tr>
-    <tr><td class="pr">PR-24</td><td>C8 P7</td><td class="status"><span class="chip inprog">IN PROGRESS</span></td><td>—</td><td>—</td><td>Per-package READMEs</td></tr>
-    <tr><td class="pr">PR-25</td><td>C9 P1</td><td class="status"><span class="chip coland">CO-LAND</span></td><td>—</td><td>PR-27, PR-29</td><td>25 Cat 1 obsolete files — human decision</td></tr>
-    <tr><td class="pr">PR-26</td><td>C9 P2</td><td class="status"><span class="chip ready">READY</span></td><td>—</td><td>—</td><td>23 Cat 2 — per-file human decision</td></tr>
-    <tr><td class="pr">PR-27</td><td>C9 P3</td><td class="status"><span class="chip coland">CO-LAND</span></td><td>—</td><td>PR-17, PR-25, PR-29</td><td>8 inbound-link conflicts (hub of co-land cluster)</td></tr>
-    <tr><td class="pr">PR-28</td><td>C9 P4</td><td class="status"><span class="chip ready">READY</span></td><td>—</td><td>—</td><td>Verify 116 Cat 3 keep-files</td></tr>
-    <tr><td class="pr">PR-29</td><td>C9 P5</td><td class="status"><span class="chip coland">CO-LAND</span></td><td>—</td><td>PR-25, PR-27</td><td>Folder-level archive moves</td></tr>
+    <tr><td class="pr">PR-15b</td><td>C6 P3b</td><td class="status"><span class="chip done">DONE</span></td><td>—</td><td>—</td><td>TS18046 fixes</td></tr>
+    <tr><td class="pr">PR-15c</td><td>C6 P3c</td><td class="status"><span class="chip done">DONE #222</span></td><td>PR-15a</td><td>—</td><td>TS7006 fixes</td></tr>
+    <tr><td class="pr">PR-15d</td><td>C6 P3d</td><td class="status"><span class="chip superseded">CLOSED / NO-OP</span></td><td>—</td><td>—</td><td>eval-llm/flows scope became empty</td></tr>
+    <tr><td class="pr">PR-15e</td><td>C6 P3e</td><td class="status"><span class="chip review">IN PR REVIEW</span></td><td>PR-15b/c (done)</td><td>—</td><td>~95 errors / ~30 files; D-C6-4 resolved here</td></tr>
+    <tr><td class="pr">PR-15f</td><td>C6 P3f</td><td class="status"><span class="chip seq">SEQUENCED</span></td><td>PR-15e</td><td>—</td><td>Dispatch after PR-15e merges — pre-commit hook hardening</td></tr>
+    <tr><td class="pr">PR-16</td><td>C6 P4+P5</td><td class="status"><span class="chip done">DONE</span></td><td>—</td><td>—</td><td>nx e2e drop + db:generate rename</td></tr>
+    <tr><td class="pr">PR-17</td><td>C7 P1-P5,P7</td><td class="status"><span class="chip review">IN PR REVIEW #226</span></td><td>—</td><td>PR-27 (Wave 3 Step 5)</td><td>Doc bundle + 2 Inngest observers. Merge last in Wave 3 window.</td></tr>
+    <tr><td class="pr">PR-18</td><td>C8 P1</td><td class="status"><span class="chip done">DONE</span></td><td>—</td><td>—</td><td>Drizzle snapshots</td></tr>
+    <tr><td class="pr">PR-19</td><td>C8 P2</td><td class="status"><span class="chip done">DONE</span></td><td>—</td><td>—</td><td>_journal.json timestamps</td></tr>
+    <tr><td class="pr">PR-20</td><td>C8 P3</td><td class="status"><span class="chip superseded">CLOSED / NO-OP</span></td><td>—</td><td>—</td><td>Migration rollback sweep</td></tr>
+    <tr><td class="pr">PR-21</td><td>C8 P4</td><td class="status"><span class="chip done">DONE</span></td><td>—</td><td>—</td><td>Memory file dedupe</td></tr>
+    <tr><td class="pr">PR-22</td><td>C8 P5</td><td class="status"><span class="chip superseded">CLOSED / NO-OP</span></td><td>—</td><td>—</td><td>Resolve vendored bmad</td></tr>
+    <tr><td class="pr">PR-23</td><td>C8 P6</td><td class="status"><span class="chip done">DONE</span></td><td>—</td><td>—</td><td>EduAgent→Mentomate naming sweep</td></tr>
+    <tr><td class="pr">PR-24</td><td>C8 P7</td><td class="status"><span class="chip superseded">CLOSED / NO-OP</span></td><td>—</td><td>—</td><td>Per-package READMEs</td></tr>
+    <tr><td class="pr">PR-25</td><td>C9 P1</td><td class="status"><span class="chip inprog">IN PROGRESS</span></td><td>PR-26 (done)</td><td>PR-27, PR-29</td><td>25 Cat 1 obsolete files — Wave 3 Step 2. Human decision per file.</td></tr>
+    <tr><td class="pr">PR-26</td><td>C9 P2</td><td class="status"><span class="chip done">DONE</span></td><td>—</td><td>—</td><td>23 Cat 2 triage — Wave 3 Step 1 ✓ merged</td></tr>
+    <tr><td class="pr">PR-27</td><td>C9 P3</td><td class="status"><span class="chip inprog">IN PROGRESS</span></td><td>PR-26 (done)</td><td>PR-17, PR-25, PR-29</td><td>8 inbound-link conflicts — Wave 3 Step 4 (hub)</td></tr>
+    <tr><td class="pr">PR-28</td><td>C9 P4</td><td class="status"><span class="chip done">DONE</span></td><td>—</td><td>—</td><td>Verify 116 Cat 3 keep-files</td></tr>
+    <tr><td class="pr">PR-29</td><td>C9 P5</td><td class="status"><span class="chip inprog">IN PROGRESS</span></td><td>PR-26 (done)</td><td>PR-25, PR-27</td><td>Folder-level archive moves — Wave 3 Step 3</td></tr>
   </tbody>
 </table>
 
 <h2>Suggested dispatch order</h2>
 
 <div class="deps">
-  <strong>What to dispatch next (PR-18/19/21/24 running; PR-11, PR-17 (#226) in PR review; PR-12/13/15b/15c (#222)/16 merged):</strong>
+  <strong>Current state (2026-05-13) — Wave 3 Steps 2–4 in progress; PR-15e and PR-17 in review:</strong>
   <ol>
-    <li><strong>Highest-leverage now:</strong> <code>PR-15d</code> — the last precondition for PR-15e (PR-15c #222 merged). Once PR-15d lands, PR-15e is immediately dispatchable.</li>
-    <li><strong>Janitor batch:</strong> <code>PR-18</code>, <code>PR-19</code>, <code>PR-21</code>, <code>PR-22</code>, <code>PR-24</code> — small standalone work, safe in any order.</li>
-    <li><strong>After PR-15c merges + PR-15d merges:</strong> dispatch <code>PR-15e</code>.</li>
-    <li><strong>After PR-15e merges:</strong> dispatch <code>PR-15f</code> (closure — pre-commit hook hardening).</li>
-    <li><strong>Note on PR-17 P3:</strong> the doc edits in P3 reference AgeBracket conventions from PR-11 — they're CI-safe now but read better once PR-11 is merged. No action needed.</li>
-    <li><strong>Co-land window:</strong> orchestrate <code>PR-17</code>, <code>PR-25</code>, <code>PR-27</code>, <code>PR-29</code> as a single merge-train.</li>
+    <li><strong>In review:</strong> <code>PR-15e</code> (C6 P3e type fixes) and <code>PR-17</code> (#226, Wave 3 Step 5).</li>
+    <li><strong>Wave 3 in progress:</strong> <code>PR-25</code> (Step 2), <code>PR-29</code> (Step 3), <code>PR-27</code> (Step 4) — all Archon running. Merge window order: PR-25 → PR-29 → PR-27 → PR-17.</li>
+    <li><strong>After PR-15e merges:</strong> dispatch <code>PR-15f</code> (spec config closure — pre-commit hook hardening).</li>
   </ol>
-  <strong>Human-review-required (don't auto-merge):</strong> <code>PR-20</code>, <code>PR-23</code>, <code>PR-25</code>, <code>PR-26</code>.
+  <strong>Human-review-required (don't auto-merge):</strong> <code>PR-25</code>.
 </div>
 
 <script type="module">
