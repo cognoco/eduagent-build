@@ -5,6 +5,23 @@ import { ShelfRow } from './ShelfRow';
 // Mocks
 // ---------------------------------------------------------------------------
 
+jest.mock(
+  '../../lib/theme',
+  /* gc1-allow: ThemeProvider requires native env; unit test cannot render it */ () => ({
+    useThemeColors: () => ({
+      retentionWeak: '#b45309',
+      success: '#16a34a',
+      textPrimary: '#111827',
+      textSecondary: '#6b7280',
+      warning: '#d97706',
+    }),
+    useSubjectTint: () => ({
+      solid: '#2f6fbd',
+      soft: '#edf3ff',
+    }),
+  }),
+);
+
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
@@ -37,9 +54,9 @@ describe('ShelfRow', () => {
     screen.getByText('3 books · 18/32 topics');
   });
 
-  it('renders the tinted icon tile (no emoji)', () => {
+  it('renders the subject bookshelf motif', () => {
     render(<ShelfRow {...defaultProps} />);
-    screen.getByTestId('shelf-row-icon-sub-math');
+    screen.getByTestId('shelf-row-bookshelf-sub-math');
   });
 
   it('opens the subject shelf when header is pressed', () => {
