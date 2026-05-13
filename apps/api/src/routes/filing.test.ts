@@ -24,6 +24,7 @@ import {
 } from '../test-utils/database-module';
 
 const mockDatabaseModule = createDatabaseModuleMock({
+  includeActual: true,
   db: createTransactionalMockDb({
     execute: jest.fn().mockResolvedValue(undefined),
   }),
@@ -36,6 +37,7 @@ jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 // ---------------------------------------------------------------------------
 
 jest.mock('../services/account', () => ({
+  ...jest.requireActual('../services/account'),
   findOrCreateAccount: jest.fn().mockResolvedValue({
     id: 'test-account-id',
     clerkUserId: 'user_test',
@@ -50,6 +52,7 @@ jest.mock('../services/account', () => ({
 // ---------------------------------------------------------------------------
 
 jest.mock('../services/profile', () => ({
+  ...jest.requireActual('../services/profile'),
   findOwnerProfile: jest.fn().mockResolvedValue({
     id: 'test-profile-id',
     accountId: 'test-account-id',
@@ -75,6 +78,7 @@ jest.mock('../services/profile', () => ({
 // ---------------------------------------------------------------------------
 
 jest.mock('../services/filing', () => ({
+  ...jest.requireActual('../services/filing'),
   buildLibraryIndex: jest.fn().mockResolvedValue({ shelves: [] }),
   fileToLibrary: jest.fn().mockResolvedValue({
     extracted: 'Test topic',
@@ -100,6 +104,7 @@ jest.mock('../services/filing', () => ({
 // ---------------------------------------------------------------------------
 
 jest.mock('../services/suggestions', () => ({
+  ...jest.requireActual('../services/suggestions'),
   markBookSuggestionPicked: jest.fn().mockResolvedValue(undefined),
   markTopicSuggestionUsed: jest.fn().mockResolvedValue(undefined),
 }));
@@ -109,6 +114,7 @@ jest.mock('../services/suggestions', () => ({
 // ---------------------------------------------------------------------------
 
 jest.mock('../services/session', () => ({
+  ...jest.requireActual('../services/session'),
   getSessionTranscript: jest.fn().mockResolvedValue(null),
   backfillSessionTopicId: jest.fn().mockResolvedValue(undefined),
 }));
@@ -118,6 +124,7 @@ jest.mock('../services/session', () => ({
 // ---------------------------------------------------------------------------
 
 jest.mock('../services/llm', () => ({
+  // gc1-allow: LLM routeAndCall external boundary
   routeAndCall: jest.fn().mockResolvedValue({ text: 'mocked' }),
   registerProvider: jest.fn(),
   getRegisteredProviders: jest.fn().mockReturnValue([]),
@@ -130,6 +137,7 @@ jest.mock('../services/llm', () => ({
 // ---------------------------------------------------------------------------
 
 jest.mock('../services/sentry', () => ({
+  // gc1-allow: @sentry/cloudflare external boundary
   captureException: jest.fn(),
 }));
 
@@ -138,6 +146,7 @@ jest.mock('../services/sentry', () => ({
 // ---------------------------------------------------------------------------
 
 jest.mock('../inngest/client', () => ({
+  // gc1-allow: Inngest SDK external boundary
   inngest: {
     send: jest.fn().mockResolvedValue(undefined),
     createFunction: jest.fn().mockReturnValue(jest.fn()),
@@ -149,7 +158,7 @@ jest.mock('../inngest/client', () => ({
 jest.mock('inngest/hono', () => ({
   serve: jest.fn().mockReturnValue(
     // Return a no-op Hono handler
-    (_c: unknown) => new Response('ok')
+    (_c: unknown) => new Response('ok'),
   ),
 }));
 
@@ -202,7 +211,7 @@ describe('filing routes', () => {
             sessionMode: 'freeform',
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);
@@ -221,7 +230,7 @@ describe('filing routes', () => {
             sessionMode: 'freeform',
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -236,7 +245,7 @@ describe('filing routes', () => {
             sessionMode: 'freeform',
             profileId: 'test-profile-id',
           }),
-        })
+        }),
       );
     });
 
@@ -250,14 +259,14 @@ describe('filing routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ sessionId: 'sess-xyz' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
       expect(inngest.send).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({ sessionMode: 'freeform' }),
-        })
+        }),
       );
     });
 
@@ -269,7 +278,7 @@ describe('filing routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ sessionMode: 'freeform' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -283,7 +292,7 @@ describe('filing routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ sessionId: 'sess-1', sessionMode: 'invalid' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -303,7 +312,7 @@ describe('filing routes', () => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ rawInput: 'photosynthesis' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);
@@ -317,7 +326,7 @@ describe('filing routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({}),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -334,7 +343,7 @@ describe('filing routes', () => {
             sessionMode: 'freeform',
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -348,7 +357,7 @@ describe('filing routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ rawInput: 'photosynthesis' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -373,13 +382,13 @@ describe('filing routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ rawInput: 'photosynthesis' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
       expect(res.status).toBe(200);
 
       expect(resolveFilingResult).toHaveBeenCalledWith(
         expect.anything(),
-        expect.objectContaining({ filedFrom: 'freeform_filing' })
+        expect.objectContaining({ filedFrom: 'freeform_filing' }),
       );
     });
 
@@ -397,13 +406,13 @@ describe('filing routes', () => {
             sessionMode: 'freeform',
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
       expect(res.status).toBe(200);
 
       expect(resolveFilingResult).toHaveBeenCalledWith(
         expect.anything(),
-        expect.objectContaining({ filedFrom: 'session_filing' })
+        expect.objectContaining({ filedFrom: 'session_filing' }),
       );
     });
   });
