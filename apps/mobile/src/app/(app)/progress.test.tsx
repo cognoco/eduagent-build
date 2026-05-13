@@ -603,6 +603,52 @@ describe('ProgressScreen — progressive disclosure', () => {
     });
   });
 
+  it('opens a valid requested child profile after child links load', async () => {
+    const childProfile: Profile = {
+      id: 'child-1',
+      accountId: 'account-1',
+      displayName: 'Emma',
+      isOwner: false,
+      hasPremiumLlm: false,
+      consentStatus: null,
+      linkCreatedAt: null,
+      conversationLanguage: 'en',
+      pronouns: null,
+      birthYear: 2015,
+      avatarUrl: null,
+      location: null,
+      createdAt: '2026-01-01T00:00:00Z',
+      updatedAt: '2026-01-01T00:00:00Z',
+    };
+    mockSearchParams = { profileId: 'child-1' };
+    mockHooks({
+      inventory: {
+        global: { ...baseGlobal, totalSessions: 2 },
+        subjects: [fullSubject],
+      },
+      childInventory: {
+        global: { ...baseGlobal, totalSessions: 6, topicsMastered: 2 },
+        subjects: [fullSubject],
+      },
+    });
+
+    const view = render(<ProgressScreen />);
+
+    expect(useChildInventory).toHaveBeenLastCalledWith(undefined, {
+      enabled: false,
+    });
+
+    mockLinkedChildren = [childProfile];
+    view.rerender(<ProgressScreen />);
+
+    await waitFor(() => {
+      expect(useChildInventory).toHaveBeenLastCalledWith('child-1', {
+        enabled: true,
+      });
+    });
+    screen.getByText('6 sessions');
+  });
+
   it('ignores an unknown requested child profile when no child link is known', () => {
     mockSearchParams = { profileId: 'foreign-child' };
     mockHooks({
