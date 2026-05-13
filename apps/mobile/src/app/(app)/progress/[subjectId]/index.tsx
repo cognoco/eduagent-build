@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import {
+  useFocusEffect,
+  useLocalSearchParams,
+  useRouter,
+  type Href,
+} from 'expo-router';
 import {
   goBackOrReplace,
   homeHrefForReturnTo,
@@ -82,7 +87,7 @@ export default function ProgressSubjectScreen(): React.ReactElement {
     router.push({
       pathname: '/(app)/shelf/[subjectId]',
       params: { subjectId: targetSubjectId },
-    } as never);
+    } as Href);
   };
 
   const handlePrimarySubjectAction = (): void => {
@@ -101,7 +106,7 @@ export default function ProgressSubjectScreen(): React.ReactElement {
         subjectId: subject.subjectId,
         status: 'archived',
       });
-      router.replace(backFallback as never);
+      router.replace(backFallback as Href);
     } catch (err: unknown) {
       platformAlert(t('progress.subject.hideErrorTitle'), formatApiError(err));
     }
@@ -174,7 +179,7 @@ export default function ProgressSubjectScreen(): React.ReactElement {
           {t('progress.subject.noSubjectSubtitle')}
         </Text>
         <Pressable
-          onPress={() => router.replace(backFallback as never)}
+          onPress={() => router.replace(backFallback as Href)}
           className="bg-primary rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
           accessibilityRole="button"
           accessibilityLabel={t('progress.subject.backToProgress')}
@@ -266,7 +271,7 @@ export default function ProgressSubjectScreen(): React.ReactElement {
           }}
           secondaryAction={{
             label: t('common.goBack'),
-            onPress: () => router.replace(backFallback as never),
+            onPress: () => router.replace(backFallback as Href),
             testID: 'progress-subject-error-back',
           }}
           testID="progress-subject-error"
@@ -425,7 +430,7 @@ export default function ProgressSubjectScreen(): React.ReactElement {
                     router.push({
                       pathname: '/(app)/vocabulary/[subjectId]',
                       params: { subjectId: subject.subjectId },
-                    } as never)
+                    } as Href)
                   }
                   className="mt-3 py-2 self-start"
                   accessibilityRole="button"
@@ -579,7 +584,7 @@ export default function ProgressSubjectScreen(): React.ReactElement {
                   router.push({
                     pathname: '/(app)/progress/[subjectId]/sessions',
                     params: { subjectId: subject.subjectId },
-                  } as never)
+                  } as Href)
                 }
                 className="bg-surface rounded-button px-4 py-3 items-center flex-1"
                 accessibilityRole="button"
@@ -632,7 +637,7 @@ export default function ProgressSubjectScreen(): React.ReactElement {
               {t('progress.subject.goneSubtitle')}
             </Text>
             <Pressable
-              onPress={() => router.replace(backFallback as never)}
+              onPress={() => router.replace(backFallback as Href)}
               className="bg-primary rounded-button px-4 py-3 items-center mt-4 min-h-[48px] justify-center"
               accessibilityRole="button"
               accessibilityLabel={t('progress.subject.backToProgress')}

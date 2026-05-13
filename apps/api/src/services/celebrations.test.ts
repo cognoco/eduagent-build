@@ -7,13 +7,16 @@ import {
 
 const profileId = 'test-profile-id';
 
-function createMockDb(pendingCelebrations: unknown[] = []) {
+function createMockDb(
+  pendingCelebrations: unknown[] = [],
+  options?: { celebrationsSeenByChild?: Date | null },
+) {
   const row =
-    pendingCelebrations.length > 0
+    pendingCelebrations.length > 0 || options?.celebrationsSeenByChild
       ? {
           profileId,
           pendingCelebrations,
-          celebrationsSeenByChild: null,
+          celebrationsSeenByChild: options?.celebrationsSeenByChild ?? null,
           celebrationsSeenByParent: null,
         }
       : null;
@@ -27,7 +30,9 @@ function createMockDb(pendingCelebrations: unknown[] = []) {
     insert: jest.fn().mockReturnValue({
       values: jest.fn().mockReturnValue({
         onConflictDoUpdate: jest.fn().mockResolvedValue(undefined),
-        onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
+        onConflictDoNothing: jest.fn().mockReturnValue({
+          returning: jest.fn().mockResolvedValue([]),
+        }),
       }),
     }),
     select: jest.fn().mockReturnValue({
@@ -91,7 +96,7 @@ describe('filterPendingCelebrations', () => {
       {
         viewer: 'child',
         now: new Date('2025-01-10T00:00:00.000Z'),
-      }
+      },
     );
 
     expect(result).toEqual([]);
@@ -114,7 +119,7 @@ describe('filterPendingCelebrations', () => {
       {
         viewer: 'parent',
         now: new Date('2025-01-06T00:00:00.000Z'),
-      }
+      },
     );
 
     expect(result).toEqual([
@@ -141,7 +146,7 @@ describe('queueCelebration', () => {
       profileId,
       'comet',
       'topic_mastered',
-      'Quadratic Equations'
+      'Quadratic Equations',
     );
 
     expect(result).toHaveLength(1);
@@ -164,9 +169,53 @@ describe('queueCelebration', () => {
       profileId,
       'comet',
       'topic_mastered',
-      'Linear Equations'
+      'Linear Equations',
     );
 
     expect(result).toHaveLength(2);
+  });
+
+  it('allows no-detail celebrations to recur after the child has seen the previous one', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2025-01-06T00:00:00.000Z'));
+
+    try {
+      const db = createMockDb(
+        [
+          {
+            celebration: 'polar_star',
+            reason: 'polar_star',
+            detail: null,
+            queuedAt: '2025-01-05T00:00:00.000Z',
+          },
+        ],
+        { celebrationsSeenByChild: new Date('2025-01-05T12:00:00.000Z') },
+      );
+
+      const result = await queueCelebration(
+        db,
+        profileId,
+        'polar_star',
+        'polar_star',
+      );
+
+      const insertValuesCalls = (
+        db.insert as unknown as jest.Mock
+      ).mock.results.flatMap((result) => {
+        const insertBuilder = result.value as {
+          values: jest.Mock;
+        };
+        return insertBuilder.values.mock.calls;
+      });
+
+      expect(result).toHaveLength(2);
+      expect(insertValuesCalls).toContainEqual([
+        expect.objectContaining({
+          sourceId: null,
+          dedupeKey: 'polar_star:polar_star:2025-01-06T00:00:00.000Z',
+        }),
+      ]);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

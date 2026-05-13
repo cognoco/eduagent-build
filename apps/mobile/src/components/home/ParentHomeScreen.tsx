@@ -8,7 +8,7 @@ import {
   type GestureResponderEvent,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { isAdultOwner } from '@eduagent/schemas';
@@ -258,17 +258,19 @@ function ChildCommandCard({
   t: (key: string, opts?: Record<string, unknown>) => string;
 }): React.ReactElement {
   return (
-    <Pressable
-      onPress={onOpenProgress}
+    <View
       className={`rounded-card px-4 py-4 ${
         highlight ? 'bg-primary-soft' : 'bg-surface'
       }`}
-      style={Platform.OS === 'web' ? { cursor: 'pointer' } : undefined}
-      accessibilityRole="button"
-      accessibilityLabel={child.displayName}
-      testID={`parent-home-check-child-${child.id}`}
     >
-      <View className="flex-row items-start">
+      <Pressable
+        onPress={onOpenProgress}
+        className="flex-row items-start"
+        style={Platform.OS === 'web' ? { cursor: 'pointer' } : undefined}
+        accessibilityRole="button"
+        accessibilityLabel={child.displayName}
+        testID={`parent-home-check-child-${child.id}`}
+      >
         <View
           className="w-11 h-11 rounded-full bg-primary items-center justify-center me-3"
           accessibilityElementsHidden
@@ -285,7 +287,7 @@ function ChildCommandCard({
             {formatChildSnapshot(dashboardChild, t)}
           </Text>
         </View>
-      </View>
+      </Pressable>
 
       <View className="flex-row gap-2 mt-4">
         <ChildActionButton
@@ -307,7 +309,7 @@ function ChildCommandCard({
           testID={`parent-home-send-nudge-${child.id}`}
         />
       </View>
-    </Pressable>
+    </View>
   );
 }
 
@@ -429,15 +431,18 @@ export function ParentHomeScreen({
       );
       return;
     }
-    router.push('/create-profile?for=child');
+    router.push({
+      pathname: '/create-profile',
+      params: { for: 'child' },
+    } as never);
   }, [subscription, familyData, router, t]);
 
   function pushChildDetail(childProfileId: string): void {
-    router.push(`/(app)/child/${childProfileId}` as never);
+    router.push(`/(app)/child/${childProfileId}` as Href);
   }
 
   function pushChildReports(childProfileId: string): void {
-    router.push(`/(app)/child/${childProfileId}/reports` as never);
+    router.push(`/(app)/child/${childProfileId}/reports` as Href);
   }
 
   const parentInitial = initialOf(activeProfile?.displayName ?? firstName);
@@ -448,7 +453,7 @@ export function ParentHomeScreen({
         <View className="flex-row items-center justify-between mb-3">
           <MentomateLogo size="sm" orientation="horizontal" />
           <Pressable
-            onPress={() => router.push('/(app)/more/account' as never)}
+            onPress={() => router.push('/(app)/more/account' as Href)}
             className="w-10 h-10 rounded-full bg-primary-soft items-center justify-center"
             style={Platform.OS === 'web' ? { cursor: 'pointer' } : undefined}
             accessibilityRole="button"

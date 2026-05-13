@@ -1,6 +1,7 @@
 import type { DictationMode } from '@eduagent/schemas';
 import { createScopedRepository } from '@eduagent/database';
 import type { Database } from '@eduagent/database';
+import { recordPracticeActivityEvent } from '../practice-activity-events';
 import type { GenerateContext } from './generate';
 
 // ---------------------------------------------------------------------------
@@ -16,20 +17,48 @@ export interface RecordResultInput {
   mistakeCount: number | null;
   mode: DictationMode;
   reviewed: boolean;
+  subjectId?: string | null;
 }
 
 export async function recordDictationResult(
   db: Database,
   profileId: string,
-  input: RecordResultInput
+  input: RecordResultInput,
 ) {
-  const repo = createScopedRepository(db, profileId);
-  return repo.dictationResults.insert({
-    date: input.localDate,
-    sentenceCount: input.sentenceCount,
-    mistakeCount: input.mistakeCount,
-    mode: input.mode,
-    reviewed: input.reviewed,
+  return db.transaction(async (tx) => {
+    // Known Drizzle pattern: PgTransaction -> Database cast (see docs/plans/2026-05-12-practice-activity-summary-service.md Phase 3).
+    const txDb = tx as unknown as Database;
+    const repo = createScopedRepository(txDb, profileId);
+    const completedAt = new Date();
+    const row = await repo.dictationResults.insert({
+      date: input.localDate,
+      sentenceCount: input.sentenceCount,
+      mistakeCount: input.mistakeCount,
+      mode: input.mode,
+      reviewed: input.reviewed,
+    });
+    if (!row) throw new Error('Dictation result insert did not return a row');
+
+    await recordPracticeActivityEvent(txDb, {
+      profileId,
+      subjectId: input.subjectId ?? null,
+      activityType: 'dictation',
+      activitySubtype: input.mode,
+      completedAt,
+      score:
+        input.mistakeCount == null
+          ? null
+          : Math.max(0, input.sentenceCount - input.mistakeCount),
+      total: input.sentenceCount,
+      sourceType: 'dictation_result',
+      sourceId: row.id,
+      metadata: {
+        reviewed: input.reviewed,
+        mistakeCount: input.mistakeCount,
+      },
+    });
+
+    return row;
   });
 }
 
@@ -40,7 +69,7 @@ export interface StreakResult {
 
 export async function getDictationStreak(
   db: Database,
-  profileId: string
+  profileId: string,
 ): Promise<StreakResult> {
   const repo = createScopedRepository(db, profileId);
 
@@ -93,7 +122,7 @@ export async function getDictationStreak(
 export async function fetchGenerateContext(
   db: Database,
   profileId: string,
-  birthYear: number | null
+  birthYear: number | null,
 ): Promise<GenerateContext> {
   const repo = createScopedRepository(db, profileId);
 

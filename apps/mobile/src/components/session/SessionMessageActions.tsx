@@ -235,7 +235,7 @@ export function SessionMessageActions({
                 hapticLight();
                 void onToggleBookmark(message);
               }}
-              className="ms-auto p-2"
+              className="ms-auto p-2 min-h-[36px] min-w-[36px] items-center justify-center"
               accessibilityRole="button"
               accessibilityLabel={
                 bookmarkState?.[message.eventId]
@@ -250,7 +250,7 @@ export function SessionMessageActions({
                     ? 'bookmark'
                     : 'bookmark-outline'
                 }
-                size={20}
+                size={22}
                 className={
                   bookmarkState?.[message.eventId]
                     ? 'text-primary'

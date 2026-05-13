@@ -194,6 +194,7 @@ export function extractJsonObject(response: string): string {
 interface GenerateParams {
   db: Database;
   profileId: string;
+  subjectId?: string | null;
   activityType: QuizActivityType;
   birthYear?: number | null;
   themePreference?: string;
@@ -220,6 +221,7 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
   const {
     db,
     profileId,
+    subjectId,
     activityType,
     birthYear,
     themePreference,
@@ -577,6 +579,7 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
 
   const repo = createScopedRepository(db, profileId);
   const inserted = await repo.quizRounds.insert({
+    subjectId: subjectId ?? null,
     activityType,
     theme: round.theme,
     questions: round.questions,

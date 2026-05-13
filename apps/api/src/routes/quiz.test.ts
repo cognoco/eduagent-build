@@ -153,7 +153,10 @@ let meteringFixture: ReturnType<typeof createRouteMeteringFixture>;
 
 function setInsertReturning(id = '01933b3c-0000-7000-8000-000000000999') {
   const returning = jest.fn().mockResolvedValue([{ id }]);
-  const values = jest.fn().mockReturnValue({ returning });
+  const values = jest.fn().mockReturnValue({
+    onConflictDoNothing: jest.fn().mockReturnValue({ returning }),
+    returning,
+  });
   (mockDb as any).insert = jest.fn().mockReturnValue({ values });
 }
 

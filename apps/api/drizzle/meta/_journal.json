@@ -505,6 +505,27 @@
       "when": 1779000020000,
       "tag": "0071_enable_rls_nudges",
       "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "7",
+      "when": 1779000021000,
+      "tag": "0072_practice_activity_events",
+      "breakpoints": true
+    },
+    {
+      "idx": 73,
+      "version": "7",
+      "when": 1779000022000,
+      "tag": "0073_open_shadow_king",
+      "breakpoints": true
+    },
+    {
+      "idx": 74,
+      "version": "7",
+      "when": 1779000023000,
+      "tag": "0074_celebration_events_source_type_check",
+      "breakpoints": true
     }
   ]
 }

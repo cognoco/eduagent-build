@@ -22,10 +22,8 @@ jest.mock('react-i18next', () => ({
         return `${opts?.count ?? 0}-day streak`;
       if (key === 'progress.weeklyReport.practiceTitle')
         return 'Practice highlights';
-      if (key === 'progress.weeklyReport.practice.quizzes')
-        return 'quizzes completed';
-      if (key === 'progress.weeklyReport.practice.reviews')
-        return 'reviews finished';
+      if (key === 'progress.weeklyReport.practice.quizzes') return 'Quizzes';
+      if (key === 'progress.weeklyReport.practice.reviews') return 'Reviews';
       if (key === 'progress.weeklyReport.mini.sessions')
         return `${opts?.count ?? 0} sessions`;
       if (key === 'progress.weeklyReport.mini.words')
@@ -77,6 +75,21 @@ describe('WeeklyReportCard', () => {
         practiceSummary: {
           quizzesCompleted: 3,
           reviewsCompleted: 5,
+          totals: {
+            activitiesCompleted: 8,
+            reviewsCompleted: 5,
+            pointsEarned: 24,
+            celebrations: 1,
+            distinctActivityTypes: 2,
+          },
+          scores: {
+            scoredActivities: 3,
+            score: 2,
+            total: 3,
+            accuracy: 0.67,
+          },
+          byType: [],
+          bySubject: [],
         },
       },
     ]);
@@ -89,10 +102,12 @@ describe('WeeklyReportCard', () => {
     screen.getByText('3 topics started');
     screen.getByText('8-day streak');
     screen.getByText('Practice highlights');
+    screen.getByTestId('weekly-report-quizzes');
     screen.getByText('3');
-    screen.getByText('quizzes completed');
+    screen.getByText('Quizzes');
+    screen.getByTestId('weekly-report-reviews');
     screen.getByText('5');
-    screen.getByText('reviews finished');
+    screen.getByText('Reviews');
   });
 
   it('uses the live mini-summary when no weekly report exists', () => {

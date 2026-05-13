@@ -350,7 +350,7 @@ describe('AppLayout', () => {
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['books'] });
   });
 
-  it('invalidates account/settings data when the More tab is pressed', () => {
+  it('invalidates account/settings data and leaves More tab navigation to the tab navigator', () => {
     const invalidateSpy = jest.spyOn(testQueryClient, 'invalidateQueries');
     renderLayout();
 
@@ -361,7 +361,7 @@ describe('AppLayout', () => {
       | { tabPress?: () => void }
       | undefined;
 
-    listeners?.tabPress?.();
+    const tabPressResult = listeners?.tabPress?.();
 
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['profiles'] });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['subscription'] });
@@ -370,7 +370,8 @@ describe('AppLayout', () => {
     });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['usage'] });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['settings'] });
-    expect(mockReplace).toHaveBeenCalledWith('/(app)/more');
+    expect(tabPressResult).toBeUndefined();
+    expect(mockReplace).not.toHaveBeenCalled();
   });
 
   it('remounts the tab shell when the active profile changes', () => {

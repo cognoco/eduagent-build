@@ -1,5 +1,5 @@
 import { Pressable, ScrollView, Text, View } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useChildDetail } from '../../../../hooks/use-dashboard';
 import {
@@ -151,7 +151,7 @@ export default function ChildReportsScreen(): React.ReactElement {
                     pathname:
                       '/(app)/child/[profileId]/weekly-report/[weeklyReportId]',
                     params: { profileId, weeklyReportId: report.id },
-                  } as never)
+                  } as Href)
                 }
                 accessibilityRole="button"
                 accessibilityLabel={`${t(
@@ -276,7 +276,7 @@ export default function ChildReportsScreen(): React.ReactElement {
                 router.push({
                   pathname: '/(app)/child/[profileId]/report/[reportId]',
                   params: { profileId, reportId: report.id },
-                } as never);
+                } as Href);
               }}
               className="bg-surface rounded-card p-4 mt-4"
               accessibilityRole="button"

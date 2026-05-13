@@ -21,15 +21,12 @@ runtime-critical.
 | `forgot-password-email` | `(auth)/forgot-password.tsx` | ✅ smoke runtime | J-02 |
 | `back-to-sign-in` | `(auth)/forgot-password.tsx` | ✅ smoke runtime | J-02 |
 | `learner-screen` | `components/home/LearnerScreen.tsx` | ✅ smoke runtime | J-01 |
-| `intent-learn` | `components/home/LearnerScreen.tsx` | ✅ smoke runtime | J-01 |
-| `intent-ask` | `components/home/LearnerScreen.tsx` | ✅ smoke runtime | J-01 |
-| `intent-practice` | `components/home/LearnerScreen.tsx` | ✅ smoke runtime | J-01 |
-| `intent-homework` | `components/home/LearnerScreen.tsx` | ✅ smoke runtime | J-01 |
-| `intent-continue` | `components/home/LearnerScreen.tsx` | ✅ source audit | Runtime coverage lands with later journeys |
-| `intent-quiz-discovery` | `components/home/LearnerScreen.tsx` | ✅ source audit | Runtime coverage lands with later journeys |
+| `home-action-study-new` | `components/home/LearnerScreen.tsx` | ✅ smoke runtime | J-01 |
+| `home-ask-anything` | `components/home/LearnerScreen.tsx` | ✅ smoke runtime | J-01 / J-08 |
+| `home-action-practice` | `components/home/LearnerScreen.tsx` | ✅ smoke runtime | J-01 / W-01 / W-04 |
+| `home-action-homework` | `components/home/LearnerScreen.tsx` | ✅ smoke runtime | J-01 |
 | `learner-screen` | `components/home/LearnerScreen.tsx` | ✅ smoke runtime | J-03 |
 | `home-child-card` | `components/home/LearnerScreen.tsx` | ✅ smoke runtime | J-03 |
-| `home-action-study-new` | `components/home/LearnerScreen.tsx` | ✅ smoke runtime | J-03 |
 | `profile-switcher-chip` | `components/common/ProfileSwitcher.tsx` | ✅ source audit | Needed by phase 2 journeys |
 | `profile-switcher-menu` | `components/common/ProfileSwitcher.tsx` | ✅ source audit | Needed by phase 2 journeys |
 | `profile-option-{id}` | `components/common/ProfileSwitcher.tsx` | ✅ source audit | Dynamic `testID` already implemented |

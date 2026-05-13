@@ -1,5 +1,5 @@
 import { Pressable, ScrollView, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import {
@@ -117,11 +117,11 @@ export default function ProgressReportsScreen(): React.ReactElement {
                       pathname:
                         '/(app)/progress/weekly-report/[weeklyReportId]',
                       params: { weeklyReportId: item.id },
-                    } as never)
+                    } as Href)
                   : router.push({
                       pathname: '/(app)/progress/reports/[reportId]',
                       params: { reportId: item.id },
-                    } as never)
+                    } as Href)
               }
               className="bg-surface rounded-card p-4 mt-4"
               accessibilityRole="button"

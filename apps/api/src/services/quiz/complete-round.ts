@@ -8,6 +8,7 @@ import type {
 import { isGuessWhoFuzzyMatch } from '@eduagent/schemas';
 import { BadRequestError, ConflictError, NotFoundError } from '../../errors';
 import { createLogger } from '../logger';
+import { recordPracticeActivityEvent } from '../practice-activity-events';
 import { reviewVocabulary } from '../vocabulary';
 import { QUIZ_CONFIG } from './config';
 import { applyQuizSm2 } from './mastery-provider';
@@ -24,26 +25,26 @@ const logger = createLogger();
  */
 export function isAnswerCorrect(
   question: QuizQuestion,
-  answerGiven: string
+  answerGiven: string,
 ): boolean {
   const normalized = answerGiven.trim().toLowerCase();
   if (!normalized) return false;
   if (question.correctAnswer.trim().toLowerCase() === normalized) return true;
   if (question.type === 'capitals') {
     return question.acceptedAliases.some(
-      (alias) => alias.trim().toLowerCase() === normalized
+      (alias) => alias.trim().toLowerCase() === normalized,
     );
   }
   if (question.type === 'vocabulary') {
     return question.acceptedAnswers.some(
-      (answer) => answer.trim().toLowerCase() === normalized
+      (answer) => answer.trim().toLowerCase() === normalized,
     );
   }
   if (question.type === 'guess_who') {
     return isGuessWhoFuzzyMatch(
       answerGiven,
       question.canonicalName,
-      question.acceptedAliases
+      question.acceptedAliases,
     );
   }
   return false;
@@ -61,7 +62,7 @@ export function isAnswerCorrect(
 export function assertAnswerInOptions(
   question: QuizQuestion,
   answerGiven: string,
-  answerMode: 'free_text' | 'multiple_choice' | undefined
+  answerMode: 'free_text' | 'multiple_choice' | undefined,
 ): void {
   if (
     answerMode !== 'multiple_choice' ||
@@ -73,15 +74,15 @@ export function assertAnswerInOptions(
     question.type === 'capitals'
       ? question.distractors.concat(question.correctAnswer)
       : question.type === 'vocabulary'
-      ? question.distractors.concat(question.correctAnswer)
-      : [];
+        ? question.distractors.concat(question.correctAnswer)
+        : [];
   const normalizedGiven = answerGiven.trim().toLowerCase();
   const inOptions = options.some(
-    (o) => o.trim().toLowerCase() === normalizedGiven
+    (o) => o.trim().toLowerCase() === normalizedGiven,
   );
   if (!inOptions) {
     throw new BadRequestError(
-      'Answer is not one of the available options for this question'
+      'Answer is not one of the available options for this question',
     );
   }
 }
@@ -97,7 +98,7 @@ export async function checkQuizAnswer(
   roundId: string,
   questionIndex: number,
   answerGiven: string,
-  answerMode?: 'free_text' | 'multiple_choice'
+  answerMode?: 'free_text' | 'multiple_choice',
 ): Promise<boolean> {
   const repo = createScopedRepository(db, profileId);
   const round = await repo.quizRounds.findById(roundId);
@@ -122,7 +123,7 @@ export async function checkQuizAnswerWithCorrect(
   roundId: string,
   questionIndex: number,
   answerGiven: string,
-  answerMode?: 'free_text' | 'multiple_choice'
+  answerMode?: 'free_text' | 'multiple_choice',
 ): Promise<{ correct: boolean; correctAnswer: string }> {
   const repo = createScopedRepository(db, profileId);
   const round = await repo.quizRounds.findById(roundId);
@@ -150,7 +151,7 @@ export async function checkQuizAnswerWithCorrect(
  */
 export function validateResults(
   questions: QuizQuestion[],
-  clientResults: QuestionResult[]
+  clientResults: QuestionResult[],
 ): QuestionResult[] {
   const validated: QuestionResult[] = [];
   for (const result of clientResults) {
@@ -168,7 +169,7 @@ export function validateResults(
           : question.distractors.concat(question.correctAnswer);
       const normalizedGiven = result.answerGiven.trim().toLowerCase();
       const inOptions = options.some(
-        (o) => o.trim().toLowerCase() === normalizedGiven
+        (o) => o.trim().toLowerCase() === normalizedGiven,
       );
       if (!inOptions) continue;
     }
@@ -209,13 +210,13 @@ export function calculateScore(results: QuestionResult[]): number {
 export function calculateXp(
   results: QuestionResult[],
   total: number,
-  activityType?: string
+  activityType?: string,
 ): number {
   const correctResults = results.filter((result) => result.correct);
   const baseXp = correctResults.length * QUIZ_CONFIG.xp.perCorrect;
   const timerBonus =
     correctResults.filter(
-      (result) => result.timeMs < QUIZ_CONFIG.defaults.timerBonusThresholdMs
+      (result) => result.timeMs < QUIZ_CONFIG.defaults.timerBonusThresholdMs,
     ).length * QUIZ_CONFIG.xp.timerBonus;
   const perfectBonus =
     correctResults.length === total ? QUIZ_CONFIG.xp.perfectBonus : 0;
@@ -250,7 +251,7 @@ export function calculateXp(
 export function getGuessWhoSm2Quality(
   correct: boolean,
   cluesUsed: number,
-  answerMode: 'free_text' | 'multiple_choice'
+  answerMode: 'free_text' | 'multiple_choice',
 ): number {
   if (!correct) return 1;
   if (answerMode === 'multiple_choice') return 2;
@@ -261,7 +262,7 @@ export function getGuessWhoSm2Quality(
 
 export function getCelebrationTier(
   score: number,
-  total: number
+  total: number,
 ): 'perfect' | 'great' | 'nice' {
   const ratio = total > 0 ? score / total : 0;
 
@@ -288,7 +289,7 @@ export async function completeQuizRound(
   db: Database,
   profileId: string,
   roundId: string,
-  results: QuestionResult[]
+  results: QuestionResult[],
 ): Promise<CompleteRoundResponse> {
   return db.transaction(async (tx) => {
     // Scoped repository bound to the transaction connection: read, update,
@@ -313,6 +314,7 @@ export async function completeQuizRound(
     const score = calculateScore(validatedResults);
     const xpEarned = calculateXp(validatedResults, total, round.activityType);
     const celebrationTier = getCelebrationTier(score, total);
+    const completedAt = new Date();
 
     // Build missed items from discovery (non-library) questions only.
     // Dedup by (activityType, questionText) within this batch so the same
@@ -348,12 +350,30 @@ export async function completeQuizRound(
       results: validatedResults,
       score,
       xpEarned,
-      completedAt: new Date(),
+      completedAt,
     });
 
     if (!updated) {
       throw new ConflictError('Round already completed');
     }
+
+    await recordPracticeActivityEvent(tx as unknown as Database, {
+      profileId,
+      subjectId: round.subjectId ?? null,
+      activityType: 'quiz',
+      activitySubtype: round.activityType,
+      completedAt,
+      pointsEarned: xpEarned,
+      score,
+      total,
+      sourceType: 'quiz_round',
+      sourceId: roundId,
+      metadata: {
+        celebrationTier,
+        droppedResults,
+        questionCount: total,
+      },
+    });
 
     if (round.activityType === 'vocabulary') {
       const libraryIndices = Array.isArray(round.libraryQuestionIndices)
@@ -365,7 +385,7 @@ export async function completeQuizRound(
         if (question?.type !== 'vocabulary' || !question.vocabularyId) continue;
 
         const result = validatedResults.find(
-          (entry) => entry.questionIndex === index
+          (entry) => entry.questionIndex === index,
         );
         if (!result) continue;
 
@@ -373,7 +393,7 @@ export async function completeQuizRound(
           tx as unknown as Database,
           profileId,
           question.vocabularyId,
-          { quality: getVocabSm2Quality(result.correct) }
+          { quality: getVocabSm2Quality(result.correct) },
         );
       }
     }
@@ -393,7 +413,7 @@ export async function completeQuizRound(
         if (!question) continue;
 
         const result = validatedResults.find(
-          (entry) => entry.questionIndex === index
+          (entry) => entry.questionIndex === index,
         );
         if (!result) continue;
 
@@ -407,11 +427,11 @@ export async function completeQuizRound(
           quality = getGuessWhoSm2Quality(
             result.correct,
             result.cluesUsed ?? 5,
-            result.answerMode ?? 'multiple_choice'
+            result.answerMode ?? 'multiple_choice',
           );
           itemKey = computeGuessWhoItemKey(
             question.canonicalName,
-            question.era
+            question.era,
           );
         } else {
           continue;
@@ -419,7 +439,7 @@ export async function completeQuizRound(
 
         const existing = await txRepo.quizMasteryItems.findByKey(
           round.activityType as 'capitals' | 'guess_who',
-          itemKey
+          itemKey,
         );
         if (existing) {
           const sm2Result = applyQuizSm2(
@@ -430,13 +450,30 @@ export async function completeQuizRound(
               lastReviewedAt: existing.updatedAt,
               nextReviewAt: existing.nextReviewAt,
             },
-            quality
+            quality,
           );
           await txRepo.quizMasteryItems.updateSm2(
             itemKey,
             round.activityType as 'capitals' | 'guess_who',
-            sm2Result
+            sm2Result,
           );
+          await recordPracticeActivityEvent(tx as unknown as Database, {
+            profileId,
+            activityType: 'review',
+            activitySubtype: round.activityType,
+            completedAt,
+            score: quality,
+            total: 5,
+            sourceType: 'quiz_mastery_item',
+            sourceId: existing.id,
+            occurrenceKey: `round:${roundId}:question:${index}`,
+            metadata: {
+              itemKey,
+              questionIndex: index,
+              answerMode: result.answerMode ?? null,
+              correct: result.correct,
+            },
+          });
         }
       }
 
@@ -455,7 +492,7 @@ export async function completeQuizRound(
         } else if (question.type === 'guess_who') {
           itemKey = computeGuessWhoItemKey(
             question.canonicalName,
-            question.era
+            question.era,
           );
           itemAnswer = question.canonicalName;
         } else {
@@ -496,7 +533,7 @@ export async function completeQuizRound(
         } else if (question.type === 'guess_who') {
           itemKey = computeGuessWhoItemKey(
             question.canonicalName,
-            question.era
+            question.era,
           );
         } else {
           continue;
@@ -508,14 +545,14 @@ export async function completeQuizRound(
         ) {
           await txRepo.quizMasteryItems.incrementMcSuccessCount(
             itemKey,
-            round.activityType as 'capitals' | 'guess_who'
+            round.activityType as 'capitals' | 'guess_who',
           );
         } else if (!result.correct && result.answerMode === 'free_text') {
           // Free-text wrong → reset to 2 (one MC success away from re-unlock)
           await txRepo.quizMasteryItems.resetMcSuccessCount(
             itemKey,
             round.activityType as 'capitals' | 'guess_who',
-            2
+            2,
           );
         }
       }
@@ -547,7 +584,7 @@ export async function completeQuizRound(
           entry.cluesUsed = result.cluesUsed;
         }
         return entry;
-      }
+      },
     );
 
     return {

@@ -7,7 +7,7 @@ import type {
   PendingCelebration,
   CelebrationReason,
 } from '@eduagent/schemas';
-import type { Router } from 'expo-router';
+import type { Router, Href } from 'expo-router';
 import type { ChatMessage } from '../session';
 import type {
   useCloseSession,
@@ -264,7 +264,7 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
           ...(filedBookId ? { filedBookId } : {}),
           ...(returnTo ? { returnTo } : {}),
         },
-      } as never);
+      } as Href);
     },
     [
       activeSessionId,
@@ -306,7 +306,7 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
                 : 'learning',
           ...(returnTo ? { returnTo } : {}),
         },
-      } as never);
+      } as Href);
     },
     [
       router,
@@ -656,7 +656,7 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
             subjectName: nextSubjectName,
             topicId: nextTopicId,
           },
-        } as never);
+        } as Href);
       } catch (err: unknown) {
         setIsClosing(false);
         platformAlert('Could not switch topic', classifyApiError(err).message);

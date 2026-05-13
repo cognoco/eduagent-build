@@ -68,6 +68,9 @@ export function ReportsListCard({
         pathname: '/(app)/child/[profileId]/reports',
         params: { profileId },
       } as Href);
+  const viewAllTestID = selfView
+    ? 'progress-reports-link'
+    : 'child-reports-link';
 
   return (
     <View className="bg-surface rounded-card p-4 mt-6" testID="reports-list">
@@ -80,10 +83,10 @@ export function ReportsListCard({
             onPress={() => router.push(reportsPath)}
             accessibilityRole="button"
             accessibilityLabel={t('progress.previousReports.viewAll')}
-            testID="child-reports-link"
+            testID={viewAllTestID}
           >
             <Text className="text-body-sm text-primary font-semibold">
-              {t('progress.milestones.seeAllLink')}
+              {t('progress.previousReports.viewAll')}
             </Text>
           </Pressable>
         ) : null}

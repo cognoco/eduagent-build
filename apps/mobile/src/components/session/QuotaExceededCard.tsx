@@ -49,7 +49,7 @@ export function QuotaExceededCard({
           </Text>
 
           <Pressable
-            onPress={() => router.push('/(app)/subscription' as never)}
+            onPress={() => router.push('/(app)/subscription' as Href)}
             className="bg-primary rounded-button py-3 items-center min-h-[44px] justify-center mb-2"
             accessibilityRole="button"
             accessibilityLabel={t('session.quota.upgradePlan')}
@@ -62,7 +62,7 @@ export function QuotaExceededCard({
 
           {details.topUpCreditsRemaining > 0 && (
             <Pressable
-              onPress={() => router.push('/(app)/subscription' as never)}
+              onPress={() => router.push('/(app)/subscription' as Href)}
               className="bg-surface-elevated rounded-button py-3 items-center min-h-[44px] justify-center"
               accessibilityRole="button"
               accessibilityLabel={t('session.quota.topUpCredits')}
@@ -95,7 +95,7 @@ export function QuotaExceededCard({
 
           {/* H5: Give child a navigation escape so they're not stuck in the locked session */}
           <Pressable
-            onPress={() => router.push(homeHref as never)}
+            onPress={() => router.push(homeHref as Href)}
             className="bg-surface-elevated rounded-button py-3 items-center min-h-[44px] justify-center"
             accessibilityRole="button"
             accessibilityLabel={t('common.goHome')}

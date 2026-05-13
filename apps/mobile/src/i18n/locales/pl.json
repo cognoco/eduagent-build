@@ -521,7 +521,12 @@
       "finishEarlyLabel": "Zakończ sesję wcześniej",
       "nextProblemLabel": "Następny problem",
       "finishHomeworkLabel": "Zakończ zadanie domowe",
-      "endSessionLabel": "Zakończ sesję"
+      "endSessionLabel": "Zakończ sesję",
+      "typeSubjectPlaceholder": "Wpisz przedmiot",
+      "typeSubjectLabel": "Wpisz przedmiot",
+      "useTypedSubject": "Użyj",
+      "useTypedSubjectLabel": "Użyj wpisanego przedmiotu",
+      "addNote": "Dodaj notatkę"
     },
     "quota": {
       "dailyLimitReached": "Osiągnięto limit dzienny",
@@ -596,7 +601,8 @@
       "writeNote": "Napisz notatkę",
       "cannotSaveTitle": "Nie można zapisać notatki",
       "cannotSaveMessage": "Notatek nie można teraz zapisać. Spróbuj ponownie.",
-      "saveFailedTitle": "Nie można zapisać notatki"
+      "saveFailedTitle": "Nie można zapisać notatki",
+      "summaryPlaceholder": "Co powinniśmy zapamiętać z tej sesji?"
     },
     "filingPrompt": {
       "title": "Dodać do biblioteki?",
@@ -978,6 +984,9 @@
       "message": "Otwórz półkę, wybierz następną książkę lub powtórz zaległy materiał.",
       "cta": "Otwórz",
       "accessibilityLabel": "Kontynuuj {{subject}}"
+    },
+    "bookmarkCard": {
+      "accessibilityLabel": "Otwórz zapisany zakładkę: {{title}}"
     }
   },
   "topic": {
@@ -1268,7 +1277,11 @@
     "tryCameraAgainLabel": "Spróbuj ponownie z aparatem",
     "tryReadingAgainLabel": "Spróbuj odczytać ponownie",
     "classifyErrorTitle": "Nie można zidentyfikować przedmiotu",
-    "classifyErrorMessage": "Wybierz przedmiot, do którego należy ta praca domowa."
+    "classifyErrorMessage": "Wybierz przedmiot, do którego należy ta praca domowa.",
+    "listening": "Słucham...",
+    "voiceHint": "Powiedz treść zadania domowego na głos.",
+    "stopDictatingProblemLabel": "Zatrzymaj dyktowanie zadania",
+    "dictateProblemLabel": "Dyktuj zadanie"
   },
   "progress": {
     "pageTitle": "Moja podróż edukacyjna",
@@ -1363,7 +1376,9 @@
       "bars": {
         "sessions": "Sesje",
         "time": "Czas",
-        "topics": "Tematy"
+        "topics": "Tematy",
+        "quizzes": "Quizy",
+        "reviews": "Powtórki"
       }
     },
     "newLearner": {
@@ -1657,6 +1672,7 @@
       "totalSessions": "{{count}} sesji",
       "recentActivity": "Ostatnia aktywność",
       "noRecentActivity": "Brak ostatniej aktywności",
+      "lastSessionAgo": "Ostatnia sesja {{time}}",
       "noSessionsYet": "Brak jeszcze sesji",
       "viewAllSessions": "Zobacz wszystkie sesje",
       "subjectsExplored": "Odkryte przedmioty",
@@ -1711,6 +1727,9 @@
       "viewSessionFrom": "Zobacz sesję z",
       "mentorMemoryTitle": "Co mentor wie o {{name}}",
       "mentorMemoryTitleFallback": "Pamięć mentora",
+      "manageMentorMemoryForChild": "Zarządzaj tym, co mentor pamięta o {{name}}",
+      "profileDetails": "Szczegóły profilu",
+      "childProfileJoined": "Dodano {{date}}",
       "setUpMentorMemory": "Skonfiguruj pamięć mentora",
       "chooseWhatMentorRemembers": "Wybierz, co mentor ma pamiętać",
       "viewWhatMentorKnows": "Zobacz, co wie mentor",
@@ -1719,6 +1738,7 @@
       "learningAccommodationTitle": "Dostosowanie nauki dla {{name}}",
       "learningAccommodationTitleFallback": "Dostosowanie nauki",
       "learningAccommodationDescription": "Dostosuj sposób, w jaki mentor uczy, aby pasował do potrzeb edukacyjnych Twojego dziecka",
+      "noLearningPreferenceSet": "Nie ustawiono preferencji nauki",
       "toggleDecisionGuide": "Pokaż przewodnik decyzyjny",
       "notSureWhichToPick": "Nie wiesz, które wybrać?",
       "pickAccommodation": "Wybierz dostosowanie",
@@ -1733,6 +1753,7 @@
       "checkConsentStatus": "Sprawdź status zgody",
       "accountTitle": "Konto — {{name}}",
       "accountTitleFallback": "Konto",
+      "childProfileScopeHint": "Postępy i raporty znajdują się na osobnych kartach, więc ta strona przechowuje tylko ustawienia dotyczące dziecka.",
       "deletionPending": "Usunięcie zaplanowane",
       "deletionCountdown": "Konto zostanie usunięte w dniu {{date}}",
       "deletionProcessing": "Usuwanie w toku",
@@ -1865,7 +1886,9 @@
       "monthlyReport": "Raport miesięczny",
       "subtitle": "Podsumowanie nauki Twojego dziecka w tym miesiącu",
       "totalWords": "Całkowita liczba słów",
-      "reportGoneTitle": "Nie znaleziono raportu"
+      "reportGoneTitle": "Nie znaleziono raportu",
+      "testsCompleted": "Ukończone testy",
+      "testPoints": "Punkty za testy"
     },
     "session": {
       "error": "Nie można załadować sesji",
@@ -1942,7 +1965,42 @@
       "sendNudge": "Wyślij przypomnienie do {{name}}",
       "openChildProfile": "Otwórz profil {{name}}",
       "reportGoneTitle": "Ten raport nie jest już dostępny",
-      "reportGoneBody": "Mógł zostać zarchiwizowany lub usunięty. Wszystkie Twoje inne raporty są nadal bezpieczne."
+      "reportGoneBody": "Mógł zostać zarchiwizowany lub usunięty. Wszystkie Twoje inne raporty są nadal bezpieczne.",
+      "testsCompleted": "Ukończone testy",
+      "testPoints": "Punkty za testy"
+    },
+    "practiceSummary": {
+      "title": "Szczegóły testów",
+      "subtitle": "{{count}} ukończonych aktywności, w tym {{reviews}} powtórek",
+      "accuracy": "Trafność",
+      "reviews": "Powtórki",
+      "points": "Punkty",
+      "celebrations": "Świętowania",
+      "activityKinds": "Rodzaje",
+      "comparison": "{{activities}} aktywności · {{points}} punktów · {{celebrations}} świętowań",
+      "byType": "Według typu",
+      "bySubject": "Według przedmiotu",
+      "typeDetail": "{{count}} ukończono · {{points}} punktów",
+      "typeDetailWithScore": "{{count}} ukończono · {{points}} punktów · {{accuracy}}%",
+      "subjectDetail": "{{count}} aktywności · {{points}} punktów · {{types}}",
+      "unknownSubject": "Nieprzypisane",
+      "activityTypes": {
+        "quiz": "Quiz",
+        "review": "Powtórka",
+        "assessment": "Udowodnij, że to wiem",
+        "dictation": "Dyktando",
+        "recitation": "Recytacja",
+        "fluency_drill": "Ćwiczenie płynności"
+      },
+      "activitySubtypes": {
+        "capitals": "Stolice",
+        "guess_who": "Zgadnij kto",
+        "vocabulary": "Słownictwo",
+        "assessment": "Udowodnij, że to wiem",
+        "dictation": "Dyktando",
+        "recitation": "Recytacja",
+        "fluency_drill": "Ćwiczenie płynności"
+      }
     }
   },
   "tabs": {

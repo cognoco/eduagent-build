@@ -11,6 +11,7 @@ import {
   UpstreamError,
 } from '../lib/api-client';
 import {
+  invalidateProgressSnapshotQueries,
   useSubjectProgress,
   useOverallProgress,
   useContinueSuggestion,
@@ -426,6 +427,35 @@ describe('useProfileWeeklyReports', () => {
 
     expect(result.current.error).toBeInstanceOf(Error);
   });
+
+  it('fetches child weekly reports when the active profile is an owner', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ reports: [] }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+
+    const ownerProfile = createTestProfile({
+      id: 'owner-profile-id',
+      isOwner: true,
+    });
+    const { result } = renderHook(
+      () => useProfileWeeklyReports('child-profile-id'),
+      {
+        wrapper: createHookWrapper({ activeProfile: ownerProfile }).wrapper,
+      },
+    );
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    expect(getMockFetchUrl()).toContain(
+      '/dashboard/children/child-profile-id/weekly-reports',
+    );
+    expect(result.current.data).toEqual([]);
+  });
 });
 
 describe('useRefreshProgressSnapshot', () => {
@@ -452,6 +482,28 @@ describe('useRefreshProgressSnapshot', () => {
     });
 
     expect(getMockFetchUrl()).toContain('/progress/refresh');
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ['progress', 'inventory', 'test-profile-id'],
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ['progress', 'history', 'test-profile-id'],
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ['progress', 'milestones', 'test-profile-id'],
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ['dashboard'],
+    });
+  });
+});
+
+describe('invalidateProgressSnapshotQueries', () => {
+  it('invalidates progress-facing queries for the active profile', () => {
+    createWrapper();
+    const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries');
+
+    invalidateProgressSnapshotQueries(queryClient, 'test-profile-id');
+
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: ['progress', 'inventory', 'test-profile-id'],
     });

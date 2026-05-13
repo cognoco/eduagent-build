@@ -168,6 +168,29 @@ describe('ParentHomeScreen', () => {
     screen.getByText('Children');
   });
 
+  it('routes the child card header and progress action to child progress', () => {
+    mockLinkedChildren = [CHILD_A];
+
+    render(<ParentHomeScreen activeProfile={makeProfile()} />);
+
+    fireEvent.press(screen.getByTestId('parent-home-check-child-child-a'));
+    expect(mockPush).toHaveBeenLastCalledWith('/(app)/child/child-a');
+
+    fireEvent.press(screen.getByTestId('parent-home-child-progress-child-a'));
+    expect(mockPush).toHaveBeenLastCalledWith('/(app)/child/child-a');
+  });
+
+  it('routes the reports action to the child reports list', () => {
+    mockLinkedChildren = [CHILD_A];
+
+    render(<ParentHomeScreen activeProfile={makeProfile()} />);
+
+    fireEvent.press(screen.getByTestId('parent-home-weekly-report-child-a'));
+
+    expect(mockPush).toHaveBeenCalledTimes(1);
+    expect(mockPush).toHaveBeenLastCalledWith('/(app)/child/child-a/reports');
+  });
+
   it('keeps own learning out of parent Home because it has its own tab', () => {
     render(<ParentHomeScreen activeProfile={makeProfile()} />);
 
@@ -186,7 +209,10 @@ describe('ParentHomeScreen', () => {
 
     fireEvent.press(screen.getByTestId('add-first-child-cta'));
 
-    expect(mockPush).toHaveBeenCalledWith('/create-profile?for=child');
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/create-profile',
+      params: { for: 'child' },
+    });
   });
 
   it('shows tonight prompts and compact status from dashboard data', () => {
@@ -327,5 +353,6 @@ describe('ParentHomeScreen', () => {
     fireEvent.press(screen.getByTestId('parent-home-send-nudge-child-a'));
 
     screen.getByTestId('nudge-action-sheet-close');
+    expect(mockPush).not.toHaveBeenCalled();
   });
 });

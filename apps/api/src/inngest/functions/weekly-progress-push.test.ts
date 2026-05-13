@@ -13,11 +13,28 @@ const mockCaptureException = jest.fn();
 jest.mock('../../services/sentry' /* gc1-allow: unit test boundary */, () => ({
   captureException: (...args: unknown[]) => mockCaptureException(...args),
 }));
+
+const mockWeeklyReportOnConflictDoNothing = jest
+  .fn()
+  .mockResolvedValue(undefined);
+const mockWeeklyReportInsertValues = jest.fn().mockReturnValue({
+  onConflictDoNothing: mockWeeklyReportOnConflictDoNothing,
+});
 const mockDb = {
   query: {
     familyLinks: { findMany: jest.fn().mockResolvedValue([]) },
-    notificationPreferences: { findMany: jest.fn().mockResolvedValue([]) },
+    consentStates: { findFirst: jest.fn().mockResolvedValue(null) },
+    profiles: { findFirst: jest.fn().mockResolvedValue(null) },
+    learningProfiles: {
+      findFirst: jest.fn().mockResolvedValue({ struggles: [] }),
+    },
+    notificationPreferences: {
+      findMany: jest.fn().mockResolvedValue([]),
+      findFirst: jest.fn().mockResolvedValue(null),
+    },
+    accounts: { findFirst: jest.fn().mockResolvedValue(null) },
   },
+  insert: jest.fn().mockReturnValue({ values: mockWeeklyReportInsertValues }),
   select: jest.fn(() => ({
     from: () => ({
       innerJoin: () => ({
@@ -30,6 +47,7 @@ const mockDb = {
 };
 jest.mock('../helpers' /* gc1-allow: unit test boundary */, () => ({
   getStepDatabase: () => mockDb,
+  getStepResendApiKey: () => 'resend-test-key',
 }));
 jest.mock('../client' /* gc1-allow: unit test boundary */, () => ({
   inngest: {
@@ -44,7 +62,224 @@ jest.mock('../client' /* gc1-allow: unit test boundary */, () => ({
   },
 }));
 
-import { isLocalHour9, weeklyProgressPushCron } from './weekly-progress-push';
+import { emptyPracticeActivitySummary } from '../../test-utils/practice-activity-summary-fixture';
+
+const mockGetPracticeActivitySummary = jest
+  .fn()
+  .mockResolvedValue(emptyPracticeActivitySummary);
+jest.mock(
+  '../../services/practice-activity-summary' /* gc1-allow: unit test boundary for Inngest handler; full DB path covered by practice-activity-summary tests */,
+  () => ({
+    getPracticeActivitySummary: (...args: unknown[]) =>
+      mockGetPracticeActivitySummary(...args),
+  }),
+);
+
+const mockGetLatestSnapshot = jest.fn().mockResolvedValue(null);
+const mockGetLatestSnapshotOnOrBefore = jest.fn().mockResolvedValue(null);
+jest.mock(
+  '../../services/snapshot-aggregation' /* gc1-allow: unit test boundary */,
+  () => ({
+    getLatestSnapshot: (...args: unknown[]) => mockGetLatestSnapshot(...args),
+    getLatestSnapshotOnOrBefore: (...args: unknown[]) =>
+      mockGetLatestSnapshotOnOrBefore(...args),
+  }),
+);
+
+const mockGenerateWeeklyReportData = jest.fn().mockReturnValue({
+  childName: 'Alex',
+  weekStart: '2026-05-11',
+  thisWeek: {
+    totalSessions: 3,
+    totalActiveMinutes: 45,
+    topicsMastered: 2,
+    topicsExplored: 3,
+    vocabularyTotal: 20,
+    streakBest: 4,
+  },
+  lastWeek: null,
+  headlineStat: {
+    value: 2,
+    label: 'Topics mastered',
+    comparison: '+1 this week',
+  },
+  practiceSummary: emptyPracticeActivitySummary,
+});
+jest.mock(
+  '../../services/weekly-report' /* gc1-allow: unit test boundary */,
+  () => ({
+    generateWeeklyReportData: (...args: unknown[]) =>
+      mockGenerateWeeklyReportData(...args),
+  }),
+);
+
+const mockSendPushNotification = jest.fn().mockResolvedValue({ sent: true });
+const mockSendEmail = jest.fn().mockResolvedValue({ sent: true });
+const mockFormatWeeklyProgressEmail = jest.fn(
+  (to: string, _childSummaries: string[], _struggleLines: unknown[]) => ({
+    to,
+    subject: 'Weekly learning progress',
+    body: 'weekly progress',
+    type: 'weekly_progress',
+  }),
+);
+jest.mock(
+  '../../services/notifications' /* gc1-allow: unit test boundary */,
+  () => ({
+    sendPushNotification: (...args: unknown[]) =>
+      mockSendPushNotification(...args),
+    sendEmail: (...args: unknown[]) => mockSendEmail(...args),
+    formatWeeklyProgressEmail: (
+      parentEmail: string,
+      childSummaries: string[],
+      struggleLines: unknown[],
+    ) =>
+      mockFormatWeeklyProgressEmail(parentEmail, childSummaries, struggleLines),
+  }),
+);
+
+const mockGetRecentNotificationCount = jest.fn().mockResolvedValue(0);
+const mockLogNotification = jest.fn().mockResolvedValue(undefined);
+jest.mock(
+  '../../services/settings' /* gc1-allow: unit test boundary */,
+  () => ({
+    getRecentNotificationCount: (...args: unknown[]) =>
+      mockGetRecentNotificationCount(...args),
+    logNotification: (...args: unknown[]) => mockLogNotification(...args),
+  }),
+);
+
+import {
+  isLocalHour9,
+  weeklyProgressPushCron,
+  weeklyProgressPushGenerate,
+} from './weekly-progress-push';
+
+const PARENT_ID = '11111111-1111-4111-8111-111111111111';
+const CHILD_ID = '22222222-2222-4222-8222-222222222222';
+const CURRENT_METRICS = {
+  totalSessions: 3,
+  totalActiveMinutes: 45,
+  totalWallClockMinutes: 55,
+  totalExchanges: 20,
+  topicsAttempted: 4,
+  topicsMastered: 5,
+  topicsInProgress: 1,
+  booksCompleted: 0,
+  vocabularyTotal: 20,
+  vocabularyMastered: 10,
+  vocabularyLearning: 8,
+  vocabularyNew: 2,
+  retentionCardsDue: 1,
+  retentionCardsStrong: 6,
+  retentionCardsFading: 1,
+  currentStreak: 4,
+  longestStreak: 4,
+  subjects: [
+    {
+      subjectId: '33333333-3333-4333-8333-333333333333',
+      subjectName: 'Math',
+      pedagogyMode: 'socratic' as const,
+      topicsAttempted: 4,
+      topicsMastered: 5,
+      topicsTotal: 10,
+      topicsExplored: 8,
+      vocabularyTotal: 20,
+      vocabularyMastered: 10,
+      sessionsCount: 3,
+      activeMinutes: 45,
+      wallClockMinutes: 55,
+      lastSessionAt: '2026-05-12T12:00:00.000Z',
+    },
+  ],
+};
+const PREVIOUS_METRICS = {
+  ...CURRENT_METRICS,
+  totalSessions: 2,
+  topicsMastered: 4,
+  vocabularyTotal: 18,
+  subjects: [
+    {
+      ...CURRENT_METRICS.subjects[0],
+      topicsMastered: 4,
+      topicsExplored: 6,
+      vocabularyTotal: 18,
+    },
+  ],
+};
+
+async function executeGenerateSteps(
+  eventData: Record<string, unknown>,
+): Promise<{
+  status: string;
+  parentId?: string;
+  reason?: string;
+}> {
+  const step = {
+    run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
+  };
+  const handler = (
+    weeklyProgressPushGenerate as unknown as {
+      fn: (ctx: {
+        event: { data: Record<string, unknown>; name: string };
+        step: typeof step;
+      }) => Promise<unknown>;
+    }
+  ).fn;
+  return (await handler({
+    event: { data: eventData, name: 'app/weekly-progress-push.generate' },
+    step,
+  })) as { status: string; parentId?: string; reason?: string };
+}
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  mockDb.query.familyLinks.findMany.mockResolvedValue([]);
+  mockDb.query.consentStates.findFirst.mockResolvedValue(null);
+  mockDb.query.profiles.findFirst.mockResolvedValue(null);
+  mockDb.query.learningProfiles.findFirst.mockResolvedValue({ struggles: [] });
+  mockDb.query.notificationPreferences.findMany.mockResolvedValue([]);
+  mockDb.query.notificationPreferences.findFirst.mockResolvedValue(null);
+  mockDb.query.accounts.findFirst.mockResolvedValue(null);
+  mockDb.select.mockReturnValue({
+    from: () => ({
+      innerJoin: () => ({ where: async () => [] }),
+    }),
+  });
+  mockDb.insert.mockReturnValue({ values: mockWeeklyReportInsertValues });
+  mockWeeklyReportInsertValues.mockReturnValue({
+    onConflictDoNothing: mockWeeklyReportOnConflictDoNothing,
+  });
+  mockWeeklyReportOnConflictDoNothing.mockResolvedValue(undefined);
+  mockGetPracticeActivitySummary.mockResolvedValue(
+    emptyPracticeActivitySummary,
+  );
+  mockGetLatestSnapshot.mockResolvedValue(null);
+  mockGetLatestSnapshotOnOrBefore.mockResolvedValue(null);
+  mockGenerateWeeklyReportData.mockReturnValue({
+    childName: 'Alex',
+    weekStart: '2026-05-11',
+    thisWeek: {
+      totalSessions: 3,
+      totalActiveMinutes: 45,
+      topicsMastered: 2,
+      topicsExplored: 3,
+      vocabularyTotal: 20,
+      streakBest: 4,
+    },
+    lastWeek: null,
+    headlineStat: {
+      value: 2,
+      label: 'Topics mastered',
+      comparison: '+1 this week',
+    },
+    practiceSummary: emptyPracticeActivitySummary,
+  });
+  mockSendPushNotification.mockResolvedValue({ sent: true });
+  mockSendEmail.mockResolvedValue({ sent: true });
+  mockGetRecentNotificationCount.mockResolvedValue(0);
+  mockLogNotification.mockResolvedValue(undefined);
+});
 
 describe('weekly-progress-push isLocalHour9 (BUG-640 / J-4)', () => {
   // Helper: count how many of the 24 Monday-UTC hours match for a TZ.
@@ -269,5 +504,66 @@ describe('weekly progress parent eligibility', () => {
         data: { parentId: 'parent-email-only' },
       }),
     ]);
+  });
+});
+
+describe('weekly progress generate practice summary', () => {
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('loads practice activity summary for the report week before generating the digest', async () => {
+    jest.useFakeTimers({ now: new Date('2026-05-13T12:00:00.000Z') });
+    mockDb.query.familyLinks.findMany.mockResolvedValue([
+      { childProfileId: CHILD_ID },
+    ]);
+    mockDb.query.profiles.findFirst.mockResolvedValue({
+      displayName: 'Alex',
+    });
+    mockDb.query.notificationPreferences.findFirst.mockResolvedValue({
+      pushEnabled: true,
+      weeklyProgressPush: true,
+      weeklyProgressEmail: false,
+    });
+    mockGetLatestSnapshot.mockResolvedValue({
+      snapshotDate: '2026-05-13',
+      metrics: CURRENT_METRICS,
+    });
+    mockGetLatestSnapshotOnOrBefore.mockResolvedValue({
+      snapshotDate: '2026-05-06',
+      metrics: PREVIOUS_METRICS,
+    });
+
+    const result = await executeGenerateSteps({ parentId: PARENT_ID });
+
+    expect(result).toEqual({ status: 'completed', parentId: PARENT_ID });
+    expect(mockGetPracticeActivitySummary).toHaveBeenCalledWith(mockDb, {
+      profileId: CHILD_ID,
+      period: {
+        start: new Date('2026-05-11T00:00:00.000Z'),
+        endExclusive: new Date('2026-05-18T00:00:00.000Z'),
+      },
+      previousPeriod: {
+        start: new Date('2026-05-04T00:00:00.000Z'),
+        endExclusive: new Date('2026-05-11T00:00:00.000Z'),
+      },
+    });
+    expect(mockGenerateWeeklyReportData).toHaveBeenCalledWith(
+      'Alex',
+      '2026-05-11',
+      CURRENT_METRICS,
+      PREVIOUS_METRICS,
+      emptyPracticeActivitySummary,
+    );
+    expect(mockWeeklyReportInsertValues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        profileId: PARENT_ID,
+        childProfileId: CHILD_ID,
+        reportWeek: '2026-05-11',
+        reportData: expect.objectContaining({
+          practiceSummary: emptyPracticeActivitySummary,
+        }),
+      }),
+    );
   });
 });

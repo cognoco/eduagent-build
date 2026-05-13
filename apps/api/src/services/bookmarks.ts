@@ -46,7 +46,7 @@ function mapBookmarkRow(row: {
 export async function createBookmark(
   db: Database,
   profileId: string,
-  eventId: string
+  eventId: string,
 ): Promise<Bookmark> {
   const [event] = await db
     .select({
@@ -65,8 +65,8 @@ export async function createBookmark(
       and(
         eq(sessionEvents.id, eventId),
         eq(sessionEvents.profileId, profileId),
-        eq(sessionEvents.eventType, 'ai_response')
-      )
+        eq(sessionEvents.eventType, 'ai_response'),
+      ),
     )
     .limit(1);
 
@@ -122,12 +122,12 @@ export async function createBookmark(
 export async function deleteBookmark(
   db: Database,
   profileId: string,
-  bookmarkId: string
+  bookmarkId: string,
 ): Promise<void> {
   const [deleted] = await db
     .delete(bookmarks)
     .where(
-      and(eq(bookmarks.id, bookmarkId), eq(bookmarks.profileId, profileId))
+      and(eq(bookmarks.id, bookmarkId), eq(bookmarks.profileId, profileId)),
     )
     .returning({ id: bookmarks.id });
 
@@ -143,13 +143,18 @@ export async function listBookmarks(
     cursor?: string;
     limit?: number;
     subjectId?: string;
-  } = {}
+    topicId?: string;
+  } = {},
 ): Promise<{ bookmarks: Bookmark[]; nextCursor: string | null }> {
   const limit = Math.min(Math.max(options.limit ?? 20, 1), 50);
   const conditions: SQL[] = [eq(bookmarks.profileId, profileId)];
 
   if (options.subjectId) {
     conditions.push(eq(bookmarks.subjectId, options.subjectId));
+  }
+
+  if (options.topicId) {
+    conditions.push(eq(bookmarks.topicId, options.topicId));
   }
 
   if (options.cursor) {
@@ -188,14 +193,14 @@ export async function listBookmarks(
   // bookmarks — the cursor is an exclusive upper bound, not an offset.
   return {
     bookmarks: page.map(mapBookmarkRow),
-    nextCursor: hasMore ? page[page.length - 1]?.id ?? null : null,
+    nextCursor: hasMore ? (page[page.length - 1]?.id ?? null) : null,
   };
 }
 
 export async function listSessionBookmarks(
   db: Database,
   profileId: string,
-  sessionId: string
+  sessionId: string,
 ): Promise<SessionBookmark[]> {
   const rows = await db
     .select({
@@ -206,8 +211,8 @@ export async function listSessionBookmarks(
     .where(
       and(
         eq(bookmarks.profileId, profileId),
-        eq(bookmarks.sessionId, sessionId)
-      )
+        eq(bookmarks.sessionId, sessionId),
+      ),
     );
 
   return rows.map((row) => ({

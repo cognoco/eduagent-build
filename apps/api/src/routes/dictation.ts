@@ -157,6 +157,7 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
         mistakeCount: input.mistakeCount ?? null,
         mode: input.mode,
         reviewed: input.reviewed,
+        subjectId: input.subjectId ?? null,
       });
 
       return c.json(

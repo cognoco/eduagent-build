@@ -1,4 +1,4 @@
-import { Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useProfileReports } from '../../hooks/use-progress';
 import { formatMinutes } from '../../lib/format-relative-date';
@@ -56,12 +56,15 @@ function ReportLines({
 
 function ReportBars({
   metrics,
+  quizzesCompleted,
+  reviewsCompleted,
 }: {
   metrics: {
     totalSessions: number;
     totalActiveMinutes: number;
-    topicsExplored: number;
   };
+  quizzesCompleted: number;
+  reviewsCompleted: number;
 }): React.ReactElement {
   const { t } = useTranslation();
   const values = [
@@ -78,10 +81,16 @@ function ReportBars({
       display: formatMinutes(metrics.totalActiveMinutes),
     },
     {
-      key: 'topics',
-      label: t('progress.monthlyReport.bars.topics'),
-      value: metrics.topicsExplored,
-      display: String(metrics.topicsExplored),
+      key: 'quizzes',
+      label: t('progress.monthlyReport.bars.quizzes'),
+      value: quizzesCompleted,
+      display: String(quizzesCompleted),
+    },
+    {
+      key: 'reviews',
+      label: t('progress.monthlyReport.bars.reviews'),
+      value: reviewsCompleted,
+      display: String(reviewsCompleted),
     },
   ];
   const maxValue = Math.max(...values.map((item) => item.value), 1);
@@ -135,9 +144,22 @@ export function MonthlyReportCard({
           {t('parentView.reports.loadingReports')}
         </Text>
       ) : reportsQuery.isError ? (
-        <Text className="text-body-sm text-text-secondary mt-2">
-          {t('parentView.reports.couldNotLoadReports')}
-        </Text>
+        <View className="py-4 items-center" testID="monthly-report-error">
+          <Text className="text-body-sm text-text-secondary text-center mb-3">
+            {t('parentView.reports.couldNotLoadReports')}
+          </Text>
+          <Pressable
+            onPress={() => void reportsQuery.refetch()}
+            className="bg-surface rounded-button px-5 py-3 min-h-[48px] items-center justify-center"
+            accessibilityRole="button"
+            accessibilityLabel={t('common.retry')}
+            testID="monthly-report-retry"
+          >
+            <Text className="text-body font-semibold text-text-primary">
+              {t('common.retry')}
+            </Text>
+          </Pressable>
+        </View>
       ) : latest ? (
         <View className="bg-background rounded-card p-3 mt-3">
           <Text className="text-caption text-text-secondary">
@@ -149,7 +171,13 @@ export function MonthlyReportCard({
           <Text className="text-body-sm text-text-secondary mt-1">
             {latest.headlineStat.comparison}
           </Text>
-          {latest.thisMonth ? <ReportBars metrics={latest.thisMonth} /> : null}
+          {latest.thisMonth ? (
+            <ReportBars
+              metrics={latest.thisMonth}
+              quizzesCompleted={latest.practiceSummary?.quizzesCompleted ?? 0}
+              reviewsCompleted={latest.practiceSummary?.reviewsCompleted ?? 0}
+            />
+          ) : null}
           <ReportLines
             title={t('progress.monthlyReport.highlightsTitle')}
             lines={highlights}

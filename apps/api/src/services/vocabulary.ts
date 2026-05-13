@@ -17,6 +17,7 @@ import {
   SubjectNotFoundError,
   VocabularyNotFoundError,
 } from '@eduagent/schemas';
+import { recordPracticeActivityEvent } from './practice-activity-events';
 
 function mapVocabularyRow(row: typeof vocabulary.$inferSelect): Vocabulary {
   return {
@@ -36,7 +37,7 @@ function mapVocabularyRow(row: typeof vocabulary.$inferSelect): Vocabulary {
 }
 
 function mapVocabularyRetentionCard(
-  row: typeof vocabularyRetentionCards.$inferSelect
+  row: typeof vocabularyRetentionCards.$inferSelect,
 ): VocabularyRetentionCard {
   return {
     vocabularyId: row.vocabularyId,
@@ -61,7 +62,7 @@ export function normalizeVocabTerm(term: string): string {
 async function ensureLanguageSubject(
   db: Database,
   profileId: string,
-  subjectId: string
+  subjectId: string,
 ): Promise<void> {
   const subject = await db.query.subjects.findFirst({
     where: and(eq(subjects.id, subjectId), eq(subjects.profileId, profileId)),
@@ -75,7 +76,7 @@ async function ensureLanguageSubject(
 export async function listVocabulary(
   db: Database,
   profileId: string,
-  subjectId: string
+  subjectId: string,
 ): Promise<Vocabulary[]> {
   await ensureLanguageSubject(db, profileId, subjectId);
 
@@ -85,8 +86,8 @@ export async function listVocabulary(
     .where(
       and(
         eq(vocabulary.profileId, profileId),
-        eq(vocabulary.subjectId, subjectId)
-      )
+        eq(vocabulary.subjectId, subjectId),
+      ),
     )
     .orderBy(asc(vocabulary.mastered), asc(vocabulary.termNormalized));
 
@@ -97,7 +98,7 @@ export async function createVocabulary(
   db: Database,
   profileId: string,
   subjectId: string,
-  input: VocabularyCreateInput
+  input: VocabularyCreateInput,
 ): Promise<Vocabulary> {
   await ensureLanguageSubject(db, profileId, subjectId);
 
@@ -145,7 +146,7 @@ export async function updateVocabulary(
   db: Database,
   profileId: string,
   vocabularyId: string,
-  input: VocabularyUpdateInput
+  input: VocabularyUpdateInput,
 ): Promise<Vocabulary | null> {
   const updates: Partial<typeof vocabulary.$inferInsert> & { updatedAt: Date } =
     {
@@ -172,7 +173,7 @@ export async function updateVocabulary(
     .update(vocabulary)
     .set(updates)
     .where(
-      and(eq(vocabulary.id, vocabularyId), eq(vocabulary.profileId, profileId))
+      and(eq(vocabulary.id, vocabularyId), eq(vocabulary.profileId, profileId)),
     )
     .returning();
 
@@ -183,7 +184,7 @@ export async function deleteVocabulary(
   db: Database,
   profileId: string,
   subjectId: string,
-  vocabularyId: string
+  vocabularyId: string,
 ): Promise<boolean> {
   const rows = await db
     .delete(vocabulary)
@@ -191,8 +192,8 @@ export async function deleteVocabulary(
       and(
         eq(vocabulary.id, vocabularyId),
         eq(vocabulary.profileId, profileId),
-        eq(vocabulary.subjectId, subjectId)
-      )
+        eq(vocabulary.subjectId, subjectId),
+      ),
     )
     .returning({ id: vocabulary.id });
 
@@ -202,7 +203,7 @@ export async function deleteVocabulary(
 export async function ensureVocabularyRetentionCard(
   db: Database,
   profileId: string,
-  vocabularyId: string
+  vocabularyId: string,
 ): Promise<typeof vocabularyRetentionCards.$inferSelect> {
   // [VOCAB-RETENTION-INSERT] intervalDays must be >= 1 to satisfy the
   // vocab_retention_cards_interval_days_positive CHECK constraint. Use 1
@@ -228,13 +229,13 @@ export async function ensureVocabularyRetentionCard(
   const row = await db.query.vocabularyRetentionCards.findFirst({
     where: and(
       eq(vocabularyRetentionCards.profileId, profileId),
-      eq(vocabularyRetentionCards.vocabularyId, vocabularyId)
+      eq(vocabularyRetentionCards.vocabularyId, vocabularyId),
     ),
   });
 
   if (!row) {
     throw new Error(
-      `Failed to ensure retention card for vocabulary ${vocabularyId}`
+      `Failed to ensure retention card for vocabulary ${vocabularyId}`,
     );
   }
 
@@ -246,7 +247,7 @@ export async function reviewVocabulary(
   profileId: string,
   vocabularyId: string,
   input: VocabularyReviewInput,
-  subjectId?: string
+  subjectId?: string,
 ): Promise<{
   vocabulary: Vocabulary;
   retention: VocabularyRetentionCard;
@@ -273,7 +274,7 @@ export async function reviewVocabulary(
     const card = await ensureVocabularyRetentionCard(
       txDb,
       profileId,
-      vocabularyId
+      vocabularyId,
     );
     const now = new Date().toISOString();
     const result = sm2({
@@ -308,8 +309,8 @@ export async function reviewVocabulary(
       .where(
         and(
           eq(vocabularyRetentionCards.vocabularyId, vocabularyId),
-          eq(vocabularyRetentionCards.profileId, profileId)
-        )
+          eq(vocabularyRetentionCards.profileId, profileId),
+        ),
       )
       .returning();
 
@@ -322,13 +323,33 @@ export async function reviewVocabulary(
       .where(
         and(
           eq(vocabulary.id, vocabularyId),
-          eq(vocabulary.profileId, profileId)
-        )
+          eq(vocabulary.profileId, profileId),
+        ),
       )
       .returning();
 
     if (!updatedCard)
       throw new Error('Update vocabulary retention card did not return a row');
+
+    await recordPracticeActivityEvent(txDb, {
+      profileId,
+      subjectId: (updatedVocab ?? vocabRow).subjectId,
+      activityType: 'review',
+      activitySubtype: 'vocabulary',
+      completedAt: new Date(now),
+      score: input.quality,
+      total: 5,
+      sourceType: 'vocabulary_retention_card',
+      sourceId: updatedCard.id,
+      occurrenceKey: `vocabulary:${vocabularyId}:reviewed:${now}`,
+      metadata: {
+        vocabularyId,
+        mastered,
+        repetitions: result.card.repetitions,
+        intervalDays: result.card.interval,
+      },
+    });
+
     return {
       vocabulary: mapVocabularyRow(updatedVocab ?? vocabRow),
       retention: mapVocabularyRetentionCard(updatedCard),
@@ -344,7 +365,7 @@ export async function upsertExtractedVocabulary(
     VocabularyCreateInput & {
       quality?: number;
     }
-  >
+  >,
 ): Promise<Vocabulary[]> {
   const created: Vocabulary[] = [];
 
@@ -364,7 +385,7 @@ export async function upsertExtractedVocabulary(
 export async function getVocabularyDueForReview(
   db: Database,
   profileId: string,
-  subjectId: string
+  subjectId: string,
 ): Promise<Array<Vocabulary & { nextReviewAt: string | null }>> {
   const rows = await db
     .select({
@@ -374,18 +395,18 @@ export async function getVocabularyDueForReview(
     .from(vocabulary)
     .leftJoin(
       vocabularyRetentionCards,
-      eq(vocabulary.id, vocabularyRetentionCards.vocabularyId)
+      eq(vocabulary.id, vocabularyRetentionCards.vocabularyId),
     )
     .where(
       and(
         eq(vocabulary.profileId, profileId),
-        eq(vocabulary.subjectId, subjectId)
-      )
+        eq(vocabulary.subjectId, subjectId),
+      ),
     )
     .orderBy(
       asc(vocabulary.mastered),
       asc(vocabularyRetentionCards.nextReviewAt),
-      desc(vocabulary.createdAt)
+      desc(vocabulary.createdAt),
     );
 
   return rows.map((row) => ({

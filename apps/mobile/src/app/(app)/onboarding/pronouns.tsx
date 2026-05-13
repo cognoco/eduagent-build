@@ -10,7 +10,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -84,7 +84,7 @@ export default function PronounsScreen(): React.ReactElement {
 
   const navigateForward = useCallback(() => {
     if (returnTo === 'settings') {
-      goBackOrReplace(router, '/(app)/more' as never);
+      goBackOrReplace(router, '/(app)/more' as Href);
       return;
     }
     if (!subjectId) {
@@ -104,7 +104,7 @@ export default function PronounsScreen(): React.ReactElement {
               sessionId: result.session.id,
               topicId: result.session.topicId ?? undefined,
             },
-          } as never);
+          } as Href);
         },
         onError: () => {
           goBackOrReplace(router, '/(app)/home' as const);

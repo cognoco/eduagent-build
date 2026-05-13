@@ -17,6 +17,7 @@ interface NoteInputProps {
   onSave: (content: string) => void;
   onCancel: () => void;
   initialValue?: string;
+  placeholder?: string;
   saving?: boolean;
 }
 
@@ -24,6 +25,7 @@ export function NoteInput({
   onSave,
   onCancel,
   initialValue = '',
+  placeholder = 'Write your note...',
   saving = false,
 }: NoteInputProps): React.ReactElement {
   const themeColors = useThemeColors();
@@ -63,7 +65,7 @@ export function NoteInput({
         testID="note-text-input"
         value={text}
         onChangeText={setText}
-        placeholder="Write your note..."
+        placeholder={placeholder}
         placeholderTextColor={themeColors.textSecondary}
         multiline
         maxLength={MAX_CHARS}

@@ -12,6 +12,7 @@ import {
   listEligibleSelfReportProfileIds,
   listEligibleSelfReportProfileIdsAtLocalHour9,
 } from '../../services/solo-progress-reports';
+import { getPracticeActivitySummary } from '../../services/practice-activity-summary';
 import { getLatestSnapshotOnOrBefore } from '../../services/snapshot-aggregation';
 import { generateWeeklyReportData } from '../../services/weekly-report';
 import { captureException } from '../../services/sentry';
@@ -161,6 +162,9 @@ export const weeklySelfReportGenerate = inngest.createFunction(
     const reportWeekStart =
       parsed.data.reportWeekStart ?? isoDate(startOfCurrentWeek(new Date()));
     const reportWeekStartDate = new Date(`${reportWeekStart}T00:00:00.000Z`);
+    // Self-reports are delivered at the start of the new week and summarize
+    // the trailing seven days. Parent weekly progress push intentionally
+    // writes the in-progress report week for parent/child digest rows.
     const activityWindowStart = subtractDays(reportWeekStartDate, 7);
     const reportWindowEnd = subtractDays(reportWeekStartDate, 1);
     const previousWindowEnd = subtractDays(reportWeekStartDate, 8);
@@ -265,11 +269,24 @@ export const weeklySelfReportGenerate = inngest.createFunction(
         const cappedPrevious =
           snapshotGapMs <= MAX_SNAPSHOT_GAP_MS ? previous : null;
 
+        const practiceSummary = await getPracticeActivitySummary(db, {
+          profileId,
+          period: {
+            start: activityWindowStart,
+            endExclusive: reportWeekStartDate,
+          },
+          previousPeriod: {
+            start: subtractDays(reportWeekStartDate, 14),
+            endExclusive: activityWindowStart,
+          },
+        });
+
         const reportData = generateWeeklyReportData(
           profile.displayName,
           reportWeekStart,
           latest.metrics,
           cappedPrevious?.metrics ?? null,
+          practiceSummary,
         );
 
         await db

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RewardBurst } from '../../../components/common/RewardBurst';
 import { useFetchRound } from '../../../hooks/use-quiz';
@@ -116,7 +116,7 @@ export default function QuizResultsScreen(): React.ReactElement {
     if (prefetchedRound.data) {
       setRound(prefetchedRound.data);
       setPrefetchedRoundId(null);
-      router.replace('/(app)/quiz/play' as never);
+      router.replace('/(app)/quiz/play' as Href);
       return;
     }
 
@@ -129,11 +129,11 @@ export default function QuizResultsScreen(): React.ReactElement {
     }
 
     if (!activityType) {
-      router.replace('/(app)/practice' as never);
+      router.replace('/(app)/practice' as Href);
       return;
     }
 
-    router.replace('/(app)/quiz/launch' as never);
+    router.replace('/(app)/quiz/launch' as Href);
   }
 
   function handleDone() {
@@ -147,7 +147,7 @@ export default function QuizResultsScreen(): React.ReactElement {
     // QuizFlowProvider, which resets state naturally; calling clear() inside
     // the handler causes the same QuizFlowProvider/router-update interleave
     // that broke Play Again on web.
-    router.replace('/(app)/practice' as never);
+    router.replace('/(app)/practice' as Href);
   }
 
   return (
@@ -194,8 +194,8 @@ export default function QuizResultsScreen(): React.ReactElement {
       ) : null}
 
       {xpEarned > 0 ? (
-        <View className="mt-4 rounded-full bg-primary-soft px-4 py-2">
-          <Text className="text-body-sm font-semibold text-primary">
+        <View className="mt-4 rounded-full bg-reward-soft px-4 py-2">
+          <Text className="text-body-sm font-semibold text-reward">
             +{xpEarned} XP
           </Text>
         </View>
@@ -289,7 +289,7 @@ export default function QuizResultsScreen(): React.ReactElement {
             router.push({
               pathname: '/(app)/quiz/history',
               params: practiceReturnParams,
-            } as never)
+            } as Href)
           }
         >
           <Text className="text-primary mt-2">View History</Text>

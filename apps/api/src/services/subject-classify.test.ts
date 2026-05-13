@@ -76,7 +76,7 @@ describe('classifySubject', () => {
     expect(mockRouteAndCall).toHaveBeenCalledTimes(1);
   });
 
-  it('returns null suggestedSubjectName when LLM fails with no subjects', async () => {
+  it('uses a deterministic suggestion when LLM fails with no subjects', async () => {
     mockListSubjects.mockResolvedValueOnce([]);
     mockRouteAndCall.mockRejectedValueOnce(new Error('LLM unavailable'));
 
@@ -88,7 +88,7 @@ describe('classifySubject', () => {
 
     expect(result.candidates).toEqual([]);
     expect(result.needsConfirmation).toBe(true);
-    expect(result.suggestedSubjectName).toBeNull();
+    expect(result.suggestedSubjectName).toBe('Mathematics');
   });
 
   // [AUDIT-SILENT-FAIL] Break test — a silent fallback in the zero-subject
@@ -490,6 +490,54 @@ describe('classifySubject', () => {
       // The key assertion: suggestedSubjectName must never be null for valid topics
       expect(result.suggestedSubjectName).not.toBeNull();
       expect(result.suggestedSubjectName).toBe('World History');
+    });
+
+    it('suggests Physics for War of Currents when the LLM response is unparseable', async () => {
+      mockListSubjects.mockResolvedValueOnce([
+        makeSubject('sub-001', 'English'),
+        makeSubject('sub-002', 'Chemistry'),
+        makeSubject('sub-003', 'Italian'),
+        makeSubject('sub-004', 'Biology'),
+      ]);
+
+      mockRouteAndCall.mockResolvedValueOnce({
+        response: 'I cannot classify this text.',
+        provider: 'gemini',
+        model: 'gemini-2.5-flash',
+        stopReason: 'stop',
+        latencyMs: 50,
+      });
+
+      const result = await classifySubject(
+        FAKE_DB,
+        PROFILE_ID,
+        'Tell me about the war of currents',
+      );
+
+      expect(result.candidates).toEqual([]);
+      expect(result.needsConfirmation).toBe(true);
+      expect(result.suggestedSubjectName).toBe('Physics');
+    });
+
+    it('suggests Physics for War of Currents when the LLM call fails', async () => {
+      mockListSubjects.mockResolvedValueOnce([
+        makeSubject('sub-001', 'English'),
+        makeSubject('sub-002', 'Chemistry'),
+        makeSubject('sub-003', 'Italian'),
+        makeSubject('sub-004', 'Biology'),
+      ]);
+      mockRouteAndCall.mockRejectedValueOnce(new Error('LLM unavailable'));
+
+      const result = await classifySubject(
+        FAKE_DB,
+        PROFILE_ID,
+        'Tell me about the war of currents',
+      );
+
+      expect(result.candidates).toEqual([]);
+      expect(result.needsConfirmation).toBe(true);
+      expect(result.suggestedSubjectName).toBe('Physics');
+      expect(mockCaptureException).toHaveBeenCalledTimes(1);
     });
 
     it('sends the updated prompt with cross-disciplinary matching guidance', async () => {

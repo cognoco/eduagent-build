@@ -1,6 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { ScrollView, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ErrorFallback } from './ErrorFallback';
 import { Sentry } from '../../lib/sentry';
@@ -66,7 +66,7 @@ function ErrorFallbackView({
             // true and the fallback renders over whatever Home resolves to,
             // making the button appear to do nothing.
             onGoHome();
-            router.replace('/(app)/home' as never);
+            router.replace('/(app)/home' as Href);
           },
           testID: 'error-boundary-go-home',
         }}

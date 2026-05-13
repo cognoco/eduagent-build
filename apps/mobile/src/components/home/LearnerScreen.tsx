@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import type { Profile } from '@eduagent/schemas';
@@ -282,7 +282,7 @@ export function LearnerScreen({
               }),
               ...returnParams,
             },
-          } as never);
+          } as Href);
         },
       };
     }
@@ -309,7 +309,7 @@ export function LearnerScreen({
           router.push({
             pathname: '/(app)/topic/relearn',
             params: returnParams,
-          } as never),
+          } as Href),
       };
     }
 
@@ -324,7 +324,7 @@ export function LearnerScreen({
               activityType: quizDiscovery.activityType,
               ...returnParams,
             },
-          } as never);
+          } as Href);
         },
       };
     }
@@ -344,7 +344,7 @@ export function LearnerScreen({
   const openIntentAction = useCallback(
     (route: HomeIntentAction['route']): void => {
       if (route === '/(app)/homework/camera') {
-        router.push(homeHref as never);
+        router.push(homeHref as Href);
       }
 
       router.push({
@@ -353,7 +353,7 @@ export function LearnerScreen({
           route === '/(app)/session'
             ? { mode: 'freeform', ...returnParams }
             : returnParams,
-      } as never);
+      } as Href);
     },
     [homeHref, returnParams],
   );
@@ -388,7 +388,7 @@ export function LearnerScreen({
               </Text>
             </Pressable>
             <Pressable
-              onPress={() => router.replace(homeHref as never)}
+              onPress={() => router.replace(homeHref as Href)}
               className="mt-2 min-h-[44px] items-center justify-center px-6 py-2"
               testID="learner-loading-go-home"
             >
@@ -567,7 +567,7 @@ export function LearnerScreen({
                                 subjectId: card.subjectId,
                                 returnTo: returnToTab,
                               },
-                            } as never);
+                            } as Href);
                           }
                     }
                   />
@@ -579,7 +579,7 @@ export function LearnerScreen({
                       router.push({
                         pathname: CREATE_SUBJECT_FROM_HOME_HREF,
                         params: { returnTo: returnToTab },
-                      } as never)
+                      } as Href)
                     }
                     className="rounded-2xl border border-dashed border-border items-center justify-center"
                     style={{ width: 96, height: 150, gap: 8 }}
@@ -619,7 +619,7 @@ export function LearnerScreen({
                     router.push({
                       pathname: CREATE_SUBJECT_FROM_HOME_HREF,
                       params: { returnTo: returnToTab },
-                    } as never)
+                    } as Href)
                   }
                   className="bg-primary rounded-xl px-5 py-2.5 mt-1"
                   accessibilityRole="button"

@@ -12,7 +12,7 @@ import {
 } from '@eduagent/database';
 import { and, eq, like } from 'drizzle-orm';
 import type { ChatMessage, LLMProvider, ModelConfig } from './llm';
-import { _clearProviders, _resetCircuits, registerProvider } from './llm';
+import { _resetCircuits, registerProvider, unregisterProvider } from './llm';
 
 import {
   closeSession,
@@ -96,7 +96,7 @@ beforeAll(async () => {
   }
 
   db = createDatabase(databaseUrl);
-  _clearProviders();
+  unregisterProvider('gemini');
   _resetCircuits();
   registerProvider(createSessionSummaryProvider());
 });
@@ -116,7 +116,7 @@ afterAll(async () => {
   await db
     .delete(accounts)
     .where(like(accounts.clerkUserId, `clerk_session_summary_${RUN_ID}%`));
-  _clearProviders();
+  unregisterProvider('gemini');
   _resetCircuits();
 });
 

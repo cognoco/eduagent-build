@@ -85,6 +85,10 @@ import {
 } from './session-context-builders';
 import { projectAiResponseContent } from '../llm/project-response';
 import { isSubstantiveCalibrationAnswer } from './review-calibration';
+import {
+  recordPracticeActivityEvent,
+  type RecordPracticeActivityEventInput,
+} from '../practice-activity-events';
 
 const BANNED_FILLER_OPENERS = [
   "i'm so proud",
@@ -106,6 +110,25 @@ const BANNED_FILLER_OPENERS = [
  */
 const LANGUAGE_REGEX =
   /\b(how do (you|i) say|translate|in (french|spanish|german|czech|italian|portuguese|japanese|chinese|korean|arabic|russian|hindi|dutch|polish|swedish|norwegian|danish|finnish|greek|turkish|hungarian|romanian|thai|vietnamese|indonesian|malay|tagalog|swahili|hebrew|ukrainian|croatian|serbian|slovak|slovenian|bulgarian|latvian|lithuanian|estonian)|what('s| is) .+ in \w+)\b/i;
+
+async function recordSessionPracticeActivityEvent(
+  db: Database,
+  input: RecordPracticeActivityEventInput,
+): Promise<void> {
+  try {
+    await recordPracticeActivityEvent(db, input);
+  } catch (err) {
+    captureException(err, {
+      profileId: input.profileId,
+      extra: {
+        surface: 'session-exchange.practice-activity-event',
+        activityType: input.activityType,
+        sourceType: input.sourceType,
+        sourceId: input.sourceId,
+      },
+    });
+  }
+}
 
 const logger = createLogger();
 
@@ -1683,6 +1706,47 @@ export async function persistExchangeResult(
           eventType: sessionEvents.eventType,
         });
 
+  const aiEventId = insertedEvents.find(
+    (event) => event.eventType === 'ai_response',
+  )?.id;
+  const sessionMetadata = session.metadata as Record<string, unknown> | null;
+  const effectiveMode = sessionMetadata?.['effectiveMode'];
+
+  if (aiEventId && effectiveMode === 'recitation') {
+    await recordSessionPracticeActivityEvent(db, {
+      profileId,
+      subjectId: session.subjectId,
+      activityType: 'recitation',
+      activitySubtype: 'recitation',
+      completedAt: now,
+      sourceType: 'session_event',
+      sourceId: aiEventId,
+      dedupeKey: `recitation:session_event:${aiEventId}`,
+      metadata: {
+        sessionId,
+        exchangeCount: updated.exchangeCount,
+      },
+    });
+  }
+
+  if (aiEventId && drillCorrect != null && drillTotal != null) {
+    await recordSessionPracticeActivityEvent(db, {
+      profileId,
+      subjectId: session.subjectId,
+      activityType: 'fluency_drill',
+      activitySubtype: 'language',
+      completedAt: now,
+      score: drillCorrect,
+      total: drillTotal,
+      sourceType: 'session_event',
+      sourceId: aiEventId,
+      metadata: {
+        sessionId,
+        exchangeCount: updated.exchangeCount,
+      },
+    });
+  }
+
   if (previousRung !== effectiveRung) {
     await db.insert(sessionEvents).values({
       sessionId,
@@ -1731,8 +1795,7 @@ export async function persistExchangeResult(
 
   return {
     exchangeCount: updated.exchangeCount,
-    aiEventId: insertedEvents.find((event) => event.eventType === 'ai_response')
-      ?.id,
+    aiEventId,
     persistedUserMessage: true,
   };
 }

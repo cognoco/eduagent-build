@@ -201,11 +201,16 @@ describe('dailySnapshotCron', () => {
       'fan-out-progress-refresh-200',
       expect.any(Array),
     );
-    // First batch has 200 events, second has 50
     const firstBatch = mockStep['sendEvent']!.mock.calls[0]![1]! as unknown[];
     const secondBatch = mockStep['sendEvent']!.mock.calls[1]![1]! as unknown[];
     expect(firstBatch).toHaveLength(200);
+    expect(firstBatch[0]).toEqual(
+      expect.objectContaining({ name: 'app/progress.snapshot.refresh' }),
+    );
     expect(secondBatch).toHaveLength(50);
+    expect(secondBatch[0]).toEqual(
+      expect.objectContaining({ name: 'app/progress.snapshot.refresh' }),
+    );
     expect(result).toEqual({ status: 'completed', queuedProfiles: 250 });
   });
 

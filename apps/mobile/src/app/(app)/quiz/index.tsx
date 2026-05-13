@@ -1,7 +1,7 @@
 import React from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { IntentCard } from '../../../components/home/IntentCard';
@@ -159,16 +159,16 @@ export default function QuizIndexScreen(): React.ReactElement {
     setRound(null);
     setPrefetchedRoundId(null);
     setCompletionResult(null);
-    router.push('/(app)/quiz/launch' as never);
+    router.push('/(app)/quiz/launch' as Href);
   };
   const handleBack = () => {
     if (isPracticeReturn) {
-      router.replace('/(app)/practice' as never);
+      router.replace('/(app)/practice' as Href);
       return;
     }
 
     if (returnTo) {
-      router.replace(homeHrefForReturnTo(returnTo) as never);
+      router.replace(homeHrefForReturnTo(returnTo) as Href);
       return;
     }
 
@@ -255,7 +255,7 @@ export default function QuizIndexScreen(): React.ReactElement {
               setRound(null);
               setPrefetchedRoundId(null);
               setCompletionResult(null);
-              router.push('/(app)/quiz/launch' as never);
+              router.push('/(app)/quiz/launch' as Href);
             }}
             testID="quiz-capitals"
           />
@@ -306,7 +306,7 @@ export default function QuizIndexScreen(): React.ReactElement {
               setRound(null);
               setPrefetchedRoundId(null);
               setCompletionResult(null);
-              router.push('/(app)/quiz/launch' as never);
+              router.push('/(app)/quiz/launch' as Href);
             }}
             testID="quiz-guess-who"
           />
@@ -319,7 +319,7 @@ export default function QuizIndexScreen(): React.ReactElement {
               <IntentCard
                 title={t('quiz.index.vocabLockedTitle')}
                 subtitle={t('quiz.index.vocabLockedSubtitle')}
-                onPress={() => router.push('/(app)/library' as never)}
+                onPress={() => router.push('/(app)/library' as Href)}
                 testID="quiz-vocab-locked"
               />
             </View>

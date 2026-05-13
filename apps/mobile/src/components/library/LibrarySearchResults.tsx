@@ -93,8 +93,14 @@ function SectionHeader({
   );
 }
 
-function SubjectPill({ name }: { name: string }): React.ReactElement {
-  const tint = useSubjectTint(name);
+function SubjectPill({
+  name,
+  subjectId,
+}: {
+  name: string;
+  subjectId: string;
+}): React.ReactElement {
+  const tint = useSubjectTint(subjectId);
   return (
     <View
       style={{
@@ -126,6 +132,7 @@ function ResultRow({
   icon,
   title,
   subtitle,
+  subjectId,
   subjectName,
   onPress,
 }: {
@@ -133,11 +140,12 @@ function ResultRow({
   icon: keyof typeof Ionicons.glyphMap;
   title: string;
   subtitle: string;
+  subjectId: string;
   subjectName: string;
   onPress: () => void;
 }): React.ReactElement {
   const colors = useThemeColors();
-  const tint = useSubjectTint(subjectName);
+  const tint = useSubjectTint(subjectId);
 
   return (
     <Pressable
@@ -180,7 +188,7 @@ function ResultRow({
           {subtitle}
         </Text>
       </View>
-      <SubjectPill name={subjectName} />
+      <SubjectPill name={subjectName} subjectId={subjectId} />
       <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
     </Pressable>
   );
@@ -199,6 +207,7 @@ function BookRow({
       icon="book-outline"
       title={item.title}
       subtitle={item.subjectName}
+      subjectId={item.subjectId}
       subjectName={item.subjectName}
       onPress={() => onPress(item.subjectId, item.id)}
     />
@@ -218,6 +227,7 @@ function TopicRow({
       icon="list-outline"
       title={item.name}
       subtitle={`${item.bookTitle} - ${item.subjectName}`}
+      subjectId={item.subjectId}
       subjectName={item.subjectName}
       onPress={() => onPress(item.id)}
     />
@@ -239,6 +249,7 @@ function NoteRow({
       subtitle={`${item.topicName} - ${item.subjectName} - ${formatSearchDate(
         item.createdAt,
       )}`}
+      subjectId={item.subjectId}
       subjectName={item.subjectName}
       onPress={() => onPress(item.topicId)}
     />
@@ -266,6 +277,7 @@ function SessionRow({
       subtitle={`${topicLabel} - ${item.subjectName} - ${formatSearchDate(
         item.occurredAt,
       )}`}
+      subjectId={item.subjectId}
       subjectName={item.subjectName}
       onPress={() => onPress(item.sessionId, item.subjectId, item.topicId)}
     />

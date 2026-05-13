@@ -1,6 +1,6 @@
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { IntentCard } from '../../../components/home/IntentCard';
@@ -68,7 +68,7 @@ export default function DictationChoiceScreen(): React.ReactElement {
       // [F-030] Yield to React render cycle so context state commits before
       // playback screen mounts. Without this, useState setter hasn't flushed
       // and playback sees data=null on first attempt.
-      setTimeout(() => router.push('/(app)/dictation/playback' as never), 0);
+      setTimeout(() => router.push('/(app)/dictation/playback' as Href), 0);
     } catch (err: unknown) {
       // [BUG-692] Don't show an alert if the user already navigated away.
       if (generateCancelledRef.current) return;
@@ -191,9 +191,7 @@ export default function DictationChoiceScreen(): React.ReactElement {
           <IntentCard
             title={t('dictation.index.iHaveAText')}
             subtitle={t('dictation.index.iHaveATextSubtitle')}
-            onPress={() =>
-              router.push('/(app)/dictation/text-preview' as never)
-            }
+            onPress={() => router.push('/(app)/dictation/text-preview' as Href)}
             testID="dictation-homework"
           />
           <IntentCard

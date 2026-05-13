@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, ScrollView, TextInput, Pressable } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import type {
@@ -119,11 +119,11 @@ export default function PickBookScreen(): React.ReactElement {
       router.replace({
         pathname: '/(app)/shelf/[subjectId]',
         params: { subjectId },
-      } as never);
+      } as Href);
       return;
     }
 
-    router.replace('/(app)/library' as never);
+    router.replace('/(app)/library' as Href);
   }, [router, subjectId]);
 
   // M12: Filing overlay timeout — show skip button after 8 seconds (was 15)
@@ -209,14 +209,14 @@ export default function PickBookScreen(): React.ReactElement {
       router.push({
         pathname: '/(app)/shelf/[subjectId]',
         params: { subjectId: result.shelfId },
-      } as never);
+      } as Href);
       router.push({
         pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
         params: {
           subjectId: result.shelfId,
           bookId: result.bookId,
         },
-      } as never);
+      } as Href);
     } catch {
       filingInFlight.current = false;
       platformAlert(
@@ -264,14 +264,14 @@ export default function PickBookScreen(): React.ReactElement {
       router.push({
         pathname: '/(app)/shelf/[subjectId]',
         params: { subjectId: result.shelfId },
-      } as never);
+      } as Href);
       router.push({
         pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
         params: {
           subjectId: result.shelfId,
           bookId: result.bookId,
         },
-      } as never);
+      } as Href);
     } catch (err) {
       filingInFlight.current = false;
       platformAlert('Something went wrong', formatApiError(err), [
@@ -612,7 +612,7 @@ export default function PickBookScreen(): React.ReactElement {
                 router.replace({
                   pathname: '/(app)/shelf/[subjectId]',
                   params: { subjectId },
-                } as never);
+                } as Href);
               }}
               className="mt-6 bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
               testID="pick-book-filing-skip"

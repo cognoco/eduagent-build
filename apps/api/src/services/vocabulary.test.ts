@@ -121,7 +121,9 @@ function createMockDb({
           }),
         }
       : {
-          onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
+          onConflictDoNothing: jest.fn().mockReturnValue({
+            returning: jest.fn().mockResolvedValue(insertReturning),
+          }),
         };
 
   const db = {

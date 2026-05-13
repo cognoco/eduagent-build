@@ -1,5 +1,5 @@
 import React from 'react';
-import { Tabs, Redirect, usePathname, useRouter } from 'expo-router';
+import { Tabs, Redirect, usePathname, useRouter, type Href } from 'expo-router';
 import {
   View,
   Text,
@@ -569,7 +569,6 @@ function CreateProfileGate(): React.ReactElement {
   const queryClient = useQueryClient();
   const { profiles } = useProfile();
   const { t } = useTranslation();
-  const isPushingRef = React.useRef(false);
 
   const handleSignOut = async () => {
     try {
@@ -588,13 +587,18 @@ function CreateProfileGate(): React.ReactElement {
   };
 
   const handleGetStarted = React.useCallback(() => {
-    if (isPushingRef.current) return;
-    isPushingRef.current = true;
+    if (Platform.OS === 'web') {
+      const webLocation = globalThis as typeof globalThis & {
+        location?: { assign: (url: string) => void };
+      };
+
+      if (webLocation.location) {
+        webLocation.location.assign('/create-profile');
+        return;
+      }
+    }
+
     router.push('/create-profile');
-    // Reset after navigation settles to allow re-entry if user backs out
-    setTimeout(() => {
-      isPushingRef.current = false;
-    }, 1000);
   }, [router]);
 
   return (
@@ -1367,8 +1371,7 @@ export default function AppLayout() {
   }, [queryClient]);
   const handleMoreTabPress = React.useCallback(() => {
     refreshMoreTabQueries();
-    router.replace('/(app)/more' as never);
-  }, [refreshMoreTabQueries, router]);
+  }, [refreshMoreTabQueries]);
   const refreshProgressTabQueries = React.useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: ['progress'] });
     void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
@@ -1450,7 +1453,7 @@ export default function AppLayout() {
     }
 
     replayedAuthRedirectRef.current = pendingAuthRedirect;
-    router.replace(pendingAuthRedirect as never);
+    router.replace(pendingAuthRedirect as Href);
   }, [currentAppPath, pendingAuthRedirect, router]);
 
   // Auto-dismiss profile-switched toast after 5 seconds

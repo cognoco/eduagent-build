@@ -90,6 +90,42 @@ function buildGateMetrics(
   };
 }
 
+function hasHomeworkCue(text: string): boolean {
+  if (/\d/.test(text) || /[+\-−×*·÷/=<>≤≥±²³]/.test(text)) {
+    return true;
+  }
+
+  if (/^\s*(?:\d+|[A-Z])[.)]\s+/m.test(text)) {
+    return true;
+  }
+
+  if (/[?!:]/.test(text)) {
+    return true;
+  }
+
+  return /\b(?:answer|calculate|choose|circle|compare|complete|conjugate|contrast|correct|define|describe|draw|evaluate|explain|factor|fill|find|graph|how|identify|label|prove|read|select|show|simplify|solve|translate|underline|what|when|where|which|who|why|write)\b/iu.test(
+    text,
+  );
+}
+
+function shouldEscalateLocalOcr(text: string, confidence?: number): boolean {
+  if (confidence != null && confidence < 0.75) {
+    return true;
+  }
+
+  if (hasHomeworkCue(text)) {
+    return false;
+  }
+
+  const words = getWordCount(text);
+  const nonEmptyLines = text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean).length;
+
+  return words > 0 && words <= 8 && nonEmptyLines <= 5;
+}
+
 function getLocalConfidence(result: unknown): number | undefined {
   if (!result || typeof result !== 'object') {
     return undefined;
@@ -343,6 +379,28 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
         // defense is to drop its result if the user cancelled while it ran.
         if (controller.signal.aborted) return;
         if (recognized.text) {
+          if (shouldEscalateLocalOcr(recognized.text, recognized.confidence)) {
+            trackHomeworkOcrGateShortcircuit(
+              buildGateMetrics(recognized.text, recognized.confidence),
+            );
+            const serverResult = await tryServerFallback(
+              uri,
+              controller.signal,
+            );
+            if (controller.signal.aborted) return;
+            if (serverResult && resolveSuccess(serverResult, 'server')) {
+              return;
+            }
+            if (serverResult?.text) {
+              finishAsError(NON_HOMEWORK_ERROR_MESSAGE);
+              return;
+            }
+            finishAsError(
+              "We couldn't read that clearly. Try taking the photo again with better lighting.",
+            );
+            return;
+          }
+
           if (resolveSuccess(recognized, 'local')) {
             return;
           }
@@ -351,10 +409,18 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
             recognized.confidence,
           );
           trackHomeworkOcrGateShortcircuit(rejectedMetrics);
+          const serverResult = await tryServerFallback(uri, controller.signal);
+          if (controller.signal.aborted) return;
+          if (serverResult && resolveSuccess(serverResult, 'server')) {
+            return;
+          }
+          if (serverResult?.text) {
+            finishAsError(NON_HOMEWORK_ERROR_MESSAGE);
+            return;
+          }
           finishAsError(NON_HOMEWORK_ERROR_MESSAGE);
           return;
         }
-
         const serverResult = await tryServerFallback(uri, controller.signal);
         if (controller.signal.aborted) return;
         if (serverResult && resolveSuccess(serverResult, 'server')) {

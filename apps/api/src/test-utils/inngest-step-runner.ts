@@ -1,3 +1,9 @@
+/**
+ * Test-only Inngest step runner. Assertion contract:
+ * - Positive: `expect(sendEventCalls).toEqual(expect.arrayContaining([{ name, payload: expect.objectContaining({...}) }]))`
+ * - Negative: `expect(sendEventCalls).toHaveLength(0)`
+ * - Never use `expect.any(Array)` as a payload — it proves the step was called but not that correct events were dispatched.
+ */
 type StepCallback<T> = () => T | Promise<T>;
 type StepResult = unknown | (() => unknown | Promise<unknown>);
 

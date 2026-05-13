@@ -160,7 +160,10 @@ describe('GeminiOcrProvider', () => {
         expect.objectContaining({
           role: 'user',
           content: expect.arrayContaining([
-            expect.objectContaining({ type: 'text' }),
+            expect.objectContaining({
+              type: 'text',
+              text: expect.stringContaining('Ignore logos'),
+            }),
             expect.objectContaining({
               type: 'inline_data',
               mimeType: 'image/jpeg',

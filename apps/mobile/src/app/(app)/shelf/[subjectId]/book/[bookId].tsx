@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
@@ -196,20 +196,20 @@ export default function BookScreen() {
       router.replace({
         pathname: '/(app)/shelf/[subjectId]',
         params: { subjectId },
-      } as never);
+      } as Href);
       return;
     }
-    goBackOrReplace(router, '/(app)/library' as never);
+    goBackOrReplace(router, '/(app)/library' as Href);
   }, [router, subjectId]);
 
   const handleSubjectBookmarksPress = useCallback(() => {
     if (!subjectId) return;
-    router.push('/(app)/progress' as never);
+    router.push('/(app)/progress' as Href);
     requestAnimationFrame(() => {
       router.push({
         pathname: '/(app)/progress/saved',
         params: { subjectId },
-      } as never);
+      } as Href);
     });
   }, [router, subjectId]);
 
@@ -633,7 +633,7 @@ export default function BookScreen() {
           bookId,
           ...(topic?.chapter ? { chapter: topic.chapter } : {}),
         },
-      } as never);
+      } as Href);
     },
     [bookId, router, subjectId, topicById],
   );
@@ -655,7 +655,7 @@ export default function BookScreen() {
           subjectId,
           ...(session.topicId ? { topicId: session.topicId } : {}),
         },
-      } as never);
+      } as Href);
     },
     [router, subjectId],
   );
@@ -669,7 +669,7 @@ export default function BookScreen() {
           subjectId,
           ...(topicId ? { topicId } : {}),
         },
-      } as never);
+      } as Href);
     },
     [router, subjectId],
   );
@@ -742,7 +742,7 @@ export default function BookScreen() {
         router.push({
           pathname: '/(app)/topic/[topicId]',
           params: { topicId: topic.id, subjectId, bookId },
-        } as never);
+        } as Href);
         return;
       }
     }
@@ -756,7 +756,7 @@ export default function BookScreen() {
           topicId: upNextTopic.id,
           topicName: upNextTopic.title,
         },
-      } as never);
+      } as Href);
       return;
     }
 
@@ -770,7 +770,7 @@ export default function BookScreen() {
         router.push({
           pathname: '/(app)/topic/[topicId]',
           params: { topicId: topic.id, subjectId, bookId },
-        } as never);
+        } as Href);
       }
     }
   }, [
@@ -789,7 +789,7 @@ export default function BookScreen() {
       router.push({
         pathname: '/(app)/session',
         params: { mode: 'learning', subjectId, topicId, topicName: topicTitle },
-      } as never);
+      } as Href);
     },
     [router, subjectId],
   );
@@ -823,7 +823,7 @@ export default function BookScreen() {
           topicId: result.session.topicId ?? undefined,
           subjectName: book?.title ?? undefined,
         },
-      } as never);
+      } as Href);
     } catch (error) {
       platformAlert('Could not start learning', formatApiError(error));
     }
@@ -848,14 +848,14 @@ export default function BookScreen() {
         subjectId,
         topicName: reviewTopic.title,
       },
-    } as never);
+    } as Href);
   }, [reviewTopic, router, subjectId]);
 
   const handleNextBook = useCallback(() => {
     router.push({
       pathname: '/(app)/shelf/[subjectId]',
       params: { subjectId },
-    } as never);
+    } as Href);
   }, [router, subjectId]);
 
   // --- Note handlers ---

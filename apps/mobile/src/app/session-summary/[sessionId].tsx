@@ -9,7 +9,7 @@ import {
   ActivityIndicator,
   InteractionManager,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, type Href } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -378,12 +378,12 @@ export default function SessionSummaryScreen() {
 
   const finishSummaryNavigation = (): void => {
     if (filedSubjectId && filedBookId) {
-      router.replace('/(app)/library' as never);
+      router.replace('/(app)/library' as Href);
       InteractionManager.runAfterInteractions(() => {
         router.push({
           pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
           params: { subjectId: filedSubjectId, bookId: filedBookId },
-        } as never);
+        } as Href);
       });
       return;
     }
@@ -394,7 +394,7 @@ export default function SessionSummaryScreen() {
       router.replace({
         pathname: '/(app)/topic/[topicId]',
         params: { topicId: effectiveTopicId, subjectId: effectiveSubjectId },
-      } as never);
+      } as Href);
       return;
     }
 
@@ -528,7 +528,7 @@ export default function SessionSummaryScreen() {
           This session could not be loaded. Head home to start a new one.
         </Text>
         <Pressable
-          onPress={() => router.replace(summaryHomeHref as never)}
+          onPress={() => router.replace(summaryHomeHref as Href)}
           className="bg-primary rounded-button py-3 px-8 items-center"
           testID="session-not-found-go-home"
           accessibilityLabel="Go home"
@@ -755,7 +755,7 @@ export default function SessionSummaryScreen() {
       router.replace({
         pathname: '/(app)/topic/[topicId]',
         params: { topicId, subjectId },
-      } as never);
+      } as Href);
     } else if (fallbackSession?.topicId && fallbackSession.subjectId) {
       router.replace({
         pathname: '/(app)/topic/[topicId]',
@@ -763,7 +763,7 @@ export default function SessionSummaryScreen() {
           topicId: fallbackSession.topicId,
           subjectId: fallbackSession.subjectId,
         },
-      } as never);
+      } as Href);
     } else {
       router.replace('/(app)/library');
     }
@@ -774,7 +774,7 @@ export default function SessionSummaryScreen() {
       router.push({
         pathname: '/(app)/child/[profileId]/mentor-memory',
         params: { profileId: childProfile.id },
-      } as never);
+      } as Href);
       return;
     }
 
@@ -942,7 +942,7 @@ export default function SessionSummaryScreen() {
                   ...(resumeSubjectId ? { subjectId: resumeSubjectId } : {}),
                   ...(resumeTopicId ? { topicId: resumeTopicId } : {}),
                 },
-              } as never);
+              } as Href);
             }}
             className="bg-primary rounded-button py-3 items-center mb-4"
             accessibilityRole="button"
@@ -1106,7 +1106,7 @@ export default function SessionSummaryScreen() {
                       topicId: persisted.nextTopicId,
                       topicName: persisted.nextTopicTitle,
                     },
-                  } as never)
+                  } as Href)
                 }
                 className="bg-primary rounded-button py-3 items-center"
                 accessibilityRole="button"
@@ -1155,7 +1155,7 @@ export default function SessionSummaryScreen() {
 
         {hasXpIncentive && !showSubmittedView && !isPersistedSkipped ? (
           <View
-            className="bg-surface-elevated rounded-card p-4 mb-4 flex-row items-center"
+            className="bg-reward-soft rounded-card p-4 mb-4 flex-row items-center"
             testID="xp-incentive-banner"
           >
             <Text className="text-body-sm mr-2">+</Text>
@@ -1173,11 +1173,11 @@ export default function SessionSummaryScreen() {
 
         {hasXpIncentive && showSubmittedView && reflectionBonusXp != null ? (
           <View
-            className="bg-success/10 rounded-card p-4 mb-4 flex-row items-center"
+            className="bg-reward-soft rounded-card p-4 mb-4 flex-row items-center"
             testID="xp-bonus-earned"
           >
             <Text className="text-body-sm mr-2">+</Text>
-            <Text className="text-body-sm font-semibold text-success">
+            <Text className="text-body-sm font-semibold text-reward">
               +{reflectionBonusXp} bonus XP earned!
             </Text>
           </View>

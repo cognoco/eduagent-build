@@ -52,6 +52,8 @@ export function WeeklyReportCard({
     wordsLearned: 0,
     topicsTouched: 0,
   };
+  const practiceQuizzes = latest?.practiceSummary?.quizzesCompleted ?? 0;
+  const practiceReviews = latest?.practiceSummary?.reviewsCompleted ?? 0;
   const hasMiniSummary =
     mini.sessions > 0 || mini.wordsLearned > 0 || mini.topicsTouched > 0;
 
@@ -129,7 +131,7 @@ export function WeeklyReportCard({
                   testID="weekly-report-quizzes"
                 >
                   <Text className="text-h3 font-semibold text-text-primary">
-                    {latest.practiceSummary.quizzesCompleted}
+                    {practiceQuizzes}
                   </Text>
                   <Text className="text-caption text-text-secondary mt-1">
                     {t('progress.weeklyReport.practice.quizzes')}
@@ -140,7 +142,7 @@ export function WeeklyReportCard({
                   testID="weekly-report-reviews"
                 >
                   <Text className="text-h3 font-semibold text-text-primary">
-                    {latest.practiceSummary.reviewsCompleted}
+                    {practiceReviews}
                   </Text>
                   <Text className="text-caption text-text-secondary mt-1">
                     {t('progress.weeklyReport.practice.reviews')}

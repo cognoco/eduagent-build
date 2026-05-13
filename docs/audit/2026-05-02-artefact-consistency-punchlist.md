@@ -1,8 +1,10 @@
 # Artefact-consistency audit — punch list
 
 **Source recon:** 9-agent audit, 2 rounds, 2026-05-01.
-**Last updated:** 2026-05-02 (post extended-scope recons: TYPES-1, TESTS-1, MOBILE-1, PACKAGE-SCRIPTS-1 all complete).
+**Last updated:** 2026-05-13 (historical-only note refreshed; live tracking moved to `cleanup-plan.md`).
 **Coordination branch:** `artefact-consistency` (carries audit-only tracking docs; not merged to main).
+
+> Historical snapshot only. `docs/audit/cleanup-plan.md` supersedes this file and is the single maintained tracker for new findings, closures, deviations, and paper-trail-only notes after 2026-05-04.
 
 ---
 
@@ -158,11 +160,6 @@
 - **AUDIT-MIGRATIONS-3-SWEEP** (synthesized) Sweep all destructive migrations for missing `## Rollback` sections
   - Severity: YELLOW; Effort: ~2 hr (PR #135 only fixed migration 0017; broader audit pending)
   - Why: closes the CLAUDE.md "Schema And Deploy Safety" rule across history
-
-- **AUDIT-TS6307-EVAL-LLM-FLOWS** (synthesized 2026-05-12) Residual TS6307 ("File not listed within the file list of project") errors on `apps/api/eval-llm/flows/*.ts` when running `pnpm exec tsc --noEmit -p apps/api/tsconfig.spec.json` manually.
-  - Severity: GREEN (cosmetic — CI path is jest + ts-jest, which doesn't consult `tsconfig.spec.json`'s `include`); Effort: ~5 min
-  - Origin: surfaced while closing PR-15d as no-op. D-C6-1 is a resolved decision with no live owner, so this is recorded here for paper trail only — no committed PR.
-  - Fix when annoying: extend `apps/api/tsconfig.spec.json` `include` to cover `eval-llm/**`, verify with the same re-grep.
 
 ## Formerly unclassified findings (now resolved)
 

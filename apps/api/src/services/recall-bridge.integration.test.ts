@@ -21,7 +21,11 @@ import {
   type Database,
 } from '@eduagent/database';
 import { like } from 'drizzle-orm';
-import { registerProvider, createMockProvider, _clearProviders } from './llm';
+import {
+  registerProvider,
+  createMockProvider,
+  unregisterProvider,
+} from './llm';
 import { generateRecallBridge } from './recall-bridge';
 
 // ---------------------------------------------------------------------------
@@ -46,7 +50,7 @@ function requireDatabaseUrl(): string {
   const url = process.env.DATABASE_URL;
   if (!url) {
     throw new Error(
-      'DATABASE_URL is not set. Create .env.test.local or .env.development.local at the workspace root, or supply it via Doppler in CI.'
+      'DATABASE_URL is not set. Create .env.test.local or .env.development.local at the workspace root, or supply it via Doppler in CI.',
     );
   }
   return url;
@@ -103,7 +107,7 @@ async function seedSubject(profileId: string) {
 async function seedCurriculumAndTopic(
   subjectId: string,
   topicTitle: string,
-  topicDescription: string
+  topicDescription: string,
 ) {
   const [curriculum] = await db
     .insert(curricula)
@@ -137,7 +141,7 @@ async function seedCurriculumAndTopic(
 async function seedSession(
   profileId: string,
   subjectId: string,
-  topicId: string | null
+  topicId: string | null,
 ) {
   const [session] = await db
     .insert(learningSessions)
@@ -162,7 +166,7 @@ describe('generateRecallBridge (integration)', () => {
     db = createDatabase(requireDatabaseUrl());
 
     // Register mock LLM provider — the ONLY mocked external boundary
-    _clearProviders();
+    unregisterProvider('gemini');
     registerProvider(createMockProvider('gemini'));
   });
 
@@ -176,7 +180,7 @@ describe('generateRecallBridge (integration)', () => {
         .where(like(accounts.clerkUserId, `clerk_integ_recall_${RUN_ID}%`));
     }
 
-    _clearProviders();
+    unregisterProvider('gemini');
   });
 
   // -------------------------------------------------------------------------
@@ -206,7 +210,7 @@ describe('generateRecallBridge (integration)', () => {
     const result = await generateRecallBridge(
       db,
       profileId,
-      nonExistentSessionId
+      nonExistentSessionId,
     );
 
     expect(result.questions).toEqual([]);
@@ -224,7 +228,7 @@ describe('generateRecallBridge (integration)', () => {
     const { topicId } = await seedCurriculumAndTopic(
       subjectId,
       'Quadratic Equations',
-      'Solving equations of the form ax² + bx + c = 0'
+      'Solving equations of the form ax² + bx + c = 0',
     );
     const sessionId = await seedSession(profileId, subjectId, topicId);
 
@@ -249,7 +253,7 @@ describe('generateRecallBridge (integration)', () => {
     const { topicId } = await seedCurriculumAndTopic(
       subjectId,
       'Calculus',
-      'Limits, derivatives, and integrals'
+      'Limits, derivatives, and integrals',
     );
     // Session belongs to profile B
     const sessionId = await seedSession(profileB, subjectId, topicId);
