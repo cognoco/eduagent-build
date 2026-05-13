@@ -20,6 +20,7 @@ jest.mock(
 let mockFetch: RoutedMockFetch;
 
 jest.mock('../../../../lib/api-client', () => {
+  // gc1-allow: Clerk useAuth() external boundary
   const {
     createRoutedMockFetch,
     mockApiClientFactory,
@@ -29,6 +30,7 @@ jest.mock('../../../../lib/api-client', () => {
 });
 
 jest.mock('../../../../lib/profile', () => ({
+  ...jest.requireActual('../../../../lib/profile'),
   useProfile: () => ({
     activeProfile: {
       id: 'test-profile-id',
@@ -55,6 +57,7 @@ jest.mock('react-native-safe-area-context', () => ({
 }));
 
 jest.mock('../../../../components/common', () => ({
+  // gc1-allow: Reanimated worklets + react-native-svg cannot run in JSDOM
   BookPageFlipAnimation: () => null,
 }));
 
@@ -103,6 +106,7 @@ jest.mock('../../../../lib/format-api-error', () => {
 });
 
 jest.mock('../../../../components/library/BookCard', () => ({
+  ...jest.requireActual('../../../../components/library/BookCard'),
   BookCard: ({
     book,
     onPress,
@@ -120,6 +124,7 @@ jest.mock('../../../../components/library/BookCard', () => ({
 }));
 
 jest.mock('../../../../components/library/SuggestionCard', () => ({
+  ...jest.requireActual('../../../../components/library/SuggestionCard'),
   SuggestionCard: ({
     title,
     onPress,
