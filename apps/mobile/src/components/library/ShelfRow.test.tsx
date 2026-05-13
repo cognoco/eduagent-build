@@ -6,8 +6,8 @@ import { ShelfRow } from './ShelfRow';
 // ---------------------------------------------------------------------------
 
 jest.mock(
-  '../../lib/theme',
-  /* gc1-allow: ThemeProvider requires native env; unit test cannot render it */ () => ({
+  '../../lib/theme' /* gc1-allow: ThemeProvider requires native env; unit test cannot render it */,
+  () => ({
     useThemeColors: () => ({
       retentionWeak: '#b45309',
       success: '#16a34a',
