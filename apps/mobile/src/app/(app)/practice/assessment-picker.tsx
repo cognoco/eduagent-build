@@ -8,10 +8,9 @@ import { useAssessmentEligibleTopics } from '../../../hooks/use-assessments';
 import { Button } from '../../../components/common/Button';
 import { ErrorFallback } from '../../../components/common/ErrorFallback';
 import { useThemeColors } from '../../../lib/theme';
+import type { Translate } from '../../../i18n';
 
-type TranslationFn = (key: string, options?: Record<string, unknown>) => string;
-
-function formatStudiedAt(isoDate: string, t: TranslationFn): string {
+function formatStudiedAt(isoDate: string, t: Translate): string {
   const diffDays = Math.floor(
     (Date.now() - new Date(isoDate).getTime()) / (1000 * 60 * 60 * 24),
   );

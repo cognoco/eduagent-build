@@ -41,6 +41,7 @@ import { ChildQuotaLine } from './ChildQuotaLine';
 import { EarlyAdopterCard } from './EarlyAdopterCard';
 import { ParentHomeScreen } from './ParentHomeScreen';
 import { SubjectCard } from './SubjectCard';
+import type { TranslateKey } from '../../i18n';
 
 const CREATE_SUBJECT_FROM_HOME_HREF = '/create-subject' as const;
 
@@ -50,8 +51,8 @@ const DEFAULT_SUBJECT_ICON: React.ComponentProps<typeof Ionicons>['name'] =
 type HomeIntentAction = {
   testID: string;
   icon: React.ComponentProps<typeof Ionicons>['name'];
-  titleKey: string;
-  subtitleKey: string;
+  titleKey: TranslateKey;
+  subtitleKey: TranslateKey;
   route:
     | '/create-subject'
     | '/(app)/homework/camera'

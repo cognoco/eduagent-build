@@ -8,6 +8,7 @@ import type {
   MemorySource,
   StruggleEntry,
 } from '@eduagent/schemas';
+import type { TranslateKey } from '../i18n';
 
 // Shared helpers used by both the child-facing and parent-facing mentor
 // memory screens. Extracted here to keep both screens in sync.
@@ -225,7 +226,7 @@ const INTEREST_CONTEXT_OPTIONS: InterestContext[] = [
   'both',
 ];
 
-const INTEREST_CONTEXT_LABEL_KEYS: Record<InterestContext, string> = {
+const INTEREST_CONTEXT_LABEL_KEYS: Record<InterestContext, TranslateKey> = {
   school: 'session.mentorMemory.interestContext.school',
   free_time: 'session.mentorMemory.interestContext.freeTime',
   both: 'session.mentorMemory.interestContext.both',

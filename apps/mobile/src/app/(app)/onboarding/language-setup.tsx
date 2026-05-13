@@ -59,7 +59,7 @@ function getDeviceNativeLanguage(): string {
 
 const LEVEL_OPTIONS: Array<{
   label: string;
-  level: CefrLevel;
+  level: 'A1' | 'A2' | 'B1' | 'B2';
   description: string;
   testId: string;
 }> = [

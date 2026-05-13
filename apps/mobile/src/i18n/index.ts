@@ -1,4 +1,6 @@
+import './types';
 import i18next from 'i18next';
+import type { ParseKeys, TFunction } from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import * as Localization from 'expo-localization';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -11,6 +13,9 @@ import ja from './locales/ja.json';
 import nb from './locales/nb.json';
 import pl from './locales/pl.json';
 import pt from './locales/pt.json';
+
+export type TranslateKey = ParseKeys;
+export type Translate = TFunction<'translation', undefined>;
 
 // 7 launch locales — translations generated via scripts/translate.ts and
 // human-reviewed for nb/de. Adding a locale requires updating this array,

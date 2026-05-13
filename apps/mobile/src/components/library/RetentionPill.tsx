@@ -2,6 +2,7 @@ import { Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import type { RetentionStatus } from '@eduagent/schemas';
 import { useThemeColors } from '../../lib/theme';
+import type { TranslateKey } from '../../i18n';
 
 interface RetentionPillProps {
   status: RetentionStatus;
@@ -10,14 +11,14 @@ interface RetentionPillProps {
   testID?: string;
 }
 
-const STATUS_KEY: Record<RetentionStatus, string> = {
+const STATUS_KEY: Record<RetentionStatus, TranslateKey> = {
   strong: 'progress.retention.strong.label',
   fading: 'progress.retention.fading.label',
   weak: 'progress.retention.weak.label',
   forgotten: 'progress.retention.forgotten.label',
 };
 
-const ELAPSED_KEY: Record<RetentionStatus, string> = {
+const ELAPSED_KEY: Record<RetentionStatus, TranslateKey> = {
   strong: 'progress.retention.elapsed.remembered',
   fading: 'progress.retention.elapsed.fading',
   weak: 'progress.retention.elapsed.weak',
