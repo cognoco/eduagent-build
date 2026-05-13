@@ -500,7 +500,8 @@
       "typeSubjectPlaceholder": "Fach eingeben",
       "typeSubjectLabel": "Fach eingeben",
       "useTypedSubject": "Verwenden",
-      "useTypedSubjectLabel": "Eingegebenes Fach verwenden"
+      "useTypedSubjectLabel": "Eingegebenes Fach verwenden",
+      "addNote": "Notiz hinzufügen"
     },
     "quota": {
       "dailyLimitReached": "Tageslimit erreicht",
@@ -575,7 +576,8 @@
       "writeNote": "Notiz schreiben",
       "cannotSaveTitle": "Notiz nicht gespeichert",
       "cannotSaveMessage": "Notizen können im Moment nicht gespeichert werden. Bitte versuche es erneut.",
-      "saveFailedTitle": "Notiz konnte nicht gespeichert werden"
+      "saveFailedTitle": "Notiz konnte nicht gespeichert werden",
+      "summaryPlaceholder": "Was sollen wir uns aus dieser Sitzung merken?"
     },
     "filingPrompt": {
       "title": "Zur Bibliothek hinzufügen?",
@@ -957,6 +959,9 @@
       "message": "Öffne das Regal, wähle das nächste Buch oder wiederhole, was fällig ist.",
       "cta": "Öffnen",
       "accessibilityLabel": "Mit {{subject}} weitermachen"
+    },
+    "bookmarkCard": {
+      "accessibilityLabel": "Gespeichertes Lesezeichen öffnen: {{title}}"
     }
   },
   "topic": {
@@ -1247,7 +1252,11 @@
     "tryCameraAgainLabel": "Kamera erneut versuchen",
     "tryReadingAgainLabel": "Erneut lesen versuchen",
     "classifyErrorTitle": "Fach konnte nicht identifiziert werden",
-    "classifyErrorMessage": "Bitte wähle das Fach aus, zu dem diese Hausaufgabe gehört."
+    "classifyErrorMessage": "Bitte wähle das Fach aus, zu dem diese Hausaufgabe gehört.",
+    "listening": "Höre zu...",
+    "voiceHint": "Sag die Hausaufgabe laut.",
+    "stopDictatingProblemLabel": "Diktat der Aufgabe stoppen",
+    "dictateProblemLabel": "Aufgabe diktieren"
   },
   "progress": {
     "pageTitle": "Meine Lernreise",
@@ -1342,7 +1351,9 @@
       "bars": {
         "sessions": "Sitzungen",
         "time": "Zeit",
-        "topics": "Themen"
+        "topics": "Themen",
+        "quizzes": "Quizze",
+        "reviews": "Wiederholungen"
       }
     },
     "newLearner": {
@@ -1844,7 +1855,9 @@
       "monthlyReport": "Monatsbericht",
       "subtitle": "Eine Zusammenfassung des Lernens deines Kindes diesen Monat",
       "totalWords": "Gesamtzahl Wörter",
-      "reportGoneTitle": "Bericht nicht gefunden"
+      "reportGoneTitle": "Bericht nicht gefunden",
+      "testsCompleted": "Tests abgeschlossen",
+      "testPoints": "Testpunkte"
     },
     "session": {
       "error": "Sitzung konnte nicht geladen werden",
@@ -1921,7 +1934,9 @@
       "sendNudge": "{{name}} einen Anstoß geben",
       "openChildProfile": "{{name}}s Profil öffnen",
       "reportGoneTitle": "Dieser Bericht ist nicht mehr verfügbar",
-      "reportGoneBody": "Er wurde möglicherweise archiviert oder entfernt. Alle deine anderen Berichte sind noch sicher."
+      "reportGoneBody": "Er wurde möglicherweise archiviert oder entfernt. Alle deine anderen Berichte sind noch sicher.",
+      "testsCompleted": "Tests abgeschlossen",
+      "testPoints": "Testpunkte"
     },
     "practiceSummary": {
       "title": "Testdetails",

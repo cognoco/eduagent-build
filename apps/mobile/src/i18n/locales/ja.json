@@ -500,7 +500,8 @@
       "typeSubjectPlaceholder": "科目を入力",
       "typeSubjectLabel": "科目を入力",
       "useTypedSubject": "使う",
-      "useTypedSubjectLabel": "入力した科目を使う"
+      "useTypedSubjectLabel": "入力した科目を使う",
+      "addNote": "メモを追加"
     },
     "quota": {
       "dailyLimitReached": "1日の上限に達しました",
@@ -575,7 +576,8 @@
       "writeNote": "メモを書く",
       "cannotSaveTitle": "メモを保存できません",
       "cannotSaveMessage": "現在メモを保存できません。もう一度お試しください。",
-      "saveFailedTitle": "メモを保存できませんでした"
+      "saveFailedTitle": "メモを保存できませんでした",
+      "summaryPlaceholder": "このセッションで覚えておくことは何ですか？"
     },
     "filingPrompt": {
       "title": "ライブラリに追加しますか？",
@@ -957,6 +959,9 @@
       "message": "本棚を開いて次の本を選ぶか、復習が必要な項目を再確認しましょう。",
       "cta": "開く",
       "accessibilityLabel": "{{subject}}を続ける"
+    },
+    "bookmarkCard": {
+      "accessibilityLabel": "保存したブックマークを開く: {{title}}"
     }
   },
   "topic": {
@@ -1247,7 +1252,11 @@
     "tryCameraAgainLabel": "もう一度カメラを試す",
     "tryReadingAgainLabel": "もう一度読み取りを試す",
     "classifyErrorTitle": "科目を特定できませんでした",
-    "classifyErrorMessage": "この宿題が属する科目を選んでください。"
+    "classifyErrorMessage": "この宿題が属する科目を選んでください。",
+    "listening": "聞き取り中...",
+    "voiceHint": "宿題の問題を声に出して言ってください。",
+    "stopDictatingProblemLabel": "問題の音声入力を停止",
+    "dictateProblemLabel": "問題を音声入力"
   },
   "progress": {
     "pageTitle": "私の学習の旅",
@@ -1342,7 +1351,9 @@
       "bars": {
         "sessions": "セッション",
         "time": "時間",
-        "topics": "トピック"
+        "topics": "トピック",
+        "quizzes": "クイズ",
+        "reviews": "復習"
       }
     },
     "newLearner": {
@@ -1844,7 +1855,9 @@
       "monthlyReport": "月次レポート",
       "subtitle": "今月のお子様の学習の要約",
       "totalWords": "総単語数",
-      "reportGoneTitle": "レポートが見つかりません"
+      "reportGoneTitle": "レポートが見つかりません",
+      "testsCompleted": "完了したテスト",
+      "testPoints": "テストポイント"
     },
     "session": {
       "error": "セッションを読み込めませんでした",
@@ -1921,7 +1934,9 @@
       "sendNudge": "{{name}}さんに声かけを送る",
       "openChildProfile": "{{name}}さんのプロフィールを開く",
       "reportGoneTitle": "このレポートは利用できなくなりました",
-      "reportGoneBody": "アーカイブされたか、削除された可能性があります。他のすべてのレポートは安全です。"
+      "reportGoneBody": "アーカイブされたか、削除された可能性があります。他のすべてのレポートは安全です。",
+      "testsCompleted": "完了したテスト",
+      "testPoints": "テストポイント"
     },
     "practiceSummary": {
       "title": "テスト詳細",

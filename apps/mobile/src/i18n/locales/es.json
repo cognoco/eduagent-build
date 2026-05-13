@@ -500,7 +500,8 @@
       "typeSubjectPlaceholder": "Escribe una materia",
       "typeSubjectLabel": "Escribe una materia",
       "useTypedSubject": "Usar",
-      "useTypedSubjectLabel": "Usar materia escrita"
+      "useTypedSubjectLabel": "Usar materia escrita",
+      "addNote": "Añadir nota"
     },
     "quota": {
       "dailyLimitReached": "Límite diario alcanzado",
@@ -575,7 +576,8 @@
       "writeNote": "Escribir una nota",
       "cannotSaveTitle": "No se puede guardar la nota",
       "cannotSaveMessage": "No se pueden guardar notas ahora. Inténtalo de nuevo.",
-      "saveFailedTitle": "No se pudo guardar la nota"
+      "saveFailedTitle": "No se pudo guardar la nota",
+      "summaryPlaceholder": "¿Qué deberíamos recordar de esta sesión?"
     },
     "filingPrompt": {
       "title": "¿Añadir a la biblioteca?",
@@ -957,6 +959,9 @@
       "message": "Abre la estantería, elige el siguiente libro o repasa lo que tienes pendiente.",
       "cta": "Abrir",
       "accessibilityLabel": "Continuar {{subject}}"
+    },
+    "bookmarkCard": {
+      "accessibilityLabel": "Abrir marcador guardado: {{title}}"
     }
   },
   "topic": {
@@ -1247,7 +1252,11 @@
     "tryCameraAgainLabel": "Probar cámara de nuevo",
     "tryReadingAgainLabel": "Intentar leer de nuevo",
     "classifyErrorTitle": "No se pudo identificar la materia",
-    "classifyErrorMessage": "Por favor, elige la materia a la que pertenece esta tarea."
+    "classifyErrorMessage": "Por favor, elige la materia a la que pertenece esta tarea.",
+    "listening": "Escuchando...",
+    "voiceHint": "Di el problema de la tarea en voz alta.",
+    "stopDictatingProblemLabel": "Dejar de dictar el problema",
+    "dictateProblemLabel": "Dictar problema"
   },
   "progress": {
     "pageTitle": "Mi Viaje de Aprendizaje",
@@ -1342,7 +1351,9 @@
       "bars": {
         "sessions": "Sesiones",
         "time": "Tiempo",
-        "topics": "Temas"
+        "topics": "Temas",
+        "quizzes": "Cuestionarios",
+        "reviews": "Repasos"
       }
     },
     "newLearner": {
@@ -1844,7 +1855,9 @@
       "monthlyReport": "Informe mensual",
       "subtitle": "Un resumen del aprendizaje de tu hijo este mes",
       "totalWords": "Total de palabras",
-      "reportGoneTitle": "Informe no encontrado"
+      "reportGoneTitle": "Informe no encontrado",
+      "testsCompleted": "Pruebas completadas",
+      "testPoints": "Puntos de prueba"
     },
     "session": {
       "error": "No se pudo cargar la sesión",
@@ -1921,7 +1934,9 @@
       "sendNudge": "Enviar un empujón a {{name}}",
       "openChildProfile": "Abrir el perfil de {{name}}",
       "reportGoneTitle": "Este informe ya no está disponible",
-      "reportGoneBody": "Puede haber sido archivado o eliminado. Todos tus otros informes siguen a salvo."
+      "reportGoneBody": "Puede haber sido archivado o eliminado. Todos tus otros informes siguen a salvo.",
+      "testsCompleted": "Pruebas completadas",
+      "testPoints": "Puntos de prueba"
     },
     "practiceSummary": {
       "title": "Detalle de pruebas",

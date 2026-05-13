@@ -525,7 +525,8 @@
       "typeSubjectPlaceholder": "Wpisz przedmiot",
       "typeSubjectLabel": "Wpisz przedmiot",
       "useTypedSubject": "Użyj",
-      "useTypedSubjectLabel": "Użyj wpisanego przedmiotu"
+      "useTypedSubjectLabel": "Użyj wpisanego przedmiotu",
+      "addNote": "Dodaj notatkę"
     },
     "quota": {
       "dailyLimitReached": "Osiągnięto limit dzienny",
@@ -600,7 +601,8 @@
       "writeNote": "Napisz notatkę",
       "cannotSaveTitle": "Nie można zapisać notatki",
       "cannotSaveMessage": "Notatek nie można teraz zapisać. Spróbuj ponownie.",
-      "saveFailedTitle": "Nie można zapisać notatki"
+      "saveFailedTitle": "Nie można zapisać notatki",
+      "summaryPlaceholder": "Co powinniśmy zapamiętać z tej sesji?"
     },
     "filingPrompt": {
       "title": "Dodać do biblioteki?",
@@ -982,6 +984,9 @@
       "message": "Otwórz półkę, wybierz następną książkę lub powtórz zaległy materiał.",
       "cta": "Otwórz",
       "accessibilityLabel": "Kontynuuj {{subject}}"
+    },
+    "bookmarkCard": {
+      "accessibilityLabel": "Otwórz zapisany zakładkę: {{title}}"
     }
   },
   "topic": {
@@ -1272,7 +1277,11 @@
     "tryCameraAgainLabel": "Spróbuj ponownie z aparatem",
     "tryReadingAgainLabel": "Spróbuj odczytać ponownie",
     "classifyErrorTitle": "Nie można zidentyfikować przedmiotu",
-    "classifyErrorMessage": "Wybierz przedmiot, do którego należy ta praca domowa."
+    "classifyErrorMessage": "Wybierz przedmiot, do którego należy ta praca domowa.",
+    "listening": "Słucham...",
+    "voiceHint": "Powiedz treść zadania domowego na głos.",
+    "stopDictatingProblemLabel": "Zatrzymaj dyktowanie zadania",
+    "dictateProblemLabel": "Dyktuj zadanie"
   },
   "progress": {
     "pageTitle": "Moja podróż edukacyjna",
@@ -1367,7 +1376,9 @@
       "bars": {
         "sessions": "Sesje",
         "time": "Czas",
-        "topics": "Tematy"
+        "topics": "Tematy",
+        "quizzes": "Quizy",
+        "reviews": "Powtórki"
       }
     },
     "newLearner": {
@@ -1869,7 +1880,9 @@
       "monthlyReport": "Raport miesięczny",
       "subtitle": "Podsumowanie nauki Twojego dziecka w tym miesiącu",
       "totalWords": "Całkowita liczba słów",
-      "reportGoneTitle": "Nie znaleziono raportu"
+      "reportGoneTitle": "Nie znaleziono raportu",
+      "testsCompleted": "Ukończone testy",
+      "testPoints": "Punkty za testy"
     },
     "session": {
       "error": "Nie można załadować sesji",
@@ -1946,7 +1959,9 @@
       "sendNudge": "Wyślij przypomnienie do {{name}}",
       "openChildProfile": "Otwórz profil {{name}}",
       "reportGoneTitle": "Ten raport nie jest już dostępny",
-      "reportGoneBody": "Mógł zostać zarchiwizowany lub usunięty. Wszystkie Twoje inne raporty są nadal bezpieczne."
+      "reportGoneBody": "Mógł zostać zarchiwizowany lub usunięty. Wszystkie Twoje inne raporty są nadal bezpieczne.",
+      "testsCompleted": "Ukończone testy",
+      "testPoints": "Punkty za testy"
     },
     "practiceSummary": {
       "title": "Szczegóły testów",

@@ -525,7 +525,8 @@
       "typeSubjectPlaceholder": "Digite uma matéria",
       "typeSubjectLabel": "Digite uma matéria",
       "useTypedSubject": "Usar",
-      "useTypedSubjectLabel": "Usar matéria digitada"
+      "useTypedSubjectLabel": "Usar matéria digitada",
+      "addNote": "Adicionar nota"
     },
     "quota": {
       "dailyLimitReached": "Limite diário atingido",
@@ -600,7 +601,8 @@
       "writeNote": "Escrever uma nota",
       "cannotSaveTitle": "Não é possível salvar a nota",
       "cannotSaveMessage": "Não é possível salvar notas no momento. Tente novamente.",
-      "saveFailedTitle": "Não foi possível salvar a nota"
+      "saveFailedTitle": "Não foi possível salvar a nota",
+      "summaryPlaceholder": "O que devemos lembrar desta sessão?"
     },
     "filingPrompt": {
       "title": "Adicionar à biblioteca?",
@@ -982,6 +984,9 @@
       "message": "Abra a estante, escolha o próximo livro ou reveja o que está pendente.",
       "cta": "Abrir",
       "accessibilityLabel": "Continuar {{subject}}"
+    },
+    "bookmarkCard": {
+      "accessibilityLabel": "Abrir marcador salvo: {{title}}"
     }
   },
   "topic": {
@@ -1272,7 +1277,11 @@
     "tryCameraAgainLabel": "Tentar a câmera novamente",
     "tryReadingAgainLabel": "Tentar ler novamente",
     "classifyErrorTitle": "Não foi possível identificar a matéria",
-    "classifyErrorMessage": "Por favor, escolha a matéria a que este dever de casa pertence."
+    "classifyErrorMessage": "Por favor, escolha a matéria a que este dever de casa pertence.",
+    "listening": "Ouvindo...",
+    "voiceHint": "Diga o problema da lição em voz alta.",
+    "stopDictatingProblemLabel": "Parar de ditar o problema",
+    "dictateProblemLabel": "Ditar problema"
   },
   "progress": {
     "pageTitle": "Minha Jornada de Aprendizagem",
@@ -1367,7 +1376,9 @@
       "bars": {
         "sessions": "Sessões",
         "time": "Tempo",
-        "topics": "Tópicos"
+        "topics": "Tópicos",
+        "quizzes": "Questionários",
+        "reviews": "Revisões"
       }
     },
     "newLearner": {
@@ -1869,7 +1880,9 @@
       "monthlyReport": "Relatório mensal",
       "subtitle": "Um resumo do aprendizado do seu filho este mês",
       "totalWords": "Total de palavras",
-      "reportGoneTitle": "Relatório não encontrado"
+      "reportGoneTitle": "Relatório não encontrado",
+      "testsCompleted": "Testes concluídos",
+      "testPoints": "Pontos dos testes"
     },
     "session": {
       "error": "Não foi possível carregar a sessão",
@@ -1946,7 +1959,9 @@
       "sendNudge": "Enviar um incentivo para {{name}}",
       "openChildProfile": "Abrir o perfil de {{name}}",
       "reportGoneTitle": "Este relatório não está mais disponível",
-      "reportGoneBody": "Ele pode ter sido arquivado ou removido. Todos os seus outros relatórios ainda estão seguros."
+      "reportGoneBody": "Ele pode ter sido arquivado ou removido. Todos os seus outros relatórios ainda estão seguros.",
+      "testsCompleted": "Testes concluídos",
+      "testPoints": "Pontos dos testes"
     },
     "practiceSummary": {
       "title": "Detalhes dos testes",
