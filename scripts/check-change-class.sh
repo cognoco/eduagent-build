@@ -9,8 +9,8 @@
 #   scripts/check-change-class.sh --run --fast  # execute only fast commands
 #
 # Exit codes:
-#   0 — no validation needed, or all commands passed
-#   1 — validation identified (advisory) or a command failed (--run)
+#   0 — no validation needed, or advisory mode (validation identified but not run)
+#   1 — a command failed (--run mode only)
 
 set -euo pipefail
 
@@ -265,8 +265,8 @@ if [[ -n "$EVAL_CODE" ]]; then
   add_cmd fast  "pnpm eval:llm"              "Verify eval harness runs clean"
 fi
 
-# ── Test Utilities / Factory ─────────────────────────────────────────────
-if hit '^packages/(test-utils|factory)/src/'; then
+# ── Test Utilities ──────────────────────────────────────────────────────
+if hit '^packages/test-utils/src/'; then
   CLASSES+=("test-infra")
   add_cmd fast  "pnpm test:api:unit"         "API unit tests (test helper consumer)"
   add_cmd fast  "pnpm test:mobile:unit"      "Mobile unit tests (test helper consumer)"
