@@ -123,10 +123,19 @@ describe('useHomeworkOcr', () => {
     );
   });
 
-  it('gate-reject on local OCR does NOT invoke server fallback', async () => {
+  it('uses server vision OCR instead of a local non-homework dump', async () => {
     mockRecognize.mockResolvedValue({
       text: Array.from({ length: 130 }, (_, index) => `word${index}`).join(' '),
     });
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          text: '1. What is chasing you?\n2. What are you avoiding?',
+          confidence: 0.88,
+        }),
+        { status: 200 },
+      ),
+    );
 
     const { result } = renderHook(() => useHomeworkOcr());
 
@@ -134,20 +143,110 @@ describe('useHomeworkOcr', () => {
       await result.current.process('file:///tmp/photo.jpg');
     });
 
-    expect(mockFetch).not.toHaveBeenCalled();
-    expect(result.current.status).toBe('error');
-    expect(result.current.error).toBe(NON_HOMEWORK_ERROR_MESSAGE);
-    expect(result.current.failCount).toBe(1);
-    expect(mockTrackHomeworkOcrGateRejected).toHaveBeenCalledWith(
+    expect(mockFetch).toHaveBeenCalled();
+    expect(result.current.status).toBe('done');
+    expect(result.current.text).toBe(
+      '1. What is chasing you?\n2. What are you avoiding?',
+    );
+    expect(mockTrackHomeworkOcrGateAccepted).toHaveBeenCalledWith(
       expect.objectContaining({
-        source: 'local',
-        droppedCount: 1,
+        source: 'server',
+        confidence: 0.88,
       }),
     );
-    expect(mockTrackHomeworkOcrGateShortcircuit).toHaveBeenCalledWith(
+    expect(mockTrackHomeworkOcrGateRejected).not.toHaveBeenCalled();
+  });
+
+  it('escalates short cue-less OCR fragments instead of accepting them as problems', async () => {
+    mockRecognize.mockResolvedValue({
+      text: 'Radissen\nCryiy\nan\nWhal',
+      confidence: 0.9,
+    });
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          text: [
+            '1. What is chasing you',
+            '2. What are you avoiding',
+            '3. What do you want',
+            '4. What feels dead',
+            '5. What hurts',
+            '6. What wants to live',
+          ].join('\n'),
+          confidence: 0.86,
+        }),
+        { status: 200 },
+      ),
+    );
+
+    const { result } = renderHook(() => useHomeworkOcr());
+
+    await act(async () => {
+      await result.current.process('file:///tmp/photo.jpg');
+    });
+
+    expect(mockFetch).toHaveBeenCalled();
+    expect(result.current.status).toBe('done');
+    expect(result.current.text).toContain('1. What is chasing you');
+    expect(result.current.text).not.toContain('Radissen');
+    expect(mockTrackHomeworkOcrGateAccepted).toHaveBeenCalledWith(
       expect.objectContaining({
-        tokens: expect.any(Number),
-        words: expect.any(Number),
+        source: 'server',
+        confidence: 0.86,
+      }),
+    );
+  });
+
+  it('uses server vision OCR before local OCR when the server can read the photo', async () => {
+    mockRecognize.mockResolvedValue({
+      text: 'Radissen\nCryiy\nan\nWhal',
+      confidence: 0.9,
+    });
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          text: 'What is chasing you',
+          confidence: 0.9,
+        }),
+        { status: 200 },
+      ),
+    );
+
+    const { result } = renderHook(() => useHomeworkOcr());
+
+    await act(async () => {
+      await result.current.process('file:///tmp/photo.jpg');
+    });
+
+    expect(result.current.status).toBe('done');
+    expect(result.current.text).toBe('What is chasing you');
+    expect(mockRecognize).not.toHaveBeenCalled();
+    expect(mockTrackHomeworkOcrGateAccepted).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: 'server',
+      }),
+    );
+  });
+
+  it('falls back to local OCR when server vision OCR is unavailable', async () => {
+    mockRecognize.mockResolvedValue({
+      text: 'What is chasing you',
+      confidence: 0.9,
+    });
+    mockFetch.mockRejectedValueOnce(new Error('server unavailable'));
+
+    const { result } = renderHook(() => useHomeworkOcr());
+
+    await act(async () => {
+      await result.current.process('file:///tmp/photo.jpg');
+    });
+
+    expect(mockFetch).toHaveBeenCalled();
+    expect(result.current.status).toBe('done');
+    expect(result.current.text).toBe('What is chasing you');
+    expect(mockTrackHomeworkOcrGateAccepted).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: 'local',
       }),
     );
   });
@@ -278,7 +377,7 @@ describe('useHomeworkOcr', () => {
       .mockResolvedValueOnce({
         text: Array.from({ length: 130 }, () => 'word').join(' '),
       })
-      .mockResolvedValueOnce({ text: 'new text found' });
+      .mockResolvedValueOnce({ text: 'What is new text found' });
 
     const { result } = renderHook(() => useHomeworkOcr());
 
@@ -291,7 +390,7 @@ describe('useHomeworkOcr', () => {
       await result.current.process('file:///tmp/photo2.jpg');
     });
     expect(result.current.failCount).toBe(0);
-    expect(result.current.text).toBe('new text found');
+    expect(result.current.text).toBe('What is new text found');
   });
 
   it('retry() is a no-op when no image has been processed', async () => {

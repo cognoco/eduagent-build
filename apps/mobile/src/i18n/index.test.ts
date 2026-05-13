@@ -1,4 +1,11 @@
 import { resolveLanguage, SUPPORTED_LANGUAGES } from './index';
+import de from './locales/de.json';
+import en from './locales/en.json';
+import es from './locales/es.json';
+import ja from './locales/ja.json';
+import nb from './locales/nb.json';
+import pl from './locales/pl.json';
+import pt from './locales/pt.json';
 
 describe('resolveLanguage', () => {
   it('returns stored language when it is a supported language', () => {
@@ -39,5 +46,21 @@ describe('SUPPORTED_LANGUAGES', () => {
       'pl',
       'pt',
     ]);
+  });
+});
+
+describe('launch locale key parity', () => {
+  const locales = { de, es, ja, nb, pl, pt } as const;
+
+  it('keeps practice summary activity labels translated in every locale', () => {
+    const sections = ['activityTypes', 'activitySubtypes'] as const;
+
+    for (const messages of Object.values(locales)) {
+      for (const section of sections) {
+        expect(
+          Object.keys(messages.parentView.practiceSummary[section]).sort(),
+        ).toEqual(Object.keys(en.parentView.practiceSummary[section]).sort());
+      }
+    }
   });
 });

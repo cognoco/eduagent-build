@@ -27,7 +27,7 @@ describe('StubOcrProvider', () => {
     const provider = new StubOcrProvider();
     const result = await provider.extractText(
       new ArrayBuffer(100),
-      'image/jpeg'
+      'image/jpeg',
     );
 
     expect(result.text).toBe('Stub OCR text for testing');
@@ -54,11 +54,11 @@ describe('StubOcrProvider', () => {
     const provider = new StubOcrProvider();
     const result1 = await provider.extractText(
       new ArrayBuffer(0),
-      'image/jpeg'
+      'image/jpeg',
     );
     const result2 = await provider.extractText(
       new ArrayBuffer(1000),
-      'image/webp'
+      'image/webp',
     );
 
     expect(result1).toEqual(result2);
@@ -93,7 +93,7 @@ describe('getOcrProvider / setOcrProvider', () => {
 
   it('throws when no provider configured and allowStub is false', () => {
     expect(() => getOcrProvider(undefined, false)).toThrow(
-      'OCR provider not configured'
+      'OCR provider not configured',
     );
   });
 
@@ -160,7 +160,10 @@ describe('GeminiOcrProvider', () => {
         expect.objectContaining({
           role: 'user',
           content: expect.arrayContaining([
-            expect.objectContaining({ type: 'text' }),
+            expect.objectContaining({
+              type: 'text',
+              text: expect.stringContaining('Ignore logos'),
+            }),
             expect.objectContaining({
               type: 'inline_data',
               mimeType: 'image/jpeg',
@@ -168,7 +171,7 @@ describe('GeminiOcrProvider', () => {
           ]),
         }),
       ],
-      1
+      1,
     );
   });
 

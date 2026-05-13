@@ -7,12 +7,15 @@
 import type { OcrResult } from '@eduagent/schemas';
 import { routeAndCall, type ChatMessage } from './llm';
 
-const OCR_PROMPT = `Extract all readable text from this image.
+const OCR_PROMPT = `Extract the readable homework text from this image.
 Return ONLY JSON with this shape:
 {"text":"full extracted text","confidence":0.0}
 
 Rules:
-- Preserve line breaks when they matter
+- Focus on handwritten or printed homework/problem text
+- Ignore logos, brand names, headers, watermarks, and page decorations
+- Preserve line breaks and numbering when they matter
+- If the homework text is too unclear to read reliably, return {"text":"","confidence":0}
 - Do not add explanations
 - confidence must be between 0 and 1`;
 
@@ -37,7 +40,7 @@ export interface OcrProvider {
 export class StubOcrProvider implements OcrProvider {
   async extractText(
     _image: ArrayBuffer,
-    _mimeType: string
+    _mimeType: string,
   ): Promise<OcrResult> {
     return {
       text: 'Stub OCR text for testing',
@@ -148,7 +151,7 @@ let _provider: OcrProvider | null = null;
  */
 export function getOcrProvider(
   useRouter?: boolean | string,
-  allowStub?: boolean
+  allowStub?: boolean,
 ): OcrProvider {
   if (_provider) {
     return _provider;
@@ -165,7 +168,7 @@ export function getOcrProvider(
   }
 
   throw new Error(
-    'OCR provider not configured: set GEMINI_API_KEY or use allowStub for testing'
+    'OCR provider not configured: set GEMINI_API_KEY or use allowStub for testing',
   );
 }
 
