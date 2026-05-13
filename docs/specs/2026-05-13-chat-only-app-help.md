@@ -63,23 +63,28 @@ Initial map:
 
 | User asks about | Chat answer should point to |
 |---|---|
-| Notes | "Library > choose the subject/book/topic > Notes section." Mention Library search can find notes if relevant. |
-| Saved explanations / bookmarks | "Progress > Saved." Distinguish this from notes when the user says "saved". |
-| Learning preferences | "More > Preferences." |
-| Learning accommodation | "More > Preferences > Learning accommodation." |
+| Notes | "Library > choose the subject/book/topic > Your Notes." Mention Library search can find notes if relevant. |
+| Saved explanations / bookmarks | "Progress > tap Saved." (Saved is a link inside the Progress screen, not a separate tab.) Distinguish this from notes when the user says "saved". |
+| Learning preferences | "More > Preferences." (Row labelled "Preferences" under the "Your learning" section.) |
+| Learning accommodation | "More > Preferences > Your learning accommodation." |
 | Explorer mode | Relaxed, flexible learning. The mentor is more encouraging, and the learner can move at their own pace. |
 | Challenge mode | More focused learning. The mentor keeps the learner on track and asks for stronger proof of understanding. |
-| Changing Explorer / Challenge | In a session, tap the mode chip in the header. Outside a session, use "More > Preferences" if that row is available. |
+| Changing Explorer / Challenge | In a session, tap the mode button in the session header. Outside a session, use "More > Preferences." |
 | Mentor memory / what the mentor knows | "More > Mentor memory." |
-| Mentor language / profile | "More > Mentor language" or "More > Profile." |
+| Profile / account | "More > Profile." (Opens account settings.) |
 | Notifications | "More > Notifications." |
 | Privacy / data export / account deletion | "More > Privacy & data." |
-| Help / feedback | "More > Help & Feedback." |
-| Homework | "Home > I have homework" or the Homework entry. |
-| Practice / reviews | "Practice" if visible from the app shell; otherwise "Home" entry cards. |
-| Parent child settings | "Home > open the child's profile" for child-specific preferences. |
+| Help / feedback | "More > Help & feedback." |
+| Homework | "Home > Help with an assignment." |
+| Practice / reviews | "Home > Test yourself." (An action card on the Home screen, not a separate tab.) |
+| Viewing a child's progress (parent) | "Home > tap the child's card" to see their progress overview. |
+| Changing a child's preferences (parent) | Switch to the child's profile using the profile selector, then use "More > Preferences" as normal. |
 
 The map should be easy to edit as IA changes. If a destination moves, updating this single map should update prompt behavior.
+
+**Label accuracy rule:** Every label in the map must match the exact i18n string visible in the app. The unit tests for the map helper should import the relevant i18n keys and assert the map matches. If a screen is renamed, the map and tests must update together.
+
+**Localization note:** The map hardcodes English labels. When the app ships localized (nb/de/es/pt/pl/ja per the i18n plan), `buildAppHelpPromptBlock` should accept a locale parameter and pull labels from the same i18n source as the mobile app. Until then, add a prompt instruction telling the model to translate destination labels to match the conversation language. This is fragile — the locale-aware map is the correct long-term fix.
 
 ## Implementation
 
@@ -106,11 +111,19 @@ Placement:
 2. Before topic-specific teaching guidance.
 3. Before the final JSON envelope instruction.
 
+**Scope-boundary override:** The existing scope-boundaries block (`exchange-prompts.ts:770-791`) tells the model to redirect off-topic questions back to the current topic. App-navigation questions are exactly the kind of question that block would redirect. The app-help instruction must explicitly carve an exception in the scope-boundaries block:
+
+```text
+Exception: if the learner asks how to find, change, or understand something in the app itself, answer from the APP HELP map below. This is not off-topic — it is a valid in-context question.
+```
+
+**Conditional injection (recommended):** The app-help map adds ~400-600 tokens of static content to every exchange, even when the user is mid-session on a learning topic. The system prompt is already the largest in the codebase (~25 context fields, ~750 lines). To reduce attention dilution, consider injecting the full map only when the user's message matches a lightweight keyword classifier (contains "where", "how do I", "find", "settings", "preference", "change", etc. without topic-specific content). For non-matching exchanges, inject only a one-line pointer: "If the learner asks about using the app, say you can help and ask them to rephrase." This keeps the prompt lean for 95%+ of exchanges. If conditional injection is deferred, accept the ~10-15% prompt size increase as a Phase 1 cost.
+
 Prompt rule:
 
 ```text
 APP HELP:
-If the learner asks how to find, change, or understand something in the app, answer from this map in plain chat text. Do not invent screens, buttons, routes, links, or capabilities. Use visible labels only. Keep the answer short, then return to the learning thread if appropriate.
+If the learner asks how to find, change, or understand something in the app, answer from this map in plain chat text. Do not invent screens, buttons, routes, links, or capabilities. Use visible labels only. Keep the answer short, then return to the learning thread if appropriate. When answering in a non-English conversation, translate the destination labels to match the language you are speaking.
 ```
 
 ### No envelope change
@@ -133,6 +146,8 @@ For app-help turns:
 - `signals.understanding_check` should be false unless the mentor genuinely asks a learning check after the help answer.
 - `ui_hints.note_prompt.show` should be false.
 
+These are prompt-level instructions. The server-side hard cap described in "Accounting and learning state" enforces them even when the LLM does not comply.
+
 No new `ui_hints.navigation` field in this slice.
 
 ### Accounting and learning state
@@ -143,7 +158,20 @@ Phase 1 accepts that app-help questions are normal chat exchanges:
 - They consume the same quota as any LLM turn.
 - They remain in the transcript.
 
-The prompt should prevent them from mutating learning-state signals, but this slice does not add a separate `app_help` event type or billing exemption. If support questions become common enough to pollute learning analytics, add that as a separate feature.
+**Signal enforcement (server-side hard cap):** The prompt instructs the model to set learning signals to false on app-help turns, but LLMs don't comply 100% of the time. Per the project rule "every envelope signal must have a server-side hard cap," add a post-parse guard: if the exchange is classified as app-help (even by a simple heuristic on the user message — same classifier as the conditional injection above), force `partial_progress`, `needs_deepening`, and `understanding_check` to `false` and `note_prompt.show` to `false` before persisting. This prevents a stray `partial_progress: true` from feeding into escalation-rung logic or SM-2 retention updates.
+
+**Analytics pollution — accepted risks in Phase 1:** Without a separate `app_help` session type or event type, app-help exchanges will flow through the following downstream consumers as if they were learning exchanges:
+
+1. `analyzeSessionTranscript` → may update learner profile `strengths`, `struggles`, `interests` based on app-navigation questions
+2. `createPendingSessionSummary` → parent dashboard shows app-help chats as learning session summaries
+3. `extractVocabularyFromTranscript` → may extract app-navigation terms as vocabulary
+4. XP and streak accounting → count app-help sessions toward engagement metrics
+5. Engagement signal extraction → produces meaningless "curious" or "focused" signals from help questions
+6. Review calibration → retrieval scores from app-help exchanges may skew topic retention data
+
+This is accepted for Phase 1. If app-help becomes common (>5% of exchanges), add an `app_help` session type to filter these consumers. The signal enforcement guard above mitigates the worst case (retention data corruption) but does not prevent the profile and summary pollution.
+
+**Free-tier quota impact:** Free users have 10 exchanges/day. Three app-help questions consume 30% of a free user's daily quota on non-learning exchanges. This is accepted for Phase 1 but should be monitored. If app-help volume is significant, consider a lightweight FAQ route that bypasses metering entirely.
 
 ### Mobile
 
@@ -177,6 +205,7 @@ Add tests for the helper if split into `app-help-map.ts`:
 - It returns stable visible labels.
 - It contains no markdown links.
 - It contains no raw route paths.
+- Key labels match the actual i18n strings (import from the mobile i18n source and assert exact match for Notes, Preferences, Homework, Practice, Help & feedback, etc.).
 
 ### Eval harness
 
@@ -224,16 +253,23 @@ pnpm exec nx run api:test -- --runInBand
 | Overlong support answer | Model explains the whole IA | Chat feels heavy | Prompt says one or two sentences; eval snapshots review tone |
 | User asks for current-screen state | "Where am I now?" | Mentor may not know | Prompt says it cannot inspect the current screen; suggest visible top-level tabs |
 | User asks for account/security action | Delete/export/privacy question | Wrong or unsafe advice would be high-friction | Map points only to More > Privacy & data; do not provide policy/legal claims |
-| Parent/child context ambiguity | Parent asks how to change child preferences | Mentor gives self-profile directions | Map includes parent path: Home > child profile for child-specific preferences |
+| Parent/child context ambiguity | Parent asks how to change child preferences | Mentor gives self-profile directions | Map distinguishes viewing (tap child card) from editing (switch profile first). Mentor asks which action is intended if ambiguous. |
+| Free-tier quota burn | Free user asks 3+ app-help questions in one day | 30%+ daily quota consumed on non-learning exchanges | Accepted for Phase 1. Monitor app-help volume; consider FAQ route bypass if >5% of exchanges. |
+| Learning signals leak through | LLM sets `partial_progress: true` on an app-help answer | Escalation rung advances; retention data skewed | Server-side hard cap forces learning signals to false on app-help-classified exchanges. |
+| Scope-boundary conflict | User asks app-help question mid-topic session | Scope block redirects as off-topic instead of answering | Scope-boundaries block includes explicit app-help exception. |
+| App-help mid-homework | Student asks "where are my notes?" while solving a homework problem | Homework scope says "stay focused on the user's question" (the homework problem) | App-help takes precedence when the question is clearly about app navigation, not the homework problem. Prompt rule: app-help overrides homework scope for navigation questions. |
+| Analytics pollution | App-help sessions feed into profile analysis, parent summaries, vocabulary extraction | Learner profile updated with non-learning signals; parent sees help chat as a session | Accepted for Phase 1 (6 consumers listed in Accounting section). Add `app_help` session type if volume exceeds 5%. |
 
 ## Sequencing
 
-1. Add `app-help-map.ts`.
+1. Add `app-help-map.ts` with labels verified against mobile i18n strings.
 2. Inject the app-help block into `buildSystemPrompt()`.
-3. Add prompt-map unit tests.
-4. Add app-help probes to the exchanges eval harness.
-5. Run focused tests and `pnpm eval:llm -- --flow exchanges`.
-6. Review generated snapshots for tone, route hallucination, and signal defaults.
+3. Add the scope-boundary exception so app-help is not redirected as off-topic.
+4. Add the server-side signal hard cap for app-help-classified exchanges.
+5. Add prompt-map unit tests (including i18n label assertions).
+6. Add app-help probes to the exchanges eval harness.
+7. Run focused tests and `pnpm eval:llm -- --flow exchanges`.
+8. Review generated snapshots for tone, route hallucination, and signal defaults.
 
 ## Rollback
 
