@@ -18,6 +18,12 @@ const fileInsideShelfStack = {
   filename:
     '/repo/apps/mobile/src/app/(app)/shelf/[subjectId]/book/[bookId].tsx',
 };
+// Looks similar to a child of `shelf/[subjectId]` but is actually a SIBLING
+// route. `startsWith` without a `/` boundary would falsely accept this.
+const fileSiblingWithSuffix = {
+  filename:
+    '/repo/apps/mobile/src/app/(app)/shelf/[subjectId]-detail/topic/[topicId].tsx',
+};
 
 ruleTester.run('router-push-ancestor-chain', rule, {
   valid: [
@@ -91,6 +97,25 @@ ruleTester.run('router-push-ancestor-chain', rule, {
     {
       code: `function f() {
         router.push({ pathname: '/(app)/library', params: {} });
+        router.push({ pathname: '/(app)/shelf/[subjectId]/book/[bookId]', params: { subjectId, bookId } });
+      }`,
+      ...fileUnderLibrary,
+      errors: [{ messageId: 'missingParentPush' }],
+    },
+    // Regression: a sibling route whose path PREFIX-matches the parent but
+    // belongs to a different stack (e.g. `[subjectId]-detail`) must still
+    // be flagged. The old `startsWith` check silently passed this.
+    {
+      code: "router.push({ pathname: '/(app)/shelf/[subjectId]/book/[bookId]', params: { subjectId, bookId } });",
+      ...fileSiblingWithSuffix,
+      errors: [{ messageId: 'missingParentPush' }],
+    },
+    // Same prefix-match hazard for the in-function parent push: a prior
+    // push to `/(app)/shelf/[subjectId]-detail` must NOT satisfy parent
+    // `/(app)/shelf/[subjectId]`.
+    {
+      code: `function f() {
+        router.push({ pathname: '/(app)/shelf/[subjectId]-detail', params: { subjectId } });
         router.push({ pathname: '/(app)/shelf/[subjectId]/book/[bookId]', params: { subjectId, bookId } });
       }`,
       ...fileUnderLibrary,

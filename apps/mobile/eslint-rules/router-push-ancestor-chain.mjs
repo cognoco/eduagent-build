@@ -168,7 +168,15 @@ const rule = {
       context.filename ?? context.getFilename?.(),
     );
 
-    /** Collect every router.push pathname in a given body, preserving range order. */
+    /**
+     * Collect every router.push pathname in a given body, preserving range
+     * order. KNOWN LIMITATION: the walk descends into conditional branches
+     * (`if`, `.forEach`, ternary), so a parent push that only runs on some
+     * code paths is treated as if it always runs. The rule accepts that
+     * false-negative because the alternative (control-flow analysis) is
+     * disproportionate for what is a heuristic guardrail, and a clearly
+     * misplaced parent push surfaces in review.
+     */
     function collectPushPathnamesUpTo(bodyNode, beforeRange) {
       const results = [];
       function walk(n) {
@@ -204,18 +212,27 @@ const rule = {
         const parent = parentPrefix(target);
         if (!parent) return; // fewer than 2 [param] segments — fine
 
-        // (b) file's own route is already inside the parent stack
-        if (fileRoute && fileRoute.startsWith(parent)) return;
+        // (b) file's own route is already inside the parent stack. Compare
+        // path-segment-exact: `parent` itself or `parent` + `/` prefix. A
+        // sibling like "/(app)/shelf/[subjectId]-detail/..." must NOT
+        // satisfy the check against parent "/(app)/shelf/[subjectId]".
+        if (
+          fileRoute &&
+          (fileRoute === parent || fileRoute.startsWith(parent + '/'))
+        ) {
+          return;
+        }
 
         // (c) explicit allow annotation
         if (commentHasGc4Allow(sourceCode, node)) return;
 
-        // (a) preceding sibling push in the same enclosing body
+        // (a) preceding sibling push in the same enclosing body. Same
+        // path-segment-exact check as case (b).
         const body = enclosingBody(node);
         if (body) {
           const priorPushes = collectPushPathnamesUpTo(body, node.range);
           for (const p of priorPushes) {
-            if (p.startsWith(parent)) return;
+            if (p === parent || p.startsWith(parent + '/')) return;
           }
         }
 
