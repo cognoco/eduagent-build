@@ -1,24 +1,23 @@
+import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 import { handleReviewCalibrationGrade } from './review-calibration-grade';
 
 async function executeHandler(eventData: unknown) {
-  const mockStep = {
-    run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
-  };
+  const { step, runCalls } = createInngestStepRunner();
   const result = await handleReviewCalibrationGrade({
     // handleReviewCalibrationGrade declares `event: { data: unknown }` and
     // TS2353 rejects excess properties on object literals — `name` is
     // intentionally omitted here. Do not add it back.
     event: { data: eventData },
-    step: mockStep as unknown as {
+    step: step as unknown as {
       run: <T>(name: string, fn: () => T | Promise<T>) => Promise<T>;
     },
   });
-  return { result, mockStep };
+  return { result, runCalls };
 }
 
 describe('reviewCalibrationGrade', () => {
   it('skips invalid payloads before running any steps', async () => {
-    const { result, mockStep } = await executeHandler({
+    const { result, runCalls } = await executeHandler({
       profileId: 'profile-1',
       sessionId: 'session-1',
       topicId: 'topic-1',
@@ -28,6 +27,6 @@ describe('reviewCalibrationGrade', () => {
     });
 
     expect(result).toEqual({ skipped: 'invalid_payload' });
-    expect(mockStep.run).not.toHaveBeenCalled();
+    expect(runCalls).toHaveLength(0);
   });
 });

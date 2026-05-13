@@ -49,18 +49,15 @@ jest.mock('../helpers' /* gc1-allow: unit test boundary */, () => ({
   getStepDatabase: () => mockDb,
   getStepResendApiKey: () => 'resend-test-key',
 }));
-jest.mock('../client' /* gc1-allow: unit test boundary */, () => ({
-  inngest: {
-    createFunction: jest.fn(
-      (config: unknown, trigger: unknown, fn: unknown) => ({
-        fn,
-        _config: config,
-        _trigger: trigger,
-      }),
-    ),
-    send: jest.fn().mockResolvedValue(undefined),
-  },
-}));
+
+import { createInngestTransportCapture } from '../../test-utils/inngest-transport-capture';
+import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
+
+const mockInngestTransport = createInngestTransportCapture();
+jest.mock(
+  '../client' /* gc1-allow: inngest framework boundary */,
+  () => mockInngestTransport.module,
+);
 
 import { emptyPracticeActivitySummary } from '../../test-utils/practice-activity-summary-fixture';
 
@@ -215,9 +212,7 @@ async function executeGenerateSteps(
   parentId?: string;
   reason?: string;
 }> {
-  const step = {
-    run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
-  };
+  const { step } = createInngestStepRunner();
   const handler = (
     weeklyProgressPushGenerate as unknown as {
       fn: (ctx: {
@@ -234,6 +229,7 @@ async function executeGenerateSteps(
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockInngestTransport.clear();
   mockDb.query.familyLinks.findMany.mockResolvedValue([]);
   mockDb.query.consentStates.findFirst.mockResolvedValue(null);
   mockDb.query.profiles.findFirst.mockResolvedValue(null);
@@ -344,6 +340,7 @@ describe('[BUG-850 / F-SVC-021] weekly-progress-push fan-out error escalation', 
   beforeEach(() => {
     mockCaptureException.mockClear();
     jest.clearAllMocks();
+    mockInngestTransport.clear();
     mockDb.query.familyLinks.findMany.mockResolvedValue([]);
     mockDb.query.notificationPreferences.findMany.mockResolvedValue([]);
     mockDb.select.mockReturnValue({
@@ -360,26 +357,18 @@ describe('[BUG-850 / F-SVC-021] weekly-progress-push fan-out error escalation', 
     //   - still dispatch the third batch,
     //   - return `partial` with queuedBatches=2, failedBatches=1.
     const parentIds = Array.from({ length: 401 }, (_, i) => `parent-${i}`);
-    let sendEventCalls = 0;
-    const mockStep = {
-      run: jest.fn(async (_name: string, _fn: () => Promise<unknown>) => {
-        // The handler's first step.run resolves the parent list; later steps
-        // are only used inside the per-event handler (not under test here).
-        return parentIds;
-      }),
-      sendEvent: jest.fn(async (label: string) => {
-        sendEventCalls += 1;
-        if (label === 'fan-out-weekly-progress-200') {
-          throw new Error('transient inngest 500');
-        }
-      }),
-    };
+    const { step, sendEventCalls } = createInngestStepRunner({
+      runResults: { 'find-weekly-parents': parentIds },
+      sendEventErrors: {
+        'fan-out-weekly-progress-200': new Error('transient inngest 500'),
+      },
+    });
     const handler = (
       weeklyProgressPushCron as unknown as {
-        fn: (ctx: { step: typeof mockStep }) => Promise<unknown>;
+        fn: (ctx: { step: typeof step }) => Promise<unknown>;
       }
     ).fn;
-    const result = (await handler({ step: mockStep })) as {
+    const result = (await handler({ step })) as {
       status: string;
       queuedParents: number;
       totalParents: number;
@@ -387,7 +376,7 @@ describe('[BUG-850 / F-SVC-021] weekly-progress-push fan-out error escalation', 
       failedBatches: number;
     };
 
-    expect(sendEventCalls).toBe(3);
+    expect(sendEventCalls).toHaveLength(3);
     expect(result.status).toBe('partial');
     expect(result.failedBatches).toBe(1);
     expect(result.queuedBatches).toBe(2);
@@ -456,6 +445,7 @@ describe('weekly progress parent eligibility', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockInngestTransport.clear();
     mockDb.query.familyLinks.findMany.mockResolvedValue([]);
     mockDb.query.notificationPreferences.findMany.mockResolvedValue([]);
   });
@@ -485,10 +475,7 @@ describe('weekly progress parent eligibility', () => {
       }),
     });
 
-    const step = {
-      run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
-      sendEvent: jest.fn().mockResolvedValue(undefined),
-    };
+    const { step, sendEventCalls } = createInngestStepRunner();
     const handler = (
       weeklyProgressPushCron as unknown as {
         fn: (ctx: { step: typeof step }) => Promise<unknown>;
@@ -498,12 +485,17 @@ describe('weekly progress parent eligibility', () => {
     const result = (await handler({ step })) as { queuedParents: number };
 
     expect(result.queuedParents).toBe(1);
-    expect(step.sendEvent).toHaveBeenCalledWith(expect.any(String), [
+    expect(sendEventCalls).toContainEqual(
       expect.objectContaining({
-        name: 'app/weekly-progress-push.generate',
-        data: { parentId: 'parent-email-only' },
+        name: expect.any(String),
+        payload: expect.arrayContaining([
+          expect.objectContaining({
+            name: 'app/weekly-progress-push.generate',
+            data: { parentId: 'parent-email-only' },
+          }),
+        ]),
       }),
-    ]);
+    );
   });
 });
 

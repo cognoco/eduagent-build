@@ -7,76 +7,84 @@ const mockSendPushNotification = jest.fn();
 const mockFormatRecallNudge = jest.fn();
 const mockResolveProfileRole = jest.fn();
 
-jest.mock('../helpers', () => ({
-  getStepDatabase: () => mockGetStepDatabase(),
-}));
+jest.mock(
+  '../helpers' /* gc1-allow: isolates DB connection from unit test */,
+  () => ({
+    getStepDatabase: () => mockGetStepDatabase(),
+  }),
+);
 
-jest.mock('../../services/notifications', () => ({
-  sendPushNotification: (...args: unknown[]) =>
-    mockSendPushNotification(...args),
-  formatRecallNudge: (...args: unknown[]) => mockFormatRecallNudge(...args),
-}));
+jest.mock(
+  '../../services/notifications' /* gc1-allow: isolates push notification external boundary */,
+  () => ({
+    sendPushNotification: (...args: unknown[]) =>
+      mockSendPushNotification(...args),
+    formatRecallNudge: (...args: unknown[]) => mockFormatRecallNudge(...args),
+  }),
+);
 
-jest.mock('../../services/profile', () => ({
-  resolveProfileRole: (...args: unknown[]) => mockResolveProfileRole(...args),
-}));
+jest.mock(
+  '../../services/profile' /* gc1-allow: isolates profile service from unit test */,
+  () => ({
+    resolveProfileRole: (...args: unknown[]) => mockResolveProfileRole(...args),
+  }),
+);
 
 const mockGetRecentNotificationCount = jest.fn().mockResolvedValue(0);
-jest.mock('../../services/settings', () => ({
-  getRecentNotificationCount: (...args: unknown[]) =>
-    mockGetRecentNotificationCount(...args),
-}));
+jest.mock(
+  '../../services/settings' /* gc1-allow: isolates notification settings service */,
+  () => ({
+    getRecentNotificationCount: (...args: unknown[]) =>
+      mockGetRecentNotificationCount(...args),
+  }),
+);
 
 const mockCaptureException = jest.fn();
-jest.mock('../../services/sentry', () => ({
-  captureException: (...args: unknown[]) => mockCaptureException(...args),
-}));
+jest.mock(
+  '../../services/sentry' /* gc1-allow: isolates Sentry external boundary */,
+  () => ({
+    captureException: (...args: unknown[]) => mockCaptureException(...args),
+  }),
+);
 
-jest.mock('../client', () => ({
-  inngest: {
-    createFunction: jest.fn((_config, _trigger, handler) => ({
-      fn: handler,
-      opts: _config,
-      _trigger,
-    })),
-    send: jest.fn().mockResolvedValue(undefined),
-  },
-}));
+import { createInngestTransportCapture } from '../../test-utils/inngest-transport-capture';
+import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
+
+const mockInngestTransport = createInngestTransportCapture();
+jest.mock('../client', () => mockInngestTransport.module); // gc1-allow: inngest framework boundary
 
 // Mock drizzle-orm + database
-jest.mock('drizzle-orm', () => ({
-  eq: jest.fn(),
-  inArray: jest.fn(),
-}));
+jest.mock(
+  'drizzle-orm' /* gc1-allow: isolates drizzle-orm from unit test */,
+  () => ({
+    eq: jest.fn(),
+    inArray: jest.fn(),
+  }),
+);
 
-jest.mock('@eduagent/database', () => ({
-  curriculumTopics: {},
-  familyLinks: {},
-  profiles: {},
-}));
+jest.mock(
+  '@eduagent/database' /* gc1-allow: isolates database schema from unit test */,
+  () => ({
+    curriculumTopics: {},
+    familyLinks: {},
+    profiles: {},
+  }),
+);
 
 import { recallNudgeSend } from './recall-nudge-send';
-
-function createMockStep() {
-  return {
-    run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
-    sendEvent: jest.fn().mockResolvedValue(undefined),
-    sleep: jest.fn(),
-  };
-}
 
 async function executeHandler(eventData: {
   profileId: string;
   fadingCount: number;
   topTopicIds: string[];
 }) {
-  const mockStep = createMockStep();
+  const { step, sendEventCalls, sleepCalls } = createInngestStepRunner();
   const handler = (recallNudgeSend as any).fn;
   const result = await handler({
     event: { id: 'evt-recall-001', data: eventData },
-    step: mockStep,
+    step,
   });
-  return { result, mockStep };
+  return { result, sendEventCalls, sleepCalls };
 }
 
 describe('recallNudgeSend', () => {
@@ -108,7 +116,7 @@ describe('recallNudgeSend', () => {
     });
 
     it('triggers on app/recall-nudge.send', () => {
-      const trigger = (recallNudgeSend as any)._trigger;
+      const trigger = (recallNudgeSend as any).trigger;
       expect(trigger.event).toBe('app/recall-nudge.send');
     });
 
@@ -190,7 +198,7 @@ describe('[BUG-699-FOLLOWUP] recall-nudge-send 24h push dedup', () => {
       mockDb,
       'p-dup',
       'recall_nudge',
-      24
+      24,
     );
     expect(mockSendPushNotification).not.toHaveBeenCalled();
     expect(result).toEqual({
@@ -262,7 +270,7 @@ describe('[CR-RECALL-DEDUP-GUARD] getRecentNotificationCount DB failure — fail
         extra: expect.objectContaining({
           context: 'recall-nudge-send:getRecentNotificationCount',
         }),
-      })
+      }),
     );
     expect(mockSendPushNotification).not.toHaveBeenCalled();
     expect(result).toEqual({

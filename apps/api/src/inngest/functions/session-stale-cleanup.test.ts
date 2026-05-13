@@ -12,32 +12,35 @@ import type { Database } from '@eduagent/database';
 const mockCloseStaleSessions = jest.fn();
 const mockAbandonStaleQuizRounds = jest.fn();
 
-jest.mock('../../services/session', () => ({
-  closeStaleSessions: (...args: unknown[]) => mockCloseStaleSessions(...args),
-}));
+jest.mock(
+  '../../services/session' /* gc1-allow: isolates session service from unit test */,
+  () => ({
+    closeStaleSessions: (...args: unknown[]) => mockCloseStaleSessions(...args),
+  }),
+);
 
-jest.mock('../../services/quiz', () => ({
-  abandonStaleQuizRounds: (...args: unknown[]) =>
-    mockAbandonStaleQuizRounds(...args),
-}));
+jest.mock(
+  '../../services/quiz' /* gc1-allow: isolates quiz service from unit test */,
+  () => ({
+    abandonStaleQuizRounds: (...args: unknown[]) =>
+      mockAbandonStaleQuizRounds(...args),
+  }),
+);
 
 const mockGetStepDatabase = jest.fn();
 
-jest.mock('../helpers', () => ({
-  getStepDatabase: () => mockGetStepDatabase(),
-}));
+jest.mock(
+  '../helpers' /* gc1-allow: isolates DB connection from unit test */,
+  () => ({
+    getStepDatabase: () => mockGetStepDatabase(),
+  }),
+);
 
-const mockInngestSend = jest.fn().mockResolvedValue(undefined);
+import { createInngestTransportCapture } from '../../test-utils/inngest-transport-capture';
+import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 
-jest.mock('../client', () => ({
-  inngest: {
-    createFunction: jest.fn((_config, _trigger, handler) => {
-      // Expose the handler for direct invocation in tests
-      return { fn: handler, _config, _trigger };
-    }),
-    send: (...args: unknown[]) => mockInngestSend(...args),
-  },
-}));
+const mockInngestTransport = createInngestTransportCapture();
+jest.mock('../client', () => mockInngestTransport.module); // gc1-allow: inngest framework boundary
 
 // Import AFTER mocks are set up
 import { sessionStaleCleanup } from './session-stale-cleanup';
@@ -47,20 +50,11 @@ import { sessionStaleCleanup } from './session-stale-cleanup';
 // ---------------------------------------------------------------------------
 
 async function executeHandler() {
-  const mockStep = {
-    run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
-    // [BUG-696 / J-7] sendEvent must be a jest.fn — production now dispatches
-    // the per-session events via a single step.sendEvent('name', array) call
-    // (memoized atomically) instead of bare inngest.send loops. A missing
-    // sendEvent on the mock would surface as `step.sendEvent is not a function`.
-    sendEvent: jest.fn().mockResolvedValue(undefined),
-    sleep: jest.fn(),
-    waitForEvent: jest.fn().mockResolvedValue(null),
-  };
+  const { step, sendEventCalls } = createInngestStepRunner();
 
   const handler = (sessionStaleCleanup as any).fn;
-  const result = await handler({ step: mockStep });
-  return { result, mockStep };
+  const result = await handler({ step });
+  return { result, sendEventCalls };
 }
 
 // ---------------------------------------------------------------------------
@@ -79,7 +73,7 @@ function createClosedSession(
     summaryStatus: string;
     interleavedTopicIds: string[];
     escalationRungs: number[];
-  }> = {}
+  }> = {},
 ) {
   return {
     profileId: overrides.profileId ?? 'profile-1',
@@ -104,13 +98,14 @@ describe('session-stale-cleanup Inngest function', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockInngestTransport.clear();
     mockGetStepDatabase.mockReturnValue(mockDb);
     mockAbandonStaleQuizRounds.mockResolvedValue(0);
   });
 
   it('is configured with the correct function ID and cron schedule', () => {
-    const config = (sessionStaleCleanup as any)._config;
-    const trigger = (sessionStaleCleanup as any)._trigger;
+    const config = (sessionStaleCleanup as any).opts;
+    const trigger = (sessionStaleCleanup as any).trigger;
 
     expect(config.id).toBe('session-stale-cleanup');
     expect(trigger.cron).toBe('*/10 * * * *');
@@ -125,7 +120,7 @@ describe('session-stale-cleanup Inngest function', () => {
 
     expect(mockCloseStaleSessions).toHaveBeenCalledWith(
       mockDb,
-      expect.any(Date)
+      expect.any(Date),
     );
 
     const cutoff = mockCloseStaleSessions.mock.calls[0][1] as Date;
@@ -152,13 +147,13 @@ describe('session-stale-cleanup Inngest function', () => {
     });
     mockCloseStaleSessions.mockResolvedValue([session1, session2]);
 
-    const { mockStep } = await executeHandler();
+    const { sendEventCalls } = await executeHandler();
 
     // [BUG-696 / J-7] One memoized step.sendEvent call carrying the array of
     // per-session payloads — NOT N separate inngest.send calls.
-    expect(mockStep.sendEvent).toHaveBeenCalledTimes(1);
-    expect(mockStep.sendEvent).toHaveBeenCalledWith(
-      'dispatch-session-completed',
+    expect(sendEventCalls).toHaveLength(1);
+    expect(sendEventCalls[0]!.name).toBe('dispatch-session-completed');
+    expect(sendEventCalls[0]!.payload).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           name: 'app/session.completed',
@@ -177,7 +172,7 @@ describe('session-stale-cleanup Inngest function', () => {
             sessionId: 'session-2',
           }),
         }),
-      ])
+      ]),
     );
   });
 
@@ -188,10 +183,9 @@ describe('session-stale-cleanup Inngest function', () => {
     });
     mockCloseStaleSessions.mockResolvedValue([session]);
 
-    const { mockStep } = await executeHandler();
+    const { sendEventCalls } = await executeHandler();
 
-    expect(mockStep.sendEvent).toHaveBeenCalledWith(
-      'dispatch-session-completed',
+    expect(sendEventCalls[0]!.payload).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           data: expect.objectContaining({
@@ -199,7 +193,7 @@ describe('session-stale-cleanup Inngest function', () => {
             verificationType: 'teach_back',
           }),
         }),
-      ])
+      ]),
     );
   });
 
@@ -211,10 +205,9 @@ describe('session-stale-cleanup Inngest function', () => {
     });
     mockCloseStaleSessions.mockResolvedValue([session]);
 
-    const { mockStep } = await executeHandler();
+    const { sendEventCalls } = await executeHandler();
 
-    expect(mockStep.sendEvent).toHaveBeenCalledWith(
-      'dispatch-session-completed',
+    expect(sendEventCalls[0]!.payload).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           data: expect.objectContaining({
@@ -222,16 +215,16 @@ describe('session-stale-cleanup Inngest function', () => {
             interleavedTopicIds: ['topic-a', 'topic-b'],
           }),
         }),
-      ])
+      ]),
     );
   });
 
   it('dispatches no events when no sessions are stale', async () => {
     mockCloseStaleSessions.mockResolvedValue([]);
 
-    const { result, mockStep } = await executeHandler();
+    const { result, sendEventCalls } = await executeHandler();
 
-    expect(mockStep.sendEvent).not.toHaveBeenCalled();
+    expect(sendEventCalls).toHaveLength(0);
     expect(result.closedCount).toBe(0);
   });
 
@@ -241,10 +234,10 @@ describe('session-stale-cleanup Inngest function', () => {
     // included in the result array. The function should handle this gracefully.
     mockCloseStaleSessions.mockResolvedValue([]);
 
-    const { result, mockStep } = await executeHandler();
+    const { result, sendEventCalls } = await executeHandler();
 
     // No events dispatched for resumed sessions
-    expect(mockStep.sendEvent).not.toHaveBeenCalled();
+    expect(sendEventCalls).toHaveLength(0);
     expect(result.status).toBe('completed');
     expect(result.closedCount).toBe(0);
   });
@@ -256,11 +249,11 @@ describe('session-stale-cleanup Inngest function', () => {
     const closed2 = createClosedSession({ sessionId: 'session-3' });
     mockCloseStaleSessions.mockResolvedValue([closed1, closed2]);
 
-    const { result, mockStep } = await executeHandler();
+    const { result, sendEventCalls } = await executeHandler();
 
     // One step.sendEvent call carrying both payloads in the array.
-    expect(mockStep.sendEvent).toHaveBeenCalledTimes(1);
-    const dispatched = mockStep.sendEvent.mock.calls[0][1] as unknown[];
+    expect(sendEventCalls).toHaveLength(1);
+    const dispatched = sendEventCalls[0]!.payload as unknown[];
     expect(dispatched).toHaveLength(2);
     expect(result.closedCount).toBe(2);
   });
@@ -292,7 +285,7 @@ describe('session-stale-cleanup Inngest function', () => {
 
     expect(mockAbandonStaleQuizRounds).toHaveBeenCalledWith(
       mockDb,
-      expect.any(Date)
+      expect.any(Date),
     );
 
     const cutoff = mockAbandonStaleQuizRounds.mock.calls[0][1] as Date;
@@ -315,10 +308,9 @@ describe('session-stale-cleanup Inngest function', () => {
     const session = createClosedSession();
     mockCloseStaleSessions.mockResolvedValue([session]);
 
-    const { mockStep } = await executeHandler();
+    const { sendEventCalls } = await executeHandler();
 
-    expect(mockStep.sendEvent).toHaveBeenCalledWith(
-      'dispatch-session-completed',
+    expect(sendEventCalls[0]!.payload).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           name: 'app/session.completed',
@@ -327,7 +319,7 @@ describe('session-stale-cleanup Inngest function', () => {
             summaryStatus: 'auto_closed',
           }),
         }),
-      ])
+      ]),
     );
   });
 
@@ -346,10 +338,10 @@ describe('session-stale-cleanup Inngest function', () => {
     });
     mockCloseStaleSessions.mockResolvedValue([session1, session2]);
 
-    const { mockStep } = await executeHandler();
+    const { sendEventCalls } = await executeHandler();
 
-    expect(mockStep.sendEvent).toHaveBeenCalledTimes(1);
-    const dispatched = mockStep.sendEvent.mock.calls[0][1] as Array<{
+    expect(sendEventCalls).toHaveLength(1);
+    const dispatched = sendEventCalls[0]!.payload as Array<{
       data: { sessionId: string };
     }>;
     expect(dispatched).toHaveLength(2);
@@ -367,9 +359,9 @@ describe('session-stale-cleanup Inngest function', () => {
     const session = createClosedSession();
     mockCloseStaleSessions.mockResolvedValue([session]);
 
-    const { mockStep } = await executeHandler();
+    const { sendEventCalls } = await executeHandler();
 
-    expect(mockInngestSend).not.toHaveBeenCalled();
-    expect(mockStep.sendEvent).toHaveBeenCalledTimes(1);
+    expect(mockInngestTransport.sentEvents).toHaveLength(0);
+    expect(sendEventCalls).toHaveLength(1);
   });
 });

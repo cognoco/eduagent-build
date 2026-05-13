@@ -14,6 +14,7 @@ const mockFormatConsentReminderEmail = jest.fn(
 // Fake DB whose query.consentStates.findFirst returns a valid consent token.
 // All values are defined inline inside the factory to avoid Jest hoisting issues.
 jest.mock('../helpers', () => ({
+  // gc1-allow: isolates step-database helper from real DB config reads
   getStepDatabase: jest.fn(() => ({
     query: {
       consentStates: {
@@ -29,12 +30,14 @@ jest.mock('../helpers', () => ({
 }));
 
 jest.mock('../../services/consent', () => ({
+  // gc1-allow: isolates consent-reminder guards from consent service DB access
   getConsentStatus: (...args: unknown[]) => mockGetConsentStatus(...args),
   getProfileConsentState: (...args: unknown[]) =>
     mockGetProfileConsentState(...args),
 }));
 
 jest.mock('../../services/notifications', () => ({
+  // gc1-allow: prevents real email delivery while asserting notification boundary
   sendEmail: (...args: unknown[]) => mockSendEmail(...args),
   formatConsentReminderEmail: (...args: unknown[]) =>
     mockFormatConsentReminderEmail(
@@ -43,10 +46,12 @@ jest.mock('../../services/notifications', () => ({
 }));
 
 jest.mock('../../services/deletion', () => ({
+  // gc1-allow: prevents destructive profile deletion while asserting the handler boundary
   deleteProfileIfNoConsent: (...args: unknown[]) =>
     mockDeleteProfileIfNoConsent(...args),
 }));
 
+import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 import { consentReminder } from './consent-reminders';
 
 interface ProfileConsentState {
@@ -73,10 +78,7 @@ async function executeHandler(
   // parentEmail is looked up from DB via getProfileConsentState
   mockGetProfileConsentState.mockResolvedValue(profileState);
 
-  const mockStep = {
-    run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
-    sleep: jest.fn(),
-  };
+  const { step } = createInngestStepRunner();
 
   const handler = (consentReminder as any).fn;
   await handler({
@@ -88,7 +90,7 @@ async function executeHandler(
         consentType: 'GDPR',
       },
     },
-    step: mockStep,
+    step,
   });
 }
 
