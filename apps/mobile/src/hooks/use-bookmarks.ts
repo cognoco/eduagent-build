@@ -21,13 +21,20 @@ import { assertOk } from '../lib/assert-ok';
 
 export function useBookmarks(options?: {
   subjectId?: string;
+  topicId?: string;
   limit?: number;
+  enabled?: boolean;
 }): UseInfiniteQueryResult<InfiniteData<BookmarkListResponse>, Error> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
 
   return useInfiniteQuery({
-    queryKey: ['bookmarks', activeProfile?.id, options?.subjectId],
+    queryKey: [
+      'bookmarks',
+      activeProfile?.id,
+      options?.subjectId,
+      options?.topicId,
+    ],
     initialPageParam: undefined as string | undefined,
     queryFn: async ({ pageParam, signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
@@ -37,6 +44,7 @@ export function useBookmarks(options?: {
             query: {
               ...(pageParam ? { cursor: pageParam } : {}),
               ...(options?.subjectId ? { subjectId: options.subjectId } : {}),
+              ...(options?.topicId ? { topicId: options.topicId } : {}),
               ...(options?.limit ? { limit: String(options.limit) } : {}),
             },
           },
@@ -49,7 +57,7 @@ export function useBookmarks(options?: {
       }
     },
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
-    enabled: !!activeProfile,
+    enabled: !!activeProfile && (options?.enabled ?? true),
   });
 }
 

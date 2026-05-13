@@ -16,6 +16,37 @@ describe('SessionToolAccessory stage gating', () => {
     expect(queryByTestId('quick-chip-park')).toBeTruthy();
   });
 
+  it('renders Add note as a primary teaching action when provided', () => {
+    const onAddNote = jest.fn();
+    const { getByTestId } = render(
+      <SessionToolAccessory
+        isStreaming={false}
+        handleQuickChip={handleQuickChip}
+        stage="teaching"
+        onAddNote={onAddNote}
+      />,
+    );
+
+    fireEvent.press(getByTestId('quick-chip-add-note'));
+
+    expect(onAddNote).toHaveBeenCalledTimes(1);
+  });
+
+  it('disables Add note while streaming', () => {
+    const { getByTestId } = render(
+      <SessionToolAccessory
+        isStreaming
+        handleQuickChip={handleQuickChip}
+        stage="teaching"
+        onAddNote={jest.fn()}
+      />,
+    );
+
+    expect(getByTestId('quick-chip-add-note').props.accessibilityState).toEqual(
+      { disabled: true },
+    );
+  });
+
   it('renders nothing when stage is greeting', () => {
     const { queryByTestId } = render(
       <SessionToolAccessory

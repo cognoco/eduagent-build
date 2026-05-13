@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { View, Text, Pressable, ScrollView } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import { Ionicons } from '@expo/vector-icons';
 import type { HomeworkProblem } from '@eduagent/schemas';
-import type { Router } from 'expo-router';
+import type { Router, Href } from 'expo-router';
 import type { useCreateSubject } from '../../hooks/use-subjects';
 import {
   type QuickChipId,
@@ -16,12 +17,14 @@ export interface SessionToolAccessoryProps {
   isStreaming: boolean;
   handleQuickChip: (chip: QuickChipId) => Promise<void>;
   stage: ConversationStage;
+  onAddNote?: () => void;
 }
 
 export function SessionToolAccessory({
   isStreaming,
   handleQuickChip,
   stage,
+  onAddNote,
 }: SessionToolAccessoryProps) {
   const { t } = useTranslation();
   if (stage !== 'teaching') return null;
@@ -34,6 +37,28 @@ export function SessionToolAccessory({
         contentContainerStyle={{ gap: 6 }}
         testID="session-quick-chips"
       >
+        {onAddNote ? (
+          <Pressable
+            onPress={onAddNote}
+            disabled={isStreaming}
+            className={`rounded-full px-4 py-2 min-h-[44px] flex-row items-center ${
+              isStreaming ? 'bg-surface' : 'bg-primary/15'
+            }`}
+            accessibilityRole="button"
+            accessibilityLabel={t('session.accessories.addNote')}
+            accessibilityState={{ disabled: isStreaming }}
+            testID="quick-chip-add-note"
+          >
+            <Ionicons
+              name="document-text-outline"
+              size={16}
+              className="text-primary"
+            />
+            <Text className="text-body-sm font-semibold text-primary ms-1.5">
+              {t('session.accessories.addNote')}
+            </Text>
+          </Pressable>
+        ) : null}
         {(
           [
             { id: 'switch_topic', label: t('session.accessories.switchTopic') },
@@ -198,7 +223,7 @@ export function SubjectResolutionAccessory({
                   returnTo: 'chat',
                   chatTopic: pendingSubjectResolution.originalText,
                 },
-              } as never)
+              } as Href)
             }
             disabled={isStreaming || pendingClassification}
             className="rounded-full border border-border px-4 py-2"
@@ -225,7 +250,7 @@ export function SubjectResolutionAccessory({
                 returnTo: 'chat',
                 chatTopic: pendingSubjectResolution.originalText,
               },
-            } as never);
+            } as Href);
           }}
           className="rounded-button bg-primary py-3 items-center min-h-[44px] justify-center"
           accessibilityRole="button"

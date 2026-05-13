@@ -496,7 +496,8 @@
       "finishEarlyLabel": "Sitzung frühzeitig beenden",
       "nextProblemLabel": "Nächste Aufgabe",
       "finishHomeworkLabel": "Hausaufgaben beenden",
-      "endSessionLabel": "Sitzung beenden"
+      "endSessionLabel": "Sitzung beenden",
+      "addNote": "Notiz hinzufügen"
     },
     "quota": {
       "dailyLimitReached": "Tageslimit erreicht",
@@ -571,7 +572,8 @@
       "writeNote": "Notiz schreiben",
       "cannotSaveTitle": "Notiz nicht gespeichert",
       "cannotSaveMessage": "Notizen können im Moment nicht gespeichert werden. Bitte versuche es erneut.",
-      "saveFailedTitle": "Notiz konnte nicht gespeichert werden"
+      "saveFailedTitle": "Notiz konnte nicht gespeichert werden",
+      "summaryPlaceholder": "Fasse dies in deinen eigenen Worten zusammen ..."
     },
     "filingPrompt": {
       "title": "Zur Bibliothek hinzufügen?",
@@ -1324,8 +1326,6 @@
         "streak": "{{count}} Tage in Folge"
       },
       "practice": {
-        "quizzes": "Quizze abgeschlossen",
-        "reviews": "Wiederholungen abgeschlossen",
         "tests": "Tests",
         "points": "Punkte"
       }
@@ -1340,7 +1340,9 @@
       "bars": {
         "sessions": "Sitzungen",
         "time": "Zeit",
-        "topics": "Themen"
+        "topics": "Themen",
+        "quizzes": "Quizze",
+        "reviews": "Wiederholungen"
       }
     },
     "newLearner": {

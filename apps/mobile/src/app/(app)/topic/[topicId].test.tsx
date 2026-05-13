@@ -152,6 +152,7 @@ interface SetupOptions {
   resolveResult?: object | null | false;
   notes?: object[];
   sessions?: object[];
+  bookmarks?: object[];
 }
 
 function setupRoutes(opts: SetupOptions = {}) {
@@ -169,6 +170,7 @@ function setupRoutes(opts: SetupOptions = {}) {
     resolveResult = false,
     notes = [],
     sessions = [],
+    bookmarks = [],
   } = opts;
 
   // GET /topics/t1/progress → { topic }
@@ -213,6 +215,9 @@ function setupRoutes(opts: SetupOptions = {}) {
 
   // GET /subjects/s1/topics/t1/sessions → { sessions }
   mockFetch.setRoute('/topics/t1/sessions', { sessions });
+
+  // GET /bookmarks → { bookmarks, nextCursor }
+  mockFetch.setRoute('/bookmarks', { bookmarks, nextCursor: null });
 }
 
 // ---------------------------------------------------------------------------
@@ -678,6 +683,76 @@ describe('TopicDetailScreen rendering details', () => {
 
     await waitFor(() => {
       screen.getByText('+ Add a note');
+    });
+  });
+
+  it('shows saved chat bookmarks for this topic', async () => {
+    setupRoutes({
+      bookmarks: [
+        {
+          id: 'bookmark-1',
+          eventId: 'event-1',
+          sessionId: 'session-1',
+          subjectId: 's1',
+          topicId: 't1',
+          subjectName: 'Math',
+          topicTitle: 'Algebra',
+          content: 'This is a saved explanation from chat.',
+          createdAt: '2026-05-13T10:00:00.000Z',
+        },
+      ],
+    });
+
+    render(<TopicDetailScreen />, { wrapper: TestWrapper });
+
+    await waitFor(() => {
+      screen.getByText('Saved from chat');
+    });
+    screen.getByText('This is a saved explanation from chat.');
+  });
+
+  it('hides saved chat section when there are no bookmarks', async () => {
+    setupRoutes({ bookmarks: [] });
+
+    render(<TopicDetailScreen />, { wrapper: TestWrapper });
+
+    await waitFor(() => {
+      screen.getByText('+ Add your first note for this topic');
+    });
+    expect(screen.queryByText('Saved from chat')).toBeNull();
+  });
+
+  it('opens source session when a topic bookmark is pressed', async () => {
+    setupRoutes({
+      bookmarks: [
+        {
+          id: 'bookmark-1',
+          eventId: 'event-1',
+          sessionId: 'session-1',
+          subjectId: 's1',
+          topicId: 't1',
+          subjectName: 'Math',
+          topicTitle: 'Algebra',
+          content: 'Saved chat item.',
+          createdAt: '2026-05-13T10:00:00.000Z',
+        },
+      ],
+    });
+
+    render(<TopicDetailScreen />, { wrapper: TestWrapper });
+
+    await waitFor(() => {
+      screen.getByTestId('bookmark-card-bookmark-1');
+    });
+    fireEvent.press(screen.getByTestId('bookmark-card-bookmark-1'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/session-summary/[sessionId]',
+      params: {
+        sessionId: 'session-1',
+        subjectId: 's1',
+        topicId: 't1',
+      },
     });
   });
 

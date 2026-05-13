@@ -496,7 +496,8 @@
       "finishEarlyLabel": "セッションを早めに終了",
       "nextProblemLabel": "次の問題",
       "finishHomeworkLabel": "宿題を終える",
-      "endSessionLabel": "セッションを終了"
+      "endSessionLabel": "セッションを終了",
+      "addNote": "ノートを追加"
     },
     "quota": {
       "dailyLimitReached": "1日の上限に達しました",
@@ -571,7 +572,8 @@
       "writeNote": "メモを書く",
       "cannotSaveTitle": "メモを保存できません",
       "cannotSaveMessage": "現在メモを保存できません。もう一度お試しください。",
-      "saveFailedTitle": "メモを保存できませんでした"
+      "saveFailedTitle": "メモを保存できませんでした",
+      "summaryPlaceholder": "自分の言葉で要約してみましょう..."
     },
     "filingPrompt": {
       "title": "ライブラリに追加しますか？",
@@ -1324,8 +1326,6 @@
         "streak": "{{count}}日連続"
       },
       "practice": {
-        "quizzes": "クイズ完了",
-        "reviews": "復習完了",
         "tests": "テスト",
         "points": "ポイント"
       }
@@ -1340,7 +1340,9 @@
       "bars": {
         "sessions": "セッション",
         "time": "時間",
-        "topics": "トピック"
+        "topics": "トピック",
+        "quizzes": "クイズ",
+        "reviews": "復習"
       }
     },
     "newLearner": {

@@ -521,7 +521,8 @@
       "finishEarlyLabel": "Zakończ sesję wcześniej",
       "nextProblemLabel": "Następny problem",
       "finishHomeworkLabel": "Zakończ zadanie domowe",
-      "endSessionLabel": "Zakończ sesję"
+      "endSessionLabel": "Zakończ sesję",
+      "addNote": "Dodaj notatkę"
     },
     "quota": {
       "dailyLimitReached": "Osiągnięto limit dzienny",
@@ -596,7 +597,8 @@
       "writeNote": "Napisz notatkę",
       "cannotSaveTitle": "Nie można zapisać notatki",
       "cannotSaveMessage": "Notatek nie można teraz zapisać. Spróbuj ponownie.",
-      "saveFailedTitle": "Nie można zapisać notatki"
+      "saveFailedTitle": "Nie można zapisać notatki",
+      "summaryPlaceholder": "Streszcz to własnymi słowami..."
     },
     "filingPrompt": {
       "title": "Dodać do biblioteki?",
@@ -1349,8 +1351,6 @@
         "streak": "{{count}} dni z rzędu"
       },
       "practice": {
-        "quizzes": "quizy ukończone",
-        "reviews": "powtórki zakończone",
         "tests": "testy",
         "points": "punkty"
       }
@@ -1365,7 +1365,9 @@
       "bars": {
         "sessions": "Sesje",
         "time": "Czas",
-        "topics": "Tematy"
+        "topics": "Tematy",
+        "quizzes": "Quizy",
+        "reviews": "Powtórki"
       }
     },
     "newLearner": {

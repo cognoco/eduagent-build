@@ -25,6 +25,7 @@ import {
   useRouter,
   useLocalSearchParams,
   useFocusEffect,
+  type Href,
 } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type {
@@ -273,7 +274,7 @@ class SessionErrorBoundary extends Component<
                 error: null,
                 componentStack: null,
               });
-              router.replace('/(app)/home' as never);
+              router.replace('/(app)/home' as Href);
             }}
             style={{
               backgroundColor: tokens.light.colors.border,
@@ -425,21 +426,21 @@ function SessionScreenInner() {
   // typed object form makes the navigation reliable across web + native.
   const handleChatBackPress = useCallback(() => {
     if (returnTo) {
-      router.replace(homeBackHref as never);
+      router.replace(homeBackHref as Href);
       return;
     }
     if (subjectId) {
       router.replace({
         pathname: '/(app)/shelf/[subjectId]',
         params: { subjectId },
-      } as never);
+      } as Href);
       return;
     }
-    router.replace('/(app)/home' as never);
+    router.replace('/(app)/home' as Href);
   }, [returnTo, subjectId, homeBackHref, router]);
   const handleHomeBack = useCallback(() => {
     if (returnTo) {
-      router.replace(homeBackHref as never);
+      router.replace(homeBackHref as Href);
       return;
     }
 
@@ -456,7 +457,7 @@ function SessionScreenInner() {
         ...(topicName ? { topicName } : {}),
         ...(returnTo ? { returnTo } : {}),
       },
-    } as never);
+    } as Href);
   }, [mode, returnTo, router, subjectId, subjectName, topicId, topicName]);
   const normalizedOcrText = Array.isArray(ocrText) ? ocrText[0] : ocrText;
   const normalizedCaptureSource = Array.isArray(captureSource)
@@ -1478,6 +1479,7 @@ function SessionScreenInner() {
       isStreaming={isStreaming}
       handleQuickChip={handleQuickChip}
       stage={conversationStage}
+      onAddNote={() => setShowNoteInput(true)}
     />
   );
 

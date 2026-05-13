@@ -496,7 +496,8 @@
       "finishEarlyLabel": "Fullfør økten tidlig",
       "nextProblemLabel": "Neste oppgave",
       "finishHomeworkLabel": "Fullfør leksene",
-      "endSessionLabel": "Avslutt økt"
+      "endSessionLabel": "Avslutt økt",
+      "addNote": "Legg til notat"
     },
     "quota": {
       "dailyLimitReached": "Daglig grense nådd",
@@ -571,7 +572,8 @@
       "writeNote": "Skriv et notat",
       "cannotSaveTitle": "Kan ikke lagre notat",
       "cannotSaveMessage": "Notater kan ikke lagres akkurat nå. Prøv igjen.",
-      "saveFailedTitle": "Kunne ikke lagre notat"
+      "saveFailedTitle": "Kunne ikke lagre notat",
+      "summaryPlaceholder": "Oppsummer dette med dine egne ord ..."
     },
     "filingPrompt": {
       "title": "Legge til i biblioteket?",
@@ -1324,8 +1326,6 @@
         "streak": "{{count}} dager på rad"
       },
       "practice": {
-        "quizzes": "quizer fullført",
-        "reviews": "repetisjoner fullført",
         "tests": "tester",
         "points": "poeng"
       }
@@ -1340,7 +1340,9 @@
       "bars": {
         "sessions": "Økter",
         "time": "Tid",
-        "topics": "Temaer"
+        "topics": "Temaer",
+        "quizzes": "Quizer",
+        "reviews": "Repetisjoner"
       }
     },
     "newLearner": {

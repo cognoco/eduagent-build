@@ -39,7 +39,7 @@ describe('SessionMessageActions stage gating', () => {
   });
 
   it('renders bookmark toggle when bookmark props are provided', () => {
-    const { queryByTestId } = render(
+    const { getByTestId, queryByTestId } = render(
       <SessionMessageActions
         {...defaultProps}
         stage="teaching"
@@ -49,6 +49,22 @@ describe('SessionMessageActions stage gating', () => {
     );
 
     expect(queryByTestId('bookmark-toggle-evt-1')).toBeTruthy();
+    expect(getByTestId('bookmark-toggle-evt-1').props.className).toContain(
+      'min-h-[36px]',
+    );
+  });
+
+  it('hides bookmark toggle when the assistant message has no eventId', () => {
+    const { queryByTestId } = render(
+      <SessionMessageActions
+        {...defaultProps}
+        message={{ ...baseMessage, eventId: undefined }}
+        bookmarkState={{}}
+        onToggleBookmark={jest.fn()}
+      />,
+    );
+
+    expect(queryByTestId('bookmark-toggle-evt-1')).toBeNull();
   });
 
   it('hides chips and feedback when stage is greeting', () => {

@@ -480,6 +480,7 @@
     "accessories": {
       "switchTopic": "Switch topic",
       "parkIt": "Park it",
+      "addNote": "Add note",
       "pickSubject": "Pick the subject",
       "adding": "Adding...",
       "newSubject": "+ New subject",
@@ -571,7 +572,8 @@
       "writeNote": "Write a note",
       "cannotSaveTitle": "Cannot save note",
       "cannotSaveMessage": "Notes cannot be saved right now. Please try again.",
-      "saveFailedTitle": "Could not save note"
+      "saveFailedTitle": "Could not save note",
+      "summaryPlaceholder": "Summarize this in your own words..."
     },
     "filingPrompt": {
       "title": "Add to library?",
@@ -1387,8 +1389,6 @@
         "streak": "{{count}}-day streak"
       },
       "practice": {
-        "quizzes": "quizzes completed",
-        "reviews": "reviews finished",
         "tests": "tests",
         "points": "points"
       },
@@ -1411,7 +1411,9 @@
       "bars": {
         "sessions": "Sessions",
         "time": "Time",
-        "topics": "Topics"
+        "topics": "Topics",
+        "quizzes": "Quizzes",
+        "reviews": "Reviews"
       },
       "empty": {
         "child": "Your first monthly summary lands at the end of {{month}}.",
