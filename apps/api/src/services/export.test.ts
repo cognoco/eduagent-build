@@ -208,9 +208,9 @@ describe('generateExport', () => {
     const result = await generateExport(db, 'account-1');
 
     expect(result.profiles).toHaveLength(1);
-    expect(result.profiles[0].displayName).toBe('Alice');
-    expect(result.profiles[0].birthYear).toBe(1990);
-    expect(result.profiles[0].createdAt).toBe('2025-01-15T10:00:00.000Z');
+    expect(result.profiles[0]!.displayName).toBe('Alice');
+    expect(result.profiles[0]!.birthYear).toBe(1990);
+    expect(result.profiles[0]!.createdAt).toBe('2025-01-15T10:00:00.000Z');
   });
 
   it('includes consent states with mapped dates', async () => {
@@ -220,9 +220,9 @@ describe('generateExport', () => {
     const result = await generateExport(db, 'account-1');
 
     expect(result.consentStates).toHaveLength(1);
-    expect(result.consentStates[0].consentType).toBe('GDPR');
-    expect(result.consentStates[0].status).toBe('CONSENTED');
-    expect(result.consentStates[0].requestedAt).toBe(
+    expect(result.consentStates[0]!.consentType).toBe('GDPR');
+    expect(result.consentStates[0]!.status).toBe('CONSENTED');
+    expect(result.consentStates[0]!.requestedAt).toBe(
       '2025-01-15T10:00:00.000Z',
     );
   });

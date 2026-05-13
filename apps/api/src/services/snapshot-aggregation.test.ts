@@ -618,7 +618,7 @@ describe('getSnapshotsInRange', () => {
     );
 
     expect(result).toHaveLength(1);
-    expect(result[0].snapshotDate).toBe('2026-04-10');
+    expect(result[0]!.snapshotDate).toBe('2026-04-10');
   });
 
   it('returns parsed metrics without updatedAt (narrower public shape)', async () => {
@@ -636,7 +636,7 @@ describe('getSnapshotsInRange', () => {
       }),
     );
     // updatedAt must NOT be present on the returned shape
-    expect('updatedAt' in result[0]).toBe(false);
+    expect('updatedAt' in result[0]!).toBe(false);
   });
 
   it('returns empty array when range contains no matching dates', async () => {
@@ -684,7 +684,7 @@ describe('buildKnowledgeInventory', () => {
     });
     (
       db.query as unknown as Record<string, { findMany: jest.Mock }>
-    ).subjects.findMany.mockResolvedValue([makeSubjectRow(subjectId)]);
+    ).subjects!.findMany.mockResolvedValue([makeSubjectRow(subjectId)]);
 
     const result = await buildKnowledgeInventory(db, profileId);
 
@@ -707,7 +707,7 @@ describe('buildKnowledgeInventory', () => {
     const db = createSnapshotDb({ findFirst: latest, findMany: [latest] });
     (
       db.query as unknown as Record<string, { findFirst: jest.Mock }>
-    ).learningProfiles.findFirst.mockResolvedValue({
+    ).learningProfiles!.findFirst.mockResolvedValue({
       profileId,
       struggles: [
         {
@@ -839,9 +839,9 @@ describe('listRecentMilestones', () => {
     const result = await listRecentMilestones(db, profileId, 5);
 
     expect(result).toHaveLength(1);
-    expect(result[0].milestoneType).toBe('session_count');
-    expect(result[0].threshold).toBe(1);
-    expect(result[0].createdAt).toBe(createdAt.toISOString());
+    expect(result[0]!.milestoneType).toBe('session_count');
+    expect(result[0]!.threshold).toBe(1);
+    expect(result[0]!.createdAt).toBe(createdAt.toISOString());
   });
 
   it('respects the limit parameter', async () => {
@@ -862,7 +862,7 @@ describe('listRecentMilestones', () => {
     // the function does not silently drop the limit argument.
     const milestonesFindMany = (
       db.query as unknown as Record<string, { findMany: jest.Mock }>
-    ).milestones.findMany;
+    ).milestones!.findMany;
     const lastCall = milestonesFindMany.mock.calls.at(-1)?.[0] as
       | { limit?: number }
       | undefined;
@@ -951,7 +951,7 @@ describe('refreshProgressSnapshot', () => {
     expect(result.milestones).toEqual([]);
     // The expensive recompute path loads subjects; it must not run.
     expect(
-      (db.query as unknown as Record<string, { findMany: jest.Mock }>).subjects
+      (db.query as unknown as Record<string, { findMany: jest.Mock }>).subjects!
         .findMany,
     ).not.toHaveBeenCalled();
   });
@@ -973,7 +973,7 @@ describe('refreshProgressSnapshot', () => {
 
     expect(result.milestones).toEqual([]);
     expect(
-      (db.query as unknown as Record<string, { findMany: jest.Mock }>).subjects
+      (db.query as unknown as Record<string, { findMany: jest.Mock }>).subjects!
         .findMany,
     ).not.toHaveBeenCalled();
   });
@@ -999,7 +999,7 @@ describe('refreshProgressSnapshot', () => {
 
     // The recompute path must have loaded subjects (even if empty)
     expect(
-      (db.query as unknown as Record<string, { findMany: jest.Mock }>).subjects
+      (db.query as unknown as Record<string, { findMany: jest.Mock }>).subjects!
         .findMany,
     ).toHaveBeenCalled();
   });
@@ -1018,7 +1018,7 @@ describe('refreshProgressSnapshot', () => {
     await refreshProgressSnapshot(db, profileId, { sessionEndedAt });
 
     expect(
-      (db.query as unknown as Record<string, { findMany: jest.Mock }>).subjects
+      (db.query as unknown as Record<string, { findMany: jest.Mock }>).subjects!
         .findMany,
     ).toHaveBeenCalled();
   });
@@ -1030,7 +1030,7 @@ describe('refreshProgressSnapshot', () => {
     await refreshProgressSnapshot(db, profileId, { sessionEndedAt });
 
     expect(
-      (db.query as unknown as Record<string, { findMany: jest.Mock }>).subjects
+      (db.query as unknown as Record<string, { findMany: jest.Mock }>).subjects!
         .findMany,
     ).toHaveBeenCalled();
   });
@@ -1053,7 +1053,7 @@ describe('refreshProgressSnapshot', () => {
 
     // Must still invoke the full recompute path
     expect(
-      (db.query as unknown as Record<string, { findMany: jest.Mock }>).subjects
+      (db.query as unknown as Record<string, { findMany: jest.Mock }>).subjects!
         .findMany,
     ).toHaveBeenCalled();
   });
@@ -1106,7 +1106,7 @@ describe('refreshProgressSnapshot', () => {
     const result = await refreshProgressSnapshot(db, profileId);
 
     expect(result.milestones).toHaveLength(1);
-    expect(result.milestones[0].milestoneType).toBe('session_count');
+    expect(result.milestones[0]!.milestoneType).toBe('session_count');
   });
 
   it('queues celebrations for each newly inserted milestone', async () => {

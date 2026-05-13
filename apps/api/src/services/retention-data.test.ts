@@ -242,11 +242,11 @@ describe('getSubjectRetention', () => {
     const result = await getSubjectRetention(db, profileId, subjectId);
 
     expect(result.topics).toHaveLength(1);
-    expect(result.topics[0].topicId).toBe(topicId);
-    expect(result.topics[0].easeFactor).toBe(2.5);
-    expect(result.topics[0].intervalDays).toBe(7);
-    expect(result.topics[0].daysSinceLastReview).toEqual(expect.any(Number));
-    expect(result.topics[0].topicTitle).toBe('Topic 1');
+    expect(result.topics[0]!.topicId).toBe(topicId);
+    expect(result.topics[0]!.easeFactor).toBe(2.5);
+    expect(result.topics[0]!.intervalDays).toBe(7);
+    expect(result.topics[0]!.daysSinceLastReview).toEqual(expect.any(Number));
+    expect(result.topics[0]!.topicTitle).toBe('Topic 1');
   });
 
   it('computes elapsed review days from lastReviewedAt', () => {
@@ -567,8 +567,8 @@ describe('processRecallTest', () => {
     expect(result.failureCount).toBe(0);
 
     // Verify the DB update includes failureCount: 0
-    const setArg = (db.update as jest.Mock).mock.results[0].value.set.mock
-      .calls[0][0];
+    const setArg = (db.update as jest.Mock).mock.results[0]!.value.set.mock
+      .calls[0]![0];
     expect(setArg.failureCount).toBe(0);
   });
 
@@ -1067,7 +1067,7 @@ describe('getSubjectNeedsDeepening', () => {
     const result = await getSubjectNeedsDeepening(db, profileId, subjectId);
 
     expect(result.topics).toHaveLength(1);
-    expect(result.topics[0].topicId).toBe(topicId);
+    expect(result.topics[0]!.topicId).toBe(topicId);
     expect(result.count).toBe(1);
   });
 });
@@ -1346,8 +1346,8 @@ describe('updateNeedsDeepeningProgress', () => {
     await updateNeedsDeepeningProgress(db, profileId, topicId, 3);
 
     expect(db.update).toHaveBeenCalled();
-    const setArg = (db.update as jest.Mock).mock.results[0].value.set.mock
-      .calls[0][0];
+    const setArg = (db.update as jest.Mock).mock.results[0]!.value.set.mock
+      .calls[0]![0];
     expect(setArg.consecutiveSuccessCount).toBe(2);
     expect(setArg.status).toBe('active');
   });
@@ -1371,8 +1371,8 @@ describe('updateNeedsDeepeningProgress', () => {
     await updateNeedsDeepeningProgress(db, profileId, topicId, 2);
 
     expect(db.update).toHaveBeenCalled();
-    const setArg = (db.update as jest.Mock).mock.results[0].value.set.mock
-      .calls[0][0];
+    const setArg = (db.update as jest.Mock).mock.results[0]!.value.set.mock
+      .calls[0]![0];
     expect(setArg.consecutiveSuccessCount).toBe(0);
     expect(setArg.status).toBe('active');
   });
@@ -1396,8 +1396,8 @@ describe('updateNeedsDeepeningProgress', () => {
     await updateNeedsDeepeningProgress(db, profileId, topicId, 4);
 
     expect(db.update).toHaveBeenCalled();
-    const setArg = (db.update as jest.Mock).mock.results[0].value.set.mock
-      .calls[0][0];
+    const setArg = (db.update as jest.Mock).mock.results[0]!.value.set.mock
+      .calls[0]![0];
     expect(setArg.consecutiveSuccessCount).toBe(3);
     expect(setArg.status).toBe('resolved');
     expect(canExitNeedsDeepening).toHaveBeenCalledWith(

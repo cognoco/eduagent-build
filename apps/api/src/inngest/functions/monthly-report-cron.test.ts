@@ -296,7 +296,7 @@ async function executeCronSteps(): Promise<{
   const result = (await handler({
     event: { name: 'inngest/function.invoked' },
     step: mockStep,
-  })) as CronResult;
+  })) as MonthlyReportCronResult;
 
   return { result, mockStep };
 }

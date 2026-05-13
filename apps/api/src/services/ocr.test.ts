@@ -39,7 +39,7 @@ describe('StubOcrProvider', () => {
     const provider = new StubOcrProvider();
     const result = await provider.extractText(new ArrayBuffer(50), 'image/png');
 
-    const region = result.regions[0];
+    const region = result.regions[0]!;
     expect(region.text).toBe('Stub OCR text for testing');
     expect(region.confidence).toBe(0.95);
     expect(region.boundingBox).toEqual({

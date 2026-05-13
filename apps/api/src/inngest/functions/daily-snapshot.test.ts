@@ -191,17 +191,21 @@ describe('dailySnapshotCron', () => {
     const { mockStep, result } = await executeCronSteps();
 
     expect(mockStep['sendEvent']).toHaveBeenCalledTimes(2);
-    const firstBatch = mockStep['sendEvent'].mock.calls[0][1] as unknown[];
-    const secondBatch = mockStep['sendEvent'].mock.calls[1][1] as unknown[];
-    expect(mockStep['sendEvent'].mock.calls[0][0]).toBe(
+    expect(mockStep['sendEvent']).toHaveBeenNthCalledWith(
+      1,
       'fan-out-progress-refresh-0',
+      expect.any(Array),
     );
+    expect(mockStep['sendEvent']).toHaveBeenNthCalledWith(
+      2,
+      'fan-out-progress-refresh-200',
+      expect.any(Array),
+    );
+    const firstBatch = mockStep['sendEvent']!.mock.calls[0]![1]! as unknown[];
+    const secondBatch = mockStep['sendEvent']!.mock.calls[1]![1]! as unknown[];
     expect(firstBatch).toHaveLength(200);
     expect(firstBatch[0]).toEqual(
       expect.objectContaining({ name: 'app/progress.snapshot.refresh' }),
-    );
-    expect(mockStep['sendEvent'].mock.calls[1][0]).toBe(
-      'fan-out-progress-refresh-200',
     );
     expect(secondBatch).toHaveLength(50);
     expect(secondBatch[0]).toEqual(

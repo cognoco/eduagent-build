@@ -215,10 +215,10 @@ describe('listVocabulary', () => {
     const result = await listVocabulary(db, PROFILE_ID, SUBJECT_ID);
 
     expect(result).toHaveLength(2);
-    expect(result[0].id).toBe('v1');
-    expect(result[0].term).toBe('hola');
-    expect(result[0].translation).toBe('hello');
-    expect(result[0].createdAt).toBe('2026-01-15T10:00:00.000Z');
+    expect(result[0]!.id).toBe('v1');
+    expect(result[0]!.term).toBe('hola');
+    expect(result[0]!.translation).toBe('hello');
+    expect(result[0]!.createdAt).toBe('2026-01-15T10:00:00.000Z');
   });
 
   it('returns empty array when no vocabulary exists', async () => {
@@ -534,8 +534,8 @@ describe('upsertExtractedVocabulary', () => {
     ]);
 
     expect(result).toHaveLength(2);
-    expect(result[0].term).toBe('hola');
-    expect(result[1].term).toBe('adiós');
+    expect(result[0]!.term).toBe('hola');
+    expect(result[1]!.term).toBe('adiós');
   });
 
   it('returns empty array for empty items list', async () => {
@@ -573,8 +573,8 @@ describe('getVocabularyDueForReview', () => {
     const result = await getVocabularyDueForReview(db, PROFILE_ID, SUBJECT_ID);
 
     expect(result).toHaveLength(1);
-    expect(result[0].id).toBe('v1');
-    expect(result[0].nextReviewAt).toBe('2026-01-20T10:00:00.000Z');
+    expect(result[0]!.id).toBe('v1');
+    expect(result[0]!.nextReviewAt).toBe('2026-01-20T10:00:00.000Z');
   });
 
   it('returns null nextReviewAt when no retention card exists', async () => {
@@ -589,7 +589,7 @@ describe('getVocabularyDueForReview', () => {
     const result = await getVocabularyDueForReview(db, PROFILE_ID, SUBJECT_ID);
 
     expect(result).toHaveLength(1);
-    expect(result[0].nextReviewAt).toBeNull();
+    expect(result[0]!.nextReviewAt).toBeNull();
   });
 
   it('returns empty array when no vocabulary exists', async () => {

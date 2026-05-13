@@ -39,31 +39,19 @@
   "cefrCeiling": "B2",
   "interests": [
     {
-      "label": {
-        "label": "French literature",
-        "context": "both"
-      },
+      "label": "French literature",
       "context": "free_time"
     },
     {
-      "label": {
-        "label": "philosophy",
-        "context": "both"
-      },
+      "label": "philosophy",
       "context": "free_time"
     },
     {
-      "label": {
-        "label": "existentialism",
-        "context": "free_time"
-      },
+      "label": "existentialism",
       "context": "free_time"
     },
     {
-      "label": {
-        "label": "creative writing",
-        "context": "free_time"
-      },
+      "label": "creative writing",
       "context": "free_time"
     }
   ],
@@ -86,7 +74,7 @@ You are generating a multiple-choice vocabulary quiz for a 17-year-old learner s
 Activity: Vocabulary quiz
 Target language: French
 Maximum CEFR level: B2
-Choose a vocabulary theme that connects to the learner's interests: [object Object], [object Object], [object Object], [object Object]. (e.g. "French [object Object]")
+Choose a vocabulary theme that connects to the learner's interests: French literature, philosophy, existentialism, creative writing. (e.g. "French French literature")
 Questions needed: exactly 6
 
 Do NOT repeat these recently seen English answers: l'angoisse, le fardeau, éphémère
@@ -128,6 +116,6 @@ Generate the quiz round.
 ## Builder notes
 
 - Uses languageCode=fr and cefrCeiling=B2.
-- Fine-grained age: 17. Interests passed: [object Object], [object Object], [object Object], [object Object].
+- Fine-grained age: 17. Interests passed: French literature, philosophy, existentialism, creative writing.
 - Native language passed: cs — L1-aware distractors active for supported pairs.
 - Library topics passed: Camus — L'Étranger; French subjunctive; essay structure; Enlightenment thinkers.

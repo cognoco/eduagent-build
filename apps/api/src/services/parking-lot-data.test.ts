@@ -21,7 +21,7 @@ function mockParkingLotRow(
     question: string;
     explored: boolean;
     createdAt: Date;
-  }>
+  }>,
 ) {
   return {
     id: overrides?.id ?? 'item-1',
@@ -115,7 +115,7 @@ describe('getParkingLotItems', () => {
 
     const result = await getParkingLotItems(db, profileId, sessionId);
 
-    expect(result.items[0].createdAt).toBe('2026-01-20T14:30:00.000Z');
+    expect(result.items[0]!.createdAt).toBe('2026-01-20T14:30:00.000Z');
   });
 });
 
@@ -161,7 +161,7 @@ describe('addParkingLotItem', () => {
       db,
       profileId,
       sessionId,
-      'Why does the sky appear blue?'
+      'Why does the sky appear blue?',
     );
 
     expect(result).not.toBeNull();
@@ -184,7 +184,7 @@ describe('addParkingLotItem', () => {
     await addParkingLotItem(db, profileId, sessionId, 'Some question', topicId);
 
     expect(mockValues).toHaveBeenCalledWith(
-      expect.objectContaining({ topicId })
+      expect.objectContaining({ topicId }),
     );
   });
 
@@ -201,25 +201,25 @@ describe('addParkingLotItem', () => {
     await addParkingLotItem(db, profileId, sessionId, 'Some question');
 
     expect(mockValues).toHaveBeenCalledWith(
-      expect.objectContaining({ topicId: null })
+      expect.objectContaining({ topicId: null }),
     );
   });
 
   it('returns null when limit (10) is reached', async () => {
     const existingRows = Array.from({ length: 10 }, (_, i) =>
-      mockParkingLotRow({ id: `item-${i}`, question: `Question ${i}` })
+      mockParkingLotRow({ id: `item-${i}`, question: `Question ${i}` }),
     );
 
     const db = createMockDb();
     (db.query.parkingLotItems.findMany as jest.Mock).mockResolvedValue(
-      existingRows
+      existingRows,
     );
 
     const result = await addParkingLotItem(
       db,
       profileId,
       sessionId,
-      'One too many'
+      'One too many',
     );
 
     expect(result).toBeNull();
@@ -236,7 +236,7 @@ describe('addParkingLotItem', () => {
 
     const db = createMockDb();
     (db.query.parkingLotItems.findMany as jest.Mock).mockResolvedValue(
-      existingRows
+      existingRows,
     );
 
     const result = await addParkingLotItem(
@@ -244,7 +244,7 @@ describe('addParkingLotItem', () => {
       profileId,
       sessionId,
       'One too many',
-      topicId
+      topicId,
     );
 
     expect(result).toBeNull();
@@ -252,12 +252,12 @@ describe('addParkingLotItem', () => {
 
   it('does not call insert when limit is reached', async () => {
     const existingRows = Array.from({ length: 10 }, (_, i) =>
-      mockParkingLotRow({ id: `item-${i}`, question: `Question ${i}` })
+      mockParkingLotRow({ id: `item-${i}`, question: `Question ${i}` }),
     );
 
     const db = createMockDb();
     (db.query.parkingLotItems.findMany as jest.Mock).mockResolvedValue(
-      existingRows
+      existingRows,
     );
 
     await addParkingLotItem(db, profileId, sessionId, 'One too many');
@@ -286,19 +286,19 @@ describe('addParkingLotItem', () => {
 
   it('D-04: performs count check inside the transaction context', async () => {
     const existingRows = Array.from({ length: 10 }, (_, i) =>
-      mockParkingLotRow({ id: `item-${i}`, question: `Question ${i}` })
+      mockParkingLotRow({ id: `item-${i}`, question: `Question ${i}` }),
     );
 
     const db = createMockDb();
     (db.query.parkingLotItems.findMany as jest.Mock).mockResolvedValue(
-      existingRows
+      existingRows,
     );
 
     const result = await addParkingLotItem(
       db,
       profileId,
       sessionId,
-      'Should be rejected'
+      'Should be rejected',
     );
 
     // Count check happened inside the transaction
@@ -311,13 +311,13 @@ describe('addParkingLotItem', () => {
 
   it('allows insert when count is below limit', async () => {
     const existingRows = Array.from({ length: 9 }, (_, i) =>
-      mockParkingLotRow({ id: `item-${i}`, question: `Question ${i}` })
+      mockParkingLotRow({ id: `item-${i}`, question: `Question ${i}` }),
     );
     const newRow = mockParkingLotRow({ id: 'item-9', question: 'Question 9' });
 
     const db = createMockDb();
     (db.query.parkingLotItems.findMany as jest.Mock).mockResolvedValue(
-      existingRows
+      existingRows,
     );
     (db.insert as jest.Mock).mockReturnValue({
       values: jest.fn().mockReturnValue({
@@ -329,7 +329,7 @@ describe('addParkingLotItem', () => {
       db,
       profileId,
       sessionId,
-      'Question 9'
+      'Question 9',
     );
 
     expect(result).not.toBeNull();

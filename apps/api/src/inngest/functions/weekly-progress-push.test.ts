@@ -115,20 +115,26 @@ jest.mock(
 
 const mockSendPushNotification = jest.fn().mockResolvedValue({ sent: true });
 const mockSendEmail = jest.fn().mockResolvedValue({ sent: true });
-const mockFormatWeeklyProgressEmail = jest.fn((to: string) => ({
-  to,
-  subject: 'Weekly learning progress',
-  body: 'weekly progress',
-  type: 'weekly_progress',
-}));
+const mockFormatWeeklyProgressEmail = jest.fn(
+  (to: string, _childSummaries: string[], _struggleLines: unknown[]) => ({
+    to,
+    subject: 'Weekly learning progress',
+    body: 'weekly progress',
+    type: 'weekly_progress',
+  }),
+);
 jest.mock(
   '../../services/notifications' /* gc1-allow: unit test boundary */,
   () => ({
     sendPushNotification: (...args: unknown[]) =>
       mockSendPushNotification(...args),
     sendEmail: (...args: unknown[]) => mockSendEmail(...args),
-    formatWeeklyProgressEmail: (...args: unknown[]) =>
-      mockFormatWeeklyProgressEmail(...args),
+    formatWeeklyProgressEmail: (
+      parentEmail: string,
+      childSummaries: string[],
+      struggleLines: unknown[],
+    ) =>
+      mockFormatWeeklyProgressEmail(parentEmail, childSummaries, struggleLines),
   }),
 );
 

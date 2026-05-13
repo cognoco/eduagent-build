@@ -48,14 +48,14 @@ function createMockDb(): Database {
             },
           },
         },
-      ])
+      ]),
     )
     .mockReturnValueOnce(
       createSelectChain([
         {
           name: 'Math',
         },
-      ])
+      ]),
     )
     .mockReturnValueOnce(
       createSelectChain([
@@ -68,7 +68,7 @@ function createMockDb(): Database {
             },
           },
         },
-      ])
+      ]),
     );
 
   return {
@@ -110,7 +110,7 @@ describe('parseHomeworkSummaryResponse', () => {
 
     const result = parseHomeworkSummaryResponse(
       '{"problemCount":2,"practicedSkills":["linear equations"],"independentProblemCount":1,"guidedProblemCount":1,"summary":"2 problems, practiced linear equations.","displayTitle":"Math Homework"}',
-      fallback
+      fallback,
     );
 
     expect(result.problemCount).toBe(2);
@@ -129,7 +129,7 @@ describe('parseHomeworkSummaryResponse', () => {
     };
 
     expect(parseHomeworkSummaryResponse('not-json', fallback)).toEqual(
-      fallback
+      fallback,
     );
   });
 });
@@ -148,7 +148,7 @@ describe('extractHomeworkSummary', () => {
     const result = await extractHomeworkSummary(
       createMockDb(),
       'profile-1',
-      'session-1'
+      'session-1',
     );
 
     expect(result.summary).toBe('2 problems, practiced linear equations.');
@@ -170,11 +170,11 @@ describe('extractHomeworkSummary', () => {
 
     // The subjects query where clause receives an `and()` expression that
     // includes both subjects.id and subjects.profileId.
-    const subjectsFrom = selectCalls[1].value.from;
+    const subjectsFrom = selectCalls[1]!.value.from;
     expect(subjectsFrom).toHaveBeenCalled();
-    const subjectsWhere = subjectsFrom.mock.results[0].value.where;
+    const subjectsWhere = subjectsFrom.mock.results[0]!.value.where;
     expect(subjectsWhere).toHaveBeenCalled();
-    const whereArg = subjectsWhere.mock.calls[0][0];
+    const whereArg = subjectsWhere.mock.calls[0]![0];
     // Drizzle's and() produces a combined SQL node — serialize to check for profile_id
     const seen = new WeakSet();
     const whereStr = JSON.stringify(
@@ -185,7 +185,7 @@ describe('extractHomeworkSummary', () => {
           seen.add(value as object);
         }
         return value;
-      }
+      },
     );
     expect(whereStr).toContain('profile_id');
   });
@@ -205,10 +205,10 @@ describe('extractHomeworkSummary', () => {
             subjectId: 'subject-1',
             metadata: { homework: { problemCount: 1, problems: [] } },
           },
-        ])
+        ]),
       )
       .mockReturnValueOnce(
-        createSelectChain([]) // No subject found — profileId doesn't match
+        createSelectChain([]), // No subject found — profileId doesn't match
       );
 
     const db = {
@@ -223,7 +223,7 @@ describe('extractHomeworkSummary', () => {
     const result = await extractHomeworkSummary(
       db,
       'wrong-profile',
-      'session-1'
+      'session-1',
     );
 
     // Falls back to 'Homework' when subject is not found for profile
@@ -237,7 +237,7 @@ describe('extractHomeworkSummary', () => {
     const result = await extractHomeworkSummary(
       createMockDb(),
       'profile-1',
-      'session-1'
+      'session-1',
     );
 
     expect(result.problemCount).toBe(2);
@@ -273,7 +273,7 @@ describe('extractHomeworkSummary — [BUG-934] envelope projection', () => {
               homework: { problemCount: 1, problems: [] },
             },
           },
-        ])
+        ]),
       )
       .mockReturnValueOnce(createSelectChain([{ name: 'Math' }]))
       .mockReturnValueOnce(createSelectChain([{ metadata: {} }]));
@@ -309,7 +309,7 @@ describe('extractHomeworkSummary — [BUG-934] envelope projection', () => {
     // prose reply, NOT the raw envelope JSON.
     const call = (routeAndCall as jest.Mock).mock.calls[0];
     const userMessage = call[0].find(
-      (m: { role: string }) => m.role === 'user'
+      (m: { role: string }) => m.role === 'user',
     );
     expect(userMessage.content).toContain('Nice work on fractions!');
     expect(userMessage.content).not.toContain('"signals"');

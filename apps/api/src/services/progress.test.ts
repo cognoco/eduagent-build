@@ -608,7 +608,7 @@ describe('getTopicProgress', () => {
     // Break test — removing gte(exchangeCount, 1) from the query will fail this.
     // Drizzle SQL trees are circular (PgTable ⇄ PgColumn), so use util.inspect
     // which handles cycles natively.
-    const repoMock = (createScopedRepository as jest.Mock).mock.results[0]
+    const repoMock = (createScopedRepository as jest.Mock).mock.results[0]!
       .value as { sessions: { findMany: jest.Mock } };
     const filterArg = repoMock.sessions.findMany.mock.calls[0]?.[0];
     const { inspect } = await import('util');
@@ -791,8 +791,8 @@ describe('getOverallProgress', () => {
     const result = await getOverallProgress(db, profileId);
 
     expect(result.subjects).toHaveLength(1);
-    expect(result.subjects[0].topicsTotal).toBe(0);
-    expect(result.subjects[0].retentionStatus).toBe('strong');
+    expect(result.subjects[0]!.topicsTotal).toBe(0);
+    expect(result.subjects[0]!.retentionStatus).toBe('strong');
     expect(result.totalTopicsCompleted).toBe(0);
   });
 
@@ -824,9 +824,9 @@ describe('getOverallProgress', () => {
       const result = await getOverallProgress(db, profileId);
 
       expect(result.subjects).toHaveLength(1);
-      expect(result.subjects[0].topicsTotal).toBe(1);
-      expect(result.subjects[0].topicsCompleted).toBe(1);
-      expect(result.subjects[0].topicsVerified).toBe(0);
+      expect(result.subjects[0]!.topicsTotal).toBe(1);
+      expect(result.subjects[0]!.topicsCompleted).toBe(1);
+      expect(result.subjects[0]!.topicsVerified).toBe(0);
       expect(result.totalTopicsCompleted).toBe(1);
       expect(result.totalTopicsVerified).toBe(0);
     });
@@ -856,8 +856,8 @@ describe('getOverallProgress', () => {
 
       const result = await getOverallProgress(db, profileId);
 
-      expect(result.subjects[0].topicsCompleted).toBe(1);
-      expect(result.subjects[0].topicsVerified).toBe(1);
+      expect(result.subjects[0]!.topicsCompleted).toBe(1);
+      expect(result.subjects[0]!.topicsVerified).toBe(1);
       expect(result.totalTopicsCompleted).toBe(1);
     });
   });

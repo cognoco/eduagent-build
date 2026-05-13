@@ -38,31 +38,19 @@
   ],
   "interests": [
     {
-      "label": {
-        "label": "horses",
-        "context": "free_time"
-      },
+      "label": "horses",
       "context": "free_time"
     },
     {
-      "label": {
-        "label": "forest animals",
-        "context": "free_time"
-      },
+      "label": "forest animals",
       "context": "free_time"
     },
     {
-      "label": {
-        "label": "nature journaling",
-        "context": "both"
-      },
+      "label": "nature journaling",
       "context": "free_time"
     },
     {
-      "label": {
-        "label": "drawing",
-        "context": "free_time"
-      },
+      "label": "drawing",
       "context": "free_time"
     }
   ],
@@ -82,7 +70,7 @@
 You are generating a clue-by-clue Guess Who quiz for a 11-year-old learner.
 
 Activity: Guess Who
-Choose a theme of famous people connected to the learner's interests: [object Object], [object Object], [object Object], [object Object].
+Choose a theme of famous people connected to the learner's interests: horses, forest animals, nature journaling, drawing.
 Questions needed: exactly 4
 
 No recent-person exclusions.
@@ -123,6 +111,6 @@ Generate the quiz round.
 
 ## Builder notes
 
-- Fine-grained age: 11. Interests passed: [object Object], [object Object], [object Object], [object Object].
+- Fine-grained age: 11. Interests passed: horses, forest animals, nature journaling, drawing.
 - Library topics passed: Czech reading comprehension; basic fractions; human body systems; water cycle.
 - Topic titles passed: Czech reading comprehension; basic fractions; human body systems; water cycle.

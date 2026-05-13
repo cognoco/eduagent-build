@@ -119,18 +119,6 @@ function makeArgs(opts: {
     onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
   };
 
-  const _txSelect = {
-    from: jest.fn().mockReturnThis(),
-    where: jest.fn().mockReturnThis(),
-    limit: jest
-      .fn()
-      .mockResolvedValue(
-        opts.candidates && opts.candidates.length > 0
-          ? [opts.candidates[0]]
-          : [],
-      ),
-  };
-
   let txSelectCallCount = 0;
   const txSelectFn = jest.fn().mockImplementation(() => {
     txSelectCallCount += 1;
@@ -161,10 +149,6 @@ function makeArgs(opts: {
         ),
     };
   });
-
-  const _fakeApplyDedupAction = jest
-    .fn()
-    .mockResolvedValue(opts.actionOutcome ?? { kind: 'keep_both' as const });
 
   const fakeDb = {
     select: jest.fn().mockReturnValue(memoSelect),

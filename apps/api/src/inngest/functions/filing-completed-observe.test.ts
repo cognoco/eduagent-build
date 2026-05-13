@@ -26,8 +26,8 @@ jest.mock('../client', () => ({
       (
         _config: unknown,
         _trigger: unknown,
-        handler: (...args: unknown[]) => unknown
-      ) => ({ fn: handler, _config, _trigger })
+        handler: (...args: unknown[]) => unknown,
+      ) => ({ fn: handler, _config, _trigger }),
     ),
   },
 }));
@@ -76,12 +76,12 @@ async function executeHandler(
   // Defaults to [{ id: SESSION_ID }] (1 row updated → flipped = true).
   updateRows: unknown[] = [{ id: SESSION_ID }],
   stepRunOverrides: StepRunOverrides = {},
-  eventOverrides: Partial<Record<string, unknown>> = {}
+  eventOverrides: Partial<Record<string, unknown>> = {},
 ) {
   const mockStep = {
     run: jest.fn(async (name: string, fn: () => Promise<unknown>) => {
       if (name in stepRunOverrides) {
-        return stepRunOverrides[name]();
+        return stepRunOverrides[name]!();
       }
       return fn();
     }),
@@ -100,7 +100,7 @@ async function executeHandler(
         findFirst: jest
           .fn()
           .mockResolvedValue(
-            filingStatus !== null ? { filingStatus } : undefined
+            filingStatus !== null ? { filingStatus } : undefined,
           ),
       },
     },
@@ -136,7 +136,7 @@ describe('filing-completed-observe', () => {
   it('flips filing_pending → filing_recovered on completion event', async () => {
     const { result, mockStep, mockUpdateChain } = await executeHandler(
       'filing_pending',
-      [{ id: SESSION_ID }]
+      [{ id: SESSION_ID }],
     );
 
     // Function reports recovered = true
@@ -145,7 +145,7 @@ describe('filing-completed-observe', () => {
 
     // The update step ran and included the correct status values
     expect(mockUpdateChain.set).toHaveBeenCalledWith(
-      expect.objectContaining({ filingStatus: 'filing_recovered' })
+      expect.objectContaining({ filingStatus: 'filing_recovered' }),
     );
 
     // No filing_resolved event — pending path is handled by timed-out-observer
@@ -190,7 +190,7 @@ describe('filing-completed-observe', () => {
   it('is a no-op for sessions with filing_status null', async () => {
     const { result, mockStep, mockUpdateChain } = await executeHandler(
       null,
-      []
+      [],
     );
 
     expect(result.recovered).toBe(false);
@@ -227,7 +227,7 @@ describe('filing-completed-observe', () => {
   it('is a no-op when session is already filing_recovered', async () => {
     const { result, mockStep, mockUpdateChain } = await executeHandler(
       'filing_recovered',
-      []
+      [],
     );
 
     expect(result.recovered).toBe(false);
@@ -246,7 +246,7 @@ describe('filing-completed-observe', () => {
   it('does NOT dispatch filing_resolved when CAS update matches 0 rows (concurrent update)', async () => {
     const { result, mockStep } = await executeHandler(
       'filing_failed',
-      [] // 0 rows updated → flipped = false
+      [], // 0 rows updated → flipped = false
     );
 
     expect(result.recovered).toBe(false);

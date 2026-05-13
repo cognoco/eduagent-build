@@ -218,9 +218,9 @@ describe('requestConsent', () => {
       EMAIL_OPTIONS,
     );
 
-    const insertCall = (db.insert as jest.Mock).mock.results[0].value;
+    const insertCall = (db.insert as jest.Mock).mock.results[0]!.value;
     const valuesCall = insertCall.values as jest.Mock;
-    const insertedValues = valuesCall.mock.calls[0][0];
+    const insertedValues = valuesCall.mock.calls[0]![0];
     expect(insertedValues).toHaveProperty('consentToken');
     expect(typeof insertedValues.consentToken).toBe('string');
     expect(insertedValues.consentToken.length).toBeGreaterThan(0);
@@ -286,7 +286,7 @@ describe('requestConsent', () => {
     );
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    const [, init] = fetchMock.mock.calls[0];
+    const [, init] = fetchMock.mock.calls[0]!;
     const emailRequestBody = JSON.parse(String(init?.body)) as { text: string };
     expect(emailRequestBody.text).toContain(
       'https://api.mentomate.com/v1/consent-page?token=',
@@ -308,7 +308,7 @@ describe('requestConsent', () => {
       EMAIL_OPTIONS,
     );
 
-    const [, init] = fetchMock.mock.calls[0];
+    const [, init] = fetchMock.mock.calls[0]!;
     const emailRequestBody = JSON.parse(String(init?.body)) as { text: string };
     expect(emailRequestBody.text).not.toContain('app.mentomate.com');
     expect(emailRequestBody.text).not.toContain('www.mentomate.com');
@@ -459,8 +459,8 @@ describe('createPendingConsentState', () => {
       'GDPR',
     );
 
-    const onConflictArgs = (db.insert as jest.Mock).mock.results[0].value.values
-      .mock.results[0].value.onConflictDoUpdate.mock.calls[0][0];
+    const onConflictArgs = (db.insert as jest.Mock).mock.results[0]!.value
+      .values.mock.results[0]!.value.onConflictDoUpdate.mock.calls[0]![0];
 
     expect(onConflictArgs.set).toMatchObject({
       status: 'PENDING',

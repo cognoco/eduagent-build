@@ -182,8 +182,8 @@ describe('generateLanguageCurriculum', () => {
     if (a1Topics.length >= 2) {
       // Later milestones should have equal or higher word counts
       expect(
-        a1Topics[a1Topics.length - 1].targetWordCount,
-      ).toBeGreaterThanOrEqual(a1Topics[0].targetWordCount!);
+        a1Topics[a1Topics.length - 1]!.targetWordCount,
+      ).toBeGreaterThanOrEqual(a1Topics[0]!.targetWordCount!);
     }
   });
 

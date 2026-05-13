@@ -226,7 +226,7 @@ describe('selectInterleavedTopics', () => {
     });
 
     expect(topics).toHaveLength(1);
-    expect(topics[0].topicId).toBe('topic-001');
+    expect(topics[0]!.topicId).toBe('topic-001');
   });
 
   it('returns empty when subject has no curriculum', async () => {
@@ -342,7 +342,7 @@ describe('startInterleavedSession', () => {
 
     expect(result.sessionId).toBe('session-001');
     expect(result.topics).toHaveLength(1);
-    expect(result.topics[0].topicId).toBe('topic-001');
+    expect(result.topics[0]!.topicId).toBe('topic-001');
     expect(mockInsert).toHaveBeenCalled();
   });
 

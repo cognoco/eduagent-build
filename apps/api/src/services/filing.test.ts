@@ -70,10 +70,10 @@ describe('buildLibraryIndex', () => {
     const index = await buildLibraryIndex(db, 'profile-1');
 
     expect(index.shelves).toHaveLength(1);
-    expect(index.shelves[0].name).toBe('Geography');
-    expect(index.shelves[0].books).toHaveLength(1);
-    expect(index.shelves[0].books[0].name).toBe('Europe');
-    expect(index.shelves[0].books[0].chapters).toHaveLength(2);
+    expect(index.shelves[0]!.name).toBe('Geography');
+    expect(index.shelves[0]!.books).toHaveLength(1);
+    expect(index.shelves[0]!.books[0]!.name).toBe('Europe');
+    expect(index.shelves[0]!.books[0]!.chapters).toHaveLength(2);
   });
 });
 

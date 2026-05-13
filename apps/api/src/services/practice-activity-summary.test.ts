@@ -269,8 +269,8 @@ describe('buildSummaryFromRows', () => {
       ],
       0,
     );
-    expect(result.bySubject[0].subjectName).toBe('Algebra');
-    expect(result.bySubject[1].subjectName).toBe('Zoology');
+    expect(result.bySubject[0]!.subjectName).toBe('Algebra');
+    expect(result.bySubject[1]!.subjectName).toBe('Zoology');
   });
 });
 

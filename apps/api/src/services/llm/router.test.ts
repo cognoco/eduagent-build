@@ -637,7 +637,7 @@ describe('LLM Router', () => {
           receivedMessages.push(messages);
           return okResult;
         },
-        chatStream(messages): ChatStreamResult {
+        chatStream(messages: ChatMessage[]): ChatStreamResult {
           receivedMessages.push(messages);
           return makeChatStreamResult(
             (async function* () {
