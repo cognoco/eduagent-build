@@ -6,6 +6,7 @@ import {
   startFirstCurriculumSession,
   stripMarkdownFence,
 } from './session-crud';
+import type { LearningSession } from '@eduagent/schemas';
 
 const PROFILE_ID = '00000000-0000-7000-8000-000000000001';
 const SUBJECT_ID = '00000000-0000-7000-8000-000000000002';
@@ -173,15 +174,18 @@ describe('startFirstCurriculumSession topic intent matcher', () => {
       fallbackReason: null,
       matcherLatencyMs: 12,
     }));
-    const startSession = jest.fn(async () => ({ id: 'session-1' }));
+    // Cast applied to the return value (minimal stub shape) rather than the
+    // whole function, so the function signature stays type-checked.
+    const startSession = jest.fn(
+      async () => ({ id: 'session-1' }) as unknown as LearningSession,
+    );
 
     __sessionCrudTestHooks.setDependencies({
       findFirstAvailableTopicId,
       loadLatestCompletedDraftSignals,
       loadSubjectStructureType: jest.fn(async () => 'narrow'),
       matchTopicByIntent,
-      startSession:
-        startSession as unknown as typeof import('./session-crud').startSession,
+      startSession,
     });
 
     await startFirstCurriculumSession(

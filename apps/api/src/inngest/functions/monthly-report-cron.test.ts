@@ -6,6 +6,7 @@ import {
   createDatabaseModuleMock,
   createTransactionalMockDb,
 } from '../../test-utils/database-module';
+import type { ChildStruggleLine } from '../../services/notifications';
 
 // ---------------------------------------------------------------------------
 // Mock DB setup
@@ -157,7 +158,7 @@ jest.mock('../../services/snapshot-aggregation', () => ({
 const mockSendPushNotification = jest.fn().mockResolvedValue({ sent: true });
 const mockSendEmail = jest.fn().mockResolvedValue({ sent: true });
 const mockFormatMonthlyProgressEmail = jest.fn(
-  (to: string, body: string, struggleLines: unknown[]) => ({
+  (to: string, body: string, _struggleLines: ChildStruggleLine[]) => ({
     to,
     subject: "This month's learning report",
     body,
@@ -172,7 +173,7 @@ jest.mock('../../services/notifications', () => ({
   formatMonthlyProgressEmail: (
     to: string,
     body: string,
-    struggleLines: unknown[],
+    struggleLines: ChildStruggleLine[],
   ) => mockFormatMonthlyProgressEmail(to, body, struggleLines),
 }));
 
