@@ -212,8 +212,8 @@ The `/commit` skill is a subagent (`context: fork`) that inherits cwd from the l
 ### i18n locale staleness pre-commit hook
 When `apps/mobile/src/i18n/locales/en.json` is staged, the husky pre-commit hook demands all other locales (`de.json`, `es.json`, `nb.json`, `pt.json`, `pl.json`, `ja.json`) be staged in the same commit. PR-23 had to sweep all 7 locales together. If your archive moves or link fixes ever touch any locale key surface, mind the hook.
 
-### `docs/audit/pr-dispatch-graph.html` is pre-existing dirty
-This file has been showing as `M` in `git status` for the entire session, never committed. **Leave it alone.** If you commit broadly with `git add -A`, you'll accidentally include it. Stage files explicitly. The `/commit` skill stages explicitly by file so it handles this correctly.
+### `docs/audit/pr-dispatch-graph.html` — staging-discipline pitfall (historical)
+This file showed as `M` in `git status` for the prior session without being committed; that session's guidance was **Leave it alone** to prevent accidental inclusion via `git add -A`. Stage files explicitly. The `/commit` skill stages explicitly by file so it handles this correctly. _Note: this file was consciously committed as part of the PR-25/27/29 closure PR (2026-05-13) to keep the dispatch graph in sync with the cleanup-plan truth table — the original advice is preserved as a guard against accidental staging, not a permanent prohibition on touching the file._
 
 ### Stale "summary" lines in `cleanup-plan.md` line ~183
 The "Independently startable" list at `cleanup-plan.md:183` is maintained inconsistently. It currently reads:
