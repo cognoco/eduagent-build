@@ -61,6 +61,11 @@ ruleTester.run('securestore-safe-key', rule, {
       code: 'setItemAsync(`bookmark-nudge-shown:${id}`, "1");',
       errors: [{ messageId: 'unsafeTemplate' }],
     },
+    // Empty string key — SAFE_KEY_RE uses `+` so it rejects ''.
+    {
+      code: "setItemAsync('', '1');",
+      errors: [{ messageId: 'unsafeLiteral' }],
+    },
     {
       code: 'getItemAsync(`prefix:${a}:suffix`);',
       // Two unsafe static parts: "prefix:" and ":suffix"

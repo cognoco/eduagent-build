@@ -8,6 +8,9 @@ const ruleTester = new RuleTester({
 const inngestFile = {
   filename: '/repo/apps/api/src/inngest/functions/my-function.ts',
 };
+const nestedInngestFile = {
+  filename: '/repo/apps/api/src/inngest/functions/billing/cron.ts',
+};
 const inngestTestFile = {
   filename: '/repo/apps/api/src/inngest/functions/my-function.test.ts',
 };
@@ -104,6 +107,48 @@ const fn = async () => {
   const a = await db.query.profiles.findFirst({});
   const b = await db.select().from(profiles);
   await db.insert(profiles).values({});
+};`,
+      ...inngestFile,
+      errors: [{ messageId: 'missingAdminTag' }],
+    },
+    // Regression: createScopedRepository in a comment must NOT count as a
+    // real import — the rule used to use a textual regex and would bypass.
+    {
+      code: `// note: this function used to use createScopedRepository before refactor
+const fn = async () => {
+  const x = await db.query.profiles.findFirst({});
+};`,
+      ...inngestFile,
+      errors: [{ messageId: 'missingAdminTag' }],
+    },
+    // Regression: createScopedRepository inside a string literal also must
+    // not count — same false-negative class as the comment case.
+    {
+      code: `const helper = 'createScopedRepository';
+const fn = async () => {
+  const x = await db.select().from(profiles);
+};`,
+      ...inngestFile,
+      errors: [{ messageId: 'missingAdminTag' }],
+    },
+    // Regression: nested function file under functions/ — the path regex
+    // used to require a flat layout and silently skip nested files.
+    {
+      code: `const fn = async () => {
+  const x = await db.query.profiles.findFirst({});
+};`,
+      ...nestedInngestFile,
+      errors: [{ messageId: 'missingAdminTag' }],
+    },
+    // Regression: raw-db call lives inside a NESTED function body, not the
+    // top-level arrow. The rule walks MemberExpression nodes globally, so
+    // depth must not change the verdict.
+    {
+      code: `const outer = async () => {
+  const inner = async () => {
+    const x = await db.query.profiles.findFirst({});
+  };
+  await inner();
 };`,
       ...inngestFile,
       errors: [{ messageId: 'missingAdminTag' }],

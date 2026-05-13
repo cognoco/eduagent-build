@@ -65,10 +65,17 @@ function hasAdminTagInLeadingComments(sourceCode) {
 }
 
 function importsCreateScopedRepository(sourceCode) {
-  // Quick textual probe — keeps the rule cheap. A false positive (comment
-  // mentioning the name) is harmless because the rule's purpose is to
-  // surface raw-db files for review, not to ban the import itself.
-  return /createScopedRepository\b/.test(sourceCode.text);
+  // Scan tokens (not raw text) so `createScopedRepository` mentions inside
+  // comments or string literals don't cause the rule to skip a file that
+  // genuinely bypasses the scoped repo. Identifier tokens are the only way
+  // the name appears in real code (imports, references, call callees).
+  const tokens = sourceCode.ast?.tokens ?? [];
+  for (const t of tokens) {
+    if (t.type === 'Identifier' && t.value === 'createScopedRepository') {
+      return true;
+    }
+  }
+  return false;
 }
 
 /** @type {import('eslint').Rule.RuleModule} */
@@ -88,9 +95,11 @@ const rule = {
 
   create(context) {
     const sourceCode = context.sourceCode;
-    // Only enforce inside Inngest function source files (non-test).
+    // Only enforce inside Inngest function source files (non-test). The
+    // pattern allows arbitrary subdirectories under functions/ so future
+    // nesting (e.g. functions/billing/cron.ts) stays covered.
     const filename = (context.filename ?? context.getFilename?.() ?? '').replace(/\\/g, '/');
-    if (!/\/apps\/api\/src\/inngest\/functions\/[^/]+\.ts$/.test(filename)) {
+    if (!/\/apps\/api\/src\/inngest\/functions\/.+\.ts$/.test(filename)) {
       return {};
     }
     if (/\.test\.ts$/.test(filename) || /\.integration\.test\.ts$/.test(filename)) {

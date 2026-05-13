@@ -83,7 +83,7 @@ Applied in `eslint.config.mjs` (root) and `apps/mobile/eslint.config.mjs` as app
 - **GC3** — Flag `#[0-9a-fA-F]{3,6}` literals in mobile component JSX/TSX. ✅ Shipped as the mobile hex-color rule (Property > Literal selector; `error` severity; preventive).
 - **GC4** — Flag `router.push(` calls with two `[param]` segments and no intermediate push. ✅ Shipped as `local/router-push-ancestor-chain` at `error`. Three escape paths: prior parent push in same function, file already inside parent stack, or `// gc4-allow: <reason>` annotation. Zero existing violations.
 - **GC5** — Enforce the `// @inngest-admin: <reason>` tag on every Inngest function that bypasses `createScopedRepository`. ✅ Shipped as `gov/inngest-admin-tag` at `warn`. Surfaces a 17-file backlog; severity stays at `warn` until each file gets an accurate reason (`cross-profile` vs `parent-chain`) or refactors to use the scoped repo.
-- **GC6** — Boy-scout internal-mock sweep on test-file edits. ✅ Shipped as the strengthened `~/.claude/hooks/post-edit-jest-mock-check.sh` PostToolUse hook plus a CLAUDE.md rule under Code Quality Guards. The hook surfaces `jest.mock('./...')` and `jest.mock('@eduagent/...')` lines after any test-file Edit/Write/MultiEdit, directing the agent at `/my:mockfix`.
+- **GC6** — Boy-scout internal-mock sweep on test-file edits. ✅ Shipped as the strengthened `~/.claude/hooks/post-edit-jest-mock-check.sh` PostToolUse hook plus a CLAUDE.md rule under Code Quality Guards. The hook surfaces `jest.mock('./...')`, `jest.mock('../...')` (the regex `\.` covers both), and `jest.mock('@eduagent/...')` lines after any test-file Edit/Write/MultiEdit, directing the agent at `/my:mockfix`.
 
 ### Claude Code drift-catcher hooks
 
