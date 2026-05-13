@@ -210,6 +210,9 @@ export function useSetSessionInputMode(
       void queryClient.invalidateQueries({
         queryKey: ['session-transcript', sessionId],
       });
+      // Input mode changes only mutate the session row/transcript metadata.
+      // Progress, dashboard, retention, language-progress, and resume-nudge
+      // data derive from completed learning activity, not this preference flip.
       void queryClient.invalidateQueries({ queryKey: ['sessions'] });
     },
   });
