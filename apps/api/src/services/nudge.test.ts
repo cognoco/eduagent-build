@@ -15,6 +15,7 @@ import {
   RateLimitedError,
   ForbiddenError,
 } from '@eduagent/schemas';
+import type { NudgeTemplate } from '@eduagent/schemas';
 import {
   createNudge,
   listUnreadNudges,
@@ -86,8 +87,7 @@ function makeInsertedRow(
     id: overrides?.id ?? NUDGE_ID,
     fromProfileId: overrides?.fromProfileId ?? FROM_PROFILE_ID,
     toProfileId: overrides?.toProfileId ?? TO_PROFILE_ID,
-    template: (overrides?.template ??
-      'you_got_this') as import('@eduagent/schemas').NudgeTemplate,
+    template: (overrides?.template ?? 'you_got_this') as NudgeTemplate,
     createdAt: overrides?.createdAt ?? BASE_NOW,
     readAt: overrides?.readAt ?? null,
   };
@@ -212,14 +212,19 @@ function makeDb({
   // createNudge wraps count-check + insert in db.transaction(). The tx object
   // receives the same select/insert/execute API as the outer db.
   const executeFn = jest.fn().mockResolvedValue(undefined);
-  const tx = {
+  interface TxShape {
+    select: typeof selectFn;
+    insert: typeof insertFn;
+    execute: typeof executeFn;
+  }
+  const tx: TxShape = {
     select: selectFn,
     insert: insertFn,
     execute: executeFn,
   };
   const transactionFn = jest
     .fn()
-    .mockImplementation((cb: (tx: typeof tx) => Promise<unknown>) => cb(tx));
+    .mockImplementation((cb: (tx: TxShape) => Promise<unknown>) => cb(tx));
 
   return {
     select: selectFn,

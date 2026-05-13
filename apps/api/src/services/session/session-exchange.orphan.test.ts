@@ -123,7 +123,7 @@ describe('orphan persistence — unit/boundary tests [INTERACTION-DUR-L2]', () =
             .join('\n')
         );
       }
-      return { sanitizeUserContent, buildOrphanSystemAddendum };
+      return { buildOrphanSystemAddendum };
     })();
 
     it('returns empty string when no orphans in history', () => {

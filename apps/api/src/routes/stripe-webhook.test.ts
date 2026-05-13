@@ -39,7 +39,7 @@ jest.mock('../services/subscription', () => ({
           priceYearly: 168,
           topUpPrice: 10,
           topUpAmount: 500,
-        }
+        },
   ),
 }));
 
@@ -55,6 +55,7 @@ jest.mock('../services/sentry', () => ({
 
 import { Hono } from 'hono';
 import { stripeWebhookRoute } from './stripe-webhook';
+import type { AppVariables } from '../types/hono';
 import { verifyWebhookSignature } from '../services/stripe';
 import { writeSubscriptionStatus } from '../services/kv';
 import {
@@ -74,9 +75,9 @@ import { captureException } from '../services/sentry';
 const mockDb = {} as any;
 const mockKv = { put: jest.fn(), get: jest.fn() } as any;
 
-const app = new Hono()
+const app = new Hono<{ Variables: AppVariables }>()
   .use('*', async (c, next) => {
-    c.set('db', mockDb);
+    c.set('db', mockDb as AppVariables['db']);
     await next();
   })
   .route('/', stripeWebhookRoute);
@@ -93,7 +94,7 @@ const TEST_ENV = {
 function makeStripeEvent(
   type: string,
   dataObject: Record<string, unknown>,
-  created = Math.floor(Date.now() / 1000)
+  created = Math.floor(Date.now() / 1000),
 ) {
   return {
     id: `evt_${Date.now()}`,
@@ -104,7 +105,7 @@ function makeStripeEvent(
 }
 
 function makeSubscription(
-  overrides: Record<string, unknown> = {}
+  overrides: Record<string, unknown> = {},
 ): Record<string, unknown> {
   return {
     id: 'sub_stripe_123',
@@ -124,7 +125,7 @@ function makeSubscription(
 }
 
 function makeInvoice(
-  overrides: Record<string, unknown> = {}
+  overrides: Record<string, unknown> = {},
 ): Record<string, unknown> {
   return {
     id: 'in_123',
@@ -140,7 +141,7 @@ function makeInvoice(
 }
 
 function makeCheckoutSession(
-  overrides: Record<string, unknown> = {}
+  overrides: Record<string, unknown> = {},
 ): Record<string, unknown> {
   return {
     id: 'cs_test_123',
@@ -165,17 +166,17 @@ beforeEach(() => {
   jest.clearAllMocks();
 
   (updateSubscriptionFromWebhook as jest.Mock).mockResolvedValue(
-    mockUpdatedSubscription()
+    mockUpdatedSubscription(),
   );
   (getSubscriptionByAccountId as jest.Mock).mockResolvedValue(
-    mockUpdatedSubscription()
+    mockUpdatedSubscription(),
   );
   (getQuotaPool as jest.Mock).mockResolvedValue({
     monthlyLimit: 500,
     usedThisMonth: 42,
   });
   (activateSubscriptionFromCheckout as jest.Mock).mockResolvedValue(
-    mockUpdatedSubscription()
+    mockUpdatedSubscription(),
   );
   (updateQuotaPoolLimit as jest.Mock).mockResolvedValue(undefined);
 });
@@ -189,7 +190,7 @@ describe('signature verification', () => {
     const res = await app.request(
       '/stripe/webhook',
       { method: 'POST', body: '{}' },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(400);
@@ -205,7 +206,7 @@ describe('signature verification', () => {
         headers: { 'stripe-signature': 'sig_test' },
         body: '{}',
       },
-      {} // no STRIPE_WEBHOOK_SECRET
+      {}, // no STRIPE_WEBHOOK_SECRET
     );
 
     expect(res.status).toBe(500);
@@ -215,7 +216,7 @@ describe('signature verification', () => {
 
   it('returns 400 when signature verification fails', async () => {
     (verifyWebhookSignature as jest.Mock).mockRejectedValue(
-      new Error('Signature verification failed')
+      new Error('Signature verification failed'),
     );
 
     const res = await app.request(
@@ -225,7 +226,7 @@ describe('signature verification', () => {
         headers: { 'stripe-signature': 'bad_sig' },
         body: '{}',
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(400);
@@ -236,8 +237,8 @@ describe('signature verification', () => {
   it('does not invoke any billing handlers when signature verification fails [4C.4]', async () => {
     (verifyWebhookSignature as jest.Mock).mockRejectedValue(
       new Error(
-        'Webhook signature verification failed: timestamp outside tolerance'
-      )
+        'Webhook signature verification failed: timestamp outside tolerance',
+      ),
     );
 
     const res = await app.request(
@@ -250,7 +251,7 @@ describe('signature verification', () => {
           data: {},
         }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(400);
@@ -266,8 +267,8 @@ describe('signature verification', () => {
   it('returns MISSING_SIGNATURE code when signature verification fails [4C.4]', async () => {
     (verifyWebhookSignature as jest.Mock).mockRejectedValue(
       new Error(
-        'No signatures found matching the expected signature for payload'
-      )
+        'No signatures found matching the expected signature for payload',
+      ),
     );
 
     const res = await app.request(
@@ -277,7 +278,7 @@ describe('signature verification', () => {
         headers: { 'stripe-signature': 'v1=invalid_hmac,t=1234567890' },
         body: '{"id":"evt_fake"}',
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(400);
@@ -289,7 +290,7 @@ describe('signature verification', () => {
   it('catches all error types from signature verification (generic Error) [4C.4]', async () => {
     // verifyWebhookSignature might throw a generic Error, not just Stripe-specific errors
     (verifyWebhookSignature as jest.Mock).mockRejectedValue(
-      new TypeError('Cannot read properties of undefined')
+      new TypeError('Cannot read properties of undefined'),
     );
 
     const res = await app.request(
@@ -299,7 +300,7 @@ describe('signature verification', () => {
         headers: { 'stripe-signature': 'sig_crash' },
         body: '{}',
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     // The catch block catches any error, not just Stripe signature errors
@@ -310,7 +311,7 @@ describe('signature verification', () => {
 
   it('returns 200 when signature is valid', async () => {
     (verifyWebhookSignature as jest.Mock).mockResolvedValue(
-      makeStripeEvent('customer.subscription.updated', makeSubscription())
+      makeStripeEvent('customer.subscription.updated', makeSubscription()),
     );
 
     const res = await app.request(
@@ -320,7 +321,7 @@ describe('signature verification', () => {
         headers: { 'stripe-signature': 'valid_sig' },
         body: '{}',
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -347,7 +348,7 @@ describe('test-mode event guard', () => {
         headers: { 'stripe-signature': 'valid_sig' },
         body: '{}',
       },
-      { ...TEST_ENV, ENVIRONMENT: 'production' }
+      { ...TEST_ENV, ENVIRONMENT: 'production' },
     );
 
     expect(res.status).toBe(200);
@@ -371,7 +372,7 @@ describe('test-mode event guard', () => {
         headers: { 'stripe-signature': 'valid_sig' },
         body: '{}',
       },
-      { ...TEST_ENV, ENVIRONMENT: 'development' }
+      { ...TEST_ENV, ENVIRONMENT: 'development' },
     );
 
     expect(res.status).toBe(200);
@@ -388,7 +389,7 @@ describe('stale event rejection', () => {
     const staleCreated = Math.floor(Date.now() / 1000) - 49 * 60 * 60; // 49 hours ago
     const stripeSub = makeSubscription({ status: 'active' });
     (verifyWebhookSignature as jest.Mock).mockResolvedValue(
-      makeStripeEvent('customer.subscription.updated', stripeSub, staleCreated)
+      makeStripeEvent('customer.subscription.updated', stripeSub, staleCreated),
     );
 
     const res = await app.request(
@@ -398,7 +399,7 @@ describe('stale event rejection', () => {
         headers: { 'stripe-signature': 'valid_sig' },
         body: '{}',
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(400);
@@ -411,7 +412,11 @@ describe('stale event rejection', () => {
     const recentCreated = Math.floor(Date.now() / 1000) - 2 * 60 * 60; // 2 hours ago
     const stripeSub = makeSubscription({ status: 'active' });
     (verifyWebhookSignature as jest.Mock).mockResolvedValue(
-      makeStripeEvent('customer.subscription.updated', stripeSub, recentCreated)
+      makeStripeEvent(
+        'customer.subscription.updated',
+        stripeSub,
+        recentCreated,
+      ),
     );
 
     const res = await app.request(
@@ -421,7 +426,7 @@ describe('stale event rejection', () => {
         headers: { 'stripe-signature': 'valid_sig' },
         body: '{}',
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -437,7 +442,7 @@ describe('customer.subscription.created', () => {
   it('calls updateSubscriptionFromWebhook with mapped status', async () => {
     const stripeSub = makeSubscription({ status: 'active' });
     (verifyWebhookSignature as jest.Mock).mockResolvedValue(
-      makeStripeEvent('customer.subscription.created', stripeSub)
+      makeStripeEvent('customer.subscription.created', stripeSub),
     );
 
     await app.request(
@@ -447,7 +452,7 @@ describe('customer.subscription.created', () => {
         headers: { 'stripe-signature': 'valid_sig' },
         body: '{}',
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(updateSubscriptionFromWebhook).toHaveBeenCalledWith(
@@ -456,14 +461,14 @@ describe('customer.subscription.created', () => {
       expect.objectContaining({
         status: 'active',
         lastStripeEventTimestamp: expect.any(String),
-      })
+      }),
     );
   });
 
   it('refreshes KV cache after successful update', async () => {
     const stripeSub = makeSubscription({ status: 'active' });
     (verifyWebhookSignature as jest.Mock).mockResolvedValue(
-      makeStripeEvent('customer.subscription.created', stripeSub)
+      makeStripeEvent('customer.subscription.created', stripeSub),
     );
 
     await app.request(
@@ -473,7 +478,7 @@ describe('customer.subscription.created', () => {
         headers: { 'stripe-signature': 'valid_sig' },
         body: '{}',
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(writeSubscriptionStatus).toHaveBeenCalledWith(
@@ -484,7 +489,7 @@ describe('customer.subscription.created', () => {
         status: 'active',
         monthlyLimit: 500,
         usedThisMonth: 42,
-      })
+      }),
     );
   });
 });
@@ -493,7 +498,7 @@ describe('customer.subscription.updated', () => {
   it('maps trialing status to active', async () => {
     const stripeSub = makeSubscription({ status: 'trialing' });
     (verifyWebhookSignature as jest.Mock).mockResolvedValue(
-      makeStripeEvent('customer.subscription.updated', stripeSub)
+      makeStripeEvent('customer.subscription.updated', stripeSub),
     );
 
     await app.request(
@@ -503,13 +508,13 @@ describe('customer.subscription.updated', () => {
         headers: { 'stripe-signature': 'valid_sig' },
         body: '{}',
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(updateSubscriptionFromWebhook).toHaveBeenCalledWith(
       mockDb,
       'sub_stripe_123',
-      expect.objectContaining({ status: 'active' })
+      expect.objectContaining({ status: 'active' }),
     );
   });
 
@@ -519,7 +524,7 @@ describe('customer.subscription.updated', () => {
       canceled_at: 1700100000,
     });
     (verifyWebhookSignature as jest.Mock).mockResolvedValue(
-      makeStripeEvent('customer.subscription.updated', stripeSub)
+      makeStripeEvent('customer.subscription.updated', stripeSub),
     );
 
     await app.request(
@@ -529,7 +534,7 @@ describe('customer.subscription.updated', () => {
         headers: { 'stripe-signature': 'valid_sig' },
         body: '{}',
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(updateSubscriptionFromWebhook).toHaveBeenCalledWith(
@@ -538,7 +543,7 @@ describe('customer.subscription.updated', () => {
       expect.objectContaining({
         status: 'cancelled',
         cancelledAt: expect.any(String),
-      })
+      }),
     );
   });
 
@@ -546,7 +551,7 @@ describe('customer.subscription.updated', () => {
     (updateSubscriptionFromWebhook as jest.Mock).mockResolvedValue(null);
     const stripeSub = makeSubscription({ status: 'active' });
     (verifyWebhookSignature as jest.Mock).mockResolvedValue(
-      makeStripeEvent('customer.subscription.updated', stripeSub)
+      makeStripeEvent('customer.subscription.updated', stripeSub),
     );
 
     await app.request(
@@ -556,7 +561,7 @@ describe('customer.subscription.updated', () => {
         headers: { 'stripe-signature': 'valid_sig' },
         body: '{}',
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(writeSubscriptionStatus).not.toHaveBeenCalled();
@@ -571,7 +576,7 @@ describe('customer.subscription.deleted', () => {
   it('sets subscription to expired', async () => {
     const stripeSub = makeSubscription({ status: 'canceled' });
     (verifyWebhookSignature as jest.Mock).mockResolvedValue(
-      makeStripeEvent('customer.subscription.deleted', stripeSub)
+      makeStripeEvent('customer.subscription.deleted', stripeSub),
     );
 
     await app.request(
@@ -581,7 +586,7 @@ describe('customer.subscription.deleted', () => {
         headers: { 'stripe-signature': 'valid_sig' },
         body: '{}',
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(updateSubscriptionFromWebhook).toHaveBeenCalledWith(
@@ -591,13 +596,13 @@ describe('customer.subscription.deleted', () => {
         status: 'expired',
         tier: 'free',
         cancelledAt: expect.any(String),
-      })
+      }),
     );
     expect(updateQuotaPoolLimit).toHaveBeenCalledWith(
       mockDb,
       'sub-internal-1',
       100,
-      10
+      10,
     );
   });
 });
@@ -610,7 +615,7 @@ describe('invoice.payment_failed', () => {
   it('updates subscription to past_due', async () => {
     const invoice = makeInvoice();
     (verifyWebhookSignature as jest.Mock).mockResolvedValue(
-      makeStripeEvent('invoice.payment_failed', invoice)
+      makeStripeEvent('invoice.payment_failed', invoice),
     );
 
     await app.request(
@@ -620,20 +625,20 @@ describe('invoice.payment_failed', () => {
         headers: { 'stripe-signature': 'valid_sig' },
         body: '{}',
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(updateSubscriptionFromWebhook).toHaveBeenCalledWith(
       mockDb,
       'sub_stripe_123',
-      expect.objectContaining({ status: 'past_due' })
+      expect.objectContaining({ status: 'past_due' }),
     );
   });
 
   it('emits app/payment.failed Inngest event', async () => {
     const invoice = makeInvoice({ attempt_count: 2 });
     (verifyWebhookSignature as jest.Mock).mockResolvedValue(
-      makeStripeEvent('invoice.payment_failed', invoice)
+      makeStripeEvent('invoice.payment_failed', invoice),
     );
 
     await app.request(
@@ -643,7 +648,7 @@ describe('invoice.payment_failed', () => {
         headers: { 'stripe-signature': 'valid_sig' },
         body: '{}',
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(inngest.send).toHaveBeenCalledWith({
@@ -661,7 +666,7 @@ describe('invoice.payment_failed', () => {
     (updateSubscriptionFromWebhook as jest.Mock).mockResolvedValue(null);
     const invoice = makeInvoice();
     (verifyWebhookSignature as jest.Mock).mockResolvedValue(
-      makeStripeEvent('invoice.payment_failed', invoice)
+      makeStripeEvent('invoice.payment_failed', invoice),
     );
 
     await app.request(
@@ -671,7 +676,7 @@ describe('invoice.payment_failed', () => {
         headers: { 'stripe-signature': 'valid_sig' },
         body: '{}',
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(inngest.send).not.toHaveBeenCalled();
@@ -687,7 +692,7 @@ describe('invoice.payment_failed', () => {
     // subscription pointer (e.g. one-off invoice or a future schema change).
     const invoice = makeInvoice({ parent: undefined });
     (verifyWebhookSignature as jest.Mock).mockResolvedValue(
-      makeStripeEvent('invoice.payment_failed', invoice)
+      makeStripeEvent('invoice.payment_failed', invoice),
     );
 
     const res = await app.request(
@@ -697,7 +702,7 @@ describe('invoice.payment_failed', () => {
         headers: { 'stripe-signature': 'valid_sig' },
         body: '{}',
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -711,7 +716,7 @@ describe('invoice.payment_failed', () => {
           context: 'stripe.webhook.payment_failed.missing_subscription_id',
           invoiceId: 'in_123',
         }),
-      })
+      }),
     );
   });
 });
@@ -724,7 +729,7 @@ describe('invoice.payment_succeeded', () => {
   it('updates subscription to active', async () => {
     const invoice = makeInvoice();
     (verifyWebhookSignature as jest.Mock).mockResolvedValue(
-      makeStripeEvent('invoice.payment_succeeded', invoice)
+      makeStripeEvent('invoice.payment_succeeded', invoice),
     );
 
     await app.request(
@@ -734,20 +739,20 @@ describe('invoice.payment_succeeded', () => {
         headers: { 'stripe-signature': 'valid_sig' },
         body: '{}',
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(updateSubscriptionFromWebhook).toHaveBeenCalledWith(
       mockDb,
       'sub_stripe_123',
-      expect.objectContaining({ status: 'active' })
+      expect.objectContaining({ status: 'active' }),
     );
   });
 
   it('refreshes KV cache after payment success', async () => {
     const invoice = makeInvoice();
     (verifyWebhookSignature as jest.Mock).mockResolvedValue(
-      makeStripeEvent('invoice.payment_succeeded', invoice)
+      makeStripeEvent('invoice.payment_succeeded', invoice),
     );
 
     await app.request(
@@ -757,7 +762,7 @@ describe('invoice.payment_succeeded', () => {
         headers: { 'stripe-signature': 'valid_sig' },
         body: '{}',
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(writeSubscriptionStatus).toHaveBeenCalled();
@@ -772,7 +777,7 @@ describe('invoice.payment_succeeded', () => {
     // subscription pointer (e.g. one-off invoice or a future schema change).
     const invoice = makeInvoice({ parent: undefined });
     (verifyWebhookSignature as jest.Mock).mockResolvedValue(
-      makeStripeEvent('invoice.payment_succeeded', invoice)
+      makeStripeEvent('invoice.payment_succeeded', invoice),
     );
 
     const res = await app.request(
@@ -782,7 +787,7 @@ describe('invoice.payment_succeeded', () => {
         headers: { 'stripe-signature': 'valid_sig' },
         body: '{}',
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -795,7 +800,7 @@ describe('invoice.payment_succeeded', () => {
           context: 'stripe.webhook.payment_succeeded.missing_subscription_id',
           invoiceId: 'in_123',
         }),
-      })
+      }),
     );
   });
 });
@@ -812,7 +817,7 @@ describe('checkout.session.completed', () => {
   it('calls activateSubscriptionFromCheckout with correct args', async () => {
     const session = makeCheckoutSession();
     (verifyWebhookSignature as jest.Mock).mockResolvedValue(
-      makeStripeEvent('checkout.session.completed', session)
+      makeStripeEvent('checkout.session.completed', session),
     );
 
     const res = await app.request(
@@ -822,7 +827,7 @@ describe('checkout.session.completed', () => {
         headers: { 'stripe-signature': 'valid_sig' },
         body: '{}',
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -831,14 +836,14 @@ describe('checkout.session.completed', () => {
       'acc-1',
       'sub_stripe_123',
       'plus',
-      expect.any(String)
+      expect.any(String),
     );
   });
 
   it('refreshes KV cache after activation', async () => {
     const session = makeCheckoutSession();
     (verifyWebhookSignature as jest.Mock).mockResolvedValue(
-      makeStripeEvent('checkout.session.completed', session)
+      makeStripeEvent('checkout.session.completed', session),
     );
 
     await app.request(
@@ -848,7 +853,7 @@ describe('checkout.session.completed', () => {
         headers: { 'stripe-signature': 'valid_sig' },
         body: '{}',
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(writeSubscriptionStatus).toHaveBeenCalled();
@@ -862,7 +867,7 @@ describe('checkout.session.completed', () => {
   it('escalates missing metadata to Sentry [BUG-658]', async () => {
     const session = makeCheckoutSession({ metadata: {} });
     (verifyWebhookSignature as jest.Mock).mockResolvedValue(
-      makeStripeEvent('checkout.session.completed', session)
+      makeStripeEvent('checkout.session.completed', session),
     );
 
     const res = await app.request(
@@ -872,7 +877,7 @@ describe('checkout.session.completed', () => {
         headers: { 'stripe-signature': 'valid_sig' },
         body: '{}',
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -885,14 +890,14 @@ describe('checkout.session.completed', () => {
           hasAccountId: false,
           hasTier: false,
         }),
-      })
+      }),
     );
   });
 
   it('escalates missing subscription id to Sentry [BUG-658]', async () => {
     const session = makeCheckoutSession({ subscription: null });
     (verifyWebhookSignature as jest.Mock).mockResolvedValue(
-      makeStripeEvent('checkout.session.completed', session)
+      makeStripeEvent('checkout.session.completed', session),
     );
 
     const res = await app.request(
@@ -902,7 +907,7 @@ describe('checkout.session.completed', () => {
         headers: { 'stripe-signature': 'valid_sig' },
         body: '{}',
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -914,7 +919,7 @@ describe('checkout.session.completed', () => {
           context: 'stripe.webhook.checkout.completed.missing_metadata',
           hasSubscriptionId: false,
         }),
-      })
+      }),
     );
   });
 
@@ -923,7 +928,7 @@ describe('checkout.session.completed', () => {
       metadata: { accountId: 'acc-1', tier: 'invalid' },
     });
     (verifyWebhookSignature as jest.Mock).mockResolvedValue(
-      makeStripeEvent('checkout.session.completed', session)
+      makeStripeEvent('checkout.session.completed', session),
     );
 
     const res = await app.request(
@@ -933,7 +938,7 @@ describe('checkout.session.completed', () => {
         headers: { 'stripe-signature': 'valid_sig' },
         body: '{}',
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -944,7 +949,7 @@ describe('checkout.session.completed', () => {
         extra: expect.objectContaining({
           hasTier: false,
         }),
-      })
+      }),
     );
   });
 
@@ -952,7 +957,7 @@ describe('checkout.session.completed', () => {
     (activateSubscriptionFromCheckout as jest.Mock).mockResolvedValue(null);
     const session = makeCheckoutSession();
     (verifyWebhookSignature as jest.Mock).mockResolvedValue(
-      makeStripeEvent('checkout.session.completed', session)
+      makeStripeEvent('checkout.session.completed', session),
     );
 
     await app.request(
@@ -962,7 +967,7 @@ describe('checkout.session.completed', () => {
         headers: { 'stripe-signature': 'valid_sig' },
         body: '{}',
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(writeSubscriptionStatus).not.toHaveBeenCalled();
@@ -980,7 +985,7 @@ describe('tier metadata in subscription events', () => {
       metadata: { tier: 'family' },
     });
     (verifyWebhookSignature as jest.Mock).mockResolvedValue(
-      makeStripeEvent('customer.subscription.updated', stripeSub)
+      makeStripeEvent('customer.subscription.updated', stripeSub),
     );
 
     await app.request(
@@ -990,13 +995,13 @@ describe('tier metadata in subscription events', () => {
         headers: { 'stripe-signature': 'valid_sig' },
         body: '{}',
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(updateSubscriptionFromWebhook).toHaveBeenCalledWith(
       mockDb,
       'sub_stripe_123',
-      expect.objectContaining({ tier: 'family' })
+      expect.objectContaining({ tier: 'family' }),
     );
   });
 
@@ -1006,7 +1011,7 @@ describe('tier metadata in subscription events', () => {
       metadata: { tier: 'pro' },
     });
     (verifyWebhookSignature as jest.Mock).mockResolvedValue(
-      makeStripeEvent('customer.subscription.updated', stripeSub)
+      makeStripeEvent('customer.subscription.updated', stripeSub),
     );
 
     await app.request(
@@ -1016,14 +1021,14 @@ describe('tier metadata in subscription events', () => {
         headers: { 'stripe-signature': 'valid_sig' },
         body: '{}',
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(updateQuotaPoolLimit).toHaveBeenCalledWith(
       mockDb,
       'sub-internal-1',
       expect.any(Number),
-      null
+      null,
     );
   });
 
@@ -1033,7 +1038,7 @@ describe('tier metadata in subscription events', () => {
       metadata: { tier: 'bogus' },
     });
     (verifyWebhookSignature as jest.Mock).mockResolvedValue(
-      makeStripeEvent('customer.subscription.updated', stripeSub)
+      makeStripeEvent('customer.subscription.updated', stripeSub),
     );
 
     await app.request(
@@ -1043,13 +1048,13 @@ describe('tier metadata in subscription events', () => {
         headers: { 'stripe-signature': 'valid_sig' },
         body: '{}',
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(updateSubscriptionFromWebhook).toHaveBeenCalledWith(
       mockDb,
       'sub_stripe_123',
-      expect.not.objectContaining({ tier: expect.anything() })
+      expect.not.objectContaining({ tier: expect.anything() }),
     );
     expect(updateQuotaPoolLimit).not.toHaveBeenCalled();
   });
@@ -1057,7 +1062,7 @@ describe('tier metadata in subscription events', () => {
   it('skips quota update when no tier in metadata', async () => {
     const stripeSub = makeSubscription({ status: 'active' });
     (verifyWebhookSignature as jest.Mock).mockResolvedValue(
-      makeStripeEvent('customer.subscription.updated', stripeSub)
+      makeStripeEvent('customer.subscription.updated', stripeSub),
     );
 
     await app.request(
@@ -1067,7 +1072,7 @@ describe('tier metadata in subscription events', () => {
         headers: { 'stripe-signature': 'valid_sig' },
         body: '{}',
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(updateQuotaPoolLimit).not.toHaveBeenCalled();
@@ -1081,7 +1086,7 @@ describe('tier metadata in subscription events', () => {
 describe('unknown event types', () => {
   it('returns 200 for unhandled event types', async () => {
     (verifyWebhookSignature as jest.Mock).mockResolvedValue(
-      makeStripeEvent('charge.succeeded', { id: 'ch_123' })
+      makeStripeEvent('charge.succeeded', { id: 'ch_123' }),
     );
 
     const res = await app.request(
@@ -1091,7 +1096,7 @@ describe('unknown event types', () => {
         headers: { 'stripe-signature': 'valid_sig' },
         body: '{}',
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);

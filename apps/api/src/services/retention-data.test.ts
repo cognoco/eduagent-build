@@ -52,6 +52,8 @@ import {
   type ChatMessage,
   type ModelConfig,
 } from './llm';
+import { makeChatStreamResult } from './llm/types';
+import type { ChatResult, ChatStreamResult, StopReason } from './llm/types';
 import {
   getSubjectRetention,
   getTopicRetention,
@@ -139,7 +141,7 @@ function createMockDb(options?: {
       set: jest.fn().mockReturnValue({
         where: jest.fn().mockImplementation(() => {
           const p = Promise.resolve(undefined);
-          (p as Record<string, unknown>).returning = jest
+          (p as unknown as Record<string, unknown>).returning = jest
             .fn()
             .mockResolvedValue([{}]);
           return p;
@@ -477,6 +479,7 @@ describe('processRecallTest', () => {
     const db = createMockDb();
     const result = await processRecallTest(db, profileId, {
       topicId,
+      answer: '',
       attemptMode: 'dont_remember',
     });
 
@@ -810,7 +813,7 @@ describe('processRecallTest', () => {
     // Simulate atomic guard returning 0 rows (concurrent request already claimed)
     const whereMock = jest.fn().mockImplementation(() => {
       const p = Promise.resolve(undefined);
-      (p as Record<string, unknown>).returning = jest
+      (p as unknown as Record<string, unknown>).returning = jest
         .fn()
         .mockResolvedValue([]); // empty = 0 rows updated
       return p;
@@ -1546,7 +1549,7 @@ describe('updateRetentionFromSession', () => {
       set: jest.fn().mockReturnValue({
         where: jest.fn().mockImplementation(() => {
           const p = Promise.resolve(undefined);
-          (p as Record<string, unknown>).returning = jest
+          (p as unknown as Record<string, unknown>).returning = jest
             .fn()
             .mockResolvedValue([]); // 0 rows = optimistic lock conflict
           return p;
@@ -1636,11 +1639,16 @@ describe('evaluateRecallQuality', () => {
       async chat(
         _messages: ChatMessage[],
         _config: ModelConfig,
-      ): Promise<string> {
-        return '4';
+      ): Promise<ChatResult> {
+        return { content: '4', stopReason: 'stop' };
       },
-      async *chatStream(): AsyncIterable<string> {
-        yield '4';
+      chatStream(): ChatStreamResult {
+        return makeChatStreamResult(
+          (async function* () {
+            yield '4';
+          })(),
+          Promise.resolve<StopReason>('stop'),
+        );
       },
     };
     registerProvider(provider);
@@ -1655,11 +1663,16 @@ describe('evaluateRecallQuality', () => {
   it('handles quality 0 (blackout)', async () => {
     const provider: LLMProvider = {
       id: 'gemini',
-      async chat(): Promise<string> {
-        return '0';
+      async chat(): Promise<ChatResult> {
+        return { content: '0', stopReason: 'stop' };
       },
-      async *chatStream(): AsyncIterable<string> {
-        yield '0';
+      chatStream(): ChatStreamResult {
+        return makeChatStreamResult(
+          (async function* () {
+            yield '0';
+          })(),
+          Promise.resolve<StopReason>('stop'),
+        );
       },
     };
     registerProvider(provider);
@@ -1671,11 +1684,16 @@ describe('evaluateRecallQuality', () => {
   it('handles quality 5 (perfect)', async () => {
     const provider: LLMProvider = {
       id: 'gemini',
-      async chat(): Promise<string> {
-        return '5';
+      async chat(): Promise<ChatResult> {
+        return { content: '5', stopReason: 'stop' };
       },
-      async *chatStream(): AsyncIterable<string> {
-        yield '5';
+      chatStream(): ChatStreamResult {
+        return makeChatStreamResult(
+          (async function* () {
+            yield '5';
+          })(),
+          Promise.resolve<StopReason>('stop'),
+        );
       },
     };
     registerProvider(provider);
@@ -1690,11 +1708,16 @@ describe('evaluateRecallQuality', () => {
   it('falls back to length heuristic on unparseable LLM response', async () => {
     const provider: LLMProvider = {
       id: 'gemini',
-      async chat(): Promise<string> {
-        return 'I think the answer is good';
+      async chat(): Promise<ChatResult> {
+        return { content: 'I think the answer is good', stopReason: 'stop' };
       },
-      async *chatStream(): AsyncIterable<string> {
-        yield 'good';
+      chatStream(): ChatStreamResult {
+        return makeChatStreamResult(
+          (async function* () {
+            yield 'good';
+          })(),
+          Promise.resolve<StopReason>('stop'),
+        );
       },
     };
     registerProvider(provider);
@@ -1706,11 +1729,16 @@ describe('evaluateRecallQuality', () => {
   it('falls back to short-answer heuristic on unparseable LLM response', async () => {
     const provider: LLMProvider = {
       id: 'gemini',
-      async chat(): Promise<string> {
-        return 'not a number';
+      async chat(): Promise<ChatResult> {
+        return { content: 'not a number', stopReason: 'stop' };
       },
-      async *chatStream(): AsyncIterable<string> {
-        yield 'not a number';
+      chatStream(): ChatStreamResult {
+        return makeChatStreamResult(
+          (async function* () {
+            yield 'not a number';
+          })(),
+          Promise.resolve<StopReason>('stop'),
+        );
       },
     };
     registerProvider(provider);
@@ -1722,11 +1750,16 @@ describe('evaluateRecallQuality', () => {
   it('falls back to length heuristic on LLM error', async () => {
     const provider: LLMProvider = {
       id: 'gemini',
-      async chat(): Promise<string> {
+      async chat(): Promise<ChatResult> {
         throw new Error('LLM unavailable');
       },
-      async *chatStream(): AsyncIterable<string> {
-        yield '';
+      chatStream(): ChatStreamResult {
+        return makeChatStreamResult(
+          (async function* () {
+            yield '';
+          })(),
+          Promise.resolve<StopReason>('stop'),
+        );
       },
     };
     registerProvider(provider);
@@ -1738,11 +1771,16 @@ describe('evaluateRecallQuality', () => {
   it('falls back for long answer on LLM error', async () => {
     const provider: LLMProvider = {
       id: 'gemini',
-      async chat(): Promise<string> {
+      async chat(): Promise<ChatResult> {
         throw new Error('LLM unavailable');
       },
-      async *chatStream(): AsyncIterable<string> {
-        yield '';
+      chatStream(): ChatStreamResult {
+        return makeChatStreamResult(
+          (async function* () {
+            yield '';
+          })(),
+          Promise.resolve<StopReason>('stop'),
+        );
       },
     };
     registerProvider(provider);
@@ -1754,11 +1792,16 @@ describe('evaluateRecallQuality', () => {
   it('clamps out-of-range values to fallback', async () => {
     const provider: LLMProvider = {
       id: 'gemini',
-      async chat(): Promise<string> {
-        return '7';
+      async chat(): Promise<ChatResult> {
+        return { content: '7', stopReason: 'stop' };
       },
-      async *chatStream(): AsyncIterable<string> {
-        yield '7';
+      chatStream(): ChatStreamResult {
+        return makeChatStreamResult(
+          (async function* () {
+            yield '7';
+          })(),
+          Promise.resolve<StopReason>('stop'),
+        );
       },
     };
     registerProvider(provider);
@@ -1770,11 +1813,16 @@ describe('evaluateRecallQuality', () => {
   it('clamps negative values to fallback', async () => {
     const provider: LLMProvider = {
       id: 'gemini',
-      async chat(): Promise<string> {
-        return '-1';
+      async chat(): Promise<ChatResult> {
+        return { content: '-1', stopReason: 'stop' };
       },
-      async *chatStream(): AsyncIterable<string> {
-        yield '-1';
+      chatStream(): ChatStreamResult {
+        return makeChatStreamResult(
+          (async function* () {
+            yield '-1';
+          })(),
+          Promise.resolve<StopReason>('stop'),
+        );
       },
     };
     registerProvider(provider);
@@ -1786,11 +1834,16 @@ describe('evaluateRecallQuality', () => {
   it('handles LLM response with whitespace', async () => {
     const provider: LLMProvider = {
       id: 'gemini',
-      async chat(): Promise<string> {
-        return '  3  \n';
+      async chat(): Promise<ChatResult> {
+        return { content: '  3  \n', stopReason: 'stop' };
       },
-      async *chatStream(): AsyncIterable<string> {
-        yield '3';
+      chatStream(): ChatStreamResult {
+        return makeChatStreamResult(
+          (async function* () {
+            yield '3';
+          })(),
+          Promise.resolve<StopReason>('stop'),
+        );
       },
     };
     registerProvider(provider);

@@ -152,7 +152,9 @@ describe('Session lifecycle (integration)', () => {
     const subjectId = await seedSubject(profileId);
 
     const session = await startSession(db, profileId, subjectId, {
+      subjectId,
       sessionType: 'learning',
+      inputMode: 'text',
     });
 
     // Verify session row persisted
@@ -192,7 +194,9 @@ describe('Session lifecycle (integration)', () => {
 
     await expect(
       startSession(db, profileId, archivedSubjectId, {
+        subjectId: archivedSubjectId,
         sessionType: 'learning',
+        inputMode: 'text',
       }),
     ).rejects.toThrow(SubjectInactiveError);
   });
@@ -206,7 +210,9 @@ describe('Session lifecycle (integration)', () => {
     const subjectId = await seedSubject(profileId);
 
     const session = await startSession(db, profileId, subjectId, {
+      subjectId,
       sessionType: 'learning',
+      inputMode: 'text',
     });
 
     const result = await processMessage(db, profileId, session.id, {
@@ -253,7 +259,9 @@ describe('Session lifecycle (integration)', () => {
 
     // Start a session, then directly set exchangeCount to 49 in DB
     const session = await startSession(db, profileId, subjectId, {
+      subjectId,
       sessionType: 'learning',
+      inputMode: 'text',
     });
 
     await db
@@ -292,7 +300,9 @@ describe('Session lifecycle (integration)', () => {
     const subjectId = await seedSubject(profileId);
 
     const session = await startSession(db, profileId, subjectId, {
+      subjectId,
       sessionType: 'learning',
+      inputMode: 'text',
     });
 
     // Push to one exchange below the 50-cap.
@@ -369,7 +379,9 @@ describe('Session lifecycle (integration)', () => {
     const { profileId } = await seedProfile();
     const subjectId = await seedSubject(profileId);
     const session = await startSession(db, profileId, subjectId, {
+      subjectId,
       sessionType: 'learning',
+      inputMode: 'text',
     });
 
     await persistExchangeResult(
@@ -413,7 +425,9 @@ describe('Session lifecycle (integration)', () => {
     const { profileId } = await seedProfile();
     const subjectId = await seedSubject(profileId);
     const session = await startSession(db, profileId, subjectId, {
+      subjectId,
       sessionType: 'learning',
+      inputMode: 'text',
     });
 
     await persistExchangeResult(
@@ -460,7 +474,9 @@ describe('Session lifecycle (integration)', () => {
     const subjectId = await seedSubject(profileId);
 
     const session = await startSession(db, profileId, subjectId, {
+      subjectId,
       sessionType: 'learning',
+      inputMode: 'text',
     });
 
     await processMessage(db, profileId, session.id, {
@@ -508,12 +524,16 @@ describe('Session lifecycle (integration)', () => {
 
     // Session with recent activity (should NOT be closed)
     const recentSession = await startSession(db, profileId1, subjectId1, {
+      subjectId: subjectId1,
       sessionType: 'learning',
+      inputMode: 'text',
     });
 
     // Session with old activity — backdate lastActivityAt to 3 hours ago
     const staleSession = await startSession(db, profileId2, subjectId2, {
+      subjectId: subjectId2,
       sessionType: 'learning',
+      inputMode: 'text',
     });
 
     const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000);

@@ -85,7 +85,7 @@ async function executeRevocation(eventData: {
   };
 
   const handler = (
-    consentRevocation as { fn: (ctx: unknown) => Promise<unknown> }
+    consentRevocation as unknown as { fn: (ctx: unknown) => Promise<unknown> }
   ).fn;
   const result = await handler({
     event: { data: eventData, name: 'app/consent.revoked' },

@@ -37,6 +37,7 @@ describe('book-generation', () => {
         provider: 'mock',
         model: 'mock-model',
         latencyMs: 12,
+        stopReason: 'stop',
       });
 
       const result = await detectSubjectType('History', 11);
@@ -64,6 +65,7 @@ describe('book-generation', () => {
         provider: 'mock',
         model: 'mock-model',
         latencyMs: 12,
+        stopReason: 'stop',
       });
 
       const result = await detectSubjectType('Fractions', 11);
@@ -91,6 +93,7 @@ describe('book-generation', () => {
         provider: 'mock',
         model: 'mock-model',
         latencyMs: 12,
+        stopReason: 'stop',
       });
 
       await detectSubjectType('Biology', 20);
@@ -149,6 +152,7 @@ describe('book-generation', () => {
         provider: 'mock',
         model: 'mock-model',
         latencyMs: 12,
+        stopReason: 'stop',
       });
 
       const result = await generateBookTopics(
@@ -169,6 +173,7 @@ describe('book-generation', () => {
         provider: 'mock',
         model: 'mock-model',
         latencyMs: 12,
+        stopReason: 'stop',
       });
 
       await generateBookTopics(
@@ -206,6 +211,7 @@ describe('book-generation', () => {
         provider: 'mock',
         model: 'mock-model',
         latencyMs: 12,
+        stopReason: 'stop',
       });
 
       await expect(
@@ -219,6 +225,7 @@ describe('book-generation', () => {
         provider: 'mock',
         model: 'mock-model',
         latencyMs: 12,
+        stopReason: 'stop',
       });
 
       await generateBookTopics(
@@ -268,6 +275,7 @@ describe('book-generation', () => {
         provider: 'mock',
         model: 'mock-model',
         latencyMs: 12,
+        stopReason: 'stop',
       });
 
       await expect(detectSubjectType('History', 11)).rejects.toThrow(
@@ -281,6 +289,7 @@ describe('book-generation', () => {
         provider: 'mock',
         model: 'mock-model',
         latencyMs: 12,
+        stopReason: 'stop',
       });
 
       await expect(detectSubjectType('History', 11)).rejects.toThrow(
@@ -298,6 +307,7 @@ describe('book-generation', () => {
         provider: 'mock',
         model: 'mock-model',
         latencyMs: 12,
+        stopReason: 'stop',
       });
 
       await expect(detectSubjectType('History', 11)).rejects.toThrow(
@@ -314,6 +324,7 @@ describe('book-generation', () => {
         provider: 'mock',
         model: 'mock-model',
         latencyMs: 12,
+        stopReason: 'stop',
       });
 
       await expect(detectSubjectType('History', 11)).rejects.toThrow(
@@ -340,6 +351,7 @@ describe('book-generation', () => {
         provider: 'mock',
         model: 'mock-model',
         latencyMs: 12,
+        stopReason: 'stop',
       });
 
       const result = await detectSubjectType('Fractions', 11);
@@ -352,6 +364,7 @@ describe('book-generation', () => {
         provider: 'mock',
         model: 'mock-model',
         latencyMs: 12,
+        stopReason: 'stop',
       });
 
       await expect(detectSubjectType('History', 11)).rejects.toThrow(
@@ -367,6 +380,7 @@ describe('book-generation', () => {
         provider: 'mock',
         model: 'mock-model',
         latencyMs: 12,
+        stopReason: 'stop',
       });
 
       await expect(
@@ -380,6 +394,7 @@ describe('book-generation', () => {
         provider: 'mock',
         model: 'mock-model',
         latencyMs: 12,
+        stopReason: 'stop',
       });
 
       await expect(
@@ -397,6 +412,7 @@ describe('book-generation', () => {
         provider: 'mock',
         model: 'mock-model',
         latencyMs: 12,
+        stopReason: 'stop',
       });
 
       await expect(
@@ -421,6 +437,7 @@ describe('book-generation', () => {
         provider: 'mock',
         model: 'mock-model',
         latencyMs: 12,
+        stopReason: 'stop',
       });
 
       await expect(
@@ -448,6 +465,7 @@ describe('book-generation', () => {
         provider: 'mock',
         model: 'mock-model',
         latencyMs: 12,
+        stopReason: 'stop',
       });
 
       const result = await generateBookTopics(
@@ -465,6 +483,7 @@ describe('book-generation', () => {
         provider: 'mock',
         model: 'mock-model',
         latencyMs: 12,
+        stopReason: 'stop',
       });
 
       // extractJson regex /\{[\s\S]*\}/ extracts {"title":"Timeline"} from the array,

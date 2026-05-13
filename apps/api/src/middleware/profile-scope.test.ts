@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import type { AppVariables } from '../types/hono';
 
 jest.mock('../services/sentry', () => ({
   captureException: jest.fn(),
@@ -46,18 +47,18 @@ jest.mock('../services/profile', () => ({
 }));
 
 describe('profileScopeMiddleware', () => {
-  function createApp(): InstanceType<typeof Hono> {
-    const app = new Hono();
+  function createApp(): Hono<{ Variables: AppVariables }> {
+    const app = new Hono<{ Variables: AppVariables }>();
     // Simulate account middleware having run
     app.use('*', async (c, next) => {
-      c.set('account' as never, { id: 'test-account-id' });
-      c.set('db' as never, {});
+      c.set('account', { id: 'test-account-id' } as AppVariables['account']);
+      c.set('db', {} as AppVariables['db']);
       await next();
     });
     app.use('*', profileScopeMiddleware);
     app.get('/test', (c) => {
       const profileId = c.get('profileId');
-      const profileMeta = c.get('profileMeta' as never) ?? null;
+      const profileMeta = c.get('profileMeta') ?? null;
       return c.json({ profileId: profileId ?? null, profileMeta });
     });
     return app;
@@ -211,12 +212,12 @@ describe('profileScopeMiddleware', () => {
   });
 
   it('skips auto-resolution and calls next when db or account is missing', async () => {
-    const app = new Hono();
+    const app = new Hono<{ Variables: AppVariables }>();
     // Do NOT set db or account — simulate no prior middleware
     app.use('*', profileScopeMiddleware);
     app.get('/test', (c) => {
       const profileId = c.get('profileId');
-      const profileMeta = c.get('profileMeta' as never) ?? null;
+      const profileMeta = c.get('profileMeta') ?? null;
       return c.json({ profileId: profileId ?? null, profileMeta });
     });
 

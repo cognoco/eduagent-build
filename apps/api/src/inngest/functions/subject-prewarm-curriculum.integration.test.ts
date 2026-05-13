@@ -131,6 +131,7 @@ describe('subject-prewarm-curriculum integration', () => {
       provider: 'test',
       model: 'fixture',
       latencyMs: 1,
+      stopReason: 'stop',
     });
   });
 

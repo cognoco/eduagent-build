@@ -2,6 +2,14 @@
 // Workers KV Helpers — Tests
 // ---------------------------------------------------------------------------
 
+// KVNamespace is a Cloudflare Workers type absent from tsconfig.spec.json.
+// Use Record<string, unknown> as a structural stand-in so return-type
+// annotations compile. This local declaration shadows the real interface for
+// the whole module — proper fix is to add @cloudflare/workers-types to
+// tsconfig.spec.json. Tracked in Notion bug tracker:
+// https://www.notion.so/35f8bce91f7c81b5b944ee47fad6fc9e
+type KVNamespace = Record<string, unknown>;
+
 import {
   writeSubscriptionStatus,
   readSubscriptionStatus,
@@ -38,7 +46,7 @@ describe('writeSubscriptionStatus', () => {
     expect(kv.put).toHaveBeenCalledWith(
       'sub:acc-123',
       JSON.stringify(sampleStatus),
-      { expirationTtl: 86400 }
+      { expirationTtl: 86400 },
     );
   });
 

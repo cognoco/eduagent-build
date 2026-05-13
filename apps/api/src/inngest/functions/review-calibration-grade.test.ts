@@ -5,8 +5,13 @@ async function executeHandler(eventData: unknown) {
     run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
   };
   const result = await handleReviewCalibrationGrade({
-    event: { data: eventData, name: 'app/review.calibration.requested' },
-    step: mockStep,
+    // handleReviewCalibrationGrade declares `event: { data: unknown }` and
+    // TS2353 rejects excess properties on object literals — `name` is
+    // intentionally omitted here. Do not add it back.
+    event: { data: eventData },
+    step: mockStep as unknown as {
+      run: <T>(name: string, fn: () => T | Promise<T>) => Promise<T>;
+    },
   });
   return { result, mockStep };
 }
