@@ -200,6 +200,10 @@ describe('ProgressWeeklyReportDetail', () => {
     screen.getByText('5');
     screen.getByText('Time on app');
     screen.getByText('1h 15m');
+    screen.getByTestId('progress-weekly-report-metric-sessions');
+    screen.getByTestId('progress-weekly-report-metric-minutes');
+    screen.getByTestId('progress-weekly-report-metric-tests');
+    screen.getByTestId('progress-weekly-report-metric-test-points');
   });
 
   it('shows the reportGone state when data is null and there is no loading or error', () => {

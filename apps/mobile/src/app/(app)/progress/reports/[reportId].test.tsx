@@ -203,6 +203,10 @@ describe('ProgressMonthlyReportDetail', () => {
     screen.getByText('8');
     screen.getByText('Time on app');
     screen.getByText('2h');
+    screen.getByTestId('progress-report-metric-sessions');
+    screen.getByTestId('progress-report-metric-minutes');
+    screen.getByTestId('progress-report-metric-tests');
+    screen.getByTestId('progress-report-metric-test-points');
   });
 
   it('renders highlights when the report includes them', () => {

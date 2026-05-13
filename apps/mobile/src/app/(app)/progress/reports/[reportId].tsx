@@ -116,12 +116,14 @@ export default function ProgressMonthlyReportDetail(): React.ReactElement {
               <MetricCard
                 label={t('parentView.report.sessions')}
                 value={String(report.reportData.thisMonth.totalSessions)}
+                testID="progress-report-metric-sessions"
               />
               <MetricCard
                 label={t('parentView.report.timeOnApp')}
                 value={formatMinutes(
                   report.reportData.thisMonth.totalActiveMinutes,
                 )}
+                testID="progress-report-metric-minutes"
               />
             </View>
 
@@ -132,12 +134,14 @@ export default function ProgressMonthlyReportDetail(): React.ReactElement {
                   report.reportData.practiceSummary?.totals
                     .activitiesCompleted ?? 0,
                 )}
+                testID="progress-report-metric-tests"
               />
               <MetricCard
                 label={t('parentView.report.testPoints')}
                 value={String(
                   report.reportData.practiceSummary?.totals.pointsEarned ?? 0,
                 )}
+                testID="progress-report-metric-test-points"
               />
             </View>
 

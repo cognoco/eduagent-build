@@ -16,7 +16,8 @@ jest.mock('react-i18next', () => ({
       if (key === 'progress.monthlyReport.nextStepTitle') return 'Next step';
       if (key === 'progress.monthlyReport.bars.sessions') return 'Sessions';
       if (key === 'progress.monthlyReport.bars.time') return 'Time';
-      if (key === 'progress.monthlyReport.bars.topics') return 'Topics';
+      if (key === 'progress.monthlyReport.bars.quizzes') return 'Quizzes';
+      if (key === 'progress.monthlyReport.bars.reviews') return 'Reviews';
       if (key === 'progress.monthlyReport.empty.child')
         return `Your first monthly summary lands at the end of ${opts?.month}.`;
       if (key === 'progress.monthlyReport.empty.adult')
@@ -61,6 +62,25 @@ describe('MonthlyReportCard', () => {
           vocabularyTotal: 0,
           streakBest: 5,
         },
+        practiceSummary: {
+          quizzesCompleted: 3,
+          reviewsCompleted: 5,
+          totals: {
+            activitiesCompleted: 8,
+            reviewsCompleted: 5,
+            pointsEarned: 24,
+            celebrations: 1,
+            distinctActivityTypes: 2,
+          },
+          scores: {
+            scoredActivities: 3,
+            score: 2,
+            total: 3,
+            accuracy: 0.67,
+          },
+          byType: [],
+          bySubject: [],
+        },
       },
     ]);
 
@@ -71,6 +91,10 @@ describe('MonthlyReportCard', () => {
     screen.getByText('Solved fraction problems');
     screen.getByText('Kept a steady rhythm');
     screen.getByTestId('monthly-bars');
+    screen.getByText('Quizzes');
+    screen.getByText('Reviews');
+    screen.getByText('3');
+    screen.getByText('5');
     screen.getByText('Next step');
     screen.getByText('Review decimals');
   });

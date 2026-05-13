@@ -139,12 +139,14 @@ export default function ProgressWeeklyReportDetail(): React.ReactElement {
               <MetricCard
                 label={t('parentView.weeklyReport.sessionsThisWeek')}
                 value={String(report.reportData.thisWeek.totalSessions)}
+                testID="progress-weekly-report-metric-sessions"
               />
               <MetricCard
                 label={t('parentView.weeklyReport.timeOnApp')}
                 value={formatMinutes(
                   report.reportData.thisWeek.totalActiveMinutes,
                 )}
+                testID="progress-weekly-report-metric-minutes"
               />
             </View>
 
@@ -155,12 +157,14 @@ export default function ProgressWeeklyReportDetail(): React.ReactElement {
                   report.reportData.practiceSummary?.totals
                     .activitiesCompleted ?? 0,
                 )}
+                testID="progress-weekly-report-metric-tests"
               />
               <MetricCard
                 label={t('parentView.weeklyReport.testPoints')}
                 value={String(
                   report.reportData.practiceSummary?.totals.pointsEarned ?? 0,
                 )}
+                testID="progress-weekly-report-metric-test-points"
               />
             </View>
 

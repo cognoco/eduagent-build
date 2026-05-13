@@ -102,8 +102,10 @@ describe('WeeklyReportCard', () => {
     screen.getByText('3 topics started');
     screen.getByText('8-day streak');
     screen.getByText('Practice highlights');
+    screen.getByTestId('weekly-report-tests');
     screen.getByText('8');
     screen.getByText('tests');
+    screen.getByTestId('weekly-report-points');
     screen.getByText('24');
     screen.getByText('points');
   });

@@ -56,12 +56,15 @@ function ReportLines({
 
 function ReportBars({
   metrics,
+  quizzesCompleted,
+  reviewsCompleted,
 }: {
   metrics: {
     totalSessions: number;
     totalActiveMinutes: number;
-    topicsExplored: number;
   };
+  quizzesCompleted: number;
+  reviewsCompleted: number;
 }): React.ReactElement {
   const { t } = useTranslation();
   const values = [
@@ -78,10 +81,16 @@ function ReportBars({
       display: formatMinutes(metrics.totalActiveMinutes),
     },
     {
-      key: 'topics',
-      label: t('progress.monthlyReport.bars.topics'),
-      value: metrics.topicsExplored,
-      display: String(metrics.topicsExplored),
+      key: 'quizzes',
+      label: t('progress.monthlyReport.bars.quizzes'),
+      value: quizzesCompleted,
+      display: String(quizzesCompleted),
+    },
+    {
+      key: 'reviews',
+      label: t('progress.monthlyReport.bars.reviews'),
+      value: reviewsCompleted,
+      display: String(reviewsCompleted),
     },
   ];
   const maxValue = Math.max(...values.map((item) => item.value), 1);
@@ -149,7 +158,13 @@ export function MonthlyReportCard({
           <Text className="text-body-sm text-text-secondary mt-1">
             {latest.headlineStat.comparison}
           </Text>
-          {latest.thisMonth ? <ReportBars metrics={latest.thisMonth} /> : null}
+          {latest.thisMonth ? (
+            <ReportBars
+              metrics={latest.thisMonth}
+              quizzesCompleted={latest.practiceSummary?.quizzesCompleted ?? 0}
+              reviewsCompleted={latest.practiceSummary?.reviewsCompleted ?? 0}
+            />
+          ) : null}
           <ReportLines
             title={t('progress.monthlyReport.highlightsTitle')}
             lines={highlights}
