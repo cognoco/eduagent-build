@@ -1,7 +1,3 @@
-// ---------------------------------------------------------------------------
-// Hono app type declarations — shared Variables type for tests and middleware.
-// ---------------------------------------------------------------------------
-
 import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import type { ProfileMeta } from '../middleware/profile-scope';
@@ -12,7 +8,7 @@ export type AppVariables = {
   user: AuthUser;
   db: Database;
   account: Account;
-  profileId: string | undefined;
+  profileId: string;
   profileMeta: ProfileMeta | undefined;
   subscriptionId: string;
   llmTier: LLMTier;

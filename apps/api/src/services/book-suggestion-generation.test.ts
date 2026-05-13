@@ -109,17 +109,12 @@ function makeTx(opts: {
     chain['limit'] = terminal;
     // Make the chain itself thenable so awaiting it resolves the result.
     // Some calls are awaited directly (no .limit()), others via .limit().
-    (chain as unknown as Promise<unknown[]>)['then'] = <
-      TResult1 = unknown[],
-      TResult2 = never,
-    >(
-      onFulfilled?:
-        | ((value: unknown[]) => TResult1 | PromiseLike<TResult1>)
-        | null,
-      onRejected?:
-        | ((reason: unknown) => TResult2 | PromiseLike<TResult2>)
-        | null,
-    ) => Promise.resolve(result).then(onFulfilled, onRejected);
+    (chain as unknown as PromiseLike<unknown[]>).then = ((
+      onFulfilled?: ((value: unknown[]) => unknown) | null,
+      onRejected?: ((reason: unknown) => unknown) | null,
+    ) => Promise.resolve(result).then(onFulfilled, onRejected)) as PromiseLike<
+      unknown[]
+    >['then'];
     return chain;
   };
 
