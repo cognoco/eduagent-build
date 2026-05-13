@@ -236,6 +236,23 @@ const fullSubject = {
   sessionsCount: 5,
 };
 
+const childProgressProfile: Profile = {
+  id: 'child-1',
+  accountId: 'account-1',
+  displayName: 'Emma',
+  isOwner: false,
+  hasPremiumLlm: false,
+  consentStatus: null,
+  linkCreatedAt: null,
+  conversationLanguage: 'en',
+  pronouns: null,
+  birthYear: 2015,
+  avatarUrl: null,
+  location: null,
+  createdAt: '2026-01-01T00:00:00Z',
+  updatedAt: '2026-01-01T00:00:00Z',
+};
+
 function mockHooks(
   overrides: {
     inventory?:
@@ -565,24 +582,7 @@ describe('ProgressScreen — progressive disclosure', () => {
   });
 
   it('opens the requested child progress profile from route params', () => {
-    mockLinkedChildren = [
-      {
-        id: 'child-1',
-        accountId: 'account-1',
-        displayName: 'Emma',
-        isOwner: false,
-        hasPremiumLlm: false,
-        consentStatus: null,
-        linkCreatedAt: null,
-        conversationLanguage: 'en',
-        pronouns: null,
-        birthYear: 2015,
-        avatarUrl: null,
-        location: null,
-        createdAt: '2026-01-01T00:00:00Z',
-        updatedAt: '2026-01-01T00:00:00Z',
-      },
-    ];
+    mockLinkedChildren = [childProgressProfile];
     mockSearchParams = { profileId: 'child-1' };
     mockHooks({
       inventory: {
@@ -600,6 +600,37 @@ describe('ProgressScreen — progressive disclosure', () => {
     screen.getByTestId('progress-pill-child-1');
     expect(useChildInventory).toHaveBeenCalledWith('child-1', {
       enabled: true,
+    });
+  });
+
+  it('opens a valid requested child profile after child links load', async () => {
+    mockSearchParams = { profileId: 'child-1' };
+    mockHooks({
+      inventory: {
+        global: { ...baseGlobal, totalSessions: 2 },
+        subjects: [fullSubject],
+      },
+      childInventory: {
+        global: { ...baseGlobal, totalSessions: 6, topicsMastered: 2 },
+        subjects: [fullSubject],
+      },
+    });
+
+    const view = render(<ProgressScreen />);
+
+    expect(useChildInventory).toHaveBeenLastCalledWith(undefined, {
+      enabled: false,
+    });
+
+    mockLinkedChildren = [childProgressProfile];
+    view.rerender(<ProgressScreen />);
+
+    await waitFor(() => {
+      expect(useChildInventory).toHaveBeenLastCalledWith('child-1', {
+        enabled: true,
+      });
+      screen.getByTestId('progress-pill-child-1');
+      screen.getByText('6 sessions');
     });
   });
 
