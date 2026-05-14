@@ -6,9 +6,13 @@ import type { Database } from '@eduagent/database';
 
 const mockCaptureException = jest.fn();
 
-jest.mock('./sentry', () => ({
-  captureException: (...args: unknown[]) => mockCaptureException(...args),
-}));
+jest.mock('./sentry' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual('./sentry') as typeof import('./sentry');
+  return {
+    ...actual,
+    captureException: (...args: unknown[]) => mockCaptureException(...args),
+  };
+});
 
 import {
   getSubscriptionByAccountId,
