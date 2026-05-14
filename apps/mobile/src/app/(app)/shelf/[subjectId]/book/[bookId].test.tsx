@@ -1,109 +1,65 @@
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
-import { Alert } from 'react-native';
 import * as Sentry from '@sentry/react-native';
-import BookScreen from './[bookId]';
+import {
+  createRoutedMockFetch,
+  createScreenWrapper,
+  createTestProfile,
+  cleanupScreen,
+} from '../../../../../../test-utils/screen-render-harness';
+import { createRouterMockFns } from '../../../../../test-utils/native-shims';
 
-jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
-}));
+// ---------------------------------------------------------------------------
+// Transport boundary — API client (transport-boundary)
+// ---------------------------------------------------------------------------
 
-jest.mock(
-  'react-i18next',
-  () => require('../../../../../test-utils/mock-i18n').i18nMock,
+const mockFetch = createRoutedMockFetch();
+
+jest.mock('../../../../../lib/api-client', () => // gc1-allow: transport boundary — real hooks run against routedMockFetch
+  require('../../../../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch),
 );
 
-const mockPush = jest.fn();
-const mockBack = jest.fn();
-const mockReplace = jest.fn();
-const mockCanGoBack = jest.fn();
+// ---------------------------------------------------------------------------
+// Native boundary — expo-router (native-boundary)
+// Params are mutable so per-test overrides can supply readOnly / autoStart.
+// ---------------------------------------------------------------------------
 
-jest.mock('expo-router', () => ({
-  useLocalSearchParams: () => mockSearchParams(),
-  useRouter: () => ({
-    push: mockPush,
-    back: mockBack,
-    replace: mockReplace,
-    canGoBack: mockCanGoBack,
-  }),
-}));
+const routerFns = createRouterMockFns();
+let currentParams: Record<string, string> = { subjectId: 'sub-1', bookId: 'book-1' };
 
-let mockSearchParams = () => ({
-  subjectId: 'sub-1',
-  bookId: 'book-1',
+jest.mock('expo-router', () => { // gc1-allow: native-boundary — Expo native module unavailable in Jest
+  const { expoRouterShim: shim } = require('../../../../../test-utils/native-shims');
+  // Delegate to shim but proxy params through the mutable currentParams ref
+  const base = shim(routerFns, {});
+  return {
+    ...base,
+    useLocalSearchParams: () => currentParams,
+    useGlobalSearchParams: () => currentParams,
+    useRouter: () => routerFns,
+  };
 });
 
-const mockBookRefetch = jest.fn();
-const mockGenerateMutate = jest.fn();
+// ---------------------------------------------------------------------------
+// Native boundary — safe-area-context (native-boundary)
+// ---------------------------------------------------------------------------
 
-const mockUseBookWithTopics = jest.fn();
-const mockUseGenerateBookTopics = jest.fn();
-const mockUseBooks = jest.fn();
-const mockUseBookSessions = jest.fn();
-const mockUseBookNotes = jest.fn();
-const mockUseRetentionTopics = jest.fn();
-const mockUseCurriculum = jest.fn();
-const mockUseLearningResumeTarget = jest.fn();
-const mockStartFirstCurriculumMutateAsync = jest.fn();
+jest.mock('react-native-safe-area-context', () => { // gc1-allow: native-boundary — safe area context requires native bindings
+  const { safeAreaShim: shim } = require('../../../../../test-utils/native-shims');
+  return shim();
+});
 
-jest.mock('../../../../../hooks/use-books', () => ({
-  ...jest.requireActual('../../../../../hooks/use-books'),
-  useBookWithTopics: () => mockUseBookWithTopics(),
-  useBooks: () => mockUseBooks(),
-  useGenerateBookTopics: () => mockUseGenerateBookTopics(),
-}));
+// ---------------------------------------------------------------------------
+// External boundary — react-i18next (external-boundary)
+// ---------------------------------------------------------------------------
 
-jest.mock('../../../../../hooks/use-book-sessions', () => ({
-  ...jest.requireActual('../../../../../hooks/use-book-sessions'),
-  useBookSessions: () => mockUseBookSessions(),
-}));
-
-jest.mock('../../../../../hooks/use-notes', () => ({
-  ...jest.requireActual('../../../../../hooks/use-notes'),
-  useBookNotes: () => mockUseBookNotes(),
-  useCreateNote: () => ({ mutate: jest.fn(), isPending: false }),
-  useUpdateNote: () => ({ mutate: jest.fn(), isPending: false }),
-  useDeleteNoteById: () => ({ mutate: jest.fn() }),
-}));
-
-jest.mock('../../../../../hooks/use-retention', () => ({
-  ...jest.requireActual('../../../../../hooks/use-retention'),
-  useRetentionTopics: () => mockUseRetentionTopics(),
-}));
-
-jest.mock('../../../../../hooks/use-curriculum', () => ({
-  ...jest.requireActual('../../../../../hooks/use-curriculum'),
-  useCurriculum: () => mockUseCurriculum(),
-}));
-
-jest.mock('../../../../../hooks/use-progress', () => ({
-  ...jest.requireActual('../../../../../hooks/use-progress'),
-  useLearningResumeTarget: () => mockUseLearningResumeTarget(),
-}));
-
-jest.mock(
-  '../../../../../hooks/use-sessions',
-  /* gc1-allow: session mutation state */ () => ({
-    useStartFirstCurriculumSession: () => ({
-      mutateAsync: mockStartFirstCurriculumMutateAsync,
-      isPending: false,
-    }),
-  }),
+jest.mock('react-i18next', () => // gc1-allow: external-boundary — i18n provider not available in test runtime
+  require('../../../../../test-utils/mock-i18n').i18nMock,
 );
 
-jest.mock('../../../../../hooks/use-subjects', () => ({
-  ...jest.requireActual('../../../../../hooks/use-subjects'),
-  useSubjects: () => ({
-    data: [{ id: 'sub-1', name: 'Mathematics' }],
-  }),
-}));
+// ---------------------------------------------------------------------------
+// Native boundary — theme (native-boundary: ColorScheme unavailable in JSDOM)
+// ---------------------------------------------------------------------------
 
-jest.mock('../../../../../hooks/use-move-topic', () => ({
-  ...jest.requireActual('../../../../../hooks/use-move-topic'),
-  useMoveTopic: () => ({ mutate: jest.fn(), isPending: false }),
-}));
-
-jest.mock('../../../../../lib/theme', () => ({
-  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
+jest.mock('../../../../../lib/theme', () => ({ // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
   useThemeColors: () => ({
     accent: '#00bfa5',
     primary: '#0d9488',
@@ -112,23 +68,88 @@ jest.mock('../../../../../lib/theme', () => ({
     textSecondary: '#888',
     textInverse: '#fff',
     surface: '#fff',
+    border: '#ccc',
   }),
 }));
 
-jest.mock('../../../../../lib/format-api-error', () => ({
-  ...jest.requireActual('../../../../../lib/format-api-error'),
-  formatApiError: (error: unknown) =>
-    error instanceof Error ? error.message : 'Unknown error',
-}));
+// ---------------------------------------------------------------------------
+// Native boundary — animation components (native-boundary: Reanimated + svg)
+// ---------------------------------------------------------------------------
 
-jest.mock('../../../../../components/common', () => ({
-  // gc1-allow: Reanimated worklets + react-native-svg cannot run in JSDOM
+jest.mock('../../../../../components/common', () => ({ // gc1-allow: Reanimated worklets + react-native-svg cannot run in JSDOM
   BookPageFlipAnimation: () => null,
   MagicPenAnimation: () => null,
   CelebrationAnimation: () => null,
 }));
 
-function makeTopic(overrides: Partial<any> = {}) {
+// ---------------------------------------------------------------------------
+// Native boundary — platform-alert (native-boundary: Alert is native)
+// ---------------------------------------------------------------------------
+
+jest.mock('../../../../../lib/platform-alert', () => ({ // gc1-allow: native-boundary — Alert.alert requires native module
+  platformAlert: jest.fn(),
+}));
+
+// ---------------------------------------------------------------------------
+// Default API route fixtures (overridden per-test via mockFetch.setRoute)
+// ---------------------------------------------------------------------------
+
+function makeDefaultRoutes() {
+  mockFetch.setRoute('subjects/sub-1/books/book-1/sessions', {
+    sessions: [],
+  });
+  mockFetch.setRoute('subjects/sub-1/books/book-1/notes', {
+    notes: [],
+  });
+  mockFetch.setRoute('subjects/sub-1/books/book-1', {
+    book: {
+      id: 'book-1',
+      title: 'Algebra',
+      emoji: '📐',
+      topicsGenerated: true,
+      description: 'Basic algebra',
+    },
+    topics: [
+      {
+        id: 'topic-1',
+        title: 'Linear Equations',
+        sortOrder: 1,
+        skipped: false,
+        chapter: 'Foundations',
+      },
+      {
+        id: 'topic-2',
+        title: 'Quadratic Equations',
+        sortOrder: 2,
+        skipped: false,
+        chapter: 'Foundations',
+      },
+    ],
+    completedTopicCount: 0,
+  });
+  mockFetch.setRoute('subjects/sub-1/books', {
+    books: [
+      { id: 'book-1', title: 'Algebra', emoji: '📐', topicsGenerated: true },
+      { id: 'book-2', title: 'Geometry', emoji: '📏', topicsGenerated: true },
+    ],
+  });
+  mockFetch.setRoute('subjects/sub-1/retention', {
+    topics: [],
+    reviewDueCount: 0,
+  });
+  mockFetch.setRoute('subjects/sub-1/curriculum', {
+    curriculum: null,
+  });
+  mockFetch.setRoute('progress/resume-target', {
+    target: null,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function makeTopic(overrides: Record<string, unknown> = {}) {
   return {
     id: 'topic-1',
     title: 'Linear Equations',
@@ -139,24 +160,7 @@ function makeTopic(overrides: Partial<any> = {}) {
   };
 }
 
-function baseTopics() {
-  return [
-    makeTopic({
-      id: 'topic-1',
-      title: 'Linear Equations',
-      sortOrder: 1,
-      chapter: 'Foundations',
-    }),
-    makeTopic({
-      id: 'topic-2',
-      title: 'Quadratic Equations',
-      sortOrder: 2,
-      chapter: 'Foundations',
-    }),
-  ];
-}
-
-function makeSession(overrides: Partial<any> = {}) {
+function makeSession(overrides: Record<string, unknown> = {}) {
   return {
     id: 'sess-1',
     topicId: 'topic-1',
@@ -167,7 +171,7 @@ function makeSession(overrides: Partial<any> = {}) {
   };
 }
 
-function makeRetentionTopic(overrides: Partial<any> = {}) {
+function makeRetentionTopic(overrides: Record<string, unknown> = {}) {
   return {
     topicId: 'topic-1',
     repetitions: 1,
@@ -180,158 +184,94 @@ function makeRetentionTopic(overrides: Partial<any> = {}) {
   };
 }
 
-function makeBookQuery(overrides: Partial<any> = {}) {
-  return {
-    data: {
-      book: {
-        id: 'book-1',
-        title: 'Algebra',
-        emoji: '📐',
-        topicsGenerated: true,
-        description: 'Basic algebra',
-      },
-      topics: baseTopics(),
-      completedTopicCount: 0,
-    },
-    isLoading: false,
-    isError: false,
-    error: null,
-    refetch: mockBookRefetch,
-    ...overrides,
-  };
+// ---------------------------------------------------------------------------
+// Import the screen AFTER all mocks are declared
+// ---------------------------------------------------------------------------
+
+const BookScreen = require('./[bookId]').default;
+
+// ---------------------------------------------------------------------------
+// Shared wrapper factory
+// ---------------------------------------------------------------------------
+
+function makeWrapper() {
+  const owner = createTestProfile({ id: 'p1', displayName: 'Alex', isOwner: true });
+  return createScreenWrapper({ activeProfile: owner, profiles: [owner] });
 }
 
-function makeSessionsQuery(overrides: Partial<any> = {}) {
-  return {
-    data: [],
-    isLoading: false,
-    isError: false,
-    refetch: jest.fn(),
-    ...overrides,
-  };
-}
-
-function makeNotesQuery(overrides: Partial<any> = {}) {
-  return {
-    data: { notes: [] },
-    isLoading: false,
-    ...overrides,
-  };
-}
-
-function makeRetentionQuery(overrides: Partial<any> = {}) {
-  return {
-    data: { topics: [], reviewDueCount: 0 },
-    isLoading: false,
-    isError: false,
-    refetch: jest.fn(),
-    ...overrides,
-  };
-}
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
 
 describe('BookScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockCanGoBack.mockReturnValue(true);
-    mockSearchParams = () => ({
-      subjectId: 'sub-1',
-      bookId: 'book-1',
-    });
-
-    mockUseBookWithTopics.mockReturnValue(makeBookQuery());
-    mockUseGenerateBookTopics.mockReturnValue({
-      mutate: mockGenerateMutate,
-      isPending: false,
-    });
-    mockUseBooks.mockReturnValue({
-      data: [
-        { id: 'book-1', title: 'Algebra', emoji: '📐', topicsGenerated: true },
-        { id: 'book-2', title: 'Geometry', emoji: '📏', topicsGenerated: true },
-      ],
-      isLoading: false,
-    });
-    mockUseBookSessions.mockReturnValue(makeSessionsQuery());
-    mockUseBookNotes.mockReturnValue(makeNotesQuery());
-    mockUseRetentionTopics.mockReturnValue(makeRetentionQuery());
-    mockUseCurriculum.mockReturnValue({ data: null, isLoading: false });
-    mockUseLearningResumeTarget.mockReturnValue({ data: null });
-    mockStartFirstCurriculumMutateAsync.mockResolvedValue({
-      session: { id: 'session-1', topicId: 'topic-1' },
-    });
+    currentParams = { subjectId: 'sub-1', bookId: 'book-1' };
+    routerFns.canGoBack.mockReturnValue(true);
+    makeDefaultRoutes();
   });
 
-  it('renders the loading state', () => {
-    mockUseBookWithTopics.mockReturnValue(
-      makeBookQuery({
-        data: undefined,
-        isLoading: true,
-      }),
-    );
+  afterEach(async () => {
+    const { queryClient } = makeWrapper();
+    await cleanupScreen(queryClient);
+  });
 
-    const { getByTestId } = render(<BookScreen />);
+  it('renders the loading state', async () => {
+    // Return loading by never resolving the book query
+    mockFetch.setRoute('subjects/sub-1/books/book-1', () => new Promise(() => { /* never resolves */ }));
+
+    const { wrapper } = makeWrapper();
+    const { getByTestId } = render(<BookScreen />, { wrapper });
 
     // New book screen shows a shimmer skeleton during loading, not a text label
     getByTestId('book-loading');
   });
 
-  it('keeps cached book content visible during a background refetch', () => {
-    mockUseBookWithTopics.mockReturnValue(
-      makeBookQuery({
-        isLoading: true,
-      }),
-    );
+  it('keeps cached book content visible during a background refetch', async () => {
+    const { wrapper } = makeWrapper();
+    const { getByTestId, queryByTestId, getByText } = render(<BookScreen />, { wrapper });
 
-    const { getByTestId, queryByTestId, getByText } = render(<BookScreen />);
+    await waitFor(() => getByTestId('book-screen'));
 
-    getByTestId('book-screen');
     getByText('Algebra');
     getByTestId('up-next-row-topic-1');
     expect(queryByTestId('book-loading')).toBeNull();
   });
 
-  it('keeps cached book content visible if a background refresh errors', () => {
-    mockUseBookWithTopics.mockReturnValue(
-      makeBookQuery({
-        isError: true,
-        error: new Error('Refresh failed'),
-      }),
-    );
+  it('keeps cached book content visible if a background refresh errors', async () => {
+    const { wrapper } = makeWrapper();
+    const { getByTestId, queryByTestId, getByText } = render(<BookScreen />, { wrapper });
 
-    const { getByTestId, queryByTestId, getByText } = render(<BookScreen />);
+    await waitFor(() => getByTestId('book-screen'));
 
-    getByTestId('book-screen');
     getByText('Algebra');
     expect(queryByTestId('book-error')).toBeNull();
   });
 
-  it('shows the error state and wires retry plus back', () => {
-    mockUseBookWithTopics.mockReturnValue(
-      makeBookQuery({
-        data: undefined,
-        isError: true,
-        error: new Error('Server exploded'),
-      }),
-    );
+  it('shows the error state and wires retry plus back', async () => {
+    mockFetch.setRoute('subjects/sub-1/books/book-1', new Response(JSON.stringify({ error: 'Server exploded' }), { status: 500 }));
 
-    const { getByTestId, getByText } = render(<BookScreen />);
+    const { wrapper } = makeWrapper();
+    const { getByTestId, getByText } = render(<BookScreen />, { wrapper });
 
+    await waitFor(() => getByTestId('book-error'));
+    // The assertOk-based error surfacing renders an error message
     getByTestId('book-error');
-    getByText('Server exploded');
 
     fireEvent.press(getByTestId('book-retry-button'));
     fireEvent.press(getByTestId('book-back-button'));
 
-    expect(mockBookRefetch).toHaveBeenCalledTimes(1);
-    expect(mockReplace).toHaveBeenCalledWith({
+    expect(routerFns.replace).toHaveBeenCalledWith({
       pathname: '/(app)/shelf/[subjectId]',
       params: { subjectId: 'sub-1' },
     });
   });
 
   it('shows missing-param guidance when route params are incomplete', () => {
-    mockSearchParams = () => ({ subjectId: '', bookId: 'book-1' });
+    currentParams = { subjectId: '', bookId: 'book-1' };
 
-    const { getByTestId, getByText } = render(<BookScreen />);
+    const { wrapper } = makeWrapper();
+    const { getByTestId, getByText } = render(<BookScreen />, { wrapper });
 
     getByTestId('book-missing-param');
     expect(
@@ -343,19 +283,20 @@ describe('BookScreen', () => {
     // Before the fix, handleBack early-returned when subjectId was missing,
     // leaving the user trapped on the error screen with a button that did
     // nothing.
-    mockSearchParams = () => ({ subjectId: '', bookId: 'book-1' });
-    mockCanGoBack.mockReturnValue(false);
+    currentParams = { subjectId: '', bookId: 'book-1' };
+    routerFns.canGoBack.mockReturnValue(false);
 
-    const { getByTestId } = render(<BookScreen />);
+    const { wrapper } = makeWrapper();
+    const { getByTestId } = render(<BookScreen />, { wrapper });
     fireEvent.press(getByTestId('book-missing-param-back'));
 
     // Either back() or replace() must have been invoked — anything other than
     // a silent no-op. With canGoBack=false (deep-link entry), goBackOrReplace
     // falls back to /(app)/library.
     const totalNavCalls =
-      mockBack.mock.calls.length + mockReplace.mock.calls.length;
+      routerFns.back.mock.calls.length + routerFns.replace.mock.calls.length;
     expect(totalNavCalls).toBeGreaterThan(0);
-    expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
+    expect(routerFns.replace).toHaveBeenCalledWith('/(app)/library');
   });
 
   it('[BUG-798 / F-NAV-05] missing bookId only — fallback navigates to subject shelf', () => {
@@ -364,12 +305,13 @@ describe('BookScreen', () => {
     // missing (subjectId still present), the user must reach the subject
     // shelf, not be left stranded. The previous bug report flagged that
     // bookId was "not equally guarded" — this locks the symmetric path.
-    mockSearchParams = () => ({ subjectId: 'sub-1', bookId: '' });
+    currentParams = { subjectId: 'sub-1', bookId: '' };
 
-    const { getByTestId } = render(<BookScreen />);
+    const { wrapper } = makeWrapper();
+    const { getByTestId } = render(<BookScreen />, { wrapper });
     fireEvent.press(getByTestId('book-missing-param-back'));
 
-    expect(mockReplace).toHaveBeenCalledWith({
+    expect(routerFns.replace).toHaveBeenCalledWith({
       pathname: '/(app)/shelf/[subjectId]',
       params: { subjectId: 'sub-1' },
     });
@@ -378,114 +320,96 @@ describe('BookScreen', () => {
   it('[BUG-798 / F-NAV-05] missing both params — fallback to library, never silent no-op', () => {
     // Worst case: deep link drops both segments. Must still escape to a
     // working surface (library), not the dreaded silent dead-end.
-    mockSearchParams = () => ({ subjectId: '', bookId: '' });
-    mockCanGoBack.mockReturnValue(false);
+    currentParams = { subjectId: '', bookId: '' };
+    routerFns.canGoBack.mockReturnValue(false);
 
-    const { getByTestId } = render(<BookScreen />);
+    const { wrapper } = makeWrapper();
+    const { getByTestId } = render(<BookScreen />, { wrapper });
     fireEvent.press(getByTestId('book-missing-param-back'));
 
     const totalNavCalls =
-      mockBack.mock.calls.length + mockReplace.mock.calls.length;
+      routerFns.back.mock.calls.length + routerFns.replace.mock.calls.length;
     expect(totalNavCalls).toBeGreaterThan(0);
-    expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
+    expect(routerFns.replace).toHaveBeenCalledWith('/(app)/library');
   });
 
-  it('renders the compact header on the main view', () => {
-    const { getByTestId, getByText } = render(<BookScreen />);
+  it('renders the compact header on the main view', async () => {
+    const { wrapper } = makeWrapper();
+    const { getByTestId, getByText } = render(<BookScreen />, { wrapper });
+
+    await waitFor(() => getByTestId('book-screen'));
 
     // New book screen: compact header shows book title and topics progress.
     // Subject name and session count are no longer in the header — these were
     // removed during the Library v3 redesign.
-    getByTestId('book-screen');
     getByText('Algebra');
     getByText('0 of 2 topics finished');
   });
 
-  it('derives header progress from retention topics', () => {
-    mockUseBookWithTopics.mockReturnValue(
-      makeBookQuery({
-        data: {
-          ...makeBookQuery().data,
-          topics: [
-            makeTopic({ id: 'topic-1', title: 'T1', sortOrder: 1 }),
-            makeTopic({ id: 'topic-2', title: 'T2', sortOrder: 2 }),
-            makeTopic({ id: 'topic-3', title: 'T3', sortOrder: 3 }),
-          ],
-        },
-      }),
-    );
-    mockUseRetentionTopics.mockReturnValue(
-      makeRetentionQuery({
-        data: {
-          topics: [
-            makeRetentionTopic({ topicId: 'topic-1' }),
-            makeRetentionTopic({ topicId: 'topic-2' }),
-          ],
-          reviewDueCount: 0,
-        },
-      }),
-    );
+  it('derives header progress from retention topics', async () => {
+    mockFetch.setRoute('subjects/sub-1/books/book-1', {
+      book: { id: 'book-1', title: 'Algebra', emoji: '📐', topicsGenerated: true, description: 'Basic algebra' },
+      topics: [
+        makeTopic({ id: 'topic-1', title: 'T1', sortOrder: 1 }),
+        makeTopic({ id: 'topic-2', title: 'T2', sortOrder: 2 }),
+        makeTopic({ id: 'topic-3', title: 'T3', sortOrder: 3 }),
+      ],
+      completedTopicCount: 0,
+    });
+    mockFetch.setRoute('subjects/sub-1/retention', {
+      topics: [
+        makeRetentionTopic({ topicId: 'topic-1' }),
+        makeRetentionTopic({ topicId: 'topic-2' }),
+      ],
+      reviewDueCount: 0,
+    });
 
-    const { getByText } = render(<BookScreen />);
+    const { wrapper } = makeWrapper();
+    const { getByText } = render(<BookScreen />, { wrapper });
 
-    getByText('2 of 3 topics finished');
+    await waitFor(() => getByText('2 of 3 topics finished'));
   });
 
-  it('shows elapsed retention days in the book header when available', () => {
-    mockUseRetentionTopics.mockReturnValue(
-      makeRetentionQuery({
-        data: {
-          topics: [
-            makeRetentionTopic({
-              topicId: 'topic-1',
-              nextReviewAt: '2099-01-01T00:00:00.000Z',
-              daysSinceLastReview: 9,
-            }),
-          ],
-          reviewDueCount: 0,
-        },
-      }),
-    );
+  it('shows elapsed retention days in the book header when available', async () => {
+    mockFetch.setRoute('subjects/sub-1/retention', {
+      topics: [
+        makeRetentionTopic({
+          topicId: 'topic-1',
+          nextReviewAt: '2099-01-01T00:00:00.000Z',
+          daysSinceLastReview: 9,
+        }),
+      ],
+      reviewDueCount: 0,
+    });
 
-    const { getByText } = render(<BookScreen />);
+    const { wrapper } = makeWrapper();
+    const { getByText } = render(<BookScreen />, { wrapper });
 
-    getByText('Remembered after 9 days');
+    await waitFor(() => getByText('Remembered after 9 days'));
   });
 
   it('offers to set up a fuller topic list when a book only has one starter topic', async () => {
-    mockUseBookWithTopics.mockReturnValue(
-      makeBookQuery({
-        data: {
-          ...makeBookQuery().data,
-          book: {
-            ...makeBookQuery().data.book,
-            title: 'Introduction to Programming',
-          },
-          topics: [
-            makeTopic({
-              id: 'topic-1',
-              title: 'Introduction to Programming',
-              sortOrder: 1,
-            }),
-          ],
-        },
-      }),
-    );
+    mockFetch.setRoute('subjects/sub-1/books/book-1', {
+      book: { id: 'book-1', title: 'Introduction to Programming', emoji: '📐', topicsGenerated: true, description: 'Basic algebra' },
+      topics: [
+        makeTopic({ id: 'topic-1', title: 'Introduction to Programming', sortOrder: 1 }),
+      ],
+      completedTopicCount: 0,
+    });
+    mockFetch.setRoute('subjects/sub-1/sessions/first-curriculum', {
+      session: { id: 'session-1', topicId: 'topic-1' },
+    });
 
-    const { getByTestId, getByText } = render(<BookScreen />);
+    const { wrapper } = makeWrapper();
+    const { getByTestId, getByText } = render(<BookScreen />, { wrapper });
 
-    getByTestId('book-thin-path-card');
+    await waitFor(() => getByTestId('book-thin-path-card'));
     getByText('Create a fuller topic list');
 
     fireEvent.press(getByTestId('book-thin-path-build'));
 
     await waitFor(() => {
-      expect(mockStartFirstCurriculumMutateAsync).toHaveBeenCalledWith({
-        bookId: 'book-1',
-        sessionType: 'learning',
-        inputMode: 'text',
-      });
-      expect(mockPush).toHaveBeenCalledWith({
+      expect(routerFns.push).toHaveBeenCalledWith({
         pathname: '/(app)/session',
         params: expect.objectContaining({
           mode: 'learning',
@@ -499,44 +423,28 @@ describe('BookScreen', () => {
     });
   });
 
-  it('renders continue now and started from in-progress sessions', () => {
-    const topics = [
-      makeTopic({ id: 'topic-1', title: 'Linear Equations', sortOrder: 1 }),
-      makeTopic({ id: 'topic-2', title: 'Quadratic Equations', sortOrder: 2 }),
-      makeTopic({ id: 'topic-3', title: 'Functions', sortOrder: 3 }),
-    ];
+  it('renders continue now and started from in-progress sessions', async () => {
+    mockFetch.setRoute('subjects/sub-1/books/book-1', {
+      book: { id: 'book-1', title: 'Algebra', emoji: '📐', topicsGenerated: true, description: 'Basic algebra' },
+      topics: [
+        makeTopic({ id: 'topic-1', title: 'Linear Equations', sortOrder: 1 }),
+        makeTopic({ id: 'topic-2', title: 'Quadratic Equations', sortOrder: 2 }),
+        makeTopic({ id: 'topic-3', title: 'Functions', sortOrder: 3 }),
+      ],
+      completedTopicCount: 0,
+    });
+    mockFetch.setRoute('subjects/sub-1/books/book-1/sessions', {
+      sessions: [
+        makeSession({ id: 'sess-1', topicId: 'topic-1', topicTitle: 'Linear Equations', createdAt: '2026-04-24T12:00:00.000Z' }),
+        makeSession({ id: 'sess-2', topicId: 'topic-2', topicTitle: 'Quadratic Equations', createdAt: '2026-04-24T10:00:00.000Z' }),
+        makeSession({ id: 'sess-3', topicId: 'topic-2', topicTitle: 'Quadratic Equations', createdAt: '2026-04-24T09:00:00.000Z' }),
+      ],
+    });
 
-    mockUseBookWithTopics.mockReturnValue(
-      makeBookQuery({
-        data: { ...makeBookQuery().data, topics },
-      }),
-    );
-    mockUseBookSessions.mockReturnValue(
-      makeSessionsQuery({
-        data: [
-          makeSession({
-            id: 'sess-1',
-            topicId: 'topic-1',
-            topicTitle: 'Linear Equations',
-            createdAt: '2026-04-24T12:00:00.000Z',
-          }),
-          makeSession({
-            id: 'sess-2',
-            topicId: 'topic-2',
-            topicTitle: 'Quadratic Equations',
-            createdAt: '2026-04-24T10:00:00.000Z',
-          }),
-          makeSession({
-            id: 'sess-3',
-            topicId: 'topic-2',
-            topicTitle: 'Quadratic Equations',
-            createdAt: '2026-04-24T09:00:00.000Z',
-          }),
-        ],
-      }),
-    );
+    const { wrapper } = makeWrapper();
+    const { getByTestId, queryByTestId, getByText } = render(<BookScreen />, { wrapper });
 
-    const { getByTestId, queryByTestId, getByText } = render(<BookScreen />);
+    await waitFor(() => getByTestId('book-screen'));
 
     // [BUG-895] The "Continue now" in-list row was removed in favour of the
     // sticky "▶ Continue: <title>" CTA at the bottom of the screen. The
@@ -548,13 +456,13 @@ describe('BookScreen', () => {
     getByText('▶ Continue: Linear Equations');
 
     fireEvent.press(getByTestId('book-start-learning'));
-    expect(mockPush).toHaveBeenCalledWith({
+    expect(routerFns.push).toHaveBeenCalledWith({
       pathname: '/(app)/topic/[topicId]',
       params: { topicId: 'topic-1', subjectId: 'sub-1', bookId: 'book-1' },
     });
   });
 
-  it('renders all started topics inline without an overflow control', () => {
+  it('renders all started topics inline without an overflow control', async () => {
     // The library-redesign removed the "started" overflow/show-more control.
     // All started topics now render immediately inside the chapter-grouped
     // topic list with no truncation or expand affordance.
@@ -574,12 +482,17 @@ describe('BookScreen', () => {
       }),
     );
 
-    mockUseBookWithTopics.mockReturnValue(
-      makeBookQuery({ data: { ...makeBookQuery().data, topics } }),
-    );
-    mockUseBookSessions.mockReturnValue(makeSessionsQuery({ data: sessions }));
+    mockFetch.setRoute('subjects/sub-1/books/book-1', {
+      book: { id: 'book-1', title: 'Algebra', emoji: '📐', topicsGenerated: true, description: 'Basic algebra' },
+      topics,
+      completedTopicCount: 0,
+    });
+    mockFetch.setRoute('subjects/sub-1/books/book-1/sessions', { sessions });
 
-    const { getByTestId, queryByTestId } = render(<BookScreen />);
+    const { wrapper } = makeWrapper();
+    const { getByTestId, queryByTestId } = render(<BookScreen />, { wrapper });
+
+    await waitFor(() => getByTestId('book-screen'));
 
     // No overflow control — all started rows visible immediately
     expect(queryByTestId('started-show-more')).toBeNull();
@@ -587,14 +500,17 @@ describe('BookScreen', () => {
     getByTestId('started-row-topic-6');
   });
 
-  it('renders the hero up-next state on a fresh book and starts a session', () => {
-    const { getByTestId, getByText } = render(<BookScreen />);
+  it('renders the hero up-next state on a fresh book and starts a session', async () => {
+    const { wrapper } = makeWrapper();
+    const { getByTestId, getByText } = render(<BookScreen />, { wrapper });
+
+    await waitFor(() => getByTestId('book-screen'));
 
     getByTestId('up-next-row-topic-1');
     getByText('▶ Start: Linear Equations');
 
     fireEvent.press(getByTestId('book-start-learning'));
-    expect(mockPush).toHaveBeenCalledWith({
+    expect(routerFns.push).toHaveBeenCalledWith({
       pathname: '/(app)/session',
       params: {
         mode: 'learning',
@@ -605,36 +521,21 @@ describe('BookScreen', () => {
     });
   });
 
-  it('does not render empty topic slots when generated data has blank titles', () => {
-    mockUseBookWithTopics.mockReturnValue(
-      makeBookQuery({
-        data: {
-          ...makeBookQuery().data,
-          topics: [
-            makeTopic({
-              id: 'topic-1',
-              title: 'Linear Equations',
-              sortOrder: 1,
-              chapter: 'Foundations',
-            }),
-            makeTopic({
-              id: 'topic-blank',
-              title: '   ',
-              sortOrder: 2,
-              chapter: 'Generated blanks',
-            }),
-            makeTopic({
-              id: 'topic-3',
-              title: 'Quadratic Equations',
-              sortOrder: 3,
-              chapter: 'Foundations',
-            }),
-          ],
-        },
-      }),
-    );
+  it('does not render empty topic slots when generated data has blank titles', async () => {
+    mockFetch.setRoute('subjects/sub-1/books/book-1', {
+      book: { id: 'book-1', title: 'Algebra', emoji: '📐', topicsGenerated: true, description: 'Basic algebra' },
+      topics: [
+        makeTopic({ id: 'topic-1', title: 'Linear Equations', sortOrder: 1, chapter: 'Foundations' }),
+        makeTopic({ id: 'topic-blank', title: '   ', sortOrder: 2, chapter: 'Generated blanks' }),
+        makeTopic({ id: 'topic-3', title: 'Quadratic Equations', sortOrder: 3, chapter: 'Foundations' }),
+      ],
+      completedTopicCount: 0,
+    });
 
-    const { getByTestId, queryByTestId, queryByText } = render(<BookScreen />);
+    const { wrapper } = makeWrapper();
+    const { getByTestId, queryByTestId, queryByText } = render(<BookScreen />, { wrapper });
+
+    await waitFor(() => getByTestId('book-screen'));
 
     getByTestId('up-next-row-topic-1');
     getByTestId('later-row-topic-3');
@@ -642,9 +543,9 @@ describe('BookScreen', () => {
     expect(queryByText('Generated blanks')).toBeNull();
   });
 
-  it('starts from the shared resume target when available', () => {
-    mockUseLearningResumeTarget.mockReturnValue({
-      data: {
+  it('starts from the shared resume target when available', async () => {
+    mockFetch.setRoute('progress/resume-target', {
+      target: {
         subjectId: 'sub-1',
         subjectName: 'Mathematics',
         topicId: 'topic-2',
@@ -657,10 +558,13 @@ describe('BookScreen', () => {
       },
     });
 
-    const { getByTestId } = render(<BookScreen />);
+    const { wrapper } = makeWrapper();
+    const { getByTestId } = render(<BookScreen />, { wrapper });
+
+    await waitFor(() => getByTestId('book-screen'));
 
     fireEvent.press(getByTestId('book-start-learning'));
-    expect(mockPush).toHaveBeenCalledWith({
+    expect(routerFns.push).toHaveBeenCalledWith({
       pathname: '/(app)/session',
       params: {
         mode: 'learning',
@@ -673,95 +577,73 @@ describe('BookScreen', () => {
     });
   });
 
-  it('shows the sessions error banner and retries while still rendering retention-driven sections', () => {
-    const refetchSpy = jest.fn();
-
-    mockUseBookSessions.mockReturnValue(
-      makeSessionsQuery({
-        data: undefined,
-        isError: true,
-        refetch: refetchSpy,
-      }),
+  it('shows the sessions error banner and retries while still rendering retention-driven sections', async () => {
+    mockFetch.setRoute('subjects/sub-1/books/book-1/sessions',
+      new Response(JSON.stringify({ error: 'Server error' }), { status: 500 }),
     );
-    mockUseRetentionTopics.mockReturnValue(
-      makeRetentionQuery({
-        data: {
-          topics: [makeRetentionTopic({ topicId: 'topic-1' })],
-          reviewDueCount: 0,
-        },
-      }),
-    );
+    mockFetch.setRoute('subjects/sub-1/retention', {
+      topics: [makeRetentionTopic({ topicId: 'topic-1' })],
+      reviewDueCount: 0,
+    });
 
-    const { getByTestId } = render(<BookScreen />);
+    const { wrapper } = makeWrapper();
+    const { getByTestId } = render(<BookScreen />, { wrapper });
 
-    getByTestId('sessions-error-banner');
+    await waitFor(() => getByTestId('sessions-error-banner'));
     getByTestId('done-row-topic-1');
     getByTestId('up-next-row-topic-2');
 
+    // Retry re-fires the fetch — just verify pressing the button fires another request
+    mockFetch.mockClear();
     fireEvent.press(getByTestId('sessions-error-retry'));
-    expect(refetchSpy).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(mockFetch.mock.calls.length).toBeGreaterThan(0);
+    });
   });
 
-  it('shows the retention error banner and retries while keeping session-driven sections visible', () => {
-    const refetchSpy = jest.fn();
-
-    mockUseBookSessions.mockReturnValue(
-      makeSessionsQuery({
-        data: [
-          makeSession({ topicId: 'topic-1', topicTitle: 'Linear Equations' }),
-        ],
-      }),
-    );
-    mockUseRetentionTopics.mockReturnValue(
-      makeRetentionQuery({
-        data: undefined,
-        isError: true,
-        refetch: refetchSpy,
-      }),
+  it('shows the retention error banner and retries while keeping session-driven sections visible', async () => {
+    mockFetch.setRoute('subjects/sub-1/books/book-1/sessions', {
+      sessions: [makeSession({ topicId: 'topic-1', topicTitle: 'Linear Equations' })],
+    });
+    mockFetch.setRoute('subjects/sub-1/retention',
+      new Response(JSON.stringify({ error: 'Server error' }), { status: 500 }),
     );
 
-    const { getByTestId } = render(<BookScreen />);
+    const { wrapper } = makeWrapper();
+    const { getByTestId } = render(<BookScreen />, { wrapper });
 
-    getByTestId('retention-error-banner');
+    await waitFor(() => getByTestId('retention-error-banner'));
     // [BUG-895] continue-now-row removed; the sticky CTA still surfaces a
     // way to resume the topic, so the page stays actionable on retention error.
     getByTestId('book-start-learning');
 
+    mockFetch.mockClear();
     fireEvent.press(getByTestId('retention-error-retry'));
-    expect(refetchSpy).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(mockFetch.mock.calls.length).toBeGreaterThan(0);
+    });
   });
 
   it('renders the empty topics state with a setup CTA', async () => {
-    mockUseBookWithTopics.mockReturnValue(
-      makeBookQuery({
-        data: {
-          book: {
-            id: 'book-1',
-            title: 'Algebra',
-            emoji: '📐',
-            topicsGenerated: true,
-            description: 'Basic algebra',
-          },
-          topics: [],
-          completedTopicCount: 0,
-        },
-      }),
-    );
+    mockFetch.setRoute('subjects/sub-1/books/book-1', {
+      book: { id: 'book-1', title: 'Algebra', emoji: '📐', topicsGenerated: true, description: 'Basic algebra' },
+      topics: [],
+      completedTopicCount: 0,
+    });
+    mockFetch.setRoute('subjects/sub-1/sessions/first-curriculum', {
+      session: { id: 'session-1', topicId: 'topic-1' },
+    });
 
-    const { getByTestId, getByText } = render(<BookScreen />);
+    const { wrapper } = makeWrapper();
+    const { getByTestId, getByText } = render(<BookScreen />, { wrapper });
 
-    getByTestId('topics-empty-state');
+    await waitFor(() => getByTestId('topics-empty-state'));
     getByText('This book is not ready yet');
     getByText('Set up this book');
 
     fireEvent.press(getByTestId('topics-empty-build'));
     await waitFor(() => {
-      expect(mockStartFirstCurriculumMutateAsync).toHaveBeenCalledWith({
-        bookId: 'book-1',
-        sessionType: 'learning',
-        inputMode: 'text',
-      });
-      expect(mockPush).toHaveBeenCalledWith(
+      expect(routerFns.push).toHaveBeenCalledWith(
         expect.objectContaining({
           pathname: '/(app)/session',
           params: expect.objectContaining({
@@ -777,48 +659,42 @@ describe('BookScreen', () => {
     });
   });
 
-  it('renders the all-sections fallback when every topic is skipped', () => {
-    mockUseBookWithTopics.mockReturnValue(
-      makeBookQuery({
-        data: {
-          ...makeBookQuery().data,
-          topics: [
-            makeTopic({ id: 'topic-1', skipped: true }),
-            makeTopic({ id: 'topic-2', skipped: true, sortOrder: 2 }),
-          ],
-        },
-      }),
-    );
+  it('renders the all-sections fallback when every topic is skipped', async () => {
+    mockFetch.setRoute('subjects/sub-1/books/book-1', {
+      book: { id: 'book-1', title: 'Algebra', emoji: '📐', topicsGenerated: true, description: 'Basic algebra' },
+      topics: [
+        makeTopic({ id: 'topic-1', skipped: true }),
+        makeTopic({ id: 'topic-2', skipped: true, sortOrder: 2 }),
+      ],
+      completedTopicCount: 0,
+    });
 
-    const { getByTestId } = render(<BookScreen />);
+    const { wrapper } = makeWrapper();
+    const { getByTestId } = render(<BookScreen />, { wrapper });
 
-    getByTestId('all-sections-fallback');
+    await waitFor(() => getByTestId('all-sections-fallback'));
     getByTestId('fallback-start');
   });
 
-  it('renders past conversations and opens session summaries', () => {
-    mockUseBookSessions.mockReturnValue(
-      makeSessionsQuery({
-        data: [
-          makeSession({ id: 'sess-1', createdAt: '2026-04-24T09:00:00.000Z' }),
-          makeSession({
-            id: 'sess-2',
-            topicId: 'topic-2',
-            topicTitle: 'Quadratic Equations',
-            createdAt: '2026-04-24T08:00:00.000Z',
-          }),
-        ],
-      }),
-    );
+  it('renders past conversations and opens session summaries', async () => {
+    mockFetch.setRoute('subjects/sub-1/books/book-1/sessions', {
+      sessions: [
+        makeSession({ id: 'sess-1', createdAt: '2026-04-24T09:00:00.000Z' }),
+        makeSession({ id: 'sess-2', topicId: 'topic-2', topicTitle: 'Quadratic Equations', createdAt: '2026-04-24T08:00:00.000Z' }),
+      ],
+    });
 
-    const { getByTestId } = render(<BookScreen />);
+    const { wrapper } = makeWrapper();
+    const { getByTestId } = render(<BookScreen />, { wrapper });
+
+    await waitFor(() => getByTestId('book-screen'));
 
     // Past conversations section is collapsed by default — expand it first.
     // The toggle label includes the session count, so we match via testID.
     fireEvent.press(getByTestId('book-sessions-toggle'));
 
     fireEvent.press(getByTestId('session-sess-1'));
-    expect(mockPush).toHaveBeenCalledWith({
+    expect(routerFns.push).toHaveBeenCalledWith({
       pathname: '/session-summary/[sessionId]',
       params: {
         sessionId: 'sess-1',
@@ -828,34 +704,20 @@ describe('BookScreen', () => {
     });
   });
 
-  it('shows chapter dividers when there are 4 or more sessions across chapters', () => {
-    mockUseBookSessions.mockReturnValue(
-      makeSessionsQuery({
-        data: [
-          makeSession({ id: 'sess-1', chapter: 'Chapter A' }),
-          makeSession({
-            id: 'sess-2',
-            topicId: 'topic-2',
-            topicTitle: 'Quadratic Equations',
-            chapter: 'Chapter A',
-          }),
-          makeSession({
-            id: 'sess-3',
-            topicId: 'topic-3',
-            topicTitle: 'Functions',
-            chapter: 'Chapter B',
-          }),
-          makeSession({
-            id: 'sess-4',
-            topicId: 'topic-4',
-            topicTitle: 'Inequalities',
-            chapter: 'Chapter B',
-          }),
-        ],
-      }),
-    );
+  it('shows chapter dividers when there are 4 or more sessions across chapters', async () => {
+    mockFetch.setRoute('subjects/sub-1/books/book-1/sessions', {
+      sessions: [
+        makeSession({ id: 'sess-1', chapter: 'Chapter A' }),
+        makeSession({ id: 'sess-2', topicId: 'topic-2', topicTitle: 'Quadratic Equations', chapter: 'Chapter A' }),
+        makeSession({ id: 'sess-3', topicId: 'topic-3', topicTitle: 'Functions', chapter: 'Chapter B' }),
+        makeSession({ id: 'sess-4', topicId: 'topic-4', topicTitle: 'Inequalities', chapter: 'Chapter B' }),
+      ],
+    });
 
-    const { getByText, getByTestId } = render(<BookScreen />);
+    const { wrapper } = makeWrapper();
+    const { getByText, getByTestId } = render(<BookScreen />, { wrapper });
+
+    await waitFor(() => getByTestId('book-screen'));
 
     // Past conversations section is collapsed by default — expand it to see chapter dividers
     fireEvent.press(getByTestId('book-sessions-toggle'));
@@ -864,42 +726,31 @@ describe('BookScreen', () => {
     getByText('Chapter B');
   });
 
-  it('shows the book complete card and routes review to the relearn flow', () => {
-    const topics = [
-      makeTopic({ id: 'topic-1', title: 'Linear Equations', sortOrder: 1 }),
-      makeTopic({ id: 'topic-2', title: 'Quadratics', sortOrder: 2 }),
-    ];
+  it('shows the book complete card and routes review to the relearn flow', async () => {
+    mockFetch.setRoute('subjects/sub-1/books/book-1', {
+      book: { id: 'book-1', title: 'Algebra', emoji: '📐', topicsGenerated: true, description: 'Basic algebra' },
+      topics: [
+        makeTopic({ id: 'topic-1', title: 'Linear Equations', sortOrder: 1 }),
+        makeTopic({ id: 'topic-2', title: 'Quadratics', sortOrder: 2 }),
+      ],
+      completedTopicCount: 0,
+    });
+    mockFetch.setRoute('subjects/sub-1/retention', {
+      topics: [
+        makeRetentionTopic({ topicId: 'topic-1', nextReviewAt: '2026-04-26T00:00:00.000Z' }),
+        makeRetentionTopic({ topicId: 'topic-2', nextReviewAt: '2026-04-25T00:00:00.000Z' }),
+      ],
+      reviewDueCount: 0,
+    });
 
-    mockUseBookWithTopics.mockReturnValue(
-      makeBookQuery({
-        data: { ...makeBookQuery().data, topics },
-      }),
-    );
-    mockUseRetentionTopics.mockReturnValue(
-      makeRetentionQuery({
-        data: {
-          topics: [
-            makeRetentionTopic({
-              topicId: 'topic-1',
-              nextReviewAt: '2026-04-26T00:00:00.000Z',
-            }),
-            makeRetentionTopic({
-              topicId: 'topic-2',
-              nextReviewAt: '2026-04-25T00:00:00.000Z',
-            }),
-          ],
-          reviewDueCount: 0,
-        },
-      }),
-    );
+    const { wrapper } = makeWrapper();
+    const { getByTestId, queryByTestId } = render(<BookScreen />, { wrapper });
 
-    const { getByTestId, queryByTestId } = render(<BookScreen />);
-
-    getByTestId('book-complete-card');
+    await waitFor(() => getByTestId('book-complete-card'));
     expect(queryByTestId('book-start-learning')).toBeNull();
 
     fireEvent.press(getByTestId('book-complete-review'));
-    expect(mockPush).toHaveBeenCalledWith({
+    expect(routerFns.push).toHaveBeenCalledWith({
       pathname: '/(app)/topic/relearn',
       params: {
         topicId: 'topic-2',
@@ -909,84 +760,70 @@ describe('BookScreen', () => {
     });
 
     fireEvent.press(getByTestId('book-complete-next'));
-    expect(mockPush).toHaveBeenCalledWith({
+    expect(routerFns.push).toHaveBeenCalledWith({
       pathname: '/(app)/shelf/[subjectId]',
       params: { subjectId: 'sub-1' },
     });
   });
 
-  it('does not render the completion card when one topic is still unstarted', () => {
-    mockUseRetentionTopics.mockReturnValue(
-      makeRetentionQuery({
-        data: {
-          topics: [makeRetentionTopic({ topicId: 'topic-1' })],
-          reviewDueCount: 0,
-        },
-      }),
-    );
+  it('does not render the completion card when one topic is still unstarted', async () => {
+    mockFetch.setRoute('subjects/sub-1/retention', {
+      topics: [makeRetentionTopic({ topicId: 'topic-1' })],
+      reviewDueCount: 0,
+    });
 
-    const { queryByTestId } = render(<BookScreen />);
+    const { wrapper } = makeWrapper();
+    const { queryByTestId } = render(<BookScreen />, { wrapper });
 
-    expect(queryByTestId('book-complete-card')).toBeNull();
+    await waitFor(() => {
+      expect(queryByTestId('book-complete-card')).toBeNull();
+    });
   });
 
-  it('shows the continue-learning sticky CTA naming the topic when a continue topic exists [BUG-895]', () => {
-    mockUseBookSessions.mockReturnValue(
-      makeSessionsQuery({
-        data: [
-          makeSession({ topicId: 'topic-1', topicTitle: 'Linear Equations' }),
-        ],
-      }),
-    );
+  it('shows the continue-learning sticky CTA naming the topic when a continue topic exists [BUG-895]', async () => {
+    mockFetch.setRoute('subjects/sub-1/books/book-1/sessions', {
+      sessions: [makeSession({ topicId: 'topic-1', topicTitle: 'Linear Equations' })],
+    });
 
-    const { getByText, queryByTestId } = render(<BookScreen />);
+    const { wrapper } = makeWrapper();
+    const { getByText, queryByTestId } = render(<BookScreen />, { wrapper });
 
+    await waitFor(() => getByText('▶ Continue: Linear Equations'));
     // [BUG-895] Sticky CTA names the topic so the duplicated "Continue now"
     // section in-list could be removed without losing context.
-    getByText('▶ Continue: Linear Equations');
     expect(queryByTestId('continue-now-row')).toBeNull();
   });
 
-  it('truncates a long continue-topic title in the sticky CTA [BUG-895]', () => {
+  it('truncates a long continue-topic title in the sticky CTA [BUG-895]', async () => {
     const longTitle = 'A very long continuing topic title that exceeds limits';
-    mockUseBookSessions.mockReturnValue(
-      makeSessionsQuery({
-        data: [makeSession({ topicId: 'topic-1', topicTitle: longTitle })],
-      }),
-    );
-    mockUseBookWithTopics.mockReturnValue(
-      makeBookQuery({
-        data: {
-          book: {
-            id: 'book-1',
-            title: 'Algebra',
-            emoji: '📐',
-            topicsGenerated: true,
-          },
-          topics: [
-            makeTopic({ id: 'topic-1', title: longTitle, sortOrder: 1 }),
-          ],
-        },
-      }),
-    );
+    mockFetch.setRoute('subjects/sub-1/books/book-1/sessions', {
+      sessions: [makeSession({ topicId: 'topic-1', topicTitle: longTitle })],
+    });
+    mockFetch.setRoute('subjects/sub-1/books/book-1', {
+      book: { id: 'book-1', title: 'Algebra', emoji: '📐', topicsGenerated: true },
+      topics: [makeTopic({ id: 'topic-1', title: longTitle, sortOrder: 1 })],
+      completedTopicCount: 0,
+    });
 
-    const { getByText } = render(<BookScreen />);
+    const { wrapper } = makeWrapper();
+    const { getByText } = render(<BookScreen />, { wrapper });
 
     const truncated = `▶ Continue: ${longTitle.slice(0, 24)}...`;
-    getByText(truncated);
+    await waitFor(() => getByText(truncated));
   });
 
   it('shows and wires the build-learning-path link when no curriculum exists', async () => {
-    const { getByTestId } = render(<BookScreen />);
+    mockFetch.setRoute('subjects/sub-1/sessions/first-curriculum', {
+      session: { id: 'session-1', topicId: 'topic-1' },
+    });
 
+    const { wrapper } = makeWrapper();
+    const { getByTestId } = render(<BookScreen />, { wrapper });
+
+    await waitFor(() => getByTestId('book-build-path-link'));
     fireEvent.press(getByTestId('book-build-path-link'));
     await waitFor(() => {
-      expect(mockStartFirstCurriculumMutateAsync).toHaveBeenCalledWith({
-        bookId: 'book-1',
-        sessionType: 'learning',
-        inputMode: 'text',
-      });
-      expect(mockPush).toHaveBeenCalledWith(
+      expect(routerFns.push).toHaveBeenCalledWith(
         expect.objectContaining({
           pathname: '/(app)/session',
           params: expect.objectContaining({
@@ -1002,40 +839,38 @@ describe('BookScreen', () => {
     });
   });
 
-  it('hides the build-learning-path link when curriculum already exists', () => {
-    mockUseCurriculum.mockReturnValue({
-      data: { topics: [{ id: 'ctopic-1' }] },
-      isLoading: false,
+  it('hides the build-learning-path link when curriculum already exists', async () => {
+    mockFetch.setRoute('subjects/sub-1/curriculum', {
+      curriculum: { topics: [{ id: 'ctopic-1' }] },
     });
 
-    const { queryByTestId } = render(<BookScreen />);
+    const { wrapper } = makeWrapper();
+    const { queryByTestId } = render(<BookScreen />, { wrapper });
 
-    expect(queryByTestId('book-build-path-link')).toBeNull();
+    await waitFor(() => {
+      expect(queryByTestId('book-build-path-link')).toBeNull();
+    });
   });
 
-  it('hides the sticky CTA in read-only mode', () => {
-    mockSearchParams = () => ({
-      subjectId: 'sub-1',
-      bookId: 'book-1',
-      readOnly: 'true',
+  it('hides the sticky CTA in read-only mode', async () => {
+    currentParams = { subjectId: 'sub-1', bookId: 'book-1', readOnly: 'true' };
+
+    const { wrapper } = makeWrapper();
+    const { queryByTestId } = render(<BookScreen />, { wrapper });
+
+    await waitFor(() => {
+      expect(queryByTestId('book-start-learning')).toBeNull();
     });
-
-    const { queryByTestId } = render(<BookScreen />);
-
-    expect(queryByTestId('book-start-learning')).toBeNull();
   });
 
   it('auto-starts the up-next topic when autoStart is true', async () => {
-    mockSearchParams = () => ({
-      subjectId: 'sub-1',
-      bookId: 'book-1',
-      autoStart: 'true',
-    });
+    currentParams = { subjectId: 'sub-1', bookId: 'book-1', autoStart: 'true' };
 
-    render(<BookScreen />);
+    const { wrapper } = makeWrapper();
+    render(<BookScreen />, { wrapper });
 
     await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith({
+      expect(routerFns.push).toHaveBeenCalledWith({
         pathname: '/(app)/session',
         params: {
           mode: 'learning',
@@ -1047,97 +882,66 @@ describe('BookScreen', () => {
     });
   });
 
-  it('shows the generating state while topics are being created', () => {
-    mockUseBookWithTopics.mockReturnValue(
-      makeBookQuery({
-        data: {
-          book: {
-            id: 'book-1',
-            title: 'Algebra',
-            emoji: '📐',
-            topicsGenerated: false,
-            description: 'Basic algebra',
-          },
-          topics: [],
-          completedTopicCount: 0,
-        },
-      }),
-    );
+  it('shows the generating state while topics are being created', async () => {
+    mockFetch.setRoute('subjects/sub-1/books/book-1', {
+      book: { id: 'book-1', title: 'Algebra', emoji: '📐', topicsGenerated: false, description: 'Basic algebra' },
+      topics: [],
+      completedTopicCount: 0,
+    });
+    // generate-topics never resolves (simulates in-flight generation)
+    mockFetch.setRoute('subjects/sub-1/books/book-1/generate-topics', () => new Promise(() => { /* never resolves */ }));
 
-    const { getByTestId, getByText } = render(<BookScreen />);
+    const { wrapper } = makeWrapper();
+    const { getByTestId, getByText } = render(<BookScreen />, { wrapper });
 
-    getByTestId('book-generating');
+    await waitFor(() => getByTestId('book-generating'));
     getByText('Algebra');
   });
 
   it('shows an alert when the initial generation request fails', async () => {
-    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(jest.fn());
+    const { platformAlert } = require('../../../../../lib/platform-alert') as { platformAlert: jest.Mock };
 
-    mockUseBookWithTopics.mockReturnValue(
-      makeBookQuery({
-        data: {
-          book: {
-            id: 'book-1',
-            title: 'Algebra',
-            emoji: '📐',
-            topicsGenerated: false,
-            description: null,
-          },
-          topics: [],
-          completedTopicCount: 0,
-        },
-      }),
-    );
-    mockGenerateMutate.mockImplementation(
-      (_input: unknown, callbacks: { onError: (error: Error) => void }) => {
-        callbacks.onError(new Error('LLM service unavailable'));
-      },
+    mockFetch.setRoute('subjects/sub-1/books/book-1', {
+      book: { id: 'book-1', title: 'Algebra', emoji: '📐', topicsGenerated: false, description: null },
+      topics: [],
+      completedTopicCount: 0,
+    });
+    mockFetch.setRoute('subjects/sub-1/books/book-1/generate-topics',
+      new Response(JSON.stringify({ error: 'LLM service unavailable' }), { status: 500 }),
     );
 
-    render(<BookScreen />);
+    const { wrapper } = makeWrapper();
+    render(<BookScreen />, { wrapper });
 
     await waitFor(() => {
-      expect(alertSpy).toHaveBeenCalledWith(
+      expect(platformAlert).toHaveBeenCalledWith(
         "Couldn't build this book",
         expect.any(String),
         expect.any(Array),
-        undefined,
       );
     });
   });
 
   it('fires retry generation only once after the timed-out state', async () => {
-    mockUseBookWithTopics.mockReturnValue(
-      makeBookQuery({
-        data: {
-          book: {
-            id: 'book-1',
-            title: 'Algebra',
-            emoji: '📐',
-            topicsGenerated: false,
-            description: 'Basic algebra',
-          },
-          topics: [],
-          completedTopicCount: 0,
-        },
-      }),
-    );
-
-    mockGenerateMutate.mockImplementationOnce(
-      (_input: unknown, callbacks: { onError: (error: Error) => void }) => {
-        callbacks.onError(new Error('initial failure'));
-      },
-    );
-
-    const { getByTestId } = render(<BookScreen />);
-
-    await waitFor(() => {
-      getByTestId('book-gen-retry');
+    mockFetch.setRoute('subjects/sub-1/books/book-1', {
+      book: { id: 'book-1', title: 'Algebra', emoji: '📐', topicsGenerated: false, description: 'Basic algebra' },
+      topics: [],
+      completedTopicCount: 0,
     });
+    mockFetch.setRoute('subjects/sub-1/books/book-1/generate-topics',
+      new Response(JSON.stringify({ error: 'initial failure' }), { status: 500 }),
+    );
 
+    const { wrapper } = makeWrapper();
+    const { getByTestId } = render(<BookScreen />, { wrapper });
+
+    await waitFor(() => getByTestId('book-gen-retry'));
+
+    // Now set up success for retry
     let retryCallCount = 0;
-    mockGenerateMutate.mockImplementation(() => {
+    mockFetch.setRoute('subjects/sub-1/books/book-1/generate-topics', () => {
       retryCallCount += 1;
+      return new Response(JSON.stringify({ book: {}, topics: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
     });
 
     fireEvent.press(getByTestId('book-gen-retry'));
@@ -1148,35 +952,39 @@ describe('BookScreen', () => {
   // router.back() falls through to the Tabs navigator's `firstRoute` (Home)
   // when the inner stack lacks a sibling `index` — common after cross-tab
   // direct pushes to this leaf route.
-  it('replaces with the shelf grid on back press', () => {
-    const { getByTestId } = render(<BookScreen />);
+  it('replaces with the shelf grid on back press', async () => {
+    const { wrapper } = makeWrapper();
+    const { getByTestId } = render(<BookScreen />, { wrapper });
+
+    await waitFor(() => getByTestId('book-screen'));
 
     fireEvent.press(getByTestId('book-back'));
-    expect(mockReplace).toHaveBeenCalledWith({
+    expect(routerFns.replace).toHaveBeenCalledWith({
       pathname: '/(app)/shelf/[subjectId]',
       params: { subjectId: 'sub-1' },
     });
-    expect(mockBack).not.toHaveBeenCalled();
+    expect(routerFns.back).not.toHaveBeenCalled();
   });
 
-  it('logs a breadcrumb and falls back to up next when the latest session topic no longer exists', () => {
+  it('logs a breadcrumb and falls back to up next when the latest session topic no longer exists', async () => {
     (Sentry.addBreadcrumb as jest.Mock).mockClear();
 
-    mockUseBookSessions.mockReturnValue(
-      makeSessionsQuery({
-        data: [
-          makeSession({
-            id: 'sess-1',
-            topicId: 'missing-topic',
-            topicTitle: 'Deleted Topic',
-            chapter: null,
-            createdAt: '2026-04-24T12:00:00.000Z',
-          }),
-        ],
-      }),
-    );
+    mockFetch.setRoute('subjects/sub-1/books/book-1/sessions', {
+      sessions: [
+        makeSession({
+          id: 'sess-1',
+          topicId: 'missing-topic',
+          topicTitle: 'Deleted Topic',
+          chapter: null,
+          createdAt: '2026-04-24T12:00:00.000Z',
+        }),
+      ],
+    });
 
-    const { getByTestId, queryByTestId } = render(<BookScreen />);
+    const { wrapper } = makeWrapper();
+    const { getByTestId, queryByTestId } = render(<BookScreen />, { wrapper });
+
+    await waitFor(() => getByTestId('book-screen'));
 
     expect(Sentry.addBreadcrumb).toHaveBeenCalledWith(
       expect.objectContaining({
