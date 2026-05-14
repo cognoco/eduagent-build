@@ -77,6 +77,11 @@ export function useReviewVocabulary(subjectId: string) {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['vocabulary'] });
+      // PR-10 deferred: broad ['language-progress'] — review affects the per-subject
+      // language progress for `subjectId`, which maps to
+      // queryKeys.languageProgress.subject(activeProfileId, subjectId). But
+      // activeProfileId is not available here (useReviewVocabulary does not call
+      // useProfile). Keep broad until a workflow test proves the precise key.
       void queryClient.invalidateQueries({ queryKey: ['language-progress'] });
     },
   });
@@ -97,6 +102,8 @@ export function useDeleteVocabulary(subjectId: string) {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['vocabulary'] });
+      // PR-10 deferred: broad ['language-progress'] — same reason as
+      // useReviewVocabulary above: activeProfileId not in scope here.
       void queryClient.invalidateQueries({ queryKey: ['language-progress'] });
     },
   });

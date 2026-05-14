@@ -13,8 +13,11 @@ import {
 import {
   useLearningResumeTarget,
   useOverallProgress,
+  useProgressInventory,
   useReviewSummary,
 } from '../../hooks/use-progress';
+import { useDashboard } from '../../hooks/use-dashboard';
+import { isInGracePeriod } from '../../lib/consent-grace';
 import { useSubscription } from '../../hooks/use-subscription';
 import { useSubjects } from '../../hooks/use-subjects';
 import { getGreeting } from '../../lib/greeting';
@@ -34,13 +37,16 @@ import { FEATURE_FLAGS } from '../../lib/feature-flags';
 import { getSubjectTint } from '../../lib/subject-tints';
 import { useTheme } from '../../lib/theme';
 import { useThemeColors } from '../../lib/theme';
-import { WithdrawalCountdownBanner } from '../family/WithdrawalCountdownBanner';
+import {
+  WithdrawalCountdownBanner,
+  type ChildInGracePeriod,
+} from '../family/WithdrawalCountdownBanner';
 import { NudgeBanner } from '../nudge/NudgeBanner';
 import { CoachBand } from './CoachBand';
 import { ChildQuotaLine } from './ChildQuotaLine';
 import { EarlyAdopterCard } from './EarlyAdopterCard';
 import { ParentHomeScreen } from './ParentHomeScreen';
-import { SubjectCard } from './SubjectCard';
+import { SubjectTile } from './SubjectTile';
 import type { TranslateKey } from '../../i18n';
 
 const CREATE_SUBJECT_FROM_HOME_HREF = '/create-subject' as const;
@@ -116,6 +122,8 @@ export function LearnerScreen({
   const { data: resumeTarget } = useLearningResumeTarget();
   const { data: reviewSummary } = useReviewSummary();
   const { data: overallProgress } = useOverallProgress();
+  const { data: progressInventory } = useProgressInventory();
+  const { data: dashboard } = useDashboard();
   const { data: quizDiscovery } = useQuizDiscoveryCard();
   const { data: subscription } = useSubscription();
   const markQuizDiscoverySurfaced = useMarkQuizDiscoverySurfaced();
@@ -129,6 +137,26 @@ export function LearnerScreen({
     activeProfile && !activeProfile.isOwner && profiles.some((p) => p.isOwner),
   );
   const [coachBandDismissed, setCoachBandDismissed] = useState(false);
+  const totalTopicsCompleted = overallProgress?.totalTopicsCompleted ?? null;
+  const totalSessions = progressInventory?.global.totalSessions ?? 0;
+  const childrenInGracePeriod = useMemo((): ChildInGracePeriod[] => {
+    return (dashboard?.children ?? []).flatMap((child) => {
+      if (
+        child.consentStatus === 'WITHDRAWN' &&
+        child.respondedAt != null &&
+        isInGracePeriod(child.respondedAt)
+      ) {
+        return [
+          {
+            profileId: child.profileId,
+            displayName: child.displayName,
+            respondedAt: child.respondedAt,
+          },
+        ];
+      }
+      return [];
+    });
+  }, [dashboard]);
   const returnParams = useMemo(
     () => ({ returnTo: returnToTab }),
     [returnToTab],
@@ -459,7 +487,9 @@ export function LearnerScreen({
             <Text className="text-body-sm text-text-secondary mt-0.5">
               {subtitle}
             </Text>
-            {!isParentProxy ? <ChildQuotaLine /> : null}
+            {!isParentProxy ? (
+              <ChildQuotaLine totalTopicsCompleted={totalTopicsCompleted} />
+            ) : null}
           </View>
         </View>
       </View>
@@ -469,7 +499,7 @@ export function LearnerScreen({
         contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
         showsVerticalScrollIndicator={false}
       >
-        <EarlyAdopterCard />
+        <EarlyAdopterCard totalSessions={totalSessions} />
         {!isParentProxy ? <NudgeBanner /> : null}
 
         {showCoachBand && (
@@ -487,7 +517,9 @@ export function LearnerScreen({
         )}
 
         <View className="px-5">
-          <WithdrawalCountdownBanner />
+          <WithdrawalCountdownBanner
+            childrenInGracePeriod={childrenInGracePeriod}
+          />
         </View>
 
         {!isParentProxy && (
@@ -554,7 +586,7 @@ export function LearnerScreen({
                 contentContainerStyle={{ paddingHorizontal: 20, gap: 12 }}
               >
                 {subjectCards.map((card) => (
-                  <SubjectCard
+                  <SubjectTile
                     key={card.subjectId}
                     {...card}
                     testID={`home-subject-card-${card.subjectId}`}

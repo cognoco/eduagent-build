@@ -764,7 +764,8 @@ describe('ProgressScreen — progressive disclosure', () => {
 
     screen.getByText('You learned 3 topics. Steady wins.');
     screen.getByText('What you learned');
-    screen.getByText('Your week');
+    // Weekly/Monthly report card titles (WeeklyReportCard/MonthlyReportCard) were removed
+    // in PR-6 (reports dedup). Register-aware growth chart title still present.
     expect(screen.queryByText('Your growth')).toBeNull();
     expect(screen.queryByText('Weekly report')).toBeNull();
   });
@@ -780,7 +781,8 @@ describe('ProgressScreen — progressive disclosure', () => {
     render(<ProgressScreen />);
 
     screen.getByText('Your growth');
-    screen.getByText('Weekly report');
+    // Weekly/Monthly report card titles (WeeklyReportCard/MonthlyReportCard) were removed
+    // in PR-6 (reports dedup). Register-aware growth chart title still present.
     expect(screen.queryByText('Your week')).toBeNull();
   });
 

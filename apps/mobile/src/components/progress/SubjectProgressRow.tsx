@@ -7,18 +7,20 @@ import { formatMinutes } from '../../lib/format-relative-date';
 
 // 'review' is planned for spaced-repetition scenarios but not yet wired.
 // Add it back here and to ACTION_LABEL + getContextualAction when implemented.
-type SubjectCardAction = 'continue' | 'explore';
+type SubjectProgressRowAction = 'continue' | 'explore';
 
-interface SubjectCardProps {
+interface SubjectProgressRowProps {
   subject: SubjectInventory;
   onPress?: () => void;
-  onAction?: (action: SubjectCardAction) => void;
+  onAction?: (action: SubjectProgressRowAction) => void;
   childProfileId?: string;
   subjectId?: string;
   testID?: string;
 }
 
-function getContextualAction(subject: SubjectInventory): SubjectCardAction {
+function getContextualAction(
+  subject: SubjectInventory,
+): SubjectProgressRowAction {
   // Only show "Continue" when the user has actual progress AND still has
   // topics left to cover. An untouched subject (all notStarted, zero
   // activity) should invite exploration, not continuation.
@@ -77,19 +79,19 @@ function getTopicHeadline(subject: SubjectInventory): {
   };
 }
 
-const ACTION_LABEL: Record<SubjectCardAction, string> = {
+const ACTION_LABEL: Record<SubjectProgressRowAction, string> = {
   continue: 'Continue',
   explore: 'Explore',
 };
 
-export function SubjectCard({
+export function SubjectProgressRow({
   subject,
   onPress,
   onAction,
   childProfileId,
   subjectId,
   testID,
-}: SubjectCardProps): React.ReactElement {
+}: SubjectProgressRowProps): React.ReactElement {
   const [expanded, setExpanded] = useState(false);
   const isAccordionMode = !!childProfileId && !!subjectId && !onPress;
   const hasExpandableTopics =

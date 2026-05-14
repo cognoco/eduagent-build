@@ -64,11 +64,11 @@ import { useClassifySubject } from '../../../hooks/use-classify-subject';
 import { useResolveSubject } from '../../../hooks/use-resolve-subject';
 import { useFiling } from '../../../hooks/use-filing';
 import { useStreaks } from '../../../hooks/use-streaks';
+import { useActiveSessionForTopic } from '../../../hooks/use-progress';
 import {
-  useOverallProgress,
-  useProgressInventory,
-  useActiveSessionForTopic,
-} from '../../../hooks/use-progress';
+  useTotalTopicsCompleted,
+  useIsFirstSession,
+} from '../../../hooks/use-session-context';
 import { useNetworkStatus } from '../../../hooks/use-network-status';
 import { useApiReachability } from '../../../hooks/use-api-reachability';
 import {
@@ -479,8 +479,8 @@ function SessionScreenInner() {
     initialHomeworkProblems[0]?.text ?? problemText ?? undefined;
   const modeConfig = getModeConfig(effectiveMode);
   const { data: streak } = useStreaks();
-  const { data: overallProgress } = useOverallProgress();
-  const progressInventory = useProgressInventory();
+  const totalTopicsCompleted = useTotalTopicsCompleted();
+  const isFirstSession = useIsFirstSession();
   const { data: celebrationLevel = 'all' } = useCelebrationLevel();
   const { data: learnerProfile } = useLearnerProfile();
   const { data: learningMode, isLoading: learningModeLoading } =
@@ -513,7 +513,7 @@ function SessionScreenInner() {
   // starts. See shouldShowBookLink for the full rationale.
   const showBookLink = shouldShowBookLink({
     effectiveMode,
-    totalTopicsCompleted: overallProgress?.totalTopicsCompleted ?? 0,
+    totalTopicsCompleted,
     messagesLength: messages.length,
   });
   const [isStreaming, setIsStreaming] = useState(false);
@@ -1672,9 +1672,7 @@ function SessionScreenInner() {
           <>
             <BookmarkNudgeTooltip
               aiResponseCount={aiResponseCount}
-              isFirstSession={
-                (progressInventory.data?.global.totalSessions ?? 0) === 0
-              }
+              isFirstSession={isFirstSession}
               profileId={activeProfile?.id}
             />
             <SessionFooter

@@ -1,15 +1,18 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import { SubjectCard, hasSubjectActivity } from './SubjectCard';
+import { SubjectProgressRow, hasSubjectActivity } from './SubjectProgressRow';
 import type { SubjectInventory } from '@eduagent/schemas';
 
-jest.mock('./AccordionTopicList', () => {
-  const { Text } = require('react-native');
+jest.mock(
+  './AccordionTopicList' /* gc1-allow: pre-existing mock carried through PR 7 rename */,
+  () => {
+    const { Text } = require('react-native');
 
-  return {
-    AccordionTopicList: ({ expanded }: { expanded: boolean }) =>
-      expanded ? <Text testID="mock-topic-list">Topics visible</Text> : null,
-  };
-});
+    return {
+      AccordionTopicList: ({ expanded }: { expanded: boolean }) =>
+        expanded ? <Text testID="mock-topic-list">Topics visible</Text> : null,
+    };
+  },
+);
 
 function makeSubject(
   overrides: Partial<SubjectInventory> = {},
@@ -36,10 +39,10 @@ function makeSubject(
   };
 }
 
-describe('SubjectCard headline', () => {
+describe('SubjectProgressRow headline', () => {
   it('shows a unified started and mastered headline for curriculum subjects', () => {
     render(
-      <SubjectCard
+      <SubjectProgressRow
         subject={makeSubject({
           topics: {
             total: 13,
@@ -63,7 +66,7 @@ describe('SubjectCard headline', () => {
 
   it('keeps zero mastery visible in the headline', () => {
     render(
-      <SubjectCard
+      <SubjectProgressRow
         subject={makeSubject({
           topics: {
             total: 13,
@@ -91,7 +94,7 @@ describe('SubjectCard headline', () => {
   // subline.
   it('uses the unified topic headline even when sessions exist but topics are still zero [BUG-880]', () => {
     render(
-      <SubjectCard
+      <SubjectProgressRow
         subject={makeSubject({
           sessionsCount: 2,
           wallClockMinutes: 69,
@@ -110,7 +113,7 @@ describe('SubjectCard headline', () => {
 
   it('hides the progress bar for open-ended subjects', () => {
     render(
-      <SubjectCard
+      <SubjectProgressRow
         subject={makeSubject({
           topics: {
             total: null,
@@ -132,7 +135,7 @@ describe('SubjectCard headline', () => {
   });
 
   it('shows the unified zero-state headline when there is no activity', () => {
-    render(<SubjectCard subject={makeSubject()} testID="card" />);
+    render(<SubjectProgressRow subject={makeSubject()} testID="card" />);
 
     screen.getByText('0 topics started · 0 mastered');
     screen.getByText('0 min · 0 sessions');
@@ -140,10 +143,10 @@ describe('SubjectCard headline', () => {
   });
 });
 
-describe('SubjectCard accordion mode', () => {
+describe('SubjectProgressRow accordion mode', () => {
   it('toggles expanded state on tap', () => {
     render(
-      <SubjectCard
+      <SubjectProgressRow
         subject={makeSubject({
           topics: {
             total: 13,
@@ -175,7 +178,7 @@ describe('SubjectCard accordion mode', () => {
 
   it('sets accordion accessibility metadata', () => {
     render(
-      <SubjectCard
+      <SubjectProgressRow
         subject={makeSubject({
           topics: {
             total: 13,
@@ -200,7 +203,7 @@ describe('SubjectCard accordion mode', () => {
 
   it('hides the see-topics hint when there is no activity to expand', () => {
     render(
-      <SubjectCard
+      <SubjectProgressRow
         subject={makeSubject()}
         childProfileId="child-1"
         subjectId="sub-1"
@@ -215,7 +218,7 @@ describe('SubjectCard accordion mode', () => {
     const onPress = jest.fn();
 
     render(
-      <SubjectCard
+      <SubjectProgressRow
         subject={makeSubject({
           sessionsCount: 2,
           wallClockMinutes: 30,
@@ -233,11 +236,15 @@ describe('SubjectCard accordion mode', () => {
   });
 });
 
-describe('SubjectCard action label [IMP-1]', () => {
+describe('SubjectProgressRow action label [IMP-1]', () => {
   it('shows "Explore" for an untouched subject with zero activity', () => {
     const onAction = jest.fn();
     render(
-      <SubjectCard subject={makeSubject()} onAction={onAction} testID="card" />,
+      <SubjectProgressRow
+        subject={makeSubject()}
+        onAction={onAction}
+        testID="card"
+      />,
     );
 
     screen.getByText('Explore');
@@ -247,7 +254,7 @@ describe('SubjectCard action label [IMP-1]', () => {
   it('shows "Continue" for a subject with activity and remaining topics', () => {
     const onAction = jest.fn();
     render(
-      <SubjectCard
+      <SubjectProgressRow
         subject={makeSubject({
           sessionsCount: 3,
           wallClockMinutes: 45,
@@ -270,7 +277,7 @@ describe('SubjectCard action label [IMP-1]', () => {
   it('shows "Explore" when all topics are completed', () => {
     const onAction = jest.fn();
     render(
-      <SubjectCard
+      <SubjectProgressRow
         subject={makeSubject({
           sessionsCount: 10,
           wallClockMinutes: 300,

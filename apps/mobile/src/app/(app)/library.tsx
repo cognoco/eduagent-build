@@ -9,7 +9,6 @@ import {
   View,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { useQuery } from '@tanstack/react-query';
 import { platformAlert } from '../../lib/platform-alert';
 import { useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -24,10 +23,11 @@ import { useAllBooks } from '../../hooks/use-all-books';
 import { useThemeColors } from '../../lib/theme';
 import { useSubjects, useUpdateSubject } from '../../hooks/use-subjects';
 import { useOverallProgress } from '../../hooks/use-progress';
-import { useApiClient } from '../../lib/api-client';
+import {
+  useLibraryRetention,
+  type LibraryRetentionTopic,
+} from '../../hooks/use-library-context';
 import { isGuardianProfile, useProfile } from '../../lib/profile';
-import { combinedSignal } from '../../lib/query-timeout';
-import { assertOk } from '../../lib/assert-ok';
 import { formatApiError } from '../../lib/format-api-error';
 import {
   deriveRetentionStatus,
@@ -44,33 +44,13 @@ import { ShimmerSkeleton } from '../../components/common/ShimmerSkeleton';
 import { getLearningSubjectTint } from '../../lib/learning-subject-tints';
 
 // ---------------------------------------------------------------------------
-// Local interfaces (retention API shape)
+// Local types
 // ---------------------------------------------------------------------------
 
-interface SubjectRetentionTopic {
-  topicId: string;
-  topicTitle?: string;
-  bookId?: string | null;
-  easeFactor: number;
-  repetitions: number;
-  nextReviewAt?: string | null;
-  lastReviewedAt: string | null;
-  daysSinceLastReview?: number | null;
-  xpStatus: 'pending' | 'verified' | 'decayed';
-  failureCount: number;
-}
-
+/** Per-subject retention view used by computeShelfRetention. */
 interface SubjectRetentionResponse {
-  topics: SubjectRetentionTopic[];
+  topics: LibraryRetentionTopic[];
   reviewDueCount: number;
-}
-
-interface LibraryRetentionResponse {
-  subjects: Array<{
-    subjectId: string;
-    topics: SubjectRetentionTopic[];
-    reviewDueCount: number;
-  }>;
 }
 
 // ---------------------------------------------------------------------------
@@ -153,7 +133,6 @@ export default function LibraryScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const themeColors = useThemeColors();
-  const apiClient = useApiClient();
   const { activeProfile, profiles } = useProfile();
   const isGuardian = isGuardianProfile(activeProfile, profiles);
 
@@ -221,24 +200,9 @@ export default function LibraryScreen() {
   const allBooks = allBooksQuery.books;
 
   // [BUG-732 / PERF-2] Single aggregate /library/retention call
-  const libraryRetentionQuery = useQuery({
-    queryKey: ['library', 'retention', activeProfile?.id],
-    queryFn: async ({ signal: querySignal }: { signal?: AbortSignal }) => {
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const res = await apiClient.library.retention.$get(
-          {},
-          { init: { signal } },
-        );
-        await assertOk(res);
-        return (await res.json()) as LibraryRetentionResponse;
-      } finally {
-        cleanup();
-      }
-    },
-    enabled: !!activeProfile,
-    retry: false,
-  });
+  // [PR-4 / surface-ownership] Inline query replaced by useLibraryRetention()
+  // — library is the canonical owner of /library/retention.
+  const libraryRetentionQuery = useLibraryRetention();
 
   const retentionDataBySubjectId = useMemo(() => {
     const map = new Map<string, SubjectRetentionResponse>();

@@ -1,7 +1,7 @@
 import { Pressable, View, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-export interface SubjectCardProps {
+export interface SubjectTileProps {
   subjectId: string;
   name: string;
   hint: string;
@@ -16,7 +16,7 @@ export interface SubjectCardProps {
   testID: string;
 }
 
-export function SubjectCard({
+export function SubjectTile({
   name,
   hint,
   isPreparing,
@@ -28,7 +28,7 @@ export function SubjectCard({
   icon,
   onPress,
   testID,
-}: SubjectCardProps) {
+}: SubjectTileProps) {
   return (
     <Pressable
       testID={testID}

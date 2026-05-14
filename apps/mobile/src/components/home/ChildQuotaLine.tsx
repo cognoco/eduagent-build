@@ -1,15 +1,18 @@
 import { Text } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
-import { useOverallProgress } from '../../hooks/use-progress';
+interface ChildQuotaLineProps {
+  totalTopicsCompleted: number | null;
+}
 
-export function ChildQuotaLine(): React.ReactElement | null {
+export function ChildQuotaLine({
+  totalTopicsCompleted,
+}: ChildQuotaLineProps): React.ReactElement | null {
   const { t } = useTranslation();
-  const { data } = useOverallProgress();
 
-  if (!data) return null;
+  if (totalTopicsCompleted === null) return null;
 
-  const total = data.totalTopicsCompleted;
+  const total = totalTopicsCompleted;
   if (total < 1) return null;
 
   const key =

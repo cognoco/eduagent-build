@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { isAdultOwner } from '@eduagent/schemas';
 import type { DashboardChild, DashboardData, Profile } from '@eduagent/schemas';
+import { isInGracePeriod } from '../../lib/consent-grace';
 import type { Translate, TranslateKey } from '../../i18n';
 
 import { useActiveProfileRole } from '../../hooks/use-active-profile-role';
@@ -26,7 +27,10 @@ import { platformAlert } from '../../lib/platform-alert';
 import { useLinkedChildren } from '../../lib/profile';
 import { useThemeColors } from '../../lib/theme';
 import { MentomateLogo } from '../MentomateLogo';
-import { WithdrawalCountdownBanner } from '../family/WithdrawalCountdownBanner';
+import {
+  WithdrawalCountdownBanner,
+  type ChildInGracePeriod,
+} from '../family/WithdrawalCountdownBanner';
 import { NudgeActionSheet } from '../nudge/NudgeActionSheet';
 import { useChildLearnerProfile } from '../../hooks/use-learner-profile';
 import { ACCOMMODATION_OPTIONS } from '../../lib/accommodation-options';
@@ -398,6 +402,24 @@ export function ParentHomeScreen({
     subscription?.tier === 'family' || subscription?.tier === 'pro',
   );
   const [sheetChildId, setSheetChildId] = useState<string | null>(null);
+  const childrenInGracePeriod = useMemo((): ChildInGracePeriod[] => {
+    return (dashboard?.children ?? []).flatMap((child) => {
+      if (
+        child.consentStatus === 'WITHDRAWN' &&
+        child.respondedAt != null &&
+        isInGracePeriod(child.respondedAt)
+      ) {
+        return [
+          {
+            profileId: child.profileId,
+            displayName: child.displayName,
+            respondedAt: child.respondedAt,
+          },
+        ];
+      }
+      return [];
+    });
+  }, [dashboard]);
   const { subtitle } = getGreeting(activeProfile?.displayName ?? '', now);
   const firstName = activeProfile?.displayName?.split(' ')[0] ?? 'there';
   const sheetChild = linkedChildren.find((child) => child.id === sheetChildId);
@@ -558,7 +580,9 @@ export function ParentHomeScreen({
         showsVerticalScrollIndicator={false}
       >
         <View className="mt-4">
-          <WithdrawalCountdownBanner />
+          <WithdrawalCountdownBanner
+            childrenInGracePeriod={childrenInGracePeriod}
+          />
         </View>
         {linkedChildren.length > 0 ? (
           <ParentTransitionNotice

@@ -19,7 +19,7 @@ import {
 } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ErrorFallback, TrackedView } from '../../../components/common';
+import { ErrorFallback } from '../../../components/common';
 import {
   formatMinutes,
   formatRelativeDate,
@@ -29,11 +29,9 @@ import {
   CurrentlyWorkingOnCard,
   GrowthChart,
   MilestoneCard,
-  MonthlyReportCard,
   RecentSessionsList,
-  ReportsListCard,
+  ReportsList,
   WeeklyDeltaChip,
-  WeeklyReportCard,
 } from '../../../components/progress';
 import { ProgressPillRow } from '../../../components/progress/ProgressPillRow';
 import { useActiveProfileRole } from '../../../hooks/use-active-profile-role';
@@ -480,9 +478,6 @@ export default function ProgressScreen(): React.ReactElement {
   const firstActiveSubject = subjectsQuery.data?.find(
     (subject) => subject.status === 'active',
   );
-  const targetProfileHash = selectedProfileId
-    ? hashProfileId(selectedProfileId)
-    : null;
   const selectedChild = linkedChildren.find(
     (child) => child.id === selectedProfileId,
   );
@@ -695,52 +690,49 @@ export default function ProgressScreen(): React.ReactElement {
               ) : null}
             </View>
 
-            {selectedProfileId && isViewingSelf ? (
-              <>
-                <TrackedView
-                  eventName="progress_report_viewed"
-                  dwellMs={1000}
-                  properties={{
-                    profile_id_hash: targetProfileHash,
-                    is_active_profile_owner: isViewingSelf,
-                    report_type: 'weekly',
-                  }}
-                  testID="progress-weekly-report-tracker"
-                >
-                  <WeeklyReportCard
-                    profileId={selectedProfileId}
-                    title={t(`progress.register.${register}.weekTitle`)}
-                    register={register}
-                    thisWeekMini={inventory?.thisWeekMini}
-                  />
-                </TrackedView>
-                <TrackedView
-                  eventName="progress_report_viewed"
-                  dwellMs={1000}
-                  properties={{
-                    profile_id_hash: targetProfileHash,
-                    is_active_profile_owner: isViewingSelf,
-                    report_type: 'monthly',
-                  }}
-                  testID="progress-monthly-report-tracker"
-                >
-                  <MonthlyReportCard
-                    profileId={selectedProfileId}
-                    title={t(`progress.register.${register}.monthTitle`)}
-                    register={register}
-                  />
-                </TrackedView>
-              </>
-            ) : null}
-
             {selectedProfileId &&
             isViewingSelf &&
             progressSurfaceState === 'ready' ? (
-              <ReportsListCard
-                profileId={selectedProfileId}
-                interactive
-                selfView={isViewingSelf}
-              />
+              <View
+                className="bg-surface rounded-card p-4 mt-6"
+                testID="reports-list-card"
+              >
+                <View className="flex-row items-center justify-between mb-1">
+                  <Text className="text-body font-semibold text-text-primary">
+                    {t('progress.previousReports.title')}
+                  </Text>
+                  <Pressable
+                    onPress={() =>
+                      router.push('/(app)/progress/reports' as Href)
+                    }
+                    accessibilityRole="button"
+                    accessibilityLabel={t('progress.previousReports.viewAll')}
+                    testID="progress-reports-link"
+                  >
+                    <Text className="text-body-sm text-primary font-semibold">
+                      {t('progress.previousReports.viewAll')}
+                    </Text>
+                  </Pressable>
+                </View>
+                <ReportsList
+                  monthlyReports={monthlyReportsQuery.data ?? []}
+                  weeklyReports={weeklyReportsQuery.data ?? []}
+                  limit={3}
+                  onPressMonthly={(reportId) =>
+                    router.push({
+                      pathname: '/(app)/progress/reports/[reportId]',
+                      params: { reportId },
+                    } as Href)
+                  }
+                  onPressWeekly={(reportId) =>
+                    router.push({
+                      pathname:
+                        '/(app)/progress/weekly-report/[weeklyReportId]',
+                      params: { weeklyReportId: reportId },
+                    } as Href)
+                  }
+                />
+              </View>
             ) : null}
 
             {!isViewingSelf ? (

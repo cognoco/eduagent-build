@@ -58,7 +58,12 @@ describe('ChildReportsScreen', () => {
     mockUseChildDetail.mockReturnValue({
       data: { displayName: 'Emma', profileId: 'child-001' },
     });
-    mockUseChildWeeklyReports.mockReturnValue({ data: undefined });
+    mockUseChildWeeklyReports.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
   });
 
   describe('empty state', () => {
@@ -173,6 +178,37 @@ describe('ChildReportsScreen', () => {
         expect.anything(),
         '/(app)/child/child-001',
       );
+    });
+
+    // [CCR finding, 2026-05-14] Break test for the weekly-only failure case:
+    // before the fix, monthly success + weekly failure hid the weekly error
+    // entirely (no banner, no retry). Now combinedError = (isError || weeklyError)
+    // when there's no data from either source.
+    it('renders error card when weekly fails and monthly returns empty', () => {
+      const monthlyRefetch = jest.fn();
+      const weeklyRefetch = jest.fn();
+      mockUseChildReports.mockReturnValue({
+        data: [],
+        isLoading: false,
+        isError: false,
+        refetch: monthlyRefetch,
+      });
+      mockUseChildWeeklyReports.mockReturnValue({
+        data: undefined,
+        isLoading: false,
+        isError: true,
+        refetch: weeklyRefetch,
+      });
+
+      render(<ChildReportsScreen />);
+
+      screen.getByTestId('child-reports-error');
+
+      fireEvent.press(screen.getByTestId('child-reports-error-retry'));
+      // The retry handler kicks off BOTH refetches so whichever endpoint
+      // failed gets re-attempted.
+      expect(monthlyRefetch).toHaveBeenCalled();
+      expect(weeklyRefetch).toHaveBeenCalled();
     });
   });
 

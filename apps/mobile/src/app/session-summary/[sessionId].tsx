@@ -29,7 +29,7 @@ import {
 } from '../../hooks/use-sessions';
 import { useSessionBookmarks } from '../../hooks/use-bookmarks';
 import { useDepthEvaluation } from '../../hooks/use-depth-evaluation';
-import { useProgressInventory } from '../../hooks/use-progress';
+import { useTotalSessionCount } from '../../hooks/use-session-context';
 import { usePostSessionNotificationAsk } from '../../hooks/use-post-session-notification-ask';
 import { goBackOrReplace, homeHrefForReturnTo } from '../../lib/navigation';
 import { platformAlert } from '../../lib/platform-alert';
@@ -128,14 +128,14 @@ export default function SessionSummaryScreen() {
       : 'adolescent';
   const recallBridge = useRecallBridge(sessionId ?? '');
   const depthEvaluation = useDepthEvaluation();
-  const progressInventory = useProgressInventory();
+  const totalSessionCount = useTotalSessionCount();
   // JIT notification permission ask — fires once after the user has
   // completed at least one session (the post-value moment). Skipped in
   // parent-proxy mode and dedup'd via SecureStore inside the hook.
   // Must be called before any early returns to satisfy Rules of Hooks.
   usePostSessionNotificationAsk(
     activeProfile?.id,
-    (progressInventory.data?.global.totalSessions ?? 0) >= 1,
+    totalSessionCount >= 1,
     isParentProxy,
   );
   const [recallQuestions, setRecallQuestions] = useState<string[] | null>(null);
@@ -833,9 +833,10 @@ export default function SessionSummaryScreen() {
     }
   });
   const effectiveSubjectId = subjectId ?? fallbackSession?.subjectId ?? null;
-  const completedSessionCount = progressInventory.data?.global.totalSessions;
-  const hasMentorMemorySignal =
-    completedSessionCount !== undefined && completedSessionCount >= 2;
+  // boundary-enforced: facade returns 0 on cold cache, so hasMentorMemorySignal
+  // is false (0 >= 2 is false) while loading — same behaviour as the original
+  // `completedSessionCount !== undefined && completedSessionCount >= 2` guard.
+  const hasMentorMemorySignal = totalSessionCount >= 2;
   const hasParentProxyMemoryAccess =
     !isParentProxy ||
     (childProfile?.consentStatus === 'CONSENTED' && !!childProfile.id);
@@ -844,7 +845,7 @@ export default function SessionSummaryScreen() {
   const shouldShowBookmarkPrompt =
     exchanges >= 5 &&
     (sessionBookmarks.data?.length ?? 0) === 0 &&
-    (progressInventory.data?.global.totalSessions ?? 0) <= 3;
+    totalSessionCount <= 3;
 
   return (
     <KeyboardAvoidingView
