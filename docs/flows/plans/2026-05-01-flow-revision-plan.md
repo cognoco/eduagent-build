@@ -1,6 +1,6 @@
 # Mobile App Flow Revision Plan — 2026-05-01
 
-Source inventory: [`mobile-app-flow-inventory.md`](../mobile-app-flow-inventory.md) (snapshot refreshed 2026-05-13). Companion E2E gap audit: [`e2e-flow-coverage-audit-2026-05-13.md`](../e2e-flow-coverage-audit-2026-05-13.md).
+Source inventory: [`mobile-app-flow-inventory.md`](../mobile-app-flow-inventory.md) (snapshot refreshed 2026-05-14). Companion E2E gap audit: [`e2e-flow-coverage-audit-2026-05-13.md`](../e2e-flow-coverage-audit-2026-05-13.md).
 
 **Reset 2026-05-14:** all batch rows are marked not yet tested (`⬜`) so the flow revision can restart from the current inventory and E2E audit. Previous pass/fail/blocker notes were stale relative to the current More-tab route shape and E2E coverage audit.
 
@@ -182,16 +182,16 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 
 | ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| HOME-04 | Animated splash and initial shell | ⬜ | — | | | |
-| AUTH-01 | App launch and auth gate | ⬜ | — | | | |
+| HOME-04 | Animated splash and initial shell | ✅ | Pass | | | 2026-05-14 web preview: auth smoke passed; manual screenshot shows splash clears to sign-in by ~10s. |
+| AUTH-01 | App launch and auth gate | ✅ | Pass | | | 2026-05-14 web preview: unauthenticated `/sign-in` renders MentoMate sign-in shell with email/password, Google button, forgot-password, and sign-up link. |
 | AUTH-12 | First-time vs returning sign-in copy | ⬜ | — | | | |
-| AUTH-07 | Auth screen navigation (sign-in ↔ sign-up ↔ forgot) | ⬜ | — | | | |
-| AUTH-02 | Sign up with email and password | ⬜ | — | | | |
-| AUTH-03 | Sign-up email verification code | ⬜ | — | | | |
+| AUTH-07 | Auth screen navigation (sign-in ↔ sign-up ↔ forgot) | ✅ | Pass | | | 2026-05-14 Playwright `smoke-auth`: sign-in -> sign-up -> sign-in -> forgot-password -> sign-in passed. |
+| AUTH-02 | Sign up with email and password | ⚠️ | Pass w/ issues | | | 2026-05-14 Playwright `smoke-auth`: form renders, validation works, submit reaches Clerk and disables button. Full account creation/verification was not exercised in this web smoke. |
+| AUTH-03 | Sign-up email verification code | 🚫 | Blocked | | | 2026-05-14 web pass did not reach the verification-code stage; needs Clerk testing token/full sign-up path or native/dev-client run. |
 | AUTH-04 | Sign in with email and password | ⬜ | — | | | |
 | AUTH-05 | Additional sign-in verification (email/phone/TOTP) | ⬜ | — | | | |
-| AUTH-06 | Forgot password and reset password | ⬜ | — | | | |
-| AUTH-08 | OAuth sign in / sign up (Google, Apple, OpenAI) | ⬜ | — | | | |
+| AUTH-06 | Forgot password and reset password | ⚠️ | Pass w/ issues | | | 2026-05-14 Playwright `smoke-auth`: forgot-password screen is reachable and back navigation works; reset-code completion was not exercised. |
+| AUTH-08 | OAuth sign in / sign up (Google, Apple, OpenAI) | 🚫 | Blocked | | | 2026-05-14 visual/auth smoke: Google button renders. OAuth happy path remains blocked in web preview. |
 | AUTH-09 | SSO callback completion + fallback | ⬜ | — | | | |
 | HOME-05 | Empty first-user state | ⬜ | — | | | |
 | AUTH-13 | Deep-link auth redirect preservation (BUG-530) | ⬜ | — | | | |
@@ -250,11 +250,11 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 
 | ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| HOME-01 | Learner home redesigned carousel + quick actions | ⬜ | — | | | |
+| HOME-01 | Learner home redesigned carousel + quick actions | ⚠️ | Pass w/ issues | | | 2026-05-14 Playwright `smoke-learner`: seeded learner reaches `learner-screen` and Study/Homework/Practice actions render. Existing screenshot crawl captures too early unless it waits for the splash overlay to clear, so visual evidence needs a wait-hardened rerun. |
 | HOME-06 | Resume interrupted session (Continue card) | ⬜ | — | | | |
 | HOME-08 | Home loading-timeout fallback (10s) | ⬜ | — | | | |
 | ACCOUNT-04 | Profile switching | ⬜ | — | | | |
-| ACCOUNT-06 | More tab navigation | ⬜ | — | | | |
+| ACCOUNT-06 | More hub + nested Account/Profile, Privacy & Data, Notifications, Learning preferences, Accommodation, Help | ⬜ | — | | | |
 | CC-05 | Continue-where-you-left-off (recovery marker vs API) | ⬜ | — | | | |
 
 ---
@@ -402,17 +402,17 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 
 | ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| ACCOUNT-07 | Push notifications + weekly digest toggles | ⬜ | — | | | |
-| ACCOUNT-08 | Learning mode + celebration preferences | ⬜ | — | | | |
-| ACCOUNT-09 | Change password | ⬜ | — | | | |
-| ACCOUNT-10 | Export my data | ⬜ | — | | | |
+| ACCOUNT-07 | Notifications sub-screen: push notifications + weekly digest toggles | ⬜ | — | | | |
+| ACCOUNT-08 | Learning preferences -> Accommodation mode + celebration-level preferences | ⬜ | — | | | |
+| ACCOUNT-09 | Account/Profile sub-screen: change password | ⬜ | — | | | |
+| ACCOUNT-10 | Privacy & Data sub-screen: export my data | ⬜ | — | | | |
 | ACCOUNT-13 | Privacy policy | ⬜ | — | | | |
 | ACCOUNT-14 | Terms of service | ⬜ | — | | | |
 | ACCOUNT-15 | Self mentor memory | ⬜ | — | | | |
 | AUTH-10 | Sign out | ⬜ | — | | | |
 | AUTH-11 | Session-expired forced sign-out | ⬜ | — | | | |
-| ACCOUNT-28 | App language (UI locale) edit | ⬜ | — | | | |
-| ACCOUNT-29 | Tutor language edit from More | ⬜ | — | | | |
+| ACCOUNT-28 | Account/Profile sub-screen: app language bottom-sheet edit | ⬜ | — | | | |
+| ACCOUNT-29 | More mentor-language row opens Account/Profile; no distinct tutor-language save flow currently exists | ⬜ | — | | | |
 
 ---
 
@@ -423,8 +423,8 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 
 | ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| ACCOUNT-11 | Delete account with 7-day grace | ⬜ | — | | | |
-| ACCOUNT-12 | Cancel scheduled deletion | ⬜ | — | | | |
+| ACCOUNT-11 | Privacy & Data sub-screen: delete account typed-confirmation flow with 7-day grace | ⬜ | — | | | |
+| ACCOUNT-12 | Scheduled deletion state: keep account / cancel deletion | ⬜ | — | | | |
 
 ---
 
@@ -442,7 +442,7 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | ACCOUNT-25 | Parent consent management for a child | ⬜ | — | | | |
 | ACCOUNT-16 | Child mentor memory | ⬜ | — | | | |
 | ACCOUNT-17 | Child memory consent prompt | ⬜ | — | | | |
-| ACCOUNT-30 | Impersonated-child guard on More | ⬜ | — | | | |
+| ACCOUNT-30 | Impersonated-child guard across More hub, Account/Profile, and Privacy & Data | ⬜ | — | | | |
 
 ---
 
@@ -480,19 +480,19 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 
 | ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| BILLING-01 | Subscription screen + current-plan details | ⬜ | — | | | |
-| BILLING-02 | Upgrade plan purchase flow | ⬜ | — | | | |
-| BILLING-03 | Trial / plan usage / family-pool detail | ⬜ | — | | | |
-| BILLING-04 | Restore purchases | ⬜ | — | | | |
-| BILLING-05 | Manage billing deep link | ⬜ | — | | | |
-| BILLING-06 | Child paywall + notify-parent | ⬜ | — | | | |
+| BILLING-01 | Account/Profile -> Subscription: current-plan details | ⬜ | — | | | |
+| BILLING-02 | Account/Profile -> Subscription: upgrade purchase + webhook polling | ⬜ | — | | | |
+| BILLING-03 | Account/Profile -> Subscription: trial, plan usage, family-pool states | ⬜ | — | | | |
+| BILLING-04 | Account/Profile -> Subscription: restore purchases | ⬜ | — | | | |
+| BILLING-05 | Account/Profile -> Subscription: manage billing deep link | ⬜ | — | | | |
+| BILLING-06 | Child entitlement paywall + notify-parent; no visible child More subscription row | ⬜ | — | | | |
 | BILLING-07 | Daily quota exceeded paywall | ⬜ | — | | | |
-| BILLING-08 | Family pool visibility | ⬜ | — | | | |
+| BILLING-08 | Account/Profile -> Subscription: family-pool visibility | ⬜ | — | | | |
 | BILLING-09 | Top-up question credits | ⬜ | — | | | |
 | BILLING-10 | BYOK waitlist | ⬜ | — | | | |
 | CC-06 | Top-up purchase confidence (two-stage polling) | ⬜ | — | | | |
-| BILLING-11 | Trial state UI (BUG-966) | ⬜ | — | | | |
-| BILLING-12 | Pro / Family static tier comparison cards (BUG-917) | ⬜ | — | | | |
+| BILLING-11 | Account/Profile -> Subscription: trial banner/status UI (BUG-966) | ⬜ | — | | | |
+| BILLING-12 | Account/Profile -> Subscription: Pro / Family static tier comparison cards (BUG-917) | ⬜ | — | | | |
 
 ---
 
@@ -566,10 +566,10 @@ Update this once a batch is complete to track overall progress.
 
 | Batch | Section | Items | Status | Notes |
 | --- | --- | --- | --- | --- |
-| 1  | Pre-auth & Auth          | 14 | ⬜ | |
+| 1  | Pre-auth & Auth          | 14 | ⚠️ | 3✅ 2⚠️ 2🚫 7⬜ — 2026-05-14 web smoke-auth passed; full verification/reset/OAuth remain incomplete or blocked. |
 | 2  | First Profile + Consent  | 11 | ⬜ | |
 | 3  | Subject Onboarding       | 12 | ⬜ | |
-| 4  | Learner Home + Resume    |  6 | ⬜ | |
+| 4  | Learner Home + Resume    |  6 | ⚠️ | 1⚠️ 5⬜ — 2026-05-14 smoke-learner passed locators; screenshot crawl needs splash-wait hardening before visual sign-off. |
 | 5  | Core Learning Sessions   | 12 | ⬜ | |
 | 6  | Library, Books, Topics   |  7 | ⬜ | |
 | 7  | Retention & Recall       |  4 | ⬜ | |
@@ -584,7 +584,7 @@ Update this once a batch is complete to track overall progress.
 | 16 | Billing                  | 13 | ⬜ | |
 | 17 | Cross-Cutting Final Pass | 11 | ⬜ | |
 | 18 | Regression Smoke         | 12 | ⬜ | |
-| **Total** | | **184** | ⬜ | Reset 2026-05-14: all batch rows returned to not-started pending a fresh revision pass. |
+| **Total** | | **184** | ⚠️ | 3✅ 3⚠️ 2🚫 176⬜ — reset 2026-05-14, then web smoke-auth and smoke-learner started the fresh pass. |
 
 ### Coverage Audit
 
