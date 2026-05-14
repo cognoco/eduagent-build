@@ -2,42 +2,88 @@
 // RevenueCat Webhook Route — Tests
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/kv', () => ({
-  ...jest.requireActual('../services/kv'),
-  writeSubscriptionStatus: jest.fn().mockResolvedValue(undefined),
-}));
+jest.mock('../services/kv' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/kv',
+  ) as typeof import('../services/kv');
+  return {
+    ...actual,
+    writeSubscriptionStatus: jest.fn().mockResolvedValue(undefined),
+  };
+});
 
-jest.mock('../services/billing', () => ({ // gc1-allow: billing service requires real DB; mockDb={} as any would throw on all db.select/insert calls
-  ...jest.requireActual('../services/billing'),
-  getSubscriptionByAccountId: jest.fn(),
-  getQuotaPool: jest.fn(),
-  ensureFreeSubscription: jest.fn().mockResolvedValue({
-    id: 'sub-internal-1',
-    accountId: 'acc-1',
-    tier: 'free',
-    status: 'active',
-  }),
-  isRevenuecatEventProcessed: jest.fn().mockResolvedValue(false),
-  updateSubscriptionFromRevenuecatWebhook: jest.fn(),
-  activateSubscriptionFromRevenuecat: jest.fn(),
-  updateQuotaPoolLimit: jest.fn().mockResolvedValue(undefined),
-  transitionToExtendedTrial: jest.fn().mockResolvedValue(undefined),
-  purchaseTopUpCredits: jest.fn().mockResolvedValue({
-    id: 'topup-1',
-    subscriptionId: 'sub-internal-1',
-    amount: 500,
-    remaining: 500,
-    purchasedAt: new Date().toISOString(),
-    expiresAt: new Date().toISOString(),
-    revenuecatTransactionId: 'txn_test_123',
-    createdAt: new Date().toISOString(),
-  }),
-}));
+jest.mock('../services/billing' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/billing',
+  ) as typeof import('../services/billing');
+  return {
+    ...actual,
+    getSubscriptionByAccountId: jest.fn(),
+    getQuotaPool: jest.fn(),
+    ensureFreeSubscription: jest.fn().mockResolvedValue({
+      id: 'sub-internal-1',
+      accountId: 'acc-1',
+      tier: 'free',
+      status: 'active',
+    }),
+    isRevenuecatEventProcessed: jest.fn().mockResolvedValue(false),
+    updateSubscriptionFromRevenuecatWebhook: jest.fn(),
+    activateSubscriptionFromRevenuecat: jest.fn(),
+    updateQuotaPoolLimit: jest.fn().mockResolvedValue(undefined),
+    transitionToExtendedTrial: jest.fn().mockResolvedValue(undefined),
+    purchaseTopUpCredits: jest.fn().mockResolvedValue({
+      id: 'topup-1',
+      subscriptionId: 'sub-internal-1',
+      amount: 500,
+      remaining: 500,
+      purchasedAt: new Date().toISOString(),
+      expiresAt: new Date().toISOString(),
+      revenuecatTransactionId: 'txn_test_123',
+      createdAt: new Date().toISOString(),
+    }),
+  };
+});
 
-jest.mock('../services/account', () => ({ // gc1-allow: account service requires real DB; mockDb={} as any would throw on db.select calls
-  ...jest.requireActual('../services/account'),
-  findAccountByClerkId: jest.fn(),
-}));
+jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/account',
+  ) as typeof import('../services/account');
+  return {
+    ...actual,
+    findAccountByClerkId: jest.fn(),
+  };
+});
+
+jest.mock(
+  '../services/subscription' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../services/subscription',
+    ) as typeof import('../services/subscription');
+    return {
+      ...actual,
+      getTierConfig: jest.fn().mockReturnValue({
+        monthlyQuota: 500,
+        dailyLimit: null,
+        maxProfiles: 1,
+        priceMonthly: 18.99,
+        priceYearly: 168,
+        topUpPrice: 10,
+        topUpAmount: 500,
+      }),
+    };
+  },
+);
+
+jest.mock('../services/trial' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/trial',
+  ) as typeof import('../services/trial');
+  return {
+    ...actual,
+    EXTENDED_TRIAL_MONTHLY_EQUIVALENT: 450,
+  };
+});
 
 jest.mock('../inngest/client', () => ({
   // gc1-allow: Inngest SDK external boundary
