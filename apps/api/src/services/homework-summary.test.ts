@@ -1,6 +1,10 @@
-jest.mock('./llm', () => ({
-  routeAndCall: jest.fn(),
-}));
+jest.mock('./llm', () => {
+  const actual = jest.requireActual('./llm') as Record<string, unknown>;
+  return {
+    ...actual,
+    routeAndCall: jest.fn(),
+  };
+});
 
 import type { Database } from '@eduagent/database';
 import { routeAndCall } from './llm';
