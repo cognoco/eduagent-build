@@ -1,11 +1,12 @@
 jest.mock('../services/parking-lot-data', () => ({
+  ...jest.requireActual('../services/parking-lot-data'),
   getParkingLotItems: jest.fn(),
   getParkingLotItemsForTopic: jest.fn(),
   addParkingLotItem: jest.fn(),
-  MAX_ITEMS_PER_TOPIC: 10,
 }));
 
 jest.mock('../services/session', () => ({
+  ...jest.requireActual('../services/session'),
   getSession: jest.fn(),
 }));
 

@@ -23,6 +23,7 @@ jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 // ---------------------------------------------------------------------------
 
 jest.mock('../services/account', () => ({
+  ...jest.requireActual('../services/account'),
   findOrCreateAccount: jest.fn().mockResolvedValue({
     id: 'test-account-id',
     clerkUserId: 'user_test',
@@ -33,6 +34,7 @@ jest.mock('../services/account', () => ({
 }));
 
 jest.mock('../services/profile', () => ({
+  ...jest.requireActual('../services/profile'),
   findOwnerProfile: jest.fn().mockResolvedValue(null),
   getProfile: jest.fn().mockResolvedValue({
     id: 'test-profile-id',
@@ -50,6 +52,7 @@ jest.mock('../services/profile', () => ({
 const mockSearchLibrary = jest.fn();
 
 jest.mock('../services/library-search', () => ({
+  ...jest.requireActual('../services/library-search'),
   searchLibrary: (...args: unknown[]) => mockSearchLibrary(...args),
 }));
 
