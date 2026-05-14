@@ -1,27 +1,10 @@
-import {
-  Component,
-  useState,
-  useCallback,
-  useRef,
-  useEffect,
-  useMemo,
-} from 'react';
-import type { ErrorInfo, ReactNode } from 'react';
-import {
-  AppState,
-  View,
-  Text,
-  Pressable,
-  ScrollView,
-  Modal,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { AppState, View, Text, Pressable } from 'react-native';
 import { platformAlert } from '../../../lib/platform-alert';
 import { goBackOrReplace, homeHrefForReturnTo } from '../../../lib/navigation';
 import { firstParam } from '../../../lib/route-params';
 import { shouldShowBookLink } from '../../../lib/show-book-link';
 import {
-  router,
   useRouter,
   useLocalSearchParams,
   useFocusEffect,
@@ -32,7 +15,6 @@ import type {
   HomeworkCaptureSource,
   HomeworkProblem,
   InputMode,
-  LearningMode,
   PendingCelebration,
 } from '@eduagent/schemas';
 import {
@@ -71,11 +53,7 @@ import {
 } from '../../../hooks/use-session-context';
 import { useNetworkStatus } from '../../../hooks/use-network-status';
 import { useApiReachability } from '../../../hooks/use-api-reachability';
-import {
-  useCelebrationLevel,
-  useLearningMode,
-  useUpdateLearningMode,
-} from '../../../hooks/use-settings';
+import { useCelebrationLevel } from '../../../hooks/use-settings';
 import { useLearnerProfile } from '../../../hooks/use-learner-profile';
 import { useCelebration } from '../../../hooks/use-celebration';
 import { useSubjects, useCreateSubject } from '../../../hooks/use-subjects';
@@ -91,7 +69,6 @@ import {
   type QuotaExceededDetails,
 } from '../../../lib/api-client';
 import { useThemeColors } from '../../../lib/theme';
-import { tokens } from '../../../lib/design-tokens';
 import { useCreateNote } from '../../../hooks/use-notes';
 import { getVoiceLocaleForLanguage } from '../../../lib/language-locales';
 import { useProfile } from '../../../lib/profile';
@@ -129,179 +106,12 @@ import {
 import { SessionFooter } from '../../../components/session/SessionFooter';
 import { SessionTopicHeader } from '../../../components/session/SessionTopicHeader';
 import { getResumeBannerCopy } from '../../../components/session/resume-banner-copy';
-import { Sentry } from '../../../lib/sentry';
 import { OutboxFailedBanner } from '../../../components/durability/OutboxFailedBanner';
 import { useTranslation } from 'react-i18next';
-
-/**
- * Session-specific error boundary with visible diagnostics.
- * Uses hardcoded hex colors intentionally — theme context may not be
- * available during a crash, so inline styles guarantee readable text
- * regardless of whether ThemeProvider is mounted. Do not replace with
- * semantic tokens.
- */
-class SessionErrorBoundary extends Component<
-  { children: ReactNode },
-  { hasError: boolean; error: Error | null; componentStack: string | null }
-> {
-  override state = {
-    hasError: false,
-    error: null as Error | null,
-    componentStack: null as string | null,
-  };
-
-  static getDerivedStateFromError(error: Error) {
-    return { hasError: true, error };
-  }
-
-  override componentDidCatch(error: Error, info: ErrorInfo) {
-    const stack = info.componentStack ?? '';
-    this.setState({ componentStack: stack });
-    console.error(
-      '[SessionScreen CRASH]',
-      error.message,
-      '\n\nError stack:',
-      error.stack,
-      '\n\nComponent stack:',
-      stack,
-    );
-    Sentry.captureException(error, {
-      tags: { screen: 'session', crashLocation: 'SessionErrorBoundary' },
-      extra: { componentStack: stack },
-    });
-  }
-
-  override render() {
-    if (this.state.hasError) {
-      return (
-        <ScrollView
-          style={{ flex: 1, backgroundColor: tokens.light.colors.background }}
-          contentContainerStyle={{
-            padding: 24,
-            paddingTop: 60,
-          }}
-        >
-          <Text
-            style={{
-              fontSize: 20,
-              fontWeight: 'bold',
-              color: tokens.light.colors.danger,
-              marginBottom: 12,
-            }}
-          >
-            Session screen crashed
-          </Text>
-          <Text
-            style={{
-              fontSize: 15,
-              color: tokens.light.colors.textPrimary,
-              marginBottom: 16,
-              fontWeight: '600',
-            }}
-          >
-            {this.state.error?.message ?? 'Unknown error'}
-          </Text>
-          {__DEV__ && (
-            <>
-              <Text
-                style={{
-                  fontSize: 11,
-                  color: tokens.light.colors.textSecondary,
-                  fontFamily: 'monospace',
-                  marginBottom: 16,
-                }}
-                selectable
-              >
-                {this.state.error?.stack?.slice(0, 1200) ?? ''}
-              </Text>
-              {this.state.componentStack && (
-                <View
-                  style={{
-                    backgroundColor: tokens.light.colors.dangerSoft,
-                    borderRadius: 8,
-                    padding: 12,
-                    marginBottom: 16,
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: 10,
-                      color: tokens.light.colors.textPrimary,
-                      fontFamily: 'monospace',
-                    }}
-                    selectable
-                  >
-                    {this.state.componentStack.trim().slice(0, 1000)}
-                  </Text>
-                </View>
-              )}
-            </>
-          )}
-          <Pressable
-            onPress={() =>
-              this.setState({
-                hasError: false,
-                error: null,
-                componentStack: null,
-              })
-            }
-            style={{
-              backgroundColor: tokens.light.colors.primary,
-              borderRadius: 12,
-              paddingVertical: 14,
-              alignItems: 'center',
-              marginBottom: 12,
-            }}
-          >
-            <Text
-              style={{
-                color: tokens.light.colors.textInverse,
-                fontSize: 16,
-                fontWeight: '600',
-              }}
-            >
-              Try Again
-            </Text>
-          </Pressable>
-          {/* [UX-DE-M3] Secondary escape so a crash-loop doesn't trap the user.
-              Hardcoded hex intentional — ThemeProvider may not be available.
-              Uses the imperative expo-router `router` (module-level singleton)
-              since class components cannot call the useRouter hook. */}
-          <Pressable
-            onPress={() => {
-              this.setState({
-                hasError: false,
-                error: null,
-                componentStack: null,
-              });
-              router.replace('/(app)/home' as Href);
-            }}
-            style={{
-              backgroundColor: tokens.light.colors.border,
-              borderRadius: 12,
-              paddingVertical: 14,
-              alignItems: 'center',
-            }}
-            testID="session-error-boundary-go-home"
-            accessibilityRole="button"
-            accessibilityLabel="Go Home"
-          >
-            <Text
-              style={{
-                color: tokens.light.colors.textSecondary,
-                fontSize: 16,
-                fontWeight: '600',
-              }}
-            >
-              Go Home
-            </Text>
-          </Pressable>
-        </ScrollView>
-      );
-    }
-    return this.props.children;
-  }
-}
+import { SessionErrorBoundary } from './_components/SessionErrorBoundary';
+import { getConfidenceCopy } from './_lib/confidence-copy';
+import { ConfirmationToast } from './_components/ConfirmationToast';
+import { useLearningModeControl } from './_components/LearningModeControl';
 
 export default function SessionScreen() {
   return (
@@ -309,45 +119,6 @@ export default function SessionScreen() {
       <SessionScreenInner />
     </SessionErrorBoundary>
   );
-}
-
-/**
- * Age-aware copy for the F6 confidence affordance. Three variants keep the
- * metacognitive intent (learner signals uncertainty about their own
- * understanding) but adjust phrasing to fit the learner's voice.
- *
- * Brackets follow `computeAgeBracket` thresholds (under 13 / 13–17 / 18+).
- * `null` birthYear falls back to the middle bracket — neutral default.
- */
-function getConfidenceCopy(birthYear: number | null): {
-  label: string;
-  accessibilityLabel: string;
-  retryMessage: string;
-} {
-  const age = birthYear == null ? null : new Date().getFullYear() - birthYear;
-  if (age != null && age < 13) {
-    return {
-      label: 'Does this feel right? Tap to ask',
-      accessibilityLabel:
-        "If something doesn't make sense yet, that's okay! Tap here to ask the mentor to explain it a different way.",
-      retryMessage: "I don't get this — can you say it another way?",
-    };
-  }
-  if (age != null && age >= 18) {
-    return {
-      label: 'Not sure about this? Tap to ask',
-      accessibilityLabel:
-        'Need a different angle? Tap to ask for clarification or an alternate explanation.',
-      retryMessage:
-        "I'm not sure that was right — can you explain it differently?",
-    };
-  }
-  return {
-    label: 'Is this right? Tap to ask',
-    accessibilityLabel:
-      'Stuck on this answer? Tap to get it explained differently or work through it together.',
-    retryMessage: "I'm not sure I get this — can you explain it differently?",
-  };
 }
 
 function SessionScreenInner() {
@@ -483,9 +254,6 @@ function SessionScreenInner() {
   const isFirstSession = useIsFirstSession();
   const { data: celebrationLevel = 'all' } = useCelebrationLevel();
   const { data: learnerProfile } = useLearnerProfile();
-  const { data: learningMode, isLoading: learningModeLoading } =
-    useLearningMode();
-  const updateLearningMode = useUpdateLearningMode();
   const sessionExperience = streak?.longestStreak ?? 0;
   const openingContent = getOpeningMessage(
     effectiveMode,
@@ -573,7 +341,6 @@ function SessionScreenInner() {
   const [showParkingLot, setShowParkingLot] = useState(false);
   const [parkingLotDraft, setParkingLotDraft] = useState('');
   const [showTopicSwitcher, setShowTopicSwitcher] = useState(false);
-  const [showLearningModeSheet, setShowLearningModeSheet] = useState(false);
   const [topicSwitcherSubjectId, setTopicSwitcherSubjectId] = useState<
     string | null
   >(subjectId ?? null);
@@ -1318,76 +1085,8 @@ function SessionScreenInner() {
     </Pressable>
   );
 
-  const learningModeOptions: Array<{
-    mode: LearningMode;
-    title: string;
-    description: string;
-    icon: keyof typeof Ionicons.glyphMap;
-  }> = [
-    {
-      mode: 'casual',
-      title: t('more.learningMode.casual.title'),
-      description: t('more.learningMode.casual.description'),
-      icon: 'compass-outline',
-    },
-    {
-      mode: 'serious',
-      title: t('more.learningMode.serious.title'),
-      description: t('more.learningMode.serious.description'),
-      icon: 'trophy-outline',
-    },
-  ];
-  const selectedLearningMode = learningModeOptions.find(
-    (option) => option.mode === learningMode,
-  );
-  const learningModeButtonDisabled =
-    !learningMode || learningModeLoading || updateLearningMode.isPending;
-  const handleSelectLearningMode = (nextMode: LearningMode) => {
-    if (updateLearningMode.isPending) return;
-    if (nextMode === learningMode) {
-      setShowLearningModeSheet(false);
-      return;
-    }
-    updateLearningMode.mutate(nextMode, {
-      onSuccess: () => {
-        setShowLearningModeSheet(false);
-      },
-      onError: () => {
-        platformAlert(
-          t('more.errors.couldNotSaveSetting'),
-          t('more.errors.tryAgain'),
-        );
-      },
-    });
-  };
-  const learningModeButton = (
-    <Pressable
-      onPress={() => setShowLearningModeSheet(true)}
-      disabled={learningModeButtonDisabled}
-      className={`ms-1 px-2 py-2 rounded-button bg-surface-elevated min-h-[44px] min-w-[44px] items-center justify-center flex-row ${
-        learningModeButtonDisabled ? 'opacity-50' : ''
-      }`}
-      accessibilityRole="button"
-      accessibilityLabel={
-        selectedLearningMode
-          ? `Learning mode: ${selectedLearningMode.title}`
-          : 'Learning mode loading'
-      }
-      accessibilityState={{ disabled: learningModeButtonDisabled }}
-      testID="learning-mode-header-button"
-    >
-      <Ionicons
-        name={selectedLearningMode?.icon ?? 'options-outline'}
-        size={20}
-        color={colors.textSecondary}
-      />
-      {selectedLearningMode ? (
-        <Text className="ms-1 text-caption font-semibold text-text-secondary">
-          {selectedLearningMode.title}
-        </Text>
-      ) : null}
-    </Pressable>
-  );
+  const { button: learningModeButton, sheet: learningModeSheet } =
+    useLearningModeControl();
 
   const headerRight = (
     <View className="flex-row items-center">
@@ -1709,76 +1408,7 @@ function SessionScreenInner() {
           </>
         }
       />
-      <Modal
-        visible={showLearningModeSheet}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowLearningModeSheet(false)}
-        testID="learning-mode-modal"
-      >
-        <Pressable
-          className="flex-1 bg-black/40 justify-end"
-          onPress={() => setShowLearningModeSheet(false)}
-          testID="learning-mode-sheet-backdrop"
-        >
-          <Pressable
-            className="bg-background rounded-t-card px-5 pt-4 pb-6"
-            onPress={() => undefined}
-            testID="learning-mode-sheet"
-          >
-            <Text className="text-title-sm font-semibold text-text-primary mb-1">
-              {t('more.learningMode.sheetTitle')}
-            </Text>
-            <Text
-              className="text-caption text-text-secondary mb-3"
-              testID="learning-mode-next-message-copy"
-            >
-              {t('more.learningMode.sheetEffectMessage')}
-            </Text>
-            {learningModeOptions.map((option) => {
-              const selected = learningMode === option.mode;
-              return (
-                <Pressable
-                  key={option.mode}
-                  onPress={() => handleSelectLearningMode(option.mode)}
-                  disabled={updateLearningMode.isPending}
-                  className={`bg-surface rounded-card px-4 py-3.5 mb-2 border-2 ${
-                    selected ? 'border-primary' : 'border-transparent'
-                  } ${updateLearningMode.isPending ? 'opacity-50' : ''}`}
-                  accessibilityLabel={`${option.title}: ${option.description}`}
-                  accessibilityRole="radio"
-                  accessibilityState={{
-                    selected,
-                    disabled: updateLearningMode.isPending,
-                  }}
-                  testID={`session-learning-mode-${option.mode}`}
-                >
-                  <View className="flex-row items-center justify-between">
-                    <View className="flex-row items-center flex-1">
-                      <Ionicons
-                        name={option.icon}
-                        size={20}
-                        color={colors.textSecondary}
-                      />
-                      <Text className="ms-2 text-body font-semibold text-text-primary">
-                        {option.title}
-                      </Text>
-                    </View>
-                    {selected ? (
-                      <Text className="text-primary text-body font-semibold">
-                        {t('more.active')}
-                      </Text>
-                    ) : null}
-                  </View>
-                  <Text className="text-body-sm text-text-secondary mt-1">
-                    {option.description}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </Pressable>
-        </Pressable>
-      </Modal>
+      {learningModeSheet}
       {activeProfile?.id ? (
         <OutboxFailedBanner profileId={activeProfile.id} flow="session" />
       ) : null}
@@ -1803,22 +1433,10 @@ function SessionScreenInner() {
         insetsBottom={insets.bottom}
         isSwitching={isClosing}
       />
-      {confirmationToast ? (
-        <View
-          className="absolute left-4 right-4 z-50 items-center"
-          style={{
-            pointerEvents: 'none',
-            bottom: Math.max(insets.bottom, 16) + 88,
-          }}
-          testID="session-confirmation-toast"
-        >
-          <View className="rounded-full bg-text-primary px-4 py-3">
-            <Text className="text-body-sm font-semibold text-text-inverse">
-              {confirmationToast}
-            </Text>
-          </View>
-        </View>
-      ) : null}
+      <ConfirmationToast
+        message={confirmationToast}
+        insetsBottom={insets.bottom}
+      />
       {CelebrationOverlay}
     </View>
   );
