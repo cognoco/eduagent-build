@@ -27,6 +27,17 @@
 # ── Tunables ────────────────────────────────────────────────────────────────
 : "${PREFLIGHT_API_URL:=http://127.0.0.1:8787}"
 : "${PREFLIGHT_METRO_HOST:=127.0.0.1}"
+
+# If METRO_URL is set (the same env var seed-and-run.sh uses to choose where the
+# emulator points its dev-client), derive the Metro port from it so that the
+# preflight check, the harness, and Maestro agree. Otherwise default to 8081.
+# Without this, running Metro on a non-default port (e.g. 8083 when 8081/8082
+# are held by another branch's dev server) fails preflight even though the
+# harness itself was instructed to use the alternate port.
+if [ -z "${PREFLIGHT_METRO_PORT:-}" ] && [ -n "${METRO_URL:-}" ]; then
+  _DERIVED_METRO_PORT=$(echo "$METRO_URL" | sed -n 's#.*:\([0-9][0-9]*\)\(/.*\)\?$#\1#p')
+  PREFLIGHT_METRO_PORT="${_DERIVED_METRO_PORT:-8081}"
+fi
 : "${PREFLIGHT_METRO_PORT:=8081}"
 : "${PREFLIGHT_PROXY_PORT:=8082}"
 : "${PREFLIGHT_PROXY_MAX_SECONDS:=2}"    # Fresh warm proxy serves bundle <0.2s; repeat >2s = stale
@@ -206,7 +217,7 @@ check_adb_reverse_ports() {
   "$PREFLIGHT_ADB" reverse tcp:"$PREFLIGHT_METRO_PORT" tcp:"$PREFLIGHT_METRO_PORT" >/dev/null 2>&1 || true
   "$PREFLIGHT_ADB" reverse tcp:"$PREFLIGHT_PROXY_PORT" tcp:"$PREFLIGHT_PROXY_PORT" >/dev/null 2>&1 || true
   "$PREFLIGHT_ADB" reverse tcp:8787 tcp:8787 >/dev/null 2>&1 || true
-  _preflight_ok "adb reverse ports configured (8081, ${PREFLIGHT_PROXY_PORT}, 8787)"
+  _preflight_ok "adb reverse ports configured (${PREFLIGHT_METRO_PORT}, ${PREFLIGHT_PROXY_PORT}, 8787)"
 }
 
 # ── Orchestrator ────────────────────────────────────────────────────────────

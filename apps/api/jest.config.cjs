@@ -1,9 +1,20 @@
 const { join } = require('path');
 
+// CI-only readability defaults — silence captured console output from passing
+// tests + custom reporter for GitHub Actions annotations and end-of-log
+// summary. See docs/superpowers/specs/2026-05-14-ci-failure-readability-design.md.
+const ciDefaults = process.env.CI
+  ? {
+      silent: true,
+      reporters: ['default', join(__dirname, '../../scripts/jest-ci-reporter.cjs')],
+    }
+  : {};
+
 module.exports = {
   displayName: '@eduagent/api',
   rootDir: '../..',
   testEnvironment: 'node',
+  ...ciDefaults,
   transform: {
     '^.+\\.ts$': ['ts-jest', { tsconfig: '<rootDir>/apps/api/tsconfig.app.json' }],
   },

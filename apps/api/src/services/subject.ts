@@ -38,7 +38,7 @@ import {
 import { createLogger } from './logger';
 import { getProfileAge } from './profile';
 import { setNativeLanguage } from './retention-data';
-import { captureException } from './sentry';
+import { safeSend } from './safe-non-core';
 
 /**
  * [BUG-SUBJ-LANG] Thrown when `configureLanguageSubject` is called on a
@@ -110,21 +110,19 @@ async function dispatchCurriculumPrewarm(args: {
     timestamp: new Date().toISOString(),
   });
 
-  try {
-    await inngest.send({
-      name: 'app/subject.curriculum-prewarm-requested',
-      data,
-    });
-  } catch (err) {
-    captureException(err, {
+  await safeSend(
+    () =>
+      inngest.send({
+        name: 'app/subject.curriculum-prewarm-requested',
+        data,
+      }),
+    'subject_prewarm_dispatch',
+    {
       profileId: args.profileId,
-      extra: {
-        subjectId: args.subjectId,
-        bookId: args.bookId,
-        phase: 'subject_prewarm_dispatch',
-      },
-    });
-  }
+      subjectId: args.subjectId,
+      bookId: args.bookId,
+    },
+  );
 }
 
 async function dispatchCurriculumRetry(args: {
@@ -138,21 +136,19 @@ async function dispatchCurriculumRetry(args: {
     timestamp: new Date().toISOString(),
   });
 
-  try {
-    await inngest.send({
-      name: 'app/subject.curriculum-retry-requested',
-      data,
-    });
-  } catch (err) {
-    captureException(err, {
+  await safeSend(
+    () =>
+      inngest.send({
+        name: 'app/subject.curriculum-retry-requested',
+        data,
+      }),
+    'subject_retry_dispatch',
+    {
       profileId: args.profileId,
-      extra: {
-        subjectId: args.subjectId,
-        bookId: args.bookId,
-        phase: 'subject_retry_dispatch',
-      },
-    });
-  }
+      subjectId: args.subjectId,
+      bookId: args.bookId,
+    },
+  );
 }
 
 export async function retryCurriculumForSubject(

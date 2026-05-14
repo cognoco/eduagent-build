@@ -61,6 +61,7 @@ import {
 import type { LLMTier } from '../services/subscription';
 import { notFound, apiError } from '../errors';
 import { inngest } from '../inngest/client';
+import { safeSend } from '../services/safe-non-core';
 import { safeRefundQuota } from '../services/billing';
 import {
   startInterleavedSession,
@@ -359,44 +360,43 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       return sum + exchange.content.split(/\s+/).filter(Boolean).length;
     }, 0);
 
-    // [A-1] Observability events — no Inngest handler; awaited per CLAUDE.md rule.
-    // [BUG-653] Inngest events are observability-only — never fail the request
-    // when their delivery hiccups (network blip, rate-limit, partial outage).
-    // The depth result is already in hand and is what the client asked for.
-    try {
-      await inngest.send({
-        name: 'app/ask.gate_decision',
-        data: {
-          sessionId,
-          meaningful: result.meaningful,
-          reason: result.reason,
-          method: result.method,
-          exchangeCount: transcript.session.exchangeCount,
-          learnerWordCount,
-          topicCount: result.topics.length,
-        },
-      });
-
-      if (result.method === 'fail_open') {
-        await inngest.send({
-          name: 'app/ask.gate_timeout',
+    // [A-1] Observability events — consumed by ask-gate-observe.ts (decision +
+    // timeout). [BUG-653] Inngest events are observability-only — never fail
+    // the request when their delivery hiccups (network blip, rate-limit, partial
+    // outage). The depth result is already in hand and is what the client asked
+    // for. safeSend satisfies the CLAUDE.md "Silent Recovery Without Escalation
+    // Is Banned" rule by routing dispatch failures through Sentry.
+    await safeSend(
+      () =>
+        inngest.send({
+          name: 'app/ask.gate_decision',
           data: {
             sessionId,
+            meaningful: result.meaningful,
+            reason: result.reason,
+            method: result.method,
             exchangeCount: transcript.session.exchangeCount,
+            learnerWordCount,
+            topicCount: result.topics.length,
           },
-        });
-      }
-    } catch (err) {
-      // Capture so the silent-recovery rule (CLAUDE.md → "Silent Recovery
-      // Without Escalation is Banned") is satisfied — failures here surface
-      // in Sentry rather than disappearing into stdout.
-      captureException(err, {
-        extra: {
-          context: 'sessions.evaluate-depth.inngest_send',
-          sessionId,
-          method: result.method,
-        },
-      });
+        }),
+      'sessions.evaluate-depth.gate_decision_dispatch',
+      { sessionId, profileId, method: result.method },
+    );
+
+    if (result.method === 'fail_open') {
+      await safeSend(
+        () =>
+          inngest.send({
+            name: 'app/ask.gate_timeout',
+            data: {
+              sessionId,
+              exchangeCount: transcript.session.exchangeCount,
+            },
+          }),
+        'sessions.evaluate-depth.gate_timeout_dispatch',
+        { sessionId, profileId },
+      );
     }
 
     return c.json(result);

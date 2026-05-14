@@ -79,6 +79,7 @@ import {
 } from './session-crud';
 import { createLogger } from '../logger';
 import { captureException } from '../sentry';
+import { safeSend } from '../safe-non-core';
 import {
   buildResumeContext,
   loadPriorSessionMeta,
@@ -347,28 +348,19 @@ async function maybeDispatchReviewCalibration(
 
   if (!payload) return;
 
-  try {
-    await inngest.send({
-      name: 'app/review.calibration.requested',
-      data: payload,
-    });
-  } catch (err) {
-    logger.warn('[session-exchange] review calibration dispatch failed', {
-      event: 'review_calibration.dispatch_failed',
+  await safeSend(
+    () =>
+      inngest.send({
+        name: 'app/review.calibration.requested',
+        data: payload,
+      }),
+    'review_calibration.dispatch',
+    {
       profileId,
       sessionId: session.id,
       topicId: session.topicId,
-      error: err instanceof Error ? err.message : String(err),
-    });
-    captureException(err, {
-      profileId,
-      extra: {
-        site: 'maybeDispatchReviewCalibration',
-        sessionId: session.id,
-        topicId: session.topicId,
-      },
-    });
-  }
+    },
+  );
 }
 
 async function maybeDispatchTopicProbeExtraction(
@@ -1797,16 +1789,24 @@ export async function processMessage(
           orphanReason: classifyOrphanError(err),
         });
       } catch (persistErr) {
-        await inngest.send({
-          name: 'app/orphan.persist.failed',
-          data: {
-            profileId,
-            sessionId,
-            route: 'session-exchange/process',
-            reason: classifyOrphanError(err),
-            error: String(persistErr),
-          },
-        });
+        // safeSend prevents the dispatch from masking the original LlmStreamError
+        // (`throw err` below). Without it, an Inngest hiccup here would propagate
+        // and shadow the underlying processExchange failure.
+        await safeSend(
+          () =>
+            inngest.send({
+              name: 'app/orphan.persist.failed',
+              data: {
+                profileId,
+                sessionId,
+                route: 'session-exchange/process',
+                reason: classifyOrphanError(err),
+                error: String(persistErr),
+              },
+            }),
+          'orphan_persist_failed_dispatch',
+          { profileId, sessionId, route: 'session-exchange/process' },
+        );
         captureException(persistErr, {
           profileId,
           extra: { phase: 'orphan_persist_failed' },
@@ -1971,16 +1971,21 @@ export async function streamMessage(
               },
             );
           } catch (persistErr) {
-            await inngest.send({
-              name: 'app/orphan.persist.failed',
-              data: {
-                profileId,
-                sessionId,
-                route: 'session-exchange/stream',
-                reason: classifyOrphanError(err),
-                error: String(persistErr),
-              },
-            });
+            await safeSend(
+              () =>
+                inngest.send({
+                  name: 'app/orphan.persist.failed',
+                  data: {
+                    profileId,
+                    sessionId,
+                    route: 'session-exchange/stream',
+                    reason: classifyOrphanError(err),
+                    error: String(persistErr),
+                  },
+                }),
+              'orphan_persist_failed_dispatch',
+              { profileId, sessionId, route: 'session-exchange/stream' },
+            );
             captureException(persistErr, {
               profileId,
               extra: { phase: 'orphan_persist_failed' },
@@ -2019,16 +2024,21 @@ export async function streamMessage(
               },
             );
           } catch (persistErr) {
-            await inngest.send({
-              name: 'app/orphan.persist.failed',
-              data: {
-                profileId,
-                sessionId,
-                route: 'session-exchange/fallback',
-                reason: 'llm_empty_or_unparseable',
-                error: String(persistErr),
-              },
-            });
+            await safeSend(
+              () =>
+                inngest.send({
+                  name: 'app/orphan.persist.failed',
+                  data: {
+                    profileId,
+                    sessionId,
+                    route: 'session-exchange/fallback',
+                    reason: 'llm_empty_or_unparseable',
+                    error: String(persistErr),
+                  },
+                }),
+              'orphan_persist_failed_dispatch',
+              { profileId, sessionId, route: 'session-exchange/fallback' },
+            );
             captureException(persistErr, {
               profileId,
               extra: { phase: 'orphan_persist_failed' },

@@ -223,10 +223,24 @@ check_emulator
 # ── Set up adb reverse for Metro access ──
 # The emulator can reach the host via 10.0.2.2, but adb reverse is more reliable
 # (avoids firewall issues, works with both 10.0.2.2 and localhost URLs).
-$ADB $DEVICE_FLAG reverse tcp:8081 tcp:8081 2>/dev/null || true
-$ADB $DEVICE_FLAG reverse tcp:8082 tcp:8082 2>/dev/null || true
+# Always reverse the two well-known ports (regular Metro 8081, bundle proxy
+# 8082) AND the port parsed from METRO_URL — otherwise running against a
+# non-default Metro (e.g. 8083 when 8081/8082 are taken by another branch's
+# dev server) fails with SocketTimeoutException + dev-launcher ANR on WHPX.
+METRO_PORT=$(echo "$METRO_URL" | sed -n 's#.*:\([0-9][0-9]*\)\(/.*\)\?$#\1#p')
+REVERSED_PORTS=""
+reverse_port() {
+  local port="$1"
+  [ -z "$port" ] && return
+  case " $REVERSED_PORTS " in *" $port "*) return ;; esac
+  REVERSED_PORTS="$REVERSED_PORTS $port"
+  $ADB $DEVICE_FLAG reverse tcp:"$port" tcp:"$port" 2>/dev/null || true
+}
+reverse_port 8081
+reverse_port 8082
+reverse_port "${METRO_PORT:-}"
 
-echo "[seed-and-run] Emulator OK. Ports forwarded. Timeouts: launcher=${LAUNCHER_TIMEOUT}s, bundle=${BUNDLE_TIMEOUT}s"
+echo "[seed-and-run] Emulator OK. Ports forwarded:${REVERSED_PORTS}. METRO_URL=${METRO_URL}. Timeouts: launcher=${LAUNCHER_TIMEOUT}s, bundle=${BUNDLE_TIMEOUT}s"
 
 # ── UI_MODE: switch system theme if requested ──
 if [ "${UI_MODE:-}" = "light" ]; then

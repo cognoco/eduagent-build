@@ -159,7 +159,12 @@ export default function QuizIndexScreen(): React.ReactElement {
     setRound(null);
     setPrefetchedRoundId(null);
     setCompletionResult(null);
-    router.push('/(app)/quiz/launch' as never);
+    // Pass activityType as route param so launch.tsx can start generation even
+    // if the context update hasn't propagated by first render (web timing gap).
+    router.push({
+      pathname: '/(app)/quiz/launch',
+      params: { activityType: 'vocabulary', subjectId },
+    } as never);
   };
   const handleBack = () => {
     if (isPracticeReturn) {
@@ -255,7 +260,10 @@ export default function QuizIndexScreen(): React.ReactElement {
               setRound(null);
               setPrefetchedRoundId(null);
               setCompletionResult(null);
-              router.push('/(app)/quiz/launch' as never);
+              router.push({
+                pathname: '/(app)/quiz/launch',
+                params: { activityType: 'capitals' },
+              } as never);
             }}
             testID="quiz-capitals"
           />
@@ -306,7 +314,10 @@ export default function QuizIndexScreen(): React.ReactElement {
               setRound(null);
               setPrefetchedRoundId(null);
               setCompletionResult(null);
-              router.push('/(app)/quiz/launch' as never);
+              router.push({
+                pathname: '/(app)/quiz/launch',
+                params: { activityType: 'guess_who' },
+              } as never);
             }}
             testID="quiz-guess-who"
           />

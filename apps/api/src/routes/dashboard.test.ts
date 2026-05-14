@@ -20,9 +20,16 @@ const familyLinksQuery = {
   findMany: jest.fn().mockResolvedValue([]),
 };
 
+const mockFindConsentState = jest.fn().mockResolvedValue(undefined);
+const consentStatesQuery = {
+  findFirst: (...args: unknown[]) => mockFindConsentState(...args),
+  findMany: jest.fn().mockResolvedValue([]),
+};
+
 mockDatabaseModule.db.query = new Proxy(mockDatabaseModule.db.query, {
   get(target, prop, receiver) {
     if (prop === 'familyLinks') return familyLinksQuery;
+    if (prop === 'consentStates') return consentStatesQuery;
     return Reflect.get(target, prop, receiver);
   },
 });
@@ -110,6 +117,10 @@ describe('dashboard routes', () => {
       parentProfileId: 'test-profile-id',
       childProfileId: PROFILE_ID,
     });
+    // Reset the mock queue (clearAllMocks does NOT clear mockResolvedValueOnce
+    // queues), then restore the default.
+    mockFindConsentState.mockReset();
+    mockFindConsentState.mockResolvedValue(undefined);
   });
 
   // -------------------------------------------------------------------------
@@ -121,7 +132,7 @@ describe('dashboard routes', () => {
       const res = await app.request(
         '/v1/dashboard',
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -137,7 +148,7 @@ describe('dashboard routes', () => {
         {
           headers: makeAuthHeaders(),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -160,7 +171,7 @@ describe('dashboard routes', () => {
       const res = await app.request(
         `/v1/dashboard/children/${PROFILE_ID}`,
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -173,10 +184,68 @@ describe('dashboard routes', () => {
       const res = await app.request(
         `/v1/dashboard/children/${PROFILE_ID}`,
         {},
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);
+    });
+
+    it('[BUG-62] returns 200 with redacted child for PENDING-consent profile (regression: route used to 403)', async () => {
+      // Regression: commit d1a1f27d5 (2026-05-07) added a route-entry call to
+      // assertChildDashboardDataVisible that threw ForbiddenError (→ 403)
+      // whenever the child's latest consent status was not CONSENTED. The
+      // mobile child-detail screen handles restricted consent by rendering a
+      // dedicated panel using the redacted child object that getChildDetail
+      // returns via redactDashboardChild — but the route-level 403 short-
+      // circuited the response, so parents landed on a generic "Try Again /
+      // Back to dashboard" error fallback instead of the consent-restricted
+      // panel.
+      //
+      // Fix: removed the route-entry assertion. assertParentAccess (the IDOR
+      // guard) still runs. Service-layer redaction zeroes metrics for non-
+      // CONSENTED status, so the response is safe.
+      mockFindConsentState.mockResolvedValueOnce({ status: 'PENDING' });
+      const redactedChild = {
+        profileId: PROFILE_ID,
+        displayName: 'Timmy',
+        consentStatus: 'PENDING',
+        respondedAt: null,
+        summary:
+          'Timmy: consent is pending. Learning metrics are hidden until consent is active.',
+        sessionsThisWeek: 0,
+        sessionsLastWeek: 0,
+        totalTimeThisWeek: 0,
+        totalTimeLastWeek: 0,
+        exchangesThisWeek: 0,
+        exchangesLastWeek: 0,
+        trend: 'stable' as const,
+        subjects: [],
+        guidedVsImmediateRatio: 0,
+        retentionTrend: 'stable' as const,
+        totalSessions: 0,
+        currentlyWorkingOn: [],
+        progress: null,
+        currentStreak: 0,
+        longestStreak: 0,
+        totalXp: 0,
+      };
+      mockGetChildDetail.mockResolvedValueOnce(redactedChild);
+
+      const res = await app.request(
+        `/v1/dashboard/children/${PROFILE_ID}`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.child).toMatchObject({
+        profileId: PROFILE_ID,
+        displayName: 'Timmy',
+        consentStatus: 'PENDING',
+        sessionsThisWeek: 0,
+        totalSessions: 0,
+      });
     });
   });
 
@@ -189,7 +258,7 @@ describe('dashboard routes', () => {
       const res = await app.request(
         `/v1/dashboard/children/${PROFILE_ID}/subjects/${SUBJECT_ID}`,
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -202,7 +271,7 @@ describe('dashboard routes', () => {
       const res = await app.request(
         `/v1/dashboard/children/${PROFILE_ID}/subjects/${SUBJECT_ID}`,
         {},
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);
@@ -218,7 +287,7 @@ describe('dashboard routes', () => {
       const res = await app.request(
         '/v1/dashboard/demo',
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -251,7 +320,7 @@ describe('dashboard routes', () => {
       const res = await app.request(
         '/v1/dashboard/demo',
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
       const body = await res.json();
 
@@ -277,7 +346,7 @@ describe('dashboard routes', () => {
       const res = await app.request(
         `/v1/dashboard/children/${PROFILE_ID}/weekly-reports`,
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -289,7 +358,7 @@ describe('dashboard routes', () => {
       const res = await app.request(
         `/v1/dashboard/children/${PROFILE_ID}/weekly-reports`,
         {},
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);
@@ -299,13 +368,13 @@ describe('dashboard routes', () => {
       await app.request(
         `/v1/dashboard/children/${PROFILE_ID}/weekly-reports`,
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(mockListWeeklyReports).toHaveBeenCalledWith(
         expect.anything(),
         'test-profile-id',
-        PROFILE_ID
+        PROFILE_ID,
       );
     });
   });
@@ -348,7 +417,7 @@ describe('dashboard routes', () => {
       const res = await app.request(
         `/v1/dashboard/children/${PROFILE_ID}/weekly-reports/${REPORT_ID}`,
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -361,7 +430,7 @@ describe('dashboard routes', () => {
       const res = await app.request(
         `/v1/dashboard/children/${PROFILE_ID}/weekly-reports/${REPORT_ID}`,
         {},
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);
@@ -379,7 +448,7 @@ describe('dashboard routes', () => {
       const res = await app.request(
         `/v1/dashboard/children/${PROFILE_ID}/weekly-reports/${REPORT_ID}/view`,
         { method: 'POST', headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -389,7 +458,7 @@ describe('dashboard routes', () => {
         expect.anything(),
         'test-profile-id',
         PROFILE_ID,
-        REPORT_ID
+        REPORT_ID,
       );
     });
 
@@ -397,7 +466,7 @@ describe('dashboard routes', () => {
       const res = await app.request(
         `/v1/dashboard/children/${PROFILE_ID}/weekly-reports/${REPORT_ID}/view`,
         { method: 'POST' },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);
@@ -422,7 +491,7 @@ describe('dashboard routes', () => {
       const res = await app.request(
         `/v1/dashboard/children/${PROFILE_ID}/memory`,
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(403);
@@ -433,7 +502,7 @@ describe('dashboard routes', () => {
       // would still 403 (because the mock returns undefined) but would silently
       // break the IDOR contract — this assertion catches that.
       const params = extractDrizzleParamValues(
-        mockFindFamilyLink.mock.calls[0]?.[0]
+        mockFindFamilyLink.mock.calls[0]?.[0],
       );
       expect(params).toContain('test-profile-id');
       expect(params).toContain(PROFILE_ID);
@@ -444,7 +513,7 @@ describe('dashboard routes', () => {
       const res = await app.request(
         `/v1/dashboard/children/${PROFILE_ID}/memory`,
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       // 200 or 404 (profile not found) — either way not 403
@@ -458,13 +527,13 @@ describe('dashboard routes', () => {
     // proving the route's error middleware translates it to a 403.
     it('[BREAK] GET /dashboard/children/:id returns 403 when service rejects unlinked parent', async () => {
       mockGetChildDetail.mockRejectedValueOnce(
-        new ForbiddenError('You do not have access to this child profile.')
+        new ForbiddenError('You do not have access to this child profile.'),
       );
 
       const res = await app.request(
         `/v1/dashboard/children/${PROFILE_ID}`,
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(403);
@@ -476,13 +545,13 @@ describe('dashboard routes', () => {
     // ForbiddenError must surface as 403, not 200 with mixed-tenant data.
     it('[BREAK] GET /dashboard/children/:id/subjects/:subjectId returns 403 when service rejects unlinked parent', async () => {
       mockGetChildSubjectTopics.mockRejectedValueOnce(
-        new ForbiddenError('You do not have access to this child profile.')
+        new ForbiddenError('You do not have access to this child profile.'),
       );
 
       const res = await app.request(
         `/v1/dashboard/children/${PROFILE_ID}/subjects/${SUBJECT_ID}`,
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(403);
@@ -493,13 +562,13 @@ describe('dashboard routes', () => {
     // service module. Both must surface ForbiddenError as 403.
     it('[BREAK] GET /dashboard/children/:id/weekly-reports returns 403 when service rejects unlinked parent', async () => {
       mockListWeeklyReports.mockRejectedValueOnce(
-        new ForbiddenError('You do not have access to this child profile.')
+        new ForbiddenError('You do not have access to this child profile.'),
       );
 
       const res = await app.request(
         `/v1/dashboard/children/${PROFILE_ID}/weekly-reports`,
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(403);
@@ -577,7 +646,7 @@ describe('dashboard routes', () => {
         const res = await app.request(
           fixture.path,
           { method: fixture.method ?? 'GET', headers: AUTH_HEADERS },
-          TEST_ENV
+          TEST_ENV,
         );
 
         expect(res.status).toBe(403);
@@ -597,7 +666,7 @@ describe('dashboard routes', () => {
       const res = await app.request(
         `/v1/dashboard/children/${PROFILE_ID}`,
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(403);
@@ -619,7 +688,7 @@ describe('dashboard routes', () => {
 
     it('[BREAK] GET /dashboard/children/:id/sessions/:sessionId — 404 has { code: NOT_FOUND, message }', async () => {
       const sessionsModule = jest.requireMock(
-        '../services/dashboard'
+        '../services/dashboard',
       ) as Record<string, jest.Mock>;
       sessionsModule.getChildSessionDetail = jest
         .fn()
@@ -628,7 +697,7 @@ describe('dashboard routes', () => {
       const res = await app.request(
         `/v1/dashboard/children/${PROFILE_ID}/sessions/${SESSION_ID}`,
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(404);
@@ -642,7 +711,7 @@ describe('dashboard routes', () => {
 
     it('[BREAK] GET /dashboard/children/:id/reports/:reportId — 404 has { code: NOT_FOUND, message }', async () => {
       const dashboardModule = jest.requireMock(
-        '../services/dashboard'
+        '../services/dashboard',
       ) as Record<string, jest.Mock>;
       dashboardModule.getChildReportDetail = jest
         .fn()
@@ -651,7 +720,7 @@ describe('dashboard routes', () => {
       const res = await app.request(
         `/v1/dashboard/children/${PROFILE_ID}/reports/${REPORT_ID}`,
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(404);
@@ -669,7 +738,7 @@ describe('dashboard routes', () => {
       const res = await app.request(
         `/v1/dashboard/children/${PROFILE_ID}/weekly-reports/${REPORT_ID}`,
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(404);

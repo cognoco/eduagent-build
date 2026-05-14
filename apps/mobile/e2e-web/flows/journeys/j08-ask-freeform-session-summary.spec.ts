@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
 import { authStateDir } from '../../helpers/runtime';
+import { pressableClick } from '../../helpers/pressable';
 
 test.use({ storageState: path.join(authStateDir, 'solo-learner.json') });
 
@@ -13,7 +14,7 @@ test('J-08 learner → Ask → freeform chat → end session → summary → hom
   });
 
   // Ask intent → session screen with chat input
-  await page.getByTestId('intent-ask').click();
+  await pressableClick(page.getByTestId('home-ask-anything'));
   await expect(page.getByTestId('chat-input')).toBeVisible({ timeout: 30_000 });
 
   // Send a freeform question — real API classifies, creates session, streams
@@ -50,7 +51,7 @@ test('J-08 learner → Ask → freeform chat → end session → summary → hom
   await page
     .getByTestId('summary-input')
     .fill(
-      'I learned that pressure builds up under the ground before the eruption.'
+      'I learned that pressure builds up under the ground before the eruption.',
     );
   await page.getByTestId('submit-summary-button').click();
 

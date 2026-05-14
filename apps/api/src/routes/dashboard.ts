@@ -91,8 +91,16 @@ export const dashboardRoutes = new Hono<DashboardRouteEnv>()
     // any future refactor (or a service that forgets the check) cannot
     // become an IDOR. 404 vs 403 are no longer indistinguishable.
     await assertParentAccess(db, parentProfileId, childProfileId);
-    await assertChildDashboardDataVisible(db, childProfileId);
 
+    // [BUG-62] No consent-visibility gate here. The mobile child-detail screen
+    // renders a dedicated consent-restricted panel for PENDING / REQUESTED /
+    // WITHDRAWN states using the redacted child object that getChildDetail
+    // returns via redactDashboardChild (zeroed metrics, restricted summary,
+    // displayName preserved). A 403 at the route entry breaks that path and
+    // the parent gets a generic "Try Again / Back to dashboard" error fallback.
+    // Sub-routes (inventory, progress-history, sessions, memory, reports) keep
+    // their own assertChildDashboardDataVisible guards because they don't have
+    // a "restricted view" — they should not return data at all.
     const child = await getChildDetail(db, parentProfileId, childProfileId);
     return c.json(childDetailResponseSchema.parse({ child }));
   })

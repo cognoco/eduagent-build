@@ -282,6 +282,55 @@ else
 fi
 
 echo ""
+echo "─── METRO_URL → PREFLIGHT_METRO_PORT derivation ──────────────────────"
+# CASE: when METRO_URL is set to a non-default port (e.g. running Metro on 8083
+# because 8081/8082 are held by another branch's dev server), the preflight
+# must check the SAME port the harness will hit — otherwise check_metro_reachable
+# fails against 8081 and the regression suite stops before any test runs.
+# This is the exact failure that blocked 166+ flow-review rows on 2026-05-14
+# (SocketTimeoutException + dev-launcher ANR was the harness-side symptom; the
+# preflight-side symptom of the same root cause is "Metro bundler not reachable
+# at 127.0.0.1:8081" even though Metro is happily running on 8083).
+rc=0
+(
+  unset PREFLIGHT_METRO_PORT
+  export METRO_URL="http://10.0.2.2:8083"
+  # Re-source to re-evaluate the tunables block.
+  source "$SCRIPT_DIR/e2e-preflight.sh"
+  [ "$PREFLIGHT_METRO_PORT" = "8083" ] || exit 1
+) || rc=$?
+if [ $rc -eq 0 ]; then
+  _tpass "derives PREFLIGHT_METRO_PORT=8083 from METRO_URL=http://10.0.2.2:8083"
+else
+  _tfail "METRO_URL=http://10.0.2.2:8083 did NOT derive PREFLIGHT_METRO_PORT=8083"
+fi
+
+rc=0
+(
+  unset PREFLIGHT_METRO_PORT METRO_URL
+  source "$SCRIPT_DIR/e2e-preflight.sh"
+  [ "$PREFLIGHT_METRO_PORT" = "8081" ] || exit 1
+) || rc=$?
+if [ $rc -eq 0 ]; then
+  _tpass "defaults PREFLIGHT_METRO_PORT=8081 when METRO_URL unset"
+else
+  _tfail "PREFLIGHT_METRO_PORT did not default to 8081 when METRO_URL unset"
+fi
+
+rc=0
+(
+  export PREFLIGHT_METRO_PORT=9000
+  export METRO_URL="http://10.0.2.2:8083"
+  source "$SCRIPT_DIR/e2e-preflight.sh"
+  [ "$PREFLIGHT_METRO_PORT" = "9000" ] || exit 1
+) || rc=$?
+if [ $rc -eq 0 ]; then
+  _tpass "explicit PREFLIGHT_METRO_PORT overrides METRO_URL derivation"
+else
+  _tfail "explicit PREFLIGHT_METRO_PORT=9000 was overridden by METRO_URL"
+fi
+
+echo ""
 echo "─── E2E_PREFLIGHT_SKIP honored ────────────────────────────────────────"
 # CASE 11: Escape hatch works.
 E2E_PREFLIGHT_SKIP=1 run_preflight >/tmp/pf_skip_stdout.txt 2>&1
