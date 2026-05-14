@@ -2,14 +2,13 @@
 // Language Detection — Tests [4A.3]
 // ---------------------------------------------------------------------------
 
-// EXTERNAL boundary mock — routeAndCall is the LLM provider HTTP call.
-// requireActual spreads all real exports; only routeAndCall is replaced with
-// a jest.fn() so the real module's other helpers remain intact.
-const mockRouteAndCall = jest.fn();
-jest.mock('./llm', () => ({
-  ...(jest.requireActual('./llm') as Record<string, unknown>),
-  routeAndCall: (...args: unknown[]) => mockRouteAndCall(...args),
-}));
+jest.mock('./llm' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual('./llm') as typeof import('./llm');
+  return {
+    ...actual,
+    routeAndCall: jest.fn(),
+  };
+});
 
 import { detectLanguageSubject } from './language-detect';
 
