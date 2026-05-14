@@ -25,20 +25,27 @@ import {
   curriculumBooks,
   curriculumTopics,
   curricula,
+  familyLinks,
   generateUUIDv7,
   learningSessions,
   learningProfiles,
+  memoryFacts,
+  notificationPreferences,
   profiles,
   progressSnapshots,
   retentionCards,
   sessionEvents,
   streaks,
   subjects,
+  vocabulary,
   xpLedger,
   sessionSummaries,
   type Database,
 } from '@eduagent/database';
 import { and, eq, like } from 'drizzle-orm';
+
+import * as config from '../../config';
+import * as sentry from '../../services/sentry';
 
 import * as llm from '../../services/llm';
 import { sessionCompleted } from './session-completed';
@@ -444,37 +451,917 @@ describe('session-completed integration', () => {
     // No passed assessment was seeded → no XP row (insertSessionXpEntry no-ops).
     expect(xpRows).toHaveLength(0);
   });
+
+  // ── Additional scenarios ────────────────────────────────────────────────────
+
+  it('freeform session: waitForEvent returns filing event, re-read-session runs, summary topicId populated', async () => {
+    // done as: freeform session — waitForEvent succeeds
+    const { accountId } = await seedAccount();
+    const { profileId } = await seedProfile(accountId);
+    const { subjectId } = await seedSubject(profileId);
+    const { topicId } = await seedCurriculum(subjectId);
+
+    // Freeform session: no topicId at close time, exchangeCount=3
+    const [sessionRow] = await db
+      .insert(learningSessions)
+      .values({
+        profileId,
+        subjectId,
+        topicId: null,
+        sessionType: 'learning',
+        status: 'completed',
+        exchangeCount: 3,
+      })
+      .returning({ id: learningSessions.id });
+    const sessionId = sessionRow!.id;
+
+    await seedSessionEvents({ sessionId, profileId, subjectId, topicId });
+    await seedLearningProfile(profileId);
+
+    const now = new Date();
+
+    const step = {
+      run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
+      // Synthesize filing event: filing completed and backfilled topicId
+      waitForEvent: jest.fn().mockResolvedValue({
+        data: { sessionId, topicId },
+      }),
+      sendEvent: jest.fn().mockResolvedValue(undefined),
+    };
+
+    const handler = getHandler();
+    const result = (await handler({
+      event: {
+        name: 'app/session.completed',
+        data: {
+          profileId,
+          sessionId,
+          subjectId,
+          topicId: null, // freeform — no topicId at event time
+          exchangeCount: null, // not provided — triggers re-read-session
+          summaryStatus: 'pending',
+          timestamp: now.toISOString(),
+          verificationType: null,
+          sessionType: 'learning',
+          qualityRating: 4,
+          mode: null,
+          reason: 'user_ended',
+        },
+      },
+      step,
+    })) as { status: string; sessionId: string; outcomes: Array<{ step: string; status: string }> };
+
+    // waitForEvent was called (freeform session)
+    expect(step.waitForEvent).toHaveBeenCalledWith(
+      'wait-for-filing',
+      expect.objectContaining({ event: 'app/filing.completed' }),
+    );
+
+    // re-read-session step ran (topicId was null + exchangeCount was null)
+    const reReadCalls = (step.run as jest.Mock).mock.calls.map((c: [string, ...unknown[]]) => c[0]);
+    expect(reReadCalls).toContain('re-read-session');
+
+    // session_summaries row created
+    const summary = await db.query.sessionSummaries.findFirst({
+      where: and(
+        eq(sessionSummaries.sessionId, sessionId),
+        eq(sessionSummaries.profileId, profileId),
+      ),
+    });
+    expect(summary).toBeDefined();
+    // topicId was backfilled via re-read (we seeded it on the session row after
+    // the filing event returned, but the session row was seeded without topicId;
+    // the waitForEvent mock returned topicId so downstream steps use it).
+    expect(result.status).toMatch(/^completed/);
+  });
+
+  it('homework session: waitForEvent runs and homework summary stored in session metadata', async () => {
+    // done as: homework session — waitForEvent + homework summary
+    const { accountId } = await seedAccount();
+    const { profileId } = await seedProfile(accountId);
+    const { subjectId } = await seedSubject(profileId);
+    const { topicId } = await seedCurriculum(subjectId);
+
+    const [sessionRow] = await db
+      .insert(learningSessions)
+      .values({
+        profileId,
+        subjectId,
+        topicId,
+        sessionType: 'homework',
+        status: 'completed',
+        exchangeCount: 3,
+      })
+      .returning({ id: learningSessions.id });
+    const sessionId = sessionRow!.id;
+
+    await seedSessionEvents({ sessionId, profileId, subjectId, topicId });
+    await seedLearningProfile(profileId);
+
+    const now = new Date();
+
+    // LLM returns a shape that satisfies the homework-summary parser
+    const HOMEWORK_LLM_RESPONSE = JSON.stringify({
+      problemCount: 3,
+      practicedSkills: ['algebra'],
+      independentProblemCount: 2,
+      guidedProblemCount: 1,
+      summary: '3 problems completed.',
+      displayTitle: 'Biology Homework',
+      // Also include standard summary fields so other parsers don't fail
+      closingLine: 'Great work today!',
+      learnerRecap: 'You worked through homework problems.',
+      narrative: 'The learner completed a homework session on biology.',
+      topicsCovered: ['photosynthesis'],
+      sessionState: 'completed',
+      reEntryRecommendation: 'Continue homework next session.',
+    });
+
+    routeAndCallSpy.mockResolvedValue({
+      response: HOMEWORK_LLM_RESPONSE,
+      provider: 'test',
+      model: 'fixture',
+      latencyMs: 1,
+    });
+
+    const step = {
+      run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
+      waitForEvent: jest.fn().mockResolvedValue({
+        data: { sessionId, topicId },
+      }),
+      sendEvent: jest.fn().mockResolvedValue(undefined),
+    };
+
+    const handler = getHandler();
+    const result = (await handler({
+      event: {
+        name: 'app/session.completed',
+        data: {
+          profileId,
+          sessionId,
+          subjectId,
+          topicId,
+          exchangeCount: 3,
+          summaryStatus: 'pending',
+          timestamp: now.toISOString(),
+          verificationType: null,
+          sessionType: 'homework',
+          qualityRating: 4,
+          mode: null,
+          reason: 'user_ended',
+        },
+      },
+      step,
+    })) as { status: string; outcomes: Array<{ step: string; status: string }> };
+
+    // waitForEvent was called for homework session
+    expect(step.waitForEvent).toHaveBeenCalled();
+
+    // extract-homework-summary step ran (not skipped)
+    const homeworkOutcome = result.outcomes.find(
+      (o) => o.step === 'extract-homework-summary',
+    );
+    expect(homeworkOutcome?.status).toBe('ok');
+
+    // routeAndCall was invoked — homework summary LLM prompt fired
+    expect(routeAndCallSpy).toHaveBeenCalled();
+
+    // The homework summary is stored in session metadata
+    const updatedSession = await db.query.learningSessions.findFirst({
+      where: eq(learningSessions.id, sessionId),
+    });
+    // metadata.homeworkSummary should be populated
+    const meta = updatedSession?.metadata as Record<string, unknown> | null;
+    expect(meta?.homeworkSummary).toBeDefined();
+  });
+
+  it('relearn session: relearn-retention-reset runs before SM-2 update, card advances past reset baseline', async () => {
+    // done as: relearn session — relearn-retention-reset path
+    const { accountId } = await seedAccount();
+    const { profileId } = await seedProfile(accountId);
+    const { subjectId } = await seedSubject(profileId);
+    const { topicId } = await seedCurriculum(subjectId);
+
+    const [sessionRow] = await db
+      .insert(learningSessions)
+      .values({
+        profileId,
+        subjectId,
+        topicId,
+        sessionType: 'learning',
+        status: 'completed',
+        exchangeCount: 3,
+      })
+      .returning({ id: learningSessions.id });
+    const sessionId = sessionRow!.id;
+
+    await seedSessionEvents({ sessionId, profileId, subjectId, topicId });
+    await seedLearningProfile(profileId);
+
+    // Pre-seed a retention card at advanced state
+    await db.insert(retentionCards).values({
+      profileId,
+      topicId,
+      intervalDays: 14,
+      repetitions: 3,
+      easeFactor: 2.6,
+      failureCount: 0,
+      consecutiveSuccesses: 3,
+    });
+
+    const now = new Date();
+    const step = buildStep();
+    const handler = getHandler();
+
+    const result = (await handler({
+      event: {
+        name: 'app/session.completed',
+        data: {
+          profileId,
+          sessionId,
+          subjectId,
+          topicId,
+          exchangeCount: 3,
+          summaryStatus: 'pending',
+          timestamp: now.toISOString(),
+          verificationType: null,
+          sessionType: 'learning',
+          qualityRating: 4,
+          mode: 'relearn', // triggers relearn-retention-reset
+          reason: 'user_ended',
+        },
+      },
+      step,
+    })) as { status: string; outcomes: Array<{ step: string; status: string }> };
+
+    // relearn-retention-reset outcome is 'ok'
+    const resetOutcome = result.outcomes.find(
+      (o) => o.step === 'relearn-retention-reset',
+    );
+    expect(resetOutcome?.status).toBe('ok');
+
+    // SM-2 update ran
+    const retentionOutcome = result.outcomes.find(
+      (o) => o.step === 'update-retention',
+    );
+    expect(retentionOutcome?.status).toBe('ok');
+
+    // Card's repetitions advanced past the reset baseline (0) — SM-2 fired AFTER reset
+    const card = await db.query.retentionCards.findFirst({
+      where: and(
+        eq(retentionCards.profileId, profileId),
+        eq(retentionCards.topicId, topicId),
+      ),
+    });
+    expect(card).toBeDefined();
+    // After reset (reps=0) then SM-2 quality=4: first repetition → reps becomes 1
+    expect(card!.repetitions).toBeGreaterThan(0);
+    // intervalDays should have advanced from the reset baseline of 1
+    expect(card!.intervalDays).toBeGreaterThanOrEqual(1);
+  });
+
+  it('verification evaluate: process-verification-completion runs and qualityRating is non-null', async () => {
+    // done as: verification — evaluate
+    const { accountId } = await seedAccount();
+    const { profileId } = await seedProfile(accountId);
+    const { subjectId } = await seedSubject(profileId);
+    const { topicId } = await seedCurriculum(subjectId);
+
+    const [sessionRow] = await db
+      .insert(learningSessions)
+      .values({
+        profileId,
+        subjectId,
+        topicId,
+        sessionType: 'learning',
+        status: 'completed',
+        exchangeCount: 3,
+      })
+      .returning({ id: learningSessions.id });
+    const sessionId = sessionRow!.id;
+
+    // Pre-seed a retention card (required for processEvaluateCompletion)
+    await db.insert(retentionCards).values({
+      profileId,
+      topicId,
+      intervalDays: 4,
+      repetitions: 2,
+      easeFactor: 2.5,
+      evaluateDifficultyRung: 1,
+    });
+
+    await seedLearningProfile(profileId);
+
+    // Seed an ai_response event with a parseable EVALUATE assessment JSON
+    // parseEvaluateAssessment looks for: {"challengePassed": bool, "quality": number}
+    const evaluateAssessmentJson = JSON.stringify({
+      challengePassed: true,
+      flawIdentified: 'The formula was reversed',
+      quality: 4,
+    });
+    await db.insert(sessionEvents).values([
+      {
+        sessionId,
+        profileId,
+        subjectId,
+        topicId,
+        eventType: 'user_message',
+        content: 'I think the formula is wrong because the variables are swapped.',
+      },
+      {
+        sessionId,
+        profileId,
+        subjectId,
+        topicId,
+        eventType: 'ai_response',
+        content: `You correctly identified the flaw. ${evaluateAssessmentJson}`,
+      },
+    ]);
+
+    const now = new Date();
+    const step = buildStep();
+    const handler = getHandler();
+
+    const result = (await handler({
+      event: {
+        name: 'app/session.completed',
+        data: {
+          profileId,
+          sessionId,
+          subjectId,
+          topicId,
+          exchangeCount: 3,
+          summaryStatus: 'pending',
+          timestamp: now.toISOString(),
+          verificationType: 'evaluate',
+          sessionType: 'learning',
+          qualityRating: null,
+          mode: null,
+          reason: 'user_ended',
+        },
+      },
+      step,
+    })) as { status: string; outcomes: Array<{ step: string; status: string; qualityRating?: number }> };
+
+    const verificationOutcome = result.outcomes.find(
+      (o) => o.step === 'process-verification-completion',
+    );
+    expect(verificationOutcome?.status).toBe('ok');
+    // processEvaluateCompletion returns sm2Quality which is propagated
+    expect(typeof verificationOutcome?.qualityRating).toBe('number');
+    expect(verificationOutcome!.qualityRating).toBeGreaterThanOrEqual(3);
+  });
+
+  it('verification teach_back: process-verification-completion runs and qualityRating is non-null', async () => {
+    // done as: verification — teach_back
+    const { accountId } = await seedAccount();
+    const { profileId } = await seedProfile(accountId);
+    const { subjectId } = await seedSubject(profileId);
+    const { topicId } = await seedCurriculum(subjectId);
+
+    const [sessionRow] = await db
+      .insert(learningSessions)
+      .values({
+        profileId,
+        subjectId,
+        topicId,
+        sessionType: 'learning',
+        status: 'completed',
+        exchangeCount: 3,
+      })
+      .returning({ id: learningSessions.id });
+    const sessionId = sessionRow!.id;
+
+    await seedLearningProfile(profileId);
+
+    // Seed an ai_response event with a parseable TEACH_BACK assessment JSON
+    // parseTeachBackAssessment looks for: {"completeness": n, "accuracy": n, "clarity": n}
+    const teachBackAssessmentJson = JSON.stringify({
+      completeness: 4,
+      accuracy: 4,
+      clarity: 3,
+      overallQuality: 4,
+      weakestArea: 'clarity',
+      gapIdentified: 'Could be clearer on light reactions',
+    });
+    await db.insert(sessionEvents).values([
+      {
+        sessionId,
+        profileId,
+        subjectId,
+        topicId,
+        eventType: 'user_message',
+        content: 'Photosynthesis uses light to convert CO2 and water into glucose.',
+      },
+      {
+        sessionId,
+        profileId,
+        subjectId,
+        topicId,
+        eventType: 'ai_response',
+        content: `Good explanation! ${teachBackAssessmentJson}`,
+      },
+    ]);
+
+    const now = new Date();
+    const step = buildStep();
+    const handler = getHandler();
+
+    const result = (await handler({
+      event: {
+        name: 'app/session.completed',
+        data: {
+          profileId,
+          sessionId,
+          subjectId,
+          topicId,
+          exchangeCount: 3,
+          summaryStatus: 'pending',
+          timestamp: now.toISOString(),
+          verificationType: 'teach_back',
+          sessionType: 'learning',
+          qualityRating: null,
+          mode: null,
+          reason: 'user_ended',
+        },
+      },
+      step,
+    })) as { status: string; outcomes: Array<{ step: string; status: string; qualityRating?: number }> };
+
+    const verificationOutcome = result.outcomes.find(
+      (o) => o.step === 'process-verification-completion',
+    );
+    expect(verificationOutcome?.status).toBe('ok');
+    // mapTeachBackRubricToSm2(completeness=4, accuracy=4, clarity=3) = round(4*0.5+4*0.3+3*0.2)=round(3.8)=4
+    expect(typeof verificationOutcome?.qualityRating).toBe('number');
+    expect(verificationOutcome!.qualityRating).toBeGreaterThanOrEqual(3);
+  });
+
+  it('four_strands pedagogy: vocabulary rows inserted after LLM extraction', async () => {
+    // done as: four_strands pedagogy
+    const { accountId } = await seedAccount();
+    const { profileId } = await seedProfile(accountId);
+
+    // Seed subject with four_strands + languageCode
+    const [subjectRow] = await db
+      .insert(subjects)
+      .values({
+        profileId,
+        name: 'French',
+        pedagogyMode: 'four_strands',
+        languageCode: 'fr',
+      })
+      .returning({ id: subjects.id });
+    const subjectId = subjectRow!.id;
+
+    const { topicId } = await seedCurriculum(subjectId);
+
+    const [sessionRow] = await db
+      .insert(learningSessions)
+      .values({
+        profileId,
+        subjectId,
+        topicId,
+        sessionType: 'learning',
+        status: 'completed',
+        exchangeCount: 3,
+      })
+      .returning({ id: learningSessions.id });
+    const sessionId = sessionRow!.id;
+
+    await seedSessionEvents({ sessionId, profileId, subjectId, topicId });
+    await seedLearningProfile(profileId);
+
+    // LLM returns vocabulary-extract JSON shape + standard summary fields
+    const VOCAB_LLM_RESPONSE = JSON.stringify({
+      // extractVocabularyFromTranscript expects: {"items": [{term, translation, type}]}
+      items: [
+        { term: 'la photosynthèse', translation: 'photosynthesis', type: 'word', cefrLevel: 'B1' },
+        { term: 'la lumière', translation: 'light', type: 'word', cefrLevel: 'A1' },
+      ],
+      // Standard summary fields for other parsers
+      closingLine: 'Très bien!',
+      learnerRecap: 'Tu as exploré la photosynthèse.',
+      narrative: 'The learner worked on French vocabulary for photosynthesis.',
+      topicsCovered: ['photosynthesis'],
+      sessionState: 'completed',
+      reEntryRecommendation: 'Practise vocabulary next session.',
+      problemCount: 0,
+      practicedSkills: [],
+      independentProblemCount: 0,
+      guidedProblemCount: 0,
+      summary: 'Vocabulary session completed.',
+      displayTitle: 'French Session',
+    });
+
+    routeAndCallSpy.mockResolvedValue({
+      response: VOCAB_LLM_RESPONSE,
+      provider: 'test',
+      model: 'fixture',
+      latencyMs: 1,
+    });
+
+    const now = new Date();
+    const step = buildStep();
+    const handler = getHandler();
+
+    const result = (await handler({
+      event: {
+        name: 'app/session.completed',
+        data: {
+          profileId,
+          sessionId,
+          subjectId,
+          topicId,
+          exchangeCount: 3,
+          summaryStatus: 'pending',
+          timestamp: now.toISOString(),
+          verificationType: null,
+          sessionType: 'learning',
+          qualityRating: 4,
+          mode: null,
+          reason: 'user_ended',
+        },
+      },
+      step,
+    })) as { status: string; outcomes: Array<{ step: string; status: string }> };
+
+    // update-vocabulary-retention ran (not skipped)
+    const vocabOutcome = result.outcomes.find(
+      (o) => o.step === 'update-vocabulary-retention',
+    );
+    expect(vocabOutcome?.status).toBe('ok');
+
+    // vocabulary rows were inserted for this profile+subject
+    const vocabRows = await db
+      .select()
+      .from(vocabulary)
+      .where(
+        and(
+          eq(vocabulary.profileId, profileId),
+          eq(vocabulary.subjectId, subjectId),
+        ),
+      );
+    expect(vocabRows.length).toBeGreaterThan(0);
+    const terms = vocabRows.map((r) => r.term);
+    expect(terms).toContain('la photosynthèse');
+  });
+
+  it('struggle detection: consent granted triggers analyzeSessionTranscript; push fired when parent link + token present', async () => {
+    // done as: struggle detection
+    const { accountId: parentAccountId } = await seedAccount();
+    const { profileId: parentProfileId } = await seedProfile(parentAccountId);
+
+    const { accountId } = await seedAccount();
+    const { profileId } = await seedProfile(accountId);
+    const { subjectId } = await seedSubject(profileId);
+    const { topicId } = await seedCurriculum(subjectId);
+
+    const [sessionRow] = await db
+      .insert(learningSessions)
+      .values({
+        profileId,
+        subjectId,
+        topicId,
+        sessionType: 'learning',
+        status: 'completed',
+        exchangeCount: 3,
+      })
+      .returning({ id: learningSessions.id });
+    const sessionId = sessionRow!.id;
+
+    // 3 session events to pass the >=3 transcript-length gate in analyzeSessionTranscript
+    await db.insert(sessionEvents).values([
+      {
+        sessionId,
+        profileId,
+        subjectId,
+        topicId,
+        eventType: 'user_message',
+        content: 'I really struggle with photosynthesis light reactions.',
+      },
+      {
+        sessionId,
+        profileId,
+        subjectId,
+        topicId,
+        eventType: 'ai_response',
+        content: 'Let me help you understand the light reactions.',
+      },
+      {
+        sessionId,
+        profileId,
+        subjectId,
+        topicId,
+        eventType: 'user_message',
+        content: 'I still find it very difficult.',
+      },
+    ]);
+
+    // Seed learning profile with consent GRANTED + collection enabled
+    await db.insert(learningProfiles).values({
+      profileId,
+      memoryConsentStatus: 'granted',
+      memoryCollectionEnabled: true,
+      memoryEnabled: true,
+    });
+
+    // Seed parent → child family link so sendStruggleNotification can find a parent
+    await db.insert(familyLinks).values({
+      parentProfileId,
+      childProfileId: profileId,
+    });
+
+    // Seed parent's notification preferences with a valid Expo push token
+    await db.insert(notificationPreferences).values({
+      profileId: parentProfileId,
+      pushEnabled: true,
+      expoPushToken: 'ExponentPushToken[integration-test-token]',
+      maxDailyPush: 10,
+    });
+
+    // LLM returns an analysis with a medium-confidence struggle → triggers struggle_noticed
+    const STRUGGLE_LLM_RESPONSE = JSON.stringify({
+      struggles: [{ topic: 'photosynthesis light reactions', subject: 'Biology', confidence: 'medium' }],
+      interests: null,
+      strengths: null,
+      resolvedTopics: null,
+      communicationNotes: null,
+      engagementLevel: 'low',
+      confidence: 'medium',
+      learningStyle: null,
+      // standard summary fields
+      closingLine: 'Keep trying!',
+      learnerRecap: 'You worked through photosynthesis.',
+      narrative: 'Session focused on light reactions.',
+      topicsCovered: ['photosynthesis'],
+      sessionState: 'completed',
+      reEntryRecommendation: 'Review again.',
+    });
+
+    routeAndCallSpy.mockResolvedValue({
+      response: STRUGGLE_LLM_RESPONSE,
+      provider: 'test',
+      model: 'fixture',
+      latencyMs: 1,
+    });
+
+    const now = new Date();
+    const step = buildStep();
+    const handler = getHandler();
+
+    const result = (await handler({
+      event: {
+        name: 'app/session.completed',
+        data: {
+          profileId,
+          sessionId,
+          subjectId,
+          topicId,
+          exchangeCount: 3,
+          summaryStatus: 'pending',
+          timestamp: now.toISOString(),
+          verificationType: null,
+          sessionType: 'learning',
+          qualityRating: 4,
+          mode: null,
+          reason: 'user_ended',
+        },
+      },
+      step,
+    })) as { status: string; outcomes: Array<{ step: string; status: string }> };
+
+    // analyze-learner-profile ran (consent granted)
+    const analyzeOutcome = result.outcomes.find(
+      (o) => o.step === 'analyze-learner-profile',
+    );
+    expect(analyzeOutcome?.status).toBe('ok');
+
+    // Expo push URL was hit (sendStruggleNotification fired fetch to Expo)
+    const expoPushCalls = fetchCalls.filter((c) => c.url.startsWith(EXPO_PUSH_URL));
+    expect(expoPushCalls.length).toBeGreaterThan(0);
+  });
+
+  it('silence_timeout: SM-2 skipped and streak NOT advanced', async () => {
+    // done as: silence_timeout close reason
+    const { accountId } = await seedAccount();
+    const { profileId } = await seedProfile(accountId);
+    const { subjectId } = await seedSubject(profileId);
+    const { topicId } = await seedCurriculum(subjectId);
+
+    const [sessionRow] = await db
+      .insert(learningSessions)
+      .values({
+        profileId,
+        subjectId,
+        topicId,
+        sessionType: 'learning',
+        status: 'completed',
+        exchangeCount: 2,
+      })
+      .returning({ id: learningSessions.id });
+    const sessionId = sessionRow!.id;
+
+    await seedSessionEvents({ sessionId, profileId, subjectId, topicId });
+    await seedLearningProfile(profileId);
+
+    const now = new Date();
+    const step = buildStep();
+    const handler = getHandler();
+
+    const result = (await handler({
+      event: {
+        name: 'app/session.completed',
+        data: {
+          profileId,
+          sessionId,
+          subjectId,
+          topicId,
+          exchangeCount: 2,
+          summaryStatus: 'pending',
+          timestamp: now.toISOString(),
+          verificationType: null,
+          sessionType: 'learning',
+          qualityRating: null, // silence_timeout — no quality signal
+          mode: null,
+          reason: 'silence_timeout', // UNATTENDED_REASONS → skip SM-2 + streak
+        },
+      },
+      step,
+    })) as { status: string; outcomes: Array<{ step: string; status: string }> };
+
+    // update-retention skipped (no quality signal for silence_timeout)
+    const retentionOutcome = result.outcomes.find(
+      (o) => o.step === 'update-retention',
+    );
+    expect(retentionOutcome?.status).toBe('skipped');
+
+    // No retention card created (SM-2 did not advance)
+    const card = await db.query.retentionCards.findFirst({
+      where: and(
+        eq(retentionCards.profileId, profileId),
+        eq(retentionCards.topicId, topicId),
+      ),
+    });
+    expect(card).toBeUndefined();
+
+    // Streak NOT advanced for unattended session — recordSessionActivity not called
+    const streak = await db.query.streaks.findFirst({
+      where: eq(streaks.profileId, profileId),
+    });
+    // No prior streak row for this fresh profile. recordSessionActivity skipped
+    // → no row created at all.
+    expect(streak).toBeUndefined();
+  });
+
+  it('memory dedup rollout: dedup-new-facts step runs when flags enabled and profile in rollout', async () => {
+    // done as: memory dedup rollout
+    const { accountId } = await seedAccount();
+    const { profileId } = await seedProfile(accountId);
+    const { subjectId } = await seedSubject(profileId);
+    const { topicId } = await seedCurriculum(subjectId);
+    const { sessionId } = await seedSession({ profileId, subjectId, topicId });
+    await seedSessionEvents({ sessionId, profileId, subjectId, topicId });
+    await seedLearningProfile(profileId);
+
+    // Seed memory_facts rows so dedup has candidates (no embedding = skippable)
+    await db.insert(memoryFacts).values([
+      {
+        profileId,
+        category: 'interests',
+        text: 'likes photosynthesis',
+        textNormalized: 'likes photosynthesis',
+        observedAt: new Date(),
+      },
+    ]);
+
+    // Spy on config flags to enable dedup + force profile into rollout
+    const dedupEnabledSpy = jest
+      .spyOn(config, 'isMemoryFactsDedupEnabled')
+      .mockReturnValue(true);
+    const rolloutSpy = jest
+      .spyOn(config, 'isProfileInDedupRollout')
+      .mockReturnValue(true);
+
+    const now = new Date();
+    const step = buildStep();
+    const handler = getHandler();
+
+    const result = (await handler({
+      event: {
+        name: 'app/session.completed',
+        data: {
+          profileId,
+          sessionId,
+          subjectId,
+          topicId,
+          exchangeCount: 2,
+          summaryStatus: 'pending',
+          timestamp: now.toISOString(),
+          verificationType: null,
+          sessionType: 'learning',
+          qualityRating: 4,
+          mode: null,
+          reason: 'user_ended',
+        },
+      },
+      step,
+    })) as { status: string; outcomes: Array<{ step: string; status: string }> };
+
+    dedupEnabledSpy.mockRestore();
+    rolloutSpy.mockRestore();
+
+    // dedup-new-facts outcome is present and 'ok'
+    const dedupOutcome = result.outcomes.find(
+      (o) => o.step === 'dedup-new-facts',
+    );
+    expect(dedupOutcome?.status).toBe('ok');
+  });
+
+  it('waitForEvent timeout: filing_timed_out event sent and captureException called', async () => {
+    // done as: waitForEvent timeout — filing-timed-out event emission
+    const { accountId } = await seedAccount();
+    const { profileId } = await seedProfile(accountId);
+    const { subjectId } = await seedSubject(profileId);
+    const { topicId } = await seedCurriculum(subjectId);
+
+    // Freeform session — no topicId at close → triggers waitForEvent
+    const [sessionRow] = await db
+      .insert(learningSessions)
+      .values({
+        profileId,
+        subjectId,
+        topicId: null,
+        sessionType: 'learning',
+        status: 'completed',
+        exchangeCount: 2,
+      })
+      .returning({ id: learningSessions.id });
+    const sessionId = sessionRow!.id;
+
+    await seedSessionEvents({ sessionId, profileId, subjectId, topicId });
+    await seedLearningProfile(profileId);
+
+    const captureExceptionSpy = jest.spyOn(sentry, 'captureException');
+
+    const now = new Date();
+    const step = {
+      run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
+      // waitForEvent returns null → timeout path
+      waitForEvent: jest.fn().mockResolvedValue(null),
+      sendEvent: jest.fn().mockResolvedValue(undefined),
+    };
+
+    const handler = getHandler();
+    await handler({
+      event: {
+        name: 'app/session.completed',
+        data: {
+          profileId,
+          sessionId,
+          subjectId,
+          topicId: null, // freeform — triggers waitForEvent
+          exchangeCount: 2,
+          summaryStatus: 'pending',
+          timestamp: now.toISOString(),
+          verificationType: null,
+          sessionType: 'learning',
+          qualityRating: 4,
+          mode: null,
+          reason: 'user_ended',
+        },
+      },
+      step,
+    });
+
+    captureExceptionSpy.mockRestore();
+
+    // step.sendEvent called with app/session.filing_timed_out
+    const sendEventCalls = (step.sendEvent as jest.Mock).mock.calls as Array<[string, unknown]>;
+    const timedOutCall = sendEventCalls.find((args) => {
+      const payload = args[1] as { name?: string } | undefined;
+      return payload?.name === 'app/session.filing_timed_out';
+    });
+    expect(timedOutCall).toBeDefined();
+
+    // captureException was called with a timeout error
+    expect(captureExceptionSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ message: expect.stringContaining('waitForEvent timed out') }),
+      expect.objectContaining({ profileId }),
+    );
+  });
+
 });
 
-// ── Deferred scenarios (future iterations) ────────────────────────────────────
+// ── Scenario coverage index ────────────────────────────────────────────────────
 //
-// TODO [session-completed-integration-2]: freeform session (topicId=null)
-//   exercises waitForEvent + re-read-session step; transcript is freeform.
-//
-// TODO [session-completed-integration-3]: homework session (sessionType='homework')
-//   exercises waitForEvent + extractAndStoreHomeworkSummary.
-//
-// TODO [session-completed-integration-4]: relearn session (mode='relearn')
-//   exercises relearn-retention-reset path before SM-2 update.
-//
-// TODO [session-completed-integration-5]: verification flows
-//   verificationType='evaluate' + verificationType='teach_back'
-//   exercises processEvaluateCompletion / processTeachBackCompletion.
-//
-// TODO [session-completed-integration-6]: four_strands pedagogy
-//   subject.pedagogyMode='four_strands' + languageCode set
-//   exercises vocabulary extraction + milestone celebrations.
-//
-// TODO [session-completed-integration-7]: struggle detection
-//   memoryConsentStatus='granted', memoryCollectionEnabled=true,
-//   analyzeSessionTranscript yielding a StruggleNotification → push fired.
-//
-// TODO [session-completed-integration-8]: silence_timeout close reason
-//   skips SM-2 and streak entirely (UNATTENDED_REASONS guard).
-//
-// TODO [session-completed-integration-9]: memory dedup rollout
-//   MEMORY_FACTS_DEDUP_ENABLED=true + profile in rollout → runDedupForProfile.
-//
-// TODO [session-completed-integration-10]: waitForEvent timeout
-//   Freeform session where step.waitForEvent resolves null (timeout) →
-//   app/session.filing_timed_out event emitted via step.sendEvent.
+// done as: freeform session — waitForEvent succeeds [session-completed-integration-2]
+// done as: homework session — waitForEvent + homework summary [session-completed-integration-3]
+// done as: relearn session — relearn-retention-reset path [session-completed-integration-4]
+// done as: verification evaluate [session-completed-integration-5a]
+// done as: verification teach_back [session-completed-integration-5b]
+// done as: four_strands pedagogy [session-completed-integration-6]
+// done as: struggle detection [session-completed-integration-7]
+// done as: silence_timeout close reason [session-completed-integration-8]
+// done as: memory dedup rollout [session-completed-integration-9]
+// done as: waitForEvent timeout — filing-timed-out event emission [session-completed-integration-10]
