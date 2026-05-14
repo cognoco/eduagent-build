@@ -136,6 +136,13 @@ The orchestrator classifies and dispatches. Sub-agents do the file-level convers
 | 3–5 | `sonnet` |
 | 6+ or service-layer-restructuring needed | `opus` |
 
+### Batch size & concurrency
+
+Dispatch **3–5 sub-agents in parallel per batch**. Group files by directory affinity so parallel agents don't fight over shared fixtures or helpers. After all agents in the batch report SUCCESS, run the per-batch verification (below) and commit before dispatching the next batch.
+
+- Don't go below 3 — sequential dispatch is unnecessarily slow on a 90+ file backlog.
+- Don't go above 5 — at higher concurrency, agents start colliding on shared test utilities and the orchestrator loses signal on which agent is responsible for which failure.
+
 ### Escalation
 
 If a sub-agent fails (tests break, types break, or the conversion is incorrect): retry once at the same tier, then escalate to the next model. Cap at two attempts per tier before escalating.
