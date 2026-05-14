@@ -23,6 +23,7 @@ const mockDatabaseModule = createDatabaseModuleMock({
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
 jest.mock('../services/account' /* gc1-allow: unit test boundary */, () => ({
+  ...jest.requireActual('../services/account'),
   // gc1-allow: stubs findOrCreateAccount — avoids real Clerk/DB round-trip
   findOrCreateAccount: jest.fn().mockResolvedValue({
     id: 'test-account-id',
@@ -39,6 +40,7 @@ const mockMarkNudgeRead = jest.fn();
 const mockMarkAllNudgesRead = jest.fn();
 
 jest.mock('../services/nudge' /* gc1-allow: unit test boundary */, () => ({
+  ...jest.requireActual('../services/nudge'),
   // gc1-allow: stubs all nudge service functions — tests exercise HTTP layer, not DB
   createNudge: (...args: unknown[]) => mockCreateNudge(...args),
   listUnreadNudges: (...args: unknown[]) => mockListUnreadNudges(...args),

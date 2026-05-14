@@ -2,12 +2,12 @@
 // RevenueCat Webhook Route — Tests
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/kv', () => ({
+jest.mock('../services/kv' /* gc1-allow: pattern-a conversion */, () => ({
   ...jest.requireActual('../services/kv'),
   writeSubscriptionStatus: jest.fn().mockResolvedValue(undefined),
 }));
 
-jest.mock('../services/billing', () => ({
+jest.mock('../services/billing' /* gc1-allow: pattern-a conversion */, () => ({
   ...jest.requireActual('../services/billing'),
   getSubscriptionByAccountId: jest.fn(),
   getQuotaPool: jest.fn(),
@@ -34,30 +34,35 @@ jest.mock('../services/billing', () => ({
   }),
 }));
 
-jest.mock('../services/account', () => ({
+jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => ({
   ...jest.requireActual('../services/account'),
   findAccountByClerkId: jest.fn(),
 }));
 
-jest.mock('../services/subscription', () => ({
-  ...jest.requireActual('../services/subscription'),
-  getTierConfig: jest.fn().mockReturnValue({
-    monthlyQuota: 500,
-    dailyLimit: null,
-    maxProfiles: 1,
-    priceMonthly: 18.99,
-    priceYearly: 168,
-    topUpPrice: 10,
-    topUpAmount: 500,
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
+  '../services/subscription' /* gc1-allow: pattern-a conversion */,
+  () => ({
+    ...jest.requireActual('../services/subscription'),
+    getTierConfig: jest.fn().mockReturnValue({
+      monthlyQuota: 500,
+      dailyLimit: null,
+      maxProfiles: 1,
+      priceMonthly: 18.99,
+      priceYearly: 168,
+      topUpPrice: 10,
+      topUpAmount: 500,
+    }),
   }),
-}));
+);
 
-jest.mock('../services/trial', () => ({
+jest.mock('../services/trial' /* gc1-allow: pattern-a conversion */, () => ({
   ...jest.requireActual('../services/trial'),
   EXTENDED_TRIAL_MONTHLY_EQUIVALENT: 450,
 }));
 
-jest.mock('../inngest/client', () => ({
+jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../inngest/client'),
   // gc1-allow: Inngest SDK external boundary
   inngest: {
     send: jest.fn().mockResolvedValue(undefined),
@@ -66,7 +71,8 @@ jest.mock('../inngest/client', () => ({
 
 const mockCaptureException = jest.fn();
 
-jest.mock('../services/sentry', () => ({
+jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../services/sentry'),
   // gc1-allow: @sentry/cloudflare external boundary
   captureException: (...args: unknown[]) => mockCaptureException(...args),
 }));

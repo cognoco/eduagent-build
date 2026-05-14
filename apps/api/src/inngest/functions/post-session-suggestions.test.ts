@@ -10,12 +10,15 @@
 const mockRouteAndCall = jest.fn();
 
 jest.mock('../../services/llm' /* gc1-allow: LLM external boundary */, () => ({
+  ...jest.requireActual('../../services/llm'),
   routeAndCall: (...args: unknown[]) => mockRouteAndCall(...args),
 }));
 
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../../services/llm/sanitize' /* gc1-allow: LLM sanitization boundary */,
   () => ({
+    ...jest.requireActual('../../services/llm/sanitize'),
     sanitizeXmlValue: (s: string) => s,
   }),
 );
@@ -30,9 +33,11 @@ const mockDb = {
   insert: jest.fn(),
 };
 
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../helpers' /* gc1-allow: isolates DB connection in unit tests */,
   () => ({
+    ...jest.requireActual('../helpers'),
     getStepDatabase: () => mockDb,
   }),
 );
@@ -41,7 +46,10 @@ import { createInngestTransportCapture } from '../../test-utils/inngest-transpor
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 
 const mockInngestTransport = createInngestTransportCapture();
-jest.mock('../client', () => mockInngestTransport.module); // gc1-allow: inngest framework boundary
+jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../client'),
+  ...mockInngestTransport.module,
+})); // gc1-allow: inngest framework boundary
 
 import { postSessionSuggestions } from './post-session-suggestions';
 

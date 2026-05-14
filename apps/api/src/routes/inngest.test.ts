@@ -2,7 +2,8 @@
 // Inngest Route Tests
 // ---------------------------------------------------------------------------
 
-jest.mock('../inngest', () => ({
+jest.mock('../inngest' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../inngest'),
   inngest: { id: 'test-inngest' },
   functions: [],
 }));

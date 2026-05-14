@@ -1,4 +1,5 @@
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../services/subject' /* gc1-allow: unit route classification regression; integration covers real service */,
   () => {
     const actual = jest.requireActual('../services/subject') as Record<

@@ -14,12 +14,18 @@
 const mockClassifySubject = jest.fn();
 const mockGetStepDatabase = jest.fn();
 
-jest.mock('../../services/subject-classify', () => ({
-  // gc1-allow: external service boundary — prevents real LLM calls in unit tests
-  classifySubject: (...args: unknown[]) => mockClassifySubject(...args),
-}));
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
+  '../../services/subject-classify' /* gc1-allow: pattern-a conversion */,
+  () => ({
+    ...jest.requireActual('../../services/subject-classify'),
+    // gc1-allow: external service boundary — prevents real LLM calls in unit tests
+    classifySubject: (...args: unknown[]) => mockClassifySubject(...args),
+  }),
+);
 
-jest.mock('../helpers', () => ({
+jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../helpers'),
   // gc1-allow: isolates step-database helper from real DB config reads
   getStepDatabase: () => mockGetStepDatabase(),
 }));
@@ -29,7 +35,10 @@ const { createInngestTransportCapture } =
 
 const mockInngestTransport = createInngestTransportCapture();
 
-jest.mock('../client', () => mockInngestTransport.module); // gc1-allow: inngest framework boundary
+jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../client'),
+  ...mockInngestTransport.module,
+})); // gc1-allow: inngest framework boundary
 
 // Import AFTER mocks
 import { TEST_PROFILE_ID, TEST_SESSION_ID } from '@eduagent/test-utils';

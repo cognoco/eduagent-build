@@ -14,7 +14,8 @@ const mockDatabaseModule = createDatabaseModuleMock();
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
-jest.mock('../services/account', () => ({
+jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../services/account'),
   findOrCreateAccount: jest.fn().mockResolvedValue({
     id: 'test-account-id',
     clerkUserId: 'user_test',
@@ -24,7 +25,8 @@ jest.mock('../services/account', () => ({
   }),
 }));
 
-jest.mock('../services/profile', () => ({
+jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../services/profile'),
   findOwnerProfile: jest.fn().mockResolvedValue(null),
   getProfile: jest.fn().mockResolvedValue({
     id: 'a0000000-0000-4000-a000-000000000001',
@@ -34,65 +36,70 @@ jest.mock('../services/profile', () => ({
   }),
 }));
 
-jest.mock('../services/vocabulary', () => ({
-  listVocabulary: jest.fn().mockResolvedValue([
-    {
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
+  '../services/vocabulary' /* gc1-allow: pattern-a conversion */,
+  () => ({
+    ...jest.requireActual('../services/vocabulary'),
+    listVocabulary: jest.fn().mockResolvedValue([
+      {
+        id: '770e8400-e29b-41d4-a716-446655440000',
+        profileId: 'a0000000-0000-4000-a000-000000000001',
+        subjectId: '550e8400-e29b-41d4-a716-446655440000',
+        term: 'hola',
+        termNormalized: 'hola',
+        translation: 'hello',
+        type: 'word',
+        cefrLevel: 'A1',
+        milestoneId: null,
+        mastered: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    ]),
+    createVocabulary: jest.fn().mockResolvedValue({
       id: '770e8400-e29b-41d4-a716-446655440000',
       profileId: 'a0000000-0000-4000-a000-000000000001',
       subjectId: '550e8400-e29b-41d4-a716-446655440000',
-      term: 'hola',
-      termNormalized: 'hola',
-      translation: 'hello',
-      type: 'word',
+      term: 'buenos dias',
+      termNormalized: 'buenos dias',
+      translation: 'good morning',
+      type: 'chunk',
       cefrLevel: 'A1',
       milestoneId: null,
       mastered: false,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-    },
-  ]),
-  createVocabulary: jest.fn().mockResolvedValue({
-    id: '770e8400-e29b-41d4-a716-446655440000',
-    profileId: 'a0000000-0000-4000-a000-000000000001',
-    subjectId: '550e8400-e29b-41d4-a716-446655440000',
-    term: 'buenos dias',
-    termNormalized: 'buenos dias',
-    translation: 'good morning',
-    type: 'chunk',
-    cefrLevel: 'A1',
-    milestoneId: null,
-    mastered: false,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    }),
+    reviewVocabulary: jest.fn().mockResolvedValue({
+      vocabulary: {
+        id: '770e8400-e29b-41d4-a716-446655440000',
+        profileId: 'a0000000-0000-4000-a000-000000000001',
+        subjectId: '550e8400-e29b-41d4-a716-446655440000',
+        term: 'hola',
+        termNormalized: 'hola',
+        translation: 'hello',
+        type: 'word',
+        cefrLevel: 'A1',
+        milestoneId: null,
+        mastered: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      retention: {
+        vocabularyId: '770e8400-e29b-41d4-a716-446655440000',
+        easeFactor: 2.5,
+        intervalDays: 1,
+        repetitions: 1,
+        lastReviewedAt: new Date().toISOString(),
+        nextReviewAt: new Date().toISOString(),
+        failureCount: 0,
+        consecutiveSuccesses: 1,
+      },
+    }),
+    deleteVocabulary: jest.fn().mockResolvedValue(true),
   }),
-  reviewVocabulary: jest.fn().mockResolvedValue({
-    vocabulary: {
-      id: '770e8400-e29b-41d4-a716-446655440000',
-      profileId: 'a0000000-0000-4000-a000-000000000001',
-      subjectId: '550e8400-e29b-41d4-a716-446655440000',
-      term: 'hola',
-      termNormalized: 'hola',
-      translation: 'hello',
-      type: 'word',
-      cefrLevel: 'A1',
-      milestoneId: null,
-      mastered: false,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    retention: {
-      vocabularyId: '770e8400-e29b-41d4-a716-446655440000',
-      easeFactor: 2.5,
-      intervalDays: 1,
-      repetitions: 1,
-      lastReviewedAt: new Date().toISOString(),
-      nextReviewAt: new Date().toISOString(),
-      failureCount: 0,
-      consecutiveSuccesses: 1,
-    },
-  }),
-  deleteVocabulary: jest.fn().mockResolvedValue(true),
-}));
+);
 
 import { app } from '../index';
 import {
@@ -135,7 +142,7 @@ describe('vocabulary routes', () => {
       const res = await app.request(
         `/v1/subjects/${SUBJECT_ID}/vocabulary`,
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -148,13 +155,13 @@ describe('vocabulary routes', () => {
 
     it('[FIX-API-6] returns 404 when SubjectNotFoundError is thrown (typed instanceof)', async () => {
       (listVocabulary as jest.Mock).mockRejectedValueOnce(
-        new SubjectNotFoundError()
+        new SubjectNotFoundError(),
       );
 
       const res = await app.request(
         `/v1/subjects/${SUBJECT_ID}/vocabulary`,
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(404);
@@ -166,7 +173,7 @@ describe('vocabulary routes', () => {
       const res = await app.request(
         `/v1/subjects/${SUBJECT_ID}/vocabulary`,
         {},
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);
@@ -187,7 +194,7 @@ describe('vocabulary routes', () => {
             cefrLevel: 'A1',
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(201);
@@ -208,7 +215,7 @@ describe('vocabulary routes', () => {
             translation: 'hello',
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -216,7 +223,7 @@ describe('vocabulary routes', () => {
 
     it('[FIX-API-6] returns 404 when SubjectNotFoundError is thrown on create (typed instanceof)', async () => {
       (createVocabulary as jest.Mock).mockRejectedValueOnce(
-        new SubjectNotFoundError()
+        new SubjectNotFoundError(),
       );
 
       const res = await app.request(
@@ -229,7 +236,7 @@ describe('vocabulary routes', () => {
             translation: 'hello',
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(404);
@@ -247,7 +254,7 @@ describe('vocabulary routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ quality: 4 }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -260,7 +267,7 @@ describe('vocabulary routes', () => {
 
     it('[FIX-API-6] returns 404 when VocabularyNotFoundError is thrown on review (typed instanceof)', async () => {
       (reviewVocabulary as jest.Mock).mockRejectedValueOnce(
-        new VocabularyNotFoundError()
+        new VocabularyNotFoundError(),
       );
 
       const res = await app.request(
@@ -270,7 +277,7 @@ describe('vocabulary routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ quality: 4 }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(404);
@@ -280,7 +287,7 @@ describe('vocabulary routes', () => {
 
     it('returns 422 when review input is semantically invalid', async () => {
       (reviewVocabulary as jest.Mock).mockRejectedValueOnce(
-        new Error('Review failed')
+        new Error('Review failed'),
       );
 
       const res = await app.request(
@@ -290,7 +297,7 @@ describe('vocabulary routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ quality: 4 }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(422);
@@ -304,7 +311,7 @@ describe('vocabulary routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ quality: 8 }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -318,7 +325,7 @@ describe('vocabulary routes', () => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ quality: 4 }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);
@@ -335,7 +342,7 @@ describe('vocabulary routes', () => {
           method: 'DELETE',
           headers: AUTH_HEADERS,
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -354,7 +361,7 @@ describe('vocabulary routes', () => {
           method: 'DELETE',
           headers: AUTH_HEADERS,
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(404);
@@ -369,7 +376,7 @@ describe('vocabulary routes', () => {
           method: 'DELETE',
           headers: AUTH_HEADERS,
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       const [, profileId, subjectId, vocabularyId] = (
@@ -386,7 +393,7 @@ describe('vocabulary routes', () => {
         {
           method: 'DELETE',
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);

@@ -2,11 +2,13 @@
 // Vocabulary Extraction — Tests [4A.4]
 // ---------------------------------------------------------------------------
 
-jest.mock('./llm', () => ({
+jest.mock('./llm' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('./llm'),
   routeAndCall: jest.fn(),
 }));
 
-jest.mock('./sentry', () => ({
+jest.mock('./sentry' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('./sentry'),
   captureException: jest.fn(),
   addBreadcrumb: jest.fn(),
 }));

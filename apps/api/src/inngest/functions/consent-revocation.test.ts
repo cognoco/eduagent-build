@@ -36,7 +36,8 @@ const mockGetConsentStatus = jest.fn();
 const mockGetProfileDisplayName = jest.fn();
 const mockGetProfileForConsentRevocation = jest.fn();
 const mockGetFamilyOwnerProfileId = jest.fn();
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../../services/consent' /* gc1-allow: external-boundary — DB-dependent; calculateAge is real */,
   () => {
     const actual = jest.requireActual('../../services/consent') as Record<
@@ -57,17 +58,21 @@ jest.mock(
 );
 
 const mockDeleteProfile = jest.fn().mockResolvedValue(undefined);
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../../services/deletion' /* gc1-allow: external-boundary — DB-dependent */,
   () => ({
+    ...jest.requireActual('../../services/deletion'),
     deleteProfile: (...args: unknown[]) => mockDeleteProfile(...args),
   }),
 );
 
 const mockSendPushNotification = jest.fn().mockResolvedValue({ sent: true });
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../../services/notifications' /* gc1-allow: external-boundary — push delivery */,
   () => ({
+    ...jest.requireActual('../../services/notifications'),
     sendPushNotification: (...args: unknown[]) =>
       mockSendPushNotification(...args),
   }),
@@ -75,9 +80,11 @@ jest.mock(
 
 const mockGetRecentNotificationCount = jest.fn().mockResolvedValue(0);
 const mockGetWithdrawalArchivePreference = jest.fn().mockResolvedValue('never');
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../../services/settings' /* gc1-allow: external-boundary — DB-dependent */,
   () => ({
+    ...jest.requireActual('../../services/settings'),
     getRecentNotificationCount: (...args: unknown[]) =>
       mockGetRecentNotificationCount(...args),
     getWithdrawalArchivePreference: (...args: unknown[]) =>
@@ -87,6 +94,7 @@ jest.mock(
 
 const mockRecordPendingNotice = jest.fn().mockResolvedValue(undefined);
 jest.mock('../../services/notices' /* gc1-allow: DB insert boundary */, () => ({
+  ...jest.requireActual('../../services/notices'),
   recordPendingNotice: (...args: unknown[]) => mockRecordPendingNotice(...args),
 }));
 

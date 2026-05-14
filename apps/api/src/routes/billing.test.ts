@@ -40,7 +40,8 @@ const mockDatabaseModule = createDatabaseModuleMock({
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
-jest.mock('../services/account', () => ({
+jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../services/account'),
   findOrCreateAccount: jest.fn().mockResolvedValue({
     id: 'test-account-id',
     clerkUserId: 'user_test',
@@ -83,7 +84,8 @@ const mockBuildUsageDateLabels = jest.fn((input) => ({
   renewsAtLabel: input.renewsAt ? 'February 15, 2025' : null,
 }));
 
-jest.mock('../services/billing', () => ({
+jest.mock('../services/billing' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../services/billing'),
   getSubscriptionByAccountId: (...args: unknown[]) =>
     mockGetSubscriptionByAccountId(...args),
   ensureFreeSubscription: (...args: unknown[]) =>
@@ -116,7 +118,8 @@ jest.mock('../services/billing', () => ({
 
 const mockReadSubscriptionStatus = jest.fn();
 
-jest.mock('../services/kv', () => ({
+jest.mock('../services/kv' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../services/kv'),
   readSubscriptionStatus: (...args: unknown[]) =>
     mockReadSubscriptionStatus(...args),
 }));
@@ -131,7 +134,8 @@ const mockCustomersCreate = jest.fn();
 const mockPaymentIntentsCreate = jest.fn();
 const mockPortalCreate = jest.fn();
 
-jest.mock('../services/stripe', () => ({
+jest.mock('../services/stripe' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../services/stripe'),
   createStripeClient: jest.fn().mockReturnValue({
     checkout: {
       sessions: { create: (...args: unknown[]) => mockCheckoutCreate(...args) },

@@ -25,10 +25,12 @@ function mockPracticeSummary(
   };
 }
 
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   // gc1-allow: unit test boundary
   './practice-activity-summary',
   () => ({
+    ...jest.requireActual('./practice-activity-summary'),
     getPracticeActivitySummary: (...args: unknown[]) =>
       mockGetPracticeActivitySummary(...args),
   }),

@@ -15,9 +15,11 @@
 
 const mockGetStepDatabase = jest.fn();
 
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../helpers' /* gc1-allow: isolates DB connection from unit test */,
   () => ({
+    ...jest.requireActual('../helpers'),
     getStepDatabase: () => mockGetStepDatabase(),
   }),
 );
@@ -26,12 +28,17 @@ import { createInngestTransportCapture } from '../../test-utils/inngest-transpor
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 
 const mockInngestTransport = createInngestTransportCapture();
-jest.mock('../client', () => mockInngestTransport.module); // gc1-allow: inngest framework boundary
+jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../client'),
+  ...mockInngestTransport.module,
+})); // gc1-allow: inngest framework boundary
 
 const mockCaptureException = jest.fn();
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../../services/sentry' /* gc1-allow: isolates Sentry external boundary */,
   () => ({
+    ...jest.requireActual('../../services/sentry'),
     captureException: (...args: unknown[]) => mockCaptureException(...args),
   }),
 );
@@ -41,9 +48,11 @@ const mockFormatFilingFailedPush = jest.fn().mockReturnValue({
   body: 'We could not save your session.',
 });
 const mockSendPushNotification = jest.fn().mockResolvedValue({ sent: true });
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../../services/notifications' /* gc1-allow: isolates push notification external boundary */,
   () => ({
+    ...jest.requireActual('../../services/notifications'),
     formatFilingFailedPush: () => mockFormatFilingFailedPush(),
     sendPushNotification: (...args: unknown[]) =>
       mockSendPushNotification(...args),
@@ -51,17 +60,21 @@ jest.mock(
 );
 
 const mockGetRecentNotificationCount = jest.fn().mockResolvedValue(0);
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../../services/settings' /* gc1-allow: isolates notification settings service */,
   () => ({
+    ...jest.requireActual('../../services/settings'),
     getRecentNotificationCount: (...args: unknown[]) =>
       mockGetRecentNotificationCount(...args),
   }),
 );
 
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../../services/logger' /* gc1-allow: isolates logger to prevent console noise in tests */,
   () => ({
+    ...jest.requireActual('../../services/logger'),
     createLogger: () => ({
       info: jest.fn(),
       warn: jest.fn(),

@@ -1,6 +1,11 @@
-jest.mock('../services/support/spillover', () => ({
-  recordOutboxSpillover: jest.fn(),
-}));
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
+  '../services/support/spillover' /* gc1-allow: pattern-a conversion */,
+  () => ({
+    ...jest.requireActual('../services/support/spillover'),
+    recordOutboxSpillover: jest.fn(),
+  }),
+);
 
 import { Hono } from 'hono';
 import { supportRoutes } from './support';
@@ -59,7 +64,7 @@ describe('POST /outbox-spillover', () => {
     expect(mockRecordOutboxSpillover).toHaveBeenCalledWith(
       {},
       'test-profile-id',
-      entries
+      entries,
     );
   });
 

@@ -21,7 +21,8 @@ jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
 const mockRouteAndCall = jest.fn();
 
-jest.mock('./llm', () => ({
+jest.mock('./llm' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('./llm'),
   routeAndCall: (...args: unknown[]) => mockRouteAndCall(...args),
 }));
 
@@ -245,7 +246,7 @@ describe('generateRecallBridge', () => {
 
     const messages = mockRouteAndCall.mock.calls[0][0];
     const systemMessage = messages.find(
-      (m: { role: string }) => m.role === 'system'
+      (m: { role: string }) => m.role === 'system',
     );
     expect(systemMessage.content).toContain('Trigonometry');
     expect(systemMessage.content).toContain('Angles, sine, cosine, tangent');

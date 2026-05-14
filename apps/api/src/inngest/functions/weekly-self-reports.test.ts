@@ -63,9 +63,11 @@ const mockDb = {
   insert: mockInsert,
 };
 
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../../services/solo-progress-reports' /* gc1-allow: unit test boundary */,
   () => ({
+    ...jest.requireActual('../../services/solo-progress-reports'),
     listEligibleSelfReportProfileIds: (...args: unknown[]) =>
       mockListEligibleSelfReportProfileIds(...args),
     listEligibleSelfReportProfileIdsAtLocalHour9: (...args: unknown[]) =>
@@ -73,39 +75,48 @@ jest.mock(
   }),
 );
 
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../../services/snapshot-aggregation' /* gc1-allow: unit test boundary */,
   () => ({
+    ...jest.requireActual('../../services/snapshot-aggregation'),
     getLatestSnapshotOnOrBefore: (...args: unknown[]) =>
       mockGetLatestSnapshotOnOrBefore(...args),
   }),
 );
 
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../../services/practice-activity-summary' /* gc1-allow: unit test boundary */,
   () => ({
+    ...jest.requireActual('../../services/practice-activity-summary'),
     getPracticeActivitySummary: (...args: unknown[]) =>
       mockGetPracticeActivitySummary(...args),
   }),
 );
 
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../../services/weekly-report' /* gc1-allow: unit test boundary */,
   () => ({
+    ...jest.requireActual('../../services/weekly-report'),
     generateWeeklyReportData: (...args: unknown[]) =>
       mockGenerateWeeklyReportData(...args),
   }),
 );
 
 jest.mock('../../services/sentry' /* gc1-allow: unit test boundary */, () => ({
+  ...jest.requireActual('../../services/sentry'),
   captureException: (...args: unknown[]) => mockCaptureException(...args),
 }));
 
 jest.mock('../helpers' /* gc1-allow: unit test boundary */, () => ({
+  ...jest.requireActual('../helpers'),
   getStepDatabase: jest.fn().mockReturnValue(mockDb),
 }));
 
 jest.mock('../client' /* gc1-allow: unit test boundary */, () => ({
+  ...jest.requireActual('../client'),
   inngest: {
     createFunction: jest.fn(
       (config: unknown, trigger: unknown, fn: unknown) => ({

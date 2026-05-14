@@ -16,7 +16,8 @@ const mockDatabaseModule = createDatabaseModuleMock();
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
-jest.mock('../services/account', () => ({
+jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../services/account'),
   findOrCreateAccount: jest.fn().mockResolvedValue({
     id: 'test-account-id',
     clerkUserId: 'user_test',
@@ -27,7 +28,8 @@ jest.mock('../services/account', () => ({
 }));
 
 // Mock session service (to prevent actual session operations)
-jest.mock('../services/session', () => ({
+jest.mock('../services/session' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../services/session'),
   // gc1-allow: processMessage/streamMessage/evaluateSessionDepth call LLM
   processMessage: jest
     .fn()
@@ -84,15 +86,21 @@ jest.mock('../services/session', () => ({
 }));
 
 // Mock recall bridge service so we can exercise the route without an LLM call.
-jest.mock('../services/recall-bridge', () => ({
-  // gc1-allow: LLM external boundary (routeAndCall)
-  generateRecallBridge: jest
-    .fn()
-    .mockResolvedValue({ questions: ['Q?'], generated: true }),
-}));
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
+  '../services/recall-bridge' /* gc1-allow: pattern-a conversion */,
+  () => ({
+    ...jest.requireActual('../services/recall-bridge'),
+    // gc1-allow: LLM external boundary (routeAndCall)
+    generateRecallBridge: jest
+      .fn()
+      .mockResolvedValue({ questions: ['Q?'], generated: true }),
+  }),
+);
 
 // Mock profile service
-jest.mock('../services/profile', () => ({
+jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../services/profile'),
   findOwnerProfile: jest.fn().mockResolvedValue({
     id: 'test-profile-id',
     birthYear: 2010,
@@ -106,7 +114,8 @@ jest.mock('../services/profile', () => ({
 }));
 
 // Mock subject service for route coverage
-jest.mock('../services/subject', () => ({
+jest.mock('../services/subject' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../services/subject'),
   listSubjects: jest.fn().mockResolvedValue([]),
   getSubject: jest.fn().mockResolvedValue({
     id: 'subject-1',
@@ -127,7 +136,8 @@ const mockGetQuotaPool = jest.fn();
 const mockDecrementQuota = jest.fn();
 const mockGetTopUpCreditsRemaining = jest.fn().mockResolvedValue(0);
 
-jest.mock('../services/billing', () => ({
+jest.mock('../services/billing' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../services/billing'),
   ensureFreeSubscription: (...args: unknown[]) =>
     mockEnsureFreeSubscription(...args),
   getQuotaPool: (...args: unknown[]) => mockGetQuotaPool(...args),
@@ -149,7 +159,7 @@ const mockLoggerInfo = jest.fn();
 const mockLoggerError = jest.fn();
 const mockLoggerDebug = jest.fn();
 
-jest.mock('../services/logger', () => ({
+jest.mock('../services/logger' /* gc1-allow: pattern-a conversion */, () => ({
   ...jest.requireActual('../services/logger'),
   createLogger: () => ({
     info: mockLoggerInfo,

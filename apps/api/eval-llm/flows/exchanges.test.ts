@@ -1,6 +1,7 @@
 // runLive tests: mock hoisted before imports so jest.mock applies before transitive pulls of runner/llm-client.
 const mockRunHarnessLlm = jest.fn();
-jest.mock('../runner/llm-client', () => ({
+jest.mock('../runner/llm-client' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../runner/llm-client'),
   runHarnessLlm: (...args: unknown[]) => mockRunHarnessLlm(...args),
 }));
 

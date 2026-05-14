@@ -6,11 +6,13 @@ import { jest } from '@jest/globals';
 
 const routeAndCallMock = jest.fn<(...args: unknown[]) => Promise<unknown>>();
 jest.mock('./llm' /* gc1-allow: LLM external boundary */, () => ({
+  ...jest.requireActual<typeof import('./llm')>('./llm'),
   routeAndCall: (...args: unknown[]) => routeAndCallMock(...args),
 }));
 
 const loggerWarnMock = jest.fn<(...args: unknown[]) => void>();
 jest.mock('./logger' /* gc1-allow: metric verification */, () => ({
+  ...jest.requireActual<typeof import('./logger')>('./logger'),
   createLogger: () => ({
     warn: (...args: unknown[]) => loggerWarnMock(...args),
     info: jest.fn(),

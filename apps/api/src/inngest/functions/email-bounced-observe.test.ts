@@ -9,9 +9,11 @@ const consoleErrorSpy = jest
   .spyOn(console, 'error')
   .mockImplementation(() => undefined);
 
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../client' /* gc1-allow: observer test requires inngest client mock to expose trigger metadata */,
   () => ({
+    ...jest.requireActual('../client'),
     inngest: {
       createFunction: jest.fn(
         (_opts: unknown, _trigger: unknown, fn: unknown) => {

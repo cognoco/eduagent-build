@@ -24,6 +24,7 @@ const mockDatabaseModule = createDatabaseModuleMock({
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
 jest.mock('../services/account' /* gc1-allow: unit test boundary */, () => ({
+  ...jest.requireActual('../services/account'),
   // gc1-allow: stubs findOrCreateAccount — avoids real Clerk/DB round-trip in unit tests for settings routes
   findOrCreateAccount: jest.fn().mockResolvedValue({
     id: 'test-account-id',
@@ -52,7 +53,8 @@ jest.mock('../services/settings' /* gc1-allow: unit test boundary */, () => {
 });
 
 const mockClearSessionStaticContextForProfile = jest.fn();
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../services/session/session-cache' /* gc1-allow: unit test boundary */,
   () => {
     // gc1-allow: partial mock via requireActual — intercepts clearSessionStaticContextForProfile to verify cache invalidation fires on learning-mode change
@@ -67,6 +69,7 @@ jest.mock(
 
 const mockCaptureException = jest.fn();
 jest.mock('../services/sentry' /* gc1-allow: unit test boundary */, () => ({
+  ...jest.requireActual('../services/sentry'),
   captureException: (...args: unknown[]) => mockCaptureException(...args),
 }));
 

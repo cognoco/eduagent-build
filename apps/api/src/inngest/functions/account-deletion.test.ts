@@ -6,16 +6,20 @@ const mockAccountExists = jest.fn();
 const mockIsDeletionCancelled = jest.fn();
 const mockExecuteDeletion = jest.fn();
 
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../helpers' /* gc1-allow: getStepDatabase wraps Inngest step-level DB acquisition; must be intercepted to inject mockDb without a real Neon connection */,
   () => ({
+    ...jest.requireActual('../helpers'),
     getStepDatabase: () => mockGetStepDatabase(),
   }),
 );
 
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../../services/deletion' /* gc1-allow: prevents destructive account deletion in unit tests */,
   () => ({
+    ...jest.requireActual('../../services/deletion'),
     accountExists: (...args: unknown[]) => mockAccountExists(...args),
     isDeletionCancelled: (...args: unknown[]) =>
       mockIsDeletionCancelled(...args),

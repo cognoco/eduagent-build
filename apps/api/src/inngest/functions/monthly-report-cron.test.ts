@@ -146,9 +146,11 @@ const mockGetPracticeActivitySummary = jest
   .fn()
   .mockResolvedValue(emptyPracticeActivitySummary);
 
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../../services/monthly-report' /* gc1-allow: external-boundary — generateReportHighlights calls LLM */,
   () => ({
+    ...jest.requireActual('../../services/monthly-report'),
     generateMonthlyReportData: (...args: unknown[]) =>
       mockGenerateMonthlyReportData(...args),
     generateReportHighlights: (...args: unknown[]) =>
@@ -156,17 +158,21 @@ jest.mock(
   }),
 );
 
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../../services/practice-activity-summary' /* gc1-allow: unit test boundary */,
   () => ({
+    ...jest.requireActual('../../services/practice-activity-summary'),
     getPracticeActivitySummary: (...args: unknown[]) =>
       mockGetPracticeActivitySummary(...args),
   }),
 );
 
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../../services/solo-progress-reports' /* gc1-allow: unit test boundary */,
   () => ({
+    ...jest.requireActual('../../services/solo-progress-reports'),
     listEligibleSelfReportProfileIds: (...args: unknown[]) =>
       mockListEligibleSelfReportProfileIds(...args),
   }),
@@ -174,9 +180,11 @@ jest.mock(
 
 const mockGetSnapshotsInRange = jest.fn().mockResolvedValue([]);
 
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../../services/snapshot-aggregation' /* gc1-allow: external-boundary — DB-dependent */,
   () => ({
+    ...jest.requireActual('../../services/snapshot-aggregation'),
     getSnapshotsInRange: (...args: unknown[]) =>
       mockGetSnapshotsInRange(...args),
   }),
@@ -193,9 +201,11 @@ const mockFormatMonthlyProgressEmail = jest.fn(
   }),
 );
 
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../../services/notifications' /* gc1-allow: external-boundary — push/email delivery */,
   () => ({
+    ...jest.requireActual('../../services/notifications'),
     sendPushNotification: (...args: unknown[]) =>
       mockSendPushNotification(...args),
     sendEmail: (...args: unknown[]) => mockSendEmail(...args),
@@ -211,9 +221,11 @@ jest.mock(
 // individual tests override to simulate a prior successful send (replay path).
 const mockGetRecentNotificationCount = jest.fn().mockResolvedValue(0);
 
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../../services/settings' /* gc1-allow: external-boundary — DB-dependent */,
   () => ({
+    ...jest.requireActual('../../services/settings'),
     getRecentNotificationCount: (...args: unknown[]) =>
       mockGetRecentNotificationCount(...args),
   }),
@@ -221,16 +233,20 @@ jest.mock(
 
 const mockCaptureException = jest.fn();
 
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../../services/sentry' /* gc1-allow: external-boundary — observability */,
   () => ({
+    ...jest.requireActual('../../services/sentry'),
     captureException: (...args: unknown[]) => mockCaptureException(...args),
   }),
 );
 
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../helpers' /* gc1-allow: external-boundary — DB connection factory */,
   () => ({
+    ...jest.requireActual('../helpers'),
     getStepDatabase: jest.fn().mockReturnValue(mockMonthlyReportDb),
     getStepResendApiKey: jest.fn().mockReturnValue('resend-test-key'),
     resetDatabaseUrl: jest.fn(),

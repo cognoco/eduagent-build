@@ -13,7 +13,7 @@ jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 // jest.requireActual for createFunction so the function-definition shape
 // stays identical to production.
 const mockInngestSend = jest.fn().mockResolvedValue(undefined);
-jest.mock('../client', () => {
+jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
   const realInngest = jest.requireActual('inngest').Inngest;
   const realInstance = new realInngest({ id: 'eduagent-test' });
   return {
@@ -26,9 +26,14 @@ jest.mock('../client', () => {
 });
 
 const mockCaptureException = jest.fn();
-jest.mock('../../services/sentry', () => ({
-  captureException: (...args: unknown[]) => mockCaptureException(...args),
-}));
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
+  '../../services/sentry' /* gc1-allow: pattern-a conversion */,
+  () => ({
+    ...jest.requireActual('../../services/sentry'),
+    captureException: (...args: unknown[]) => mockCaptureException(...args),
+  }),
+);
 
 // subscription: getTierConfig is a pure static config lookup — use real code.
 
@@ -38,38 +43,58 @@ const mockTransitionToExtendedTrial = jest.fn().mockResolvedValue(undefined);
 const mockDowngradeQuotaPool = jest.fn().mockResolvedValue(undefined);
 const mockFindExpiredTrialsByDaysSinceEnd = jest.fn().mockResolvedValue([]);
 
-jest.mock('../../services/billing', () => ({
-  findExpiredTrials: (...args: unknown[]) => mockFindExpiredTrials(...args),
-  findSubscriptionsByTrialDateRange: (...args: unknown[]) =>
-    mockFindSubscriptionsByTrialDateRange(...args),
-  transitionToExtendedTrial: (...args: unknown[]) =>
-    mockTransitionToExtendedTrial(...args),
-  downgradeQuotaPool: (...args: unknown[]) => mockDowngradeQuotaPool(...args),
-  findExpiredTrialsByDaysSinceEnd: (...args: unknown[]) =>
-    mockFindExpiredTrialsByDaysSinceEnd(...args),
-}));
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
+  '../../services/billing' /* gc1-allow: pattern-a conversion */,
+  () => ({
+    ...jest.requireActual('../../services/billing'),
+    findExpiredTrials: (...args: unknown[]) => mockFindExpiredTrials(...args),
+    findSubscriptionsByTrialDateRange: (...args: unknown[]) =>
+      mockFindSubscriptionsByTrialDateRange(...args),
+    transitionToExtendedTrial: (...args: unknown[]) =>
+      mockTransitionToExtendedTrial(...args),
+    downgradeQuotaPool: (...args: unknown[]) => mockDowngradeQuotaPool(...args),
+    findExpiredTrialsByDaysSinceEnd: (...args: unknown[]) =>
+      mockFindExpiredTrialsByDaysSinceEnd(...args),
+  }),
+);
 
 // trial: all exports are pure functions / constants — use real code.
 
 const mockSendPushNotification = jest.fn().mockResolvedValue({ sent: true });
-jest.mock('../../services/notifications', () => ({
-  sendPushNotification: (...args: unknown[]) =>
-    mockSendPushNotification(...args),
-}));
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
+  '../../services/notifications' /* gc1-allow: pattern-a conversion */,
+  () => ({
+    ...jest.requireActual('../../services/notifications'),
+    sendPushNotification: (...args: unknown[]) =>
+      mockSendPushNotification(...args),
+  }),
+);
 
 // [BUG-699-FOLLOWUP] getRecentNotificationCount gates dedup: default 0 so
 // existing tests continue to send. Individual tests override to simulate a
 // prior successful send (retry path).
 const mockGetRecentNotificationCount = jest.fn().mockResolvedValue(0);
-jest.mock('../../services/settings', () => ({
-  getRecentNotificationCount: (...args: unknown[]) =>
-    mockGetRecentNotificationCount(...args),
-}));
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
+  '../../services/settings' /* gc1-allow: pattern-a conversion */,
+  () => ({
+    ...jest.requireActual('../../services/settings'),
+    getRecentNotificationCount: (...args: unknown[]) =>
+      mockGetRecentNotificationCount(...args),
+  }),
+);
 
 const mockFindOwnerProfile = jest.fn();
-jest.mock('../../services/profile', () => ({
-  findOwnerProfile: (...args: unknown[]) => mockFindOwnerProfile(...args),
-}));
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
+  '../../services/profile' /* gc1-allow: pattern-a conversion */,
+  () => ({
+    ...jest.requireActual('../../services/profile'),
+    findOwnerProfile: (...args: unknown[]) => mockFindOwnerProfile(...args),
+  }),
+);
 
 import { trialExpiry } from './trial-expiry';
 import {

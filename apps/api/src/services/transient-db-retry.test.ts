@@ -3,9 +3,13 @@ import {
   withTransientDatabaseRetry,
 } from './transient-db-retry';
 
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   './sentry' /* gc1-allow: transient-retry unit test suppresses Sentry */,
-  () => ({ captureException: jest.fn() }),
+  () => ({
+    ...jest.requireActual('./sentry'),
+    captureException: jest.fn(),
+  }),
 );
 
 const { captureException } = jest.requireMock('./sentry') as {

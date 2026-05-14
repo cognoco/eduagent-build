@@ -30,7 +30,8 @@ import {
 const mockAssertParentAccess = jest.fn();
 const mockGetConsentStatus = jest.fn();
 
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   './family-access' /* gc1-allow: nudge.test stubs parent-access guard; family-access has its own dedicated test suite */,
   () => ({
     ...jest.requireActual('./family-access'),
@@ -38,7 +39,8 @@ jest.mock(
   }),
 );
 
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   './consent' /* gc1-allow: nudge.test stubs consent lookup; consent service has its own test suite */,
   () => ({
     ...jest.requireActual('./consent'),
@@ -53,7 +55,8 @@ jest.mock(
 
 const mockSendPushNotification = jest.fn();
 
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   './notifications' /* gc1-allow: nudge.test stubs push delivery; notifications service has its own dedicated test suite */,
   () => ({
     ...jest.requireActual('./notifications'),

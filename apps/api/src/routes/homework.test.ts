@@ -13,7 +13,8 @@ jest.mock('inngest/hono', () => ({
   serve: jest.fn().mockReturnValue(jest.fn()),
 }));
 
-jest.mock('../inngest/client', () => ({
+jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../inngest/client'),
   // gc1-allow: Inngest SDK external boundary
   inngest: {
     send: jest.fn().mockResolvedValue(undefined),
@@ -21,7 +22,8 @@ jest.mock('../inngest/client', () => ({
   },
 }));
 
-jest.mock('../services/sentry', () => ({
+jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../services/sentry'),
   // gc1-allow: @sentry/cloudflare external boundary
   captureException: jest.fn(),
   addBreadcrumb: jest.fn(),
@@ -33,7 +35,7 @@ const mockDatabaseModule = createDatabaseModuleMock({ includeActual: true });
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
-jest.mock('../services/account', () => ({
+jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => ({
   ...jest.requireActual('../services/account'),
   findOrCreateAccount: jest.fn().mockResolvedValue({
     id: 'test-account-id',
@@ -44,7 +46,7 @@ jest.mock('../services/account', () => ({
   }),
 }));
 
-jest.mock('../services/profile', () => ({
+jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => ({
   ...jest.requireActual('../services/profile'),
   findOwnerProfile: jest.fn().mockResolvedValue(null),
   getProfile: jest.fn().mockResolvedValue({
@@ -57,7 +59,7 @@ jest.mock('../services/profile', () => ({
 
 const mockStartSession = jest.fn();
 
-jest.mock('../services/session', () => ({
+jest.mock('../services/session' /* gc1-allow: pattern-a conversion */, () => ({
   // Use real error classes so instanceof checks in route handlers match production behavior.
   ...jest.requireActual('../services/session'),
   startSession: (...args: unknown[]) => mockStartSession(...args),
@@ -70,7 +72,7 @@ jest.mock('../services/session', () => ({
   submitSummary: jest.fn(),
 }));
 
-jest.mock('../services/ocr', () => ({
+jest.mock('../services/ocr' /* gc1-allow: pattern-a conversion */, () => ({
   ...jest.requireActual('../services/ocr'),
   getOcrProvider: jest.fn().mockReturnValue({
     extractText: jest.fn().mockResolvedValue({

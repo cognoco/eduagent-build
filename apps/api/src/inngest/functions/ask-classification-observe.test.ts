@@ -3,9 +3,11 @@
 // ---------------------------------------------------------------------------
 
 const mockCaptureException = jest.fn();
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../../services/sentry' /* gc1-allow: observability test isolates Sentry */,
   () => ({
+    ...jest.requireActual('../../services/sentry'),
     captureException: (...args: unknown[]) => mockCaptureException(...args),
   }),
 );
@@ -20,7 +22,10 @@ const consoleErrorSpy = jest
 import { createInngestTransportCapture } from '../../test-utils/inngest-transport-capture';
 
 const mockInngestTransport = createInngestTransportCapture();
-jest.mock('../client', () => mockInngestTransport.module); // gc1-allow: inngest framework boundary
+jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../client'),
+  ...mockInngestTransport.module,
+})); // gc1-allow: inngest framework boundary
 
 import {
   askClassificationCompletedObserve,

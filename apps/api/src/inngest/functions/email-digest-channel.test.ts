@@ -27,6 +27,7 @@ const CHILD_ID_RESTRICTED = 'cccccccc-0000-4000-8000-000000000001';
 // Sentry — external error tracker (no real process.env in test)
 const mockCaptureException = jest.fn();
 jest.mock('../../services/sentry' /* gc1-allow: unit test boundary */, () => ({
+  ...jest.requireActual('../../services/sentry'),
   captureException: (...args: unknown[]) => mockCaptureException(...args),
 }));
 
@@ -35,7 +36,10 @@ import { createInngestTransportCapture } from '../../test-utils/inngest-transpor
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 
 const mockInngestTransport = createInngestTransportCapture();
-jest.mock('../client', () => mockInngestTransport.module); // gc1-allow: inngest framework boundary
+jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../client'),
+  ...mockInngestTransport.module,
+})); // gc1-allow: inngest framework boundary
 
 // Internal services used by the generate handlers — we intercept them here
 // using jest.requireActual patterns would be awkward since these are async
@@ -68,6 +72,7 @@ const mockFormatMonthlyProgressEmail = jest.fn().mockReturnValue({
 jest.mock( // gc1-allow: handler control-flow test; services tested in own suites
   '../../services/notifications',
   () => ({
+    ...jest.requireActual('../../services/notifications'),
     sendPushNotification: (...args: unknown[]) =>
       mockSendPushNotification(...args),
     sendEmail: (...args: unknown[]) => mockSendEmail(...args),
@@ -84,6 +89,7 @@ const mockLogNotification = jest.fn().mockResolvedValue(undefined);
 jest.mock( // gc1-allow: handler control-flow test; services tested in own suites
   '../../services/settings',
   () => ({
+    ...jest.requireActual('../../services/settings'),
     getRecentNotificationCount: (...args: unknown[]) =>
       mockGetRecentNotificationCount(...args),
     logNotification: (...args: unknown[]) => mockLogNotification(...args),
@@ -97,6 +103,7 @@ const mockGetLatestSnapshotOnOrBefore = jest.fn().mockResolvedValue(null);
 jest.mock( // gc1-allow: handler control-flow test; services tested in own suites
   '../../services/snapshot-aggregation',
   () => ({
+    ...jest.requireActual('../../services/snapshot-aggregation'),
     getSnapshotsInRange: (...args: unknown[]) =>
       mockGetSnapshotsInRange(...args),
     getLatestSnapshot: (...args: unknown[]) => mockGetLatestSnapshot(...args),
@@ -112,6 +119,7 @@ const mockGenerateWeeklyReportData = jest
 jest.mock( // gc1-allow: handler control-flow test; services tested in own suites
   '../../services/weekly-report',
   () => ({
+    ...jest.requireActual('../../services/weekly-report'),
     generateWeeklyReportData: (...args: unknown[]) =>
       mockGenerateWeeklyReportData(...args),
   }),
@@ -126,6 +134,7 @@ const mockGetPracticeActivitySummary = jest
 jest.mock( // gc1-allow: handler control-flow test; service tested separately
   '../../services/practice-activity-summary',
   () => ({
+    ...jest.requireActual('../../services/practice-activity-summary'),
     getPracticeActivitySummary: (...args: unknown[]) =>
       mockGetPracticeActivitySummary(...args),
   }),
@@ -231,6 +240,7 @@ function buildMockDb(
 
 const mockGetStepResendApiKey = jest.fn(() => 'test-resend-key');
 jest.mock('../helpers' /* gc1-allow: unit test boundary */, () => ({
+  ...jest.requireActual('../helpers'),
   getStepDatabase: jest.fn(),
   resetDatabaseUrl: jest.fn(),
   getStepResendApiKey: () => mockGetStepResendApiKey(),
@@ -669,6 +679,7 @@ const mockGenerateReportHighlights = jest.fn().mockResolvedValue({
 jest.mock( // gc1-allow: handler control-flow test; services tested in own suites
   '../../services/monthly-report',
   () => ({
+    ...jest.requireActual('../../services/monthly-report'),
     generateMonthlyReportData: (...args: unknown[]) =>
       mockGenerateMonthlyReportData(...args),
     generateReportHighlights: (...args: unknown[]) =>

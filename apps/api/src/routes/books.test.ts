@@ -22,7 +22,7 @@ jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 // Mock account + profile services
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/account', () => ({
+jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => ({
   ...jest.requireActual('../services/account'),
   findOrCreateAccount: jest.fn().mockResolvedValue({
     id: 'test-account-id',
@@ -33,7 +33,7 @@ jest.mock('../services/account', () => ({
   }),
 }));
 
-jest.mock('../services/profile', () => ({
+jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => ({
   ...jest.requireActual('../services/profile'),
   findOwnerProfile: jest.fn().mockResolvedValue(null),
   getProfile: jest.fn().mockResolvedValue({
@@ -82,37 +82,46 @@ const mockBookWithTopics = {
   status: 'NOT_STARTED' as const,
 };
 
-jest.mock('../services/curriculum', () => ({
-  ...jest.requireActual('../services/curriculum'),
-  getBooks: jest.fn().mockResolvedValue([]),
-  getAllProfileBooks: jest.fn().mockResolvedValue({ subjects: [] }),
-  getBookWithTopics: jest.fn().mockResolvedValue(null),
-  persistBookTopics: jest.fn().mockResolvedValue(mockBookWithTopics),
-  claimBookForGeneration: jest.fn().mockResolvedValue(null),
-  moveTopicToBook: jest.fn().mockResolvedValue({ ok: true }),
-}));
-
-jest.mock('../services/book-generation', () => ({
-  ...jest.requireActual('../services/book-generation'),
-  generateBookTopics: jest.fn().mockResolvedValue({
-    topics: [
-      {
-        title: 'Timeline of Egypt',
-        description: 'How it all began',
-        chapter: 'The Story',
-        sortOrder: 1,
-        estimatedMinutes: 30,
-      },
-    ],
-    connections: [],
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
+  '../services/curriculum' /* gc1-allow: pattern-a conversion */,
+  () => ({
+    ...jest.requireActual('../services/curriculum'),
+    getBooks: jest.fn().mockResolvedValue([]),
+    getAllProfileBooks: jest.fn().mockResolvedValue({ subjects: [] }),
+    getBookWithTopics: jest.fn().mockResolvedValue(null),
+    persistBookTopics: jest.fn().mockResolvedValue(mockBookWithTopics),
+    claimBookForGeneration: jest.fn().mockResolvedValue(null),
+    moveTopicToBook: jest.fn().mockResolvedValue({ ok: true }),
   }),
-}));
+);
+
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
+  '../services/book-generation' /* gc1-allow: pattern-a conversion */,
+  () => ({
+    ...jest.requireActual('../services/book-generation'),
+    generateBookTopics: jest.fn().mockResolvedValue({
+      topics: [
+        {
+          title: 'Timeline of Egypt',
+          description: 'How it all began',
+          chapter: 'The Story',
+          sortOrder: 1,
+          estimatedMinutes: 30,
+        },
+      ],
+      connections: [],
+    }),
+  }),
+);
 
 jest.mock('inngest/hono', () => ({
   serve: jest.fn().mockReturnValue(jest.fn()),
 }));
 
-jest.mock('../inngest/client', () => ({
+jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../inngest/client'),
   // gc1-allow: Inngest SDK external boundary
   inngest: {
     send: jest.fn().mockResolvedValue(undefined),

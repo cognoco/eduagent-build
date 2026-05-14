@@ -22,24 +22,40 @@ const mockGetEmailFrom = jest.fn();
 const mockGetStepSupportEmail = jest.fn();
 const mockLoggerWarn = jest.fn();
 
-jest.mock('../../services/notifications', () => ({
-  sendEmail: (...args: unknown[]) => mockSendEmail(...args),
-}));
-
-jest.mock('../../services/sentry', () => ({
-  captureException: (...args: unknown[]) => mockCaptureException(...args),
-}));
-
-jest.mock('../../services/logger', () => ({
-  createLogger: () => ({
-    debug: jest.fn(),
-    info: jest.fn(),
-    warn: (...args: unknown[]) => mockLoggerWarn(...args),
-    error: jest.fn(),
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
+  '../../services/notifications' /* gc1-allow: pattern-a conversion */,
+  () => ({
+    ...jest.requireActual('../../services/notifications'),
+    sendEmail: (...args: unknown[]) => mockSendEmail(...args),
   }),
-}));
+);
 
-jest.mock('../helpers', () => ({
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
+  '../../services/sentry' /* gc1-allow: pattern-a conversion */,
+  () => ({
+    ...jest.requireActual('../../services/sentry'),
+    captureException: (...args: unknown[]) => mockCaptureException(...args),
+  }),
+);
+
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
+  '../../services/logger' /* gc1-allow: pattern-a conversion */,
+  () => ({
+    ...jest.requireActual('../../services/logger'),
+    createLogger: () => ({
+      debug: jest.fn(),
+      info: jest.fn(),
+      warn: (...args: unknown[]) => mockLoggerWarn(...args),
+      error: jest.fn(),
+    }),
+  }),
+);
+
+jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../helpers'),
   getStepResendApiKey: () => mockGetResendApiKey(),
   getStepEmailFrom: () => mockGetEmailFrom(),
   getStepSupportEmail: () => mockGetStepSupportEmail(),
@@ -49,7 +65,10 @@ import { createInngestTransportCapture } from '../../test-utils/inngest-transpor
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 
 const mockInngestTransport = createInngestTransportCapture();
-jest.mock('../client', () => mockInngestTransport.module); // gc1-allow: inngest framework boundary
+jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../client'),
+  ...mockInngestTransport.module,
+})); // gc1-allow: inngest framework boundary
 
 import { feedbackDeliveryFailed } from './feedback-delivery-failed';
 
@@ -396,7 +415,8 @@ describe('[BUG-767 / A-24] handler is registered with serve()', () => {
     // Mock client/createFunction once for this isolated import so we don't
     // collide with the test module's mocks above.
     jest.isolateModules(() => {
-      jest.doMock('../client', () => ({
+      jest.doMock('../client' /* gc1-allow: pattern-a conversion */, () => ({
+        ...jest.requireActual('../client'),
         inngest: {
           createFunction: jest.fn((cfg, _trigger, handler) => ({
             fn: handler,

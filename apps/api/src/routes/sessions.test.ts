@@ -13,7 +13,8 @@ const mockCaptureException = jest.fn();
 const mockAddBreadcrumb = jest.fn();
 const mockCaptureMessage = jest.fn();
 
-jest.mock('../services/sentry', () => ({
+jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../services/sentry'),
   addBreadcrumb: (...args: unknown[]) => mockAddBreadcrumb(...args),
   captureException: (...args: unknown[]) => mockCaptureException(...args),
   captureMessage: (...args: unknown[]) => mockCaptureMessage(...args),
@@ -33,7 +34,8 @@ jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 // Mock account + session services — no DB interaction
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/account', () => ({
+jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../services/account'),
   findOrCreateAccount: jest.fn().mockResolvedValue({
     id: 'test-account-id',
     clerkUserId: 'user_test',
@@ -47,7 +49,8 @@ jest.mock('../services/account', () => ({
 // Mock profile service — middleware auto-resolves owner profile
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/profile', () => ({
+jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../services/profile'),
   getProfile: jest.fn().mockResolvedValue({
     id: 'test-profile-id',
     birthYear: null,
@@ -94,7 +97,8 @@ const mockSafeRefundQuota = jest.fn(
   },
 );
 
-jest.mock('../services/billing', () => ({
+jest.mock('../services/billing' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../services/billing'),
   getSubscriptionByAccountId: jest.fn().mockResolvedValue(mockSubscription),
   ensureFreeSubscription: jest.fn().mockResolvedValue(mockSubscription),
   getQuotaPool: jest.fn().mockResolvedValue({
@@ -126,13 +130,14 @@ const SUBJECT_ID = '550e8400-e29b-41d4-a716-446655440000';
 const SESSION_ID = '660e8400-e29b-41d4-a716-446655440000';
 const EVENT_ID = '770e8400-e29b-41d4-a716-446655440000';
 
-jest.mock('../services/session', () => {
+jest.mock('../services/session' /* gc1-allow: pattern-a conversion */, () => {
   // Use real error classes so instanceof checks in route handlers match production behavior.
   const actual = jest.requireActual('../services/session') as Record<
     string,
     unknown
   >;
   return {
+    ...jest.requireActual('../services/session'),
     SubjectInactiveError: actual.SubjectInactiveError,
     SessionExchangeLimitError: actual.SessionExchangeLimitError,
     CurriculumSessionNotReadyError: actual.CurriculumSessionNotReadyError,
@@ -347,24 +352,33 @@ const mockStartInterleavedSession = jest.fn().mockResolvedValue({
   ],
 });
 
-jest.mock('../services/interleaved', () => {
-  const actual = jest.requireActual('../services/interleaved') as Record<
-    string,
-    unknown
-  >;
-  return {
-    // Preserve the real error class so route-layer instanceof checks work.
-    NoInterleavedTopicsError: actual.NoInterleavedTopicsError,
-    startInterleavedSession: (...args: unknown[]) =>
-      mockStartInterleavedSession(...args),
-  };
-});
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
+  '../services/interleaved' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual('../services/interleaved') as Record<
+      string,
+      unknown
+    >;
+    return {
+      // Preserve the real error class so route-layer instanceof checks work.
+      NoInterleavedTopicsError: actual.NoInterleavedTopicsError,
+      startInterleavedSession: (...args: unknown[]) =>
+        mockStartInterleavedSession(...args),
+    };
+  },
+);
 
-jest.mock('../services/recall-bridge', () => ({
-  generateRecallBridge: jest.fn().mockResolvedValue({
-    bridge: 'mock bridge',
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
+  '../services/recall-bridge' /* gc1-allow: pattern-a conversion */,
+  () => ({
+    ...jest.requireActual('../services/recall-bridge'),
+    generateRecallBridge: jest.fn().mockResolvedValue({
+      bridge: 'mock bridge',
+    }),
   }),
-}));
+);
 
 jest.mock('inngest/hono', () => ({
   serve: jest.fn().mockReturnValue(jest.fn()),
@@ -372,7 +386,8 @@ jest.mock('inngest/hono', () => ({
 
 const mockInngestSend = jest.fn().mockResolvedValue(undefined);
 
-jest.mock('../inngest/client', () => ({
+jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../inngest/client'),
   inngest: {
     send: (...args: unknown[]) => mockInngestSend(...args),
     createFunction: jest.fn().mockReturnValue(jest.fn()),

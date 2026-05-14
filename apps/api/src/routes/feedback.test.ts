@@ -6,7 +6,8 @@ jest.mock('inngest/hono', () => ({
   serve: jest.fn().mockReturnValue(jest.fn()),
 }));
 
-jest.mock('../inngest/client', () => ({
+jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../inngest/client'),
   inngest: {
     send: jest.fn().mockResolvedValue(undefined),
   },

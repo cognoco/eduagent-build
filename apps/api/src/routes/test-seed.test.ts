@@ -10,19 +10,25 @@ const mockRouteAndCall = jest.fn();
 const mockRouteAndStream = jest.fn();
 const mockGetRegisteredProviders = jest.fn().mockReturnValue([]);
 
-jest.mock('../services/llm', () => ({
+jest.mock('../services/llm' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../services/llm'),
   routeAndCall: (...args: unknown[]) => mockRouteAndCall(...args),
   routeAndStream: (...args: unknown[]) => mockRouteAndStream(...args),
   getRegisteredProviders: () => mockGetRegisteredProviders(),
 }));
 
-jest.mock('../services/test-seed', () => ({
-  seedScenario: jest.fn(),
-  resetDatabase: jest.fn(),
-  debugAccountsByEmail: jest.fn(),
-  debugSubjectsByClerkUserId: jest.fn(),
-  VALID_SCENARIOS: ['default'],
-}));
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
+  '../services/test-seed' /* gc1-allow: pattern-a conversion */,
+  () => ({
+    ...jest.requireActual('../services/test-seed'),
+    seedScenario: jest.fn(),
+    resetDatabase: jest.fn(),
+    debugAccountsByEmail: jest.fn(),
+    debugSubjectsByClerkUserId: jest.fn(),
+    VALID_SCENARIOS: ['default'],
+  }),
+);
 
 import { testSeedRoutes } from './test-seed';
 

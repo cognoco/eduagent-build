@@ -72,9 +72,11 @@ jest.mock('@eduagent/database', () => ({
 // ---------------------------------------------------------------------------
 
 const mockGetSessionTranscript = jest.fn();
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../../services/session' /* gc1-allow: isolates unit test from DB-backed transcript service */,
   () => ({
+    ...jest.requireActual('../../services/session'),
     getSessionTranscript: (...args: unknown[]) =>
       mockGetSessionTranscript(...args),
   }),
@@ -99,9 +101,11 @@ const mockResolveFilingResult = jest.fn().mockResolvedValue({
   isNew: { shelf: false, book: false, chapter: false },
 });
 
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../../services/filing' /* gc1-allow: isolates unit test from DB-backed filing service */,
   () => ({
+    ...jest.requireActual('../../services/filing'),
     buildLibraryIndex: (...args: unknown[]) => mockBuildLibraryIndex(...args),
     fileToLibrary: (...args: unknown[]) => mockFileToLibrary(...args),
     resolveFilingResult: (...args: unknown[]) =>
@@ -109,7 +113,8 @@ jest.mock(
   }),
 );
 
-jest.mock('../../services/llm', () => ({
+jest.mock('../../services/llm' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../../services/llm'),
   routeAndCall: jest.fn().mockResolvedValue({ text: 'mocked' }),
 }));
 

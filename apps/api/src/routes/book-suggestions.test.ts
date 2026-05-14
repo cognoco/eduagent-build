@@ -29,7 +29,8 @@ jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 // Mock account service — resolves Clerk user → local Account
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/account', () => ({
+jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../services/account'),
   findOrCreateAccount: jest.fn().mockResolvedValue({
     id: 'test-account-id',
     clerkUserId: 'user_test',
@@ -43,7 +44,8 @@ jest.mock('../services/account', () => ({
 // Mock profile service — profile-scope middleware auto-resolves owner profile
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/profile', () => ({
+jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../services/profile'),
   findOwnerProfile: jest.fn().mockResolvedValue({
     id: 'test-profile-id',
     accountId: 'test-account-id',
@@ -68,7 +70,8 @@ jest.mock('../services/profile', () => ({
 // Mock suggestion services — stubs for route handler
 // ---------------------------------------------------------------------------
 
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../services/suggestions' /* gc1-allow: LLM service boundary */,
   () => {
     const stubSuggestion = {
@@ -82,6 +85,7 @@ jest.mock(
       pickedAt: null,
     };
     return {
+      ...jest.requireActual('../services/suggestions'),
       getUnpickedBookSuggestionsEnvelope: jest.fn().mockResolvedValue({
         suggestions: [stubSuggestion],
         curriculumBookCount: 3,
@@ -99,7 +103,8 @@ jest.mock(
 // Mock LLM services — registerProvider for llm middleware
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/llm', () => ({
+jest.mock('../services/llm' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../services/llm'),
   routeAndCall: jest.fn(),
   registerProvider: jest.fn(),
   getRegisteredProviders: jest.fn().mockReturnValue([]),
@@ -111,7 +116,8 @@ jest.mock('../services/llm', () => ({
 // Mock Sentry (used by global error handler)
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/sentry', () => ({
+jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../services/sentry'),
   captureException: jest.fn(),
 }));
 

@@ -32,7 +32,7 @@ jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 // Mock account service — resolves Clerk user → local Account
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/account', () => ({
+jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => ({
   ...jest.requireActual('../services/account'),
   findOrCreateAccount: jest.fn().mockResolvedValue({
     id: 'test-account-id',
@@ -47,7 +47,7 @@ jest.mock('../services/account', () => ({
 // Mock profile service — profile-scope middleware auto-resolves owner profile
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/profile', () => ({
+jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => ({
   ...jest.requireActual('../services/profile'),
   findOwnerProfile: jest.fn().mockResolvedValue({
     id: 'test-profile-id',
@@ -73,24 +73,29 @@ jest.mock('../services/profile', () => ({
 // Mock suggestion services — stub for route handler
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/suggestions', () => ({
-  ...jest.requireActual('../services/suggestions'),
-  getUnusedTopicSuggestions: jest.fn().mockResolvedValue([
-    {
-      id: TEST_TOPIC_ID,
-      bookId: 'a0000000-0000-4000-a000-000000000401',
-      title: 'Suggested Topic',
-      createdAt: '2024-01-01T00:00:00.000Z',
-      usedAt: null,
-    },
-  ]),
-}));
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
+  '../services/suggestions' /* gc1-allow: pattern-a conversion */,
+  () => ({
+    ...jest.requireActual('../services/suggestions'),
+    getUnusedTopicSuggestions: jest.fn().mockResolvedValue([
+      {
+        id: TEST_TOPIC_ID,
+        bookId: 'a0000000-0000-4000-a000-000000000401',
+        title: 'Suggested Topic',
+        createdAt: '2024-01-01T00:00:00.000Z',
+        usedAt: null,
+      },
+    ]),
+  }),
+);
 
 // ---------------------------------------------------------------------------
 // Mock LLM services — registerProvider for llm middleware
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/llm', () => ({
+jest.mock('../services/llm' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../services/llm'),
   // gc1-allow: LLM routeAndCall external boundary
   routeAndCall: jest.fn(),
   registerProvider: jest.fn(),
@@ -103,7 +108,8 @@ jest.mock('../services/llm', () => ({
 // Mock Sentry (used by global error handler)
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/sentry', () => ({
+jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../services/sentry'),
   // gc1-allow: @sentry/cloudflare external boundary
   captureException: jest.fn(),
 }));

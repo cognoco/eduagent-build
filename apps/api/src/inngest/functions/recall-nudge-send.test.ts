@@ -7,42 +7,52 @@ const mockSendPushNotification = jest.fn();
 const mockFormatRecallNudge = jest.fn();
 const mockResolveProfileRole = jest.fn();
 
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../helpers' /* gc1-allow: isolates DB connection from unit test */,
   () => ({
+    ...jest.requireActual('../helpers'),
     getStepDatabase: () => mockGetStepDatabase(),
   }),
 );
 
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../../services/notifications' /* gc1-allow: isolates push notification external boundary */,
   () => ({
+    ...jest.requireActual('../../services/notifications'),
     sendPushNotification: (...args: unknown[]) =>
       mockSendPushNotification(...args),
     formatRecallNudge: (...args: unknown[]) => mockFormatRecallNudge(...args),
   }),
 );
 
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../../services/profile' /* gc1-allow: isolates profile service from unit test */,
   () => ({
+    ...jest.requireActual('../../services/profile'),
     resolveProfileRole: (...args: unknown[]) => mockResolveProfileRole(...args),
   }),
 );
 
 const mockGetRecentNotificationCount = jest.fn().mockResolvedValue(0);
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../../services/settings' /* gc1-allow: isolates notification settings service */,
   () => ({
+    ...jest.requireActual('../../services/settings'),
     getRecentNotificationCount: (...args: unknown[]) =>
       mockGetRecentNotificationCount(...args),
   }),
 );
 
 const mockCaptureException = jest.fn();
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../../services/sentry' /* gc1-allow: isolates Sentry external boundary */,
   () => ({
+    ...jest.requireActual('../../services/sentry'),
     captureException: (...args: unknown[]) => mockCaptureException(...args),
   }),
 );
@@ -51,7 +61,10 @@ import { createInngestTransportCapture } from '../../test-utils/inngest-transpor
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 
 const mockInngestTransport = createInngestTransportCapture();
-jest.mock('../client', () => mockInngestTransport.module); // gc1-allow: inngest framework boundary
+jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../client'),
+  ...mockInngestTransport.module,
+})); // gc1-allow: inngest framework boundary
 
 // Mock drizzle-orm + database
 jest.mock(

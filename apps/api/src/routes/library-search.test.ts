@@ -22,7 +22,8 @@ jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 // Mock account + profile services (required by auth middleware)
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/account', () => ({
+jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../services/account'),
   findOrCreateAccount: jest.fn().mockResolvedValue({
     id: 'test-account-id',
     clerkUserId: 'user_test',
@@ -32,7 +33,8 @@ jest.mock('../services/account', () => ({
   }),
 }));
 
-jest.mock('../services/profile', () => ({
+jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../services/profile'),
   findOwnerProfile: jest.fn().mockResolvedValue(null),
   getProfile: jest.fn().mockResolvedValue({
     id: 'test-profile-id',
@@ -49,9 +51,14 @@ jest.mock('../services/profile', () => ({
 
 const mockSearchLibrary = jest.fn();
 
-jest.mock('../services/library-search', () => ({
-  searchLibrary: (...args: unknown[]) => mockSearchLibrary(...args),
-}));
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
+  '../services/library-search' /* gc1-allow: pattern-a conversion */,
+  () => ({
+    ...jest.requireActual('../services/library-search'),
+    searchLibrary: (...args: unknown[]) => mockSearchLibrary(...args),
+  }),
+);
 
 // ---------------------------------------------------------------------------
 // Imports (after mocks)

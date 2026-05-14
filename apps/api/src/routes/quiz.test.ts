@@ -26,9 +26,11 @@ jest.mock('inngest/hono', () => ({
   serve: jest.fn().mockReturnValue(jest.fn()),
 }));
 
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../inngest/client' /* gc1-allow: route-level test isolates Inngest event bus */,
   () => ({
+    ...jest.requireActual('../inngest/client'),
     inngest: {
       send: jest.fn().mockResolvedValue(undefined),
       createFunction: jest.fn().mockReturnValue(jest.fn()),
@@ -37,6 +39,7 @@ jest.mock(
 );
 
 jest.mock('../services/account' /* gc1-allow: unit test boundary */, () => ({
+  ...jest.requireActual('../services/account'),
   findOrCreateAccount: jest.fn().mockResolvedValue({
     id: 'test-account-id',
     clerkUserId: 'user_test',
@@ -47,6 +50,7 @@ jest.mock('../services/account' /* gc1-allow: unit test boundary */, () => ({
 }));
 
 jest.mock('../services/profile' /* gc1-allow: unit test boundary */, () => ({
+  ...jest.requireActual('../services/profile'),
   findOwnerProfile: jest.fn().mockResolvedValue(null),
   getProfile: jest.fn().mockResolvedValue({
     id: 'test-profile-id',
@@ -58,6 +62,7 @@ jest.mock('../services/profile' /* gc1-allow: unit test boundary */, () => ({
 }));
 
 jest.mock('../services/streaks' /* gc1-allow: unit test boundary */, () => ({
+  ...jest.requireActual('../services/streaks'),
   recordSessionActivity: jest
     .fn()
     .mockResolvedValue({ currentStreak: 1, longestStreak: 1 }),

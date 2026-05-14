@@ -38,9 +38,11 @@ jest.mock('@eduagent/database', () => mockDatabaseModule.module); // gc1-allow: 
 
 const mockRefreshProgressSnapshot = jest.fn();
 
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../../services/snapshot-aggregation' /* gc1-allow: isolates snapshot refresh from real DB aggregation */,
   () => ({
+    ...jest.requireActual('../../services/snapshot-aggregation'),
     refreshProgressSnapshot: (...args: unknown[]) =>
       mockRefreshProgressSnapshot(...args),
   }),
@@ -48,14 +50,17 @@ jest.mock(
 
 const mockCaptureException = jest.fn();
 
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../../services/sentry' /* gc1-allow: external error tracker boundary */,
   () => ({
+    ...jest.requireActual('../../services/sentry'),
     captureException: (...args: unknown[]) => mockCaptureException(...args),
   }),
 );
 
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../helpers' /* gc1-allow: isolates step-database helper; uses requireActual for non-stubbed exports */,
   () => {
     const actual = jest.requireActual('../helpers');

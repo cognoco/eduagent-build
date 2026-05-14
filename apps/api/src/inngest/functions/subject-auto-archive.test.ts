@@ -11,9 +11,11 @@ jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
 const mockArchiveInactiveSubjects = jest.fn().mockResolvedValue([]);
 
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../../services/subject' /* gc1-allow: prevents real DB subject archival from running in unit tests */,
   () => ({
+    ...jest.requireActual('../../services/subject'),
     archiveInactiveSubjects: (...args: unknown[]) =>
       mockArchiveInactiveSubjects(...args),
   }),

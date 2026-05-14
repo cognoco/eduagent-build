@@ -29,7 +29,8 @@ mockDatabaseModule.db.query = new Proxy(mockDatabaseModule.db.query as object, {
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
-jest.mock('../services/account', () => ({
+jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../services/account'),
   findOrCreateAccount: jest.fn().mockResolvedValue({
     id: 'test-account-id',
     clerkUserId: 'user_test',
@@ -39,7 +40,8 @@ jest.mock('../services/account', () => ({
   }),
 }));
 
-jest.mock('../services/profile', () => ({
+jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../services/profile'),
   findOwnerProfile: jest.fn().mockResolvedValue(null),
   getProfile: jest.fn().mockResolvedValue({
     id: 'test-profile-id',
@@ -53,14 +55,18 @@ const mockGetChildrenForParent = jest.fn().mockResolvedValue([]);
 const mockGetChildDetail = jest.fn().mockResolvedValue(null);
 const mockGetChildSubjectTopics = jest.fn().mockResolvedValue([]);
 
-jest.mock('../services/dashboard', () => ({
-  ...jest.requireActual('../services/dashboard'),
-  getChildrenForParent: (...args: unknown[]) =>
-    mockGetChildrenForParent(...args),
-  getChildDetail: (...args: unknown[]) => mockGetChildDetail(...args),
-  getChildSubjectTopics: (...args: unknown[]) =>
-    mockGetChildSubjectTopics(...args),
-}));
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
+  '../services/dashboard' /* gc1-allow: pattern-a conversion */,
+  () => ({
+    ...jest.requireActual('../services/dashboard'),
+    getChildrenForParent: (...args: unknown[]) =>
+      mockGetChildrenForParent(...args),
+    getChildDetail: (...args: unknown[]) => mockGetChildDetail(...args),
+    getChildSubjectTopics: (...args: unknown[]) =>
+      mockGetChildSubjectTopics(...args),
+  }),
+);
 
 const mockGetProgressSummary = jest.fn().mockResolvedValue({
   summary: null,
@@ -71,9 +77,11 @@ const mockGetProgressSummary = jest.fn().mockResolvedValue({
   nudgeRecommended: true,
 });
 
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../services/progress-summary' /* gc1-allow: route test isolates progress summary service contract */,
   () => ({
+    ...jest.requireActual('../services/progress-summary'),
     getProgressSummary: (...args: unknown[]) => mockGetProgressSummary(...args),
   }),
 );
@@ -85,15 +93,19 @@ const mockMarkWeeklyReportViewed = jest.fn().mockResolvedValue(undefined);
 // NOTE: This is a route-unit test — shallow-mocking the weekly-report service
 // is intentional here. Integration coverage for the service layer lives in the
 // Inngest integration test (weekly-progress-push.integration.test.ts).
-jest.mock('../services/weekly-report', () => ({
-  ...jest.requireActual('../services/weekly-report'),
-  listWeeklyReportsForParentChild: (...args: unknown[]) =>
-    mockListWeeklyReports(...args),
-  getWeeklyReportForParentChild: (...args: unknown[]) =>
-    mockGetWeeklyReport(...args),
-  markWeeklyReportViewed: (...args: unknown[]) =>
-    mockMarkWeeklyReportViewed(...args),
-}));
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
+  '../services/weekly-report' /* gc1-allow: pattern-a conversion */,
+  () => ({
+    ...jest.requireActual('../services/weekly-report'),
+    listWeeklyReportsForParentChild: (...args: unknown[]) =>
+      mockListWeeklyReports(...args),
+    getWeeklyReportForParentChild: (...args: unknown[]) =>
+      mockGetWeeklyReport(...args),
+    markWeeklyReportViewed: (...args: unknown[]) =>
+      mockMarkWeeklyReportViewed(...args),
+  }),
+);
 
 import { app } from '../index';
 import { ForbiddenError } from '../errors';

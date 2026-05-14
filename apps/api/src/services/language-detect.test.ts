@@ -2,7 +2,8 @@
 // Language Detection — Tests [4A.3]
 // ---------------------------------------------------------------------------
 
-jest.mock('./llm', () => ({
+jest.mock('./llm' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('./llm'),
   routeAndCall: jest.fn(),
 }));
 

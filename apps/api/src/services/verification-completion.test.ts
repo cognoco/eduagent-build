@@ -13,13 +13,15 @@ const mockDatabaseModule = createDatabaseModuleMock({
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
-jest.mock('./evaluate', () => ({
+jest.mock('./evaluate' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('./evaluate'),
   parseEvaluateAssessment: jest.fn(),
   mapEvaluateQualityToSm2: jest.fn(),
   handleEvaluateFailure: jest.fn(),
 }));
 
-jest.mock('./teach-back', () => ({
+jest.mock('./teach-back' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('./teach-back'),
   parseTeachBackAssessment: jest.fn(),
   mapTeachBackRubricToSm2: jest.fn(),
 }));

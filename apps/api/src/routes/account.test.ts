@@ -13,14 +13,16 @@ jest.mock('inngest/hono', () => ({
   serve: jest.fn().mockReturnValue(jest.fn()),
 }));
 
-jest.mock('../inngest/client', () => ({
+jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../inngest/client'),
   inngest: {
     send: jest.fn().mockResolvedValue(undefined),
     createFunction: jest.fn().mockReturnValue(jest.fn()),
   },
 }));
 
-jest.mock('../services/sentry', () => ({
+jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../services/sentry'),
   captureException: jest.fn(),
   addBreadcrumb: jest.fn(),
 }));
@@ -50,7 +52,8 @@ jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 // Mock account, deletion, and export services — no DB interaction
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/account', () => ({
+jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../services/account'),
   findOrCreateAccount: jest.fn().mockResolvedValue({
     id: 'test-account-id',
     clerkUserId: 'user_test',
@@ -60,17 +63,19 @@ jest.mock('../services/account', () => ({
   }),
 }));
 
-jest.mock('../services/deletion', () => ({
+jest.mock('../services/deletion' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../services/deletion'),
   scheduleDeletion: jest.fn().mockResolvedValue({
     gracePeriodEnds: new Date(
-      Date.now() + 7 * 24 * 60 * 60 * 1000
+      Date.now() + 7 * 24 * 60 * 60 * 1000,
     ).toISOString(),
   }),
   cancelDeletion: jest.fn().mockResolvedValue(undefined),
   getProfileIdsForAccount: jest.fn().mockResolvedValue(['profile-1']),
 }));
 
-jest.mock('../services/export', () => ({
+jest.mock('../services/export' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../services/export'),
   generateExport: jest.fn().mockResolvedValue({
     account: {
       email: 'test@example.com',
@@ -121,7 +126,7 @@ describe('account routes', () => {
           method: 'POST',
           headers: makeAuthHeaders(),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -150,7 +155,7 @@ describe('account routes', () => {
           method: 'POST',
           headers: makeAuthHeaders(),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       const body = await res.json();
@@ -158,7 +163,7 @@ describe('account routes', () => {
       expect(res.status).toBe(200);
       expect(body.message).toBe('Deletion scheduled');
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to dispatch deletion event')
+        expect.stringContaining('Failed to dispatch deletion event'),
       );
 
       // Sentry escalation: assert the deliberate call from this catch block
@@ -181,7 +186,7 @@ describe('account routes', () => {
       const res = await app.request(
         '/v1/account/delete',
         { method: 'POST' },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);
@@ -200,7 +205,7 @@ describe('account routes', () => {
           method: 'POST',
           headers: makeAuthHeaders(),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -213,7 +218,7 @@ describe('account routes', () => {
       const res = await app.request(
         '/v1/account/cancel-deletion',
         { method: 'POST' },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);
@@ -229,7 +234,7 @@ describe('account routes', () => {
       const res = await app.request(
         '/v1/account/export',
         { headers: makeAuthHeaders() },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);

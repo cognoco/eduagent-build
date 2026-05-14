@@ -20,7 +20,8 @@ jest.mock('inngest/hono', () => ({
   serve: jest.fn().mockReturnValue(jest.fn()),
 }));
 
-jest.mock('../inngest/client', () => ({
+jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../inngest/client'),
   // gc1-allow: Inngest SDK external boundary
   inngest: {
     send: jest.fn().mockResolvedValue(undefined),
@@ -50,7 +51,7 @@ mockDatabaseModule.db.query = new Proxy(mockDatabaseModule.db.query as object, {
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
-jest.mock('../services/account', () => ({
+jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => ({
   ...jest.requireActual('../services/account'),
   findOrCreateAccount: jest.fn().mockResolvedValue({
     id: 'test-account-id',
@@ -65,7 +66,7 @@ jest.mock('../services/account', () => ({
 // a verified profileId on the account. We return a profile owned by the
 // account regardless of which id is sent so the middleware accepts the
 // header and writes it to the context.
-jest.mock('../services/profile', () => ({
+jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => ({
   ...jest.requireActual('../services/profile'),
   findOwnerProfile: jest.fn().mockResolvedValue(null),
   getProfile: jest
@@ -91,33 +92,43 @@ const mockUnsuppressInference = jest.fn();
 const mockBuildHumanReadableMemoryExport = jest.fn();
 const mockUpdateAccommodationMode = jest.fn();
 
-jest.mock('../services/learner-profile', () => ({
-  ...jest.requireActual('../services/learner-profile'),
-  getOrCreateLearningProfile: (...args: unknown[]) =>
-    mockGetOrCreateLearningProfile(...args),
-  deleteAllMemory: (...args: unknown[]) => mockDeleteAllMemory(...args),
-  deleteMemoryItem: (...args: unknown[]) => mockDeleteMemoryItem(...args),
-  toggleMemoryEnabled: (...args: unknown[]) => mockToggleMemoryEnabled(...args),
-  toggleMemoryCollection: (...args: unknown[]) =>
-    mockToggleMemoryCollection(...args),
-  toggleMemoryInjection: (...args: unknown[]) =>
-    mockToggleMemoryInjection(...args),
-  grantMemoryConsent: (...args: unknown[]) => mockGrantMemoryConsent(...args),
-  unsuppressInference: (...args: unknown[]) => mockUnsuppressInference(...args),
-  buildHumanReadableMemoryExport: (...args: unknown[]) =>
-    mockBuildHumanReadableMemoryExport(...args),
-  updateAccommodationMode: (...args: unknown[]) =>
-    mockUpdateAccommodationMode(...args),
-}));
-
-jest.mock('../services/learner-input', () => ({
-  ...jest.requireActual('../services/learner-input'),
-  parseLearnerInput: jest.fn().mockResolvedValue({
-    success: true,
-    message: 'Got it!',
-    fieldsUpdated: ['interests'],
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
+  '../services/learner-profile' /* gc1-allow: pattern-a conversion */,
+  () => ({
+    ...jest.requireActual('../services/learner-profile'),
+    getOrCreateLearningProfile: (...args: unknown[]) =>
+      mockGetOrCreateLearningProfile(...args),
+    deleteAllMemory: (...args: unknown[]) => mockDeleteAllMemory(...args),
+    deleteMemoryItem: (...args: unknown[]) => mockDeleteMemoryItem(...args),
+    toggleMemoryEnabled: (...args: unknown[]) =>
+      mockToggleMemoryEnabled(...args),
+    toggleMemoryCollection: (...args: unknown[]) =>
+      mockToggleMemoryCollection(...args),
+    toggleMemoryInjection: (...args: unknown[]) =>
+      mockToggleMemoryInjection(...args),
+    grantMemoryConsent: (...args: unknown[]) => mockGrantMemoryConsent(...args),
+    unsuppressInference: (...args: unknown[]) =>
+      mockUnsuppressInference(...args),
+    buildHumanReadableMemoryExport: (...args: unknown[]) =>
+      mockBuildHumanReadableMemoryExport(...args),
+    updateAccommodationMode: (...args: unknown[]) =>
+      mockUpdateAccommodationMode(...args),
   }),
-}));
+);
+
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
+  '../services/learner-input' /* gc1-allow: pattern-a conversion */,
+  () => ({
+    ...jest.requireActual('../services/learner-input'),
+    parseLearnerInput: jest.fn().mockResolvedValue({
+      success: true,
+      message: 'Got it!',
+      fieldsUpdated: ['interests'],
+    }),
+  }),
+);
 
 import { app } from '../index';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';

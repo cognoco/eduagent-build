@@ -5,14 +5,20 @@ import { streakRecord } from './streak-record';
 const mockGetStepDatabase = jest.fn();
 const mockRecordSessionActivity = jest.fn();
 
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../helpers' /* gc1-allow: Inngest step runtime requires mocking helper abstractions */,
-  () => ({ getStepDatabase: () => mockGetStepDatabase() }),
+  () => ({
+    ...jest.requireActual('../helpers'),
+    getStepDatabase: () => mockGetStepDatabase(),
+  }),
 );
 
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../../services/streaks' /* gc1-allow: Inngest step runtime requires mocking service abstractions */,
   () => ({
+    ...jest.requireActual('../../services/streaks'),
     recordSessionActivity: (...args: unknown[]) =>
       mockRecordSessionActivity(...args),
   }),

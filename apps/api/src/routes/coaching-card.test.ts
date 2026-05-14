@@ -14,7 +14,8 @@ const mockDatabaseModule = createDatabaseModuleMock();
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
-jest.mock('../services/account', () => ({
+jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../services/account'),
   findOrCreateAccount: jest.fn().mockResolvedValue({
     id: 'test-account-id',
     clerkUserId: 'user_test',
@@ -24,7 +25,8 @@ jest.mock('../services/account', () => ({
   }),
 }));
 
-jest.mock('../services/profile', () => ({
+jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../services/profile'),
   findOwnerProfile: jest.fn().mockResolvedValue(null),
   getProfile: jest.fn().mockResolvedValue({
     id: 'test-profile-id',
@@ -34,9 +36,14 @@ jest.mock('../services/profile', () => ({
   }),
 }));
 
-jest.mock('../services/coaching-cards', () => ({
-  getCoachingCardForProfile: jest.fn(),
-}));
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
+  '../services/coaching-cards' /* gc1-allow: pattern-a conversion */,
+  () => ({
+    ...jest.requireActual('../services/coaching-cards'),
+    getCoachingCardForProfile: jest.fn(),
+  }),
+);
 
 import { app } from '../index';
 import { getCoachingCardForProfile } from '../services/coaching-cards';
@@ -87,7 +94,7 @@ describe('coaching card routes', () => {
       const res = await app.request(
         '/v1/coaching-card',
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -127,7 +134,7 @@ describe('coaching card routes', () => {
       const res = await app.request(
         '/v1/coaching-card',
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);

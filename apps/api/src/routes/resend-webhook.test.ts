@@ -2,14 +2,16 @@
 // Resend Webhook Route — Tests [BUG-29]
 // ---------------------------------------------------------------------------
 
-jest.mock('../inngest/client', () => ({
+jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../inngest/client'),
   inngest: {
     send: jest.fn().mockResolvedValue(undefined),
   },
 }));
 
 const mockLoggerWarn = jest.fn();
-jest.mock('../services/logger', () => ({
+jest.mock('../services/logger' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../services/logger'),
   createLogger: () => ({
     info: jest.fn(),
     warn: mockLoggerWarn,

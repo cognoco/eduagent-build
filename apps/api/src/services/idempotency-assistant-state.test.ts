@@ -13,11 +13,13 @@ import { like } from 'drizzle-orm';
 import type { Database } from '@eduagent/database';
 import { lookupAssistantTurnState } from './idempotency-assistant-state';
 
-jest.mock('./sentry', () => ({
+jest.mock('./sentry' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('./sentry'),
   captureException: jest.fn(),
   addBreadcrumb: jest.fn(),
 }));
-jest.mock('./logger', () => ({
+jest.mock('./logger' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('./logger'),
   createLogger: () => ({
     info: jest.fn(),
     warn: jest.fn(),
@@ -25,7 +27,8 @@ jest.mock('./logger', () => ({
     debug: jest.fn(),
   }),
 }));
-jest.mock('../inngest/client', () => ({
+jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../inngest/client'),
   inngest: { send: jest.fn().mockResolvedValue(undefined) },
 }));
 

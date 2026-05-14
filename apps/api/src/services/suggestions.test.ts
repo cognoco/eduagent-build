@@ -6,9 +6,13 @@
 import { jest } from '@jest/globals';
 
 const generateMock = jest.fn<(...args: unknown[]) => Promise<void>>();
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   './book-suggestion-generation' /* gc1-allow: LLM dependency */,
   () => ({
+    ...jest.requireActual<typeof import('./book-suggestion-generation')>(
+      './book-suggestion-generation',
+    ),
     generateCategorizedBookSuggestions: (...args: unknown[]) =>
       generateMock(...args),
   }),

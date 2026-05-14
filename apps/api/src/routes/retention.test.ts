@@ -14,7 +14,8 @@ const mockDatabaseModule = createDatabaseModuleMock();
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
-jest.mock('../services/account', () => ({
+jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../services/account'),
   findOrCreateAccount: jest.fn().mockResolvedValue({
     id: 'test-account-id',
     clerkUserId: 'user_test',
@@ -24,7 +25,8 @@ jest.mock('../services/account', () => ({
   }),
 }));
 
-jest.mock('../services/profile', () => ({
+jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../services/profile'),
   findOwnerProfile: jest.fn().mockResolvedValue(null),
   getProfile: jest.fn().mockResolvedValue({
     id: 'test-profile-id',
@@ -34,18 +36,23 @@ jest.mock('../services/profile', () => ({
   }),
 }));
 
-jest.mock('../services/retention-data', () => ({
-  getSubjectRetention: jest.fn(),
-  getAllSubjectsRetention: jest.fn(),
-  getTopicRetention: jest.fn(),
-  processRecallTest: jest.fn(),
-  startRelearn: jest.fn(),
-  getSubjectNeedsDeepening: jest.fn(),
-  getTeachingPreference: jest.fn(),
-  setTeachingPreference: jest.fn(),
-  deleteTeachingPreference: jest.fn(),
-  getStableTopics: jest.fn(),
-}));
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
+  '../services/retention-data' /* gc1-allow: pattern-a conversion */,
+  () => ({
+    ...jest.requireActual('../services/retention-data'),
+    getSubjectRetention: jest.fn(),
+    getAllSubjectsRetention: jest.fn(),
+    getTopicRetention: jest.fn(),
+    processRecallTest: jest.fn(),
+    startRelearn: jest.fn(),
+    getSubjectNeedsDeepening: jest.fn(),
+    getTeachingPreference: jest.fn(),
+    setTeachingPreference: jest.fn(),
+    deleteTeachingPreference: jest.fn(),
+    getStableTopics: jest.fn(),
+  }),
+);
 
 import { app } from '../index';
 import {

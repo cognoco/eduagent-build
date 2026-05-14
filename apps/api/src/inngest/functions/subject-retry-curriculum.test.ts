@@ -8,35 +8,47 @@ const mockPersistBookTopics = jest.fn();
 const mockGetProfileAge = jest.fn();
 const mockCaptureException = jest.fn();
 
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../helpers' /* gc1-allow: Inngest step runtime requires mocking helper abstractions */,
-  () => ({ getStepDatabase: () => mockGetStepDatabase() }),
+  () => ({
+    ...jest.requireActual('../helpers'),
+    getStepDatabase: () => mockGetStepDatabase(),
+  }),
 );
 
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../../services/book-generation' /* gc1-allow: Inngest step runtime requires mocking service abstractions */,
   () => ({
+    ...jest.requireActual('../../services/book-generation'),
     generateBookTopics: (...args: unknown[]) => mockGenerateBookTopics(...args),
   }),
 );
 
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../../services/curriculum' /* gc1-allow: Inngest step runtime requires mocking service abstractions */,
   () => ({
+    ...jest.requireActual('../../services/curriculum'),
     persistBookTopics: (...args: unknown[]) => mockPersistBookTopics(...args),
   }),
 );
 
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../../services/profile' /* gc1-allow: Inngest step runtime requires mocking service abstractions */,
   () => ({
+    ...jest.requireActual('../../services/profile'),
     getProfileAge: (...args: unknown[]) => mockGetProfileAge(...args),
   }),
 );
 
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../../services/sentry' /* gc1-allow: Inngest step runtime requires mocking service abstractions */,
   () => ({
+    ...jest.requireActual('../../services/sentry'),
     captureException: (...args: unknown[]) => mockCaptureException(...args),
   }),
 );

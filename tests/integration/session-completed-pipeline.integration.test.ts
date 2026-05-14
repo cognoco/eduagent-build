@@ -55,9 +55,14 @@ import { mockVoyageAI, type MockHandle } from './external-mocks';
 
 const mockCaptureException = jest.fn();
 
-jest.mock('../../apps/api/src/services/sentry', () => ({
-  captureException: (...args: unknown[]) => mockCaptureException(...args),
-}));
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
+  '../../apps/api/src/services/sentry' /* gc1-allow: pattern-a conversion */,
+  () => ({
+    ...jest.requireActual('../../apps/api/src/services/sentry'),
+    captureException: (...args: unknown[]) => mockCaptureException(...args),
+  }),
+);
 
 import { sessionCompleted } from '../../apps/api/src/inngest/functions/session-completed';
 
@@ -92,7 +97,7 @@ interface ChainResult {
 }
 
 async function executeChain(
-  eventData: Record<string, unknown>
+  eventData: Record<string, unknown>,
 ): Promise<ChainResult> {
   const mockStep = {
     // Each step's callback is invoked immediately — no Inngest runtime needed
@@ -229,9 +234,9 @@ async function seedScenario(options?: {
         content: ex.content,
         createdAt: new Date(
           new Date('2026-02-24T10:00:00.000Z').getTime() +
-            ex.offsetSeconds * 1000
+            ex.offsetSeconds * 1000,
         ),
-      }))
+      })),
     );
   }
 
@@ -298,7 +303,7 @@ async function loadRetentionCard(profileId: string, topicId: string) {
   return db.query.retentionCards.findFirst({
     where: and(
       eq(retentionCards.profileId, profileId),
-      eq(retentionCards.topicId, topicId)
+      eq(retentionCards.topicId, topicId),
     ),
   });
 }
@@ -377,7 +382,7 @@ describe('session-completed Inngest pipeline (integration)', () => {
     // SM-2 algorithm applied: retention card must be updated
     const retentionCard = await loadRetentionCard(
       scenario.profileId,
-      scenario.topicId
+      scenario.topicId,
     );
     expect(retentionCard).not.toBeNull();
     // Good quality (4/5) increments repetitions: 3 → 4+
@@ -387,12 +392,12 @@ describe('session-completed Inngest pipeline (integration)', () => {
     // nextReviewAt must be set to a future date relative to session timestamp
     expect(retentionCard!.nextReviewAt).not.toBeNull();
     expect(retentionCard!.nextReviewAt!.getTime()).toBeGreaterThan(
-      new Date(SESSION_TIMESTAMP).getTime()
+      new Date(SESSION_TIMESTAMP).getTime(),
     );
 
     // update-retention step must report success (not failed/skipped)
     const retentionOutcome = result.outcomes.find(
-      (o) => o.step === 'update-retention'
+      (o) => o.step === 'update-retention',
     );
     expect(retentionOutcome?.status).toBe('ok');
 
@@ -411,7 +416,7 @@ describe('session-completed Inngest pipeline (integration)', () => {
     // Verify no card exists before the pipeline runs
     const cardBefore = await loadRetentionCard(
       scenario.profileId,
-      scenario.topicId
+      scenario.topicId,
     );
     expect(cardBefore).toBeUndefined();
 
@@ -431,7 +436,7 @@ describe('session-completed Inngest pipeline (integration)', () => {
     // updateRetentionFromSession auto-creates via ensureRetentionCard
     const cardAfter = await loadRetentionCard(
       scenario.profileId,
-      scenario.topicId
+      scenario.topicId,
     );
     expect(cardAfter).not.toBeNull();
     expect(cardAfter!.profileId).toBe(scenario.profileId);
@@ -441,12 +446,12 @@ describe('session-completed Inngest pipeline (integration)', () => {
     // nextReviewAt must be scheduled into the future
     expect(cardAfter!.nextReviewAt).not.toBeNull();
     expect(cardAfter!.nextReviewAt!.getTime()).toBeGreaterThan(
-      new Date(SESSION_TIMESTAMP).getTime()
+      new Date(SESSION_TIMESTAMP).getTime(),
     );
 
     // update-retention step must report success
     const retentionOutcome = result.outcomes.find(
-      (o) => o.step === 'update-retention'
+      (o) => o.step === 'update-retention',
     );
     expect(retentionOutcome?.status).toBe('ok');
 
@@ -460,7 +465,7 @@ describe('session-completed Inngest pipeline (integration)', () => {
 
     // Verify the Authorization header used the right API key
     expect(voyageCalls[0].headers['Authorization']).toBe(
-      'Bearer voyage-stab-pipeline-test-key'
+      'Bearer voyage-stab-pipeline-test-key',
     );
   });
 
@@ -489,13 +494,13 @@ describe('session-completed Inngest pipeline (integration)', () => {
 
     // Without qualityRating, retention update must be SKIPPED (not failed)
     const retentionOutcome = result.outcomes.find(
-      (o) => o.step === 'update-retention'
+      (o) => o.step === 'update-retention',
     );
     expect(retentionOutcome?.status).toBe('skipped');
 
     // needs-deepening step also requires a quality rating — must be SKIPPED
     const needsDeepeningOutcome = result.outcomes.find(
-      (o) => o.step === 'update-needs-deepening'
+      (o) => o.step === 'update-needs-deepening',
     );
     expect(needsDeepeningOutcome?.status).toBe('skipped');
 
@@ -574,10 +579,10 @@ describe('session-completed Inngest pipeline (integration)', () => {
     expect(summary).not.toBeNull();
     expect(summary!.highlight).toBe('Practiced equivalent fractions');
     expect(summary!.narrative).toBe(
-      'They compared fraction sizes and fixed one shaky step after a hint.'
+      'They compared fraction sizes and fixed one shaky step after a hint.',
     );
     expect(summary!.conversationPrompt).toBe(
-      'Which fraction felt easiest to compare today?'
+      'Which fraction felt easiest to compare today?',
     );
     expect(summary!.engagementSignal).toBe('curious');
 
@@ -585,7 +590,7 @@ describe('session-completed Inngest pipeline (integration)', () => {
       createIntegrationDb(),
       parentProfileId,
       scenario.profileId,
-      scenario.sessionId
+      scenario.sessionId,
     );
 
     expect(sessionDetail).toEqual(
@@ -595,7 +600,7 @@ describe('session-completed Inngest pipeline (integration)', () => {
           'They compared fraction sizes and fixed one shaky step after a hint.',
         conversationPrompt: 'Which fraction felt easiest to compare today?',
         engagementSignal: 'curious',
-      })
+      }),
     );
   });
 

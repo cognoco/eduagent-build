@@ -19,9 +19,11 @@
 
 const mockCaptureException = jest.fn();
 
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../../apps/api/src/services/sentry' /* gc1-allow: external error-tracking boundary (Sentry SDK) */,
   () => ({
+    ...jest.requireActual('../../apps/api/src/services/sentry'),
     addBreadcrumb: jest.fn(),
     captureException: (...args: unknown[]) => mockCaptureException(...args),
     captureMessage: jest.fn(),

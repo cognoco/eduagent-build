@@ -16,14 +16,17 @@
 
 const mockGetStepDatabase = jest.fn();
 
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../helpers' /* gc1-allow: isolates handler from Neon DB connection in unit tests */,
   () => ({
+    ...jest.requireActual('../helpers'),
     getStepDatabase: () => mockGetStepDatabase(),
   }),
 );
 
-jest.mock('../client', () => ({
+jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../client'),
   inngest: {
     createFunction: jest.fn(
       (
@@ -35,9 +38,11 @@ jest.mock('../client', () => ({
   },
 }));
 
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../../services/logger' /* gc1-allow: prevents logger side-effects and noisy output in unit tests */,
   () => ({
+    ...jest.requireActual('../../services/logger'),
     createLogger: () => ({
       info: jest.fn(),
       warn: jest.fn(),

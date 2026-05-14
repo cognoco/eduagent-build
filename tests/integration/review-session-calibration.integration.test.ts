@@ -40,9 +40,11 @@ import { registerProvider } from '../../apps/api/src/services/llm';
 // ---------------------------------------------------------------------------
 
 const mockCaptureException = jest.fn();
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../../apps/api/src/services/sentry' /* gc1-allow: external error-tracking boundary (Sentry SDK) */,
   () => ({
+    ...jest.requireActual('../../apps/api/src/services/sentry'),
     captureException: (...args: unknown[]) => mockCaptureException(...args),
   }),
 );

@@ -1,10 +1,12 @@
 const mockGetStepDatabase = jest.fn();
 
-jest.mock('../helpers', () => ({
+jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../helpers'),
   getStepDatabase: () => mockGetStepDatabase(),
 }));
 
-jest.mock('../client', () => ({
+jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../client'),
   inngest: {
     createFunction: jest.fn((_config, _trigger, handler) => ({
       fn: handler,

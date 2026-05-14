@@ -12,16 +12,20 @@ import type { Database } from '@eduagent/database';
 const mockCloseStaleSessions = jest.fn();
 const mockAbandonStaleQuizRounds = jest.fn();
 
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../../services/session' /* gc1-allow: isolates session service from unit test */,
   () => ({
+    ...jest.requireActual('../../services/session'),
     closeStaleSessions: (...args: unknown[]) => mockCloseStaleSessions(...args),
   }),
 );
 
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../../services/quiz' /* gc1-allow: isolates quiz service from unit test */,
   () => ({
+    ...jest.requireActual('../../services/quiz'),
     abandonStaleQuizRounds: (...args: unknown[]) =>
       mockAbandonStaleQuizRounds(...args),
   }),
@@ -29,9 +33,11 @@ jest.mock(
 
 const mockGetStepDatabase = jest.fn();
 
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../helpers' /* gc1-allow: isolates DB connection from unit test */,
   () => ({
+    ...jest.requireActual('../helpers'),
     getStepDatabase: () => mockGetStepDatabase(),
   }),
 );
@@ -40,7 +46,10 @@ import { createInngestTransportCapture } from '../../test-utils/inngest-transpor
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 
 const mockInngestTransport = createInngestTransportCapture();
-jest.mock('../client', () => mockInngestTransport.module); // gc1-allow: inngest framework boundary
+jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../client'),
+  ...mockInngestTransport.module,
+})); // gc1-allow: inngest framework boundary
 
 // Import AFTER mocks are set up
 import { sessionStaleCleanup } from './session-stale-cleanup';

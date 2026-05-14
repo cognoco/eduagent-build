@@ -6,16 +6,20 @@ const mockGetStepDatabase = jest.fn();
 const mockSendPushNotification = jest.fn();
 const mockFormatDailyReminderBody = jest.fn();
 
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../helpers' /* gc1-allow: isolates step-database helper from real DB config reads */,
   () => ({
+    ...jest.requireActual('../helpers'),
     getStepDatabase: () => mockGetStepDatabase(),
   }),
 );
 
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../../services/notifications' /* gc1-allow: prevents real push delivery while asserting notification boundary */,
   () => ({
+    ...jest.requireActual('../../services/notifications'),
     sendPushNotification: (...args: unknown[]) =>
       mockSendPushNotification(...args),
     formatDailyReminderBody: (...args: unknown[]) =>
@@ -24,18 +28,22 @@ jest.mock(
 );
 
 const mockGetRecentNotificationCount = jest.fn().mockResolvedValue(0);
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../../services/settings' /* gc1-allow: isolates notification-count reads from real DB */,
   () => ({
+    ...jest.requireActual('../../services/settings'),
     getRecentNotificationCount: (...args: unknown[]) =>
       mockGetRecentNotificationCount(...args),
   }),
 );
 
 const mockCaptureException = jest.fn();
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../../services/sentry' /* gc1-allow: external error tracker boundary */,
   () => ({
+    ...jest.requireActual('../../services/sentry'),
     captureException: (...args: unknown[]) => mockCaptureException(...args),
   }),
 );
@@ -44,7 +52,10 @@ import { createInngestTransportCapture } from '../../test-utils/inngest-transpor
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 
 const mockInngestTransport = createInngestTransportCapture();
-jest.mock('../client', () => mockInngestTransport.module); // gc1-allow: inngest framework boundary
+jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../client'),
+  ...mockInngestTransport.module,
+})); // gc1-allow: inngest framework boundary
 
 import { dailyReminderSend } from './daily-reminder-send';
 

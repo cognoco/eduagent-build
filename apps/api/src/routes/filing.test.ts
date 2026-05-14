@@ -36,7 +36,7 @@ jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 // Mock account service — resolves Clerk user → local Account
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/account', () => ({
+jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => ({
   ...jest.requireActual('../services/account'),
   findOrCreateAccount: jest.fn().mockResolvedValue({
     id: 'test-account-id',
@@ -51,7 +51,7 @@ jest.mock('../services/account', () => ({
 // Mock profile service — profile-scope middleware auto-resolves owner profile
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/profile', () => ({
+jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => ({
   ...jest.requireActual('../services/profile'),
   findOwnerProfile: jest.fn().mockResolvedValue({
     id: 'test-profile-id',
@@ -77,7 +77,7 @@ jest.mock('../services/profile', () => ({
 // Mock filing services — stubs so route handler does not hit real DB/LLM
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/filing', () => ({
+jest.mock('../services/filing' /* gc1-allow: pattern-a conversion */, () => ({
   ...jest.requireActual('../services/filing'),
   buildLibraryIndex: jest.fn().mockResolvedValue({ shelves: [] }),
   fileToLibrary: jest.fn().mockResolvedValue({
@@ -103,17 +103,21 @@ jest.mock('../services/filing', () => ({
 // Mock suggestion services
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/suggestions', () => ({
-  ...jest.requireActual('../services/suggestions'),
-  markBookSuggestionPicked: jest.fn().mockResolvedValue(undefined),
-  markTopicSuggestionUsed: jest.fn().mockResolvedValue(undefined),
-}));
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
+  '../services/suggestions' /* gc1-allow: pattern-a conversion */,
+  () => ({
+    ...jest.requireActual('../services/suggestions'),
+    markBookSuggestionPicked: jest.fn().mockResolvedValue(undefined),
+    markTopicSuggestionUsed: jest.fn().mockResolvedValue(undefined),
+  }),
+);
 
 // ---------------------------------------------------------------------------
 // Mock session services
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/session', () => ({
+jest.mock('../services/session' /* gc1-allow: pattern-a conversion */, () => ({
   ...jest.requireActual('../services/session'),
   getSessionTranscript: jest.fn().mockResolvedValue(null),
   backfillSessionTopicId: jest.fn().mockResolvedValue(undefined),
@@ -123,7 +127,8 @@ jest.mock('../services/session', () => ({
 // Mock LLM services — routeAndCall + registerProvider for llm middleware
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/llm', () => ({
+jest.mock('../services/llm' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../services/llm'),
   // gc1-allow: LLM routeAndCall external boundary
   routeAndCall: jest.fn().mockResolvedValue({ text: 'mocked' }),
   registerProvider: jest.fn(),
@@ -136,7 +141,8 @@ jest.mock('../services/llm', () => ({
 // Mock Sentry
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/sentry', () => ({
+jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../services/sentry'),
   // gc1-allow: @sentry/cloudflare external boundary
   captureException: jest.fn(),
 }));
@@ -145,7 +151,8 @@ jest.mock('../services/sentry', () => ({
 // Mock Inngest client
 // ---------------------------------------------------------------------------
 
-jest.mock('../inngest/client', () => ({
+jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../inngest/client'),
   // gc1-allow: Inngest SDK external boundary
   inngest: {
     send: jest.fn().mockResolvedValue(undefined),

@@ -1,4 +1,5 @@
-jest.mock('../config', () => ({
+jest.mock('../config' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../config'),
   validateEnv: jest.fn(),
 }));
 
@@ -8,7 +9,7 @@ import { envValidationMiddleware, resetEnvValidation } from './env-validation';
 const mockValidateEnv = validateEnv as jest.MockedFunction<typeof validateEnv>;
 
 function createMockContext(
-  env: Record<string, string | undefined>
+  env: Record<string, string | undefined>,
 ): Parameters<typeof envValidationMiddleware>[0] {
   let responseBody: unknown = undefined;
   let responseStatus: number | undefined = undefined;
@@ -83,7 +84,7 @@ describe('envValidationMiddleware', () => {
         code: 'ENV_VALIDATION_ERROR',
         message: 'Invalid environment: {"DATABASE_URL":["Required"]}',
       },
-      500
+      500,
     );
     expect(errorSpy).toHaveBeenCalled();
 

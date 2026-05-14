@@ -2,7 +2,8 @@
 // Mock the LLM router — true external boundary
 // ---------------------------------------------------------------------------
 
-jest.mock('../llm', () => ({
+jest.mock('../llm' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../llm'),
   routeAndCall: jest.fn(),
 }));
 
@@ -67,7 +68,7 @@ describe('generateDictation', () => {
       generateDictation({
         nativeLanguage: 'en',
         ageYears: 8,
-      })
+      }),
     ).rejects.toThrow();
   });
 
@@ -83,7 +84,7 @@ describe('generateDictation', () => {
       generateDictation({
         nativeLanguage: 'en',
         ageYears: 9,
-      })
+      }),
     ).rejects.toThrow();
   });
 
@@ -110,7 +111,7 @@ describe('generateDictation', () => {
       generateDictation({
         nativeLanguage: 'en',
         ageYears: 8,
-      })
+      }),
     ).rejects.toThrow();
   });
 

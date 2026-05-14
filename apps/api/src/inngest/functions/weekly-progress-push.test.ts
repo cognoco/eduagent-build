@@ -11,6 +11,7 @@
 
 const mockCaptureException = jest.fn();
 jest.mock('../../services/sentry' /* gc1-allow: unit test boundary */, () => ({
+  ...jest.requireActual('../../services/sentry'),
   captureException: (...args: unknown[]) => mockCaptureException(...args),
 }));
 
@@ -46,6 +47,7 @@ const mockDb = {
   })),
 };
 jest.mock('../helpers' /* gc1-allow: unit test boundary */, () => ({
+  ...jest.requireActual('../helpers'),
   getStepDatabase: () => mockDb,
   getStepResendApiKey: () => 'resend-test-key',
 }));
@@ -54,9 +56,13 @@ import { createInngestTransportCapture } from '../../test-utils/inngest-transpor
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 
 const mockInngestTransport = createInngestTransportCapture();
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../client' /* gc1-allow: inngest framework boundary */,
-  () => mockInngestTransport.module,
+  () => ({
+    ...jest.requireActual('../client'),
+    ...mockInngestTransport.module,
+  }),
 );
 
 import { emptyPracticeActivitySummary } from '../../test-utils/practice-activity-summary-fixture';
@@ -64,9 +70,11 @@ import { emptyPracticeActivitySummary } from '../../test-utils/practice-activity
 const mockGetPracticeActivitySummary = jest
   .fn()
   .mockResolvedValue(emptyPracticeActivitySummary);
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../../services/practice-activity-summary' /* gc1-allow: unit test boundary for Inngest handler; full DB path covered by practice-activity-summary tests */,
   () => ({
+    ...jest.requireActual('../../services/practice-activity-summary'),
     getPracticeActivitySummary: (...args: unknown[]) =>
       mockGetPracticeActivitySummary(...args),
   }),
@@ -74,9 +82,11 @@ jest.mock(
 
 const mockGetLatestSnapshot = jest.fn().mockResolvedValue(null);
 const mockGetLatestSnapshotOnOrBefore = jest.fn().mockResolvedValue(null);
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../../services/snapshot-aggregation' /* gc1-allow: unit test boundary */,
   () => ({
+    ...jest.requireActual('../../services/snapshot-aggregation'),
     getLatestSnapshot: (...args: unknown[]) => mockGetLatestSnapshot(...args),
     getLatestSnapshotOnOrBefore: (...args: unknown[]) =>
       mockGetLatestSnapshotOnOrBefore(...args),
@@ -102,9 +112,11 @@ const mockGenerateWeeklyReportData = jest.fn().mockReturnValue({
   },
   practiceSummary: emptyPracticeActivitySummary,
 });
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../../services/weekly-report' /* gc1-allow: unit test boundary */,
   () => ({
+    ...jest.requireActual('../../services/weekly-report'),
     generateWeeklyReportData: (...args: unknown[]) =>
       mockGenerateWeeklyReportData(...args),
   }),
@@ -120,9 +132,11 @@ const mockFormatWeeklyProgressEmail = jest.fn(
     type: 'weekly_progress',
   }),
 );
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../../services/notifications' /* gc1-allow: unit test boundary */,
   () => ({
+    ...jest.requireActual('../../services/notifications'),
     sendPushNotification: (...args: unknown[]) =>
       mockSendPushNotification(...args),
     sendEmail: (...args: unknown[]) => mockSendEmail(...args),
@@ -137,9 +151,11 @@ jest.mock(
 
 const mockGetRecentNotificationCount = jest.fn().mockResolvedValue(0);
 const mockLogNotification = jest.fn().mockResolvedValue(undefined);
-jest.mock(
+// prettier-ignore
+jest.mock( // gc1-allow: pattern-a conversion
   '../../services/settings' /* gc1-allow: unit test boundary */,
   () => ({
+    ...jest.requireActual('../../services/settings'),
     getRecentNotificationCount: (...args: unknown[]) =>
       mockGetRecentNotificationCount(...args),
     logNotification: (...args: unknown[]) => mockLogNotification(...args),
