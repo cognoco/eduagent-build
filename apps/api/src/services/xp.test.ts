@@ -9,7 +9,8 @@ const mockDatabaseModule = createDatabaseModuleMock({
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
-jest.mock('./settings', () => ({
+jest.mock('./settings' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('./settings'),
   getLearningMode: jest.fn().mockResolvedValue({ mode: 'serious' }),
   getLearningModeRules: jest.fn().mockReturnValue({
     masteryGates: true,
@@ -179,7 +180,7 @@ describe('insertSessionXpEntry', () => {
         subjectId: 'subject-001',
         amount: 120, // 100 * 0.80 * 1.5 (explain)
         status: 'pending',
-      })
+      }),
     );
   });
 
@@ -269,7 +270,7 @@ describe('insertSessionXpEntry', () => {
     expect(insertValues).toHaveBeenCalledWith(
       expect.objectContaining({
         amount: 150,
-      })
+      }),
     );
   });
 
@@ -303,7 +304,7 @@ describe('insertSessionXpEntry', () => {
       expect.objectContaining({
         status: 'verified',
         amount: 80,
-      })
+      }),
     );
   });
 
@@ -329,7 +330,7 @@ describe('insertSessionXpEntry', () => {
       expect.objectContaining({
         status: 'pending',
         amount: 80,
-      })
+      }),
     );
   });
 });
@@ -339,7 +340,7 @@ describe('insertSessionXpEntry', () => {
 // ---------------------------------------------------------------------------
 
 function createMockSyncDb(
-  matchedRows: Array<{ id: string }> = [{ id: 'xp-1' }]
+  matchedRows: Array<{ id: string }> = [{ id: 'xp-1' }],
 ): {
   db: Database;
   updateSet: jest.Mock;
@@ -368,7 +369,7 @@ describe('syncXpLedgerStatus', () => {
       db,
       'profile-001',
       'topic-001',
-      'verified'
+      'verified',
     );
 
     expect(updated).toBe(true);
@@ -377,7 +378,7 @@ describe('syncXpLedgerStatus', () => {
       expect.objectContaining({
         status: 'verified',
         verifiedAt: expect.any(Date),
-      })
+      }),
     );
   });
 
@@ -388,7 +389,7 @@ describe('syncXpLedgerStatus', () => {
       db,
       'profile-001',
       'topic-001',
-      'decayed'
+      'decayed',
     );
 
     expect(updated).toBe(true);
@@ -405,7 +406,7 @@ describe('syncXpLedgerStatus', () => {
       db,
       'profile-001',
       'nonexistent-topic',
-      'verified'
+      'verified',
     );
 
     expect(updated).toBe(false);
@@ -468,7 +469,7 @@ describe('applyReflectionMultiplier', () => {
     const result = await applyReflectionMultiplier(
       db,
       'profile-001',
-      'session-1'
+      'session-1',
     );
 
     expect(result).toEqual({ applied: true, newAmount: 150 });
@@ -476,7 +477,7 @@ describe('applyReflectionMultiplier', () => {
       expect.objectContaining({
         amount: 150,
         reflectionMultiplierApplied: true,
-      })
+      }),
     );
   });
 
@@ -492,7 +493,7 @@ describe('applyReflectionMultiplier', () => {
     const result = await applyReflectionMultiplier(
       db,
       'profile-001',
-      'session-1'
+      'session-1',
     );
 
     expect(result).toEqual({ applied: true, newAmount: 200 });
@@ -510,7 +511,7 @@ describe('applyReflectionMultiplier', () => {
     const result = await applyReflectionMultiplier(
       db,
       'profile-001',
-      'session-1'
+      'session-1',
     );
 
     expect(result).toEqual({ applied: false, newAmount: 150 });
@@ -529,7 +530,7 @@ describe('applyReflectionMultiplier', () => {
     const result = await applyReflectionMultiplier(
       db,
       'profile-001',
-      'session-1'
+      'session-1',
     );
 
     expect(result).toEqual({ applied: false, newAmount: 0 });
@@ -541,7 +542,7 @@ describe('applyReflectionMultiplier', () => {
     const result = await applyReflectionMultiplier(
       db,
       'profile-001',
-      'session-1'
+      'session-1',
     );
 
     expect(result).toEqual({ applied: false, newAmount: 0 });

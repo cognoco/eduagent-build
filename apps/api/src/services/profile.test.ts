@@ -2,7 +2,8 @@
 // Profile Service Tests
 // ---------------------------------------------------------------------------
 
-jest.mock('./consent', () => ({
+jest.mock('./consent' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('./consent'),
   getConsentStatus: jest.fn().mockResolvedValue(null),
   checkConsentRequired: jest
     .fn()
