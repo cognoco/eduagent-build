@@ -1,3 +1,5 @@
+> **STATUS: COMPANION** — point-in-time triage from 2026-05-08. Verify specific claims against current state before acting. Known-stale entries: J-10 (`usage_events` table now exists), J-19 (paywall now passes), W-01/W-04 (practice intent now passes).
+
 # Web E2E Full-Suite Bug Ledger — 2026-05-08
 
 **Run date:** 2026-05-08

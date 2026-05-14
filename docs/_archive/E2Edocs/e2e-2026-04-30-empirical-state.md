@@ -1,3 +1,5 @@
+> **STATUS: SNAPSHOT** taken 2026-04-30. Do not edit — the runbook (`e2e-runbook.md`) is the living document; this records what was known good on that date.
+
 # E2E Empirical State — 2026-04-30
 
 **Branch when written:** `emulator-clean-slate` (rebased on top of

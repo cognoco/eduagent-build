@@ -1,3 +1,5 @@
+> **STATUS: ACTIVE** — working batch plan. All rows reset to ⬜ on 2026-05-14; M1-B drives each to completion or DEFERRED.
+
 # Mobile App Flow Revision Plan — 2026-05-01
 
 Source inventory: [`mobile-app-flow-inventory.md`](../mobile-app-flow-inventory.md) (snapshot refreshed 2026-05-14). Companion E2E gap audit: [`e2e-flow-coverage-audit-2026-05-13.md`](../e2e-flow-coverage-audit-2026-05-13.md).

@@ -5,8 +5,8 @@
 **Index established:** 2026-05-02 (consolidation pulled in `docs/cleanup-triage-2026-04-30.md`, `docs/changelog.md`, and `docs/claude-optimization/*` from the wider `docs/` tree).
 
 **Out of scope (intentionally left where they are):**
-- `docs/_archive/analysis/spec-vs-code-audit-2026-04-13.md` — already retired into the formal archive; left in place.
-- `docs/E2Edocs/e2e-2026-04-30-empirical-state.md` — point-in-time snapshot, but lives next to its referencing runbook on purpose.
+- `docs/_archive/analysis/spec-vs-code-audit-2026-04-13.md` — already retired into the formal archive.
+- `docs/_archive/E2Edocs/e2e-2026-04-30-empirical-state.md` — point-in-time snapshot (archived)
 - `docs/_vault/emulator-2026-04-30/` — self-contained "stash" of replaced docs from the emulator-fix WIP; distinct purpose.
 - `.claude/memory/_archive/` — per-repo convention; new memory archives append here.
 

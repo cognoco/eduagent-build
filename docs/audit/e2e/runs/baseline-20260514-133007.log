@@ -1,0 +1,9 @@
+Starting at 2026-05-14T13:30:07+02:00
+START_EPOCH=1778758213
+Unable to fetch secrets from the Doppler API
+[31mDoppler Error:[0m You must specify a project
+Reading secrets from fallback file
+[31mDoppler Error:[0m The fallback file does not exist
+END_EPOCH=1778758213
+EXIT=1
+DURATION_SEC=0
