@@ -11,7 +11,9 @@ test('J-04 parent taps child card to open child progress', async ({ page }) => {
     page.getByTestId(/^parent-home-check-child-/).first(),
   ).toBeVisible();
 
-  await pressableClick(page.getByTestId(/^parent-home-check-child-/).first());
+  await pressableClick(
+    page.getByTestId(/^parent-home-child-progress-/).first(),
+  );
   await expect(page.getByTestId('progress-screen')).toBeVisible({
     timeout: 30_000,
   });
