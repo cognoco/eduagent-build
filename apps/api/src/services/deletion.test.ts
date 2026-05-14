@@ -2,6 +2,7 @@ import type { Database } from '@eduagent/database';
 import {
   scheduleDeletion,
   cancelDeletion,
+  getDeletionStatus,
   isDeletionCancelled,
   executeDeletion,
   getProfileIdsForAccount,
@@ -51,7 +52,7 @@ describe('scheduleDeletion', () => {
     const result = await scheduleDeletion(db, 'account-1');
     expect(() => new Date(result.gracePeriodEnds)).not.toThrow();
     expect(new Date(result.gracePeriodEnds).toISOString()).toBe(
-      result.gracePeriodEnds
+      result.gracePeriodEnds,
     );
   });
 
@@ -113,6 +114,55 @@ describe('isDeletionCancelled', () => {
     });
     const result = await isDeletionCancelled(db, 'account-1');
     expect(result).toBe(false);
+  });
+});
+
+describe('getDeletionStatus', () => {
+  it('returns unscheduled when no deletion is pending', async () => {
+    const db = createMockDb({
+      findFirstResult: {
+        deletionScheduledAt: null,
+        deletionCancelledAt: null,
+      },
+    });
+
+    const result = await getDeletionStatus(db, 'account-1');
+
+    expect(result).toEqual({
+      scheduled: false,
+      deletionScheduledAt: null,
+      gracePeriodEnds: null,
+    });
+  });
+
+  it('returns scheduled status with derived grace period end', async () => {
+    const db = createMockDb({
+      findFirstResult: {
+        deletionScheduledAt: new Date('2026-02-17T00:00:00.000Z'),
+        deletionCancelledAt: null,
+      },
+    });
+
+    const result = await getDeletionStatus(db, 'account-1');
+
+    expect(result).toEqual({
+      scheduled: true,
+      deletionScheduledAt: '2026-02-17T00:00:00.000Z',
+      gracePeriodEnds: '2026-02-24T00:00:00.000Z',
+    });
+  });
+
+  it('returns unscheduled when deletion was cancelled after scheduling', async () => {
+    const db = createMockDb({
+      findFirstResult: {
+        deletionScheduledAt: new Date('2026-02-17T00:00:00.000Z'),
+        deletionCancelledAt: new Date('2026-02-18T00:00:00.000Z'),
+      },
+    });
+
+    const result = await getDeletionStatus(db, 'account-1');
+
+    expect(result.scheduled).toBe(false);
   });
 });
 

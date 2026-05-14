@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,11 @@ import { useAuth } from '@clerk/clerk-expo';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQueryClient } from '@tanstack/react-query';
-import { useDeleteAccount, useCancelDeletion } from '../hooks/use-account';
+import {
+  useDeleteAccount,
+  useCancelDeletion,
+  useDeletionStatus,
+} from '../hooks/use-account';
 import { useThemeColors } from '../lib/theme';
 import { goBackOrReplace } from '../lib/navigation';
 import { formatApiError } from '../lib/format-api-error';
@@ -36,6 +40,7 @@ export default function DeleteAccountScreen() {
   const { profiles } = useProfile();
   const deleteAccount = useDeleteAccount();
   const cancelDeletion = useCancelDeletion();
+  const deletionStatus = useDeletionStatus();
 
   const [stage, setStage] = useState<Stage>('initial');
   const [confirmText, setConfirmText] = useState('');
@@ -46,6 +51,12 @@ export default function DeleteAccountScreen() {
   // the destructive button could fire two requests. A ref toggled
   // synchronously around the mutation closes that race.
   const submittingRef = useRef(false);
+
+  useEffect(() => {
+    if (deletionStatus.data?.scheduled !== true) return;
+    setGracePeriodEnds(deletionStatus.data.gracePeriodEnds);
+    setStage('scheduled');
+  }, [deletionStatus.data]);
 
   const handleClose = useCallback(() => {
     goBackOrReplace(router, '/(app)/more');
@@ -87,13 +98,19 @@ export default function DeleteAccountScreen() {
     setError('');
     try {
       await cancelDeletion.mutateAsync();
+      await queryClient.invalidateQueries({
+        queryKey: ['account', 'deletion-status'],
+      });
       handleClose();
     } catch (err: unknown) {
       setError(formatApiError(err));
     }
-  }, [cancelDeletion, handleClose]);
+  }, [cancelDeletion, handleClose, queryClient]);
 
-  const isLoading = deleteAccount.isPending || cancelDeletion.isPending;
+  const isLoading =
+    deleteAccount.isPending ||
+    cancelDeletion.isPending ||
+    deletionStatus.isLoading;
   const canConfirm =
     confirmText === DELETE_CONFIRMATION_PHRASE &&
     !deleteAccount.isPending &&
@@ -135,18 +152,25 @@ export default function DeleteAccountScreen() {
           </Pressable>
         </View>
 
-        {error !== '' && (
+        {(error !== '' || deletionStatus.isError) && (
           <View className="bg-danger/10 rounded-card px-4 py-3 mb-4">
             <Text
               className="text-danger text-body-sm"
               testID="delete-account-error"
             >
-              {error}
+              {error || t('errors.networkError')}
             </Text>
           </View>
         )}
 
-        {stage === 'scheduled' ? (
+        {deletionStatus.isLoading ? (
+          <View className="flex-1 items-center justify-center py-10">
+            <ActivityIndicator
+              color={colors.primary}
+              testID="delete-account-status-loading"
+            />
+          </View>
+        ) : stage === 'scheduled' ? (
           <View testID="delete-account-scheduled">
             <Text className="text-body text-text-primary mb-2">
               {t('account.scheduledTitle')}

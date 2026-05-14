@@ -19,6 +19,16 @@ export type CancelDeletionResponse = z.infer<
   typeof cancelDeletionResponseSchema
 >;
 
+export const accountDeletionStatusResponseSchema = z.object({
+  scheduled: z.boolean(),
+  deletionScheduledAt: z.string().datetime().nullable(),
+  gracePeriodEnds: z.string().datetime().nullable(),
+});
+
+export type AccountDeletionStatusResponse = z.infer<
+  typeof accountDeletionStatusResponseSchema
+>;
+
 export const dataExportConsentSchema = z.object({
   id: z.string().uuid(),
   profileId: z.string().uuid(),

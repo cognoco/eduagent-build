@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { Database } from '@eduagent/database';
 import {
   accountDeletionResponseSchema,
+  accountDeletionStatusResponseSchema,
   cancelDeletionResponseSchema,
   dataExportSchema,
 } from '@eduagent/schemas';
@@ -10,6 +11,7 @@ import type { Account } from '../services/account';
 import {
   scheduleDeletion,
   cancelDeletion,
+  getDeletionStatus,
   getProfileIdsForAccount,
 } from '../services/deletion';
 import { generateExport } from '../services/export';
@@ -22,6 +24,12 @@ type AccountRouteEnv = {
 };
 
 export const accountRoutes = new Hono<AccountRouteEnv>()
+  .get('/account/deletion-status', async (c) => {
+    const db = c.get('db');
+    const account = c.get('account');
+    const status = await getDeletionStatus(db, account.id);
+    return c.json(accountDeletionStatusResponseSchema.parse(status));
+  })
   .post('/account/delete', async (c) => {
     const db = c.get('db');
     const account = c.get('account');

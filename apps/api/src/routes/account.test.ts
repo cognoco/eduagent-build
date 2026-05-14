@@ -88,8 +88,14 @@ jest.mock('../services/deletion' /* gc1-allow: pattern-a conversion */, () => {
       gracePeriodEnds: new Date(
         Date.now() + 7 * 24 * 60 * 60 * 1000,
       ).toISOString(),
+      scheduledNow: true,
     }),
     cancelDeletion: jest.fn().mockResolvedValue(undefined),
+    getDeletionStatus: jest.fn().mockResolvedValue({
+      scheduled: true,
+      deletionScheduledAt: '2026-02-17T00:00:00.000Z',
+      gracePeriodEnds: '2026-02-24T00:00:00.000Z',
+    }),
     getProfileIdsForAccount: jest.fn().mockResolvedValue(['profile-1']),
   };
 });
@@ -115,7 +121,9 @@ jest.mock('../services/export' /* gc1-allow: pattern-a conversion */, () => {
 import { app } from '../index';
 import { inngest } from '../inngest/client';
 import { captureException } from '../services/sentry';
+import { getDeletionStatus, scheduleDeletion } from '../services/deletion';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
+import { NotFoundError } from '../errors';
 
 const TEST_ENV = {
   ...BASE_AUTH_ENV,
@@ -133,6 +141,56 @@ describe('account routes', () => {
 
   beforeEach(() => {
     clearJWKSCache();
+  });
+
+  // -------------------------------------------------------------------------
+  // GET /v1/account/deletion-status
+  // -------------------------------------------------------------------------
+
+  describe('GET /v1/account/deletion-status', () => {
+    it('returns the authenticated account deletion status', async () => {
+      const res = await app.request(
+        '/v1/account/deletion-status',
+        { headers: makeAuthHeaders() },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body).toEqual({
+        scheduled: true,
+        deletionScheduledAt: '2026-02-17T00:00:00.000Z',
+        gracePeriodEnds: '2026-02-24T00:00:00.000Z',
+      });
+    });
+
+    it('returns 404 when the authenticated account disappears before status lookup', async () => {
+      (getDeletionStatus as jest.Mock).mockRejectedValueOnce(
+        new NotFoundError('Account'),
+      );
+
+      const res = await app.request(
+        '/v1/account/deletion-status',
+        { headers: makeAuthHeaders() },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(404);
+      await expect(res.json()).resolves.toEqual({
+        code: 'NOT_FOUND',
+        message: 'Account not found',
+      });
+    });
+
+    it('returns 401 without auth header', async () => {
+      const res = await app.request(
+        '/v1/account/deletion-status',
+        {},
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(401);
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -206,6 +264,31 @@ describe('account routes', () => {
       });
 
       errorSpy.mockRestore();
+    });
+
+    it('does not dispatch a second deletion event when already scheduled', async () => {
+      (scheduleDeletion as jest.Mock).mockResolvedValueOnce({
+        gracePeriodEnds: '2026-02-24T00:00:00.000Z',
+        scheduledNow: false,
+      });
+
+      const res = await app.request(
+        '/v1/account/delete',
+        {
+          method: 'POST',
+          headers: makeAuthHeaders(),
+        },
+        TEST_ENV,
+      );
+
+      const body = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(body).toEqual({
+        message: 'Deletion scheduled',
+        gracePeriodEnds: '2026-02-24T00:00:00.000Z',
+      });
+      expect(inngest.send).not.toHaveBeenCalled();
     });
 
     it('returns 401 without auth header', async () => {

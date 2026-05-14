@@ -7,10 +7,11 @@ import { eq, sql } from 'drizzle-orm';
 import { accounts, profiles, type Database } from '@eduagent/database';
 
 const GRACE_PERIOD_DAYS = 7;
+const GRACE_PERIOD_MS = GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000;
 
 export async function scheduleDeletion(
   db: Database,
-  accountId: string
+  accountId: string,
 ): Promise<{ gracePeriodEnds: string }> {
   const now = new Date();
   await db
@@ -19,14 +20,14 @@ export async function scheduleDeletion(
     .where(eq(accounts.id, accountId));
 
   const gracePeriodEnds = new Date(
-    now.getTime() + GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000
+    now.getTime() + GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000,
   ).toISOString();
   return { gracePeriodEnds };
 }
 
 export async function cancelDeletion(
   db: Database,
-  accountId: string
+  accountId: string,
 ): Promise<void> {
   await db
     .update(accounts)
@@ -36,7 +37,7 @@ export async function cancelDeletion(
 
 export async function isDeletionCancelled(
   db: Database,
-  accountId: string
+  accountId: string,
 ): Promise<boolean> {
   const row = await db.query.accounts.findFirst({
     where: eq(accounts.id, accountId),
@@ -49,6 +50,43 @@ export async function isDeletionCancelled(
   );
 }
 
+export interface AccountDeletionStatus {
+  scheduled: boolean;
+  deletionScheduledAt: string | null;
+  gracePeriodEnds: string | null;
+}
+
+export async function getDeletionStatus(
+  db: Database,
+  accountId: string,
+): Promise<AccountDeletionStatus> {
+  const row = await db.query.accounts.findFirst({
+    where: eq(accounts.id, accountId),
+  });
+
+  const scheduledAt = row?.deletionScheduledAt ?? null;
+  const cancelledAt = row?.deletionCancelledAt ?? null;
+  const scheduled =
+    scheduledAt !== null &&
+    (cancelledAt === null || cancelledAt <= scheduledAt);
+
+  if (!scheduled || scheduledAt === null) {
+    return {
+      scheduled: false,
+      deletionScheduledAt: null,
+      gracePeriodEnds: null,
+    };
+  }
+
+  return {
+    scheduled: true,
+    deletionScheduledAt: scheduledAt.toISOString(),
+    gracePeriodEnds: new Date(
+      scheduledAt.getTime() + GRACE_PERIOD_MS,
+    ).toISOString(),
+  };
+}
+
 // [BUG-844] Tells the scheduled-deletion Inngest function whether the
 // account still exists after the 7-day sleep. The grace-period flow assumes
 // the account is queryable on resume; if an admin or GC removed it during
@@ -58,7 +96,7 @@ export async function isDeletionCancelled(
 // 'already_deleted' so telemetry distinguishes it from a normal completion.
 export async function accountExists(
   db: Database,
-  accountId: string
+  accountId: string,
 ): Promise<boolean> {
   const row = await db.query.accounts.findFirst({
     where: eq(accounts.id, accountId),
@@ -68,7 +106,7 @@ export async function accountExists(
 
 export async function getProfileIdsForAccount(
   db: Database,
-  accountId: string
+  accountId: string,
 ): Promise<string[]> {
   const rows = await db.query.profiles.findMany({
     where: eq(profiles.accountId, accountId),
@@ -78,7 +116,7 @@ export async function getProfileIdsForAccount(
 
 export async function executeDeletion(
   db: Database,
-  accountId: string
+  accountId: string,
 ): Promise<void> {
   // FK cascades handle all child records. Idempotent — no-op if already deleted.
   await db.delete(accounts).where(eq(accounts.id, accountId));
@@ -86,7 +124,7 @@ export async function executeDeletion(
 
 export async function deleteProfile(
   db: Database,
-  profileId: string
+  profileId: string,
 ): Promise<void> {
   // FK cascades handle all child records (subjects, sessions, consent_states, etc.).
   // Idempotent — no-op if already deleted.
@@ -107,7 +145,7 @@ export async function deleteProfile(
  */
 export async function deleteProfileIfNoConsent(
   db: Database,
-  profileId: string
+  profileId: string,
 ): Promise<boolean> {
   const result = await db.execute(sql`
     DELETE FROM profiles WHERE id = ${profileId}

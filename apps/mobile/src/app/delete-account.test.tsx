@@ -29,6 +29,24 @@ jest.mock('react-native-safe-area-context', () => ({
 const mockDeleteMutateAsync = jest.fn();
 const mockCancelMutateAsync = jest.fn();
 let mockDeleteIsPending = false;
+type MockDeletionStatus = {
+  data: {
+    scheduled: boolean;
+    deletionScheduledAt: string | null;
+    gracePeriodEnds: string | null;
+  };
+  isLoading: boolean;
+  isError: boolean;
+};
+let mockDeletionStatus: MockDeletionStatus = {
+  data: {
+    scheduled: false,
+    deletionScheduledAt: null,
+    gracePeriodEnds: null,
+  },
+  isLoading: false,
+  isError: false,
+};
 
 jest.mock('../hooks/use-account', () => ({
   useDeleteAccount: () => ({
@@ -39,11 +57,12 @@ jest.mock('../hooks/use-account', () => ({
     mutateAsync: mockCancelMutateAsync,
     isPending: false,
   }),
+  useDeletionStatus: () => mockDeletionStatus,
 }));
 
 // prettier-ignore
 jest.mock('../lib/theme', /* gc1-allow: nativewind vars() does not resolve 'react' in jest; stub theme hooks so screen tests don't blow up on import */ () => ({
-  useThemeColors: () => ({ accent: '#0ea5e9', background: '#18181b', border: '#d4d4d8', muted: '#71717a', surface: '#ffffff', textInverse: '#ffffff', textPrimary: '#18181b', textSecondary: '#52525b' }),
+  useThemeColors: () => ({ accent: '#0ea5e9', background: '#18181b', border: '#d4d4d8', muted: '#71717a', primary: '#0ea5e9', surface: '#ffffff', textInverse: '#ffffff', textPrimary: '#18181b', textSecondary: '#52525b' }),
   useTheme: () => ({ colorScheme: 'dark' }),
   useTokenVars: () => ({}),
 }));
@@ -78,6 +97,15 @@ describe('DeleteAccountScreen', () => {
     jest.clearAllMocks();
     mockCanGoBack.mockReturnValue(true);
     mockDeleteIsPending = false;
+    mockDeletionStatus = {
+      data: {
+        scheduled: false,
+        deletionScheduledAt: null,
+        gracePeriodEnds: null,
+      },
+      isLoading: false,
+      isError: false,
+    };
   });
 
   afterEach(() => {
@@ -91,6 +119,26 @@ describe('DeleteAccountScreen', () => {
     screen.getByTestId('delete-account-confirm');
     screen.getByTestId('delete-account-cancel');
     screen.getByText(/7-day grace period/);
+  });
+
+  it('opens directly into scheduled state when deletion is already pending', async () => {
+    mockDeletionStatus = {
+      data: {
+        scheduled: true,
+        deletionScheduledAt: '2026-02-17T00:00:00.000Z',
+        gracePeriodEnds: '2026-02-24T00:00:00.000Z',
+      },
+      isLoading: false,
+      isError: false,
+    };
+
+    render(<DeleteAccountScreen />, { wrapper: Wrapper });
+
+    await waitFor(() => {
+      screen.getByTestId('delete-account-scheduled');
+    });
+    screen.getByTestId('delete-account-keep');
+    expect(screen.queryByTestId('delete-account-confirm')).toBeNull();
   });
 
   it('schedules deletion and shows grace period after typed confirmation', async () => {
