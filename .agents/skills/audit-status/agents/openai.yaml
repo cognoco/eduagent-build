@@ -1,6 +1,0 @@
-interface:
-  display_name: "Audit Status"
-  short_description: "Maintain cleanup audit status"
-  default_prompt: "Use $audit-status to refresh the cleanup audit plan status."
-policy:
-  allow_implicit_invocation: true

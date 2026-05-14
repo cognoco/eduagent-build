@@ -5,10 +5,6 @@
 - [project_implementation_phase.md](_archive/project_implementation_phase.md) — Epics 0-16 COMPLETE. LLM tuning phase COMPLETE (all 4 agents merged).
 - [project_session_lifecycle_decisions.md](project_session_lifecycle_decisions.md) — Wall-clock for users, active time internal. Adaptive silence. Hard caps removed.
 
-## Consistency Cleanup
-
-- `docs/audit/cleanup-plan.md` is the single source of truth for the consistency cleanup track. Status per PR lives there; do not duplicate state into memory.
-
 ## Product Constraint — Strictly 11+
 
 Two production dead-code branches removed 2026-04-19 in commit `970a82a5`: `AgeBracket.child` (unreachable for 11+ users) and dictation `getLiteraryTheme` ≤7 + ≤10 branches (fairy tales, Narnia). Eval harness fixtures updated to 5 profiles aged 11-17.
