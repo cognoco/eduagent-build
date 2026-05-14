@@ -1,8 +1,8 @@
 import { View, Text, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { hapticLight } from '../../lib/haptics';
-import type { ChatMessage } from '../session';
-import { QuotaExceededCard } from '../session';
+import type { ChatMessage } from './ChatShell';
+import { QuotaExceededCard } from './QuotaExceededCard';
 import type { QuotaExceededDetails } from '../../lib/api-client';
 import {
   getContextualQuickChips,
