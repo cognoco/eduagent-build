@@ -71,9 +71,11 @@ function normalizeChatResult(raw: ChatResult | string): ChatResult {
 function normalizeStreamResult(
   raw: ChatStreamResult | AsyncIterable<string>,
 ): ChatStreamResult {
+  const candidate = raw as Partial<ChatStreamResult>;
   if (
     raw &&
-    typeof (raw as ChatStreamResult).stopReasonPromise?.then === 'function'
+    typeof candidate.stopReasonPromise?.then === 'function' &&
+    candidate.stream != null
   ) {
     return raw as ChatStreamResult;
   }
