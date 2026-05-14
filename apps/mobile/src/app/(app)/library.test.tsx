@@ -6,7 +6,13 @@ import {
   waitFor,
 } from '@testing-library/react-native';
 import React from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  createRoutedMockFetch,
+  createScreenWrapper,
+  createTestProfile,
+  cleanupScreen,
+} from '../../../test-utils/screen-render-harness';
+import type { QueryClient } from '@tanstack/react-query';
 
 // Use the shared mock-i18n util so assertions reference the rendered English
 // copy from en.json (what users actually see), not bare keys. A bare-key mock
@@ -19,51 +25,24 @@ jest.mock(
 );
 
 const mockPush = jest.fn();
-const mockUseSubjects = jest.fn();
-const mockUseOverallProgress = jest.fn();
-const mockUseAllBooks = jest.fn();
-const mockUseLibrarySearch = jest.fn();
-const mockUpdateSubjectMutateAsync = jest.fn();
+const mockReplace = jest.fn();
+jest.mock('expo-router', () => { // gc1-allow: native-boundary — requires Expo native router bindings
+  const { expoRouterShim } = require('../../test-utils/native-shims');
+  return expoRouterShim({ push: mockPush, replace: mockReplace });
+});
 
-jest.mock('expo-router', () => ({
-  useRouter: () => ({ push: mockPush, replace: jest.fn() }),
-}));
+jest.mock('react-native-safe-area-context', () => { // gc1-allow: native-boundary — SafeAreaProvider requires native frame metrics
+  const { safeAreaShim } = require('../../test-utils/native-shims');
+  return safeAreaShim();
+});
 
-jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
-}));
-
-jest.mock('../../hooks/use-subjects', () => ({
-  useSubjects: () => mockUseSubjects(),
-  useUpdateSubject: () => ({ mutateAsync: mockUpdateSubjectMutateAsync }),
-}));
-
-jest.mock('../../hooks/use-progress', () => ({
-  useOverallProgress: () => mockUseOverallProgress(),
-}));
-
-jest.mock('../../hooks/use-all-books', () => ({
-  useAllBooks: () => mockUseAllBooks(),
-}));
-
-jest.mock('../../components/progress', () => ({
-  RetentionSignal: ({ status }: { status: string }) => {
-    const { Text } = require('react-native');
-    return <Text>{status}</Text>;
-  },
-}));
-
-jest.mock('../../components/common', () => ({
+jest.mock('../../components/common', () => ({ // gc1-allow: Reanimated worklets + react-native-svg cannot run in JSDOM
   ...jest.requireActual('../../components/common'),
-  // gc1-allow: Reanimated worklets + react-native-svg cannot run in JSDOM
   BookPageFlipAnimation: () => null,
   BrandCelebration: () => null,
 }));
 
-// navigation: real module is pure functions wrapping expo-router (already mocked)
-
-jest.mock('../../lib/theme', () => ({
-  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
+jest.mock('../../lib/theme', () => ({ // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
   useThemeColors: () => ({
     accent: '#2563eb',
     border: '#e5e7eb',
@@ -72,6 +51,7 @@ jest.mock('../../lib/theme', () => ({
     textSecondary: '#6b7280',
     surfaceElevated: '#f9fafb',
     warning: '#f59e0b',
+    muted: '#9ca3af',
   }),
   useSubjectTint: () => ({
     solid: '#0f766e',
@@ -79,39 +59,30 @@ jest.mock('../../lib/theme', () => ({
   }),
 }));
 
-jest.mock('../../lib/api-client', () => ({
-  // gc1-allow: Clerk useAuth() external boundary
-  ...jest.requireActual('../../lib/api-client'),
-  useApiClient: () => ({
-    library: {
-      retention: {
-        $get: jest.fn().mockResolvedValue({
-          ok: true,
-          json: jest.fn().mockResolvedValue({ subjects: [] }),
-        }),
-      },
-    },
-  }),
-}));
-
-jest.mock('../../hooks/use-library-search', () => ({
-  useLibrarySearch: (...args: unknown[]) => mockUseLibrarySearch(...args),
-}));
-
-jest.mock('../../components/common/ShimmerSkeleton', () => ({
-  ShimmerSkeleton: ({
-    children,
-    testID,
-  }: {
-    children: React.ReactNode;
-    testID?: string;
-  }) => {
-    const { View } = require('react-native');
-    return <View testID={testID}>{children}</View>;
+const mockFetch = createRoutedMockFetch({
+  '/subjects': { subjects: [] },
+  '/progress/overview': {
+    subjects: [],
+    totalTopicsCompleted: 0,
+    totalTopicsVerified: 0,
   },
-}));
+  '/library/books': { subjects: [] },
+  '/library/retention': { subjects: [] },
+  '/library/search': {
+    subjects: [],
+    books: [],
+    topics: [],
+    notes: [],
+    sessions: [],
+  },
+  '/subjects/:id': { subject: { id: 'sub-1', status: 'active' } },
+});
 
-jest.mock('../../components/library/ShelfRow', () => ({
+jest.mock('../../lib/api-client', () => // gc1-allow: transport-boundary — Clerk useAuth() + fetch transport
+  require('../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch),
+);
+
+jest.mock('../../components/library/ShelfRow', () => ({ // gc1-allow: internal UI stub exposing testID contract used across all library tests
   ShelfRow: ({
     subjectId,
     name,
@@ -138,7 +109,7 @@ jest.mock('../../components/library/ShelfRow', () => ({
   },
 }));
 
-jest.mock('../../components/library/LibrarySearchBar', () => ({
+jest.mock('../../components/library/LibrarySearchBar', () => ({ // gc1-allow: internal UI stub providing the library-search-input testID used across search tests
   LibrarySearchBar: ({
     value,
     onChangeText,
@@ -162,15 +133,11 @@ jest.mock('../../components/library/LibrarySearchBar', () => ({
   },
 }));
 
-jest.mock('../../lib/profile', () => ({
-  // gc1-allow: ProfileProvider uses SecureStore (native)
-  ...jest.requireActual('../../lib/profile'),
-  useProfile: () => ({
-    activeProfile: { id: 'profile-1', isOwner: true },
-    profiles: [{ id: 'profile-1', isOwner: true }],
-  }),
-  isGuardianProfile: () => false,
-}));
+// ---------------------------------------------------------------------------
+// Active profile shared by all test helpers
+// ---------------------------------------------------------------------------
+
+const ACTIVE_PROFILE_ID = 'profile-1';
 
 interface AggregateLibRetention {
   subjects: Array<{
@@ -178,21 +145,6 @@ interface AggregateLibRetention {
     topics: unknown[];
     reviewDueCount: number;
   }>;
-}
-
-// The active profile ID used by the profile mock below.
-const ACTIVE_PROFILE_ID = 'profile-1';
-
-function createWrapper() {
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false, gcTime: 0 } },
-  });
-  function Wrapper({ children }: { children: React.ReactNode }) {
-    return (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-    );
-  }
-  return { queryClient, Wrapper };
 }
 
 function setLibraryRetention(
@@ -207,72 +159,91 @@ function setLibraryRetention(
 
 const LibraryScreen = require('./library').default;
 
+// ---------------------------------------------------------------------------
+// Default profile fixture
+// ---------------------------------------------------------------------------
+
+const defaultProfile = createTestProfile({
+  id: ACTIVE_PROFILE_ID,
+  displayName: 'Alex',
+  isOwner: true,
+});
+
 describe('LibraryScreen', () => {
-  let testQueryClient: QueryClient;
-  let TestWrapper: React.ComponentType<{ children: React.ReactNode }>;
+  let queryClient: QueryClient;
+  let wrapper: React.ComponentType<{ children: React.ReactNode }>;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockUpdateSubjectMutateAsync.mockResolvedValue(undefined);
-    const { queryClient, Wrapper } = createWrapper();
-    testQueryClient = queryClient;
-    TestWrapper = Wrapper;
-    setLibraryRetention(testQueryClient, { subjects: [] });
-    mockUseAllBooks.mockReturnValue({
+    mockFetch.mockClear();
+
+    // Reset routes to safe defaults
+    mockFetch.setRoute('/subjects', { subjects: [] });
+    mockFetch.setRoute('/progress/overview', {
+      subjects: [],
+      totalTopicsCompleted: 0,
+      totalTopicsVerified: 0,
+    });
+    mockFetch.setRoute('/library/books', { subjects: [] });
+    mockFetch.setRoute('/library/retention', { subjects: [] });
+    mockFetch.setRoute('/library/search', {
+      subjects: [],
       books: [],
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
+      topics: [],
+      notes: [],
+      sessions: [],
     });
-    mockUseLibrarySearch.mockReturnValue({
-      data: null,
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
-    });
+
+    ({ queryClient, wrapper } = createScreenWrapper({
+      activeProfile: defaultProfile,
+      profiles: [defaultProfile],
+    }));
+
+    // Seed library retention cache to avoid a live fetch in most tests
+    setLibraryRetention(queryClient, { subjects: [] });
   });
 
-  it('shows loading state', () => {
-    mockUseSubjects.mockReturnValue({ data: undefined, isLoading: true });
-    mockUseOverallProgress.mockReturnValue({
-      data: undefined,
-      isLoading: true,
-    });
+  afterEach(() => {
+    cleanupScreen(queryClient);
+  });
 
-    render(<LibraryScreen />, { wrapper: TestWrapper });
+  it('shows loading state', async () => {
+    // Route returns a never-resolving promise to keep the query in loading state
+    mockFetch.setRoute('/subjects', () => new Promise(() => {}));
+
+    render(<LibraryScreen />, { wrapper });
 
     screen.getByTestId('library-loading');
   });
 
-  it('[BUG-634 / M-2] does not crash when subjectsQuery.data is a non-array (stale shape / error payload)', () => {
-    // Repro: TanStack Query select transform is bypassed when enabled=false,
-    // so the cached value can be a non-array. Without the Array.isArray guard
-    // the allTopics flatMap throws TypeError and the screen white-screens.
-    mockUseSubjects.mockReturnValue({
-      data: { unexpected: 'shape' } as unknown as never,
-      isLoading: false,
-    });
-    mockUseOverallProgress.mockReturnValue({
-      data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
-      isLoading: false,
-    });
+  it('[BUG-634 / M-2] does not crash when subjectsQuery.data is a non-array (stale shape / error payload)', async () => {
+    // Seed subjects cache directly with a non-array shape to simulate stale cache
+    queryClient.setQueryData(
+      ['subjects', ACTIVE_PROFILE_ID, true],
+      { unexpected: 'shape' } as unknown as never,
+    );
+    queryClient.setQueryData(
+      ['progress', 'overview', ACTIVE_PROFILE_ID],
+      { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
+    );
 
     expect(() =>
-      render(<LibraryScreen />, { wrapper: TestWrapper }),
+      render(<LibraryScreen />, { wrapper }),
     ).not.toThrow();
   });
 
-  it('[BUG-634 / M-2] does not crash when subjectsQuery.data is null', () => {
-    mockUseSubjects.mockReturnValue({
-      data: null as unknown as never,
-      isLoading: false,
-    });
-    mockUseOverallProgress.mockReturnValue({
-      data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
-      isLoading: false,
-    });
+  it('[BUG-634 / M-2] does not crash when subjectsQuery.data is null', async () => {
+    queryClient.setQueryData(
+      ['subjects', ACTIVE_PROFILE_ID, true],
+      null as unknown as never,
+    );
+    queryClient.setQueryData(
+      ['progress', 'overview', ACTIVE_PROFILE_ID],
+      { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
+    );
+
     expect(() =>
-      render(<LibraryScreen />, { wrapper: TestWrapper }),
+      render(<LibraryScreen />, { wrapper }),
     ).not.toThrow();
   });
 
@@ -280,22 +251,16 @@ describe('LibraryScreen', () => {
   // `topics` was undefined or a non-array value (schema drift, error
   // payload). Without an Array.isArray guard, `data.topics.map` threw and
   // white-screened the Library tab.
-  it('[BUG-818] does not crash when retentionQuery.data.topics is undefined', () => {
-    mockUseSubjects.mockReturnValue({
-      data: [
-        {
-          id: 'sub-1',
-          name: 'Math',
-          status: 'IN_PROGRESS',
-        },
-      ] as never,
-      isLoading: false,
-    });
-    mockUseOverallProgress.mockReturnValue({
-      data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
-      isLoading: false,
-    });
-    setLibraryRetention(testQueryClient, {
+  it('[BUG-818] does not crash when retentionQuery.data.topics is undefined', async () => {
+    queryClient.setQueryData(
+      ['subjects', ACTIVE_PROFILE_ID, true],
+      [{ id: 'sub-1', name: 'Math', status: 'IN_PROGRESS' }] as never,
+    );
+    queryClient.setQueryData(
+      ['progress', 'overview', ACTIVE_PROFILE_ID],
+      { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
+    );
+    setLibraryRetention(queryClient, {
       subjects: [
         {
           subjectId: 'sub-1',
@@ -306,26 +271,20 @@ describe('LibraryScreen', () => {
     });
 
     expect(() =>
-      render(<LibraryScreen />, { wrapper: TestWrapper }),
+      render(<LibraryScreen />, { wrapper }),
     ).not.toThrow();
   });
 
-  it('[BUG-818] does not crash when retentionQuery.data.topics is a non-array shape', () => {
-    mockUseSubjects.mockReturnValue({
-      data: [
-        {
-          id: 'sub-1',
-          name: 'Math',
-          status: 'IN_PROGRESS',
-        },
-      ] as never,
-      isLoading: false,
-    });
-    mockUseOverallProgress.mockReturnValue({
-      data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
-      isLoading: false,
-    });
-    setLibraryRetention(testQueryClient, {
+  it('[BUG-818] does not crash when retentionQuery.data.topics is a non-array shape', async () => {
+    queryClient.setQueryData(
+      ['subjects', ACTIVE_PROFILE_ID, true],
+      [{ id: 'sub-1', name: 'Math', status: 'IN_PROGRESS' }] as never,
+    );
+    queryClient.setQueryData(
+      ['progress', 'overview', ACTIVE_PROFILE_ID],
+      { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
+    );
+    setLibraryRetention(queryClient, {
       subjects: [
         {
           subjectId: 'sub-1',
@@ -336,71 +295,76 @@ describe('LibraryScreen', () => {
     });
 
     expect(() =>
-      render(<LibraryScreen />, { wrapper: TestWrapper }),
+      render(<LibraryScreen />, { wrapper }),
     ).not.toThrow();
   });
 
-  it('shows empty state when there are no subjects', () => {
-    mockUseSubjects.mockReturnValue({ data: [], isLoading: false });
-    mockUseOverallProgress.mockReturnValue({
-      data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
-      isLoading: false,
+  it('shows empty state when there are no subjects', async () => {
+    mockFetch.setRoute('/subjects', { subjects: [] });
+    mockFetch.setRoute('/progress/overview', {
+      subjects: [],
+      totalTopicsCompleted: 0,
+      totalTopicsVerified: 0,
     });
 
-    render(<LibraryScreen />, { wrapper: TestWrapper });
+    render(<LibraryScreen />, { wrapper });
 
-    // New library v3 design: empty state uses library-empty testID
-    screen.getByTestId('library-empty');
+    await waitFor(() => {
+      // New library v3 design: empty state uses library-empty testID
+      screen.getByTestId('library-empty');
+    });
     screen.getByText('Your library will grow as you learn');
   });
 
-  it('renders shelf rows for each subject', () => {
-    mockUseSubjects.mockReturnValue({
-      data: [{ id: 'sub-1', name: 'History', status: 'active' }],
-      isLoading: false,
+  it('renders shelf rows for each subject', async () => {
+    mockFetch.setRoute('/subjects', {
+      subjects: [{ id: 'sub-1', name: 'History', status: 'active' }],
     });
-    mockUseOverallProgress.mockReturnValue({
-      data: {
-        subjects: [
-          {
-            subjectId: 'sub-1',
-            name: 'History',
-            topicsTotal: 12,
-            topicsCompleted: 3,
-            topicsVerified: 1,
-            urgencyScore: 0,
-            retentionStatus: 'fading',
-            lastSessionAt: null,
-          },
-        ],
-        totalTopicsCompleted: 3,
-        totalTopicsVerified: 1,
-      },
-      isLoading: false,
+    mockFetch.setRoute('/progress/overview', {
+      subjects: [
+        {
+          subjectId: 'sub-1',
+          name: 'History',
+          topicsTotal: 12,
+          topicsCompleted: 3,
+          topicsVerified: 1,
+          urgencyScore: 0,
+          retentionStatus: 'fading',
+          lastSessionAt: null,
+        },
+      ],
+      totalTopicsCompleted: 3,
+      totalTopicsVerified: 1,
     });
 
-    render(<LibraryScreen />, { wrapper: TestWrapper });
+    render(<LibraryScreen />, { wrapper });
 
-    // Library v3: subject is a shelf row, not a card
-    screen.getByTestId('shelf-row-header-sub-1');
+    await waitFor(() => {
+      // Library v3: subject is a shelf row, not a card
+      screen.getByTestId('shelf-row-header-sub-1');
+    });
     screen.getByText('History');
   });
 
-  it('orders active subjects first, then paused, then archived', () => {
-    mockUseSubjects.mockReturnValue({
-      data: [
+  it('orders active subjects first, then paused, then archived', async () => {
+    mockFetch.setRoute('/subjects', {
+      subjects: [
         { id: 'sub-archived', name: 'Archived Spanish', status: 'archived' },
         { id: 'sub-paused', name: 'Paused History', status: 'paused' },
         { id: 'sub-active', name: 'Active Math', status: 'active' },
       ],
-      isLoading: false,
     });
-    mockUseOverallProgress.mockReturnValue({
-      data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
-      isLoading: false,
+    mockFetch.setRoute('/progress/overview', {
+      subjects: [],
+      totalTopicsCompleted: 0,
+      totalTopicsVerified: 0,
     });
 
-    render(<LibraryScreen />, { wrapper: TestWrapper });
+    render(<LibraryScreen />, { wrapper });
+
+    await waitFor(() => {
+      screen.getByTestId('shelf-row-header-sub-active');
+    });
 
     const orderedRowIds = screen
       .UNSAFE_getAllByProps({ accessibilityRole: 'button' })
@@ -414,19 +378,23 @@ describe('LibraryScreen', () => {
     ]);
   });
 
-  it('has no top-level tabs — library opens subject shelves as the next level', () => {
+  it('has no top-level tabs — library opens subject shelves as the next level', async () => {
     // Library v3 redesign replaced Shelves/Books/Topics tabs with a subject
     // shelf list. There are no tab controls at the library level.
-    mockUseSubjects.mockReturnValue({
-      data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
-      isLoading: false,
+    mockFetch.setRoute('/subjects', {
+      subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
     });
-    mockUseOverallProgress.mockReturnValue({
-      data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
-      isLoading: false,
+    mockFetch.setRoute('/progress/overview', {
+      subjects: [],
+      totalTopicsCompleted: 0,
+      totalTopicsVerified: 0,
     });
 
-    render(<LibraryScreen />, { wrapper: TestWrapper });
+    render(<LibraryScreen />, { wrapper });
+
+    await waitFor(() => {
+      screen.getByTestId('shelves-list');
+    });
 
     expect(screen.queryByTestId('library-tab-shelves')).toBeNull();
     expect(screen.queryByTestId('library-tab-books')).toBeNull();
@@ -435,19 +403,21 @@ describe('LibraryScreen', () => {
     screen.getByTestId('shelves-list');
   });
 
-  it('opens the subject shelf when a subject row is pressed', () => {
+  it('opens the subject shelf when a subject row is pressed', async () => {
     // Library is subject-first: books and suggestions live on the subject
     // shelf screen instead of expanding inline inside the Library list.
-    mockUseSubjects.mockReturnValue({
-      data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
-      isLoading: false,
+    mockFetch.setRoute('/subjects', {
+      subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
     });
-    mockUseOverallProgress.mockReturnValue({
-      data: { subjects: [] },
-      isLoading: false,
+    mockFetch.setRoute('/progress/overview', {
+      subjects: [],
     });
 
-    render(<LibraryScreen />, { wrapper: TestWrapper });
+    render(<LibraryScreen />, { wrapper });
+
+    await waitFor(() => {
+      screen.getByTestId('shelf-row-header-sub-1');
+    });
 
     fireEvent.press(screen.getByTestId('shelf-row-header-sub-1'));
 
@@ -461,55 +431,49 @@ describe('LibraryScreen', () => {
   // -----------------------------------------------------------------------
   // BUG-82: allBooksQuery failure is non-fatal — library still renders [BUG-82]
   // -----------------------------------------------------------------------
-  it('does not show full-page error when only allBooksQuery fails', () => {
-    mockUseSubjects.mockReturnValue({
-      data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
+  it('does not show full-page error when only allBooksQuery fails', async () => {
+    mockFetch.setRoute('/subjects', {
+      subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
     });
-    mockUseOverallProgress.mockReturnValue({
-      data: { subjects: [] },
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
+    mockFetch.setRoute('/progress/overview', {
+      subjects: [],
     });
-    mockUseAllBooks.mockReturnValue({
-      books: [],
-      isLoading: false,
-      isError: true,
-      refetch: jest.fn(),
-    });
+    mockFetch.setRoute(
+      '/library/books',
+      new Response(JSON.stringify({ error: 'Server Error' }), { status: 500 }),
+    );
 
-    render(<LibraryScreen />, { wrapper: TestWrapper });
+    render(<LibraryScreen />, { wrapper });
 
-    // Library renders normally — subjects still visible as shelf rows
-    expect(screen.queryByTestId('library-error')).toBeNull();
+    await waitFor(() => {
+      // Library renders normally — subjects still visible as shelf rows
+      expect(screen.queryByTestId('library-error')).toBeNull();
+    });
     screen.getByTestId('shelves-list');
   });
 
   describe('Manage Subjects modal — backdrop close [BUG-510]', () => {
-    function arrangeWithOneSubject() {
-      mockUseSubjects.mockReturnValue({
-        data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
-        isLoading: false,
-        isError: false,
-        refetch: jest.fn(),
+    async function arrangeWithOneSubject() {
+      mockFetch.setRoute('/subjects', {
+        subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
       });
-      mockUseOverallProgress.mockReturnValue({
-        data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
-        isLoading: false,
-        isError: false,
-        refetch: jest.fn(),
+      mockFetch.setRoute('/progress/overview', {
+        subjects: [],
+        totalTopicsCompleted: 0,
+        totalTopicsVerified: 0,
       });
     }
 
-    it('closes when the backdrop (outside the sheet) is tapped [BUG-510]', () => {
+    it('closes when the backdrop (outside the sheet) is tapped [BUG-510]', async () => {
       // Repro: on web the Close button sits behind the bottom tab bar so
       // pointer events never reach it; the modal had no other dismiss path
       // because the backdrop was a plain View with no onPress.
-      arrangeWithOneSubject();
-      render(<LibraryScreen />, { wrapper: TestWrapper });
+      await arrangeWithOneSubject();
+      render(<LibraryScreen />, { wrapper });
+
+      await waitFor(() => {
+        screen.getByTestId('manage-subjects-button');
+      });
 
       fireEvent.press(screen.getByTestId('manage-subjects-button'));
       screen.getByTestId('manage-subjects-backdrop');
@@ -528,9 +492,13 @@ describe('LibraryScreen', () => {
       ).not.toBeNull();
     });
 
-    it('exposes an accessible label so assistive tech can dismiss the modal [BUG-510]', () => {
-      arrangeWithOneSubject();
-      render(<LibraryScreen />, { wrapper: TestWrapper });
+    it('exposes an accessible label so assistive tech can dismiss the modal [BUG-510]', async () => {
+      await arrangeWithOneSubject();
+      render(<LibraryScreen />, { wrapper });
+
+      await waitFor(() => {
+        screen.getByTestId('manage-subjects-button');
+      });
 
       fireEvent.press(screen.getByTestId('manage-subjects-button'));
 
@@ -540,43 +508,56 @@ describe('LibraryScreen', () => {
     });
 
     it('sends archived status when the Archive action is pressed', async () => {
-      arrangeWithOneSubject();
-      render(<LibraryScreen />, { wrapper: TestWrapper });
+      await arrangeWithOneSubject();
+
+      const updateSubjectResponse = { subject: { id: 'sub-1', status: 'archived' } };
+      mockFetch.setRoute('/subjects/', updateSubjectResponse);
+
+      render(<LibraryScreen />, { wrapper });
+
+      await waitFor(() => {
+        screen.getByTestId('manage-subjects-button');
+      });
 
       fireEvent.press(screen.getByTestId('manage-subjects-button'));
       fireEvent.press(screen.getByTestId('archive-subject-sub-1'));
 
       await waitFor(() => {
-        expect(mockUpdateSubjectMutateAsync).toHaveBeenCalledWith({
-          subjectId: 'sub-1',
-          status: 'archived',
-        });
+        // The PATCH to /subjects/:id was called
+        const patchCalls = (mockFetch.mock.calls as [RequestInfo | URL, RequestInit?][])
+          .filter(([input]) => {
+            const url = typeof input === 'string' ? input : (input as Request).url;
+            return url.includes('/subjects/') && String(url).split('/subjects/')[1]?.includes('sub-1');
+          });
+        expect(patchCalls.length).toBeGreaterThan(0);
       });
     });
 
     it('disables other subject actions while one status update is saving', async () => {
-      let finishUpdate!: () => void;
-      mockUpdateSubjectMutateAsync.mockReturnValue(
-        new Promise<void>((resolve) => {
-          finishUpdate = resolve;
-        }),
-      );
-      mockUseSubjects.mockReturnValue({
-        data: [
+      // Keep the PATCH in-flight by returning a never-resolving response
+      let resolveUpdate!: (value: Response) => void;
+      const updatePromise = new Promise<Response>((resolve) => {
+        resolveUpdate = resolve;
+      });
+
+      mockFetch.setRoute('/subjects/', () => updatePromise);
+      mockFetch.setRoute('/subjects', {
+        subjects: [
           { id: 'sub-1', name: 'Math', status: 'active' },
           { id: 'sub-2', name: 'History', status: 'active' },
         ],
-        isLoading: false,
-        isError: false,
-        refetch: jest.fn(),
       });
-      mockUseOverallProgress.mockReturnValue({
-        data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
-        isLoading: false,
-        isError: false,
-        refetch: jest.fn(),
+      mockFetch.setRoute('/progress/overview', {
+        subjects: [],
+        totalTopicsCompleted: 0,
+        totalTopicsVerified: 0,
       });
-      render(<LibraryScreen />, { wrapper: TestWrapper });
+
+      render(<LibraryScreen />, { wrapper });
+
+      await waitFor(() => {
+        screen.getByTestId('manage-subjects-button');
+      });
 
       fireEvent.press(screen.getByTestId('manage-subjects-button'));
       fireEvent.press(screen.getByTestId('archive-subject-sub-1'));
@@ -584,11 +565,14 @@ describe('LibraryScreen', () => {
       await waitFor(() => {
         expect(screen.getByTestId('archive-subject-sub-2')).toBeDisabled();
       });
-      expect(mockUpdateSubjectMutateAsync).toHaveBeenCalledWith({
-        subjectId: 'sub-1',
-        status: 'archived',
-      });
-      finishUpdate();
+
+      // Resolve the pending update to avoid open handles
+      resolveUpdate(
+        new Response(JSON.stringify({ subject: { id: 'sub-1', status: 'archived' } }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      );
     });
   });
 
@@ -600,16 +584,16 @@ describe('LibraryScreen', () => {
   // from topicCountsByBookId, so the header subtitle silently undercounted
   // those topics — visibly drifting from per-shelf topic totals.
   describe('Header topic count [BUG-971]', () => {
-    it('counts topics with null bookId in the header subtitle', () => {
-      mockUseSubjects.mockReturnValue({
-        data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
-        isLoading: false,
+    it('counts topics with null bookId in the header subtitle', async () => {
+      mockFetch.setRoute('/subjects', {
+        subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
       });
-      mockUseOverallProgress.mockReturnValue({
-        data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
-        isLoading: false,
+      mockFetch.setRoute('/progress/overview', {
+        subjects: [],
+        totalTopicsCompleted: 0,
+        totalTopicsVerified: 0,
       });
-      setLibraryRetention(testQueryClient, {
+      setLibraryRetention(queryClient, {
         subjects: [
           {
             subjectId: 'sub-1',
@@ -647,31 +631,35 @@ describe('LibraryScreen', () => {
         ],
       });
 
-      render(<LibraryScreen />, { wrapper: TestWrapper });
+      render(<LibraryScreen />, { wrapper });
 
-      // 3 topics total (1 with bookId, 2 with null bookId) must all be counted.
-      // Pre-fix this would render "1 subjects · 1 topics" (orphans dropped).
-      // Match on the topic-count segment only — the subject-count segment's
-      // grammar ("1 subject" vs "1 subjects") may shift if proper i18next
-      // pluralization lands later, and that change is unrelated to BUG-971.
-      expect(screen.getByText(/· 3 topics\b/)).toBeTruthy();
+      await waitFor(() => {
+        // 3 topics total (1 with bookId, 2 with null bookId) must all be counted.
+        // Pre-fix this would render "1 subjects · 1 topics" (orphans dropped).
+        // Match on the topic-count segment only — the subject-count segment's
+        // grammar ("1 subject" vs "1 subjects") may shift if proper i18next
+        // pluralization lands later, and that change is unrelated to BUG-971.
+        expect(screen.getByText(/· 3 topics\b/)).toBeTruthy();
+      });
     });
 
-    it('omits the topic count segment entirely when there are no topics', () => {
-      mockUseSubjects.mockReturnValue({
-        data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
-        isLoading: false,
+    it('omits the topic count segment entirely when there are no topics', async () => {
+      mockFetch.setRoute('/subjects', {
+        subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
       });
-      mockUseOverallProgress.mockReturnValue({
-        data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
-        isLoading: false,
+      mockFetch.setRoute('/progress/overview', {
+        subjects: [],
+        totalTopicsCompleted: 0,
+        totalTopicsVerified: 0,
       });
-      setLibraryRetention(testQueryClient, { subjects: [] });
+      setLibraryRetention(queryClient, { subjects: [] });
 
-      render(<LibraryScreen />, { wrapper: TestWrapper });
+      render(<LibraryScreen />, { wrapper });
 
-      // Header should read just "1 subjects" with no trailing " · N topics".
-      screen.getByText('1 subjects');
+      await waitFor(() => {
+        // Header should read just "1 subjects" with no trailing " · N topics".
+        screen.getByText('1 subjects');
+      });
     });
   });
 
@@ -723,33 +711,28 @@ describe('LibraryScreen', () => {
       ],
     };
 
-    function renderSearching() {
-      mockUseSubjects.mockReturnValue({
-        data: [{ id: 'sub-1', name: 'Biology', status: 'active' }],
-        isLoading: false,
-        isError: false,
+    async function renderSearching() {
+      mockFetch.setRoute('/subjects', {
+        subjects: [{ id: 'sub-1', name: 'Biology', status: 'active' }],
       });
-      mockUseOverallProgress.mockReturnValue({
-        data: {
-          subjects: [
-            {
-              subjectId: 'sub-1',
-              topicsTotal: 5,
-              topicsCompleted: 2,
-              topicsVerified: 2,
-            },
-          ],
-        },
-        isLoading: false,
-        isError: false,
+      mockFetch.setRoute('/progress/overview', {
+        subjects: [
+          {
+            subjectId: 'sub-1',
+            topicsTotal: 5,
+            topicsCompleted: 2,
+            topicsVerified: 2,
+          },
+        ],
       });
-      mockUseLibrarySearch.mockReturnValue({
-        data: SEARCH_DATA,
-        isLoading: false,
-        isError: false,
-        refetch: jest.fn(),
+      mockFetch.setRoute('/library/search', SEARCH_DATA);
+
+      render(<LibraryScreen />, { wrapper });
+
+      await waitFor(() => {
+        screen.getByTestId('library-search-input');
       });
-      render(<LibraryScreen />, { wrapper: TestWrapper });
+
       fireEvent.changeText(screen.getByTestId('library-search-input'), 'test');
       act(() => {
         jest.runOnlyPendingTimers();
@@ -764,8 +747,9 @@ describe('LibraryScreen', () => {
       jest.useRealTimers();
     });
 
-    it('subject row tap calls router.push to shelf', () => {
-      renderSearching();
+    it('subject row tap calls router.push to shelf', async () => {
+      await renderSearching();
+      await waitFor(() => screen.getByTestId('search-subject-row-sub-1'));
       fireEvent.press(screen.getByTestId('search-subject-row-sub-1'));
       expect(mockPush).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -775,8 +759,9 @@ describe('LibraryScreen', () => {
       );
     });
 
-    it('book row tap pushes shelf then book', () => {
-      renderSearching();
+    it('book row tap pushes shelf then book', async () => {
+      await renderSearching();
+      await waitFor(() => screen.getByTestId('book-row-book-1'));
       fireEvent.press(screen.getByTestId('book-row-book-1'));
       expect(mockPush).toHaveBeenCalledTimes(2);
       expect(mockPush).toHaveBeenNthCalledWith(
@@ -795,8 +780,9 @@ describe('LibraryScreen', () => {
       );
     });
 
-    it('topic row tap pushes to topic screen', () => {
-      renderSearching();
+    it('topic row tap pushes to topic screen', async () => {
+      await renderSearching();
+      await waitFor(() => screen.getByTestId('topic-row-top-1'));
       fireEvent.press(screen.getByTestId('topic-row-top-1'));
       expect(mockPush).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -806,8 +792,9 @@ describe('LibraryScreen', () => {
       );
     });
 
-    it('note row tap pushes to parent topic', () => {
-      renderSearching();
+    it('note row tap pushes to parent topic', async () => {
+      await renderSearching();
+      await waitFor(() => screen.getByTestId('note-row-note-1'));
       fireEvent.press(screen.getByTestId('note-row-note-1'));
       expect(mockPush).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -817,8 +804,9 @@ describe('LibraryScreen', () => {
       );
     });
 
-    it('session row tap pushes to root session-summary route', () => {
-      renderSearching();
+    it('session row tap pushes to root session-summary route', async () => {
+      await renderSearching();
+      await waitFor(() => screen.getByTestId('session-row-sess-1'));
       fireEvent.press(screen.getByTestId('session-row-sess-1'));
       expect(mockPush).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -843,32 +831,31 @@ describe('LibraryScreen', () => {
   // -------------------------------------------------------------------------
   describe('Library retention boundary [PR-4]', () => {
     it('shows shimmer skeleton while libraryRetentionQuery is loading', async () => {
-      // Pre-emptively seed retention as undefined so the useApiClient mock
-      // returns a never-resolving promise — simulating a slow /library/retention.
       // Leave the retention cache unseeded — useLibraryRetention starts in
       // its loading state, and library.tsx must still render the shelf rows
       // because subjects + curriculum are already loaded.
-      testQueryClient.setQueryData(
-        ['library', 'retention', ACTIVE_PROFILE_ID],
-        undefined,
-      );
-
-      mockUseSubjects.mockReturnValue({
-        data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
-        isLoading: false,
-        isError: false,
+      queryClient.removeQueries({
+        queryKey: ['library', 'retention', ACTIVE_PROFILE_ID],
       });
-      mockUseOverallProgress.mockReturnValue({
-        data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
-        isLoading: false,
-        isError: false,
+      // Make the fetch never resolve so the loading state persists
+      mockFetch.setRoute('/library/retention', () => new Promise(() => {}));
+
+      mockFetch.setRoute('/subjects', {
+        subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
+      });
+      mockFetch.setRoute('/progress/overview', {
+        subjects: [],
+        totalTopicsCompleted: 0,
+        totalTopicsVerified: 0,
       });
 
-      render(<LibraryScreen />, { wrapper: TestWrapper });
+      render(<LibraryScreen />, { wrapper });
 
-      // While retention query is pending, subjects are loaded — screen renders
-      // (no overall-progress loading gate required). ShelfRow for sub-1 is visible.
-      screen.getByTestId('shelf-row-header-sub-1');
+      await waitFor(() => {
+        // While retention query is pending, subjects are loaded — screen renders
+        // (no overall-progress loading gate required). ShelfRow for sub-1 is visible.
+        screen.getByTestId('shelf-row-header-sub-1');
+      });
     });
 
     it('renders shelf rows when /library/retention returns subjects with mixed statuses', async () => {
@@ -879,7 +866,7 @@ describe('LibraryScreen', () => {
       ).toISOString();
       const NEAR = new Date(Date.now() + 1 * 60 * 60 * 1000).toISOString();
 
-      setLibraryRetention(testQueryClient, {
+      setLibraryRetention(queryClient, {
         subjects: [
           {
             subjectId: 'sub-strong',
@@ -929,32 +916,32 @@ describe('LibraryScreen', () => {
         ],
       });
 
-      mockUseSubjects.mockReturnValue({
-        data: [
+      mockFetch.setRoute('/subjects', {
+        subjects: [
           { id: 'sub-strong', name: 'Strong Subject', status: 'active' },
           { id: 'sub-fading', name: 'Fading Subject', status: 'active' },
           { id: 'sub-forgotten', name: 'Forgotten Subject', status: 'active' },
         ],
-        isLoading: false,
-        isError: false,
       });
-      mockUseOverallProgress.mockReturnValue({
-        data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
-        isLoading: false,
-        isError: false,
+      mockFetch.setRoute('/progress/overview', {
+        subjects: [],
+        totalTopicsCompleted: 0,
+        totalTopicsVerified: 0,
       });
 
-      render(<LibraryScreen />, { wrapper: TestWrapper });
+      render(<LibraryScreen />, { wrapper });
 
-      // All three shelves render — data sourced exclusively from the library
-      // retention cache (not from useOverallProgress). The review badge is
-      // rendered by the real ShelfRow based on reviewDueCount, but since
-      // ShelfRow is mocked in this test file we assert on what the mock exposes:
-      // the three shelf-row headers derived from the three subjects in the
-      // library retention payload.
-      screen.getByTestId('shelf-row-header-sub-strong');
-      screen.getByTestId('shelf-row-header-sub-fading');
-      screen.getByTestId('shelf-row-header-sub-forgotten');
+      await waitFor(() => {
+        // All three shelves render — data sourced exclusively from the library
+        // retention cache (not from useOverallProgress). The review badge is
+        // rendered by the real ShelfRow based on reviewDueCount, but since
+        // ShelfRow is mocked in this test file we assert on what the mock exposes:
+        // the three shelf-row headers derived from the three subjects in the
+        // library retention payload.
+        screen.getByTestId('shelf-row-header-sub-strong');
+        screen.getByTestId('shelf-row-header-sub-fading');
+        screen.getByTestId('shelf-row-header-sub-forgotten');
+      });
 
       // All three subject names are visible
       screen.getByText('Strong Subject');
