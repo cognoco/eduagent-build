@@ -1,13 +1,11 @@
+const mockRouteAndCall = jest.fn();
+
 jest.mock('./llm', () => ({
-  routeAndCall: jest.fn(),
+  ...jest.requireActual('./llm'),
+  routeAndCall: (...args: unknown[]) => mockRouteAndCall(...args),
 }));
 
-import { routeAndCall } from './llm';
 import { detectSubjectType, generateBookTopics } from './book-generation';
-
-const mockRouteAndCall = routeAndCall as jest.MockedFunction<
-  typeof routeAndCall
->;
 
 describe('book-generation', () => {
   beforeEach(() => {
