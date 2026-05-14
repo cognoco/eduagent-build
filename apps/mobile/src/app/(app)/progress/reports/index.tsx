@@ -8,7 +8,7 @@ import {
 } from '../../../../hooks/use-progress';
 import { goBackOrReplace } from '../../../../lib/navigation';
 import { useProfile } from '../../../../lib/profile';
-import { ErrorFallback } from '../../../../components/common';
+import { QueryStateView } from '../../../../components/common';
 
 function formatDateOnly(
   isoDate: string,
@@ -82,70 +82,73 @@ export default function ProgressReportsScreen(): React.ReactElement {
           </View>
         </View>
 
-        {isLoading ? (
-          <View className="bg-surface rounded-card p-4 mt-4">
-            <Text className="text-body-sm text-text-secondary">
-              {t('parentView.reports.loadingReports')}
-            </Text>
-          </View>
-        ) : isError ? (
-          <ErrorFallback
-            variant="card"
-            message={t('parentView.reports.checkConnectionRetry')}
-            primaryAction={{
-              label: t('common.tryAgain'),
-              onPress: () => {
-                void monthlyReports.refetch();
-                void weeklyReports.refetch();
-              },
-              testID: 'progress-reports-retry',
-            }}
-            secondaryAction={{
-              label: t('common.goBack'),
-              onPress: () => goBackOrReplace(router, '/(app)/progress'),
-              testID: 'progress-reports-back-secondary',
-            }}
-            testID="progress-reports-error"
-          />
-        ) : items.length > 0 ? (
-          items.map((item) => (
-            <Pressable
-              key={`${item.kind}-${item.id}`}
-              onPress={() =>
-                item.kind === 'weekly'
-                  ? router.push({
-                      pathname:
-                        '/(app)/progress/weekly-report/[weeklyReportId]',
-                      params: { weeklyReportId: item.id },
-                    } as never)
-                  : router.push({
-                      pathname: '/(app)/progress/reports/[reportId]',
-                      params: { reportId: item.id },
-                    } as never)
-              }
-              className="bg-surface rounded-card p-4 mt-4"
-              accessibilityRole="button"
-              accessibilityLabel={`${item.title}. ${item.headlineStat.label}: ${item.headlineStat.value}`}
-              testID={`progress-report-row-${item.id}`}
-            >
-              <Text className="text-body font-semibold text-text-primary">
-                {item.title}
+        <QueryStateView
+          isLoading={isLoading}
+          error={isError ? true : undefined}
+          variant="card"
+          errorMessage={t('parentView.reports.checkConnectionRetry')}
+          retry={{
+            label: t('common.tryAgain'),
+            onPress: () => {
+              void monthlyReports.refetch();
+              void weeklyReports.refetch();
+            },
+            testID: 'progress-reports-retry',
+          }}
+          back={{
+            label: t('common.goBack'),
+            onPress: () => goBackOrReplace(router, '/(app)/progress'),
+            testID: 'progress-reports-back-secondary',
+          }}
+          loadingFallback={
+            <View className="bg-surface rounded-card p-4 mt-4">
+              <Text className="text-body-sm text-text-secondary">
+                {t('parentView.reports.loadingReports')}
               </Text>
-              <Text className="text-body-sm text-text-secondary mt-1">
-                {item.headlineStat.label}: {item.headlineStat.value}
+            </View>
+          }
+          testID="progress-reports-error"
+        >
+          {items.length > 0 ? (
+            items.map((item) => (
+              <Pressable
+                key={`${item.kind}-${item.id}`}
+                onPress={() =>
+                  item.kind === 'weekly'
+                    ? router.push({
+                        pathname:
+                          '/(app)/progress/weekly-report/[weeklyReportId]',
+                        params: { weeklyReportId: item.id },
+                      } as never)
+                    : router.push({
+                        pathname: '/(app)/progress/reports/[reportId]',
+                        params: { reportId: item.id },
+                      } as never)
+                }
+                className="bg-surface rounded-card p-4 mt-4"
+                accessibilityRole="button"
+                accessibilityLabel={`${item.title}. ${item.headlineStat.label}: ${item.headlineStat.value}`}
+                testID={`progress-report-row-${item.id}`}
+              >
+                <Text className="text-body font-semibold text-text-primary">
+                  {item.title}
+                </Text>
+                <Text className="text-body-sm text-text-secondary mt-1">
+                  {item.headlineStat.label}: {item.headlineStat.value}
+                </Text>
+                <Text className="text-caption text-text-secondary mt-1">
+                  {item.headlineStat.comparison}
+                </Text>
+              </Pressable>
+            ))
+          ) : (
+            <View className="bg-surface rounded-card p-4 mt-4">
+              <Text className="text-body-sm text-text-secondary">
+                {t('parentView.index.firstReportSoon')}
               </Text>
-              <Text className="text-caption text-text-secondary mt-1">
-                {item.headlineStat.comparison}
-              </Text>
-            </Pressable>
-          ))
-        ) : (
-          <View className="bg-surface rounded-card p-4 mt-4">
-            <Text className="text-body-sm text-text-secondary">
-              {t('parentView.index.firstReportSoon')}
-            </Text>
-          </View>
-        )}
+            </View>
+          )}
+        </QueryStateView>
       </ScrollView>
     </View>
   );

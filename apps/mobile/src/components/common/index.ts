@@ -14,6 +14,7 @@ export { DeskLampAnimation } from './DeskLampAnimation';
 export { LightBulbAnimation } from './LightBulbAnimation';
 export { MagicPenAnimation } from './MagicPenAnimation';
 export { ProfileSwitcher } from './ProfileSwitcher';
+export { QueryStateView } from './QueryStateView';
 export { RewardBurst } from './RewardBurst';
 export type { RewardBurstIntensity, RewardBurstVariant } from './RewardBurst';
 export { ShimmerSkeleton } from './ShimmerSkeleton';

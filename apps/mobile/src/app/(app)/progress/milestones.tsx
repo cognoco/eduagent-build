@@ -2,7 +2,7 @@ import { ScrollView, Text, View, Pressable } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ErrorFallback } from '../../../components/common';
+import { QueryStateView } from '../../../components/common';
 import { MilestoneCard } from '../../../components/progress';
 import { useProgressMilestones } from '../../../hooks/use-progress';
 import { goBackOrReplace } from '../../../lib/navigation';
@@ -63,64 +63,65 @@ export default function MilestonesListScreen(): React.ReactElement {
         className="flex-1 px-5"
         contentContainerStyle={{ paddingBottom: insets.bottom + 28 }}
       >
-        {isLoading ? (
-          <>
-            <SkeletonRow />
-            <SkeletonRow />
-            <SkeletonRow />
-          </>
-        ) : isError ? (
-          <View testID="milestones-error">
-            <ErrorFallback
-              title={t('progress.milestones.errorTitle')}
-              message={t('progress.milestones.errorMessage')}
-              primaryAction={{
-                label: t('common.tryAgain'),
-                onPress: () => void refetch(),
-                testID: 'milestones-retry',
-              }}
-              secondaryAction={{
-                label: t('common.goBack'),
-                onPress: () =>
-                  goBackOrReplace(router, '/(app)/progress' as const),
-                testID: 'milestones-go-back',
-              }}
-              testID="milestones-error-fallback"
-            />
-          </View>
-        ) : isEmpty ? (
-          <View
-            className="bg-surface rounded-card p-5 mt-4 items-center"
-            testID="milestones-empty"
-          >
-            <Text className="text-2xl mb-3">🎯</Text>
-            <Text className="text-h3 font-semibold text-text-primary text-center">
-              {t('progress.milestones.emptyTitle')}
-            </Text>
-            <Text className="text-body-sm text-text-secondary text-center mt-2">
-              {t('progress.milestones.emptySubtitle')}
-            </Text>
-            <Pressable
-              onPress={() =>
-                goBackOrReplace(router, '/(app)/progress' as const)
-              }
-              className="bg-background rounded-button px-5 py-3 mt-4"
-              accessibilityRole="button"
-              accessibilityLabel={t('progress.milestones.emptyBackLabel')}
-              testID="milestones-empty-back"
+        <QueryStateView
+          isLoading={isLoading}
+          error={isError ? true : undefined}
+          variant="card"
+          errorTitle={t('progress.milestones.errorTitle')}
+          errorMessage={t('progress.milestones.errorMessage')}
+          retry={{
+            label: t('common.tryAgain'),
+            onPress: () => void refetch(),
+            testID: 'milestones-retry',
+          }}
+          back={{
+            label: t('common.goBack'),
+            onPress: () => goBackOrReplace(router, '/(app)/progress' as const),
+            testID: 'milestones-go-back',
+          }}
+          loadingFallback={
+            <>
+              <SkeletonRow />
+              <SkeletonRow />
+              <SkeletonRow />
+            </>
+          }
+          testID="milestones-error"
+        >
+          {isEmpty ? (
+            <View
+              className="bg-surface rounded-card p-5 mt-4 items-center"
+              testID="milestones-empty"
             >
-              <Text className="text-body font-semibold text-text-primary">
-                {t('common.goBack')}
+              <Text className="text-2xl mb-3">🎯</Text>
+              <Text className="text-h3 font-semibold text-text-primary text-center">
+                {t('progress.milestones.emptyTitle')}
               </Text>
-            </Pressable>
-          </View>
-        ) : (
-          milestones?.map((milestone) => (
-            <View key={milestone.id} className="mt-3">
-              <MilestoneCard milestone={milestone} />
+              <Text className="text-body-sm text-text-secondary text-center mt-2">
+                {t('progress.milestones.emptySubtitle')}
+              </Text>
+              <Pressable
+                onPress={() =>
+                  goBackOrReplace(router, '/(app)/progress' as const)
+                }
+                className="bg-background rounded-button px-5 py-3 mt-4"
+                accessibilityRole="button"
+                accessibilityLabel={t('progress.milestones.emptyBackLabel')}
+                testID="milestones-empty-back"
+              >
+                <Text className="text-body font-semibold text-text-primary">
+                  {t('common.goBack')}
+                </Text>
+              </Pressable>
             </View>
-          ))
-        )}
+          ) : (
+            milestones?.map((milestone) => (
+              <View key={milestone.id} className="mt-3">
+                <MilestoneCard milestone={milestone} />
+              </View>
+            ))
+          )}
+        </QueryStateView>
       </ScrollView>
     </View>
   );

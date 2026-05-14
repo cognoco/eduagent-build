@@ -10,7 +10,7 @@ import {
 } from '../../../../../lib/navigation';
 import { classifyApiError } from '../../../../../lib/format-api-error';
 import { formatMinutes } from '../../../../../lib/format-relative-date';
-import { ErrorFallback } from '../../../../../components/common';
+import { QueryStateView } from '../../../../../components/common';
 import { MetricCard } from '../../../../../components/progress';
 import {
   useChildWeeklyReportDetail,
@@ -145,162 +145,165 @@ export default function ChildWeeklyReportDetailScreen(): React.ReactElement {
           </View>
         </View>
 
-        {isLoading ? (
-          <View className="bg-surface rounded-card p-4 mt-4">
-            <Text className="text-body-sm text-text-secondary">
-              {t('parentView.weeklyReport.loadingReport')}
-            </Text>
-          </View>
-        ) : isError && !report ? (
-          // UX-DE-M6: distinct error state — network failures must not silently render as the gone state
-          <ErrorFallback
-            variant="card"
-            message={classifyApiError(error).message}
-            primaryAction={{
-              label: t('common.tryAgain'),
-              onPress: () => void refetch(),
-              testID: 'child-weekly-report-error-retry',
-            }}
-            secondaryAction={{
-              label: t('parentView.weeklyReport.backToReports'),
-              onPress: () => goBackOrReplace(router, reportsHref),
-              testID: 'child-weekly-report-error-back',
-            }}
-            testID="child-weekly-report-error"
-          />
-        ) : report ? (
-          <>
-            <View
-              className="bg-coaching-card rounded-card p-5 mt-4"
-              testID="child-weekly-report-hero"
-            >
-              <Text className="text-caption text-text-secondary">
-                {report.reportData.childName}
-              </Text>
-              <Text className="text-h1 font-bold text-text-primary mt-2">
-                {report.reportData.headlineStat.value}{' '}
-                {report.reportData.headlineStat.label.toLowerCase()}
-              </Text>
-              <Text className="text-body text-text-secondary mt-2">
-                {report.reportData.headlineStat.comparison}
+        <QueryStateView
+          isLoading={isLoading}
+          error={isError && !report ? true : undefined}
+          variant="card"
+          errorMessage={classifyApiError(error).message}
+          retry={{
+            label: t('common.tryAgain'),
+            onPress: () => void refetch(),
+            testID: 'child-weekly-report-error-retry',
+          }}
+          back={{
+            label: t('parentView.weeklyReport.backToReports'),
+            onPress: () => goBackOrReplace(router, reportsHref),
+            testID: 'child-weekly-report-error-back',
+          }}
+          loadingFallback={
+            <View className="bg-surface rounded-card p-4 mt-4">
+              <Text className="text-body-sm text-text-secondary">
+                {t('parentView.weeklyReport.loadingReport')}
               </Text>
             </View>
-
-            <View className="flex-row gap-3 mt-4">
-              <MetricCard
-                label={t('parentView.weeklyReport.sessionsThisWeek')}
-                value={String(report.reportData.thisWeek.totalSessions)}
-                testID="child-weekly-report-metric-sessions"
-              />
-              <MetricCard
-                label={t('parentView.weeklyReport.timeOnApp')}
-                value={formatMinutes(
-                  report.reportData.thisWeek.totalActiveMinutes,
-                )}
-                testID="child-weekly-report-metric-minutes"
-              />
-            </View>
-
-            <View className="flex-row gap-3 mt-3">
-              <MetricCard
-                label={t('parentView.weeklyReport.topicsMastered')}
-                value={String(report.reportData.thisWeek.topicsMastered)}
-                testID="child-weekly-report-metric-topics"
-              />
-              {/* [SUGG-1] vocabularyTotal is cumulative (absolute snapshot),
-                  not a weekly delta — label reflects that. */}
-              <MetricCard
-                label={t('parentView.weeklyReport.totalWordsKnown')}
-                value={String(report.reportData.thisWeek.vocabularyTotal)}
-                testID="child-weekly-report-metric-vocabulary"
-              />
-            </View>
-
-            {/* BUG-903 (d): Empty-state guidance when nothing happened this */}
-            {/* week. Without this, parents see four zero cards and stop. */}
-            {isEmptyWeeklyReport(report.reportData) && (
+          }
+          testID="child-weekly-report-error"
+        >
+          {/* UX-DE-M6: distinct error state — network failures must not silently render as the gone state */}
+          {report ? (
+            <>
               <View
-                className="bg-surface rounded-card p-4 mt-4"
-                testID="child-weekly-report-empty-note"
+                className="bg-coaching-card rounded-card p-5 mt-4"
+                testID="child-weekly-report-hero"
               >
-                <Text className="text-body-sm text-text-secondary">
-                  {t('parentView.weeklyReport.noActivityNote', {
-                    name: report.reportData.childName,
-                  })}
+                <Text className="text-caption text-text-secondary">
+                  {report.reportData.childName}
+                </Text>
+                <Text className="text-h1 font-bold text-text-primary mt-2">
+                  {report.reportData.headlineStat.value}{' '}
+                  {report.reportData.headlineStat.label.toLowerCase()}
+                </Text>
+                <Text className="text-body text-text-secondary mt-2">
+                  {report.reportData.headlineStat.comparison}
                 </Text>
               </View>
-            )}
 
-            {/* BUG-903 (b): Always provide at least one CTA so the report */}
-            {/* is never a true dead-end. Parent can jump back to the child */}
-            {/* dashboard to suggest a topic or send a nudge. */}
-            <View className="mt-5" testID="child-weekly-report-ctas">
-              <Pressable
-                onPress={() => {
-                  if (!profileId) return;
-                  router.push(`/(app)/child/${profileId}` as never);
-                }}
-                className="bg-primary rounded-button px-4 py-3 items-center min-h-[48px] justify-center"
-                accessibilityRole="button"
-                accessibilityLabel={t(
-                  'parentView.weeklyReport.openChildProfile',
-                  {
-                    name: report.reportData.childName,
-                  },
-                )}
-                testID="child-weekly-report-open-child"
-              >
-                <Text className="text-body font-semibold text-text-inverse">
-                  {isEmptyWeeklyReport(report.reportData)
-                    ? t('parentView.weeklyReport.sendNudge', {
-                        name: report.reportData.childName,
-                      })
-                    : t('parentView.weeklyReport.openChildProfile', {
-                        name: report.reportData.childName,
-                      })}
-                </Text>
-              </Pressable>
+              <View className="flex-row gap-3 mt-4">
+                <MetricCard
+                  label={t('parentView.weeklyReport.sessionsThisWeek')}
+                  value={String(report.reportData.thisWeek.totalSessions)}
+                  testID="child-weekly-report-metric-sessions"
+                />
+                <MetricCard
+                  label={t('parentView.weeklyReport.timeOnApp')}
+                  value={formatMinutes(
+                    report.reportData.thisWeek.totalActiveMinutes,
+                  )}
+                  testID="child-weekly-report-metric-minutes"
+                />
+              </View>
+
+              <View className="flex-row gap-3 mt-3">
+                <MetricCard
+                  label={t('parentView.weeklyReport.topicsMastered')}
+                  value={String(report.reportData.thisWeek.topicsMastered)}
+                  testID="child-weekly-report-metric-topics"
+                />
+                {/* [SUGG-1] vocabularyTotal is cumulative (absolute snapshot),
+                    not a weekly delta — label reflects that. */}
+                <MetricCard
+                  label={t('parentView.weeklyReport.totalWordsKnown')}
+                  value={String(report.reportData.thisWeek.vocabularyTotal)}
+                  testID="child-weekly-report-metric-vocabulary"
+                />
+              </View>
+
+              {/* BUG-903 (d): Empty-state guidance when nothing happened this */}
+              {/* week. Without this, parents see four zero cards and stop. */}
+              {isEmptyWeeklyReport(report.reportData) && (
+                <View
+                  className="bg-surface rounded-card p-4 mt-4"
+                  testID="child-weekly-report-empty-note"
+                >
+                  <Text className="text-body-sm text-text-secondary">
+                    {t('parentView.weeklyReport.noActivityNote', {
+                      name: report.reportData.childName,
+                    })}
+                  </Text>
+                </View>
+              )}
+
+              {/* BUG-903 (b): Always provide at least one CTA so the report */}
+              {/* is never a true dead-end. Parent can jump back to the child */}
+              {/* dashboard to suggest a topic or send a nudge. */}
+              <View className="mt-5" testID="child-weekly-report-ctas">
+                <Pressable
+                  onPress={() => {
+                    if (!profileId) return;
+                    router.push(`/(app)/child/${profileId}` as never);
+                  }}
+                  className="bg-primary rounded-button px-4 py-3 items-center min-h-[48px] justify-center"
+                  accessibilityRole="button"
+                  accessibilityLabel={t(
+                    'parentView.weeklyReport.openChildProfile',
+                    {
+                      name: report.reportData.childName,
+                    },
+                  )}
+                  testID="child-weekly-report-open-child"
+                >
+                  <Text className="text-body font-semibold text-text-inverse">
+                    {isEmptyWeeklyReport(report.reportData)
+                      ? t('parentView.weeklyReport.sendNudge', {
+                          name: report.reportData.childName,
+                        })
+                      : t('parentView.weeklyReport.openChildProfile', {
+                          name: report.reportData.childName,
+                        })}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => goBackOrReplace(router, reportsHref)}
+                  className="rounded-button px-4 py-3 items-center min-h-[48px] justify-center mt-2"
+                  accessibilityRole="button"
+                  accessibilityLabel={t(
+                    'parentView.weeklyReport.backToAllReports',
+                  )}
+                  testID="child-weekly-report-back-to-reports"
+                >
+                  <Text className="text-body font-semibold text-primary">
+                    {t('parentView.weeklyReport.backToAllReports')}
+                  </Text>
+                </Pressable>
+              </View>
+            </>
+          ) : (
+            // Dead-end fix: "gone" branch must have at least one interactive
+            // element so users are never stranded with only the OS back gesture.
+            <View
+              className="bg-surface rounded-card p-5 mt-4"
+              testID="child-weekly-report-gone"
+            >
+              <Text className="text-h3 font-semibold text-text-primary">
+                {t('parentView.weeklyReport.reportGoneTitle')}
+              </Text>
+              <Text className="text-body-sm text-text-secondary mt-2">
+                {t('parentView.weeklyReport.reportGoneBody')}
+              </Text>
               <Pressable
                 onPress={() => goBackOrReplace(router, reportsHref)}
-                className="rounded-button px-4 py-3 items-center min-h-[48px] justify-center mt-2"
+                className="bg-primary rounded-button px-4 py-3 items-center mt-4 min-h-[48px] justify-center"
                 accessibilityRole="button"
-                accessibilityLabel={t(
-                  'parentView.weeklyReport.backToAllReports',
-                )}
-                testID="child-weekly-report-back-to-reports"
+                accessibilityLabel={t('parentView.weeklyReport.backToReports')}
+                testID="child-weekly-report-gone-back"
               >
-                <Text className="text-body font-semibold text-primary">
-                  {t('parentView.weeklyReport.backToAllReports')}
+                <Text className="text-body font-semibold text-text-inverse">
+                  {t('parentView.weeklyReport.backToReports')}
                 </Text>
               </Pressable>
             </View>
-          </>
-        ) : (
-          // Dead-end fix: "gone" branch must have at least one interactive
-          // element so users are never stranded with only the OS back gesture.
-          <View
-            className="bg-surface rounded-card p-5 mt-4"
-            testID="child-weekly-report-gone"
-          >
-            <Text className="text-h3 font-semibold text-text-primary">
-              {t('parentView.weeklyReport.reportGoneTitle')}
-            </Text>
-            <Text className="text-body-sm text-text-secondary mt-2">
-              {t('parentView.weeklyReport.reportGoneBody')}
-            </Text>
-            <Pressable
-              onPress={() => goBackOrReplace(router, reportsHref)}
-              className="bg-primary rounded-button px-4 py-3 items-center mt-4 min-h-[48px] justify-center"
-              accessibilityRole="button"
-              accessibilityLabel={t('parentView.weeklyReport.backToReports')}
-              testID="child-weekly-report-gone-back"
-            >
-              <Text className="text-body font-semibold text-text-inverse">
-                {t('parentView.weeklyReport.backToReports')}
-              </Text>
-            </Pressable>
-          </View>
-        )}
+          )}
+        </QueryStateView>
       </ScrollView>
     </View>
   );

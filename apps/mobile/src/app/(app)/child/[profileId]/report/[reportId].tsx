@@ -9,7 +9,7 @@ import {
 } from '../../../../../lib/navigation';
 import { classifyApiError } from '../../../../../lib/format-api-error';
 import { formatMinutes } from '../../../../../lib/format-relative-date';
-import { ErrorFallback } from '../../../../../components/common';
+import { QueryStateView } from '../../../../../components/common';
 import { MetricCard } from '../../../../../components/progress';
 import {
   useChildReportDetail,
@@ -91,175 +91,178 @@ export default function ChildReportDetailScreen(): React.ReactElement {
           </View>
         </View>
 
-        {isLoading ? (
-          <View className="bg-surface rounded-card p-4 mt-4">
-            <Text className="text-body-sm text-text-secondary">
-              {t('parentView.report.loadingReport')}
-            </Text>
-          </View>
-        ) : isError ? (
-          // UX-DE-M6: network failures must not silently render as the gone state
-          <ErrorFallback
-            variant="card"
-            message={classifyApiError(error).message}
-            primaryAction={{
-              label: t('common.tryAgain'),
-              onPress: () => void refetch(),
-              testID: 'child-report-error-retry',
-            }}
-            secondaryAction={{
-              label: t('parentView.report.backToReports'),
-              onPress: () => goBackOrReplace(router, reportsHref),
-              testID: 'child-report-error-back',
-            }}
-            testID="child-report-error"
-          />
-        ) : report ? (
-          <>
-            <View
-              className="bg-coaching-card rounded-card p-5 mt-4"
-              testID="child-report-hero"
-            >
-              <Text className="text-caption text-text-secondary">
-                {report.reportData.childName}
-              </Text>
-              <Text className="text-h1 font-bold text-text-primary mt-2">
-                {report.reportData.headlineStat.value}{' '}
-                {report.reportData.headlineStat.label.toLowerCase()}
-              </Text>
-              <Text className="text-body text-text-secondary mt-2">
-                {report.reportData.headlineStat.comparison}
+        <QueryStateView
+          isLoading={isLoading}
+          error={isError ? true : undefined}
+          variant="card"
+          errorMessage={classifyApiError(error).message}
+          retry={{
+            label: t('common.tryAgain'),
+            onPress: () => void refetch(),
+            testID: 'child-report-error-retry',
+          }}
+          back={{
+            label: t('parentView.report.backToReports'),
+            onPress: () => goBackOrReplace(router, reportsHref),
+            testID: 'child-report-error-back',
+          }}
+          loadingFallback={
+            <View className="bg-surface rounded-card p-4 mt-4">
+              <Text className="text-body-sm text-text-secondary">
+                {t('parentView.report.loadingReport')}
               </Text>
             </View>
+          }
+          testID="child-report-error"
+        >
+          {/* UX-DE-M6: network failures must not silently render as the gone state */}
+          {report ? (
+            <>
+              <View
+                className="bg-coaching-card rounded-card p-5 mt-4"
+                testID="child-report-hero"
+              >
+                <Text className="text-caption text-text-secondary">
+                  {report.reportData.childName}
+                </Text>
+                <Text className="text-h1 font-bold text-text-primary mt-2">
+                  {report.reportData.headlineStat.value}{' '}
+                  {report.reportData.headlineStat.label.toLowerCase()}
+                </Text>
+                <Text className="text-body text-text-secondary mt-2">
+                  {report.reportData.headlineStat.comparison}
+                </Text>
+              </View>
 
-            <View className="flex-row gap-3 mt-4">
-              <MetricCard
-                label={t('parentView.report.sessions')}
-                value={String(report.reportData.thisMonth.totalSessions)}
-                testID="child-report-metric-sessions"
-              />
-              <MetricCard
-                label={t('parentView.report.timeOnApp')}
-                value={formatMinutes(
-                  report.reportData.thisMonth.totalActiveMinutes,
-                )}
-                testID="child-report-metric-minutes"
-              />
-            </View>
+              <View className="flex-row gap-3 mt-4">
+                <MetricCard
+                  label={t('parentView.report.sessions')}
+                  value={String(report.reportData.thisMonth.totalSessions)}
+                  testID="child-report-metric-sessions"
+                />
+                <MetricCard
+                  label={t('parentView.report.timeOnApp')}
+                  value={formatMinutes(
+                    report.reportData.thisMonth.totalActiveMinutes,
+                  )}
+                  testID="child-report-metric-minutes"
+                />
+              </View>
 
-            <View className="flex-row gap-3 mt-3">
-              <MetricCard
-                label={t('parentView.report.topicsMastered')}
-                value={String(report.reportData.thisMonth.topicsMastered)}
-                testID="child-report-metric-topics"
-              />
-              {/* [EP15-I2] Field renamed from vocabularyLearned to
-                  vocabularyTotal — it's cumulative, not per-month delta.
-                  "Words learned" was misleading; use "Total words". */}
-              <MetricCard
-                label={t('parentView.report.totalWords')}
-                value={String(report.reportData.thisMonth.vocabularyTotal)}
-                testID="child-report-metric-vocabulary"
-              />
-            </View>
+              <View className="flex-row gap-3 mt-3">
+                <MetricCard
+                  label={t('parentView.report.topicsMastered')}
+                  value={String(report.reportData.thisMonth.topicsMastered)}
+                  testID="child-report-metric-topics"
+                />
+                {/* [EP15-I2] Field renamed from vocabularyLearned to
+                    vocabularyTotal — it's cumulative, not per-month delta.
+                    "Words learned" was misleading; use "Total words". */}
+                <MetricCard
+                  label={t('parentView.report.totalWords')}
+                  value={String(report.reportData.thisMonth.vocabularyTotal)}
+                  testID="child-report-metric-vocabulary"
+                />
+              </View>
 
-            {report.reportData.highlights.length > 0 ? (
+              {report.reportData.highlights.length > 0 ? (
+                <View
+                  className="bg-surface rounded-card p-4 mt-4"
+                  testID="child-report-highlights"
+                >
+                  <Text className="text-h3 font-semibold text-text-primary">
+                    {t('parentView.report.highlights')}
+                  </Text>
+                  <View className="mt-3 gap-2">
+                    {report.reportData.highlights.map((highlight) => (
+                      <Text
+                        key={highlight}
+                        className="text-body-sm text-text-secondary"
+                      >
+                        • {highlight}
+                      </Text>
+                    ))}
+                  </View>
+                </View>
+              ) : null}
+
+              {report.reportData.nextSteps.length > 0 ? (
+                <View
+                  className="bg-surface rounded-card p-4 mt-4"
+                  testID="child-report-next-steps"
+                >
+                  <Text className="text-h3 font-semibold text-text-primary">
+                    {t('parentView.report.whatsNext')}
+                  </Text>
+                  <View className="mt-3 gap-2">
+                    {report.reportData.nextSteps.map((step) => (
+                      <Text
+                        key={step}
+                        className="text-body-sm text-text-secondary"
+                      >
+                        • {step}
+                      </Text>
+                    ))}
+                  </View>
+                </View>
+              ) : null}
+
               <View
                 className="bg-surface rounded-card p-4 mt-4"
-                testID="child-report-highlights"
+                testID="child-report-subjects"
               >
                 <Text className="text-h3 font-semibold text-text-primary">
-                  {t('parentView.report.highlights')}
+                  {t('parentView.report.subjectBreakdown')}
                 </Text>
-                <View className="mt-3 gap-2">
-                  {report.reportData.highlights.map((highlight) => (
-                    <Text
-                      key={highlight}
-                      className="text-body-sm text-text-secondary"
+                <View className="mt-3 gap-3">
+                  {report.reportData.subjects.map((subject) => (
+                    <View
+                      key={subject.subjectName}
+                      className="bg-background rounded-card p-4"
                     >
-                      • {highlight}
-                    </Text>
+                      <Text className="text-body font-semibold text-text-primary">
+                        {subject.subjectName}
+                      </Text>
+                      <Text className="text-body-sm text-text-secondary mt-1">
+                        {t('parentView.report.subjectStats', {
+                          topicsMastered: subject.topicsMastered,
+                          vocabularyTotal: subject.vocabularyTotal,
+                          activeMinutes: subject.activeMinutes,
+                        })}
+                      </Text>
+                    </View>
                   ))}
                 </View>
               </View>
-            ) : null}
-
-            {report.reportData.nextSteps.length > 0 ? (
-              <View
-                className="bg-surface rounded-card p-4 mt-4"
-                testID="child-report-next-steps"
-              >
-                <Text className="text-h3 font-semibold text-text-primary">
-                  {t('parentView.report.whatsNext')}
-                </Text>
-                <View className="mt-3 gap-2">
-                  {report.reportData.nextSteps.map((step) => (
-                    <Text
-                      key={step}
-                      className="text-body-sm text-text-secondary"
-                    >
-                      • {step}
-                    </Text>
-                  ))}
-                </View>
-              </View>
-            ) : null}
-
+            </>
+          ) : (
+            // [EP15-I4] Dead-end fix: prior "no longer available" branch
+            // had zero interactive elements, leaving users with only the
+            // OS back gesture. Adds an explicit back-to-reports Pressable.
             <View
-              className="bg-surface rounded-card p-4 mt-4"
-              testID="child-report-subjects"
+              className="bg-surface rounded-card p-5 mt-4"
+              testID="child-report-gone"
             >
               <Text className="text-h3 font-semibold text-text-primary">
-                {t('parentView.report.subjectBreakdown')}
+                {t('parentView.report.reportGoneTitle')}
               </Text>
-              <View className="mt-3 gap-3">
-                {report.reportData.subjects.map((subject) => (
-                  <View
-                    key={subject.subjectName}
-                    className="bg-background rounded-card p-4"
-                  >
-                    <Text className="text-body font-semibold text-text-primary">
-                      {subject.subjectName}
-                    </Text>
-                    <Text className="text-body-sm text-text-secondary mt-1">
-                      {t('parentView.report.subjectStats', {
-                        topicsMastered: subject.topicsMastered,
-                        vocabularyTotal: subject.vocabularyTotal,
-                        activeMinutes: subject.activeMinutes,
-                      })}
-                    </Text>
-                  </View>
-                ))}
-              </View>
+              <Text className="text-body-sm text-text-secondary mt-2">
+                {t('parentView.report.reportGoneBody')}
+              </Text>
+              <Pressable
+                onPress={() => goBackOrReplace(router, reportsHref)}
+                className="bg-primary rounded-button px-4 py-3 items-center mt-4 min-h-[48px] justify-center"
+                accessibilityRole="button"
+                accessibilityLabel={t('parentView.report.backToReports')}
+                testID="child-report-gone-back"
+              >
+                <Text className="text-body font-semibold text-text-inverse">
+                  {t('parentView.report.backToReports')}
+                </Text>
+              </Pressable>
             </View>
-          </>
-        ) : (
-          // [EP15-I4] Dead-end fix: prior "no longer available" branch
-          // had zero interactive elements, leaving users with only the
-          // OS back gesture. Adds an explicit back-to-reports Pressable.
-          <View
-            className="bg-surface rounded-card p-5 mt-4"
-            testID="child-report-gone"
-          >
-            <Text className="text-h3 font-semibold text-text-primary">
-              {t('parentView.report.reportGoneTitle')}
-            </Text>
-            <Text className="text-body-sm text-text-secondary mt-2">
-              {t('parentView.report.reportGoneBody')}
-            </Text>
-            <Pressable
-              onPress={() => goBackOrReplace(router, reportsHref)}
-              className="bg-primary rounded-button px-4 py-3 items-center mt-4 min-h-[48px] justify-center"
-              accessibilityRole="button"
-              accessibilityLabel={t('parentView.report.backToReports')}
-              testID="child-report-gone-back"
-            >
-              <Text className="text-body font-semibold text-text-inverse">
-                {t('parentView.report.backToReports')}
-              </Text>
-            </Pressable>
-          </View>
-        )}
+          )}
+        </QueryStateView>
       </ScrollView>
     </View>
   );

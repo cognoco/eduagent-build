@@ -1,12 +1,10 @@
-import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAssessmentEligibleTopics } from '../../../hooks/use-assessments';
-import { Button } from '../../../components/common/Button';
-import { ErrorFallback } from '../../../components/common/ErrorFallback';
+import { Button, QueryStateView } from '../../../components/common';
 import { useThemeColors } from '../../../lib/theme';
 
 type TranslationFn = (key: string, options?: Record<string, unknown>) => string;
@@ -31,16 +29,6 @@ export default function AssessmentPickerScreen(): React.ReactElement {
     isError,
     refetch,
   } = useAssessmentEligibleTopics();
-  const [loadTimedOut, setLoadTimedOut] = useState(false);
-
-  useEffect(() => {
-    if (!isLoading) {
-      setLoadTimedOut(false);
-      return;
-    }
-    const timer = setTimeout(() => setLoadTimedOut(true), 15_000);
-    return () => clearTimeout(timer);
-  }, [isLoading]);
 
   return (
     <ScrollView
@@ -72,113 +60,98 @@ export default function AssessmentPickerScreen(): React.ReactElement {
         </View>
       </View>
 
-      {isError && topics.length === 0 ? (
-        <ErrorFallback
-          variant="card"
-          message={t('assessment.pickerLoadError')}
-          primaryAction={{
-            label: t('common.tryAgain', 'Try again'),
-            testID: 'assessment-picker-retry',
-            onPress: () => {
-              void refetch();
-            },
-          }}
-          secondaryAction={{
-            label: t('common.goBack', 'Go back'),
-            testID: 'assessment-picker-error-back',
-            onPress: () => router.back(),
-          }}
-        />
-      ) : isLoading && loadTimedOut ? (
-        <ErrorFallback
-          variant="card"
-          title={t('assessment.pickerLoadTimeoutTitle')}
-          message={t('assessment.pickerLoadTimeoutMessage')}
-          primaryAction={{
-            label: t('common.tryAgain', 'Try again'),
-            testID: 'assessment-picker-timeout-retry',
-            onPress: () => {
-              void refetch();
-            },
-          }}
-          secondaryAction={{
-            label: t('common.goBack', 'Go back'),
-            testID: 'assessment-picker-timeout-back',
-            onPress: () => router.back(),
-          }}
-          testID="assessment-picker-timeout"
-        />
-      ) : isLoading ? (
-        <View
-          className="bg-surface-elevated rounded-card px-4 py-5"
-          testID="assessment-picker-loading"
-        >
-          <Text className="text-body font-semibold text-text-primary">
-            {t('assessment.pickerLoading')}
-          </Text>
-          <Text className="text-body-sm text-text-secondary mt-1">
-            {t('assessment.pickerLoadingBody')}
-          </Text>
-        </View>
-      ) : topics.length === 0 ? (
-        <View
-          testID="assessment-picker-empty"
-          className="bg-surface-elevated rounded-card px-4 py-5"
-        >
-          <Text className="text-body font-semibold text-text-primary">
-            {t('assessment.pickerEmptyTitle')}
-          </Text>
-          <Text className="text-body-sm text-text-secondary mt-1">
-            {t('assessment.pickerEmptyBody')}
-          </Text>
-          <View className="mt-4">
-            <Button
-              variant="primary"
-              label={t('assessment.pickerBrowseTopics')}
-              testID="assessment-picker-browse"
-              onPress={() => router.push('/(app)/library' as never)}
-            />
+      <QueryStateView
+        isLoading={isLoading}
+        error={isError && topics.length === 0 ? true : undefined}
+        variant="card"
+        errorMessage={t('assessment.pickerLoadError')}
+        loadingTitle={t('assessment.pickerLoadTimeoutTitle')}
+        loadingMessage={t('assessment.pickerLoadTimeoutMessage')}
+        testID="assessment-picker-timeout"
+        retry={{
+          label: t('common.tryAgain', 'Try again'),
+          onPress: () => void refetch(),
+          testID: 'assessment-picker-retry',
+        }}
+        back={{
+          label: t('common.goBack', 'Go back'),
+          onPress: () => router.back(),
+          testID: 'assessment-picker-error-back',
+        }}
+        loadingFallback={
+          <View
+            className="bg-surface-elevated rounded-card px-4 py-5"
+            testID="assessment-picker-loading"
+          >
+            <Text className="text-body font-semibold text-text-primary">
+              {t('assessment.pickerLoading')}
+            </Text>
+            <Text className="text-body-sm text-text-secondary mt-1">
+              {t('assessment.pickerLoadingBody')}
+            </Text>
           </View>
-        </View>
-      ) : (
-        <View className="gap-3">
-          {topics.map((topic) => (
-            <Pressable
-              key={topic.topicId}
-              testID={`assessment-topic-${topic.topicId}`}
-              className="bg-surface-elevated rounded-card px-4 py-4 flex-row items-center active:opacity-80"
-              accessibilityRole="button"
-              accessibilityLabel={t('assessment.pickerStartForTopic', {
-                title: topic.topicTitle,
-              })}
-              onPress={() =>
-                router.push({
-                  pathname: '/(app)/practice/assessment',
-                  params: {
-                    subjectId: topic.subjectId,
-                    topicId: topic.topicId,
-                  },
-                } as never)
-              }
-            >
-              <View className="flex-1">
-                <Text className="text-body font-semibold text-text-primary">
-                  {topic.topicTitle}
-                </Text>
-                <Text className="text-body-sm text-text-secondary mt-1">
-                  {topic.subjectName} -{' '}
-                  {formatStudiedAt(topic.lastStudiedAt, t)}
-                </Text>
-              </View>
-              <Ionicons
-                name="chevron-forward"
-                size={22}
-                color={colors.primary}
+        }
+      >
+        {topics.length === 0 ? (
+          <View
+            testID="assessment-picker-empty"
+            className="bg-surface-elevated rounded-card px-4 py-5"
+          >
+            <Text className="text-body font-semibold text-text-primary">
+              {t('assessment.pickerEmptyTitle')}
+            </Text>
+            <Text className="text-body-sm text-text-secondary mt-1">
+              {t('assessment.pickerEmptyBody')}
+            </Text>
+            <View className="mt-4">
+              <Button
+                variant="primary"
+                label={t('assessment.pickerBrowseTopics')}
+                testID="assessment-picker-browse"
+                onPress={() => router.push('/(app)/library' as never)}
               />
-            </Pressable>
-          ))}
-        </View>
-      )}
+            </View>
+          </View>
+        ) : (
+          <View className="gap-3">
+            {topics.map((topic) => (
+              <Pressable
+                key={topic.topicId}
+                testID={`assessment-topic-${topic.topicId}`}
+                className="bg-surface-elevated rounded-card px-4 py-4 flex-row items-center active:opacity-80"
+                accessibilityRole="button"
+                accessibilityLabel={t('assessment.pickerStartForTopic', {
+                  title: topic.topicTitle,
+                })}
+                onPress={() =>
+                  router.push({
+                    pathname: '/(app)/practice/assessment',
+                    params: {
+                      subjectId: topic.subjectId,
+                      topicId: topic.topicId,
+                    },
+                  } as never)
+                }
+              >
+                <View className="flex-1">
+                  <Text className="text-body font-semibold text-text-primary">
+                    {topic.topicTitle}
+                  </Text>
+                  <Text className="text-body-sm text-text-secondary mt-1">
+                    {topic.subjectName} -{' '}
+                    {formatStudiedAt(topic.lastStudiedAt, t)}
+                  </Text>
+                </View>
+                <Ionicons
+                  name="chevron-forward"
+                  size={22}
+                  color={colors.primary}
+                />
+              </Pressable>
+            ))}
+          </View>
+        )}
+      </QueryStateView>
     </ScrollView>
   );
 }

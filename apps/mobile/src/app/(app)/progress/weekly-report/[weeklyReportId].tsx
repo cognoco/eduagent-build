@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Sentry from '@sentry/react-native';
 import { useTranslation } from 'react-i18next';
-import { ErrorFallback } from '../../../../components/common';
+import { QueryStateView } from '../../../../components/common';
 import { MetricCard } from '../../../../components/progress';
 import { classifyApiError } from '../../../../lib/format-api-error';
 import { formatMinutes } from '../../../../lib/format-relative-date';
@@ -98,63 +98,66 @@ export default function ProgressWeeklyReportDetail(): React.ReactElement {
           </View>
         </View>
 
-        {isLoading ? (
-          <View className="bg-surface rounded-card p-4 mt-4">
-            <Text className="text-body-sm text-text-secondary">
-              {t('parentView.weeklyReport.loadingReport')}
-            </Text>
-          </View>
-        ) : isError ? (
-          <ErrorFallback
-            variant="card"
-            message={classifyApiError(error).message}
-            primaryAction={{
-              label: t('common.tryAgain'),
-              onPress: () => void refetch(),
-              testID: 'progress-weekly-report-error-retry',
-            }}
-            secondaryAction={{
-              label: t('parentView.weeklyReport.backToReports'),
-              onPress: () => goBackOrReplace(router, '/(app)/progress/reports'),
-              testID: 'progress-weekly-report-error-back',
-            }}
-            testID="progress-weekly-report-error"
-          />
-        ) : report ? (
-          <>
-            <View className="bg-coaching-card rounded-card p-5 mt-4">
-              <Text className="text-h1 font-bold text-text-primary">
-                {report.reportData.headlineStat.value}{' '}
-                {report.reportData.headlineStat.label.toLowerCase()}
-              </Text>
-              <Text className="text-body text-text-secondary mt-2">
-                {report.reportData.headlineStat.comparison}
+        <QueryStateView
+          isLoading={isLoading}
+          error={isError ? true : undefined}
+          variant="card"
+          errorMessage={classifyApiError(error).message}
+          retry={{
+            label: t('common.tryAgain'),
+            onPress: () => void refetch(),
+            testID: 'progress-weekly-report-error-retry',
+          }}
+          back={{
+            label: t('parentView.weeklyReport.backToReports'),
+            onPress: () => goBackOrReplace(router, '/(app)/progress/reports'),
+            testID: 'progress-weekly-report-error-back',
+          }}
+          loadingFallback={
+            <View className="bg-surface rounded-card p-4 mt-4">
+              <Text className="text-body-sm text-text-secondary">
+                {t('parentView.weeklyReport.loadingReport')}
               </Text>
             </View>
+          }
+          testID="progress-weekly-report-error"
+        >
+          {report ? (
+            <>
+              <View className="bg-coaching-card rounded-card p-5 mt-4">
+                <Text className="text-h1 font-bold text-text-primary">
+                  {report.reportData.headlineStat.value}{' '}
+                  {report.reportData.headlineStat.label.toLowerCase()}
+                </Text>
+                <Text className="text-body text-text-secondary mt-2">
+                  {report.reportData.headlineStat.comparison}
+                </Text>
+              </View>
 
-            <View className="flex-row gap-3 mt-4">
-              <MetricCard
-                label={t('parentView.weeklyReport.sessionsThisWeek')}
-                value={String(report.reportData.thisWeek.totalSessions)}
-              />
-              <MetricCard
-                label={t('parentView.weeklyReport.timeOnApp')}
-                value={formatMinutes(
-                  report.reportData.thisWeek.totalActiveMinutes,
-                )}
-              />
+              <View className="flex-row gap-3 mt-4">
+                <MetricCard
+                  label={t('parentView.weeklyReport.sessionsThisWeek')}
+                  value={String(report.reportData.thisWeek.totalSessions)}
+                />
+                <MetricCard
+                  label={t('parentView.weeklyReport.timeOnApp')}
+                  value={formatMinutes(
+                    report.reportData.thisWeek.totalActiveMinutes,
+                  )}
+                />
+              </View>
+            </>
+          ) : (
+            <View className="bg-surface rounded-card p-5 mt-4">
+              <Text className="text-h3 font-semibold text-text-primary">
+                {t('parentView.weeklyReport.reportGoneTitle')}
+              </Text>
+              <Text className="text-body-sm text-text-secondary mt-2">
+                {t('parentView.weeklyReport.reportGoneBody')}
+              </Text>
             </View>
-          </>
-        ) : (
-          <View className="bg-surface rounded-card p-5 mt-4">
-            <Text className="text-h3 font-semibold text-text-primary">
-              {t('parentView.weeklyReport.reportGoneTitle')}
-            </Text>
-            <Text className="text-body-sm text-text-secondary mt-2">
-              {t('parentView.weeklyReport.reportGoneBody')}
-            </Text>
-          </View>
-        )}
+          )}
+        </QueryStateView>
       </ScrollView>
     </View>
   );

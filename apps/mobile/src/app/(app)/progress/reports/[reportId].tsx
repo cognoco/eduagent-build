@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Sentry from '@sentry/react-native';
 import { useTranslation } from 'react-i18next';
-import { ErrorFallback } from '../../../../components/common';
+import { QueryStateView } from '../../../../components/common';
 import { MetricCard } from '../../../../components/progress';
 import { classifyApiError } from '../../../../lib/format-api-error';
 import { formatMinutes } from '../../../../lib/format-relative-date';
@@ -75,81 +75,84 @@ export default function ProgressMonthlyReportDetail(): React.ReactElement {
           </View>
         </View>
 
-        {isLoading ? (
-          <View className="bg-surface rounded-card p-4 mt-4">
-            <Text className="text-body-sm text-text-secondary">
-              {t('parentView.report.loadingReport')}
-            </Text>
-          </View>
-        ) : isError ? (
-          <ErrorFallback
-            variant="card"
-            message={classifyApiError(error).message}
-            primaryAction={{
-              label: t('common.tryAgain'),
-              onPress: () => void refetch(),
-              testID: 'progress-report-error-retry',
-            }}
-            secondaryAction={{
-              label: t('parentView.report.backToReports'),
-              onPress: () => goBackOrReplace(router, '/(app)/progress/reports'),
-              testID: 'progress-report-error-back',
-            }}
-            testID="progress-report-error"
-          />
-        ) : report ? (
-          <>
-            <View className="bg-coaching-card rounded-card p-5 mt-4">
-              <Text className="text-h1 font-bold text-text-primary">
-                {report.reportData.headlineStat.value}{' '}
-                {report.reportData.headlineStat.label.toLowerCase()}
-              </Text>
-              <Text className="text-body text-text-secondary mt-2">
-                {report.reportData.headlineStat.comparison}
+        <QueryStateView
+          isLoading={isLoading}
+          error={isError ? true : undefined}
+          variant="card"
+          errorMessage={classifyApiError(error).message}
+          retry={{
+            label: t('common.tryAgain'),
+            onPress: () => void refetch(),
+            testID: 'progress-report-error-retry',
+          }}
+          back={{
+            label: t('parentView.report.backToReports'),
+            onPress: () => goBackOrReplace(router, '/(app)/progress/reports'),
+            testID: 'progress-report-error-back',
+          }}
+          loadingFallback={
+            <View className="bg-surface rounded-card p-4 mt-4">
+              <Text className="text-body-sm text-text-secondary">
+                {t('parentView.report.loadingReport')}
               </Text>
             </View>
-
-            <View className="flex-row gap-3 mt-4">
-              <MetricCard
-                label={t('parentView.report.sessions')}
-                value={String(report.reportData.thisMonth.totalSessions)}
-              />
-              <MetricCard
-                label={t('parentView.report.timeOnApp')}
-                value={formatMinutes(
-                  report.reportData.thisMonth.totalActiveMinutes,
-                )}
-              />
-            </View>
-
-            {report.reportData.highlights.length > 0 ? (
-              <View className="bg-surface rounded-card p-4 mt-4">
-                <Text className="text-h3 font-semibold text-text-primary">
-                  {t('parentView.report.highlights')}
+          }
+          testID="progress-report-error"
+        >
+          {report ? (
+            <>
+              <View className="bg-coaching-card rounded-card p-5 mt-4">
+                <Text className="text-h1 font-bold text-text-primary">
+                  {report.reportData.headlineStat.value}{' '}
+                  {report.reportData.headlineStat.label.toLowerCase()}
                 </Text>
-                <View className="mt-3 gap-2">
-                  {report.reportData.highlights.map((highlight) => (
-                    <Text
-                      key={highlight}
-                      className="text-body-sm text-text-secondary"
-                    >
-                      - {highlight}
-                    </Text>
-                  ))}
-                </View>
+                <Text className="text-body text-text-secondary mt-2">
+                  {report.reportData.headlineStat.comparison}
+                </Text>
               </View>
-            ) : null}
-          </>
-        ) : (
-          <View className="bg-surface rounded-card p-5 mt-4">
-            <Text className="text-h3 font-semibold text-text-primary">
-              {t('parentView.report.reportGoneTitle')}
-            </Text>
-            <Text className="text-body-sm text-text-secondary mt-2">
-              {t('parentView.report.reportGoneBody')}
-            </Text>
-          </View>
-        )}
+
+              <View className="flex-row gap-3 mt-4">
+                <MetricCard
+                  label={t('parentView.report.sessions')}
+                  value={String(report.reportData.thisMonth.totalSessions)}
+                />
+                <MetricCard
+                  label={t('parentView.report.timeOnApp')}
+                  value={formatMinutes(
+                    report.reportData.thisMonth.totalActiveMinutes,
+                  )}
+                />
+              </View>
+
+              {report.reportData.highlights.length > 0 ? (
+                <View className="bg-surface rounded-card p-4 mt-4">
+                  <Text className="text-h3 font-semibold text-text-primary">
+                    {t('parentView.report.highlights')}
+                  </Text>
+                  <View className="mt-3 gap-2">
+                    {report.reportData.highlights.map((highlight) => (
+                      <Text
+                        key={highlight}
+                        className="text-body-sm text-text-secondary"
+                      >
+                        - {highlight}
+                      </Text>
+                    ))}
+                  </View>
+                </View>
+              ) : null}
+            </>
+          ) : (
+            <View className="bg-surface rounded-card p-5 mt-4">
+              <Text className="text-h3 font-semibold text-text-primary">
+                {t('parentView.report.reportGoneTitle')}
+              </Text>
+              <Text className="text-body-sm text-text-secondary mt-2">
+                {t('parentView.report.reportGoneBody')}
+              </Text>
+            </View>
+          )}
+        </QueryStateView>
       </ScrollView>
     </View>
   );
