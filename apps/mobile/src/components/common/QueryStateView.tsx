@@ -24,6 +24,8 @@ interface QueryStateViewProps {
   errorMessage?: string;
   /** ms before the loading spinner falls back to error UI. Default 15000. */
   timeoutMs?: number;
+  /** Visual variant forwarded to ErrorFallback / TimeoutLoader. Default 'centered'. */
+  variant?: 'centered' | 'card';
   testID?: string;
   children: ReactNode;
 }
@@ -46,6 +48,7 @@ export function QueryStateView({
   errorTitle,
   errorMessage,
   timeoutMs,
+  variant = 'centered',
   testID,
   children,
 }: QueryStateViewProps): ReactNode {
@@ -67,7 +70,7 @@ export function QueryStateView({
   if (error) {
     return (
       <ErrorFallback
-        variant="centered"
+        variant={variant}
         title={errorTitle}
         message={errorMessage}
         primaryAction={primaryAction}
@@ -86,6 +89,7 @@ export function QueryStateView({
         message={loadingMessage}
         primaryAction={primaryAction}
         secondaryAction={secondaryAction}
+        variant={variant}
         testID={testID}
       />
     );

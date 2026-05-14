@@ -22,14 +22,16 @@ interface TimeoutLoaderProps {
   primaryAction: TimeoutLoaderAction;
   /** Optional secondary action for the ErrorFallback (e.g. Go Back). */
   secondaryAction?: TimeoutLoaderAction;
+  /** Visual variant forwarded to ErrorFallback after timeout. Default 'centered'. */
+  variant?: 'centered' | 'card';
   /** testID forwarded to the spinner View. */
   testID?: string;
 }
 
 /**
  * Wraps a loading spinner with a configurable escape hatch.
- * After timeoutMs expires, renders ErrorFallback variant="centered" so
- * the user always has at least one action available.
+ * After timeoutMs expires, renders ErrorFallback (variant defaults to
+ * 'centered') so the user always has at least one action available.
  */
 export function TimeoutLoader({
   isLoading,
@@ -38,6 +40,7 @@ export function TimeoutLoader({
   message,
   primaryAction,
   secondaryAction,
+  variant = 'centered',
   testID,
 }: TimeoutLoaderProps) {
   const { t } = useTranslation();
@@ -59,7 +62,7 @@ export function TimeoutLoader({
   if (timedOut) {
     return (
       <ErrorFallback
-        variant="centered"
+        variant={variant}
         title={resolvedTitle}
         message={resolvedMessage}
         primaryAction={primaryAction}
