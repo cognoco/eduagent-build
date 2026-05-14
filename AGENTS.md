@@ -1,4 +1,4 @@
-# Codex
+# MentoMate
 
 ## Snapshot
 
@@ -8,31 +8,39 @@
 - Monorepo: `apps/api`, `apps/mobile`, shared packages in `packages/`
 - Core docs: `docs/project_context.md`, `docs/architecture.md`, relevant spec/plan under `docs/plans/` or `docs/specs/`
 
-> Counts verified 2026-05-13 (synced with CLAUDE.md). Test-case totals are a heuristic grep of `it(` / `test(` line starts; jest-reported totals may be slightly higher due to `it.each(...)` expansion at runtime. Re-verify with `git ls-files | grep '\.test\.'` for suite counts.
+Test-case totals are a heuristic grep of `it(` / `test(` line starts; jest-reported totals may be slightly higher due to `it.each(...)` expansion at runtime. Re-verify with `git ls-files | grep '\.test\.'` for suite counts.
 
-## Codex Initialization
+## Initialization
 
 1. Read this file before editing.
 2. Start with the relevant plan/spec if one exists for the task.
 3. Use `docs/project_context.md` for repo-specific implementation rules.
 4. Use `docs/architecture.md` when the change touches routing, data access, background jobs, or deployment.
-5. For substantial repo work, durable decisions, repeated feedback, or any request involving "memory", use `$project-memory` and read `.claude/memory/MEMORY.md` plus only the relevant linked memory files.
+5. For substantial repo work, durable decisions, repeated feedback, or any request involving "memory", load the project-memory skill from `.agents/skills/project-memory/SKILL.md` and follow its workflow. Memory lives in `.claude/memory/MEMORY.md` plus topic files.
 
 Memory is context, not law. If memory conflicts with this file, current docs, code, or explicit user instructions, follow the higher-priority source and update/archive the stale memory when appropriate.
 
-## Codex Native Support
+## Repo Skills
 
-- Repo-scoped Codex skills live in `.agents/skills/<skill-name>/SKILL.md`.
-- Use `$commit` for commits in Codex. This is the Codex-native equivalent of Claude's `/commit` workflow.
-- Use `$project-memory` to read, create, update, or archive project memory.
-- Use `$build` for safe EAS build checks/triggers, `$e2e` for mobile Maestro smoke runs, and `$maestro-testing` when writing or debugging Maestro flows.
-- Use `$deep-bugfixing` for adversarial runtime-assumption reviews, `$audit-status` for `docs/audit/cleanup-plan.md`, `$learning-evolution-next` for the learning-product evolution audit, and `$notion` before touching EduAgent/MentoMate Notion work items.
-- `.codex/prompts/` contains BMAD-generated prompt stubs, but it is not the reliable Codex-native slash-command mechanism in this setup. Do not add new repo workflows there unless Codex prompt discovery is re-verified.
-- Do not symlink Claude commands into Codex. Port useful workflows into `.agents/skills/` instead.
+All agent-scoped skills live in `.agents/skills/<skill-name>/SKILL.md`. Load the relevant skill before acting on that topic. Skills are plain markdown — any agent that can read files can follow them.
+
+Key skills:
+
+| Skill | When to load | File |
+|-------|-------------|------|
+| commit | User asks to commit, save changes, or push | `.agents/skills/commit/SKILL.md` |
+| project-memory | Substantial repo work, user says "remember" or "add to memory" | `.agents/skills/project-memory/SKILL.md` |
+| build | EAS build checks, triggers, or status for mobile app | `.agents/skills/build/SKILL.md` |
+| e2e | Mobile Maestro smoke runs | `.agents/skills/e2e/SKILL.md` |
+| maestro-testing | Writing or debugging Maestro flows | `.agents/skills/maestro-testing/SKILL.md` |
+| deep-bugfixing | Adversarial runtime-assumption reviews | `.agents/skills/deep-bugfixing/SKILL.md` |
+| audit-status | Inspect `docs/audit/cleanup-plan.md` state | `.agents/skills/audit-status/SKILL.md` |
+| learning-evolution-next | Learning-product evolution audit | `.agents/skills/learning-evolution-next/SKILL.md` |
+| notion | EduAgent/MentoMate Notion work items | `.agents/skills/notion/SKILL.md` |
 
 ## Git Commits
 
-Always use `$commit` for all commits in Codex. Never use ad-hoc commit flows, `--no-verify`, or broad staging without first checking scope. `$commit` is the single source of truth for staging, message format, hook handling, and push behavior.
+Always load the commit skill from `.agents/skills/commit/SKILL.md` before committing. It is the single source of truth for staging, message format, hook handling, and push behavior. Never use ad-hoc commit flows, `--no-verify`, or broad staging without first checking scope.
 
 Subagents must never run `git add`, `git commit`, or `git push`, except when a structured workflow explicitly prescribes the git step or the user explicitly asks for a one-off commit subagent. The coordinator commits sequentially.
 
@@ -96,7 +104,7 @@ Changed code is not fixed code. Every fix must be verified.
 - Security fixes tagged CRITICAL or HIGH require a negative-path break test that attempts the exact attack being prevented.
 - Silent recovery without escalation is banned in billing, auth, and webhook code. Emit a structured metric or Inngest event; `console.warn` alone is not enough.
 - When fixing a drift that has 3+ sibling locations, either install a forward-only guard test and sweep all current sites in the same PR, or document a deferred sweep with tracked ID, owner, and target date.
-- Commit-specific rules such as finding IDs, Verified-By tables, and sweep-audit blocks live in `$commit`.
+- Commit-specific rules such as finding IDs, Verified-By tables, and sweep-audit blocks live in the commit skill (`.agents/skills/commit/SKILL.md`).
 
 ## Code Quality Guards
 
@@ -109,7 +117,7 @@ Changed code is not fixed code. Every fix must be verified.
 
 ## Secrets Management
 
-All secrets are managed through Doppler. Never suggest `wrangler secret put`, direct Cloudflare dashboard entry, AWS console, or platform-specific secret management. When secrets need to be set, say "add to Doppler."
+All secrets are managed through Doppler. Assume the `doppler` CLI is installed and on PATH. Never suggest `wrangler secret put`, direct Cloudflare dashboard entry, AWS console, or platform-specific secret management. When secrets need to be set, say "add to Doppler."
 
 ## PR Review & CI Protocol
 
@@ -164,8 +172,8 @@ pnpm eval:llm
 pnpm eval:llm --live
 
 # Playwright E2E (web)
-C:/Tools/doppler/doppler.exe run -c stg -- pnpm run test:e2e:web:smoke
-C:/Tools/doppler/doppler.exe run -c stg -- pnpm run test:e2e:web
+doppler run -c stg -- pnpm run test:e2e:web:smoke
+doppler run -c stg -- pnpm run test:e2e:web
 ```
 
 Last updated: 2026-05-12
