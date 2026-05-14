@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { ErrorFallback } from './ErrorFallback';
@@ -24,6 +24,12 @@ interface TimeoutLoaderProps {
   secondaryAction?: TimeoutLoaderAction;
   /** Visual variant forwarded to ErrorFallback after timeout. Default 'centered'. */
   variant?: 'centered' | 'card';
+  /**
+   * Custom loading UI (e.g. a skeleton) shown before the timeout fires. When
+   * omitted, falls back to a centered ActivityIndicator. The timeout-then-
+   * ErrorFallback path is unaffected.
+   */
+  loadingFallback?: ReactNode;
   /** testID forwarded to the spinner View. */
   testID?: string;
 }
@@ -41,6 +47,7 @@ export function TimeoutLoader({
   primaryAction,
   secondaryAction,
   variant = 'centered',
+  loadingFallback,
   testID,
 }: TimeoutLoaderProps) {
   const { t } = useTranslation();
@@ -69,6 +76,10 @@ export function TimeoutLoader({
         secondaryAction={secondaryAction}
       />
     );
+  }
+
+  if (loadingFallback !== undefined) {
+    return <>{loadingFallback}</>;
   }
 
   return (

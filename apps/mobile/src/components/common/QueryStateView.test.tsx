@@ -1,5 +1,5 @@
-import { Text } from 'react-native';
-import { fireEvent, render } from '@testing-library/react-native';
+import { Text, View } from 'react-native';
+import { act, fireEvent, render } from '@testing-library/react-native';
 import { QueryStateView } from './QueryStateView';
 
 describe('QueryStateView', () => {
@@ -115,5 +115,60 @@ describe('QueryStateView', () => {
     );
     getByText('Something happened');
     getByText('Please try again in a moment');
+  });
+
+  it('renders the default spinner when loading and no loadingFallback is provided', () => {
+    const { getByTestId, queryByTestId } = render(
+      <QueryStateView isLoading retry={{ onPress: noop }} testID="qsv-spinner">
+        <Text>ready content</Text>
+      </QueryStateView>,
+    );
+    // The default loading path renders TimeoutLoader's spinner View, which
+    // forwards the QSV testID. The custom-fallback testID must not be present.
+    getByTestId('qsv-spinner');
+    expect(queryByTestId('custom-skeleton')).toBeNull();
+  });
+
+  it('renders the custom loadingFallback before the timeout fires', () => {
+    const { getByTestId, queryByText } = render(
+      <QueryStateView
+        isLoading
+        retry={{ onPress: noop }}
+        loadingFallback={<View testID="custom-skeleton" />}
+      >
+        <Text>ready content</Text>
+      </QueryStateView>,
+    );
+    getByTestId('custom-skeleton');
+    // Success children must not render while loading.
+    expect(queryByText('ready content')).toBeNull();
+  });
+
+  it('replaces loadingFallback with the timeout error UI after timeoutMs', () => {
+    jest.useFakeTimers();
+    try {
+      const { getByTestId, getByText, queryByTestId } = render(
+        <QueryStateView
+          isLoading
+          retry={{ onPress: noop, testID: 'qsv-retry' }}
+          loadingFallback={<View testID="custom-skeleton" />}
+          timeoutMs={1_000}
+          errorTitle="Took too long"
+        >
+          <Text>ready content</Text>
+        </QueryStateView>,
+      );
+      // Fallback visible before timeout.
+      getByTestId('custom-skeleton');
+      // Advance past the timeout — fallback is replaced by the error UI.
+      act(() => {
+        jest.advanceTimersByTime(1_200);
+      });
+      getByText('Took too long');
+      getByTestId('qsv-retry');
+      expect(queryByTestId('custom-skeleton')).toBeNull();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

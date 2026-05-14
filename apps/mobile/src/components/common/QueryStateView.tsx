@@ -26,6 +26,12 @@ interface QueryStateViewProps {
   timeoutMs?: number;
   /** Visual variant forwarded to ErrorFallback / TimeoutLoader. Default 'centered'. */
   variant?: 'centered' | 'card';
+  /**
+   * Custom loading UI (e.g. a skeleton). When provided, replaces the default
+   * spinner during the pre-timeout loading phase. The timeout safety net still
+   * applies — after `timeoutMs`, the error fallback takes over regardless.
+   */
+  loadingFallback?: ReactNode;
   testID?: string;
   children: ReactNode;
 }
@@ -49,6 +55,7 @@ export function QueryStateView({
   errorMessage,
   timeoutMs,
   variant = 'centered',
+  loadingFallback,
   testID,
   children,
 }: QueryStateViewProps): ReactNode {
@@ -90,6 +97,7 @@ export function QueryStateView({
         primaryAction={primaryAction}
         secondaryAction={secondaryAction}
         variant={variant}
+        loadingFallback={loadingFallback}
         testID={testID}
       />
     );
