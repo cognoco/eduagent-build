@@ -119,6 +119,7 @@ const FULL_SCREEN_ROUTES = new Set([
 ]);
 
 const PENDING_AUTH_REDIRECT_SETTLE_MS = 1_000;
+const DEFAULT_AUTH_REDIRECT_PATH = '/(app)/home';
 
 const iconMap: Record<
   string,
@@ -1393,6 +1394,11 @@ export default function AppLayout() {
 
   React.useEffect(() => {
     if (!pendingAuthRedirect || currentAppPath !== pendingAuthRedirect) {
+      return;
+    }
+
+    if (pendingAuthRedirect === DEFAULT_AUTH_REDIRECT_PATH) {
+      clearPendingAuthRedirect();
       return;
     }
 

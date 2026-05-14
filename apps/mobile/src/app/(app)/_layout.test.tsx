@@ -389,6 +389,22 @@ describe('AppLayout', () => {
     expect(peekPendingAuthRedirect()).toBeNull();
   });
 
+  it('clears the default home auth redirect immediately after landing on home', () => {
+    rememberPendingAuthRedirect('/(app)/home');
+    mockUsePathname.mockReturnValue('/home');
+
+    const view = renderLayout();
+
+    expect(peekPendingAuthRedirect()).toBeNull();
+
+    mockReplace.mockClear();
+    mockUsePathname.mockReturnValue('/create-profile');
+    view.rerender(<AppLayout />);
+
+    expect(mockReplace).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('auth-redirect-replay')).toBeNull();
+  });
+
   it('strips route-group segments from redirect targets for unauthenticated users', () => {
     mockUsePathname.mockReturnValue('/(app)/quiz');
     (useAuth as jest.Mock).mockReturnValue({
