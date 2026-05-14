@@ -1,0 +1,13 @@
+{
+  "scope": "mobile",
+  "verifiedAt": "2026-05-14T20:17:51Z",
+  "verifiedBy": "Zuzana Kopečná @ ZLY-ORION",
+  "command": "pnpm exec jest --config apps/mobile/jest.config.cjs --runInBand --forceExit --testMatch \"**/apps/mobile/src/**/*.test.ts?(x)\"",
+  "passed": true,
+  "testFiles": {
+    "apps/mobile/src/components/session/ChatShell.test.tsx": "1243f761c3eb23a7da2f4dd43666b7bd6419e27b",
+    "apps/mobile/src/components/session/session-types.test.ts": "6aac22c880763c16dd7308946fdf4b004d749176",
+    "apps/mobile/src/components/session/use-session-streaming.test.ts": "760d6d46f2863ca9c313cda6bfa15fd52e5915cc",
+    "apps/mobile/src/hooks/use-sessions.test.ts": "d34cae775a4322e85fd6f12e274de616516c3d5b"
+  }
+}
