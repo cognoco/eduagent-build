@@ -2,7 +2,8 @@
 // OCR Provider — Tests
 // ---------------------------------------------------------------------------
 
-jest.mock('./llm', () => ({
+jest.mock('./llm' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('./llm'),
   routeAndCall: jest.fn().mockResolvedValue({
     response: '{"text":"Solve for x: 2x + 5 = 13","confidence":0.81}',
     provider: 'gemini',
