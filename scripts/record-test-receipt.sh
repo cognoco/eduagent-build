@@ -24,6 +24,18 @@
 
 set -euo pipefail
 
+json_escape() {
+  local value="$1"
+  value=${value//\\/\\\\}
+  value=${value//\"/\\\"}
+  value=${value//$'\b'/\\b}
+  value=${value//$'\f'/\\f}
+  value=${value//$'\n'/\\n}
+  value=${value//$'\r'/\\r}
+  value=${value//$'\t'/\\t}
+  printf '%s' "$value"
+}
+
 SCOPE="${1:-}"
 if [[ -z "$SCOPE" ]]; then
   cat >&2 <<EOF
@@ -105,10 +117,10 @@ USER_NAME=$(git config user.name 2>/dev/null || echo unknown)
 
 {
   echo '{'
-  echo "  \"scope\": \"$SCOPE\","
-  echo "  \"verifiedAt\": \"$TIMESTAMP\","
-  echo "  \"verifiedBy\": \"$USER_NAME @ $HOST\","
-  echo "  \"command\": \"$TEST_CMD\","
+  printf '  "scope": "%s",\n' "$(json_escape "$SCOPE")"
+  printf '  "verifiedAt": "%s",\n' "$(json_escape "$TIMESTAMP")"
+  printf '  "verifiedBy": "%s",\n' "$(json_escape "$USER_NAME @ $HOST")"
+  printf '  "command": "%s",\n' "$(json_escape "$TEST_CMD")"
   echo '  "passed": true,'
   echo '  "testFiles": {'
   FIRST=1
@@ -121,7 +133,7 @@ USER_NAME=$(git config user.name 2>/dev/null || echo unknown)
     else
       echo ','
     fi
-    printf '    "%s": "%s"' "$f" "$SHA"
+    printf '    "%s": "%s"' "$(json_escape "$f")" "$(json_escape "$SHA")"
   done <<< "$ALL_CHANGED"
   echo
   echo '  }'
@@ -134,4 +146,4 @@ echo "[receipt:$SCOPE] ✓ Wrote $RECEIPT"
 echo "[receipt:$SCOPE]"
 echo "[receipt:$SCOPE] Stage the receipt before pushing:"
 echo "[receipt:$SCOPE]   git add $RECEIPT"
-echo "[receipt:$SCOPE]   git commit --amend --no-edit   # or new commit"
+echo "[receipt:$SCOPE] Commit it with the normal repo commit flow before pushing."

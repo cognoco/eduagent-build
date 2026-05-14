@@ -38,6 +38,9 @@ for entry in "${SCOPES[@]}"; do
   glob="${entry#*|}"
   receipt=".test-receipts/$scope.json"
 
+  # Pre-push validates only committed branch content because that is what will
+  # be pushed. The recorder also includes staged/unstaged edits so users can
+  # generate a receipt before making the commit that contains it.
   changed=$(git diff --name-only --diff-filter=d "$BASE..HEAD" 2>/dev/null \
             | grep -E "$glob" || true)
 
