@@ -45,7 +45,13 @@ import {
 function invalidateSessionDerivedQueries(
   queryClient: ReturnType<typeof useQueryClient>,
 ): void {
-  void queryClient.invalidateQueries({ queryKey: ['sessions'] });
+  // PR-10 deferred: broad ['progress'], ['dashboard'], ['retention'],
+  // ['language-progress'], ['resume-nudge'] — session-close touches many surfaces
+  // (summary, profile sessions list, progress overview, progress inventory,
+  // progress milestones, dashboard child views, retention subject/topic, resume
+  // nudge). A workflow test enumerating all surfaces is required before narrowing.
+  // The old ['sessions'] call was a no-op (top segment is 'sessions' but all
+  // session keys use 'session', 'session-transcript', etc.) — removed PR 10.
   void queryClient.invalidateQueries({ queryKey: ['progress'] });
   void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
   void queryClient.invalidateQueries({ queryKey: ['retention'] });
@@ -215,7 +221,9 @@ export function useSetSessionInputMode(
       // Input mode changes only mutate the session row/transcript metadata.
       // Progress, dashboard, retention, language-progress, and resume-nudge
       // data derive from completed learning activity, not this preference flip.
-      void queryClient.invalidateQueries({ queryKey: ['sessions'] });
+      // The old ['sessions'] call here was a no-op (top segment 'sessions' matches
+      // no registered key; session keys use 'session', 'session-transcript', etc.)
+      // — removed PR 10.
     },
   });
 }

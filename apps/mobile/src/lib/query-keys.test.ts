@@ -209,28 +209,28 @@ describe('queryKeys.dashboard', () => {
     );
   });
 
-  // NOTE: plural 'children' — preserved from inline literal in useChildSessions
-  it('childSessions (uses plural "children")', () => {
+  // PR 10: normalised to singular 'child' (was 'children' — see query-keys.ts comment)
+  it('childSessions (uses singular "child")', () => {
     expect(queryKeys.dashboard.childSessions(childProfileId)).toEqual([
       'dashboard',
-      'children',
+      'child',
       childProfileId,
       'sessions',
     ]);
   });
 
-  // NOTE: plural 'children' — preserved from inline literal in useChildSessionDetail
-  it('childSessionDetail (uses plural "children")', () => {
+  // PR 10: normalised to singular 'child' (was 'children')
+  it('childSessionDetail (uses singular "child")', () => {
     expect(
       queryKeys.dashboard.childSessionDetail(childProfileId, sessionId),
-    ).toEqual(['dashboard', 'children', childProfileId, 'session', sessionId]);
+    ).toEqual(['dashboard', 'child', childProfileId, 'session', sessionId]);
   });
 
-  // NOTE: plural 'children' — preserved from inline literal in useChildMemory
-  it('childMemory (uses plural "children")', () => {
+  // PR 10: normalised to singular 'child' (was 'children')
+  it('childMemory (uses singular "child")', () => {
     expect(queryKeys.dashboard.childMemory(childProfileId)).toEqual([
       'dashboard',
-      'children',
+      'child',
       childProfileId,
       'memory',
     ]);
@@ -370,9 +370,11 @@ describe('queryKeys.retention', () => {
     ]);
   });
 
+  // PR 10: now lives under 'retention' prefix so broad ['retention'] invalidations
+  // cover it (was ['evaluate-eligibility', ...] — not covered by ['retention'] prefix)
   it('evaluateEligibility', () => {
     expect(queryKeys.retention.evaluateEligibility(topicId, profileId)).toEqual(
-      ['evaluate-eligibility', topicId, profileId],
+      ['retention', 'evaluate-eligibility', topicId, profileId],
     );
   });
 
@@ -416,6 +418,73 @@ describe('queryKeys.resumeNudge', () => {
       'resume-nudge',
       undefined,
     ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PR-10 normalisation guard: 'children' (plural) → 'child' (singular)
+// ---------------------------------------------------------------------------
+
+describe('PR-10: dashboard child-session/memory keys use singular "child"', () => {
+  const childId = 'child-1';
+  const sessionId = 'sess-1';
+
+  it('childSessions key starts with ["dashboard", "child", ...]', () => {
+    const key = queryKeys.dashboard.childSessions(childId);
+    expect(key[0]).toBe('dashboard');
+    expect(key[1]).toBe('child');
+    // Guard against regression to plural 'children'
+    expect(key[1]).not.toBe('children');
+  });
+
+  it('childSessionDetail key starts with ["dashboard", "child", ...]', () => {
+    const key = queryKeys.dashboard.childSessionDetail(childId, sessionId);
+    expect(key[1]).toBe('child');
+    expect(key[1]).not.toBe('children');
+  });
+
+  it('childMemory key starts with ["dashboard", "child", ...]', () => {
+    const key = queryKeys.dashboard.childMemory(childId);
+    expect(key[1]).toBe('child');
+    expect(key[1]).not.toBe('children');
+  });
+
+  // Verify broad ['dashboard', 'child', childId] prefix covers all three keys
+  it('broad ["dashboard", "child", childId] prefix matches all three child-scoped keys', () => {
+    const prefix = ['dashboard', 'child', childId];
+    const keySessions = queryKeys.dashboard.childSessions(childId);
+    const keySessionDetail = queryKeys.dashboard.childSessionDetail(
+      childId,
+      sessionId,
+    );
+    const keyMemory = queryKeys.dashboard.childMemory(childId);
+
+    // All three keys must start with the prefix
+    for (const key of [keySessions, keySessionDetail, keyMemory]) {
+      expect(key.slice(0, prefix.length)).toEqual(prefix);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PR-10 normalisation guard: evaluateEligibility lives under 'retention'
+// ---------------------------------------------------------------------------
+
+describe('PR-10: evaluateEligibility key lives under "retention" prefix', () => {
+  const profileId = 'prof-abc';
+  const topicId = 'topic-1';
+
+  it('evaluateEligibility key starts with "retention"', () => {
+    const key = queryKeys.retention.evaluateEligibility(topicId, profileId);
+    expect(key[0]).toBe('retention');
+    // Guard: must NOT be the old top-level 'evaluate-eligibility'
+    expect(key[0]).not.toBe('evaluate-eligibility');
+  });
+
+  it('broad ["retention"] prefix covers evaluateEligibility entries', () => {
+    const key = queryKeys.retention.evaluateEligibility(topicId, profileId);
+    // The first element must be 'retention' so prefix matching works
+    expect(key.slice(0, 1)).toEqual(['retention']);
   });
 });
 

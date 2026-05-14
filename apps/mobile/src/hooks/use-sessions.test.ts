@@ -394,7 +394,12 @@ describe('useCloseSession', () => {
       await result.current.mutateAsync({ reason: 'user_ended' });
     });
 
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['sessions'] });
+    // PR-10: ['sessions'] was a no-op (top segment 'sessions' matches no registered
+    // key; session keys use 'session', 'session-transcript', etc.) — removed.
+    // Verify it is NOT called so the no-op deletion stays clean.
+    expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ['sessions'] });
+
+    // These broad invalidations remain (PR-10 deferred — session-close storm).
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['progress'] });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['dashboard'] });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['retention'] });
@@ -494,6 +499,46 @@ describe('useSetSessionInputMode', () => {
     const [, fetchInit] = mockFetch.mock.calls[0] as [string, RequestInit];
     const body = JSON.parse(fetchInit.body as string);
     expect(body.inputMode).toBe('voice');
+  });
+
+  // [PR-10] Guard: the old ['sessions'] invalidation was a no-op (top segment
+  // 'sessions' matches no registered key). Verify it was removed and only the
+  // transcript invalidation fires.
+  it('[PR-10] does not call no-op ["sessions"] invalidation on input-mode change', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          session: {
+            id: 'session-1',
+            subjectId: 'subject-1',
+            sessionType: 'learning',
+            status: 'active',
+            escalationRung: 1,
+            exchangeCount: 0,
+            startedAt: '2025-01-01T00:00:00Z',
+            lastActivityAt: '2025-01-01T00:00:00Z',
+            endedAt: null,
+            durationSeconds: null,
+            inputMode: 'text',
+          },
+        }),
+        { status: 200 },
+      ),
+    );
+
+    const { result } = renderHook(() => useSetSessionInputMode('session-1'), {
+      wrapper: createWrapper(),
+    });
+    const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries');
+
+    await act(async () => {
+      await result.current.mutateAsync({ inputMode: 'text' });
+    });
+
+    expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ['sessions'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ['session-transcript', 'session-1'],
+    });
   });
 });
 

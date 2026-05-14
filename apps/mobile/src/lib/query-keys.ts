@@ -124,10 +124,10 @@ export const queryKeys = {
   // ------------------------------------------------------------------
   // dashboard domain
   //
-  // NOTE: useChildSessions, useChildSessionDetail, and useChildMemory in
-  // use-dashboard.ts use 'children' (PLURAL) instead of 'child' (singular).
-  // This is an inconsistency flagged in the design spec (line 253), but keys
-  // are preserved byte-identical here per PR 1 rules. PR 10 may normalise.
+  // PR 10: 'children' (plural) → 'child' (singular) normalisation applied to
+  // childSessions, childSessionDetail, and childMemory. All three were
+  // inconsistent with every other 'child'-prefixed key. The broad ['dashboard']
+  // invalidation still covers these; no targeted invalidation was skipped.
   // ------------------------------------------------------------------
   dashboard: {
     root: (profileId: string | undefined) => ['dashboard', profileId] as const,
@@ -140,21 +140,16 @@ export const queryKeys = {
       subjectId: string | undefined,
     ) => ['dashboard', 'child', childProfileId, 'subject', subjectId] as const,
 
-    // NOTE: uses 'children' (plural) — preserved from the inline literal in
-    // useChildSessions. See inconsistency note above.
     childSessions: (childProfileId: string | undefined) =>
-      ['dashboard', 'children', childProfileId, 'sessions'] as const,
+      ['dashboard', 'child', childProfileId, 'sessions'] as const,
 
-    // NOTE: uses 'children' (plural) — preserved from useChildSessionDetail.
     childSessionDetail: (
       childProfileId: string | undefined,
       sessionId: string | undefined,
-    ) =>
-      ['dashboard', 'children', childProfileId, 'session', sessionId] as const,
+    ) => ['dashboard', 'child', childProfileId, 'session', sessionId] as const,
 
-    // NOTE: uses 'children' (plural) — preserved from useChildMemory.
     childMemory: (childProfileId: string | undefined) =>
-      ['dashboard', 'children', childProfileId, 'memory'] as const,
+      ['dashboard', 'child', childProfileId, 'memory'] as const,
 
     childInventory: (childProfileId: string | undefined) =>
       ['dashboard', 'child', childProfileId, 'inventory'] as const,
@@ -224,8 +219,12 @@ export const queryKeys = {
     topic: (topicId: string, profileId: string | undefined) =>
       ['retention', 'topic', topicId, profileId] as const,
 
+    // PR 10: moved from top-level 'evaluate-eligibility' → under 'retention'.
+    // The old top-level prefix was not covered by broad ['retention'] invalidations,
+    // meaning recall-test / relearn mutations silently left eligibility stale.
+    // Callers in use-retention.ts use this factory — no inline literals remain.
     evaluateEligibility: (topicId: string, profileId: string | undefined) =>
-      ['evaluate-eligibility', topicId, profileId] as const,
+      ['retention', 'evaluate-eligibility', topicId, profileId] as const,
 
     teachingPreference: (
       subjectId: string | undefined,

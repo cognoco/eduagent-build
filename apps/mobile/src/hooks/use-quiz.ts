@@ -149,6 +149,10 @@ export function useCompleteRound(): UseMutationResult<
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['quiz-recent'] });
       void queryClient.invalidateQueries({ queryKey: ['quiz-stats'] });
+      // PR-10 deferred: broad ['progress'] — quiz completion affects topic progress
+      // and subject progress for the round's topic, but the round may span multiple
+      // topics and subjectId/topicId/activeProfileId are not available in this hook's
+      // closure. Keep broad until a workflow test enumerates the key set.
       void queryClient.invalidateQueries({ queryKey: ['progress'] });
       void queryClient.invalidateQueries({ queryKey: ['streak'] });
     },

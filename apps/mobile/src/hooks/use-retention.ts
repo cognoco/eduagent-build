@@ -150,6 +150,12 @@ export function useSubmitRecallTest() {
       return data.result;
     },
     onSuccess: () => {
+      // PR-10 deferred: broad ['retention'] covers retention.subject,
+      // retention.topic, retention.evaluateEligibility (now under 'retention'
+      // prefix — fixed in PR 10), and retention.teachingPreference for the
+      // topic. Broad ['progress'] covers topic progress and subject progress.
+      // Narrowing requires subjectId + topicId + activeProfileId in scope —
+      // not available from the recall-test response alone.
       void queryClient.invalidateQueries({ queryKey: ['retention'] });
       void queryClient.invalidateQueries({ queryKey: ['progress'] });
     },
@@ -173,9 +179,15 @@ export function useStartRelearn() {
       return (await res.json()) as RelearnResult;
     },
     onSuccess: () => {
+      // PR-10 deferred: broad ['retention'] and ['progress'] — relearn
+      // triggers a new session and may update retention cards, topic progress,
+      // and subject progress. Surfaces unknown without a subjectId/topicId in
+      // scope here. Keep broad until a workflow test enumerates them.
       void queryClient.invalidateQueries({ queryKey: ['retention'] });
       void queryClient.invalidateQueries({ queryKey: ['progress'] });
-      void queryClient.invalidateQueries({ queryKey: ['sessions'] });
+      // The old ['sessions'] call here was a no-op (top segment 'sessions'
+      // matches no registered key; session keys use 'session', etc.)
+      // — removed PR 10.
     },
   });
 }
