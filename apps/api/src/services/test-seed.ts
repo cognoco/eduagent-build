@@ -2410,6 +2410,7 @@ async function seedParentWithWeeklyReport(
       ...base.ids,
       childId: childProfileId,
       reportId,
+      weeklyReportId: reportId,
     },
   };
 }

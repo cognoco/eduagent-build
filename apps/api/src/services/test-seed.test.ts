@@ -251,7 +251,7 @@ describe('new Stage-0 scenarios return required IDs', () => {
     },
     {
       scenario: 'parent-with-weekly-report',
-      requiredIds: ['childId', 'reportId'],
+      requiredIds: ['childId', 'reportId', 'weeklyReportId'],
     },
     {
       scenario: 'parent-session-with-recap',
