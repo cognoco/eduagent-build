@@ -596,13 +596,13 @@ export function ParentHomeScreen({
             <Text className="text-h3 font-bold text-text-primary mb-3">
               {t(tonightTitleKey(now))}
             </Text>
-            <View className="bg-coaching-card rounded-card px-4 py-2">
+            <View style={{ gap: 10 }}>
               {buildTonightPrompts(linkedChildren, dashboard, t).map(
                 (prompt) => (
                   <Pressable
                     key={`tonight-${prompt.key}`}
                     onPress={() => pushChildProgress(prompt.childId)}
-                    className="flex-row items-center py-2.5"
+                    className="bg-coaching-card rounded-card px-4 py-3 flex-row items-start"
                     style={
                       Platform.OS === 'web' ? { cursor: 'pointer' } : undefined
                     }
@@ -614,6 +614,7 @@ export function ParentHomeScreen({
                       name="chatbubble-outline"
                       size={18}
                       color={colors.textSecondary}
+                      style={{ marginTop: 2 }}
                     />
                     <Text className="text-body-sm text-text-primary ms-3 flex-1">
                       {prompt.text}

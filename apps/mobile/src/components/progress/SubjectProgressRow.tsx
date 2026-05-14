@@ -3,7 +3,13 @@ import { LayoutAnimation, Pressable, Text, View } from 'react-native';
 import type { SubjectInventory } from '@eduagent/schemas';
 import { AccordionTopicList } from './AccordionTopicList';
 import { ProgressBar } from './ProgressBar';
+import { SubjectBookshelfMotif } from '../common/SubjectBookshelfMotif';
 import { formatMinutes } from '../../lib/format-relative-date';
+import {
+  getLearningSubjectTint,
+  type LearningSubjectTint,
+} from '../../lib/learning-subject-tints';
+import { useThemeColors } from '../../lib/theme';
 
 // 'review' is planned for spaced-repetition scenarios but not yet wired.
 // Add it back here and to ACTION_LABEL + getContextualAction when implemented.
@@ -15,6 +21,7 @@ interface SubjectProgressRowProps {
   onAction?: (action: SubjectProgressRowAction) => void;
   childProfileId?: string;
   subjectId?: string;
+  tint?: LearningSubjectTint;
   testID?: string;
 }
 
@@ -90,8 +97,11 @@ export function SubjectProgressRow({
   onAction,
   childProfileId,
   subjectId,
+  tint: providedTint,
   testID,
 }: SubjectProgressRowProps): React.ReactElement {
+  const colors = useThemeColors();
+  const tint = providedTint ?? getLearningSubjectTint(0, colors);
   const [expanded, setExpanded] = useState(false);
   const isAccordionMode = !!childProfileId && !!subjectId && !onPress;
   const hasExpandableTopics =
@@ -105,8 +115,21 @@ export function SubjectProgressRow({
   };
 
   const content = (
-    <View className="bg-surface rounded-card p-4">
+    <View
+      className="rounded-card p-4"
+      style={{
+        backgroundColor: tint.soft,
+        borderColor: tint.solid + '33',
+        borderWidth: 1,
+      }}
+    >
       <View className="flex-row items-start justify-between">
+        <View className="me-3">
+          <SubjectBookshelfMotif
+            testID={testID ? `${testID}-bookshelf` : undefined}
+            tint={tint}
+          />
+        </View>
         <View className="flex-1 me-3">
           <Text className="text-body font-semibold text-text-primary">
             {subject.subjectName}
@@ -130,6 +153,7 @@ export function SubjectProgressRow({
           <ProgressBar
             value={topicHeadline.progressValue}
             max={topicHeadline.progressMax}
+            fillColor={tint.solid}
             testID={testID ? `${testID}-bar` : undefined}
           />
         </View>

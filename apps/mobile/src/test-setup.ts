@@ -227,7 +227,7 @@ jest.mock('@clerk/clerk-expo/token-cache', () => ({
 jest.mock('expo-web-browser', () => ({
   warmUpAsync: jest.fn().mockResolvedValue(undefined),
   coolDownAsync: jest.fn().mockResolvedValue(undefined),
-  maybeCompleteAuthSession: jest.fn(),
+  maybeCompleteAuthSession: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock('expo-linking', () => ({

@@ -23,7 +23,7 @@ Supersedes the 2026-04-27 table for current state. Phases 0.0, 0.1, and 0.3 were
 | **0.4a** — Migrate 6 live-race sites | ❌ NOT DONE | `consent.ts:199` (B), `filing.ts:371` (I), `home-surface-cache.ts:186` (I), `profile.ts:227` (I), `parking-lot-data.ts:72` (I), `settings.ts:564` (I). |
 | **0.4b** — Migrate remaining 7 sites | ❌ NOT DONE | `vocabulary.ts:261`, `complete-round.ts:230`, `curriculum.ts:780/1180/1340`, `assessments.ts:121`, `rls.ts:20`. |
 | **1.1** — RLS migrations applied | ✅ DONE | `0027_enable_rls.sql`, `0029_rls_sweep_gaps.sql`, `0032_rls_quiz_mastery_items.sql`, `0037_rls_weekly_reports.sql`. |
-| **1.2** — Drizzle snapshot metadata | ✅ DONE (presumed) | Verify `apps/api/drizzle/meta/*.json` shows `isRLSEnabled: true` for all 26 tables if in doubt. |
+| **1.2** — Drizzle snapshot metadata | ⚠️ PARTIAL (verified 2026-05-14, BUG-1044) | DB-level RLS is enabled via raw SQL migrations on **48 unique tables** (`grep -h "ENABLE ROW LEVEL SECURITY" apps/api/drizzle/*.sql \| awk '{print $3}' \| sort -u \| wc -l`). However the Drizzle snapshot flag `isRLSEnabled: true` is only set on **1 table** (`usage_events`) in `apps/api/drizzle/meta/0075_snapshot.json` because the schema files (`packages/database/src/schema/*.ts`) only call `.enableRLS()` once (`billing.ts:121`). The snapshot drift is cosmetic — runtime DB security is enforced by the applied migration SQL, not by Drizzle metadata. Bringing the snapshot into sync requires adding `.enableRLS()` calls to ~47 table definitions; tracked separately if/when needed. |
 | **1.3** — Deploy + verify in staging/prod | ⚠️ PENDING VERIFICATION | Migrations committed. **Action:** run `SELECT tablename, rowsecurity FROM pg_tables WHERE schemaname = 'public'` against staging + prod; paste result here. |
 
 **Pre-Phase-3 gate:** 0.0 ✅, 0.1 ✅, 0.3 ✅ — **gate is blocked on 0.4a** (6 live-race sites must be migrated and break-tested before switching to `app_user` connection role).
@@ -329,9 +329,9 @@ ALTER TABLE top_up_credits ENABLE ROW LEVEL SECURITY;
 ALTER TABLE family_links ENABLE ROW LEVEL SECURITY;
 ```
 
-#### 1.2 — Generate Drizzle migration metadata — ✅ DONE (verify `apps/api/drizzle/meta/*.json` snapshots show `isRLSEnabled: true` for all 26 tables)
+#### 1.2 — Generate Drizzle migration metadata — ⚠️ PARTIAL (verified 2026-05-14, BUG-1044)
 
-Run `pnpm run db:generate` to produce the corresponding snapshot JSON. Verify the snapshots now show `isRLSEnabled: true` for all 26 tables.
+Snapshot drift confirmed: only `usage_events` carries `isRLSEnabled: true` in `apps/api/drizzle/meta/0075_snapshot.json`; the remaining 47 RLS-enabled tables are enabled via raw SQL only. This is a cosmetic mismatch — DB security is enforced. Bringing the snapshot back in sync requires `.enableRLS()` on each table definition in `packages/database/src/schema/*.ts`.
 
 #### 1.3 — Deploy to dev, then staging — ✅ DONE (presumed; **action item:** re-run `SELECT tablename, rowsecurity FROM pg_tables WHERE schemaname = 'public'` against staging + prod and paste the result here)
 
@@ -393,7 +393,7 @@ After Phase 0+1, the system is ready for Phase 2 (write policies) and Phase 3 (s
 
 - [x] 0.2 — `withProfileScope()` exists at `packages/database/src/rls.ts`. **Caveat:** runtime no-op until 0.0/0.1 land.
 - [x] 1.1 — RLS migrations applied: `0027_enable_rls.sql`, `0029_rls_sweep_gaps.sql`, `0032_rls_quiz_mastery_items.sql`, `0037_rls_weekly_reports.sql`. Verify all 26 profile-scoped tables are covered.
-- [x] 1.2 — Drizzle snapshots regenerated (presumed; verify via `apps/api/drizzle/meta/*.json`).
+- [~] 1.2 — Drizzle snapshots PARTIAL (verified 2026-05-14, BUG-1044): only `usage_events` shows `isRLSEnabled: true` in the latest snapshot; the other 47 RLS-enabled tables are enabled via raw SQL migrations and the schema files don't yet call `.enableRLS()`. Snapshot drift is cosmetic — runtime security is enforced.
 - [x] 1.3 — Deployed to dev + staging (presumed). **Action item:** re-run `SELECT tablename, rowsecurity FROM pg_tables WHERE schemaname = 'public'` against staging and prod.
 - [x] 0.4 audit — DONE 2026-04-27 by parallel agent dispatch; results in "Audit Results" section above.
 - [x] `SET LOCAL` cross-request leak verification — REFUTED 2026-04-27 (Postgres no-ops; Neon PgBouncer transaction-mode prevents session leaks). See "Verification" section above.

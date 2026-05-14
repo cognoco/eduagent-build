@@ -1250,7 +1250,7 @@ export default function SessionSummaryScreen() {
               testID="summary-submitted"
             >
               <View className="items-center mb-3">
-                <CheckmarkPopAnimation size={56} />
+                <CheckmarkPopAnimation size={80} />
               </View>
               <Text className="text-body text-text-primary mb-2">
                 {displayContent}

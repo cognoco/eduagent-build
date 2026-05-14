@@ -1128,7 +1128,7 @@ export default function BookScreen() {
         style={{ paddingTop: insets.top }}
         testID="book-generating"
       >
-        <MagicPenAnimation size={100} color={themeColors.accent} />
+        <MagicPenAnimation size={150} color={themeColors.accent} />
         {book?.emoji && <Text className="text-3xl mt-4">{book.emoji}</Text>}
         <Text className="text-h2 font-bold text-text-primary mt-3 text-center">
           {book?.title ?? 'Writing your book...'}
@@ -1575,7 +1575,7 @@ export default function BookScreen() {
               {showBookCompletionBurst ? (
                 <View className="absolute end-4 top-3">
                   <CelebrationAnimation
-                    size={88}
+                    size={120}
                     color={themeColors.success}
                     accentColor={themeColors.accent}
                     onComplete={() => setShowBookCompletionBurst(false)}

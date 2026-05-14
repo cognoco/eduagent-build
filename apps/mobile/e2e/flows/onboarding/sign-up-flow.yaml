@@ -32,10 +32,13 @@ tags:
 
 - takeScreenshot: onboarding-01-signup-screen
 
-# 4. Enter email (dynamic to avoid Clerk duplicate-email errors on re-run)
+# 4. Enter email (dynamic to avoid Clerk duplicate-email errors on re-run).
+# The `+clerk_test` infix routes through Clerk's test-mode bucket: the
+# verification code is always 424242 and no real email is sent (no dev
+# quota consumed). Only works on Clerk dev instances (pk_test_).
 - tapOn:
     id: "sign-up-email"
-- inputText: "test-e2e-signup-${Date.now()}@example.com"
+- inputText: "test-e2e-signup-${Date.now()}+clerk_test@example.com"
 
 # Dismiss keyboard so password field becomes visible (BUG-20: hideKeyboard fails)
 - tapOn:
@@ -67,43 +70,29 @@ tags:
 
 - takeScreenshot: onboarding-02b-verification-screen
 
-# ════════════════════════════════════════════════════════════════════════
-# VERIFICATION BOUNDARY: Steps below require a valid Clerk verification code.
-# Clerk dev mode does NOT auto-verify or accept a fixed test code.
-# To unblock: add POST /__test/verify-email endpoint (Clerk Backend API)
-# or create a "pre-profile" seed scenario that bypasses sign-up entirely.
-# Until then, verification and subsequent steps are marked optional.
-# ════════════════════════════════════════════════════════════════════════
-
-# 6c. Enter verification code (placeholder — needs Clerk test config)
+# 6c. Enter Clerk test-mode verification code. The `+clerk_test` email above
+# tells Clerk this is a test address; the fixed code 424242 always works.
 - tapOn:
     id: "sign-up-code"
-    optional: true
 - inputText: "424242"
-  # optional: true not supported on inputText — harmless if field not focused
 
 # Dismiss number pad so Verify button becomes visible
 - pressKey: Back
 
 - tapOn:
     id: "sign-up-verify-button"
-    optional: true
 
-# 7. Profile creation screen (only reachable if verification succeeded)
+# 7. Profile creation screen
 - extendedWaitUntil:
     visible:
       id: "create-profile-name"
     timeout: 15000
-    optional: true
 
 - takeScreenshot: onboarding-03-profile-creation
-
-# ── Steps 8-16 only reachable if verification succeeded (optional) ──
 
 # 8. Enter profile name
 - tapOn:
     id: "create-profile-name"
-    optional: true
 
 # 9. Persona is auto-detected from birth date (no selector — removed in persona refactor)
 
@@ -112,40 +101,34 @@ tags:
 # 10. Submit profile
 - tapOn:
     id: "create-profile-submit"
-    optional: true
 
 # 11. Home screen reached — first-time empty state
 - extendedWaitUntil:
     visible:
       id: "learner-screen"
     timeout: 15000
-    optional: true
 
 - takeScreenshot: onboarding-05-home-empty-state
 
 # 12. Add first subject via Learn intent card (replaced add-subject-button)
 - tapOn:
     id: "home-action-study-new"
-    optional: true
 
 # 13. Subject creation modal visible
 - extendedWaitUntil:
     visible:
       text: "What would you like to learn?"
     timeout: 5000
-    optional: true
 
 - takeScreenshot: onboarding-06-create-subject-modal
 
 # 14. Enter subject name
 - tapOn:
     id: "create-subject-name"
-    optional: true
 
 # 15. Submit subject
 - tapOn:
     id: "create-subject-submit"
-    optional: true
 
 # 16. Interview screen reached (use chat-input testID — "Interview" text
 #     is unreliable in Maestro on Android per BUG-49)
@@ -153,6 +136,5 @@ tags:
     visible:
       id: "chat-input"
     timeout: 15000
-    optional: true
 
 - takeScreenshot: onboarding-07-interview-started

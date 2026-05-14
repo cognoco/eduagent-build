@@ -33,6 +33,7 @@ import {
   ReportsList,
   WeeklyDeltaChip,
 } from '../../../components/progress';
+import { SubjectBookshelfMotif } from '../../../components/common/SubjectBookshelfMotif';
 import { ProgressPillRow } from '../../../components/progress/ProgressPillRow';
 import { useActiveProfileRole } from '../../../hooks/use-active-profile-role';
 import {
@@ -49,11 +50,16 @@ import {
   useRefreshProgressSnapshot,
 } from '../../../hooks/use-progress';
 import { useSubjects } from '../../../hooks/use-subjects';
+import {
+  getLearningSubjectTint,
+  type LearningSubjectTint,
+} from '../../../lib/learning-subject-tints';
 import { pushLearningResumeTarget } from '../../../lib/navigation';
 import { copyRegisterFor, type CopyRegister } from '../../../lib/copy-register';
 import { useLinkedChildren, useProfile } from '../../../lib/profile';
 import { buildGrowthData, isProfileStale } from '../../../lib/progress';
 import { bucketAccountAge, hashProfileId, track } from '../../../lib/analytics';
+import { useThemeColors } from '../../../lib/theme';
 
 function heroCopy(
   input: {
@@ -168,22 +174,41 @@ function LoadingBlock(): React.ReactElement {
 
 function SubjectBreakdownCard({
   subject,
+  tint,
 }: {
   subject: SubjectInventory;
+  tint: LearningSubjectTint;
 }): React.ReactElement {
   const { t } = useTranslation();
   return (
     <View
       testID={`progress-subject-card-${subject.subjectId}`}
-      className="bg-surface rounded-card p-4 mt-3"
+      className="rounded-card p-4 mt-3"
+      style={{
+        backgroundColor: tint.soft,
+        borderColor: tint.solid + '33',
+        borderWidth: 1,
+      }}
     >
-      <Text className="text-body font-semibold text-text-primary">
-        {subject.subjectName}
-      </Text>
-      <Text className="text-body-sm text-text-secondary mt-1">
-        {t('progress.guardian.sessionCount', { count: subject.sessionsCount })}{' '}
-        · {formatMinutes(subject.wallClockMinutes ?? subject.activeMinutes)}
-      </Text>
+      <View className="flex-row items-start">
+        <View className="me-3">
+          <SubjectBookshelfMotif
+            testID={`progress-subject-bookshelf-${subject.subjectId}`}
+            tint={tint}
+          />
+        </View>
+        <View className="flex-1">
+          <Text className="text-body font-semibold text-text-primary">
+            {subject.subjectName}
+          </Text>
+          <Text className="text-body-sm text-text-secondary mt-1">
+            {t('progress.guardian.sessionCount', {
+              count: subject.sessionsCount,
+            })}{' '}
+            · {formatMinutes(subject.wallClockMinutes ?? subject.activeMinutes)}
+          </Text>
+        </View>
+      </View>
       {subject.lastSessionAt ? (
         <Text className="text-caption text-text-secondary mt-1">
           {t('progress.guardian.lastStudied', {
@@ -257,6 +282,7 @@ export default function ProgressScreen(): React.ReactElement {
     profileId?: string;
   }>();
   const insets = useSafeAreaInsets();
+  const themeColors = useThemeColors();
   const { activeProfile } = useProfile();
   const linkedChildren = useLinkedChildren();
   const hasLinked = linkedChildren.length > 0;
@@ -760,10 +786,11 @@ export default function ProgressScreen(): React.ReactElement {
                 ) : null}
                 {inventory?.subjects?.length ? (
                   <View testID="progress-subject-breakdown" className="mt-3">
-                    {inventory.subjects.map((subject) => (
+                    {inventory.subjects.map((subject, index) => (
                       <SubjectBreakdownCard
                         key={subject.subjectId}
                         subject={subject}
+                        tint={getLearningSubjectTint(index, themeColors)}
                       />
                     ))}
                   </View>

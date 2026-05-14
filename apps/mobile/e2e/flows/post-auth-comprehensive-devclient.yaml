@@ -4,7 +4,7 @@
 # Prerequisite: App is on the sign-in screen (dev-client already connected).
 # Prerequisite: Seed user must have bypass_client_trust=true in Clerk (CAPTCHA bypass).
 #
-# Seeded user: test-e2e@example.com / Mentomate2026xK
+# Seeded user: test-e2e+clerk_test@example.com / Mentomate2026xK
 # Scenario: learning-active (has subject, session, topic)
 appId: com.mentomate.app
 tags:
@@ -51,7 +51,7 @@ tags:
 
 - tapOn:
     id: "sign-in-email"
-- inputText: "test-e2e@example.com"
+- inputText: "test-e2e+clerk_test@example.com"
 
 # Dismiss keyboard so password field becomes visible (BUG-3)
 - hideKeyboard
