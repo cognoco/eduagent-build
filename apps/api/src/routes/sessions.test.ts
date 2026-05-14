@@ -13,11 +13,18 @@ const mockCaptureException = jest.fn();
 const mockAddBreadcrumb = jest.fn();
 const mockCaptureMessage = jest.fn();
 
-jest.mock('../services/sentry', () => ({
-  addBreadcrumb: (...args: unknown[]) => mockAddBreadcrumb(...args),
-  captureException: (...args: unknown[]) => mockCaptureException(...args),
-  captureMessage: (...args: unknown[]) => mockCaptureMessage(...args),
-}));
+jest.mock('../services/sentry', () => {
+  const actual = jest.requireActual('../services/sentry') as Record<
+    string,
+    unknown
+  >;
+  return {
+    ...actual,
+    addBreadcrumb: (...args: unknown[]) => mockAddBreadcrumb(...args),
+    captureException: (...args: unknown[]) => mockCaptureException(...args),
+    captureMessage: (...args: unknown[]) => mockCaptureMessage(...args),
+  };
+});
 
 // ---------------------------------------------------------------------------
 // Mock database module — middleware creates a stub db per request
@@ -33,35 +40,49 @@ jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 // Mock account + session services — no DB interaction
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/account', () => ({
-  findOrCreateAccount: jest.fn().mockResolvedValue({
-    id: 'test-account-id',
-    clerkUserId: 'user_test',
-    email: 'test@example.com',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  }),
-}));
+jest.mock('../services/account', () => {
+  const actual = jest.requireActual('../services/account') as Record<
+    string,
+    unknown
+  >;
+  return {
+    ...actual,
+    findOrCreateAccount: jest.fn().mockResolvedValue({
+      id: 'test-account-id',
+      clerkUserId: 'user_test',
+      email: 'test@example.com',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }),
+  };
+});
 
 // ---------------------------------------------------------------------------
 // Mock profile service — middleware auto-resolves owner profile
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/profile', () => ({
-  getProfile: jest.fn().mockResolvedValue({
-    id: 'test-profile-id',
-    birthYear: null,
-    location: null,
-    consentStatus: 'CONSENTED',
-  }),
-  getProfileAgeBracket: jest.fn().mockResolvedValue('teen'),
-  findOwnerProfile: jest.fn().mockResolvedValue({
-    id: 'test-profile-id',
-    birthYear: null,
-    location: null,
-    consentStatus: 'CONSENTED',
-  }),
-}));
+jest.mock('../services/profile', () => {
+  const actual = jest.requireActual('../services/profile') as Record<
+    string,
+    unknown
+  >;
+  return {
+    ...actual,
+    getProfile: jest.fn().mockResolvedValue({
+      id: 'test-profile-id',
+      birthYear: null,
+      location: null,
+      consentStatus: 'CONSENTED',
+    }),
+    getProfileAgeBracket: jest.fn().mockResolvedValue('teen'),
+    findOwnerProfile: jest.fn().mockResolvedValue({
+      id: 'test-profile-id',
+      birthYear: null,
+      location: null,
+      consentStatus: 'CONSENTED',
+    }),
+  };
+});
 
 // ---------------------------------------------------------------------------
 // Mock billing service — metering middleware calls these on LLM routes
@@ -94,33 +115,40 @@ const mockSafeRefundQuota = jest.fn(
   },
 );
 
-jest.mock('../services/billing', () => ({
-  getSubscriptionByAccountId: jest.fn().mockResolvedValue(mockSubscription),
-  ensureFreeSubscription: jest.fn().mockResolvedValue(mockSubscription),
-  getQuotaPool: jest.fn().mockResolvedValue({
-    id: 'qp-1',
-    subscriptionId: 'sub-1',
-    monthlyLimit: 500,
-    usedThisMonth: 10,
-    dailyLimit: null,
-    usedToday: 0,
-    cycleResetAt: new Date().toISOString(),
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  }),
-  decrementQuota: jest.fn().mockResolvedValue({
-    success: true,
-    source: 'monthly',
-    remainingMonthly: 489,
-    remainingTopUp: 0,
-    remainingDaily: null,
-  }),
-  getTopUpCreditsRemaining: jest.fn().mockResolvedValue(0),
-  incrementQuota: (...args: unknown[]) => mockIncrementQuota(...args),
-  safeRefundQuota: (...args: unknown[]) =>
-    mockSafeRefundQuota(args[0], args[1] as string, args[2]),
-  createSubscription: jest.fn(),
-}));
+jest.mock('../services/billing', () => {
+  const actual = jest.requireActual('../services/billing') as Record<
+    string,
+    unknown
+  >;
+  return {
+    ...actual,
+    getSubscriptionByAccountId: jest.fn().mockResolvedValue(mockSubscription),
+    ensureFreeSubscription: jest.fn().mockResolvedValue(mockSubscription),
+    getQuotaPool: jest.fn().mockResolvedValue({
+      id: 'qp-1',
+      subscriptionId: 'sub-1',
+      monthlyLimit: 500,
+      usedThisMonth: 10,
+      dailyLimit: null,
+      usedToday: 0,
+      cycleResetAt: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }),
+    decrementQuota: jest.fn().mockResolvedValue({
+      success: true,
+      source: 'monthly',
+      remainingMonthly: 489,
+      remainingTopUp: 0,
+      remainingDaily: null,
+    }),
+    getTopUpCreditsRemaining: jest.fn().mockResolvedValue(0),
+    incrementQuota: (...args: unknown[]) => mockIncrementQuota(...args),
+    safeRefundQuota: (...args: unknown[]) =>
+      mockSafeRefundQuota(args[0], args[1] as string, args[2]),
+    createSubscription: jest.fn(),
+  };
+});
 
 const SUBJECT_ID = '550e8400-e29b-41d4-a716-446655440000';
 const SESSION_ID = '660e8400-e29b-41d4-a716-446655440000';
@@ -360,11 +388,18 @@ jest.mock('../services/interleaved', () => {
   };
 });
 
-jest.mock('../services/recall-bridge', () => ({
-  generateRecallBridge: jest.fn().mockResolvedValue({
-    bridge: 'mock bridge',
-  }),
-}));
+jest.mock('../services/recall-bridge', () => {
+  const actual = jest.requireActual('../services/recall-bridge') as Record<
+    string,
+    unknown
+  >;
+  return {
+    ...actual,
+    generateRecallBridge: jest.fn().mockResolvedValue({
+      bridge: 'mock bridge',
+    }),
+  };
+});
 
 jest.mock('inngest/hono', () => ({
   serve: jest.fn().mockReturnValue(jest.fn()),
@@ -372,7 +407,7 @@ jest.mock('inngest/hono', () => ({
 
 const mockInngestSend = jest.fn().mockResolvedValue(undefined);
 
-jest.mock('../inngest/client', () => ({
+jest.mock('../inngest/client', () => ({ // gc1-allow: inngest client wraps the Inngest SDK external boundary; real send() dispatches jobs to Inngest cloud, cannot run in test environment
   inngest: {
     send: (...args: unknown[]) => mockInngestSend(...args),
     createFunction: jest.fn().mockReturnValue(jest.fn()),
