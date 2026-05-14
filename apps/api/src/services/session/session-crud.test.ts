@@ -205,6 +205,59 @@ describe('startFirstCurriculumSession topic intent matcher', () => {
       expect.objectContaining({ topicId: MATCHED_TOPIC_ID }),
     );
   });
+
+  it('materializes pending focused book topics once before polling again', async () => {
+    let topicsVisible = false;
+    const findFirstAvailableTopicId = jest.fn(async () =>
+      topicsVisible ? FALLBACK_TOPIC_ID : undefined,
+    );
+    const loadLatestCompletedDraftSignals = jest.fn(async () => undefined);
+    const materializeFocusedBookTopics = jest.fn(async () => {
+      topicsVisible = true;
+    });
+    const matchTopicByIntent = jest.fn(async () => ({
+      topicId: FALLBACK_TOPIC_ID,
+      selectedTopicId: FALLBACK_TOPIC_ID,
+      confidence: null,
+      fallbackReason: 'flag-off' as const,
+      matcherLatencyMs: 1,
+    }));
+    const startSession = jest.fn(
+      async () => ({ id: 'session-1' }) as unknown as LearningSession,
+    );
+
+    __sessionCrudTestHooks.setDependencies({
+      findFirstAvailableTopicId,
+      loadLatestCompletedDraftSignals,
+      loadSubjectStructureType: jest.fn(async () => 'focused_book'),
+      materializeFocusedBookTopics,
+      matchTopicByIntent,
+      startSession,
+    });
+
+    await startFirstCurriculumSession(
+      {} as never,
+      PROFILE_ID,
+      SUBJECT_ID,
+      { inputMode: 'text', sessionType: 'learning', bookId: BOOK_ID },
+      { matcherEnabled: false },
+    );
+
+    expect(materializeFocusedBookTopics).toHaveBeenCalledTimes(1);
+    expect(materializeFocusedBookTopics).toHaveBeenCalledWith(
+      {},
+      PROFILE_ID,
+      SUBJECT_ID,
+      BOOK_ID,
+    );
+    expect(findFirstAvailableTopicId).toHaveBeenCalledTimes(2);
+    expect(startSession).toHaveBeenCalledWith(
+      {},
+      PROFILE_ID,
+      SUBJECT_ID,
+      expect.objectContaining({ topicId: FALLBACK_TOPIC_ID }),
+    );
+  });
 });
 
 function predicateContainsColumnValue(
