@@ -205,6 +205,25 @@ describe('dashboard routes', () => {
     // CONSENTED status, so the response is safe. Parameterized across every
     // non-CONSENTED status so the route is verified to never 403 on any of
     // the redaction-eligible states.
+    //
+    // Contract split (so this test is not the only guard):
+    //   - THIS test (route-unit) only proves: the route returns 200 instead
+    //     of 403 for every non-CONSENTED status, and surfaces whatever
+    //     getChildDetail returns. It mocks getChildDetail with an already-
+    //     redacted payload, so it does NOT verify that redactDashboardChild
+    //     actually zeroes restricted fields.
+    //   - The redaction-correctness guarantee lives in the service
+    //     integration test:
+    //       apps/api/src/services/dashboard.integration.test.ts
+    //         → "redacts dashboard learning metrics for $status consent"
+    //     That test seeds a real session (exchangeCount: 8,
+    //     wallClockSeconds: 660) for each non-CONSENTED status, calls the
+    //     real getChildDetail against a real DB, and asserts that every
+    //     learning metric is zeroed and the summary copy is replaced —
+    //     so a regression that stopped zeroing fields fails there.
+    //   - Together these two tests cover the full "no 403, and metrics are
+    //     actually hidden" contract for non-CONSENTED children. Do not
+    //     weaken either one without re-checking the other still holds.
     it.each([
       {
         status: 'PENDING' as const,
