@@ -6,8 +6,7 @@ jest.mock('inngest/hono', () => ({
   serve: jest.fn().mockReturnValue(jest.fn()),
 }));
 
-jest.mock('../inngest/client', () => ({
-  // gc1-allow: Inngest SDK external boundary
+jest.mock('../inngest/client', () => ({ // gc1-allow: Inngest SDK external boundary
   inngest: {
     send: jest.fn().mockResolvedValue(undefined),
     createFunction: jest.fn().mockReturnValue(jest.fn()),
@@ -16,13 +15,11 @@ jest.mock('../inngest/client', () => ({
 
 const mockCaptureException = jest.fn();
 
-jest.mock('../services/sentry', () => ({
-  // gc1-allow: @sentry/cloudflare external boundary
+jest.mock('../services/sentry', () => ({ // gc1-allow: @sentry/cloudflare external boundary
   captureException: (...args: unknown[]) => mockCaptureException(...args),
 }));
 
-jest.mock('../services/notifications', () => ({
-  // gc1-allow: email + push notification external boundary
+jest.mock('../services/notifications', () => ({ // gc1-allow: email + push notification external boundary
   sendEmail: jest.fn().mockResolvedValue({ sent: true }),
   formatConsentRequestEmail: jest.fn().mockReturnValue({
     to: 'parent@example.com',
@@ -61,7 +58,7 @@ jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 // Mock account + consent services — no DB interaction
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/account', () => ({
+jest.mock('../services/account', () => ({ // gc1-allow: requireActual spread + targeted override; findOrCreateAccount stubbed to avoid DB in route unit tests
   ...jest.requireActual('../services/account'),
   findOrCreateAccount: jest.fn().mockResolvedValue({
     id: 'test-account-id',
@@ -72,7 +69,7 @@ jest.mock('../services/account', () => ({
   }),
 }));
 
-jest.mock('../services/profile', () => ({
+jest.mock('../services/profile', () => ({ // gc1-allow: requireActual spread + targeted override; profile lookup functions stubbed to avoid DB in route unit tests
   ...jest.requireActual('../services/profile'),
   findOwnerProfile: jest.fn().mockResolvedValue({
     id: 'test-profile-id',
@@ -96,7 +93,7 @@ jest.mock('../services/profile', () => ({
   switchProfile: jest.fn(),
 }));
 
-jest.mock('../services/consent', () => {
+jest.mock('../services/consent', () => { // gc1-allow: requireActual used for error classes (instanceof checks); service functions stubbed to avoid DB in route unit tests
   const actual = jest.requireActual('../services/consent') as Record<
     string,
     unknown

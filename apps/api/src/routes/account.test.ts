@@ -14,6 +14,7 @@ jest.mock('inngest/hono', () => ({
 }));
 
 jest.mock('../inngest/client', () => ({
+  ...jest.requireActual('../inngest/client'),
   inngest: {
     send: jest.fn().mockResolvedValue(undefined),
     createFunction: jest.fn().mockReturnValue(jest.fn()),
@@ -21,6 +22,7 @@ jest.mock('../inngest/client', () => ({
 }));
 
 jest.mock('../services/sentry', () => ({
+  ...jest.requireActual('../services/sentry'),
   captureException: jest.fn(),
   addBreadcrumb: jest.fn(),
 }));
@@ -51,6 +53,7 @@ jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 // ---------------------------------------------------------------------------
 
 jest.mock('../services/account', () => ({
+  ...jest.requireActual('../services/account'),
   findOrCreateAccount: jest.fn().mockResolvedValue({
     id: 'test-account-id',
     clerkUserId: 'user_test',
@@ -61,6 +64,7 @@ jest.mock('../services/account', () => ({
 }));
 
 jest.mock('../services/deletion', () => ({
+  ...jest.requireActual('../services/deletion'),
   scheduleDeletion: jest.fn().mockResolvedValue({
     gracePeriodEnds: new Date(
       Date.now() + 7 * 24 * 60 * 60 * 1000
@@ -71,6 +75,7 @@ jest.mock('../services/deletion', () => ({
 }));
 
 jest.mock('../services/export', () => ({
+  ...jest.requireActual('../services/export'),
   generateExport: jest.fn().mockResolvedValue({
     account: {
       email: 'test@example.com',
