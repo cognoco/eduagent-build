@@ -547,6 +547,19 @@ export default function RootLayout() {
                 persister: asyncStoragePersister,
                 maxAge: 24 * 60 * 60_000,
               }}
+              onSuccess={() => {
+                // [CCR finding, 2026-05-14] Drop legacy root keys after the
+                // persister rehydrates AsyncStorage. PR 10 moved
+                // `useEvaluateEligibility` from
+                //   ['evaluate-eligibility', topicId, profileId]
+                // to ['retention', 'evaluate-eligibility', topicId, profileId].
+                // Warm-cache devices (any emulator with disk state from
+                // pre-PR-10 builds) would otherwise carry orphaned eligibility
+                // entries that no invalidation path reaches.
+                queryClient.removeQueries({
+                  queryKey: ['evaluate-eligibility'],
+                });
+              }}
             >
               <ProfileProvider>
                 <OutboxDrainProvider>

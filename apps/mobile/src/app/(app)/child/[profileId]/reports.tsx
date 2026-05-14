@@ -117,6 +117,7 @@ export default function ChildReportsScreen(): React.ReactElement {
   const {
     data: weeklyReports,
     isLoading: weeklyLoading,
+    isError: weeklyError,
     refetch: weeklyRefetch,
   } = useChildWeeklyReports(profileId);
   const childName = child?.displayName ?? t('parentView.index.yourChild');
@@ -124,7 +125,11 @@ export default function ChildReportsScreen(): React.ReactElement {
   const combinedLoading = isLoading || weeklyLoading;
   const hasAnyData =
     (reports?.length ?? 0) > 0 || (weeklyReports?.length ?? 0) > 0;
-  const combinedError = !hasAnyData && isError;
+  // [CCR finding, 2026-05-14] Prior version was `!hasAnyData && isError`,
+  // which silently swallowed weekly-only failures: weekly down + monthly up
+  // showed neither an error banner nor a retry path. The retry handler
+  // already calls both refetches, so widening this condition is sufficient.
+  const combinedError = !hasAnyData && (isError || weeklyError);
 
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>

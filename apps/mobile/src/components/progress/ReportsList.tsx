@@ -90,13 +90,17 @@ export function ReportsList({
                 });
 
           /**
-           * testIDs preserved from the old components:
-           *   - weekly rows:  `weekly-report-card-{id}`   (from child/reports e2e flow)
-           *   - monthly rows: `report-card-{id}`          (from child/reports)
-           *   - progress full-list rows: `progress-report-row-{id}` (from progress/reports/index)
-           * All three patterns are kept so existing tests and e2e flows remain valid.
-           * The `report-row-{id}` testID (spec proposal) is NOT used here — existing automation
-           * depends on the above names.
+           * Row testIDs emitted by this component:
+           *   - weekly rows:  `weekly-report-card-{id}`   (preserved from child/reports e2e flow)
+           *   - monthly rows: `report-card-{id}`          (preserved from child/reports)
+           *
+           * NOTE: the deleted `progress/reports/index.tsx` inline rows used
+           * `progress-report-row-{id}`. That pattern is INTENTIONALLY NOT
+           * emitted here — grep confirms no test or e2e flow targets it
+           * (CCR finding, 2026-05-14). If a future flow needs it, accept a
+           * `rowTestIDFactory` prop on this component instead of hard-coding
+           * a third pattern. The container `progress-report-rows` testID
+           * still wraps the list on the progress full-list screen.
            */
           const rowTestID =
             item.kind === 'weekly'
