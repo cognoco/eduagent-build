@@ -1,7 +1,10 @@
-jest.mock('../config', () => ({
-  validateEnv: jest.fn(),
-  validateProductionBindings: jest.fn(),
-}));
+jest.mock('../config' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual('../config') as typeof import('../config');
+  return {
+    ...actual,
+    validateEnv: jest.fn(),
+  };
+});
 
 import { validateEnv, validateProductionBindings } from '../config';
 import { envValidationMiddleware, resetEnvValidation } from './env-validation';

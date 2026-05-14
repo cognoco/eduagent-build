@@ -6,12 +6,15 @@ const mockGetStepDatabase = jest.fn();
 const mockSendPushNotification = jest.fn();
 const mockFormatReviewReminderBody = jest.fn();
 
-jest.mock(
-  '../helpers' /* gc1-allow: isolates DB connection from unit test */,
-  () => ({
+jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../helpers',
+  ) as typeof import('../helpers');
+  return {
+    ...actual,
     getStepDatabase: () => mockGetStepDatabase(),
-  }),
-);
+  };
+});
 
 jest.mock(
   '../../services/notifications' /* gc1-allow: isolates push notification external boundary */,
