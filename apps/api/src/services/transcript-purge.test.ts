@@ -1,6 +1,6 @@
 const mockGenerateEmbedding = jest.fn();
 
-jest.mock('./embeddings', () => {
+jest.mock('./embeddings', () => { // gc1-allow: generateEmbedding calls Voyage AI REST API (external boundary; no key in test env)
   const actual = jest.requireActual('./embeddings') as Record<string, unknown>;
   return {
     ...actual,
