@@ -5,7 +5,8 @@ import {
   SubjectResolutionAccessory,
 } from './SessionAccessories';
 
-jest.mock('../../lib/theme', () => ({
+// prettier-ignore
+jest.mock('../../lib/theme', /* gc1-allow: nativewind vars() does not resolve 'react' in jest; stub theme hooks so screen tests don't blow up on import */ () => ({
   useThemeColors: () => ({
     primary: '#00b4d8',
     textSecondary: '#999',
