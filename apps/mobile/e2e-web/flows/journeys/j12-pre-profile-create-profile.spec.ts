@@ -13,30 +13,6 @@ test('J-12 new user → create profile → lands on learner home', async ({
   });
 
   await pressableClick(page.getByTestId('create-profile-cta'));
-
-  // [DIAG] Localize whether router.push reached /create-profile at all
-  await page.waitForTimeout(2_000);
-  const diag = {
-    url: page.url(),
-    gateVisible: await page
-      .getByTestId('create-profile-gate')
-      .isVisible()
-      .catch(() => 'err'),
-    formVisible: await page
-      .getByTestId('create-profile-name')
-      .isVisible()
-      .catch(() => 'err'),
-    bodyText: await page
-      .locator('body')
-      .innerText()
-      .then((t) => t.slice(0, 200))
-      .catch(() => 'err'),
-  };
-  // Throw the diag so it appears in the failure trace
-  if (diag.formVisible !== true) {
-    throw new Error(`[J-12 DIAG] ${JSON.stringify(diag, null, 2)}`);
-  }
-
   await expect(page.getByTestId('create-profile-name')).toBeVisible({
     timeout: 30_000,
   });

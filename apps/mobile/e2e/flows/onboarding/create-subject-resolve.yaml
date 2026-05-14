@@ -43,7 +43,7 @@ tags:
 - inputText: "Phsics"
 
 # 7. Dismiss keyboard so button is visible
-- pressKey: back
+- hideKeyboard
 
 # 8. Wait for submit button to be visible
 - extendedWaitUntil:

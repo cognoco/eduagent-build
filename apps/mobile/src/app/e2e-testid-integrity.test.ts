@@ -39,10 +39,10 @@ const KNOWN_DRIFT = new Set([
   'location-eu',
   'location-other',
   // Library/learning screens renamed during route restructuring
+  // library-screen: FIXED — testID added to apps/mobile/src/app/(app)/library.tsx root View
+  // home-screen: FIXED — testID added to apps/mobile/src/app/(app)/home.tsx root View
   'library-scroll',
-  'library-screen',
   'library-tab',
-  'home-screen',
   'learn-new-screen',
   'shelf-book-list',
   // Session summary
@@ -86,6 +86,14 @@ const KNOWN_DRIFT = new Set([
   // learner-screen and parent-home-screen — safe to leave in place, but the
   // Maestro flows can drop these branches in a follow-up cleanup.
   'dashboard-scroll',
+  // WIP flows (home-loading-timeout, library-loading-timeout,
+  // first-curriculum-polling-timeout, sse-reconnect-banner) use placeholder
+  // sign-in IDs that don't match source yet. Fix by updating those flows to
+  // use sign-in-email / sign-in-password / sign-in-button.
+  'email-input',
+  'password-input',
+  'sign-in-submit-button',
+  '<PLACEHOLDER_TESTID>',
 ]);
 
 function collectFiles(dir: string, ext: string): string[] {

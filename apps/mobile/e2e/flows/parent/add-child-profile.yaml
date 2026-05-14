@@ -71,7 +71,7 @@ tags:
 - tapOn:
     id: "create-profile-name"
 - inputText: "New Child"
-- pressKey: back
+- hideKeyboard
 
 # 8. Select birth date (tap date field to open picker)
 - tapOn:

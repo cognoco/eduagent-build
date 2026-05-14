@@ -331,6 +331,68 @@ else
 fi
 
 echo ""
+echo "─── check_emulator_console ────────────────────────────────────────────"
+
+# CASE A: Missing token file → warn (return 0, not a hard failure).
+_FAKE_HOME_MISSING=$(mktemp -d)
+rc=0
+HOME="$_FAKE_HOME_MISSING" \
+  check_emulator_console >/dev/null 2>/tmp/pf_err_console_missing.txt || rc=$?
+if [ $rc -eq 0 ] && grep -q "auth token missing" /tmp/pf_err_console_missing.txt; then
+  _tpass "warns (return 0) when auth token file is missing"
+else
+  _tfail "check_emulator_console did not warn on missing token (rc=$rc). stderr: $(cat /tmp/pf_err_console_missing.txt)"
+fi
+rm -rf "$_FAKE_HOME_MISSING"
+
+# CASE B: Token exists but console port is not listening → warn (return 0).
+_FAKE_HOME_NOTOK=$(mktemp -d)
+echo "fake-token" > "$_FAKE_HOME_NOTOK/.emulator_console_auth_token"
+rc=0
+HOME="$_FAKE_HOME_NOTOK" EMULATOR_CONSOLE_PORT=19997 \
+  check_emulator_console >/dev/null 2>/tmp/pf_err_console_dead.txt || rc=$?
+if [ $rc -eq 0 ] && grep -q "not listening" /tmp/pf_err_console_dead.txt; then
+  _tpass "warns (return 0) when console port is not listening"
+else
+  _tfail "check_emulator_console did not warn on closed port (rc=$rc). stderr: $(cat /tmp/pf_err_console_dead.txt)"
+fi
+rm -rf "$_FAKE_HOME_NOTOK"
+
+# CASE C: Token exists + port listening → ok.
+# Spin a minimal TCP listener using node (nc -l is not reliable on Windows Git Bash nc.exe).
+_FAKE_HOME_OK=$(mktemp -d)
+echo "fake-token" > "$_FAKE_HOME_OK/.emulator_console_auth_token"
+_CONSOLE_PORT=$(_next_port)
+node -e "
+  const net = require('net');
+  const srv = net.createServer(s => { s.end(); });
+  srv.listen(${_CONSOLE_PORT}, '127.0.0.1');
+" &
+_CONSOLE_PID=$!
+_MOCK_PIDS+=("$_CONSOLE_PID")
+# Wait for the port to be reachable
+for _ in 1 2 3 4 5 6 7 8 9 10; do
+  if node -e "
+    const net=require('net');
+    const s=net.connect(${_CONSOLE_PORT},'127.0.0.1');
+    s.on('connect',()=>{s.end();process.exit(0)});
+    s.on('error',()=>process.exit(1));
+    setTimeout(()=>process.exit(1),500);
+  " 2>/dev/null; then break; fi
+  sleep 0.2
+done
+rc=0
+PREFLIGHT_QUIET=0 HOME="$_FAKE_HOME_OK" EMULATOR_CONSOLE_PORT="${_CONSOLE_PORT}" \
+  check_emulator_console >/tmp/pf_out_console_ok.txt 2>/tmp/pf_err_console_ok.txt || rc=$?
+if [ $rc -eq 0 ] && grep -q "reachable" /tmp/pf_out_console_ok.txt; then
+  _tpass "reports ok when token exists and console port is listening"
+else
+  _tfail "check_emulator_console did not report ok (rc=$rc). stdout: $(cat /tmp/pf_out_console_ok.txt) stderr: $(cat /tmp/pf_err_console_ok.txt)"
+fi
+_cleanup
+rm -rf "$_FAKE_HOME_OK"
+
+echo ""
 echo "─── E2E_PREFLIGHT_SKIP honored ────────────────────────────────────────"
 # CASE 11: Escape hatch works.
 E2E_PREFLIGHT_SKIP=1 run_preflight >/tmp/pf_skip_stdout.txt 2>&1

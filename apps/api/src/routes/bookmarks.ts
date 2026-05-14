@@ -4,6 +4,7 @@ import { z } from 'zod';
 import type { Database } from '@eduagent/database';
 import {
   createBookmarkSchema,
+  bookmarkListQuerySchema,
   bookmarkListResponseSchema,
   sessionBookmarkListResponseSchema,
 } from '@eduagent/schemas';
@@ -33,12 +34,6 @@ const bookmarkIdParamSchema = z.object({
   id: z.string().uuid(),
 });
 
-const bookmarkListQuerySchema = z.object({
-  cursor: z.string().uuid().optional(),
-  limit: z.coerce.number().int().min(1).max(50).optional(),
-  subjectId: z.string().uuid().optional(),
-});
-
 const sessionBookmarksQuerySchema = z.object({
   sessionId: z.string().uuid(),
 });
@@ -53,7 +48,7 @@ export const bookmarkRoutes = new Hono<BookmarkRouteEnv>()
     const bookmark = await createBookmark(
       c.get('db'),
       requireProfileId(c.get('profileId')),
-      c.req.valid('json').eventId
+      c.req.valid('json').eventId,
     );
 
     return c.json({ bookmark }, 201);
@@ -65,25 +60,25 @@ export const bookmarkRoutes = new Hono<BookmarkRouteEnv>()
       const bookmarks = await listSessionBookmarks(
         c.get('db'),
         requireProfileId(c.get('profileId')),
-        c.req.valid('query').sessionId
+        c.req.valid('query').sessionId,
       );
 
       return c.json(sessionBookmarkListResponseSchema.parse({ bookmarks }));
-    }
+    },
   )
   .get(
     '/bookmarks',
     zValidator('query', bookmarkListQuerySchema),
     async (c) => {
-      const { cursor, limit, subjectId } = c.req.valid('query');
+      const { cursor, limit, subjectId, topicId } = c.req.valid('query');
       const result = await listBookmarks(
         c.get('db'),
         requireProfileId(c.get('profileId')),
-        { cursor, limit, subjectId }
+        { cursor, limit, subjectId, topicId },
       );
 
       return c.json(bookmarkListResponseSchema.parse(result));
-    }
+    },
   )
   .delete(
     '/bookmarks/:id',
@@ -93,9 +88,9 @@ export const bookmarkRoutes = new Hono<BookmarkRouteEnv>()
       await deleteBookmark(
         c.get('db'),
         requireProfileId(c.get('profileId')),
-        c.req.valid('param').id
+        c.req.valid('param').id,
       );
 
       return c.body(null, 204);
-    }
+    },
   );

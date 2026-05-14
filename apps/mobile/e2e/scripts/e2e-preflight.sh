@@ -210,7 +210,26 @@ check_seed_secret_valid() {
   _preflight_ok "TEST_SEED_SECRET accepted by ${PREFLIGHT_API_URL}/v1/__test/seed (HTTP ${status})"
 }
 
-# ── Check 8: adb reverse ports configured ──────────────────────────────────
+# ── Check 8: Emulator console reachable (for slow-network flows) ───────────
+# Slow-network flows use the emulator console (`network delay`) to inject RTT
+# latency. Without this check a missing auth token causes them to run at full
+# speed, silently passing even when the timeout UI is broken (see spec §Preflight).
+# This is warn-only so preflight does not block normal flows that don't use the
+# slow-net env vars.
+check_emulator_console() {
+  if [ ! -f "$HOME/.emulator_console_auth_token" ]; then
+    _preflight_warn "Emulator console auth token missing (~/.emulator_console_auth_token) — slow-network flows will run at full speed."
+    return 0
+  fi
+  local port="${EMULATOR_CONSOLE_PORT:-5554}"
+  if ! timeout 2 bash -c "</dev/tcp/127.0.0.1/${port}" >/dev/null 2>&1; then
+    _preflight_warn "Emulator console port ${port} not listening — slow-network flows will run at full speed."
+    return 0
+  fi
+  _preflight_ok "Emulator console reachable on :${port}"
+}
+
+# ── Check 9: adb reverse ports configured ──────────────────────────────────
 # Idempotent — sets up 8081, 8082, 8787 if not already forwarded. Not a hard
 # failure check, but without it the emulator can't reach host services.
 check_adb_reverse_ports() {
@@ -231,6 +250,7 @@ run_preflight() {
   check_adb_device            || return 1
   check_uiautomator_healthy   || return 1
   check_apk_installed         || return 1
+  check_emulator_console                # warn-only, never blocks
   check_adb_reverse_ports     || return 1
   check_metro_reachable       || return 1
   check_bundle_proxy_fast     || return 1

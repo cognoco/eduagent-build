@@ -83,7 +83,7 @@ tags:
   # optional: true not supported on inputText — harmless if field not focused
 
 # Dismiss number pad so Verify button becomes visible
-- pressKey: Back
+- hideKeyboard
 
 - tapOn:
     id: "sign-up-verify-button"

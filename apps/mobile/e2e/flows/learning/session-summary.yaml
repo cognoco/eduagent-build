@@ -124,8 +124,9 @@ tags:
 - inputText: "I learned about the key concepts and how they apply in practice"
 
 # 18. Dismiss keyboard — BUG-35 class: keyboard covers submit button on Android.
-#     pressKey: back dismisses keyboard first on Android (only navigates if already dismissed).
-- pressKey: back
+#     hideKeyboard targets only the keyboard (no-op if closed), so it cannot
+#     fall through to Android Back like the prior pressKey: back did.
+- hideKeyboard
 
 # 19. Scroll to and tap submit summary button (may be below fold after keyboard dismiss)
 - scrollUntilVisible:

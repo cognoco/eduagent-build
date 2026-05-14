@@ -1,0 +1,108 @@
+# Flow LEARN-26: First Curriculum Polling Timeout (slow-network) — DRAFT
+#
+# Status: DRAFT — blocked on two missing prerequisites:
+#
+#   1. Seed scenario `first-curriculum-seeded` does not exist. Available
+#      scenarios are defined in apps/api/src/services/test-seed.ts (SeedScenario
+#      union). This flow falls back to `onboarding-complete` which places the
+#      user at a state where curriculum generation has not started. The flow
+#      cannot deterministically trigger the polling backoff UI without a seed
+#      that pre-creates a pending first-curriculum job.
+#      BLOCKED ON: new seed scenario `first-curriculum-seeded` (or equivalent).
+#
+#   2. testID for the polling backoff / curriculum-polling banner does not exist
+#      in the current codebase. Grep of apps/mobile/src/ found no match for:
+#      curriculum-polling-banner, curriculum-polling, polling-banner,
+#      useInterviewProgress timeout UI. The banner testID must be added before
+#      this flow can assert it.
+#      BLOCKED ON: testID `curriculum-polling-banner` (or equivalent) added to
+#      the relevant component (likely near useInterviewProgress / curriculum hook).
+#
+# Once both prerequisites ship:
+#   1. Replace `onboarding-complete` below with `first-curriculum-seeded`.
+#   2. Replace `<PLACEHOLDER_TESTID>` with the real testID.
+#   3. Remove the DRAFT status from this header.
+#
+# Mechanism: NETWORK_DELAY_MS=12000 injects 12s RTT so the first-curriculum
+# polling requests time out before they resolve, triggering the backoff banner.
+#
+# Run command (once unblocked):
+#   NETWORK_DELAY_MS=12000 ./e2e/scripts/seed-and-run.sh first-curriculum-seeded e2e/flows/learning/first-curriculum-polling-timeout.yaml
+#
+# Interim run command (falls back to onboarding-complete; flow WILL FAIL at
+# the assertVisible step because the banner won't appear without the seed):
+#   NETWORK_DELAY_MS=12000 ./e2e/scripts/seed-and-run.sh onboarding-complete e2e/flows/learning/first-curriculum-polling-timeout.yaml
+#
+# Tags: weekly, learning, slow-net
+appId: com.mentomate.app
+tags:
+  - weekly
+  - learning
+  - slow-net
+---
+# ── Step 1: Sign in with seeded credentials ──
+- extendedWaitUntil:
+    visible:
+      id: "sign-in-button"
+    timeout: 120000
+
+- tapOn:
+    id: "sign-in-button"
+
+- extendedWaitUntil:
+    visible:
+      id: "email-input"
+    timeout: 10000
+
+- inputText:
+    text: ${EMAIL}
+    id: "email-input"
+
+- tapOn:
+    id: "continue-button"
+
+- extendedWaitUntil:
+    visible:
+      id: "password-input"
+    timeout: 10000
+
+- inputText:
+    text: ${PASSWORD}
+    id: "password-input"
+
+- tapOn:
+    id: "sign-in-submit-button"
+
+- takeScreenshot: curriculum-polling-01-after-sign-in
+
+# ── Step 2: Wait for home screen and navigate to first-curriculum creation ──
+# This step assumes the seed has placed the user in a state where the
+# first-curriculum job is pending. Without that seed, nothing here will trigger
+# the polling banner.
+- extendedWaitUntil:
+    anyOf:
+      - visible:
+          id: "home-screen"
+      - visible:
+          id: "home-loading-timeout"
+    timeout: 25000
+
+- takeScreenshot: curriculum-polling-02-on-home
+
+# ── Step 3: Wait for curriculum polling backoff banner ──
+# BLOCKED: testID `curriculum-polling-banner` does not yet exist in the codebase.
+# Replace <PLACEHOLDER_TESTID> once the testID is added to the relevant component.
+# See DRAFT notice at the top of this file.
+- extendedWaitUntil:
+    visible:
+      id: "<PLACEHOLDER_TESTID>"
+    timeout: 30000
+
+- takeScreenshot: curriculum-polling-03-banner-visible
+
+- assertVisible:
+    id: "<PLACEHOLDER_TESTID>"
+
+# ── Step 4: Tap retry / wait for recovery ──
+# TODO: add retry tap once the testID and retry interaction are defined.
+- takeScreenshot: curriculum-polling-04-done

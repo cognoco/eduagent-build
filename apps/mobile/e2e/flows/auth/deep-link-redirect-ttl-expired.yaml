@@ -1,0 +1,102 @@
+# Flow AUTH-13c: Deep-link Auth Redirect — TTL expired fallback
+#
+# Validates: when a pending-redirect record has expired (savedAt > 5 min ago),
+# post-sign-in navigation falls back to home-screen, NOT to the original
+# deep-link target (library-screen).
+#
+# Mechanism:
+#   The dev-only seed route (mentomate:///dev-only/seed-pending-redirect) writes
+#   a pendingAuthRedirect record whose savedAt is artificially backdated by
+#   staleMs=360000 ms (6 min), exceeding the 5-min TTL. After the seed route
+#   auto-redirects back to sign-in, the user signs in normally. The
+#   (auth)/_layout.tsx calls peekPendingAuthRedirect(), which finds the record
+#   stale and returns null, so the fallback /(app)/home is used.
+#
+# Pre-req:
+#   The APK MUST be built with EXPO_PUBLIC_E2E=true. Without it the seed route
+#   renders null and the seedPendingAuthRedirectForTesting call is never made.
+#   The flow will fail at the pending-redirect-seeded step if the flag is absent.
+#
+# testIDs verified against source:
+#   sign-in-screen          apps/mobile/src/app/(auth)/sign-in.tsx line 1090
+#   pending-redirect-seeded apps/mobile/src/app/dev-only/seed-pending-redirect.tsx
+#   home-screen             apps/mobile/src/app/(app)/home.tsx (root View)
+#   library-screen          apps/mobile/src/app/(app)/library.tsx (root View)
+#
+# Run command:
+#   ./e2e/scripts/seed-and-run.sh --no-seed e2e/flows/auth/deep-link-redirect-ttl-expired.yaml
+#
+# Tags: nightly, auth
+appId: com.mentomate.app
+tags:
+  - nightly
+  - auth
+---
+# ── Step 1: Confirm we are on the sign-in screen ──
+# seed-and-run.sh --no-seed brings the app to the sign-in screen.
+- extendedWaitUntil:
+    visible:
+      id: "sign-in-screen"
+    timeout: 120000
+
+- takeScreenshot: deep-link-ttl-01-sign-in-screen
+
+# ── Step 2: Fire the dev-only seed route ──
+# staleMs=360000 (6 min) > PENDING_AUTH_REDIRECT_TTL_MS (5 min = 300000).
+# The seed route writes a backdated record for /(app)/library then
+# router.replace to sign-in.
+- openLink: "mentomate:///dev-only/seed-pending-redirect?path=%2F(app)%2Flibrary&staleMs=360000"
+
+# ── Step 3: Confirm the seed ran ──
+# The seed screen briefly renders with testID pending-redirect-seeded before
+# auto-redirecting back to sign-in.
+- extendedWaitUntil:
+    visible:
+      id: "pending-redirect-seeded"
+    timeout: 8000
+
+- takeScreenshot: deep-link-ttl-02-seed-screen-visible
+
+# ── Step 4: Wait for sign-in screen (seed route auto-redirects) ──
+- extendedWaitUntil:
+    visible:
+      id: "sign-in-screen"
+    timeout: 10000
+
+- takeScreenshot: deep-link-ttl-03-back-on-sign-in
+
+# ── Step 5: Sign in with seeded credentials ──
+- tapOn:
+    id: "sign-in-email"
+- inputText: ${EMAIL}
+
+- pressKey: back
+
+- tapOn:
+    id: "sign-in-password"
+- inputText: ${PASSWORD}
+
+- pressKey: back
+
+- extendedWaitUntil:
+    visible:
+      id: "sign-in-button"
+    timeout: 10000
+
+- tapOn:
+    id: "sign-in-button"
+
+- takeScreenshot: deep-link-ttl-04-after-sign-in-tap
+
+# ── Step 6: Assert TTL fallback — home, NOT library ──
+# peekPendingAuthRedirect returns null (record is stale), so (auth)/_layout.tsx
+# falls back to /(app)/home.
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 15000
+
+- assertNotVisible:
+    id: "library-screen"
+
+- takeScreenshot: deep-link-ttl-05-landed-on-home-not-library

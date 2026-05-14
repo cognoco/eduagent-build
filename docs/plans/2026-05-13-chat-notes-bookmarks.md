@@ -54,16 +54,19 @@ Add bookmark results to Library search if it does not fit cleanly in PR 1:
 - `apps/mobile/src/hooks/use-bookmarks.ts` — add optional `topicId` query support if API filtering is chosen.
 - `apps/mobile/src/app/(app)/topic/[topicId].tsx` — render `Saved from chat` bookmarks section near notes.
 - `apps/mobile/src/app/(app)/topic/[topicId].test.tsx` — cover bookmark section present/absent.
-- `apps/mobile/src/i18n/locales/en.json` and generated locale files — add i18n keys (mandatory, not optional — all user-visible strings in this area use `t()`): `session.accessories.addNote`, `session.notePrompt.chatPlaceholder` (`Summarize this in your own words...`), `library.topic.savedFromChat`.
+- `apps/mobile/src/i18n/locales/en.json` and generated locale files — add ONLY the strings whose host component already uses `t()`:
+  - `session.accessories.addNote` (chip label) — `SessionAccessories.tsx` already uses `t('session.accessories.switchTopic')` / `parkIt`, so the new chip MUST localize.
+  - `library.topic.savedFromChat` — Topic page strings are localized; add this key.
+  - **Do NOT add `session.notePrompt.chatPlaceholder`.** `NoteInput.tsx` is currently un-i18n'd: `placeholder="Write your note..."`, `"Cancel"`, `"Save note"`, `"Note text"`, `"Listening..."`, `"Start recording"` / `"Stop recording"` are all hardcoded English (`NoteInput.tsx:66,84,94,113,120`). The new chat placeholder must therefore also be hardcoded in `SessionFooter.tsx` (pass the literal `"Summarize this in your own words..."` as the `placeholder` prop) so the composer is internally consistent. A NoteInput full-localization pass is out of scope for this plan; if added later, do every string in one pass.
 
 ### PR 1 API Files (Required — client-side filtering is not viable)
 
 > `useBookmarks` is a `useInfiniteQuery`. A client-side `topicId` filter only sees page 1 of results; users with many bookmarks silently miss topic-scoped items. Server-side filtering is mandatory, not optional.
 
 - `packages/schemas/src/bookmarks.ts` — add optional `topicId` to bookmark list query schema.
-- `apps/api/src/routes/bookmarks.ts` — accept optional `topicId` on `GET /bookmarks`.
-- `apps/api/src/services/bookmarks.ts` — filter bookmarks by `topicId` with profile scoping.
-- `apps/api/src/routes/bookmarks.test.ts` / `apps/api/src/services/bookmarks.test.ts` — cover topic filter and profile isolation.
+- `apps/api/src/routes/bookmarks.ts` — accept optional `topicId` on `GET /bookmarks` (add to `bookmarkListQuerySchema` at `apps/api/src/routes/bookmarks.ts:36-40`; declare independent of `subjectId` — `topicId` alone is sufficient and matches the existing `bookmarks.topicId` column).
+- `apps/api/src/services/bookmarks.ts` — filter bookmarks by `topicId`. The existing query already filters `eq(bookmarks.profileId, profileId)` (`apps/api/src/services/bookmarks.ts:149`), so adding `eq(bookmarks.topicId, options.topicId)` is safe: a request supplying another profile's `topicId` returns zero rows because the profile predicate still applies.
+- `apps/api/src/routes/bookmarks.test.ts` / `apps/api/src/services/bookmarks.test.ts` — cover topic filter AND a **profile-isolation break test** (per CLAUDE.md "Security fixes require a break test"): seed profile A's bookmark with topicId X, profile B's bookmark with topicId X, query as B with `?topicId=X`, assert profile A's row is absent. Without this test the new query parameter is an unverified attack surface.
 
 ### PR 2 Modified
 
@@ -100,7 +103,7 @@ Add bookmark results to Library search if it does not fit cleanly in PR 1:
 
 - [ ] Extend `SessionToolAccessoryProps` with `onAddNote?: () => void`.
 - [ ] Render `Add note` (label via `t('session.accessories.addNote')`, add key to `en.json`) before secondary chips only when `stage === 'teaching'` and `onAddNote` is provided.
-- [ ] Style `Add note` as primary within the strip: icon `document-text-outline`, semantic primary/accent classes, and `min-h-[44px]`.
+- [ ] Style `Add note` as primary within the strip: icon `document-text-outline`, `min-h-[44px]`, and a primary visual distinction relative to the existing chips. Existing chips use `rounded-full bg-surface-elevated px-3 py-1` with `text-text-secondary` (`SessionAccessories.tsx:47-57`). Make `Add note` `rounded-full bg-primary px-3 py-2 min-h-[44px]` with `text-text-inverse font-semibold`. Disabled state: `bg-surface` + `text-text-secondary`, matching how the other chips degrade when `isStreaming`.
 - [ ] Keep `Switch topic` and `Park it` as existing utility chips.
 - [ ] Disable `Add note` while `isStreaming`.
 - [ ] Wire `onAddNote={() => setShowNoteInput(true)}` from `session/index.tsx`.
@@ -119,9 +122,8 @@ Add bookmark results to Library search if it does not fit cleanly in PR 1:
 - `apps/mobile/src/components/session/SessionFooter.test.tsx`
 - locale files if copy is localized in this area
 
-- [ ] Add optional `placeholder?: string` prop to `NoteInput`.
-- [ ] Keep default placeholder as `Write your note...`.
-- [ ] Pass `t('session.notePrompt.chatPlaceholder')` when `NoteInput` is rendered from `SessionFooter` (add key to `en.json`: `"chatPlaceholder": "Summarize this in your own words..."`).
+- [ ] Add optional `placeholder?: string` prop to `NoteInput` (default stays `"Write your note..."`, hardcoded — see i18n note above).
+- [ ] In `SessionFooter.tsx`, pass `placeholder="Summarize this in your own words..."` as a literal string when rendering `NoteInput` from chat. Do NOT route this through `t()` until the whole `NoteInput` component is localized in a separate pass.
 - [ ] Preserve mic, save, cancel, max length, saving state, and empty validation.
 - [ ] Test: default placeholder still renders for normal note input.
 - [ ] Test: custom placeholder renders from session footer.
@@ -147,10 +149,10 @@ Add bookmark results to Library search if it does not fit cleanly in PR 1:
 - `apps/mobile/src/components/session/SessionMessageActions.tsx`
 - `apps/mobile/src/components/session/SessionMessageActions.test.tsx`
 
-- [ ] Increase bookmark icon size from 20px to 22px.
-- [ ] Ensure pressable has at least `min-h-[36px] min-w-[36px]`.
-- [ ] Preserve accessibility labels: `Bookmark this response` and `Remove bookmark`.
-- [ ] Preserve optimistic toggle behavior in `session/index.tsx`.
+- [ ] Increase bookmark icon size from 20px to 22px (`SessionMessageActions.tsx:253`).
+- [ ] Bump pressable from `ms-auto p-2` (≈36px effective hit area) to `ms-auto p-2.5 min-h-[44px] min-w-[44px] items-center justify-center` so the hit target meets the same 44px standard used by the new `Add note` chip and the platform HIG. 36px is below the project's own primary-touch-target standard and looks deliberately small next to a primary chip in the same screen.
+- [ ] Preserve accessibility labels: `Bookmark this response` and `Remove bookmark` (already hardcoded English — out of scope to localize here).
+- [ ] Optimistic toggle behavior lives in `session/index.tsx` (which is NOT listed in this task's Files). This bullet is a non-modification assertion: don't touch the toggle wiring while editing `SessionMessageActions.tsx`.
 - [ ] Test: bookmark toggle still renders for assistant messages with `eventId`.
 - [ ] Test: bookmark toggle remains absent without `eventId`.
 
@@ -161,10 +163,10 @@ Add bookmark results to Library search if it does not fit cleanly in PR 1:
 - `apps/mobile/src/components/library/BookmarkCard.tsx`
 - `apps/mobile/src/components/library/BookmarkCard.test.tsx`
 
-- [ ] Create a compact semantic-token card/row for saved chat bookmarks. Structure it to visually parallel `InlineNoteCard` (same `sourceLine`/`content`/icon/press shape) so notes and bookmarks look like related saved-item types on the topic page — not two unrelated components. Do not reuse `InlineNoteCard` directly; bookmarks have no expand/collapse and use a bookmark icon rather than a note icon.
-- [ ] Props should include `bookmarkId`, `content`, `createdAt`, optional `sourceLine` (pre-formatted display string, e.g. subject/topic/date), optional `onPress`, and `testID`.
-- [ ] Render bookmark icon, truncated content excerpt, and source/date line.
-- [ ] Use semantic classes/tokens; no hardcoded hex.
+- [ ] Create a compact card/row for saved chat bookmarks that visually parallels `InlineNoteCard` so notes and bookmarks look like related saved-item types on the topic page. Do not reuse `InlineNoteCard` directly: bookmarks have no expand/collapse and use a bookmark icon rather than a note icon.
+- [ ] Props: `bookmarkId`, `content`, `createdAt`, `subjectName?`, `topicTitle?`, optional `onPress`, `testID`. The bookmark list API already returns `subjectName` and `topicTitle` (`packages/schemas/src/bookmarks.ts:9-10`), so the card should accept those raw fields and format the source line internally — do NOT push pre-formatted strings through the prop boundary. Mirror the pattern in `apps/mobile/src/lib/format-note-source.ts` (`From session · {Month Day}` for session-linked, etc.) and either reuse that helper if its `NoteResponse` input shape can be relaxed, or add a sibling `formatBookmarkSourceLine` that takes `{ createdAt, topicTitle, subjectName }`.
+- [ ] Render bookmark icon, truncated content excerpt (2-3 lines max via `numberOfLines`), and the formatted source line.
+- [ ] No hardcoded hex. `InlineNoteCard.tsx:34-56` uses inline `style={{ backgroundColor: withOpacity(themeColors.accent, 0.08) }}` rather than NativeWind classes — that pattern is ALSO acceptable here (the rule is "no hardcoded hex", not "NativeWind-only"). Use `withOpacity(themeColors.<token>, n)` if mirroring the InlineNoteCard look; use semantic classes for everything else. Pick a different token from `accent` so notes and bookmarks are visually distinct sibling shapes — e.g. `themeColors.primary` for bookmarks, since the bookmark icon in chat is already `text-primary`.
 - [ ] Test: renders content excerpt and source line.
 - [ ] Test: calls `onPress` when pressed.
 
@@ -177,10 +179,11 @@ Add bookmark results to Library search if it does not fit cleanly in PR 1:
 - `apps/mobile/src/app/(app)/topic/[topicId].test.tsx`
 
 - [ ] Use server-side `topicId` filter: extend `useBookmarks` to accept `topicId` and pass it to the API route (see required API files above). Client-side filtering is not acceptable — `useBookmarks` is paginated and only page 1 would be visible, silently missing bookmarks on subsequent pages.
-- [ ] Query bookmarks once `subjectId` and `topicId` are known.
+- [ ] Extend the query key from `['bookmarks', activeProfile?.id, options?.subjectId]` (`apps/mobile/src/hooks/use-bookmarks.ts:30`) to `['bookmarks', activeProfile?.id, options?.subjectId, options?.topicId]`. **Order matters:** `useCreateBookmark` / `useDeleteBookmark` invalidate by prefix `['bookmarks', activeProfile?.id]` (lines 100-105, 122-128); keeping `profileId` second and appending `topicId` at the tail preserves prefix-match invalidation. Do NOT reorder.
+- [ ] Query is enabled once `topicId` is known. `subjectId` is NOT required for the filter — `bookmarks.topicId` is globally unique to the topic, so passing only `topicId` is sufficient. The hook should call with `{ topicId }` (omit `subjectId`) on the topic page.
 - [ ] Render `Saved from chat` section near existing notes using `t('library.topic.savedFromChat')` (add key to `en.json`).
 - [ ] Hide section entirely when no topic-scoped bookmarks exist.
-- [ ] Route bookmark press to `/session-summary/[sessionId]` or existing transcript/summary behavior.
+- [ ] Route bookmark press to `/session-summary/[sessionId]` using the same `router.push({ pathname: '/session-summary/[sessionId]', params: { sessionId, subjectId } })` shape already used at `apps/mobile/src/app/(app)/topic/[topicId].tsx:319-324`. `session-summary` is a root-level route (not nested under `(app)`), so no ancestor-chain push is required — same precedent as the existing topic→summary path.
 - [ ] Test: topic page shows saved bookmark content when bookmark belongs to topic.
 - [ ] Test: topic page hides bookmark section when no bookmarks match.
 - [ ] Test: bookmark with `topicId = null` does not render under topic.
@@ -282,7 +285,7 @@ cd apps/mobile && pnpm exec jest --findRelatedTests \
 | Note save fails | Existing save-failed alert with formatted API error. |
 | Note composer open during streaming | Composer remains open; only the `Add note` trigger is disabled while streaming. |
 | User closes session with unsaved note | Existing session close flow wins; unsaved note is discarded in Phase 1. |
-| Bookmark save/delete fails | Optimistic bookmark state rolls back and alert appears. |
+| Bookmark save/delete fails | Optimistic bookmark state rolls back and alert appears. (Existing behavior in `session/index.tsx` — preserve it; do not edit while changing the icon.) |
 | Bookmark has no topic | Not shown under topic page; still eligible for profile-wide search once PR 2 ships. |
 | Library search fails | Existing search error and retry behavior remain. |
 
@@ -309,3 +312,23 @@ cd apps/mobile && pnpm exec jest --findRelatedTests \
 - Highlight Library browsing.
 - Save-before-ending confirmation for unsaved note text.
 - A unified saved-item database table.
+- **Localizing `NoteInput` end-to-end.** The composer is currently un-i18n'd; a full localization pass should be its own change so every string moves in one go rather than partially via this PR.
+
+---
+
+## Adversarial Review Notes (2026-05-14)
+
+Findings applied above:
+
+- **H1 (i18n claim was wrong):** plan originally said "all user-visible strings in this area use `t()`" but `NoteInput.tsx:66,84,94,113,120` is fully hardcoded English. Reworked the i18n bullet so only strings whose host already uses `t()` (`SessionAccessories`, topic page) get keys; chat placeholder is hardcoded for consistency with the rest of `NoteInput`.
+- **H2 (BookmarkCard prop shape):** dropped pre-formatted `sourceLine` prop in favor of raw `subjectName`/`topicTitle`/`createdAt` — the API already returns those parts (`packages/schemas/src/bookmarks.ts:9-10`), so formatting belongs inside the card. Pre-formatting at the call site duplicates `formatSourceLine` logic.
+- **H3 (missing break test for new query parameter):** the `topicId` filter is new attack surface. Added explicit profile-isolation break test (seed cross-profile rows with the same topicId, assert one profile can't see the other's bookmark via the new filter).
+- **M1 (primary chip visual unspecified):** spelled out the NativeWind classes vs. existing chip baseline.
+- **M2 (styling contradiction):** plan said "semantic classes/tokens; no hardcoded hex" but `InlineNoteCard` uses inline `withOpacity(themeColors.accent, n)` styles. Clarified that `withOpacity(themeColors.<token>, n)` is acceptable since it satisfies "no hardcoded hex" while letting BookmarkCard visually parallel its sibling.
+- **M3 (over-gated query):** `topicId` is globally unique on `bookmarks`, so the query doesn't need to wait on `subjectId`. Removed the `subjectId` precondition; specified queryKey ordering so existing prefix-match invalidation in `useCreateBookmark` / `useDeleteBookmark` still fires.
+- **L1 (Files list mismatch on Task 4):** the optimistic-toggle bullet referenced `session/index.tsx` which is not listed under Task 4. Reframed it as an explicit "do not touch" assertion.
+
+Findings deliberately NOT applied:
+
+- **Note cap (50 per topic):** spec-side failure mode is real — `apps/api/src/services/notes.ts:13,87-89` enforces `MAX_NOTES_PER_TOPIC = 50` and throws a conflict. No plan change needed; the existing save-failed alert path covers it.
+- **Cross-stack push:** topic-page → session-summary already works (`apps/mobile/src/app/(app)/topic/[topicId].tsx:319-324`); `session-summary` is a root-level route, so no `unstable_settings` / ancestor-chain hazard applies here.

@@ -18,6 +18,14 @@ export const createBookmarkSchema = z.object({
 });
 export type CreateBookmarkInput = z.infer<typeof createBookmarkSchema>;
 
+export const bookmarkListQuerySchema = z.object({
+  cursor: z.string().uuid().optional(),
+  limit: z.coerce.number().int().min(1).max(50).optional(),
+  subjectId: z.string().uuid().optional(),
+  topicId: z.string().uuid().optional(),
+});
+export type BookmarkListQuery = z.infer<typeof bookmarkListQuerySchema>;
+
 export const bookmarkListResponseSchema = z.object({
   bookmarks: z.array(bookmarkSchema),
   nextCursor: z.string().uuid().nullable(),
