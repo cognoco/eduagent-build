@@ -1,0 +1,367 @@
+Starting at 2026-05-14T13:36:41+02:00
+Mode: CI-equivalent (PLAYWRIGHT_SKIP_LOCAL_API=1, CI=1 → 1 worker, retries=1)
+START_EPOCH=1778758601
+ WARN  Unsupported engine: wanted: {"node":"22.x"} (current: {"node":"v24.15.0","pnpm":"10.19.0"})
+
+> @eduagent/source@0.0.0 test:e2e:web /Users/vetinari/_dev/eduagent-build
+> pnpm exec playwright test -c apps/mobile/playwright.config.ts --reporter=list,json
+
+ WARN  Unsupported engine: wanted: {"node":"22.x"} (current: {"node":"v24.15.0","pnpm":"10.19.0"})
+[WebServer] ../..                                    | [43m[30m WARN [39m[49m Unsupported engine: wanted: {"node":"22.x"} (current: {"node":"v24.15.0","pnpm":"10.19.0"})
+[WebServer] [2mStarting Metro Bundler[22m
+[WebServer] [33mwarning[39m: Bundler cache is empty, rebuilding [2m(this may take a minute)[22m
+[WebServer] [1mWeb[22m [0m[2mapps/mobile/[22m[0m[1mindex.js[22m [47m[37m░░░░░░░░░░░░░░░░[39m[49m[1m  0.0% [22m[2m(0/1)[22m
+[WebServer] [33m|[39m [baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+[WebServer] [1mWeb[22m [0m[2mapps/mobile/[22m[0m[1mindex.js[22m [47m[37m░░░░░░░░░░░░░░░░[39m[49m[1m  0.0% [22m[2m(0/1)[22m
+[WebServer] [33m|[39m [baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+[WebServer] [33m|[39m [baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+[WebServer] [33m|[39m [baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+[WebServer] [33m|[39m [baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+[WebServer] [33m|[39m [baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+[WebServer] [33m|[39m [baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+[WebServer] [1mWeb[22m [0m[2mapps/mobile/[22m[0m[1mindex.js[22m [32m[42m▓▓▓▓▓▓▓[49m[39m[47m[37m░░░░░░░░░[39m[49m[1m 49.0% [22m[2m( 53/276)[22m
+[WebServer] [1mWeb[22m [0m[2mapps/mobile/[22m[0m[1mindex.js[22m [32m[42m▓▓▓▓▓▓▓[49m[39m[47m[37m░░░░░░░░░[39m[49m[1m 49.0% [22m[2m(165/474)[22m
+[WebServer] [33m|[39m Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+[WebServer] [33m|[39m   npx update-browserslist-db@latest
+[WebServer] [33m|[39m   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+[WebServer] [1mWeb[22m [0m[2mapps/mobile/[22m[0m[1mindex.js[22m [32m[42m▓▓▓▓▓▓▓[49m[39m[47m[37m░░░░░░░░░[39m[49m[1m 49.0% [22m[2m(439/884)[22m
+[WebServer] [1mWeb[22m [0m[2mapps/mobile/[22m[0m[1mindex.js[22m [32m[42m▓▓▓▓▓▓▓[49m[39m[47m[37m░░░░░░░░░[39m[49m[1m 49.0% [22m[2m( 716/1356)[22m
+[WebServer] [1mWeb[22m [0m[2mapps/mobile/[22m[0m[1mindex.js[22m [32m[42m▓▓▓▓▓▓▓[49m[39m[47m[37m░░░░░░░░░[39m[49m[1m 49.0% [22m[2m( 975/1627)[22m
+[WebServer] [1mWeb[22m [0m[2mapps/mobile/[22m[0m[1mindex.js[22m [32m[42m▓▓▓▓▓▓▓[49m[39m[47m[37m░░░░░░░░░[39m[49m[1m 49.0% [22m[2m(1189/1702)[22m
+[WebServer] [1mWeb[22m [0m[2mapps/mobile/[22m[0m[1mindex.js[22m [32m[42m▓▓▓▓▓▓▓▓▓[49m[39m[47m[37m░░░░░░░[39m[49m[1m 62.3% [22m[2m(1402/1776)[22m
+[WebServer] [1mWeb[22m [0m[2mapps/mobile/[22m[0m[1mindex.js[22m [32m[42m▓▓▓▓▓▓▓▓▓▓[49m[39m[47m[37m░░░░░░[39m[49m[1m 67.3% [22m[2m(1598/1950)[22m
+[WebServer] [1mWeb[22m [0m[2mapps/mobile/[22m[0m[1mindex.js[22m [32m[42m▓▓▓▓▓▓▓▓▓▓▓▓[49m[39m[47m[37m░░░░[39m[49m[1m 76.5% [22m[2m(1903/2177)[22m
+[WebServer] [1mWeb[22m [0m[2mapps/mobile/[22m[0m[1mindex.js[22m [32m[42m▓▓▓▓▓▓▓▓▓▓▓▓▓[49m[39m[47m[37m░░░[39m[49m[1m 85.2% [22m[2m(2198/2418)[22m
+[WebServer] [32m[1mWeb[22m Bundled [39m[2m45633ms[22m[0m[2m apps/mobile/index.js (2690 modules)[22m[0m
+[WebServer] 
+[WebServer] [1m› Assets (41):[22m
+[WebServer] ../../node_modules/.pnpm/@expo-google-fonts+atkinson-hyperlegible@0.4.1/node_modules/@expo-google-fonts/atkinson-hyperlegible/400Regular_Italic/AtkinsonHyperlegible_400Regular_Italic.2badbc897377af4c75f1536a29e24231.ttf [90m(54.2 kB)[39m
+[WebServer] ../../node_modules/.pnpm/@expo-google-fonts+atkinson-hyperlegible@0.4.1/node_modules/@expo-google-fonts/atkinson-hyperlegible/400Regular/AtkinsonHyperlegible_400Regular.59f0f5543754fa6b68a563036eafaaab.ttf [90m(53.5 kB)[39m
+[WebServer] ../../node_modules/.pnpm/@expo-google-fonts+atkinson-hyperlegible@0.4.1/node_modules/@expo-google-fonts/atkinson-hyperlegible/700Bold_Italic/AtkinsonHyperlegible_700Bold_Italic.1d9aff33518db56f83412a331c653888.ttf [90m(54.6 kB)[39m
+[WebServer] ../../node_modules/.pnpm/@expo-google-fonts+atkinson-hyperlegible@0.4.1/node_modules/@expo-google-fonts/atkinson-hyperlegible/700Bold/AtkinsonHyperlegible_700Bold.f2193e9c742b9554852a3000f0ccdc9c.ttf [90m(54.4 kB)[39m
+[WebServer] ../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/AntDesign.3f78af31cca60105799838a1a7a59fbd.ttf [90m(130 kB)[39m
+[WebServer] ../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Entypo.31b5ffea3daddc69dd01a1f3d6cf63c5.ttf [90m(66.2 kB)[39m
+[WebServer] ../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/EvilIcons.140c53a7643ea949007aa9a282153849.ttf [90m(13.5 kB)[39m
+[WebServer] ../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Feather.ca4b48e04dc1ce10bfbddb262c8b835f.ttf [90m(55.6 kB)[39m
+[WebServer] ../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome.b06871f281fee6b241d60582ae9369b9.ttf [90m(166 kB)[39m
+[WebServer] ../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome5_Brands.3b89dd103490708d19a95adcae52210e.ttf [90m(134 kB)[39m
+[WebServer] ../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome5_Regular.1f77739ca9ff2188b539c36f30ffa2be.ttf [90m(33.7 kB)[39m
+[WebServer] ../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome5_Solid.605ed7926cf39a2ad5ec2d1f9d391d3d.ttf [90m(203 kB)[39m
+[WebServer] ../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome6_Brands.56c8d80832e37783f12c05db7c8849e2.ttf [90m(209 kB)[39m
+[WebServer] ../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome6_Regular.370dd5af19f8364907b6e2c41f45dbbf.ttf [90m(68 kB)[39m
+[WebServer] ../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome6_Solid.adec7d6f310bc577f05e8fe06a5daccf.ttf [90m(424 kB)[39m
+[WebServer] ../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Fontisto.b49ae8ab2dbccb02c4d11caaacf09eab.ttf [90m(314 kB)[39m
+[WebServer] ../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Foundation.e20945d7c929279ef7a6f1db184a4470.ttf [90m(57 kB)[39m
+[WebServer] ../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.b4eb097d35f44ed943676fd56f6bdc51.ttf [90m(390 kB)[39m
+[WebServer] ../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/MaterialCommunityIcons.6e435534bd35da5fef04168860a9b8fa.ttf [90m(1.31 MB)[39m
+[WebServer] ../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/MaterialIcons.4e85bc9ebe07e0340c9c4fc2f6c38908.ttf [90m(357 kB)[39m
+[WebServer] ../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Octicons.871378c6eab492a3e689a9385dc45a12.ttf [90m(69.4 kB)[39m
+[WebServer] ../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/SimpleLineIcons.d2285965fe34b05465047401b8595dd0.ttf [90m(54.1 kB)[39m
+[WebServer] ../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Zocial.1681f34aaca71b8dfb70756bca331eb2.ttf [90m(25.8 kB)[39m
+[WebServer] ../../node_modules/.pnpm/@react-navigation+elements@2.9.5_@react-navigation+native@7.1.28_react-native@0.81.5_@b_55bc4e64cea369cde4c1d750354d716f/node_modules/@react-navigation/elements/lib/module/assets/back-icon-mask.0a328cd9c1afd0afe8e3b1ec5165b1b4.png [90m(653 B)[39m
+[WebServer] ../../node_modules/.pnpm/@react-navigation+elements@2.9.5_@react-navigation+native@7.1.28_react-native@0.81.5_@b_55bc4e64cea369cde4c1d750354d716f/node_modules/@react-navigation/elements/lib/module/assets/back-icon.35ba0eaec5a4f5ed12ca16fabeae451d.png [90m(207 B)[39m
+[WebServer] ../../node_modules/.pnpm/@react-navigation+elements@2.9.5_@react-navigation+native@7.1.28_react-native@0.81.5_@b_55bc4e64cea369cde4c1d750354d716f/node_modules/@react-navigation/elements/lib/module/assets/clear-icon.c94f6478e7ae0cdd9f15de1fcb9e5e55.png [90m(4 variations | 425 B)[39m
+[WebServer] ../../node_modules/.pnpm/@react-navigation+elements@2.9.5_@react-navigation+native@7.1.28_react-native@0.81.5_@b_55bc4e64cea369cde4c1d750354d716f/node_modules/@react-navigation/elements/lib/module/assets/close-icon.808e1b1b9b53114ec2838071a7e6daa7.png [90m(4 variations | 235 B)[39m
+[WebServer] ../../node_modules/.pnpm/@react-navigation+elements@2.9.5_@react-navigation+native@7.1.28_react-native@0.81.5_@b_55bc4e64cea369cde4c1d750354d716f/node_modules/@react-navigation/elements/lib/module/assets/search-icon.286d67d3f74808a60a78d3ebf1a5fb57.png [90m(928 B)[39m
+[WebServer] ../../node_modules/.pnpm/expo-router@6.0.23_5a0d0b482ec9810f7dfe3d4e8900091f/node_modules/expo-router/assets/arrow_down.017bc6ba3fc25503e5eb5e53826d48a8.png [90m(9.46 kB)[39m
+[WebServer] ../../node_modules/.pnpm/expo-router@6.0.23_5a0d0b482ec9810f7dfe3d4e8900091f/node_modules/expo-router/assets/error.d1ea1496f9057eb392d5bbf3732a61b7.png [90m(469 B)[39m
+[WebServer] ../../node_modules/.pnpm/expo-router@6.0.23_5a0d0b482ec9810f7dfe3d4e8900091f/node_modules/expo-router/assets/file.19eeb73b9593a38f8e9f418337fc7d10.png [90m(138 B)[39m
+[WebServer] ../../node_modules/.pnpm/expo-router@6.0.23_5a0d0b482ec9810f7dfe3d4e8900091f/node_modules/expo-router/assets/forward.d8b800c443b8972542883e0b9de2bdc6.png [90m(188 B)[39m
+[WebServer] ../../node_modules/.pnpm/expo-router@6.0.23_5a0d0b482ec9810f7dfe3d4e8900091f/node_modules/expo-router/assets/pkg.ab19f4cbc543357183a20571f68380a3.png [90m(364 B)[39m
+[WebServer] ../../node_modules/.pnpm/expo-router@6.0.23_5a0d0b482ec9810f7dfe3d4e8900091f/node_modules/expo-router/assets/sitemap.412dd9275b6b48ad28f5e3d81bb1f626.png [90m(465 B)[39m
+[WebServer] ../../node_modules/.pnpm/expo-router@6.0.23_5a0d0b482ec9810f7dfe3d4e8900091f/node_modules/expo-router/assets/unmatched.20e71bdf79e3a97bf55fd9e164041578.png [90m(4.75 kB)[39m
+[WebServer] 
+[WebServer] [1m› web bundles (3):[22m
+[WebServer] _expo/static/css/web-6852554d7bd6fbab07d8e2434da6f4cf.css [90m(20.2 kB)[39m
+[WebServer] _expo/static/js/web/index-3d5c09758803256d56ec0bbda544d5d1.js [90m(7.77 MB)[39m
+[WebServer] _expo/static/js/web/index-d2c6002d2c101c33b4a852751fead2ff.js [90m(10.6 kB)[39m
+[WebServer] 
+[WebServer] [1m› Files (3):[22m
+[WebServer] favicon.ico [90m(14.5 kB)[39m
+[WebServer] index.html [90m(1.4 kB)[39m
+[WebServer] metadata.json [90m(49 B)[39m
+[WebServer] 
+[WebServer] [92mExported: dist[39m
+[WebServer] Static Expo web preview ready on http://127.0.0.1:19006
+[dotenv@17.2.2] injecting env (0) from .env.local,.env -- tip: 🔐 encrypt with Dotenvx: https://dotenvx.com
+
+Running 31 tests using 1 worker
+
+  ✘   1 [setup] › apps/mobile/e2e-web/helpers/auth.setup.ts:24:8 › seed onboarding-complete and capture solo-learner storage state (1ms)
+  -   2 [setup] › apps/mobile/e2e-web/helpers/auth.setup.ts:24:8 › seed parent-multi-child and capture owner-with-children storage state
+  ✘   3 [setup] › apps/mobile/e2e-web/helpers/auth.setup.ts:24:8 › seed onboarding-complete and capture solo-learner storage state (retry #1) (1ms)
+  -   4 [setup] › apps/mobile/e2e-web/helpers/auth.setup.ts:24:8 › seed parent-multi-child and capture owner-with-children storage state (retry #1)
+  ✘   5 [smoke-auth] › apps/mobile/e2e-web/flows/auth/auth-navigation.spec.ts:4:5 › J-02 auth screen navigation works on web @smoke (3ms)
+  ✘   6 [smoke-auth] › apps/mobile/e2e-web/flows/auth/auth-navigation.spec.ts:4:5 › J-02 auth screen navigation works on web @smoke (retry #1) (2ms)
+  ✘   7 [smoke-auth] › apps/mobile/e2e-web/flows/auth/sign-up-flow.spec.ts:25:7 › [BUG-754] sign-up flow top-of-funnel › form renders with email, password, terms, and submit @smoke (1ms)
+  ✘   8 [smoke-auth] › apps/mobile/e2e-web/flows/auth/sign-up-flow.spec.ts:25:7 › [BUG-754] sign-up flow top-of-funnel › form renders with email, password, terms, and submit @smoke (retry #1) (1ms)
+  ✘   9 [smoke-auth] › apps/mobile/e2e-web/flows/auth/sign-up-flow.spec.ts:44:7 › [BUG-754] sign-up flow top-of-funnel › submit button is disabled until email + ≥8-char password are entered (1ms)
+  ✘  10 [smoke-auth] › apps/mobile/e2e-web/flows/auth/sign-up-flow.spec.ts:44:7 › [BUG-754] sign-up flow top-of-funnel › submit button is disabled until email + ≥8-char password are entered (retry #1) (1ms)
+  ✘  11 [smoke-auth] › apps/mobile/e2e-web/flows/auth/sign-up-flow.spec.ts:66:7 › [BUG-754] sign-up flow top-of-funnel › clicking submit fires a request to Clerk and transitions to loading (1ms)
+  ✘  12 [smoke-auth] › apps/mobile/e2e-web/flows/auth/sign-up-flow.spec.ts:66:7 › [BUG-754] sign-up flow top-of-funnel › clicking submit fires a request to Clerk and transitions to loading (retry #1) (1ms)
+  ✘  13 [smoke-auth] › apps/mobile/e2e-web/flows/auth/sign-up-flow.spec.ts:102:7 › [BUG-754] sign-up flow top-of-funnel › terms and privacy links are reachable from the sign-up screen (1ms)
+  ✘  14 [smoke-auth] › apps/mobile/e2e-web/flows/auth/sign-up-flow.spec.ts:102:7 › [BUG-754] sign-up flow top-of-funnel › terms and privacy links are reachable from the sign-up screen (retry #1) (1ms)
+[global-teardown] resetSeededAccounts failed: [TypeError: fetch failed] {
+  [cause]: Error: connect ECONNREFUSED 127.0.0.1:8787
+      at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16) {
+    errno: -61,
+    code: 'ECONNREFUSED',
+    syscall: 'connect',
+    address: '127.0.0.1',
+    port: 8787
+  }
+}
+
+
+  1) [setup] › apps/mobile/e2e-web/helpers/auth.setup.ts:24:8 › seed onboarding-complete and capture solo-learner storage state 
+
+    Error: browserType.launch: Executable doesn't exist at /Users/vetinari/Library/Caches/ms-playwright/chromium_headless_shell-1194/chrome-mac/headless_shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     pnpm exec playwright install                                        ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+    attachment #1: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/helpers-auth.setup.ts-seed-5b2b3--solo-learner-storage-state-setup/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/helpers-auth.setup.ts-seed-5b2b3--solo-learner-storage-state-setup/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: browserType.launch: Executable doesn't exist at /Users/vetinari/Library/Caches/ms-playwright/chromium_headless_shell-1194/chrome-mac/headless_shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     pnpm exec playwright install                                        ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+    attachment #1: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/helpers-auth.setup.ts-seed-5b2b3--solo-learner-storage-state-setup-retry1/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/helpers-auth.setup.ts-seed-5b2b3--solo-learner-storage-state-setup-retry1/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  2) [smoke-auth] › apps/mobile/e2e-web/flows/auth/auth-navigation.spec.ts:4:5 › J-02 auth screen navigation works on web @smoke 
+
+    Error: browserType.launch: Executable doesn't exist at /Users/vetinari/Library/Caches/ms-playwright/chromium_headless_shell-1194/chrome-mac/headless_shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     pnpm exec playwright install                                        ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+    attachment #1: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-auth-auth-navigation-87e4a-vigation-works-on-web-smoke-smoke-auth/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/flows-auth-auth-navigation-87e4a-vigation-works-on-web-smoke-smoke-auth/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: browserType.launch: Executable doesn't exist at /Users/vetinari/Library/Caches/ms-playwright/chromium_headless_shell-1194/chrome-mac/headless_shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     pnpm exec playwright install                                        ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+    attachment #1: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-auth-auth-navigation-87e4a-vigation-works-on-web-smoke-smoke-auth-retry1/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/flows-auth-auth-navigation-87e4a-vigation-works-on-web-smoke-smoke-auth-retry1/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  3) [smoke-auth] › apps/mobile/e2e-web/flows/auth/sign-up-flow.spec.ts:25:7 › [BUG-754] sign-up flow top-of-funnel › form renders with email, password, terms, and submit @smoke 
+
+    Error: browserType.launch: Executable doesn't exist at /Users/vetinari/Library/Caches/ms-playwright/chromium_headless_shell-1194/chrome-mac/headless_shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     pnpm exec playwright install                                        ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+    attachment #1: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-auth-sign-up-flow--B-e37fb-word-terms-and-submit-smoke-smoke-auth/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/flows-auth-sign-up-flow--B-e37fb-word-terms-and-submit-smoke-smoke-auth/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: browserType.launch: Executable doesn't exist at /Users/vetinari/Library/Caches/ms-playwright/chromium_headless_shell-1194/chrome-mac/headless_shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     pnpm exec playwright install                                        ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+    attachment #1: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-auth-sign-up-flow--B-e37fb-word-terms-and-submit-smoke-smoke-auth-retry1/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/flows-auth-sign-up-flow--B-e37fb-word-terms-and-submit-smoke-smoke-auth-retry1/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  4) [smoke-auth] › apps/mobile/e2e-web/flows/auth/sign-up-flow.spec.ts:44:7 › [BUG-754] sign-up flow top-of-funnel › submit button is disabled until email + ≥8-char password are entered 
+
+    Error: browserType.launch: Executable doesn't exist at /Users/vetinari/Library/Caches/ms-playwright/chromium_headless_shell-1194/chrome-mac/headless_shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     pnpm exec playwright install                                        ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+    attachment #1: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-auth-sign-up-flow--B-4d0a0-8-char-password-are-entered-smoke-auth/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/flows-auth-sign-up-flow--B-4d0a0-8-char-password-are-entered-smoke-auth/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: browserType.launch: Executable doesn't exist at /Users/vetinari/Library/Caches/ms-playwright/chromium_headless_shell-1194/chrome-mac/headless_shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     pnpm exec playwright install                                        ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+    attachment #1: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-auth-sign-up-flow--B-4d0a0-8-char-password-are-entered-smoke-auth-retry1/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/flows-auth-sign-up-flow--B-4d0a0-8-char-password-are-entered-smoke-auth-retry1/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  5) [smoke-auth] › apps/mobile/e2e-web/flows/auth/sign-up-flow.spec.ts:66:7 › [BUG-754] sign-up flow top-of-funnel › clicking submit fires a request to Clerk and transitions to loading 
+
+    Error: browserType.launch: Executable doesn't exist at /Users/vetinari/Library/Caches/ms-playwright/chromium_headless_shell-1194/chrome-mac/headless_shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     pnpm exec playwright install                                        ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+    attachment #1: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-auth-sign-up-flow--B-d4ae2--and-transitions-to-loading-smoke-auth/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/flows-auth-sign-up-flow--B-d4ae2--and-transitions-to-loading-smoke-auth/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: browserType.launch: Executable doesn't exist at /Users/vetinari/Library/Caches/ms-playwright/chromium_headless_shell-1194/chrome-mac/headless_shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     pnpm exec playwright install                                        ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+    attachment #1: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-auth-sign-up-flow--B-d4ae2--and-transitions-to-loading-smoke-auth-retry1/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/flows-auth-sign-up-flow--B-d4ae2--and-transitions-to-loading-smoke-auth-retry1/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  6) [smoke-auth] › apps/mobile/e2e-web/flows/auth/sign-up-flow.spec.ts:102:7 › [BUG-754] sign-up flow top-of-funnel › terms and privacy links are reachable from the sign-up screen 
+
+    Error: browserType.launch: Executable doesn't exist at /Users/vetinari/Library/Caches/ms-playwright/chromium_headless_shell-1194/chrome-mac/headless_shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     pnpm exec playwright install                                        ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+    attachment #1: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-auth-sign-up-flow--B-18d98-ble-from-the-sign-up-screen-smoke-auth/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/flows-auth-sign-up-flow--B-18d98-ble-from-the-sign-up-screen-smoke-auth/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: browserType.launch: Executable doesn't exist at /Users/vetinari/Library/Caches/ms-playwright/chromium_headless_shell-1194/chrome-mac/headless_shell
+    ╔═════════════════════════════════════════════════════════════════════════╗
+    ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+    ║ Please run the following command to download new browsers:              ║
+    ║                                                                         ║
+    ║     pnpm exec playwright install                                        ║
+    ║                                                                         ║
+    ║ <3 Playwright Team                                                      ║
+    ╚═════════════════════════════════════════════════════════════════════════╝
+
+    attachment #1: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-auth-sign-up-flow--B-18d98-ble-from-the-sign-up-screen-smoke-auth-retry1/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/flows-auth-sign-up-flow--B-18d98-ble-from-the-sign-up-screen-smoke-auth-retry1/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  6 failed
+    [setup] › apps/mobile/e2e-web/helpers/auth.setup.ts:24:8 › seed onboarding-complete and capture solo-learner storage state 
+    [smoke-auth] › apps/mobile/e2e-web/flows/auth/auth-navigation.spec.ts:4:5 › J-02 auth screen navigation works on web @smoke 
+    [smoke-auth] › apps/mobile/e2e-web/flows/auth/sign-up-flow.spec.ts:25:7 › [BUG-754] sign-up flow top-of-funnel › form renders with email, password, terms, and submit @smoke 
+    [smoke-auth] › apps/mobile/e2e-web/flows/auth/sign-up-flow.spec.ts:44:7 › [BUG-754] sign-up flow top-of-funnel › submit button is disabled until email + ≥8-char password are entered 
+    [smoke-auth] › apps/mobile/e2e-web/flows/auth/sign-up-flow.spec.ts:66:7 › [BUG-754] sign-up flow top-of-funnel › clicking submit fires a request to Clerk and transitions to loading 
+    [smoke-auth] › apps/mobile/e2e-web/flows/auth/sign-up-flow.spec.ts:102:7 › [BUG-754] sign-up flow top-of-funnel › terms and privacy links are reachable from the sign-up screen 
+  25 did not run
+ ELIFECYCLE  Command failed with exit code 1.
+END_EPOCH=1778758703
+EXIT=1
+DURATION_SEC=102

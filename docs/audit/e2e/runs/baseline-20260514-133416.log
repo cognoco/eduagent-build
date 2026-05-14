@@ -1,0 +1,59 @@
+Starting at 2026-05-14T13:34:16+02:00
+Mode: CI-equivalent (PLAYWRIGHT_SKIP_LOCAL_API=1, CI=1 → 1 worker, retries=1, no local wrangler dev)
+START_EPOCH=1778758456
+ WARN  Unsupported engine: wanted: {"node":"22.x"} (current: {"node":"v24.15.0","pnpm":"10.19.0"})
+
+> @eduagent/source@0.0.0 test:e2e:web /Users/vetinari/_dev/eduagent-build
+> pnpm exec playwright test -c apps/mobile/playwright.config.ts --reporter=list,json
+
+ WARN  Unsupported engine: wanted: {"node":"22.x"} (current: {"node":"v24.15.0","pnpm":"10.19.0"})
+[WebServer] ../..                                    | [43m[30m WARN [39m[49m Unsupported engine: wanted: {"node":"22.x"} (current: {"node":"v24.15.0","pnpm":"10.19.0"})
+[WebServer] [2mStarting Metro Bundler[22m
+[WebServer] [33mwarning[39m: Bundler cache is empty, rebuilding [2m(this may take a minute)[22m
+[WebServer] [1mWeb[22m [0m[2mapps/mobile/[22m[0m[1mindex.js[22m [47m[37m░░░░░░░░░░░░░░░░[39m[49m[1m  0.0% [22m[2m(0/1)[22m
+[WebServer] [33m|[39m [baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+[WebServer] [1mWeb[22m [0m[2mapps/mobile/[22m[0m[1mindex.js[22m [47m[37m░░░░░░░░░░░░░░░░[39m[49m[1m  0.0% [22m[2m(0/1)[22m
+[WebServer] [33m|[39m [baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+[WebServer] [33m|[39m [baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+[WebServer] [33m|[39m [baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+[WebServer] [33m|[39m [baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+[WebServer] [33m|[39m [baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+[WebServer] [33m|[39m [baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+[WebServer] [1mWeb[22m [0m[2mapps/mobile/[22m[0m[1mindex.js[22m [32m[42m▓▓▓▓▓[49m[39m[47m[37m░░░░░░░░░░░[39m[49m[1m 34.9% [22m[2m(130/323)[22m
+[WebServer] [1mWeb[22m [0m[2mapps/mobile/[22m[0m[1mindex.js[22m [32m[42m▓▓▓▓▓[49m[39m[47m[37m░░░░░░░░░░░[39m[49m[1m 34.9% [22m[2m(262/517)[22m
+[WebServer] [1mWeb[22m [0m[2mapps/mobile/[22m[0m[1mindex.js[22m [32m[42m▓▓▓▓▓[49m[39m[47m[37m░░░░░░░░░░░[39m[49m[1m 34.9% [22m[2m(487/879)[22m
+[WebServer] [1mWeb[22m [0m[2mapps/mobile/[22m[0m[1mindex.js[22m [32m[42m▓▓▓▓▓▓▓[49m[39m[47m[37m░░░░░░░░░[39m[49m[1m 46.5% [22m[2m( 823/1406)[22m
+[WebServer] [1mWeb[22m [0m[2mapps/mobile/[22m[0m[1mindex.js[22m [32m[42m▓▓▓▓▓▓▓[49m[39m[47m[37m░░░░░░░░░[39m[49m[1m 47.5% [22m[2m(1105/1604)[22m
+[WebServer] [1mWeb[22m [0m[2mapps/mobile/[22m[0m[1mindex.js[22m [32m[42m▓▓▓▓▓▓▓▓▓▓▓[49m[39m[47m[37m░░░░░[39m[49m[1m 69.0% [22m[2m(1412/1700)[22m
+[WebServer] [1mWeb[22m [0m[2mapps/mobile/[22m[0m[1mindex.js[22m [32m[42m▓▓▓▓▓▓▓▓▓▓▓▓[49m[39m[47m[37m░░░░[39m[49m[1m 77.9% [22m[2m(1778/2028)[22m
+[WebServer] [1mWeb[22m [0m[2mapps/mobile/[22m[0m[1mindex.js[22m [32m[42m▓▓▓▓▓▓▓▓▓▓▓▓▓[49m[39m[47m[37m░░░[39m[49m[1m 87.1% [22m[2m(2057/2238)[22m
+[WebServer] [1mWeb[22m [0m[2mapps/mobile/[22m[0m[1mindex.js[22m [32m[42m▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓[49m[39m[47m[37m░[39m[49m[1m 95.5% [22m[2m(2390/2470)[22m
+[WebServer] [1mWeb[22m [0m[2mapps/mobile/[22m[0m[1mindex.js[22m [32m[42m▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓[49m[39m[47m[37m░[39m[49m[1m 99.9% [22m[2m(2510/2511)[22m
+[WebServer] [1mWeb[22m [0m[2mapps/mobile/[22m[0m[1mindex.js[22m [32m[42m▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓[49m[39m[47m[37m░[39m[49m[1m 99.9% [22m[2m(2511/2511)[22m
+[WebServer] [31m[1mWeb[22m Bundling failed [39m[2m44790ms[22m[0m[2m apps/mobile/index.js (2511 modules)[22m[0m
+[WebServer] [31mError: Unable to resolve module @tanstack/react-query-persist-client from /Users/vetinari/_dev/eduagent-build/apps/mobile/src/app/_layout.tsx: @tanstack/react-query-persist-client could not be found within the project or in these directories:[39m
+[WebServer] [31m  node_modules[39m
+[WebServer] [31m  ../../node_modules[39m
+[WebServer] [31m  node_modules[39m
+[WebServer] [31m  ../../node_modules[39m
+[WebServer] [31m[0m [90m 32 |[39m[31m [36mimport[39m[31m { tokenCache [36mas[39m[31m nativeTokenCache } [36mfrom[39m[31m [32m'@clerk/clerk-expo/token-cache'[39m[31m[33m;[39m[31m[39m
+[WebServer] [31m [90m 33 |[39m[31m [36mimport[39m[31m { [33mQueryCache[39m[31m[33m,[39m[31m [33mQueryClient[39m[31m } [36mfrom[39m[31m [32m'@tanstack/react-query'[39m[31m[33m;[39m[31m[39m
+[WebServer] [31m[31m[1m>[22m[39m[31m[90m 34 |[39m[31m [36mimport[39m[31m { [33mPersistQueryClientProvider[39m[31m } [36mfrom[39m[31m [32m'@tanstack/react-query-persist-client'[39m[31m[33m;[39m[31m[39m
+[WebServer] [31m [90m    |[39m[31m                                             [31m[1m^[22m[39m[31m[39m
+[WebServer] [31m [90m 35 |[39m[31m [36mimport[39m[31m { useAuth } [36mfrom[39m[31m [32m'@clerk/clerk-expo'[39m[31m[33m;[39m[31m[39m
+[WebServer] [31m [90m 36 |[39m[31m [36mimport[39m[31m { [33mThemeContext[39m[31m[33m,[39m[31m useThemeColors[33m,[39m[31m useTokenVars } [36mfrom[39m[31m [32m'../lib/theme'[39m[31m[33m;[39m[31m[39m
+[WebServer] [31m [90m 37 |[39m[31m [36mimport[39m[31m { tokens } [36mfrom[39m[31m [32m'../lib/design-tokens'[39m[31m[33m;[39m[31m[0m[39m
+[WebServer] [31m[39m
+[WebServer] [31m[1mImport stack:[22m[39m
+[WebServer] [31m[39m
+[WebServer] [31m[90m [39m[31mapps/mobile/src/app/_layout.tsx[39m
+[WebServer] [31m[90m |[39m[31m [36mimport[39m[31m [32m"@tanstack/react-query-persist-client"[39m[31m[39m
+[WebServer] [31m[39m
+[WebServer] [31m[90m [39m[31mapps/mobile/src/app[2m (require.context)[22m[39m
+[WebServer] [31m[39m
+Error: Process from config.webServer was not able to start. Exit code: 1
+
+ ELIFECYCLE  Command failed with exit code 1.
+END_EPOCH=1778758558
+EXIT=1
+DURATION_SEC=102

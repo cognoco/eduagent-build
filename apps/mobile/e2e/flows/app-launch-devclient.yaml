@@ -27,7 +27,7 @@ tags:
     id: "sign-in-button"
 
 # NOTE: "Sign up" assertion removed — UI drift confirmed 2026-04-30.
-# See docs/E2Edocs/e2e-2026-04-30-empirical-state.md for context.
+# See docs/_archive/E2Edocs/e2e-2026-04-30-empirical-state.md for context.
 # Restore this assertion when sign-up entry point is reintroduced.
 
 - takeScreenshot: app-launch-devclient

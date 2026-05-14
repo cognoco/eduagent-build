@@ -1,3 +1,5 @@
+> **STATUS: COMPANION** — point-in-time triage from 2026-05-11. Root-cause analysis on `parent-profile-carveout` branch. Splash mitigation merged via PR #211 but incomplete — six tests still fail on splash-blocked taps.
+
 # End-User Playwright Bug Pass - 2026-05-11
 
 Date: 2026-05-11
