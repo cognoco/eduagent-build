@@ -36,117 +36,165 @@ jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 // Mock account service — resolves Clerk user → local Account
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/account', () => ({
-  ...jest.requireActual('../services/account'),
-  findOrCreateAccount: jest.fn().mockResolvedValue({
-    id: 'test-account-id',
-    clerkUserId: 'user_test',
-    email: 'test@example.com',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  }),
-}));
+jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/account',
+  ) as typeof import('../services/account');
+  return {
+    ...actual,
+    findOrCreateAccount: jest.fn().mockResolvedValue({
+      id: 'test-account-id',
+      clerkUserId: 'user_test',
+      email: 'test@example.com',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }),
+  };
+});
 
 // ---------------------------------------------------------------------------
 // Mock profile service — profile-scope middleware auto-resolves owner profile
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/profile', () => ({
-  ...jest.requireActual('../services/profile'),
-  findOwnerProfile: jest.fn().mockResolvedValue({
-    id: 'test-profile-id',
-    accountId: 'test-account-id',
-    displayName: 'Test User',
-    birthYear: null,
-    location: null,
-    consentStatus: null,
-    hasPremiumLlm: false,
-  }),
-  getProfile: jest.fn().mockResolvedValue({
-    id: 'test-profile-id',
-    accountId: 'test-account-id',
-    displayName: 'Test User',
-    birthYear: null,
-    location: null,
-    consentStatus: null,
-    hasPremiumLlm: false,
-  }),
-}));
+jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/profile',
+  ) as typeof import('../services/profile');
+  return {
+    ...actual,
+    findOwnerProfile: jest.fn().mockResolvedValue({
+      id: 'test-profile-id',
+      accountId: 'test-account-id',
+      displayName: 'Test User',
+      birthYear: null,
+      location: null,
+      consentStatus: null,
+      hasPremiumLlm: false,
+    }),
+    getProfile: jest.fn().mockResolvedValue({
+      id: 'test-profile-id',
+      accountId: 'test-account-id',
+      displayName: 'Test User',
+      birthYear: null,
+      location: null,
+      consentStatus: null,
+      hasPremiumLlm: false,
+    }),
+  };
+});
 
 // ---------------------------------------------------------------------------
 // Mock filing services — stubs so route handler does not hit real DB/LLM
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/filing', () => ({
-  ...jest.requireActual('../services/filing'),
-  buildLibraryIndex: jest.fn().mockResolvedValue({ shelves: [] }),
-  fileToLibrary: jest.fn().mockResolvedValue({
-    extracted: 'Test topic',
-    shelf: { name: 'Science' },
-    book: { name: 'Physics', emoji: '⚡', description: 'Physics book' },
-    chapter: { name: 'Mechanics' },
-    topic: { title: 'Newton Laws', description: 'Laws of motion' },
-  }),
-  resolveFilingResult: jest.fn().mockResolvedValue({
-    shelfId: TEST_SHELF_ID,
-    shelfName: 'Science',
-    bookId: TEST_BOOK_ID,
-    bookName: 'Physics',
-    chapter: 'Mechanics',
-    topicId: TEST_TOPIC_ID,
-    topicTitle: 'Newton Laws',
-    isNew: { shelf: true, book: true, chapter: true },
-  }),
-}));
+jest.mock('../services/filing' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/filing',
+  ) as typeof import('../services/filing');
+  return {
+    ...actual,
+    buildLibraryIndex: jest.fn().mockResolvedValue({ shelves: [] }),
+    fileToLibrary: jest.fn().mockResolvedValue({
+      extracted: 'Test topic',
+      shelf: { name: 'Science' },
+      book: { name: 'Physics', emoji: '⚡', description: 'Physics book' },
+      chapter: { name: 'Mechanics' },
+      topic: { title: 'Newton Laws', description: 'Laws of motion' },
+    }),
+    resolveFilingResult: jest.fn().mockResolvedValue({
+      shelfId: TEST_SHELF_ID,
+      shelfName: 'Science',
+      bookId: TEST_BOOK_ID,
+      bookName: 'Physics',
+      chapter: 'Mechanics',
+      topicId: TEST_TOPIC_ID,
+      topicTitle: 'Newton Laws',
+      isNew: { shelf: true, book: true, chapter: true },
+    }),
+  };
+});
 
 // ---------------------------------------------------------------------------
 // Mock suggestion services
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/suggestions', () => ({
-  ...jest.requireActual('../services/suggestions'),
-  markBookSuggestionPicked: jest.fn().mockResolvedValue(undefined),
-  markTopicSuggestionUsed: jest.fn().mockResolvedValue(undefined),
-}));
+jest.mock(
+  '../services/suggestions' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../services/suggestions',
+    ) as typeof import('../services/suggestions');
+    return {
+      ...actual,
+      markBookSuggestionPicked: jest.fn().mockResolvedValue(undefined),
+      markTopicSuggestionUsed: jest.fn().mockResolvedValue(undefined),
+    };
+  },
+);
 
 // ---------------------------------------------------------------------------
 // Mock session services
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/session', () => ({
-  ...jest.requireActual('../services/session'),
-  getSessionTranscript: jest.fn().mockResolvedValue(null),
-  backfillSessionTopicId: jest.fn().mockResolvedValue(undefined),
-}));
+jest.mock('../services/session' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/session',
+  ) as typeof import('../services/session');
+  return {
+    ...actual,
+    getSessionTranscript: jest.fn().mockResolvedValue(null),
+    backfillSessionTopicId: jest.fn().mockResolvedValue(undefined),
+  };
+});
 
 // ---------------------------------------------------------------------------
 // Mock LLM services — stub routeAndCall; all other exports via requireActual
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/llm', () => ({ // gc1-allow: routeAndCall is the LLM provider HTTP boundary
-  ...(jest.requireActual('../services/llm') as Record<string, unknown>),
-  routeAndCall: jest.fn().mockResolvedValue({ text: 'mocked' }),
-}));
+jest.mock('../services/llm' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/llm',
+  ) as typeof import('../services/llm');
+  return {
+    ...actual,
+    routeAndCall: jest.fn().mockResolvedValue({ text: 'mocked' }),
+    registerProvider: jest.fn(),
+    getRegisteredProviders: jest.fn().mockReturnValue([]),
+    _clearProviders: jest.fn(),
+    _resetCircuits: jest.fn(),
+  };
+});
 
 // ---------------------------------------------------------------------------
 // Mock Sentry
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/sentry', () => ({ // gc1-allow: thin wrapper for @sentry/cloudflare external boundary
-  ...(jest.requireActual('../services/sentry') as Record<string, unknown>),
-  captureException: jest.fn(),
-}));
+jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/sentry',
+  ) as typeof import('../services/sentry');
+  return {
+    ...actual,
+    captureException: jest.fn(),
+  };
+});
 
 // ---------------------------------------------------------------------------
 // Mock Inngest client
 // ---------------------------------------------------------------------------
 
-jest.mock('../inngest/client', () => ({ // gc1-allow: Inngest SDK external boundary — real client calls CF env bindings unavailable in test
-  inngest: {
-    send: jest.fn().mockResolvedValue(undefined),
-    createFunction: jest.fn().mockReturnValue(jest.fn()),
-  },
-}));
+jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../inngest/client',
+  ) as typeof import('../inngest/client');
+  return {
+    ...actual,
+    inngest: {
+      send: jest.fn().mockResolvedValue(undefined),
+      createFunction: jest.fn().mockReturnValue(jest.fn()),
+    },
+  };
+});
 
 // Mock inngest/hono serve — the real serve() calls fn.getConfig() on each
 // function at module load time, which fails with our simplified mock.

@@ -22,34 +22,67 @@ const mockGetEmailFrom = jest.fn();
 const mockGetStepSupportEmail = jest.fn();
 const mockLoggerWarn = jest.fn();
 
-jest.mock('../../services/notifications', () => ({
-  sendEmail: (...args: unknown[]) => mockSendEmail(...args),
-}));
+jest.mock(
+  '../../services/notifications' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/notifications',
+    ) as typeof import('../../services/notifications');
+    return {
+      ...actual,
+      sendEmail: (...args: unknown[]) => mockSendEmail(...args),
+    };
+  },
+);
 
-jest.mock('../../services/sentry', () => ({
-  captureException: (...args: unknown[]) => mockCaptureException(...args),
-}));
+jest.mock('../../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../../services/sentry',
+  ) as typeof import('../../services/sentry');
+  return {
+    ...actual,
+    captureException: (...args: unknown[]) => mockCaptureException(...args),
+  };
+});
 
-jest.mock('../../services/logger', () => ({
-  createLogger: () => ({
-    debug: jest.fn(),
-    info: jest.fn(),
-    warn: (...args: unknown[]) => mockLoggerWarn(...args),
-    error: jest.fn(),
-  }),
-}));
+jest.mock('../../services/logger' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../../services/logger',
+  ) as typeof import('../../services/logger');
+  return {
+    ...actual,
+    createLogger: () => ({
+      debug: jest.fn(),
+      info: jest.fn(),
+      warn: (...args: unknown[]) => mockLoggerWarn(...args),
+      error: jest.fn(),
+    }),
+  };
+});
 
-jest.mock('../helpers', () => ({
-  getStepResendApiKey: () => mockGetResendApiKey(),
-  getStepEmailFrom: () => mockGetEmailFrom(),
-  getStepSupportEmail: () => mockGetStepSupportEmail(),
-}));
+jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../helpers',
+  ) as typeof import('../helpers');
+  return {
+    ...actual,
+    getStepResendApiKey: () => mockGetResendApiKey(),
+    getStepEmailFrom: () => mockGetEmailFrom(),
+    getStepSupportEmail: () => mockGetStepSupportEmail(),
+  };
+});
 
 import { createInngestTransportCapture } from '../../test-utils/inngest-transport-capture';
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 
 const mockInngestTransport = createInngestTransportCapture();
-jest.mock('../client', () => mockInngestTransport.module); // gc1-allow: inngest framework boundary
+jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual('../client') as typeof import('../client');
+  return {
+    ...actual,
+    ...mockInngestTransport.module,
+  };
+});
 
 import { feedbackDeliveryFailed } from './feedback-delivery-failed';
 

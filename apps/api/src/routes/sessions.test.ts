@@ -13,13 +13,13 @@ const mockCaptureException = jest.fn();
 const mockAddBreadcrumb = jest.fn();
 const mockCaptureMessage = jest.fn();
 
-jest.mock('../services/sentry', () => { // gc1-allow: wraps @sentry/cloudflare external boundary; requireActual spread applied
-  const actual = jest.requireActual('../services/sentry') as Record<
-    string,
-    unknown
-  >;
+jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/sentry',
+  ) as typeof import('../services/sentry');
   return {
     ...actual,
+    // overrides
     addBreadcrumb: (...args: unknown[]) => mockAddBreadcrumb(...args),
     captureException: (...args: unknown[]) => mockCaptureException(...args),
     captureMessage: (...args: unknown[]) => mockCaptureMessage(...args),
@@ -40,13 +40,13 @@ jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 // Mock account + session services — no DB interaction
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/account', () => { // gc1-allow: requireActual + targeted overrides
-  const actual = jest.requireActual('../services/account') as Record<
-    string,
-    unknown
-  >;
+jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/account',
+  ) as typeof import('../services/account');
   return {
     ...actual,
+    // overrides
     findOrCreateAccount: jest.fn().mockResolvedValue({
       id: 'test-account-id',
       clerkUserId: 'user_test',
@@ -61,13 +61,13 @@ jest.mock('../services/account', () => { // gc1-allow: requireActual + targeted 
 // Mock profile service — middleware auto-resolves owner profile
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/profile', () => { // gc1-allow: requireActual + targeted overrides
-  const actual = jest.requireActual('../services/profile') as Record<
-    string,
-    unknown
-  >;
+jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/profile',
+  ) as typeof import('../services/profile');
   return {
     ...actual,
+    // overrides
     getProfile: jest.fn().mockResolvedValue({
       id: 'test-profile-id',
       birthYear: null,
@@ -115,13 +115,13 @@ const mockSafeRefundQuota = jest.fn(
   },
 );
 
-jest.mock('../services/billing', () => { // gc1-allow: requireActual + targeted overrides
-  const actual = jest.requireActual('../services/billing') as Record<
-    string,
-    unknown
-  >;
+jest.mock('../services/billing' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/billing',
+  ) as typeof import('../services/billing');
   return {
     ...actual,
+    // overrides
     getSubscriptionByAccountId: jest.fn().mockResolvedValue(mockSubscription),
     ensureFreeSubscription: jest.fn().mockResolvedValue(mockSubscription),
     getQuotaPool: jest.fn().mockResolvedValue({
@@ -154,16 +154,14 @@ const SUBJECT_ID = '550e8400-e29b-41d4-a716-446655440000';
 const SESSION_ID = '660e8400-e29b-41d4-a716-446655440000';
 const EVENT_ID = '770e8400-e29b-41d4-a716-446655440000';
 
-jest.mock('../services/session', () => {
+jest.mock('../services/session' /* gc1-allow: pattern-a conversion */, () => {
   // Use real error classes so instanceof checks in route handlers match production behavior.
-  const actual = jest.requireActual('../services/session') as Record<
-    string,
-    unknown
-  >;
+  const actual = jest.requireActual(
+    '../services/session',
+  ) as typeof import('../services/session');
   return {
-    SubjectInactiveError: actual.SubjectInactiveError,
-    SessionExchangeLimitError: actual.SessionExchangeLimitError,
-    CurriculumSessionNotReadyError: actual.CurriculumSessionNotReadyError,
+    ...actual,
+    // overrides
     startSession: jest
       .fn()
       .mockImplementation((_db, _profileId, subjectId, input) => ({
@@ -336,9 +334,7 @@ jest.mock('../services/session', () => {
         }),
       }),
     ),
-    claimSessionForFilingRetry: (
-      jest.requireActual('../services/session') as Record<string, unknown>
-    ).claimSessionForFilingRetry,
+    claimSessionForFilingRetry: actual.claimSessionForFilingRetry,
     getSubjectSessions: jest.fn().mockResolvedValue([
       {
         id: '11111111-1111-4111-8111-111111111111',
@@ -375,31 +371,37 @@ const mockStartInterleavedSession = jest.fn().mockResolvedValue({
   ],
 });
 
-jest.mock('../services/interleaved', () => {
-  const actual = jest.requireActual('../services/interleaved') as Record<
-    string,
-    unknown
-  >;
-  return {
-    // Preserve the real error class so route-layer instanceof checks work.
-    NoInterleavedTopicsError: actual.NoInterleavedTopicsError,
-    startInterleavedSession: (...args: unknown[]) =>
-      mockStartInterleavedSession(...args),
-  };
-});
+jest.mock(
+  '../services/interleaved' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../services/interleaved',
+    ) as typeof import('../services/interleaved');
+    return {
+      ...actual,
+      // overrides
+      // Preserve the real error class so route-layer instanceof checks work.
+      startInterleavedSession: (...args: unknown[]) =>
+        mockStartInterleavedSession(...args),
+    };
+  },
+);
 
-jest.mock('../services/recall-bridge', () => { // gc1-allow: requireActual + targeted overrides
-  const actual = jest.requireActual('../services/recall-bridge') as Record<
-    string,
-    unknown
-  >;
-  return {
-    ...actual,
-    generateRecallBridge: jest.fn().mockResolvedValue({
-      bridge: 'mock bridge',
-    }),
-  };
-});
+jest.mock(
+  '../services/recall-bridge' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../services/recall-bridge',
+    ) as typeof import('../services/recall-bridge');
+    return {
+      ...actual,
+      // overrides
+      generateRecallBridge: jest.fn().mockResolvedValue({
+        bridge: 'mock bridge',
+      }),
+    };
+  },
+);
 
 jest.mock('inngest/hono', () => ({
   serve: jest.fn().mockReturnValue(jest.fn()),
@@ -407,12 +409,19 @@ jest.mock('inngest/hono', () => ({
 
 const mockInngestSend = jest.fn().mockResolvedValue(undefined);
 
-jest.mock('../inngest/client', () => ({ // gc1-allow: inngest client wraps the Inngest SDK external boundary; real send() dispatches jobs to Inngest cloud, cannot run in test environment
-  inngest: {
-    send: (...args: unknown[]) => mockInngestSend(...args),
-    createFunction: jest.fn().mockReturnValue(jest.fn()),
-  },
-}));
+jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../inngest/client',
+  ) as typeof import('../inngest/client');
+  return {
+    ...actual,
+    // overrides
+    inngest: {
+      send: (...args: unknown[]) => mockInngestSend(...args),
+      createFunction: jest.fn().mockReturnValue(jest.fn()),
+    },
+  };
+});
 
 import { inngest } from '../inngest/client';
 import {
