@@ -44,14 +44,12 @@ jest.mock('./subscription', () => ({
 // inngest event + sentry capture + structured log. Mock the dispatch
 // surfaces so tests can assert escalation without a real Inngest client.
 const mockInngestSend = jest.fn().mockResolvedValue(undefined);
-jest.mock('../inngest/client', () => ({
-  // gc1-allow: Inngest SDK external boundary
+jest.mock('../inngest/client', () => ({ // gc1-allow: Inngest SDK external boundary
   inngest: { send: (...args: unknown[]) => mockInngestSend(...args) },
 }));
 
 const mockCaptureException = jest.fn();
-jest.mock('./sentry', () => ({
-  // gc1-allow: @sentry/cloudflare external boundary
+jest.mock('./sentry', () => ({ // gc1-allow: @sentry/cloudflare external boundary
   captureException: (...args: unknown[]) => mockCaptureException(...args),
 }));
 

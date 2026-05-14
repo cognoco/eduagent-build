@@ -7,7 +7,7 @@ jest.mock('../services/kv', () => ({
   writeSubscriptionStatus: jest.fn().mockResolvedValue(undefined),
 }));
 
-jest.mock('../services/billing', () => ({
+jest.mock('../services/billing', () => ({ // gc1-allow: billing service requires real DB; mockDb={} as any would throw on all db.select/insert calls
   ...jest.requireActual('../services/billing'),
   getSubscriptionByAccountId: jest.fn(),
   getQuotaPool: jest.fn(),
@@ -34,27 +34,9 @@ jest.mock('../services/billing', () => ({
   }),
 }));
 
-jest.mock('../services/account', () => ({
+jest.mock('../services/account', () => ({ // gc1-allow: account service requires real DB; mockDb={} as any would throw on db.select calls
   ...jest.requireActual('../services/account'),
   findAccountByClerkId: jest.fn(),
-}));
-
-jest.mock('../services/subscription', () => ({
-  ...jest.requireActual('../services/subscription'),
-  getTierConfig: jest.fn().mockReturnValue({
-    monthlyQuota: 500,
-    dailyLimit: null,
-    maxProfiles: 1,
-    priceMonthly: 18.99,
-    priceYearly: 168,
-    topUpPrice: 10,
-    topUpAmount: 500,
-  }),
-}));
-
-jest.mock('../services/trial', () => ({
-  ...jest.requireActual('../services/trial'),
-  EXTENDED_TRIAL_MONTHLY_EQUIVALENT: 450,
 }));
 
 jest.mock('../inngest/client', () => ({
