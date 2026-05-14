@@ -702,7 +702,11 @@ export default function LibraryScreen() {
   // ---- Root render --------------------------------------------------------
 
   return (
-    <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
+    <View
+      className="flex-1 bg-background"
+      style={{ paddingTop: insets.top }}
+      testID="library-screen"
+    >
       {/* Header */}
       <View
         className="px-5 pt-4 pb-3 flex-row items-center justify-between"

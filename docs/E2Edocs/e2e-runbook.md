@@ -146,7 +146,11 @@ The Doppler `-c stg` config matches the seed endpoint's `TEST_SEED_SECRET`.
 ### Required env vars for any invocation
 
 - `METRO_URL=http://10.0.2.2:8081` — overrides the script default of `:8082`
-  (the BUG-7 bundle proxy, empirically unnecessary as of 2026-04-30).
+  (the BUG-7 bundle proxy, empirically unnecessary as of 2026-04-30). The
+  harness parses the port from this URL and `adb reverse`s it automatically,
+  so any port works (e.g. `:8083` when `:8081`/`:8082` are held by another
+  branch's dev server). The preflight check picks up the same port from
+  `METRO_URL`, so a single env var configures the whole pipeline.
 - `TEMP="C:/tools/maestro/tmp"` and `TMP="C:/tools/maestro/tmp"` — Java
   jansi.dll extraction would otherwise hit `C:\Users\ZuzanaKopečná\AppData\...`
   and fail on the Unicode `č`.
@@ -200,6 +204,7 @@ powershell.exe -Command "Stop-Process -Id <pid> -Force"
 | `Maestro driver did not start up in time` | UIAutomator lock from a previous non-graceful kill | `adb reboot` and re-run |
 | Bluetooth fails to start in emulator log | Bluetooth packet streamer never initializes on this AVD | Harmless on `E2E_Device_2`; ignore |
 | `Could not connect to bundle proxy on 8082` | `seed-and-run.sh` defaulted to BUG-7 proxy port | Override with `METRO_URL=http://10.0.2.2:8081` |
+| Dev-client shows `java.net.SocketTimeoutException` after starting Metro on a non-default port (e.g. `--port 8083`) | The emulator's `10.0.2.2:<port>` alias is unreliable on WHPX; ports need an explicit `adb reverse` | Set `METRO_URL=http://10.0.2.2:<port>` when invoking `seed-and-run.sh`. The harness now parses the port and adds `adb reverse tcp:<port> tcp:<port>` automatically (in addition to 8081/8082). The preflight derives its check port from `METRO_URL` too. If the symptom still appears, verify with `adb reverse --list` that the port is forwarded. |
 
 ---
 

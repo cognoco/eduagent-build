@@ -382,7 +382,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
           },
         }),
       'ask.gate_decision',
-      { sessionId, method: result.method },
+      { sessionId, profileId, method: result.method },
     );
 
     if (result.method === 'fail_open') {
@@ -396,7 +396,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             },
           }),
         'ask.gate_timeout',
-        { sessionId },
+        { sessionId, profileId },
       );
     }
 

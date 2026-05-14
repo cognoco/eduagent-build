@@ -1,0 +1,98 @@
+# Flow AUTH-12: SSO Callback Fallback (OpenAI)
+#
+# Validates: when the OpenAI SSO OAuth callback does not complete within 10
+# seconds, `sso-callback.tsx` reveals the `sso-fallback-back` button. Tapping
+# it returns the user to the sign-in screen with no dead-end.
+#
+# This is a near-clone of sso-callback-fallback.yaml (AUTH-09 / Google variant)
+# but taps `openai-sso-button` instead of `google-sso-button`, verifying that
+# the OpenAI OAuth strategy hits the same sso-callback.tsx 10-second
+# SSO_TIMEOUT_MS fallback timer via the identical mechanism.
+#
+# Mechanism (same as AUTH-09):
+#   ADB airplane-mode toggle via seed-and-run-sso-fallback.sh wrapper.
+#   Airplane mode prevents the OAuth callback from completing. The wrapper
+#   enables airplane mode BEFORE Maestro starts, so the in-app Chrome Custom
+#   Tab cannot reach OpenAI's OAuth endpoint.
+#   sso-callback.tsx has a 10-second timer (SSO_TIMEOUT_MS = 10_000) that
+#   fires and shows the fallback button.
+#
+# testIDs verified against source:
+#   openai-sso-button    apps/mobile/src/app/(auth)/sign-in.tsx line 1264
+#                        gated by `openAIStrategy` truthy — requires
+#                        EXPO_PUBLIC_CLERK_OPENAI_SSO_KEY baked into APK at
+#                        build time (EXPO_PUBLIC_* vars are baked, not runtime)
+#   sso-fallback-back    apps/mobile/src/app/sso-callback.tsx line 48
+#   sign-in-button       apps/mobile/src/app/(auth)/sign-in.tsx line 1293
+#   sign-in-screen       apps/mobile/src/app/(auth)/sign-in.tsx line 1090
+#
+# Run command:
+#   ./e2e/scripts/seed-and-run-sso-fallback.sh e2e/flows/auth/sso-callback-fallback-openai.yaml
+#
+# Tags: weekly, auth
+appId: com.mentomate.app
+tags:
+  - weekly
+  - auth
+---
+# ── Step 1: Confirm we are on the sign-in screen ──
+# seed-and-run-sso-fallback.sh runs seed-and-run.sh --no-seed which brings
+# the app to the sign-in screen before Maestro takes over.
+- extendedWaitUntil:
+    visible:
+      id: "sign-in-screen"
+    timeout: 120000
+
+- takeScreenshot: sso-fallback-openai-01-sign-in
+
+# ── Step 2: Assert openai-sso-button is visible (strict, NOT optional) ──
+# If this assertion fails, rebuild the dev-client APK with
+# EXPO_PUBLIC_CLERK_OPENAI_SSO_KEY set — EXPO_PUBLIC_* vars are baked at
+# build time and cannot be injected at runtime. Failing fast here avoids
+# wasting the 25-second fallback timer before getting an actionable error.
+- takeScreenshot: sso-fallback-openai-02-before-sso-tap
+
+# ── Step 3: Scroll OpenAI SSO button into view and tap it ──
+- scrollUntilVisible:
+    element:
+      id: "openai-sso-button"
+    direction: UP
+    timeout: 5000
+
+- assertVisible:
+    id: "openai-sso-button"
+
+- tapOn:
+    id: "openai-sso-button"
+
+# ── Step 4: Wait for sso-callback screen (in-app browser opens then fails) ──
+# With airplane mode enabled, Chrome Custom Tab cannot reach OpenAI. The
+# browser may briefly appear then close, or redirect immediately to the
+# sso-callback route. Either way, sso-callback.tsx mounts and starts its
+# 10-second timer.
+#
+# We wait up to 25s for the fallback button — covers the 10s timer plus
+# network-error browser dismissal time. The ActivityIndicator has no testID
+# so we wait directly for the fallback button.
+- takeScreenshot: sso-fallback-openai-03-after-sso-tap
+
+- extendedWaitUntil:
+    visible:
+      id: "sso-fallback-back"
+    timeout: 25000
+
+- takeScreenshot: sso-fallback-openai-04-fallback-button-visible
+
+# ── Step 5: Tap fallback button and confirm return to sign-in ──
+- tapOn:
+    id: "sso-fallback-back"
+
+- extendedWaitUntil:
+    visible:
+      id: "sign-in-screen"
+    timeout: 10000
+
+- assertVisible:
+    id: "sign-in-button"
+
+- takeScreenshot: sso-fallback-openai-05-back-on-sign-in

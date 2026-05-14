@@ -1,4 +1,6 @@
 import {
+  act,
+  cleanup,
   render,
   screen,
   fireEvent,
@@ -43,8 +45,8 @@ jest.mock('@expo/vector-icons', () => ({
   Ionicons: () => null,
 }));
 
-jest.mock('../../lib/theme', () => ({
-  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
+// prettier-ignore
+jest.mock('../../lib/theme', /* gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM */ () => ({
   useThemeColors: () => ({
     muted: '#a3a3a3',
     textInverse: '#0f0f0f',
@@ -133,6 +135,7 @@ jest.mock('../../hooks/use-depth-evaluation', () => ({
 const mockReadSummaryDraft = jest.fn();
 const mockWriteSummaryDraft = jest.fn();
 const mockClearSummaryDraft = jest.fn();
+let resolveDefaultSummaryDraftReads: Array<() => void> = [];
 
 jest.mock('../../lib/summary-draft', () => ({
   readSummaryDraft: (...args: unknown[]) => mockReadSummaryDraft(...args),
@@ -263,8 +266,15 @@ function createWrapper() {
         // immediately on the first response.
         refetchOnWindowFocus: false,
       },
+      mutations: {
+        retry: false,
+        // TanStack mutation observers schedule a default 5-minute GC timer
+        // after unmount; keep the suite from needing --forceExit.
+        gcTime: 0,
+      },
     },
   });
+  activeQueryClient = queryClient;
   return function Wrapper({ children }: { children: React.ReactNode }) {
     return (
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
@@ -274,14 +284,43 @@ function createWrapper() {
 
 // Alias for tests that were already using `Wrapper` directly.
 let Wrapper: ReturnType<typeof createWrapper>;
+let activeQueryClient: QueryClient | null = null;
 
 const SessionSummaryScreen = require('./[sessionId]').default;
+
+async function settleAsyncWork(): Promise<void> {
+  await Promise.resolve();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  await Promise.resolve();
+}
+
+async function pressAsync(
+  element: Parameters<typeof fireEvent.press>[0],
+): Promise<void> {
+  await act(async () => {
+    fireEvent.press(element);
+    await settleAsyncWork();
+    await settleAsyncWork();
+  });
+}
+
+async function flushAsyncEffects(): Promise<void> {
+  await act(async () => {
+    await settleAsyncWork();
+  });
+}
 
 describe('SessionSummaryScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (platformAlert as jest.Mock).mockClear();
-    mockReadSummaryDraft.mockResolvedValue(null);
+    resolveDefaultSummaryDraftReads = [];
+    mockReadSummaryDraft.mockImplementation(
+      () =>
+        new Promise<null>((resolve) => {
+          resolveDefaultSummaryDraftReads.push(() => resolve(null));
+        }),
+    );
     mockWriteSummaryDraft.mockResolvedValue(undefined);
     mockClearSummaryDraft.mockResolvedValue(undefined);
     mockUseParentProxy.mockReturnValue({
@@ -349,6 +388,22 @@ describe('SessionSummaryScreen', () => {
     // Create a fresh wrapper (and QueryClient) per test to prevent cross-test
     // query cache contamination from async fetch-boundary responses.
     Wrapper = createWrapper();
+  });
+
+  afterEach(async () => {
+    const draftResolvers = resolveDefaultSummaryDraftReads;
+    resolveDefaultSummaryDraftReads = [];
+
+    await act(async () => {
+      for (const resolveDraftRead of draftResolvers) {
+        resolveDraftRead();
+      }
+      await settleAsyncWork();
+      await settleAsyncWork();
+    });
+    cleanup();
+    activeQueryClient?.clear();
+    activeQueryClient = null;
   });
 
   it('renders session takeaways', () => {
@@ -531,7 +586,7 @@ describe('SessionSummaryScreen', () => {
       screen.getByTestId('summary-input'),
       'I learned about quadratic equations and how to solve them',
     );
-    fireEvent.press(screen.getByTestId('submit-summary-button'));
+    await pressAsync(screen.getByTestId('submit-summary-button'));
 
     await waitFor(() => {
       screen.getByTestId('summary-submitted');
@@ -557,13 +612,13 @@ describe('SessionSummaryScreen', () => {
       screen.getByTestId('summary-input'),
       'I learned about quadratic equations and factoring methods',
     );
-    fireEvent.press(screen.getByTestId('submit-summary-button'));
+    await pressAsync(screen.getByTestId('submit-summary-button'));
 
     await waitFor(() => {
       screen.getByTestId('continue-button');
     });
 
-    fireEvent.press(screen.getByTestId('continue-button'));
+    await pressAsync(screen.getByTestId('continue-button'));
     await waitFor(() => {
       expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
     });
@@ -601,13 +656,13 @@ describe('SessionSummaryScreen', () => {
       screen.getByTestId('summary-input'),
       'I explained how factoring helps solve quadratic equations',
     );
-    fireEvent.press(screen.getByTestId('submit-summary-button'));
+    await pressAsync(screen.getByTestId('submit-summary-button'));
 
     await waitFor(() => {
       screen.getByTestId('continue-button');
     });
 
-    fireEvent.press(screen.getByTestId('continue-button'));
+    await pressAsync(screen.getByTestId('continue-button'));
 
     await waitFor(() => {
       expect(mockOnSuccessfulRecall).toHaveBeenCalled();
@@ -619,7 +674,7 @@ describe('SessionSummaryScreen', () => {
     render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
     const skipButton = screen.getByTestId('skip-summary-button');
-    fireEvent.press(skipButton);
+    await pressAsync(skipButton);
 
     await waitFor(() => {
       expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
@@ -640,7 +695,7 @@ describe('SessionSummaryScreen', () => {
 
     render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
-    fireEvent.press(screen.getByTestId('skip-summary-button'));
+    await pressAsync(screen.getByTestId('skip-summary-button'));
 
     await waitFor(() => {
       expect(platformAlert).toHaveBeenCalledWith(
@@ -674,7 +729,7 @@ describe('SessionSummaryScreen', () => {
 
     render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
-    fireEvent.press(screen.getByTestId('skip-summary-button'));
+    await pressAsync(screen.getByTestId('skip-summary-button'));
 
     await waitFor(() => {
       screen.getByTestId('recall-bridge-questions');
@@ -687,7 +742,7 @@ describe('SessionSummaryScreen', () => {
     expect(mockReplace).not.toHaveBeenCalled();
 
     // Press "Done — head home" to navigate
-    fireEvent.press(screen.getByTestId('recall-bridge-done-button'));
+    await pressAsync(screen.getByTestId('recall-bridge-done-button'));
 
     await waitFor(() => {
       expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
@@ -704,7 +759,7 @@ describe('SessionSummaryScreen', () => {
 
     render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
-    fireEvent.press(screen.getByTestId('skip-summary-button'));
+    await pressAsync(screen.getByTestId('skip-summary-button'));
 
     await waitFor(() => {
       expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
@@ -721,7 +776,7 @@ describe('SessionSummaryScreen', () => {
         );
       }
       if (url.includes('/summary')) {
-        return { summary: null };
+        return { summary: { learnerRecap: 'mock-recap' } };
       }
       return { session: null };
     });
@@ -732,7 +787,7 @@ describe('SessionSummaryScreen', () => {
       screen.getByTestId('summary-input'),
       'I learned about photosynthesis and how plants make food',
     );
-    fireEvent.press(screen.getByTestId('submit-summary-button'));
+    await pressAsync(screen.getByTestId('submit-summary-button'));
 
     // The inline error should appear after the mutation fails
     await waitFor(() => {
@@ -758,7 +813,7 @@ describe('SessionSummaryScreen', () => {
         );
       }
       if (url.includes('/summary')) {
-        return { summary: null };
+        return { summary: { learnerRecap: 'mock-recap' } };
       }
       return { session: null };
     });
@@ -769,7 +824,7 @@ describe('SessionSummaryScreen', () => {
       screen.getByTestId('summary-input'),
       'I learned about photosynthesis and chlorophyll absorption',
     );
-    fireEvent.press(screen.getByTestId('submit-summary-button'));
+    await pressAsync(screen.getByTestId('submit-summary-button'));
 
     await waitFor(() => {
       expect(platformAlert).toHaveBeenCalledWith(
@@ -788,7 +843,7 @@ describe('SessionSummaryScreen', () => {
         );
       }
       if (url.includes('/summary')) {
-        return { summary: null };
+        return { summary: { learnerRecap: 'mock-recap' } };
       }
       return { session: null };
     });
@@ -799,7 +854,7 @@ describe('SessionSummaryScreen', () => {
       screen.getByTestId('summary-input'),
       'I explored gravity and Newtons three laws of motion today',
     );
-    fireEvent.press(screen.getByTestId('submit-summary-button'));
+    await pressAsync(screen.getByTestId('submit-summary-button'));
 
     await waitFor(() => {
       // formatApiError stub returns the message; 400 with no "message" field
@@ -868,7 +923,7 @@ describe('SessionSummaryScreen', () => {
         screen.getByTestId('summary-input'),
         'I learned about equations and how to solve them today',
       );
-      fireEvent.press(screen.getByTestId('submit-summary-button'));
+      await pressAsync(screen.getByTestId('submit-summary-button'));
 
       await waitFor(() => {
         screen.getByTestId('summary-submitted');
@@ -1057,7 +1112,7 @@ describe('SessionSummaryScreen', () => {
         screen.getByTestId('continue-button');
       });
 
-      fireEvent.press(screen.getByTestId('continue-button'));
+      await pressAsync(screen.getByTestId('continue-button'));
 
       await waitFor(() => {
         expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
@@ -1102,7 +1157,7 @@ describe('SessionSummaryScreen', () => {
         screen.getByTestId('continue-button');
       });
 
-      fireEvent.press(screen.getByTestId('continue-button'));
+      await pressAsync(screen.getByTestId('continue-button'));
 
       await waitFor(() => {
         expect(mockBack).toHaveBeenCalled();
@@ -1116,7 +1171,9 @@ describe('SessionSummaryScreen', () => {
   // on every exit path, and draft recovery on a previously-skipped session.
   describe('bulletproof drafting [DRAFT-BULLETPROOF-01]', () => {
     it('autosaves the draft after the user types (debounced)', async () => {
+      mockReadSummaryDraft.mockResolvedValue(null);
       render(<SessionSummaryScreen />, { wrapper: Wrapper });
+      await flushAsyncEffects();
 
       fireEvent.changeText(
         screen.getByTestId('summary-input'),
@@ -1144,6 +1201,7 @@ describe('SessionSummaryScreen', () => {
       });
 
       render(<SessionSummaryScreen />, { wrapper: Wrapper });
+      await flushAsyncEffects();
 
       await waitFor(() => {
         expect(screen.getByTestId('summary-input').props.value).toBe(
@@ -1175,7 +1233,7 @@ describe('SessionSummaryScreen', () => {
         screen.getByTestId('summary-input'),
         'Some partial reflection text that is long enough',
       );
-      fireEvent.press(screen.getByTestId('summary-close-button'));
+      await pressAsync(screen.getByTestId('summary-close-button'));
 
       await waitFor(() => {
         expect(platformAlert).toHaveBeenCalled();
@@ -1185,7 +1243,11 @@ describe('SessionSummaryScreen', () => {
       const discard = buttons.find(
         (b: { text: string }) => b.text === 'Discard',
       );
-      await discard.onPress();
+      await act(async () => {
+        discard.onPress();
+        await settleAsyncWork();
+        await settleAsyncWork();
+      });
 
       await waitFor(() => {
         expect(mockClearSummaryDraft).toHaveBeenCalled();
@@ -1246,7 +1308,11 @@ describe('SessionSummaryScreen', () => {
       const submit = buttons.find(
         (b: { text: string }) => b.text === 'Submit now',
       );
-      await submit.onPress();
+      await act(async () => {
+        submit.onPress();
+        await settleAsyncWork();
+        await settleAsyncWork();
+      });
 
       await waitFor(() => {
         screen.getByTestId('summary-submitted');
@@ -1257,7 +1323,7 @@ describe('SessionSummaryScreen', () => {
       render(<SessionSummaryScreen />, { wrapper: Wrapper });
 
       // User types nothing, just taps X.
-      fireEvent.press(screen.getByTestId('summary-close-button'));
+      await pressAsync(screen.getByTestId('summary-close-button'));
 
       await waitFor(() => {
         expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
@@ -1281,6 +1347,7 @@ describe('SessionSummaryScreen', () => {
       });
 
       render(<SessionSummaryScreen />, { wrapper: Wrapper });
+      await flushAsyncEffects();
 
       await waitFor(() => {
         screen.getByTestId('summary-resubmit-banner');

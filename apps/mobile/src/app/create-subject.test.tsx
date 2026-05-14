@@ -4,6 +4,7 @@ import {
   fireEvent,
   waitFor,
   act,
+  cleanup,
 } from '@testing-library/react-native';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -129,6 +130,20 @@ function createWrapper() {
   };
 }
 
+async function enterSubjectName(name: string): Promise<void> {
+  fireEvent.changeText(screen.getByTestId('create-subject-name'), name);
+  await waitFor(() => {
+    expect(screen.getByTestId('create-subject-name').props.value).toBe(name);
+  });
+}
+
+async function enterClarification(text: string): Promise<void> {
+  fireEvent.changeText(screen.getByTestId('subject-clarify-input'), text);
+  await waitFor(() => {
+    expect(screen.getByTestId('subject-clarify-input').props.value).toBe(text);
+  });
+}
+
 // Helper: configure a single resolve response for one call.
 function setResolveResponse(response: unknown) {
   mockFetch.setRoute('/subjects/resolve', response);
@@ -208,6 +223,7 @@ describe('CreateSubjectScreen', () => {
   });
 
   afterEach(() => {
+    cleanup();
     activeQueryClient?.clear();
     activeQueryClient = null;
   });
@@ -261,7 +277,7 @@ describe('CreateSubjectScreen', () => {
 
     render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
-    fireEvent.changeText(screen.getByTestId('create-subject-name'), 'History');
+    await enterSubjectName('History');
     fireEvent.press(screen.getByTestId('create-subject-submit'));
 
     await waitFor(() => {
@@ -315,10 +331,7 @@ describe('CreateSubjectScreen', () => {
 
       render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
-      fireEvent.changeText(
-        screen.getByTestId('create-subject-name'),
-        'Ancient History',
-      );
+      await enterSubjectName('Ancient History');
       fireEvent.press(screen.getByTestId('create-subject-submit'));
 
       await waitFor(() => {
@@ -361,7 +374,7 @@ describe('CreateSubjectScreen', () => {
 
     render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
-    fireEvent.changeText(screen.getByTestId('create-subject-name'), 'ants');
+    await enterSubjectName('ants');
     fireEvent.press(screen.getByTestId('create-subject-submit'));
 
     await waitFor(() => {
@@ -397,7 +410,7 @@ describe('CreateSubjectScreen', () => {
 
     render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
-    fireEvent.changeText(screen.getByTestId('create-subject-name'), 'ants');
+    await enterSubjectName('ants');
     fireEvent.press(screen.getByTestId('create-subject-submit'));
 
     await waitFor(() => {
@@ -405,10 +418,7 @@ describe('CreateSubjectScreen', () => {
     });
 
     fireEvent.press(screen.getByTestId('subject-something-else'));
-    fireEvent.changeText(
-      screen.getByTestId('subject-clarify-input'),
-      'leaf cutter ants',
-    );
+    await enterClarification('leaf cutter ants');
     fireEvent.press(screen.getByTestId('subject-clarify-submit'));
 
     await waitFor(() => {
@@ -454,7 +464,7 @@ describe('CreateSubjectScreen', () => {
 
     render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
-    fireEvent.changeText(screen.getByTestId('create-subject-name'), 'ants');
+    await enterSubjectName('ants');
     fireEvent.press(screen.getByTestId('create-subject-submit'));
 
     await waitFor(() => {
@@ -500,7 +510,7 @@ describe('CreateSubjectScreen', () => {
 
     render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
-    fireEvent.changeText(screen.getByTestId('create-subject-name'), 'Easter');
+    await enterSubjectName('Easter');
     fireEvent.press(screen.getByTestId('create-subject-submit'));
 
     await waitFor(() => {
@@ -572,7 +582,7 @@ describe('CreateSubjectScreen', () => {
 
     render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
-    fireEvent.changeText(screen.getByTestId('create-subject-name'), 'Easter');
+    await enterSubjectName('Easter');
     fireEvent.press(screen.getByTestId('create-subject-submit'));
 
     await waitFor(() => {
@@ -687,7 +697,7 @@ describe('CreateSubjectScreen', () => {
 
     render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
-    fireEvent.changeText(screen.getByTestId('create-subject-name'), 'tea');
+    await enterSubjectName('tea');
     fireEvent.press(screen.getByTestId('create-subject-submit'));
 
     await waitFor(() => {
@@ -746,7 +756,7 @@ describe('CreateSubjectScreen', () => {
 
     render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
-    fireEvent.changeText(screen.getByTestId('create-subject-name'), 'history');
+    await enterSubjectName('history');
     fireEvent.press(screen.getByTestId('create-subject-submit'));
 
     await waitFor(() => {
@@ -801,7 +811,7 @@ describe('CreateSubjectScreen', () => {
       'You have reached the subject limit for your plan';
 
     render(<CreateSubjectScreen />, { wrapper: Wrapper });
-    fireEvent.changeText(screen.getByTestId('create-subject-name'), 'Math');
+    await enterSubjectName('Math');
     fireEvent.press(screen.getByTestId('create-subject-submit'));
 
     await waitFor(() => {
@@ -849,7 +859,7 @@ describe('CreateSubjectScreen', () => {
 
     render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
-    fireEvent.changeText(screen.getByTestId('create-subject-name'), 'Math');
+    await enterSubjectName('Math');
     fireEvent.press(screen.getByTestId('create-subject-submit'));
 
     await waitFor(() => {
@@ -879,7 +889,7 @@ describe('CreateSubjectScreen', () => {
 
     render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
-    fireEvent.changeText(screen.getByTestId('create-subject-name'), 'Math');
+    await enterSubjectName('Math');
     fireEvent.press(screen.getByTestId('create-subject-submit'));
 
     await waitFor(() => {
@@ -909,10 +919,7 @@ describe('CreateSubjectScreen', () => {
 
     render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
-    fireEvent.changeText(
-      screen.getByTestId('create-subject-name'),
-      'World History',
-    );
+    await enterSubjectName('World History');
     fireEvent.press(screen.getByTestId('create-subject-submit'));
 
     await waitFor(() => {
@@ -952,7 +959,7 @@ describe('CreateSubjectScreen', () => {
 
     render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
-    fireEvent.changeText(screen.getByTestId('create-subject-name'), 'Biology');
+    await enterSubjectName('Biology');
     fireEvent.press(screen.getByTestId('create-subject-submit'));
 
     await waitFor(() => {
@@ -972,12 +979,12 @@ describe('CreateSubjectScreen', () => {
   // SUBJECT-01: Chip visibility, returning-user section, hint text
   // ----------------------------------------------------------------
 
-  it('hides starter chips when input has text', () => {
+  it('hides starter chips when input has text', async () => {
     render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
     screen.getByTestId('subject-options');
 
-    fireEvent.changeText(screen.getByTestId('create-subject-name'), 'Bio');
+    await enterSubjectName('Bio');
 
     expect(screen.queryByTestId('subject-options')).toBeNull();
   });
@@ -1035,7 +1042,7 @@ describe('CreateSubjectScreen', () => {
       screen.getByTestId('subject-options');
     });
 
-    fireEvent.changeText(screen.getByTestId('create-subject-name'), 'Science');
+    await enterSubjectName('Science');
 
     expect(screen.queryByTestId('subject-options')).toBeNull();
   });
@@ -1049,10 +1056,10 @@ describe('CreateSubjectScreen', () => {
     ).toBeTruthy();
   });
 
-  it('hides "Not sure?" hint when input has text', () => {
+  it('hides "Not sure?" hint when input has text', async () => {
     render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
-    fireEvent.changeText(screen.getByTestId('create-subject-name'), 'Art');
+    await enterSubjectName('Art');
 
     expect(screen.queryByTestId('not-sure-hint')).toBeNull();
   });
@@ -1085,7 +1092,7 @@ describe('CreateSubjectScreen', () => {
 
     render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
-    fireEvent.changeText(screen.getByTestId('create-subject-name'), 'Math');
+    await enterSubjectName('Math');
     fireEvent.press(screen.getByTestId('create-subject-submit'));
 
     // Wait for resolve to finish (before create fires)
@@ -1135,7 +1142,7 @@ describe('CreateSubjectScreen', () => {
 
     render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
-    fireEvent.changeText(screen.getByTestId('create-subject-name'), 'Science');
+    await enterSubjectName('Science');
     fireEvent.press(screen.getByTestId('create-subject-submit'));
 
     // Cancel while resolve is pending
@@ -1207,7 +1214,7 @@ describe('CreateSubjectScreen', () => {
 
     render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
-    fireEvent.changeText(screen.getByTestId('create-subject-name'), 'italian');
+    await enterSubjectName('italian');
     fireEvent.press(screen.getByTestId('create-subject-submit'));
 
     await waitFor(() => {
@@ -1237,7 +1244,7 @@ describe('CreateSubjectScreen', () => {
 
     render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
-    fireEvent.changeText(screen.getByTestId('create-subject-name'), 'caluclus');
+    await enterSubjectName('caluclus');
     fireEvent.press(screen.getByTestId('create-subject-submit'));
 
     await waitFor(() => {
@@ -1267,7 +1274,7 @@ describe('CreateSubjectScreen', () => {
 
     render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
-    fireEvent.changeText(screen.getByTestId('create-subject-name'), 'italian');
+    await enterSubjectName('italian');
     fireEvent.press(screen.getByTestId('create-subject-submit'));
 
     await waitFor(() => {
@@ -1300,7 +1307,7 @@ describe('CreateSubjectScreen', () => {
 
     render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
-    fireEvent.changeText(screen.getByTestId('create-subject-name'), 'italian');
+    await enterSubjectName('italian');
     fireEvent.press(screen.getByTestId('create-subject-submit'));
 
     await waitFor(() => {
@@ -1331,7 +1338,7 @@ describe('CreateSubjectScreen', () => {
 
     render(<CreateSubjectScreen />, { wrapper: Wrapper });
 
-    fireEvent.changeText(screen.getByTestId('create-subject-name'), 'spanish');
+    await enterSubjectName('spanish');
     fireEvent.press(screen.getByTestId('create-subject-submit'));
 
     await waitFor(() => {

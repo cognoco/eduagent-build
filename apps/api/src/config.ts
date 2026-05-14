@@ -87,6 +87,17 @@ const envSchema = z.object({
   // Topic intent matcher for first curriculum sessions. Keep dark by default
   // for first deploy; flip through Doppler after staging soak.
   MATCHER_ENABLED: z.enum(['true', 'false']).default('false'),
+
+  // Prelaunch override for the IDEMPOTENCY_KV production deploy gate.
+  // The idempotency middleware gates replay dedup on the IDEMPOTENCY_KV
+  // KV binding; if the binding is absent the middleware silently falls
+  // through to the downstream handler, leaving a real duplicate-side-effect
+  // window (billing webhooks, session writes) even with signature +
+  // timestamp checks. Production refuses to serve traffic in that posture
+  // unless this flag is set to 'true' as an explicit prelaunch opt-in;
+  // when active, env validation emits a structured warning so the
+  // override remains visible in telemetry. Default: 'false' (gate on).
+  ALLOW_MISSING_IDEMPOTENCY_KV: z.enum(['true', 'false']).default('false'),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -192,6 +203,48 @@ export function validateProductionKeys(env: Env): string[] {
   }
 
   return missing;
+}
+
+// ---------------------------------------------------------------------------
+// Production KV-binding gate
+//
+// IDEMPOTENCY_KV is a runtime KVNamespace object on c.env, not a string —
+// it cannot be parsed by the zod env schema. This validator runs in the
+// env-validation middleware after validateEnv() and short-circuits with
+// 500 ENV_VALIDATION_ERROR if production is missing the binding without
+// the explicit prelaunch override. Override use is escalated via a
+// structured warning so it remains visible in telemetry.
+// ---------------------------------------------------------------------------
+
+export interface ProductionBindings {
+  IDEMPOTENCY_KV?: unknown;
+}
+
+export interface BindingValidationResult {
+  missing: string[];
+  overrideApplied: boolean;
+}
+
+export function validateProductionBindings(
+  env: Env,
+  bindings: ProductionBindings,
+): BindingValidationResult {
+  if (env.ENVIRONMENT !== 'production') {
+    return { missing: [], overrideApplied: false };
+  }
+
+  const missing: string[] = [];
+  let overrideApplied = false;
+
+  if (bindings.IDEMPOTENCY_KV == null) {
+    if (env.ALLOW_MISSING_IDEMPOTENCY_KV === 'true') {
+      overrideApplied = true;
+    } else {
+      missing.push('IDEMPOTENCY_KV');
+    }
+  }
+
+  return { missing, overrideApplied };
 }
 
 export function validateEnv(raw: Record<string, string | undefined>): Env {

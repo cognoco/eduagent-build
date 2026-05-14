@@ -216,7 +216,7 @@ function setupRoutes(opts: SetupOptions = {}) {
   // GET /subjects/s1/topics/t1/sessions → { sessions }
   mockFetch.setRoute('/topics/t1/sessions', { sessions });
 
-  // GET /bookmarks → { bookmarks, nextCursor }
+  // GET /bookmarks?topicId=t1 → { bookmarks, nextCursor: null }
   mockFetch.setRoute('/bookmarks', { bookmarks, nextCursor: null });
 }
 
@@ -773,5 +773,33 @@ describe('TopicDetailScreen rendering details', () => {
         headers: { 'Content-Type': 'application/json' },
       }),
     );
+  });
+});
+
+describe('TopicDetailScreen — Saved from chat (bookmarks)', () => {
+  let TestWrapper: React.ComponentType<{ children: React.ReactNode }>;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUseLocalSearchParams.mockReturnValue({
+      subjectId: 's1',
+      topicId: 't1',
+    });
+    const { Wrapper } = createWrapper();
+    TestWrapper = Wrapper;
+  });
+
+  it('sends topicId on the bookmarks request (server-side filter, not client)', async () => {
+    setupRoutes({ bookmarks: [] });
+
+    render(<TopicDetailScreen />, { wrapper: TestWrapper });
+
+    await waitFor(() => {
+      const bookmarkCall = mockFetch.mock.calls.find(
+        ([url]: [unknown, ...unknown[]]) => String(url).includes('/bookmarks'),
+      );
+      expect(bookmarkCall).toBeTruthy();
+      expect(String(bookmarkCall![0])).toContain('topicId=t1');
+    });
   });
 });

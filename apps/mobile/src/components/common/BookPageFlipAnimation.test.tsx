@@ -1,3 +1,5 @@
+import * as fs from 'fs';
+import * as path from 'path';
 import { render } from '@testing-library/react-native';
 import { BookPageFlipAnimation } from './BookPageFlipAnimation';
 
@@ -85,5 +87,64 @@ describe('BookPageFlipAnimation', () => {
     expect(() => {
       render(<BookPageFlipAnimation size={200} />);
     }).not.toThrow();
+  });
+
+  // Regression: the Library tab on Android (Fabric / New Architecture) crashed
+  // with `ClassCastException: java.lang.String cannot be cast` inside
+  // `com.facebook.react.viewmanagers.RNSVGGroupManagerDelegate`. Root cause:
+  // a previous BookPageFlipAnimation wrapped `<G>` (Group) from react-native-svg
+  // with `Animated.createAnimatedComponent(G)` and pushed a string `transform`
+  // through `useAnimatedProps`. The Fabric delegate for SVG Group expects a
+  // typed transform object, not a string.
+  //
+  // The current implementation animates `<Animated.View>` wrappers and keeps
+  // react-native-svg elements (Svg/Rect/LinearGradient) static. This test
+  // fails if a future refactor reintroduces an animated SVG `G` / `Line`.
+  // Filed in the Android E2E tracker (Notion: react-native-svg crash on Fabric).
+  it('does not animate react-native-svg Group/Line elements (Fabric crash guard)', () => {
+    const source = fs.readFileSync(
+      path.join(__dirname, 'BookPageFlipAnimation.tsx'),
+      'utf8',
+    );
+    // Strip line comments and block comments before scanning so doc references
+    // above this test do not trip the guard.
+    const stripped = source
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/(^|[^:])\/\/.*$/gm, '$1');
+
+    // No createAnimatedComponent call on any react-native-svg primitive.
+    expect(stripped).not.toMatch(/createAnimatedComponent\s*\(\s*G\s*\)/);
+    expect(stripped).not.toMatch(/createAnimatedComponent\s*\(\s*Line\s*\)/);
+    expect(stripped).not.toMatch(/createAnimatedComponent\s*\(\s*Rect\s*\)/);
+    expect(stripped).not.toMatch(/createAnimatedComponent\s*\(\s*SvgRect\s*\)/);
+
+    // No bare `G` (Group) import from react-native-svg — even if not animated
+    // today, importing it invites the next contributor to animate it. Allowed
+    // primitives: Svg, Defs, Rect / SvgRect, LinearGradient, Stop, Path, Circle.
+    //
+    // Limitation: this regex matches the FIRST `react-native-svg` import
+    // statement only. If the file ever declares two separate imports from
+    // 'react-native-svg' (e.g. a type-only import plus a value import), a
+    // forbidden symbol smuggled into the second statement would not be
+    // caught. Today the file has a single import clause and this is fine —
+    // revisit if that ever changes.
+    const svgImportMatch = stripped.match(
+      /import\s+([^;]+?)\s+from\s+['"]react-native-svg['"]/,
+    );
+    expect(svgImportMatch).not.toBeNull();
+    const importClause = svgImportMatch?.[1] ?? '';
+    // Match named imports inside the clause, e.g. `Svg, { Defs, Rect as SvgRect, G }`
+    const named = importClause.match(/\{([^}]*)\}/)?.[1] ?? '';
+    const names = named
+      .split(',')
+      .map((s) =>
+        s
+          .trim()
+          .split(/\s+as\s+/)[0]
+          ?.trim(),
+      )
+      .filter(Boolean);
+    expect(names).not.toContain('G');
+    expect(names).not.toContain('Line');
   });
 });

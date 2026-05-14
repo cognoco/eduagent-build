@@ -161,7 +161,7 @@ interface ClerkUser {
  */
 async function createClerkTestUser(
   email: string,
-  env: SeedEnv
+  env: SeedEnv,
 ): Promise<{ clerkUserId: string; password: string }> {
   const password = env.SEED_PASSWORD ?? DEFAULT_SEED_PASSWORD;
 
@@ -238,7 +238,7 @@ async function createClerkTestUser(
  * Requires CLERK_SECRET_KEY — returns null without it. */
 async function findClerkUserByEmail(
   email: string,
-  env: SeedEnv
+  env: SeedEnv,
 ): Promise<ClerkUser | null> {
   if (!env.CLERK_SECRET_KEY) return null;
 
@@ -267,7 +267,7 @@ async function findClerkUserByEmail(
  */
 async function deleteClerkTestUsers(
   env: SeedEnv,
-  options: ResetOptions = {}
+  options: ResetOptions = {},
 ): Promise<{ count: number; clerkUserIds: string[] }> {
   if (!env.CLERK_SECRET_KEY) return { count: 0, clerkUserIds: [] };
   const prefix = options.prefix?.trim().toLowerCase();
@@ -283,7 +283,7 @@ async function deleteClerkTestUsers(
       `${CLERK_API_BASE}/users?limit=${pageSize}&offset=${offset}&order_by=-created_at`,
       {
         headers: { Authorization: `Bearer ${env.CLERK_SECRET_KEY}` },
-      }
+      },
     );
 
     if (!listRes.ok) break;
@@ -297,7 +297,7 @@ async function deleteClerkTestUsers(
       const matchesEmailPrefix =
         !prefix ||
         user.email_addresses.some((email) =>
-          email.email_address.toLowerCase().startsWith(prefix)
+          email.email_address.toLowerCase().startsWith(prefix),
         );
 
       if (matchesSeedPrefix && matchesEmailPrefix) {
@@ -359,7 +359,7 @@ function futureDate(daysAhead: number): Date {
 async function createBaseAccount(
   db: Database,
   email: string,
-  clerkUserId: string
+  clerkUserId: string,
 ): Promise<{ accountId: string }> {
   const accountId = generateUUIDv7();
   await db.insert(accounts).values({
@@ -377,7 +377,7 @@ async function createBaseProfile(
     displayName: string;
     birthYear: number;
     isOwner?: boolean;
-  }
+  },
 ): Promise<string> {
   const profileId = generateUUIDv7();
 
@@ -396,7 +396,7 @@ async function createSubjectWithCurriculum(
   profileId: string,
   name: string,
   status: 'active' | 'paused' | 'archived' = 'active',
-  topicCount = 3
+  topicCount = 3,
 ): Promise<{
   subjectId: string;
   curriculumId: string;
@@ -456,7 +456,7 @@ async function createSubjectWithCurriculum(
 type SeederFn = (
   db: Database,
   email: string,
-  env: SeedEnv
+  env: SeedEnv,
 ) => Promise<SeedResult>;
 
 /** Onboarding complete but with 0 subjects — for testing the empty-state
@@ -466,7 +466,7 @@ type SeederFn = (
 async function seedOnboardingNoSubject(
   db: Database,
   email: string,
-  env: SeedEnv
+  env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
@@ -497,7 +497,7 @@ async function seedOnboardingNoSubject(
 async function seedOnboardingComplete(
   db: Database,
   email: string,
-  env: SeedEnv
+  env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
@@ -524,7 +524,7 @@ async function seedOnboardingComplete(
   const { subjectId, topicIds } = await createSubjectWithCurriculum(
     db,
     profileId,
-    'General Studies'
+    'General Studies',
   );
 
   // FIX-06: Create retention cards with mixed xpStatus so the curriculum_complete
@@ -567,7 +567,7 @@ async function seedOnboardingComplete(
 async function seedLearningActive(
   db: Database,
   email: string,
-  env: SeedEnv
+  env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
@@ -579,7 +579,7 @@ async function seedLearningActive(
   const { subjectId, bookId, topicIds } = await createSubjectWithCurriculum(
     db,
     profileId,
-    'World History'
+    'World History',
   );
 
   const sessionId = generateUUIDv7();
@@ -633,7 +633,7 @@ async function seedLearningActive(
 async function seedRetentionDue(
   db: Database,
   email: string,
-  env: SeedEnv
+  env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
@@ -645,7 +645,7 @@ async function seedRetentionDue(
   const { subjectId, topicIds } = await createSubjectWithCurriculum(
     db,
     profileId,
-    'Biology'
+    'Biology',
   );
 
   // Batch insert retention cards in a single INSERT statement
@@ -677,7 +677,7 @@ async function seedRetentionDue(
 async function seedFailedRecall3x(
   db: Database,
   email: string,
-  env: SeedEnv
+  env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
@@ -689,7 +689,7 @@ async function seedFailedRecall3x(
   const { subjectId, topicIds } = await createSubjectWithCurriculum(
     db,
     profileId,
-    'Chemistry'
+    'Chemistry',
   );
 
   const targetTopicId = topicIds[0];
@@ -745,7 +745,7 @@ async function seedFailedRecall3x(
 async function seedParentWithChildren(
   db: Database,
   email: string,
-  env: SeedEnv
+  env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
@@ -785,8 +785,21 @@ async function seedParentWithChildren(
   const { subjectId } = await createSubjectWithCurriculum(
     db,
     childProfileId,
-    'Mathematics'
+    'Mathematics',
   );
+
+  // Link the session to the first curriculum topic so getChildSubjectTopics
+  // (which filters by totalSessions >= 1) surfaces a topic card for parent
+  // drill-down screens. Without topicId, the parent subject view shows the
+  // empty state even though the child has a session.
+  const curriculumRow = await db.query.curricula.findFirst({
+    where: (c, { eq: eqFn }) => eqFn(c.subjectId, subjectId),
+  });
+  const firstTopicRow = curriculumRow
+    ? await db.query.curriculumTopics.findFirst({
+        where: (t, { eq: eqFn }) => eqFn(t.curriculumId, curriculumRow.id),
+      })
+    : undefined;
 
   // Child has a completed session
   const sessionId = generateUUIDv7();
@@ -794,6 +807,7 @@ async function seedParentWithChildren(
     id: sessionId,
     profileId: childProfileId,
     subjectId,
+    topicId: firstTopicRow?.id,
     sessionType: 'learning',
     status: 'completed',
     exchangeCount: 8,
@@ -806,14 +820,20 @@ async function seedParentWithChildren(
     profileId: parentProfileId,
     email,
     password,
-    ids: { parentProfileId, childProfileId, subjectId, sessionId },
+    ids: {
+      parentProfileId,
+      childProfileId,
+      subjectId,
+      sessionId,
+      topicId: firstTopicRow?.id ?? '',
+    },
   };
 }
 
 async function seedParentMultiChild(
   db: Database,
   email: string,
-  env: SeedEnv
+  env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
@@ -999,7 +1019,7 @@ async function seedParentMultiChild(
 async function seedTrialActive(
   db: Database,
   email: string,
-  env: SeedEnv
+  env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
@@ -1031,7 +1051,7 @@ async function seedTrialActive(
   const { subjectId, topicIds } = await createSubjectWithCurriculum(
     db,
     profileId,
-    'Science'
+    'Science',
   );
 
   const firstTopicId = topicIds[0];
@@ -1050,7 +1070,7 @@ async function seedTrialActive(
 async function seedTrialExpired(
   db: Database,
   email: string,
-  env: SeedEnv
+  env: SeedEnv,
 ): Promise<SeedResult> {
   const freeTier = getTierConfig('free');
   const { clerkUserId, password } = await createClerkTestUser(email, env);
@@ -1085,7 +1105,7 @@ async function seedTrialExpired(
   const { subjectId, topicIds } = await createSubjectWithCurriculum(
     db,
     profileId,
-    'History'
+    'History',
   );
 
   const firstTopicId = topicIds[0];
@@ -1104,7 +1124,7 @@ async function seedTrialExpired(
 async function seedMultiSubject(
   db: Database,
   email: string,
-  env: SeedEnv
+  env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
@@ -1117,21 +1137,21 @@ async function seedMultiSubject(
     db,
     profileId,
     'Physics',
-    'active'
+    'active',
   );
 
   const { subjectId: pausedSubjectId } = await createSubjectWithCurriculum(
     db,
     profileId,
     'Literature',
-    'paused'
+    'paused',
   );
 
   const { subjectId: archivedSubjectId } = await createSubjectWithCurriculum(
     db,
     profileId,
     'Art History',
-    'archived'
+    'archived',
   );
 
   return {
@@ -1152,7 +1172,7 @@ async function seedMultiSubject(
 async function seedMultiSubjectPractice(
   db: Database,
   email: string,
-  env: SeedEnv
+  env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
@@ -1165,14 +1185,14 @@ async function seedMultiSubjectPractice(
     db,
     profileId,
     'Physics',
-    'active'
+    'active',
   );
 
   const { subjectId: chemistrySubjectId } = await createSubjectWithCurriculum(
     db,
     profileId,
     'Chemistry',
-    'active'
+    'active',
   );
 
   return {
@@ -1188,7 +1208,7 @@ async function seedMultiSubjectPractice(
 async function seedHomeworkReady(
   db: Database,
   email: string,
-  env: SeedEnv
+  env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
@@ -1200,7 +1220,7 @@ async function seedHomeworkReady(
   const { subjectId, topicIds } = await createSubjectWithCurriculum(
     db,
     profileId,
-    'Algebra'
+    'Algebra',
   );
 
   // Completed learning session — gives the learner context for homework
@@ -1232,7 +1252,7 @@ async function seedHomeworkReady(
 async function seedTrialExpiredChild(
   db: Database,
   email: string,
-  env: SeedEnv
+  env: SeedEnv,
 ): Promise<SeedResult> {
   const freeTier = getTierConfig('free');
   const { clerkUserId, password } = await createClerkTestUser(email, env);
@@ -1297,7 +1317,7 @@ async function seedTrialExpiredChild(
     childProfileId,
     'Science',
     'active',
-    4
+    4,
   );
 
   return {
@@ -1313,7 +1333,7 @@ async function seedTrialExpiredChild(
 async function seedConsentWithdrawn(
   db: Database,
   email: string,
-  env: SeedEnv
+  env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
@@ -1362,7 +1382,7 @@ async function seedConsentWithdrawn(
 async function seedConsentWithdrawnSolo(
   db: Database,
   email: string,
-  env: SeedEnv
+  env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
@@ -1396,7 +1416,7 @@ async function seedConsentWithdrawnSolo(
 async function seedParentSolo(
   db: Database,
   email: string,
-  env: SeedEnv
+  env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
@@ -1453,7 +1473,7 @@ async function seedParentSolo(
 async function seedPreProfile(
   db: Database,
   email: string,
-  env: SeedEnv
+  env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
@@ -1476,7 +1496,7 @@ async function seedPreProfile(
 async function seedConsentPending(
   db: Database,
   email: string,
-  env: SeedEnv
+  env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
@@ -1509,7 +1529,7 @@ async function seedConsentPending(
 async function seedLanguageLearner(
   db: Database,
   email: string,
-  env: SeedEnv
+  env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
@@ -1645,7 +1665,7 @@ async function seedLanguageLearner(
 async function seedLanguageSubjectActive(
   db: Database,
   email: string,
-  env: SeedEnv
+  env: SeedEnv,
 ): Promise<SeedResult> {
   const base = await seedLanguageLearner(db, email, env);
   const subjectId = base.ids.subjectId;
@@ -1710,7 +1730,7 @@ async function seedLanguageSubjectActive(
 async function seedParentWithReports(
   db: Database,
   email: string,
-  env: SeedEnv
+  env: SeedEnv,
 ): Promise<SeedResult> {
   const base = await seedParentWithChildren(db, email, env);
   const parentProfileId = base.ids.parentProfileId;
@@ -1718,7 +1738,7 @@ async function seedParentWithReports(
 
   if (!parentProfileId || !childProfileId) {
     throw new Error(
-      'parent-with-children seed did not return parent/child IDs'
+      'parent-with-children seed did not return parent/child IDs',
     );
   }
 
@@ -1777,7 +1797,7 @@ async function seedParentWithReports(
 async function seedMentorMemoryPopulated(
   db: Database,
   email: string,
-  env: SeedEnv
+  env: SeedEnv,
 ): Promise<SeedResult> {
   const base = await seedParentWithChildren(db, email, env);
   const childProfileId = base.ids.childProfileId;
@@ -1785,7 +1805,7 @@ async function seedMentorMemoryPopulated(
 
   if (!childProfileId || !subjectId) {
     throw new Error(
-      'parent-with-children seed did not return childProfileId/subjectId'
+      'parent-with-children seed did not return childProfileId/subjectId',
     );
   }
 
@@ -1865,7 +1885,7 @@ async function seedMentorMemoryPopulated(
 async function seedAccountDeletionScheduled(
   db: Database,
   email: string,
-  env: SeedEnv
+  env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
 
@@ -1913,7 +1933,7 @@ async function seedAccountDeletionScheduled(
   const { subjectId } = await createSubjectWithCurriculum(
     db,
     profileId,
-    'General Studies'
+    'General Studies',
   );
 
   return {
@@ -1935,7 +1955,7 @@ async function seedAccountDeletionScheduled(
 async function seedSessionWithTranscript(
   db: Database,
   email: string,
-  env: SeedEnv
+  env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
@@ -1956,7 +1976,7 @@ async function seedSessionWithTranscript(
   const { subjectId, bookId, topicIds } = await createSubjectWithCurriculum(
     db,
     profileId,
-    'Mathematics'
+    'Mathematics',
   );
 
   const topicId = topicIds[0];
@@ -2086,7 +2106,7 @@ async function seedSessionWithTranscript(
 async function seedParentProxy(
   db: Database,
   email: string,
-  env: SeedEnv
+  env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
@@ -2121,7 +2141,7 @@ async function seedParentProxy(
   const { subjectId, bookId, topicIds } = await createSubjectWithCurriculum(
     db,
     childProfileId,
-    'Science'
+    'Science',
   );
 
   const topicId = topicIds[0];
@@ -2229,7 +2249,7 @@ async function seedParentProxy(
 async function seedWithBookmarks(
   db: Database,
   email: string,
-  env: SeedEnv
+  env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
@@ -2250,7 +2270,7 @@ async function seedWithBookmarks(
   const { subjectId, bookId, topicIds } = await createSubjectWithCurriculum(
     db,
     profileId,
-    'History'
+    'History',
   );
 
   const topicId = topicIds[0];
@@ -2316,7 +2336,7 @@ async function seedWithBookmarks(
 async function seedParentWithWeeklyReport(
   db: Database,
   email: string,
-  env: SeedEnv
+  env: SeedEnv,
 ): Promise<SeedResult> {
   const base = await seedParentWithChildren(db, email, env);
   const parentProfileId = base.ids.parentProfileId;
@@ -2324,19 +2344,23 @@ async function seedParentWithWeeklyReport(
 
   if (!parentProfileId || !childProfileId) {
     throw new Error(
-      'parent-with-children seed did not return parent/child IDs'
+      'parent-with-children seed did not return parent/child IDs',
     );
   }
 
   const reportId = generateUUIDv7();
+  const reportWeek = '2026-04-28'; // Monday start
   await db.insert(weeklyReports).values({
     id: reportId,
     profileId: parentProfileId,
     childProfileId,
-    reportWeek: '2026-04-28', // Monday start
+    reportWeek,
     reportData: {
       childName: 'Test Teen',
-      weekOf: 'April 28 – May 4, 2026',
+      // weeklyReportDataSchema requires `weekStart` (ISO YYYY-MM-DD);
+      // omitting it makes mapWeeklyReportRow's safeParse return null and
+      // the detail screen shows the gone fallback instead of the report.
+      weekStart: reportWeek,
       thisWeek: {
         totalSessions: 4,
         totalActiveMinutes: 48,
@@ -2387,7 +2411,7 @@ async function seedParentWithWeeklyReport(
 async function seedParentSessionWithRecap(
   db: Database,
   email: string,
-  env: SeedEnv
+  env: SeedEnv,
 ): Promise<SeedResult> {
   const base = await seedParentWithChildren(db, email, env);
   const childProfileId = base.ids.childProfileId;
@@ -2434,7 +2458,7 @@ async function seedParentSessionWithRecap(
 async function seedParentSessionRecapEmpty(
   db: Database,
   email: string,
-  env: SeedEnv
+  env: SeedEnv,
 ): Promise<SeedResult> {
   const base = await seedParentWithChildren(db, email, env);
   const childProfileId = base.ids.childProfileId;
@@ -2475,7 +2499,7 @@ async function seedParentSessionRecapEmpty(
 async function seedParentSubjectWithRetention(
   db: Database,
   email: string,
-  env: SeedEnv
+  env: SeedEnv,
 ): Promise<SeedResult> {
   const base = await seedParentWithChildren(db, email, env);
   const childProfileId = base.ids.childProfileId;
@@ -2483,7 +2507,7 @@ async function seedParentSubjectWithRetention(
 
   if (!childProfileId || !subjectId) {
     throw new Error(
-      'parent-with-children seed did not return childProfileId/subjectId'
+      'parent-with-children seed did not return childProfileId/subjectId',
     );
   }
 
@@ -2531,7 +2555,7 @@ async function seedParentSubjectWithRetention(
 async function seedParentSubjectNoRetention(
   db: Database,
   email: string,
-  env: SeedEnv
+  env: SeedEnv,
 ): Promise<SeedResult> {
   const base = await seedParentWithChildren(db, email, env);
   // No retention cards inserted — that's the distinguishing feature.
@@ -2550,7 +2574,7 @@ async function seedParentSubjectNoRetention(
 async function seedSubscriptionFamilyActive(
   db: Database,
   email: string,
-  env: SeedEnv
+  env: SeedEnv,
 ): Promise<SeedResult> {
   const familyTier = getTierConfig('family');
   const { clerkUserId, password } = await createClerkTestUser(email, env);
@@ -2591,7 +2615,7 @@ async function seedSubscriptionFamilyActive(
   const { subjectId } = await createSubjectWithCurriculum(
     db,
     profileId,
-    'General Knowledge'
+    'General Knowledge',
   );
 
   return {
@@ -2612,7 +2636,7 @@ async function seedSubscriptionFamilyActive(
 async function seedSubscriptionProActive(
   db: Database,
   email: string,
-  env: SeedEnv
+  env: SeedEnv,
 ): Promise<SeedResult> {
   const proTier = getTierConfig('pro');
   const { clerkUserId, password } = await createClerkTestUser(email, env);
@@ -2653,7 +2677,7 @@ async function seedSubscriptionProActive(
   const { subjectId } = await createSubjectWithCurriculum(
     db,
     profileId,
-    'Advanced Mathematics'
+    'Advanced Mathematics',
   );
 
   return {
@@ -2678,7 +2702,7 @@ async function seedSubscriptionProActive(
 async function seedPurchasePending(
   db: Database,
   email: string,
-  env: SeedEnv
+  env: SeedEnv,
 ): Promise<SeedResult> {
   const freeTier = getTierConfig('free');
   const { clerkUserId, password } = await createClerkTestUser(email, env);
@@ -2721,7 +2745,7 @@ async function seedPurchasePending(
   const { subjectId } = await createSubjectWithCurriculum(
     db,
     profileId,
-    'History'
+    'History',
   );
 
   return {
@@ -2745,7 +2769,7 @@ async function seedPurchasePending(
 async function seedPurchaseConfirmed(
   db: Database,
   email: string,
-  env: SeedEnv
+  env: SeedEnv,
 ): Promise<SeedResult> {
   const plusTier = getTierConfig('plus');
   const { clerkUserId, password } = await createClerkTestUser(email, env);
@@ -2786,7 +2810,7 @@ async function seedPurchaseConfirmed(
   const { subjectId } = await createSubjectWithCurriculum(
     db,
     profileId,
-    'Science'
+    'Science',
   );
 
   return {
@@ -2809,7 +2833,7 @@ async function seedPurchaseConfirmed(
 async function seedQuotaExceeded(
   db: Database,
   email: string,
-  env: SeedEnv
+  env: SeedEnv,
 ): Promise<SeedResult> {
   const freeTier = getTierConfig('free');
   const { clerkUserId, password } = await createClerkTestUser(email, env);
@@ -2852,7 +2876,7 @@ async function seedQuotaExceeded(
   const { subjectId, topicIds } = await createSubjectWithCurriculum(
     db,
     profileId,
-    'Mathematics'
+    'Mathematics',
   );
 
   const topicId = topicIds[0];
@@ -2880,7 +2904,7 @@ async function seedQuotaExceeded(
 async function seedForbidden(
   db: Database,
   email: string,
-  env: SeedEnv
+  env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
@@ -2902,7 +2926,7 @@ async function seedForbidden(
   const { subjectId } = await createSubjectWithCurriculum(
     db,
     profileId,
-    'Science'
+    'Science',
   );
 
   return {
@@ -2928,7 +2952,7 @@ async function seedForbidden(
 async function seedQuizMalformedRound(
   db: Database,
   email: string,
-  env: SeedEnv
+  env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
@@ -2968,7 +2992,7 @@ async function seedQuizMalformedRound(
   const { subjectId } = await createSubjectWithCurriculum(
     db,
     profileId,
-    'Geography'
+    'Geography',
   );
 
   // Build a round with a capitals question whose distractors are duplicates of
@@ -3022,7 +3046,7 @@ async function seedQuizMalformedRound(
 async function seedQuizDeterministicWrongAnswer(
   db: Database,
   email: string,
-  env: SeedEnv
+  env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
@@ -3062,7 +3086,7 @@ async function seedQuizDeterministicWrongAnswer(
   const { subjectId } = await createSubjectWithCurriculum(
     db,
     profileId,
-    'Geography'
+    'Geography',
   );
 
   // Question with correctAnswer='Paris', distractors are clearly wrong.
@@ -3114,7 +3138,7 @@ async function seedQuizDeterministicWrongAnswer(
 async function seedQuizAnswerCheckFails(
   db: Database,
   email: string,
-  env: SeedEnv
+  env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
@@ -3154,7 +3178,7 @@ async function seedQuizAnswerCheckFails(
   const { subjectId } = await createSubjectWithCurriculum(
     db,
     profileId,
-    'Geography'
+    'Geography',
   );
 
   // A completed round whose check endpoint will reject the request (already
@@ -3207,7 +3231,7 @@ async function seedQuizAnswerCheckFails(
 async function seedDailyLimitReached(
   db: Database,
   email: string,
-  env: SeedEnv
+  env: SeedEnv,
 ): Promise<SeedResult> {
   const freeTier = getTierConfig('free');
   const { clerkUserId, password } = await createClerkTestUser(email, env);
@@ -3240,7 +3264,7 @@ async function seedDailyLimitReached(
   const { subjectId, topicIds } = await createSubjectWithCurriculum(
     db,
     profileId,
-    'Mathematics'
+    'Mathematics',
   );
 
   // Create an active session so the user can attempt to send a message
@@ -3267,7 +3291,7 @@ async function seedDailyLimitReached(
         i % 2 === 0
           ? 'What is algebra?'
           : 'Algebra is a branch of mathematics...',
-    }))
+    })),
   );
 
   const firstTopicId = topicIds[0];
@@ -3290,7 +3314,7 @@ async function seedDailyLimitReached(
 async function seedReviewEmpty(
   db: Database,
   email: string,
-  env: SeedEnv
+  env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
@@ -3302,7 +3326,7 @@ async function seedReviewEmpty(
   const { subjectId, topicIds } = await createSubjectWithCurriculum(
     db,
     profileId,
-    'Environmental Science'
+    'Environmental Science',
   );
 
   // All cards scheduled for the future — totalOverdue === 0.
@@ -3351,7 +3375,7 @@ async function seedReviewEmpty(
 async function seedDictationWithMistakes(
   db: Database,
   email: string,
-  env: SeedEnv
+  env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
@@ -3372,7 +3396,7 @@ async function seedDictationWithMistakes(
   const { subjectId } = await createSubjectWithCurriculum(
     db,
     profileId,
-    'English'
+    'English',
   );
 
   return {
@@ -3396,7 +3420,7 @@ async function seedDictationWithMistakes(
 async function seedDictationPerfectScore(
   db: Database,
   email: string,
-  env: SeedEnv
+  env: SeedEnv,
 ): Promise<SeedResult> {
   const { clerkUserId, password } = await createClerkTestUser(email, env);
   const { accountId } = await createBaseAccount(db, email, clerkUserId);
@@ -3417,7 +3441,7 @@ async function seedDictationPerfectScore(
   const { subjectId } = await createSubjectWithCurriculum(
     db,
     profileId,
-    'English'
+    'English',
   );
 
   return {
@@ -3487,7 +3511,7 @@ export async function seedScenario(
   db: Database,
   scenario: SeedScenario,
   email: string,
-  env: SeedEnv = {}
+  env: SeedEnv = {},
 ): Promise<SeedResult> {
   const seeder = SCENARIO_MAP[scenario];
   if (!seeder) {
@@ -3519,7 +3543,7 @@ export async function seedScenario(
 export async function resetDatabase(
   db: Database,
   env: SeedEnv = {},
-  options: ResetOptions = {}
+  options: ResetOptions = {},
 ): Promise<ResetResult> {
   const prefix = options.prefix?.trim();
 
@@ -3578,7 +3602,7 @@ export interface DebugAccountChain {
  * accessible in test/development environments. */
 export async function debugAccountsByEmail(
   db: Database,
-  email: string
+  email: string,
 ): Promise<DebugAccountChain[]> {
   const accountRows = await db.query.accounts.findMany({
     where: eq(accounts.email, email),
@@ -3605,7 +3629,7 @@ export async function debugAccountsByEmail(
               status: s.status,
             })),
           };
-        })
+        }),
       );
       return {
         id: acc.id,
@@ -3613,7 +3637,7 @@ export async function debugAccountsByEmail(
         email: acc.email,
         profiles: profilesWithSubjects,
       };
-    })
+    }),
   );
 }
 
@@ -3631,7 +3655,7 @@ export interface DebugSubjectsResult {
  */
 export async function debugSubjectsByClerkUserId(
   db: Database,
-  clerkUserId: string
+  clerkUserId: string,
 ): Promise<
   | { result: DebugSubjectsResult }
   | { error: string; detail: Record<string, string> }

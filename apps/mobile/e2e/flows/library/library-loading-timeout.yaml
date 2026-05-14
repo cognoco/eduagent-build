@@ -1,0 +1,75 @@
+# Flow LEARN-LIB: Library Loading Timeout Fallback (slow-network)
+#
+# Validates: when subjects/progress queries stay in-flight for >15s,
+# the `library-load-timeout` ErrorFallback is shown. Tapping
+# `library-load-timeout-retry` refetches both queries and dismisses the view.
+#
+# Source: apps/mobile/src/app/(app)/library.tsx
+#   - LOAD_TIMEOUT_MS = 15_000 (line 204 — setTimeout(..., 15_000))
+#   - testID "library-load-timeout" at line 502
+#   - testID "library-load-timeout-retry" at line 495 (refetches subjects + progress)
+#
+# testIDs verified against source:
+#   library-load-timeout         apps/mobile/src/app/(app)/library.tsx line 502
+#   library-load-timeout-retry   apps/mobile/src/app/(app)/library.tsx line 495
+#
+# Mechanism: NETWORK_DELAY_MS = 15000 (library LOAD_TIMEOUT_MS) + 2000 (margin) = 17000 ms.
+# Applied via the emulator console by seed-and-run.sh after the bundle loads.
+#
+# Run command:
+#   NETWORK_DELAY_MS=17000 ./e2e/scripts/seed-and-run.sh onboarding-complete e2e/flows/library/library-loading-timeout.yaml
+#
+# Tags: weekly, library, slow-net
+appId: com.mentomate.app
+tags:
+  - weekly
+  - library
+  - slow-net
+---
+# ── Step 1: Sign in with seeded credentials ──
+# Reuses the canonical sign-in flow (testIDs: sign-in-email, sign-in-password,
+# sign-in-button — verified at apps/mobile/src/app/(auth)/sign-in.tsx:1293,
+# 1311, 1334).
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+
+- takeScreenshot: library-timeout-01-after-sign-in
+
+# ── Step 2: Navigate to Library tab ──
+# Wait for the home screen to settle (spinner or content), then tap Library tab.
+- extendedWaitUntil:
+    visible:
+      id: "tab-library"
+    timeout: 25000
+
+- tapOn:
+    id: "tab-library"
+
+- takeScreenshot: library-timeout-02-navigated-to-library
+
+# ── Step 3: Wait for library-load-timeout to appear ──
+# With 17s network delay the subjects query cannot complete before the 15s timer
+# fires. Total wait: 30s covers the 15s timer + navigation + sign-in RTT.
+- extendedWaitUntil:
+    visible:
+      id: "library-load-timeout"
+    timeout: 30000
+
+- takeScreenshot: library-timeout-03-timeout-visible
+
+- assertVisible:
+    id: "library-load-timeout"
+
+# ── Step 4: Tap retry ──
+- tapOn:
+    id: "library-load-timeout-retry"
+
+- takeScreenshot: library-timeout-04-after-retry
+
+# ── Step 5: Assert timeout view is gone after retry ──
+# refetch() dismisses the timeout state; the screen returns to shimmer skeleton
+# or library content. Either way, library-load-timeout must no longer be visible.
+- assertNotVisible:
+    id: "library-load-timeout"
+
+- takeScreenshot: library-timeout-05-timeout-dismissed

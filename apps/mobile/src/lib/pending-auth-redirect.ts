@@ -104,3 +104,30 @@ export function clearPendingAuthRedirect(): void {
   pendingAuthRedirectRecord = null;
   writeSessionRecord(null);
 }
+
+/**
+ * Dev/E2E only. Writes a pending-redirect record whose `savedAt` is
+ * artificially backdated by `staleMs` milliseconds, so callers can
+ * simulate a TTL-expired record without waiting.
+ *
+ * Throws in production builds or when `EXPO_PUBLIC_E2E !== 'true'`.
+ */
+export function seedPendingAuthRedirectForTesting(
+  path: string,
+  staleMs: number,
+): void {
+  if (
+    process.env.NODE_ENV === 'production' ||
+    process.env.EXPO_PUBLIC_E2E !== 'true'
+  ) {
+    throw new Error('seedPendingAuthRedirectForTesting is dev-only');
+  }
+
+  const record: PendingAuthRedirectRecord = {
+    path: toInternalAppRedirectPath(path),
+    savedAt: Date.now() - staleMs,
+  };
+
+  pendingAuthRedirectRecord = record;
+  writeSessionRecord(record);
+}

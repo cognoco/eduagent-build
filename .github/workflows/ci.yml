@@ -161,7 +161,10 @@ jobs:
           BASE_REF: ${{ github.base_ref }}
         run: |
           set -euo pipefail
-          violations=$(git diff "origin/${BASE_REF}...HEAD" -- '*.test.ts' '*.test.tsx' \
+          # Exclude the GC1 detector's own test file — its fixtures are
+          # literal "jest.mock(...)" strings used to test the detector, not
+          # real jest.mock calls.
+          violations=$(git diff "origin/${BASE_REF}...HEAD" -- '*.test.ts' '*.test.tsx' ':!scripts/check-gc1-pattern-a.test.ts' \
             | grep -E '^\+[^+]' \
             | grep -E "jest\.mock\(['\"\`]\.\.?/" \
             | grep -iv 'gc1-allow' \

@@ -32,9 +32,9 @@ async function emitOwnershipMismatchEvent(input: {
   subscriptionId: string;
   profileId: string;
 }): Promise<void> {
-  // Telemetry must never block billing logic. safeSend captures any Inngest
-  // outage to Sentry and logs it as a structured observable so a transient
-  // failure does not erase the signal entirely.
+  // Telemetry must never block billing logic. safeSend escalates dispatch
+  // failures via Sentry + structured error log so a transient Inngest outage
+  // does not erase the signal entirely.
   await safeSend(
     () =>
       inngest.send({

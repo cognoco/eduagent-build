@@ -27,7 +27,7 @@ tags:
 - tapOn:
     id: "create-subject-name"
 - inputText: "Italian"
-- pressKey: back
+- hideKeyboard
 
 - extendedWaitUntil:
     visible:

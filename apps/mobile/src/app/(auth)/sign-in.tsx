@@ -1145,255 +1145,257 @@ export default function SignInScreen() {
           keyboardDismissMode="interactive"
           testID="sign-in-scroll"
         >
-          <View className="items-center mt-2 mb-1">
-            <MentomateLogo size="sm" />
-          </View>
-          <Text
-            className="text-h2 font-bold text-text-primary mb-1 text-center"
-            testID={
-              isReturningUser === null
-                ? 'sign-in-welcome-loading'
-                : isReturningUser
-                  ? 'sign-in-welcome-returning'
-                  : 'sign-in-welcome-first-time'
-            }
-          >
-            {isReturningUser === null
-              ? 'Welcome'
-              : isReturningUser
-                ? 'Welcome back'
-                : 'Welcome to MentoMate'}
-          </Text>
-          <Text
-            className="text-body-sm text-text-secondary mb-2 text-center"
-            testID={
-              isReturningUser === null
-                ? 'sign-in-subtitle-loading'
-                : isReturningUser
-                  ? 'sign-in-subtitle-returning'
-                  : 'sign-in-subtitle-first-time'
-            }
-          >
-            {isReturningUser === null
-              ? 'Sign in to get started'
-              : isReturningUser
-                ? 'Sign in to continue learning'
-                : 'Sign in to start learning'}
-          </Text>
-
-          {error !== '' && (
-            <View
-              className="bg-danger/10 rounded-card px-4 py-3 mb-4"
-              accessibilityRole="alert"
-            >
-              <Text className="text-danger text-body-sm">{error}</Text>
+          <View testID="sign-in-content">
+            <View className="items-center mt-2 mb-1">
+              <MentomateLogo size="sm" />
             </View>
-          )}
-
-          {unsupportedVerificationStrategies.length > 0 && (
-            <View
-              className="bg-surface rounded-card px-4 py-4 mb-4"
-              testID="sign-in-unsupported-factor-help"
+            <Text
+              className="text-h2 font-bold text-text-primary mb-1 text-center"
+              testID={
+                isReturningUser === null
+                  ? 'sign-in-welcome-loading'
+                  : isReturningUser
+                    ? 'sign-in-welcome-returning'
+                    : 'sign-in-welcome-first-time'
+              }
             >
-              <Text className="text-body-sm text-text-secondary">
-                {unsupportedHasSSOProviders
-                  ? "If this account also uses Google or Apple sign-in, try that above. If that doesn't work, contact support."
-                  : `Contact support and we'll help you sign in. Mention: ${unsupportedVerificationStrategies
-                      .map(describeVerificationStrategy)
-                      .join(', ')}.`}
-              </Text>
-              <View className="mt-4">
+              {isReturningUser === null
+                ? 'Welcome'
+                : isReturningUser
+                  ? 'Welcome back'
+                  : 'Welcome to MentoMate'}
+            </Text>
+            <Text
+              className="text-body-sm text-text-secondary mb-2 text-center"
+              testID={
+                isReturningUser === null
+                  ? 'sign-in-subtitle-loading'
+                  : isReturningUser
+                    ? 'sign-in-subtitle-returning'
+                    : 'sign-in-subtitle-first-time'
+              }
+            >
+              {isReturningUser === null
+                ? 'Sign in to get started'
+                : isReturningUser
+                  ? 'Sign in to continue learning'
+                  : 'Sign in to start learning'}
+            </Text>
+
+            {error !== '' && (
+              <View
+                className="bg-danger/10 rounded-card px-4 py-3 mb-4"
+                accessibilityRole="alert"
+              >
+                <Text className="text-danger text-body-sm">{error}</Text>
+              </View>
+            )}
+
+            {unsupportedVerificationStrategies.length > 0 && (
+              <View
+                className="bg-surface rounded-card px-4 py-4 mb-4"
+                testID="sign-in-unsupported-factor-help"
+              >
+                <Text className="text-body-sm text-text-secondary">
+                  {unsupportedHasSSOProviders
+                    ? "If this account also uses Google or Apple sign-in, try that above. If that doesn't work, contact support."
+                    : `Contact support and we'll help you sign in. Mention: ${unsupportedVerificationStrategies
+                        .map(describeVerificationStrategy)
+                        .join(', ')}.`}
+                </Text>
+                <View className="mt-4">
+                  <Button
+                    variant="secondary"
+                    size="small"
+                    label="Contact support"
+                    onPress={() => void onContactSupport()}
+                    testID="sign-in-contact-support"
+                  />
+                </View>
+              </View>
+            )}
+
+            {activationFailureContext === 'oauth' &&
+            pendingSessionActivationId ? (
+              <View className="mb-6">
                 <Button
                   variant="secondary"
-                  size="small"
-                  label="Contact support"
-                  onPress={() => void onContactSupport()}
-                  testID="sign-in-contact-support"
+                  label="Try Again"
+                  onPress={() => void retrySessionActivation()}
+                  disabled={loading || oauthLoading !== null}
+                  testID="sign-in-oauth-retry"
                 />
               </View>
+            ) : null}
+
+            {Platform.OS !== 'ios' && (
+              <View className="mb-2">
+                <Button
+                  variant="secondary"
+                  label="Continue with Google"
+                  onPress={() => onSSOPress('oauth_google')}
+                  disabled={oauthLoading !== null}
+                  loading={oauthLoading === 'oauth_google'}
+                  testID="google-sso-button"
+                />
+              </View>
+            )}
+
+            {Platform.OS === 'ios' && (
+              <View className="mb-2">
+                <Button
+                  variant="secondary"
+                  label="Continue with Apple"
+                  onPress={() => onSSOPress('oauth_apple')}
+                  disabled={oauthLoading !== null}
+                  loading={oauthLoading === 'oauth_apple'}
+                  testID="apple-sso-button"
+                />
+              </View>
+            )}
+
+            {openAIStrategy ? (
+              <View className="mb-2">
+                <Button
+                  variant="secondary"
+                  label="Continue with OpenAI"
+                  onPress={() => onSSOPress(openAIStrategy)}
+                  disabled={oauthLoading !== null}
+                  loading={oauthLoading === openAIStrategy}
+                  testID="openai-sso-button"
+                />
+              </View>
+            ) : null}
+
+            <View className="flex-row items-center mb-2">
+              <View className="flex-1 h-px bg-border" />
+              <Text className="text-body-sm text-text-secondary mx-4">or</Text>
+              <View className="flex-1 h-px bg-border" />
             </View>
-          )}
 
-          {activationFailureContext === 'oauth' &&
-          pendingSessionActivationId ? (
-            <View className="mb-6">
-              <Button
-                variant="secondary"
-                label="Try Again"
-                onPress={() => void retrySessionActivation()}
-                disabled={loading || oauthLoading !== null}
-                testID="sign-in-oauth-retry"
-              />
-            </View>
-          ) : null}
-
-          {Platform.OS !== 'ios' && (
-            <View className="mb-2">
-              <Button
-                variant="secondary"
-                label="Continue with Google"
-                onPress={() => onSSOPress('oauth_google')}
-                disabled={oauthLoading !== null}
-                loading={oauthLoading === 'oauth_google'}
-                testID="google-sso-button"
-              />
-            </View>
-          )}
-
-          {Platform.OS === 'ios' && (
-            <View className="mb-2">
-              <Button
-                variant="secondary"
-                label="Continue with Apple"
-                onPress={() => onSSOPress('oauth_apple')}
-                disabled={oauthLoading !== null}
-                loading={oauthLoading === 'oauth_apple'}
-                testID="apple-sso-button"
-              />
-            </View>
-          )}
-
-          {openAIStrategy ? (
-            <View className="mb-2">
-              <Button
-                variant="secondary"
-                label="Continue with OpenAI"
-                onPress={() => onSSOPress(openAIStrategy)}
-                disabled={oauthLoading !== null}
-                loading={oauthLoading === openAIStrategy}
-                testID="openai-sso-button"
-              />
-            </View>
-          ) : null}
-
-          <View className="flex-row items-center mb-2">
-            <View className="flex-1 h-px bg-border" />
-            <Text className="text-body-sm text-text-secondary mx-4">or</Text>
-            <View className="flex-1 h-px bg-border" />
-          </View>
-
-          <View onLayout={onFieldLayout('email')}>
-            <Text className="text-body-sm font-semibold text-text-secondary mb-1">
-              Email
-            </Text>
-            <TextInput
-              className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-2"
-              autoCapitalize="none"
-              autoComplete="email"
-              keyboardType="email-address"
-              placeholder="you@example.com"
-              placeholderTextColor={colors.muted}
-              value={emailAddress}
-              onChangeText={(value) => {
-                clearVerificationFlow(true);
-                setEmailAddress(value);
-              }}
-              editable={!loading}
-              testID="sign-in-email"
-              onFocus={onFieldFocus('email')}
-            />
-          </View>
-
-          <View onLayout={onFieldLayout('password')}>
-            <Text className="text-body-sm font-semibold text-text-secondary mb-1">
-              Password
-            </Text>
-            <View className="mb-2">
-              <PasswordInput
-                value={password}
+            <View onLayout={onFieldLayout('email')}>
+              <Text className="text-body-sm font-semibold text-text-secondary mb-1">
+                Email
+              </Text>
+              <TextInput
+                className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-2"
+                autoCapitalize="none"
+                autoComplete="email"
+                keyboardType="email-address"
+                placeholder="you@example.com"
+                placeholderTextColor={colors.muted}
+                value={emailAddress}
                 onChangeText={(value) => {
                   clearVerificationFlow(true);
-                  setPassword(value);
+                  setEmailAddress(value);
                 }}
-                placeholder="Enter your password"
                 editable={!loading}
-                testID="sign-in-password"
-                onSubmitEditing={onSignInPress}
-                onFocus={onFieldFocus('password')}
+                testID="sign-in-email"
+                onFocus={onFieldFocus('email')}
               />
             </View>
-          </View>
 
-          <View className="items-end mb-2">
-            <Button
-              variant="tertiary"
-              size="small"
-              label="Forgot password?"
-              onPress={() => router.push('/(auth)/forgot-password')}
-              testID="forgot-password-link"
-            />
-          </View>
-
-          <Button
-            variant="primary"
-            label="Sign in"
-            onPress={onSignInPress}
-            disabled={!canSubmit}
-            loading={loading}
-            testID="sign-in-button"
-          />
-          {/* BUG-414: Explain why button is disabled when fields are empty */}
-          {!canSubmit && !loading && (
-            <Text
-              className="text-body-sm text-text-secondary text-center mt-2"
-              testID="sign-in-validation-hint"
-            >
-              {emailAddress.trim() === ''
-                ? 'Enter your email to continue'
-                : password === ''
-                  ? 'Enter your password to continue'
-                  : ''}
-            </Text>
-          )}
-
-          {verificationOffer && (
-            <View
-              className="bg-primary/10 rounded-card px-4 py-4 mt-4"
-              testID="sign-in-verification-offer"
-            >
-              <Text className="text-body font-semibold text-text-primary">
-                Additional verification is available
+            <View onLayout={onFieldLayout('password')}>
+              <Text className="text-body-sm font-semibold text-text-secondary mb-1">
+                Password
               </Text>
-              <Text className="text-body-sm text-text-secondary mt-2">
-                This account can continue with a verification code sent to{' '}
-                <Text className="font-semibold text-text-primary">
-                  {'identifier' in verificationOffer
-                    ? verificationOffer.identifier
-                    : 'your device'}
-                </Text>
-                . We will only send the code if you choose to continue.
-              </Text>
-              <View className="mt-4">
-                <Button
-                  variant="secondary"
-                  label="Send verification code"
-                  onPress={onStartVerificationPress}
-                  disabled={loading}
-                  loading={loading}
-                  testID="sign-in-start-verification"
+              <View className="mb-2">
+                <PasswordInput
+                  value={password}
+                  onChangeText={(value) => {
+                    clearVerificationFlow(true);
+                    setPassword(value);
+                  }}
+                  placeholder="Enter your password"
+                  editable={!loading}
+                  testID="sign-in-password"
+                  onSubmitEditing={onSignInPress}
+                  onFocus={onFieldFocus('password')}
                 />
               </View>
             </View>
-          )}
 
-          <View className="flex-row justify-center items-center mt-4">
-            <Text className="text-body-sm text-text-secondary">
-              Don&apos;t have an account?{' '}
-            </Text>
+            <View className="items-end mb-2">
+              <Button
+                variant="tertiary"
+                size="small"
+                label="Forgot password?"
+                onPress={() => router.push('/(auth)/forgot-password')}
+                testID="forgot-password-link"
+              />
+            </View>
+
             <Button
-              variant="tertiary"
-              size="small"
-              label="Sign up"
-              onPress={() =>
-                router.push({
-                  pathname: '/(auth)/sign-up',
-                  params: emailAddress.trim()
-                    ? { email: emailAddress.trim() }
-                    : undefined,
-                })
-              }
-              testID="sign-up-link"
+              variant="primary"
+              label="Sign in"
+              onPress={onSignInPress}
+              disabled={!canSubmit}
+              loading={loading}
+              testID="sign-in-button"
             />
+            {/* BUG-414: Explain why button is disabled when fields are empty */}
+            {!canSubmit && !loading && (
+              <Text
+                className="text-body-sm text-text-secondary text-center mt-2"
+                testID="sign-in-validation-hint"
+              >
+                {emailAddress.trim() === ''
+                  ? 'Enter your email to continue'
+                  : password === ''
+                    ? 'Enter your password to continue'
+                    : ''}
+              </Text>
+            )}
+
+            {verificationOffer && (
+              <View
+                className="bg-primary/10 rounded-card px-4 py-4 mt-4"
+                testID="sign-in-verification-offer"
+              >
+                <Text className="text-body font-semibold text-text-primary">
+                  Additional verification is available
+                </Text>
+                <Text className="text-body-sm text-text-secondary mt-2">
+                  This account can continue with a verification code sent to{' '}
+                  <Text className="font-semibold text-text-primary">
+                    {'identifier' in verificationOffer
+                      ? verificationOffer.identifier
+                      : 'your device'}
+                  </Text>
+                  . We will only send the code if you choose to continue.
+                </Text>
+                <View className="mt-4">
+                  <Button
+                    variant="secondary"
+                    label="Send verification code"
+                    onPress={onStartVerificationPress}
+                    disabled={loading}
+                    loading={loading}
+                    testID="sign-in-start-verification"
+                  />
+                </View>
+              </View>
+            )}
+
+            <View className="flex-row justify-center items-center mt-4">
+              <Text className="text-body-sm text-text-secondary">
+                Don&apos;t have an account?{' '}
+              </Text>
+              <Button
+                variant="tertiary"
+                size="small"
+                label="Sign up"
+                onPress={() =>
+                  router.push({
+                    pathname: '/(auth)/sign-up',
+                    params: emailAddress.trim()
+                      ? { email: emailAddress.trim() }
+                      : undefined,
+                  })
+                }
+                testID="sign-up-link"
+              />
+            </View>
           </View>
         </ScrollView>
       </View>

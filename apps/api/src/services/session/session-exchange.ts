@@ -1861,6 +1861,9 @@ export async function processMessage(
           orphanReason: classifyOrphanError(err),
         });
       } catch (persistErr) {
+        // safeSend prevents the dispatch from masking the original LlmStreamError
+        // (`throw err` below). Without it, an Inngest hiccup here would propagate
+        // and shadow the underlying processExchange failure.
         await safeSend(
           () =>
             inngest.send({
@@ -1876,6 +1879,10 @@ export async function processMessage(
           'orphan.persist.failed',
           { profileId, sessionId, route: 'session-exchange/process' },
         );
+        captureException(persistErr, {
+          profileId,
+          extra: { phase: 'orphan_persist_failed' },
+        });
       }
     }
     throw err;
@@ -2056,6 +2063,10 @@ export async function streamMessage(
               'orphan.persist.failed',
               { profileId, sessionId, route: 'session-exchange/stream' },
             );
+            captureException(persistErr, {
+              profileId,
+              extra: { phase: 'orphan_persist_failed' },
+            });
           }
         }
         throw err;
@@ -2105,6 +2116,10 @@ export async function streamMessage(
               'orphan.persist.failed',
               { profileId, sessionId, route: 'session-exchange/fallback' },
             );
+            captureException(persistErr, {
+              profileId,
+              extra: { phase: 'orphan_persist_failed' },
+            });
           }
         }
         return {

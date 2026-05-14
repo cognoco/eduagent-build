@@ -77,7 +77,7 @@ tags:
 - inputText: "424242"
 
 # Dismiss number pad so Verify button becomes visible
-- pressKey: Back
+- hideKeyboard
 
 - tapOn:
     id: "sign-up-verify-button"

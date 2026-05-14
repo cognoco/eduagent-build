@@ -9,7 +9,8 @@ pnpm exec lint-staged
 #
 # Triggers on staged changes to:
 #   - apps/api/src/services/**/*-prompts.ts
-#   - apps/api/src/services/llm/*.ts (excluding tests)
+#   - apps/api/src/services/llm/**/*.ts (including providers/, excluding tests)
+#   - apps/api/src/services/dictation/generate.ts (inline prompt construction)
 # Requires at least one staged file under apps/api/eval-llm/snapshots/.
 # Bypass with `git commit --no-verify` if the change is a pure refactor.
 PROMPT_CHANGED=$(git diff --cached --name-only --diff-filter=d \
@@ -45,35 +46,15 @@ if [ -n "$I18N_EN_CHANGED" ]; then
 fi
 
 # GC1 ratchet (pre-commit mirror of CI): block staged test files that add a
-# new relative-path `jest.mock('./...')` / `jest.mock('../...')` without an
-# on-same-line `gc1-allow: <reason>` justification. This catches the common
-# mistake of putting `// gc1-allow` on the line *after* `jest.mock(` — the
-# CI grep is line-by-line, so a next-line comment does NOT pass. See
-# CLAUDE.md → "No new internal jest.mock() (GC1 ratchet)".
+# new relative-path `jest.mock('./...')` / `jest.mock('../...')` unless the
+# factory follows Pattern A (spreads `jest.requireActual(<same path>)`), or
+# the line carries an on-line `gc1-allow: <reason>` escape hatch. See
+# CLAUDE.md → "No new internal jest.mock() (GC1 ratchet)" and
+# scripts/check-gc1-pattern-a.ts (the structural check that replaced the
+# previous textual-only grep — BUG-1051).
 STAGED_TESTS=$(git diff --cached --name-only --diff-filter=d -- '*.test.ts' '*.test.tsx')
 if [ -n "$STAGED_TESTS" ]; then
-  GC1_VIOLATIONS=$(echo "$STAGED_TESTS" \
-    | xargs -I{} git diff --cached --unified=0 -- {} \
-    | grep -E '^\+[^+]' \
-    | grep -E "jest\.mock\(['\"\`]\.\.?/" \
-    | grep -iv 'gc1-allow' || true)
-  if [ -n "$GC1_VIOLATIONS" ]; then
-    echo ""
-    echo "pre-commit: GC1 — new internal jest.mock() without same-line gc1-allow."
-    echo ""
-    echo "Offending added lines:"
-    echo "$GC1_VIOLATIONS" | sed 's/^/  /'
-    echo ""
-    echo "Fix one of two ways:"
-    echo "  1. Use jest.requireActual() + targeted overrides instead of mocking the module."
-    echo "  2. If it really is an external boundary (LLM, push, email, Stripe, etc.),"
-    echo "     put the comment on the SAME line as jest.mock(:"
-    echo "       jest.mock('./foo' /* gc1-allow: <reason> */, () => ({ ... }))"
-    echo "       jest.mock('./foo', () => ({ ... })); // gc1-allow: <reason>"
-    echo ""
-    echo "A comment on the line BELOW jest.mock( does NOT satisfy the check."
-    exit 1
-  fi
+  pnpm exec tsx scripts/check-gc1-pattern-a.ts || exit 1
 fi
 
 # Full project-reference type-check (incremental via composite tsconfig).

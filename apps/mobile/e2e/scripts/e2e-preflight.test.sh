@@ -282,6 +282,117 @@ else
 fi
 
 echo ""
+echo "─── METRO_URL → PREFLIGHT_METRO_PORT derivation ──────────────────────"
+# CASE: when METRO_URL is set to a non-default port (e.g. running Metro on 8083
+# because 8081/8082 are held by another branch's dev server), the preflight
+# must check the SAME port the harness will hit — otherwise check_metro_reachable
+# fails against 8081 and the regression suite stops before any test runs.
+# This is the exact failure that blocked 166+ flow-review rows on 2026-05-14
+# (SocketTimeoutException + dev-launcher ANR was the harness-side symptom; the
+# preflight-side symptom of the same root cause is "Metro bundler not reachable
+# at 127.0.0.1:8081" even though Metro is happily running on 8083).
+rc=0
+(
+  unset PREFLIGHT_METRO_PORT
+  export METRO_URL="http://10.0.2.2:8083"
+  # Re-source to re-evaluate the tunables block.
+  source "$SCRIPT_DIR/e2e-preflight.sh"
+  [ "$PREFLIGHT_METRO_PORT" = "8083" ] || exit 1
+) || rc=$?
+if [ $rc -eq 0 ]; then
+  _tpass "derives PREFLIGHT_METRO_PORT=8083 from METRO_URL=http://10.0.2.2:8083"
+else
+  _tfail "METRO_URL=http://10.0.2.2:8083 did NOT derive PREFLIGHT_METRO_PORT=8083"
+fi
+
+rc=0
+(
+  unset PREFLIGHT_METRO_PORT METRO_URL
+  source "$SCRIPT_DIR/e2e-preflight.sh"
+  [ "$PREFLIGHT_METRO_PORT" = "8081" ] || exit 1
+) || rc=$?
+if [ $rc -eq 0 ]; then
+  _tpass "defaults PREFLIGHT_METRO_PORT=8081 when METRO_URL unset"
+else
+  _tfail "PREFLIGHT_METRO_PORT did not default to 8081 when METRO_URL unset"
+fi
+
+rc=0
+(
+  export PREFLIGHT_METRO_PORT=9000
+  export METRO_URL="http://10.0.2.2:8083"
+  source "$SCRIPT_DIR/e2e-preflight.sh"
+  [ "$PREFLIGHT_METRO_PORT" = "9000" ] || exit 1
+) || rc=$?
+if [ $rc -eq 0 ]; then
+  _tpass "explicit PREFLIGHT_METRO_PORT overrides METRO_URL derivation"
+else
+  _tfail "explicit PREFLIGHT_METRO_PORT=9000 was overridden by METRO_URL"
+fi
+
+echo ""
+echo "─── check_emulator_console ────────────────────────────────────────────"
+
+# CASE A: Missing token file → warn (return 0, not a hard failure).
+_FAKE_HOME_MISSING=$(mktemp -d)
+rc=0
+HOME="$_FAKE_HOME_MISSING" \
+  check_emulator_console >/dev/null 2>/tmp/pf_err_console_missing.txt || rc=$?
+if [ $rc -eq 0 ] && grep -q "auth token missing" /tmp/pf_err_console_missing.txt; then
+  _tpass "warns (return 0) when auth token file is missing"
+else
+  _tfail "check_emulator_console did not warn on missing token (rc=$rc). stderr: $(cat /tmp/pf_err_console_missing.txt)"
+fi
+rm -rf "$_FAKE_HOME_MISSING"
+
+# CASE B: Token exists but console port is not listening → warn (return 0).
+_FAKE_HOME_NOTOK=$(mktemp -d)
+echo "fake-token" > "$_FAKE_HOME_NOTOK/.emulator_console_auth_token"
+rc=0
+HOME="$_FAKE_HOME_NOTOK" EMULATOR_CONSOLE_PORT=19997 \
+  check_emulator_console >/dev/null 2>/tmp/pf_err_console_dead.txt || rc=$?
+if [ $rc -eq 0 ] && grep -q "not listening" /tmp/pf_err_console_dead.txt; then
+  _tpass "warns (return 0) when console port is not listening"
+else
+  _tfail "check_emulator_console did not warn on closed port (rc=$rc). stderr: $(cat /tmp/pf_err_console_dead.txt)"
+fi
+rm -rf "$_FAKE_HOME_NOTOK"
+
+# CASE C: Token exists + port listening → ok.
+# Spin a minimal TCP listener using node (nc -l is not reliable on Windows Git Bash nc.exe).
+_FAKE_HOME_OK=$(mktemp -d)
+echo "fake-token" > "$_FAKE_HOME_OK/.emulator_console_auth_token"
+_CONSOLE_PORT=$(_next_port)
+node -e "
+  const net = require('net');
+  const srv = net.createServer(s => { s.end(); });
+  srv.listen(${_CONSOLE_PORT}, '127.0.0.1');
+" &
+_CONSOLE_PID=$!
+_MOCK_PIDS+=("$_CONSOLE_PID")
+# Wait for the port to be reachable
+for _ in 1 2 3 4 5 6 7 8 9 10; do
+  if node -e "
+    const net=require('net');
+    const s=net.connect(${_CONSOLE_PORT},'127.0.0.1');
+    s.on('connect',()=>{s.end();process.exit(0)});
+    s.on('error',()=>process.exit(1));
+    setTimeout(()=>process.exit(1),500);
+  " 2>/dev/null; then break; fi
+  sleep 0.2
+done
+rc=0
+PREFLIGHT_QUIET=0 HOME="$_FAKE_HOME_OK" EMULATOR_CONSOLE_PORT="${_CONSOLE_PORT}" \
+  check_emulator_console >/tmp/pf_out_console_ok.txt 2>/tmp/pf_err_console_ok.txt || rc=$?
+if [ $rc -eq 0 ] && grep -q "reachable" /tmp/pf_out_console_ok.txt; then
+  _tpass "reports ok when token exists and console port is listening"
+else
+  _tfail "check_emulator_console did not report ok (rc=$rc). stdout: $(cat /tmp/pf_out_console_ok.txt) stderr: $(cat /tmp/pf_err_console_ok.txt)"
+fi
+_cleanup
+rm -rf "$_FAKE_HOME_OK"
+
+echo ""
 echo "─── E2E_PREFLIGHT_SKIP honored ────────────────────────────────────────"
 # CASE 11: Escape hatch works.
 E2E_PREFLIGHT_SKIP=1 run_preflight >/tmp/pf_skip_stdout.txt 2>&1

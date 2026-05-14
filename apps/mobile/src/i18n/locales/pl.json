@@ -503,6 +503,7 @@
       }
     },
     "accessories": {
+      "addNote": "Dodaj notatkę",
       "switchTopic": "Zmień temat",
       "parkIt": "Zaparkuj to",
       "pickSubject": "Wybierz przedmiot",

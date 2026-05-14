@@ -26,6 +26,13 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
+// prettier-ignore
+jest.mock('../../lib/theme', /* gc1-allow: nativewind vars() does not resolve 'react' in jest; stub theme hooks so screen tests don't blow up on import */ () => ({
+  useThemeColors: () => ({ muted: '#71717a', textPrimary: '#18181b' }),
+  useTheme: () => ({ colorScheme: 'dark' }),
+  useTokenVars: () => ({}),
+}));
+
 const signInModule = require('./sign-in');
 const SignInScreen = signInModule.default;
 const { clearTransitionState } = require('../../lib/auth-transition');
@@ -95,6 +102,32 @@ describe('SignInScreen', () => {
 
     screen.getByTestId('sign-in-screen');
     screen.getByTestId('sign-in-scroll');
+  });
+
+  // Regression for "Auth layout broken on first render" (Android E2E tracker):
+  // sign-in already lacked the flex-1 logo spacer that broke sign-up under
+  // BUG-959, but a future refactor that re-introduces an expanding spacer
+  // above the "Welcome" heading would push the primary CTA below the first
+  // viewport on small phones. Mirror sign-up's regression guard so a single
+  // pattern protects both screens.
+  it('does not insert a flex-1 spacer between the logo and the heading', async () => {
+    render(<SignInScreen />);
+    await act(async () => undefined);
+
+    const content = screen.getByTestId('sign-in-content');
+    const siblings = content.children as {
+      props?: { className?: string; testID?: string };
+    }[];
+    const headingIndex = siblings.findIndex(
+      (c) =>
+        typeof c?.props?.testID === 'string' &&
+        c.props.testID.startsWith('sign-in-welcome-'),
+    );
+    expect(headingIndex).toBeGreaterThanOrEqual(0);
+    for (let i = 0; i < headingIndex; i++) {
+      const className: string = siblings[i]?.props?.className ?? '';
+      expect(className.split(/\s+/)).not.toContain('flex-1');
+    }
   });
 
   // [BUG-988] testID on KeyboardAvoidingView is not emitted as Android

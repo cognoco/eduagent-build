@@ -478,6 +478,7 @@
       }
     },
     "accessories": {
+      "addNote": "Notiz hinzufügen",
       "switchTopic": "Thema wechseln",
       "parkIt": "Parken",
       "pickSubject": "Fach auswählen",

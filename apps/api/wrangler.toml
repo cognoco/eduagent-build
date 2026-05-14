@@ -94,6 +94,21 @@ binding = "COACHING_KV"
 id = "db6f91e2639e44ce931f63f858593f3c"
 # TODO [CFG-4]: Same — create "COACHING_KV_preview" namespace and add preview_id.
 
+# TODO [BUG-12]: Create "IDEMPOTENCY_KV" namespace in the Zwizzly Cloudflare
+# account (Workers & Pages → KV → Create) and uncomment the binding below for
+# all three environments. apps/api/src/routes/resend-webhook.ts:322 reads
+# c.env.IDEMPOTENCY_KV for svix-id replay deduplication; until this binding
+# exists the route gracefully degrades to alerting-only mode (Inngest event
+# app/resend-webhook.dedup_kv_missing fires on every request in staging /
+# production). That is the deliberate launch posture — replay is signed +
+# timestamp-windowed already, so the marginal exposure is a 5-minute replay
+# window — but the dedup itself is OFF in every deployed environment until
+# the namespace exists. See BUG-12 (Notion) for tracking.
+#
+# [[kv_namespaces]]
+# binding = "IDEMPOTENCY_KV"
+# id = "<replace-after-namespace-creation>"
+
 # =============================================================================
 # Staging Environment
 # =============================================================================
@@ -124,6 +139,13 @@ id = "8cbb6e486dc64f80acb0214b7fc84e25"
 binding = "COACHING_KV"
 id = "cbed5036c909416487c3b9362da521d0"
 
+# TODO [BUG-12]: Add IDEMPOTENCY_KV staging binding once the namespace is
+# created. Pre-launch posture: dedup is OFF, the missing binding fires an
+# observability Inngest event on every request to confirm the gap.
+# [[env.staging.kv_namespaces]]
+# binding = "IDEMPOTENCY_KV"
+# id = "<replace-after-namespace-creation>"
+
 # =============================================================================
 # Production Environment
 # =============================================================================
@@ -153,3 +175,11 @@ id = "cde9f81f19a34022b6dc6951928a0511"
 [[env.production.kv_namespaces]]
 binding = "COACHING_KV"
 id = "76b36f4748fe4d77b27387a5bebf4be6"
+
+# TODO [BUG-12]: Add IDEMPOTENCY_KV production binding before any traffic that
+# would re-trigger billing/consent side-effects on replay. Pre-launch (no
+# active users) the alerting-only posture is acceptable. Once enabled, the
+# Inngest signal app/resend-webhook.dedup_kv_missing should stop firing.
+# [[env.production.kv_namespaces]]
+# binding = "IDEMPOTENCY_KV"
+# id = "<replace-after-namespace-creation>"

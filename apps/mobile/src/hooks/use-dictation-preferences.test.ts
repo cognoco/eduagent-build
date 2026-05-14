@@ -34,7 +34,7 @@ describe('useDictationPreferences', () => {
   });
 
   it('loads stored pace from SecureStore', async () => {
-    mockGet.mockImplementation(async (key) => {
+    mockGet.mockImplementation(async (key: string) => {
       if (key === 'dictation-pace-profile-123') return 'fast';
       if (key === 'dictation-punctuation-profile-123') return 'false';
       return null;

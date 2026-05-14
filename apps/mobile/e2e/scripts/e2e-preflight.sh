@@ -27,6 +27,17 @@
 # ── Tunables ────────────────────────────────────────────────────────────────
 : "${PREFLIGHT_API_URL:=http://127.0.0.1:8787}"
 : "${PREFLIGHT_METRO_HOST:=127.0.0.1}"
+
+# If METRO_URL is set (the same env var seed-and-run.sh uses to choose where the
+# emulator points its dev-client), derive the Metro port from it so that the
+# preflight check, the harness, and Maestro agree. Otherwise default to 8081.
+# Without this, running Metro on a non-default port (e.g. 8083 when 8081/8082
+# are held by another branch's dev server) fails preflight even though the
+# harness itself was instructed to use the alternate port.
+if [ -z "${PREFLIGHT_METRO_PORT:-}" ] && [ -n "${METRO_URL:-}" ]; then
+  _DERIVED_METRO_PORT=$(echo "$METRO_URL" | sed -n 's#.*:\([0-9][0-9]*\)\(/.*\)\?$#\1#p')
+  PREFLIGHT_METRO_PORT="${_DERIVED_METRO_PORT:-8081}"
+fi
 : "${PREFLIGHT_METRO_PORT:=8081}"
 : "${PREFLIGHT_PROXY_PORT:=8082}"
 : "${PREFLIGHT_PROXY_MAX_SECONDS:=2}"    # Fresh warm proxy serves bundle <0.2s; repeat >2s = stale
@@ -199,14 +210,33 @@ check_seed_secret_valid() {
   _preflight_ok "TEST_SEED_SECRET accepted by ${PREFLIGHT_API_URL}/v1/__test/seed (HTTP ${status})"
 }
 
-# ── Check 8: adb reverse ports configured ──────────────────────────────────
+# ── Check 8: Emulator console reachable (for slow-network flows) ───────────
+# Slow-network flows use the emulator console (`network delay`) to inject RTT
+# latency. Without this check a missing auth token causes them to run at full
+# speed, silently passing even when the timeout UI is broken (see spec §Preflight).
+# This is warn-only so preflight does not block normal flows that don't use the
+# slow-net env vars.
+check_emulator_console() {
+  if [ ! -f "$HOME/.emulator_console_auth_token" ]; then
+    _preflight_warn "Emulator console auth token missing (~/.emulator_console_auth_token) — slow-network flows will run at full speed."
+    return 0
+  fi
+  local port="${EMULATOR_CONSOLE_PORT:-5554}"
+  if ! timeout 2 bash -c "</dev/tcp/127.0.0.1/${port}" >/dev/null 2>&1; then
+    _preflight_warn "Emulator console port ${port} not listening — slow-network flows will run at full speed."
+    return 0
+  fi
+  _preflight_ok "Emulator console reachable on :${port}"
+}
+
+# ── Check 9: adb reverse ports configured ──────────────────────────────────
 # Idempotent — sets up 8081, 8082, 8787 if not already forwarded. Not a hard
 # failure check, but without it the emulator can't reach host services.
 check_adb_reverse_ports() {
   "$PREFLIGHT_ADB" reverse tcp:"$PREFLIGHT_METRO_PORT" tcp:"$PREFLIGHT_METRO_PORT" >/dev/null 2>&1 || true
   "$PREFLIGHT_ADB" reverse tcp:"$PREFLIGHT_PROXY_PORT" tcp:"$PREFLIGHT_PROXY_PORT" >/dev/null 2>&1 || true
   "$PREFLIGHT_ADB" reverse tcp:8787 tcp:8787 >/dev/null 2>&1 || true
-  _preflight_ok "adb reverse ports configured (8081, ${PREFLIGHT_PROXY_PORT}, 8787)"
+  _preflight_ok "adb reverse ports configured (${PREFLIGHT_METRO_PORT}, ${PREFLIGHT_PROXY_PORT}, 8787)"
 }
 
 # ── Orchestrator ────────────────────────────────────────────────────────────
@@ -220,6 +250,7 @@ run_preflight() {
   check_adb_device            || return 1
   check_uiautomator_healthy   || return 1
   check_apk_installed         || return 1
+  check_emulator_console                # warn-only, never blocks
   check_adb_reverse_ports     || return 1
   check_metro_reachable       || return 1
   check_bundle_proxy_fast     || return 1

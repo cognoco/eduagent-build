@@ -1,0 +1,53 @@
+# Flow AUTH-13b: Deep-link Auth Redirect — Already signed in
+#
+# Validates: when an already-signed-in user opens mentomate:///library via an
+# external deep link, Expo Router routes directly to library-screen without
+# any sign-in detour or pending-redirect involvement.
+#
+# Mechanism:
+#   1. seed-and-run.sh seeds an onboarding-complete user; Maestro signs in via
+#      _setup/sign-in-only.yaml so the app is authenticated on home-screen.
+#   2. openLink fires for mentomate:///library while authenticated.
+#   3. Expo Router resolves the path directly — no (app)/_layout.tsx bounce,
+#      no pending-redirect write. library-screen becomes visible.
+#
+# testIDs verified against source:
+#   sign-in-screen   apps/mobile/src/app/(auth)/sign-in.tsx
+#   home-screen      apps/mobile/src/app/(app)/home.tsx:132
+#   library-screen   apps/mobile/src/app/(app)/library.tsx (root View)
+#
+# Run command:
+#   ./e2e/scripts/seed-and-run.sh onboarding-complete e2e/flows/auth/deep-link-redirect-signed-in.yaml
+#
+# Tags: nightly, auth
+appId: com.mentomate.app
+tags:
+  - nightly
+  - auth
+---
+# ── Step 1: Sign in to a clean home ──
+- extendedWaitUntil:
+    visible:
+      id: "sign-in-screen"
+    timeout: 120000
+
+- runFlow:
+    file: ../_setup/sign-in-only.yaml
+
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 30000
+
+- takeScreenshot: deep-link-signed-in-01-home-screen
+
+# ── Step 2: Fire the deep link while signed in ──
+- openLink: "mentomate:///library"
+
+# ── Step 3: Assert library screen appears ──
+- extendedWaitUntil:
+    visible:
+      id: "library-screen"
+    timeout: 8000
+
+- takeScreenshot: deep-link-signed-in-02-landed-on-library

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { IntentCard } from '../../../components/home/IntentCard';
@@ -159,16 +159,21 @@ export default function QuizIndexScreen(): React.ReactElement {
     setRound(null);
     setPrefetchedRoundId(null);
     setCompletionResult(null);
-    router.push('/(app)/quiz/launch' as Href);
+    // Pass activityType as route param so launch.tsx can start generation even
+    // if the context update hasn't propagated by first render (web timing gap).
+    router.push({
+      pathname: '/(app)/quiz/launch',
+      params: { activityType: 'vocabulary', subjectId },
+    } as never);
   };
   const handleBack = () => {
     if (isPracticeReturn) {
-      router.replace('/(app)/practice' as Href);
+      router.replace('/(app)/practice' as never);
       return;
     }
 
     if (returnTo) {
-      router.replace(homeHrefForReturnTo(returnTo) as Href);
+      router.replace(homeHrefForReturnTo(returnTo) as never);
       return;
     }
 
@@ -255,7 +260,10 @@ export default function QuizIndexScreen(): React.ReactElement {
               setRound(null);
               setPrefetchedRoundId(null);
               setCompletionResult(null);
-              router.push('/(app)/quiz/launch' as Href);
+              router.push({
+                pathname: '/(app)/quiz/launch',
+                params: { activityType: 'capitals' },
+              } as never);
             }}
             testID="quiz-capitals"
           />
@@ -306,7 +314,10 @@ export default function QuizIndexScreen(): React.ReactElement {
               setRound(null);
               setPrefetchedRoundId(null);
               setCompletionResult(null);
-              router.push('/(app)/quiz/launch' as Href);
+              router.push({
+                pathname: '/(app)/quiz/launch',
+                params: { activityType: 'guess_who' },
+              } as never);
             }}
             testID="quiz-guess-who"
           />
@@ -319,7 +330,7 @@ export default function QuizIndexScreen(): React.ReactElement {
               <IntentCard
                 title={t('quiz.index.vocabLockedTitle')}
                 subtitle={t('quiz.index.vocabLockedSubtitle')}
-                onPress={() => router.push('/(app)/library' as Href)}
+                onPress={() => router.push('/(app)/library' as never)}
                 testID="quiz-vocab-locked"
               />
             </View>

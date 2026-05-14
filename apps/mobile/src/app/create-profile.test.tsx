@@ -56,6 +56,13 @@ jest.mock('../lib/api-client', () => ({
 
 const mockSwitchProfile = jest.fn().mockResolvedValue(undefined);
 
+// prettier-ignore
+jest.mock('../lib/theme', /* gc1-allow: nativewind vars() does not resolve 'react' in jest; stub theme hooks so screen tests don't blow up on import */ () => ({
+  useThemeColors: () => ({ accent: '#0ea5e9', background: '#18181b', border: '#d4d4d8', muted: '#71717a', surface: '#ffffff', textInverse: '#ffffff', textPrimary: '#18181b', textSecondary: '#52525b' }),
+  useTheme: () => ({ colorScheme: 'dark' }),
+  useTokenVars: () => ({}),
+}));
+
 // BUG-301: Made per-test overridable so isParentAddingChild can be tested.
 const mockUseProfile = jest.fn();
 jest.mock('../lib/profile', () => ({

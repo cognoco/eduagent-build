@@ -5,6 +5,15 @@ import {
   SubjectResolutionAccessory,
 } from './SessionAccessories';
 
+// prettier-ignore
+jest.mock('../../lib/theme', /* gc1-allow: nativewind vars() does not resolve 'react' in jest; stub theme hooks so screen tests don't blow up on import */ () => ({
+  useThemeColors: () => ({
+    primary: '#00b4d8',
+    textSecondary: '#999',
+    textInverse: '#fff',
+  }),
+}));
+
 describe('SessionToolAccessory stage gating', () => {
   const handleQuickChip = jest.fn();
 
@@ -73,6 +82,79 @@ describe('SessionToolAccessory stage gating', () => {
     );
     expect(queryByTestId('quick-chip-switch_topic')).toBeNull();
     expect(queryByTestId('quick-chip-park')).toBeNull();
+  });
+});
+
+describe('SessionToolAccessory Add note chip', () => {
+  const handleQuickChip = jest.fn();
+
+  it('does not render Add note when onAddNote is omitted', () => {
+    const { queryByTestId } = render(
+      <SessionToolAccessory
+        isStreaming={false}
+        handleQuickChip={handleQuickChip}
+        stage="teaching"
+      />,
+    );
+    expect(queryByTestId('quick-chip-add-note')).toBeNull();
+  });
+
+  it('renders Add note as the first chip when onAddNote is provided and stage is teaching', () => {
+    const onAddNote = jest.fn();
+    const { queryByTestId } = render(
+      <SessionToolAccessory
+        isStreaming={false}
+        handleQuickChip={handleQuickChip}
+        stage="teaching"
+        onAddNote={onAddNote}
+      />,
+    );
+    expect(queryByTestId('quick-chip-add-note')).toBeTruthy();
+    expect(queryByTestId('quick-chip-switch_topic')).toBeTruthy();
+    expect(queryByTestId('quick-chip-park')).toBeTruthy();
+  });
+
+  it('calls onAddNote when pressed', () => {
+    const onAddNote = jest.fn();
+    const { getByTestId } = render(
+      <SessionToolAccessory
+        isStreaming={false}
+        handleQuickChip={handleQuickChip}
+        stage="teaching"
+        onAddNote={onAddNote}
+      />,
+    );
+    fireEvent.press(getByTestId('quick-chip-add-note'));
+    expect(onAddNote).toHaveBeenCalledTimes(1);
+  });
+
+  it('is disabled while streaming', () => {
+    const onAddNote = jest.fn();
+    const { getByTestId } = render(
+      <SessionToolAccessory
+        isStreaming={true}
+        handleQuickChip={handleQuickChip}
+        stage="teaching"
+        onAddNote={onAddNote}
+      />,
+    );
+    const chip = getByTestId('quick-chip-add-note');
+    fireEvent.press(chip);
+    expect(onAddNote).not.toHaveBeenCalled();
+    expect(chip.props.accessibilityState).toEqual({ disabled: true });
+  });
+
+  it('hides Add note when stage is not teaching even if onAddNote provided', () => {
+    const onAddNote = jest.fn();
+    const { queryByTestId } = render(
+      <SessionToolAccessory
+        isStreaming={false}
+        handleQuickChip={handleQuickChip}
+        stage="greeting"
+        onAddNote={onAddNote}
+      />,
+    );
+    expect(queryByTestId('quick-chip-add-note')).toBeNull();
   });
 });
 

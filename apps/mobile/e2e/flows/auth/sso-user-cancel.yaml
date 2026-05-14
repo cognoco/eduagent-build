@@ -1,0 +1,79 @@
+# Flow AUTH-11: SSO User Cancel (silent)
+#
+# Validates: when the user dismisses the Chrome Custom Tab without completing
+# OAuth, sign-in.tsx treats authSessionResult.type !== 'success' as a silent
+# cancel — the sign-in screen stays visible with no error banner and no retry
+# button. Covers the silent-cancel branch at sign-in.tsx:649-650.
+#
+# Mechanism (Step 0 decision):
+#   Maestro `pressKey: back` after tapping google-sso-button. This dismisses
+#   the in-app browser before OAuth can complete. No network shaping needed.
+#
+#   Why not airplane mode: airplane mode tests the 10-second SSO_TIMEOUT_MS
+#   fallback in sso-callback.tsx — a different code path. The silent-cancel
+#   branch lives in sign-in.tsx and only fires when WebBrowser returns a
+#   non-success authSessionResult (user dismissed the tab).
+#
+# testIDs verified against source:
+#   sign-in-screen        apps/mobile/src/app/(auth)/sign-in.tsx:1128
+#   google-sso-button     apps/mobile/src/app/(auth)/sign-in.tsx:1238
+#   sign-in-email         apps/mobile/src/app/(auth)/sign-in.tsx:1292
+#   sign-in-oauth-retry   apps/mobile/src/app/(auth)/sign-in.tsx:1225 (must NOT appear)
+#
+# Run command:
+#   ./e2e/scripts/seed-and-run.sh --no-seed e2e/flows/auth/sso-user-cancel.yaml
+#
+# Tags: nightly, auth
+appId: com.mentomate.app
+tags:
+  - nightly
+  - auth
+---
+- extendedWaitUntil:
+    visible:
+      id: "sign-in-screen"
+    timeout: 120000
+
+- takeScreenshot: sso-user-cancel-01-sign-in
+
+# Step 1: tap Google SSO. onSSOPress (sign-in.tsx) calls startSSOFlow which
+# invokes WebBrowser.openAuthSessionAsync, opening a Chrome Custom Tab.
+- scrollUntilVisible:
+    element:
+      id: "google-sso-button"
+    direction: UP
+    timeout: 5000
+
+- tapOn:
+    id: "google-sso-button"
+
+# Brief settle so the Custom Tab activity is actually in the foreground before
+# we send Back. takeScreenshot adds a small implicit wait + gives us evidence
+# in failure triage.
+- takeScreenshot: sso-user-cancel-02-after-tap
+
+# Step 2: Press hardware Back to dismiss the Custom Tab. WebBrowser resolves
+# with authSessionResult.type === 'dismiss' (or 'cancel' depending on Chrome
+# version). sign-in.tsx:649-650 checks for anything !== 'success' and returns
+# early WITHOUT setError, so no banner should appear.
+- pressKey: back
+
+# Step 3: Confirm we are back on sign-in-screen with no error UI.
+- extendedWaitUntil:
+    visible:
+      id: "sign-in-screen"
+    timeout: 10000
+
+- assertVisible:
+    id: "google-sso-button"
+
+- assertVisible:
+    id: "sign-in-email"
+
+# Retry banner must NOT appear — that only renders when setActive throws
+# after a real session is created (activationFailureContext === 'oauth' at
+# sign-in.tsx:1217). User-cancel path bails before activation.
+- assertNotVisible:
+    id: "sign-in-oauth-retry"
+
+- takeScreenshot: sso-user-cancel-03-back-on-sign-in

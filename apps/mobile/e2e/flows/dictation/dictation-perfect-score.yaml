@@ -82,7 +82,7 @@ tags:
 # correctly spelled, so the LLM should return mistakes.length === 0.
 - inputText: "The sun is warm. Birds can sing."
 
-- pressKey: back
+- hideKeyboard
 
 - tapOn:
     id: "text-preview-start"
