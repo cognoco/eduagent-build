@@ -13,21 +13,35 @@ import { like } from 'drizzle-orm';
 import type { Database } from '@eduagent/database';
 import { lookupAssistantTurnState } from './idempotency-assistant-state';
 
-jest.mock('./sentry', () => ({
-  captureException: jest.fn(),
-  addBreadcrumb: jest.fn(),
-}));
-jest.mock('./logger', () => ({
-  createLogger: () => ({
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
-    debug: jest.fn(),
-  }),
-}));
-jest.mock('../inngest/client', () => ({
-  inngest: { send: jest.fn().mockResolvedValue(undefined) },
-}));
+jest.mock('./sentry' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual('./sentry') as typeof import('./sentry');
+  return {
+    ...actual,
+    captureException: jest.fn(),
+    addBreadcrumb: jest.fn(),
+  };
+});
+jest.mock('./logger' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual('./logger') as typeof import('./logger');
+  return {
+    ...actual,
+    createLogger: () => ({
+      info: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
+      debug: jest.fn(),
+    }),
+  };
+});
+jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../inngest/client',
+  ) as typeof import('../inngest/client');
+  return {
+    ...actual,
+    inngest: { send: jest.fn().mockResolvedValue(undefined) },
+  };
+});
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 

@@ -7,29 +7,31 @@ import { BASE_AUTH_ENV } from '../test-utils/test-env';
 // Mock sentry + logger — external observability boundaries
 // ---------------------------------------------------------------------------
 
-jest.mock(
-  '../services/sentry' /* gc1-allow: Sentry is an external observability boundary — captureException/addBreadcrumb are SDK calls, not internal service logic */,
-  () => ({
+jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/sentry',
+  ) as typeof import('../services/sentry');
+  return {
+    ...actual,
     captureException: jest.fn(),
     addBreadcrumb: jest.fn(),
-  }),
-);
+  };
+});
 
-jest.mock(
-  '../services/logger' /* gc1-allow: pre-existing logger mock — refactored to expose the singleton for warn-assertion, no new internal mock added */,
-  () => {
-    const instance = {
+jest.mock('../services/logger' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/logger',
+  ) as typeof import('../services/logger');
+  return {
+    ...actual,
+    createLogger: jest.fn(() => ({
       debug: jest.fn(),
       info: jest.fn(),
       warn: jest.fn(),
       error: jest.fn(),
-    };
-    return {
-      __loggerInstance: instance,
-      createLogger: () => instance,
-    };
-  },
-);
+    })),
+  };
+});
 
 const sentryMock = require('../services/sentry') as {
   captureException: jest.Mock;
@@ -51,11 +53,15 @@ const loggerMock = (
 // Mock jwt.ts — avoids real Web Crypto / JWKS calls in unit tests
 // ---------------------------------------------------------------------------
 
-jest.mock('./jwt', () =>
-  require('../test-utils/auth-fixture').createJwtModuleMock({
-    payload: { sub: 'user_default' },
-  }),
-);
+jest.mock('./jwt' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual('./jwt') as typeof import('./jwt');
+  return {
+    ...actual,
+    ...require('../test-utils/auth-fixture').createJwtModuleMock({
+      payload: { sub: 'user_default' },
+    }),
+  };
+});
 
 const jwtMock = require('./jwt') as {
   verifyJWT: jest.Mock;

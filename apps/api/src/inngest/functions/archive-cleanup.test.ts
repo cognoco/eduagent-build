@@ -3,23 +3,44 @@ const { createInngestTransportCapture } =
 
 const mockInngestTransport = createInngestTransportCapture();
 
-// prettier-ignore
-jest.mock('../client', () => mockInngestTransport.module); // gc1-allow: inngest framework boundary
+jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual('../client') as typeof import('../client');
+  return {
+    ...actual,
+    ...mockInngestTransport.module,
+  };
+});
 
 const mockGetConsentStatus = jest.fn();
 const mockGetProfileForConsentRevocation = jest.fn();
-// prettier-ignore
-jest.mock('../../services/consent', () => ({ // gc1-allow: isolates archive cleanup guards from consent service DB access
-  getConsentStatus: (...args: unknown[]) => mockGetConsentStatus(...args),
-  getProfileForConsentRevocation: (...args: unknown[]) =>
-    mockGetProfileForConsentRevocation(...args),
-}));
+jest.mock(
+  '../../services/consent' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/consent',
+    ) as typeof import('../../services/consent');
+    return {
+      ...actual,
+      getConsentStatus: (...args: unknown[]) => mockGetConsentStatus(...args),
+      getProfileForConsentRevocation: (...args: unknown[]) =>
+        mockGetProfileForConsentRevocation(...args),
+    };
+  },
+);
 
 const mockDeleteProfile = jest.fn().mockResolvedValue(undefined);
-// prettier-ignore
-jest.mock('../../services/deletion', () => ({ // gc1-allow: prevents destructive profile deletion while asserting the handler boundary
-  deleteProfile: (...args: unknown[]) => mockDeleteProfile(...args),
-}));
+jest.mock(
+  '../../services/deletion' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/deletion',
+    ) as typeof import('../../services/deletion');
+    return {
+      ...actual,
+      deleteProfile: (...args: unknown[]) => mockDeleteProfile(...args),
+    };
+  },
+);
 
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 import { archiveCleanup } from './archive-cleanup';
