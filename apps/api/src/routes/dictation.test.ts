@@ -19,39 +19,54 @@ const meteringFixture = createRouteMeteringFixture(mockDatabaseModule.db, {
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
-jest.mock('../services/account', () => ({
-  ...jest.requireActual('../services/account'),
-  findOrCreateAccount: jest.fn().mockResolvedValue({
-    id: 'test-account-id',
-    clerkUserId: 'user_test',
-    email: 'test@example.com',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  }),
-}));
+jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/account',
+  ) as typeof import('../services/account');
+  return {
+    ...actual,
+    findOrCreateAccount: jest.fn().mockResolvedValue({
+      id: 'test-account-id',
+      clerkUserId: 'user_test',
+      email: 'test@example.com',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }),
+  };
+});
 
-jest.mock('../services/profile', () => ({
-  ...jest.requireActual('../services/profile'),
-  findOwnerProfile: jest.fn().mockResolvedValue(null),
-  getProfile: jest.fn().mockResolvedValue({
-    id: 'test-profile-id',
-    birthYear: 2016,
-    location: null,
-    consentStatus: 'CONSENTED',
-    hasPremiumLlm: false,
-  }),
-}));
+jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/profile',
+  ) as typeof import('../services/profile');
+  return {
+    ...actual,
+    findOwnerProfile: jest.fn().mockResolvedValue(null),
+    getProfile: jest.fn().mockResolvedValue({
+      id: 'test-profile-id',
+      birthYear: 2016,
+      location: null,
+      consentStatus: 'CONSENTED',
+      hasPremiumLlm: false,
+    }),
+  };
+});
 
-// Stub dictation service functions — real implementations call the LLM (external boundary).
-jest.mock('../services/dictation', () => ({
-  ...jest.requireActual('../services/dictation'),
-  prepareHomework: jest.fn(),
-  generateDictation: jest.fn(),
-  reviewDictation: jest.fn(),
-  recordDictationResult: jest.fn(),
-  getDictationStreak: jest.fn(),
-  fetchGenerateContext: jest.fn(),
-}));
+// Mock the dictation services — they are the internal boundary
+jest.mock('../services/dictation' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/dictation',
+  ) as typeof import('../services/dictation');
+  return {
+    ...actual,
+    prepareHomework: jest.fn(),
+    generateDictation: jest.fn(),
+    reviewDictation: jest.fn(),
+    recordDictationResult: jest.fn(),
+    getDictationStreak: jest.fn(),
+    fetchGenerateContext: jest.fn(),
+  };
+});
 
 import { app } from '../index';
 import {
@@ -112,7 +127,7 @@ describe('POST /v1/dictation/prepare-homework', () => {
         headers: AUTH_HEADERS,
         body: JSON.stringify({ text: 'Hello world.' }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -141,7 +156,7 @@ describe('POST /v1/dictation/prepare-homework', () => {
         headers: AUTH_HEADERS,
         body: JSON.stringify({ text: 'Test sentence.' }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(prepareHomework).toHaveBeenCalledWith('Test sentence.');
@@ -155,7 +170,7 @@ describe('POST /v1/dictation/prepare-homework', () => {
         headers: AUTH_HEADERS,
         body: JSON.stringify({ text: '' }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(400);
@@ -171,7 +186,7 @@ describe('POST /v1/dictation/prepare-homework', () => {
         headers: AUTH_HEADERS,
         body: JSON.stringify({}),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(400);
@@ -188,7 +203,7 @@ describe('POST /v1/dictation/prepare-homework', () => {
         headers: makeAuthHeaders(),
         body: JSON.stringify({ text: 'Hello world.' }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(400);
@@ -203,7 +218,7 @@ describe('POST /v1/dictation/prepare-homework', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: 'Hello world.' }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(401);
@@ -240,7 +255,7 @@ describe('POST /v1/dictation/generate', () => {
         method: 'POST',
         headers: AUTH_HEADERS,
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -276,7 +291,7 @@ describe('POST /v1/dictation/generate', () => {
         method: 'POST',
         headers: AUTH_HEADERS,
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(fetchGenerateContext).toHaveBeenCalledTimes(1);
@@ -295,7 +310,7 @@ describe('POST /v1/dictation/generate', () => {
         method: 'POST',
         headers: makeAuthHeaders(),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(403);
@@ -306,7 +321,7 @@ describe('POST /v1/dictation/generate', () => {
     const res = await app.request(
       '/v1/dictation/generate',
       { method: 'POST' },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(401);
@@ -343,7 +358,7 @@ describe('POST /v1/dictation/result', () => {
           reviewed: false,
         }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(201);
@@ -356,7 +371,7 @@ describe('POST /v1/dictation/result', () => {
         localDate: TODAY,
         sentenceCount: 5,
         mode: 'homework',
-      })
+      }),
     );
   });
 
@@ -371,7 +386,7 @@ describe('POST /v1/dictation/result', () => {
           mode: 'homework',
         }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(400);
@@ -393,7 +408,7 @@ describe('POST /v1/dictation/result', () => {
           mode: 'homework',
         }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(400);
@@ -413,7 +428,7 @@ describe('POST /v1/dictation/result', () => {
           mode: 'invalid-mode',
         }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(400);
@@ -437,7 +452,7 @@ describe('POST /v1/dictation/result', () => {
           mode: 'homework',
         }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(403);
@@ -455,7 +470,7 @@ describe('POST /v1/dictation/result', () => {
           mode: 'homework',
         }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(401);
@@ -476,7 +491,7 @@ describe('GET /v1/dictation/streak', () => {
     const res = await app.request(
       '/v1/dictation/streak',
       { headers: AUTH_HEADERS },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -494,7 +509,7 @@ describe('GET /v1/dictation/streak', () => {
     const res = await app.request(
       '/v1/dictation/streak',
       { headers: AUTH_HEADERS },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -513,7 +528,7 @@ describe('GET /v1/dictation/streak', () => {
     const res = await app.request(
       '/v1/dictation/streak',
       { headers: AUTH_HEADERS },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -531,12 +546,12 @@ describe('GET /v1/dictation/streak', () => {
     await app.request(
       '/v1/dictation/streak',
       { headers: AUTH_HEADERS },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(getDictationStreak).toHaveBeenCalledWith(
       expect.anything(), // db
-      'test-profile-id'
+      'test-profile-id',
     );
   });
 
@@ -547,7 +562,7 @@ describe('GET /v1/dictation/streak', () => {
       {
         headers: makeAuthHeaders(),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(400);
@@ -607,7 +622,7 @@ describe('POST /v1/dictation/review', () => {
         headers: AUTH_HEADERS,
         body: JSON.stringify(REVIEW_BODY),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -626,7 +641,7 @@ describe('POST /v1/dictation/review', () => {
         headers: makeAuthHeaders(),
         body: JSON.stringify(REVIEW_BODY),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(400);
@@ -643,7 +658,7 @@ describe('POST /v1/dictation/review', () => {
         headers: AUTH_HEADERS,
         body: JSON.stringify(bodyWithoutImage),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(400);
@@ -659,7 +674,7 @@ describe('POST /v1/dictation/review', () => {
         headers: AUTH_HEADERS,
         body: JSON.stringify({ ...REVIEW_BODY, imageMimeType: 'image/gif' }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(400);
@@ -675,7 +690,7 @@ describe('POST /v1/dictation/review', () => {
         headers: AUTH_HEADERS,
         body: JSON.stringify({ ...REVIEW_BODY, sentences: [] }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(400);
@@ -691,7 +706,7 @@ describe('POST /v1/dictation/review', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(REVIEW_BODY),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(401);
@@ -707,7 +722,7 @@ describe('POST /v1/dictation/review', () => {
         headers: AUTH_HEADERS,
         body: JSON.stringify(REVIEW_BODY),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(429);
@@ -734,7 +749,7 @@ describe('Dictation LLM routes — quota exhaustion [IMP-7]', () => {
     const res = await app.request(
       '/v1/dictation/generate',
       { method: 'POST', headers: AUTH_HEADERS, body: '{}' },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(402);
@@ -750,7 +765,7 @@ describe('Dictation LLM routes — quota exhaustion [IMP-7]', () => {
         headers: AUTH_HEADERS,
         body: JSON.stringify({ text: 'Hello world.' }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(402);
@@ -766,7 +781,7 @@ describe('Dictation LLM routes — quota exhaustion [IMP-7]', () => {
         headers: AUTH_HEADERS,
         body: JSON.stringify(REVIEW_BODY),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(402);
@@ -783,7 +798,7 @@ describe('Dictation LLM routes — quota exhaustion [IMP-7]', () => {
     const res = await app.request(
       '/v1/dictation/streak',
       { method: 'GET', headers: AUTH_HEADERS },
-      TEST_ENV
+      TEST_ENV,
     );
 
     // Streak endpoint should still return 200 even when quota is exhausted
