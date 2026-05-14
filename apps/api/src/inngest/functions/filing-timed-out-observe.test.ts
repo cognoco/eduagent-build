@@ -15,26 +15,35 @@
 
 const mockGetStepDatabase = jest.fn();
 
-jest.mock(
-  '../helpers' /* gc1-allow: isolates DB connection from unit test */,
-  () => ({
+jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../helpers',
+  ) as typeof import('../helpers');
+  return {
+    ...actual,
     getStepDatabase: () => mockGetStepDatabase(),
-  }),
-);
+  };
+});
 
 import { createInngestTransportCapture } from '../../test-utils/inngest-transport-capture';
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 
 const mockInngestTransport = createInngestTransportCapture();
-jest.mock('../client', () => mockInngestTransport.module); // gc1-allow: inngest framework boundary
+jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual('../client') as typeof import('../client');
+  return { ...actual, ...mockInngestTransport.module };
+}); // gc1-allow: inngest framework boundary
 
 const mockCaptureException = jest.fn();
-jest.mock(
-  '../../services/sentry' /* gc1-allow: isolates Sentry external boundary */,
-  () => ({
+jest.mock('../../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../../services/sentry',
+  ) as typeof import('../../services/sentry');
+  return {
+    ...actual,
     captureException: (...args: unknown[]) => mockCaptureException(...args),
-  }),
-);
+  };
+});
 
 const mockFormatFilingFailedPush = jest.fn().mockReturnValue({
   title: 'Filing failed',
@@ -42,33 +51,48 @@ const mockFormatFilingFailedPush = jest.fn().mockReturnValue({
 });
 const mockSendPushNotification = jest.fn().mockResolvedValue({ sent: true });
 jest.mock(
-  '../../services/notifications' /* gc1-allow: isolates push notification external boundary */,
-  () => ({
-    formatFilingFailedPush: () => mockFormatFilingFailedPush(),
-    sendPushNotification: (...args: unknown[]) =>
-      mockSendPushNotification(...args),
-  }),
+  '../../services/notifications' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/notifications',
+    ) as typeof import('../../services/notifications');
+    return {
+      ...actual,
+      formatFilingFailedPush: () => mockFormatFilingFailedPush(),
+      sendPushNotification: (...args: unknown[]) =>
+        mockSendPushNotification(...args),
+    };
+  },
 );
 
 const mockGetRecentNotificationCount = jest.fn().mockResolvedValue(0);
 jest.mock(
-  '../../services/settings' /* gc1-allow: isolates notification settings service */,
-  () => ({
-    getRecentNotificationCount: (...args: unknown[]) =>
-      mockGetRecentNotificationCount(...args),
-  }),
+  '../../services/settings' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/settings',
+    ) as typeof import('../../services/settings');
+    return {
+      ...actual,
+      getRecentNotificationCount: (...args: unknown[]) =>
+        mockGetRecentNotificationCount(...args),
+    };
+  },
 );
 
-jest.mock(
-  '../../services/logger' /* gc1-allow: isolates logger to prevent console noise in tests */,
-  () => ({
+jest.mock('../../services/logger' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../../services/logger',
+  ) as typeof import('../../services/logger');
+  return {
+    ...actual,
     createLogger: () => ({
       info: jest.fn(),
       warn: jest.fn(),
       error: jest.fn(),
     }),
-  }),
-);
+  };
+});
 
 // Import AFTER mocks are set up
 import { filingTimedOutObserve } from './filing-timed-out-observe';

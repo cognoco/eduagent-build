@@ -73,11 +73,17 @@ jest.mock('@eduagent/database', () => ({
 
 const mockGetSessionTranscript = jest.fn();
 jest.mock(
-  '../../services/session' /* gc1-allow: isolates unit test from DB-backed transcript service */,
-  () => ({
-    getSessionTranscript: (...args: unknown[]) =>
-      mockGetSessionTranscript(...args),
-  }),
+  '../../services/session' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/session',
+    ) as typeof import('../../services/session');
+    return {
+      ...actual,
+      getSessionTranscript: (...args: unknown[]) =>
+        mockGetSessionTranscript(...args),
+    };
+  },
 );
 
 const mockBuildLibraryIndex = jest.fn().mockResolvedValue({ shelves: [] });
@@ -99,19 +105,28 @@ const mockResolveFilingResult = jest.fn().mockResolvedValue({
   isNew: { shelf: false, book: false, chapter: false },
 });
 
-jest.mock(
-  '../../services/filing' /* gc1-allow: isolates unit test from DB-backed filing service */,
-  () => ({
+jest.mock('../../services/filing' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../../services/filing',
+  ) as typeof import('../../services/filing');
+  return {
+    ...actual,
     buildLibraryIndex: (...args: unknown[]) => mockBuildLibraryIndex(...args),
     fileToLibrary: (...args: unknown[]) => mockFileToLibrary(...args),
     resolveFilingResult: (...args: unknown[]) =>
       mockResolveFilingResult(...args),
-  }),
-);
+  };
+});
 
-jest.mock('../../services/llm', () => ({
-  routeAndCall: jest.fn().mockResolvedValue({ text: 'mocked' }),
-}));
+jest.mock('../../services/llm' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../../services/llm',
+  ) as typeof import('../../services/llm');
+  return {
+    ...actual,
+    routeAndCall: jest.fn().mockResolvedValue({ text: 'mocked' }),
+  };
+});
 
 // ---------------------------------------------------------------------------
 // Import function under test
