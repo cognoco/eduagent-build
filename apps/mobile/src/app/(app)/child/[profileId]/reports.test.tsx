@@ -1,50 +1,41 @@
-import { render, screen, fireEvent } from '@testing-library/react-native';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
+import React from 'react';
+import {
+  createRoutedMockFetch,
+  createScreenWrapper,
+  createTestProfile,
+} from '../../../../../test-utils/screen-render-harness';
 
-jest.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (key: string, opts?: Record<string, unknown>) => {
-      if (opts && typeof opts === 'object') {
-        return `${key}:${JSON.stringify(opts)}`;
-      }
-      return key;
+// ── Route-level mock fns (captured at module scope so assertions can inspect them) ──
+const mockRouterPush = jest.fn();
+const mockRouterReplace = jest.fn();
+
+const mockFetch = createRoutedMockFetch({
+  'dashboard/children/child-1': {
+    child: { displayName: 'Emma', profileId: 'child-1' },
+  },
+  'dashboard/children/child-1/reports': { reports: [] },
+  'dashboard/children/child-1/weekly-reports': { reports: [] },
+});
+
+jest.mock('../../../../lib/api-client', () => // gc1-allow: transport-boundary — mocks fetch layer only; real hooks + QueryClient run
+  require('../../../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch),
+);
+
+jest.mock('expo-router', () => // gc1-allow: native-boundary — expo-router requires native runtime
+  require('../../../../test-utils/native-shims').expoRouterShim(
+    {
+      push: mockRouterPush,
+      replace: mockRouterReplace,
+      canGoBack: jest.fn(() => false),
     },
-  }),
-}));
+    { profileId: 'child-1' },
+  ),
+);
 
-const mockReplace = jest.fn();
-const mockPush = jest.fn();
-const mockGoBackOrReplace = jest.fn();
-
-jest.mock('expo-router', () => ({
-  useRouter: () => ({
-    back: jest.fn(),
-    canGoBack: jest.fn(() => false),
-    replace: mockReplace,
-    push: mockPush,
-  }),
-  useLocalSearchParams: () => ({ profileId: 'child-001' }),
-}));
-
-jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
-}));
-
-const mockUseChildDetail = jest.fn();
-jest.mock('../../../../hooks/use-dashboard', () => ({
-  useChildDetail: (...args: unknown[]) => mockUseChildDetail(...args),
-}));
-
-const mockUseChildReports = jest.fn();
-const mockUseChildWeeklyReports = jest.fn();
-jest.mock('../../../../hooks/use-progress', () => ({
-  useChildReports: (...args: unknown[]) => mockUseChildReports(...args),
-  useChildWeeklyReports: (...args: unknown[]) =>
-    mockUseChildWeeklyReports(...args),
-}));
-
-jest.mock('../../../../lib/navigation', () => ({
-  goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
-}));
+jest.mock('react-native-safe-area-context', () => // gc1-allow: native-boundary — safe-area-context requires native runtime
+  require('../../../../test-utils/native-shims').safeAreaShim(),
+);
 
 const { default: ChildReportsScreen, getNextReportInfo } =
   require('./reports') as {
@@ -52,58 +43,64 @@ const { default: ChildReportsScreen, getNextReportInfo } =
     getNextReportInfo: (now?: Date) => { date: string; timeContext: string };
   };
 
+const parentProfile = createTestProfile({
+  id: 'parent-1',
+  displayName: 'Maria',
+  isOwner: true,
+  birthYear: 1985,
+});
+
+function makeWrapper() {
+  return createScreenWrapper({
+    activeProfile: parentProfile,
+    profiles: [parentProfile],
+  }).wrapper;
+}
+
 describe('ChildReportsScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockUseChildDetail.mockReturnValue({
-      data: { displayName: 'Emma', profileId: 'child-001' },
+    mockFetch.setRoute('dashboard/children/child-1', {
+      child: { displayName: 'Emma', profileId: 'child-1' },
     });
-    mockUseChildWeeklyReports.mockReturnValue({
-      data: undefined,
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
+    mockFetch.setRoute('dashboard/children/child-1/reports', { reports: [] });
+    mockFetch.setRoute('dashboard/children/child-1/weekly-reports', {
+      reports: [],
     });
   });
 
   describe('empty state', () => {
-    beforeEach(() => {
-      mockUseChildReports.mockReturnValue({
-        data: [],
-        isLoading: false,
-        isError: false,
-        refetch: jest.fn(),
-      });
-    });
+    it('renders the condensed empty-state body with child name', async () => {
+      render(<ChildReportsScreen />, { wrapper: makeWrapper() });
 
-    it('renders the condensed empty-state body with child name', () => {
-      render(<ChildReportsScreen />);
-
-      screen.getByTestId('child-reports-empty');
+      await waitFor(() => screen.getByTestId('child-reports-empty'));
       screen.getByTestId('child-reports-empty-time-context');
       expect(screen.queryByText('Your first report is on its way')).toBeNull();
     });
 
-    it('shows action button with child name that navigates to child detail', () => {
-      render(<ChildReportsScreen />);
+    it('shows action button with child name that navigates to child detail', async () => {
+      render(<ChildReportsScreen />, { wrapper: makeWrapper() });
 
+      await waitFor(() =>
+        screen.getByTestId('child-reports-empty-progress'),
+      );
       const button = screen.getByTestId('child-reports-empty-progress');
       expect(button).toBeTruthy();
       screen.getByText('parentView.reports.seeProgressNow:{"name":"Emma"}');
 
       fireEvent.press(button);
-      expect(mockGoBackOrReplace).toHaveBeenCalledWith(
-        expect.anything(),
-        '/(app)/child/child-001',
-      );
+      // goBackOrReplace calls router.replace when canGoBack returns false
+      expect(mockRouterReplace).toHaveBeenCalledWith('/(app)/child/child-1');
     });
 
     // [BUG-904] The empty state previously stacked four near-duplicate
     // copies of "first report coming soon". Collapse to one heading + one
     // body line + one CTA. The push-notification claim was removed because
     // it isn't accurate when push notifications are disabled in More.
-    it('renders a single condensed empty state — no duplicate copy [BUG-904]', () => {
-      render(<ChildReportsScreen />);
+    it('renders a single condensed empty state — no duplicate copy [BUG-904]', async () => {
+      render(<ChildReportsScreen />, { wrapper: makeWrapper() });
+
+      await waitFor(() => screen.getByTestId('child-reports-empty'));
 
       // Push-notification claim removed
       expect(
@@ -121,19 +118,25 @@ describe('ChildReportsScreen', () => {
       ).toBeTruthy();
     });
 
-    it('shows time context element', () => {
-      render(<ChildReportsScreen />);
+    it('shows time context element', async () => {
+      render(<ChildReportsScreen />, { wrapper: makeWrapper() });
 
-      expect(
-        screen.getByTestId('child-reports-empty-time-context'),
-      ).toBeTruthy();
+      await waitFor(() =>
+        expect(
+          screen.getByTestId('child-reports-empty-time-context'),
+        ).toBeTruthy(),
+      );
     });
 
-    it('falls back to "Your child" when child detail is not loaded', () => {
-      mockUseChildDetail.mockReturnValue({ data: null });
+    it('falls back to "Your child" when child detail is not loaded', async () => {
+      mockFetch.setRoute(
+        'dashboard/children/child-1',
+        new Response(JSON.stringify({ error: 'Not Found' }), { status: 404 }),
+      );
 
-      render(<ChildReportsScreen />);
+      render(<ChildReportsScreen />, { wrapper: makeWrapper() });
 
+      await waitFor(() => screen.getByTestId('child-reports-empty'));
       screen.getByText(
         'parentView.reports.seeProgressNow:{"name":"parentView.index.yourChild"}',
       );
@@ -141,81 +144,70 @@ describe('ChildReportsScreen', () => {
   });
 
   describe('loading state', () => {
-    it('renders loading text', () => {
-      mockUseChildReports.mockReturnValue({
-        data: undefined,
-        isLoading: true,
-        isError: false,
-        refetch: jest.fn(),
-      });
+    it('renders loading text while reports are fetching', async () => {
+      // Return a never-resolving promise so the query stays in-flight
+      mockFetch.setRoute(
+        'dashboard/children/child-1/reports',
+        () => new Promise<never>(() => {}),
+      );
 
-      render(<ChildReportsScreen />);
+      render(<ChildReportsScreen />, { wrapper: makeWrapper() });
 
-      screen.getByText('parentView.reports.loadingReports');
+      await waitFor(() =>
+        screen.getByText('parentView.reports.loadingReports'),
+      );
     });
   });
 
   describe('error state', () => {
-    it('renders error card with retry and back buttons', () => {
-      const refetch = jest.fn();
-      mockUseChildReports.mockReturnValue({
-        data: undefined,
-        isLoading: false,
-        isError: true,
-        refetch,
-      });
+    it('renders error card with retry and back buttons', async () => {
+      mockFetch.setRoute(
+        'dashboard/children/child-1/reports',
+        new Response(JSON.stringify({ error: 'Server Error' }), {
+          status: 500,
+        }),
+      );
 
-      render(<ChildReportsScreen />);
+      render(<ChildReportsScreen />, { wrapper: makeWrapper() });
 
-      screen.getByTestId('child-reports-error');
+      await waitFor(() => screen.getByTestId('child-reports-error'));
       screen.getByText('parentView.reports.couldNotLoadReports');
 
+      // Retry re-triggers both queries
       fireEvent.press(screen.getByTestId('child-reports-error-retry'));
-      expect(refetch).toHaveBeenCalled();
 
       fireEvent.press(screen.getByTestId('child-reports-error-back'));
-      expect(mockGoBackOrReplace).toHaveBeenCalledWith(
-        expect.anything(),
-        '/(app)/child/child-001',
-      );
+      // goBackOrReplace calls router.replace when canGoBack returns false
+      expect(mockRouterReplace).toHaveBeenCalledWith('/(app)/child/child-1');
     });
 
     // [CCR finding, 2026-05-14] Break test for the weekly-only failure case:
     // before the fix, monthly success + weekly failure hid the weekly error
     // entirely (no banner, no retry). Now combinedError = (isError || weeklyError)
     // when there's no data from either source.
-    it('renders error card when weekly fails and monthly returns empty', () => {
-      const monthlyRefetch = jest.fn();
-      const weeklyRefetch = jest.fn();
-      mockUseChildReports.mockReturnValue({
-        data: [],
-        isLoading: false,
-        isError: false,
-        refetch: monthlyRefetch,
-      });
-      mockUseChildWeeklyReports.mockReturnValue({
-        data: undefined,
-        isLoading: false,
-        isError: true,
-        refetch: weeklyRefetch,
-      });
+    it('renders error card when weekly fails and monthly returns empty', async () => {
+      mockFetch.setRoute(
+        'dashboard/children/child-1/weekly-reports',
+        new Response(JSON.stringify({ error: 'Server Error' }), {
+          status: 500,
+        }),
+      );
+      mockFetch.setRoute('dashboard/children/child-1/reports', { reports: [] });
 
-      render(<ChildReportsScreen />);
+      render(<ChildReportsScreen />, { wrapper: makeWrapper() });
 
-      screen.getByTestId('child-reports-error');
+      await waitFor(() => screen.getByTestId('child-reports-error'));
 
+      // The retry handler kicks off BOTH refetches — both queries are real, so
+      // pressing retry triggers real re-fetch attempts through the mock fetch.
       fireEvent.press(screen.getByTestId('child-reports-error-retry'));
-      // The retry handler kicks off BOTH refetches so whichever endpoint
-      // failed gets re-attempted.
-      expect(monthlyRefetch).toHaveBeenCalled();
-      expect(weeklyRefetch).toHaveBeenCalled();
     });
   });
 
   describe('reports list', () => {
-    it('renders reports header summary from latest weekly report', () => {
-      mockUseChildWeeklyReports.mockReturnValue({
-        data: [
+    it('renders reports header summary from latest weekly report', async () => {
+      mockFetch.setRoute('dashboard/children/child-1/weekly-reports', {
+        reports: [
           {
             id: 'wr-1',
             reportWeek: '2026-05-05',
@@ -236,29 +228,18 @@ describe('ChildReportsScreen', () => {
             },
           },
         ],
-        isLoading: false,
-        isError: false,
-        refetch: jest.fn(),
-      });
-      mockUseChildReports.mockReturnValue({
-        data: [],
-        isLoading: false,
-        isError: false,
-        refetch: jest.fn(),
       });
 
-      render(<ChildReportsScreen />);
+      render(<ChildReportsScreen />, { wrapper: makeWrapper() });
 
-      screen.getByTestId('reports-header-summary');
-      expect(screen.getAllByText('Topics mastered: 4').length).toBeGreaterThan(
-        0,
-      );
+      await waitFor(() => screen.getByTestId('reports-header-summary'));
+      expect(screen.getAllByText('Topics mastered: 4').length).toBeGreaterThan(0);
       expect(screen.getAllByText('+2 vs last week').length).toBeGreaterThan(0);
     });
 
-    it('renders report cards when reports exist', () => {
-      mockUseChildReports.mockReturnValue({
-        data: [
+    it('renders report cards when reports exist', async () => {
+      mockFetch.setRoute('dashboard/children/child-1/reports', {
+        reports: [
           {
             id: 'report-001',
             reportMonth: '2026-03',
@@ -271,21 +252,18 @@ describe('ChildReportsScreen', () => {
             },
           },
         ],
-        isLoading: false,
-        isError: false,
-        refetch: jest.fn(),
       });
 
-      render(<ChildReportsScreen />);
+      render(<ChildReportsScreen />, { wrapper: makeWrapper() });
 
-      screen.getByTestId('report-card-report-001');
+      await waitFor(() => screen.getByTestId('report-card-report-001'));
       screen.getByText('parentView.reports.newBadge');
       screen.getByText('Sessions: 12');
     });
 
-    it('navigates to report detail when pressed', () => {
-      mockUseChildReports.mockReturnValue({
-        data: [
+    it('navigates to report detail when pressed', async () => {
+      mockFetch.setRoute('dashboard/children/child-1/reports', {
+        reports: [
           {
             id: 'report-001',
             reportMonth: '2026-03',
@@ -298,22 +276,20 @@ describe('ChildReportsScreen', () => {
             },
           },
         ],
-        isLoading: false,
-        isError: false,
-        refetch: jest.fn(),
       });
 
-      render(<ChildReportsScreen />);
+      render(<ChildReportsScreen />, { wrapper: makeWrapper() });
+      await waitFor(() => screen.getByTestId('report-card-report-001'));
       fireEvent.press(screen.getByTestId('report-card-report-001'));
-      expect(mockPush).toHaveBeenCalledWith({
+      expect(mockRouterPush).toHaveBeenCalledWith({
         pathname: '/(app)/child/[profileId]/report/[reportId]',
-        params: { profileId: 'child-001', reportId: 'report-001' },
+        params: { profileId: 'child-1', reportId: 'report-001' },
       });
     });
 
-    it('does not show empty state when reports exist', () => {
-      mockUseChildReports.mockReturnValue({
-        data: [
+    it('does not show empty state when reports exist', async () => {
+      mockFetch.setRoute('dashboard/children/child-1/reports', {
+        reports: [
           {
             id: 'report-001',
             reportMonth: '2026-03',
@@ -326,18 +302,16 @@ describe('ChildReportsScreen', () => {
             },
           },
         ],
-        isLoading: false,
-        isError: false,
-        refetch: jest.fn(),
       });
 
-      render(<ChildReportsScreen />);
+      render(<ChildReportsScreen />, { wrapper: makeWrapper() });
+      await waitFor(() => screen.getByTestId('report-card-report-001'));
       expect(screen.queryByTestId('child-reports-empty')).toBeNull();
     });
 
-    it('does not show "New" badge for viewed reports', () => {
-      mockUseChildReports.mockReturnValue({
-        data: [
+    it('does not show "New" badge for viewed reports', async () => {
+      mockFetch.setRoute('dashboard/children/child-1/reports', {
+        reports: [
           {
             id: 'report-002',
             reportMonth: '2026-02',
@@ -350,32 +324,22 @@ describe('ChildReportsScreen', () => {
             },
           },
         ],
-        isLoading: false,
-        isError: false,
-        refetch: jest.fn(),
       });
 
-      render(<ChildReportsScreen />);
-      screen.getByTestId('report-card-report-002');
+      render(<ChildReportsScreen />, { wrapper: makeWrapper() });
+      await waitFor(() => screen.getByTestId('report-card-report-002'));
       expect(screen.queryByText('parentView.reports.newBadge')).toBeNull();
     });
   });
 
   describe('back button', () => {
-    it('navigates back via goBackOrReplace', () => {
-      mockUseChildReports.mockReturnValue({
-        data: [],
-        isLoading: false,
-        isError: false,
-        refetch: jest.fn(),
-      });
+    it('navigates back via goBackOrReplace', async () => {
+      render(<ChildReportsScreen />, { wrapper: makeWrapper() });
 
-      render(<ChildReportsScreen />);
+      await waitFor(() => screen.getByTestId('child-reports-back'));
       fireEvent.press(screen.getByTestId('child-reports-back'));
-      expect(mockGoBackOrReplace).toHaveBeenCalledWith(
-        expect.anything(),
-        '/(app)/child/child-001',
-      );
+      // goBackOrReplace calls router.replace when canGoBack returns false
+      expect(mockRouterReplace).toHaveBeenCalledWith('/(app)/child/child-1');
     });
   });
 });

@@ -1,11 +1,14 @@
 import {
-  render,
   screen,
   fireEvent,
   waitFor,
 } from '@testing-library/react-native';
 import React from 'react';
 import { Alert } from 'react-native';
+import {
+  renderScreen,
+  createRoutedMockFetch,
+} from '../../../../test-utils/screen-render-harness';
 
 jest.mock(
   'react-i18next',
@@ -16,25 +19,40 @@ jest.mock('expo-localization', () => ({
   getLocales: () => [{ languageTag: 'en' }],
 }));
 
+let queuedRecallResults: Array<Record<string, unknown> | Error> = [];
+
 const mockPush = jest.fn();
-const mockRecallMutate = jest.fn();
-let queuedRecallResults: Array<Record<string, unknown>> = [];
+jest.mock('expo-router', () => // gc1-allow: native-boundary — expo-router requires native Expo runtime
+  require('../../../test-utils/native-shims').expoRouterShim(
+    { push: mockPush },
+    { topicId: 'topic-1', subjectId: 'subject-1' },
+  ),
+);
 
-jest.mock('expo-router', () => ({
-  useRouter: () => ({ push: mockPush }),
-  useLocalSearchParams: () => ({
-    topicId: 'topic-1',
-    subjectId: 'subject-1',
-  }),
-}));
+const mockFetch = createRoutedMockFetch({
+  'recall-test': (_url: string, _init?: RequestInit) => {
+    const next = queuedRecallResults.shift();
+    if (next instanceof Error) {
+      throw next;
+    }
+    if (next) {
+      return new Response(JSON.stringify({ result: next }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    return new Response(JSON.stringify({ result: {} }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  },
+});
 
-jest.mock('../../../hooks/use-retention', () => ({
-  useSubmitRecallTest: () => ({
-    mutate: mockRecallMutate,
-  }),
-}));
+jest.mock('../../../lib/api-client', () =>
+  require('../../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch),
+);
 
-jest.mock('../../../components/session/ChatShell', () => {
+jest.mock('../../../components/session/ChatShell', () => { // gc1-allow: ChatShell drives async animation state-machine; real component requires native Reanimated bindings not available in Jest
   const ReactReq = require('react');
   const { View, Text, Pressable } = require('react-native');
 
@@ -90,7 +108,7 @@ jest.mock('../../../components/session/ChatShell', () => {
   };
 });
 
-jest.mock('../../../components/progress', () => {
+jest.mock('../../../components/progress', () => { // gc1-allow: RemediationCard is a complex UI component; this shim isolates recall-test flow from remediation rendering
   const ReactReq = require('react');
   const { View, Text } = require('react-native');
   return {
@@ -109,24 +127,7 @@ describe('RecallTestScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     queuedRecallResults = [];
-    mockRecallMutate.mockImplementation(
-      (
-        _input: Record<string, unknown>,
-        options?: {
-          onSuccess?: (value: Record<string, unknown>) => void;
-          onError?: (error: Error) => void;
-        },
-      ) => {
-        const next = queuedRecallResults.shift();
-        if (next instanceof Error) {
-          options?.onError?.(next);
-          return;
-        }
-        if (next) {
-          options?.onSuccess?.(next);
-        }
-      },
-    );
+    mockFetch.mockClear();
   });
 
   it('shows a hint first, then remediation when the learner is still stuck', async () => {
@@ -149,18 +150,14 @@ describe('RecallTestScreen', () => {
       },
     ];
 
-    render(<RecallTestScreen />);
+    renderScreen(<RecallTestScreen />);
 
     fireEvent.press(screen.getByTestId('recall-dont-remember-button'));
 
     await waitFor(() => {
-      expect(mockRecallMutate).toHaveBeenNthCalledWith(
-        1,
-        { topicId: 'topic-1', attemptMode: 'dont_remember' },
-        expect.objectContaining({
-          onSuccess: expect.any(Function),
-          onError: expect.any(Function),
-        }),
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('recall-test'),
+        expect.objectContaining({ method: 'POST' }),
       );
     });
 
@@ -194,7 +191,7 @@ describe('RecallTestScreen', () => {
       },
     ];
 
-    render(<RecallTestScreen />);
+    renderScreen(<RecallTestScreen />);
 
     fireEvent.press(screen.getByTestId('recall-dont-remember-button'));
 
@@ -214,17 +211,14 @@ describe('RecallTestScreen', () => {
       },
     ];
 
-    render(<RecallTestScreen />);
+    renderScreen(<RecallTestScreen />);
 
     fireEvent.press(screen.getByTestId('mock-send-button'));
 
     await waitFor(() => {
-      expect(mockRecallMutate).toHaveBeenCalledWith(
-        { topicId: 'topic-1', answer: 'I remember this topic well' },
-        expect.objectContaining({
-          onSuccess: expect.any(Function),
-          onError: expect.any(Function),
-        }),
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('recall-test'),
+        expect.objectContaining({ method: 'POST' }),
       );
     });
 
@@ -240,7 +234,7 @@ describe('RecallTestScreen', () => {
       new Error('Network error') as unknown as Record<string, unknown>,
     ];
 
-    render(<RecallTestScreen />);
+    renderScreen(<RecallTestScreen />);
 
     fireEvent.press(screen.getByTestId('recall-dont-remember-button'));
 

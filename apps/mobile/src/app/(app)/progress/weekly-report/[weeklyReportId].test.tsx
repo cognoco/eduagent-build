@@ -1,53 +1,27 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import {
+  createRoutedMockFetch,
+  createScreenWrapper,
+  cleanupScreen,
+  errorResponses,
+} from '../../../../../test-utils/screen-render-harness';
+import {
+  expoRouterShim,
+  safeAreaShim,
+} from '../../../../test-utils/native-shims';
 
-const mockGoBackOrReplace = jest.fn();
-const mockRefetch = jest.fn();
-const mockUseProfileWeeklyReportDetail = jest.fn();
-let mockSearchParams: Record<string, string> = {};
+const mockFetch = createRoutedMockFetch();
 
-jest.mock('expo-router', () => ({
-  useRouter: () => ({}),
-  useLocalSearchParams: () => mockSearchParams,
-}));
-
-jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
-}));
-
-jest.mock(
-  '../../../../lib/navigation' /* gc1-allow: navigation stub captures goBackOrReplace calls; real impl requires expo-router Router which is also mocked at this boundary */,
-  () => ({
-    goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
-  }),
+jest.mock('../../../../lib/api-client', () => // gc1-allow: transport-boundary — api-client is the fetch boundary; routedMockFetch replaces per-hook mocks
+  require('../../../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch),
 );
 
-const mockMarkViewed = {
-  mutateAsync: jest.fn().mockResolvedValue({ viewed: true }),
-};
-jest.mock(
-  '../../../../hooks/use-progress' /* gc1-allow: query-hook stub at unit-test boundary; real useProfileWeeklyReportDetail needs QueryClientProvider + API client */,
-  () => ({
-    useProfileWeeklyReportDetail: () => mockUseProfileWeeklyReportDetail(),
-    useMarkProfileWeeklyReportViewed: () => mockMarkViewed,
-  }),
-);
+let routerMock: ReturnType<typeof expoRouterShim>;
+jest.mock('expo-router', () => routerMock); // gc1-allow: native-boundary — Expo Router requires native bindings unavailable in Jest
 
-jest.mock(
-  '../../../../lib/format-api-error' /* gc1-allow: classifyApiError is error-classification boundary; unit test stubs classified output, not implementation detail */,
-  () => ({
-    classifyApiError: () => ({
-      message: 'Something went wrong',
-      category: 'unknown',
-      recovery: 'retry',
-    }),
-  }),
-);
+jest.mock('react-native-safe-area-context', () => safeAreaShim()); // gc1-allow: native-boundary — safe-area context requires native bindings unavailable in Jest
 
-jest.mock('@sentry/react-native', () => ({
-  captureException: jest.fn(),
-}));
-
-jest.mock('react-i18next', () => ({
+jest.mock('react-i18next', () => ({ // gc1-allow: external-boundary — i18next initialisation requires the full i18n provider chain unavailable in Jest
   useTranslation: () => ({
     t: (key: string) => {
       const map: Record<string, string> = {
@@ -74,149 +48,147 @@ jest.mock('react-i18next', () => ({
 
 const ProgressWeeklyReportDetail = require('./[weeklyReportId]').default;
 
-const WEEKLY_REPORT = {
-  id: 'weekly-uuid-1',
-  profileId: 'profile-uuid-1',
-  childProfileId: 'child-uuid-1',
-  reportWeek: '2026-05-04',
-  reportData: {
-    childName: 'Alex',
-    weekStart: '2026-05-04',
-    thisWeek: {
-      totalSessions: 5,
-      totalActiveMinutes: 75,
-      topicsMastered: 2,
-      topicsExplored: 4,
-      vocabularyTotal: 30,
-      streakBest: 6,
+const WEEKLY_REPORT_RESPONSE = {
+  report: {
+    id: 'weekly-uuid-1',
+    profileId: 'profile-uuid-1',
+    childProfileId: 'child-uuid-1',
+    reportWeek: '2026-05-04',
+    reportData: {
+      childName: 'Alex',
+      weekStart: '2026-05-04',
+      thisWeek: {
+        totalSessions: 5,
+        totalActiveMinutes: 75,
+        topicsMastered: 2,
+        topicsExplored: 4,
+        vocabularyTotal: 30,
+        streakBest: 6,
+      },
+      lastWeek: null,
+      headlineStat: {
+        value: 2,
+        label: 'Topics mastered',
+        comparison: '2 new this week',
+      },
     },
-    lastWeek: null,
-    headlineStat: {
-      value: 2,
-      label: 'Topics mastered',
-      comparison: '2 new this week',
-    },
+    viewedAt: null,
+    createdAt: '2026-05-11T00:00:00.000Z',
   },
-  viewedAt: null,
-  createdAt: '2026-05-11T00:00:00.000Z',
 };
 
-const PRACTICE_SUMMARY = {
-  quizzesCompleted: 2,
-  reviewsCompleted: 1,
-  totals: {
-    activitiesCompleted: 3,
-    reviewsCompleted: 1,
-    pointsEarned: 20,
-    celebrations: 1,
-    distinctActivityTypes: 2,
+const WEEKLY_REPORT_WITH_PRACTICE = {
+  report: {
+    ...WEEKLY_REPORT_RESPONSE.report,
+    reportData: {
+      ...WEEKLY_REPORT_RESPONSE.report.reportData,
+      practiceSummary: {
+        quizzesCompleted: 2,
+        reviewsCompleted: 1,
+        totals: {
+          activitiesCompleted: 3,
+          reviewsCompleted: 1,
+          pointsEarned: 20,
+          celebrations: 1,
+          distinctActivityTypes: 2,
+        },
+        scores: {
+          scoredActivities: 0,
+          score: 0,
+          total: 0,
+          accuracy: null,
+        },
+        byType: [],
+        bySubject: [],
+      },
+    },
   },
-  scores: {
-    scoredActivities: 0,
-    score: 0,
-    total: 0,
-    accuracy: null,
-  },
-  byType: [],
-  bySubject: [],
 };
 
 describe('ProgressWeeklyReportDetail', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockSearchParams = { weeklyReportId: 'weekly-uuid-1' };
+    routerMock = expoRouterShim({}, { weeklyReportId: 'w-1' });
+    mockFetch.setRoute('/progress/weekly-reports/w-1', WEEKLY_REPORT_RESPONSE);
   });
 
   it('shows loading text while the report is loading', () => {
-    mockUseProfileWeeklyReportDetail.mockReturnValue({
-      data: undefined,
-      isLoading: true,
-      isError: false,
-      error: null,
-      refetch: mockRefetch,
-    });
+    // Suspend the fetch so React Query stays in loading state
+    mockFetch.setRoute('/progress/weekly-reports/w-1', () => new Promise(() => {}));
+    const { wrapper } = createScreenWrapper();
 
-    render(<ProgressWeeklyReportDetail />);
+    render(<ProgressWeeklyReportDetail />, { wrapper });
 
     screen.getByText('Loading report...');
   });
 
-  it('shows ErrorFallback with retry and back actions when the query errors', () => {
-    mockUseProfileWeeklyReportDetail.mockReturnValue({
-      data: undefined,
-      isLoading: false,
-      isError: true,
-      error: new Error('Network failure'),
-      refetch: mockRefetch,
+  it('shows ErrorFallback with retry and back actions when the query errors', async () => {
+    mockFetch.setRoute('/progress/weekly-reports/w-1', errorResponses.serverError());
+    const { wrapper, queryClient } = createScreenWrapper();
+
+    render(<ProgressWeeklyReportDetail />, { wrapper });
+
+    await waitFor(() => {
+      screen.getByTestId('progress-weekly-report-error');
     });
-
-    render(<ProgressWeeklyReportDetail />);
-
-    screen.getByTestId('progress-weekly-report-error');
     screen.getByTestId('progress-weekly-report-error-retry');
     screen.getByTestId('progress-weekly-report-error-back');
+    cleanupScreen(queryClient);
   });
 
-  it('pressing the retry button calls refetch', () => {
-    mockUseProfileWeeklyReportDetail.mockReturnValue({
-      data: undefined,
-      isLoading: false,
-      isError: true,
-      error: new Error('Network failure'),
-      refetch: mockRefetch,
-    });
+  it('pressing the retry button triggers a refetch', async () => {
+    mockFetch.setRoute('/progress/weekly-reports/w-1', errorResponses.serverError());
+    const { wrapper, queryClient } = createScreenWrapper();
 
-    render(<ProgressWeeklyReportDetail />);
+    render(<ProgressWeeklyReportDetail />, { wrapper });
 
+    await waitFor(() => screen.getByTestId('progress-weekly-report-error-retry'));
+
+    const callsBefore = mockFetch.mock.calls.length;
     fireEvent.press(screen.getByTestId('progress-weekly-report-error-retry'));
-    expect(mockRefetch).toHaveBeenCalledTimes(1);
+
+    await waitFor(() => {
+      expect(mockFetch.mock.calls.length).toBeGreaterThan(callsBefore);
+    });
+    cleanupScreen(queryClient);
   });
 
-  it('pressing the error back button fires goBackOrReplace to the reports list', () => {
-    mockUseProfileWeeklyReportDetail.mockReturnValue({
-      data: undefined,
-      isLoading: false,
-      isError: true,
-      error: new Error('Network failure'),
-      refetch: mockRefetch,
-    });
+  it('pressing the error back button calls router.replace to the reports list', async () => {
+    mockFetch.setRoute('/progress/weekly-reports/w-1', errorResponses.serverError());
+    const { wrapper, queryClient } = createScreenWrapper();
 
-    render(<ProgressWeeklyReportDetail />);
+    render(<ProgressWeeklyReportDetail />, { wrapper });
 
+    await waitFor(() => screen.getByTestId('progress-weekly-report-error-back'));
     fireEvent.press(screen.getByTestId('progress-weekly-report-error-back'));
-    expect(mockGoBackOrReplace).toHaveBeenCalledWith(
-      expect.anything(),
+
+    // expoRouterShim sets canGoBack() → false by default, so goBackOrReplace calls replace
+    expect(routerMock.useRouter().replace).toHaveBeenCalledWith(
       '/(app)/progress/reports',
     );
+    cleanupScreen(queryClient);
   });
 
-  it('renders the headline stat value, label, and comparison when data loads', () => {
-    mockUseProfileWeeklyReportDetail.mockReturnValue({
-      data: WEEKLY_REPORT,
-      isLoading: false,
-      isError: false,
-      error: null,
-      refetch: mockRefetch,
+  it('renders the headline stat value, label, and comparison when data loads', async () => {
+    const { wrapper, queryClient } = createScreenWrapper();
+
+    render(<ProgressWeeklyReportDetail />, { wrapper });
+
+    await waitFor(() => {
+      screen.getByText('2 topics mastered');
     });
-
-    render(<ProgressWeeklyReportDetail />);
-
-    screen.getByText('2 topics mastered');
     screen.getByText('2 new this week');
+    cleanupScreen(queryClient);
   });
 
-  it('renders MetricCard values for sessions this week and time on app', () => {
-    mockUseProfileWeeklyReportDetail.mockReturnValue({
-      data: WEEKLY_REPORT,
-      isLoading: false,
-      isError: false,
-      error: null,
-      refetch: mockRefetch,
+  it('renders MetricCard values for sessions this week and time on app', async () => {
+    const { wrapper, queryClient } = createScreenWrapper();
+
+    render(<ProgressWeeklyReportDetail />, { wrapper });
+
+    await waitFor(() => {
+      screen.getByText('Sessions this week');
     });
-
-    render(<ProgressWeeklyReportDetail />);
-
-    screen.getByText('Sessions this week');
     screen.getByText('5');
     screen.getByText('Time on app');
     screen.getByText('1h 15m');
@@ -224,107 +196,85 @@ describe('ProgressWeeklyReportDetail', () => {
     screen.getByTestId('progress-weekly-report-metric-minutes');
     screen.getByTestId('progress-weekly-report-metric-tests');
     screen.getByTestId('progress-weekly-report-metric-test-points');
+    cleanupScreen(queryClient);
   });
 
-  it('renders the practice summary card when practice data is present', () => {
-    mockUseProfileWeeklyReportDetail.mockReturnValue({
-      data: {
-        ...WEEKLY_REPORT,
-        reportData: {
-          ...WEEKLY_REPORT.reportData,
-          practiceSummary: PRACTICE_SUMMARY,
-        },
-      },
-      isLoading: false,
-      isError: false,
-      error: null,
-      refetch: mockRefetch,
+  it('renders the practice summary card when practice data is present', async () => {
+    mockFetch.setRoute('/progress/weekly-reports/w-1', WEEKLY_REPORT_WITH_PRACTICE);
+    const { wrapper, queryClient } = createScreenWrapper();
+
+    render(<ProgressWeeklyReportDetail />, { wrapper });
+
+    await waitFor(() => {
+      screen.getByTestId('progress-weekly-report-practice-summary');
     });
-
-    render(<ProgressWeeklyReportDetail />);
-
-    screen.getByTestId('progress-weekly-report-practice-summary');
+    cleanupScreen(queryClient);
   });
 
-  it('hides the practice summary card when practice data is absent', () => {
-    mockUseProfileWeeklyReportDetail.mockReturnValue({
-      data: WEEKLY_REPORT,
-      isLoading: false,
-      isError: false,
-      error: null,
-      refetch: mockRefetch,
+  it('hides the practice summary card when practice data is absent', async () => {
+    const { wrapper, queryClient } = createScreenWrapper();
+
+    render(<ProgressWeeklyReportDetail />, { wrapper });
+
+    await waitFor(() => {
+      screen.getByText('Sessions this week');
     });
-
-    render(<ProgressWeeklyReportDetail />);
-
     expect(
       screen.queryByTestId('progress-weekly-report-practice-summary'),
     ).toBeNull();
+    cleanupScreen(queryClient);
   });
 
-  it('shows the reportGone state when data is null and there is no loading or error', () => {
-    mockUseProfileWeeklyReportDetail.mockReturnValue({
-      data: null,
-      isLoading: false,
-      isError: false,
-      error: null,
-      refetch: mockRefetch,
+  it('shows the reportGone state when the API returns null for the report', async () => {
+    mockFetch.setRoute('/progress/weekly-reports/w-1', { report: null });
+    const { wrapper, queryClient } = createScreenWrapper();
+
+    render(<ProgressWeeklyReportDetail />, { wrapper });
+
+    await waitFor(() => {
+      screen.getByText('This report is no longer available');
     });
-
-    render(<ProgressWeeklyReportDetail />);
-
-    screen.getByText('This report is no longer available');
     screen.getByText(
       'It may have been archived or removed. All your other reports are still safe.',
     );
+    cleanupScreen(queryClient);
   });
 
-  it('fires goBackOrReplace to the reports list when the back button is pressed', () => {
-    mockUseProfileWeeklyReportDetail.mockReturnValue({
-      data: WEEKLY_REPORT,
-      isLoading: false,
-      isError: false,
-      error: null,
-      refetch: mockRefetch,
-    });
+  it('fires router.replace to the reports list when the back button is pressed', async () => {
+    const { wrapper, queryClient } = createScreenWrapper();
 
-    render(<ProgressWeeklyReportDetail />);
+    render(<ProgressWeeklyReportDetail />, { wrapper });
 
+    await waitFor(() => screen.getByTestId('progress-weekly-report-back'));
     fireEvent.press(screen.getByTestId('progress-weekly-report-back'));
-    expect(mockGoBackOrReplace).toHaveBeenCalledWith(
-      expect.anything(),
+
+    // expoRouterShim sets canGoBack() → false by default, so goBackOrReplace calls replace
+    expect(routerMock.useRouter().replace).toHaveBeenCalledWith(
       '/(app)/progress/reports',
     );
+    cleanupScreen(queryClient);
   });
 
-  it('formats the week date range as the screen title when data is loaded', () => {
-    mockUseProfileWeeklyReportDetail.mockReturnValue({
-      data: WEEKLY_REPORT,
-      isLoading: false,
-      isError: false,
-      error: null,
-      refetch: mockRefetch,
+  it('formats the week date range as the screen title when data is loaded', async () => {
+    const { wrapper, queryClient } = createScreenWrapper();
+
+    render(<ProgressWeeklyReportDetail />, { wrapper });
+
+    await waitFor(() => {
+      screen.getByText(/2026/);
     });
-
-    render(<ProgressWeeklyReportDetail />);
-
-    // formatWeeklyReportRange('2026-05-04') produces a locale-dependent string
-    // that covers Mon 4 May → Sun 10 May 2026. The string always contains the
-    // year and the "-" separator regardless of locale short-date order.
-    screen.getByText(/2026/);
+    cleanupScreen(queryClient);
   });
 
-  it('falls back to the i18n weekly report label for the title when data is absent', () => {
-    mockUseProfileWeeklyReportDetail.mockReturnValue({
-      data: null,
-      isLoading: false,
-      isError: false,
-      error: null,
-      refetch: mockRefetch,
+  it('falls back to the i18n weekly report label for the title when data is null', async () => {
+    mockFetch.setRoute('/progress/weekly-reports/w-1', { report: null });
+    const { wrapper, queryClient } = createScreenWrapper();
+
+    render(<ProgressWeeklyReportDetail />, { wrapper });
+
+    await waitFor(() => {
+      screen.getByText('Weekly report');
     });
-
-    render(<ProgressWeeklyReportDetail />);
-
-    screen.getByText('Weekly report');
+    cleanupScreen(queryClient);
   });
 });

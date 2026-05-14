@@ -1,36 +1,32 @@
-import { render, screen } from '@testing-library/react-native';
+import React from 'react';
+import { render, screen, waitFor } from '@testing-library/react-native';
+import {
+  createRoutedMockFetch,
+  createScreenWrapper,
+  createTestProfile,
+} from '../../../../../../test-utils/screen-render-harness';
 
-jest.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (key: string, opts?: Record<string, unknown>) => {
-      if (opts && typeof opts === 'object') {
-        return `${key}:${JSON.stringify(opts)}`;
-      }
-      return key;
-    },
-  }),
-}));
+const mockFetch = createRoutedMockFetch({});
 
-jest.mock('expo-router', () => ({
-  useRouter: () => ({
-    push: jest.fn(),
-  }),
-  useLocalSearchParams: () => ({
-    profileId: 'child-001',
-    reportId: 'report-001',
-  }),
-}));
+jest.mock('../../../../../lib/api-client', () =>
+  require('../../../../../test-utils/mock-api-routes').mockApiClientFactory(
+    mockFetch,
+  ),
+);
 
-jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
-}));
+jest.mock('expo-router', () => // gc1-allow: native-boundary, no Expo native runtime in Jest
+  require('../../../../../test-utils/native-shims').expoRouterShim(
+    {},
+    { profileId: 'c-1', reportId: 'r-1' },
+  ),
+);
 
-jest.mock('@sentry/react-native', () => ({
-  captureException: jest.fn(),
-}));
+jest.mock('react-native-safe-area-context', () => // gc1-allow: native-boundary, no safe-area native module in Jest
+  require('../../../../../test-utils/native-shims').safeAreaShim(),
+);
 
 jest.mock(
-  '../../../../../lib/navigation' /* gc1-allow: screen test isolates navigation side effects */,
+  '../../../../../lib/navigation', // gc1-allow: screen test isolates navigation side effects
   () => ({
     FAMILY_HOME_PATH: '/(app)/family',
     goBackOrReplace: jest.fn(),
@@ -38,7 +34,7 @@ jest.mock(
 );
 
 jest.mock(
-  '../../../../../lib/format-api-error' /* gc1-allow: screen test needs deterministic error copy */,
+  '../../../../../lib/format-api-error', // gc1-allow: screen test needs deterministic error copy
   () => ({
     classifyApiError: (e: unknown) => ({
       message: (e as Error)?.message ?? 'error',
@@ -47,23 +43,9 @@ jest.mock(
 );
 
 jest.mock(
-  '../../../../../components/common' /* gc1-allow: screen test does not exercise shared fallback UI */,
+  '../../../../../components/common', // gc1-allow: screen test does not exercise shared fallback UI
   () => ({
     ErrorFallback: () => null,
-  }),
-);
-
-const mockUseChildReportDetail = jest.fn();
-const mockMarkViewedMutateAsync = jest.fn();
-
-jest.mock(
-  '../../../../../hooks/use-progress' /* gc1-allow: screen test controls progress hook states */,
-  () => ({
-    useChildReportDetail: (...args: unknown[]) =>
-      mockUseChildReportDetail(...args),
-    useMarkChildReportViewed: () => ({
-      mutateAsync: mockMarkViewedMutateAsync,
-    }),
   }),
 );
 
@@ -92,11 +74,11 @@ const PRACTICE_SUMMARY = {
 
 function makeReport(practiceSummary?: typeof PRACTICE_SUMMARY) {
   return {
-    id: 'report-001',
+    id: 'r-1',
     profileId: 'parent-001',
-    childProfileId: 'child-001',
+    childProfileId: 'c-1',
     reportMonth: '2026-04',
-    viewedAt: null,
+    viewedAt: '2026-05-01T00:00:00.000Z',
     createdAt: '2026-05-01T00:00:00.000Z',
     reportData: {
       childName: 'Emma',
@@ -124,33 +106,59 @@ function makeReport(practiceSummary?: typeof PRACTICE_SUMMARY) {
 }
 
 describe('ChildReportDetailScreen', () => {
+  const owner = createTestProfile({
+    id: 'owner-1',
+    displayName: 'Maria',
+    isOwner: true,
+    birthYear: 1990,
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
-    mockMarkViewedMutateAsync.mockResolvedValue({});
   });
 
-  it('renders the practice summary card when practice data is present', () => {
-    mockUseChildReportDetail.mockReturnValue({
-      data: makeReport(PRACTICE_SUMMARY),
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
+  it('renders the practice summary card when practice data is present', async () => {
+    mockFetch.setRoute(
+      'dashboard/children/c-1/reports/r-1',
+      { report: makeReport(PRACTICE_SUMMARY) },
+    );
+    mockFetch.setRoute(
+      'dashboard/children/c-1/reports/r-1/view',
+      { viewed: true },
+    );
+
+    const { wrapper } = createScreenWrapper({
+      activeProfile: owner,
+      profiles: [owner],
     });
 
-    render(<ChildReportDetailScreen />);
+    render(<ChildReportDetailScreen />, { wrapper });
 
-    screen.getByTestId('child-report-practice-summary');
+    await waitFor(() => {
+      screen.getByTestId('child-report-practice-summary');
+    });
   });
 
-  it('hides the practice summary card when practice data is absent', () => {
-    mockUseChildReportDetail.mockReturnValue({
-      data: makeReport(),
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
+  it('hides the practice summary card when practice data is absent', async () => {
+    mockFetch.setRoute(
+      'dashboard/children/c-1/reports/r-1',
+      { report: makeReport() },
+    );
+    mockFetch.setRoute(
+      'dashboard/children/c-1/reports/r-1/view',
+      { viewed: true },
+    );
+
+    const { wrapper } = createScreenWrapper({
+      activeProfile: owner,
+      profiles: [owner],
     });
 
-    render(<ChildReportDetailScreen />);
+    render(<ChildReportDetailScreen />, { wrapper });
+
+    await waitFor(() => {
+      screen.getByTestId('child-report-hero');
+    });
 
     expect(screen.queryByTestId('child-report-practice-summary')).toBeNull();
   });
