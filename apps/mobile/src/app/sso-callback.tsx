@@ -3,6 +3,7 @@ import { View, Text, Pressable, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useTranslation } from 'react-i18next';
+import { Sentry } from '../lib/sentry';
 
 const SSO_TIMEOUT_MS = 10_000;
 
@@ -22,7 +23,28 @@ export default function SSOCallbackScreen() {
   const [showFallback, setShowFallback] = useState(false);
 
   useEffect(() => {
-    void WebBrowser.maybeCompleteAuthSession();
+    // [AUTH-09] maybeCompleteAuthSession() is declared sync but the native
+    // module can throw (or the return value can be a rejected Promise) on
+    // Android when the in-app browser was dismissed without a real OAuth
+    // result (network failure, user back-press, app backgrounded). We call it
+    // synchronously (satisfying the "must call on mount" contract) and
+    // defensively wrap the result in Promise.resolve so that any async
+    // rejection is also caught. The 10s fallback button below gives the user
+    // a visible escape, so we report and swallow.
+    const handleError = (err: unknown) => {
+      Sentry.captureException(err, {
+        tags: { screen: 'SSOCallback', action: 'maybeCompleteAuthSession' },
+      });
+      if (__DEV__)
+        console.warn('[AUTH-DEBUG] maybeCompleteAuthSession threw:', err);
+    };
+    try {
+      void Promise.resolve(WebBrowser.maybeCompleteAuthSession()).catch(
+        handleError,
+      );
+    } catch (err) {
+      handleError(err);
+    }
   }, []);
 
   useEffect(() => {

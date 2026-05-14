@@ -1010,7 +1010,7 @@ export default function CameraScreen(): React.ReactNode {
         {showCelebration && (
           <View className="items-center mt-2">
             <CelebrationAnimation
-              size={80}
+              size={120}
               color={colors.success}
               accentColor={colors.accent}
               onComplete={() => setShowCelebration(false)}

@@ -7,10 +7,14 @@ import { BASE_AUTH_ENV } from '../test-utils/test-env';
 // Mock sentry + logger — external observability boundaries
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/sentry', () => ({
-  captureException: jest.fn(),
-  addBreadcrumb: jest.fn(),
-}));
+jest.mock(
+  '../services/sentry' /* gc1-allow: Sentry is an external observability boundary — captureException/captureMessage/addBreadcrumb are SDK calls, not internal service logic */,
+  () => ({
+    captureException: jest.fn(),
+    captureMessage: jest.fn(),
+    addBreadcrumb: jest.fn(),
+  }),
+);
 
 jest.mock('../services/logger', () => ({
   createLogger: jest.fn(() => ({
@@ -23,6 +27,7 @@ jest.mock('../services/logger', () => ({
 
 const sentryMock = require('../services/sentry') as {
   captureException: jest.Mock;
+  captureMessage: jest.Mock;
   addBreadcrumb: jest.Mock;
 };
 
@@ -236,6 +241,7 @@ describe('authMiddleware', () => {
 
       expect(sentryMock.captureException).toHaveBeenCalledTimes(1);
       expect(sentryMock.addBreadcrumb).not.toHaveBeenCalled();
+      expect(sentryMock.captureMessage).not.toHaveBeenCalled();
     });
 
     it('calls captureException when verifyJWT rejects with an AbortError (timeout)', async () => {
@@ -254,9 +260,15 @@ describe('authMiddleware', () => {
 
       expect(sentryMock.captureException).toHaveBeenCalledTimes(1);
       expect(sentryMock.addBreadcrumb).not.toHaveBeenCalled();
+      expect(sentryMock.captureMessage).not.toHaveBeenCalled();
     });
 
-    it('does NOT call captureException for normal token validation failures', async () => {
+    // [BUG-1] Non-infra (token-validation) failures must surface a queryable
+    // Sentry signal (captureMessage at level=warning) — not just a breadcrumb,
+    // which is dropped if no exception fires later in the request. Before the
+    // fix, a sustained spike of expired/invalid/forged tokens was invisible
+    // in Sentry alerting.
+    it('[BUG-1] calls captureMessage (not captureException) for normal token validation failures', async () => {
       jwtMock.verifyJWT.mockRejectedValueOnce(
         new Error('Invalid JWT: expired'),
       );
@@ -269,8 +281,25 @@ describe('authMiddleware', () => {
       );
 
       expect(res.status).toBe(401);
+      // Must not flood Sentry exception alerts on every expired token —
+      // captureException is reserved for infra failures.
       expect(sentryMock.captureException).not.toHaveBeenCalled();
+      // Breadcrumb still attached for context if a later exception fires.
       expect(sentryMock.addBreadcrumb).toHaveBeenCalledTimes(1);
+      // The queryable signal — graphable in Sentry's "Issues" view, alertable
+      // on 24h volume, tagged with requestPath and errorName.
+      expect(sentryMock.captureMessage).toHaveBeenCalledTimes(1);
+      expect(sentryMock.captureMessage).toHaveBeenCalledWith(
+        'JWT validation failed',
+        expect.objectContaining({
+          requestPath: '/v1/me',
+          level: 'warning',
+          extra: expect.objectContaining({
+            errorName: 'Error',
+            errorMessage: 'Invalid JWT: expired',
+          }),
+        }),
+      );
     });
 
     it('always returns 401 regardless of error type', async () => {

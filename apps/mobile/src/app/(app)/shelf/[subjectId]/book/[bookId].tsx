@@ -1575,7 +1575,7 @@ export default function BookScreen() {
               {showBookCompletionBurst ? (
                 <View className="absolute end-4 top-3">
                   <CelebrationAnimation
-                    size={88}
+                    size={120}
                     color={themeColors.success}
                     accentColor={themeColors.accent}
                     onComplete={() => setShowBookCompletionBurst(false)}

@@ -2,7 +2,11 @@ import { createMiddleware } from 'hono/factory';
 import { ERROR_CODES } from '@eduagent/schemas';
 import { decodeJWTHeader, fetchJWKS, verifyJWT } from './jwt';
 import type { JWK } from './jwt';
-import { captureException, addBreadcrumb } from '../services/sentry';
+import {
+  captureException,
+  captureMessage,
+  addBreadcrumb,
+} from '../services/sentry';
 import { createLogger } from '../services/logger';
 
 const logger = createLogger();
@@ -160,7 +164,27 @@ export const authMiddleware = createMiddleware<AuthEnv>(async (c, next) => {
       });
       captureException(err, { requestPath: c.req.path });
     } else {
+      // [BUG-1] Non-infra (token-validation) failures were previously only
+      // recorded via Sentry breadcrumb, leaving no queryable signal in
+      // Sentry or logs. A breadcrumb is attached to an *exception* — when no
+      // exception fires it is dropped, so a sustained spike of bad/expired/
+      // forged tokens was invisible to alerting. Emit a structured warn log
+      // and a Sentry `captureMessage` (level=warning) so ops can graph 24h
+      // volume and alert on anomalies. We do NOT use `captureException`:
+      // expired/invalid tokens are an expected steady-state and should not
+      // page on every occurrence.
+      const errorName = err instanceof Error ? err.name : 'Unknown';
+      logger.warn('JWT validation failed', {
+        error: message,
+        errorName,
+        path: c.req.path,
+      });
       addBreadcrumb('JWT validation failed', 'auth');
+      captureMessage('JWT validation failed', {
+        requestPath: c.req.path,
+        level: 'warning',
+        extra: { errorName, errorMessage: message },
+      });
     }
 
     return c.json(

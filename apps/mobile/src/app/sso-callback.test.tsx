@@ -7,8 +7,15 @@ jest.mock('expo-router', () => ({
 }));
 
 jest.mock('expo-web-browser', () => ({
-  maybeCompleteAuthSession: jest.fn(),
+  maybeCompleteAuthSession: jest.fn().mockResolvedValue(undefined),
 }));
+
+jest.mock(
+  '../lib/sentry' /* gc1-allow: Sentry is an external observability boundary — SDK call, not internal service logic */,
+  () => ({
+    Sentry: { captureException: jest.fn() },
+  }),
+);
 
 // Resolve i18n keys: try the English catalog first, then fall back to the key.
 // New keys (not yet in en.json) are overridden in the fallbackMap below so
@@ -44,6 +51,7 @@ jest.mock('react-i18next', () => {
 });
 
 const WebBrowser = require('expo-web-browser');
+const { Sentry: SentryMock } = require('../lib/sentry');
 const SSOCallbackScreen = require('./sso-callback').default;
 
 describe('SSOCallbackScreen', () => {
@@ -61,6 +69,28 @@ describe('SSOCallbackScreen', () => {
     render(<SSOCallbackScreen />);
 
     expect(WebBrowser.maybeCompleteAuthSession).toHaveBeenCalledTimes(1);
+  });
+
+  it('[AUTH-09] does not crash when maybeCompleteAuthSession rejects; reports to Sentry', async () => {
+    const err = new Error('no session to complete');
+    WebBrowser.maybeCompleteAuthSession.mockReturnValueOnce(
+      Promise.reject(err),
+    );
+
+    // Rendering must not throw even though the promise rejects.
+    render(<SSOCallbackScreen />);
+
+    // Flush microtasks so the .catch handler runs.
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(SentryMock.captureException).toHaveBeenCalledWith(
+      err,
+      expect.objectContaining({
+        tags: expect.objectContaining({ screen: 'SSOCallback' }),
+      }),
+    );
   });
 
   describe('10s timeout fallback', () => {

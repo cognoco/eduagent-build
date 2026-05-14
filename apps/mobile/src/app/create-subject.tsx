@@ -748,7 +748,7 @@ export default function CreateSubjectScreen() {
             accessibilityLabel={busyLabel}
           >
             <BookPageFlipAnimation
-              size={72}
+              size={80}
               color={colors.primary}
               testID="subject-book-loading"
             />

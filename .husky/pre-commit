@@ -13,7 +13,7 @@ pnpm exec lint-staged
 # Requires at least one staged file under apps/api/eval-llm/snapshots/.
 # Bypass with `git commit --no-verify` if the change is a pure refactor.
 PROMPT_CHANGED=$(git diff --cached --name-only --diff-filter=d \
-  | grep -E '(apps/api/src/services/.*-prompts\.ts$|apps/api/src/services/llm/[^/]+\.ts$)' \
+  | grep -E '(apps/api/src/services/.*-prompts\.ts$|apps/api/src/services/llm/.+\.ts$|apps/api/src/services/dictation/generate\.ts$)' \
   | grep -vE '\.test\.ts$' || true)
 if [ -n "$PROMPT_CHANGED" ]; then
   SNAPSHOT_CHANGED=$(git diff --cached --name-only \

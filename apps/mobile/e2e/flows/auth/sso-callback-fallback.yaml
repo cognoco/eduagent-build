@@ -4,15 +4,15 @@
 # `sso-callback.tsx` reveals the `sso-fallback-back` button. Tapping it
 # returns the user to the sign-in screen with no dead-end.
 #
-# Mechanism (Step 0 decision — AUTH-09):
-#   ADB airplane-mode toggle via seed-and-run-sso-fallback.sh wrapper.
-#   Rationale: CLERK_TESTING_TOKEN is a placeholder (per CLAUDE.md), so Clerk
-#   testing-token rejection is not available. Airplane mode is the only
-#   mechanism that deterministically prevents the OAuth callback from
-#   completing. The wrapper enables airplane mode BEFORE Maestro starts, so
-#   the in-app Chrome Custom Tab cannot reach Google's OAuth endpoint.
-#   sso-callback.tsx has a 10-second timer (SSO_TIMEOUT_MS = 10_000) that
-#   fires and shows the fallback button.
+# Mechanism (Step 0 decision — AUTH-09, revised):
+#   ADB `svc wifi/data disable` via seed-and-run-sso-fallback.sh wrapper.
+#   Earlier revisions toggled airplane mode via `am broadcast`, but that
+#   intent requires signature-level BROADCAST_AIRPLANE_MODE and emulators
+#   reject it with Permission Denial. `svc wifi/data` requires no special
+#   permission and actually disables the radios. The wrapper disables
+#   network BEFORE Maestro starts, so the in-app Chrome Custom Tab cannot
+#   reach Google's OAuth endpoint. sso-callback.tsx has a 10-second timer
+#   (SSO_TIMEOUT_MS = 10_000) that fires and shows the fallback button.
 #
 # testIDs verified against source:
 #   google-sso-button    apps/mobile/src/app/(auth)/sign-in.tsx line 1198
@@ -57,8 +57,8 @@ tags:
     id: "google-sso-button"
 
 # ── Step 3: Wait for sso-callback screen (in-app browser opens then fails) ──
-# With airplane mode enabled, Chrome Custom Tab cannot reach Google. The
-# browser may briefly appear then close, or redirect immediately to the
+# With wifi + mobile data disabled, Chrome Custom Tab cannot reach Google.
+# The browser may briefly appear then close, or redirect immediately to the
 # sso-callback route. Either way, sso-callback.tsx mounts and starts its
 # 10-second timer.
 #
