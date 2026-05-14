@@ -1,5 +1,11 @@
-import { useMemo } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -10,8 +16,15 @@ import {
   useChildSessions,
 } from '../../../../hooks/use-dashboard';
 import { useChildLearnerProfile } from '../../../../hooks/use-learner-profile';
+import {
+  useChildConsentStatus,
+  useRestoreConsent,
+  useRevokeConsent,
+} from '../../../../hooks/use-consent';
 import { ACCOMMODATION_OPTIONS } from '../../../../lib/accommodation-options';
+import { getGracePeriodDaysRemaining } from '../../../../lib/consent-grace';
 import { FAMILY_HOME_PATH, goBackOrReplace } from '../../../../lib/navigation';
+import { platformAlert } from '../../../../lib/platform-alert';
 import { useProfile } from '../../../../lib/profile';
 import { useThemeColors } from '../../../../lib/theme';
 
@@ -118,6 +131,174 @@ function InfoRow({
       <Text className="text-body font-semibold text-text-primary mt-1">
         {value}
       </Text>
+    </View>
+  );
+}
+
+function consentMutationErrorMessage(err: unknown): string {
+  return err instanceof Error
+    ? err.message
+    : 'Could not update consent. Please try again.';
+}
+
+function ConsentManagementSection({
+  childProfileId,
+  childName,
+}: {
+  childProfileId: string;
+  childName: string;
+}): React.ReactElement | null {
+  const { t } = useTranslation();
+  const consent = useChildConsentStatus(childProfileId);
+  const revokeConsent = useRevokeConsent(childProfileId);
+  const restoreConsent = useRestoreConsent(childProfileId);
+  const [error, setError] = useState('');
+
+  const consentStatus = consent.data?.consentStatus ?? null;
+  const hasConsentRecord =
+    consent.isLoading ||
+    consentStatus === 'CONSENTED' ||
+    consentStatus === 'WITHDRAWN';
+
+  if (!hasConsentRecord) return null;
+
+  const isWithdrawn = consentStatus === 'WITHDRAWN';
+  const daysRemaining = getGracePeriodDaysRemaining(
+    consent.data?.respondedAt ?? null,
+  );
+
+  const handleWithdraw = (): void => {
+    setError('');
+    platformAlert(
+      t('parentView.index.withdrawConsentTitle', {
+        name: childName,
+        defaultValue: `Withdraw consent for ${childName}?`,
+      }),
+      t('parentView.index.withdrawConsentBody', {
+        name: childName,
+        defaultValue:
+          'Learning access will pause and account deletion will be scheduled. You can cancel during the grace period.',
+      }),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('parentView.index.withdrawConsentAction', {
+            defaultValue: 'Withdraw',
+          }),
+          style: 'destructive',
+          onPress: () => {
+            revokeConsent.mutate(undefined, {
+              onError: (err) => setError(consentMutationErrorMessage(err)),
+            });
+          },
+        },
+      ],
+    );
+  };
+
+  const handleRestore = (): void => {
+    setError('');
+    restoreConsent.mutate(undefined, {
+      onError: (err) => setError(consentMutationErrorMessage(err)),
+    });
+  };
+
+  return (
+    <View
+      className="bg-surface rounded-card px-4 py-4 mt-3"
+      testID="consent-section"
+    >
+      <Text className="text-body font-semibold text-text-primary">
+        {t('parentView.index.consentTitle', {
+          defaultValue: 'Consent',
+        })}
+      </Text>
+      <Text className="text-body-sm text-text-secondary mt-1">
+        {t('parentView.index.consentDescription', {
+          name: childName,
+          defaultValue: `Manage parental consent for ${childName}.`,
+        })}
+      </Text>
+
+      {error !== '' ? (
+        <Text
+          className="text-body-sm text-danger mt-3"
+          accessibilityRole="alert"
+          testID="consent-management-error"
+        >
+          {error}
+        </Text>
+      ) : null}
+
+      {consent.isLoading ? (
+        <View className="py-4 items-start">
+          <ActivityIndicator testID="consent-status-loading" />
+        </View>
+      ) : isWithdrawn ? (
+        <View
+          className="bg-warning/10 border border-warning/30 rounded-card px-3 py-3 mt-4"
+          accessibilityRole="alert"
+          testID="grace-period-banner"
+        >
+          <Text className="text-body font-semibold text-warning">
+            {t('parentView.index.deletionPending', {
+              defaultValue: 'Deletion pending',
+            })}
+          </Text>
+          <Text className="text-body-sm text-text-secondary mt-1">
+            {daysRemaining > 0
+              ? t('parentView.index.deletionGraceDays', {
+                  count: daysRemaining,
+                  defaultValue: `${daysRemaining} day${daysRemaining === 1 ? '' : 's'} left to cancel deletion.`,
+                })
+              : t('parentView.index.deletionGraceFallback', {
+                  defaultValue:
+                    'Deletion is scheduled. Try cancelling now if this was a mistake.',
+                })}
+          </Text>
+          <Pressable
+            onPress={handleRestore}
+            disabled={restoreConsent.isPending}
+            className="bg-warning rounded-button px-4 py-3 min-h-[44px] items-center justify-center mt-3"
+            accessibilityRole="button"
+            accessibilityLabel={t('parentView.index.cancelDeletion', {
+              defaultValue: 'Cancel deletion',
+            })}
+            testID="cancel-deletion-button"
+          >
+            {restoreConsent.isPending ? (
+              <ActivityIndicator testID="cancel-deletion-loading" />
+            ) : (
+              <Text className="text-body font-semibold text-text-inverse">
+                {t('parentView.index.cancelDeletion', {
+                  defaultValue: 'Cancel deletion',
+                })}
+              </Text>
+            )}
+          </Pressable>
+        </View>
+      ) : (
+        <Pressable
+          onPress={handleWithdraw}
+          disabled={revokeConsent.isPending}
+          className="border border-danger rounded-button px-4 py-3 min-h-[44px] items-center justify-center mt-4"
+          accessibilityRole="button"
+          accessibilityLabel={t('parentView.index.withdrawConsent', {
+            defaultValue: 'Withdraw consent',
+          })}
+          testID="withdraw-consent-button"
+        >
+          {revokeConsent.isPending ? (
+            <ActivityIndicator testID="withdraw-consent-loading" />
+          ) : (
+            <Text className="text-body font-semibold text-danger">
+              {t('parentView.index.withdrawConsent', {
+                defaultValue: 'Withdraw consent',
+              })}
+            </Text>
+          )}
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -335,6 +516,11 @@ export default function ChildDetailScreen(): React.ReactElement {
             testID="child-profile-details"
           />
         ) : null}
+
+        <ConsentManagementSection
+          childProfileId={profileId}
+          childName={childName}
+        />
 
         <View className="mt-5 rounded-card bg-primary-soft px-4 py-3">
           <View className="flex-row items-start">
