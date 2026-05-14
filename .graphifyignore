@@ -1,0 +1,28 @@
+# Archived / superseded documentation
+docs/_archive/
+docs/_vault/
+
+# Completed plans and specs (historical, not active)
+docs/plans/done/
+docs/specs/done/
+
+# Brand assets — logos and design variants (no graph value)
+docs/logo-designs/
+docs/logo.svg
+docs/screenshots_and_store_info/
+
+# Visual artefact source files (PNGs of diagrams are useful, but
+# the scripts/data/pptx that generate them are not)
+docs/visual-artefacts/scripts/
+docs/visual-artefacts/data/
+docs/visual-artefacts/exports/
+docs/visual-artefacts/assets/
+
+# BMAD
+_bmad/
+.claude/commands/bmad/
+.codex/prompts/
+
+# Lock files and generated output (graphify skips most by default,
+# but be explicit about nx cache)
+.nx/
