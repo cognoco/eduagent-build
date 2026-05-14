@@ -8,28 +8,44 @@ import { BASE_AUTH_ENV } from '../test-utils/test-env';
 // ---------------------------------------------------------------------------
 
 jest.mock(
-  '../services/sentry' /* gc1-allow: Sentry is an external observability boundary — captureException/captureMessage/addBreadcrumb are SDK calls, not internal service logic */,
+  '../services/sentry' /* gc1-allow: Sentry is an external observability boundary — captureException/addBreadcrumb are SDK calls, not internal service logic */,
   () => ({
     captureException: jest.fn(),
-    captureMessage: jest.fn(),
     addBreadcrumb: jest.fn(),
   }),
 );
 
-jest.mock('../services/logger', () => ({
-  createLogger: jest.fn(() => ({
-    debug: jest.fn(),
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
-  })),
-}));
+jest.mock(
+  '../services/logger' /* gc1-allow: pre-existing logger mock — refactored to expose the singleton for warn-assertion, no new internal mock added */,
+  () => {
+    const instance = {
+      debug: jest.fn(),
+      info: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
+    };
+    return {
+      __loggerInstance: instance,
+      createLogger: () => instance,
+    };
+  },
+);
 
 const sentryMock = require('../services/sentry') as {
   captureException: jest.Mock;
-  captureMessage: jest.Mock;
   addBreadcrumb: jest.Mock;
 };
+
+const loggerMock = (
+  require('../services/logger') as {
+    __loggerInstance: {
+      debug: jest.Mock;
+      info: jest.Mock;
+      warn: jest.Mock;
+      error: jest.Mock;
+    };
+  }
+).__loggerInstance;
 
 // ---------------------------------------------------------------------------
 // Mock jwt.ts — avoids real Web Crypto / JWKS calls in unit tests
@@ -241,7 +257,6 @@ describe('authMiddleware', () => {
 
       expect(sentryMock.captureException).toHaveBeenCalledTimes(1);
       expect(sentryMock.addBreadcrumb).not.toHaveBeenCalled();
-      expect(sentryMock.captureMessage).not.toHaveBeenCalled();
     });
 
     it('calls captureException when verifyJWT rejects with an AbortError (timeout)', async () => {
@@ -260,15 +275,16 @@ describe('authMiddleware', () => {
 
       expect(sentryMock.captureException).toHaveBeenCalledTimes(1);
       expect(sentryMock.addBreadcrumb).not.toHaveBeenCalled();
-      expect(sentryMock.captureMessage).not.toHaveBeenCalled();
     });
 
     // [BUG-1] Non-infra (token-validation) failures must surface a queryable
-    // Sentry signal (captureMessage at level=warning) — not just a breadcrumb,
-    // which is dropped if no exception fires later in the request. Before the
-    // fix, a sustained spike of expired/invalid/forged tokens was invisible
-    // in Sentry alerting.
-    it('[BUG-1] calls captureMessage (not captureException) for normal token validation failures', async () => {
+    // signal — not just a breadcrumb, which is dropped if no exception fires
+    // later in the request. Before the fix, a sustained spike of expired/
+    // invalid/forged tokens was invisible to alerting. We use a structured
+    // `logger.warn` (alertable on 24h log-aggregation volume) and NOT a
+    // Sentry `captureMessage`: under a token-flood this runs on every
+    // request and would burn Sentry quota / bury real signal.
+    it('[BUG-1] logs structured warn (not captureException) for normal token validation failures', async () => {
       jwtMock.verifyJWT.mockRejectedValueOnce(
         new Error('Invalid JWT: expired'),
       );
@@ -286,18 +302,13 @@ describe('authMiddleware', () => {
       expect(sentryMock.captureException).not.toHaveBeenCalled();
       // Breadcrumb still attached for context if a later exception fires.
       expect(sentryMock.addBreadcrumb).toHaveBeenCalledTimes(1);
-      // The queryable signal — graphable in Sentry's "Issues" view, alertable
-      // on 24h volume, tagged with requestPath and errorName.
-      expect(sentryMock.captureMessage).toHaveBeenCalledTimes(1);
-      expect(sentryMock.captureMessage).toHaveBeenCalledWith(
+      // The queryable signal — alertable on 24h volume via log aggregation.
+      expect(loggerMock.warn).toHaveBeenCalledWith(
         'JWT validation failed',
         expect.objectContaining({
-          requestPath: '/v1/me',
-          level: 'warning',
-          extra: expect.objectContaining({
-            errorName: 'Error',
-            errorMessage: 'Invalid JWT: expired',
-          }),
+          error: 'Invalid JWT: expired',
+          errorName: 'Error',
+          path: '/v1/me',
         }),
       );
     });
