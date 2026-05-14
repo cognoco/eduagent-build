@@ -1,6 +1,32 @@
 #!/usr/bin/env sh
-# Advisory change-class checklist — prints what you should validate
-# beyond what pre-commit already enforces. Non-blocking: never fails the push.
+# pre-push hook
+#
+# 1. Test-receipt verification (BLOCKING).
+#    Branches that modify scoped test files (currently: mobile) must carry
+#    a fresh, hash-bound receipt at .test-receipts/<scope>.json proving the
+#    suite passed against the current content. The pre-push gate enforces
+#    this — it was the missing piece in PR #257, where 189 mobile tests
+#    were never run locally and shipped broken.
+#
+#    Generate the receipt with:
+#      bash scripts/record-test-receipt.sh mobile
+#
+#    Bypass (visible in shell):
+#      SKIP_RECEIPT_CHECK=1 git push       # or git push --no-verify
+#
+# 2. Change-class checklist (advisory).
+#    Non-blocking. Prints validation commands beyond what pre-commit enforces.
+
+if [ -f scripts/verify-test-receipts.sh ]; then
+  if ! bash scripts/verify-test-receipts.sh; then
+    echo ""
+    echo "── push blocked by pre-push hook ──────────────────────────────"
+    echo "  Address the test-receipt issue above, then push again."
+    echo "  Override with SKIP_RECEIPT_CHECK=1 git push (use sparingly)."
+    echo ""
+    exit 1
+  fi
+fi
 
 if [ -f scripts/check-change-class.sh ]; then
   echo ""

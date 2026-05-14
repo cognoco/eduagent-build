@@ -7,11 +7,6 @@ on:
       - develop
       - improvements
       - language-add
-    paths:
-      - 'apps/**'
-      - 'packages/**'
-      - 'pnpm-lock.yaml'
-      - '.github/workflows/e2e-web.yml'
   workflow_dispatch:
 
 concurrency:
