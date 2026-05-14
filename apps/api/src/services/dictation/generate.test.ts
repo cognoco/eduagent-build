@@ -2,7 +2,7 @@
 // Mock the LLM router — true external boundary
 // ---------------------------------------------------------------------------
 
-jest.mock('../llm', () => ({
+jest.mock('../llm', () => ({ // gc1-allow: external LLM boundary — routeAndCall is the sole entry point to all LLM providers
   routeAndCall: jest.fn(),
 }));
 

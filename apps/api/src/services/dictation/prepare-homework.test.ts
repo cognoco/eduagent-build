@@ -1,8 +1,9 @@
 // ---------------------------------------------------------------------------
-// Mock the LLM router — true external boundary
+// Stub the LLM router — true external boundary, requireActual pattern
 // ---------------------------------------------------------------------------
 
 jest.mock('../llm', () => ({
+  ...(jest.requireActual('../llm') as object),
   routeAndCall: jest.fn(),
 }));
 
