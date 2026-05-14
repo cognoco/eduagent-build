@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { AppState, View, Text, Pressable } from 'react-native';
+import { View, Text, Pressable } from 'react-native';
 import { platformAlert } from '../../../lib/platform-alert';
 import { goBackOrReplace, homeHrefForReturnTo } from '../../../lib/navigation';
 import { firstParam } from '../../../lib/route-params';
@@ -58,11 +58,7 @@ import { useLearnerProfile } from '../../../hooks/use-learner-profile';
 import { useCelebration } from '../../../hooks/use-celebration';
 import { useSubjects, useCreateSubject } from '../../../hooks/use-subjects';
 import { useCurriculum } from '../../../hooks/use-curriculum';
-import {
-  createMilestoneTrackerStateFromMilestones,
-  normalizeMilestoneTrackerState,
-  useMilestoneTracker,
-} from '../../../hooks/use-milestone-tracker';
+import { useMilestoneTracker } from '../../../hooks/use-milestone-tracker';
 import {
   useApiClient,
   NotFoundError,
@@ -72,17 +68,7 @@ import { useThemeColors } from '../../../lib/theme';
 import { useCreateNote } from '../../../hooks/use-notes';
 import { getVoiceLocaleForLanguage } from '../../../lib/language-locales';
 import { useProfile } from '../../../lib/profile';
-import {
-  useCreateBookmark,
-  useDeleteBookmark,
-  useSessionBookmarks,
-} from '../../../hooks/use-bookmarks';
-import {
-  readSessionRecoveryMarker,
-  writeSessionRecoveryMarker,
-} from '../../../lib/session-recovery';
 import * as SecureStore from '../../../lib/secure-storage';
-import * as FileSystem from 'expo-file-system';
 import { parseHomeworkProblems } from '../../../components/homework/problem-cards';
 import {
   getInputModeKey,
@@ -112,6 +98,9 @@ import { SessionErrorBoundary } from './_components/SessionErrorBoundary';
 import { getConfidenceCopy } from './_lib/confidence-copy';
 import { ConfirmationToast } from './_components/ConfirmationToast';
 import { useLearningModeControl } from './_components/LearningModeControl';
+import { useImageBase64 } from './_hooks/use-image-base64';
+import { useBookmarkHandler } from './_hooks/use-bookmark-handler';
+import { useSessionRecovery } from './_hooks/use-session-recovery';
 
 export default function SessionScreen() {
   return (
@@ -351,9 +340,6 @@ function SessionScreenInner() {
   const [messageFeedback, setMessageFeedback] = useState<
     Record<string, MessageFeedbackState>
   >({});
-  const [bookmarkState, setBookmarkState] = useState<
-    Record<string, string | null>
-  >({});
   const [confirmationToast, setConfirmationToast] = useState<string | null>(
     null,
   );
@@ -373,7 +359,6 @@ function SessionScreenInner() {
   >(null);
 
   const sessionNoteSavedRef = useRef(false);
-  const bookmarkStateRef = useRef<Record<string, string | null>>({});
   const closedSessionRef = useRef<{
     wallClockSeconds: number;
     fastCelebrations: PendingCelebration[];
@@ -426,11 +411,9 @@ function SessionScreenInner() {
     router.setParams({ sessionId: resumedSessionId });
   }, [activeSessionLookup.data?.sessionId, shouldLookupActiveSession, router]);
 
-  const sessionBookmarksQuery = useSessionBookmarks(
-    activeSessionId ?? routeSessionId ?? undefined,
-  );
-  const createBookmark = useCreateBookmark();
-  const deleteBookmark = useDeleteBookmark();
+  const { bookmarkState, handleToggleBookmark } = useBookmarkHandler({
+    sessionId: activeSessionId ?? routeSessionId ?? undefined,
+  });
   const recordSystemPrompt = useRecordSystemPrompt(activeSessionId ?? '');
   const recordSessionEvent = useRecordSessionEvent(activeSessionId ?? '');
   const setSessionInputMode = useSetSessionInputMode(activeSessionId ?? '');
@@ -450,10 +433,10 @@ function SessionScreenInner() {
   // current value, not a stale closure capture from when setTimeout was created.
   const trackerStateRef = useRef(trackerState);
   trackerStateRef.current = trackerState;
-  const imageBase64Ref = useRef<string | null>(null);
-  const imageMimeTypeRef = useRef<
-    'image/jpeg' | 'image/png' | 'image/webp' | null
-  >(null);
+  const { imageBase64Ref, imageMimeTypeRef } = useImageBase64(
+    imageUri,
+    imageMimeType,
+  );
   const { CelebrationOverlay, trigger } = useCelebration({
     celebrationLevel,
     accommodationMode: learnerProfile?.accommodationMode,
@@ -516,6 +499,7 @@ function SessionScreenInner() {
       setHomeworkMode(undefined);
       hasAutoSentRef.current = false;
     }, [
+      hasHydratedRecoveryRef,
       openingContent,
       resetMilestones,
       routeSessionId,
@@ -546,15 +530,6 @@ function SessionScreenInner() {
 
     return () => clearTimeout(timer);
   }, [confirmationToast]);
-
-  useEffect(() => {
-    const activeBookmarkState: Record<string, string | null> = {};
-    for (const bookmark of sessionBookmarksQuery.data ?? []) {
-      activeBookmarkState[bookmark.eventId] = bookmark.bookmarkId;
-    }
-    bookmarkStateRef.current = activeBookmarkState;
-    setBookmarkState(activeBookmarkState);
-  }, [sessionBookmarksQuery.data, activeSessionId, routeSessionId]);
 
   // '' is intentional: all consumers gate on truthiness or convert via `|| undefined`
   // before use as a route param or API argument (see ensureSession, writeSessionRecoveryMarker).
@@ -674,124 +649,20 @@ function SessionScreenInner() {
     setResumedBanner(false);
   }, [sessionExpired]);
 
-  useEffect(() => {
-    if (!routeSessionId || hasHydratedRecoveryRef.current) return;
-
-    let cancelled = false;
-
-    void (async () => {
-      try {
-        const marker = await readSessionRecoveryMarker(activeProfile?.id);
-        if (cancelled || hasHydratedRecoveryRef.current) return;
-
-        if (marker?.sessionId === routeSessionId && marker.milestoneTracker) {
-          hydrate(normalizeMilestoneTrackerState(marker.milestoneTracker));
-          hasHydratedRecoveryRef.current = true;
-          return;
-        }
-
-        const transcriptMilestones =
-          liveTranscript?.session.milestonesReached ?? [];
-        if (transcriptMilestones.length > 0) {
-          hydrate(
-            createMilestoneTrackerStateFromMilestones(transcriptMilestones),
-          );
-          hasHydratedRecoveryRef.current = true;
-        }
-      } catch {
-        /* SecureStore unavailable — skip recovery hydration */
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    activeProfile?.id,
-    hydrate,
-    routeSessionId,
-    liveTranscript?.session.milestonesReached,
-  ]);
-
-  useEffect(() => {
-    const subscription = AppState.addEventListener('change', (nextState) => {
-      if (
-        (nextState === 'background' || nextState === 'inactive') &&
-        activeSessionId
-      ) {
-        void writeSessionRecoveryMarker(
-          {
-            sessionId: activeSessionId,
-            profileId: activeProfile?.id ?? undefined,
-            subjectId: effectiveSubjectId || undefined,
-            subjectName: effectiveSubjectName || undefined,
-            topicId: topicId ?? undefined,
-            topicName: topicName ?? undefined,
-            mode: effectiveMode,
-            milestoneTracker: trackerState,
-            updatedAt: new Date().toISOString(),
-          },
-          activeProfile?.id,
-        ).catch(() => undefined);
-      }
-    });
-
-    return () => subscription.remove();
-  }, [
+  useSessionRecovery({
+    activeProfileId: activeProfile?.id,
     activeSessionId,
-    activeProfile?.id,
+    routeSessionId,
     effectiveMode,
     effectiveSubjectId,
     effectiveSubjectName,
-    trackerState,
     topicId,
     topicName,
-  ]);
-
-  useEffect(() => {
-    if (!imageUri) return;
-    // Capture as a narrowed const so the inner async closure sees a defined
-    // string without re-asserting non-null at every reference.
-    const uri = imageUri;
-    let cancelled = false;
-
-    async function convertImage() {
-      try {
-        const base64 = await FileSystem.readAsStringAsync(uri, {
-          encoding: 'base64',
-        });
-        if (!cancelled) {
-          imageBase64Ref.current = base64;
-          // [IMP-1] Prefer route-supplied mimeType from image picker over
-          // extension sniffing. Camera captures are always JPEG; gallery
-          // picks provide OS-level mimeType. Falls back to extension
-          // sniffing for backward compat with deep links or missing values.
-          const ext = uri.split('.').pop()?.toLowerCase();
-          const mimeType: 'image/jpeg' | 'image/png' | 'image/webp' =
-            imageMimeType === 'image/png'
-              ? 'image/png'
-              : imageMimeType === 'image/webp'
-                ? 'image/webp'
-                : imageMimeType?.includes('jpeg') ||
-                    imageMimeType?.includes('jpg')
-                  ? 'image/jpeg'
-                  : ext === 'png'
-                    ? 'image/png'
-                    : ext === 'webp'
-                      ? 'image/webp'
-                      : 'image/jpeg';
-          imageMimeTypeRef.current = mimeType;
-        }
-      } catch (err) {
-        console.warn('[Session] Failed to read image as base64:', err);
-      }
-    }
-
-    void convertImage();
-    return () => {
-      cancelled = true;
-    };
-  }, [imageUri, imageMimeType]);
+    trackerState,
+    liveTranscriptMilestones: liveTranscript?.session.milestonesReached,
+    hydrate,
+    hasHydratedRecoveryRef,
+  });
 
   const {
     syncHomeworkMetadata,
@@ -1016,56 +887,6 @@ function SessionScreenInner() {
           !!message.eventId,
       ).length,
     [messages],
-  );
-
-  const updateBookmarkEntry = useCallback(
-    (eventId: string, value: string | null) => {
-      setBookmarkState((prev) => {
-        const next = { ...prev, [eventId]: value };
-        bookmarkStateRef.current = next;
-        return next;
-      });
-    },
-    [],
-  );
-
-  const handleToggleBookmark = useCallback(
-    async (message: ChatMessage) => {
-      const eventId = message.eventId;
-      if (!eventId) return;
-
-      const existingBookmarkId = bookmarkStateRef.current[eventId] ?? null;
-      if (existingBookmarkId === 'pending') {
-        return;
-      }
-
-      if (existingBookmarkId) {
-        updateBookmarkEntry(eventId, null);
-        try {
-          await deleteBookmark.mutateAsync(existingBookmarkId);
-        } catch (error) {
-          updateBookmarkEntry(eventId, existingBookmarkId);
-          platformAlert(
-            'Could not remove bookmark',
-            error instanceof Error ? error.message : 'Please try again.',
-          );
-        }
-        return;
-      }
-
-      updateBookmarkEntry(eventId, 'pending');
-      try {
-        const result = await createBookmark.mutateAsync({ eventId });
-        updateBookmarkEntry(eventId, result.bookmark.id);
-      } catch (error) {
-        updateBookmarkEntry(eventId, null);
-        platformAlert(
-          'Could not save bookmark',
-          error instanceof Error ? error.message : 'Please try again.',
-        );
-      }
-    },
-    [createBookmark, deleteBookmark, updateBookmarkEntry],
   );
 
   // [UX-DE-H5] Exit button is always rendered (no gating on session existence).
