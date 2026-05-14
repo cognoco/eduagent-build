@@ -9,17 +9,19 @@ import {
   screen,
   within,
 } from '@testing-library/react-native';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
+  createScreenWrapper,
+  createTestProfile,
+  cleanupScreen,
   fetchCallsMatching,
   extractJsonBody,
   type RoutedMockFetch,
-} from '../../../test-utils/mock-api-routes';
+} from '../../../../test-utils/screen-render-harness';
 import SessionScreen from './index';
 
 // ---------------------------------------------------------------------------
-// Fetch boundary mock — API-calling hooks run against this
+// Fetch boundary — API-calling hooks run against the real QueryClient + this
 // ---------------------------------------------------------------------------
 //
 // IMPORTANT: jest.mock() factories are hoisted above all module-level code by
@@ -29,11 +31,11 @@ import SessionScreen from './index';
 // the factory and expose it via `global.__sessionTestMockFetch` so the rest of
 // the test file can reference it through a typed alias below.
 
-jest.mock('../../../lib/api-client' /* gc1-allow: unit test boundary */, () => {
+jest.mock('../../../lib/api-client', () => { // gc1-allow: transport boundary — mockApiClientFactory replaces fetch layer
   const {
     createRoutedMockFetch: _create,
     mockApiClientFactory: _factory,
-  } = require('../../../test-utils/mock-api-routes');
+  } = require('../../../../test-utils/screen-render-harness');
   // IMPORTANT: Routes are matched by url.includes(pattern) in insertion order.
   // More-specific patterns must come BEFORE general ones to avoid shadowing.
   const _mockFetch = _create({
@@ -111,24 +113,10 @@ const mockFetch = (global as { __sessionTestMockFetch?: RoutedMockFetch })
   .__sessionTestMockFetch!;
 
 // ---------------------------------------------------------------------------
-// QueryClient wrapper
-// ---------------------------------------------------------------------------
-
-function createWrapper() {
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false, gcTime: 0 } },
-  });
-  return function Wrapper({ children }: { children: React.ReactNode }) {
-    return (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-    );
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Session hook mocks (use-sessions stays mocked because useStreamMessage uses
-// XHR via streamSSEViaXHR, which bypasses useApiClient and cannot be
-// intercepted through mockFetch).
+// Session hook mocks — use-sessions stays mocked because useStreamMessage uses
+// streamSSEViaXHR (XHR transport), which bypasses useApiClient and cannot be
+// intercepted through mockFetch. All other hooks in use-sessions also mocked
+// for consistency with the stream mock, since they share session state.
 // ---------------------------------------------------------------------------
 
 const mockStartSession = jest.fn();
@@ -169,8 +157,8 @@ type TranscriptMockReturn = {
 const mockUseSessionTranscript = jest.fn<TranscriptMockReturn, [string?]>(
   () => ({ data: null }),
 );
-jest.mock(
-  '../../../hooks/use-sessions' /* gc1-allow: unit test boundary */,
+jest.mock( // gc1-allow: transport boundary — useStreamMessage uses XHR (streamSSEViaXHR) not fetch
+  '../../../hooks/use-sessions',
   () => ({
     useSession: () => ({ data: null }),
     useStartSession: () => ({
@@ -197,8 +185,8 @@ jest.mock(
   }),
 );
 
-jest.mock(
-  '../../../hooks/use-settings' /* gc1-allow: unit test boundary */,
+jest.mock( // gc1-allow: loading-state boundary — isLoading/isPending cannot be expressed via fetch response timing
+  '../../../hooks/use-settings',
   () => ({
     useCelebrationLevel: () => ({ data: 'all' }),
     useLearningMode: () => ({
@@ -213,18 +201,18 @@ jest.mock(
 );
 
 // ---------------------------------------------------------------------------
-// Local-state / device hooks — no useApiClient(), keep as mocks
+// Native-boundary hooks — NetInfo and direct health-fetch cannot be intercepted
 // ---------------------------------------------------------------------------
 
-jest.mock(
-  '../../../hooks/use-network-status' /* gc1-allow: unit test boundary */,
+jest.mock( // gc1-allow: native-boundary — uses @react-native-community/netinfo (no useApiClient)
+  '../../../hooks/use-network-status',
   () => ({
     useNetworkStatus: () => ({ isOffline: false }),
   }),
 );
 
-jest.mock(
-  '../../../hooks/use-api-reachability' /* gc1-allow: unit test boundary */,
+jest.mock( // gc1-allow: native-boundary — polls API health via raw fetch + AppState, bypasses useApiClient
+  '../../../hooks/use-api-reachability',
   () => ({
     useApiReachability: () => ({ isApiReachable: true, isChecked: true }),
   }),
@@ -235,8 +223,8 @@ const mockCelebrationResult = {
   CelebrationOverlay: null,
   trigger: mockTrigger,
 };
-jest.mock(
-  '../../../hooks/use-celebration' /* gc1-allow: unit test boundary */,
+jest.mock( // gc1-allow: native-boundary — renders native animation components (PolarStar, TwinStars, etc.) that crash in Jest
+  '../../../hooks/use-celebration',
   () => ({
     useCelebration: () => mockCelebrationResult,
   }),
@@ -253,8 +241,8 @@ const mockMilestoneTracker = {
   hydrate: mockHydrate,
   reset: mockResetMilestones,
 };
-jest.mock(
-  '../../../hooks/use-milestone-tracker' /* gc1-allow: unit test boundary */,
+jest.mock( // gc1-allow: stateful-boundary — milestone tracker holds mutable ref state; test assertions inspect .hydrate / .trackExchange calls
+  '../../../hooks/use-milestone-tracker',
   () => ({
     celebrationForReason: jest.fn(),
     createMilestoneTrackerStateFromMilestones: jest.fn().mockReturnValue({}),
@@ -264,24 +252,32 @@ jest.mock(
 );
 
 // ---------------------------------------------------------------------------
-// External / rendering mocks
+// Native-boundary shims via catalog
 // ---------------------------------------------------------------------------
 
-jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
-}));
+jest.mock('react-native-safe-area-context', () => // gc1-allow: native-boundary — SafeAreaContext requires native module
+  require('../../../test-utils/native-shims').safeAreaShim(),
+);
 
-jest.mock('expo-router', () => ({
-  useRouter: jest.fn(),
-  useLocalSearchParams: jest.fn(),
-  useFocusEffect: (callback: () => void) => {
-    const { useEffect } = require('react');
-    useEffect(() => callback(), [callback]);
-  },
-}));
+jest.mock('expo-router', () => { // gc1-allow: native-boundary — expo-router requires native navigation runtime
+  const shim = require('../../../test-utils/native-shims').expoRouterShim();
+  return {
+    ...shim,
+    // expo-router's useRouter / useLocalSearchParams are replaced per-test
+    // via (useRouter as jest.Mock).mockReturnValue(...) — keep as jest.fn()
+    // so tests can control return values.
+    useRouter: jest.fn(),
+    useLocalSearchParams: jest.fn(),
+    // useFocusEffect: run immediately in tests so focus-triggered side effects fire
+    useFocusEffect: (callback: () => void) => {
+      const { useEffect } = require('react');
+      useEffect(() => callback(), [callback]);
+    },
+  };
+});
 
-jest.mock(
-  '../../../components/session' /* gc1-allow: unit test boundary */,
+jest.mock( // gc1-allow: native-boundary — session UI components use native animation and audio APIs
+  '../../../components/session',
   () => ({
     ChatShell: ({
       subtitle,
@@ -401,8 +397,8 @@ jest.mock(
   }),
 );
 
-jest.mock(
-  '../../../lib/session-recovery' /* gc1-allow: unit test boundary */,
+jest.mock( // gc1-allow: native-boundary — session-recovery wraps expo-secure-store which requires native bindings
+  '../../../lib/session-recovery',
   () => ({
     clearSessionRecoveryMarker: jest.fn().mockResolvedValue(undefined),
     readSessionRecoveryMarker: jest.fn().mockResolvedValue(null),
@@ -411,8 +407,8 @@ jest.mock(
 );
 
 const secureStore: Record<string, string> = {};
-jest.mock(
-  '../../../lib/secure-storage' /* gc1-allow: unit test boundary */,
+jest.mock( // gc1-allow: native-boundary — expo-secure-store requires native bindings unavailable in Jest
+  '../../../lib/secure-storage',
   () => ({
     getItemAsync: jest.fn((key: string) =>
       Promise.resolve(secureStore[key] ?? null),
@@ -433,33 +429,22 @@ const { readSessionRecoveryMarker: mockReadSessionRecoveryMarker } =
     readSessionRecoveryMarker: jest.Mock;
   };
 
-jest.mock(
-  '../../../lib/format-api-error' /* gc1-allow: unit test boundary */,
+jest.mock( // gc1-allow: native-boundary — formatApiError depends on platform-specific error shapes
+  '../../../lib/format-api-error',
   () => ({
     formatApiError: (error: unknown) =>
       error instanceof Error ? error.message : 'Unknown error',
   }),
 );
 
-jest.mock('../../../lib/profile' /* gc1-allow: unit test boundary */, () => ({
-  useProfile: () => ({
-    activeProfile: {
-      id: 'profile-1',
-      accountId: 'test-account-id',
-      displayName: 'Test Learner',
-      isOwner: true,
-      hasPremiumLlm: false,
-      conversationLanguage: 'en',
-      pronouns: null,
-      consentStatus: null,
-    },
-  }),
-  ProfileContext: {
-    Provider: ({ children }: { children: React.ReactNode }) => children,
-  },
-}));
-
 describe('SessionScreen homework flow', () => {
+  const activeProfile = createTestProfile({
+    id: 'profile-1',
+    displayName: 'Test Learner',
+    isOwner: true,
+    birthYear: 2010,
+  });
+
   async function flushAsyncWork(): Promise<void> {
     await act(async () => {
       await Promise.resolve();
@@ -541,7 +526,11 @@ describe('SessionScreen homework flow', () => {
     jest.useRealTimers();
     mockLearningMode = 'casual';
 
-    const testScreen = render(<SessionScreen />, { wrapper: createWrapper() });
+    const { wrapper, queryClient } = createScreenWrapper({
+      activeProfile,
+      profiles: [activeProfile],
+    });
+    const testScreen = render(<SessionScreen />, { wrapper });
 
     await waitFor(() => {
       testScreen.getByTestId('learning-mode-header-button');
@@ -550,22 +539,34 @@ describe('SessionScreen homework flow', () => {
     expect(testScreen.queryByTestId('agency-badge')).toBeNull();
     expect(testScreen.queryByText('Independent mode')).toBeNull();
     expect(testScreen.queryByText('Guided mode')).toBeNull();
+
+    cleanupScreen(queryClient);
   });
 
   it('renders Challenge mode in the session header', async () => {
     jest.useRealTimers();
     mockLearningMode = 'serious';
 
-    const testScreen = render(<SessionScreen />, { wrapper: createWrapper() });
+    const { wrapper, queryClient } = createScreenWrapper({
+      activeProfile,
+      profiles: [activeProfile],
+    });
+    const testScreen = render(<SessionScreen />, { wrapper });
 
     await waitFor(() => {
       testScreen.getByText('Challenge mode');
     });
+
+    cleanupScreen(queryClient);
   });
 
   it('opens the learning mode selector from the session header', async () => {
     jest.useRealTimers();
-    const testScreen = render(<SessionScreen />, { wrapper: createWrapper() });
+    const { wrapper, queryClient } = createScreenWrapper({
+      activeProfile,
+      profiles: [activeProfile],
+    });
+    const testScreen = render(<SessionScreen />, { wrapper });
 
     await waitFor(() => {
       testScreen.getByTestId('learning-mode-header-button');
@@ -576,12 +577,18 @@ describe('SessionScreen homework flow', () => {
     testScreen.getByText('Takes effect from your next message.');
     testScreen.getByTestId('session-learning-mode-casual');
     testScreen.getByTestId('session-learning-mode-serious');
+
+    cleanupScreen(queryClient);
   });
 
   it('closes the selector without a network call when active mode is tapped', async () => {
     jest.useRealTimers();
     mockLearningMode = 'casual';
-    const testScreen = render(<SessionScreen />, { wrapper: createWrapper() });
+    const { wrapper, queryClient } = createScreenWrapper({
+      activeProfile,
+      profiles: [activeProfile],
+    });
+    const testScreen = render(<SessionScreen />, { wrapper });
 
     // Wait for the learning mode to load (button becomes enabled and shows the
     // mode label). Without this, learningMode is undefined and tapping casual
@@ -599,13 +606,19 @@ describe('SessionScreen homework flow', () => {
       ).toBe(false);
     });
     expect(mockUpdateLearningModeMutate).not.toHaveBeenCalled();
+
+    cleanupScreen(queryClient);
   });
 
   it('calls the learning mode mutation when an inactive mode is selected', async () => {
     jest.useRealTimers();
     mockLearningMode = 'casual';
 
-    const testScreen = render(<SessionScreen />, { wrapper: createWrapper() });
+    const { wrapper, queryClient } = createScreenWrapper({
+      activeProfile,
+      profiles: [activeProfile],
+    });
+    const testScreen = render(<SessionScreen />, { wrapper });
 
     await waitFor(() => {
       testScreen.getByText('Explorer');
@@ -620,6 +633,8 @@ describe('SessionScreen homework flow', () => {
         onSuccess: expect.any(Function),
       }),
     );
+
+    cleanupScreen(queryClient);
   });
 
   it('starts a fresh session route from the session-expired primary action', async () => {
@@ -637,7 +652,11 @@ describe('SessionScreen homework flow', () => {
       error: new NotFoundError('Session not found'),
     } as never);
 
-    render(<SessionScreen />, { wrapper: createWrapper() });
+    const { wrapper, queryClient } = createScreenWrapper({
+      activeProfile,
+      profiles: [activeProfile],
+    });
+    render(<SessionScreen />, { wrapper });
 
     fireEvent.press(screen.getByTestId('session-expired-new-session'));
 
@@ -651,6 +670,8 @@ describe('SessionScreen homework flow', () => {
         topicName: 'Linear equations',
       },
     });
+
+    cleanupScreen(queryClient);
   });
 
   it('disables the learning mode header while the mode is loading', async () => {
@@ -658,19 +679,29 @@ describe('SessionScreen homework flow', () => {
     mockLearningMode = undefined;
     mockLearningModeLoading = true;
 
-    const testScreen = render(<SessionScreen />, { wrapper: createWrapper() });
+    const { wrapper, queryClient } = createScreenWrapper({
+      activeProfile,
+      profiles: [activeProfile],
+    });
+    const testScreen = render(<SessionScreen />, { wrapper });
 
     expect(
       testScreen.getByTestId('learning-mode-header-button').props
         .accessibilityState.disabled,
     ).toBe(true);
+
+    cleanupScreen(queryClient);
   });
 
   it('disables the learning mode header while a mode save is pending', async () => {
     jest.useRealTimers();
     mockLearningModePending = true;
 
-    const testScreen = render(<SessionScreen />, { wrapper: createWrapper() });
+    const { wrapper, queryClient } = createScreenWrapper({
+      activeProfile,
+      profiles: [activeProfile],
+    });
+    const testScreen = render(<SessionScreen />, { wrapper });
 
     await waitFor(() => {
       testScreen.getByText('Explorer');
@@ -679,10 +710,15 @@ describe('SessionScreen homework flow', () => {
       testScreen.getByTestId('learning-mode-header-button').props
         .accessibilityState.disabled,
     ).toBe(true);
+
+    cleanupScreen(queryClient);
   });
 
   it('keeps homework progress in one session when moving to the next problem', async () => {
-    const wrapper = createWrapper();
+    const { wrapper, queryClient } = createScreenWrapper({
+      activeProfile,
+      profiles: [activeProfile],
+    });
     const testScreen = render(<SessionScreen />, { wrapper });
 
     fireEvent.press(testScreen.getByTestId('manual-send-button'));
@@ -725,6 +761,8 @@ describe('SessionScreen homework flow', () => {
     expect(
       testScreen.getByTestId('homework-problem-progress'),
     ).toHaveTextContent('Problem 2 of 2');
+
+    cleanupScreen(queryClient);
   }, 15000);
 
   it('includes the capture source in homework metadata when homework starts from the gallery', async () => {
@@ -743,7 +781,10 @@ describe('SessionScreen homework flow', () => {
       ]),
     });
 
-    const wrapper = createWrapper();
+    const { wrapper, queryClient } = createScreenWrapper({
+      activeProfile,
+      profiles: [activeProfile],
+    });
     const testScreen = render(<SessionScreen />, { wrapper });
 
     fireEvent.press(testScreen.getByTestId('manual-send-button'));
@@ -771,10 +812,15 @@ describe('SessionScreen homework flow', () => {
       );
       expect(body?.metadata).toMatchObject({ source: 'gallery' });
     });
+
+    cleanupScreen(queryClient);
   });
 
   it('hides contextual chips on greeting but shows session tools', () => {
-    const wrapper = createWrapper();
+    const { wrapper, queryClient } = createScreenWrapper({
+      activeProfile,
+      profiles: [activeProfile],
+    });
     const testScreen = render(<SessionScreen />, { wrapper });
 
     // Contextual quick chips should NOT appear before any user message
@@ -786,10 +832,15 @@ describe('SessionScreen homework flow', () => {
     // Session tool chips should always be present
     testScreen.getByText('Switch topic');
     testScreen.getByText('Park it');
+
+    cleanupScreen(queryClient);
   });
 
   it('records quick chips and learner feedback with follow-up prompts', async () => {
-    const wrapper = createWrapper();
+    const { wrapper, queryClient } = createScreenWrapper({
+      activeProfile,
+      profiles: [activeProfile],
+    });
     const testScreen = render(<SessionScreen />, { wrapper });
 
     fireEvent.press(testScreen.getByTestId('manual-send-button'));
@@ -905,6 +956,8 @@ describe('SessionScreen homework flow', () => {
         expect.objectContaining({ idempotencyKey: expect.any(String) }),
       );
     });
+
+    cleanupScreen(queryClient);
   });
 
   it('hydrates milestone tracker state from the recovery marker when resuming', async () => {
@@ -926,13 +979,18 @@ describe('SessionScreen homework flow', () => {
       },
     });
 
-    const wrapper = createWrapper();
+    const { wrapper, queryClient } = createScreenWrapper({
+      activeProfile,
+      profiles: [activeProfile],
+    });
     render(<SessionScreen />, { wrapper });
 
     await waitFor(() => {
       expect(mockReadSessionRecoveryMarker).toHaveBeenCalled();
       expect(mockHydrate).toHaveBeenCalled();
     });
+
+    cleanupScreen(queryClient);
   });
 
   it('renders prior chat history when resuming a session with cached transcript', async () => {
@@ -975,7 +1033,10 @@ describe('SessionScreen homework flow', () => {
       },
     });
 
-    const wrapper = createWrapper();
+    const { wrapper, queryClient } = createScreenWrapper({
+      activeProfile,
+      profiles: [activeProfile],
+    });
     const testScreen = render(<SessionScreen />, { wrapper });
     await flushAsyncWork();
 
@@ -985,6 +1046,8 @@ describe('SessionScreen homework flow', () => {
         testScreen.queryByText('Africa is the second-largest continent.'),
       ).toBeTruthy();
     });
+
+    cleanupScreen(queryClient);
   });
 
   it('auto-resumes the active session for a learning topic when no sessionId is in the route', async () => {
@@ -998,7 +1061,10 @@ describe('SessionScreen homework flow', () => {
     // Return active session for this topic via fetch boundary
     mockFetch.setRoute('/progress/topic', { sessionId: 'session-resumed' });
 
-    const wrapper = createWrapper();
+    const { wrapper, queryClient } = createScreenWrapper({
+      activeProfile,
+      profiles: [activeProfile],
+    });
     render(<SessionScreen />, { wrapper });
     await flushAsyncWork();
 
@@ -1007,6 +1073,8 @@ describe('SessionScreen homework flow', () => {
         sessionId: 'session-resumed',
       });
     });
+
+    cleanupScreen(queryClient);
   });
 
   it('does not auto-resume when entering a topic in review mode', async () => {
@@ -1022,11 +1090,16 @@ describe('SessionScreen homework flow', () => {
       sessionId: 'session-shouldnt-resume',
     });
 
-    const wrapper = createWrapper();
+    const { wrapper, queryClient } = createScreenWrapper({
+      activeProfile,
+      profiles: [activeProfile],
+    });
     render(<SessionScreen />, { wrapper });
     await flushAsyncWork();
 
     expect(mockSetParams).not.toHaveBeenCalled();
+
+    cleanupScreen(queryClient);
   });
 
   it('does not call setParams when the topic has no active session', async () => {
@@ -1039,11 +1112,16 @@ describe('SessionScreen homework flow', () => {
     });
     // Default route already returns null for /progress/topic
 
-    const wrapper = createWrapper();
+    const { wrapper, queryClient } = createScreenWrapper({
+      activeProfile,
+      profiles: [activeProfile],
+    });
     render(<SessionScreen />, { wrapper });
     await flushAsyncWork();
 
     expect(mockSetParams).not.toHaveBeenCalled();
+
+    cleanupScreen(queryClient);
   });
 
   it('shows the topic header and opens the topic switcher when "Change topic" is tapped', async () => {
@@ -1068,7 +1146,10 @@ describe('SessionScreen homework flow', () => {
       },
     });
 
-    const wrapper = createWrapper();
+    const { wrapper, queryClient } = createScreenWrapper({
+      activeProfile,
+      profiles: [activeProfile],
+    });
     const testScreen = render(<SessionScreen />, { wrapper });
     await flushAsyncWork();
 
@@ -1080,10 +1161,15 @@ describe('SessionScreen homework flow', () => {
     await flushAsyncWork();
 
     testScreen.getByTestId('switch-topic-topic-1');
+
+    cleanupScreen(queryClient);
   });
 
   it('persists input-mode changes once the session exists', async () => {
-    const wrapper = createWrapper();
+    const { wrapper, queryClient } = createScreenWrapper({
+      activeProfile,
+      profiles: [activeProfile],
+    });
     const testScreen = render(<SessionScreen />, { wrapper });
 
     fireEvent.press(testScreen.getByTestId('manual-send-button'));
@@ -1100,6 +1186,8 @@ describe('SessionScreen homework flow', () => {
         inputMode: 'voice',
       });
     });
+
+    cleanupScreen(queryClient);
   });
 
   it('prompts for subject resolution before starting a session when classification is ambiguous', async () => {
@@ -1115,7 +1203,10 @@ describe('SessionScreen homework flow', () => {
       needsConfirmation: true,
     });
 
-    const wrapper = createWrapper();
+    const { wrapper, queryClient } = createScreenWrapper({
+      activeProfile,
+      profiles: [activeProfile],
+    });
     const testScreen = render(<SessionScreen />, { wrapper });
 
     fireEvent.press(testScreen.getByTestId('manual-send-button'));
@@ -1165,6 +1256,8 @@ describe('SessionScreen homework flow', () => {
         expect.objectContaining({ idempotencyKey: expect.any(String) }),
       );
     });
+
+    cleanupScreen(queryClient);
   });
 
   it('shows "+ New subject" escape hatch when classification fails [BUG-234]', async () => {
@@ -1177,7 +1270,10 @@ describe('SessionScreen homework flow', () => {
       new Response(JSON.stringify({ error: 'Network error' }), { status: 500 }),
     );
 
-    const wrapper = createWrapper();
+    const { wrapper, queryClient } = createScreenWrapper({
+      activeProfile,
+      profiles: [activeProfile],
+    });
     const testScreen = render(<SessionScreen />, { wrapper });
 
     fireEvent.press(testScreen.getByTestId('manual-send-button'));
@@ -1191,6 +1287,8 @@ describe('SessionScreen homework flow', () => {
     });
 
     expect(mockStartSession).not.toHaveBeenCalled();
+
+    cleanupScreen(queryClient);
   });
 
   it('shows "+ New subject" chip alongside candidates when classification is ambiguous [BUG-234]', async () => {
@@ -1204,7 +1302,10 @@ describe('SessionScreen homework flow', () => {
       needsConfirmation: true,
     });
 
-    const wrapper = createWrapper();
+    const { wrapper, queryClient } = createScreenWrapper({
+      activeProfile,
+      profiles: [activeProfile],
+    });
     const testScreen = render(<SessionScreen />, { wrapper });
 
     fireEvent.press(testScreen.getByTestId('manual-send-button'));
@@ -1215,6 +1316,8 @@ describe('SessionScreen homework flow', () => {
       testScreen.getByTestId('subject-resolution-new');
       testScreen.getByText('+ New subject');
     });
+
+    cleanupScreen(queryClient);
   });
 
   describe('post-session filing prompt', () => {
@@ -1240,7 +1343,10 @@ describe('SessionScreen homework flow', () => {
       // Spy on Alert.alert so we can invoke the "End Session" button callback
       const alertSpy = jest.spyOn(Alert, 'alert');
 
-      const wrapper = createWrapper();
+      const { wrapper } = createScreenWrapper({
+        activeProfile,
+        profiles: [activeProfile],
+      });
       const testScreen = render(<SessionScreen />, { wrapper });
 
       // Send a message to start the session and get exchangeCount > 0
@@ -1358,6 +1464,13 @@ describe('SessionScreen homework flow', () => {
 });
 
 describe('voice mode persistence', () => {
+  const activeProfile = createTestProfile({
+    id: 'profile-1',
+    displayName: 'Test Learner',
+    isOwner: true,
+    birthYear: 2010,
+  });
+
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();
@@ -1406,23 +1519,34 @@ describe('voice mode persistence', () => {
 
   it('defaults to voice when SecureStore has voice preference', async () => {
     secureStore['voice-input-mode-profile-1'] = 'voice';
-    const wrapper = createWrapper();
+    const { wrapper, queryClient } = createScreenWrapper({
+      activeProfile,
+      profiles: [activeProfile],
+    });
     const { getByTestId } = render(<SessionScreen />, { wrapper });
     await waitFor(() => {
       expect(getByTestId('mock-input-mode').props.children).toBe('voice');
     });
+    cleanupScreen(queryClient);
   });
 
   it('defaults to text when SecureStore has no preference', async () => {
-    const wrapper = createWrapper();
+    const { wrapper, queryClient } = createScreenWrapper({
+      activeProfile,
+      profiles: [activeProfile],
+    });
     const { getByTestId } = render(<SessionScreen />, { wrapper });
     await waitFor(() => {
       expect(getByTestId('mock-input-mode').props.children).toBe('text');
     });
+    cleanupScreen(queryClient);
   });
 
   it('persists voice preference when mode changes to voice', async () => {
-    const wrapper = createWrapper();
+    const { wrapper, queryClient } = createScreenWrapper({
+      activeProfile,
+      profiles: [activeProfile],
+    });
     const { getByTestId } = render(<SessionScreen />, { wrapper });
     await act(async () => {
       fireEvent.press(getByTestId('mock-set-voice-mode'));
@@ -1430,11 +1554,15 @@ describe('voice mode persistence', () => {
     await waitFor(() => {
       expect(secureStore['voice-input-mode-profile-1']).toBe('voice');
     });
+    cleanupScreen(queryClient);
   });
 
   it('persists text preference when mode changes to text', async () => {
     secureStore['voice-input-mode-profile-1'] = 'voice';
-    const wrapper = createWrapper();
+    const { wrapper, queryClient } = createScreenWrapper({
+      activeProfile,
+      profiles: [activeProfile],
+    });
     const { getByTestId } = render(<SessionScreen />, { wrapper });
     // Wait for initial voice mode to load
     await waitFor(() => {
@@ -1446,6 +1574,7 @@ describe('voice mode persistence', () => {
     await waitFor(() => {
       expect(secureStore['voice-input-mode-profile-1']).toBe('text');
     });
+    cleanupScreen(queryClient);
   });
 
   it('shows QuotaExceededCard and disables input when stream returns 402', async () => {
@@ -1464,7 +1593,10 @@ describe('voice mode persistence', () => {
       new QuotaExceededError('Quota exceeded', details),
     );
 
-    const wrapper = createWrapper();
+    const { wrapper, queryClient } = createScreenWrapper({
+      activeProfile,
+      profiles: [activeProfile],
+    });
     const { unmount } = render(<SessionScreen />, { wrapper });
 
     // Flush startup async work
@@ -1482,5 +1614,6 @@ describe('voice mode persistence', () => {
     });
 
     unmount();
+    cleanupScreen(queryClient);
   });
 });
