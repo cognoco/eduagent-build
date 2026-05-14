@@ -182,20 +182,20 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 
 | ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| HOME-04 | Animated splash and initial shell | ✅ | Pass | | | 2026-05-14 web preview: auth smoke passed; manual screenshot shows splash clears to sign-in by ~10s. |
-| AUTH-01 | App launch and auth gate | ✅ | Pass | | | 2026-05-14 web preview: unauthenticated `/sign-in` renders MentoMate sign-in shell with email/password, Google button, forgot-password, and sign-up link. |
-| AUTH-12 | First-time vs returning sign-in copy | ⬜ | — | | | |
-| AUTH-07 | Auth screen navigation (sign-in ↔ sign-up ↔ forgot) | ✅ | Pass | | | 2026-05-14 Playwright `smoke-auth`: sign-in -> sign-up -> sign-in -> forgot-password -> sign-in passed. |
-| AUTH-02 | Sign up with email and password | ⚠️ | Pass w/ issues | | | 2026-05-14 Playwright `smoke-auth`: form renders, validation works, submit reaches Clerk and disables button. Full account creation/verification was not exercised in this web smoke. |
-| AUTH-03 | Sign-up email verification code | 🚫 | Blocked | | | 2026-05-14 web pass did not reach the verification-code stage; needs Clerk testing token/full sign-up path or native/dev-client run. |
-| AUTH-04 | Sign in with email and password | ⬜ | — | | | |
-| AUTH-05 | Additional sign-in verification (email/phone/TOTP) | ⬜ | — | | | |
-| AUTH-06 | Forgot password and reset password | ⚠️ | Pass w/ issues | | | 2026-05-14 Playwright `smoke-auth`: forgot-password screen is reachable and back navigation works; reset-code completion was not exercised. |
-| AUTH-08 | OAuth sign in / sign up (Google, Apple, OpenAI) | 🚫 | Blocked | | | 2026-05-14 visual/auth smoke: Google button renders. OAuth happy path remains blocked in web preview. |
-| AUTH-09 | SSO callback completion + fallback | ⬜ | — | | | |
-| HOME-05 | Empty first-user state | ⬜ | — | | | |
-| AUTH-13 | Deep-link auth redirect preservation (BUG-530) | ⬜ | — | | | |
-| AUTH-14 | Sign-in transition spinner + stuck-state recovery | ⬜ | — | | | |
+| HOME-04 | Animated splash and initial shell | 🚫 | Blocked | | | Dev-client overlay covers the splash before Maestro can observe it; requires production APK. Web smoke (2026-05-14): splash clears to sign-in by ~10s ✅. |
+| AUTH-01 | App launch and auth gate | ✅ | Pass | | | 2026-05-14 Galaxy S10e emulator/dev-client: launch reaches sign-in gate with Google SSO, email, password, and Sign in CTA. Also confirmed on web preview. |
+| AUTH-12 | First-time vs returning sign-in copy | ✅ | Pass | | | Clean launch shows first-time copy (`Welcome to MentoMate` / `sign-in-welcome-first-time`), not returning-user copy. |
+| AUTH-07 | Auth screen navigation (sign-in ↔ sign-up ↔ forgot) | ❌ | Fail | https://www.notion.so/3558bce91f7c811cbe38d45d3181c47a | | Sign-in to sign-up works, but the sign-up screen's return-to-sign-in link is not visible/reachable after scrolling to the primary CTA on the small emulator. Web smoke passed navigation. |
+| AUTH-02 | Sign up with email and password | ❌ | Fail | https://www.notion.so/3358bce91f7c816d8c0ff709538ada08?pvs=1 | | Sign-up screen opens, but after entering credentials the Create account CTA is no longer found/reachable on the small emulator. Web smoke: form + Clerk submit reached, full creation not exercised. |
+| AUTH-03 | Sign-up email verification code | 🚫 | Blocked | | | Blocked behind AUTH-02 on device. Web smoke did not reach verification-code stage either; needs Clerk testing token. |
+| AUTH-04 | Sign in with email and password | ❌ | Fail | https://www.notion.so/3358bce91f7c816d8c0ff709538ada08?pvs=1 | | Seeded-user sign-in could not continue reliably after email entry; password field/submit CTA becomes unreachable on the small emulator. |
+| AUTH-05 | Additional sign-in verification (email/phone/TOTP) | 🚫 | Blocked | | | Required MFA seed scenarios do not exist yet (`mfa-email-code`, `mfa-phone`, `mfa-totp`, backup-code). |
+| AUTH-06 | Forgot password and reset password | ❌ | Fail | https://www.notion.so/3358bce91f7c816d8c0ff709538ada08?pvs=1 | | Forgot-password screen renders and accepts email, but the Send reset code button is not found/reachable after keyboard dismissal on device. Web smoke: screen reachable + back nav works; reset-code completion not exercised. |
+| AUTH-08 | OAuth sign in / sign up (Google, Apple, OpenAI) | ✅ | Pass | | | Android/dev-client: Google SSO button renders and is tappable; OpenAI absent but optional. Web smoke: Google button renders, happy path blocked in web preview. |
+| AUTH-09 | SSO callback completion + fallback | 🚫 | Blocked | | | Airplane-mode broadcast blocked on this emulator (`Permission Denial`); network-failure callback path could not be validated. |
+| HOME-05 | Empty first-user state | 🚫 | Blocked | https://www.notion.so/3358bce91f7c816d8c0ff709538ada08?pvs=1 | | Seeded `onboarding-no-subject` state prepared, but flow blocked at seeded sign-in because password field becomes unreachable after email entry. |
+| AUTH-13 | Deep-link auth redirect preservation (BUG-530) | 🚫 | Blocked | https://www.notion.so/3358bce91f7c816d8c0ff709538ada08?pvs=1 | | Requires successful post-deep-link sign-in; blocked by AUTH-04 small-screen auth form reachability. |
+| AUTH-14 | Sign-in transition spinner + stuck-state recovery | 🚫 | Blocked | https://www.notion.so/3358bce91f7c816d8c0ff709538ada08?pvs=1 | | Requires successful sign-in/controlled slow transition; blocked by AUTH-04 small-screen auth form reachability in this pass. |
 
 ---
 
@@ -566,7 +566,7 @@ Update this once a batch is complete to track overall progress.
 
 | Batch | Section | Items | Status | Notes |
 | --- | --- | --- | --- | --- |
-| 1  | Pre-auth & Auth          | 14 | ⚠️ | 3✅ 2⚠️ 2🚫 7⬜ — 2026-05-14 web smoke-auth passed; full verification/reset/OAuth remain incomplete or blocked. |
+| 1  | Pre-auth & Auth          | 14 | ❌ | Device (S10e, 2026-05-14): 3 pass, 4 fail, 7 blocked. Main blocker: auth form controls unreachable on small screen after input. Web smoke: 3 pass, 2 pass-w-issues, 2 blocked. |
 | 2  | First Profile + Consent  | 11 | ⬜ | |
 | 3  | Subject Onboarding       | 12 | ⬜ | |
 | 4  | Learner Home + Resume    |  6 | ⚠️ | 1⚠️ 5⬜ — 2026-05-14 smoke-learner passed locators; screenshot crawl needs splash-wait hardening before visual sign-off. |
