@@ -341,4 +341,56 @@ describe('QuizLaunchScreen', () => {
       expect(screen.queryByTestId('quiz-launch-error-fallback')).toBeNull();
     });
   });
+
+  describe('typed unretryable errors', () => {
+    beforeEach(() => {
+      mockMutate.mockImplementation(() => {
+        // Keep screen on the current error branch.
+      });
+    });
+
+    it('suppresses Retry for ForbiddenError-shaped launch failures', () => {
+      const forbidden = Object.assign(new Error('Insufficient permissions'), {
+        name: 'ForbiddenError',
+        errorCode: 'FORBIDDEN',
+        apiCode: 'FORBIDDEN',
+      });
+      mockGenerateRound = {
+        mutate: mockMutate,
+        isPending: false,
+        isError: true,
+        error: forbidden,
+      };
+
+      render(<QuizLaunchScreen />);
+
+      screen.getByTestId('quiz-launch-error-fallback');
+      screen.getByText('Insufficient permissions');
+      expect(screen.queryByTestId('quiz-launch-retry')).toBeNull();
+      screen.getByTestId('quiz-launch-back');
+    });
+
+    it('suppresses Retry for consent-required launch failures', () => {
+      const consentRequired = Object.assign(
+        new Error('Parent consent is required.'),
+        {
+          name: 'ConsentRequiredError',
+          errorCode: 'CONSENT_REQUIRED',
+          code: 'CONSENT_REQUIRED',
+        },
+      );
+      mockGenerateRound = {
+        mutate: mockMutate,
+        isPending: false,
+        isError: true,
+        error: consentRequired,
+      };
+
+      render(<QuizLaunchScreen />);
+
+      screen.getByTestId('quiz-launch-error-fallback');
+      expect(screen.queryByTestId('quiz-launch-retry')).toBeNull();
+      screen.getByTestId('quiz-launch-back');
+    });
+  });
 });

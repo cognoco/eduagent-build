@@ -25,6 +25,10 @@ test('J-10 learner → Practice → Quiz → launch → play → results → hom
 
   // Launch capitals quiz — a general-knowledge activity always available
   await pressableClick(page.getByTestId('quiz-capitals'));
+  const challengeStart = page.getByTestId('quiz-challenge-start');
+  if (await challengeStart.isVisible({ timeout: 5_000 }).catch(() => false)) {
+    await pressableClick(challengeStart);
+  }
   await expect(page.getByTestId('quiz-play-screen')).toBeVisible({
     timeout: 30_000,
   });
@@ -40,8 +44,10 @@ test('J-10 learner → Practice → Quiz → launch → play → results → hom
     if (resultsVisible) break;
 
     const firstOption = quizScreen.getByTestId('quiz-option-0');
+    const freeTextField = page.getByTestId('quiz-free-text-field');
+    const freeTextSubmit = page.getByTestId('quiz-free-text-submit');
     await expect(
-      firstOption.or(page.getByTestId('quiz-results-screen')),
+      firstOption.or(freeTextField).or(page.getByTestId('quiz-results-screen')),
     ).toBeVisible({
       timeout: 30_000,
     });
@@ -52,6 +58,9 @@ test('J-10 learner → Practice → Quiz → launch → play → results → hom
         );
         const option = document.querySelector(
           '[data-testid="quiz-play-screen"] [data-testid="quiz-option-0"]',
+        );
+        const freeText = document.querySelector(
+          '[data-testid="quiz-free-text-field"]',
         );
         const isVisible = (element: Element | null) => {
           if (!element) return false;
@@ -67,7 +76,8 @@ test('J-10 learner → Practice → Quiz → launch → play → results → hom
           isVisible(results) ||
           (isVisible(option) &&
             !option.hasAttribute('disabled') &&
-            option.getAttribute('aria-disabled') !== 'true')
+            option.getAttribute('aria-disabled') !== 'true') ||
+          isVisible(freeText)
         );
       },
       null,
@@ -76,11 +86,16 @@ test('J-10 learner → Practice → Quiz → launch → play → results → hom
 
     if (await page.getByTestId('quiz-results-screen').isVisible()) break;
 
-    await expect(firstOption).toBeEnabled({
-      timeout: 30_000,
-    });
-
-    await pressableClick(firstOption);
+    if (await freeTextField.isVisible().catch(() => false)) {
+      await freeTextField.fill('Not sure');
+      await expect(freeTextSubmit).toBeEnabled({ timeout: 30_000 });
+      await pressableClick(freeTextSubmit);
+    } else {
+      await expect(firstOption).toBeEnabled({
+        timeout: 30_000,
+      });
+      await pressableClick(firstOption);
+    }
     await expect(page.getByTestId('quiz-answer-feedback')).toBeVisible({
       timeout: 30_000,
     });
