@@ -29,24 +29,32 @@ mockDatabaseModule.db.query = new Proxy(mockDatabaseModule.db.query as object, {
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
+const mockFindOrCreateAccount = jest.fn().mockResolvedValue({
+  id: 'test-account-id',
+  clerkUserId: 'user_test',
+  email: 'test@example.com',
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+});
+
 jest.mock('../services/account', () => ({
-  findOrCreateAccount: jest.fn().mockResolvedValue({
-    id: 'test-account-id',
-    clerkUserId: 'user_test',
-    email: 'test@example.com',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  }),
+  ...jest.requireActual('../services/account'),
+  findOrCreateAccount: (...args: unknown[]) =>
+    mockFindOrCreateAccount(...args),
 }));
 
+const mockFindOwnerProfile = jest.fn().mockResolvedValue(null);
+const mockGetProfile = jest.fn().mockResolvedValue({
+  id: 'test-profile-id',
+  birthYear: null,
+  location: null,
+  consentStatus: 'CONSENTED',
+});
+
 jest.mock('../services/profile', () => ({
-  findOwnerProfile: jest.fn().mockResolvedValue(null),
-  getProfile: jest.fn().mockResolvedValue({
-    id: 'test-profile-id',
-    birthYear: null,
-    location: null,
-    consentStatus: 'CONSENTED',
-  }),
+  ...jest.requireActual('../services/profile'),
+  findOwnerProfile: (...args: unknown[]) => mockFindOwnerProfile(...args),
+  getProfile: (...args: unknown[]) => mockGetProfile(...args),
 }));
 
 const mockGetChildrenForParent = jest.fn().mockResolvedValue([]);

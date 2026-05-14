@@ -120,24 +120,20 @@ jest.mock('../services/session', () => ({
 }));
 
 // ---------------------------------------------------------------------------
-// Mock LLM services — routeAndCall + registerProvider for llm middleware
+// Mock LLM services — stub routeAndCall; all other exports via requireActual
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/llm', () => ({
-  // gc1-allow: LLM routeAndCall external boundary
+jest.mock('../services/llm', () => ({ // gc1-allow: routeAndCall is the LLM provider HTTP boundary
+  ...(jest.requireActual('../services/llm') as Record<string, unknown>),
   routeAndCall: jest.fn().mockResolvedValue({ text: 'mocked' }),
-  registerProvider: jest.fn(),
-  getRegisteredProviders: jest.fn().mockReturnValue([]),
-  _clearProviders: jest.fn(),
-  _resetCircuits: jest.fn(),
 }));
 
 // ---------------------------------------------------------------------------
 // Mock Sentry
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/sentry', () => ({
-  // gc1-allow: @sentry/cloudflare external boundary
+jest.mock('../services/sentry', () => ({ // gc1-allow: thin wrapper for @sentry/cloudflare external boundary
+  ...(jest.requireActual('../services/sentry') as Record<string, unknown>),
   captureException: jest.fn(),
 }));
 
@@ -145,8 +141,7 @@ jest.mock('../services/sentry', () => ({
 // Mock Inngest client
 // ---------------------------------------------------------------------------
 
-jest.mock('../inngest/client', () => ({
-  // gc1-allow: Inngest SDK external boundary
+jest.mock('../inngest/client', () => ({ // gc1-allow: Inngest SDK external boundary — real client calls CF env bindings unavailable in test
   inngest: {
     send: jest.fn().mockResolvedValue(undefined),
     createFunction: jest.fn().mockReturnValue(jest.fn()),
