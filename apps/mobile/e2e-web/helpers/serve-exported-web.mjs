@@ -3,6 +3,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { createReadStream } from 'node:fs';
 import { access, stat, readFile, writeFile, rename, rm } from 'node:fs/promises';
+import { statSync } from 'node:fs';
 import { constants as fsConstants } from 'node:fs';
 
 const projectRoot = process.cwd();
@@ -69,28 +70,51 @@ async function resolveAssetPath(urlPath) {
 }
 
 async function startServer() {
-  const server = http.createServer(async (request, response) => {
+  const server = http.createServer((request, response) => {
     const url = new URL(request.url ?? '/', `http://${host}:${port}`);
-    const assetPath = await resolveAssetPath(url.pathname);
+    const safePath = path.normalize(url.pathname).replace(/^(\.\.[/\\])+/, '');
+    let candidate = path.join(distDir, safePath);
 
-    if (!assetPath) {
-      response.statusCode = 404;
-      response.end('Not found');
+    const resolvedCandidate = path.resolve(candidate);
+    const resolvedDist = path.resolve(distDir);
+    if (!resolvedCandidate.startsWith(resolvedDist + path.sep) && resolvedCandidate !== resolvedDist) {
+      response.statusCode = 403;
+      response.end('Forbidden');
       return;
     }
 
-    const extension = path.extname(assetPath).toLowerCase();
-    response.setHeader(
-      'Content-Type',
-      mimeTypes[extension] ?? 'application/octet-stream'
-    );
-    createReadStream(assetPath).pipe(response);
+    try {
+      const stats = statSync(candidate);
+      if (stats.isDirectory()) candidate = path.join(candidate, 'index.html');
+    } catch {
+      if (!path.extname(candidate)) {
+        candidate = path.join(distDir, 'index.html');
+      } else {
+        response.statusCode = 404;
+        response.end('Not found');
+        return;
+      }
+    }
+
+    const extension = path.extname(candidate).toLowerCase();
+    response.setHeader('Content-Type', mimeTypes[extension] ?? 'application/octet-stream');
+    const stream = createReadStream(candidate);
+    stream.on('error', () => {
+      if (!response.headersSent) {
+        response.statusCode = 500;
+        response.end('Internal Server Error');
+      }
+    });
+    stream.pipe(response);
   });
 
-  const shutdown = () => {
-    server.close(() => process.exit(0));
-  };
+  server.on('error', (err) => {
+    console.error(`[serve] server error: ${err.message}`);
+  });
 
+  server.keepAliveTimeout = 0;
+
+  const shutdown = () => server.close(() => process.exit(0));
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);
 
@@ -110,7 +134,11 @@ const envFilesToOverride = ['.env.local', '.env.development.local'].map(
     backupPath: path.join(projectRoot, `${name}.e2e-bak`),
   })
 );
-const apiUrl = process.env.PLAYWRIGHT_API_URL ?? 'http://127.0.0.1:8787';
+const defaultApiUrl =
+  process.env.PLAYWRIGHT_SKIP_LOCAL_API === '1'
+    ? 'https://api-test.mentomate.com'
+    : 'http://127.0.0.1:8787';
+const apiUrl = process.env.PLAYWRIGHT_API_URL ?? defaultApiUrl;
 process.env.EXPO_PUBLIC_API_URL = apiUrl;
 const generatedEnvFiles = new Set();
 

@@ -4,7 +4,9 @@ import { apiBaseUrl, appBaseUrl, runId } from './e2e-web/helpers/runtime';
 
 const e2eWebDir = path.join(process.cwd(), 'apps', 'mobile', 'e2e-web');
 const shouldStartLocalApi = process.env.PLAYWRIGHT_SKIP_LOCAL_API !== '1';
-const usesSharedStagingApi = process.env.PLAYWRIGHT_SKIP_LOCAL_API === '1';
+const usesSharedStagingApi =
+  process.env.PLAYWRIGHT_SKIP_LOCAL_API === '1' &&
+  apiBaseUrl.includes('.workers.dev');
 
 export default defineConfig({
   testDir: e2eWebDir,
@@ -12,8 +14,8 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  // Shared staging can edge-block parallel authenticated bursts; local API runs
-  // keep parallel workers because they do not traverse the staging gateway.
+  // Shared *.workers.dev rate-limits parallel bursts; custom domains and local
+  // API are not rate-limited, so they can use full parallelism.
   workers: process.env.CI ? (usesSharedStagingApi ? 1 : 4) : undefined,
   reporter: [
     ['line'],
@@ -60,7 +62,7 @@ export default defineConfig({
     {
       command: 'node e2e-web/helpers/serve-exported-web.mjs',
       url: appBaseUrl,
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: true,
       stdout: 'pipe',
       stderr: 'pipe',
       timeout: 240_000,
@@ -70,6 +72,7 @@ export default defineConfig({
     {
       name: 'setup',
       testMatch: /helpers[\\/]auth\.setup\.ts/,
+      fullyParallel: false,
     },
     {
       name: 'smoke-auth',
