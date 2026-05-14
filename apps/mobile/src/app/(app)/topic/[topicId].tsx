@@ -38,6 +38,8 @@ import { showNoteContextMenu } from '../../../components/library/NoteContextMenu
 import { TopicSessionRow } from '../../../components/library/TopicSessionRow';
 import { StudyCTA } from '../../../components/library/StudyCTA';
 import { NoteInput } from '../../../components/library/NoteInput';
+import { BookmarkCard } from '../../../components/library/BookmarkCard';
+import { useBookmarks } from '../../../hooks/use-bookmarks';
 import { formatApiError } from '../../../lib/format-api-error';
 import { platformAlert } from '../../../lib/platform-alert';
 
@@ -189,6 +191,16 @@ export default function TopicDetailScreen() {
   );
   const { mutate: updateNote, isPending: updatingNote } = useUpdateNote();
   const { mutate: deleteNote } = useDeleteNoteById();
+
+  // Topic-scoped bookmarks. Server-side filtered — `useBookmarks` is
+  // paginated, so client-side filtering would silently miss page 2+.
+  const { data: bookmarksData } = useBookmarks(
+    topicId ? { topicId } : undefined,
+  );
+  const topicBookmarks = useMemo(() => {
+    if (!bookmarksData) return [];
+    return bookmarksData.pages.flatMap((page) => page.bookmarks);
+  }, [bookmarksData]);
 
   // Note input state: null = hidden, 'new' = adding new note, string = editing note id
   const [noteInputMode, setNoteInputMode] = useState<null | 'new' | string>(
@@ -595,6 +607,26 @@ export default function TopicDetailScreen() {
                 </Pressable>
               )}
             </View>
+
+            {/* SAVED FROM CHAT section */}
+            {topicBookmarks.length > 0 ? (
+              <View className="mt-4 mb-2" testID="topic-bookmarks-section">
+                <Text className="text-body-sm font-semibold text-text-secondary tracking-wide px-5 mb-2">
+                  Saved from chat
+                </Text>
+                {topicBookmarks.map((bookmark) => (
+                  <BookmarkCard
+                    key={bookmark.id}
+                    bookmarkId={bookmark.id}
+                    content={bookmark.content}
+                    createdAt={bookmark.createdAt}
+                    subjectName={bookmark.subjectName}
+                    topicTitle={bookmark.topicTitle}
+                    onPress={() => handleSessionPress(bookmark.sessionId)}
+                  />
+                ))}
+              </View>
+            ) : null}
 
             {/* SESSIONS section */}
             <View className="mt-4 mb-2">

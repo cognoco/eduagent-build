@@ -5,22 +5,28 @@
 # pendingAuthRedirect, routes to sign-in, and after successful authentication
 # the user lands on library-screen (NOT home-screen).
 #
-# Mechanism (Step 0 decision):
-#   Maestro openLink fires an ACTION_VIEW intent for mentomate:///library while
-#   the app is on the sign-in screen. The (app)/_layout.tsx intercepts via
-#   rememberPendingAuthRedirect and redirects. After sign-in, (auth)/_layout.tsx
-#   reads the pending record and replaces to the original target.
+# Mechanism:
+#   1. seed-and-run.sh seeds an onboarding-complete user and brings the app to
+#      the sign-in screen (pm clear → launch → wait for sign-in-screen).
+#   2. Maestro fires openLink for mentomate:///library. Expo Router resolves
+#      this to /(app)/library; the (app) layout's signed-out check at
+#      apps/mobile/src/app/(app)/_layout.tsx:~1455-1463 calls
+#      rememberPendingAuthRedirect('/(app)/library') and redirects to
+#      /sign-in?redirectTo=...
+#   3. The flow signs in via the canonical _setup/sign-in-only.yaml.
+#   4. (auth)/_layout.tsx reads the pending record and router.replace to
+#      /(app)/library — landing on library-screen, not home-screen.
 #
 # testIDs verified against source:
-#   sign-in-screen    apps/mobile/src/app/(auth)/sign-in.tsx line 1090
-#   sign-in-email     apps/mobile/src/app/(auth)/sign-in.tsx
-#   sign-in-password  apps/mobile/src/app/(auth)/sign-in.tsx
-#   sign-in-button    apps/mobile/src/app/(auth)/sign-in.tsx line 1293
+#   sign-in-screen    apps/mobile/src/app/(auth)/sign-in.tsx (root View with testID)
+#   sign-in-email     apps/mobile/src/app/(auth)/sign-in.tsx:1293
+#   sign-in-password  apps/mobile/src/app/(auth)/sign-in.tsx:1311
+#   sign-in-button    apps/mobile/src/app/(auth)/sign-in.tsx:1334
 #   library-screen    apps/mobile/src/app/(app)/library.tsx (root View)
-#   home-screen       apps/mobile/src/app/(app)/home.tsx (root View)
+#   home-screen       apps/mobile/src/app/(app)/home.tsx:132
 #
 # Run command:
-#   ./e2e/scripts/seed-and-run.sh --no-seed e2e/flows/auth/deep-link-redirect-signed-out.yaml
+#   ./e2e/scripts/seed-and-run.sh onboarding-complete e2e/flows/auth/deep-link-redirect-signed-out.yaml
 #
 # Tags: nightly, auth
 appId: com.mentomate.app
@@ -29,7 +35,6 @@ tags:
   - auth
 ---
 # ── Step 1: Confirm we are on the sign-in screen ──
-# seed-and-run.sh --no-seed brings the app to the sign-in screen.
 - extendedWaitUntil:
     visible:
       id: "sign-in-screen"
@@ -38,11 +43,10 @@ tags:
 - takeScreenshot: deep-link-signed-out-01-sign-in-screen
 
 # ── Step 2: Fire the deep link while signed out ──
-# The (app)/_layout.tsx intercepts the navigation attempt, calls
-# rememberPendingAuthRedirect("/(app)/library"), and stays on sign-in.
+# (app)/_layout.tsx intercepts, calls rememberPendingAuthRedirect, redirects
+# back to sign-in. The visible screen should still be sign-in-screen.
 - openLink: "mentomate:///library"
 
-# Brief pause to let the bounce resolve (up to 2 s per spec).
 - extendedWaitUntil:
     visible:
       id: "sign-in-screen"
@@ -50,31 +54,16 @@ tags:
 
 - takeScreenshot: deep-link-signed-out-02-after-open-link
 
-# ── Step 3: Sign in with seeded credentials ──
-- tapOn:
-    id: "sign-in-email"
-- inputText: ${EMAIL}
+# ── Step 3: Sign in via canonical sign-in flow ──
+# sign-in-only.yaml uses the correct testIDs (sign-in-email/password/button)
+# and the hideKeyboard pattern. It has NO post-auth return-to-home recovery,
+# so the pending-redirect replace will not be defeated.
+- runFlow:
+    file: ../_setup/sign-in-only.yaml
 
-- pressKey: back
-
-- tapOn:
-    id: "sign-in-password"
-- inputText: ${PASSWORD}
-
-- pressKey: back
-
-- extendedWaitUntil:
-    visible:
-      id: "sign-in-button"
-    timeout: 10000
-
-- tapOn:
-    id: "sign-in-button"
-
-- takeScreenshot: deep-link-signed-out-03-after-sign-in-tap
+- takeScreenshot: deep-link-signed-out-03-after-sign-in
 
 # ── Step 4: Assert post-auth landing is library, not home ──
-# (auth)/_layout.tsx reads the pending record and router.replace to library.
 - extendedWaitUntil:
     visible:
       id: "library-screen"

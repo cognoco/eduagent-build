@@ -46,53 +46,34 @@ tags:
   - slow-net
 ---
 # ── Step 1: Sign in with seeded credentials ──
-- extendedWaitUntil:
-    visible:
-      id: "sign-in-button"
-    timeout: 120000
-
-- tapOn:
-    id: "sign-in-button"
-
-- extendedWaitUntil:
-    visible:
-      id: "email-input"
-    timeout: 10000
-
-- inputText:
-    text: ${EMAIL}
-    id: "email-input"
-
-- tapOn:
-    id: "continue-button"
-
-- extendedWaitUntil:
-    visible:
-      id: "password-input"
-    timeout: 10000
-
-- inputText:
-    text: ${PASSWORD}
-    id: "password-input"
-
-- tapOn:
-    id: "sign-in-submit-button"
+# Reuses the canonical sign-in flow.
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
 
 - takeScreenshot: sse-reconnect-01-after-sign-in
 
 # ── Step 2: Navigate to active session ──
 # With `session-active` seed, the user should land in or near the session chat
 # shell. With `learning-active` fallback, we need to navigate into a session.
-# This step waits for any of: session chat shell, home, or timeout.
+# Maestro YAML has no OR/anyOf construct inside extendedWaitUntil — fallbacks
+# are checked sequentially with `optional: true`.
 - extendedWaitUntil:
-    anyOf:
-      - visible:
-          id: "session-chat-shell"
-      - visible:
-          id: "home-screen"
-      - visible:
-          id: "home-loading-timeout"
+    visible:
+      id: "session-chat-shell"
     timeout: 25000
+    optional: true
+
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 5000
+    optional: true
+
+- extendedWaitUntil:
+    visible:
+      id: "home-loading-timeout"
+    timeout: 5000
+    optional: true
 
 - takeScreenshot: sse-reconnect-02-on-app
 

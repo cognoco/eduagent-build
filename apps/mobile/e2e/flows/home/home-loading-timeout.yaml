@@ -31,38 +31,11 @@ tags:
 # ── Step 1: Sign in with seeded credentials ──
 # seed-and-run.sh has brought the app to the sign-in screen and seeded the
 # onboarding-complete scenario. NETWORK_DELAY_MS was applied after app launch
-# so Metro bundle loaded at full speed.
-- extendedWaitUntil:
-    visible:
-      id: "sign-in-button"
-    timeout: 120000
-
-- tapOn:
-    id: "sign-in-button"
-
-- extendedWaitUntil:
-    visible:
-      id: "email-input"
-    timeout: 10000
-
-- inputText:
-    text: ${EMAIL}
-    id: "email-input"
-
-- tapOn:
-    id: "continue-button"
-
-- extendedWaitUntil:
-    visible:
-      id: "password-input"
-    timeout: 10000
-
-- inputText:
-    text: ${PASSWORD}
-    id: "password-input"
-
-- tapOn:
-    id: "sign-in-submit-button"
+# so Metro bundle loaded at full speed. Reuses the canonical sign-in flow
+# (testIDs: sign-in-email, sign-in-password, sign-in-button — verified at
+# apps/mobile/src/app/(auth)/sign-in.tsx:1293, 1311, 1334).
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
 
 - takeScreenshot: home-timeout-01-after-sign-in
 

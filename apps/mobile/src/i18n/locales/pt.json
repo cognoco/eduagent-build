@@ -501,6 +501,7 @@
       }
     },
     "accessories": {
+      "addNote": "Adicionar nota",
       "switchTopic": "Mudar de tópico",
       "parkIt": "Estacionar",
       "pickSubject": "Escolha a matéria",

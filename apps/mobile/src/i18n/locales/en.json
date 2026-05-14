@@ -476,6 +476,7 @@
       }
     },
     "accessories": {
+      "addNote": "Add note",
       "switchTopic": "Switch topic",
       "parkIt": "Park it",
       "pickSubject": "Pick the subject",

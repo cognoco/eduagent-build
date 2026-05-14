@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { View, Text, Pressable, ScrollView } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import type { HomeworkProblem } from '@eduagent/schemas';
 import type { Router } from 'expo-router';
 import type { useCreateSubject } from '../../hooks/use-subjects';
+import { useThemeColors } from '../../lib/theme';
 import {
   type QuickChipId,
   type PendingSubjectResolution,
@@ -16,14 +18,17 @@ export interface SessionToolAccessoryProps {
   isStreaming: boolean;
   handleQuickChip: (chip: QuickChipId) => Promise<void>;
   stage: ConversationStage;
+  onAddNote?: () => void;
 }
 
 export function SessionToolAccessory({
   isStreaming,
   handleQuickChip,
   stage,
+  onAddNote,
 }: SessionToolAccessoryProps) {
   const { t } = useTranslation();
+  const themeColors = useThemeColors();
   if (stage !== 'teaching') return null;
 
   return (
@@ -31,9 +36,39 @@ export function SessionToolAccessory({
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: 6 }}
+        contentContainerStyle={{ gap: 6, alignItems: 'center' }}
         testID="session-quick-chips"
       >
+        {onAddNote ? (
+          <Pressable
+            onPress={onAddNote}
+            disabled={isStreaming}
+            className={`flex-row items-center rounded-full px-3 min-h-[44px] ${
+              isStreaming ? 'bg-surface' : 'bg-primary'
+            }`}
+            accessibilityRole="button"
+            accessibilityLabel={t('session.accessories.addNote')}
+            accessibilityState={{ disabled: isStreaming }}
+            testID="quick-chip-add-note"
+          >
+            <Ionicons
+              name="document-text-outline"
+              size={16}
+              color={
+                isStreaming
+                  ? themeColors.textSecondary
+                  : themeColors.textInverse
+              }
+            />
+            <Text
+              className={`text-caption font-semibold ml-1 ${
+                isStreaming ? 'text-text-secondary' : 'text-text-inverse'
+              }`}
+            >
+              {t('session.accessories.addNote')}
+            </Text>
+          </Pressable>
+        ) : null}
         {(
           [
             { id: 'switch_topic', label: t('session.accessories.switchTopic') },

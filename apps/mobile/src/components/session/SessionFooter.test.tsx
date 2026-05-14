@@ -139,4 +139,19 @@ describe('SessionFooter', () => {
       }),
     );
   });
+
+  it('passes the chat placeholder into the note composer', () => {
+    const props = createProps({
+      showFilingPrompt: false,
+      notePromptOffered: true,
+      showNoteInput: true,
+      topicId: 'topic-1',
+      sessionId: 'session-1',
+    });
+    render(<SessionFooter {...(props as any)} />);
+
+    expect(screen.getByTestId('note-text-input').props.placeholder).toBe(
+      'Summarize this in your own words...',
+    );
+  });
 });

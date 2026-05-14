@@ -21,6 +21,12 @@ ruleTester.run('no-internal-jest-mock', rule, {
     // GC1 ratchet escape hatch — must be on the jest.mock/argument line.
     "jest.mock('./sentry' /* gc1-allow: unit test boundary */, () => ({}));",
     "jest.mock( // gc1-allow: handler control-flow test\n  '../services/notifications',\n  () => ({})\n);",
+    // Pattern A — inline spread of jest.requireActual(<same path>) is the
+    // canonical GC1-compliant shape and must NOT require gc1-allow.
+    "jest.mock('./services/foo', () => ({\n  ...jest.requireActual('./services/foo'),\n  bar: jest.fn(),\n}));",
+    // Pattern A — named-local spread (two-step form, e.g. when a type
+    // annotation is needed on the requireActual call).
+    "jest.mock('../services/dashboard', () => {\n  const actual = jest.requireActual('../services/dashboard');\n  return { ...actual, foo: jest.fn() };\n});",
   ],
   invalid: [
     {
@@ -42,6 +48,18 @@ ruleTester.run('no-internal-jest-mock', rule, {
     },
     {
       code: "jest.doMock('../foo');",
+      errors: [{ messageId: 'internalMock' }],
+    },
+    // requireActual of a DIFFERENT specifier is not Pattern A — that's the
+    // shadow-mock trick BUG-1051 specifically warns about.
+    {
+      code: "jest.mock('./services/foo', () => ({\n  ...jest.requireActual('./services/bar'),\n  baz: jest.fn(),\n}));",
+      errors: [{ messageId: 'internalMock' }],
+    },
+    // requireActual without any spread isn't Pattern A — the test still
+    // shadows the real implementation, just with cherry-picked exports.
+    {
+      code: "jest.mock('./services/foo', () => {\n  const real = jest.requireActual('./services/foo');\n  return { bar: real.bar };\n});",
       errors: [{ messageId: 'internalMock' }],
     },
   ],

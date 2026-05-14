@@ -198,15 +198,12 @@ export default function CreateProfileScreen() {
         result.profile.consentStatus === 'PENDING' ||
         result.profile.consentStatus === 'PARENTAL_CONSENT_REQUESTED';
 
-      const switchResult = await switchProfile(result.profile.id);
-      if (switchResult?.success === false) {
-        platformAlert(
-          'Profile created',
-          switchResult.error ??
-            'We created the profile, but could not switch to it automatically. You can switch from the Profiles screen.',
-        );
-      }
-
+      // Navigate FIRST — switchProfile triggers a nav-tree remount via
+      // setActiveProfileId; any router call that fires after the remount
+      // starts operates on a torn-down navigator and silently no-ops on web.
+      // The profile context's isLoading guard prevents CreateProfileGate from
+      // flashing during the switch window (profiles.length > 0 &&
+      // activeProfile === null stays true until the switch completes).
       if (needsConsentFlow) {
         router.replace({
           pathname: '/consent',
@@ -214,6 +211,15 @@ export default function CreateProfileScreen() {
         });
       } else {
         handleClose();
+      }
+
+      const switchResult = await switchProfile(result.profile.id);
+      if (switchResult?.success === false) {
+        platformAlert(
+          'Profile created',
+          switchResult.error ??
+            'We created the profile, but could not switch to it automatically. You can switch from the Profiles screen.',
+        );
       }
     } catch (err: unknown) {
       // [BUG-947] PROFILE_LIMIT_EXCEEDED is an upgrade gate, not a server fault.

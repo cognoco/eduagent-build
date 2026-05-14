@@ -19,6 +19,13 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
+// prettier-ignore
+jest.mock('../../lib/theme', /* gc1-allow: nativewind vars() does not resolve 'react' in jest; stub theme hooks so screen tests don't blow up on import */ () => ({
+  useThemeColors: () => ({ muted: '#71717a', textPrimary: '#18181b' }),
+  useTheme: () => ({ colorScheme: 'dark' }),
+  useTokenVars: () => ({}),
+}));
+
 const mockStartSSOFlow = jest.fn();
 
 const SignUpScreen = require('./sign-up').default;
@@ -74,6 +81,26 @@ describe('SignUpScreen', () => {
 
     screen.getByTestId('sign-up-screen');
     screen.getByTestId('sign-up-scroll');
+  });
+
+  // BUG-959 regression: a future refactor that re-introduces an expanding
+  // flex-1 spacer above the heading would push the primary CTA below the
+  // first viewport on small phones. Mirror sign-in's regression guard.
+  it('does not insert a flex-1 spacer between the logo and the heading', () => {
+    render(<SignUpScreen />);
+
+    const content = screen.getByTestId('sign-up-content');
+    const siblings = content.children as {
+      props?: { className?: string; testID?: string };
+    }[];
+    const headingIndex = siblings.findIndex(
+      (c) => c?.props?.testID === 'sign-up-heading',
+    );
+    expect(headingIndex).toBeGreaterThanOrEqual(0);
+    for (let i = 0; i < headingIndex; i++) {
+      const className: string = siblings[i]?.props?.className ?? '';
+      expect(className.split(/\s+/)).not.toContain('flex-1');
+    }
   });
 
   it('renders OpenAI SSO when configured', () => {

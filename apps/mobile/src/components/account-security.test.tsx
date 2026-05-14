@@ -19,6 +19,13 @@ jest.mock('expo-router', () => ({
 // and useProfile() — both need providers. Pattern mirrors change-password.test.tsx.
 jest.mock('../lib/profile', () => ({ useProfile: () => ({ profiles: [] }) })); // gc1-allow: external boundary stub for QueryClient-dependent child component
 
+// prettier-ignore
+jest.mock('../lib/theme', /* gc1-allow: nativewind vars() does not resolve 'react' in jest; stub theme hooks so screen tests don't blow up on import */ () => ({
+  useThemeColors: () => ({ accent: '#0ea5e9', background: '#18181b', border: '#d4d4d8', muted: '#71717a', surface: '#ffffff', textInverse: '#ffffff', textPrimary: '#18181b', textSecondary: '#52525b' }),
+  useTheme: () => ({ colorScheme: 'dark' }),
+  useTokenVars: () => ({}),
+}));
+
 function renderWithProviders(ui: React.ReactElement) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },

@@ -476,6 +476,7 @@
       }
     },
     "accessories": {
+      "addNote": "Añadir nota",
       "switchTopic": "Cambiar tema",
       "parkIt": "Aparcarlo",
       "pickSubject": "Elige la materia",

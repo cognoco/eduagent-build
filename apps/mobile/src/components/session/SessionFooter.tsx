@@ -118,6 +118,7 @@ export function SessionFooter({
       {showNoteInput ? (
         <View className="px-4 mb-2">
           <NoteInput
+            placeholder="Summarize this in your own words..."
             onSave={(content) => {
               if (!topicId) {
                 platformAlert(

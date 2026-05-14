@@ -43,9 +43,66 @@ set -euo pipefail
 cleanup() {
   echo ""
   echo "[seed-and-run] INTERRUPTED — exiting immediately."
+  slow_net_restore 2>/dev/null || true
   exit 130
 }
 trap cleanup INT TERM
+
+# ── Slow-network shaping (NETWORK_DELAY_MS / NETWORK_SPEED / NETWORK_KILL_AFTER_MS) ──
+# See docs/specs/2026-05-14-e2e-slow-network-sim.md.
+# All env vars default to empty/0 → these helpers are no-ops unless opted in.
+emulator_console_cmd() {
+  local cmd="$1"
+  local port="${EMULATOR_CONSOLE_PORT:-5554}"
+  local token
+  token=$(cat "$HOME/.emulator_console_auth_token" 2>/dev/null || echo "")
+  # Git Bash bundled netcat does not support -q; -w sets a per-read timeout.
+  printf 'auth %s\n%s\nquit\n' "$token" "$cmd" \
+    | "${NETCAT:-/c/Program Files/Git/usr/bin/nc.exe}" -w 2 localhost "$port" >/dev/null 2>&1 || true
+}
+
+apply_network_speed() {
+  local speed="${NETWORK_SPEED:-}"
+  if [ -n "$speed" ]; then
+    emulator_console_cmd "network speed ${speed}"
+    echo "[seed-and-run] Applied network speed=${speed}"
+  fi
+}
+
+apply_network_delay() {
+  local delay="${NETWORK_DELAY_MS:-0}"
+  if [ "$delay" -gt 0 ] 2>/dev/null; then
+    emulator_console_cmd "network delay ${delay}"
+    echo "[seed-and-run] Applied network delay=${delay}ms"
+  fi
+}
+
+schedule_network_kill() {
+  local kill_ms="${NETWORK_KILL_AFTER_MS:-0}"
+  if [ "$kill_ms" -gt 0 ] 2>/dev/null; then
+    (
+      sleep "$((kill_ms / 1000))"
+      "$ADB" $DEVICE_FLAG shell settings put global airplane_mode_on 1 >/dev/null 2>&1 || true
+      "$ADB" $DEVICE_FLAG shell am broadcast -a android.intent.action.AIRPLANE_MODE --ez state true >/dev/null 2>&1 || true
+      echo "[seed-and-run] NETWORK_KILL_AFTER_MS=${kill_ms} reached — enabling airplane mode."
+    ) &
+  fi
+}
+
+slow_net_restore() {
+  emulator_console_cmd "network delay none" || true
+  emulator_console_cmd "network speed full" || true
+  # Disable airplane mode (harmless if it wasn't enabled).
+  if [ -n "${ADB:-}" ]; then
+    "$ADB" $DEVICE_FLAG shell settings put global airplane_mode_on 0 >/dev/null 2>&1 || true
+    "$ADB" $DEVICE_FLAG shell am broadcast -a android.intent.action.AIRPLANE_MODE --ez state false >/dev/null 2>&1 || true
+  fi
+  echo "[seed-and-run] Network restored (delay=none, airplane=off)."
+}
+
+# Compose with any prior EXIT trap so other wrappers' cleanup still runs.
+PRIOR_EXIT_TRAP=$(trap -p EXIT | sed "s/^trap -- '//;s/' EXIT\$//")
+trap 'slow_net_restore; eval "${PRIOR_EXIT_TRAP:-:}"' EXIT
 
 # Prevent Git Bash (MSYS) from converting Unix paths like /sdcard/ to Windows paths.
 # Without this, adb shell commands get mangled paths (e.g., /sdcard/ → C:/Program Files/Git/sdcard/).
@@ -594,6 +651,12 @@ fi
 
 echo "[seed-and-run] App on sign-in screen."
 
+# Apply slow-network shaping after the app is up so the bundle download itself
+# runs at full speed. The EXIT trap (slow_net_restore) handles cleanup.
+apply_network_speed
+apply_network_delay
+schedule_network_kill
+
 if [ $NO_SEED -eq 1 ]; then
   # ── No-seed mode: skip API seeding, run Maestro with minimal env vars ──
   echo "[seed-and-run] --no-seed mode: skipping seed API call."
@@ -609,6 +672,12 @@ if [ $NO_SEED -eq 1 ]; then
   CMD+=("${FLOW_FILE}")
   echo "[seed-and-run] Running: ${CMD[*]}"
   reset_maestro_driver
+  # When slow-network shaping is active, we must NOT exec — exec replaces the
+  # shell, which would skip the EXIT trap that restores network state.
+  if [ "${NETWORK_DELAY_MS:-0}" -gt 0 ] 2>/dev/null || [ -n "${NETWORK_SPEED:-}" ] || [ "${NETWORK_KILL_AFTER_MS:-0}" -gt 0 ] 2>/dev/null; then
+    "${CMD[@]}"
+    exit "$?"
+  fi
   exec "${CMD[@]}"
 fi
 
@@ -676,4 +745,10 @@ CMD+=("${FLOW_FILE}")
 echo "[seed-and-run] Running: ${CMD[*]}"
 
 reset_maestro_driver
+# When slow-network shaping is active, the EXIT trap must run to restore
+# network state, so don't replace the shell with exec.
+if [ "${NETWORK_DELAY_MS:-0}" -gt 0 ] 2>/dev/null || [ -n "${NETWORK_SPEED:-}" ] || [ "${NETWORK_KILL_AFTER_MS:-0}" -gt 0 ] 2>/dev/null; then
+  "${CMD[@]}"
+  exit "$?"
+fi
 exec "${CMD[@]}"

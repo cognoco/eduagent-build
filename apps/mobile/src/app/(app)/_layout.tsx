@@ -298,15 +298,20 @@ export function buildSwitchProfileConfirmation(params: {
 function usePostApprovalLanding(
   profileId: string | undefined,
   consentStatus: string | null | undefined,
-  // [BUG-914] Only child profiles ever see the post-approval celebration —
-  // parents (owners) approve consent FOR a child, never receive it, and
-  // an impersonating parent isn't the audience for "Your parent said yes"
-  // either. Gating on the discriminated role lets all role-aware copy
-  // sites (more.tsx, mentor-memory.tsx, this hook) speak one vocabulary.
+  // [BUG-914] Suppress the "Your parent said yes" celebration for an
+  // impersonating parent — they aren't the audience.
+  // [BUG-61] Teen-owners (11-17 with their own account) who transitioned
+  // PARENTAL_CONSENT_REQUESTED → CONSENTED ARE the audience and have
+  // role === 'owner'. Discriminator vs adult-owners: a parental consent record
+  // exists (parentEmail is set). Adult-owners with no parental consent flow
+  // have parentEmail === null and never see the celebration.
   role: ActiveProfileRole | null,
 ): [boolean, () => void] {
   const isConsented = !!profileId && consentStatus === 'CONSENTED';
-  const isChildProfile = role === 'child';
+  const { data: consentData } = useConsentStatus();
+  const hadParentalConsentFlow = !!consentData?.parentEmail;
+  const acceptsPostApproval =
+    role === 'child' || (role === 'owner' && hadParentalConsentFlow);
   const [shouldShow, setShouldShow] = React.useState(false);
   const [checked, setChecked] = React.useState(false);
   // [IMP-2] Only query subjects once we know the screen should show — avoids
@@ -314,11 +319,11 @@ function usePostApprovalLanding(
   // key is already set to 'true'. For new users, the query fires after the
   // SecureStore async read completes.
   const subjects = useSubjects({
-    enabled: isConsented && isChildProfile && checked && shouldShow,
+    enabled: isConsented && acceptsPostApproval && checked && shouldShow,
   });
 
   React.useEffect(() => {
-    if (!profileId || consentStatus !== 'CONSENTED' || !isChildProfile) {
+    if (!profileId || consentStatus !== 'CONSENTED' || !acceptsPostApproval) {
       setChecked(true);
       setShouldShow(false);
       return;
@@ -334,7 +339,7 @@ function usePostApprovalLanding(
         setChecked(true);
       }
     })();
-  }, [profileId, consentStatus, isChildProfile]);
+  }, [profileId, consentStatus, acceptsPostApproval]);
 
   const dismiss = React.useCallback(() => {
     if (!profileId) return;
@@ -349,7 +354,11 @@ function usePostApprovalLanding(
   const subjectsReady = !subjects.isLoading;
   const hasSubjects = (subjects.data?.length ?? 0) > 0;
   return [
-    isChildProfile && checked && subjectsReady && shouldShow && !hasSubjects,
+    acceptsPostApproval &&
+      checked &&
+      subjectsReady &&
+      shouldShow &&
+      !hasSubjects,
     dismiss,
   ];
 }

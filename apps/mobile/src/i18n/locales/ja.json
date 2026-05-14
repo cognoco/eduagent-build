@@ -476,6 +476,7 @@
       }
     },
     "accessories": {
+      "addNote": "ノートを追加",
       "switchTopic": "トピックを切り替える",
       "parkIt": "保留する",
       "pickSubject": "科目を選ぶ",

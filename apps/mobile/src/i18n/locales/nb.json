@@ -476,6 +476,7 @@
       }
     },
     "accessories": {
+      "addNote": "Legg til notat",
       "switchTopic": "Bytt emne",
       "parkIt": "Parker det",
       "pickSubject": "Velg emnet",

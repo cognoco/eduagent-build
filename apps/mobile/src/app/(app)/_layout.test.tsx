@@ -501,6 +501,54 @@ describe('AppLayout', () => {
     screen.getByTestId('tabs');
   });
 
+  // [BUG-61] A teen-owner (under-18 with their own account) who just
+  // transitioned PARENTAL_CONSENT_REQUESTED → CONSENTED IS the audience for
+  // "Your parent said yes" — they're the learner, not an impersonating parent.
+  // The discriminator vs the BUG-914 adult-owner case is consentData.parentEmail
+  // (non-null only after a parental-consent record exists).
+  it('shows post-approval landing for a teen-owner whose parent just approved (BUG-61)', async () => {
+    mockUseProfile.mockReturnValue({
+      profiles: [
+        {
+          id: 'p1',
+          isOwner: true,
+          consentStatus: 'CONSENTED',
+          birthYear: 2014, // teen
+        },
+      ],
+      activeProfile: {
+        id: 'p1',
+        isOwner: true,
+        consentStatus: 'CONSENTED',
+        birthYear: 2014,
+      },
+      isLoading: false,
+      profileWasRemoved: false,
+      acknowledgeProfileRemoval: jest.fn(),
+      switchProfile: jest.fn(),
+    });
+    mockFetch.setRoute(
+      '/consent/my-status',
+      () =>
+        new Response(
+          JSON.stringify({
+            consentStatus: 'CONSENTED',
+            parentEmail: 'parent@example.com',
+            consentType: 'GDPR',
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+    );
+    // No subjects yet — empty list is the default.
+
+    renderLayout();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('post-approval-landing')).toBeTruthy();
+    });
+    expect(screen.getByTestId('post-approval-continue')).toBeTruthy();
+  });
+
   it('does not show post-approval landing when user already has subjects (BUG-544)', () => {
     mockUseProfile.mockReturnValue({
       profiles: [

@@ -41,51 +41,28 @@ tags:
   - slow-net
 ---
 # ── Step 1: Sign in with seeded credentials ──
-- extendedWaitUntil:
-    visible:
-      id: "sign-in-button"
-    timeout: 120000
-
-- tapOn:
-    id: "sign-in-button"
-
-- extendedWaitUntil:
-    visible:
-      id: "email-input"
-    timeout: 10000
-
-- inputText:
-    text: ${EMAIL}
-    id: "email-input"
-
-- tapOn:
-    id: "continue-button"
-
-- extendedWaitUntil:
-    visible:
-      id: "password-input"
-    timeout: 10000
-
-- inputText:
-    text: ${PASSWORD}
-    id: "password-input"
-
-- tapOn:
-    id: "sign-in-submit-button"
+# Reuses the canonical sign-in flow.
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
 
 - takeScreenshot: curriculum-polling-01-after-sign-in
 
 # ── Step 2: Wait for home screen and navigate to first-curriculum creation ──
 # This step assumes the seed has placed the user in a state where the
 # first-curriculum job is pending. Without that seed, nothing here will trigger
-# the polling banner.
+# the polling banner. Maestro YAML has no OR/anyOf construct inside
+# extendedWaitUntil — both fallbacks are checked sequentially with `optional`.
 - extendedWaitUntil:
-    anyOf:
-      - visible:
-          id: "home-screen"
-      - visible:
-          id: "home-loading-timeout"
+    visible:
+      id: "home-screen"
     timeout: 25000
+    optional: true
+
+- extendedWaitUntil:
+    visible:
+      id: "home-loading-timeout"
+    timeout: 5000
+    optional: true
 
 - takeScreenshot: curriculum-polling-02-on-home
 

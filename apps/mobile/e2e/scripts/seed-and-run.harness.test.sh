@@ -240,6 +240,34 @@ else
 fi
 
 echo ""
+echo "─── seed-and-run.sh wiring (regression guard) ─────────────────────────"
+
+# These guard against the helpers being deleted from seed-and-run.sh and the
+# inline copies above still passing — keeping the test green while the runtime
+# is silently broken. We check that the real script defines each function AND
+# calls them after the sign-in-screen marker.
+SEED_RUN_SH="${SCRIPT_DIR}/seed-and-run.sh"
+
+for fn in emulator_console_cmd apply_network_speed apply_network_delay schedule_network_kill slow_net_restore; do
+  if grep -Eq "^${fn}\\(\\)" "$SEED_RUN_SH"; then
+    _tpass "seed-and-run.sh defines ${fn}()"
+  else
+    _tfail "seed-and-run.sh missing function ${fn}() — helpers must live in the real script, not just this test"
+  fi
+done
+
+# Each of the three apply/schedule helpers must be invoked in the script, not
+# just defined. Without this guard a refactor that removes the call sites would
+# leave the env vars inert.
+for fn in apply_network_speed apply_network_delay schedule_network_kill; do
+  if grep -Eq "^[[:space:]]*${fn}\$" "$SEED_RUN_SH"; then
+    _tpass "seed-and-run.sh invokes ${fn} before maestro test"
+  else
+    _tfail "seed-and-run.sh defines ${fn} but never calls it — NETWORK_* env vars would be inert"
+  fi
+done
+
+echo ""
 echo "─── Summary ────────────────────────────────────────────────────────────"
 echo "  PASS: $PASS"
 echo "  FAIL: $FAIL"

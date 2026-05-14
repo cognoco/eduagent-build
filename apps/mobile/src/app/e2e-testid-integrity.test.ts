@@ -86,13 +86,9 @@ const KNOWN_DRIFT = new Set([
   // learner-screen and parent-home-screen — safe to leave in place, but the
   // Maestro flows can drop these branches in a follow-up cleanup.
   'dashboard-scroll',
-  // WIP flows (home-loading-timeout, library-loading-timeout,
-  // first-curriculum-polling-timeout, sse-reconnect-banner) use placeholder
-  // sign-in IDs that don't match source yet. Fix by updating those flows to
-  // use sign-in-email / sign-in-password / sign-in-button.
-  'email-input',
-  'password-input',
-  'sign-in-submit-button',
+  // DRAFT slow-net flows (first-curriculum-polling-timeout, sse-reconnect-banner)
+  // use this sentinel for testIDs that need to be added to source code before
+  // the flow can run. Each flow's header lists the prerequisite work.
   '<PLACEHOLDER_TESTID>',
 ]);
 
