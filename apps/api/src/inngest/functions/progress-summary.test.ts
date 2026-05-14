@@ -22,39 +22,71 @@ jest.mock('@eduagent/database', () => ({
   profiles: { id: 'profiles.id' },
 }));
 
-jest.mock('../helpers' /* gc1-allow: controls step DB boundary */, () => ({
-  getStepDatabase: () => mockGetStepDatabase(),
-}));
+jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../helpers',
+  ) as typeof import('../helpers');
+  return {
+    ...actual,
+    getStepDatabase: () => mockGetStepDatabase(),
+  };
+});
 
-jest.mock('../client' /* gc1-allow: capture registered handler */, () => ({
-  inngest: {
-    createFunction: jest.fn((_opts, _trigger, fn) =>
-      Object.assign(fn, { fn, opts: _opts, trigger: _trigger }),
-    ),
+jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual('../client') as typeof import('../client');
+  return {
+    ...actual,
+    inngest: {
+      createFunction: jest.fn((_opts, _trigger, fn) =>
+        Object.assign(fn, { fn, opts: _opts, trigger: _trigger }),
+      ),
+    },
+  };
+});
+
+jest.mock(
+  '../../services/snapshot-aggregation' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/snapshot-aggregation',
+    ) as typeof import('../../services/snapshot-aggregation');
+    return {
+      ...actual,
+      buildKnowledgeInventory: (...args: unknown[]) =>
+        mockBuildKnowledgeInventory(...args),
+    };
   },
-}));
+);
 
-// prettier-ignore
-jest.mock(/* gc1-allow: isolate orchestration */ '../../services/snapshot-aggregation', () => ({
-  buildKnowledgeInventory: (...args: unknown[]) =>
-    mockBuildKnowledgeInventory(...args),
-}));
+jest.mock(
+  '../../services/progress-summary' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/progress-summary',
+    ) as typeof import('../../services/progress-summary');
+    return {
+      ...actual,
+      deterministicProgressSummaryFallback: (childName: string) =>
+        `Fallback summary for ${childName}.`,
+      findLatestCompletedLearningSession: (...args: unknown[]) =>
+        mockFindLatestCompletedLearningSession(...args),
+      generateProgressSummary: (...args: unknown[]) =>
+        mockGenerateProgressSummary(...args),
+      upsertProgressSummary: (...args: unknown[]) =>
+        mockUpsertProgressSummary(...args),
+    };
+  },
+);
 
-// prettier-ignore
-jest.mock(/* gc1-allow: deterministic branch control */ '../../services/progress-summary', () => ({
-  deterministicProgressSummaryFallback: (childName: string) =>
-    `Fallback summary for ${childName}.`,
-  findLatestCompletedLearningSession: (...args: unknown[]) =>
-    mockFindLatestCompletedLearningSession(...args),
-  generateProgressSummary: (...args: unknown[]) =>
-    mockGenerateProgressSummary(...args),
-  upsertProgressSummary: (...args: unknown[]) =>
-    mockUpsertProgressSummary(...args),
-}));
-
-jest.mock('../../services/sentry' /* gc1-allow: assert capture */, () => ({
-  captureException: (...args: unknown[]) => mockCaptureException(...args),
-}));
+jest.mock('../../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../../services/sentry',
+  ) as typeof import('../../services/sentry');
+  return {
+    ...actual,
+    captureException: (...args: unknown[]) => mockCaptureException(...args),
+  };
+});
 
 import { eq } from 'drizzle-orm';
 import { learningSessions } from '@eduagent/database';
