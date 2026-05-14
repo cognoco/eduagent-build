@@ -48,6 +48,11 @@ jest.mock(
   '../../../../lib/profile' /* gc1-allow: profile context requires app provider setup; this test controls the owned child profile only */,
   () => ({
     useProfile: () => ({
+      activeProfile: {
+        id: 'parent-001',
+        displayName: 'Parent',
+        isOwner: true,
+      },
       profiles: [
         {
           id: 'child-001',
@@ -71,6 +76,15 @@ jest.mock(
   () => ({
     useChildDetail: (...args: unknown[]) => mockUseChildDetail(...args),
     useChildSessions: (...args: unknown[]) => mockUseChildSessions(...args),
+  }),
+);
+
+const mockUseProfileSessions = jest.fn();
+
+jest.mock(
+  '../../../../hooks/use-progress' /* gc1-allow: recent-session list owns API query wiring; child-detail tests assert rendered navigation surface */,
+  () => ({
+    useProfileSessions: (...args: unknown[]) => mockUseProfileSessions(...args),
   }),
 );
 
@@ -108,7 +122,14 @@ function setupDefaultMocks() {
       currentStreak: 0,
       totalXp: 0,
       progress: null,
-      subjects: [],
+      subjects: [
+        {
+          subjectId: '11111111-1111-7111-8111-111111111111',
+          name: 'Mathematics',
+          retentionStatus: 'strong',
+          rawInput: 'fractions homework',
+        },
+      ],
     },
     isLoading: false,
     isError: false,
@@ -117,6 +138,24 @@ function setupDefaultMocks() {
 
   mockUseChildSessions.mockReturnValue({
     data: [],
+    isLoading: false,
+    isError: false,
+    refetch: jest.fn(),
+  });
+
+  mockUseProfileSessions.mockReturnValue({
+    data: [
+      {
+        sessionId: '22222222-2222-7222-8222-222222222222',
+        startedAt: '2026-05-13T12:00:00.000Z',
+        sessionType: 'learning',
+        durationSeconds: 600,
+        wallClockSeconds: 900,
+        displaySummary: null,
+        highlight: 'Used a number line to compare fractions.',
+        homeworkSummary: null,
+      },
+    ],
     isLoading: false,
     isError: false,
     refetch: jest.fn(),
@@ -222,7 +261,7 @@ describe('ChildDetailScreen — profile overview', () => {
     screen.getByTestId('child-profile-details');
   });
 
-  it('does not duplicate progress, reports, subjects, recent sessions, or consent sections', () => {
+  it('shows parent data surfaces for reports, subjects, raw input, and recent sessions', () => {
     mockUseChildDetail.mockReturnValue({
       data: {
         displayName: 'Emma',
@@ -240,7 +279,14 @@ describe('ChildDetailScreen — profile overview', () => {
           engagementTrend: 'stable',
           guidance: 'Keep going',
         },
-        subjects: [{ name: 'Math', retentionStatus: 'strong' }],
+        subjects: [
+          {
+            subjectId: '11111111-1111-7111-8111-111111111111',
+            name: 'Mathematics',
+            retentionStatus: 'strong',
+            rawInput: 'fractions homework',
+          },
+        ],
         weeklyHeadline: {
           label: 'Topics mastered',
           value: 5,
@@ -255,9 +301,32 @@ describe('ChildDetailScreen — profile overview', () => {
 
     render(<ChildDetailScreen />);
 
-    expect(screen.queryByTestId('child-weekly-headline-card')).toBeNull();
-    expect(screen.queryByTestId('child-reports-button')).toBeNull();
-    expect(screen.queryByTestId('growth-teaser')).toBeNull();
-    expect(screen.queryByTestId('consent-section')).toBeNull();
+    screen.getByTestId('child-reports-link');
+    screen.getByTestId('child-subjects-section');
+    screen.getByTestId('subject-card-11111111-1111-7111-8111-111111111111');
+    screen.getByTestId('subject-raw-input-Mathematics');
+    screen.getByTestId('session-card-22222222-2222-7222-8222-222222222222');
+  });
+
+  it('routes subject and report surfaces from child detail', () => {
+    render(<ChildDetailScreen />);
+
+    fireEvent.press(screen.getByTestId('child-reports-link'));
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/child/[profileId]/reports',
+      params: { profileId: 'child-001' },
+    });
+
+    fireEvent.press(
+      screen.getByTestId('subject-card-11111111-1111-7111-8111-111111111111'),
+    );
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/child/[profileId]/subjects/[subjectId]',
+      params: {
+        profileId: 'child-001',
+        subjectId: '11111111-1111-7111-8111-111111111111',
+        subjectName: 'Mathematics',
+      },
+    });
   });
 });

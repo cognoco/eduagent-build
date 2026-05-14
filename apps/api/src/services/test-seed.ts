@@ -397,6 +397,7 @@ async function createSubjectWithCurriculum(
   name: string,
   status: 'active' | 'paused' | 'archived' = 'active',
   topicCount = 3,
+  rawInput?: string,
 ): Promise<{
   subjectId: string;
   curriculumId: string;
@@ -409,6 +410,7 @@ async function createSubjectWithCurriculum(
     profileId,
     name,
     status,
+    rawInput,
   });
 
   const curriculumId = generateUUIDv7();
@@ -786,6 +788,9 @@ async function seedParentWithChildren(
     db,
     childProfileId,
     'Mathematics',
+    'active',
+    3,
+    'fractions homework',
   );
 
   // Link the session to the first curriculum topic so getChildSubjectTopics
@@ -871,7 +876,14 @@ async function seedParentMultiChild(
   });
 
   const { subjectId: subject1Id, topicIds: child1TopicIds } =
-    await createSubjectWithCurriculum(db, child1ProfileId, 'Mathematics');
+    await createSubjectWithCurriculum(
+      db,
+      child1ProfileId,
+      'Mathematics',
+      'active',
+      3,
+      'fractions homework',
+    );
   const child1TopicId = child1TopicIds[0];
   if (!child1TopicId) {
     throw new Error('Mathematics seed subject is missing a topic');
@@ -2434,7 +2446,7 @@ async function seedParentSessionWithRecap(
       'The learner approached algebra methodically and self-corrected on the second equation without prompting.',
     conversationPrompt:
       'Can you spot any connection between this and the last topic?',
-    engagementSignal: 'engaged',
+    engagementSignal: 'curious',
     status: 'accepted',
   });
 
