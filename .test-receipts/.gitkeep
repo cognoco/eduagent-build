@@ -1,0 +1,10 @@
+# Test verification receipts live here.
+#
+# Each scope writes one JSON file (e.g., mobile.json). Pre-push hook reads
+# these and validates that every changed test file in the branch has a
+# matching content hash recorded — proof the suite actually ran against
+# the version being pushed. Receipts ARE tracked in git so reviewers can
+# see which suites the author verified before opening the PR.
+#
+# Generate with: bash scripts/record-test-receipt.sh <scope>
+# Validate with: bash scripts/verify-test-receipts.sh
