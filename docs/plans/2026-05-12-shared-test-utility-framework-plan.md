@@ -224,11 +224,13 @@ pnpm exec jest -c apps/mobile/jest.config.cjs --runTestsByPath "apps/mobile/src/
 
 Tasks:
 
-- **Done for the current LLM guard:** Replace shell-based `git ls-files` discovery with sandbox-safe Node filesystem enumeration.
-- Add a general integration mock guard:
-  - fail on new internal mocks in `*.integration.test.ts`
-  - allow only explicit external/native/transport/observability boundaries
-  - require allowlist shrink when offenders are migrated
+- **Done:** Replace shell-based `git ls-files` discovery with sandbox-safe Node filesystem enumeration.
+- **Done 2026-05-14:** Generalize the integration mock guard beyond the LLM channel.
+  - Moved from `apps/api/src/services/llm/integration-mock-guard.test.ts` to `apps/api/src/test-utils/integration-mock-guard.test.ts` to reflect general scope.
+  - Scans every `*.integration.test.ts` in `apps/api` and `tests/integration`.
+  - Allowlist is intentionally narrow (`services/sentry`, `services/stripe`); `KNOWN_OFFENDERS` is empty.
+  - Self-test fixtures cover `./llm`, `../../services/notifications`, `../../services/llm/router`, `../../inngest/client`, `@eduagent/database`, and confirm `services/sentry` / `services/stripe` are not flagged.
+  - Forward-only: `KNOWN_OFFENDERS` is a shrinking punch list, never a permanent carve-out.
 - **Done:** Add a generated raw CSV inventory:
   - file
   - line
@@ -250,10 +252,10 @@ Verification:
 
 ```powershell
 $env:NX_DAEMON='false'; $env:NX_ISOLATE_PLUGINS='false'
-pnpm exec jest -c apps/api/jest.config.cjs apps/api/src/services/llm/integration-mock-guard.test.ts --runInBand --no-coverage
+pnpm exec jest -c apps/api/jest.config.cjs apps/api/src/test-utils/integration-mock-guard.test.ts --runInBand --no-coverage
 ```
 
-Current status: `apps/api/src/services/llm/integration-mock-guard.test.ts` no longer shells through `cmd.exe`; it scans `apps/api` and `tests/integration` with Node filesystem APIs and passes in the Windows sandbox. The raw CSV inventory now lives at `docs/plans/2026-05-12-internal-mock-cleanup-inventory.csv` and can be regenerated with `node --no-warnings scripts/generate-internal-mock-cleanup-inventory.ts`. Remaining Phase 4 work is to generalize the guard beyond LLM mocks.
+Current status: the guard lives at `apps/api/src/test-utils/integration-mock-guard.test.ts`, scans `apps/api` and `tests/integration` with Node filesystem APIs, allowlists only `services/sentry` and `services/stripe`, and the `KNOWN_OFFENDERS` set is empty. The raw CSV inventory lives at `docs/plans/2026-05-12-internal-mock-cleanup-inventory.csv` and can be regenerated with `pnpm exec tsx scripts/generate-internal-mock-cleanup-inventory.ts`. Phase 4 is complete.
 
 ## Implementation Rules
 
