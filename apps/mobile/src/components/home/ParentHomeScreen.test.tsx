@@ -70,10 +70,22 @@ jest.mock(
   }),
 );
 
+type BannerProps = {
+  childrenInGracePeriod: Array<{
+    profileId: string;
+    displayName: string;
+    respondedAt: string;
+  }>;
+};
+let capturedBannerProps: BannerProps | null = null;
+
 jest.mock(
   '../family/WithdrawalCountdownBanner' /* gc1-allow: depends on its own hook tree — isolated here to keep test focused */,
   () => ({
-    WithdrawalCountdownBanner: () => null,
+    WithdrawalCountdownBanner: (props: BannerProps) => {
+      capturedBannerProps = props;
+      return null;
+    },
   }),
 );
 
@@ -148,6 +160,7 @@ describe('ParentHomeScreen', () => {
     jest.clearAllMocks();
     mockLinkedChildren = [];
     mockDashboardData = undefined;
+    capturedBannerProps = null;
   });
 
   it('renders greeting with profile first name', () => {
@@ -387,5 +400,50 @@ describe('ParentHomeScreen', () => {
 
     screen.getByTestId('nudge-action-sheet-close');
     expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('derives childrenInGracePeriod from dashboard and passes it to WithdrawalCountdownBanner', () => {
+    const respondedAt = new Date(
+      Date.now() - 2 * 24 * 60 * 60 * 1000,
+    ).toISOString();
+    mockDashboardData = {
+      children: [
+        {
+          profileId: 'child-a',
+          displayName: 'Emma',
+          consentStatus: 'WITHDRAWN',
+          respondedAt,
+          summary: '',
+          sessionsThisWeek: 0,
+          sessionsLastWeek: 0,
+          totalTimeThisWeek: 0,
+          totalTimeLastWeek: 0,
+          exchangesThisWeek: 0,
+          exchangesLastWeek: 0,
+          trend: 'stable',
+          subjects: [],
+          guidedVsImmediateRatio: 0,
+          retentionTrend: 'stable',
+          totalSessions: 0,
+          currentlyWorkingOn: [],
+          progress: null,
+          currentStreak: 0,
+          longestStreak: 0,
+          totalXp: 0,
+        },
+      ],
+      pendingNotices: [],
+      demoMode: false,
+    };
+
+    render(<ParentHomeScreen activeProfile={makeProfile()} />);
+
+    expect(capturedBannerProps).not.toBeNull();
+    expect(capturedBannerProps?.childrenInGracePeriod).toHaveLength(1);
+    expect(capturedBannerProps?.childrenInGracePeriod[0]).toMatchObject({
+      profileId: 'child-a',
+      displayName: 'Emma',
+      respondedAt,
+    });
   });
 });

@@ -1,5 +1,4 @@
 import { render, screen } from '@testing-library/react-native';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { EarlyAdopterCard } from './EarlyAdopterCard';
 
 jest.mock('../../lib/profile', () => ({
@@ -34,28 +33,9 @@ jest.mock('@expo/vector-icons', () => {
 });
 
 describe('EarlyAdopterCard', () => {
-  let testQueryClient: QueryClient;
-
-  function renderCard() {
-    return render(<EarlyAdopterCard />, {
-      wrapper: ({ children }) => (
-        <QueryClientProvider client={testQueryClient}>
-          {children}
-        </QueryClientProvider>
-      ),
-    });
+  function renderCard(totalSessions = 2) {
+    return render(<EarlyAdopterCard totalSessions={totalSessions} />);
   }
-
-  beforeEach(() => {
-    testQueryClient = new QueryClient({
-      defaultOptions: { queries: { retry: false, gcTime: 0 } },
-    });
-    // Pre-populate the cache with the data the component reads via getQueryData.
-    // Profile ID 'profile-1' matches the useProfile mock above.
-    testQueryClient.setQueryData(['progress', 'inventory', 'profile-1'], {
-      global: { totalSessions: 2 },
-    });
-  });
 
   it('renders the card when not dismissed and under session cap', async () => {
     renderCard();
@@ -69,6 +49,11 @@ describe('EarlyAdopterCard', () => {
       await screen.findByTestId('early-adopter-feedback-cta'),
     ).toBeTruthy();
     expect(await screen.findByTestId('early-adopter-dismiss')).toBeTruthy();
+  });
+
+  it('renders nothing when totalSessions meets the cap', () => {
+    const { queryByTestId } = renderCard(5);
+    expect(queryByTestId('early-adopter-card')).toBeNull();
   });
 
   // [a11y sweep] Break tests: decorative icons must be hidden from screen
