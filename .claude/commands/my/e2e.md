@@ -1,3 +1,5 @@
+<!-- Mirror: .agents/skills/e2e/SKILL.md — keep in sync -->
+
 # E2E Test Run — Mobile (Maestro on Android dev-client)
 
 For background, conventions, and the full troubleshooting matrix, READ
@@ -6,8 +8,22 @@ For background, conventions, and the full troubleshooting matrix, READ
 ## Arguments
 
 $ARGUMENTS — Optional: flow file path relative to repo root (e.g.,
-`apps/mobile/e2e/flows/quick-check.yaml`). If omitted, runs `quick-check.yaml`
-as a smoke test against current UI state.
+`apps/mobile/e2e/flows/app-launch-devclient.yaml`). If omitted, runs
+`app-launch-devclient.yaml` as a smoke test against current UI state.
+
+## OS detection
+
+Before running any commands, detect the platform:
+
+```bash
+uname -s
+```
+
+- `Darwin` → macOS
+- `Linux` → Linux
+- `MINGW*` / `MSYS*` → Windows (MSYS/Git Bash)
+
+Use this to select the correct command variants below.
 
 ## Preconditions to check (run these first; fix any failure before continuing)
 
@@ -29,29 +45,62 @@ as a smoke test against current UI state.
    curl -s http://localhost:8081/status   # expect: packager-status:running
    ```
    If absent, start in background (this is OK to do unprompted). Run from
-   the repo root — `apps/mobile` is a relative path so the snippet works on
-   any contributor's machine:
+   the repo root:
    ```bash
-   cd apps/mobile
-   pnpm exec expo start --port 8081 --dev-client
+   cd apps/mobile && pnpm exec expo start --port 8081 --dev-client
    ```
    (Run in background; wait until `/status` responds.)
 
 4. Working Maestro binary present:
+
+   **macOS / Linux:**
+   ```bash
+   maestro --version
+   ```
+
+   **Windows (MSYS):**
    ```bash
    TEMP="C:/tools/maestro/tmp" TMP="C:/tools/maestro/tmp" /c/tools/maestro/bin/maestro --version
    ```
-   Expect `2.4.0` or higher. If it errors with "Java 17 or higher is required",
-   you're hitting the broken `~/.maestro/bin/` binary — the path needs to be
-   the FULL `/c/tools/maestro/bin/maestro` (see runbook troubleshooting).
+
+   Expect `2.4.0` or higher. On Windows, if Java/version errors mention
+   `~/.maestro/bin/`, use the full `/c/tools/maestro/bin/maestro` path and
+   set TEMP/TMP (see runbook § Windows-only troubleshooting).
 
 ## Run the flow
 
-Default — `quick-check.yaml` against current UI:
+### macOS / Linux
+
+Default — `app-launch-devclient.yaml` against current UI:
+
+```bash
+METRO_URL=http://10.0.2.2:8081 \
+  bash apps/mobile/e2e/scripts/seed-and-run.sh --no-seed \
+    apps/mobile/e2e/flows/app-launch-devclient.yaml
+```
+
+With $ARGUMENTS:
+
+```bash
+METRO_URL=http://10.0.2.2:8081 \
+  bash apps/mobile/e2e/scripts/seed-and-run.sh --no-seed $ARGUMENTS
+```
+
+Seeded flows (require Doppler):
+
+```bash
+doppler run -c stg -- bash apps/mobile/e2e/scripts/seed-and-run.sh \
+  <scenario> $ARGUMENTS
+```
+
+### Windows (MSYS)
+
+Default:
 
 ```bash
 METRO_URL=http://10.0.2.2:8081 TEMP="C:/tools/maestro/tmp" TMP="C:/tools/maestro/tmp" \
-  bash apps/mobile/e2e/scripts/seed-and-run.sh --no-seed apps/mobile/e2e/flows/quick-check.yaml
+  bash apps/mobile/e2e/scripts/seed-and-run.sh --no-seed \
+    apps/mobile/e2e/flows/app-launch-devclient.yaml
 ```
 
 With $ARGUMENTS:
@@ -61,7 +110,7 @@ METRO_URL=http://10.0.2.2:8081 TEMP="C:/tools/maestro/tmp" TMP="C:/tools/maestro
   bash apps/mobile/e2e/scripts/seed-and-run.sh --no-seed $ARGUMENTS
 ```
 
-For seeded flows (require API + Doppler):
+Seeded flows:
 
 ```bash
 C:/Tools/doppler/doppler.exe run -c stg -- bash apps/mobile/e2e/scripts/seed-and-run.sh \
@@ -80,11 +129,11 @@ C:/Tools/doppler/doppler.exe run -c stg -- bash apps/mobile/e2e/scripts/seed-and
 
 ## Known issues to mention if relevant
 
-- `pnpm test:e2e:smoke` is currently broken (PATH points at the Unicode-path
-  broken Maestro binary). A Notion issue tracks the fix. Do not suggest as a
-  workaround until fixed.
+- `pnpm test:e2e:smoke` is currently broken on Windows (PATH resolves to the
+  Unicode-path broken Maestro binary). Use `seed-and-run.sh` directly.
 - `quick-check.yaml` will reliably fail the "Sign up" assertion (UI drift,
-  not infra). 6/7 pass means infra is healthy.
+  not infra). Use `app-launch-devclient.yaml` instead — same checks minus
+  the broken assertion.
 - "Maestro driver did not start up in time" almost always means UIAutomator
   lock from a non-graceful kill of a previous Maestro run. Recovery: `adb reboot`.
 
@@ -92,9 +141,8 @@ C:/Tools/doppler/doppler.exe run -c stg -- bash apps/mobile/e2e/scripts/seed-and
 
 - Use `KEYCODE_BACK` from the dev launcher's main screen (exits the app).
   From a dev menu *overlay*, BACK dismisses the overlay correctly.
-- Kill Maestro via Windows `taskkill` mid-flow — leaves UIAutomator lock
-  stuck. Use `Ctrl+C` in the terminal.
-- Use bash `taskkill /PID` to stop Metro — MSYS mangles `/PID` to a path.
-  Use PowerShell `Stop-Process -Id <pid> -Force`.
-- Use bash `adb shell <unix-path>` without `MSYS_NO_PATHCONV=1` — paths get
-  mangled.
+- Kill Maestro mid-flow via `taskkill` (Windows) or `kill -9` (macOS/Linux)
+  — leaves UIAutomator lock stuck. Use `Ctrl+C` in the terminal.
+- On Windows: use bash `taskkill /PID` to stop Metro — MSYS mangles `/PID`
+  to a path. Use PowerShell `Stop-Process -Id <pid> -Force`.
+- On Windows: use `adb shell <unix-path>` without `MSYS_NO_PATHCONV=1`.
