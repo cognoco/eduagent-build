@@ -1,43 +1,97 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import {
+  createRoutedMockFetch,
+  createScreenWrapper,
+  cleanupScreen,
+} from '../../../test-utils/screen-render-harness';
 import { AccordionTopicList } from './AccordionTopicList';
 
+// ─── Transport boundary ───────────────────────────────────────────────────────
+// Mock only the fetch layer — real hooks + QueryClient execute as production code.
+
+const mockFetch = createRoutedMockFetch();
+
+jest.mock('../../lib/api-client', () => // gc1-allow: transport-boundary — mocks fetch layer only, real hooks execute
+  require('../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch),
+);
+
+// ─── expo-router  (native-boundary) ──────────────────────────────────────────
+
 const mockPush = jest.fn();
-const mockUseChildSubjectTopics = jest.fn();
 let mockSegments: string[] = ['(app)', 'child', '[profileId]'];
 
-jest.mock('expo-router', () => ({
+jest.mock('expo-router', () => ({ // gc1-allow: native-boundary — expo-router requires native navigation stack unavailable in Jest
   useRouter: () => ({ push: mockPush }),
   useSegments: () => mockSegments,
 }));
 
-jest.mock('../../hooks/use-dashboard', () => ({
-  useChildSubjectTopics: (...args: unknown[]) =>
-    mockUseChildSubjectTopics(...args),
-}));
+// ─── Shared topic fixtures ────────────────────────────────────────────────────
 
-jest.mock('./RetentionSignal', () => {
-  const { Text } = require('react-native');
+const TOPIC_FRACTIONS = {
+  topicId: 'topic-1',
+  title: 'Fractions',
+  description: 'Desc',
+  completionStatus: 'in_progress',
+  retentionStatus: 'fading',
+  struggleStatus: 'normal',
+  masteryScore: 0.4,
+  summaryExcerpt: null,
+  xpStatus: 'pending',
+  totalSessions: 3,
+};
 
-  return {
-    RetentionSignal: ({ status }: { status: string }) => (
-      <Text testID={`retention-signal-${status}`}>{status}</Text>
-    ),
-  };
-});
+const TOPIC_GEOMETRY = {
+  topicId: 'topic-2',
+  title: 'Geometry',
+  description: 'Desc',
+  completionStatus: 'completed',
+  retentionStatus: null,
+  struggleStatus: 'normal',
+  masteryScore: 0.8,
+  summaryExcerpt: null,
+  xpStatus: 'verified',
+  totalSessions: 2,
+};
+
+const TOPIC_DECIMALS = {
+  topicId: 'topic-3',
+  title: 'Decimals',
+  description: 'Desc',
+  completionStatus: 'completed',
+  retentionStatus: null,
+  struggleStatus: 'normal',
+  masteryScore: 0.7,
+  summaryExcerpt: null,
+  xpStatus: 'pending',
+  totalSessions: 1,
+};
+
+const TOPIC_ALGEBRA = {
+  topicId: 'topic-4',
+  title: 'Algebra',
+  description: 'Desc',
+  completionStatus: 'completed',
+  retentionStatus: 'weak',
+  struggleStatus: 'normal',
+  masteryScore: 0.7,
+  summaryExcerpt: null,
+  xpStatus: 'decayed',
+  totalSessions: 4,
+};
+
+// ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe('AccordionTopicList', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockSegments = ['(app)', 'child', '[profileId]'];
-    mockUseChildSubjectTopics.mockReturnValue({
-      data: [],
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
+    mockFetch.setRoute('/dashboard/children/child-1/subjects/subject-1', {
+      topics: [],
     });
   });
 
   it('does not render content while collapsed and keeps the query disabled', () => {
+    const { wrapper, queryClient } = createScreenWrapper();
     render(
       <AccordionTopicList
         childProfileId="child-1"
@@ -45,23 +99,26 @@ describe('AccordionTopicList', () => {
         subjectName="Mathematics"
         expanded={false}
       />,
+      { wrapper },
     );
 
     expect(screen.queryByText('No topics yet')).toBeNull();
-    expect(mockUseChildSubjectTopics).toHaveBeenCalledWith(
-      undefined,
-      undefined,
+    // No fetch should fire — the query is disabled when expanded=false (both IDs are undefined).
+    expect(mockFetch).not.toHaveBeenCalledWith(
+      expect.stringContaining('/dashboard/children'),
+      expect.anything(),
     );
+
+    cleanupScreen(queryClient);
   });
 
-  it('renders skeleton rows while loading after expansion', () => {
-    mockUseChildSubjectTopics.mockReturnValue({
-      data: undefined,
-      isLoading: true,
-      isError: false,
-      refetch: jest.fn(),
-    });
+  it('renders skeleton rows while loading after expansion', async () => {
+    mockFetch.setRoute(
+      '/dashboard/children/child-1/subjects/subject-1',
+      () => new Promise(() => {}), // never resolves — keeps isLoading=true
+    );
 
+    const { wrapper, queryClient } = createScreenWrapper();
     render(
       <AccordionTopicList
         childProfileId="child-1"
@@ -69,24 +126,20 @@ describe('AccordionTopicList', () => {
         subjectName="Mathematics"
         expanded
       />,
+      { wrapper },
     );
 
     expect(screen.getAllByTestId('accordion-topic-skeleton')).toHaveLength(3);
-    expect(mockUseChildSubjectTopics).toHaveBeenCalledWith(
-      'child-1',
-      'subject-1',
-    );
+    await cleanupScreen(queryClient);
   });
 
-  it('shows a retry state when topic loading fails', () => {
-    const refetch = jest.fn();
-    mockUseChildSubjectTopics.mockReturnValue({
-      data: undefined,
-      isLoading: false,
-      isError: true,
-      refetch,
-    });
+  it('shows a retry state when topic loading fails', async () => {
+    mockFetch.setRoute(
+      '/dashboard/children/child-1/subjects/subject-1',
+      new Response(JSON.stringify({ error: 'boom' }), { status: 500 }),
+    );
 
+    const { wrapper, queryClient } = createScreenWrapper();
     render(
       <AccordionTopicList
         childProfileId="child-1"
@@ -94,75 +147,37 @@ describe('AccordionTopicList', () => {
         subjectName="Mathematics"
         expanded
       />,
+      { wrapper },
     );
 
-    fireEvent.press(screen.getByTestId('accordion-topics-retry'));
+    await waitFor(() =>
+      screen.getByTestId('accordion-topics-retry'),
+    );
 
     expect(
       screen.getByText(
         'Could not load topics. Tap to retry, or close the subject card to dismiss.',
       ),
     ).toBeTruthy();
-    expect(refetch).toHaveBeenCalled();
+
+    // Pressing retry fires a refetch — the mock fetch is called again.
+    fireEvent.press(screen.getByTestId('accordion-topics-retry'));
+    await waitFor(() =>
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('/dashboard/children/child-1/subjects/subject-1'),
+        expect.anything(),
+      ),
+    );
+
+    cleanupScreen(queryClient);
   });
 
-  it('renders topic labels and navigates to topic details', () => {
-    mockUseChildSubjectTopics.mockReturnValue({
-      data: [
-        {
-          topicId: 'topic-1',
-          title: 'Fractions',
-          description: 'Desc',
-          completionStatus: 'in_progress',
-          retentionStatus: 'fading',
-          struggleStatus: 'normal',
-          masteryScore: 0.4,
-          summaryExcerpt: null,
-          xpStatus: 'pending',
-          totalSessions: 3,
-        },
-        {
-          topicId: 'topic-2',
-          title: 'Geometry',
-          description: 'Desc',
-          completionStatus: 'completed',
-          retentionStatus: null,
-          struggleStatus: 'normal',
-          masteryScore: 0.8,
-          summaryExcerpt: null,
-          xpStatus: 'verified',
-          totalSessions: 2,
-        },
-        {
-          topicId: 'topic-3',
-          title: 'Decimals',
-          description: 'Desc',
-          completionStatus: 'completed',
-          retentionStatus: null,
-          struggleStatus: 'normal',
-          masteryScore: 0.7,
-          summaryExcerpt: null,
-          xpStatus: 'pending',
-          totalSessions: 1,
-        },
-        {
-          topicId: 'topic-4',
-          title: 'Algebra',
-          description: 'Desc',
-          completionStatus: 'completed',
-          retentionStatus: 'weak',
-          struggleStatus: 'normal',
-          masteryScore: 0.7,
-          summaryExcerpt: null,
-          xpStatus: 'decayed',
-          totalSessions: 4,
-        },
-      ],
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
+  it('renders topic labels and navigates to topic details', async () => {
+    mockFetch.setRoute('/dashboard/children/child-1/subjects/subject-1', {
+      topics: [TOPIC_FRACTIONS, TOPIC_GEOMETRY, TOPIC_DECIMALS, TOPIC_ALGEBRA],
     });
 
+    const { wrapper, queryClient } = createScreenWrapper();
     render(
       <AccordionTopicList
         childProfileId="child-1"
@@ -170,7 +185,10 @@ describe('AccordionTopicList', () => {
         subjectName="Mathematics"
         expanded
       />,
+      { wrapper },
     );
+
+    await waitFor(() => screen.getByText('Fractions'));
 
     screen.getByText('Started');
     screen.getByText('Mastered');
@@ -192,16 +210,16 @@ describe('AccordionTopicList', () => {
         }),
       }),
     );
+
+    cleanupScreen(queryClient);
   });
 
-  it('renders an empty state when no topics are available', () => {
-    mockUseChildSubjectTopics.mockReturnValue({
-      data: [],
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
+  it('renders an empty state when no topics are available', async () => {
+    mockFetch.setRoute('/dashboard/children/child-1/subjects/subject-1', {
+      topics: [],
     });
 
+    const { wrapper, queryClient } = createScreenWrapper();
     render(
       <AccordionTopicList
         childProfileId="child-1"
@@ -209,19 +227,19 @@ describe('AccordionTopicList', () => {
         subjectName="Mathematics"
         expanded
       />,
+      { wrapper },
     );
 
-    screen.getByText('No topics yet');
+    await waitFor(() => screen.getByText('No topics yet'));
+    cleanupScreen(queryClient);
   });
 
-  it('[UX-DE-M5] empty state shows Browse topics CTA that navigates to library', () => {
-    mockUseChildSubjectTopics.mockReturnValue({
-      data: [],
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
+  it('[UX-DE-M5] empty state shows Browse topics CTA that navigates to library', async () => {
+    mockFetch.setRoute('/dashboard/children/child-1/subjects/subject-1', {
+      topics: [],
     });
 
+    const { wrapper, queryClient } = createScreenWrapper();
     render(
       <AccordionTopicList
         childProfileId="child-1"
@@ -229,20 +247,22 @@ describe('AccordionTopicList', () => {
         subjectName="Mathematics"
         expanded
       />,
+      { wrapper },
     );
 
-    screen.getByTestId('accordion-topics-empty');
+    await waitFor(() => screen.getByTestId('accordion-topics-empty'));
     screen.getByTestId('accordion-topics-browse');
 
     fireEvent.press(screen.getByTestId('accordion-topics-browse'));
 
     expect(mockPush).toHaveBeenCalledWith('/(app)/library');
+    cleanupScreen(queryClient);
   });
 
-  it('[MOBILE-1 F2] pushes parent chain when rendered outside the child stack', () => {
+  it('[MOBILE-1 F2] pushes parent chain when rendered outside the child stack', async () => {
     mockSegments = ['(app)', 'progress'];
-    mockUseChildSubjectTopics.mockReturnValue({
-      data: [
+    mockFetch.setRoute('/dashboard/children/child-1/subjects/subject-1', {
+      topics: [
         {
           topicId: 'topic-1',
           title: 'Fractions',
@@ -256,11 +276,9 @@ describe('AccordionTopicList', () => {
           totalSessions: 2,
         },
       ],
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
     });
 
+    const { wrapper, queryClient } = createScreenWrapper();
     render(
       <AccordionTopicList
         childProfileId="child-1"
@@ -268,8 +286,10 @@ describe('AccordionTopicList', () => {
         subjectName="Mathematics"
         expanded
       />,
+      { wrapper },
     );
 
+    await waitFor(() => screen.getByTestId('accordion-topic-topic-1'));
     fireEvent.press(screen.getByTestId('accordion-topic-topic-1'));
 
     expect(mockPush).toHaveBeenCalledTimes(2);
@@ -287,12 +307,14 @@ describe('AccordionTopicList', () => {
         }),
       }),
     );
+
+    cleanupScreen(queryClient);
   });
 
-  it('[MOBILE-1 F2] does not double-push when already inside the child stack', () => {
+  it('[MOBILE-1 F2] does not double-push when already inside the child stack', async () => {
     mockSegments = ['(app)', 'child', '[profileId]'];
-    mockUseChildSubjectTopics.mockReturnValue({
-      data: [
+    mockFetch.setRoute('/dashboard/children/child-1/subjects/subject-1', {
+      topics: [
         {
           topicId: 'topic-1',
           title: 'Fractions',
@@ -306,11 +328,9 @@ describe('AccordionTopicList', () => {
           totalSessions: 2,
         },
       ],
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
     });
 
+    const { wrapper, queryClient } = createScreenWrapper();
     render(
       <AccordionTopicList
         childProfileId="child-1"
@@ -318,8 +338,10 @@ describe('AccordionTopicList', () => {
         subjectName="Mathematics"
         expanded
       />,
+      { wrapper },
     );
 
+    await waitFor(() => screen.getByTestId('accordion-topic-topic-1'));
     fireEvent.press(screen.getByTestId('accordion-topic-topic-1'));
 
     expect(mockPush).toHaveBeenCalledTimes(1);
@@ -328,5 +350,7 @@ describe('AccordionTopicList', () => {
         pathname: '/(app)/child/[profileId]/topic/[topicId]',
       }),
     );
+
+    cleanupScreen(queryClient);
   });
 });

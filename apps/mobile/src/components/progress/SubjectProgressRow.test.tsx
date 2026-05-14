@@ -2,17 +2,17 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 import { SubjectProgressRow, hasSubjectActivity } from './SubjectProgressRow';
 import type { SubjectInventory } from '@eduagent/schemas';
 
-jest.mock(
-  './AccordionTopicList' /* gc1-allow: pre-existing mock carried through PR 7 rename */,
-  () => {
-    const { Text } = require('react-native');
-
-    return {
-      AccordionTopicList: ({ expanded }: { expanded: boolean }) =>
-        expanded ? <Text testID="mock-topic-list">Topics visible</Text> : null,
-    };
-  },
-);
+jest.mock('./AccordionTopicList', () => {
+  const actual = jest.requireActual<typeof import('./AccordionTopicList')>(
+    './AccordionTopicList',
+  );
+  const { Text } = require('react-native');
+  return {
+    ...actual,
+    AccordionTopicList: ({ expanded }: { expanded: boolean }) =>
+      expanded ? <Text testID="mock-topic-list">Topics visible</Text> : null,
+  };
+});
 
 function makeSubject(
   overrides: Partial<SubjectInventory> = {},

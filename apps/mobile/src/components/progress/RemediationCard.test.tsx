@@ -2,16 +2,6 @@ import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import type { RetentionStatus } from './RetentionSignal';
 import { RemediationCard } from './RemediationCard';
 
-jest.mock(
-  './RetentionSignal' /* gc1-allow: Ionicons (native vector-icon asset) + ThemeContext provider not available in JSDOM test env */,
-  () => ({
-    RetentionSignal: ({ status }: { status: string }) => {
-      const { View } = require('react-native');
-      return <View testID={`retention-signal-${status}`} />;
-    },
-  }),
-);
-
 const defaultProps = {
   retentionStatus: 'fading' as RetentionStatus,
   onReviewRetest: jest.fn(),
