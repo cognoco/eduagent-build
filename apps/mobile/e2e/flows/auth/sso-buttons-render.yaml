@@ -52,6 +52,12 @@ tags:
 
 # OpenAI: must be visible when openAIStrategy resolves. If this fails the APK
 # was built without EXPO_PUBLIC_CLERK_OPENAI_SSO_KEY — rebuild and rerun.
+- scrollUntilVisible:
+    element:
+      id: "openai-sso-button"
+    direction: UP
+    timeout: 5000
+
 - assertVisible:
     id: "openai-sso-button"
 

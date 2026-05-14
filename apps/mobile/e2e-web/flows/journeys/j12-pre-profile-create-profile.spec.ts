@@ -1,7 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { pressableClick } from '../../helpers/pressable';
 import { seedAndSignIn } from '../../helpers/seed-and-sign-in';
-import { pressableClick } from '../../helpers/pressable';
 
 test('J-12 new user → create profile → lands on learner home', async ({
   page,

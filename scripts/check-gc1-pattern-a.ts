@@ -20,7 +20,7 @@
 //   pnpm exec tsx scripts/check-gc1-pattern-a.ts
 // Exit codes: 0 clean, 1 violations.
 
-import { execSync } from 'node:child_process';
+import { execSync, spawnSync } from 'node:child_process';
 
 export type Violation = {
   file: string;
@@ -154,10 +154,21 @@ function runCli(): void {
     let diff: string;
     let staged: string;
     try {
-      diff = execSync(`git diff --cached --unified=0 -- "${f}"`, {
+      const diffResult = spawnSync(
+        'git',
+        ['diff', '--cached', '--unified=0', '--', f],
+        {
+          encoding: 'utf8',
+        },
+      );
+      const stagedResult = spawnSync('git', ['show', `:${f}`], {
         encoding: 'utf8',
       });
-      staged = execSync(`git show :"${f}"`, { encoding: 'utf8' });
+      if (diffResult.status !== 0 || stagedResult.status !== 0) {
+        continue;
+      }
+      diff = diffResult.stdout;
+      staged = stagedResult.stdout;
     } catch {
       continue;
     }

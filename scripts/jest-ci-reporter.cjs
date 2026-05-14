@@ -10,7 +10,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const ANSI = /\[[0-9;]*m/g;
+const ANSI = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, 'g');
 
 function stripAnsi(s) {
   return typeof s === 'string' ? s.replace(ANSI, '') : '';
@@ -58,7 +58,12 @@ function locateAssertion(failureMessage, rootDir) {
 
 // GitHub Actions multi-line annotation messages need newlines URL-encoded.
 function gaEscape(s) {
-  return String(s).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+  return String(s)
+    .replace(/%/g, '%25')
+    .replace(/\r/g, '%0D')
+    .replace(/\n/g, '%0A')
+    .replace(/:/g, '%3A')
+    .replace(/,/g, '%2C');
 }
 
 class CiReporter {
@@ -81,9 +86,8 @@ class CiReporter {
       this.failures.push(entry);
 
       // GitHub Actions inline annotation on the PR diff.
-      // eslint-disable-next-line no-console
       console.log(
-        `::error file=${entry.file},line=${entry.line},col=${entry.col},title=${gaEscape(title || 'Jest failure')}::${gaEscape(message)}`
+        `::error file=${gaEscape(entry.file)},line=${entry.line},col=${entry.col},title=${gaEscape(title || 'Jest failure')}::${gaEscape(message)}`
       );
     }
 
@@ -95,9 +99,8 @@ class CiReporter {
       const message = firstFailureLine(failureMessage);
       const entry = { file: loc.file, line: loc.line, col: loc.col, title: 'load error', message };
       this.failures.push(entry);
-      // eslint-disable-next-line no-console
       console.log(
-        `::error file=${entry.file},line=${entry.line},col=${entry.col},title=${gaEscape('Jest load error')}::${gaEscape(message)}`
+        `::error file=${gaEscape(entry.file)},line=${entry.line},col=${entry.col},title=${gaEscape('Jest load error')}::${gaEscape(message)}`
       );
     }
   }
@@ -115,7 +118,6 @@ class CiReporter {
       if (f.message) lines.push(`    ${f.message}`);
     }
     lines.push(sep + '\n');
-    // eslint-disable-next-line no-console
     console.log(lines.join('\n'));
 
     // Append a markdown summary to GitHub Actions step summary, if available.

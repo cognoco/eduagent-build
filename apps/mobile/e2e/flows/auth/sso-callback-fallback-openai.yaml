@@ -52,15 +52,15 @@ tags:
 # wasting the 25-second fallback timer before getting an actionable error.
 - takeScreenshot: sso-fallback-openai-02-before-sso-tap
 
-- assertVisible:
-    id: "openai-sso-button"
-
 # ── Step 3: Scroll OpenAI SSO button into view and tap it ──
 - scrollUntilVisible:
     element:
       id: "openai-sso-button"
     direction: UP
     timeout: 5000
+
+- assertVisible:
+    id: "openai-sso-button"
 
 - tapOn:
     id: "openai-sso-button"

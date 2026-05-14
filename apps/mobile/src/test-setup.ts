@@ -341,9 +341,19 @@ if (_savedFormData) {
 const { notifyManager } = require('@tanstack/react-query');
 const { act } = require('@testing-library/react-native');
 notifyManager.setScheduler((cb: () => void) => {
-  void act(() => {
+  const maybeActPromise = act(() => {
     cb();
   });
+  if (
+    maybeActPromise &&
+    typeof (maybeActPromise as Promise<void>).catch === 'function'
+  ) {
+    (maybeActPromise as Promise<void>).catch((err) => {
+      setTimeout(() => {
+        throw err;
+      }, 0);
+    });
+  }
 });
 
 // Note: TextInput native component stubs (AndroidTextInputNativeComponent,
