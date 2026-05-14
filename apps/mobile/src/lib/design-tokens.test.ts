@@ -42,6 +42,26 @@ describe('tokensToCssVars', () => {
     expect(cssVars['--color-background']).toBe(base.colors.background);
   });
 
+  it('maps reusable practice palette tokens to CSS variable keys', () => {
+    const base = tokens.light;
+    const cssVars = tokensToCssVars(base);
+
+    expect(cssVars['--color-practice-review-bg']).toBe(
+      base.colors.practiceReviewBg,
+    );
+    expect(cssVars['--color-practice-quiz']).toBe(base.colors.practiceQuiz);
+    expect(cssVars['--color-practice-dictation']).toBe(
+      base.colors.practiceDictation,
+    );
+    expect(cssVars['--color-practice-recite']).toBe(base.colors.practiceRecite);
+    expect(cssVars['--color-practice-history-border']).toBe(
+      base.colors.practiceHistoryBorder,
+    );
+    expect(cssVars['--color-practice-chip-bg']).toBe(
+      base.colors.practiceChipBg,
+    );
+  });
+
   it('includes radii and spacing', () => {
     const base = tokens.light;
     const cssVars = tokensToCssVars(base);

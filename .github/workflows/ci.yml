@@ -178,11 +178,22 @@ jobs:
       - name: scripts/* tests
         run: pnpm exec jest --config scripts/jest.config.cjs --no-coverage
 
-      # Prepend any command with "nx-cloud record --" to record its logs to Nx Cloud
-      # - run: pnpm exec nx-cloud record -- echo Hello World
-      # When you enable task distribution, run the e2e-ci task instead of e2e
-      # Note: Mobile build excluded - mobile:build requires EAS CLI which is handled by mobile-ci.yml
-      - run: pnpm exec nx run-many -t lint test typecheck && pnpm exec nx run-many -t build --exclude=@eduagent/mobile
+      # PR builds: only lint/test/typecheck/build projects affected by the diff.
+      # Push to main: full validation across all projects.
+      # Mobile build excluded in both — requires EAS CLI, handled by mobile-ci.yml.
+      - name: Lint, test, typecheck, build (PR — affected only)
+        if: github.event_name == 'pull_request'
+        env:
+          NX_BASE: origin/${{ github.base_ref }}
+        run: |
+          pnpm exec nx affected -t lint test typecheck --base=$NX_BASE --head=HEAD
+          pnpm exec nx affected -t build --base=$NX_BASE --head=HEAD --exclude=@eduagent/mobile
+
+      - name: Lint, test, typecheck, build (push — all)
+        if: github.event_name == 'push'
+        run: |
+          pnpm exec nx run-many -t lint test typecheck
+          pnpm exec nx run-many -t build --exclude=@eduagent/mobile
 
       # Run API integration tests against real PostgreSQL (only when API-relevant files changed)
       - name: API integration tests

@@ -933,6 +933,9 @@
     "loadError": {
       "message": "Unable to load your library. Please try again."
     },
+    "staleBanner": {
+      "message": "Showing your saved library. Tap to refresh."
+    },
     "empty": {
       "title": "Your library will grow as you learn",
       "message": "Start with homework help or learn something new. Books and topics will appear here afterward.",

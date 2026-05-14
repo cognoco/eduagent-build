@@ -168,6 +168,7 @@ describe('ParentHomeScreen', () => {
 
     screen.getByTestId('parent-home-check-child-child-a');
     screen.getByTestId('parent-home-check-child-child-b');
+    screen.getByTestId('parent-home-child-progress-child-a');
     screen.getByTestId('parent-home-weekly-report-child-a');
     screen.getByTestId('parent-home-weekly-report-child-b');
     screen.getByTestId('parent-home-send-nudge-child-a');
@@ -175,7 +176,7 @@ describe('ParentHomeScreen', () => {
     screen.getByText('Children');
   });
 
-  it('routes the child card header and progress action to child progress', async () => {
+  it('routes the child card header to the child profile detail screen', async () => {
     mockLinkedChildren = [CHILD_A];
 
     render(<ParentHomeScreen activeProfile={makeProfile()} />);
@@ -183,9 +184,16 @@ describe('ParentHomeScreen', () => {
 
     fireEvent.press(screen.getByTestId('parent-home-check-child-child-a'));
     expect(mockPush).toHaveBeenLastCalledWith({
-      pathname: '/(app)/progress',
+      pathname: '/(app)/child/[profileId]',
       params: { profileId: 'child-a' },
     });
+  });
+
+  it('routes the progress action to child progress', async () => {
+    mockLinkedChildren = [CHILD_A];
+
+    render(<ParentHomeScreen activeProfile={makeProfile()} />);
+    await waitForParentTransitionNotice();
 
     fireEvent.press(screen.getByTestId('parent-home-child-progress-child-a'));
     expect(mockPush).toHaveBeenLastCalledWith({

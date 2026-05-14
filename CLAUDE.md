@@ -197,6 +197,13 @@ pnpm eval:llm --live             # Tier 2: real LLM call + schema validation
 C:/Tools/doppler/doppler.exe run -c stg -- pnpm run test:e2e:web:smoke   # smoke only (~1-2 min)
 C:/Tools/doppler/doppler.exe run -c stg -- pnpm run test:e2e:web         # full suite
 # CLERK_TESTING_TOKEN is currently a placeholder — tests work without it but Clerk may rate-limit.
+
+# Change Class Checker — "you touched X, run Y"
+bash scripts/check-change-class.sh              # advisory: what to validate
+bash scripts/check-change-class.sh --run        # execute all validation
+bash scripts/check-change-class.sh --run --fast  # fast commands only
+bash scripts/check-change-class.sh --branch     # check full branch diff vs main
+# See docs/change-classes.md for the full reference table.
 ```
 
-Last updated: 2026-04-30
+Last updated: 2026-05-13

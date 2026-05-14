@@ -57,9 +57,9 @@ describe('SuggestionCard', () => {
         onPress={jest.fn()}
         testID="suggestion-forests"
         tint={{
-          name: 'emerald',
-          solid: '#047857',
-          soft: 'rgba(4,120,87,0.14)',
+          name: 'rose',
+          solid: '#db2777',
+          soft: 'rgba(219,39,119,0.14)',
         }}
       />,
     );
@@ -67,8 +67,8 @@ describe('SuggestionCard', () => {
     const card = screen.getByTestId('suggestion-forests');
     expect(card.props.style).toEqual(
       expect.objectContaining({
-        borderColor: '#047857',
-        backgroundColor: 'rgba(4,120,87,0.14)',
+        borderColor: '#db2777',
+        backgroundColor: 'rgba(219,39,119,0.14)',
       }),
     );
   });

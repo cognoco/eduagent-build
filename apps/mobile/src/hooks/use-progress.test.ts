@@ -22,6 +22,7 @@ import {
   useProfileWeeklyReports,
   useRefreshProgressSnapshot,
 } from './use-progress';
+import { queryKeys } from '../lib/query-keys';
 
 const mockFetch = jest.fn();
 
@@ -516,5 +517,77 @@ describe('invalidateProgressSnapshotQueries', () => {
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: ['dashboard'],
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Profile-switch cache isolation
+// ---------------------------------------------------------------------------
+
+describe('profile-switch cache isolation', () => {
+  it('useOverallProgress — profile A and B have different query keys', () => {
+    const keyA = queryKeys.progress.overview('profile-A');
+    const keyB = queryKeys.progress.overview('profile-B');
+    expect(keyA).not.toEqual(keyB);
+    // Confirm the values are what we expect
+    expect(keyA).toEqual(['progress', 'overview', 'profile-A']);
+    expect(keyB).toEqual(['progress', 'overview', 'profile-B']);
+  });
+
+  it('useSubjectProgress — same subject, different profiles produce different cache slots', () => {
+    const keyA = queryKeys.progress.subject('sub-1', 'profile-A');
+    const keyB = queryKeys.progress.subject('sub-1', 'profile-B');
+    expect(keyA).not.toEqual(keyB);
+  });
+
+  it('useProgressInventory — different profiles never share cache', () => {
+    const keyA = queryKeys.progress.inventory('profile-A');
+    const keyB = queryKeys.progress.inventory('profile-B');
+    expect(keyA).not.toEqual(keyB);
+    // Undefined profile must also be isolated
+    const keyUndef = queryKeys.progress.inventory(undefined);
+    expect(keyA).not.toEqual(keyUndef);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Parent-proxy isolation
+// ---------------------------------------------------------------------------
+
+describe('parent-proxy isolation', () => {
+  it('profileReports — same child, different parent viewers have different keys', () => {
+    const childId = 'child-profile-1';
+    const keyParentA = queryKeys.progress.profileReports(childId, 'parent-A');
+    const keyParentB = queryKeys.progress.profileReports(childId, 'parent-B');
+    expect(keyParentA).not.toEqual(keyParentB);
+    // The key includes both the target child profileId and the active viewer
+    expect(keyParentA).toEqual([
+      'progress',
+      'profile',
+      childId,
+      'reports',
+      'parent-A',
+    ]);
+    expect(keyParentB).toEqual([
+      'progress',
+      'profile',
+      childId,
+      'reports',
+      'parent-B',
+    ]);
+  });
+
+  it('profileSessions — same child, different parent viewers have different keys', () => {
+    const childId = 'child-profile-1';
+    const keyParentA = queryKeys.progress.profileSessions(childId, 'parent-A');
+    const keyParentB = queryKeys.progress.profileSessions(childId, 'parent-B');
+    expect(keyParentA).not.toEqual(keyParentB);
+    expect(keyParentA).toEqual([
+      'progress',
+      'profile',
+      childId,
+      'sessions',
+      'parent-A',
+    ]);
   });
 });

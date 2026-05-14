@@ -30,11 +30,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ClerkProvider, useClerk } from '@clerk/clerk-expo';
 import { tokenCache as nativeTokenCache } from '@clerk/clerk-expo/token-cache';
-import {
-  QueryCache,
-  QueryClient,
-  QueryClientProvider,
-} from '@tanstack/react-query';
+import { QueryCache, QueryClient } from '@tanstack/react-query';
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { useAuth } from '@clerk/clerk-expo';
 import { ThemeContext, useThemeColors, useTokenVars } from '../lib/theme';
 import { tokens } from '../lib/design-tokens';
@@ -54,6 +51,7 @@ import { useNetworkStatus } from '../hooks/use-network-status';
 import { Sentry } from '../lib/sentry';
 import { configureRevenueCat } from '../lib/revenuecat';
 import { AnimatedSplash } from '../components/AnimatedSplash';
+import { asyncStoragePersister } from '../lib/query-persister';
 
 // BUG-417: Clerk's default tokenCache uses expo-secure-store directly,
 // which crashes on web. Use our secure-storage wrapper instead.
@@ -94,6 +92,7 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 5 * 60_000,
+      gcTime: 24 * 60 * 60_000,
       retry: 2,
       // Bug #7 fix: changed from 'online' to 'always'. The 'online' mode
       // pauses queries when the device is deemed offline, which causes
@@ -542,7 +541,13 @@ export default function RootLayout() {
           tokenCache={tokenCache}
         >
           <ClerkGate onReady={onClerkReady} timedOut={clerkTimedOut}>
-            <QueryClientProvider client={queryClient}>
+            <PersistQueryClientProvider
+              client={queryClient}
+              persistOptions={{
+                persister: asyncStoragePersister,
+                maxAge: 24 * 60 * 60_000,
+              }}
+            >
               <ProfileProvider>
                 <OutboxDrainProvider>
                   <ErrorBoundary>
@@ -550,7 +555,7 @@ export default function RootLayout() {
                   </ErrorBoundary>
                 </OutboxDrainProvider>
               </ProfileProvider>
-            </QueryClientProvider>
+            </PersistQueryClientProvider>
           </ClerkGate>
         </ClerkProvider>
       </SafeAreaProvider>

@@ -18,6 +18,7 @@ import { createRoutedMockFetch } from '../../test-utils/mock-api-routes';
 const mockFetch = createRoutedMockFetch();
 
 jest.mock('../../lib/api-client', () =>
+  // gc1-allow: Clerk useAuth() external boundary
   require('../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch),
 );
 
@@ -103,6 +104,7 @@ jest.mock('expo-speech-recognition', () => ({
 }));
 
 jest.mock('../../lib/profile', () => ({
+  ...jest.requireActual('../../lib/profile'),
   useProfile: () => mockUseProfile(),
   isGuardianProfile: (
     profile: { isOwner: boolean } | null | undefined,
@@ -130,14 +132,17 @@ jest.mock(
 );
 
 jest.mock('../../hooks/use-revenuecat', () => ({
+  // gc1-allow: react-native-purchases native SDK
   useRevenueCatIdentity: jest.fn(),
 }));
 
 jest.mock('../../hooks/use-mentor-language-sync', () => ({
+  ...jest.requireActual('../../hooks/use-mentor-language-sync'),
   useMentorLanguageSync: jest.fn(),
 }));
 
 jest.mock('../../lib/sentry', () => ({
+  // gc1-allow: @sentry/react-native external boundary
   evaluateSentryForProfile: jest.fn(),
   // useParentProxy (rendered inside _layout) catches SecureStore failures
   // with Sentry.captureException — provide a no-op so the hook doesn't crash
@@ -146,6 +151,7 @@ jest.mock('../../lib/sentry', () => ({
 }));
 
 jest.mock('../../lib/secure-storage', () => ({
+  // gc1-allow: expo-secure-store native keychain
   getItemAsync: jest.fn(),
   setItemAsync: jest.fn(),
   deleteItemAsync: jest.fn(),
@@ -153,6 +159,7 @@ jest.mock('../../lib/secure-storage', () => ({
 }));
 
 jest.mock('../../components/feedback/FeedbackProvider', () => ({
+  // gc1-allow: expo-sensors (Accelerometer) native boundary
   FeedbackProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 

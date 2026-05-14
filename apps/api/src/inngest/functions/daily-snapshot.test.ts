@@ -34,28 +34,37 @@ const mockDatabaseModule = createDatabaseModuleMock({
   },
 });
 
-jest.mock('@eduagent/database', () => mockDatabaseModule.module);
+jest.mock('@eduagent/database', () => mockDatabaseModule.module); // gc1-allow: replaces database module with transactional mock
 
 const mockRefreshProgressSnapshot = jest.fn();
 
-jest.mock('../../services/snapshot-aggregation', () => ({
-  refreshProgressSnapshot: (...args: unknown[]) =>
-    mockRefreshProgressSnapshot(...args),
-}));
+jest.mock(
+  '../../services/snapshot-aggregation' /* gc1-allow: isolates snapshot refresh from real DB aggregation */,
+  () => ({
+    refreshProgressSnapshot: (...args: unknown[]) =>
+      mockRefreshProgressSnapshot(...args),
+  }),
+);
 
 const mockCaptureException = jest.fn();
 
-jest.mock('../../services/sentry', () => ({
-  captureException: (...args: unknown[]) => mockCaptureException(...args),
-}));
+jest.mock(
+  '../../services/sentry' /* gc1-allow: external error tracker boundary */,
+  () => ({
+    captureException: (...args: unknown[]) => mockCaptureException(...args),
+  }),
+);
 
-jest.mock('../helpers', () => {
-  const actual = jest.requireActual('../helpers');
-  return {
-    ...actual,
-    getStepDatabase: jest.fn(() => mockSnapshotDb),
-  };
-});
+jest.mock(
+  '../helpers' /* gc1-allow: isolates step-database helper; uses requireActual for non-stubbed exports */,
+  () => {
+    const actual = jest.requireActual('../helpers');
+    return {
+      ...actual,
+      getStepDatabase: jest.fn(() => mockSnapshotDb),
+    };
+  },
+);
 
 import { dailySnapshotCron, dailySnapshotRefresh } from './daily-snapshot';
 

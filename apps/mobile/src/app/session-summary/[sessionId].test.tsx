@@ -52,23 +52,27 @@ jest.mock('../../lib/theme', () => ({
 }));
 
 jest.mock('../../lib/sentry', () => ({
+  // gc1-allow: @sentry/react-native native crash handlers
   Sentry: {
     addBreadcrumb: jest.fn(),
   },
 }));
 
 jest.mock('../../lib/platform-alert', () => ({
+  ...jest.requireActual('../../lib/platform-alert'),
   platformAlert: jest.fn(),
 }));
 
 // [BUG-800] formatApiError stub: returns Error.message verbatim so tests can
 // assert the typed server reason reaches platformAlert.
 jest.mock('../../lib/format-api-error', () => ({
+  ...jest.requireActual('../../lib/format-api-error'),
   formatApiError: (e: unknown) =>
     e instanceof Error ? e.message : 'Unknown error',
 }));
 
 jest.mock('../../lib/profile', () => ({
+  // gc1-allow: ProfileProvider uses SecureStore (native)
   useProfile: () => ({
     activeProfile: {
       id: 'test-profile-id',
@@ -104,6 +108,7 @@ const mockUseParentProxy = jest.fn(() => ({
   parentProfile: null,
 }));
 jest.mock('../../hooks/use-parent-proxy', () => ({
+  // gc1-allow: SecureStore read/write in useEffect
   useParentProxy: () => mockUseParentProxy(),
 }));
 
@@ -111,6 +116,7 @@ jest.mock('../../hooks/use-parent-proxy', () => ({
 // no useApiClient() calls — keep as a direct mock.
 const mockOnSuccessfulRecall = jest.fn();
 jest.mock('../../hooks/use-rating-prompt', () => ({
+  // gc1-allow: expo-store-review + SecureStore native APIs
   useRatingPrompt: () => ({
     onSuccessfulRecall: mockOnSuccessfulRecall,
   }),

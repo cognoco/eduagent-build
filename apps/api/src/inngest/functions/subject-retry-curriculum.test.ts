@@ -1,4 +1,5 @@
 import { NonRetriableError } from 'inngest';
+import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 import { subjectRetryCurriculum } from './subject-retry-curriculum';
 
 const mockGetStepDatabase = jest.fn();
@@ -39,13 +40,6 @@ jest.mock(
     captureException: (...args: unknown[]) => mockCaptureException(...args),
   }),
 );
-
-function createMockStep() {
-  return {
-    run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
-    sendEvent: jest.fn().mockResolvedValue(undefined),
-  };
-}
 
 const handler = (subjectRetryCurriculum as any).fn;
 
@@ -141,14 +135,14 @@ describe('subjectRetryCurriculum', () => {
   // -------------------------------------------------------------------------
 
   it('throws NonRetriableError on invalid payload', async () => {
-    const step = createMockStep();
+    const { step } = createInngestStepRunner();
     await expect(handler({ event: { data: {} }, step })).rejects.toThrow(
       NonRetriableError,
     );
   });
 
   it('throws NonRetriableError when version is wrong', async () => {
-    const step = createMockStep();
+    const { step } = createInngestStepRunner();
     await expect(
       handler({ event: { data: validPayload({ version: 2 }) }, step }),
     ).rejects.toThrow(NonRetriableError);
@@ -161,7 +155,7 @@ describe('subjectRetryCurriculum', () => {
   it('returns already-generated when book.topicsGenerated is true', async () => {
     const mockDb = makeMockDb({ topicsGenerated: true });
     mockGetStepDatabase.mockReturnValue(mockDb);
-    const step = createMockStep();
+    const { step } = createInngestStepRunner();
 
     const result = await handler({
       event: { data: validPayload() },
@@ -184,7 +178,7 @@ describe('subjectRetryCurriculum', () => {
     const mockDb = makeMockDb();
     mockDb.query.curriculumBooks.findFirst.mockResolvedValue(null);
     mockGetStepDatabase.mockReturnValue(mockDb);
-    const step = createMockStep();
+    const { step } = createInngestStepRunner();
 
     await expect(
       handler({ event: { data: validPayload() }, step }),
@@ -196,7 +190,7 @@ describe('subjectRetryCurriculum', () => {
       subjectId: 'a0000000-0000-4000-8000-000000000099',
     });
     mockGetStepDatabase.mockReturnValue(mockDb);
-    const step = createMockStep();
+    const { step } = createInngestStepRunner();
 
     await expect(
       handler({ event: { data: validPayload() }, step }),
@@ -207,7 +201,7 @@ describe('subjectRetryCurriculum', () => {
     const mockDb = makeMockDb();
     mockDb.query.subjects.findFirst.mockResolvedValue(null);
     mockGetStepDatabase.mockReturnValue(mockDb);
-    const step = createMockStep();
+    const { step } = createInngestStepRunner();
 
     await expect(
       handler({ event: { data: validPayload() }, step }),
@@ -226,7 +220,7 @@ describe('subjectRetryCurriculum', () => {
       callCount++;
       return callCount <= 2 ? mockDb : confirmDb;
     });
-    const step = createMockStep();
+    const { step, sendEventCalls } = createInngestStepRunner();
 
     const result = await handler({
       event: { data: validPayload() },
@@ -246,12 +240,15 @@ describe('subjectRetryCurriculum', () => {
       expect.any(Array),
       expect.any(Array),
     );
-    expect(step.sendEvent).toHaveBeenCalledWith('emit-retry-topics-generated', {
-      name: 'app/book.topics-generated',
-      data: {
-        subjectId: SUBJECT_ID,
-        bookId: BOOK_ID,
-        profileId: PROFILE_ID,
+    expect(sendEventCalls).toContainEqual({
+      name: 'emit-retry-topics-generated',
+      payload: {
+        name: 'app/book.topics-generated',
+        data: {
+          subjectId: SUBJECT_ID,
+          bookId: BOOK_ID,
+          profileId: PROFILE_ID,
+        },
       },
     });
     expect(result).toMatchObject({
@@ -269,7 +266,7 @@ describe('subjectRetryCurriculum', () => {
     const mockDb = makeMockDb();
     mockGetStepDatabase.mockReturnValue(mockDb);
     mockGenerateBookTopics.mockResolvedValue({ topics: [], connections: [] });
-    const step = createMockStep();
+    const { step } = createInngestStepRunner();
 
     await expect(
       handler({ event: { data: validPayload() }, step }),
@@ -295,7 +292,7 @@ describe('subjectRetryCurriculum', () => {
       }
       return mockDb;
     });
-    const step = createMockStep();
+    const { step } = createInngestStepRunner();
 
     await handler({ event: { data: validPayload() }, step });
 
@@ -314,10 +311,10 @@ describe('subjectRetryCurriculum', () => {
       callCount++;
       return callCount <= 2 ? mockDb : confirmDb;
     });
-    const step = createMockStep();
+    const { step, sendEventCalls } = createInngestStepRunner();
 
     await handler({ event: { data: validPayload() }, step });
 
-    expect(step.sendEvent).not.toHaveBeenCalled();
+    expect(sendEventCalls).toHaveLength(0);
   });
 });

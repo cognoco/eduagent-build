@@ -9,6 +9,7 @@ import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
+import { queryKeys } from '../lib/query-keys';
 
 // ---------------------------------------------------------------------------
 // Recall test + relearn response types (mirror API route wrappers)
@@ -46,7 +47,7 @@ export function useRetentionTopics(subjectId: string) {
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['retention', 'subject', subjectId, activeProfile?.id],
+    queryKey: queryKeys.retention.subject(subjectId, activeProfile?.id),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -71,7 +72,7 @@ export function useTopicRetention(
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['retention', 'topic', topicId, activeProfile?.id],
+    queryKey: queryKeys.retention.topic(topicId, activeProfile?.id),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -110,7 +111,10 @@ export function useEvaluateEligibility(
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['evaluate-eligibility', topicId, activeProfile?.id],
+    queryKey: queryKeys.retention.evaluateEligibility(
+      topicId,
+      activeProfile?.id,
+    ),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -183,12 +187,10 @@ export function useTeachingPreference(
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: [
-      'retention',
-      'teaching-preference',
+    queryKey: queryKeys.retention.teachingPreference(
       subjectId,
       activeProfile?.id,
-    ],
+    ),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {

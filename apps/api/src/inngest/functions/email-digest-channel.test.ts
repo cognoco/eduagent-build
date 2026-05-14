@@ -31,18 +31,11 @@ jest.mock('../../services/sentry' /* gc1-allow: unit test boundary */, () => ({
 }));
 
 // Inngest client — external framework boundary
-jest.mock('../client' /* gc1-allow: unit test boundary */, () => ({
-  inngest: {
-    createFunction: jest.fn(
-      (config: unknown, trigger: unknown, fn: unknown) => ({
-        fn,
-        opts: config,
-        _trigger: trigger,
-      }),
-    ),
-    send: jest.fn().mockResolvedValue(undefined),
-  },
-}));
+import { createInngestTransportCapture } from '../../test-utils/inngest-transport-capture';
+import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
+
+const mockInngestTransport = createInngestTransportCapture();
+jest.mock('../client', () => mockInngestTransport.module); // gc1-allow: inngest framework boundary
 
 // Internal services used by the generate handlers — we intercept them here
 // using jest.requireActual patterns would be awkward since these are async
@@ -257,9 +250,7 @@ async function executeWeeklyGenerate(
 ): Promise<unknown> {
   (getStepDatabase as jest.Mock).mockReturnValue(db);
 
-  const mockStep = {
-    run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
-  };
+  const { step } = createInngestStepRunner();
 
   const handler = (
     weeklyProgressPushGenerate as unknown as {
@@ -272,7 +263,7 @@ async function executeWeeklyGenerate(
       name: 'app/weekly-progress-push.generate',
       data: { parentId },
     },
-    step: mockStep,
+    step,
   });
 }
 
@@ -283,9 +274,7 @@ async function executeMonthlyGenerate(
 ): Promise<unknown> {
   (getStepDatabase as jest.Mock).mockReturnValue(db);
 
-  const mockStep = {
-    run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
-  };
+  const { step } = createInngestStepRunner();
 
   const handler = (
     monthlyReportGenerate as unknown as {
@@ -298,7 +287,7 @@ async function executeMonthlyGenerate(
       name: 'app/monthly-report.generate',
       data: { parentId, childId },
     },
-    step: mockStep,
+    step,
   });
 }
 
@@ -333,6 +322,7 @@ const SAMPLE_METRICS = {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockInngestTransport.clear();
   resetDbState();
   mockGetStepResendApiKey.mockReturnValue('test-resend-key');
 

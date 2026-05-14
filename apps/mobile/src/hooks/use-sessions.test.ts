@@ -15,6 +15,7 @@ import {
   useTopicParkingLot,
   computeFilingRefetchInterval,
 } from './use-sessions';
+import { queryKeys } from '../lib/query-keys';
 
 const mockFetch = jest.fn();
 
@@ -962,6 +963,7 @@ describe('useStreamMessage', () => {
       events: (async function* () {
         yield {
           type: 'error',
+          code: 'LLM_UNAVAILABLE',
           message:
             'Something went wrong while generating a reply. Please try again.',
         };
@@ -984,6 +986,7 @@ describe('useStreamMessage', () => {
 
     expect((caught as Error).name).toBe('UpstreamError');
     expect((caught as Error & { status?: number }).status).toBe(502);
+    expect((caught as Error & { code?: string }).code).toBe('LLM_UNAVAILABLE');
   });
 });
 
@@ -1052,5 +1055,37 @@ describe('computeFilingRefetchInterval', () => {
 
   it('returns false for undefined (data not yet loaded)', () => {
     expect(computeFilingRefetchInterval(undefined)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Profile-switch cache isolation
+// ---------------------------------------------------------------------------
+
+describe('profile-switch cache isolation', () => {
+  it('sessions.detail — same session ID, different profiles produce different keys', () => {
+    const keyA = queryKeys.sessions.detail('sess-1', 'profile-A');
+    const keyB = queryKeys.sessions.detail('sess-1', 'profile-B');
+    expect(keyA).not.toEqual(keyB);
+    expect(keyA).toEqual(['session', 'sess-1', 'profile-A']);
+  });
+
+  it('sessions.transcript — same session, different profiles are isolated', () => {
+    const keyA = queryKeys.sessions.transcript('sess-1', 'profile-A');
+    const keyB = queryKeys.sessions.transcript('sess-1', 'profile-B');
+    expect(keyA).not.toEqual(keyB);
+    expect(keyA).toEqual(['session-transcript', 'sess-1', 'profile-A']);
+  });
+
+  it('sessions.summary — same session, different profiles are isolated', () => {
+    const keyA = queryKeys.sessions.summary('sess-1', 'profile-A');
+    const keyB = queryKeys.sessions.summary('sess-1', 'profile-B');
+    expect(keyA).not.toEqual(keyB);
+  });
+
+  it('sessions.parkingLot — same session, undefined profile is isolated from defined', () => {
+    const keyDefined = queryKeys.sessions.parkingLot('sess-1', 'profile-A');
+    const keyUndefined = queryKeys.sessions.parkingLot('sess-1', undefined);
+    expect(keyDefined).not.toEqual(keyUndefined);
   });
 });

@@ -13,6 +13,7 @@ const mockCreateSubscription = jest.fn().mockResolvedValue({
   status: 'trial',
 });
 jest.mock('./billing', () => ({
+  ...jest.requireActual('./billing'),
   createSubscription: (...args: unknown[]) => mockCreateSubscription(...args),
 }));
 
@@ -21,11 +22,13 @@ const mockComputeTrialEndDate = jest
   .fn()
   .mockReturnValue(new Date('2025-01-29T23:59:59.999Z'));
 jest.mock('./trial', () => ({
+  ...jest.requireActual('./trial'),
   computeTrialEndDate: (...args: unknown[]) => mockComputeTrialEndDate(...args),
 }));
 
 // Mock the subscription service — getTierConfig
 jest.mock('./subscription', () => ({
+  ...jest.requireActual('./subscription'),
   getTierConfig: jest.fn().mockReturnValue({
     monthlyQuota: 500,
     dailyLimit: null,
@@ -42,11 +45,13 @@ jest.mock('./subscription', () => ({
 // surfaces so tests can assert escalation without a real Inngest client.
 const mockInngestSend = jest.fn().mockResolvedValue(undefined);
 jest.mock('../inngest/client', () => ({
+  // gc1-allow: Inngest SDK external boundary
   inngest: { send: (...args: unknown[]) => mockInngestSend(...args) },
 }));
 
 const mockCaptureException = jest.fn();
 jest.mock('./sentry', () => ({
+  // gc1-allow: @sentry/cloudflare external boundary
   captureException: (...args: unknown[]) => mockCaptureException(...args),
 }));
 

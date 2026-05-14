@@ -6,60 +6,60 @@ const mockGetStepDatabase = jest.fn();
 const mockSendPushNotification = jest.fn();
 const mockFormatDailyReminderBody = jest.fn();
 
-jest.mock('../helpers', () => ({
-  getStepDatabase: () => mockGetStepDatabase(),
-}));
+jest.mock(
+  '../helpers' /* gc1-allow: isolates step-database helper from real DB config reads */,
+  () => ({
+    getStepDatabase: () => mockGetStepDatabase(),
+  }),
+);
 
-jest.mock('../../services/notifications', () => ({
-  sendPushNotification: (...args: unknown[]) =>
-    mockSendPushNotification(...args),
-  formatDailyReminderBody: (...args: unknown[]) =>
-    mockFormatDailyReminderBody(...args),
-}));
+jest.mock(
+  '../../services/notifications' /* gc1-allow: prevents real push delivery while asserting notification boundary */,
+  () => ({
+    sendPushNotification: (...args: unknown[]) =>
+      mockSendPushNotification(...args),
+    formatDailyReminderBody: (...args: unknown[]) =>
+      mockFormatDailyReminderBody(...args),
+  }),
+);
 
 const mockGetRecentNotificationCount = jest.fn().mockResolvedValue(0);
-jest.mock('../../services/settings', () => ({
-  getRecentNotificationCount: (...args: unknown[]) =>
-    mockGetRecentNotificationCount(...args),
-}));
+jest.mock(
+  '../../services/settings' /* gc1-allow: isolates notification-count reads from real DB */,
+  () => ({
+    getRecentNotificationCount: (...args: unknown[]) =>
+      mockGetRecentNotificationCount(...args),
+  }),
+);
 
 const mockCaptureException = jest.fn();
-jest.mock('../../services/sentry', () => ({
-  captureException: (...args: unknown[]) => mockCaptureException(...args),
-}));
+jest.mock(
+  '../../services/sentry' /* gc1-allow: external error tracker boundary */,
+  () => ({
+    captureException: (...args: unknown[]) => mockCaptureException(...args),
+  }),
+);
 
-jest.mock('../client', () => ({
-  inngest: {
-    createFunction: jest.fn((_config, _trigger, handler) => ({
-      fn: handler,
-      opts: _config,
-      _trigger,
-    })),
-    send: jest.fn().mockResolvedValue(undefined),
-  },
-}));
+import { createInngestTransportCapture } from '../../test-utils/inngest-transport-capture';
+import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
+
+const mockInngestTransport = createInngestTransportCapture();
+jest.mock('../client', () => mockInngestTransport.module); // gc1-allow: inngest framework boundary
 
 import { dailyReminderSend } from './daily-reminder-send';
 
-function createMockStep() {
-  return {
-    run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
-    sendEvent: jest.fn().mockResolvedValue(undefined),
-    sleep: jest.fn(),
-  };
-}
-
 async function executeHandler(
   eventData: { profileId: string; streakDays: number },
-  eventId?: string
+  eventId?: string,
 ) {
-  const mockStep = createMockStep();
+  const { step, sendEventCalls, runCalls, sleepCalls } =
+    createInngestStepRunner();
   const handler = (dailyReminderSend as any).fn;
   const result = await handler({
     event: { id: eventId ?? 'evt-daily-001', data: eventData },
-    step: mockStep,
+    step,
   });
-  return { result, mockStep };
+  return { result, sendEventCalls, runCalls, sleepCalls };
 }
 
 describe('dailyReminderSend', () => {
@@ -67,6 +67,7 @@ describe('dailyReminderSend', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockInngestTransport.clear();
     mockGetStepDatabase.mockReturnValue(mockDb);
     mockFormatDailyReminderBody.mockReturnValue('Keep your streak going!');
     mockSendPushNotification.mockResolvedValue({
@@ -81,7 +82,7 @@ describe('dailyReminderSend', () => {
     });
 
     it('triggers on app/daily-reminder.send', () => {
-      const trigger = (dailyReminderSend as any)._trigger;
+      const trigger = (dailyReminderSend as any).trigger;
       expect(trigger.event).toBe('app/daily-reminder.send');
     });
 
@@ -187,6 +188,7 @@ describe('[BUG-699-FOLLOWUP] daily-reminder-send 24h push dedup', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockInngestTransport.clear();
     mockGetStepDatabase.mockReturnValue(mockDb);
     mockFormatDailyReminderBody.mockReturnValue('Keep your streak going!');
   });
@@ -203,7 +205,7 @@ describe('[BUG-699-FOLLOWUP] daily-reminder-send 24h push dedup', () => {
       mockDb,
       'p-dup',
       'daily_reminder',
-      24
+      24,
     );
     expect(mockSendPushNotification).not.toHaveBeenCalled();
     expect(result).toEqual({
@@ -248,6 +250,7 @@ describe('[BUG-976] daily-reminder-send getRecentNotificationCount DB failure â€
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockInngestTransport.clear();
     mockGetStepDatabase.mockReturnValue(mockDb);
     mockFormatDailyReminderBody.mockReturnValue('Keep your streak going!');
   });
@@ -256,7 +259,7 @@ describe('[BUG-976] daily-reminder-send getRecentNotificationCount DB failure â€
     const dbError = new Error('connection timeout');
     mockGetRecentNotificationCount.mockRejectedValueOnce(dbError);
 
-    const { result, mockStep } = await executeHandler({
+    const { result, sendEventCalls } = await executeHandler({
       profileId: 'p-err',
       streakDays: 5,
     });
@@ -268,7 +271,7 @@ describe('[BUG-976] daily-reminder-send getRecentNotificationCount DB failure â€
         extra: expect.objectContaining({
           context: 'daily-reminder-send:getRecentNotificationCount',
         }),
-      })
+      }),
     );
     expect(mockSendPushNotification).not.toHaveBeenCalled();
     expect(result).toEqual({
@@ -279,17 +282,17 @@ describe('[BUG-976] daily-reminder-send getRecentNotificationCount DB failure â€
     // CLAUDE.md "Silent recovery without escalation is banned": the
     // dedup_check_failed path must dispatch a structured event so the
     // suppression is queryable in 24h dashboards. Sentry alone is not enough.
-    expect(mockStep.sendEvent).toHaveBeenCalledWith(
-      'notify-notification-suppressed',
-      expect.objectContaining({
+    expect(sendEventCalls).toContainEqual({
+      name: 'notify-notification-suppressed',
+      payload: expect.objectContaining({
         name: 'app/notification.suppressed',
         data: expect.objectContaining({
           profileId: 'p-err',
           notificationType: 'daily_reminder',
           reason: 'dedup_check_failed',
         }),
-      })
-    );
+      }),
+    });
   });
 
   it('does NOT call captureException on the happy path', async () => {
@@ -299,7 +302,7 @@ describe('[BUG-976] daily-reminder-send getRecentNotificationCount DB failure â€
       ticketId: 'ticket-ok',
     });
 
-    const { mockStep } = await executeHandler({
+    const { sendEventCalls } = await executeHandler({
       profileId: 'p-ok',
       streakDays: 1,
     });
@@ -307,6 +310,6 @@ describe('[BUG-976] daily-reminder-send getRecentNotificationCount DB failure â€
     expect(mockCaptureException).not.toHaveBeenCalled();
     expect(mockSendPushNotification).toHaveBeenCalled();
     // Happy path must not emit the suppression escalation event.
-    expect(mockStep.sendEvent).not.toHaveBeenCalled();
+    expect(sendEventCalls).toHaveLength(0);
   });
 });

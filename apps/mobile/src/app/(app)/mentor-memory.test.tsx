@@ -53,6 +53,7 @@ jest.mock('expo-router', () => ({
 }));
 
 jest.mock('../../lib/profile', () => ({
+  ...jest.requireActual('../../lib/profile'),
   useProfile: () => ({
     activeProfile: {
       id: 'test-profile-id',
@@ -87,26 +88,31 @@ const mockFetch = createRoutedMockFetch({
 });
 
 jest.mock('../../lib/api-client', () =>
+  // gc1-allow: Clerk useAuth() external boundary
   require('../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch),
 );
 
 // use-parent-proxy uses setProxyMode from api-client (not the RPC useApiClient hook)
 // plus SecureStore reads — not an API hook. Keep as a direct mock.
 jest.mock('../../hooks/use-parent-proxy', () => ({
+  // gc1-allow: SecureStore native boundary
   useParentProxy: () => ({ isParentProxy: false }),
 }));
 
 // use-active-profile-role is derived from useProfile + useParentProxy — no API calls.
 let mockActiveRole: 'owner' | 'child' | 'impersonated-child' | null = 'owner';
 jest.mock('../../hooks/use-active-profile-role', () => ({
+  ...jest.requireActual('../../hooks/use-active-profile-role'),
   useActiveProfileRole: () => mockActiveRole,
 }));
 
 jest.mock('../../lib/platform-alert', () => ({
+  ...jest.requireActual('../../lib/platform-alert'),
   platformAlert: (...args: unknown[]) => mockPlatformAlert(...args),
 }));
 
 jest.mock('../../lib/sentry', () => ({
+  // gc1-allow: @sentry/react-native external boundary
   Sentry: { captureException: jest.fn() },
 }));
 
@@ -115,6 +121,7 @@ jest.mock('../../lib/sentry', () => ({
 // Strategy: mock TellMentorInput to expose a testID-tagged submit button so
 // we can trigger onSubmit directly without depending on TellMentorInput internals.
 jest.mock('../../components/tell-mentor-input', () => ({
+  ...jest.requireActual('../../components/tell-mentor-input'),
   TellMentorInput: ({
     onSubmit,
     onChangeText,

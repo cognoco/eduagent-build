@@ -45,35 +45,28 @@ jest.mock('../helpers', () => ({
   getStepSupportEmail: () => mockGetStepSupportEmail(),
 }));
 
-jest.mock('../client', () => ({
-  inngest: {
-    createFunction: jest.fn((_config, _trigger, handler) => {
-      return { fn: handler, _config, _trigger };
-    }),
-    send: jest.fn().mockResolvedValue(undefined),
-  },
-}));
+import { createInngestTransportCapture } from '../../test-utils/inngest-transport-capture';
+import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
+
+const mockInngestTransport = createInngestTransportCapture();
+jest.mock('../client', () => mockInngestTransport.module); // gc1-allow: inngest framework boundary
 
 import { feedbackDeliveryFailed } from './feedback-delivery-failed';
 
 async function executeHandler(eventData: unknown, eventId?: string) {
-  const mockStep = {
-    run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
-    sendEvent: jest.fn().mockResolvedValue(undefined),
-    sleep: jest.fn(),
-    waitForEvent: jest.fn().mockResolvedValue(null),
-  };
+  const { step } = createInngestStepRunner();
   const handler = (feedbackDeliveryFailed as any).fn;
   const result = await handler({
     event: { id: eventId, data: eventData },
-    step: mockStep,
+    step,
   });
-  return { result, mockStep };
+  return { result };
 }
 
 describe('feedback-delivery-failed Inngest function [BUG-767 / A-24]', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockInngestTransport.clear();
     mockGetResendApiKey.mockReturnValue('test-resend-key');
     mockGetEmailFrom.mockReturnValue('noreply@test.com');
     mockGetStepSupportEmail.mockReturnValue('support@test.com');
@@ -81,12 +74,12 @@ describe('feedback-delivery-failed Inngest function [BUG-767 / A-24]', () => {
 
   describe('configuration', () => {
     it('triggers on app/feedback.delivery_failed', () => {
-      const trigger = (feedbackDeliveryFailed as any)._trigger;
+      const trigger = (feedbackDeliveryFailed as any).trigger;
       expect(trigger.event).toBe('app/feedback.delivery_failed');
     });
 
     it('declares the expected function id and retry budget', () => {
-      const config = (feedbackDeliveryFailed as any)._config;
+      const config = (feedbackDeliveryFailed as any).opts;
       expect(config.id).toBe('feedback-delivery-failed');
       expect(config.retries).toBe(2);
     });
@@ -358,6 +351,7 @@ describe('feedback-delivery-failed Inngest function [BUG-767 / A-24]', () => {
 describe('[FIX-INNGEST-5] uses getStepSupportEmail() not process.env', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockInngestTransport.clear();
     mockGetResendApiKey.mockReturnValue('test-resend-key');
     mockGetEmailFrom.mockReturnValue('noreply@test.com');
     mockGetStepSupportEmail.mockReturnValue('support@test.com');
@@ -406,6 +400,7 @@ describe('[BUG-767 / A-24] handler is registered with serve()', () => {
         inngest: {
           createFunction: jest.fn((cfg, _trigger, handler) => ({
             fn: handler,
+            opts: cfg,
             _config: cfg,
             id: cfg.id,
           })),
@@ -414,7 +409,8 @@ describe('[BUG-767 / A-24] handler is registered with serve()', () => {
       }));
       const { functions } = require('../index');
       const ids = functions.map(
-        (f: { _config?: { id?: string } }) => f._config?.id,
+        (f: { opts?: { id?: string }; _config?: { id?: string } }) =>
+          f.opts?.id ?? f._config?.id,
       );
       expect(ids).toContain('feedback-delivery-failed');
     });

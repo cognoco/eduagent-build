@@ -245,6 +245,7 @@ function ChildCommandCard({
   child,
   dashboardChild,
   highlight,
+  onOpenProfile,
   onOpenProgress,
   onOpenReports,
   onOpenNudge,
@@ -253,11 +254,14 @@ function ChildCommandCard({
   child: Profile;
   dashboardChild: DashboardChild | undefined;
   highlight: boolean;
+  onOpenProfile: () => void;
   onOpenProgress: () => void;
   onOpenReports: () => void;
   onOpenNudge: () => void;
   t: Translate;
 }): React.ReactElement {
+  const colors = useThemeColors();
+
   return (
     <View
       className={`rounded-card px-4 py-4 ${
@@ -265,9 +269,18 @@ function ChildCommandCard({
       }`}
     >
       <Pressable
-        onPress={onOpenProgress}
-        className="flex-row items-start"
-        style={Platform.OS === 'web' ? { cursor: 'pointer' } : undefined}
+        onPress={onOpenProfile}
+        className="flex-row items-center bg-background rounded-button px-3 py-3"
+        style={{
+          borderColor: colors.primary + '24',
+          borderWidth: 1,
+          shadowColor: colors.primary,
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.08,
+          shadowRadius: 5,
+          elevation: 2,
+          ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
+        }}
         accessibilityRole="button"
         accessibilityLabel={child.displayName}
         testID={`parent-home-check-child-${child.id}`}
@@ -284,9 +297,18 @@ function ChildCommandCard({
           <Text className="text-h3 font-bold text-text-primary">
             {child.displayName}
           </Text>
-          <Text className="text-body-sm text-text-secondary mt-1">
+          <Text
+            className="text-body-sm text-text-secondary mt-1"
+            numberOfLines={2}
+          >
             {formatChildSnapshot(dashboardChild, t)}
           </Text>
+        </View>
+        <View
+          className="w-9 h-9 rounded-full bg-primary-soft items-center justify-center ms-3"
+          accessibilityElementsHidden
+        >
+          <Ionicons name="chevron-forward" size={20} color={colors.primary} />
         </View>
       </Pressable>
 
@@ -470,6 +492,16 @@ export function ParentHomeScreen({
     navigateToSubscription,
   ]);
 
+  const pushChildProfile = useCallback(
+    (childProfileId: string): void => {
+      router.push({
+        pathname: '/(app)/child/[profileId]',
+        params: { profileId: childProfileId },
+      } as Href);
+    },
+    [router],
+  );
+
   const pushChildProgress = useCallback(
     (childProfileId: string): void => {
       router.push({
@@ -608,6 +640,7 @@ export function ParentHomeScreen({
               child={child}
               dashboardChild={findDashboardChild(dashboard, child.id)}
               highlight={index === 0}
+              onOpenProfile={() => pushChildProfile(child.id)}
               onOpenProgress={() => pushChildProgress(child.id)}
               onOpenReports={() => pushChildReports(child.id)}
               onOpenNudge={() => setSheetChildId(child.id)}

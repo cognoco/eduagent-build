@@ -36,6 +36,7 @@ import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
+import { queryKeys } from '../lib/query-keys';
 
 interface ProgressHistoryQuery {
   from?: string;
@@ -65,7 +66,7 @@ export function useSubjectProgress(
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['progress', 'subject', subjectId, activeProfile?.id],
+    queryKey: queryKeys.progress.subject(subjectId, activeProfile?.id),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -104,7 +105,7 @@ export function useOverallProgress(): UseQueryResult<OverallProgressResponse> {
   const { activeProfile } = useProfile();
 
   return useQuery<OverallProgressResponse>({
-    queryKey: ['progress', 'overview', activeProfile?.id],
+    queryKey: queryKeys.progress.overview(activeProfile?.id),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -127,7 +128,7 @@ export function useContinueSuggestion() {
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['progress', 'continue', activeProfile?.id],
+    queryKey: queryKeys.progress.continue(activeProfile?.id),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -183,14 +184,7 @@ export function useLearningResumeTarget(
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: [
-      'progress',
-      'resume-target',
-      activeProfile?.id,
-      scope.subjectId ?? null,
-      scope.bookId ?? null,
-      scope.topicId ?? null,
-    ],
+    queryKey: queryKeys.progress.resumeTarget(activeProfile?.id, scope),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -209,7 +203,7 @@ export function useResumeNudge() {
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['resume-nudge', activeProfile?.id],
+    queryKey: queryKeys.resumeNudge.root(activeProfile?.id),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -240,13 +234,10 @@ export function useActiveSessionForTopic(topicId: string | undefined) {
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: [
-      'progress',
-      'topic',
+    queryKey: queryKeys.progress.activeSessionForTopic(
       topicId,
-      'active-session',
       activeProfile?.id,
-    ],
+    ),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -269,7 +260,10 @@ export function useResolveTopicSubject(topicId: string | undefined) {
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['progress', 'topic', topicId, 'resolve', activeProfile?.id],
+    queryKey: queryKeys.progress.resolveTopicSubject(
+      topicId,
+      activeProfile?.id,
+    ),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -296,7 +290,7 @@ export function useReviewSummary(): UseQueryResult<ReviewSummary> {
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['progress', 'review-summary', activeProfile?.id],
+    queryKey: queryKeys.progress.reviewSummary(activeProfile?.id),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -319,7 +313,7 @@ export function useOverdueTopics(): UseQueryResult<OverdueTopicsResponse> {
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['progress', 'overdue-topics', activeProfile?.id],
+    queryKey: queryKeys.progress.overdueTopics(activeProfile?.id),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -345,7 +339,11 @@ export function useTopicProgress(
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['progress', 'topic', subjectId, topicId, activeProfile?.id],
+    queryKey: queryKeys.progress.topicProgress(
+      subjectId,
+      topicId,
+      activeProfile?.id,
+    ),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -371,7 +369,7 @@ export function useProgressInventory(): UseQueryResult<KnowledgeInventory> {
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['progress', 'inventory', activeProfile?.id],
+    queryKey: queryKeys.progress.inventory(activeProfile?.id),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -398,7 +396,7 @@ export function useProgressHistory(
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['progress', 'history', activeProfile?.id, query],
+    queryKey: queryKeys.progress.history(activeProfile?.id, query),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -431,7 +429,7 @@ export function useProgressMilestones(
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['progress', 'milestones', activeProfile?.id, limit],
+    queryKey: queryKeys.progress.milestones(activeProfile?.id, limit),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -459,7 +457,7 @@ export function useProfileSessions(
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['progress', 'profile', profileId, 'sessions', activeProfile?.id],
+    queryKey: queryKeys.progress.profileSessions(profileId, activeProfile?.id),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -491,7 +489,7 @@ export function useProfileReports(
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['progress', 'profile', profileId, 'reports', activeProfile?.id],
+    queryKey: queryKeys.progress.profileReports(profileId, activeProfile?.id),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -523,13 +521,10 @@ export function useProfileWeeklyReports(
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: [
-      'progress',
-      'profile',
+    queryKey: queryKeys.progress.profileWeeklyReports(
       profileId,
-      'weekly-reports',
       activeProfile?.id,
-    ],
+    ),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -606,7 +601,7 @@ export function useChildInventory(
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['dashboard', 'child', childProfileId, 'inventory'],
+    queryKey: queryKeys.dashboard.childInventory(childProfileId),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -642,7 +637,7 @@ export function useChildProgressHistory(
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['dashboard', 'child', childProfileId, 'history', query],
+    queryKey: queryKeys.dashboard.childHistory(childProfileId, query),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -682,7 +677,7 @@ export function useChildProgressSummary(
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['dashboard', 'child', childProfileId, 'progress-summary'],
+    queryKey: queryKeys.dashboard.childProgressSummary(childProfileId),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -723,7 +718,7 @@ export function useChildReports(
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['dashboard', 'child', childProfileId, 'reports'],
+    queryKey: queryKeys.dashboard.childReports(childProfileId),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -751,7 +746,7 @@ export function useChildReportDetail(
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['dashboard', 'child', childProfileId, 'report', reportId],
+    queryKey: queryKeys.dashboard.childReportDetail(childProfileId, reportId),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -790,7 +785,10 @@ export function useProfileReportDetail(
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['progress', 'profile', activeProfile?.id, 'report', reportId],
+    queryKey: queryKeys.progress.profileReportDetail(
+      activeProfile?.id,
+      reportId,
+    ),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -841,16 +839,13 @@ export function useMarkChildReportViewed(): UseMutationResult<
     },
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({
-        queryKey: ['dashboard', 'child', variables.childProfileId, 'reports'],
+        queryKey: queryKeys.dashboard.childReports(variables.childProfileId),
       });
       void queryClient.invalidateQueries({
-        queryKey: [
-          'dashboard',
-          'child',
+        queryKey: queryKeys.dashboard.childReportDetail(
           variables.childProfileId,
-          'report',
           variables.reportId,
-        ],
+        ),
       });
     },
   });
@@ -867,7 +862,7 @@ export function useChildWeeklyReports(
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['dashboard', 'child', childProfileId, 'weekly-reports'],
+    queryKey: queryKeys.dashboard.childWeeklyReports(childProfileId),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -911,7 +906,10 @@ export function useChildWeeklyReportDetail(
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['dashboard', 'child', childProfileId, 'weekly-report', reportId],
+    queryKey: queryKeys.dashboard.childWeeklyReportDetail(
+      childProfileId,
+      reportId,
+    ),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -950,13 +948,10 @@ export function useProfileWeeklyReportDetail(
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: [
-      'progress',
-      'profile',
+    queryKey: queryKeys.progress.profileWeeklyReportDetail(
       activeProfile?.id,
-      'weekly-report',
       reportId,
-    ],
+    ),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -1007,21 +1002,15 @@ export function useMarkWeeklyReportViewed(): UseMutationResult<
     },
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({
-        queryKey: [
-          'dashboard',
-          'child',
+        queryKey: queryKeys.dashboard.childWeeklyReports(
           variables.childProfileId,
-          'weekly-reports',
-        ],
+        ),
       });
       void queryClient.invalidateQueries({
-        queryKey: [
-          'dashboard',
-          'child',
+        queryKey: queryKeys.dashboard.childWeeklyReportDetail(
           variables.childProfileId,
-          'weekly-report',
           variables.reportId,
-        ],
+        ),
       });
     },
   });
@@ -1065,13 +1054,10 @@ export function useMarkProfileReportViewed(): UseMutationResult<
         queryKey: ['progress', 'profile', activeProfile?.id, 'reports'],
       });
       void queryClient.invalidateQueries({
-        queryKey: [
-          'progress',
-          'profile',
+        queryKey: queryKeys.progress.profileReportDetail(
           activeProfile?.id,
-          'report',
           variables.reportId,
-        ],
+        ),
       });
     },
   });
@@ -1111,13 +1097,10 @@ export function useMarkProfileWeeklyReportViewed(): UseMutationResult<
         queryKey: ['progress', 'profile', activeProfile?.id, 'weekly-reports'],
       });
       void queryClient.invalidateQueries({
-        queryKey: [
-          'progress',
-          'profile',
+        queryKey: queryKeys.progress.profileWeeklyReportDetail(
           activeProfile?.id,
-          'weekly-report',
           variables.reportId,
-        ],
+        ),
       });
     },
   });

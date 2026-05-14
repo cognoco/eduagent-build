@@ -32,10 +32,12 @@ jest.mock('react-native-safe-area-context', () => ({
 }));
 
 jest.mock('../../../hooks/use-progress', () => ({
+  // gc1-allow: wraps api-client fetch boundary — needs network stub in unit tests
   useOverdueTopics: () => mockOverdueTopicsReturn,
 }));
 
 jest.mock('../../../hooks/use-retention', () => ({
+  // gc1-allow: wraps api-client fetch boundary — needs network stub in unit tests
   useStartRelearn: () => ({
     mutate: mockMutate,
     isPending: false,
@@ -44,16 +46,19 @@ jest.mock('../../../hooks/use-retention', () => ({
 }));
 
 jest.mock('../../../hooks/use-parent-proxy', () => ({
+  // gc1-allow: wraps api-client fetch boundary — needs network stub in unit tests
   useParentProxy: () => ({ isParentProxy: mockIsParentProxy }),
 }));
 
 jest.mock('../../../lib/profile', () => ({
+  ...jest.requireActual('../../../lib/profile'),
   useProfile: () => ({
     activeProfile: { id: 'owner-id', isOwner: true, birthYear: null },
   }),
 }));
 
 jest.mock('../../../lib/navigation', () => ({
+  // gc1-allow: imports expo-router Router type; goBackOrReplace calls router.back which requires native navigation context
   goBackOrReplace: (...args: unknown[]) => mockBack(...args),
   homeHrefForReturnTo: (returnTo: string | undefined) =>
     returnTo === 'learner-home' ? '/(app)/home' : '/(app)/home',

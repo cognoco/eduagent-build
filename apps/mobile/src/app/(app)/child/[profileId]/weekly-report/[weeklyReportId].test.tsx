@@ -38,16 +38,19 @@ jest.mock('@sentry/react-native', () => ({
 }));
 
 jest.mock('../../../../../lib/navigation', () => ({
+  // gc1-allow: imports expo-router Router type; goBackOrReplace calls router.back which requires native navigation context
   goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
 }));
 
 jest.mock('../../../../../lib/format-api-error', () => ({
+  // gc1-allow: depends on i18next instance requiring full i18n init — cannot run in JSDOM without setup
   classifyApiError: (e: unknown) => ({
     message: (e as Error)?.message ?? 'error',
   }),
 }));
 
 jest.mock('../../../../../components/common', () => ({
+  // gc1-allow: barrel exports RN components including Reanimated animations — cannot render in JSDOM
   ErrorFallback: () => null,
 }));
 
@@ -63,6 +66,7 @@ const mockUseChildWeeklyReportDetail = jest.fn();
 const mockMarkViewedMutateAsync = jest.fn();
 
 jest.mock('../../../../../hooks/use-progress', () => ({
+  // gc1-allow: wraps api-client fetch boundary — needs network stub in unit tests
   useChildWeeklyReportDetail: (...args: unknown[]) =>
     mockUseChildWeeklyReportDetail(...args),
   useMarkWeeklyReportViewed: () => ({

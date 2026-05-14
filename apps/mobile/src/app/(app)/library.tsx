@@ -41,6 +41,7 @@ import {
 } from '../../components/library/LibrarySearchResults';
 import { useLibrarySearch } from '../../hooks/use-library-search';
 import { ShimmerSkeleton } from '../../components/common/ShimmerSkeleton';
+import { getLearningSubjectTint } from '../../lib/learning-subject-tints';
 
 // ---------------------------------------------------------------------------
 // Local interfaces (retention API shape)
@@ -189,6 +190,16 @@ export default function LibraryScreen() {
   const sortedSubjects = useMemo(
     () => sortSubjectsByStatus(subjects),
     [subjects],
+  );
+  const subjectTintsById = useMemo(
+    () =>
+      new Map(
+        sortedSubjects.map((subject, index) => [
+          subject.id,
+          getLearningSubjectTint(index, themeColors),
+        ]),
+      ),
+    [sortedSubjects, themeColors],
   );
 
   const progressQuery = useOverallProgress();
@@ -570,9 +581,27 @@ export default function LibraryScreen() {
     }
 
     const isSearching = debouncedQuery.trim().length > 0;
+    const showingStaleCachedData =
+      (subjectsQuery.isError || progressQuery.isError) && subjects.length > 0;
 
     return (
       <>
+        {/* Stale-data banner — visible when cached data is shown after a refresh failure */}
+        {showingStaleCachedData && (
+          <Pressable
+            onPress={handleRetry}
+            className="bg-surface-elevated rounded-card px-4 py-3 mb-3 flex-row items-center"
+            testID="library-stale-banner"
+          >
+            <Text className="text-body-sm text-text-secondary flex-1">
+              {t('library.staleBanner.message')}
+            </Text>
+            <Text className="text-body-sm font-semibold text-primary ms-3">
+              {t('common.retry')}
+            </Text>
+          </Pressable>
+        )}
+
         {/* Curriculum complete banner */}
         {!!progressQuery.data?.subjects.length &&
           progressQuery.data.subjects.every(
@@ -635,6 +664,7 @@ export default function LibraryScreen() {
                 isError={searchResult.isError}
                 query={debouncedQuery}
                 enrichedSubjects={enrichedSubjectResults}
+                subjectTintsById={subjectTintsById}
                 onSubjectPress={handleShelfPress}
                 onBookPress={handleBookPress}
                 onTopicPress={handleTopicPress}
@@ -697,6 +727,7 @@ export default function LibraryScreen() {
                   reviewDueCount={retData?.reviewDueCount ?? 0}
                   isFinished={isFinished}
                   status={subject.status}
+                  tint={subjectTintsById.get(subject.id)}
                   onPress={handleShelfPress}
                 />
               );

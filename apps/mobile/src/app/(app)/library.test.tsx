@@ -54,44 +54,13 @@ jest.mock('../../components/progress', () => ({
 }));
 
 jest.mock('../../components/common', () => ({
+  ...jest.requireActual('../../components/common'),
+  // gc1-allow: Reanimated worklets + react-native-svg cannot run in JSDOM
   BookPageFlipAnimation: () => null,
   BrandCelebration: () => null,
-  ErrorFallback: ({
-    testID,
-    primaryAction,
-    secondaryAction,
-  }: {
-    testID?: string;
-    primaryAction?: { label: string; onPress: () => void; testID?: string };
-    secondaryAction?: { label: string; onPress: () => void; testID?: string };
-  }) => {
-    const { View, Text, Pressable } = require('react-native');
-    return (
-      <View testID={testID}>
-        {primaryAction && (
-          <Pressable
-            testID={primaryAction.testID}
-            onPress={primaryAction.onPress}
-          >
-            <Text>{primaryAction.label}</Text>
-          </Pressable>
-        )}
-        {secondaryAction && (
-          <Pressable
-            testID={secondaryAction.testID}
-            onPress={secondaryAction.onPress}
-          >
-            <Text>{secondaryAction.label}</Text>
-          </Pressable>
-        )}
-      </View>
-    );
-  },
 }));
 
-jest.mock('../../lib/navigation', () => ({
-  goBackOrReplace: jest.fn(),
-}));
+// navigation: real module is pure functions wrapping expo-router (already mocked)
 
 jest.mock('../../lib/theme', () => ({
   // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
@@ -111,6 +80,8 @@ jest.mock('../../lib/theme', () => ({
 }));
 
 jest.mock('../../lib/api-client', () => ({
+  // gc1-allow: Clerk useAuth() external boundary
+  ...jest.requireActual('../../lib/api-client'),
   useApiClient: () => ({
     library: {
       retention: {
@@ -192,6 +163,8 @@ jest.mock('../../components/library/LibrarySearchBar', () => ({
 }));
 
 jest.mock('../../lib/profile', () => ({
+  // gc1-allow: ProfileProvider uses SecureStore (native)
+  ...jest.requireActual('../../lib/profile'),
   useProfile: () => ({
     activeProfile: { id: 'profile-1', isOwner: true },
     profiles: [{ id: 'profile-1', isOwner: true }],

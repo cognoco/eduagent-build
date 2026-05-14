@@ -15,39 +15,34 @@ const mockClassifySubject = jest.fn();
 const mockGetStepDatabase = jest.fn();
 
 jest.mock('../../services/subject-classify', () => ({
+  // gc1-allow: external service boundary — prevents real LLM calls in unit tests
   classifySubject: (...args: unknown[]) => mockClassifySubject(...args),
 }));
 
 jest.mock('../helpers', () => ({
+  // gc1-allow: isolates step-database helper from real DB config reads
   getStepDatabase: () => mockGetStepDatabase(),
 }));
 
-const mockInngestSend = jest.fn().mockResolvedValue(undefined);
+const { createInngestTransportCapture } =
+  require('../../test-utils/inngest-transport-capture') as typeof import('../../test-utils/inngest-transport-capture');
 
-jest.mock('../client', () => ({
-  inngest: {
-    createFunction: jest.fn((_config, _trigger, handler) => {
-      return { fn: handler, _config, _trigger };
-    }),
-    send: (...args: unknown[]) => mockInngestSend(...args),
-  },
-}));
+const mockInngestTransport = createInngestTransportCapture();
+
+jest.mock('../client', () => mockInngestTransport.module); // gc1-allow: inngest framework boundary
 
 // Import AFTER mocks
 import { TEST_PROFILE_ID, TEST_SESSION_ID } from '@eduagent/test-utils';
+import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 
 import { askSilentClassify } from './ask-silent-classify';
 
 async function executeHandler(eventData: unknown) {
-  const mockStep = {
-    run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
-    sendEvent: jest.fn().mockResolvedValue(undefined),
-    sleep: jest.fn(),
-    waitForEvent: jest.fn().mockResolvedValue(null),
-  };
+  const { step, runCalls, sendEventCalls, sleepCalls, waitForEventCalls } =
+    createInngestStepRunner();
   const handler = (askSilentClassify as any).fn;
-  const result = await handler({ event: { data: eventData }, step: mockStep });
-  return { result, mockStep };
+  const result = await handler({ event: { data: eventData }, step });
+  return { result, runCalls, sendEventCalls, sleepCalls, waitForEventCalls };
 }
 
 describe('ask-silent-classify Inngest function', () => {
@@ -95,36 +90,36 @@ describe('ask-silent-classify Inngest function', () => {
       // queryable via dashboards / metrics, not buried in logger.warn.
       // ask-classification-observe.ts:38-66 is the consumer that turns this
       // event into a structured log line.
-      const { mockStep } = await executeHandler({
+      const { sendEventCalls } = await executeHandler({
         sessionId: 'sess-1',
         // Missing the rest — partial payloads still emit best-effort sessionId.
       });
 
-      expect(mockStep.sendEvent).toHaveBeenCalledWith(
-        'classification-invalid-payload',
-        expect.objectContaining({
+      expect(sendEventCalls).toContainEqual({
+        name: 'classification-invalid-payload',
+        payload: expect.objectContaining({
           name: 'app/ask.classification_failed',
           data: expect.objectContaining({
             sessionId: 'sess-1',
             error: expect.stringContaining('invalid_payload'),
           }),
-        })
-      );
+        }),
+      });
     });
 
     it('emits failure event even when sessionId itself is invalid', async () => {
-      const { mockStep } = await executeHandler(null);
+      const { sendEventCalls } = await executeHandler(null);
 
-      expect(mockStep.sendEvent).toHaveBeenCalledWith(
-        'classification-invalid-payload',
-        expect.objectContaining({
+      expect(sendEventCalls).toContainEqual({
+        name: 'classification-invalid-payload',
+        payload: expect.objectContaining({
           name: 'app/ask.classification_failed',
           data: expect.objectContaining({
             sessionId: undefined,
             error: expect.stringContaining('invalid_payload'),
           }),
-        })
-      );
+        }),
+      });
     });
   });
 
@@ -135,14 +130,14 @@ describe('ask-silent-classify Inngest function', () => {
     // the Inngest queue level — guaranteed at-most-once semantics for racing
     // duplicate classify events for the same session.
     it('declares idempotency key on event.data.sessionId', () => {
-      const cfg = (askSilentClassify as any)._config as {
+      const cfg = (askSilentClassify as any).opts as {
         idempotency?: string;
       };
       expect(cfg.idempotency).toBe('event.data.sessionId');
     });
 
     it('keeps concurrency=1 as defence-in-depth alongside idempotency', () => {
-      const cfg = (askSilentClassify as any)._config as {
+      const cfg = (askSilentClassify as any).opts as {
         concurrency?: { key?: string; limit?: number };
       };
       expect(cfg.concurrency?.key).toBe('event.data.sessionId');

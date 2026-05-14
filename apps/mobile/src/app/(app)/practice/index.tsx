@@ -45,26 +45,26 @@ function usePracticeColors() {
     muted: theme.textSecondary,
     line: theme.border,
     surface: theme.surface,
-    reviewBg: isDark ? '#1a2e24' : '#effcf5',
-    reviewBorder: isDark ? '#2a5040' : '#b9ddc8',
+    reviewBg: theme.practiceReviewBg,
+    reviewBorder: theme.practiceReviewBorder,
     mint: theme.practiceMint,
-    quizBg: isDark ? '#1a2030' : '#f2f7ff',
-    quizBorder: isDark ? '#2a3a58' : '#b8ccec',
-    quiz: isDark ? '#5b8fd6' : '#386dbe',
-    dictationBg: isDark ? '#2a2518' : '#fff6df',
-    dictationBorder: isDark ? '#5a4a2a' : '#e6c883',
-    dictation: isDark ? '#d89830' : '#b46f00',
-    reciteBg: isDark ? '#221a30' : '#f4efff',
-    reciteBorder: isDark ? '#3a2a58' : '#c7bdf1',
-    recite: isDark ? '#9080e0' : '#7058c8',
-    history: isDark ? '#d06a82' : '#b64a62',
-    historyBorder: isDark ? '#4a2a34' : '#edbdc7',
-    chipBg: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.86)',
+    quizBg: theme.practiceQuizBg,
+    quizBorder: theme.practiceQuizBorder,
+    quiz: theme.practiceQuiz,
+    dictationBg: theme.practiceDictationBg,
+    dictationBorder: theme.practiceDictationBorder,
+    dictation: theme.practiceDictation,
+    reciteBg: theme.practiceReciteBg,
+    reciteBorder: theme.practiceReciteBorder,
+    recite: theme.practiceRecite,
+    history: theme.practiceHistory,
+    historyBorder: theme.practiceHistoryBorder,
+    chipBg: theme.practiceChipBg,
     chipText: theme.textPrimary,
     chipStrongText: theme.textInverse,
     primaryButtonBg: isDark ? theme.textPrimary : theme.practiceDarkTeal,
     xpPillBg: theme.practiceDarkTeal,
-    quizOptionBg: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.76)',
+    quizOptionBg: theme.practiceQuizOptionBg,
   };
 }
 
@@ -631,7 +631,11 @@ export default function PracticeScreen(): React.ReactElement {
                     { backgroundColor: colors.mint },
                   ]}
                 >
-                  <Ionicons name="checkmark" size={24} color="#ffffff" />
+                  <Ionicons
+                    name="checkmark"
+                    size={24}
+                    color={colors.chipStrongText}
+                  />
                 </View>
                 <View className="flex-1">
                   <Text className="text-body font-semibold text-text-primary">
