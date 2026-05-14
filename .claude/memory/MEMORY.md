@@ -57,8 +57,8 @@ Two production dead-code branches removed 2026-04-19 in commit `970a82a5`: `AgeB
 
 ## Android SDK & Build
 
-- Windows username `ZuzanaKopečná` contains `č` — breaks native executables/JNI.
-- Emulator/ADB at `C:\Android\Sdk`, Doppler CLI at `C:\Tools\doppler\doppler.exe`.
+- Windows username `ZuzanaKopečná` contains `č` — breaks Maestro JNI on Windows (use `/c/tools/maestro/bin/maestro` + TEMP override).
+- Windows paths: Emulator/ADB at `C:\Android\Sdk`, Doppler at `C:\Tools\doppler\doppler.exe`. macOS/Linux: standard PATH.
 - [project_eas_build.md](project_eas_build.md) — EAS Build config, OTA operational, NX Cloud connected, Sentry upload disabled.
 - [project_eas_update_ota.md](project_eas_update_ota.md) — OTA IMPLEMENTED. JS-only changes deploy in ~5 min via expo-updates.
 - [project_fingerprint_pnpm_mismatch.md](project_fingerprint_pnpm_mismatch.md) — Fingerprint policy fails in pnpm monorepo. Using appVersion policy.
@@ -66,7 +66,7 @@ Two production dead-code branches removed 2026-04-19 in commit `970a82a5`: `AgeB
 
 ## Testing Infrastructure
 
-- [project_playwright_e2e_setup.md](project_playwright_e2e_setup.md) — Playwright E2E: must use `doppler run -c stg`, seed secret, Clerk token placeholder
+- [project_playwright_e2e_setup.md](project_playwright_e2e_setup.md) — Playwright E2E: `doppler run -c stg`, seed secret, baseline 23m/48% pass (2026-05-14)
 
 ## Deployment & Secrets
 
@@ -114,7 +114,7 @@ Two production dead-code branches removed 2026-04-19 in commit `970a82a5`: `AgeB
 - [feedback_e2e_never_skip.md](feedback_e2e_never_skip.md) — Never skip E2E tests.
 - [feedback_e2e_release_gate.md](feedback_e2e_release_gate.md) — Release-blocking E2E means full suite, failure ledger, investigate each failure, fix real bugs or stale tests, repeat until green.
 - [feedback_batch_pr_fixes.md](feedback_batch_pr_fixes.md) — Batch PR fixes, validate locally, push once.
-- [feedback_emulator_issues_doc.md](feedback_emulator_issues_doc.md) — ALWAYS read e2e-emulator-issues.md before emulator work.
+- [feedback_emulator_issues_doc.md](feedback_emulator_issues_doc.md) — Old emulator-issues doc vaulted; runbook is the authority now.
 - [feedback_eas_no_retry.md](feedback_eas_no_retry.md) — NEVER retry eas build without checking dashboard first.
 - [feedback_build_dedup.md](feedback_build_dedup.md) — After merge/build trigger, wait 3 min + check before triggering.
 - [feedback_fix_root_cause.md](feedback_fix_root_cause.md) — Fix actual root cause, not symptoms.
@@ -144,11 +144,11 @@ Two production dead-code branches removed 2026-04-19 in commit `970a82a5`: `AgeB
 - Template repo extraction plan — tracked in Notion (archived from memory 2026-05-04).
 - [feedback_notion_rest_for_queries.md](feedback_notion_rest_for_queries.md) — Always REST API for exhaustive Notion queries.
 - [feedback_notion_resolution_recording.md](feedback_notion_resolution_recording.md) — Record resolution on Done items. Never reopen.
-- [feedback_e2e_runbook.md](feedback_e2e_runbook.md) — Read `docs/E2Edocs/e2e-runbook.md` BEFORE any E2E/emulator/Maestro debugging. 2,358 lines of vault docs replaced with verified short runbook on 2026-04-30.
+- [feedback_e2e_runbook.md](feedback_e2e_runbook.md) — Read `docs/E2Edocs/e2e-runbook.md` (OS-aware) BEFORE any E2E/emulator/Maestro debugging.
 
 ## Custom Skills
 
-- `/e2e`, `/ship`, `/fix-ci`, `/dispatch`, `/notion`, `/build`, `/commit` — all operational. **`/e2e` rewritten 2026-04-30** with empirical verification — see `feedback_e2e_runbook.md`.
+- `/e2e`, `/ship`, `/fix-ci`, `/dispatch`, `/notion`, `/build`, `/commit` — all operational. **`/e2e` OS-aware (macOS/Windows/Linux) since 2026-05-14**, default flow `app-launch-devclient.yaml` — see `feedback_e2e_runbook.md`.
 - Husky pre-commit: `tsc --build` (incremental) + lint-staged + surgical tests
 
 ## Cross-Project Assets
