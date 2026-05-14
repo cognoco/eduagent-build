@@ -139,10 +139,7 @@ describe('account routes', () => {
     // through safeSend (services/safe-non-core.ts), which logs via
     // logger.error → console.error.
     it('still returns 200 and escalates via logger.error + captureException when dispatch fails', async () => {
-      // eslint-disable-next-line @typescript-eslint/no-empty-function
-      const errorSpy = jest
-        .spyOn(console, 'error')
-        .mockImplementation(() => {});
+      const errorSpy = jest.spyOn(console, 'error').mockImplementation();
       (captureException as jest.Mock).mockClear();
 
       const dispatchError = new Error('Inngest unavailable');
