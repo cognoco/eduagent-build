@@ -9,19 +9,23 @@ const consoleLogSpy = jest
   .spyOn(console, 'log')
   .mockImplementation(() => undefined);
 
-jest.mock('../client', () => ({
-  inngest: {
-    createFunction: jest.fn(
-      (_opts: unknown, _trigger: unknown, fn: unknown) => {
-        return Object.assign(fn as object, {
-          opts: _opts,
-          trigger: _trigger,
-          fn,
-        });
-      }
-    ),
-  },
-}));
+jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual('../client') as typeof import('../client');
+  return {
+    ...actual,
+    inngest: {
+      createFunction: jest.fn(
+        (_opts: unknown, _trigger: unknown, fn: unknown) => {
+          return Object.assign(fn as object, {
+            opts: _opts,
+            trigger: _trigger,
+            fn,
+          });
+        },
+      ),
+    },
+  };
+});
 
 import { topupExpiryReminderSend } from './topup-expiry-reminder-send';
 
