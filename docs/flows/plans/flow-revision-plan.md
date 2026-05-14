@@ -527,7 +527,7 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
 | QA-01 | Quick smoke check | ✅ | Pass | | | 2026-05-14 hosted GitHub Playwright web smoke run 25852959340 passed 10/10: auth navigation, sign-up top-of-funnel, learner home, learner UX crawl, and parent home. WSL full web suite and targeted probes now provide the broader web path for follow-up coverage. |
-| QA-02 | Post-auth comprehensive smoke | ⬜ |  | | | 2026-05-14: not covered by hosted Playwright web smoke run 25852959340 or the targeted WSL web probes run so far. This is an inventory coverage gap, not an observed product failure; needs a targeted WSL web probe or native/mobile pass. |
+| QA-02 | Post-auth comprehensive smoke | ✅ | Pass | | | 2026-05-14 WSL Playwright web: setup seeded learner + parent storage states, `j01-learner-home` landed on learner home, and `j01-ux-pass` completed the single-learner UX crawl. |
 | QA-03 | Chat classifier regression (easter / suggestion) | ⬜ |  | | | 2026-05-14: not covered by hosted Playwright web smoke run 25852959340 or the targeted WSL web probes run so far. This is an inventory coverage gap, not an observed product failure; needs a targeted WSL web probe or native/mobile pass. |
 | QA-04 | Chat subject picker regression | ⬜ |  | | | 2026-05-14: not covered by hosted Playwright web smoke run 25852959340 or the targeted WSL web probes run so far. This is an inventory coverage gap, not an observed product failure; needs a targeted WSL web probe or native/mobile pass. |
 | QA-05 | Return to chat after creating a subject | ⬜ |  | | | 2026-05-14: not covered by hosted Playwright web smoke run 25852959340 or the targeted WSL web probes run so far. This is an inventory coverage gap, not an observed product failure; needs a targeted WSL web probe or native/mobile pass. |
@@ -585,8 +585,8 @@ Update this once a batch is complete to track overall progress.
 | 15 | Parent Dashboard         | 17 | ❌ | 6 pass, 3 pass-w/issues, 6 fail, 2 untested. Targeted WSL web passed multi-child dashboard, parent library, monthly reports, accommodation rows, and child-topic Understanding/review-status cards; weekly report detail and retention-badge seed paths failed; raw-input audit and guided-practice tooltip remain untested. |
 | 16 | Billing                  | 13 | ❌ | 6 pass, 3 pass-w/issues, 1 fail, 3 untested. WSL web probes covered current plan, trial/usage, family-pool visibility, restore/BYOK visibility, and found no Manage billing deep link on web. |
 | 17 | Cross-Cutting Final Pass | 11 | ⚠️ | 3 pass, 8 untested. WSL full web passed goBackOrReplace, opaque web backgrounds, and profile-as-lens fallback. |
-| 18 | Regression Smoke         | 12 | ❌ | 3 pass, 1 pass-w/issues, 1 fail, 7 untested. Hosted/WSL web passed quick smoke, parent add-child, and tab leak checks; controlled web pass covered dictation full-flow shell; quiz full-flow regression failed. |
-| **Total** | | **184** | ⚠️ | 58✅ 32⚠️ pass-w/issues 24❌ 13 blocked 6 removed 51 untested. Hosted Playwright smoke passed 10/10; WSL full Playwright web ran 31 tests with 19 passed, 1 flaky setup, and 11 failed; targeted WSL web probes added settings/account/billing/learning/practice/dictation/retention/progress/subject-onboarding/parent-dashboard/core-session coverage without using the emulator. |
+| 18 | Regression Smoke         | 12 | ❌ | 4 pass, 1 pass-w/issues, 1 fail, 6 untested. Hosted/WSL web passed quick smoke, post-auth learner UX smoke, parent add-child, and tab leak checks; controlled web pass covered dictation full-flow shell; quiz full-flow regression failed. |
+| **Total** | | **184** | ⚠️ | 59✅ 32⚠️ pass-w/issues 24❌ 13 blocked 6 removed 50 untested. Hosted Playwright smoke passed 10/10; WSL full Playwright web ran 31 tests with 19 passed, 1 flaky setup, and 11 failed; targeted WSL web probes added settings/account/billing/learning/practice/dictation/retention/progress/subject-onboarding/parent-dashboard/core-session coverage without using the emulator. |
 
 ### Blocker Taxonomy
 
@@ -594,7 +594,7 @@ Update this once a batch is complete to track overall progress.
 
 | Queue bucket | Count | What it means | Next action |
 | --- | ---: | --- | --- |
-| untested | 51 | The row was not reached by hosted smoke, the WSL full web suite, or targeted WSL probes yet. No product failure has been observed for these rows. | Write/run targeted WSL Playwright probes, then change each row to Pass, Pass w/ issues, Fail, or Removed. |
+| untested | 50 | The row was not reached by hosted smoke, the WSL full web suite, or targeted WSL probes yet. No product failure has been observed for these rows. | Write/run targeted WSL Playwright probes, then change each row to Pass, Pass w/ issues, Fail, or Removed. |
 | Clerk email quota | 3 | Email-dependent auth rows render, but verification/reset completion is blocked by Clerk development email quota. | Use a Clerk environment with email quota, seed verified users, or add a test-only verification path. |
 | Missing auth harness/scenario | 2 | MFA and slow-auth/stuck-spinner flows require dedicated seed or network-delay harnesses. | Add explicit MFA/slow-network test scenarios before judging product behavior. |
 | Mobile/dev-client/APK-specific | 3 | Splash, SSO fallback, and mobile-only consent denial paths require native tooling, production APK, or emulator behavior not available in the web pass. | Run on native/mobile or add a production-build smoke path. |
