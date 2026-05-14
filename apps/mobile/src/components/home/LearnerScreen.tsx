@@ -401,7 +401,7 @@ export function LearnerScreen({
         }}
         testID="learner-loading-state"
       >
-        <BookPageFlipAnimation size={140} />
+        <BookPageFlipAnimation size={150} />
         {loadingTimedOut && (
           <View className="mt-6 items-center" testID="learner-loading-timeout">
             <Text className="text-body text-text-secondary text-center">

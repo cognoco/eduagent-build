@@ -303,18 +303,11 @@ describe('session operations integration', () => {
       where: eq(learningSessions.id, session.id),
     });
 
-    // The return type annotation `Promise<{ metadata: HomeworkSessionMetadata }>`
-    // is narrower than the actual runtime shape, which also includes
-    // loggedCorrectionIds / loggedStartedProblemIds / loggedCompletedProblemIds.
-    // Widen the source annotation in `services/session/session-homework.ts` and
-    // remove this cast. Tracked in Notion bug tracker:
-    // https://www.notion.so/35f8bce91f7c8104bc43f77e0627032c
-    // (Verified 2026-05-13: no other callers read these three fields, so this
-    // is the only test site affected.)
-    const firstMeta = firstResult.metadata as Record<string, unknown>;
-    expect(firstMeta['loggedCorrectionIds']).toEqual(['problem-1']);
-    expect(firstMeta['loggedStartedProblemIds']).toEqual(['problem-1']);
-    expect(firstMeta['loggedCompletedProblemIds']).toEqual(['problem-2']);
+    expect(firstResult.metadata.loggedCorrectionIds).toEqual(['problem-1']);
+    expect(firstResult.metadata.loggedStartedProblemIds).toEqual(['problem-1']);
+    expect(firstResult.metadata.loggedCompletedProblemIds).toEqual([
+      'problem-2',
+    ]);
     expect(secondResult.metadata).toEqual(firstResult.metadata);
     expect(
       events.map((event: typeof sessionEvents.$inferSelect) => event.eventType),

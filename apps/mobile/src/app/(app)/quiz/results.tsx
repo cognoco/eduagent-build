@@ -68,7 +68,7 @@ export default function QuizResultsScreen(): React.ReactElement {
     perfect: {
       icon: 'trophy' as const,
       title: 'Perfect round!',
-      color: colors.warning,
+      color: colors.reward,
     },
     great: {
       icon: 'star' as const,

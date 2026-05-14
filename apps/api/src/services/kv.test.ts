@@ -1,14 +1,46 @@
 // ---------------------------------------------------------------------------
 // Workers KV Helpers — Tests
 // ---------------------------------------------------------------------------
+//
+// KVNamespace is a global ambient interface from @cloudflare/workers-types,
+// which is intentionally omitted from tsconfig.spec.json: adding it globally
+// would override `lib.dom`'s `Response.json(): Promise<any>` with Workers'
+// `Promise<unknown>`, cascading as ~430 type errors across the test suite.
+// A triple-slash `/// <reference types="@cloudflare/workers-types" />` has
+// the same global effect.
+//
+// Instead, this structural stand-in mirrors the real KVNamespace surface
+// (the get/put/delete/list shape and signatures we actually use). Passing a
+// structurally wrong argument to writeSubscriptionStatus/readSubscriptionStatus
+// will fail type-checking here, matching the real interface's intent — without
+// pulling Workers types into the spec compilation.
+type KVNamespaceListResult<Key extends string = string> = {
+  keys: Array<{ name: Key; expiration?: number; metadata?: unknown }>;
+  list_complete: boolean;
+  cursor?: string;
+};
 
-// KVNamespace is a Cloudflare Workers type absent from tsconfig.spec.json.
-// Use Record<string, unknown> as a structural stand-in so return-type
-// annotations compile. This local declaration shadows the real interface for
-// the whole module — proper fix is to add @cloudflare/workers-types to
-// tsconfig.spec.json. Tracked in Notion bug tracker:
-// https://www.notion.so/35f8bce91f7c81b5b944ee47fad6fc9e
-type KVNamespace = Record<string, unknown>;
+type KVNamespace = {
+  put: (
+    key: string,
+    value: string | ArrayBuffer | ArrayBufferView | ReadableStream,
+    options?: {
+      expirationTtl?: number;
+      expiration?: number;
+      metadata?: unknown;
+    },
+  ) => Promise<void>;
+  get: (key: string) => Promise<string | null>;
+  delete: (key: string) => Promise<void>;
+  list: (options?: {
+    prefix?: string;
+    limit?: number;
+    cursor?: string;
+  }) => Promise<KVNamespaceListResult>;
+  getWithMetadata: (
+    key: string,
+  ) => Promise<{ value: string | null; metadata: unknown }>;
+};
 
 import {
   writeSubscriptionStatus,

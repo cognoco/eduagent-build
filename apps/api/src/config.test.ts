@@ -360,6 +360,80 @@ describe('validateEnv', () => {
     expect(env.MEMORY_FACTS_DEDUP_ROLLOUT_PCT).toBe(25);
   });
 
+  // Cloudflare Workers passes env values as raw strings — verify every
+  // z.coerce.number() key actually coerces (not just accepts a JS number).
+  // Catches a regression from z.coerce.number() → z.number() that would
+  // otherwise reject valid string-typed env in production.
+  describe('z.coerce.number() env keys parse raw strings', () => {
+    const rawStringEnv: Record<string, string> = {
+      ENVIRONMENT: 'development',
+      DATABASE_URL: 'postgresql://localhost/test',
+      MEMORY_FACTS_DEDUP_ENABLED: 'true',
+      MEMORY_FACTS_DEDUP_THRESHOLD: '0.42',
+      MAX_DEDUP_LLM_CALLS_PER_SESSION: '15',
+      MEMORY_FACTS_DEDUP_ROLLOUT_PCT: '50',
+    };
+
+    it('coerces MEMORY_FACTS_DEDUP_THRESHOLD from string to float', () => {
+      const env = validateEnv(rawStringEnv);
+      expect(env.MEMORY_FACTS_DEDUP_THRESHOLD).toBe(0.42);
+      expect(typeof env.MEMORY_FACTS_DEDUP_THRESHOLD).toBe('number');
+    });
+
+    it('coerces MAX_DEDUP_LLM_CALLS_PER_SESSION from string to integer', () => {
+      const env = validateEnv(rawStringEnv);
+      expect(env.MAX_DEDUP_LLM_CALLS_PER_SESSION).toBe(15);
+      expect(typeof env.MAX_DEDUP_LLM_CALLS_PER_SESSION).toBe('number');
+      expect(Number.isInteger(env.MAX_DEDUP_LLM_CALLS_PER_SESSION)).toBe(true);
+    });
+
+    it('coerces MEMORY_FACTS_DEDUP_ROLLOUT_PCT from string to integer', () => {
+      const env = validateEnv(rawStringEnv);
+      expect(env.MEMORY_FACTS_DEDUP_ROLLOUT_PCT).toBe(50);
+      expect(typeof env.MEMORY_FACTS_DEDUP_ROLLOUT_PCT).toBe('number');
+      expect(Number.isInteger(env.MEMORY_FACTS_DEDUP_ROLLOUT_PCT)).toBe(true);
+    });
+
+    it('enforces THRESHOLD min/max bounds on string inputs', () => {
+      expect(() =>
+        validateEnv({ ...rawStringEnv, MEMORY_FACTS_DEDUP_THRESHOLD: '-0.1' }),
+      ).toThrow('Invalid environment');
+      expect(() =>
+        validateEnv({ ...rawStringEnv, MEMORY_FACTS_DEDUP_THRESHOLD: '2.5' }),
+      ).toThrow('Invalid environment');
+    });
+
+    it('enforces MAX_DEDUP_LLM_CALLS_PER_SESSION min/max bounds on string inputs', () => {
+      expect(() =>
+        validateEnv({ ...rawStringEnv, MAX_DEDUP_LLM_CALLS_PER_SESSION: '-1' }),
+      ).toThrow('Invalid environment');
+      expect(() =>
+        validateEnv({
+          ...rawStringEnv,
+          MAX_DEDUP_LLM_CALLS_PER_SESSION: '101',
+        }),
+      ).toThrow('Invalid environment');
+    });
+
+    it('enforces ROLLOUT_PCT 0-100 bounds on string inputs', () => {
+      expect(() =>
+        validateEnv({ ...rawStringEnv, MEMORY_FACTS_DEDUP_ROLLOUT_PCT: '-1' }),
+      ).toThrow('Invalid environment');
+      expect(() =>
+        validateEnv({ ...rawStringEnv, MEMORY_FACTS_DEDUP_ROLLOUT_PCT: '101' }),
+      ).toThrow('Invalid environment');
+    });
+
+    it('rejects non-numeric string for coerced number env keys', () => {
+      expect(() =>
+        validateEnv({
+          ...rawStringEnv,
+          MEMORY_FACTS_DEDUP_THRESHOLD: 'not-a-number',
+        }),
+      ).toThrow('Invalid environment');
+    });
+  });
+
   it('isMemoryFactsDedupEnabled returns true only for "true"', () => {
     expect(isMemoryFactsDedupEnabled('true')).toBe(true);
     expect(isMemoryFactsDedupEnabled('false')).toBe(false);

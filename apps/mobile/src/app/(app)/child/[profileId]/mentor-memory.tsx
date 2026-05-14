@@ -397,6 +397,12 @@ export default function ChildMentorMemoryScreen() {
                 value={profile?.memoryCollectionEnabled ?? false}
                 onValueChange={handleToggleCollection}
                 disabled={isLoading || toggleCollection.isPending}
+                accessibilityLabel={t(
+                  'parentView.mentorMemory.learnAboutChild',
+                )}
+                accessibilityHint={t(
+                  'parentView.mentorMemory.learnAboutChildDescription',
+                )}
               />
             </View>
             <View className="flex-row items-center justify-between mt-4">
@@ -412,6 +418,12 @@ export default function ChildMentorMemoryScreen() {
                 value={profile?.memoryInjectionEnabled ?? false}
                 onValueChange={handleToggleInjection}
                 disabled={isLoading || toggleInjection.isPending}
+                accessibilityLabel={t(
+                  'parentView.mentorMemory.useWhatMentorKnows',
+                )}
+                accessibilityHint={t(
+                  'parentView.mentorMemory.useWhatMentorKnowsDescription',
+                )}
               />
             </View>
           </View>

@@ -21,7 +21,7 @@
 #
 # Environment variables (optional):
 #   API_URL          — API base URL (default: http://localhost:8787)
-#   EMAIL            — Test user email (default: test-e2e@example.com)
+#   EMAIL            — Test user email (default: test-e2e+clerk_test@example.com)
 #   MAESTRO_PATH     — Path to maestro binary (default: /c/tools/maestro/bin/maestro)
 #   METRO_URL        — Metro server URL for dev-client (default: http://10.0.2.2:8082)
 #                      Uses bundle proxy by default (BUG-7: OkHttp chunked encoding fails on 8081)
@@ -68,7 +68,7 @@ EXTRA_ARGS=("$@")
 
 # ── Config ──
 API_URL="${API_URL:-http://localhost:8787}"
-EMAIL="${EMAIL:-test-e2e@example.com}"
+EMAIL="${EMAIL:-test-e2e+clerk_test@example.com}"
 MAESTRO="${MAESTRO_PATH:-/c/tools/maestro/bin/maestro}"
 METRO_URL="${METRO_URL:-http://10.0.2.2:8082}"
 ADB="${ADB_PATH:-/c/Android/Sdk/platform-tools/adb.exe}"

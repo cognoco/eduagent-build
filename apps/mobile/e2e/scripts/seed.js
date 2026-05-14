@@ -15,7 +15,11 @@ const scenario = __maestro.env['SCENARIO'] || 'onboarding-complete';
 const apiUrl = __maestro.env['API_URL'] || 'http://10.0.2.2:8787';
 // Default to a fixed email so Clerk reuses the same test user across runs
 // (avoids creating a new Clerk user every time the seed runs).
-const email = __maestro.env['EMAIL'] || 'test-e2e@example.com';
+// The `+clerk_test` infix puts this address into Clerk's test-mode bucket:
+// forgot-password and verification flows accept the fixed code 424242 and
+// do NOT consume Clerk dev's monthly email quota. Only valid on Clerk dev
+// instances (pk_test_); production rejects it.
+const email = __maestro.env['EMAIL'] || 'test-e2e+clerk_test@example.com';
 
 const response = http.post(apiUrl + '/v1/__test/seed', {
   headers: { 'Content-Type': 'application/json' },
@@ -24,7 +28,7 @@ const response = http.post(apiUrl + '/v1/__test/seed', {
 
 if (response.status !== 201) {
   throw new Error(
-    'Seed failed: HTTP ' + response.status + ' — ' + response.body
+    'Seed failed: HTTP ' + response.status + ' — ' + response.body,
   );
 }
 
