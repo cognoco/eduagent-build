@@ -1,7 +1,7 @@
 const mockRouteAndCall = jest.fn();
 const mockCaptureException = jest.fn();
 
-jest.mock('./llm', () => {
+jest.mock('./llm', () => { // gc1-allow: LLM external boundary (routeAndCall), requireActual spread applied
   const actual = jest.requireActual('./llm') as Record<string, unknown>;
   return {
     ...actual,
@@ -9,9 +9,13 @@ jest.mock('./llm', () => {
   };
 });
 
-jest.mock('./sentry', () => ({
-  captureException: (...args: unknown[]) => mockCaptureException(...args),
-}));
+jest.mock('./sentry', () => {
+  const actual = jest.requireActual('./sentry') as Record<string, unknown>;
+  return {
+    ...actual,
+    captureException: (...args: unknown[]) => mockCaptureException(...args),
+  };
+});
 
 import type { Database } from '@eduagent/database';
 import {

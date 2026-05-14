@@ -17,11 +17,11 @@ const mockDatabaseModule = createDatabaseModuleMock({
   },
 });
 
-jest.mock('@eduagent/database', () => mockDatabaseModule.module);
+jest.mock('@eduagent/database', () => mockDatabaseModule.module); // gc1-allow: DB dependency injection, no real DB in unit test environment
 
 const mockRouteAndCall = jest.fn();
 
-jest.mock('./llm', () => ({
+jest.mock('./llm' /* gc1-allow: LLM external boundary */, () => ({
   routeAndCall: (...args: unknown[]) => mockRouteAndCall(...args),
 }));
 
