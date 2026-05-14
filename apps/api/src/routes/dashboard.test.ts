@@ -36,33 +36,37 @@ mockDatabaseModule.db.query = new Proxy(mockDatabaseModule.db.query as object, {
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
-const mockFindOrCreateAccount = jest.fn().mockResolvedValue({
-  id: 'test-account-id',
-  clerkUserId: 'user_test',
-  email: 'test@example.com',
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
+jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/account',
+  ) as typeof import('../services/account');
+  return {
+    ...actual,
+    findOrCreateAccount: jest.fn().mockResolvedValue({
+      id: 'test-account-id',
+      clerkUserId: 'user_test',
+      email: 'test@example.com',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }),
+  };
 });
 
-jest.mock('../services/account', () => ({
-  ...jest.requireActual('../services/account'),
-  findOrCreateAccount: (...args: unknown[]) =>
-    mockFindOrCreateAccount(...args),
-}));
-
-const mockFindOwnerProfile = jest.fn().mockResolvedValue(null);
-const mockGetProfile = jest.fn().mockResolvedValue({
-  id: 'test-profile-id',
-  birthYear: null,
-  location: null,
-  consentStatus: 'CONSENTED',
+jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/profile',
+  ) as typeof import('../services/profile');
+  return {
+    ...actual,
+    findOwnerProfile: jest.fn().mockResolvedValue(null),
+    getProfile: jest.fn().mockResolvedValue({
+      id: 'test-profile-id',
+      birthYear: null,
+      location: null,
+      consentStatus: 'CONSENTED',
+    }),
+  };
 });
-
-jest.mock('../services/profile', () => ({
-  ...jest.requireActual('../services/profile'),
-  findOwnerProfile: (...args: unknown[]) => mockFindOwnerProfile(...args),
-  getProfile: (...args: unknown[]) => mockGetProfile(...args),
-}));
 
 const mockGetChildrenForParent = jest.fn().mockResolvedValue([]);
 const mockGetChildDetail = jest.fn().mockResolvedValue(null);
