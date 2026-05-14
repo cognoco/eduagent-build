@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
+import { pressableClick } from '../../helpers/pressable';
 import { authStateDir } from '../../helpers/runtime';
 import { readSeedData } from '../../helpers/seed-data';
 
@@ -16,17 +17,22 @@ test('J-11 learner → Library → shelf → book → start learning', async ({
     timeout: 60_000,
   });
 
-  await page.getByTestId('tab-library').click();
+  await pressableClick(page.getByTestId('tab-library'));
   await expect(page.getByTestId(`shelf-row-header-${subjectId}`)).toBeVisible({
     timeout: 30_000,
   });
 
-  await page.locator('[data-testid^="book-row-"]').first().click();
+  await pressableClick(page.getByTestId(`shelf-row-header-${subjectId}`));
+  await expect(page.getByTestId('shelf-screen')).toBeVisible({
+    timeout: 30_000,
+  });
+
+  await pressableClick(page.locator('[data-testid^="book-card-"]').first());
   await expect(page.getByTestId('book-screen')).toBeVisible({
     timeout: 30_000,
   });
 
-  await page.getByTestId('book-start-learning').click();
+  await pressableClick(page.getByTestId('book-start-learning'));
   await expect(page.getByTestId('chat-input')).toBeVisible({ timeout: 30_000 });
   await expect(page).toHaveURL(/\/session(?:\?.*)?$/);
 });

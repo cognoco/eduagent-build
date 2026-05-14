@@ -7,6 +7,7 @@ import {
   View,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import type { Translate } from '../../../i18n';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Markdown from 'react-native-markdown-display';
@@ -16,10 +17,7 @@ import { platformAlert } from '../../../lib/platform-alert';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { useParentProxy } from '../../../hooks/use-parent-proxy';
 
-function formatRelativeDate(
-  dateStr: string,
-  t: (key: string, opts?: Record<string, unknown>) => string,
-): string {
+function formatRelativeDate(dateStr: string, t: Translate): string {
   const date = new Date(dateStr);
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();

@@ -9,6 +9,7 @@ import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
+import { queryKeys } from '../lib/query-keys';
 
 // ---------------------------------------------------------------------------
 // Recall test + relearn response types (mirror API route wrappers)
@@ -46,7 +47,7 @@ export function useRetentionTopics(subjectId: string) {
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['retention', 'subject', subjectId, activeProfile?.id],
+    queryKey: queryKeys.retention.subject(subjectId, activeProfile?.id),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -71,7 +72,7 @@ export function useTopicRetention(
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['retention', 'topic', topicId, activeProfile?.id],
+    queryKey: queryKeys.retention.topic(topicId, activeProfile?.id),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -110,7 +111,10 @@ export function useEvaluateEligibility(
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['evaluate-eligibility', topicId, activeProfile?.id],
+    queryKey: queryKeys.retention.evaluateEligibility(
+      topicId,
+      activeProfile?.id,
+    ),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -146,6 +150,12 @@ export function useSubmitRecallTest() {
       return data.result;
     },
     onSuccess: () => {
+      // PR-10 deferred: broad ['retention'] covers retention.subject,
+      // retention.topic, retention.evaluateEligibility (now under 'retention'
+      // prefix — fixed in PR 10), and retention.teachingPreference for the
+      // topic. Broad ['progress'] covers topic progress and subject progress.
+      // Narrowing requires subjectId + topicId + activeProfileId in scope —
+      // not available from the recall-test response alone.
       void queryClient.invalidateQueries({ queryKey: ['retention'] });
       void queryClient.invalidateQueries({ queryKey: ['progress'] });
     },
@@ -169,9 +179,15 @@ export function useStartRelearn() {
       return (await res.json()) as RelearnResult;
     },
     onSuccess: () => {
+      // PR-10 deferred: broad ['retention'] and ['progress'] — relearn
+      // triggers a new session and may update retention cards, topic progress,
+      // and subject progress. Surfaces unknown without a subjectId/topicId in
+      // scope here. Keep broad until a workflow test enumerates them.
       void queryClient.invalidateQueries({ queryKey: ['retention'] });
       void queryClient.invalidateQueries({ queryKey: ['progress'] });
-      void queryClient.invalidateQueries({ queryKey: ['sessions'] });
+      // The old ['sessions'] call here was a no-op (top segment 'sessions'
+      // matches no registered key; session keys use 'session', etc.)
+      // — removed PR 10.
     },
   });
 }
@@ -183,12 +199,10 @@ export function useTeachingPreference(
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: [
-      'retention',
-      'teaching-preference',
+    queryKey: queryKeys.retention.teachingPreference(
       subjectId,
       activeProfile?.id,
-    ],
+    ),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {

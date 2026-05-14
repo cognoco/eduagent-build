@@ -7,6 +7,7 @@ jest.mock('inngest/hono', () => ({
 }));
 
 jest.mock('../inngest/client', () => ({
+  // gc1-allow: Inngest SDK external boundary
   inngest: {
     send: jest.fn().mockResolvedValue(undefined),
     createFunction: jest.fn().mockReturnValue(jest.fn()),
@@ -16,10 +17,12 @@ jest.mock('../inngest/client', () => ({
 const mockCaptureException = jest.fn();
 
 jest.mock('../services/sentry', () => ({
+  // gc1-allow: @sentry/cloudflare external boundary
   captureException: (...args: unknown[]) => mockCaptureException(...args),
 }));
 
 jest.mock('../services/notifications', () => ({
+  // gc1-allow: email + push notification external boundary
   sendEmail: jest.fn().mockResolvedValue({ sent: true }),
   formatConsentRequestEmail: jest.fn().mockReturnValue({
     to: 'parent@example.com',
@@ -50,7 +53,7 @@ import { clearJWKSCache } from '../middleware/jwt';
 
 import { createDatabaseModuleMock } from '../test-utils/database-module';
 
-const mockDatabaseModule = createDatabaseModuleMock();
+const mockDatabaseModule = createDatabaseModuleMock({ includeActual: true });
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
@@ -59,6 +62,7 @@ jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 // ---------------------------------------------------------------------------
 
 jest.mock('../services/account', () => ({
+  ...jest.requireActual('../services/account'),
   findOrCreateAccount: jest.fn().mockResolvedValue({
     id: 'test-account-id',
     clerkUserId: 'user_test',
@@ -69,6 +73,7 @@ jest.mock('../services/account', () => ({
 }));
 
 jest.mock('../services/profile', () => ({
+  ...jest.requireActual('../services/profile'),
   findOwnerProfile: jest.fn().mockResolvedValue({
     id: 'test-profile-id',
     birthYear: 2010,
@@ -132,7 +137,7 @@ jest.mock('../services/consent', () => {
           parentEmail: 'parent@example.com',
           requestedAt: new Date().toISOString(),
           respondedAt: new Date().toISOString(),
-        })
+        }),
       ),
     revokeConsent: jest.fn().mockResolvedValue({
       id: 'consent-1',
@@ -199,7 +204,7 @@ describe('consent routes', () => {
             consentType: 'GDPR',
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(201);
@@ -222,7 +227,7 @@ describe('consent routes', () => {
             consentType: 'COPPA',
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(201);
@@ -234,14 +239,14 @@ describe('consent routes', () => {
 
     it('returns 502 when email delivery fails', async () => {
       const { requestConsent: mockRequestConsent } = jest.requireMock(
-        '../services/consent'
+        '../services/consent',
       ) as { requestConsent: jest.Mock };
       const { EmailDeliveryError: EmailDeliveryErrorClass } =
         jest.requireActual('../services/consent') as {
           EmailDeliveryError: new (reason?: string) => Error;
         };
       mockRequestConsent.mockRejectedValueOnce(
-        new EmailDeliveryErrorClass('no_api_key')
+        new EmailDeliveryErrorClass('no_api_key'),
       );
 
       const res = await app.request(
@@ -255,7 +260,7 @@ describe('consent routes', () => {
             consentType: 'GDPR',
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(502);
@@ -268,7 +273,7 @@ describe('consent routes', () => {
     // BUG-240: Verify the route passes request origin (API domain), not APP_URL
     it('passes API origin (not APP_URL) to requestConsent [BUG-240]', async () => {
       const { requestConsent: mockRequestConsent } = jest.requireMock(
-        '../services/consent'
+        '../services/consent',
       ) as { requestConsent: jest.Mock };
       mockRequestConsent.mockClear();
 
@@ -283,7 +288,7 @@ describe('consent routes', () => {
             consentType: 'GDPR',
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(mockRequestConsent).toHaveBeenCalledTimes(1);
@@ -306,7 +311,7 @@ describe('consent routes', () => {
             consentType: 'INVALID',
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -324,7 +329,7 @@ describe('consent routes', () => {
             consentType: 'GDPR',
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -342,7 +347,7 @@ describe('consent routes', () => {
             consentType: 'GDPR',
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -360,7 +365,7 @@ describe('consent routes', () => {
             consentType: 'GDPR',
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);
@@ -383,7 +388,7 @@ describe('consent routes', () => {
             approved: true,
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -403,7 +408,7 @@ describe('consent routes', () => {
             approved: false,
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -420,7 +425,7 @@ describe('consent routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ approved: true }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -434,7 +439,7 @@ describe('consent routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ token: 'consent-token-abc' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -442,12 +447,12 @@ describe('consent routes', () => {
 
     it('returns 404 when consent token is invalid', async () => {
       const { processConsentResponse: mockProcess } = jest.requireMock(
-        '../services/consent'
+        '../services/consent',
       ) as {
         processConsentResponse: jest.Mock;
       };
       const { ConsentTokenNotFoundError } = jest.requireActual(
-        '../services/consent'
+        '../services/consent',
       ) as { ConsentTokenNotFoundError: new () => Error };
       mockProcess.mockRejectedValueOnce(new ConsentTokenNotFoundError());
 
@@ -461,7 +466,7 @@ describe('consent routes', () => {
             approved: true,
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(404);
@@ -478,12 +483,12 @@ describe('consent routes', () => {
     // must NOT call the underlying processConsentResponse service.
     it('rate-limits per source IP after 30 attempts in an hour [BUG-655]', async () => {
       const { __resetConsentRespondRateLimit } = jest.requireActual(
-        './consent'
+        './consent',
       ) as { __resetConsentRespondRateLimit: () => void };
       __resetConsentRespondRateLimit();
 
       const { processConsentResponse: mockProcess } = jest.requireMock(
-        '../services/consent'
+        '../services/consent',
       ) as { processConsentResponse: jest.Mock };
       mockProcess.mockResolvedValue(undefined);
 
@@ -496,7 +501,7 @@ describe('consent routes', () => {
         const ok = await app.request(
           '/v1/consent/respond',
           { method: 'POST', headers, body },
-          TEST_ENV
+          TEST_ENV,
         );
         expect(ok.status).toBe(200);
       }
@@ -507,7 +512,7 @@ describe('consent routes', () => {
       const blocked = await app.request(
         '/v1/consent/respond',
         { method: 'POST', headers, body },
-        TEST_ENV
+        TEST_ENV,
       );
       expect(blocked.status).toBe(429);
       expect(blocked.headers.get('Retry-After')).toBe('3600');
@@ -525,7 +530,7 @@ describe('consent routes', () => {
           headers: { ...AUTH_HEADERS, 'cf-connecting-ip': '198.51.100.1' },
           body,
         },
-        TEST_ENV
+        TEST_ENV,
       );
       expect(otherIp.status).toBe(200);
     });
@@ -540,7 +545,7 @@ describe('consent routes', () => {
       const res = await app.request(
         '/v1/consent/my-status',
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -559,7 +564,7 @@ describe('consent routes', () => {
             'X-Profile-Id': 'test-profile-id',
           },
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -571,7 +576,7 @@ describe('consent routes', () => {
 
     it('returns 200 with consent status and masked parentEmail when consent exists', async () => {
       const { getProfileConsentState: mockGetState } = jest.requireMock(
-        '../services/consent'
+        '../services/consent',
       ) as { getProfileConsentState: jest.Mock };
       mockGetState.mockResolvedValueOnce({
         status: 'PARENTAL_CONSENT_REQUESTED',
@@ -586,7 +591,7 @@ describe('consent routes', () => {
             'X-Profile-Id': 'test-profile-id',
           },
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -600,7 +605,7 @@ describe('consent routes', () => {
 
     it('[BUG-625 / A-10] does NOT leak full parent email to child profile session', async () => {
       const { getProfileConsentState: mockGetState } = jest.requireMock(
-        '../services/consent'
+        '../services/consent',
       ) as { getProfileConsentState: jest.Mock };
       mockGetState.mockResolvedValueOnce({
         status: 'PARENTAL_CONSENT_REQUESTED',
@@ -613,7 +618,7 @@ describe('consent routes', () => {
         {
           headers: { ...AUTH_HEADERS, 'X-Profile-Id': 'child-profile-id' },
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       const body = await res.json();
@@ -625,7 +630,7 @@ describe('consent routes', () => {
 
     it('[BUG-625 / A-10] returns null when no parentEmail set', async () => {
       const { getProfileConsentState: mockGetState } = jest.requireMock(
-        '../services/consent'
+        '../services/consent',
       ) as { getProfileConsentState: jest.Mock };
       mockGetState.mockResolvedValueOnce({
         status: 'PARENTAL_CONSENT_REQUESTED',
@@ -635,7 +640,7 @@ describe('consent routes', () => {
       const res = await app.request(
         '/v1/consent/my-status',
         { headers: { ...AUTH_HEADERS, 'X-Profile-Id': 'test-profile-id' } },
-        TEST_ENV
+        TEST_ENV,
       );
 
       const body = await res.json();
@@ -678,7 +683,7 @@ describe('consent Inngest dispatch observability [A-23]', () => {
           consentType: 'GDPR',
         }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     // Consent request must succeed even when Inngest is unreachable
@@ -692,7 +697,7 @@ describe('consent Inngest dispatch observability [A-23]', () => {
         extra: expect.objectContaining({
           context: 'consent.requested.inngest_dispatch',
         }),
-      })
+      }),
     );
   });
 
@@ -708,7 +713,7 @@ describe('consent Inngest dispatch observability [A-23]', () => {
         method: 'PUT',
         headers: { ...AUTH_HEADERS, 'X-Profile-Id': 'test-profile-id' },
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     // Revocation must succeed even when Inngest is unreachable
@@ -722,7 +727,7 @@ describe('consent Inngest dispatch observability [A-23]', () => {
         extra: expect.objectContaining({
           context: 'consent.revoked.inngest_dispatch',
         }),
-      })
+      }),
     );
   });
 });
@@ -744,11 +749,11 @@ describe('[BUG-765] consent route classification by typed error (not by err.mess
     const consentMock = jest.requireMock('../services/consent') as {
       getChildConsentForParent: jest.Mock;
       ConsentNotAuthorizedError: new (
-        action: 'view' | 'revoke' | 'restore'
+        action: 'view' | 'revoke' | 'restore',
       ) => Error;
     };
     consentMock.getChildConsentForParent.mockRejectedValueOnce(
-      new consentMock.ConsentNotAuthorizedError('view')
+      new consentMock.ConsentNotAuthorizedError('view'),
     );
 
     const res = await app.request(
@@ -757,7 +762,7 @@ describe('[BUG-765] consent route classification by typed error (not by err.mess
         method: 'GET',
         headers: { ...AUTH_HEADERS, 'X-Profile-Id': 'test-profile-id' },
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(403);
@@ -769,11 +774,11 @@ describe('[BUG-765] consent route classification by typed error (not by err.mess
     const consentMock = jest.requireMock('../services/consent') as {
       revokeConsent: jest.Mock;
       ConsentNotAuthorizedError: new (
-        action: 'view' | 'revoke' | 'restore'
+        action: 'view' | 'revoke' | 'restore',
       ) => Error;
     };
     consentMock.revokeConsent.mockRejectedValueOnce(
-      new consentMock.ConsentNotAuthorizedError('revoke')
+      new consentMock.ConsentNotAuthorizedError('revoke'),
     );
 
     const res = await app.request(
@@ -782,7 +787,7 @@ describe('[BUG-765] consent route classification by typed error (not by err.mess
         method: 'PUT',
         headers: { ...AUTH_HEADERS, 'X-Profile-Id': 'test-profile-id' },
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(403);
@@ -796,7 +801,7 @@ describe('[BUG-765] consent route classification by typed error (not by err.mess
       ConsentRecordNotFoundError: new () => Error;
     };
     consentMock.revokeConsent.mockRejectedValueOnce(
-      new consentMock.ConsentRecordNotFoundError()
+      new consentMock.ConsentRecordNotFoundError(),
     );
 
     const res = await app.request(
@@ -805,7 +810,7 @@ describe('[BUG-765] consent route classification by typed error (not by err.mess
         method: 'PUT',
         headers: { ...AUTH_HEADERS, 'X-Profile-Id': 'test-profile-id' },
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(404);
@@ -817,11 +822,11 @@ describe('[BUG-765] consent route classification by typed error (not by err.mess
     const consentMock = jest.requireMock('../services/consent') as {
       restoreConsent: jest.Mock;
       ConsentNotAuthorizedError: new (
-        action: 'view' | 'revoke' | 'restore'
+        action: 'view' | 'revoke' | 'restore',
       ) => Error;
     };
     consentMock.restoreConsent.mockRejectedValueOnce(
-      new consentMock.ConsentNotAuthorizedError('restore')
+      new consentMock.ConsentNotAuthorizedError('restore'),
     );
 
     const res = await app.request(
@@ -830,7 +835,7 @@ describe('[BUG-765] consent route classification by typed error (not by err.mess
         method: 'PUT',
         headers: { ...AUTH_HEADERS, 'X-Profile-Id': 'test-profile-id' },
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(403);
@@ -847,7 +852,7 @@ describe('[BUG-765] consent route classification by typed error (not by err.mess
       revokeConsent: jest.Mock;
     };
     consentMock.revokeConsent.mockRejectedValueOnce(
-      new Error('Not authorized to do something else entirely')
+      new Error('Not authorized to do something else entirely'),
     );
 
     const res = await app.request(
@@ -856,7 +861,7 @@ describe('[BUG-765] consent route classification by typed error (not by err.mess
         method: 'PUT',
         headers: { ...AUTH_HEADERS, 'X-Profile-Id': 'test-profile-id' },
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     // Must NOT classify by string match — generic errors fall through to 500.

@@ -127,32 +127,15 @@ const SESSION_ID = '660e8400-e29b-41d4-a716-446655440000';
 const EVENT_ID = '770e8400-e29b-41d4-a716-446655440000';
 
 jest.mock('../services/session', () => {
-  class _SubjectInactiveError extends Error {
-    subjectStatus: string;
-    constructor(status: string) {
-      super(`Subject is ${status}`);
-      this.name = 'SubjectInactiveError';
-      this.subjectStatus = status;
-    }
-  }
-  class _SessionExchangeLimitError extends Error {
-    exchangeCount: number;
-    constructor(count: number) {
-      super(`Session has reached the maximum of 50 exchanges`);
-      this.name = 'SessionExchangeLimitError';
-      this.exchangeCount = count;
-    }
-  }
-  class _CurriculumSessionNotReadyError extends Error {
-    constructor() {
-      super('Curriculum is still being prepared');
-      this.name = 'CurriculumSessionNotReadyError';
-    }
-  }
+  // Use real error classes so instanceof checks in route handlers match production behavior.
+  const actual = jest.requireActual('../services/session') as Record<
+    string,
+    unknown
+  >;
   return {
-    SubjectInactiveError: _SubjectInactiveError,
-    SessionExchangeLimitError: _SessionExchangeLimitError,
-    CurriculumSessionNotReadyError: _CurriculumSessionNotReadyError,
+    SubjectInactiveError: actual.SubjectInactiveError,
+    SessionExchangeLimitError: actual.SessionExchangeLimitError,
+    CurriculumSessionNotReadyError: actual.CurriculumSessionNotReadyError,
     startSession: jest
       .fn()
       .mockImplementation((_db, _profileId, subjectId, input) => ({

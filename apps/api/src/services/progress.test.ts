@@ -1,4 +1,5 @@
 import { createDatabaseModuleMock } from '../test-utils/database-module';
+import { emptyPracticeActivitySummary } from '../test-utils/practice-activity-summary-fixture';
 
 const mockDatabaseModule = createDatabaseModuleMock({
   includeActual: true,
@@ -8,6 +9,30 @@ const mockDatabaseModule = createDatabaseModuleMock({
 });
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
+
+const mockGetPracticeActivitySummary = jest.fn().mockResolvedValue({
+  ...emptyPracticeActivitySummary,
+});
+
+function mockPracticeSummary(
+  overrides?: Partial<
+    Awaited<ReturnType<typeof mockGetPracticeActivitySummary>>
+  >,
+) {
+  return {
+    ...emptyPracticeActivitySummary,
+    ...overrides,
+  };
+}
+
+jest.mock(
+  // gc1-allow: unit test boundary
+  './practice-activity-summary',
+  () => ({
+    getPracticeActivitySummary: (...args: unknown[]) =>
+      mockGetPracticeActivitySummary(...args),
+  }),
+);
 
 import type { Database } from '@eduagent/database';
 import type { SubjectProgress } from '@eduagent/schemas';
@@ -583,7 +608,7 @@ describe('getTopicProgress', () => {
     // Break test — removing gte(exchangeCount, 1) from the query will fail this.
     // Drizzle SQL trees are circular (PgTable ⇄ PgColumn), so use util.inspect
     // which handles cycles natively.
-    const repoMock = (createScopedRepository as jest.Mock).mock.results[0]
+    const repoMock = (createScopedRepository as jest.Mock).mock.results[0]!
       .value as { sessions: { findMany: jest.Mock } };
     const filterArg = repoMock.sessions.findMany.mock.calls[0]?.[0];
     const { inspect } = await import('util');
@@ -597,6 +622,16 @@ describe('getTopicProgress', () => {
 
 describe('getOverallProgress', () => {
   it('returns empty when no subjects', async () => {
+    const practiceSummary = mockPracticeSummary({
+      totals: {
+        activitiesCompleted: 4,
+        reviewsCompleted: 1,
+        pointsEarned: 25,
+        celebrations: 2,
+        distinctActivityTypes: 2,
+      },
+    });
+    mockGetPracticeActivitySummary.mockResolvedValueOnce(practiceSummary);
     setupScopedRepo({ subjectsFindMany: [] });
     const db = createMockDb();
     const result = await getOverallProgress(db, profileId);
@@ -604,6 +639,76 @@ describe('getOverallProgress', () => {
     expect(result.subjects).toEqual([]);
     expect(result.totalTopicsCompleted).toBe(0);
     expect(result.totalTopicsVerified).toBe(0);
+    expect(result.practiceActivityCount).toBe(4);
+    expect(result.practiceSummary).toBe(practiceSummary);
+  });
+
+  it('limits practice activity summary to a rolling 90-day window', async () => {
+    jest.useFakeTimers({ now: new Date('2026-05-13T12:00:00.000Z') });
+    try {
+      setupScopedRepo({ subjectsFindMany: [] });
+      const db = createMockDb();
+
+      await getOverallProgress(db, profileId);
+
+      expect(mockGetPracticeActivitySummary).toHaveBeenCalledWith(
+        db,
+        expect.objectContaining({
+          profileId,
+          period: {
+            start: new Date('2026-02-12T12:00:00.000Z'),
+            endExclusive: new Date('2026-05-13T12:00:00.000Z'),
+          },
+        }),
+      );
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('starts subject loading and practice summary in parallel', async () => {
+    const order: string[] = [];
+    let resolveSubjects: (
+      subjects: ReturnType<typeof mockSubjectRow>[],
+    ) => void;
+    const subjectsPromise = new Promise<ReturnType<typeof mockSubjectRow>[]>(
+      (resolve) => {
+        resolveSubjects = resolve;
+      },
+    );
+    (createScopedRepository as jest.Mock).mockReturnValue({
+      subjects: {
+        findMany: jest.fn(() => {
+          order.push('subjects-start');
+          return subjectsPromise;
+        }),
+      },
+      retentionCards: { findMany: jest.fn().mockResolvedValue([]) },
+      assessments: { findMany: jest.fn().mockResolvedValue([]) },
+      sessions: { findMany: jest.fn().mockResolvedValue([]) },
+      needsDeepeningTopics: { findMany: jest.fn().mockResolvedValue([]) },
+      xpLedger: { findMany: jest.fn().mockResolvedValue([]) },
+      sessionSummaries: { findFirst: jest.fn().mockResolvedValue(undefined) },
+    });
+    mockGetPracticeActivitySummary.mockImplementationOnce(() => {
+      order.push('practice-start');
+      return Promise.resolve(emptyPracticeActivitySummary);
+    });
+
+    const db = createMockDb();
+    const resultPromise = getOverallProgress(db, profileId);
+    // This probe intentionally uses one microtask tick to prove both loads were
+    // started before the unresolved subjects query settles. If the service adds
+    // awaits before Promise.all(), this brittle ordering guard should fail.
+    await Promise.resolve();
+
+    expect(order).toEqual(['subjects-start', 'practice-start']);
+
+    resolveSubjects!([]);
+    await expect(resultPromise).resolves.toMatchObject({
+      subjects: [],
+      practiceActivityCount: 0,
+    });
   });
 
   it('aggregates across multiple subjects with batch queries', async () => {
@@ -686,8 +791,8 @@ describe('getOverallProgress', () => {
     const result = await getOverallProgress(db, profileId);
 
     expect(result.subjects).toHaveLength(1);
-    expect(result.subjects[0].topicsTotal).toBe(0);
-    expect(result.subjects[0].retentionStatus).toBe('strong');
+    expect(result.subjects[0]!.topicsTotal).toBe(0);
+    expect(result.subjects[0]!.retentionStatus).toBe('strong');
     expect(result.totalTopicsCompleted).toBe(0);
   });
 
@@ -719,9 +824,9 @@ describe('getOverallProgress', () => {
       const result = await getOverallProgress(db, profileId);
 
       expect(result.subjects).toHaveLength(1);
-      expect(result.subjects[0].topicsTotal).toBe(1);
-      expect(result.subjects[0].topicsCompleted).toBe(1);
-      expect(result.subjects[0].topicsVerified).toBe(0);
+      expect(result.subjects[0]!.topicsTotal).toBe(1);
+      expect(result.subjects[0]!.topicsCompleted).toBe(1);
+      expect(result.subjects[0]!.topicsVerified).toBe(0);
       expect(result.totalTopicsCompleted).toBe(1);
       expect(result.totalTopicsVerified).toBe(0);
     });
@@ -751,8 +856,8 @@ describe('getOverallProgress', () => {
 
       const result = await getOverallProgress(db, profileId);
 
-      expect(result.subjects[0].topicsCompleted).toBe(1);
-      expect(result.subjects[0].topicsVerified).toBe(1);
+      expect(result.subjects[0]!.topicsCompleted).toBe(1);
+      expect(result.subjects[0]!.topicsVerified).toBe(1);
       expect(result.totalTopicsCompleted).toBe(1);
     });
   });

@@ -9,10 +9,12 @@ import {
 import { clearJWKSCache } from '../middleware/jwt';
 
 jest.mock('inngest/hono', () => ({
+  // gc1-allow: Inngest framework boundary
   serve: jest.fn().mockReturnValue(jest.fn()),
 }));
 
 jest.mock('../inngest/client', () => ({
+  // gc1-allow: Inngest SDK external boundary
   inngest: {
     send: jest.fn().mockResolvedValue(undefined),
     createFunction: jest.fn().mockReturnValue(jest.fn()),
@@ -20,17 +22,19 @@ jest.mock('../inngest/client', () => ({
 }));
 
 jest.mock('../services/sentry', () => ({
+  // gc1-allow: @sentry/cloudflare external boundary
   captureException: jest.fn(),
   addBreadcrumb: jest.fn(),
 }));
 
 import { createDatabaseModuleMock } from '../test-utils/database-module';
 
-const mockDatabaseModule = createDatabaseModuleMock();
+const mockDatabaseModule = createDatabaseModuleMock({ includeActual: true });
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
 jest.mock('../services/account', () => ({
+  ...jest.requireActual('../services/account'),
   findOrCreateAccount: jest.fn().mockResolvedValue({
     id: 'test-account-id',
     clerkUserId: 'user_test',
@@ -41,6 +45,7 @@ jest.mock('../services/account', () => ({
 }));
 
 jest.mock('../services/profile', () => ({
+  ...jest.requireActual('../services/profile'),
   findOwnerProfile: jest.fn().mockResolvedValue(null),
   getProfile: jest.fn().mockResolvedValue({
     id: 'test-profile-id',
@@ -53,15 +58,9 @@ jest.mock('../services/profile', () => ({
 const mockStartSession = jest.fn();
 
 jest.mock('../services/session', () => ({
+  // Use real error classes so instanceof checks in route handlers match production behavior.
+  ...jest.requireActual('../services/session'),
   startSession: (...args: unknown[]) => mockStartSession(...args),
-  SubjectInactiveError: class SubjectInactiveError extends Error {
-    subjectStatus: string;
-    constructor(status: string) {
-      super(`Subject is ${status}`);
-      this.name = 'SubjectInactiveError';
-      this.subjectStatus = status;
-    }
-  },
   getSession: jest.fn(),
   processMessage: jest.fn(),
   streamMessage: jest.fn(),
@@ -72,6 +71,7 @@ jest.mock('../services/session', () => ({
 }));
 
 jest.mock('../services/ocr', () => ({
+  ...jest.requireActual('../services/ocr'),
   getOcrProvider: jest.fn().mockReturnValue({
     extractText: jest.fn().mockResolvedValue({
       text: 'Stub OCR text for testing',
@@ -145,7 +145,7 @@ describe('homework routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({}),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(201);
@@ -188,7 +188,7 @@ describe('homework routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({}),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       // Verify the service was called with correct subjectId and sessionType
@@ -205,7 +205,7 @@ describe('homework routes', () => {
     it('returns 403 when subject is paused', async () => {
       const { SubjectInactiveError } = require('../services/session');
       mockStartSession.mockRejectedValueOnce(
-        new SubjectInactiveError('paused')
+        new SubjectInactiveError('paused'),
       );
 
       const res = await app.request(
@@ -215,7 +215,7 @@ describe('homework routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({}),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(403);
@@ -226,7 +226,7 @@ describe('homework routes', () => {
     it('returns 403 when subject is archived', async () => {
       const { SubjectInactiveError } = require('../services/session');
       mockStartSession.mockRejectedValueOnce(
-        new SubjectInactiveError('archived')
+        new SubjectInactiveError('archived'),
       );
 
       const res = await app.request(
@@ -236,7 +236,7 @@ describe('homework routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({}),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(403);
@@ -252,7 +252,7 @@ describe('homework routes', () => {
           body: JSON.stringify({}),
           headers: { 'Content-Type': 'application/json' },
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);
@@ -274,7 +274,7 @@ describe('homework routes', () => {
       const formData = new FormData();
       formData.append(
         'image',
-        new File([new ArrayBuffer(100)], 'test.jpg', { type: 'image/jpeg' })
+        new File([new ArrayBuffer(100)], 'test.jpg', { type: 'image/jpeg' }),
       );
 
       const res = await app.request(
@@ -284,7 +284,7 @@ describe('homework routes', () => {
           headers: OCR_HEADERS,
           body: formData,
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -300,7 +300,7 @@ describe('homework routes', () => {
       const formData = new FormData();
       formData.append(
         'image',
-        new File([new ArrayBuffer(50)], 'test.png', { type: 'image/png' })
+        new File([new ArrayBuffer(50)], 'test.png', { type: 'image/png' }),
       );
 
       const res = await app.request(
@@ -310,7 +310,7 @@ describe('homework routes', () => {
           headers: OCR_HEADERS,
           body: formData,
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -320,7 +320,7 @@ describe('homework routes', () => {
       const formData = new FormData();
       formData.append(
         'image',
-        new File([new ArrayBuffer(50)], 'test.webp', { type: 'image/webp' })
+        new File([new ArrayBuffer(50)], 'test.webp', { type: 'image/webp' }),
       );
 
       const res = await app.request(
@@ -330,7 +330,7 @@ describe('homework routes', () => {
           headers: OCR_HEADERS,
           body: formData,
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -346,7 +346,7 @@ describe('homework routes', () => {
           headers: OCR_HEADERS,
           body: formData,
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -368,7 +368,7 @@ describe('homework routes', () => {
           headers: OCR_HEADERS,
           body: formData,
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -383,7 +383,7 @@ describe('homework routes', () => {
       const formData = new FormData();
       formData.append(
         'image',
-        new File([new ArrayBuffer(100)], 'test.gif', { type: 'image/gif' })
+        new File([new ArrayBuffer(100)], 'test.gif', { type: 'image/gif' }),
       );
 
       const res = await app.request(
@@ -393,7 +393,7 @@ describe('homework routes', () => {
           headers: OCR_HEADERS,
           body: formData,
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -411,7 +411,7 @@ describe('homework routes', () => {
       const formData = new FormData();
       formData.append(
         'image',
-        new File([largeBuffer], 'large.jpg', { type: 'image/jpeg' })
+        new File([largeBuffer], 'large.jpg', { type: 'image/jpeg' }),
       );
 
       const res = await app.request(
@@ -421,7 +421,7 @@ describe('homework routes', () => {
           headers: OCR_HEADERS,
           body: formData,
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -437,7 +437,7 @@ describe('homework routes', () => {
       const formData = new FormData();
       formData.append(
         'image',
-        new File([exactBuffer], 'exact.jpg', { type: 'image/jpeg' })
+        new File([exactBuffer], 'exact.jpg', { type: 'image/jpeg' }),
       );
 
       const res = await app.request(
@@ -447,7 +447,7 @@ describe('homework routes', () => {
           headers: OCR_HEADERS,
           body: formData,
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -465,7 +465,7 @@ describe('homework routes', () => {
       const formData = new FormData();
       formData.append(
         'image',
-        new File([new ArrayBuffer(100)], 'test.jpg', { type: 'image/jpeg' })
+        new File([new ArrayBuffer(100)], 'test.jpg', { type: 'image/jpeg' }),
       );
 
       const res = await app.request(
@@ -475,7 +475,7 @@ describe('homework routes', () => {
           headers: OCR_HEADERS,
           body: formData,
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       // [FIX-API-5] Config error is a permanent server misconfiguration, not transient — 500 not 503
@@ -484,7 +484,7 @@ describe('homework routes', () => {
       const body = await res.json();
       expect(body.code).toBe('INTERNAL_ERROR');
       expect(body.message).toBe(
-        'OCR service is not configured. Please contact support.'
+        'OCR service is not configured. Please contact support.',
       );
       // [FIX-API-5] captureException must be called so ops can detect unconfigured OCR
       expect(captureException).toHaveBeenCalledTimes(1);
@@ -494,7 +494,7 @@ describe('homework routes', () => {
       const formData = new FormData();
       formData.append(
         'image',
-        new File([new ArrayBuffer(100)], 'test.jpg', { type: 'image/jpeg' })
+        new File([new ArrayBuffer(100)], 'test.jpg', { type: 'image/jpeg' }),
       );
 
       const res = await app.request(
@@ -503,7 +503,7 @@ describe('homework routes', () => {
           method: 'POST',
           body: formData,
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);
@@ -515,7 +515,7 @@ describe('homework routes', () => {
       const formData = new FormData();
       formData.append(
         'image',
-        new File([new ArrayBuffer(100)], 'test.jpg', { type: 'image/jpeg' })
+        new File([new ArrayBuffer(100)], 'test.jpg', { type: 'image/jpeg' }),
       );
 
       const res = await app.request(
@@ -525,7 +525,7 @@ describe('homework routes', () => {
           headers: makeAuthHeaders(),
           body: formData,
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);

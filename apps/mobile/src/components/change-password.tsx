@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { platformAlert } from '../lib/platform-alert';
 import { useUser, useAuth } from '@clerk/clerk-expo';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { PasswordInput } from './common';
 import { extractClerkError } from '../lib/clerk-error';
@@ -69,7 +69,7 @@ export function ChangePassword(): React.JSX.Element {
     } finally {
       setIsSigningOut(false);
     }
-    router.replace('/(auth)/sign-in' as never);
+    router.replace('/(auth)/sign-in' as Href);
   }, [signOut, router, queryClient, profiles]);
 
   return (

@@ -11,7 +11,7 @@ import {
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 
 import { registerLlmProviderFixture } from '../test-utils/llm-provider-fixtures';
-import { _clearProviders, _resetCircuits } from './llm';
+import { _resetCircuits } from './llm';
 import { generateCategorizedBookSuggestions } from './book-suggestion-generation';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
@@ -118,7 +118,7 @@ describe('generateCategorizedBookSuggestions — integration', () => {
 
   afterAll(async () => {
     await cleanup();
-    _clearProviders();
+    llmFixture.dispose();
     _resetCircuits();
   });
 

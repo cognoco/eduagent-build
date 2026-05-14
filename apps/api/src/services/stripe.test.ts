@@ -60,7 +60,7 @@ describe('verifyWebhookSignature', () => {
     // Create a client first so we have an instance
     createStripeClient('unused');
     const latestInstance =
-      StripeMock.mock.results[StripeMock.mock.results.length - 1].value;
+      StripeMock.mock.results[StripeMock.mock.results.length - 1]!.value;
     latestInstance.webhooks.constructEventAsync.mockResolvedValue(mockEvent);
 
     const result = await verifyWebhookSignature(
@@ -76,7 +76,7 @@ describe('verifyWebhookSignature', () => {
   it('uses SubtleCrypto provider for Workers runtime', async () => {
     createStripeClient('unused');
     const latestInstance =
-      StripeMock.mock.results[StripeMock.mock.results.length - 1].value;
+      StripeMock.mock.results[StripeMock.mock.results.length - 1]!.value;
     latestInstance.webhooks.constructEventAsync.mockResolvedValue({
       id: 'evt_1',
     });
@@ -92,7 +92,7 @@ describe('verifyWebhookSignature', () => {
   it('propagates errors from signature verification', async () => {
     createStripeClient('unused');
     const latestInstance =
-      StripeMock.mock.results[StripeMock.mock.results.length - 1].value;
+      StripeMock.mock.results[StripeMock.mock.results.length - 1]!.value;
     latestInstance.webhooks.constructEventAsync.mockRejectedValue(
       new Error('Signature verification failed'),
     );

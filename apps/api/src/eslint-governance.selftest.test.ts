@@ -28,7 +28,7 @@ const ESLINT_BIN = path.join(
   REPO_ROOT,
   'node_modules',
   '.bin',
-  process.platform === 'win32' ? 'eslint.cmd' : 'eslint'
+  process.platform === 'win32' ? 'eslint.cmd' : 'eslint',
 );
 
 interface LintMessage {
@@ -53,7 +53,7 @@ function lint(filePath: string, source: string): LintResult {
       input: source,
       encoding: 'utf8',
       shell: process.platform === 'win32',
-    }
+    },
   );
 
   if (proc.error) {
@@ -62,14 +62,14 @@ function lint(filePath: string, source: string): LintResult {
   // eslint exits 1 when violations are reported; stdout still contains JSON.
   if (!proc.stdout) {
     throw new Error(
-      `eslint produced no stdout. status=${proc.status} stderr=${proc.stderr}`
+      `eslint produced no stdout. status=${proc.status} stderr=${proc.stderr}`,
     );
   }
   const results = JSON.parse(proc.stdout) as LintResult[];
   if (results.length !== 1) {
     throw new Error(`Expected one lint result, got ${results.length}`);
   }
-  return results[0];
+  return results[0]!;
 }
 
 function messageHits(result: LintResult, needle: string): LintMessage[] {
@@ -80,40 +80,40 @@ describe('eslint governance rules — self-test', () => {
   describe('G1: drizzle-orm imports banned in routes', () => {
     const routePath = path.join(
       REPO_ROOT,
-      'apps/api/src/routes/__selftest_g1.ts'
+      'apps/api/src/routes/__selftest_g1.ts',
     );
 
     it('flags `import { eq } from "drizzle-orm"` in a route file', () => {
       const result = lint(
         routePath,
-        `import { eq } from 'drizzle-orm';\nexport const x = eq;\n`
+        `import { eq } from 'drizzle-orm';\nexport const x = eq;\n`,
       );
       expect(
-        messageHits(result, 'Route files must not import drizzle-orm').length
+        messageHits(result, 'Route files must not import drizzle-orm').length,
       ).toBeGreaterThan(0);
     });
 
     it('flags `import x from "drizzle-orm/pg-core"` (pattern group)', () => {
       const result = lint(
         routePath,
-        `import { pgTable } from 'drizzle-orm/pg-core';\nexport const t = pgTable;\n`
+        `import { pgTable } from 'drizzle-orm/pg-core';\nexport const t = pgTable;\n`,
       );
       expect(
-        messageHits(result, 'Route files must not import drizzle-orm').length
+        messageHits(result, 'Route files must not import drizzle-orm').length,
       ).toBeGreaterThan(0);
     });
 
     it('does NOT flag drizzle-orm imports in services/', () => {
       const servicePath = path.join(
         REPO_ROOT,
-        'apps/api/src/services/__selftest_g1_service.ts'
+        'apps/api/src/services/__selftest_g1_service.ts',
       );
       const result = lint(
         servicePath,
-        `import { eq } from 'drizzle-orm';\nexport const x = eq;\n`
+        `import { eq } from 'drizzle-orm';\nexport const x = eq;\n`,
       );
       expect(
-        messageHits(result, 'Route files must not import drizzle-orm').length
+        messageHits(result, 'Route files must not import drizzle-orm').length,
       ).toBe(0);
     });
   });
@@ -121,40 +121,40 @@ describe('eslint governance rules — self-test', () => {
   describe('G3: direct LLM SDK imports banned outside services/llm/providers', () => {
     const inServicesPath = path.join(
       REPO_ROOT,
-      'apps/api/src/services/__selftest_g3.ts'
+      'apps/api/src/services/__selftest_g3.ts',
     );
     const inProvidersPath = path.join(
       REPO_ROOT,
-      'apps/api/src/services/llm/providers/__selftest_g3_provider.ts'
+      'apps/api/src/services/llm/providers/__selftest_g3_provider.ts',
     );
 
     it('flags `import Anthropic from "@anthropic-ai/sdk"` outside providers/', () => {
       const result = lint(
         inServicesPath,
-        `import Anthropic from '@anthropic-ai/sdk';\nexport const A = Anthropic;\n`
+        `import Anthropic from '@anthropic-ai/sdk';\nexport const A = Anthropic;\n`,
       );
       expect(
-        messageHits(result, 'Import the LLM router from services/llm').length
+        messageHits(result, 'Import the LLM router from services/llm').length,
       ).toBeGreaterThan(0);
     });
 
     it('flags `import OpenAI from "openai"` outside providers/', () => {
       const result = lint(
         inServicesPath,
-        `import OpenAI from 'openai';\nexport const O = OpenAI;\n`
+        `import OpenAI from 'openai';\nexport const O = OpenAI;\n`,
       );
       expect(
-        messageHits(result, 'Import the LLM router from services/llm').length
+        messageHits(result, 'Import the LLM router from services/llm').length,
       ).toBeGreaterThan(0);
     });
 
     it('does NOT flag SDK imports inside services/llm/providers/', () => {
       const result = lint(
         inProvidersPath,
-        `import Anthropic from '@anthropic-ai/sdk';\nexport const A = Anthropic;\n`
+        `import Anthropic from '@anthropic-ai/sdk';\nexport const A = Anthropic;\n`,
       );
       expect(
-        messageHits(result, 'Import the LLM router from services/llm').length
+        messageHits(result, 'Import the LLM router from services/llm').length,
       ).toBe(0);
     });
   });
@@ -162,18 +162,18 @@ describe('eslint governance rules — self-test', () => {
   describe('G4: raw process.env reads banned in API production code', () => {
     const prodPath = path.join(
       REPO_ROOT,
-      'apps/api/src/services/__selftest_g4.ts'
+      'apps/api/src/services/__selftest_g4.ts',
     );
     const testPath = path.join(
       REPO_ROOT,
-      'apps/api/src/services/__selftest_g4.test.ts'
+      'apps/api/src/services/__selftest_g4.test.ts',
     );
     const configPath = path.join(REPO_ROOT, 'apps/api/src/config.ts');
 
     it('flags `process.env.FOO` in a production source file', () => {
       const result = lint(prodPath, `export const foo = process.env.FOO;\n`);
       expect(
-        messageHits(result, 'Use the typed config object').length
+        messageHits(result, 'Use the typed config object').length,
       ).toBeGreaterThan(0);
     });
 
@@ -191,7 +191,7 @@ describe('eslint governance rules — self-test', () => {
   describe('G5: route files must not call .select/.insert/.update/.delete on c.get("db")', () => {
     const routePath = path.join(
       REPO_ROOT,
-      'apps/api/src/routes/__selftest_g5.ts'
+      'apps/api/src/routes/__selftest_g5.ts',
     );
 
     // The G5 rule emits a single shared message
@@ -203,13 +203,13 @@ describe('eslint governance rules — self-test', () => {
       it(`flags \`c.get("db").${op}()\` inside a route`, () => {
         const result = lint(
           routePath,
-          `export const handler = (c: any) => c.get('db').${op}();\n`
+          `export const handler = (c: any) => c.get('db').${op}();\n`,
         );
         expect(
           messageHits(
             result,
-            'Route files must not call .select/.insert/.update/.delete'
-          ).length
+            'Route files must not call .select/.insert/.update/.delete',
+          ).length,
         ).toBeGreaterThan(0);
       });
     }
@@ -222,13 +222,13 @@ describe('eslint governance rules — self-test', () => {
     it("does NOT flag c.get('user').select() — rule is anchored to c.get('db')", () => {
       const result = lint(
         routePath,
-        `export const handler = (c: any) => c.get('user').select();\n`
+        `export const handler = (c: any) => c.get('user').select();\n`,
       );
       expect(
         messageHits(
           result,
-          'Route files must not call .select/.insert/.update/.delete'
-        ).length
+          'Route files must not call .select/.insert/.update/.delete',
+        ).length,
       ).toBe(0);
     });
   });

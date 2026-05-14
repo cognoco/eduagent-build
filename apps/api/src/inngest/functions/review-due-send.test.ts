@@ -6,73 +6,78 @@ const mockGetStepDatabase = jest.fn();
 const mockSendPushNotification = jest.fn();
 const mockFormatReviewReminderBody = jest.fn();
 
-jest.mock('../helpers', () => ({
-  getStepDatabase: () => mockGetStepDatabase(),
-}));
+jest.mock(
+  '../helpers' /* gc1-allow: isolates DB connection from unit test */,
+  () => ({
+    getStepDatabase: () => mockGetStepDatabase(),
+  }),
+);
 
-jest.mock('../../services/notifications', () => ({
-  sendPushNotification: (...args: unknown[]) =>
-    mockSendPushNotification(...args),
-  formatReviewReminderBody: (...args: unknown[]) =>
-    mockFormatReviewReminderBody(...args),
-}));
+jest.mock(
+  '../../services/notifications' /* gc1-allow: isolates push notification external boundary */,
+  () => ({
+    sendPushNotification: (...args: unknown[]) =>
+      mockSendPushNotification(...args),
+    formatReviewReminderBody: (...args: unknown[]) =>
+      mockFormatReviewReminderBody(...args),
+  }),
+);
 
 const mockGetRecentNotificationCount = jest.fn().mockResolvedValue(0);
-jest.mock('../../services/settings', () => ({
-  getRecentNotificationCount: (...args: unknown[]) =>
-    mockGetRecentNotificationCount(...args),
-}));
+jest.mock(
+  '../../services/settings' /* gc1-allow: isolates notification settings service */,
+  () => ({
+    getRecentNotificationCount: (...args: unknown[]) =>
+      mockGetRecentNotificationCount(...args),
+  }),
+);
 
 const mockCaptureException = jest.fn();
-jest.mock('../../services/sentry', () => ({
-  captureException: (...args: unknown[]) => mockCaptureException(...args),
-}));
+jest.mock(
+  '../../services/sentry' /* gc1-allow: isolates Sentry external boundary */,
+  () => ({
+    captureException: (...args: unknown[]) => mockCaptureException(...args),
+  }),
+);
 
-jest.mock('../client', () => ({
-  inngest: {
-    createFunction: jest.fn((_config, _trigger, handler) => ({
-      fn: handler,
-      opts: _config,
-      _trigger,
-    })),
-    send: jest.fn().mockResolvedValue(undefined),
-  },
-}));
+import { createInngestTransportCapture } from '../../test-utils/inngest-transport-capture';
+import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
+
+const mockInngestTransport = createInngestTransportCapture();
+jest.mock('../client', () => mockInngestTransport.module); // gc1-allow: inngest framework boundary
 
 // Mock drizzle-orm + database
-jest.mock('drizzle-orm', () => ({
-  eq: jest.fn(),
-  inArray: jest.fn(),
-}));
+jest.mock(
+  'drizzle-orm' /* gc1-allow: isolates drizzle-orm from unit test */,
+  () => ({
+    eq: jest.fn(),
+    inArray: jest.fn(),
+  }),
+);
 
-jest.mock('@eduagent/database', () => ({
-  curriculumTopics: {},
-  curricula: {},
-  subjects: {},
-}));
+jest.mock(
+  '@eduagent/database' /* gc1-allow: isolates database schema from unit test */,
+  () => ({
+    curriculumTopics: {},
+    curricula: {},
+    subjects: {},
+  }),
+);
 
 import { reviewDueSend } from './review-due-send';
-
-function createMockStep() {
-  return {
-    run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
-    sendEvent: jest.fn().mockResolvedValue(undefined),
-    sleep: jest.fn(),
-  };
-}
 
 async function executeHandler(eventData: {
   profileId: string;
   overdueCount: number;
   topTopicIds: string[];
 }) {
-  const mockStep = createMockStep();
+  const { step, sendEventCalls, sleepCalls } = createInngestStepRunner();
   const handler = (reviewDueSend as any).fn;
   const result = await handler({
     event: { id: 'evt-review-001', data: eventData },
-    step: mockStep,
+    step,
   });
-  return { result, mockStep };
+  return { result, sendEventCalls, sleepCalls };
 }
 
 describe('reviewDueSend', () => {
@@ -93,7 +98,7 @@ describe('reviewDueSend', () => {
     jest.clearAllMocks();
     mockGetStepDatabase.mockReturnValue(mockDb);
     mockFormatReviewReminderBody.mockReturnValue(
-      'You have 2 topics to review.'
+      'You have 2 topics to review.',
     );
     mockSendPushNotification.mockResolvedValue({
       sent: true,
@@ -107,7 +112,7 @@ describe('reviewDueSend', () => {
     });
 
     it('triggers on app/retention.review-due', () => {
-      const trigger = (reviewDueSend as any)._trigger;
+      const trigger = (reviewDueSend as any).trigger;
       expect(trigger.event).toBe('app/retention.review-due');
     });
 
@@ -189,7 +194,7 @@ describe('[BUG-699-FOLLOWUP] review-due-send 24h push dedup', () => {
       mockDb,
       'p-dup',
       'review_reminder',
-      24
+      24,
     );
     expect(mockSendPushNotification).not.toHaveBeenCalled();
     expect(result).toEqual({
@@ -253,7 +258,7 @@ describe('[BUG-976] review-due-send getRecentNotificationCount DB failure — fa
     const dbError = new Error('connection timeout');
     mockGetRecentNotificationCount.mockRejectedValueOnce(dbError);
 
-    const { result, mockStep } = await executeHandler({
+    const { result, sendEventCalls } = await executeHandler({
       profileId: 'p-err',
       overdueCount: 2,
       topTopicIds: [],
@@ -266,7 +271,7 @@ describe('[BUG-976] review-due-send getRecentNotificationCount DB failure — fa
         extra: expect.objectContaining({
           context: 'review-due-send:getRecentNotificationCount',
         }),
-      })
+      }),
     );
     expect(mockSendPushNotification).not.toHaveBeenCalled();
     expect(result).toEqual({
@@ -277,17 +282,17 @@ describe('[BUG-976] review-due-send getRecentNotificationCount DB failure — fa
     // CLAUDE.md "Silent recovery without escalation is banned": the
     // dedup_check_failed path must dispatch a structured event so the
     // suppression is queryable in 24h dashboards. Sentry alone is not enough.
-    expect(mockStep.sendEvent).toHaveBeenCalledWith(
-      'notify-notification-suppressed',
-      expect.objectContaining({
+    expect(sendEventCalls).toContainEqual({
+      name: 'notify-notification-suppressed',
+      payload: expect.objectContaining({
         name: 'app/notification.suppressed',
         data: expect.objectContaining({
           profileId: 'p-err',
           notificationType: 'review_reminder',
           reason: 'dedup_check_failed',
         }),
-      })
-    );
+      }),
+    });
   });
 
   it('does NOT call captureException on the happy path', async () => {
@@ -297,7 +302,7 @@ describe('[BUG-976] review-due-send getRecentNotificationCount DB failure — fa
       ticketId: 'ticket-ok',
     });
 
-    const { mockStep } = await executeHandler({
+    const { sendEventCalls } = await executeHandler({
       profileId: 'p-ok',
       overdueCount: 1,
       topTopicIds: [],
@@ -306,6 +311,6 @@ describe('[BUG-976] review-due-send getRecentNotificationCount DB failure — fa
     expect(mockCaptureException).not.toHaveBeenCalled();
     expect(mockSendPushNotification).toHaveBeenCalled();
     // Happy path must not emit the suppression escalation event.
-    expect(mockStep.sendEvent).not.toHaveBeenCalled();
+    expect(sendEventCalls).toHaveLength(0);
   });
 });

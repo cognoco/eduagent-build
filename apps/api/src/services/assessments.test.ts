@@ -14,9 +14,15 @@ import {
   calculateMasteryScore,
   createAssessment,
   getAssessment,
+  recordAssessmentCompletionActivity,
   updateAssessment,
 } from './assessments';
-import type { QuickCheckContext, AssessmentContext } from '@eduagent/schemas';
+import type {
+  QuickCheckContext,
+  AssessmentContext,
+  AssessmentEvaluation,
+  AssessmentRecord,
+} from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 
 // ---------------------------------------------------------------------------
@@ -607,9 +613,9 @@ describe('createAssessment', () => {
 
     await createAssessment(db, testProfileId, testSubjectId, testTopicId);
 
-    const insertCall = (db.insert as jest.Mock).mock.results[0].value;
+    const insertCall = (db.insert as jest.Mock).mock.results[0]!.value;
     const valuesCall = insertCall.values as jest.Mock;
-    const insertedValues = valuesCall.mock.calls[0][0];
+    const insertedValues = valuesCall.mock.calls[0]![0];
     expect(insertedValues.profileId).toBe(testProfileId);
   });
 
@@ -690,9 +696,9 @@ describe('updateAssessment', () => {
       verificationDepth: 'explain',
     });
 
-    const updateCall = (db.update as jest.Mock).mock.results[0].value;
+    const updateCall = (db.update as jest.Mock).mock.results[0]!.value;
     const setCall = updateCall.set as jest.Mock;
-    const setValues = setCall.mock.calls[0][0];
+    const setValues = setCall.mock.calls[0]![0];
     expect(setValues.verificationDepth).toBe('explain');
     expect(setValues).toHaveProperty('updatedAt');
     expect(setValues).not.toHaveProperty('status');
@@ -708,9 +714,59 @@ describe('updateAssessment', () => {
       masteryScore: 0.65,
     });
 
-    const updateCall = (db.update as jest.Mock).mock.results[0].value;
+    const updateCall = (db.update as jest.Mock).mock.results[0]!.value;
     const setCall = updateCall.set as jest.Mock;
-    const setValues = setCall.mock.calls[0][0];
+    const setValues = setCall.mock.calls[0]![0];
     expect(setValues.masteryScore).toBe(0.65);
+  });
+});
+
+describe('recordAssessmentCompletionActivity', () => {
+  it('records assessment score without awarding undefined assessment XP', async () => {
+    const returning = jest.fn().mockResolvedValue([]);
+    const onConflictDoNothing = jest.fn().mockReturnValue({ returning });
+    const values = jest.fn().mockReturnValue({ onConflictDoNothing });
+    const db = {
+      insert: jest.fn().mockReturnValue({ values }),
+    } as unknown as Database;
+    const assessment: AssessmentRecord = {
+      id: testAssessmentId,
+      profileId: testProfileId,
+      subjectId: testSubjectId,
+      topicId: testTopicId,
+      sessionId: null,
+      verificationDepth: 'transfer',
+      status: 'passed',
+      masteryScore: 0.92,
+      qualityRating: 5,
+      exchangeHistory: [],
+      createdAt: '2025-01-15T10:00:00.000Z',
+      updatedAt: '2025-01-15T10:30:00.000Z',
+    };
+    const evaluation: AssessmentEvaluation = {
+      feedback: 'Strong transfer answer.',
+      passed: true,
+      shouldEscalateDepth: false,
+      masteryScore: 0.92,
+      qualityRating: 5,
+    };
+
+    await recordAssessmentCompletionActivity(
+      db,
+      testProfileId,
+      assessment,
+      'passed',
+      evaluation,
+    );
+
+    expect(values).toHaveBeenCalledWith(
+      expect.objectContaining({
+        activityType: 'assessment',
+        activitySubtype: 'passed',
+        pointsEarned: 0,
+        score: 92,
+        total: 100,
+      }),
+    );
   });
 });

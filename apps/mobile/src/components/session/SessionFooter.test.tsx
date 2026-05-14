@@ -175,4 +175,17 @@ describe('SessionFooter', () => {
       undefined,
     );
   });
+
+  it('uses summary-oriented placeholder for session notes', () => {
+    const props = createProps({
+      showFilingPrompt: false,
+      notePromptOffered: true,
+      showNoteInput: true,
+    });
+    render(<SessionFooter {...(props as any)} />);
+
+    expect(screen.getByTestId('note-text-input').props.placeholder).toBe(
+      'What should we remember from this session?',
+    );
+  });
 });

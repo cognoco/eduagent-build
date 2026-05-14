@@ -62,6 +62,22 @@ jest.mock('../services/dashboard', () => ({
     mockGetChildSubjectTopics(...args),
 }));
 
+const mockGetProgressSummary = jest.fn().mockResolvedValue({
+  summary: null,
+  generatedAt: null,
+  basedOnLastSessionAt: null,
+  latestSessionId: null,
+  activityState: 'no_recent_activity',
+  nudgeRecommended: true,
+});
+
+jest.mock(
+  '../services/progress-summary' /* gc1-allow: route test isolates progress summary service contract */,
+  () => ({
+    getProgressSummary: (...args: unknown[]) => mockGetProgressSummary(...args),
+  }),
+);
+
 const mockListWeeklyReports = jest.fn().mockResolvedValue([]);
 const mockGetWeeklyReport = jest.fn().mockResolvedValue(null);
 const mockMarkWeeklyReportViewed = jest.fn().mockResolvedValue(undefined);
@@ -529,6 +545,10 @@ describe('dashboard routes', () => {
       {
         label: 'GET /dashboard/children/:id/progress-history',
         path: `/v1/dashboard/children/${PROFILE_ID}/progress-history`,
+      },
+      {
+        label: 'GET /dashboard/children/:id/progress-summary',
+        path: `/v1/dashboard/children/${PROFILE_ID}/progress-summary`,
       },
       {
         label: 'GET /dashboard/children/:id/subjects/:subjectId',

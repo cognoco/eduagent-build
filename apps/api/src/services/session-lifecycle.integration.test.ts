@@ -20,7 +20,11 @@ import {
   type Database,
 } from '@eduagent/database';
 import { eq, and, like } from 'drizzle-orm';
-import { registerProvider, createMockProvider, _clearProviders } from './llm';
+import {
+  registerProvider,
+  createMockProvider,
+  unregisterProvider,
+} from './llm';
 import {
   startSession,
   SubjectInactiveError,
@@ -112,7 +116,7 @@ beforeAll(async () => {
   db = createDatabase(dbUrl);
 
   // Register mock LLM provider — the ONLY mocked external boundary
-  _clearProviders();
+  unregisterProvider('gemini');
   registerProvider(createMockProvider('gemini'));
 });
 
@@ -129,7 +133,7 @@ afterAll(async () => {
 
   // Reset in-process caches to avoid cross-test pollution
   resetSessionStaticContextCache();
-  _clearProviders();
+  unregisterProvider('gemini');
 });
 
 beforeEach(() => {

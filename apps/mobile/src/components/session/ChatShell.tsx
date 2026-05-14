@@ -16,7 +16,7 @@ import {
   Vibration,
   Platform,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -613,7 +613,7 @@ export function ChatShell({
               }
               const fallback = (backFallback ?? '/(app)/home') as '/(app)/home';
               if (backBehavior === 'replace') {
-                router.replace(fallback as never);
+                router.replace(fallback as Href);
                 return;
               }
 

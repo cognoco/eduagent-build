@@ -90,6 +90,7 @@ export async function buildAndGenerateRound(
   const round = await generateQuizRound({
     db,
     profileId,
+    subjectId: input.subjectId ?? null,
     activityType: input.activityType,
     birthYear: profileMeta.birthYear,
     themePreference: input.themePreference,

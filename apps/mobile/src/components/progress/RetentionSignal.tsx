@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '../../lib/theme';
 import { getParentRetentionInfo } from '../../lib/parent-vocab';
 import type { RetentionStatus } from '@eduagent/schemas';
+import type { TranslateKey } from '../../i18n';
 export type { RetentionStatus };
 
 interface RetentionSignalProps {
@@ -15,7 +16,7 @@ interface RetentionSignalProps {
 const CONFIG: Record<
   RetentionStatus,
   {
-    labelKey: string;
+    labelKey: TranslateKey;
     icon: keyof typeof Ionicons.glyphMap;
     colorKey:
       | 'retentionStrong'

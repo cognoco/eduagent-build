@@ -496,7 +496,12 @@
       "finishEarlyLabel": "Sitzung frühzeitig beenden",
       "nextProblemLabel": "Nächste Aufgabe",
       "finishHomeworkLabel": "Hausaufgaben beenden",
-      "endSessionLabel": "Sitzung beenden"
+      "endSessionLabel": "Sitzung beenden",
+      "typeSubjectPlaceholder": "Fach eingeben",
+      "typeSubjectLabel": "Fach eingeben",
+      "useTypedSubject": "Verwenden",
+      "useTypedSubjectLabel": "Eingegebenes Fach verwenden",
+      "addNote": "Notiz hinzufügen"
     },
     "quota": {
       "dailyLimitReached": "Tageslimit erreicht",
@@ -571,7 +576,8 @@
       "writeNote": "Notiz schreiben",
       "cannotSaveTitle": "Notiz nicht gespeichert",
       "cannotSaveMessage": "Notizen können im Moment nicht gespeichert werden. Bitte versuche es erneut.",
-      "saveFailedTitle": "Notiz konnte nicht gespeichert werden"
+      "saveFailedTitle": "Notiz konnte nicht gespeichert werden",
+      "summaryPlaceholder": "Was sollen wir uns aus dieser Sitzung merken?"
     },
     "filingPrompt": {
       "title": "Zur Bibliothek hinzufügen?",
@@ -857,6 +863,9 @@
     "loadError": {
       "message": "Deine Bibliothek konnte nicht geladen werden. Bitte versuche es erneut."
     },
+    "staleBanner": {
+      "message": "Gespeicherte Bibliothek wird angezeigt. Tippe zum Aktualisieren."
+    },
     "empty": {
       "title": "Deine Bibliothek ist leer",
       "message": "Starte eine Lernsitzung und deine Fächer werden hier erscheinen.",
@@ -953,6 +962,9 @@
       "message": "Öffne das Regal, wähle das nächste Buch oder wiederhole, was fällig ist.",
       "cta": "Öffnen",
       "accessibilityLabel": "Mit {{subject}} weitermachen"
+    },
+    "bookmarkCard": {
+      "accessibilityLabel": "Gespeichertes Lesezeichen öffnen: {{title}}"
     }
   },
   "topic": {
@@ -1243,7 +1255,11 @@
     "tryCameraAgainLabel": "Kamera erneut versuchen",
     "tryReadingAgainLabel": "Erneut lesen versuchen",
     "classifyErrorTitle": "Fach konnte nicht identifiziert werden",
-    "classifyErrorMessage": "Bitte wähle das Fach aus, zu dem diese Hausaufgabe gehört."
+    "classifyErrorMessage": "Bitte wähle das Fach aus, zu dem diese Hausaufgabe gehört.",
+    "listening": "Höre zu...",
+    "voiceHint": "Sag die Hausaufgabe laut.",
+    "stopDictatingProblemLabel": "Diktat der Aufgabe stoppen",
+    "dictateProblemLabel": "Aufgabe diktieren"
   },
   "progress": {
     "pageTitle": "Meine Lernreise",
@@ -1338,7 +1354,9 @@
       "bars": {
         "sessions": "Sitzungen",
         "time": "Zeit",
-        "topics": "Themen"
+        "topics": "Themen",
+        "quizzes": "Quizze",
+        "reviews": "Wiederholungen"
       }
     },
     "newLearner": {
@@ -1545,6 +1563,19 @@
     "loadTimeout": {
       "title": "Das Laden des Fortschritts dauert zu lange",
       "message": "Prüfe deine Verbindung, versuche es erneut oder gehe zur Startseite."
+    },
+    "guardian": {
+      "sessionCount_one": "{{count}} Sitzung",
+      "sessionCount_other": "{{count}} Sitzungen",
+      "lastStudied": "Zuletzt gelernt am {{date}}",
+      "topicsMastered": "{{mastered}}/{{total}} Themen gemeistert",
+      "summaryFallback": "Noch keine Zusammenfassung verfügbar. Eine erscheint nach der nächsten Sitzung.",
+      "noRecentSessions": "Keine neuen Sitzungen seit {{date}}.",
+      "noRecentSessionsFallback": "Keine neuen Sitzungen seit Längerem.",
+      "staleSummary": "Die Zusammenfassung ist möglicherweise noch nicht auf dem neuesten Stand.",
+      "nudgeCta": "Ein Anstupser könnte {{name}} helfen, neu zu starten.",
+      "nudgeA11y": "{{name}} einen Anstupser senden",
+      "viewAllReports": "Alle Berichte ansehen"
     }
   },
   "onboarding": {
@@ -1632,6 +1663,7 @@
       "totalSessions": "{{count}} Sitzungen",
       "recentActivity": "Letzte Aktivität",
       "noRecentActivity": "Noch keine letzte Aktivität",
+      "lastSessionAgo": "Letzte Sitzung {{time}}",
       "noSessionsYet": "Noch keine Sitzungen",
       "viewAllSessions": "Alle Sitzungen ansehen",
       "subjectsExplored": "Erkundete Fächer",
@@ -1686,6 +1718,9 @@
       "viewSessionFrom": "Sitzung ansehen von",
       "mentorMemoryTitle": "Was der Mentor über {{name}} weiß",
       "mentorMemoryTitleFallback": "Mentor-Gedächtnis",
+      "manageMentorMemoryForChild": "Verwalte, was der Mentor sich über {{name}} merkt",
+      "profileDetails": "Profildetails",
+      "childProfileJoined": "Hinzugefügt {{date}}",
       "setUpMentorMemory": "Mentor-Gedächtnis einrichten",
       "chooseWhatMentorRemembers": "Wähle, was der Mentor sich merkt",
       "viewWhatMentorKnows": "Ansehen, was der Mentor weiß",
@@ -1694,6 +1729,7 @@
       "learningAccommodationTitle": "Lernanpassung für {{name}}",
       "learningAccommodationTitleFallback": "Lernanpassung",
       "learningAccommodationDescription": "Passe an, wie der Mentor begleitet, um den Lernbedürfnissen deines Kindes gerecht zu werden",
+      "noLearningPreferenceSet": "Keine Lernpräferenz festgelegt",
       "toggleDecisionGuide": "Entscheidungshilfe anzeigen",
       "notSureWhichToPick": "Nicht sicher, was du wählen sollst?",
       "pickAccommodation": "Eine Anpassung wählen",
@@ -1708,6 +1744,7 @@
       "checkConsentStatus": "Zustimmungsstatus prüfen",
       "accountTitle": "Konto – {{name}}",
       "accountTitleFallback": "Konto",
+      "childProfileScopeHint": "Fortschritt und Berichte befinden sich in eigenen Tabs, daher enthält diese Seite nur kindbezogene Einstellungen.",
       "deletionPending": "Löschung geplant",
       "deletionCountdown": "Konto wird am {{date}} gelöscht",
       "deletionProcessing": "Löschung wird bearbeitet",
@@ -1840,7 +1877,9 @@
       "monthlyReport": "Monatsbericht",
       "subtitle": "Eine Zusammenfassung des Lernens deines Kindes diesen Monat",
       "totalWords": "Gesamtzahl Wörter",
-      "reportGoneTitle": "Bericht nicht gefunden"
+      "reportGoneTitle": "Bericht nicht gefunden",
+      "testsCompleted": "Tests abgeschlossen",
+      "testPoints": "Testpunkte"
     },
     "session": {
       "error": "Sitzung konnte nicht geladen werden",
@@ -1917,7 +1956,42 @@
       "sendNudge": "{{name}} einen Anstoß geben",
       "openChildProfile": "{{name}}s Profil öffnen",
       "reportGoneTitle": "Dieser Bericht ist nicht mehr verfügbar",
-      "reportGoneBody": "Er wurde möglicherweise archiviert oder entfernt. Alle deine anderen Berichte sind noch sicher."
+      "reportGoneBody": "Er wurde möglicherweise archiviert oder entfernt. Alle deine anderen Berichte sind noch sicher.",
+      "testsCompleted": "Tests abgeschlossen",
+      "testPoints": "Testpunkte"
+    },
+    "practiceSummary": {
+      "title": "Testdetails",
+      "subtitle": "{{count}} Aktivitäten abgeschlossen, davon {{reviews}} Wiederholungen",
+      "accuracy": "Genauigkeit",
+      "reviews": "Wiederholungen",
+      "points": "Punkte",
+      "celebrations": "Feiern",
+      "activityKinds": "Arten",
+      "comparison": "{{activities}} Aktivitäten · {{points}} Punkte · {{celebrations}} Feiern",
+      "byType": "Nach Typ",
+      "bySubject": "Nach Fach",
+      "typeDetail": "{{count}} abgeschlossen · {{points}} Punkte",
+      "typeDetailWithScore": "{{count}} abgeschlossen · {{points}} Punkte · {{accuracy}}%",
+      "subjectDetail": "{{count}} Aktivitäten · {{points}} Punkte · {{types}}",
+      "unknownSubject": "Nicht zugeordnet",
+      "activityTypes": {
+        "quiz": "Quiz",
+        "review": "Wiederholung",
+        "assessment": "Beweisen, dass ich es kann",
+        "dictation": "Diktat",
+        "recitation": "Vortragen",
+        "fluency_drill": "Flüssigkeitsübung"
+      },
+      "activitySubtypes": {
+        "capitals": "Hauptstädte",
+        "guess_who": "Wer ist das?",
+        "vocabulary": "Wortschatz",
+        "assessment": "Beweisen, dass ich es kann",
+        "dictation": "Diktat",
+        "recitation": "Vortragen",
+        "fluency_drill": "Flüssigkeitsübung"
+      }
     }
   },
   "tabs": {

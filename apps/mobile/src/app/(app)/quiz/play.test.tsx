@@ -44,6 +44,7 @@ jest.mock('../../../lib/theme', () => ({
 }));
 
 jest.mock('../../../components/quiz/GuessWhoQuestion', () => ({
+  // gc1-allow: GuessWhoQuestion uses native ColorScheme via useThemeColors
   GuessWhoQuestion: ({
     onResolved,
   }: {
@@ -84,6 +85,7 @@ jest.mock(
 );
 
 jest.mock('../../../hooks/use-quiz', () => ({
+  ...jest.requireActual('../../../hooks/use-quiz'),
   useCheckAnswer: () => ({
     mutateAsync: mockCheckAnswer,
   }),
@@ -97,17 +99,12 @@ jest.mock('../../../hooks/use-quiz', () => ({
 }));
 
 jest.mock('../../../lib/platform-alert', () => ({
+  ...jest.requireActual('../../../lib/platform-alert'),
   platformAlert: (...args: unknown[]) => mockPlatformAlert(...args),
 }));
 
-// formatApiError stub: returns the Error message verbatim, otherwise a
-// recognisable sentinel. Lets tests assert which error reached the user.
-jest.mock('../../../lib/format-api-error', () => ({
-  formatApiError: (e: unknown) =>
-    e instanceof Error ? e.message : 'Unknown error',
-}));
-
 jest.mock('../../../lib/sentry', () => ({
+  // gc1-allow: @sentry/react-native external boundary
   Sentry: {
     captureException: (...args: unknown[]) => mockSentryCapture(...args),
     addBreadcrumb: jest.fn(),
@@ -133,6 +130,7 @@ let mockRound: object | null = {
 let mockReturnTo: string | null = null;
 
 jest.mock('./_layout', () => ({
+  ...jest.requireActual('./_layout'),
   useQuizFlow: () => ({
     round: mockRound,
     activityType:
@@ -981,7 +979,7 @@ describe('QuizPlayScreen — error feedback [BUG-799 / BUG-806]', () => {
     await waitFor(() => {
       expect(mockPlatformAlert).toHaveBeenCalledWith(
         "Couldn't check your answer",
-        'Network unreachable',
+        "Looks like you're offline or our servers can't be reached. Check your internet connection and try again.",
       );
     });
     expect(mockSentryCapture).toHaveBeenCalledTimes(1);
@@ -995,10 +993,10 @@ describe('QuizPlayScreen — error feedback [BUG-799 / BUG-806]', () => {
     fireEvent.press(screen.getByTestId('quiz-option-0'));
 
     await waitFor(() => {
-      // formatApiError stub returns 'Unknown error' for non-Error shapes.
+      // Real formatApiError returns the generic fallback for non-Error shapes.
       expect(mockPlatformAlert).toHaveBeenCalledWith(
         "Couldn't check your answer",
-        'Unknown error',
+        'Something unexpected happened. Please try again.',
       );
     });
   });

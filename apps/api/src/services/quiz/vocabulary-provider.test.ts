@@ -138,8 +138,8 @@ describe('validateVocabularyRound', () => {
     const output: VocabularyLlmOutput = {
       ...validOutput,
       questions: [
-        { ...validOutput.questions[0], cefrLevel: 'A1' },
-        { ...validOutput.questions[1], cefrLevel: 'C2' },
+        { ...validOutput.questions[0]!, cefrLevel: 'A1' },
+        { ...validOutput.questions[1]!, cefrLevel: 'C2' },
       ],
     };
 

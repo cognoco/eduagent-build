@@ -40,6 +40,9 @@ test('single learner UX screenshot crawl', async ({ page }) => {
   await capture(page, '03-study-new-click');
 
   await page.goto('/library', { waitUntil: 'commit' });
+  // Wait for the subjects query + /library/retention to settle before asserting.
+  // Without this, the shelf-row testID poll can race the first paint on slow CI.
+  await page.waitForLoadState('networkidle');
   await expect(page.getByTestId(`shelf-row-header-${subjectId}`)).toBeVisible({
     timeout: 30_000,
   });

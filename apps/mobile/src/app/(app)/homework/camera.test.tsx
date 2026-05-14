@@ -83,6 +83,10 @@ jest.mock('../../../lib/theme', () => ({
   // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
   useThemeColors: () => ({
     muted: '#a3a3a3',
+    primary: '#0d9488',
+    textInverse: '#ffffff',
+    textPrimary: '#1a1a1a',
+    textSecondary: '#525252',
   }),
 }));
 
@@ -102,6 +106,34 @@ jest.mock('../../../hooks/use-homework-ocr', () => ({
     cancel: mockCancel,
   }),
 }));
+
+const mockStartListening = jest.fn().mockResolvedValue(undefined);
+const mockStopListening = jest.fn().mockResolvedValue(undefined);
+const mockClearTranscript = jest.fn();
+let mockSpeechState = {
+  isListening: false,
+  transcript: '',
+  error: null as string | null,
+};
+jest.mock(
+  '../../../hooks/use-speech-recognition' /* gc1-allow: isolate native speech module state for camera screen */,
+  () => ({
+    useSpeechRecognition: () => ({
+      status: mockSpeechState.isListening ? 'listening' : 'idle',
+      transcript: mockSpeechState.transcript,
+      error: mockSpeechState.error,
+      isListening: mockSpeechState.isListening,
+      startListening: mockStartListening,
+      stopListening: mockStopListening,
+      clearTranscript: mockClearTranscript,
+      requestMicrophonePermission: jest.fn().mockResolvedValue(true),
+      getMicrophonePermissionStatus: jest.fn().mockResolvedValue({
+        granted: true,
+        canAskAgain: true,
+      }),
+    }),
+  }),
+);
 
 jest.mock('../../../lib/profile', () => ({
   useProfile: () => ({
@@ -276,6 +308,11 @@ beforeEach(() => {
     retry: mockRetry,
     cancel: mockCancel,
   });
+  mockSpeechState = {
+    isListening: false,
+    transcript: '',
+    error: null,
+  };
 });
 
 describe('CameraScreen', () => {
@@ -626,6 +663,44 @@ describe('CameraScreen', () => {
       getByTestId('result-text-input');
       getByTestId('problem-card-1');
       getByTestId('add-problem-button');
+    });
+  });
+
+  it('adds microphone dictation to editable problem cards', async () => {
+    (useHomeworkOcr as jest.Mock).mockReturnValue({
+      text: 'I Wha\nWath\nRadissen',
+      status: 'done',
+      error: null,
+      failCount: 0,
+      process: mockProcess,
+      retry: mockRetry,
+      cancel: mockCancel,
+    });
+
+    const { getByTestId, rerender } = render(<CameraScreen />, {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      getByTestId('problem-mic-0');
+    });
+
+    fireEvent.press(getByTestId('problem-mic-0'));
+
+    expect(mockClearTranscript).toHaveBeenCalled();
+    expect(mockStartListening).toHaveBeenCalled();
+
+    mockSpeechState = {
+      isListening: false,
+      transcript: 'What is chasing you',
+      error: null,
+    };
+    rerender(<CameraScreen />);
+
+    await waitFor(() => {
+      expect(getByTestId('result-text-input').props.value).toContain(
+        'What is chasing you',
+      );
     });
   });
 

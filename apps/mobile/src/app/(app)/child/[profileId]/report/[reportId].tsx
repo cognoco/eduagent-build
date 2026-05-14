@@ -10,7 +10,10 @@ import {
 import { classifyApiError } from '../../../../../lib/format-api-error';
 import { formatMinutes } from '../../../../../lib/format-relative-date';
 import { ErrorFallback } from '../../../../../components/common';
-import { MetricCard } from '../../../../../components/progress';
+import {
+  MetricCard,
+  PracticeActivitySummaryCard,
+} from '../../../../../components/progress';
 import {
   useChildReportDetail,
   useMarkChildReportViewed,
@@ -72,7 +75,7 @@ export default function ChildReportDetailScreen(): React.ReactElement {
           {/* UX-DE-M6: contextual back — was /(app)/more, now goes to child reports */}
           <Pressable
             onPress={() => goBackOrReplace(router, reportsHref)}
-            className="me-3 py-2 pe-2"
+            className="me-3 min-h-[44px] min-w-[44px] items-center justify-center"
             accessibilityRole="button"
             accessibilityLabel={t('common.goBack')}
             testID="child-report-back"
@@ -162,6 +165,29 @@ export default function ChildReportDetailScreen(): React.ReactElement {
                 testID="child-report-metric-vocabulary"
               />
             </View>
+
+            <View className="flex-row gap-3 mt-3">
+              <MetricCard
+                label={t('parentView.report.testsCompleted')}
+                value={String(
+                  report.reportData.practiceSummary?.totals
+                    .activitiesCompleted ?? 0,
+                )}
+                testID="child-report-metric-tests"
+              />
+              <MetricCard
+                label={t('parentView.report.testPoints')}
+                value={String(
+                  report.reportData.practiceSummary?.totals.pointsEarned ?? 0,
+                )}
+                testID="child-report-metric-test-points"
+              />
+            </View>
+
+            <PracticeActivitySummaryCard
+              summary={report.reportData.practiceSummary}
+              testID="child-report-practice-summary"
+            />
 
             {report.reportData.highlights.length > 0 ? (
               <View

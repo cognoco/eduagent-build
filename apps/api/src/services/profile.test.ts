@@ -121,9 +121,9 @@ describe('listProfiles', () => {
     const result = await listProfiles(db, 'account-123');
 
     expect(result).toHaveLength(2);
-    expect(result[0].displayName).toBe('Alice');
-    expect(result[1].displayName).toBe('Bob');
-    expect(result[0].createdAt).toBe('2025-01-15T10:00:00.000Z');
+    expect(result[0]!.displayName).toBe('Alice');
+    expect(result[1]!.displayName).toBe('Bob');
+    expect(result[0]!.createdAt).toBe('2025-01-15T10:00:00.000Z');
   });
 
   it('includes consentStatus from consent service', async () => {
@@ -139,8 +139,8 @@ describe('listProfiles', () => {
     const db = createMockDb({ findManyResult: rows });
     const result = await listProfiles(db, 'account-123');
 
-    expect(result[0].consentStatus).toBe('PARENTAL_CONSENT_REQUESTED');
-    expect(result[1].consentStatus).toBeNull();
+    expect(result[0]!.consentStatus).toBe('PARENTAL_CONSENT_REQUESTED');
+    expect(result[1]!.consentStatus).toBeNull();
   });
 });
 

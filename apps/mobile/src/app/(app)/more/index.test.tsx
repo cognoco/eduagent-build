@@ -220,7 +220,10 @@ describe('MoreScreen landing', () => {
 
     fireEvent.press(screen.getByTestId('add-child-link'));
 
-    expect(mockPush).toHaveBeenCalledWith('/create-profile?for=child');
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/create-profile',
+      params: { for: 'child' },
+    });
   });
 
   it('hides sign out in impersonation', () => {

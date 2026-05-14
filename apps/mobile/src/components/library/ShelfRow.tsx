@@ -4,6 +4,8 @@ import { useTranslation } from 'react-i18next';
 
 import type { SubjectStatus } from '@eduagent/schemas';
 
+import { SubjectBookshelfMotif } from '../common/SubjectBookshelfMotif';
+import type { LearningSubjectTint } from '../../lib/learning-subject-tints';
 import { useSubjectTint, useThemeColors } from '../../lib/theme';
 
 interface ShelfRowProps {
@@ -15,6 +17,7 @@ interface ShelfRowProps {
   isFinished: boolean;
   isPaused?: boolean;
   status?: SubjectStatus;
+  tint?: LearningSubjectTint;
   onPress: (subjectId: string) => void;
   testID?: string;
 }
@@ -28,12 +31,14 @@ export function ShelfRow({
   isFinished,
   isPaused = false,
   status,
+  tint: providedTint,
   onPress,
   testID,
 }: ShelfRowProps): React.ReactElement {
   const { t } = useTranslation();
   const colors = useThemeColors();
-  const tint = useSubjectTint(name || subjectId);
+  const fallbackTint = useSubjectTint(subjectId);
+  const tint = providedTint ?? fallbackTint;
   const rowStatus = status ?? (isPaused ? 'paused' : 'active');
   const isInactive = rowStatus !== 'active';
   const statusSuffix =
@@ -96,20 +101,10 @@ export function ShelfRow({
           gap: 12,
         }}
       >
-        {/* Tinted icon tile — Ionicons "library" in subject's tint color */}
-        <View
-          testID={`shelf-row-icon-${subjectId}`}
-          style={{
-            width: 40,
-            height: 40,
-            borderRadius: 12,
-            backgroundColor: tint.soft,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Ionicons name="library" size={22} color={tint.solid} />
-        </View>
+        <SubjectBookshelfMotif
+          testID={`shelf-row-bookshelf-${subjectId}`}
+          tint={tint}
+        />
 
         {/* Name + subtitle */}
         <View style={{ flex: 1 }}>

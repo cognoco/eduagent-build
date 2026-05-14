@@ -84,6 +84,7 @@ import { memoryFactsEmbedBackfill } from './functions/memory-facts-embed-backfil
 import { reviewCalibrationGrade } from './functions/review-calibration-grade';
 import { topicProbeExtract } from './functions/topic-probe-extract';
 import { streakRecord } from './functions/streak-record';
+import { progressSummaryGeneration } from './functions/progress-summary';
 
 export {
   inngest,
@@ -148,6 +149,7 @@ export {
   reviewCalibrationGrade,
   topicProbeExtract,
   streakRecord,
+  progressSummaryGeneration,
 };
 
 // All Inngest functions to register with the serve handler
@@ -214,4 +216,5 @@ export const functions = [
   reviewCalibrationGrade,
   topicProbeExtract,
   streakRecord,
+  progressSummaryGeneration,
 ];

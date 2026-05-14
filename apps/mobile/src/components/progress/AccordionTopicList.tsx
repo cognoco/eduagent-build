@@ -1,4 +1,4 @@
-import { useRouter, useSegments } from 'expo-router';
+import { useRouter, useSegments, type Href } from 'expo-router';
 import { Pressable, Text, View } from 'react-native';
 import type { TopicProgress } from '@eduagent/schemas';
 import { useChildSubjectTopics } from '../../hooks/use-dashboard';
@@ -96,7 +96,7 @@ export function AccordionTopicList({
                 router.push({
                   pathname: '/(app)/child/[profileId]',
                   params: { profileId: childProfileId },
-                } as never);
+                } as Href);
               }
               router.push({
                 pathname: '/(app)/child/[profileId]/topic/[topicId]',
@@ -114,7 +114,7 @@ export function AccordionTopicList({
                   subjectId,
                   subjectName,
                 },
-              } as never);
+              } as Href);
             }}
             className="flex-row items-center justify-between py-2"
             accessibilityRole="link"

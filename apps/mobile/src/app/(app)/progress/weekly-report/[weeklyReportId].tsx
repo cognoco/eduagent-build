@@ -5,7 +5,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Sentry from '@sentry/react-native';
 import { useTranslation } from 'react-i18next';
 import { ErrorFallback } from '../../../../components/common';
-import { MetricCard } from '../../../../components/progress';
+import {
+  MetricCard,
+  PracticeActivitySummaryCard,
+} from '../../../../components/progress';
 import { classifyApiError } from '../../../../lib/format-api-error';
 import { formatMinutes } from '../../../../lib/format-relative-date';
 import { goBackOrReplace } from '../../../../lib/navigation';
@@ -77,7 +80,7 @@ export default function ProgressWeeklyReportDetail(): React.ReactElement {
         <View className="flex-row items-center mt-4">
           <Pressable
             onPress={() => goBackOrReplace(router, '/(app)/progress/reports')}
-            className="me-3 py-2 pe-2"
+            className="me-3 min-h-[44px] min-w-[44px] items-center justify-center"
             accessibilityRole="button"
             accessibilityLabel={t('common.goBack')}
             testID="progress-weekly-report-back"
@@ -136,14 +139,39 @@ export default function ProgressWeeklyReportDetail(): React.ReactElement {
               <MetricCard
                 label={t('parentView.weeklyReport.sessionsThisWeek')}
                 value={String(report.reportData.thisWeek.totalSessions)}
+                testID="progress-weekly-report-metric-sessions"
               />
               <MetricCard
                 label={t('parentView.weeklyReport.timeOnApp')}
                 value={formatMinutes(
                   report.reportData.thisWeek.totalActiveMinutes,
                 )}
+                testID="progress-weekly-report-metric-minutes"
               />
             </View>
+
+            <View className="flex-row gap-3 mt-3">
+              <MetricCard
+                label={t('parentView.weeklyReport.testsCompleted')}
+                value={String(
+                  report.reportData.practiceSummary?.totals
+                    .activitiesCompleted ?? 0,
+                )}
+                testID="progress-weekly-report-metric-tests"
+              />
+              <MetricCard
+                label={t('parentView.weeklyReport.testPoints')}
+                value={String(
+                  report.reportData.practiceSummary?.totals.pointsEarned ?? 0,
+                )}
+                testID="progress-weekly-report-metric-test-points"
+              />
+            </View>
+
+            <PracticeActivitySummaryCard
+              summary={report.reportData.practiceSummary}
+              testID="progress-weekly-report-practice-summary"
+            />
           </>
         ) : (
           <View className="bg-surface rounded-card p-5 mt-4">

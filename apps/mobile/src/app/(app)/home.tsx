@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { View, ActivityIndicator, Text, Pressable } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { LearnerScreen } from '../../components/home';
 import { useCelebration } from '../../hooks/use-celebration';
@@ -103,7 +103,7 @@ export default function HomeScreen(): React.ReactElement {
           </Text>
         </Pressable>
         <Pressable
-          onPress={() => router.replace('/(app)/library' as never)}
+          onPress={() => router.replace('/(app)/library' as Href)}
           className="mt-3 px-6 py-3 min-h-[48px] items-center justify-center"
           accessibilityRole="button"
           accessibilityLabel={t('home.goToLibraryLabel')}
@@ -114,7 +114,7 @@ export default function HomeScreen(): React.ReactElement {
           </Text>
         </Pressable>
         <Pressable
-          onPress={() => router.replace('/(app)/more' as never)}
+          onPress={() => router.replace('/(app)/more' as Href)}
           className="px-6 py-3 min-h-[48px] items-center justify-center"
           accessibilityRole="button"
           accessibilityLabel={t('home.moreOptionsLabel')}

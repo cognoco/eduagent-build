@@ -20,14 +20,22 @@ import {
 import type {
   LearningResumeScope,
   LearningResumeTarget,
+  ReportPracticeSummary,
   SubjectProgress,
   TopicProgress,
 } from '@eduagent/schemas';
+import { getPracticeActivitySummary } from './practice-activity-summary';
 import { computeDaysSinceLastReview } from './retention-data';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+const PROGRESS_OVERVIEW_PRACTICE_WINDOW_DAYS = 90;
+
+function subtractDays(date: Date, days: number): Date {
+  return new Date(date.getTime() - days * 24 * 60 * 60 * 1000);
+}
 
 function computeRetentionStatus(
   nextReviewAt: Date | null,
@@ -319,13 +327,40 @@ export async function getOverallProgress(
   subjects: SubjectProgress[];
   totalTopicsCompleted: number;
   totalTopicsVerified: number;
+  practiceActivityCount: number;
+  practiceSummary: ReportPracticeSummary;
 }> {
   const repo = createScopedRepository(db, profileId);
 
-  // 1. Batch all queries upfront (6 total regardless of N subjects)
-  const allSubjects = await repo.subjects.findMany();
+  const practiceSummaryEnd = new Date();
+  // 1. Batch independent overview queries upfront (constant count regardless
+  // of N subjects). The practice activity summary does not depend on subjects,
+  // so keep it off the subject/curriculum critical path.
+  const [allSubjects, practiceSummary] = await Promise.all([
+    repo.subjects.findMany(),
+    getPracticeActivitySummary(db, {
+      profileId,
+      // Overview is loaded on every Progress tab visit, so keep the practice
+      // activity scan bounded. Long-range/all-time reporting belongs on report
+      // detail endpoints that are opened intentionally.
+      period: {
+        start: subtractDays(
+          practiceSummaryEnd,
+          PROGRESS_OVERVIEW_PRACTICE_WINDOW_DAYS,
+        ),
+        endExclusive: practiceSummaryEnd,
+      },
+    }),
+  ]);
+
   if (allSubjects.length === 0) {
-    return { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 };
+    return {
+      subjects: [],
+      totalTopicsCompleted: 0,
+      totalTopicsVerified: 0,
+      practiceActivityCount: practiceSummary.totals.activitiesCompleted,
+      practiceSummary,
+    };
   }
 
   const subjectIds = allSubjects.map((s) => s.id);
@@ -503,6 +538,8 @@ export async function getOverallProgress(
     subjects: subjectProgressList,
     totalTopicsCompleted: totalCompleted,
     totalTopicsVerified: totalVerified,
+    practiceActivityCount: practiceSummary.totals.activitiesCompleted,
+    practiceSummary,
   };
 }
 

@@ -21,6 +21,7 @@ jest.mock('inngest/hono', () => ({
 }));
 
 jest.mock('../inngest/client', () => ({
+  // gc1-allow: Inngest SDK external boundary
   inngest: {
     send: jest.fn().mockResolvedValue(undefined),
     createFunction: jest.fn().mockReturnValue(jest.fn()),
@@ -50,6 +51,7 @@ mockDatabaseModule.db.query = new Proxy(mockDatabaseModule.db.query as object, {
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
 jest.mock('../services/account', () => ({
+  ...jest.requireActual('../services/account'),
   findOrCreateAccount: jest.fn().mockResolvedValue({
     id: 'test-account-id',
     clerkUserId: 'user_test',
@@ -64,6 +66,7 @@ jest.mock('../services/account', () => ({
 // account regardless of which id is sent so the middleware accepts the
 // header and writes it to the context.
 jest.mock('../services/profile', () => ({
+  ...jest.requireActual('../services/profile'),
   findOwnerProfile: jest.fn().mockResolvedValue(null),
   getProfile: jest
     .fn()
@@ -89,6 +92,7 @@ const mockBuildHumanReadableMemoryExport = jest.fn();
 const mockUpdateAccommodationMode = jest.fn();
 
 jest.mock('../services/learner-profile', () => ({
+  ...jest.requireActual('../services/learner-profile'),
   getOrCreateLearningProfile: (...args: unknown[]) =>
     mockGetOrCreateLearningProfile(...args),
   deleteAllMemory: (...args: unknown[]) => mockDeleteAllMemory(...args),
@@ -107,6 +111,7 @@ jest.mock('../services/learner-profile', () => ({
 }));
 
 jest.mock('../services/learner-input', () => ({
+  ...jest.requireActual('../services/learner-input'),
   parseLearnerInput: jest.fn().mockResolvedValue({
     success: true,
     message: 'Got it!',

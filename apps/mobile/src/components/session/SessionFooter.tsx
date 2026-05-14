@@ -87,7 +87,7 @@ export function SessionFooter({
             {t('session.expired.message')}
           </Text>
           <Pressable
-            onPress={() => router.replace(homeHref as never)}
+            onPress={() => router.replace(homeHref as Href)}
             className="bg-primary rounded-button py-3 items-center"
             testID="session-expired-go-home"
             accessibilityRole="button"
@@ -120,6 +120,9 @@ export function SessionFooter({
       {showNoteInput ? (
         <View className="px-4 mb-2">
           <NoteInput
+            placeholder={t('session.notePrompt.summaryPlaceholder', {
+              defaultValue: 'Summarize this in your own words...',
+            })}
             onSave={(content) => {
               if (!topicId) {
                 platformAlert(

@@ -21,6 +21,7 @@ import {
   loadTopicTitle,
   MAX_ASSESSMENT_EXCHANGES,
   evaluateQuickCheckAnswer,
+  recordAssessmentCompletionActivity,
 } from '../services/assessments';
 import { mapEvaluateQualityToSm2 } from '../services/evaluate';
 import { updateRetentionFromSession } from '../services/retention-data';
@@ -28,6 +29,7 @@ import { insertSessionXpEntry } from '../services/xp';
 import { getSession } from '../services/session';
 import { notFound } from '../errors';
 import { createLogger } from '../services/logger';
+import { captureException } from '../services/sentry';
 
 const logger = createLogger();
 
@@ -169,6 +171,25 @@ export const assessmentRoutes = new Hono<RouteEnv>()
             );
           }
         });
+        try {
+          await recordAssessmentCompletionActivity(
+            db,
+            profileId,
+            updatedAssessment ?? assessment,
+            newStatus,
+            evaluation,
+          );
+        } catch (err) {
+          captureException(err, {
+            profileId,
+            requestPath: '/v1/assessments/:assessmentId/answer',
+            extra: {
+              assessmentId,
+              topicId: assessment.topicId,
+              status: newStatus,
+            },
+          });
+        }
       }
 
       return c.json(

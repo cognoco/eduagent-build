@@ -9,9 +9,8 @@ import {
   View,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { useQuery } from '@tanstack/react-query';
 import { platformAlert } from '../../lib/platform-alert';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Subject, RetentionStatus } from '@eduagent/schemas';
 import {
@@ -24,10 +23,11 @@ import { useAllBooks } from '../../hooks/use-all-books';
 import { useThemeColors } from '../../lib/theme';
 import { useSubjects, useUpdateSubject } from '../../hooks/use-subjects';
 import { useOverallProgress } from '../../hooks/use-progress';
-import { useApiClient } from '../../lib/api-client';
+import {
+  useLibraryRetention,
+  type LibraryRetentionTopic,
+} from '../../hooks/use-library-context';
 import { isGuardianProfile, useProfile } from '../../lib/profile';
-import { combinedSignal } from '../../lib/query-timeout';
-import { assertOk } from '../../lib/assert-ok';
 import { formatApiError } from '../../lib/format-api-error';
 import {
   deriveRetentionStatus,
@@ -41,35 +41,16 @@ import {
 } from '../../components/library/LibrarySearchResults';
 import { useLibrarySearch } from '../../hooks/use-library-search';
 import { ShimmerSkeleton } from '../../components/common/ShimmerSkeleton';
+import { getLearningSubjectTint } from '../../lib/learning-subject-tints';
 
 // ---------------------------------------------------------------------------
-// Local interfaces (retention API shape)
+// Local types
 // ---------------------------------------------------------------------------
 
-interface SubjectRetentionTopic {
-  topicId: string;
-  topicTitle?: string;
-  bookId?: string | null;
-  easeFactor: number;
-  repetitions: number;
-  nextReviewAt?: string | null;
-  lastReviewedAt: string | null;
-  daysSinceLastReview?: number | null;
-  xpStatus: 'pending' | 'verified' | 'decayed';
-  failureCount: number;
-}
-
+/** Per-subject retention view used by computeShelfRetention. */
 interface SubjectRetentionResponse {
-  topics: SubjectRetentionTopic[];
+  topics: LibraryRetentionTopic[];
   reviewDueCount: number;
-}
-
-interface LibraryRetentionResponse {
-  subjects: Array<{
-    subjectId: string;
-    topics: SubjectRetentionTopic[];
-    reviewDueCount: number;
-  }>;
 }
 
 // ---------------------------------------------------------------------------
@@ -152,7 +133,6 @@ export default function LibraryScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const themeColors = useThemeColors();
-  const apiClient = useApiClient();
   const { activeProfile, profiles } = useProfile();
   const isGuardian = isGuardianProfile(activeProfile, profiles);
 
@@ -190,6 +170,16 @@ export default function LibraryScreen() {
     () => sortSubjectsByStatus(subjects),
     [subjects],
   );
+  const subjectTintsById = useMemo(
+    () =>
+      new Map(
+        sortedSubjects.map((subject, index) => [
+          subject.id,
+          getLearningSubjectTint(index, themeColors),
+        ]),
+      ),
+    [sortedSubjects, themeColors],
+  );
 
   const progressQuery = useOverallProgress();
 
@@ -210,24 +200,9 @@ export default function LibraryScreen() {
   const allBooks = allBooksQuery.books;
 
   // [BUG-732 / PERF-2] Single aggregate /library/retention call
-  const libraryRetentionQuery = useQuery({
-    queryKey: ['library', 'retention', activeProfile?.id],
-    queryFn: async ({ signal: querySignal }: { signal?: AbortSignal }) => {
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const res = await apiClient.library.retention.$get(
-          {},
-          { init: { signal } },
-        );
-        await assertOk(res);
-        return (await res.json()) as LibraryRetentionResponse;
-      } finally {
-        cleanup();
-      }
-    },
-    enabled: !!activeProfile,
-    retry: false,
-  });
+  // [PR-4 / surface-ownership] Inline query replaced by useLibraryRetention()
+  // — library is the canonical owner of /library/retention.
+  const libraryRetentionQuery = useLibraryRetention();
 
   const retentionDataBySubjectId = useMemo(() => {
     const map = new Map<string, SubjectRetentionResponse>();
@@ -325,7 +300,7 @@ export default function LibraryScreen() {
       router.push({
         pathname: '/(app)/shelf/[subjectId]',
         params: { subjectId },
-      } as never);
+      } as Href);
     },
     [router],
   );
@@ -335,11 +310,11 @@ export default function LibraryScreen() {
       router.push({
         pathname: '/(app)/shelf/[subjectId]',
         params: { subjectId },
-      } as never);
+      } as Href);
       router.push({
         pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
         params: { subjectId, bookId },
-      } as never);
+      } as Href);
     },
     [router],
   );
@@ -349,7 +324,7 @@ export default function LibraryScreen() {
       router.push({
         pathname: '/(app)/topic/[topicId]',
         params: { topicId },
-      } as never);
+      } as Href);
     },
     [router],
   );
@@ -359,7 +334,7 @@ export default function LibraryScreen() {
       router.push({
         pathname: '/(app)/topic/[topicId]',
         params: { topicId },
-      } as never);
+      } as Href);
     },
     [router],
   );
@@ -373,7 +348,7 @@ export default function LibraryScreen() {
           subjectId,
           ...(topicId ? { topicId } : {}),
         },
-      } as never);
+      } as Href);
     },
     [router],
   );
@@ -570,9 +545,27 @@ export default function LibraryScreen() {
     }
 
     const isSearching = debouncedQuery.trim().length > 0;
+    const showingStaleCachedData =
+      (subjectsQuery.isError || progressQuery.isError) && subjects.length > 0;
 
     return (
       <>
+        {/* Stale-data banner — visible when cached data is shown after a refresh failure */}
+        {showingStaleCachedData && (
+          <Pressable
+            onPress={handleRetry}
+            className="bg-surface-elevated rounded-card px-4 py-3 mb-3 flex-row items-center"
+            testID="library-stale-banner"
+          >
+            <Text className="text-body-sm text-text-secondary flex-1">
+              {t('library.staleBanner.message')}
+            </Text>
+            <Text className="text-body-sm font-semibold text-primary ms-3">
+              {t('common.retry')}
+            </Text>
+          </Pressable>
+        )}
+
         {/* Curriculum complete banner */}
         {!!progressQuery.data?.subjects.length &&
           progressQuery.data.subjects.every(
@@ -602,7 +595,7 @@ export default function LibraryScreen() {
                   router.push({
                     pathname: '/create-subject',
                     params: { returnTo: 'library' },
-                  } as never)
+                  } as Href)
                 }
                 className="bg-primary rounded-button py-3 mt-4 items-center"
                 testID="library-add-subject"
@@ -635,6 +628,7 @@ export default function LibraryScreen() {
                 isError={searchResult.isError}
                 query={debouncedQuery}
                 enrichedSubjects={enrichedSubjectResults}
+                subjectTintsById={subjectTintsById}
                 onSubjectPress={handleShelfPress}
                 onBookPress={handleBookPress}
                 onTopicPress={handleTopicPress}
@@ -697,6 +691,7 @@ export default function LibraryScreen() {
                   reviewDueCount={retData?.reviewDueCount ?? 0}
                   isFinished={isFinished}
                   status={subject.status}
+                  tint={subjectTintsById.get(subject.id)}
                   onPress={handleShelfPress}
                 />
               );

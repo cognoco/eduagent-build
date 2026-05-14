@@ -54,7 +54,7 @@ describe('resolveSubjectName', () => {
 
     expect(result.status).toBe('corrected');
     expect(result.resolvedName).toBe('Physics');
-    expect(result.suggestions[0].name).toBe('Physics');
+    expect(result.suggestions[0]!.name).toBe('Physics');
   });
 
   it('returns ambiguous with multiple suggestions for a broad topic', async () => {
@@ -77,8 +77,8 @@ describe('resolveSubjectName', () => {
     expect(result.status).toBe('ambiguous');
     expect(result.resolvedName).toBeNull();
     expect(result.suggestions).toHaveLength(2);
-    expect(result.suggestions[0].name).toBe('Biology — Entomology');
-    expect(result.suggestions[1].name).toBe('Ecology');
+    expect(result.suggestions[0]!.name).toBe('Biology — Entomology');
+    expect(result.suggestions[1]!.name).toBe('Ecology');
   });
 
   it('returns resolved for natural language input', async () => {

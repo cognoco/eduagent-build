@@ -5,7 +5,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Sentry from '@sentry/react-native';
 import { useTranslation } from 'react-i18next';
 import { ErrorFallback } from '../../../../components/common';
-import { MetricCard } from '../../../../components/progress';
+import {
+  MetricCard,
+  PracticeActivitySummaryCard,
+} from '../../../../components/progress';
 import { classifyApiError } from '../../../../lib/format-api-error';
 import { formatMinutes } from '../../../../lib/format-relative-date';
 import { goBackOrReplace } from '../../../../lib/navigation';
@@ -56,7 +59,7 @@ export default function ProgressMonthlyReportDetail(): React.ReactElement {
         <View className="flex-row items-center mt-4">
           <Pressable
             onPress={() => goBackOrReplace(router, '/(app)/progress/reports')}
-            className="me-3 py-2 pe-2"
+            className="me-3 min-h-[44px] min-w-[44px] items-center justify-center"
             accessibilityRole="button"
             accessibilityLabel={t('common.goBack')}
             testID="progress-report-back"
@@ -113,14 +116,39 @@ export default function ProgressMonthlyReportDetail(): React.ReactElement {
               <MetricCard
                 label={t('parentView.report.sessions')}
                 value={String(report.reportData.thisMonth.totalSessions)}
+                testID="progress-report-metric-sessions"
               />
               <MetricCard
                 label={t('parentView.report.timeOnApp')}
                 value={formatMinutes(
                   report.reportData.thisMonth.totalActiveMinutes,
                 )}
+                testID="progress-report-metric-minutes"
               />
             </View>
+
+            <View className="flex-row gap-3 mt-3">
+              <MetricCard
+                label={t('parentView.report.testsCompleted')}
+                value={String(
+                  report.reportData.practiceSummary?.totals
+                    .activitiesCompleted ?? 0,
+                )}
+                testID="progress-report-metric-tests"
+              />
+              <MetricCard
+                label={t('parentView.report.testPoints')}
+                value={String(
+                  report.reportData.practiceSummary?.totals.pointsEarned ?? 0,
+                )}
+                testID="progress-report-metric-test-points"
+              />
+            </View>
+
+            <PracticeActivitySummaryCard
+              summary={report.reportData.practiceSummary}
+              testID="progress-report-practice-summary"
+            />
 
             {report.reportData.highlights.length > 0 ? (
               <View className="bg-surface rounded-card p-4 mt-4">

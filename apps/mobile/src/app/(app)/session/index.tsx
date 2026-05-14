@@ -25,6 +25,7 @@ import {
   useRouter,
   useLocalSearchParams,
   useFocusEffect,
+  type Href,
 } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type {
@@ -63,11 +64,11 @@ import { useClassifySubject } from '../../../hooks/use-classify-subject';
 import { useResolveSubject } from '../../../hooks/use-resolve-subject';
 import { useFiling } from '../../../hooks/use-filing';
 import { useStreaks } from '../../../hooks/use-streaks';
+import { useActiveSessionForTopic } from '../../../hooks/use-progress';
 import {
-  useOverallProgress,
-  useProgressInventory,
-  useActiveSessionForTopic,
-} from '../../../hooks/use-progress';
+  useTotalTopicsCompleted,
+  useIsFirstSession,
+} from '../../../hooks/use-session-context';
 import { useNetworkStatus } from '../../../hooks/use-network-status';
 import { useApiReachability } from '../../../hooks/use-api-reachability';
 import {
@@ -273,7 +274,7 @@ class SessionErrorBoundary extends Component<
                 error: null,
                 componentStack: null,
               });
-              router.replace('/(app)/home' as never);
+              router.replace('/(app)/home' as Href);
             }}
             style={{
               backgroundColor: tokens.light.colors.border,
@@ -425,21 +426,21 @@ function SessionScreenInner() {
   // typed object form makes the navigation reliable across web + native.
   const handleChatBackPress = useCallback(() => {
     if (returnTo) {
-      router.replace(homeBackHref as never);
+      router.replace(homeBackHref as Href);
       return;
     }
     if (subjectId) {
       router.replace({
         pathname: '/(app)/shelf/[subjectId]',
         params: { subjectId },
-      } as never);
+      } as Href);
       return;
     }
-    router.replace('/(app)/home' as never);
+    router.replace('/(app)/home' as Href);
   }, [returnTo, subjectId, homeBackHref, router]);
   const handleHomeBack = useCallback(() => {
     if (returnTo) {
-      router.replace(homeBackHref as never);
+      router.replace(homeBackHref as Href);
       return;
     }
 
@@ -456,7 +457,7 @@ function SessionScreenInner() {
         ...(topicName ? { topicName } : {}),
         ...(returnTo ? { returnTo } : {}),
       },
-    } as never);
+    } as Href);
   }, [mode, returnTo, router, subjectId, subjectName, topicId, topicName]);
   const normalizedOcrText = Array.isArray(ocrText) ? ocrText[0] : ocrText;
   const normalizedCaptureSource = Array.isArray(captureSource)
@@ -478,8 +479,8 @@ function SessionScreenInner() {
     initialHomeworkProblems[0]?.text ?? problemText ?? undefined;
   const modeConfig = getModeConfig(effectiveMode);
   const { data: streak } = useStreaks();
-  const { data: overallProgress } = useOverallProgress();
-  const progressInventory = useProgressInventory();
+  const totalTopicsCompleted = useTotalTopicsCompleted();
+  const isFirstSession = useIsFirstSession();
   const { data: celebrationLevel = 'all' } = useCelebrationLevel();
   const { data: learnerProfile } = useLearnerProfile();
   const { data: learningMode, isLoading: learningModeLoading } =
@@ -512,7 +513,7 @@ function SessionScreenInner() {
   // starts. See shouldShowBookLink for the full rationale.
   const showBookLink = shouldShowBookLink({
     effectiveMode,
-    totalTopicsCompleted: overallProgress?.totalTopicsCompleted ?? 0,
+    totalTopicsCompleted,
     messagesLength: messages.length,
   });
   const [isStreaming, setIsStreaming] = useState(false);
@@ -789,9 +790,19 @@ function SessionScreenInner() {
   }, [sessionBookmarksQuery.data, activeSessionId, routeSessionId]);
 
   // '' is intentional: all consumers gate on truthiness or convert via `|| undefined`
-  // before use as a route param or API argument (see useCreateNote, ensureSession, writeSessionRecoveryMarker).
+  // before use as a route param or API argument (see ensureSession, writeSessionRecoveryMarker).
   const effectiveSubjectId = classifiedSubject?.subjectId ?? subjectId ?? '';
   const effectiveSubjectName = classifiedSubject?.subjectName ?? subjectName;
+  const noteSubjectId =
+    effectiveSubjectId ||
+    liveTranscript?.session.subjectId ||
+    activeSession.data?.subjectId ||
+    undefined;
+  const noteTopicId =
+    topicId ??
+    liveTranscript?.session.topicId ??
+    activeSession.data?.topicId ??
+    undefined;
   const activeSubject = availableSubjects.find(
     (availableSubject) => availableSubject.id === effectiveSubjectId,
   );
@@ -816,7 +827,7 @@ function SessionScreenInner() {
   const apiClient = useApiClient();
   const classifySubject = useClassifySubject();
   const resolveSubject = useResolveSubject();
-  const createNote = useCreateNote(effectiveSubjectId || undefined, undefined);
+  const createNote = useCreateNote(noteSubjectId, undefined);
   const filing = useFiling();
   const startSession = useStartSession(effectiveSubjectId);
   const closeSession = useCloseSession(activeSessionId ?? '');
@@ -1097,6 +1108,7 @@ function SessionScreenInner() {
     handleResolveSubject,
     handleCreateResolveSuggestion,
     handleCreateSuggestedSubject,
+    handleTypeSubject,
     handleSend,
   } = useSubjectClassification({
     isStreaming,
@@ -1468,6 +1480,7 @@ function SessionScreenInner() {
       isStreaming={isStreaming}
       handleQuickChip={handleQuickChip}
       stage={conversationStage}
+      onAddNote={() => setShowNoteInput(true)}
     />
   );
 
@@ -1490,6 +1503,7 @@ function SessionScreenInner() {
       handleResolveSubject={handleResolveSubject}
       handleCreateSuggestedSubject={handleCreateSuggestedSubject}
       handleCreateResolveSuggestion={handleCreateResolveSuggestion}
+      handleTypeSubject={handleTypeSubject}
       setPendingSubjectResolution={setPendingSubjectResolution}
       router={router}
       effectiveMode={effectiveMode}
@@ -1658,9 +1672,7 @@ function SessionScreenInner() {
           <>
             <BookmarkNudgeTooltip
               aiResponseCount={aiResponseCount}
-              isFirstSession={
-                (progressInventory.data?.global.totalSessions ?? 0) === 0
-              }
+              isFirstSession={isFirstSession}
               profileId={activeProfile?.id}
             />
             <SessionFooter
@@ -1686,7 +1698,7 @@ function SessionScreenInner() {
               showNoteInput={showNoteInput}
               setShowNoteInput={setShowNoteInput}
               sessionNoteSavedRef={sessionNoteSavedRef}
-              topicId={topicId ?? undefined}
+              topicId={noteTopicId}
               sessionId={activeSessionId ?? undefined}
               createNote={createNote}
               colors={colors}

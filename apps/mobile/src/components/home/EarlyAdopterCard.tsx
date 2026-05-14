@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useQueryClient } from '@tanstack/react-query';
-import type { KnowledgeInventory } from '@eduagent/schemas';
 import * as SecureStore from '../../lib/secure-storage';
 import { useProfile } from '../../lib/profile';
 import { useThemeColors } from '../../lib/theme';
@@ -13,11 +11,16 @@ const MAX_SESSIONS = 5;
 const DISMISSED_KEY = (profileId: string) =>
   `earlyAdopterDismissed_${profileId}`;
 
-export function EarlyAdopterCard(): React.ReactElement | null {
+interface EarlyAdopterCardProps {
+  totalSessions: number;
+}
+
+export function EarlyAdopterCard({
+  totalSessions,
+}: EarlyAdopterCardProps): React.ReactElement | null {
   const { activeProfile } = useProfile();
   const { openFeedback } = useFeedbackContext();
   const colors = useThemeColors();
-  const queryClient = useQueryClient();
   const [dismissed, setDismissed] = useState<boolean | null>(null);
 
   const profileId = activeProfile?.id;
@@ -48,13 +51,6 @@ export function EarlyAdopterCard(): React.ReactElement | null {
       );
     }
   }, [profileId]);
-
-  const cachedInventory = queryClient.getQueryData<KnowledgeInventory>([
-    'progress',
-    'inventory',
-    profileId,
-  ]);
-  const totalSessions = cachedInventory?.global.totalSessions ?? 0;
 
   if (dismissed === null || dismissed || totalSessions >= MAX_SESSIONS) {
     return null;

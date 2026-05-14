@@ -2,13 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 
 import { WithdrawalCountdownBanner } from './WithdrawalCountdownBanner';
 
-const mockUseDashboard = jest.fn();
 const mockMutate = jest.fn();
-
-jest.mock(
-  '../../hooks/use-dashboard' /* gc1-allow: banner test isolates dashboard hook from real API calls */,
-  () => ({ useDashboard: () => mockUseDashboard() }),
-);
 
 jest.mock(
   '../../hooks/use-restore-consent' /* gc1-allow: restore-consent is a network side effect; mocked for CTA wiring tests */,
@@ -35,73 +29,40 @@ describe('WithdrawalCountdownBanner', () => {
     jest.useFakeTimers();
     jest.setSystemTime(new Date('2026-05-07T10:00:00Z'));
     jest.clearAllMocks();
-    mockUseDashboard.mockReturnValue({ data: { children: [] } });
   });
 
   afterEach(() => {
     jest.useRealTimers();
   });
 
-  it('renders nothing when no child is withdrawn in grace', () => {
-    mockUseDashboard.mockReturnValue({
-      data: {
-        children: [
-          {
-            profileId: 'c1',
-            displayName: 'Liam',
-            consentStatus: 'CONSENTED',
-            respondedAt,
-          },
-        ],
-      },
-    });
-
-    render(<WithdrawalCountdownBanner />);
+  it('renders nothing when childrenInGracePeriod is empty', () => {
+    render(<WithdrawalCountdownBanner childrenInGracePeriod={[]} />);
 
     expect(screen.queryByTestId('withdrawal-countdown-banner')).toBeNull();
   });
 
   it('renders the single-child countdown and Reverse CTA', () => {
-    mockUseDashboard.mockReturnValue({
-      data: {
-        children: [
-          {
-            profileId: 'c1',
-            displayName: 'Liam',
-            consentStatus: 'WITHDRAWN',
-            respondedAt,
-          },
-        ],
-      },
-    });
-
-    render(<WithdrawalCountdownBanner />);
+    render(
+      <WithdrawalCountdownBanner
+        childrenInGracePeriod={[
+          { profileId: 'c1', displayName: 'Liam', respondedAt },
+        ]}
+      />,
+    );
 
     expect(screen.getByText("Liam's account closes in 6 days")).toBeTruthy();
     expect(screen.getByText('Reverse')).toBeTruthy();
   });
 
   it('renders multi-child summary with per-child rows', () => {
-    mockUseDashboard.mockReturnValue({
-      data: {
-        children: [
-          {
-            profileId: 'c1',
-            displayName: 'Liam',
-            consentStatus: 'WITHDRAWN',
-            respondedAt,
-          },
-          {
-            profileId: 'c2',
-            displayName: 'Mia',
-            consentStatus: 'WITHDRAWN',
-            respondedAt,
-          },
-        ],
-      },
-    });
-
-    render(<WithdrawalCountdownBanner />);
+    render(
+      <WithdrawalCountdownBanner
+        childrenInGracePeriod={[
+          { profileId: 'c1', displayName: 'Liam', respondedAt },
+          { profileId: 'c2', displayName: 'Mia', respondedAt },
+        ]}
+      />,
+    );
 
     expect(screen.getByText('2 accounts closing soon')).toBeTruthy();
     expect(screen.getByTestId('withdrawal-countdown-row-c1')).toBeTruthy();
@@ -109,20 +70,13 @@ describe('WithdrawalCountdownBanner', () => {
   });
 
   it('calls useRestoreConsent.mutate with the right id when Reverse is pressed', () => {
-    mockUseDashboard.mockReturnValue({
-      data: {
-        children: [
-          {
-            profileId: 'c1',
-            displayName: 'Liam',
-            consentStatus: 'WITHDRAWN',
-            respondedAt,
-          },
-        ],
-      },
-    });
-
-    render(<WithdrawalCountdownBanner />);
+    render(
+      <WithdrawalCountdownBanner
+        childrenInGracePeriod={[
+          { profileId: 'c1', displayName: 'Liam', respondedAt },
+        ]}
+      />,
+    );
     fireEvent.press(screen.getByTestId('withdrawal-countdown-reverse-c1'));
 
     expect(mockMutate).toHaveBeenCalledWith(
@@ -137,20 +91,14 @@ describe('WithdrawalCountdownBanner', () => {
 
   it('uses singular day when 1 day is left', () => {
     jest.setSystemTime(new Date('2026-05-12T10:00:00Z'));
-    mockUseDashboard.mockReturnValue({
-      data: {
-        children: [
-          {
-            profileId: 'c1',
-            displayName: 'Liam',
-            consentStatus: 'WITHDRAWN',
-            respondedAt,
-          },
-        ],
-      },
-    });
 
-    render(<WithdrawalCountdownBanner />);
+    render(
+      <WithdrawalCountdownBanner
+        childrenInGracePeriod={[
+          { profileId: 'c1', displayName: 'Liam', respondedAt },
+        ]}
+      />,
+    );
 
     expect(screen.getByText(/in 1 day$/)).toBeTruthy();
   });

@@ -1,8 +1,12 @@
 import { resolve } from 'path';
-import { loadDatabaseEnv } from '@eduagent/test-utils';
+import { like } from 'drizzle-orm';
+
 import {
   accounts,
   createDatabase,
+  curricula,
+  curriculumBooks,
+  curriculumTopics,
   generateUUIDv7,
   learningSessions,
   profiles,
@@ -10,8 +14,9 @@ import {
   subjects,
   type Database,
 } from '@eduagent/database';
-import { like } from 'drizzle-orm';
 import type { Bookmark, SessionBookmark } from '@eduagent/schemas';
+import { loadDatabaseEnv } from '@eduagent/test-utils';
+
 import {
   createBookmark,
   deleteBookmark,
@@ -33,6 +38,8 @@ let subjectId: string;
 let sessionId: string;
 let aiEventId: string;
 let aiEventId2: string;
+let topicId: string;
+let otherTopicId: string;
 
 async function seedTestData(): Promise<void> {
   const [account] = await db
@@ -84,11 +91,55 @@ async function seedTestData(): Promise<void> {
     .returning({ id: subjects.id });
   subjectId = subject!.id;
 
+  const [curriculum] = await db
+    .insert(curricula)
+    .values({
+      subjectId,
+      version: 1,
+    })
+    .returning({ id: curricula.id });
+
+  const [book] = await db
+    .insert(curriculumBooks)
+    .values({
+      subjectId,
+      title: 'Biology foundations',
+      sortOrder: 0,
+    })
+    .returning({ id: curriculumBooks.id });
+
+  const [topic] = await db
+    .insert(curriculumTopics)
+    .values({
+      curriculumId: curriculum!.id,
+      bookId: book!.id,
+      title: 'Calvin cycle',
+      description: 'Carbon fixation and glucose building',
+      sortOrder: 0,
+      estimatedMinutes: 12,
+    })
+    .returning({ id: curriculumTopics.id });
+  topicId = topic!.id;
+
+  const [otherTopic] = await db
+    .insert(curriculumTopics)
+    .values({
+      curriculumId: curriculum!.id,
+      bookId: book!.id,
+      title: 'Light reactions',
+      description: 'Converting light energy',
+      sortOrder: 1,
+      estimatedMinutes: 10,
+    })
+    .returning({ id: curriculumTopics.id });
+  otherTopicId = otherTopic!.id;
+
   const [session] = await db
     .insert(learningSessions)
     .values({
       profileId,
       subjectId,
+      topicId,
       status: 'completed',
     })
     .returning({ id: learningSessions.id });
@@ -100,6 +151,7 @@ async function seedTestData(): Promise<void> {
       sessionId,
       profileId,
       subjectId,
+      topicId,
       eventType: 'ai_response',
       content:
         'The Calvin cycle uses CO₂ to build glucose through carbon fixation.',
@@ -113,6 +165,7 @@ async function seedTestData(): Promise<void> {
       sessionId,
       profileId,
       subjectId,
+      topicId: otherTopicId,
       eventType: 'ai_response',
       content: 'Photosynthesis converts light energy into chemical energy.',
     })
@@ -144,7 +197,8 @@ describeIfDb('Bookmarks (integration)', () => {
       'The Calvin cycle uses CO₂ to build glucose through carbon fixation.',
     );
     expect(bookmark.subjectName).toBe('Mathematics');
-    expect(bookmark.topicTitle).toBeNull();
+    expect(bookmark.topicId).toBe(topicId);
+    expect(bookmark.topicTitle).toBe('Calvin cycle');
     expect(bookmark.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
   });
 
@@ -180,6 +234,17 @@ describeIfDb('Bookmarks (integration)', () => {
     expect(result.bookmarks[0]!.content).toContain('Photosynthesis');
     expect(result.bookmarks[1]!.content).toContain('Calvin cycle');
     expect(result.nextCursor).toBeNull();
+  });
+
+  it('filters bookmarks by topicId', async () => {
+    const result = await listBookmarks(db, profileId, { topicId });
+
+    expect(result.bookmarks).toHaveLength(1);
+    expect(result.bookmarks[0]).toMatchObject({
+      eventId: aiEventId,
+      topicId,
+      topicTitle: 'Calvin cycle',
+    });
   });
 
   it('cursor pagination', async () => {

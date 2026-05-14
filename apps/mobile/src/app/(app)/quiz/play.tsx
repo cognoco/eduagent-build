@@ -16,7 +16,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { hapticError, hapticLight, hapticSuccess } from '../../../lib/haptics';
 import { useTranslation } from 'react-i18next';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type {
   ClientQuizQuestion,
@@ -155,7 +155,7 @@ export default function QuizPlayScreen(): React.ReactElement {
 
   useEffect(() => {
     if (!round || !currentQuestion) {
-      router.replace(exitHref as never);
+      router.replace(exitHref as Href);
     }
   }, [currentQuestion, exitHref, round, router]);
 
@@ -252,7 +252,7 @@ export default function QuizPlayScreen(): React.ReactElement {
             setRoundAutoSaveStarted(false);
             if (navigateOnSuccess || pendingResultsNavigateRef.current) {
               pendingResultsNavigateRef.current = false;
-              router.replace('/(app)/quiz/results' as never);
+              router.replace('/(app)/quiz/results' as Href);
             }
           },
           onError: (err) => {
@@ -284,7 +284,7 @@ export default function QuizPlayScreen(): React.ReactElement {
   };
   const handleConfirmQuit = () => {
     setQuitConfirmVisible(false);
-    router.replace(exitHref as never);
+    router.replace(exitHref as Href);
   };
   const handleSaveAndQuit = () => {
     if (resultsRef.current.length === 0) return;
@@ -293,12 +293,12 @@ export default function QuizPlayScreen(): React.ReactElement {
   };
   const handleSeeResults = () => {
     if (!roundAutoSaved) return;
-    router.replace('/(app)/quiz/results' as never);
+    router.replace('/(app)/quiz/results' as Href);
   };
   const handleOneMore = () => {
     if (!roundAutoSaved) return;
     setRound(null);
-    router.replace('/(app)/quiz/launch' as never);
+    router.replace('/(app)/quiz/launch' as Href);
   };
   // [BUG-542] Use checkAnswer.mutateAsync (stable ref in TanStack Query v5)
   // instead of the whole checkAnswer object, which creates a new reference on
@@ -426,7 +426,7 @@ export default function QuizPlayScreen(): React.ReactElement {
         </Text>
         <View className="flex-row gap-3 w-full">
           <Pressable
-            onPress={() => router.replace('/(app)/quiz' as never)}
+            onPress={() => router.replace('/(app)/quiz' as Href)}
             className="flex-1 bg-primary rounded-button px-4 py-3 min-h-[48px] items-center justify-center"
             accessibilityRole="button"
             accessibilityLabel={t('common.retry')}
@@ -437,7 +437,7 @@ export default function QuizPlayScreen(): React.ReactElement {
             </Text>
           </Pressable>
           <Pressable
-            onPress={() => router.replace(exitHref as never)}
+            onPress={() => router.replace(exitHref as Href)}
             className="flex-1 bg-surface-elevated rounded-button px-4 py-3 min-h-[48px] items-center justify-center"
             accessibilityRole="button"
             accessibilityLabel={t('common.goHome')}
@@ -630,7 +630,7 @@ export default function QuizPlayScreen(): React.ReactElement {
 
     if (currentIndex + 1 >= totalQuestions) {
       if (roundAutoSaved) {
-        router.replace('/(app)/quiz/results' as never);
+        router.replace('/(app)/quiz/results' as Href);
         return;
       }
       if (roundAutoSaveStarted) {

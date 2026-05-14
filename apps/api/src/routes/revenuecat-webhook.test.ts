@@ -3,10 +3,12 @@
 // ---------------------------------------------------------------------------
 
 jest.mock('../services/kv', () => ({
+  ...jest.requireActual('../services/kv'),
   writeSubscriptionStatus: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock('../services/billing', () => ({
+  ...jest.requireActual('../services/billing'),
   getSubscriptionByAccountId: jest.fn(),
   getQuotaPool: jest.fn(),
   ensureFreeSubscription: jest.fn().mockResolvedValue({
@@ -33,10 +35,12 @@ jest.mock('../services/billing', () => ({
 }));
 
 jest.mock('../services/account', () => ({
+  ...jest.requireActual('../services/account'),
   findAccountByClerkId: jest.fn(),
 }));
 
 jest.mock('../services/subscription', () => ({
+  ...jest.requireActual('../services/subscription'),
   getTierConfig: jest.fn().mockReturnValue({
     monthlyQuota: 500,
     dailyLimit: null,
@@ -49,10 +53,12 @@ jest.mock('../services/subscription', () => ({
 }));
 
 jest.mock('../services/trial', () => ({
+  ...jest.requireActual('../services/trial'),
   EXTENDED_TRIAL_MONTHLY_EQUIVALENT: 450,
 }));
 
 jest.mock('../inngest/client', () => ({
+  // gc1-allow: Inngest SDK external boundary
   inngest: {
     send: jest.fn().mockResolvedValue(undefined),
   },
@@ -61,6 +67,7 @@ jest.mock('../inngest/client', () => ({
 const mockCaptureException = jest.fn();
 
 jest.mock('../services/sentry', () => ({
+  // gc1-allow: @sentry/cloudflare external boundary
   captureException: (...args: unknown[]) => mockCaptureException(...args),
 }));
 
@@ -885,7 +892,7 @@ describe('SUBSCRIBER_ALIAS', () => {
         );
       expect(aliasLog.length).toBeGreaterThan(0);
 
-      const parsed = JSON.parse(aliasLog[0]) as {
+      const parsed = JSON.parse(aliasLog[0]!) as {
         level: string;
         message: string;
         context?: { appUserId?: unknown; transferredFrom?: unknown };

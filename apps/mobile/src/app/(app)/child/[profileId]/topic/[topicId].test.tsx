@@ -12,7 +12,7 @@ jest.mock('react-i18next', () => ({
 }));
 
 const mockUseLocalSearchParams = jest.fn();
-const mockUseChildSessions = jest.fn();
+const mockUseProfileSessions = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: jest.fn(), replace: jest.fn() }),
@@ -23,16 +23,19 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
-jest.mock('../../../../../hooks/use-dashboard', () => ({
-  useChildSessions: (...args: unknown[]) => mockUseChildSessions(...args),
-}));
+jest.mock(
+  '../../../../../hooks/use-progress' /* gc1-allow: existing isolated screen test now mirrors the real useProfileSessions dependency */,
+  () => ({
+    useProfileSessions: (...args: unknown[]) => mockUseProfileSessions(...args),
+  }),
+);
 
 const TopicDetailScreen = require('./[topicId]').default;
 
 describe('TopicDetailScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockUseChildSessions.mockReturnValue({
+    mockUseProfileSessions.mockReturnValue({
       data: [],
       isLoading: false,
     });

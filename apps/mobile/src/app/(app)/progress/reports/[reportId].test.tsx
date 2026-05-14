@@ -104,6 +104,26 @@ const MONTHLY_REPORT = {
   createdAt: '2026-04-30T00:00:00.000Z',
 };
 
+const PRACTICE_SUMMARY = {
+  quizzesCompleted: 2,
+  reviewsCompleted: 1,
+  totals: {
+    activitiesCompleted: 3,
+    reviewsCompleted: 1,
+    pointsEarned: 20,
+    celebrations: 1,
+    distinctActivityTypes: 2,
+  },
+  scores: {
+    scoredActivities: 0,
+    score: 0,
+    total: 0,
+    accuracy: null,
+  },
+  byType: [],
+  bySubject: [],
+};
+
 describe('ProgressMonthlyReportDetail', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -203,6 +223,44 @@ describe('ProgressMonthlyReportDetail', () => {
     screen.getByText('8');
     screen.getByText('Time on app');
     screen.getByText('2h');
+    screen.getByTestId('progress-report-metric-sessions');
+    screen.getByTestId('progress-report-metric-minutes');
+    screen.getByTestId('progress-report-metric-tests');
+    screen.getByTestId('progress-report-metric-test-points');
+  });
+
+  it('renders the practice summary card when practice data is present', () => {
+    mockUseProfileReportDetail.mockReturnValue({
+      data: {
+        ...MONTHLY_REPORT,
+        reportData: {
+          ...MONTHLY_REPORT.reportData,
+          practiceSummary: PRACTICE_SUMMARY,
+        },
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: mockRefetch,
+    });
+
+    render(<ProgressMonthlyReportDetail />);
+
+    screen.getByTestId('progress-report-practice-summary');
+  });
+
+  it('hides the practice summary card when practice data is absent', () => {
+    mockUseProfileReportDetail.mockReturnValue({
+      data: MONTHLY_REPORT,
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: mockRefetch,
+    });
+
+    render(<ProgressMonthlyReportDetail />);
+
+    expect(screen.queryByTestId('progress-report-practice-summary')).toBeNull();
   });
 
   it('renders highlights when the report includes them', () => {

@@ -1,17 +1,16 @@
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAssessmentEligibleTopics } from '../../../hooks/use-assessments';
 import { Button } from '../../../components/common/Button';
 import { ErrorFallback } from '../../../components/common/ErrorFallback';
 import { useThemeColors } from '../../../lib/theme';
+import type { Translate } from '../../../i18n';
 
-type TranslationFn = (key: string, options?: Record<string, unknown>) => string;
-
-function formatStudiedAt(isoDate: string, t: TranslationFn): string {
+function formatStudiedAt(isoDate: string, t: Translate): string {
   const diffDays = Math.floor(
     (Date.now() - new Date(isoDate).getTime()) / (1000 * 60 * 60 * 24),
   );
@@ -136,7 +135,7 @@ export default function AssessmentPickerScreen(): React.ReactElement {
               variant="primary"
               label={t('assessment.pickerBrowseTopics')}
               testID="assessment-picker-browse"
-              onPress={() => router.push('/(app)/library' as never)}
+              onPress={() => router.push('/(app)/library' as Href)}
             />
           </View>
         </View>
@@ -158,7 +157,7 @@ export default function AssessmentPickerScreen(): React.ReactElement {
                     subjectId: topic.subjectId,
                     topicId: topic.topicId,
                   },
-                } as never)
+                } as Href)
               }
             >
               <View className="flex-1">

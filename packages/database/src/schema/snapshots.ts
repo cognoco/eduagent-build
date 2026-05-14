@@ -12,6 +12,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { generateUUIDv7 } from '../utils/uuid';
 import { profiles } from './profiles';
+import { learningSessions } from './sessions';
 import { curriculumBooks, subjects } from './subjects';
 
 export const progressSnapshots = pgTable(
@@ -42,6 +43,36 @@ export const progressSnapshots = pgTable(
       table.snapshotDate,
     ),
   ],
+);
+
+export const progressSummaries = pgTable(
+  'progress_summaries',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .$defaultFn(() => generateUUIDv7()),
+    profileId: uuid('profile_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    summary: text('summary').notNull(),
+    generatedAt: timestamp('generated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    basedOnLastSessionAt: timestamp('based_on_last_session_at', {
+      withTimezone: true,
+    }),
+    latestSessionId: uuid('latest_session_id').references(
+      () => learningSessions.id,
+      { onDelete: 'set null' },
+    ),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [uniqueIndex('progress_summaries_profile_uq').on(table.profileId)],
 );
 
 export const milestones = pgTable(

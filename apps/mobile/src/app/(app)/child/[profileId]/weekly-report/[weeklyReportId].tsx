@@ -1,6 +1,6 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import * as Sentry from '@sentry/react-native';
@@ -11,11 +11,15 @@ import {
 import { classifyApiError } from '../../../../../lib/format-api-error';
 import { formatMinutes } from '../../../../../lib/format-relative-date';
 import { ErrorFallback } from '../../../../../components/common';
-import { MetricCard } from '../../../../../components/progress';
+import {
+  MetricCard,
+  PracticeActivitySummaryCard,
+} from '../../../../../components/progress';
 import {
   useChildWeeklyReportDetail,
   useMarkWeeklyReportViewed,
 } from '../../../../../hooks/use-progress';
+import { NudgeActionSheet } from '../../../../../components/nudge/NudgeActionSheet';
 
 /**
  * BUG-903 (c): Render a "Apr 27 – May 3, 2026" date range so the parent sees
@@ -54,12 +58,18 @@ function isEmptyWeeklyReport(reportData: {
     topicsMastered: number;
     vocabularyTotal: number;
   };
+  practiceSummary?: {
+    totals: {
+      activitiesCompleted: number;
+    };
+  };
 }): boolean {
   return (
     reportData.thisWeek.totalSessions === 0 &&
     reportData.thisWeek.totalActiveMinutes === 0 &&
     reportData.thisWeek.topicsMastered === 0 &&
-    reportData.thisWeek.vocabularyTotal === 0
+    reportData.thisWeek.vocabularyTotal === 0 &&
+    (reportData.practiceSummary?.totals.activitiesCompleted ?? 0) === 0
   );
 }
 
@@ -84,6 +94,7 @@ export default function ChildWeeklyReportDetailScreen(): React.ReactElement {
     ? (`/(app)/child/${profileId}/reports` as const)
     : FAMILY_HOME_PATH;
   const markViewed = useMarkWeeklyReportViewed();
+  const [showNudge, setShowNudge] = useState(false);
   const markViewedRef = useRef(markViewed);
   markViewedRef.current = markViewed;
   const viewedRef = useRef(false);
@@ -124,7 +135,7 @@ export default function ChildWeeklyReportDetailScreen(): React.ReactElement {
                   : FAMILY_HOME_PATH,
               )
             }
-            className="me-3 py-2 pe-2"
+            className="me-3 min-h-[44px] min-w-[44px] items-center justify-center"
             accessibilityRole="button"
             accessibilityLabel={t('common.goBack')}
             testID="child-weekly-report-back"
@@ -216,6 +227,29 @@ export default function ChildWeeklyReportDetailScreen(): React.ReactElement {
               />
             </View>
 
+            <View className="flex-row gap-3 mt-3">
+              <MetricCard
+                label={t('parentView.weeklyReport.testsCompleted')}
+                value={String(
+                  report.reportData.practiceSummary?.totals
+                    .activitiesCompleted ?? 0,
+                )}
+                testID="child-weekly-report-metric-tests"
+              />
+              <MetricCard
+                label={t('parentView.weeklyReport.testPoints')}
+                value={String(
+                  report.reportData.practiceSummary?.totals.pointsEarned ?? 0,
+                )}
+                testID="child-weekly-report-metric-test-points"
+              />
+            </View>
+
+            <PracticeActivitySummaryCard
+              summary={report.reportData.practiceSummary}
+              testID="child-weekly-report-practice-summary"
+            />
+
             {/* BUG-903 (d): Empty-state guidance when nothing happened this */}
             {/* week. Without this, parents see four zero cards and stop. */}
             {isEmptyWeeklyReport(report.reportData) && (
@@ -238,7 +272,11 @@ export default function ChildWeeklyReportDetailScreen(): React.ReactElement {
               <Pressable
                 onPress={() => {
                   if (!profileId) return;
-                  router.push(`/(app)/child/${profileId}` as never);
+                  if (isEmptyWeeklyReport(report.reportData)) {
+                    setShowNudge(true);
+                    return;
+                  }
+                  router.push(`/(app)/child/${profileId}` as Href);
                 }}
                 className="bg-primary rounded-button px-4 py-3 items-center min-h-[48px] justify-center"
                 accessibilityRole="button"
@@ -302,6 +340,13 @@ export default function ChildWeeklyReportDetailScreen(): React.ReactElement {
           </View>
         )}
       </ScrollView>
+      {showNudge && profileId && report ? (
+        <NudgeActionSheet
+          childName={report.reportData.childName}
+          childProfileId={profileId}
+          onClose={() => setShowNudge(false)}
+        />
+      ) : null}
     </View>
   );
 }

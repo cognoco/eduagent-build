@@ -34,7 +34,7 @@ beforeAll(async () => {
       hash: 'SHA-256',
     },
     true, // extractable — needed to export as JWK
-    ['sign', 'verify']
+    ['sign', 'verify'],
   );
 
   const exported = await crypto.subtle.exportKey('jwk', keyPair.publicKey);
@@ -63,7 +63,7 @@ function toBase64Url(obj: Record<string, unknown>): string {
 
 async function signJWT(
   header: Record<string, unknown>,
-  payload: Record<string, unknown>
+  payload: Record<string, unknown>,
 ): Promise<string> {
   const headerB64 = toBase64Url(header);
   const payloadB64 = toBase64Url(payload);
@@ -73,7 +73,7 @@ async function signJWT(
   const signatureBuffer = await crypto.subtle.sign(
     'RSASSA-PKCS1-v1_5',
     keyMaterial.privateKey,
-    data
+    data,
   );
 
   // Convert ArrayBuffer → base64url
@@ -94,7 +94,7 @@ async function signJWT(
 // Used to assert that the implementation rejects tampered tokens.
 function buildUnsignedFakeToken(
   header: Record<string, unknown>,
-  payload: Record<string, unknown>
+  payload: Record<string, unknown>,
 ): string {
   return `${toBase64Url(header)}.${toBase64Url(payload)}.invalidsignature`;
 }
@@ -107,7 +107,7 @@ describe('decodeJWTHeader', () => {
   it('decodes a valid JWT header', () => {
     const token = buildUnsignedFakeToken(
       { alg: 'RS256', typ: 'JWT', kid: 'key-1' },
-      { sub: 'user-1' }
+      { sub: 'user-1' },
     );
     const header = decodeJWTHeader(token);
 
@@ -127,7 +127,7 @@ describe('decodeJWTPayload', () => {
   it('decodes a valid JWT payload', () => {
     const token = buildUnsignedFakeToken(
       { alg: 'RS256' },
-      { sub: 'user-42', iss: 'https://clerk.dev', exp: 9999999999 }
+      { sub: 'user-42', iss: 'https://clerk.dev', exp: 9999999999 },
     );
     const payload = decodeJWTPayload(token);
 
@@ -140,7 +140,7 @@ describe('decodeJWTPayload', () => {
 
   it('throws when token has fewer than 3 segments', () => {
     expect(() => decodeJWTPayload('header.payload')).toThrow(
-      'expected 3 segments'
+      'expected 3 segments',
     );
   });
 
@@ -178,10 +178,10 @@ describe('fetchJWKS', () => {
 
     expect(globalThis.fetch).toHaveBeenCalledWith(
       JWKS_URL,
-      expect.objectContaining({ signal: expect.any(AbortSignal) })
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
     expect(jwks.keys).toHaveLength(1);
-    expect(jwks.keys[0].kid).toBe('key-1');
+    expect(jwks.keys[0]!.kid).toBe('key-1');
   });
 
   it('passes an AbortSignal to fetch for timeout enforcement', async () => {
@@ -189,7 +189,7 @@ describe('fetchJWKS', () => {
 
     const [, options] = (globalThis.fetch as jest.Mock).mock.calls[0] as [
       string,
-      RequestInit
+      RequestInit,
     ];
     expect(options.signal).toBeInstanceOf(AbortSignal);
     expect(options.signal?.aborted).toBe(false);
@@ -198,7 +198,7 @@ describe('fetchJWKS', () => {
   it('throws when fetch is aborted (simulated timeout)', async () => {
     const abortError = new DOMException(
       'The user aborted a request.',
-      'AbortError'
+      'AbortError',
     );
     globalThis.fetch = jest
       .fn()
@@ -244,7 +244,7 @@ describe('fetchJWKS', () => {
 describe('verifyJWT', () => {
   it('throws on token with wrong number of segments', async () => {
     await expect(verifyJWT('only.two', keyMaterial.publicJwk)).rejects.toThrow(
-      'expected 3 segments'
+      'expected 3 segments',
     );
   });
 
@@ -252,7 +252,7 @@ describe('verifyJWT', () => {
     const exp = Math.floor(Date.now() / 1000) + 3600;
     const token = await signJWT(
       { alg: 'RS256', kid: 'test-key-1' },
-      { sub: 'user-1', iss: 'https://clerk.dev', exp }
+      { sub: 'user-1', iss: 'https://clerk.dev', exp },
     );
 
     const payload = await verifyJWT(token, keyMaterial.publicJwk);
@@ -265,7 +265,7 @@ describe('verifyJWT', () => {
     const exp = Math.floor(Date.now() / 1000) + 3600;
     const validToken = await signJWT(
       { alg: 'RS256', kid: 'test-key-1' },
-      { sub: 'user-1', iss: 'https://clerk.dev', exp }
+      { sub: 'user-1', iss: 'https://clerk.dev', exp },
     );
 
     // Replace the real signature with garbage
@@ -273,7 +273,7 @@ describe('verifyJWT', () => {
     const tamperedToken = `${header}.${payload}.dGFtcGVyZWQ`;
 
     await expect(
-      verifyJWT(tamperedToken, keyMaterial.publicJwk)
+      verifyJWT(tamperedToken, keyMaterial.publicJwk),
     ).rejects.toThrow('signature verification failed');
   });
 
@@ -281,7 +281,7 @@ describe('verifyJWT', () => {
     const exp = Math.floor(Date.now() / 1000) + 3600;
     const originalToken = await signJWT(
       { alg: 'RS256', kid: 'test-key-1' },
-      { sub: 'user-1', iss: 'https://clerk.dev', exp }
+      { sub: 'user-1', iss: 'https://clerk.dev', exp },
     );
 
     // Swap in a different payload (different sub) — signature no longer matches
@@ -294,7 +294,7 @@ describe('verifyJWT', () => {
     const tamperedToken = `${header}.${maliciousPayload}.${sig}`;
 
     await expect(
-      verifyJWT(tamperedToken, keyMaterial.publicJwk)
+      verifyJWT(tamperedToken, keyMaterial.publicJwk),
     ).rejects.toThrow('signature verification failed');
   });
 
@@ -302,11 +302,11 @@ describe('verifyJWT', () => {
     const pastExp = Math.floor(Date.now() / 1000) - 1; // already expired
     const token = await signJWT(
       { alg: 'RS256', kid: 'test-key-1' },
-      { sub: 'user-1', iss: 'https://clerk.dev', exp: pastExp }
+      { sub: 'user-1', iss: 'https://clerk.dev', exp: pastExp },
     );
 
     await expect(verifyJWT(token, keyMaterial.publicJwk)).rejects.toThrow(
-      'token has expired'
+      'token has expired',
     );
   });
 
@@ -314,11 +314,11 @@ describe('verifyJWT', () => {
     const exp = Math.floor(Date.now() / 1000) + 3600;
     const token = await signJWT(
       { alg: 'RS256', kid: 'test-key-1' },
-      { sub: 'user-1', iss: 'https://clerk.dev', exp }
+      { sub: 'user-1', iss: 'https://clerk.dev', exp },
     );
 
     await expect(
-      verifyJWT(token, keyMaterial.publicJwk, { audience: 'eduagent-api' })
+      verifyJWT(token, keyMaterial.publicJwk, { audience: 'eduagent-api' }),
     ).rejects.toThrow('missing audience claim');
   });
 
@@ -331,7 +331,7 @@ describe('verifyJWT', () => {
         iss: 'https://clerk.dev',
         aud: ['eduagent-web', 'eduagent-api'],
         exp,
-      }
+      },
     );
 
     const payload = await verifyJWT(token, keyMaterial.publicJwk, {
@@ -353,11 +353,11 @@ describe('verifyJWT', () => {
         iss: 'https://clerk.dev',
         aud: ['eduagent-web'],
         exp,
-      }
+      },
     );
 
     await expect(
-      verifyJWT(token, keyMaterial.publicJwk, { audience: 'eduagent-api' })
+      verifyJWT(token, keyMaterial.publicJwk, { audience: 'eduagent-api' }),
     ).rejects.toThrow('audience mismatch');
   });
 
@@ -365,13 +365,13 @@ describe('verifyJWT', () => {
     const exp = Math.floor(Date.now() / 1000) + 3600;
     const token = await signJWT(
       { alg: 'RS256', kid: 'test-key-1' },
-      { sub: 'user-1', iss: 'https://evil.com', exp }
+      { sub: 'user-1', iss: 'https://evil.com', exp },
     );
 
     await expect(
       verifyJWT(token, keyMaterial.publicJwk, {
         issuer: 'https://clerk.dev',
-      })
+      }),
     ).rejects.toThrow('issuer mismatch');
   });
 
@@ -385,7 +385,7 @@ describe('verifyJWT', () => {
         hash: 'SHA-256',
       },
       true,
-      ['sign', 'verify']
+      ['sign', 'verify'],
     );
 
     const exp = Math.floor(Date.now() / 1000) + 3600;
@@ -398,7 +398,7 @@ describe('verifyJWT', () => {
     const signatureBuffer = await crypto.subtle.sign(
       'RSASSA-PKCS1-v1_5',
       wrongKeyPair.privateKey, // signed with WRONG key
-      data
+      data,
     );
 
     const bytes = new Uint8Array(signatureBuffer);
@@ -415,7 +415,7 @@ describe('verifyJWT', () => {
 
     // Verify with the test suite's public key — must fail
     await expect(
-      verifyJWT(tokenSignedWithWrongKey, keyMaterial.publicJwk)
+      verifyJWT(tokenSignedWithWrongKey, keyMaterial.publicJwk),
     ).rejects.toThrow('signature verification failed');
   });
 });

@@ -35,7 +35,7 @@ describe('wrangler.toml config guards', () => {
 
       // workers_dev must be explicitly false. Wrangler defaults to true on
       // missing key, so absence is also a failure here.
-      const workersDev = productionSection![1].match(
+      const workersDev = productionSection![1]!.match(
         /^workers_dev\s*=\s*(\S+)/m,
       );
       expect(workersDev).not.toBeNull();

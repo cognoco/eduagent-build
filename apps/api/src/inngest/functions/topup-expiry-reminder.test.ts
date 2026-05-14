@@ -3,9 +3,10 @@
 // ---------------------------------------------------------------------------
 
 const mockFindExpiringTopUpCredits = jest.fn().mockResolvedValue([]);
-const mockInngestSend = jest.fn().mockResolvedValue(undefined);
 
 import { createDatabaseModuleMock } from '../../test-utils/database-module';
+import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
+import { createInngestTransportCapture } from '../../test-utils/inngest-transport-capture';
 
 const mockDatabaseModule = createDatabaseModuleMock({
   db: {
@@ -27,17 +28,8 @@ const mockDatabaseModule = createDatabaseModuleMock({
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
-jest.mock('../client', () => ({
-  inngest: {
-    createFunction: jest.fn((_opts: unknown, _trigger: unknown, fn: object) => {
-      return Object.assign(fn, {
-        opts: _opts,
-        fn,
-      });
-    }),
-    send: (...args: unknown[]) => mockInngestSend(...args),
-  },
-}));
+const mockInngestTransport = createInngestTransportCapture();
+jest.mock('../client', () => mockInngestTransport.module); // gc1-allow: inngest framework boundary
 
 jest.mock('../../services/billing', () => ({
   findExpiringTopUpCredits: (...args: unknown[]) =>
@@ -60,33 +52,23 @@ interface TopupExpiryResult {
 
 async function executeSteps(): Promise<{
   result: TopupExpiryResult;
-  mockStep: { run: jest.Mock; sendEvent: jest.Mock; sleep: jest.Mock };
-  stepResults: Record<string, unknown>;
+  runCalls: import('../../test-utils/inngest-step-runner').InngestStepRunCall[];
+  sendEventCalls: import('../../test-utils/inngest-step-runner').InngestStepSendEventCall[];
 }> {
-  const stepResults: Record<string, unknown> = {};
-  const mockStep: TopupMockStep = {
-    run: jest.fn(async (name: string, fn: () => Promise<unknown>) => {
-      const result = await fn();
-      stepResults[name] = result;
-      return result;
-    }),
-    // [SWEEP-J7] Production now dispatches reminder events via memoized
-    // step.sendEvent instead of bare inngest.send inside step.run.
-    sendEvent: jest.fn().mockResolvedValue(undefined),
-    sleep: jest.fn(),
-  };
+  const { step, runCalls, sendEventCalls } = createInngestStepRunner();
 
   const handler = (topupExpiryReminder as any).fn ?? topupExpiryReminder;
   const result = (await handler({
     event: { name: 'inngest/function.invoked' },
-    step: mockStep,
+    step,
   })) as TopupExpiryResult;
 
-  return { result, mockStep, stepResults };
+  return { result, runCalls, sendEventCalls };
 }
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockInngestTransport.clear();
   jest.useFakeTimers({ now: NOW });
   process.env['DATABASE_URL'] = 'postgresql://test:test@localhost/test';
 });
@@ -135,25 +117,27 @@ describe('topupExpiryReminder', () => {
       .mockResolvedValueOnce([]) // 2-month milestone
       .mockResolvedValueOnce([]); // 0-month (expiring today)
 
-    const { result, mockStep } = await executeSteps();
+    const { result, sendEventCalls } = await executeSteps();
 
     expect(result.totalReminders).toBe(1);
     // [SWEEP-J7] Memoized step.sendEvent carrying the array of per-credit
     // payloads — bare inngest.send is forbidden inside step.run.
-    expect(mockStep.sendEvent).toHaveBeenCalledWith(
-      'queue-reminders-expiring-in-6-months',
-      expect.arrayContaining([
-        expect.objectContaining({
-          name: 'app/topup.expiry-reminder',
-          data: expect.objectContaining({
-            topUpCreditId: 'tu-1',
-            subscriptionId: 'sub-1',
-            remaining: 300,
+    expect(sendEventCalls).toContainEqual(
+      expect.objectContaining({
+        name: 'queue-reminders-expiring-in-6-months',
+        payload: expect.arrayContaining([
+          expect.objectContaining({
+            name: 'app/topup.expiry-reminder',
+            data: expect.objectContaining({
+              topUpCreditId: 'tu-1',
+              subscriptionId: 'sub-1',
+              remaining: 300,
+            }),
           }),
-        }),
-      ]),
+        ]),
+      }),
     );
-    expect(mockInngestSend).not.toHaveBeenCalled();
+    expect(mockInngestTransport.sentEvents).toHaveLength(0);
   });
 
   it('handles multiple expiring credits across milestones', async () => {
@@ -182,12 +166,12 @@ describe('topupExpiryReminder', () => {
       .mockResolvedValueOnce([credit2]) // 2-month milestone
       .mockResolvedValueOnce([]); // 0-month
 
-    const { result, mockStep } = await executeSteps();
+    const { result, sendEventCalls } = await executeSteps();
 
     expect(result.totalReminders).toBe(2);
     // Two milestones produced credits → two memoized step.sendEvent calls.
-    expect(mockStep.sendEvent).toHaveBeenCalledTimes(2);
-    expect(mockInngestSend).not.toHaveBeenCalled();
+    expect(sendEventCalls).toHaveLength(2);
+    expect(mockInngestTransport.sentEvents).toHaveLength(0);
   });
 
   it('[BUG-838] does not throw when system clock returns an invalid date', async () => {
@@ -222,14 +206,14 @@ describe('topupExpiryReminder', () => {
   it('checks all four reminder milestones', async () => {
     mockFindExpiringTopUpCredits.mockResolvedValue([]);
 
-    const { mockStep } = await executeSteps();
+    const { runCalls } = await executeSteps();
 
     // Should run find-credits step for each of the 4 milestones
-    const runCalls = mockStep.run.mock.calls.map((call: unknown[]) => call[0]);
-    expect(runCalls).toContain('find-credits-expiring-in-6-months');
-    expect(runCalls).toContain('find-credits-expiring-in-4-months');
-    expect(runCalls).toContain('find-credits-expiring-in-2-months');
-    expect(runCalls).toContain('find-credits-expiring-today');
+    const names = runCalls.map((c) => c.name);
+    expect(names).toContain('find-credits-expiring-in-6-months');
+    expect(names).toContain('find-credits-expiring-in-4-months');
+    expect(names).toContain('find-credits-expiring-in-2-months');
+    expect(names).toContain('find-credits-expiring-today');
   });
 
   it('[BUG-838] does not throw when system clock returns an invalid date', async () => {

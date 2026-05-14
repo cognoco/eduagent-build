@@ -156,6 +156,10 @@ export function useUpdateSubject(): UseMutationResult<
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['subjects'] });
+      // PR-10 deferred: broad ['progress'] — subject updates (name, status, archive)
+      // affect progress.subject and progress.overview for that subject, but
+      // activeProfileId is not available in this hook's closure (useUpdateSubject
+      // does not call useProfile). Keep broad until narrowing is proven by test.
       void queryClient.invalidateQueries({ queryKey: ['progress'] });
     },
     retry: (failureCount, error) =>

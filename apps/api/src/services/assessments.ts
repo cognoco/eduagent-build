@@ -13,6 +13,7 @@ import { escapeXml, sanitizeXmlValue } from './llm/sanitize';
 import { extractFirstJsonObject } from './llm/extract-json';
 import { captureException } from './sentry';
 import { createLogger } from './logger';
+import { recordPracticeActivityEvent } from './practice-activity-events';
 import type {
   VerificationDepth,
   QuickCheckContext,
@@ -110,7 +111,7 @@ Respond in this exact JSON format:
  * Questions require learner to explain reasoning (FR44).
  */
 export async function generateQuickCheck(
-  context: QuickCheckContext
+  context: QuickCheckContext,
 ): Promise<QuickCheckResult> {
   // [PROMPT-INJECT-8] topic fields are stored content; exchange history is
   // raw learner+assistant text. Sanitize titles, entity-encode the joined
@@ -150,7 +151,7 @@ export async function generateQuickCheck(
  */
 export async function evaluateAssessmentAnswer(
   context: AssessmentContext,
-  answer: string
+  answer: string,
 ): Promise<AssessmentEvaluation> {
   // [PROMPT-INJECT-8] Same pattern as generateQuickCheck.
   const safeTopicTitle = sanitizeXmlValue(context.topicTitle, 200);
@@ -180,7 +181,7 @@ export async function evaluateAssessmentAnswer(
 
 export async function evaluateQuickCheckAnswer(
   context: AssessmentContext,
-  answer: string
+  answer: string,
 ): Promise<AssessmentEvaluation> {
   const safeTopicTitle = sanitizeXmlValue(context.topicTitle, 200);
   const safeTopicDescription = sanitizeXmlValue(context.topicDescription, 500);
@@ -210,7 +211,7 @@ export async function evaluateQuickCheckAnswer(
  * Progression: recall -> explain -> transfer -> null
  */
 export function getNextVerificationDepth(
-  current: VerificationDepth
+  current: VerificationDepth,
 ): VerificationDepth | null {
   const currentIndex = DEPTH_ORDER.indexOf(current);
   if (currentIndex === -1 || currentIndex >= DEPTH_ORDER.length - 1) {
@@ -229,7 +230,7 @@ export function getNextVerificationDepth(
  */
 export function calculateMasteryScore(
   depth: VerificationDepth,
-  rawScore: number
+  rawScore: number,
 ): number {
   const cap = DEPTH_CAPS[depth];
   const clamped = Math.max(0, Math.min(1, rawScore));
@@ -265,11 +266,11 @@ function parseQuickCheckResult(response: string): QuickCheckResult {
             reason: 'missing_questions',
             rawResponseLength: response.length,
           },
-        }
+        },
       );
       assessmentsLogger.warn(
         '[parseQuickCheckResult] missing questions array — falling back to generic prompts',
-        { reason: 'missing_questions', rawResponseLength: response.length }
+        { reason: 'missing_questions', rawResponseLength: response.length },
       );
     } catch (err) {
       captureException(err, {
@@ -281,7 +282,7 @@ function parseQuickCheckResult(response: string): QuickCheckResult {
       });
       assessmentsLogger.warn(
         '[parseQuickCheckResult] invalid JSON — falling back to generic prompts',
-        { reason: 'invalid_json' }
+        { reason: 'invalid_json' },
       );
     }
   } else {
@@ -294,7 +295,7 @@ function parseQuickCheckResult(response: string): QuickCheckResult {
     });
     assessmentsLogger.warn(
       '[parseQuickCheckResult] no JSON object found — falling back to generic prompts',
-      { reason: 'no_json_found', rawResponseLength: response.length }
+      { reason: 'no_json_found', rawResponseLength: response.length },
     );
   }
 
@@ -320,7 +321,7 @@ const ASSESSMENT_FALLBACK_FEEDBACK =
 function parseAssessmentEvaluation(
   response: string,
   depth: VerificationDepth,
-  options: { passMode?: 'mastery' | 'llm' } = {}
+  options: { passMode?: 'mastery' | 'llm' } = {},
 ): AssessmentEvaluation {
   // [BUG-664 / S-4] Use extractFirstJsonObject — see parseQuickCheckResult for
   // the rationale. Falling back to the brittle /\{[\s\S]*\}/ regex caused
@@ -334,7 +335,7 @@ function parseAssessmentEvaluation(
       const masteryScore = calculateMasteryScore(depth, rawScore);
       const qualityRating = Math.max(
         0,
-        Math.min(5, Number(parsed.qualityRating ?? 0))
+        Math.min(5, Number(parsed.qualityRating ?? 0)),
       );
       const passed =
         options.passMode === 'llm'
@@ -376,7 +377,7 @@ function parseAssessmentEvaluation(
       });
       assessmentsLogger.warn(
         '[parseAssessmentEvaluation] invalid JSON — falling back to canned feedback',
-        { reason: 'invalid_json' }
+        { reason: 'invalid_json' },
       );
     }
   } else {
@@ -388,11 +389,11 @@ function parseAssessmentEvaluation(
           reason: 'no_json_found',
           rawResponseLength: response.length,
         },
-      }
+      },
     );
     assessmentsLogger.warn(
       '[parseAssessmentEvaluation] no JSON object found — falling back to canned feedback',
-      { reason: 'no_json_found', rawResponseLength: response.length }
+      { reason: 'no_json_found', rawResponseLength: response.length },
     );
   }
 
@@ -415,7 +416,7 @@ function parseAssessmentEvaluation(
 export type { AssessmentRecord } from '@eduagent/schemas';
 
 function mapAssessmentRow(
-  row: typeof assessments.$inferSelect
+  row: typeof assessments.$inferSelect,
 ): AssessmentRecord {
   return {
     id: row.id,
@@ -437,7 +438,7 @@ function mapAssessmentRow(
 export async function loadTopicTitle(
   db: Database,
   topicId: string,
-  profileId: string
+  profileId: string,
 ): Promise<string> {
   // curriculumTopics has no profileId column; ownership is verified by joining
   // through curricula → subjects where subjects.profileId = profileId.
@@ -449,7 +450,7 @@ export async function loadTopicTitle(
     .innerJoin(curricula, eq(curriculumTopics.curriculumId, curricula.id))
     .innerJoin(subjects, eq(curricula.subjectId, subjects.id))
     .where(
-      and(eq(curriculumTopics.id, topicId), eq(subjects.profileId, profileId))
+      and(eq(curriculumTopics.id, topicId), eq(subjects.profileId, profileId)),
     )
     .limit(1);
   const [topic] = await query;
@@ -461,7 +462,7 @@ export async function createAssessment(
   profileId: string,
   subjectId: string,
   topicId: string,
-  sessionId?: string
+  sessionId?: string,
 ): Promise<AssessmentRecord> {
   // Write: raw drizzle insert with profileId bound in values — correct pattern.
   // createScopedRepository only provides read methods (findFirst/findMany).
@@ -484,11 +485,11 @@ export async function createAssessment(
 export async function getAssessment(
   db: Database,
   profileId: string,
-  assessmentId: string
+  assessmentId: string,
 ): Promise<AssessmentRecord | null> {
   const repo = createScopedRepository(db, profileId);
   const row = await repo.assessments.findFirst(
-    eq(assessments.id, assessmentId)
+    eq(assessments.id, assessmentId),
   );
   return row ? mapAssessmentRow(row) : null;
 }
@@ -503,7 +504,7 @@ export async function updateAssessment(
     masteryScore?: number;
     qualityRating?: number;
     exchangeHistory?: ChatExchange[];
-  }
+  },
 ): Promise<AssessmentRecord | null> {
   // Write: raw drizzle with explicit profileId guard is correct here —
   // createScopedRepository only provides read methods (findFirst/findMany).
@@ -529,9 +530,39 @@ export async function updateAssessment(
     .where(
       and(
         eq(assessments.id, assessmentId),
-        eq(assessments.profileId, profileId)
-      )
+        eq(assessments.profileId, profileId),
+      ),
     )
     .returning();
   return row ? mapAssessmentRow(row) : null;
+}
+
+export async function recordAssessmentCompletionActivity(
+  db: Database,
+  profileId: string,
+  assessment: AssessmentRecord,
+  status: AssessmentStatus,
+  evaluation: AssessmentEvaluation,
+): Promise<void> {
+  const completedAt = new Date(assessment.updatedAt);
+  await recordPracticeActivityEvent(db, {
+    profileId,
+    subjectId: assessment.subjectId,
+    activityType: 'assessment',
+    activitySubtype: status,
+    completedAt,
+    // Assessment mastery is recorded in score/total below. Do not award
+    // activity points until product defines an assessment XP formula.
+    pointsEarned: 0,
+    score: Math.round(evaluation.masteryScore * 100),
+    total: 100,
+    sourceType: 'assessment',
+    sourceId: assessment.id,
+    metadata: {
+      topicId: assessment.topicId,
+      verificationDepth: assessment.verificationDepth,
+      passed: evaluation.passed,
+      qualityRating: evaluation.qualityRating,
+    },
+  });
 }

@@ -80,28 +80,45 @@ test('J-10 learner → Practice → Quiz → launch → play → results → hom
       timeout: 30_000,
     });
 
-    await firstOption.click();
+    await pressableClick(firstOption);
     await expect(page.getByTestId('quiz-answer-feedback')).toBeVisible({
       timeout: 30_000,
     });
 
-    await expect(page.getByText('Tap anywhere to continue')).toBeVisible({
+    const nextQuestion = page.getByTestId('quiz-next-question');
+    const seeResults = page.getByTestId('quiz-final-see-results');
+    const resultsScreen = page.getByTestId('quiz-results-screen');
+
+    await expect(nextQuestion.or(seeResults).or(resultsScreen)).toBeVisible({
       timeout: 30_000,
     });
-    await quizScreen.click();
+
+    if (await resultsScreen.isVisible().catch(() => false)) break;
+    if (await seeResults.isVisible().catch(() => false)) {
+      await pressableClick(seeResults);
+      continue;
+    }
+    if (await nextQuestion.isVisible().catch(() => false)) {
+      await pressableClick(nextQuestion);
+      continue;
+    }
+
+    throw new Error(
+      'None of quiz-results-screen, quiz-final-see-results, or quiz-next-question were visible after answer feedback.',
+    );
   }
 
   // Results screen
   await expect(page.getByTestId('quiz-results-screen')).toBeVisible({
     timeout: 30_000,
   });
-  await page.getByTestId('quiz-results-done').click();
+  await pressableClick(page.getByTestId('quiz-results-done'));
 
   // Back on practice screen, then navigate home
   await expect(page.getByTestId('practice-screen')).toBeVisible({
     timeout: 30_000,
   });
-  await page.getByTestId('practice-back').click({ force: true });
+  await pressableClick(page.getByTestId('practice-back'));
   await expect(page.getByTestId('learner-screen')).toBeVisible({
     timeout: 30_000,
   });

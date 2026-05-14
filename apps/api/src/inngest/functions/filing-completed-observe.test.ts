@@ -16,9 +16,12 @@
 
 const mockGetStepDatabase = jest.fn();
 
-jest.mock('../helpers', () => ({
-  getStepDatabase: () => mockGetStepDatabase(),
-}));
+jest.mock(
+  '../helpers' /* gc1-allow: isolates handler from Neon DB connection in unit tests */,
+  () => ({
+    getStepDatabase: () => mockGetStepDatabase(),
+  }),
+);
 
 jest.mock('../client', () => ({
   inngest: {
@@ -26,22 +29,26 @@ jest.mock('../client', () => ({
       (
         _config: unknown,
         _trigger: unknown,
-        handler: (...args: unknown[]) => unknown
-      ) => ({ fn: handler, _config, _trigger })
+        handler: (...args: unknown[]) => unknown,
+      ) => ({ fn: handler, _config, _trigger }),
     ),
   },
 }));
 
-jest.mock('../../services/logger', () => ({
-  createLogger: () => ({
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
+jest.mock(
+  '../../services/logger' /* gc1-allow: prevents logger side-effects and noisy output in unit tests */,
+  () => ({
+    createLogger: () => ({
+      info: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
+    }),
   }),
-}));
+);
 
 // Import AFTER mocks are set up
 import { filingCompletedObserve } from './filing-completed-observe';
+import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -68,25 +75,17 @@ function makeEvent(overrides: Partial<Record<string, unknown>> = {}) {
 //   - control what db.update().returning() resolves to (flipped / not flipped)
 // ---------------------------------------------------------------------------
 
-type StepRunOverrides = Record<string, () => Promise<unknown>>;
-
 async function executeHandler(
   filingStatus: string | null,
   // Controls what db.update().returning() resolves to.
   // Defaults to [{ id: SESSION_ID }] (1 row updated → flipped = true).
   updateRows: unknown[] = [{ id: SESSION_ID }],
-  stepRunOverrides: StepRunOverrides = {},
-  eventOverrides: Partial<Record<string, unknown>> = {}
+  stepRunOverrides: Record<string, unknown> = {},
+  eventOverrides: Partial<Record<string, unknown>> = {},
 ) {
-  const mockStep = {
-    run: jest.fn(async (name: string, fn: () => Promise<unknown>) => {
-      if (name in stepRunOverrides) {
-        return stepRunOverrides[name]();
-      }
-      return fn();
-    }),
-    sendEvent: jest.fn().mockResolvedValue(undefined),
-  };
+  const { step, sendEventCalls } = createInngestStepRunner({
+    runResults: stepRunOverrides,
+  });
 
   const mockUpdateChain = {
     set: jest.fn().mockReturnThis(),
@@ -100,7 +99,7 @@ async function executeHandler(
         findFirst: jest
           .fn()
           .mockResolvedValue(
-            filingStatus !== null ? { filingStatus } : undefined
+            filingStatus !== null ? { filingStatus } : undefined,
           ),
       },
     },
@@ -112,9 +111,9 @@ async function executeHandler(
   const handler = (filingCompletedObserve as any).fn;
   const result = await handler({
     event: makeEvent(eventOverrides),
-    step: mockStep,
+    step,
   });
-  return { result, mockStep, mockDb, mockUpdateChain };
+  return { result, sendEventCalls, mockDb, mockUpdateChain };
 }
 
 // ---------------------------------------------------------------------------
@@ -134,9 +133,9 @@ describe('filing-completed-observe', () => {
   // that is the timed-out-observer's responsibility for the pending path.
   // -------------------------------------------------------------------------
   it('flips filing_pending → filing_recovered on completion event', async () => {
-    const { result, mockStep, mockUpdateChain } = await executeHandler(
+    const { result, sendEventCalls, mockUpdateChain } = await executeHandler(
       'filing_pending',
-      [{ id: SESSION_ID }]
+      [{ id: SESSION_ID }],
     );
 
     // Function reports recovered = true
@@ -145,11 +144,11 @@ describe('filing-completed-observe', () => {
 
     // The update step ran and included the correct status values
     expect(mockUpdateChain.set).toHaveBeenCalledWith(
-      expect.objectContaining({ filingStatus: 'filing_recovered' })
+      expect.objectContaining({ filingStatus: 'filing_recovered' }),
     );
 
     // No filing_resolved event — pending path is handled by timed-out-observer
-    expect(mockStep.sendEvent).not.toHaveBeenCalled();
+    expect(sendEventCalls).toHaveLength(0);
   });
 
   // -------------------------------------------------------------------------
@@ -160,7 +159,7 @@ describe('filing-completed-observe', () => {
   // consumers can act on the late recovery.
   // -------------------------------------------------------------------------
   it('flips filing_failed → filing_recovered and dispatches app/session.filing_resolved', async () => {
-    const { result, mockStep } = await executeHandler('filing_failed', [
+    const { result, sendEventCalls } = await executeHandler('filing_failed', [
       { id: SESSION_ID },
     ]);
 
@@ -168,10 +167,9 @@ describe('filing-completed-observe', () => {
     expect(result.priorStatus).toBe('filing_failed');
 
     // filing_resolved MUST be dispatched with resolution 'recovered'
-    expect(mockStep.sendEvent).toHaveBeenCalledTimes(1);
-    const [stepName, payload] = mockStep.sendEvent.mock.calls[0];
-    expect(stepName).toBe('emit-resolved');
-    expect(payload).toMatchObject({
+    expect(sendEventCalls).toHaveLength(1);
+    expect(sendEventCalls[0]!.name).toBe('emit-resolved');
+    expect(sendEventCalls[0]!.payload).toMatchObject({
       name: 'app/session.filing_resolved',
       data: expect.objectContaining({
         sessionId: SESSION_ID,
@@ -188,9 +186,9 @@ describe('filing-completed-observe', () => {
   // already cleaned up), the function returns early without touching the DB.
   // -------------------------------------------------------------------------
   it('is a no-op for sessions with filing_status null', async () => {
-    const { result, mockStep, mockUpdateChain } = await executeHandler(
+    const { result, sendEventCalls, mockUpdateChain } = await executeHandler(
       null,
-      []
+      [],
     );
 
     expect(result.recovered).toBe(false);
@@ -198,7 +196,7 @@ describe('filing-completed-observe', () => {
 
     // No UPDATE and no event
     expect(mockUpdateChain.set).not.toHaveBeenCalled();
-    expect(mockStep.sendEvent).not.toHaveBeenCalled();
+    expect(sendEventCalls).toHaveLength(0);
   });
 
   // -------------------------------------------------------------------------
@@ -209,7 +207,7 @@ describe('filing-completed-observe', () => {
   // For filing_pending the condition must be false.
   // -------------------------------------------------------------------------
   it('does NOT dispatch filing_resolved when flipping from filing_pending (observer handles it)', async () => {
-    const { result, mockStep } = await executeHandler('filing_pending', [
+    const { result, sendEventCalls } = await executeHandler('filing_pending', [
       { id: SESSION_ID },
     ]);
 
@@ -218,23 +216,23 @@ describe('filing-completed-observe', () => {
     expect(result.priorStatus).toBe('filing_pending');
 
     // But no event dispatched — only filing_failed triggers the event
-    expect(mockStep.sendEvent).not.toHaveBeenCalled();
+    expect(sendEventCalls).toHaveLength(0);
   });
 
   // -------------------------------------------------------------------------
   // Bonus: filing_recovered → no-op (already in terminal recovered state)
   // -------------------------------------------------------------------------
   it('is a no-op when session is already filing_recovered', async () => {
-    const { result, mockStep, mockUpdateChain } = await executeHandler(
+    const { result, sendEventCalls, mockUpdateChain } = await executeHandler(
       'filing_recovered',
-      []
+      [],
     );
 
     expect(result.recovered).toBe(false);
     expect(result.priorStatus).toBe('filing_recovered');
 
     expect(mockUpdateChain.set).not.toHaveBeenCalled();
-    expect(mockStep.sendEvent).not.toHaveBeenCalled();
+    expect(sendEventCalls).toHaveLength(0);
   });
 
   // -------------------------------------------------------------------------
@@ -244,26 +242,23 @@ describe('filing-completed-observe', () => {
   // flipped = false → no filing_resolved event despite priorStatus=filing_failed.
   // -------------------------------------------------------------------------
   it('does NOT dispatch filing_resolved when CAS update matches 0 rows (concurrent update)', async () => {
-    const { result, mockStep } = await executeHandler(
+    const { result, sendEventCalls } = await executeHandler(
       'filing_failed',
-      [] // 0 rows updated → flipped = false
+      [], // 0 rows updated → flipped = false
     );
 
     expect(result.recovered).toBe(false);
     expect(result.priorStatus).toBe('filing_failed');
 
     // flipped is false so event must NOT be dispatched
-    expect(mockStep.sendEvent).not.toHaveBeenCalled();
+    expect(sendEventCalls).toHaveLength(0);
   });
 
   // -------------------------------------------------------------------------
   // Bonus: missing sessionId / profileId → early return
   // -------------------------------------------------------------------------
   it('returns recovered: false and priorStatus: null when sessionId is missing', async () => {
-    const mockStep = {
-      run: jest.fn(),
-      sendEvent: jest.fn(),
-    };
+    const { step, sendEventCalls, runCalls } = createInngestStepRunner();
 
     const mockDb = {
       query: { learningSessions: { findFirst: jest.fn() } },
@@ -274,11 +269,11 @@ describe('filing-completed-observe', () => {
     const handler = (filingCompletedObserve as any).fn;
     const result = await handler({
       event: { data: { profileId: PROFILE_ID } }, // sessionId absent
-      step: mockStep,
+      step,
     });
 
     expect(result).toEqual({ recovered: false, priorStatus: null });
-    expect(mockStep.run).not.toHaveBeenCalled();
-    expect(mockStep.sendEvent).not.toHaveBeenCalled();
+    expect(runCalls).toHaveLength(0);
+    expect(sendEventCalls).toHaveLength(0);
   });
 });

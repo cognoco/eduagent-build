@@ -7,9 +7,9 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { RetentionStatus } from '@eduagent/schemas';
+import type { Bookmark, RetentionStatus } from '@eduagent/schemas';
 import {
   useTopicProgress,
   useActiveSessionForTopic,
@@ -24,6 +24,7 @@ import {
   useDeleteNoteById,
 } from '../../../hooks/use-notes';
 import { useTopicSessions } from '../../../hooks/use-topic-sessions';
+import { useBookmarks } from '../../../hooks/use-bookmarks';
 import { useThemeColors } from '../../../lib/theme';
 import { formatSourceLine } from '../../../lib/format-note-source';
 import { deriveRetentionStatus } from '../../../lib/retention-utils';
@@ -35,6 +36,7 @@ import { ErrorFallback } from '../../../components/common';
 import { ShimmerSkeleton } from '../../../components/common/ShimmerSkeleton';
 import { TopicHeader } from '../../../components/library/TopicHeader';
 import { InlineNoteCard } from '../../../components/library/InlineNoteCard';
+import { BookmarkCard } from '../../../components/library/BookmarkCard';
 import { showNoteContextMenu } from '../../../components/library/NoteContextMenu';
 import { TopicSessionRow } from '../../../components/library/TopicSessionRow';
 import { StudyCTA } from '../../../components/library/StudyCTA';
@@ -103,6 +105,10 @@ function formatSessionsSummary(
       : String(Math.floor(totalSeconds / 60));
   const sessionLabel = sessions.length === 1 ? 'session' : 'sessions';
   return `${sessions.length} ${sessionLabel} · ${totalMinutes} min total`;
+}
+
+function formatBookmarkSourceLine(bookmark: Bookmark): string {
+  return `From chat · ${formatSessionDate(bookmark.createdAt)}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -193,6 +199,12 @@ export default function TopicDetailScreen() {
     subjectId,
     topicId,
   );
+  const bookmarksQuery = useBookmarks({
+    subjectId,
+    topicId,
+    limit: 50,
+    enabled: !!subjectId && !!topicId,
+  });
   const { mutate: createNote, isPending: creatingNote } = useCreateNote(
     subjectId,
     undefined,
@@ -228,6 +240,11 @@ export default function TopicDetailScreen() {
       null,
   );
   const sessionsSummary = formatSessionsSummary(topicSessions);
+  const topicBookmarks = useMemo(
+    () =>
+      bookmarksQuery.data?.pages.flatMap((page) => page.bookmarks ?? []) ?? [],
+    [bookmarksQuery.data],
+  );
 
   const studyCTA = useMemo(
     () => deriveStudyCTA(topicProgress?.completionStatus, retentionStatus),
@@ -243,7 +260,7 @@ export default function TopicDetailScreen() {
         router.push({
           pathname: '/(app)/session',
           params: { mode: 'learning', subjectId, topicId, topicName },
-        } as never);
+        } as Href);
     }
 
     const isOverdue =
@@ -258,7 +275,7 @@ export default function TopicDetailScreen() {
         router.push({
           pathname: '/(app)/session',
           params: { mode: 'review', subjectId, topicId, topicName },
-        } as never);
+        } as Href);
     }
 
     return () => {
@@ -277,7 +294,7 @@ export default function TopicDetailScreen() {
             sessionId: activeSession.sessionId,
           }),
         },
-      } as never);
+      } as Href);
     };
   }, [
     activeSession?.sessionId,
@@ -333,8 +350,9 @@ export default function TopicDetailScreen() {
         sessionId,
         ...(subjectId ? { subjectId } : {}),
         ...(topicId ? { topicId } : {}),
+        ...(paramBookId ? { bookId: paramBookId } : {}),
       },
-    } as never);
+    } as Href);
   };
 
   // ---------------------------------------------------------------------------
@@ -605,6 +623,43 @@ export default function TopicDetailScreen() {
                 </Pressable>
               )}
             </View>
+
+            {/* SAVED FROM CHAT section */}
+            {bookmarksQuery.isLoading || topicBookmarks.length > 0 ? (
+              <View className="mt-4 mb-2">
+                <Text className="text-body-sm font-semibold text-text-secondary tracking-wide px-5 mb-2">
+                  Saved from chat
+                </Text>
+
+                {bookmarksQuery.isLoading ? (
+                  <ShimmerSkeleton testID="bookmarks-loading">
+                    <View className="px-5">
+                      {[0, 1].map((i) => (
+                        <View
+                          key={i}
+                          style={{
+                            height: 64,
+                            borderRadius: 8,
+                            marginBottom: 8,
+                            backgroundColor: colors.border,
+                          }}
+                        />
+                      ))}
+                    </View>
+                  </ShimmerSkeleton>
+                ) : (
+                  topicBookmarks.map((bookmark) => (
+                    <BookmarkCard
+                      key={bookmark.id}
+                      bookmarkId={bookmark.id}
+                      content={bookmark.content}
+                      sourceLine={formatBookmarkSourceLine(bookmark)}
+                      onPress={() => handleSessionPress(bookmark.sessionId)}
+                    />
+                  ))
+                )}
+              </View>
+            ) : null}
 
             {/* SESSIONS section */}
             <View className="mt-4 mb-2">

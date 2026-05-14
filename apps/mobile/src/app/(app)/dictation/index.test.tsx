@@ -27,6 +27,7 @@ const mockGenerateReset = jest.fn();
 let mockGenerateIsPending = false;
 
 jest.mock('../../../hooks/use-dictation-api', () => ({
+  ...jest.requireActual('../../../hooks/use-dictation-api'),
   useGenerateDictation: () => ({
     mutateAsync: mockGenerateMutateAsync,
     isPending: mockGenerateIsPending,
@@ -42,6 +43,7 @@ jest.mock('../../../hooks/use-dictation-api', () => ({
 const mockSetData = jest.fn();
 
 jest.mock('./_layout', () => ({
+  ...jest.requireActual('./_layout'),
   useDictationData: () => ({
     data: null,
     setData: mockSetData,
@@ -51,10 +53,12 @@ jest.mock('./_layout', () => ({
 
 const mockGoBackOrReplace = jest.fn();
 jest.mock('../../../lib/navigation', () => ({
+  ...jest.requireActual('../../../lib/navigation'),
   goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
 }));
 
 jest.mock('../../../lib/platform-alert', () => ({
+  ...jest.requireActual('../../../lib/platform-alert'),
   platformAlert: jest.fn(),
 }));
 
@@ -67,12 +71,8 @@ jest.mock('../../../lib/theme', () => ({
   }),
 }));
 
-jest.mock('../../../lib/format-api-error', () => ({
-  formatApiError: (err: unknown) =>
-    err instanceof Error ? err.message : 'Unknown error',
-}));
-
 jest.mock('../../../components/home/IntentCard', () => ({
+  ...jest.requireActual('../../../components/home/IntentCard'),
   IntentCard: ({
     title,
     onPress,

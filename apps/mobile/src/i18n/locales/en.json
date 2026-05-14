@@ -496,7 +496,12 @@
       "finishEarlyLabel": "Finish session early",
       "nextProblemLabel": "Next problem",
       "finishHomeworkLabel": "Finish homework",
-      "endSessionLabel": "End session"
+      "endSessionLabel": "End session",
+      "typeSubjectPlaceholder": "Type a subject",
+      "typeSubjectLabel": "Type a subject",
+      "useTypedSubject": "Use",
+      "useTypedSubjectLabel": "Use typed subject",
+      "addNote": "Add note"
     },
     "quota": {
       "dailyLimitReached": "Daily limit reached",
@@ -571,7 +576,8 @@
       "writeNote": "Write a note",
       "cannotSaveTitle": "Cannot save note",
       "cannotSaveMessage": "Notes cannot be saved right now. Please try again.",
-      "saveFailedTitle": "Could not save note"
+      "saveFailedTitle": "Could not save note",
+      "summaryPlaceholder": "What should we remember from this session?"
     },
     "filingPrompt": {
       "title": "Add to library?",
@@ -927,6 +933,9 @@
     "loadError": {
       "message": "Unable to load your library. Please try again."
     },
+    "staleBanner": {
+      "message": "Showing your saved library. Tap to refresh."
+    },
     "empty": {
       "title": "Your library will grow as you learn",
       "message": "Start with homework help or learn something new. Books and topics will appear here afterward.",
@@ -1023,6 +1032,9 @@
       "title": "Note options",
       "deleteTitle": "Delete note",
       "deleteMessage": "Are you sure you want to delete this note?"
+    },
+    "bookmarkCard": {
+      "accessibilityLabel": "Open saved bookmark: {{title}}"
     }
   },
   "topic": {
@@ -1313,7 +1325,11 @@
     "tryCameraAgainLabel": "Try camera again",
     "tryReadingAgainLabel": "Try reading again",
     "classifyErrorTitle": "Could not identify the subject",
-    "classifyErrorMessage": "Please pick the subject this homework belongs to."
+    "classifyErrorMessage": "Please pick the subject this homework belongs to.",
+    "listening": "Listening...",
+    "voiceHint": "Say the homework problem out loud.",
+    "stopDictatingProblemLabel": "Stop dictating problem",
+    "dictateProblemLabel": "Dictate problem"
   },
   "progress": {
     "pageTitle": "My Learning Journey",
@@ -1377,6 +1393,19 @@
     "currentlyWorkingOn": {
       "andNMore": "and {{count}} more"
     },
+    "guardian": {
+      "sessionCount_one": "{{count}} session",
+      "sessionCount_other": "{{count}} sessions",
+      "lastStudied": "Last studied {{date}}",
+      "topicsMastered": "{{mastered}}/{{total}} topics mastered",
+      "summaryFallback": "No summary available yet. One will appear after the next session.",
+      "noRecentSessions": "No new sessions since {{date}}.",
+      "noRecentSessionsFallback": "No new sessions since a while ago.",
+      "staleSummary": "Summary may not reflect the latest activity yet.",
+      "nudgeCta": "A short nudge might help {{name}} restart",
+      "nudgeA11y": "Send {{name}} a nudge",
+      "viewAllReports": "View all reports"
+    },
     "weeklyReport": {
       "thisWeekSoFar": "This week so far",
       "practiceTitle": "Practice highlights",
@@ -1409,7 +1438,9 @@
       "bars": {
         "sessions": "Sessions",
         "time": "Time",
-        "topics": "Topics"
+        "topics": "Topics",
+        "quizzes": "Quizzes",
+        "reviews": "Reviews"
       },
       "empty": {
         "child": "Your first monthly summary lands at the end of {{month}}.",
@@ -1702,6 +1733,7 @@
       "totalSessions": "{{count}} sessions",
       "recentActivity": "Recent activity",
       "noRecentActivity": "No recent activity yet",
+      "lastSessionAgo": "Last session {{time}}",
       "noSessionsYet": "No sessions yet",
       "viewAllSessions": "View all sessions",
       "subjectsExplored": "Subjects explored",
@@ -1756,6 +1788,9 @@
       "viewSessionFrom": "View session from",
       "mentorMemoryTitle": "What the mentor knows about {{name}}",
       "mentorMemoryTitleFallback": "Mentor memory",
+      "manageMentorMemoryForChild": "Manage what the mentor remembers about {{name}}",
+      "profileDetails": "Profile details",
+      "childProfileJoined": "Added {{date}}",
       "setUpMentorMemory": "Set up mentor memory",
       "chooseWhatMentorRemembers": "Choose what the mentor remembers",
       "viewWhatMentorKnows": "View what the mentor knows",
@@ -1764,6 +1799,7 @@
       "learningAccommodationTitle": "Learning accommodation for {{name}}",
       "learningAccommodationTitleFallback": "Learning accommodation",
       "learningAccommodationDescription": "Adjust how the mentor teaches to fit your child's learning needs",
+      "noLearningPreferenceSet": "No learning preference set",
       "toggleDecisionGuide": "Show decision guide",
       "notSureWhichToPick": "Not sure which to pick?",
       "pickAccommodation": "Pick an accommodation",
@@ -1778,6 +1814,7 @@
       "checkConsentStatus": "Check consent status",
       "accountTitle": "Account — {{name}}",
       "accountTitleFallback": "Account",
+      "childProfileScopeHint": "Progress and reports live in their own tabs, so this page only keeps child-specific settings.",
       "deletionPending": "Deletion scheduled",
       "deletionCountdown": "Account will be deleted on {{date}}",
       "deletionProcessing": "Deletion in progress",
@@ -1910,7 +1947,9 @@
       "monthlyReport": "Monthly report",
       "subtitle": "A summary of your child's learning this month",
       "totalWords": "Total words",
-      "reportGoneTitle": "Report not found"
+      "reportGoneTitle": "Report not found",
+      "testsCompleted": "Tests completed",
+      "testPoints": "Test points"
     },
     "session": {
       "error": "Could not load session",
@@ -1987,7 +2026,42 @@
       "sendNudge": "Send {{name}} a nudge",
       "openChildProfile": "Open {{name}}'s profile",
       "reportGoneTitle": "This report is no longer available",
-      "reportGoneBody": "It may have been archived or removed. All your other reports are still safe."
+      "reportGoneBody": "It may have been archived or removed. All your other reports are still safe.",
+      "testsCompleted": "Tests completed",
+      "testPoints": "Test points"
+    },
+    "practiceSummary": {
+      "title": "Test detail",
+      "subtitle": "{{count}} activities finished, including {{reviews}} reviews",
+      "accuracy": "Accuracy",
+      "reviews": "Reviews",
+      "points": "Points",
+      "celebrations": "Celebrations",
+      "activityKinds": "Kinds",
+      "comparison": "{{activities}} activities · {{points}} points · {{celebrations}} celebrations",
+      "byType": "By type",
+      "bySubject": "By subject",
+      "typeDetail": "{{count}} finished · {{points}} points",
+      "typeDetailWithScore": "{{count}} finished · {{points}} points · {{accuracy}}%",
+      "subjectDetail": "{{count}} activities · {{points}} points · {{types}}",
+      "unknownSubject": "Unassigned",
+      "activityTypes": {
+        "quiz": "Quiz",
+        "review": "Review",
+        "assessment": "Prove I know this",
+        "dictation": "Dictation",
+        "recitation": "Recite",
+        "fluency_drill": "Fluency drill"
+      },
+      "activitySubtypes": {
+        "capitals": "Capitals",
+        "guess_who": "Guess who",
+        "vocabulary": "Vocabulary",
+        "assessment": "Prove I know this",
+        "dictation": "Dictation",
+        "recitation": "Recite",
+        "fluency_drill": "Fluency drill"
+      }
     }
   },
   "tabs": {

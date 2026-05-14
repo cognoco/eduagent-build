@@ -3,6 +3,25 @@ const mockListEligibleSelfReportProfileIdsAtLocalHour9 = jest
   .fn()
   .mockResolvedValue([]);
 const mockGetLatestSnapshotOnOrBefore = jest.fn().mockResolvedValue(null);
+const mockGetPracticeActivitySummary = jest.fn().mockResolvedValue({
+  quizzesCompleted: 2,
+  reviewsCompleted: 3,
+  totals: {
+    activitiesCompleted: 5,
+    reviewsCompleted: 3,
+    pointsEarned: 18,
+    celebrations: 1,
+    distinctActivityTypes: 2,
+  },
+  scores: {
+    scoredActivities: 2,
+    score: 2,
+    total: 2,
+    accuracy: 1,
+  },
+  byType: [],
+  bySubject: [],
+});
 const mockGenerateWeeklyReportData = jest.fn().mockReturnValue({
   childName: 'Alex',
   weekStart: '2026-05-11',
@@ -59,6 +78,14 @@ jest.mock(
   () => ({
     getLatestSnapshotOnOrBefore: (...args: unknown[]) =>
       mockGetLatestSnapshotOnOrBefore(...args),
+  }),
+);
+
+jest.mock(
+  '../../services/practice-activity-summary' /* gc1-allow: unit test boundary */,
+  () => ({
+    getPracticeActivitySummary: (...args: unknown[]) =>
+      mockGetPracticeActivitySummary(...args),
   }),
 );
 
@@ -184,6 +211,24 @@ describe('weeklySelfReportGenerate', () => {
       '2026-05-11',
       expect.objectContaining({ totalSessions: 2 }),
       null,
+      expect.objectContaining({
+        quizzesCompleted: 2,
+        reviewsCompleted: 3,
+      }),
+    );
+    expect(mockGetPracticeActivitySummary).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        profileId: PROFILE_A,
+        period: {
+          start: new Date('2026-05-04T00:00:00.000Z'),
+          endExclusive: new Date('2026-05-11T00:00:00.000Z'),
+        },
+        previousPeriod: {
+          start: new Date('2026-04-27T00:00:00.000Z'),
+          endExclusive: new Date('2026-05-04T00:00:00.000Z'),
+        },
+      }),
     );
     expect(mockInsertValues).toHaveBeenCalledWith(
       expect.objectContaining({

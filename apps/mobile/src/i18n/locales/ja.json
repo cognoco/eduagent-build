@@ -496,7 +496,12 @@
       "finishEarlyLabel": "セッションを早めに終了",
       "nextProblemLabel": "次の問題",
       "finishHomeworkLabel": "宿題を終える",
-      "endSessionLabel": "セッションを終了"
+      "endSessionLabel": "セッションを終了",
+      "typeSubjectPlaceholder": "科目を入力",
+      "typeSubjectLabel": "科目を入力",
+      "useTypedSubject": "使う",
+      "useTypedSubjectLabel": "入力した科目を使う",
+      "addNote": "メモを追加"
     },
     "quota": {
       "dailyLimitReached": "1日の上限に達しました",
@@ -571,7 +576,8 @@
       "writeNote": "メモを書く",
       "cannotSaveTitle": "メモを保存できません",
       "cannotSaveMessage": "現在メモを保存できません。もう一度お試しください。",
-      "saveFailedTitle": "メモを保存できませんでした"
+      "saveFailedTitle": "メモを保存できませんでした",
+      "summaryPlaceholder": "このセッションで覚えておくことは何ですか？"
     },
     "filingPrompt": {
       "title": "ライブラリに追加しますか？",
@@ -857,6 +863,9 @@
     "loadError": {
       "message": "ライブラリを読み込めませんでした。もう一度お試しください。"
     },
+    "staleBanner": {
+      "message": "保存済みのライブラリを表示しています。タップして更新。"
+    },
     "empty": {
       "title": "ライブラリは空です",
       "message": "学習セッションを開始すると、科目がここに表示されます。",
@@ -953,6 +962,9 @@
       "message": "本棚を開いて次の本を選ぶか、復習が必要な項目を再確認しましょう。",
       "cta": "開く",
       "accessibilityLabel": "{{subject}}を続ける"
+    },
+    "bookmarkCard": {
+      "accessibilityLabel": "保存したブックマークを開く: {{title}}"
     }
   },
   "topic": {
@@ -1243,7 +1255,11 @@
     "tryCameraAgainLabel": "もう一度カメラを試す",
     "tryReadingAgainLabel": "もう一度読み取りを試す",
     "classifyErrorTitle": "科目を特定できませんでした",
-    "classifyErrorMessage": "この宿題が属する科目を選んでください。"
+    "classifyErrorMessage": "この宿題が属する科目を選んでください。",
+    "listening": "聞き取り中...",
+    "voiceHint": "宿題の問題を声に出して言ってください。",
+    "stopDictatingProblemLabel": "問題の音声入力を停止",
+    "dictateProblemLabel": "問題を音声入力"
   },
   "progress": {
     "pageTitle": "私の学習の旅",
@@ -1338,7 +1354,9 @@
       "bars": {
         "sessions": "セッション",
         "time": "時間",
-        "topics": "トピック"
+        "topics": "トピック",
+        "quizzes": "クイズ",
+        "reviews": "復習"
       }
     },
     "newLearner": {
@@ -1545,6 +1563,19 @@
     "loadTimeout": {
       "title": "進捗の読み込みに時間がかかりすぎています",
       "message": "接続を確認して再試行するか、ホームに戻ってください。"
+    },
+    "guardian": {
+      "sessionCount_one": "{{count}} セッション",
+      "sessionCount_other": "{{count}} セッション",
+      "lastStudied": "最終学習日: {{date}}",
+      "topicsMastered": "習得済みトピック: {{mastered}}/{{total}}",
+      "summaryFallback": "概要はまだありません。次のセッションの後に表示されます。",
+      "noRecentSessions": "{{date}}以降、新しいセッションはありません。",
+      "noRecentSessionsFallback": "しばらく新しいセッションはありません。",
+      "staleSummary": "概要には、最新のアクティビティがまだ反映されていない場合があります。",
+      "nudgeCta": "{{name}}さんにリマインダーを送って再開を促しましょう。",
+      "nudgeA11y": "{{name}}さんにリマインダーを送信",
+      "viewAllReports": "すべてのレポートを表示"
     }
   },
   "onboarding": {
@@ -1632,6 +1663,7 @@
       "totalSessions": "{{count}}セッション",
       "recentActivity": "最近のアクティビティ",
       "noRecentActivity": "最近のアクティビティはまだありません",
+      "lastSessionAgo": "前回のセッション {{time}}",
       "noSessionsYet": "まだセッションがありません",
       "viewAllSessions": "すべてのセッションを表示",
       "subjectsExplored": "探求した科目",
@@ -1686,6 +1718,9 @@
       "viewSessionFrom": "からのセッションを表示",
       "mentorMemoryTitle": "{{name}}についてメンターが知っていること",
       "mentorMemoryTitleFallback": "メンターの記憶",
+      "manageMentorMemoryForChild": "{{name}}についてメンターが覚えておく内容を管理",
+      "profileDetails": "プロフィール詳細",
+      "childProfileJoined": "{{date}}に追加",
       "setUpMentorMemory": "メンターの記憶を設定",
       "chooseWhatMentorRemembers": "メンターが記憶することを選択",
       "viewWhatMentorKnows": "メンターが知っていることを表示",
@@ -1694,6 +1729,7 @@
       "learningAccommodationTitle": "{{name}}さんのための学習サポート",
       "learningAccommodationTitleFallback": "学習サポート",
       "learningAccommodationDescription": "お子様の学習ニーズに合わせてメンターの関わり方を調整します",
+      "noLearningPreferenceSet": "学習設定はまだありません",
       "toggleDecisionGuide": "決定ガイドを表示",
       "notSureWhichToPick": "どれを選べばいいかわからない？",
       "pickAccommodation": "サポートを選択",
@@ -1708,6 +1744,7 @@
       "checkConsentStatus": "同意ステータスを確認",
       "accountTitle": "アカウント — {{name}}",
       "accountTitleFallback": "アカウント",
+      "childProfileScopeHint": "進捗とレポートはそれぞれのタブにあるため、このページにはお子様固有の設定だけが表示されます。",
       "deletionPending": "削除予定",
       "deletionCountdown": "アカウントは{{date}}に削除されます",
       "deletionProcessing": "削除処理中",
@@ -1840,7 +1877,9 @@
       "monthlyReport": "月次レポート",
       "subtitle": "今月のお子様の学習の要約",
       "totalWords": "総単語数",
-      "reportGoneTitle": "レポートが見つかりません"
+      "reportGoneTitle": "レポートが見つかりません",
+      "testsCompleted": "完了したテスト",
+      "testPoints": "テストポイント"
     },
     "session": {
       "error": "セッションを読み込めませんでした",
@@ -1917,7 +1956,42 @@
       "sendNudge": "{{name}}さんに声かけを送る",
       "openChildProfile": "{{name}}さんのプロフィールを開く",
       "reportGoneTitle": "このレポートは利用できなくなりました",
-      "reportGoneBody": "アーカイブされたか、削除された可能性があります。他のすべてのレポートは安全です。"
+      "reportGoneBody": "アーカイブされたか、削除された可能性があります。他のすべてのレポートは安全です。",
+      "testsCompleted": "完了したテスト",
+      "testPoints": "テストポイント"
+    },
+    "practiceSummary": {
+      "title": "テスト詳細",
+      "subtitle": "{{count}}件のアクティビティ完了（復習{{reviews}}件を含む）",
+      "accuracy": "正答率",
+      "reviews": "復習",
+      "points": "ポイント",
+      "celebrations": "お祝い",
+      "activityKinds": "種類",
+      "comparison": "{{activities}}件のアクティビティ · {{points}}ポイント · {{celebrations}}回のお祝い",
+      "byType": "タイプ別",
+      "bySubject": "科目別",
+      "typeDetail": "{{count}}件完了 · {{points}}ポイント",
+      "typeDetailWithScore": "{{count}}件完了 · {{points}}ポイント · {{accuracy}}%",
+      "subjectDetail": "{{count}}件のアクティビティ · {{points}}ポイント · {{types}}",
+      "unknownSubject": "未割り当て",
+      "activityTypes": {
+        "quiz": "クイズ",
+        "review": "復習",
+        "assessment": "わかったことを証明",
+        "dictation": "ディクテーション",
+        "recitation": "暗唱",
+        "fluency_drill": "流暢さ練習"
+      },
+      "activitySubtypes": {
+        "capitals": "首都",
+        "guess_who": "人物あて",
+        "vocabulary": "語彙",
+        "assessment": "わかったことを証明",
+        "dictation": "ディクテーション",
+        "recitation": "暗唱",
+        "fluency_drill": "流暢さ練習"
+      }
     }
   },
   "tabs": {

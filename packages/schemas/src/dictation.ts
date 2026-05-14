@@ -73,6 +73,7 @@ export const recordDictationResultInputSchema = z.object({
   mistakeCount: z.number().int().nonnegative().nullable().optional(),
   mode: dictationModeSchema,
   reviewed: z.boolean().optional().default(false),
+  subjectId: z.string().uuid().nullish(),
 });
 export type RecordDictationResultInput = z.infer<
   typeof recordDictationResultInputSchema

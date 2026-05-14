@@ -7,7 +7,12 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
+import {
+  Redirect,
+  useLocalSearchParams,
+  useRouter,
+  type Href,
+} from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   useStartRelearn,
@@ -202,7 +207,7 @@ export default function RelearnScreen() {
 
   const handleLeave = useCallback(() => {
     if (returnTo) {
-      router.replace(homeHrefForReturnTo(returnTo) as never);
+      router.replace(homeHrefForReturnTo(returnTo) as Href);
       return;
     }
 
@@ -291,7 +296,7 @@ export default function RelearnScreen() {
               ...(result.recap ? { recap: result.recap } : {}),
               ...(returnTo ? { returnTo } : {}),
             },
-          } as never);
+          } as Href);
         },
         onError: (err: unknown) => {
           setError(formatApiError(err));

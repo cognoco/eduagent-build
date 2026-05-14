@@ -1,7 +1,7 @@
 # Progress Tab - Reports-First Redesign
 
 **Date:** 2026-05-11
-**Status:** Draft plan
+**Status:** Implemented through Phase 3
 **Mockup:** `docs/mockups/library-progress-low-data-states.html`
 **Related:** `docs/plans/2026-05-09-progress-tab-currently-working-on.md`
 
@@ -329,10 +329,22 @@ Acceptance: the empty-state branch is testable as a distinct render path, not ju
 
 ### Phase 3: Practice Highlights
 
-- Confirm quiz completion source.
-- Confirm review completion source.
+- Confirm quiz completion source: `practiceActivityEvents` rows where `activityType = 'quiz'`.
+- Confirm review completion source: `practiceActivityEvents` rows where `activityType = 'review'`.
 - Add `practiceSummary` to report payloads (optional field; D-RP-17).
 - Render quizzes and reviews when backed by real data. Stars remain out of scope.
+
+## Completion Notes
+
+Completed 2026-05-13:
+
+- Progress overview uses the reports-first hierarchy with deterministic empty/awaiting/ready/ineligible states.
+- Self learners get report rows through eligible self-report cron/backfill paths.
+- Self-view weekly/monthly detail endpoints are scoped by `childProfileId = activeProfileId`.
+- Practice highlights use the shared `getPracticeActivitySummary` service and are persisted in weekly/monthly report JSONB payloads.
+- Weekly overview cards show quizzes completed and reviews finished from `practiceSummary`.
+- Monthly overview bars show sessions, time, quizzes, and reviews.
+- Stars remain intentionally out of scope.
 
 ## Validation
 
@@ -358,7 +370,7 @@ Tests must be named at the assertion level, not generically.
 
 ## Open Questions
 
-- Which table/event is the canonical source for completed reviews? (Phase 3 blocker only — Phase 1/2 ships without this.)
+- ~~Which table/event is the canonical source for completed reviews?~~ Resolved: `practiceActivityEvents` is the canonical activity source for report practice highlights.
 - ~~Do stars already have a persisted source, or should the first version omit stars?~~ Resolved: omit in v1 (D-RP-16).
 - ~~Should self reports be generated only for owner profiles, or for every learning profile including child profiles?~~ Resolved: only profiles without a `familyLinks` row as child (D-RP-11).
 - ~~Should existing active profiles get a one-time backfill, or wait for the next weekly/monthly cron?~~ Resolved: one-shot backfill ships with Phase 2 (D-RP-14).

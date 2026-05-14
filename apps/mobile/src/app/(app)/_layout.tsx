@@ -1,5 +1,5 @@
 import React from 'react';
-import { Tabs, Redirect, usePathname, useRouter } from 'expo-router';
+import { Tabs, Redirect, usePathname, useRouter, type Href } from 'expo-router';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Platform,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import type { Translate } from '../../i18n';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth, useClerk, useUser } from '@clerk/clerk-expo';
 import { useQueryClient } from '@tanstack/react-query';
@@ -251,7 +252,7 @@ function canSwitchFromConsentGate(
 export function buildSwitchProfileConfirmation(params: {
   activeProfile: { id: string } | null;
   profiles: ReadonlyArray<{ id: string; displayName: string }>;
-  t: (key: string, options?: Record<string, string>) => string;
+  t: Translate;
 }): {
   target: { id: string; displayName: string };
   title: string;
@@ -569,7 +570,6 @@ function CreateProfileGate(): React.ReactElement {
   const queryClient = useQueryClient();
   const { profiles } = useProfile();
   const { t } = useTranslation();
-  const isPushingRef = React.useRef(false);
 
   const handleSignOut = async () => {
     try {
@@ -588,13 +588,18 @@ function CreateProfileGate(): React.ReactElement {
   };
 
   const handleGetStarted = React.useCallback(() => {
-    if (isPushingRef.current) return;
-    isPushingRef.current = true;
+    if (Platform.OS === 'web') {
+      const webLocation = globalThis as typeof globalThis & {
+        location?: { assign: (url: string) => void };
+      };
+
+      if (webLocation.location) {
+        webLocation.location.assign('/create-profile');
+        return;
+      }
+    }
+
     router.push('/create-profile');
-    // Reset after navigation settles to allow re-entry if user backs out
-    setTimeout(() => {
-      isPushingRef.current = false;
-    }, 1000);
   }, [router]);
 
   return (
@@ -1345,6 +1350,10 @@ export default function AppLayout() {
     : 'no-active-profile';
   const refreshLearningTabQueries = React.useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: ['subjects'] });
+    // PR-10 deferred: broad ['progress'] and ['dashboard'] — tab-focus refresh
+    // fires for any user returning to the learning tab; the full set of progress
+    // and dashboard keys for the active profile is not enumerable without a
+    // workflow test that seeds and asserts every registered sub-key.
     void queryClient.invalidateQueries({ queryKey: ['progress'] });
     void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     void queryClient.invalidateQueries({ queryKey: ['coaching-card'] });
@@ -1354,6 +1363,9 @@ export default function AppLayout() {
   }, [queryClient]);
   const refreshLibraryTabQueries = React.useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: ['subjects'] });
+    // PR-10 deferred: broad ['progress'] — library tab refresh needs subject
+    // progress entries, but the set of active subjects/profiles is not known
+    // at the call site without iterating all active cache keys.
     void queryClient.invalidateQueries({ queryKey: ['progress'] });
     void queryClient.invalidateQueries({ queryKey: ['library'] });
     void queryClient.invalidateQueries({ queryKey: ['books'] });
@@ -1367,9 +1379,15 @@ export default function AppLayout() {
   }, [queryClient]);
   const handleMoreTabPress = React.useCallback(() => {
     refreshMoreTabQueries();
-    router.replace('/(app)/more' as never);
-  }, [refreshMoreTabQueries, router]);
+  }, [refreshMoreTabQueries]);
   const refreshProgressTabQueries = React.useCallback(() => {
+    // PR-10 deferred: broad ['progress'], ['dashboard'], ['retention'],
+    // ['language-progress'], ['resume-nudge'] — progress tab refresh fires on
+    // tab focus and must refresh the entire progress surface for the active
+    // profile including all sub-keys (overview, inventory, history, milestones,
+    // profile sessions, profile reports, topic progress per subject, etc.).
+    // Enumerating all keys requires a workflow test that seeds every registered
+    // sub-key and asserts staleness after the refresh call. Keep broad.
     void queryClient.invalidateQueries({ queryKey: ['progress'] });
     void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     void queryClient.invalidateQueries({ queryKey: ['retention'] });
@@ -1450,7 +1468,7 @@ export default function AppLayout() {
     }
 
     replayedAuthRedirectRef.current = pendingAuthRedirect;
-    router.replace(pendingAuthRedirect as never);
+    router.replace(pendingAuthRedirect as Href);
   }, [currentAppPath, pendingAuthRedirect, router]);
 
   // Auto-dismiss profile-switched toast after 5 seconds

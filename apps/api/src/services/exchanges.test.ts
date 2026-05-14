@@ -852,6 +852,52 @@ describe('processExchange', () => {
     const result = await processExchange(baseContext, 'Hello');
     expect(result.isUnderstandingCheck).toBe(false);
   });
+
+  it('forces learning signals off for app-help turns', async () => {
+    const appHelpProvider: LLMProvider = {
+      id: 'gemini',
+      async chat(_messages: ChatMessage[], _config: ModelConfig) {
+        return {
+          content: JSON.stringify({
+            reply: 'You can find your notes in Library.',
+            signals: {
+              understanding_check: true,
+              partial_progress: true,
+              needs_deepening: true,
+            },
+            ui_hints: {
+              note_prompt: {
+                show: true,
+                post_session: true,
+              },
+            },
+          }),
+          stopReason: 'stop' as StopReason,
+        };
+      },
+      chatStream() {
+        const s = (async function* () {
+          yield '';
+        })();
+        return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
+      },
+    };
+    registerProvider(appHelpProvider);
+
+    const result = await processExchange(
+      baseContext,
+      'Where do I find my notes?',
+    );
+
+    expect(result.response).toBe('You can find your notes in Library.');
+    expect(result.isUnderstandingCheck).toBe(false);
+    expect(result.partialProgress).toBe(false);
+    expect(result.needsDeepening).toBe(false);
+    expect(result.notePrompt).toBeUndefined();
+    expect(result.notePromptPostSession).toBeUndefined();
+
+    registerProvider(createMockProvider('gemini'));
+  });
 });
 
 // ---------------------------------------------------------------------------

@@ -14,4 +14,4 @@ For Playwright web smoke failures, inspect `error-context.md` plus the trace net
 
 After pushing a PR fix, `gh pr checks --watch` may briefly say no checks are reported. Wait a few seconds or inspect `gh pr view --json statusCheckRollup` before assuming the push failed to trigger workflows.
 
-Automated review comments can arrive after checks turn green. Treat "ready to merge" as current checks plus a fresh review/comment sweep, not checks alone.
+Automated review comments can arrive after checks turn green. Before calling a PR ready, do the fresh review/comment sweep required by `CLAUDE.md` / `AGENTS.md` PR Review & CI Protocol (`gh api repos/{owner}/{repo}/pulls/<number>/reviews` and `/comments`), not checks alone.

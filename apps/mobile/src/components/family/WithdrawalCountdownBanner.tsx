@@ -2,41 +2,37 @@ import React from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
-import { useDashboard } from '../../hooks/use-dashboard';
 import { useRestoreConsent } from '../../hooks/use-restore-consent';
-import {
-  getGracePeriodDaysRemaining,
-  isInGracePeriod,
-} from '../../lib/consent-grace';
+import { getGracePeriodDaysRemaining } from '../../lib/consent-grace';
 import { platformAlert } from '../../lib/platform-alert';
 
-type Child = {
+export type ChildInGracePeriod = {
   profileId: string;
   displayName: string;
-  consentStatus: string | null;
-  respondedAt: string | null;
+  respondedAt: string;
 };
 
-export function WithdrawalCountdownBanner(): React.ReactElement | null {
+interface WithdrawalCountdownBannerProps {
+  childrenInGracePeriod: ChildInGracePeriod[];
+}
+
+export function WithdrawalCountdownBanner({
+  childrenInGracePeriod,
+}: WithdrawalCountdownBannerProps): React.ReactElement | null {
   const { t } = useTranslation();
-  const { data } = useDashboard();
   const restoreConsent = useRestoreConsent();
   const [pendingChildId, setPendingChildId] = React.useState<string | null>(
     null,
   );
   const [restoredName, setRestoredName] = React.useState<string | null>(null);
 
-  const children = (data?.children ?? []) as Child[];
-  const inGrace = children.filter(
-    (child) =>
-      child.consentStatus === 'WITHDRAWN' && isInGracePeriod(child.respondedAt),
-  );
+  const inGrace = childrenInGracePeriod;
 
   if (inGrace.length === 0) return null;
 
   const isMulti = inGrace.length > 1;
 
-  const handleRestore = (child: Child): void => {
+  const handleRestore = (child: ChildInGracePeriod): void => {
     setPendingChildId(child.profileId);
     restoreConsent.mutate(
       { childProfileId: child.profileId },

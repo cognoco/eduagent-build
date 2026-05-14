@@ -430,6 +430,11 @@ export function _resetCircuits(): void {
   circuits.clear();
 }
 
+/** Exported for testing only — removes a single provider by ID */
+export function unregisterProvider(id: string): void {
+  providers.delete(id);
+}
+
 /** Exported for testing only */
 export function _clearProviders(): void {
   providers.clear();

@@ -5,8 +5,8 @@
  * unreachable (device has internet but server doesn't respond).
  */
 
-/** Default timeout for data-fetching queries (10 seconds). */
-export const DEFAULT_QUERY_TIMEOUT_MS = 10_000;
+/** Default timeout for data-fetching queries (12 seconds). */
+export const DEFAULT_QUERY_TIMEOUT_MS = 12_000;
 
 /**
  * Creates an AbortSignal that fires after `ms` milliseconds.

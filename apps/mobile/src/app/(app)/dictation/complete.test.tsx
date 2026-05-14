@@ -40,6 +40,7 @@ let mockReviewIsPending = false;
 let mockRecordIsPending = false;
 
 jest.mock('../../../hooks/use-dictation-api', () => ({
+  // gc1-allow: wraps api-client fetch boundary — needs network stub in unit tests
   useReviewDictation: () => ({
     mutateAsync: mockReviewMutateAsync,
     isPending: mockReviewIsPending,
@@ -53,11 +54,13 @@ jest.mock('../../../hooks/use-dictation-api', () => ({
 
 const mockGoBackOrReplace = jest.fn();
 jest.mock('../../../lib/navigation', () => ({
+  // gc1-allow: imports expo-router Router type; goBackOrReplace calls router.back which requires native navigation context
   goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
 }));
 
 const mockPlatformAlert = jest.fn();
 jest.mock('../../../lib/platform-alert', () => ({
+  // gc1-allow: wraps RN Alert.alert and Platform.OS — requires native Alert shim unavailable in JSDOM
   platformAlert: (...args: unknown[]) => mockPlatformAlert(...args),
 }));
 
@@ -91,6 +94,7 @@ const validSession = {
 };
 
 jest.mock('./_layout', () => ({
+  // gc1-allow: layout depends on expo-router Stack and native theme — cannot render in JSDOM
   useDictationData: () => ({
     data: validSession,
     setData: mockSetData,

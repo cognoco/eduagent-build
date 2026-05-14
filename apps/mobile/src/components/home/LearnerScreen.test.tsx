@@ -36,6 +36,10 @@ const mockFetch = createRoutedMockFetch({
     totalTopicsCompleted: 0,
     totalTopicsVerified: 0,
   },
+  '/progress/inventory': {
+    global: { totalSessions: 2 },
+    subjects: [],
+  },
   '/dashboard': {
     children: [],
     pendingNotices: [],
@@ -211,6 +215,10 @@ describe('LearnerScreen', () => {
       subjects: [],
       totalTopicsCompleted: 0,
       totalTopicsVerified: 0,
+    });
+    mockFetch.setRoute('/progress/inventory', {
+      global: { totalSessions: 2 },
+      subjects: [],
     });
     mockFetch.setRoute('/dashboard', {
       children: [],

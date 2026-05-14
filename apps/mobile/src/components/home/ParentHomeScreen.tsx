@@ -8,11 +8,13 @@ import {
   type GestureResponderEvent,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { isAdultOwner } from '@eduagent/schemas';
 import type { DashboardChild, DashboardData, Profile } from '@eduagent/schemas';
+import { isInGracePeriod } from '../../lib/consent-grace';
+import type { Translate, TranslateKey } from '../../i18n';
 
 import { useActiveProfileRole } from '../../hooks/use-active-profile-role';
 import { useDashboard } from '../../hooks/use-dashboard';
@@ -25,7 +27,10 @@ import { platformAlert } from '../../lib/platform-alert';
 import { useLinkedChildren } from '../../lib/profile';
 import { useThemeColors } from '../../lib/theme';
 import { MentomateLogo } from '../MentomateLogo';
-import { WithdrawalCountdownBanner } from '../family/WithdrawalCountdownBanner';
+import {
+  WithdrawalCountdownBanner,
+  type ChildInGracePeriod,
+} from '../family/WithdrawalCountdownBanner';
 import { NudgeActionSheet } from '../nudge/NudgeActionSheet';
 import { useChildLearnerProfile } from '../../hooks/use-learner-profile';
 import { ACCOMMODATION_OPTIONS } from '../../lib/accommodation-options';
@@ -55,7 +60,7 @@ function firstNameOf(name: string): string {
 
 function formatActivityLabel(
   dashboardChild: DashboardChild | undefined,
-  t: (key: string, opts?: Record<string, unknown>) => string,
+  t: Translate,
 ): string {
   if (!dashboardChild) return t('home.parent.childCard.statusPending');
   if (dashboardChild.totalTimeThisWeek > 0) {
@@ -73,7 +78,7 @@ function formatActivityLabel(
 
 function formatFocusLabel(
   dashboardChild: DashboardChild | undefined,
-  t: (key: string, opts?: Record<string, unknown>) => string,
+  t: Translate,
 ): string {
   const focus =
     dashboardChild?.currentlyWorkingOn[0] ?? dashboardChild?.subjects[0]?.name;
@@ -82,7 +87,7 @@ function formatFocusLabel(
 
 function formatChildSnapshot(
   dashboardChild: DashboardChild | undefined,
-  t: (key: string, opts?: Record<string, unknown>) => string,
+  t: Translate,
 ): string {
   const focus = formatFocusLabel(dashboardChild, t);
   const activity = formatActivityLabel(dashboardChild, t);
@@ -98,7 +103,7 @@ interface TonightPrompt {
 function primaryPromptFor(
   child: Profile,
   dashboardChild: DashboardChild | undefined,
-  t: (key: string, opts?: Record<string, unknown>) => string,
+  t: Translate,
 ): string {
   const childName = firstNameOf(child.displayName);
   const focus =
@@ -121,7 +126,7 @@ function primaryPromptFor(
 function buildSingleChildPrompts(
   child: Profile,
   dashboardChild: DashboardChild | undefined,
-  t: (key: string, opts?: Record<string, unknown>) => string,
+  t: Translate,
 ): TonightPrompt[] {
   const childName = firstNameOf(child.displayName);
   const focus =
@@ -168,7 +173,7 @@ function buildSingleChildPrompts(
 function buildTonightPrompts(
   children: Profile[],
   dashboard: DashboardData | undefined,
-  t: (key: string, opts?: Record<string, unknown>) => string,
+  t: Translate,
 ): TonightPrompt[] {
   const first = children[0];
   if (!first) return [];
@@ -195,7 +200,7 @@ function buildTonightPrompts(
   }));
 }
 
-function tonightTitleKey(now?: Date): string {
+function tonightTitleKey(now?: Date): TranslateKey {
   const tod = getTimeOfDay(now ?? new Date());
   if (tod === 'morning') return 'home.parent.tonight.titleMorning';
   if (tod === 'afternoon') return 'home.parent.tonight.titleAfternoon';
@@ -244,6 +249,7 @@ function ChildCommandCard({
   child,
   dashboardChild,
   highlight,
+  onOpenProfile,
   onOpenProgress,
   onOpenReports,
   onOpenNudge,
@@ -252,23 +258,37 @@ function ChildCommandCard({
   child: Profile;
   dashboardChild: DashboardChild | undefined;
   highlight: boolean;
+  onOpenProfile: () => void;
   onOpenProgress: () => void;
   onOpenReports: () => void;
   onOpenNudge: () => void;
-  t: (key: string, opts?: Record<string, unknown>) => string;
+  t: Translate;
 }): React.ReactElement {
+  const colors = useThemeColors();
+
   return (
-    <Pressable
-      onPress={onOpenProgress}
+    <View
       className={`rounded-card px-4 py-4 ${
         highlight ? 'bg-primary-soft' : 'bg-surface'
       }`}
-      style={Platform.OS === 'web' ? { cursor: 'pointer' } : undefined}
-      accessibilityRole="button"
-      accessibilityLabel={child.displayName}
-      testID={`parent-home-check-child-${child.id}`}
     >
-      <View className="flex-row items-start">
+      <Pressable
+        onPress={onOpenProfile}
+        className="flex-row items-center bg-background rounded-button px-3 py-3"
+        style={{
+          borderColor: colors.primary + '24',
+          borderWidth: 1,
+          shadowColor: colors.primary,
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.08,
+          shadowRadius: 5,
+          elevation: 2,
+          ...(Platform.OS === 'web' ? { cursor: 'pointer' } : {}),
+        }}
+        accessibilityRole="button"
+        accessibilityLabel={child.displayName}
+        testID={`parent-home-check-child-${child.id}`}
+      >
         <View
           className="w-11 h-11 rounded-full bg-primary items-center justify-center me-3"
           accessibilityElementsHidden
@@ -281,11 +301,20 @@ function ChildCommandCard({
           <Text className="text-h3 font-bold text-text-primary">
             {child.displayName}
           </Text>
-          <Text className="text-body-sm text-text-secondary mt-1">
+          <Text
+            className="text-body-sm text-text-secondary mt-1"
+            numberOfLines={2}
+          >
             {formatChildSnapshot(dashboardChild, t)}
           </Text>
         </View>
-      </View>
+        <View
+          className="w-9 h-9 rounded-full bg-primary-soft items-center justify-center ms-3"
+          accessibilityElementsHidden
+        >
+          <Ionicons name="chevron-forward" size={20} color={colors.primary} />
+        </View>
+      </Pressable>
 
       <View className="flex-row gap-2 mt-4">
         <ChildActionButton
@@ -307,7 +336,7 @@ function ChildCommandCard({
           testID={`parent-home-send-nudge-${child.id}`}
         />
       </View>
-    </Pressable>
+    </View>
   );
 }
 
@@ -373,6 +402,24 @@ export function ParentHomeScreen({
     subscription?.tier === 'family' || subscription?.tier === 'pro',
   );
   const [sheetChildId, setSheetChildId] = useState<string | null>(null);
+  const childrenInGracePeriod = useMemo((): ChildInGracePeriod[] => {
+    return (dashboard?.children ?? []).flatMap((child) => {
+      if (
+        child.consentStatus === 'WITHDRAWN' &&
+        child.respondedAt != null &&
+        isInGracePeriod(child.respondedAt)
+      ) {
+        return [
+          {
+            profileId: child.profileId,
+            displayName: child.displayName,
+            respondedAt: child.respondedAt,
+          },
+        ];
+      }
+      return [];
+    });
+  }, [dashboard]);
   const { subtitle } = getGreeting(activeProfile?.displayName ?? '', now);
   const firstName = activeProfile?.displayName?.split(' ')[0] ?? 'there';
   const sheetChild = linkedChildren.find((child) => child.id === sheetChildId);
@@ -389,8 +436,36 @@ export function ParentHomeScreen({
     role,
     birthYear: activeProfile?.birthYear,
   });
+  const hasNoLinkedChildren = linkedChildren.length === 0;
+
+  const navigateToCreateChildProfile = useCallback(() => {
+    if (Platform.OS === 'web') {
+      const webLocation = globalThis as typeof globalThis & {
+        location?: { assign: (url: string) => void };
+      };
+
+      if (webLocation.location) {
+        webLocation.location.assign('/create-profile?for=child');
+        return;
+      }
+    }
+
+    router.push({
+      pathname: '/create-profile',
+      params: { for: 'child' },
+    } as Href);
+  }, [router]);
+
+  const navigateToSubscription = useCallback(() => {
+    router.push('/(app)/subscription' as Href);
+  }, [router]);
 
   const handleAddChild = useCallback(() => {
+    if (hasNoLinkedChildren) {
+      navigateToCreateChildProfile();
+      return;
+    }
+
     if (!subscription) {
       platformAlert(t('common.loading'), t('more.errors.tryAgainMoment'));
       return;
@@ -403,7 +478,7 @@ export function ParentHomeScreen({
         [
           {
             text: t('more.family.viewPlans'),
-            onPress: () => router.push('/(app)/subscription'),
+            onPress: navigateToSubscription,
           },
           { text: t('common.cancel'), style: 'cancel' },
         ],
@@ -421,7 +496,7 @@ export function ParentHomeScreen({
           ? [
               {
                 text: t('more.family.viewPlans'),
-                onPress: () => router.push('/(app)/subscription'),
+                onPress: navigateToSubscription,
               },
               { text: t('common.cancel'), style: 'cancel' },
             ]
@@ -429,16 +504,42 @@ export function ParentHomeScreen({
       );
       return;
     }
-    router.push('/create-profile?for=child');
-  }, [subscription, familyData, router, t]);
+    navigateToCreateChildProfile();
+  }, [
+    hasNoLinkedChildren,
+    subscription,
+    familyData,
+    t,
+    navigateToCreateChildProfile,
+    navigateToSubscription,
+  ]);
 
-  function pushChildDetail(childProfileId: string): void {
-    router.push(`/(app)/child/${childProfileId}` as never);
-  }
+  const pushChildProfile = useCallback(
+    (childProfileId: string): void => {
+      router.push({
+        pathname: '/(app)/child/[profileId]',
+        params: { profileId: childProfileId },
+      } as Href);
+    },
+    [router],
+  );
 
-  function pushChildReports(childProfileId: string): void {
-    router.push(`/(app)/child/${childProfileId}/reports` as never);
-  }
+  const pushChildProgress = useCallback(
+    (childProfileId: string): void => {
+      router.push({
+        pathname: '/(app)/progress',
+        params: { profileId: childProfileId },
+      } as Href);
+    },
+    [router],
+  );
+
+  const pushChildReports = useCallback(
+    (childProfileId: string): void => {
+      router.push(`/(app)/child/${childProfileId}/reports` as Href);
+    },
+    [router],
+  );
 
   const parentInitial = initialOf(activeProfile?.displayName ?? firstName);
 
@@ -448,7 +549,7 @@ export function ParentHomeScreen({
         <View className="flex-row items-center justify-between mb-3">
           <MentomateLogo size="sm" orientation="horizontal" />
           <Pressable
-            onPress={() => router.push('/(app)/more/account' as never)}
+            onPress={() => router.push('/(app)/more/account' as Href)}
             className="w-10 h-10 rounded-full bg-primary-soft items-center justify-center"
             style={Platform.OS === 'web' ? { cursor: 'pointer' } : undefined}
             accessibilityRole="button"
@@ -479,12 +580,16 @@ export function ParentHomeScreen({
         showsVerticalScrollIndicator={false}
       >
         <View className="mt-4">
-          <WithdrawalCountdownBanner />
+          <WithdrawalCountdownBanner
+            childrenInGracePeriod={childrenInGracePeriod}
+          />
         </View>
-        <ParentTransitionNotice
-          profileId={activeProfile?.id}
-          childNames={childNames}
-        />
+        {linkedChildren.length > 0 ? (
+          <ParentTransitionNotice
+            profileId={activeProfile?.id}
+            childNames={childNames}
+          />
+        ) : null}
 
         {linkedChildren.length > 0 ? (
           <View className="mt-5" testID="parent-home-tonight-section">
@@ -496,7 +601,7 @@ export function ParentHomeScreen({
                 (prompt) => (
                   <Pressable
                     key={`tonight-${prompt.key}`}
-                    onPress={() => pushChildDetail(prompt.childId)}
+                    onPress={() => pushChildProgress(prompt.childId)}
                     className="flex-row items-center py-2.5"
                     style={
                       Platform.OS === 'web' ? { cursor: 'pointer' } : undefined
@@ -559,7 +664,8 @@ export function ParentHomeScreen({
               child={child}
               dashboardChild={findDashboardChild(dashboard, child.id)}
               highlight={index === 0}
-              onOpenProgress={() => pushChildDetail(child.id)}
+              onOpenProfile={() => pushChildProfile(child.id)}
+              onOpenProgress={() => pushChildProgress(child.id)}
               onOpenReports={() => pushChildReports(child.id)}
               onOpenNudge={() => setSheetChildId(child.id)}
               t={t}

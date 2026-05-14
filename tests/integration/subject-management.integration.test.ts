@@ -17,6 +17,17 @@
  * 9. GET /v1/subjects — 401 without auth
  */
 
+const mockCaptureException = jest.fn();
+
+jest.mock(
+  '../../apps/api/src/services/sentry' /* gc1-allow: external error-tracking boundary (Sentry SDK) */,
+  () => ({
+    addBreadcrumb: jest.fn(),
+    captureException: (...args: unknown[]) => mockCaptureException(...args),
+    captureMessage: jest.fn(),
+  }),
+);
+
 import { buildIntegrationEnv, cleanupAccounts } from './helpers';
 import {
   buildAuthHeaders,
@@ -25,15 +36,20 @@ import {
 } from './route-fixtures';
 import {
   createSubjectWithStructureResponseSchema,
+  ERROR_CODES,
   subjectClassifyResultSchema,
   subjectListResponseSchema,
   subjectResolveResultSchema,
   subjectResponseSchema,
+  UpstreamLlmError,
 } from '@eduagent/schemas';
 
-import { registerLlmProviderFixture } from '../../apps/api/src/test-utils/llm-provider-fixtures';
-import { _clearProviders } from '../../apps/api/src/services/llm';
 import { app } from '../../apps/api/src/index';
+import {
+  _clearProviders,
+  _resetCircuits,
+} from '../../apps/api/src/services/llm';
+import { registerLlmProviderFixture } from '../../apps/api/src/test-utils/llm-provider-fixtures';
 
 const TEST_ENV = buildIntegrationEnv();
 const SUBJECT_AUTH_USER_ID = 'integration-subject-user';
@@ -118,6 +134,53 @@ afterAll(async () => {
     clerkUserIds: [SUBJECT_AUTH_USER_ID, OTHER_SUBJECT_AUTH_USER_ID],
   });
   _clearProviders();
+});
+
+// ---------------------------------------------------------------------------
+// POST /v1/subjects/resolve
+// ---------------------------------------------------------------------------
+
+describe('Integration: POST /v1/subjects/resolve', () => {
+  it('returns 502 and captures Sentry when the subject resolver LLM is unavailable', async () => {
+    const profileId = await createOwnerProfile();
+    const upstreamError = new UpstreamLlmError(
+      'Subject resolver LLM unavailable',
+    );
+    subjectLlmFixture.setChatError(upstreamError);
+    mockCaptureException.mockClear();
+    _resetCircuits();
+
+    try {
+      const res = await app.request(
+        '/v1/subjects/resolve',
+        {
+          method: 'POST',
+          headers: buildAuthHeaders(
+            { sub: SUBJECT_AUTH_USER_ID, email: SUBJECT_AUTH_EMAIL },
+            profileId,
+          ),
+          body: JSON.stringify({ rawInput: 'Physics' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(502);
+      const body = await res.json();
+      expect(body).toMatchObject({
+        code: ERROR_CODES.UPSTREAM_ERROR,
+        message: upstreamError.message,
+      });
+      expect(mockCaptureException).toHaveBeenCalledWith(upstreamError, {
+        userId: SUBJECT_AUTH_USER_ID,
+        profileId,
+        requestPath: '/v1/subjects/resolve',
+      });
+    } finally {
+      subjectLlmFixture.clearChatError();
+      subjectLlmFixture.setChatResponse(SUBJECT_LLM_RESPONSE);
+      _resetCircuits();
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------

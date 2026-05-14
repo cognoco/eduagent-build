@@ -51,6 +51,8 @@ import {
   quizMissedItems,
   quizMasteryItems,
   memoryFacts,
+  practiceActivityEvents,
+  celebrationEvents,
 } from './schema/index';
 
 // [BUG-704 / P-8] Single source of truth for the runtime DB enum
@@ -1094,6 +1096,22 @@ export function createScopedRepository(db: Database, profileId: string) {
             ),
           )
           .returning({ id: quizMasteryItems.id });
+      },
+    },
+
+    practiceActivityEvents: {
+      async findMany(extraWhere?: SQL) {
+        return db.query.practiceActivityEvents.findMany({
+          where: scopedWhere(practiceActivityEvents, extraWhere),
+        });
+      },
+    },
+
+    celebrationEvents: {
+      async findMany(extraWhere?: SQL) {
+        return db.query.celebrationEvents.findMany({
+          where: scopedWhere(celebrationEvents, extraWhere),
+        });
       },
     },
   };

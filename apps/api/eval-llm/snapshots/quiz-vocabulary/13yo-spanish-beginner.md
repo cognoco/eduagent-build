@@ -39,31 +39,19 @@
   "cefrCeiling": "A2",
   "interests": [
     {
-      "label": {
-        "label": "horses",
-        "context": "free_time"
-      },
+      "label": "horses",
       "context": "free_time"
     },
     {
-      "label": {
-        "label": "showjumping",
-        "context": "free_time"
-      },
+      "label": "showjumping",
       "context": "free_time"
     },
     {
-      "label": {
-        "label": "eventing",
-        "context": "free_time"
-      },
+      "label": "eventing",
       "context": "free_time"
     },
     {
-      "label": {
-        "label": "nature photography",
-        "context": "free_time"
-      },
+      "label": "nature photography",
       "context": "free_time"
     }
   ],
@@ -86,7 +74,7 @@ You are generating a multiple-choice vocabulary quiz for a 13-year-old learner s
 Activity: Vocabulary quiz
 Target language: Spanish
 Maximum CEFR level: A2
-Choose a vocabulary theme that connects to the learner's interests: [object Object], [object Object], [object Object], [object Object]. (e.g. "Spanish [object Object]")
+Choose a vocabulary theme that connects to the learner's interests: horses, showjumping, eventing, nature photography. (e.g. "Spanish horses")
 Questions needed: exactly 6
 
 Do NOT repeat these recently seen English answers: el caballo, la escuela, el perro
@@ -129,6 +117,6 @@ Generate the quiz round.
 ## Builder notes
 
 - Uses languageCode=es and cefrCeiling=A2.
-- Fine-grained age: 13. Interests passed: [object Object], [object Object], [object Object], [object Object].
+- Fine-grained age: 13. Interests passed: horses, showjumping, eventing, nature photography.
 - Native language passed: en — L1-aware distractors active for supported pairs.
 - Library topics passed: Spanish present tense verbs; Spanish family vocabulary; Spanish numbers 1-1000; Spain geography.

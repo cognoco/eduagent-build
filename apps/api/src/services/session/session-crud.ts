@@ -2,7 +2,18 @@
 // Session CRUD — core session lifecycle: start, get, close, transcript
 // ---------------------------------------------------------------------------
 
-import { eq, and, asc, desc, gte, isNull, lt, sql } from 'drizzle-orm';
+import {
+  eq,
+  and,
+  asc,
+  desc,
+  gte,
+  isNull,
+  inArray,
+  isNotNull,
+  lt,
+  sql,
+} from 'drizzle-orm';
 import { z } from 'zod';
 import {
   learningSessions,
@@ -26,11 +37,15 @@ import type {
   SessionAnalyticsEventInput,
   ContentFlagInput,
   TranscriptResponse,
+  HomeworkSummary,
+  EngagementSignal,
+  SessionMetadata,
 } from '@eduagent/schemas';
 import {
   celebrationReasonSchema,
   extractedInterviewSignalsSchema,
   llmSummarySchema,
+  engagementSignalSchema,
 } from '@eduagent/schemas';
 import { insertSessionEvent } from './session-events';
 import { getSubject } from '../subject';
@@ -57,7 +72,7 @@ export class SubjectInactiveError extends Error {
   constructor(public readonly subjectStatus: 'paused' | 'archived') {
     const action = subjectStatus === 'paused' ? 'resume' : 'restore';
     super(
-      `Subject is ${subjectStatus} \u2014 ${action} it before starting a session`
+      `Subject is ${subjectStatus} \u2014 ${action} it before starting a session`,
     );
     this.name = 'SubjectInactiveError';
   }
@@ -69,7 +84,7 @@ export const MAX_EXCHANGES_PER_SESSION = 50;
 export class SessionExchangeLimitError extends Error {
   constructor(public readonly exchangeCount: number) {
     super(
-      `Session has reached the maximum of ${MAX_EXCHANGES_PER_SESSION} exchanges`
+      `Session has reached the maximum of ${MAX_EXCHANGES_PER_SESSION} exchanges`,
     );
     this.name = 'SessionExchangeLimitError';
   }
@@ -99,7 +114,7 @@ export {
 } from '../llm/project-response';
 
 function collectEscalationRungs(
-  events: Array<TimedEvent>
+  events: Array<TimedEvent>,
 ): number[] | undefined {
   const rungs = Array.from(
     new Set(
@@ -111,8 +126,8 @@ function collectEscalationRungs(
             ? metadata.escalationRung
             : null;
         })
-        .filter((rung): rung is number => rung != null)
-    )
+        .filter((rung): rung is number => rung != null),
+    ),
   ).sort((left, right) => left - right);
 
   return rungs.length > 0 ? rungs : undefined;
@@ -122,7 +137,7 @@ async function resolveInterleavedTopicIds(
   db: Database,
   profileId: string,
   sessionId: string,
-  sessionType: string
+  sessionType: string,
 ): Promise<string[] | undefined> {
   if (sessionType !== 'interleaved') {
     return undefined;
@@ -153,7 +168,7 @@ export async function startSession(
   db: Database,
   profileId: string,
   subjectId: string,
-  input: SessionStartInput
+  input: SessionStartInput,
 ): Promise<LearningSession> {
   // Verify subject belongs to this profile (horizontal privilege guard)
   const subject = await getSubject(db, profileId, subjectId);
@@ -181,8 +196,8 @@ export async function startSession(
         and(
           eq(curriculumTopics.id, input.topicId),
           eq(curricula.subjectId, subjectId),
-          eq(subjects.profileId, profileId)
-        )
+          eq(subjects.profileId, profileId),
+        ),
       )
       .limit(1);
     if (!topic) {
@@ -267,7 +282,7 @@ function sleep(ms: number): Promise<void> {
 }
 
 function parseTopicIntentMatcherResponse(
-  response: string
+  response: string,
 ): z.infer<typeof topicIntentMatcherResponseSchema> | null {
   try {
     const jsonMatch = response.match(/\{[\s\S]*\}/);
@@ -312,7 +327,7 @@ export function buildTopicIntentMatcherMessages(input: {
 async function loadLatestCompletedDraftSignals(
   db: Database,
   profileId: string,
-  subjectId: string
+  subjectId: string,
 ): Promise<ExtractedInterviewSignals | undefined> {
   const rows = await db
     .select({ metadata: learningSessions.metadata })
@@ -320,8 +335,8 @@ async function loadLatestCompletedDraftSignals(
     .where(
       and(
         eq(learningSessions.profileId, profileId),
-        eq(learningSessions.subjectId, subjectId)
-      )
+        eq(learningSessions.subjectId, subjectId),
+      ),
     )
     .orderBy(desc(learningSessions.updatedAt), desc(learningSessions.id))
     .limit(10);
@@ -337,7 +352,7 @@ async function loadLatestCompletedDraftSignals(
       continue;
     }
     const parsed = extractedInterviewSignalsSchema.safeParse(
-      metadata['extractedSignals']
+      metadata['extractedSignals'],
     );
     if (parsed.success) return parsed.data;
   }
@@ -349,7 +364,7 @@ async function findFirstAvailableTopicId(
   db: Database,
   profileId: string,
   subjectId: string,
-  bookId?: string
+  bookId?: string,
 ): Promise<string | undefined> {
   // Verify optional book belongs to this subject before using it as a filter.
   if (bookId) {
@@ -361,8 +376,8 @@ async function findFirstAvailableTopicId(
         and(
           eq(curriculumBooks.id, bookId),
           eq(curriculumBooks.subjectId, subjectId),
-          eq(subjects.profileId, profileId)
-        )
+          eq(subjects.profileId, profileId),
+        ),
       )
       .limit(1);
     if (!book) {
@@ -380,8 +395,8 @@ async function findFirstAvailableTopicId(
         eq(curricula.subjectId, subjectId),
         eq(subjects.profileId, profileId),
         eq(curriculumTopics.skipped, false),
-        ...(bookId ? [eq(curriculumTopics.bookId, bookId)] : [])
-      )
+        ...(bookId ? [eq(curriculumTopics.bookId, bookId)] : []),
+      ),
     )
     .orderBy(asc(curriculumTopics.sortOrder), asc(curriculumTopics.id))
     .limit(1);
@@ -393,7 +408,7 @@ async function verifyTopicBelongsToSubject(
   profileId: string,
   subjectId: string,
   topicId: string,
-  bookId?: string
+  bookId?: string,
 ): Promise<void> {
   const [topic] = await db
     .select({ id: curriculumTopics.id })
@@ -405,8 +420,8 @@ async function verifyTopicBelongsToSubject(
         eq(curriculumTopics.id, topicId),
         eq(curricula.subjectId, subjectId),
         eq(subjects.profileId, profileId),
-        ...(bookId ? [eq(curriculumTopics.bookId, bookId)] : [])
-      )
+        ...(bookId ? [eq(curriculumTopics.bookId, bookId)] : []),
+      ),
     )
     .limit(1);
   if (!topic) {
@@ -417,7 +432,7 @@ async function verifyTopicBelongsToSubject(
 async function loadSubjectRawInput(
   db: Database,
   profileId: string,
-  subjectId: string
+  subjectId: string,
 ): Promise<string | null> {
   const [subject] = await db
     .select({ rawInput: subjects.rawInput })
@@ -431,7 +446,7 @@ async function loadMaterializedTopicsForIntentMatch(
   db: Database,
   profileId: string,
   subjectId: string,
-  bookId?: string
+  bookId?: string,
 ): Promise<TopicIntentMatcherTopic[]> {
   return db
     .select({ id: curriculumTopics.id, title: curriculumTopics.title })
@@ -443,15 +458,15 @@ async function loadMaterializedTopicsForIntentMatch(
         eq(curricula.subjectId, subjectId),
         eq(subjects.profileId, profileId),
         eq(curriculumTopics.skipped, false),
-        ...(bookId ? [eq(curriculumTopics.bookId, bookId)] : [])
-      )
+        ...(bookId ? [eq(curriculumTopics.bookId, bookId)] : []),
+      ),
     )
     .orderBy(asc(curriculumTopics.sortOrder), asc(curriculumTopics.id));
 }
 
 async function runTopicIntentMatcher(
   rawInput: string,
-  topics: TopicIntentMatcherTopic[]
+  topics: TopicIntentMatcherTopic[],
 ): Promise<z.infer<typeof topicIntentMatcherResponseSchema> | null> {
   const messages = buildTopicIntentMatcherMessages({ rawInput, topics });
   const response = await Promise.race([
@@ -498,7 +513,7 @@ export async function matchTopicByIntent(
     bookId?: string;
     matcherEnabled: boolean;
     firstSessionStartedAt: number;
-  }
+  },
 ): Promise<TopicIntentMatcherDecision> {
   const startedAt = Date.now();
 
@@ -508,7 +523,7 @@ export async function matchTopicByIntent(
       profileId,
       subjectId,
       input.explicitTopicId,
-      input.bookId
+      input.bookId,
     );
     const decision = {
       topicId: input.explicitTopicId,
@@ -577,7 +592,7 @@ export async function matchTopicByIntent(
     db,
     profileId,
     subjectId,
-    input.bookId
+    input.bookId,
   );
   if (topics.length === 0) {
     const decision = {
@@ -609,8 +624,8 @@ export async function matchTopicByIntent(
       !match || !matchedTopic
         ? 'no-match'
         : match.confidence < MATCH_CONFIDENCE_FLOOR
-        ? 'low-confidence'
-        : null;
+          ? 'low-confidence'
+          : null;
     const selectedTopicId =
       fallbackReason === null ? matchedTopic?.id : input.fallbackTopicId;
     const decision = {
@@ -685,7 +700,7 @@ async function loadSubjectStructureType(
   db: Database,
   profileId: string,
   subjectId: string,
-  bookId?: string
+  bookId?: string,
 ): Promise<'focused_book' | 'narrow' | 'broad'> {
   const suggestionCount = await db
     .select({ count: sql<number>`COUNT(*)` })
@@ -694,8 +709,8 @@ async function loadSubjectStructureType(
     .where(
       and(
         eq(bookSuggestions.subjectId, subjectId),
-        eq(subjects.profileId, profileId)
-      )
+        eq(subjects.profileId, profileId),
+      ),
     );
   if ((suggestionCount[0]?.count ?? 0) > 0) return 'broad';
   if (bookId) return 'focused_book';
@@ -707,7 +722,7 @@ export async function startFirstCurriculumSession(
   profileId: string,
   subjectId: string,
   input: FirstCurriculumSessionStartInput,
-  options: { matcherEnabled?: boolean } = {}
+  options: { matcherEnabled?: boolean } = {},
 ): Promise<LearningSession> {
   const startedAt = Date.now();
   const deadline = Date.now() + FIRST_CURRICULUM_SESSION_WAIT_MS;
@@ -718,12 +733,12 @@ export async function startFirstCurriculumSession(
         db,
         profileId,
         subjectId,
-        input.bookId
+        input.bookId,
       ),
       sessionCrudDependencies.loadLatestCompletedDraftSignals(
         db,
         profileId,
-        subjectId
+        subjectId,
       ),
     ]);
 
@@ -734,7 +749,7 @@ export async function startFirstCurriculumSession(
           db,
           profileId,
           subjectId,
-          input.bookId
+          input.bookId,
         );
       const intentDecision = await sessionCrudDependencies.matchTopicByIntent(
         db,
@@ -746,14 +761,14 @@ export async function startFirstCurriculumSession(
           bookId: input.bookId,
           matcherEnabled: options.matcherEnabled ?? false,
           firstSessionStartedAt: startedAt,
-        }
+        },
       );
       const prewarmHit = topicAvailableMs < FIRST_CURRICULUM_SESSION_POLL_MS;
       addBreadcrumb(
         'first curriculum session topic check',
         'curriculum.first-session',
         'info',
-        { prewarmHit, topicAvailableMs, structureType }
+        { prewarmHit, topicAvailableMs, structureType },
       );
       logger.info('first_curriculum_session_topic_check', {
         profileId,
@@ -788,7 +803,7 @@ export async function startFirstCurriculumSession(
 export async function getSession(
   db: Database,
   profileId: string,
-  sessionId: string
+  sessionId: string,
 ): Promise<LearningSession | null> {
   const repo = createScopedRepository(db, profileId);
   const row = await repo.sessions.findFirst(eq(learningSessions.id, sessionId));
@@ -798,7 +813,7 @@ export async function getSession(
 export async function clearContinuationDepth(
   db: Database,
   profileId: string,
-  sessionId: string
+  sessionId: string,
 ): Promise<LearningSession | null> {
   const session = await getSession(db, profileId, sessionId);
   if (!session) return null;
@@ -816,8 +831,8 @@ export async function clearContinuationDepth(
     .where(
       and(
         eq(learningSessions.id, sessionId),
-        eq(learningSessions.profileId, profileId)
-      )
+        eq(learningSessions.profileId, profileId),
+      ),
     )
     .returning();
 
@@ -828,7 +843,7 @@ export async function closeSession(
   db: Database,
   profileId: string,
   sessionId: string,
-  input: SessionCloseInput
+  input: SessionCloseInput,
 ): Promise<{
   message: string;
   sessionId: string;
@@ -855,7 +870,7 @@ export async function closeSession(
   const sessionStartedAt = new Date(session.startedAt);
   const wallClockSeconds = Math.max(
     0,
-    Math.round((now.getTime() - sessionStartedAt.getTime()) / 1000)
+    Math.round((now.getTime() - sessionStartedAt.getTime()) / 1000),
   );
 
   // FR210: Compute active time from session event gaps (internal analytics only)
@@ -866,7 +881,7 @@ export async function closeSession(
   const events = await db.query.sessionEvents.findMany({
     where: and(
       eq(sessionEvents.sessionId, sessionId),
-      eq(sessionEvents.profileId, profileId)
+      eq(sessionEvents.profileId, profileId),
     ),
     orderBy: [asc(sessionEvents.createdAt), asc(sessionEvents.id)],
   });
@@ -903,8 +918,8 @@ export async function closeSession(
       and(
         eq(learningSessions.id, sessionId),
         eq(learningSessions.profileId, profileId),
-        eq(learningSessions.status, 'active')
-      )
+        eq(learningSessions.status, 'active'),
+      ),
     )
     .returning({ id: learningSessions.id });
 
@@ -931,7 +946,7 @@ export async function closeSession(
     sessionId,
     profileId,
     session.topicId ?? null,
-    effectiveSummaryStatus
+    effectiveSummaryStatus,
   );
 
   if (effectiveSummaryStatus === 'skipped') {
@@ -943,7 +958,7 @@ export async function closeSession(
     db,
     profileId,
     sessionId,
-    session.sessionType
+    session.sessionType,
   );
 
   return {
@@ -963,7 +978,7 @@ export async function closeSession(
 
 export async function closeStaleSessions(
   db: Database,
-  cutoff: Date
+  cutoff: Date,
 ): Promise<
   Array<{
     profileId: string;
@@ -989,7 +1004,7 @@ export async function closeStaleSessions(
   const staleSessions = await db.query.learningSessions.findMany({
     where: and(
       eq(learningSessions.status, 'active'),
-      lt(learningSessions.lastActivityAt, cutoff)
+      lt(learningSessions.lastActivityAt, cutoff),
     ),
   });
 
@@ -1019,7 +1034,7 @@ export async function closeStaleSessions(
       {
         reason: 'silence_timeout',
         summaryStatus: 'auto_closed',
-      }
+      },
     );
 
     // BD-05: Skip sessions that were resumed between read and write
@@ -1039,7 +1054,7 @@ export async function closeStaleSessions(
 export async function getSessionCompletionContext(
   db: Database,
   profileId: string,
-  sessionId: string
+  sessionId: string,
 ): Promise<{
   sessionId: string;
   topicId: string | null;
@@ -1061,7 +1076,7 @@ export async function getSessionCompletionContext(
   const events = await db.query.sessionEvents.findMany({
     where: and(
       eq(sessionEvents.sessionId, sessionId),
-      eq(sessionEvents.profileId, profileId)
+      eq(sessionEvents.profileId, profileId),
     ),
     orderBy: [asc(sessionEvents.createdAt), asc(sessionEvents.id)],
   });
@@ -1079,7 +1094,7 @@ export async function getSessionCompletionContext(
       db,
       profileId,
       sessionId,
-      session.sessionType
+      session.sessionType,
     ),
     escalationRungs: collectEscalationRungs(events),
   };
@@ -1088,7 +1103,7 @@ export async function getSessionCompletionContext(
 export async function getSessionTranscript(
   db: Database,
   profileId: string,
-  sessionId: string
+  sessionId: string,
 ): Promise<TranscriptResponse | null> {
   const session = await getSession(db, profileId, sessionId);
   if (!session) return null;
@@ -1096,7 +1111,7 @@ export async function getSessionTranscript(
   const purgedSummary = await db.query.sessionSummaries.findFirst({
     where: and(
       eq(sessionSummaries.sessionId, sessionId),
-      eq(sessionSummaries.profileId, profileId)
+      eq(sessionSummaries.profileId, profileId),
     ),
     columns: {
       purgedAt: true,
@@ -1157,7 +1172,7 @@ export async function getSessionTranscript(
   const events = await db.query.sessionEvents.findMany({
     where: and(
       eq(sessionEvents.sessionId, sessionId),
-      eq(sessionEvents.profileId, profileId)
+      eq(sessionEvents.profileId, profileId),
     ),
     orderBy: [asc(sessionEvents.createdAt), asc(sessionEvents.id)],
   });
@@ -1173,7 +1188,7 @@ export async function getSessionTranscript(
       (event) =>
         event.eventType === 'user_message' ||
         event.eventType === 'ai_response' ||
-        event.eventType === 'system_prompt'
+        event.eventType === 'system_prompt',
     )
     .map((event) => {
       const meta = event.metadata as Record<string, unknown> | null;
@@ -1217,7 +1232,7 @@ export async function getSessionTranscript(
   const rawSession = await db.query.learningSessions.findFirst({
     where: and(
       eq(learningSessions.id, sessionId),
-      eq(learningSessions.profileId, profileId)
+      eq(learningSessions.profileId, profileId),
     ),
   });
 
@@ -1228,7 +1243,7 @@ export async function getSessionTranscript(
         .map((value) => celebrationReasonSchema.safeParse(value))
         .filter(
           (result): result is { success: true; data: CelebrationReason } =>
-            result.success
+            result.success,
         )
         .map((result) => result.data)
     : [];
@@ -1260,7 +1275,7 @@ export async function recordSystemPrompt(
   profileId: string,
   sessionId: string,
   content: string,
-  metadata?: Record<string, unknown>
+  metadata?: Record<string, unknown>,
 ): Promise<void> {
   const session = await getSession(db, profileId, sessionId);
   if (!session) {
@@ -1280,7 +1295,7 @@ export async function recordSessionEvent(
   db: Database,
   profileId: string,
   sessionId: string,
-  input: SessionAnalyticsEventInput
+  input: SessionAnalyticsEventInput,
 ): Promise<void> {
   const session = await getSession(db, profileId, sessionId);
   if (!session) {
@@ -1300,7 +1315,7 @@ export async function flagContent(
   db: Database,
   profileId: string,
   sessionId: string,
-  input: ContentFlagInput
+  input: ContentFlagInput,
 ): Promise<{ message: string }> {
   // Look up the session to get its subjectId
   const session = await getSession(db, profileId, sessionId);
@@ -1335,7 +1350,7 @@ export interface ResumeNudgeCandidate {
 export async function claimSessionForFilingRetry(
   db: Database,
   profileId: string,
-  sessionId: string
+  sessionId: string,
 ): Promise<{ id: string } | undefined> {
   const [updated] = await db
     .update(learningSessions)
@@ -1349,8 +1364,8 @@ export async function claimSessionForFilingRetry(
         eq(learningSessions.id, sessionId),
         eq(learningSessions.profileId, profileId),
         eq(learningSessions.filingStatus, 'filing_failed'),
-        lt(learningSessions.filingRetryCount, 3)
-      )
+        lt(learningSessions.filingRetryCount, 3),
+      ),
     )
     .returning({ id: learningSessions.id });
 
@@ -1359,7 +1374,7 @@ export async function claimSessionForFilingRetry(
 
 export async function getResumeNudgeCandidate(
   db: Database,
-  profileId: string
+  profileId: string,
 ): Promise<ResumeNudgeCandidate | null> {
   const [candidate] = await db
     .select({
@@ -1377,8 +1392,8 @@ export async function getResumeNudgeCandidate(
         isNull(learningSessions.topicId),
         gte(learningSessions.exchangeCount, 5),
         sql`${learningSessions.metadata} ->> 'effectiveMode' = 'freeform'`,
-        gte(learningSessions.createdAt, sql`NOW() - INTERVAL '7 days'`)
-      )
+        gte(learningSessions.createdAt, sql`NOW() - INTERVAL '7 days'`),
+      ),
     )
     .orderBy(desc(learningSessions.createdAt))
     .limit(1);
@@ -1392,8 +1407,8 @@ export async function getResumeNudgeCandidate(
       and(
         eq(sessionEvents.sessionId, candidate.id),
         eq(sessionEvents.profileId, profileId),
-        eq(sessionEvents.eventType, 'user_message')
-      )
+        eq(sessionEvents.eventType, 'user_message'),
+      ),
     )
     // [BUG-913 sweep] Tie-break by id when created_at collides — see
     // getSessionTranscript above for the full rationale. With limit:1 the
@@ -1411,4 +1426,200 @@ export async function getResumeNudgeCandidate(
     exchangeCount: candidate.exchangeCount,
     createdAt: candidate.createdAt.toISOString(),
   };
+}
+
+// ---------------------------------------------------------------------------
+// Profile session list — extracted from dashboard.ts (PR-2)
+// Used by routes/progress.ts (self-view) and re-called by getChildSessions
+// (parent-proxy view, which adds its own access guard before delegating here).
+// ---------------------------------------------------------------------------
+
+export interface ChildSessionDrillScore {
+  correct: number;
+  total: number;
+  createdAt: string;
+}
+
+export interface ChildSession {
+  sessionId: string;
+  subjectId: string;
+  subjectName: string | null;
+  topicId: string | null;
+  topicTitle: string | null;
+  sessionType: string;
+  startedAt: string;
+  endedAt: string | null;
+  exchangeCount: number;
+  escalationRung: number;
+  durationSeconds: number | null;
+  wallClockSeconds: number | null;
+  displayTitle: string;
+  displaySummary: string | null;
+  homeworkSummary: HomeworkSummary | null;
+  highlight: string | null;
+  narrative: string | null;
+  conversationPrompt: string | null;
+  engagementSignal: EngagementSignal | null;
+  /**
+   * Fluency-drill outcomes recorded during this session, oldest first.
+   * Empty when no scored drill happened. Used by per-topic detail to render
+   * a "Recent drills: 4/5, 3/5, 5/5" strip without a separate endpoint.
+   */
+  drills: ChildSessionDrillScore[];
+}
+
+export function getSessionMetadata(metadata: unknown): SessionMetadata {
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
+    return {};
+  }
+  return metadata as SessionMetadata;
+}
+
+export function formatSessionDisplayTitle(
+  sessionType: string,
+  homeworkSummary?: HomeworkSummary | null,
+): string {
+  if (homeworkSummary?.displayTitle) {
+    return homeworkSummary.displayTitle;
+  }
+
+  switch (sessionType) {
+    case 'homework':
+      return 'Homework';
+    case 'interleaved':
+      return 'Interleaved Practice';
+    default:
+      return 'Learning';
+  }
+}
+
+export function parseEngagementSignal(
+  raw: string | null | undefined,
+): EngagementSignal | null {
+  if (!raw) return null;
+  const parsed = engagementSignalSchema.safeParse(raw);
+  return parsed.success ? parsed.data : null;
+}
+
+/**
+ * Lists recent sessions for a profile, scoped to that profile.
+ * Returns up to 50 most recent sessions ordered by startedAt descending.
+ *
+ * No parent-proxy guard here — this function operates on a single profileId
+ * directly. Parent-facing callers (getChildSessions in dashboard.ts) add
+ * assertParentAccess + assertChildDashboardDataVisible before delegating here.
+ */
+export async function getProfileSessions(
+  db: Database,
+  profileId: string,
+): Promise<ChildSession[]> {
+  const scoped = createScopedRepository(db, profileId);
+  const sessions = await scoped.sessions.findMany(
+    gte(learningSessions.exchangeCount, 1),
+    50,
+    desc(learningSessions.startedAt),
+  );
+
+  if (sessions.length === 0) return [];
+
+  // Batch-fetch highlights from session_summaries for all sessions
+  const sessionIds = sessions.map((s) => s.id);
+
+  // [BUG-526] Batch-fetch subject names and topic titles so the mobile
+  // client can render structured context instead of relying on the highlight string.
+  const uniqueSubjectIds = [...new Set(sessions.map((s) => s.subjectId))];
+  const uniqueTopicIds = [
+    ...new Set(sessions.map((s) => s.topicId).filter(Boolean) as string[]),
+  ];
+
+  const [summaries, subjectRows, topicRows, drillRows] = await Promise.all([
+    db.query.sessionSummaries.findMany({
+      where: inArray(sessionSummaries.sessionId, sessionIds),
+      columns: {
+        sessionId: true,
+        highlight: true,
+        narrative: true,
+        conversationPrompt: true,
+        engagementSignal: true,
+      },
+    }),
+    uniqueSubjectIds.length > 0
+      ? db.query.subjects.findMany({
+          where: inArray(subjects.id, uniqueSubjectIds),
+          columns: { id: true, name: true },
+        })
+      : Promise.resolve([]),
+    uniqueTopicIds.length > 0
+      ? db.query.curriculumTopics.findMany({
+          where: inArray(curriculumTopics.id, uniqueTopicIds),
+          columns: { id: true, title: true },
+        })
+      : Promise.resolve([]),
+    // Fluency-drill outcomes for each session, oldest first. Sparse: most
+    // ai_response rows have null drill columns, so the IS NOT NULL filter
+    // keeps the row count small even on the 50-session window.
+    db
+      .select({
+        sessionId: sessionEvents.sessionId,
+        drillCorrect: sessionEvents.drillCorrect,
+        drillTotal: sessionEvents.drillTotal,
+        createdAt: sessionEvents.createdAt,
+      })
+      .from(sessionEvents)
+      .where(
+        and(
+          inArray(sessionEvents.sessionId, sessionIds),
+          eq(sessionEvents.eventType, 'ai_response'),
+          isNotNull(sessionEvents.drillTotal),
+        ),
+      )
+      .orderBy(asc(sessionEvents.createdAt)),
+  ]);
+
+  const summaryBySession = new Map(
+    summaries.map((summary) => [summary.sessionId, summary]),
+  );
+  const subjectNameById = new Map(subjectRows.map((s) => [s.id, s.name]));
+  const topicTitleById = new Map(topicRows.map((t) => [t.id, t.title]));
+  const drillsBySession = new Map<string, ChildSessionDrillScore[]>();
+  for (const row of drillRows) {
+    if (row.drillCorrect == null || row.drillTotal == null) continue;
+    const list = drillsBySession.get(row.sessionId) ?? [];
+    list.push({
+      correct: row.drillCorrect,
+      total: row.drillTotal,
+      createdAt: row.createdAt.toISOString(),
+    });
+    drillsBySession.set(row.sessionId, list);
+  }
+
+  return sessions.map((s) => {
+    const metadata = getSessionMetadata(s.metadata);
+    const homeworkSummary = metadata.homeworkSummary ?? null;
+
+    const summary = summaryBySession.get(s.id);
+
+    return {
+      sessionId: s.id,
+      subjectId: s.subjectId,
+      subjectName: subjectNameById.get(s.subjectId) ?? null,
+      topicId: s.topicId,
+      topicTitle: s.topicId ? (topicTitleById.get(s.topicId) ?? null) : null,
+      sessionType: s.sessionType,
+      startedAt: s.startedAt.toISOString(),
+      endedAt: s.endedAt?.toISOString() ?? null,
+      exchangeCount: s.exchangeCount,
+      escalationRung: s.escalationRung,
+      durationSeconds: s.durationSeconds,
+      wallClockSeconds: s.wallClockSeconds,
+      displayTitle: formatSessionDisplayTitle(s.sessionType, homeworkSummary),
+      displaySummary: homeworkSummary?.summary ?? null,
+      homeworkSummary,
+      highlight: summary?.highlight ?? null,
+      narrative: summary?.narrative ?? null,
+      conversationPrompt: summary?.conversationPrompt ?? null,
+      engagementSignal: parseEngagementSignal(summary?.engagementSignal),
+      drills: drillsBySession.get(s.id) ?? [],
+    };
+  });
 }

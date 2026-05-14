@@ -1,12 +1,8 @@
 import { createContext, useContext, useMemo } from 'react';
 import { vars } from 'nativewind';
-import {
-  tokens,
-  tokensToCssVars,
-  accentPresets,
-  pickSubjectTint,
-} from './design-tokens';
+import { tokens, tokensToCssVars, accentPresets } from './design-tokens';
 import type { ColorScheme, SubjectTint } from './design-tokens';
+import { getSubjectTint } from './subject-tints';
 
 export interface ThemeContextValue {
   colorScheme: ColorScheme;
@@ -58,7 +54,7 @@ export function useThemeColors(): ThemeColors {
  */
 export function useSubjectTint(seed: string): SubjectTint {
   const { colorScheme } = useTheme();
-  return useMemo(() => pickSubjectTint(seed, colorScheme), [seed, colorScheme]);
+  return useMemo(() => getSubjectTint(seed, colorScheme), [seed, colorScheme]);
 }
 
 export function useTokenVars(): ReturnType<typeof vars> {

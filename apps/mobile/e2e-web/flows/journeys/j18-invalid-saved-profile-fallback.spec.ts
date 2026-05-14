@@ -22,7 +22,7 @@ test('J-18 invalid saved profile falls back to the owner profile', async ({
   });
 
   await page.goto('/home', { waitUntil: 'commit' });
-  await expect(page.getByTestId('learner-screen')).toBeVisible({
+  await expect(page.getByTestId('parent-home-screen')).toBeVisible({
     timeout: 60_000,
   });
   await expect

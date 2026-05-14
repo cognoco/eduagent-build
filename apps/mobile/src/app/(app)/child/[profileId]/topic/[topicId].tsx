@@ -5,10 +5,11 @@ import {
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
-import { useChildSessions } from '../../../../../hooks/use-dashboard';
+import type { Translate, TranslateKey } from '../../../../../i18n';
+import { useProfileSessions } from '../../../../../hooks/use-progress';
 import { goBackOrReplace } from '../../../../../lib/navigation';
 import {
   getParentRetentionInfo,
@@ -18,7 +19,7 @@ import {
 import { useThemeColors } from '../../../../../lib/theme';
 import { MetricInfoDot } from '../../../../../components/parent/MetricInfoDot';
 
-const COMPLETION_STATUS_KEYS: Record<string, string> = {
+const COMPLETION_STATUS_KEYS: Record<string, TranslateKey> = {
   not_started: 'parentView.topic.completionStatus.notStarted',
   in_progress: 'parentView.topic.completionStatus.inProgress',
   completed: 'parentView.topic.completionStatus.completed',
@@ -43,10 +44,7 @@ function formatDuration(seconds: number | null): string {
   return `${mins} min`;
 }
 
-function formatTimeOnApp(
-  seconds: number | null,
-  t: (key: string, opts?: Record<string, unknown>) => string,
-): string {
+function formatTimeOnApp(seconds: number | null, t: Translate): string {
   const duration = formatDuration(seconds);
   return duration === '--'
     ? t('parentView.topic.timeOnAppUnavailable')
@@ -106,7 +104,7 @@ export default function TopicDetailScreen() {
   const masteryPercent = mastery !== null ? Math.round(mastery * 100) : null;
 
   const { data: sessions, isLoading: sessionsLoading } =
-    useChildSessions(profileId);
+    useProfileSessions(profileId);
   const topicSessions = sessions?.filter((s) => s.topicId === topicId) ?? [];
 
   // Most recent fluency-drill outcomes for this topic. Flat-mapped across
@@ -288,7 +286,7 @@ export default function TopicDetailScreen() {
                     profileId: profileId ?? '',
                     sessionId: session.sessionId,
                   },
-                } as never)
+                } as Href)
               }
               className="bg-surface rounded-card p-4 mt-2"
               accessibilityLabel={t('parentView.topic.viewSessionFrom', {

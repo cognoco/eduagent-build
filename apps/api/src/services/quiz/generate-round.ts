@@ -1,5 +1,4 @@
 import {
-  capitalsLlmOutputSchema,
   type CefrLevel,
   computeAgeBracket,
   type CapitalsQuestion,
@@ -17,9 +16,12 @@ import { routeAndCall, CircuitOpenError } from '../llm';
 import { captureException } from '../sentry';
 import { UpstreamLlmError, VocabularyContextError } from '../../errors';
 import { getLearningProfile } from '../learner-profile';
-import { CAPITALS_BY_COUNTRY, CAPITALS_DATA } from './capitals-data';
+import {
+  CAPITALS_BY_COUNTRY,
+  CAPITALS_DATA,
+  type CapitalEntry,
+} from './capitals-data';
 import { resolveRoundContent, type LibraryItem } from './content-resolver';
-import { validateCapitalsRound } from './capitals-validation';
 import { shuffle } from './shuffle';
 import {
   buildVocabularyMasteryQuestion,
@@ -45,6 +47,33 @@ import { buildCapitalsPrompt as _buildCapitalsPrompt } from './quiz-prompts';
 export { buildCapitalsPrompt } from './quiz-prompts';
 
 const logger = createLogger();
+
+const COMMON_CAPITALS_COUNTRIES = new Set(
+  [
+    'Australia',
+    'Austria',
+    'Belgium',
+    'Brazil',
+    'Canada',
+    'China',
+    'France',
+    'Germany',
+    'India',
+    'Italy',
+    'Japan',
+    'Mexico',
+    'Norway',
+    'Poland',
+    'Portugal',
+    'Spain',
+    'United Kingdom',
+    'United States',
+  ].map(normalizeQuizToken),
+);
+
+function normalizeQuizToken(value: string): string {
+  return value.trim().toLowerCase();
+}
 
 /**
  * [BUG-990] Wrap routeAndCall for quiz generation so that AbortError (from
@@ -88,6 +117,160 @@ function buildMasteryDistractors(correctAnswer: string): string[] {
   return shuffle(pool)
     .slice(0, 3)
     .map((entry) => entry.capital);
+}
+
+function pickDistractorsForCapital(
+  entry: CapitalEntry,
+  preferSameRegion: boolean,
+): string[] {
+  const used = new Set([normalizeQuizToken(entry.capital)]);
+  const selected: string[] = [];
+  const preferredPool = preferSameRegion
+    ? CAPITALS_DATA.filter((candidate) => candidate.region === entry.region)
+    : [];
+  const fallbackPool = CAPITALS_DATA;
+
+  for (const candidate of shuffle([...preferredPool, ...fallbackPool])) {
+    const key = normalizeQuizToken(candidate.capital);
+    if (used.has(key)) continue;
+
+    used.add(key);
+    selected.push(candidate.capital);
+    if (selected.length === 3) break;
+  }
+
+  return selected;
+}
+
+function findCapitalEntryByCountry(country: string): CapitalEntry | undefined {
+  return CAPITALS_BY_COUNTRY.get(country.trim().toLowerCase());
+}
+
+function matchesTheme(entry: CapitalEntry, themePreference?: string): boolean {
+  if (!themePreference?.trim()) return false;
+
+  const theme = normalizeQuizToken(themePreference);
+  return (
+    normalizeQuizToken(entry.region).includes(theme) ||
+    normalizeQuizToken(entry.country).includes(theme) ||
+    theme.includes(normalizeQuizToken(entry.region)) ||
+    theme.includes(normalizeQuizToken(entry.country))
+  );
+}
+
+function buildCapitalsTheme(
+  selected: CapitalEntry[],
+  themePreference?: string,
+  difficultyBump = false,
+): string {
+  const trimmedTheme = themePreference?.trim();
+  if (trimmedTheme) {
+    return trimmedTheme.toLowerCase().includes('capital')
+      ? trimmedTheme
+      : `${trimmedTheme} Capitals`;
+  }
+
+  const regionCounts = new Map<string, number>();
+  for (const entry of selected) {
+    regionCounts.set(entry.region, (regionCounts.get(entry.region) ?? 0) + 1);
+  }
+  const dominantRegion = [...regionCounts.entries()].sort(
+    (a, b) => b[1] - a[1],
+  )[0];
+  if (dominantRegion && dominantRegion[1] >= Math.ceil(selected.length * 0.6)) {
+    return difficultyBump
+      ? `Challenge: ${dominantRegion[0]} Capitals`
+      : `${dominantRegion[0]} Capitals`;
+  }
+
+  return difficultyBump ? 'Challenge Capitals' : 'World Capitals';
+}
+
+export function buildCapitalsDiscoveryRound(params: {
+  discoveryCount: number;
+  recentAnswers: string[];
+  recentlyMissedItems?: string[];
+  themePreference?: string;
+  difficultyBump?: boolean;
+  excludedCountries?: string[];
+  excludedAnswers?: string[];
+}): { theme: string; questions: CapitalsQuestion[] } {
+  const {
+    discoveryCount,
+    recentAnswers,
+    recentlyMissedItems = [],
+    themePreference,
+    difficultyBump = false,
+    excludedCountries = [],
+    excludedAnswers = [],
+  } = params;
+  const count = Math.max(0, discoveryCount);
+  const selected: CapitalEntry[] = [];
+  const selectedCountries = new Set<string>();
+  const selectedAnswers = new Set<string>();
+  const blockedCountries = new Set(excludedCountries.map(normalizeQuizToken));
+  const blockedAnswers = new Set([
+    ...recentAnswers.map(normalizeQuizToken),
+    ...excludedAnswers.map(normalizeQuizToken),
+  ]);
+
+  const addEntry = (entry: CapitalEntry, allowRecentAnswer = false) => {
+    const countryKey = normalizeQuizToken(entry.country);
+    const answerKey = normalizeQuizToken(entry.capital);
+    if (selected.length >= count) return;
+    if (selectedCountries.has(countryKey) || selectedAnswers.has(answerKey)) {
+      return;
+    }
+    if (blockedCountries.has(countryKey)) return;
+    if (!allowRecentAnswer && blockedAnswers.has(answerKey)) return;
+
+    selected.push(entry);
+    selectedCountries.add(countryKey);
+    selectedAnswers.add(answerKey);
+  };
+
+  for (const missed of recentlyMissedItems) {
+    const entry = findCapitalEntryByCountry(missed);
+    if (entry) addEntry(entry, true);
+  }
+
+  const themedPool = CAPITALS_DATA.filter((entry) =>
+    matchesTheme(entry, themePreference),
+  );
+  const challengePool = CAPITALS_DATA.filter(
+    (entry) =>
+      !COMMON_CAPITALS_COUNTRIES.has(normalizeQuizToken(entry.country)),
+  );
+  const preferredPool =
+    themedPool.length >= count
+      ? themedPool
+      : difficultyBump && challengePool.length >= count
+        ? challengePool
+        : CAPITALS_DATA;
+
+  for (const entry of shuffle(preferredPool)) {
+    addEntry(entry);
+  }
+  for (const entry of shuffle(CAPITALS_DATA)) {
+    addEntry(entry);
+  }
+
+  const questions = selected.map(
+    (entry): CapitalsQuestion => ({
+      type: 'capitals',
+      country: entry.country,
+      correctAnswer: entry.capital,
+      acceptedAliases: entry.acceptedAliases,
+      distractors: pickDistractorsForCapital(entry, difficultyBump),
+      funFact: entry.funFact,
+      isLibraryItem: false,
+    }),
+  );
+
+  return {
+    theme: buildCapitalsTheme(selected, themePreference, difficultyBump),
+    questions,
+  };
 }
 
 export function injectMasteryQuestions(
@@ -194,6 +377,7 @@ export function extractJsonObject(response: string): string {
 interface GenerateParams {
   db: Database;
   profileId: string;
+  subjectId?: string | null;
   activityType: QuizActivityType;
   birthYear?: number | null;
   themePreference?: string;
@@ -220,6 +404,7 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
   const {
     db,
     profileId,
+    subjectId,
     activityType,
     birthYear,
     themePreference,
@@ -296,7 +481,7 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
   const resolvedNativeLanguage = nativeLanguage;
 
   // [P1 — quiz_missed_items wiring] Fetch recent unsurfaced misses for this
-  // activity so the LLM can re-surface them in the new round. Best-effort:
+  // activity so the next round can re-surface them. Best-effort:
   // `getRecentMissedItems` returns [] on any DB error.
   const missedRows = await getRecentMissedItems(db, profileId, activityType);
   const recentlyMissedItems = missedRows.map((row) =>
@@ -307,79 +492,29 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
   let questions: QuizQuestion[] = [];
 
   if (activityType === 'capitals') {
-    let prompt = _buildCapitalsPrompt({
-      discoveryCount: plan.discoveryCount,
-      ageBracket,
-      recentAnswers,
-      themePreference,
-      interests: resolvedInterests,
-      libraryTopics: topicTitles,
-      ageYears,
-      recentStruggles: resolvedStruggles,
-      recentlyMissedItems,
-    });
     if (difficultyBump) {
-      prompt +=
-        '\n\nDIFFICULTY BUMP: The learner is on a streak. Choose lesser-known countries. Distractors should be from the same region as the correct answer.';
       logger.info('quiz_round.difficulty_bump.applied', {
         profileId,
         activityType,
       });
     }
 
-    const messages: ChatMessage[] = [
-      { role: 'system', content: prompt },
-      { role: 'user', content: 'Generate the quiz round.' },
-    ];
-
-    const llmResult = await routeAndCallForQuiz(messages, 1, {
-      ageBracket,
+    const discoveryRound = buildCapitalsDiscoveryRound({
+      discoveryCount: plan.discoveryCount,
+      recentAnswers,
+      recentlyMissedItems,
+      themePreference,
+      difficultyBump,
+      excludedCountries: plan.masteryItems.map((item) => item.question),
+      excludedAnswers: plan.masteryItems.map((item) => item.answer),
     });
 
-    const raw = llmResult.response.slice(0, 64 * 1024);
-
-    let llmOutput;
-    try {
-      llmOutput = capitalsLlmOutputSchema.parse(
-        JSON.parse(extractJsonObject(raw)),
-      );
-    } catch (parseErr) {
-      captureException(
-        parseErr instanceof Error
-          ? parseErr
-          : new Error('Quiz LLM parse failed'),
-        {
-          userId: undefined,
-          profileId,
-          requestPath: 'services/quiz/generate-round',
-        },
-      );
-      throw new UpstreamLlmError('Quiz LLM returned invalid structured output');
-    }
-
-    const validated = validateCapitalsRound(llmOutput);
-    if (validated.questions.length === 0) {
-      throw new UpstreamLlmError('No valid questions after validation');
-    }
-
-    const discoveryQuestions: CapitalsQuestion[] = validated.questions
-      .slice(0, plan.discoveryCount)
-      .map((question) => ({
-        type: 'capitals',
-        country: question.country,
-        correctAnswer: question.correctAnswer,
-        acceptedAliases: question.acceptedAliases,
-        distractors: question.distractors,
-        funFact: question.funFact,
-        isLibraryItem: false,
-      }));
-
     questions = injectMasteryQuestions(
-      discoveryQuestions,
+      discoveryRound.questions,
       plan.masteryItems,
       activityType,
     );
-    theme = validated.theme;
+    theme = discoveryRound.theme;
   } else if (activityType === 'vocabulary') {
     if (!languageCode || !cefrCeiling) {
       // [BUG-543] VocabularyContextError so the quiz route catches it as 400
@@ -577,6 +712,7 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
 
   const repo = createScopedRepository(db, profileId);
   const inserted = await repo.quizRounds.insert({
+    subjectId: subjectId ?? null,
     activityType,
     theme: round.theme,
     questions: round.questions,

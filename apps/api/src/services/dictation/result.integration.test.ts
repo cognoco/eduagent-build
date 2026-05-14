@@ -3,6 +3,7 @@ import {
   accounts,
   createDatabase,
   dictationResults,
+  practiceActivityEvents,
   profiles,
 } from '@eduagent/database';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
@@ -74,6 +75,7 @@ beforeAll(async () => {
     .insert(profiles)
     .values({
       accountId,
+      displayName: 'Integration Learner',
       birthYear: 2010,
       isOwner: true,
     })
@@ -83,6 +85,9 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   const db = createIntegrationDb();
+  await db
+    .delete(practiceActivityEvents)
+    .where(eq(practiceActivityEvents.profileId, profileId));
   await db
     .delete(dictationResults)
     .where(eq(dictationResults.profileId, profileId));
@@ -113,6 +118,30 @@ describe('recordDictationResult (integration)', () => {
     expect(rows[0]!.mistakeCount).toBe(2);
     expect(rows[0]!.mode).toBe('homework');
     expect(rows[0]!.reviewed).toBe(false);
+  });
+
+  it('records the practice event at completion time instead of local-date midnight', async () => {
+    const db = createIntegrationDb();
+    const before = new Date();
+
+    const row = await recordDictationResult(db, profileId, {
+      localDate: '2026-05-13',
+      sentenceCount: 5,
+      mistakeCount: 2,
+      mode: 'homework',
+      reviewed: false,
+    });
+
+    const after = new Date();
+    const [event] = await db
+      .select({ completedAt: practiceActivityEvents.completedAt })
+      .from(practiceActivityEvents)
+      .where(eq(practiceActivityEvents.sourceId, row.id));
+
+    expect(event?.completedAt.getTime()).toBeGreaterThanOrEqual(
+      before.getTime(),
+    );
+    expect(event?.completedAt.getTime()).toBeLessThanOrEqual(after.getTime());
   });
 
   it('creates separate rows for duplicate (profileId, date) inserts', async () => {

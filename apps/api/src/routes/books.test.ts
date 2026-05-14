@@ -14,7 +14,7 @@ import { clearJWKSCache } from '../middleware/jwt';
 
 import { createDatabaseModuleMock } from '../test-utils/database-module';
 
-const mockDatabaseModule = createDatabaseModuleMock();
+const mockDatabaseModule = createDatabaseModuleMock({ includeActual: true });
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
@@ -23,6 +23,7 @@ jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 // ---------------------------------------------------------------------------
 
 jest.mock('../services/account', () => ({
+  ...jest.requireActual('../services/account'),
   findOrCreateAccount: jest.fn().mockResolvedValue({
     id: 'test-account-id',
     clerkUserId: 'user_test',
@@ -33,6 +34,7 @@ jest.mock('../services/account', () => ({
 }));
 
 jest.mock('../services/profile', () => ({
+  ...jest.requireActual('../services/profile'),
   findOwnerProfile: jest.fn().mockResolvedValue(null),
   getProfile: jest.fn().mockResolvedValue({
     id: 'test-profile-id',
@@ -81,6 +83,7 @@ const mockBookWithTopics = {
 };
 
 jest.mock('../services/curriculum', () => ({
+  ...jest.requireActual('../services/curriculum'),
   getBooks: jest.fn().mockResolvedValue([]),
   getAllProfileBooks: jest.fn().mockResolvedValue({ subjects: [] }),
   getBookWithTopics: jest.fn().mockResolvedValue(null),
@@ -90,6 +93,7 @@ jest.mock('../services/curriculum', () => ({
 }));
 
 jest.mock('../services/book-generation', () => ({
+  ...jest.requireActual('../services/book-generation'),
   generateBookTopics: jest.fn().mockResolvedValue({
     topics: [
       {
@@ -109,6 +113,7 @@ jest.mock('inngest/hono', () => ({
 }));
 
 jest.mock('../inngest/client', () => ({
+  // gc1-allow: Inngest SDK external boundary
   inngest: {
     send: jest.fn().mockResolvedValue(undefined),
     createFunction: jest.fn().mockReturnValue(jest.fn()),
@@ -180,7 +185,7 @@ describe('book routes', () => {
       const res = await app.request(
         '/v1/library/books',
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -191,7 +196,7 @@ describe('book routes', () => {
       expect(mockGetAllProfileBooks).toHaveBeenCalledTimes(1);
       // Second arg must be the profile ID — proves the route passes scope.
       expect((mockGetAllProfileBooks as jest.Mock).mock.calls[0]?.[1]).toBe(
-        'test-profile-id'
+        'test-profile-id',
       );
     });
 
@@ -201,7 +206,7 @@ describe('book routes', () => {
         {
           headers: makeAuthHeaders(),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -224,7 +229,7 @@ describe('book routes', () => {
       const res = await app.request(
         `/v1/subjects/${SUBJECT_ID}/books`,
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -239,7 +244,7 @@ describe('book routes', () => {
       const res = await app.request(
         `/v1/subjects/${SUBJECT_ID}/books`,
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -253,7 +258,7 @@ describe('book routes', () => {
       const res = await app.request(
         '/v1/subjects/not-a-uuid/books',
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -263,7 +268,7 @@ describe('book routes', () => {
       const res = await app.request(
         `/v1/subjects/${SUBJECT_ID}/books`,
         { headers: { 'Content-Type': 'application/json' } },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);
@@ -279,7 +284,7 @@ describe('book routes', () => {
       const res = await app.request(
         `/v1/subjects/${SUBJECT_ID}/books/${BOOK_ID}`,
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -296,7 +301,7 @@ describe('book routes', () => {
       const res = await app.request(
         `/v1/subjects/${SUBJECT_ID}/books/${BOOK_ID}`,
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(404);
@@ -306,7 +311,7 @@ describe('book routes', () => {
       const res = await app.request(
         `/v1/subjects/${SUBJECT_ID}/books/not-a-uuid`,
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -330,7 +335,7 @@ describe('book routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({}),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -351,7 +356,7 @@ describe('book routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({}),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -367,7 +372,7 @@ describe('book routes', () => {
       });
 
       const { generateBookTopics } = jest.requireMock(
-        '../services/book-generation'
+        '../services/book-generation',
       );
 
       const res = await app.request(
@@ -379,7 +384,7 @@ describe('book routes', () => {
             priorKnowledge: 'I already know about pyramids',
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -387,7 +392,7 @@ describe('book routes', () => {
         'Ancient Egypt',
         'Explore pyramids and pharaohs',
         12,
-        'I already know about pyramids'
+        'I already know about pyramids',
       );
     });
 
@@ -403,7 +408,7 @@ describe('book routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({}),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(404);

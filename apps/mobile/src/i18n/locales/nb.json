@@ -496,7 +496,12 @@
       "finishEarlyLabel": "Fullfør økten tidlig",
       "nextProblemLabel": "Neste oppgave",
       "finishHomeworkLabel": "Fullfør leksene",
-      "endSessionLabel": "Avslutt økt"
+      "endSessionLabel": "Avslutt økt",
+      "typeSubjectPlaceholder": "Skriv inn et emne",
+      "typeSubjectLabel": "Skriv inn et emne",
+      "useTypedSubject": "Bruk",
+      "useTypedSubjectLabel": "Bruk skrevet emne",
+      "addNote": "Legg til notat"
     },
     "quota": {
       "dailyLimitReached": "Daglig grense nådd",
@@ -571,7 +576,8 @@
       "writeNote": "Skriv et notat",
       "cannotSaveTitle": "Kan ikke lagre notat",
       "cannotSaveMessage": "Notater kan ikke lagres akkurat nå. Prøv igjen.",
-      "saveFailedTitle": "Kunne ikke lagre notat"
+      "saveFailedTitle": "Kunne ikke lagre notat",
+      "summaryPlaceholder": "Hva skal vi huske fra denne økten?"
     },
     "filingPrompt": {
       "title": "Legge til i biblioteket?",
@@ -857,6 +863,9 @@
     "loadError": {
       "message": "Kunne ikke laste biblioteket ditt. Prøv igjen."
     },
+    "staleBanner": {
+      "message": "Viser lagret bibliotek. Trykk for å oppdatere."
+    },
     "empty": {
       "title": "Biblioteket ditt er tomt",
       "message": "Start en studieøkt, så vil emnene dine vises her.",
@@ -953,6 +962,9 @@
       "message": "Åpne hyllen, velg neste bok, eller repeter det som er forfalt.",
       "cta": "Åpne",
       "accessibilityLabel": "Fortsett med {{subject}}"
+    },
+    "bookmarkCard": {
+      "accessibilityLabel": "Åpne lagret bokmerke: {{title}}"
     }
   },
   "topic": {
@@ -1243,7 +1255,11 @@
     "tryCameraAgainLabel": "Prøv kameraet igjen",
     "tryReadingAgainLabel": "Prøv å lese igjen",
     "classifyErrorTitle": "Kunne ikke identifisere emnet",
-    "classifyErrorMessage": "Vennligst velg hvilket emne denne leksen tilhører."
+    "classifyErrorMessage": "Vennligst velg hvilket emne denne leksen tilhører.",
+    "listening": "Lytter...",
+    "voiceHint": "Si lekseoppgaven høyt.",
+    "stopDictatingProblemLabel": "Stopp diktering av oppgaven",
+    "dictateProblemLabel": "Dikter oppgave"
   },
   "progress": {
     "pageTitle": "Min læringsreise",
@@ -1338,7 +1354,9 @@
       "bars": {
         "sessions": "Økter",
         "time": "Tid",
-        "topics": "Temaer"
+        "topics": "Temaer",
+        "quizzes": "Quizer",
+        "reviews": "Repetisjoner"
       }
     },
     "newLearner": {
@@ -1545,6 +1563,19 @@
     "loadTimeout": {
       "title": "Fremdriften tar for lang tid å laste",
       "message": "Sjekk tilkoblingen din, prøv igjen eller gå hjem."
+    },
+    "guardian": {
+      "sessionCount_one": "{{count}} økt",
+      "sessionCount_other": "{{count}} økter",
+      "lastStudied": "Sist studert {{date}}",
+      "topicsMastered": "{{mastered}}/{{total}} emner mestret",
+      "summaryFallback": "Ingen oppsummering tilgjengelig ennå. En vil vises etter neste økt.",
+      "noRecentSessions": "Ingen nye økter siden {{date}}.",
+      "noRecentSessionsFallback": "Ingen nye økter på en stund.",
+      "staleSummary": "Oppsummeringen gjenspeiler kanskje ikke den siste aktiviteten ennå.",
+      "nudgeCta": "Et lite dytt kan hjelpe {{name}} i gang igjen",
+      "nudgeA11y": "Send {{name}} et dytt",
+      "viewAllReports": "Se alle rapporter"
     }
   },
   "onboarding": {
@@ -1632,6 +1663,7 @@
       "totalSessions": "{{count}} økter",
       "recentActivity": "Nylig aktivitet",
       "noRecentActivity": "Ingen nylig aktivitet ennå",
+      "lastSessionAgo": "Siste økt {{time}}",
       "noSessionsYet": "Ingen økter ennå",
       "viewAllSessions": "Se alle økter",
       "subjectsExplored": "Utforskede emner",
@@ -1686,6 +1718,9 @@
       "viewSessionFrom": "Se økt fra",
       "mentorMemoryTitle": "Hva mentoren vet om {{name}}",
       "mentorMemoryTitleFallback": "Mentorens minne",
+      "manageMentorMemoryForChild": "Administrer hva mentoren husker om {{name}}",
+      "profileDetails": "Profildetaljer",
+      "childProfileJoined": "Lagt til {{date}}",
       "setUpMentorMemory": "Sett opp mentorens minne",
       "chooseWhatMentorRemembers": "Velg hva mentoren husker",
       "viewWhatMentorKnows": "Se hva mentoren vet",
@@ -1694,6 +1729,7 @@
       "learningAccommodationTitle": "Læringstilpasning for {{name}}",
       "learningAccommodationTitleFallback": "Læringstilpasning",
       "learningAccommodationDescription": "Juster hvordan mentoren underviser for å passe barnets læringsbehov",
+      "noLearningPreferenceSet": "Ingen læringspreferanse er satt",
       "toggleDecisionGuide": "Vis beslutningsguide",
       "notSureWhichToPick": "Ikke sikker på hvilken du skal velge?",
       "pickAccommodation": "Velg en tilpasning",
@@ -1708,6 +1744,7 @@
       "checkConsentStatus": "Sjekk samtykkestatus",
       "accountTitle": "Konto – {{name}}",
       "accountTitleFallback": "Konto",
+      "childProfileScopeHint": "Fremgang og rapporter ligger i egne faner, så denne siden viser bare barnespesifikke innstillinger.",
       "deletionPending": "Sletting planlagt",
       "deletionCountdown": "Kontoen vil bli slettet den {{date}}",
       "deletionProcessing": "Sletting pågår",
@@ -1840,7 +1877,9 @@
       "monthlyReport": "Månedsrapport",
       "subtitle": "Et sammendrag av barnets læring denne måneden",
       "totalWords": "Totalt antall ord",
-      "reportGoneTitle": "Rapport ikke funnet"
+      "reportGoneTitle": "Rapport ikke funnet",
+      "testsCompleted": "Tester fullført",
+      "testPoints": "Testpoeng"
     },
     "session": {
       "error": "Kunne ikke laste økt",
@@ -1917,7 +1956,42 @@
       "sendNudge": "Send {{name}} et dytt",
       "openChildProfile": "Åpne {{name}}s profil",
       "reportGoneTitle": "Denne rapporten er ikke lenger tilgjengelig",
-      "reportGoneBody": "Den kan ha blitt arkivert eller fjernet. Alle de andre rapportene dine er fortsatt trygge."
+      "reportGoneBody": "Den kan ha blitt arkivert eller fjernet. Alle de andre rapportene dine er fortsatt trygge.",
+      "testsCompleted": "Tester fullført",
+      "testPoints": "Testpoeng"
+    },
+    "practiceSummary": {
+      "title": "Testdetaljer",
+      "subtitle": "{{count}} aktiviteter fullført, inkludert {{reviews}} repetisjoner",
+      "accuracy": "Treffprosent",
+      "reviews": "Repetisjoner",
+      "points": "Poeng",
+      "celebrations": "Feiringer",
+      "activityKinds": "Typer",
+      "comparison": "{{activities}} aktiviteter · {{points}} poeng · {{celebrations}} feiringer",
+      "byType": "Etter type",
+      "bySubject": "Etter fag",
+      "typeDetail": "{{count}} fullført · {{points}} poeng",
+      "typeDetailWithScore": "{{count}} fullført · {{points}} poeng · {{accuracy}}%",
+      "subjectDetail": "{{count}} aktiviteter · {{points}} poeng · {{types}}",
+      "unknownSubject": "Ikke tilordnet",
+      "activityTypes": {
+        "quiz": "Quiz",
+        "review": "Repetisjon",
+        "assessment": "Bevis at jeg kan det",
+        "dictation": "Diktat",
+        "recitation": "Resitasjon",
+        "fluency_drill": "Flytøvelse"
+      },
+      "activitySubtypes": {
+        "capitals": "Hovedsteder",
+        "guess_who": "Gjett hvem",
+        "vocabulary": "Ordforråd",
+        "assessment": "Bevis at jeg kan det",
+        "dictation": "Diktat",
+        "recitation": "Resitasjon",
+        "fluency_drill": "Flytøvelse"
+      }
     }
   },
   "tabs": {

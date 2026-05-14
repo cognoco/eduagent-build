@@ -9,13 +9,16 @@
 
 const mockRouteAndCall = jest.fn();
 
-jest.mock('../../services/llm', () => ({
+jest.mock('../../services/llm' /* gc1-allow: LLM external boundary */, () => ({
   routeAndCall: (...args: unknown[]) => mockRouteAndCall(...args),
 }));
 
-jest.mock('../../services/llm/sanitize', () => ({
-  sanitizeXmlValue: (s: string) => s,
-}));
+jest.mock(
+  '../../services/llm/sanitize' /* gc1-allow: LLM sanitization boundary */,
+  () => ({
+    sanitizeXmlValue: (s: string) => s,
+  }),
+);
 
 const mockDb = {
   query: {
@@ -27,35 +30,25 @@ const mockDb = {
   insert: jest.fn(),
 };
 
-jest.mock('../helpers', () => ({
-  getStepDatabase: () => mockDb,
-}));
+jest.mock(
+  '../helpers' /* gc1-allow: isolates DB connection in unit tests */,
+  () => ({
+    getStepDatabase: () => mockDb,
+  }),
+);
 
-jest.mock('../client', () => ({
-  inngest: {
-    createFunction: jest.fn((_config, _trigger, handler) => ({
-      fn: handler,
-      _config,
-      _trigger,
-    })),
-  },
-}));
+import { createInngestTransportCapture } from '../../test-utils/inngest-transport-capture';
+import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
+
+const mockInngestTransport = createInngestTransportCapture();
+jest.mock('../client', () => mockInngestTransport.module); // gc1-allow: inngest framework boundary
 
 import { postSessionSuggestions } from './post-session-suggestions';
 
 async function runHandler(eventData: Record<string, unknown>) {
-  const mockStep = {
-    run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
-  };
-  const handler = (
-    postSessionSuggestions as unknown as {
-      fn: (args: {
-        event: { data: Record<string, unknown> };
-        step: typeof mockStep;
-      }) => Promise<unknown>;
-    }
-  ).fn;
-  return handler({ event: { data: eventData }, step: mockStep });
+  const { step } = createInngestStepRunner();
+  const handler = (postSessionSuggestions as any).fn;
+  return handler({ event: { data: eventData }, step });
 }
 
 beforeEach(() => {
@@ -103,7 +96,7 @@ describe('post-session-suggestions [BUG-639 / J-3]', () => {
       expect.objectContaining({
         status: 'skipped',
         reason: 'invalid_json',
-      })
+      }),
     );
     expect(mockDb.insert).not.toHaveBeenCalled();
   });
@@ -112,7 +105,7 @@ describe('post-session-suggestions [BUG-639 / J-3]', () => {
     mockRouteAndCall.mockResolvedValue({ response: '' });
     const result = await runHandler(validEventData);
     expect(result).toEqual(
-      expect.objectContaining({ status: 'skipped', reason: 'invalid_json' })
+      expect.objectContaining({ status: 'skipped', reason: 'invalid_json' }),
     );
   });
 
@@ -122,7 +115,7 @@ describe('post-session-suggestions [BUG-639 / J-3]', () => {
     });
     const result = await runHandler(validEventData);
     expect(result).toEqual(
-      expect.objectContaining({ status: 'skipped', reason: 'invalid_json' })
+      expect.objectContaining({ status: 'skipped', reason: 'invalid_json' }),
     );
   });
 
@@ -135,7 +128,7 @@ describe('post-session-suggestions [BUG-639 / J-3]', () => {
       expect.objectContaining({
         status: 'skipped',
         reason: 'invalid LLM response',
-      })
+      }),
     );
   });
 
@@ -148,7 +141,7 @@ describe('post-session-suggestions [BUG-639 / J-3]', () => {
       expect.objectContaining({
         status: 'completed',
         suggestions: ['Light Reactions', 'Dark Reactions'],
-      })
+      }),
     );
     expect(mockDb.insert).toHaveBeenCalled();
   });
@@ -162,7 +155,7 @@ describe('post-session-suggestions [BUG-639 / J-3]', () => {
       expect.objectContaining({
         status: 'completed',
         suggestions: ['A', 'B'],
-      })
+      }),
     );
   });
 });
