@@ -10,9 +10,15 @@
 // ---------------------------------------------------------------------------
 
 const mockCaptureException = jest.fn();
-jest.mock('../../services/sentry' /* gc1-allow: unit test boundary */, () => ({
-  captureException: (...args: unknown[]) => mockCaptureException(...args),
-}));
+jest.mock('../../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../../services/sentry',
+  ) as typeof import('../../services/sentry');
+  return {
+    ...actual,
+    captureException: (...args: unknown[]) => mockCaptureException(...args),
+  };
+});
 
 const mockWeeklyReportOnConflictDoNothing = jest
   .fn()
@@ -45,10 +51,16 @@ const mockDb = {
     }),
   })),
 };
-jest.mock('../helpers' /* gc1-allow: unit test boundary */, () => ({
-  getStepDatabase: () => mockDb,
-  getStepResendApiKey: () => 'resend-test-key',
-}));
+jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../helpers',
+  ) as typeof import('../helpers');
+  return {
+    ...actual,
+    getStepDatabase: () => mockDb,
+    getStepResendApiKey: () => 'resend-test-key',
+  };
+});
 
 import { createInngestTransportCapture } from '../../test-utils/inngest-transport-capture';
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';

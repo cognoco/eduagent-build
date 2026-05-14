@@ -65,17 +65,21 @@ const mockFormatMonthlyProgressEmail = jest.fn().mockReturnValue({
 });
 
 // prettier-ignore
-jest.mock( // gc1-allow: handler control-flow test; services tested in own suites
+jest.mock( // gc1-allow: pattern-a conversion
   '../../services/notifications',
-  () => ({
-    sendPushNotification: (...args: unknown[]) =>
-      mockSendPushNotification(...args),
-    sendEmail: (...args: unknown[]) => mockSendEmail(...args),
-    formatWeeklyProgressEmail: (...args: unknown[]) =>
-      mockFormatWeeklyProgressEmail(...args),
-    formatMonthlyProgressEmail: (...args: unknown[]) =>
-      mockFormatMonthlyProgressEmail(...args),
-  }),
+  () => {
+    const actual = jest.requireActual('../../services/notifications') as typeof import('../../services/notifications');
+    return {
+      ...actual,
+      sendPushNotification: (...args: unknown[]) =>
+        mockSendPushNotification(...args),
+      sendEmail: (...args: unknown[]) => mockSendEmail(...args),
+      formatWeeklyProgressEmail: (...args: unknown[]) =>
+        mockFormatWeeklyProgressEmail(...args),
+      formatMonthlyProgressEmail: (...args: unknown[]) =>
+        mockFormatMonthlyProgressEmail(...args),
+    };
+  },
 );
 
 const mockGetRecentNotificationCount = jest.fn().mockResolvedValue(0);
@@ -230,11 +234,17 @@ function buildMockDb(
 }
 
 const mockGetStepResendApiKey = jest.fn(() => 'test-resend-key');
-jest.mock('../helpers' /* gc1-allow: unit test boundary */, () => ({
-  getStepDatabase: jest.fn(),
-  resetDatabaseUrl: jest.fn(),
-  getStepResendApiKey: () => mockGetStepResendApiKey(),
-}));
+jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../helpers',
+  ) as typeof import('../helpers');
+  return {
+    ...actual,
+    getStepDatabase: jest.fn(),
+    resetDatabaseUrl: jest.fn(),
+    getStepResendApiKey: () => mockGetStepResendApiKey(),
+  };
+});
 
 import { getStepDatabase } from '../helpers';
 import { weeklyProgressPushGenerate } from './weekly-progress-push';
