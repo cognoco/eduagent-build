@@ -1467,6 +1467,7 @@ function SessionScreenInner() {
       isStreaming={isStreaming}
       handleQuickChip={handleQuickChip}
       stage={conversationStage}
+      onAddNote={() => setShowNoteInput(true)}
     />
   );
 
