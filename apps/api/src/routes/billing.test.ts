@@ -40,15 +40,22 @@ const mockDatabaseModule = createDatabaseModuleMock({
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
-jest.mock('../services/account', () => ({
-  findOrCreateAccount: jest.fn().mockResolvedValue({
-    id: 'test-account-id',
-    clerkUserId: 'user_test',
-    email: 'test@example.com',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  }),
-}));
+jest.mock('../services/account', () => {
+  const actual = jest.requireActual('../services/account') as Record<
+    string,
+    unknown
+  >;
+  return {
+    ...actual,
+    findOrCreateAccount: jest.fn().mockResolvedValue({
+      id: 'test-account-id',
+      clerkUserId: 'user_test',
+      email: 'test@example.com',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }),
+  };
+});
 
 // ---------------------------------------------------------------------------
 // Mock billing service
@@ -65,12 +72,6 @@ const mockGetTopUpPriceCents = jest.fn().mockReturnValue(499);
 const mockListFamilyMembers = jest.fn();
 const mockAddProfileToSubscription = jest.fn();
 const mockRemoveProfileFromSubscription = jest.fn();
-class MockProfileRemovalNotImplementedError extends Error {
-  constructor() {
-    super('Profile removal requires an invite/claim flow');
-    this.name = 'ProfileRemovalNotImplementedError';
-  }
-}
 const mockGetFamilyPoolStatus = jest.fn();
 const mockGetUsageBreakdownForProfile = jest.fn();
 const mockGetUsageEventsAvailableSince = jest
@@ -83,32 +84,41 @@ const mockBuildUsageDateLabels = jest.fn((input) => ({
   renewsAtLabel: input.renewsAt ? 'February 15, 2025' : null,
 }));
 
-jest.mock('../services/billing', () => ({
-  getSubscriptionByAccountId: (...args: unknown[]) =>
-    mockGetSubscriptionByAccountId(...args),
-  ensureFreeSubscription: (...args: unknown[]) =>
-    mockEnsureFreeSubscription(...args),
-  getQuotaPool: (...args: unknown[]) => mockGetQuotaPool(...args),
-  linkStripeCustomer: (...args: unknown[]) => mockLinkStripeCustomer(...args),
-  addToByokWaitlist: (...args: unknown[]) => mockAddToByokWaitlist(...args),
-  markSubscriptionCancelled: (...args: unknown[]) =>
-    mockMarkSubscriptionCancelled(...args),
-  getTopUpCreditsRemaining: (...args: unknown[]) =>
-    mockGetTopUpCreditsRemaining(...args),
-  getTopUpPriceCents: (...args: unknown[]) => mockGetTopUpPriceCents(...args),
-  listFamilyMembers: (...args: unknown[]) => mockListFamilyMembers(...args),
-  addProfileToSubscription: (...args: unknown[]) =>
-    mockAddProfileToSubscription(...args),
-  removeProfileFromSubscription: (...args: unknown[]) =>
-    mockRemoveProfileFromSubscription(...args),
-  ProfileRemovalNotImplementedError: MockProfileRemovalNotImplementedError,
-  getFamilyPoolStatus: (...args: unknown[]) => mockGetFamilyPoolStatus(...args),
-  getUsageBreakdownForProfile: (...args: unknown[]) =>
-    mockGetUsageBreakdownForProfile(...args),
-  getUsageEventsAvailableSince: (...args: unknown[]) =>
-    mockGetUsageEventsAvailableSince(...args),
-  buildUsageDateLabels: (input: unknown) => mockBuildUsageDateLabels(input),
-}));
+jest.mock('../services/billing', () => {
+  const actual = jest.requireActual('../services/billing') as Record<
+    string,
+    unknown
+  >;
+  return {
+    ...actual,
+    // Use real ProfileRemovalNotImplementedError so instanceof checks in the
+    // route handler match production behaviour.
+    getSubscriptionByAccountId: (...args: unknown[]) =>
+      mockGetSubscriptionByAccountId(...args),
+    ensureFreeSubscription: (...args: unknown[]) =>
+      mockEnsureFreeSubscription(...args),
+    getQuotaPool: (...args: unknown[]) => mockGetQuotaPool(...args),
+    linkStripeCustomer: (...args: unknown[]) => mockLinkStripeCustomer(...args),
+    addToByokWaitlist: (...args: unknown[]) => mockAddToByokWaitlist(...args),
+    markSubscriptionCancelled: (...args: unknown[]) =>
+      mockMarkSubscriptionCancelled(...args),
+    getTopUpCreditsRemaining: (...args: unknown[]) =>
+      mockGetTopUpCreditsRemaining(...args),
+    getTopUpPriceCents: (...args: unknown[]) => mockGetTopUpPriceCents(...args),
+    listFamilyMembers: (...args: unknown[]) => mockListFamilyMembers(...args),
+    addProfileToSubscription: (...args: unknown[]) =>
+      mockAddProfileToSubscription(...args),
+    removeProfileFromSubscription: (...args: unknown[]) =>
+      mockRemoveProfileFromSubscription(...args),
+    getFamilyPoolStatus: (...args: unknown[]) =>
+      mockGetFamilyPoolStatus(...args),
+    getUsageBreakdownForProfile: (...args: unknown[]) =>
+      mockGetUsageBreakdownForProfile(...args),
+    getUsageEventsAvailableSince: (...args: unknown[]) =>
+      mockGetUsageEventsAvailableSince(...args),
+    buildUsageDateLabels: (input: unknown) => mockBuildUsageDateLabels(input),
+  };
+});
 
 // ---------------------------------------------------------------------------
 // Mock KV service
@@ -116,10 +126,17 @@ jest.mock('../services/billing', () => ({
 
 const mockReadSubscriptionStatus = jest.fn();
 
-jest.mock('../services/kv', () => ({
-  readSubscriptionStatus: (...args: unknown[]) =>
-    mockReadSubscriptionStatus(...args),
-}));
+jest.mock('../services/kv', () => {
+  const actual = jest.requireActual('../services/kv') as Record<
+    string,
+    unknown
+  >;
+  return {
+    ...actual,
+    readSubscriptionStatus: (...args: unknown[]) =>
+      mockReadSubscriptionStatus(...args),
+  };
+});
 
 // ---------------------------------------------------------------------------
 // Mock Stripe SDK
@@ -131,7 +148,7 @@ const mockCustomersCreate = jest.fn();
 const mockPaymentIntentsCreate = jest.fn();
 const mockPortalCreate = jest.fn();
 
-jest.mock('../services/stripe', () => ({
+jest.mock('../services/stripe', () => ({ // gc1-allow: thin wrapper — stubs Stripe external boundary (no real HTTP)
   createStripeClient: jest.fn().mockReturnValue({
     checkout: {
       sessions: { create: (...args: unknown[]) => mockCheckoutCreate(...args) },
