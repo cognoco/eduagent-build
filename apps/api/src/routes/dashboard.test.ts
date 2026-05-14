@@ -72,14 +72,17 @@ const mockGetChildrenForParent = jest.fn().mockResolvedValue([]);
 const mockGetChildDetail = jest.fn().mockResolvedValue(null);
 const mockGetChildSubjectTopics = jest.fn().mockResolvedValue([]);
 
-jest.mock('../services/dashboard', () => ({
-  ...jest.requireActual('../services/dashboard'),
-  getChildrenForParent: (...args: unknown[]) =>
-    mockGetChildrenForParent(...args),
-  getChildDetail: (...args: unknown[]) => mockGetChildDetail(...args),
-  getChildSubjectTopics: (...args: unknown[]) =>
-    mockGetChildSubjectTopics(...args),
-}));
+jest.mock(
+  '../services/dashboard' /* gc1-allow: pattern-a conversion */,
+  () => ({
+    ...jest.requireActual('../services/dashboard'),
+    getChildrenForParent: (...args: unknown[]) =>
+      mockGetChildrenForParent(...args),
+    getChildDetail: (...args: unknown[]) => mockGetChildDetail(...args),
+    getChildSubjectTopics: (...args: unknown[]) =>
+      mockGetChildSubjectTopics(...args),
+  }),
+);
 
 const mockGetProgressSummary = jest.fn().mockResolvedValue({
   summary: null,
@@ -104,15 +107,18 @@ const mockMarkWeeklyReportViewed = jest.fn().mockResolvedValue(undefined);
 // NOTE: This is a route-unit test — shallow-mocking the weekly-report service
 // is intentional here. Integration coverage for the service layer lives in the
 // Inngest integration test (weekly-progress-push.integration.test.ts).
-jest.mock('../services/weekly-report', () => ({
-  ...jest.requireActual('../services/weekly-report'),
-  listWeeklyReportsForParentChild: (...args: unknown[]) =>
-    mockListWeeklyReports(...args),
-  getWeeklyReportForParentChild: (...args: unknown[]) =>
-    mockGetWeeklyReport(...args),
-  markWeeklyReportViewed: (...args: unknown[]) =>
-    mockMarkWeeklyReportViewed(...args),
-}));
+jest.mock(
+  '../services/weekly-report' /* gc1-allow: pattern-a conversion */,
+  () => ({
+    ...jest.requireActual('../services/weekly-report'),
+    listWeeklyReportsForParentChild: (...args: unknown[]) =>
+      mockListWeeklyReports(...args),
+    getWeeklyReportForParentChild: (...args: unknown[]) =>
+      mockGetWeeklyReport(...args),
+    markWeeklyReportViewed: (...args: unknown[]) =>
+      mockMarkWeeklyReportViewed(...args),
+  }),
+);
 
 import { app } from '../index';
 import { ForbiddenError } from '../errors';

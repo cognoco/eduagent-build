@@ -1,7 +1,7 @@
 const mockRouteAndCall = jest.fn();
 const mockCaptureException = jest.fn();
 
-jest.mock('./llm', () => { // gc1-allow: LLM external boundary (routeAndCall), requireActual spread applied
+jest.mock('./llm' /* gc1-allow: pattern-a conversion */, () => {
   const actual = jest.requireActual('./llm') as Record<string, unknown>;
   return {
     ...actual,
