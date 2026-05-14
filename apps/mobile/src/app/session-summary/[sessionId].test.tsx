@@ -45,8 +45,8 @@ jest.mock('@expo/vector-icons', () => ({
   Ionicons: () => null,
 }));
 
-jest.mock('../../lib/theme', () => ({
-  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
+// prettier-ignore
+jest.mock('../../lib/theme', /* gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM */ () => ({
   useThemeColors: () => ({
     muted: '#a3a3a3',
     textInverse: '#0f0f0f',
@@ -265,6 +265,12 @@ function createWrapper() {
         // learnerRecap in every session-summary response so the polling stops
         // immediately on the first response.
         refetchOnWindowFocus: false,
+      },
+      mutations: {
+        retry: false,
+        // TanStack mutation observers schedule a default 5-minute GC timer
+        // after unmount; keep the suite from needing --forceExit.
+        gcTime: 0,
       },
     },
   });
