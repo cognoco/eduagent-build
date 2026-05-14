@@ -16,9 +16,9 @@ export const databaseMiddleware = createMiddleware<DatabaseEnv>(
     if (url) {
       // Phase 0.0 (RLS plan 2026-04-27): neon-serverless WS driver — real ACID
       // transactions; onTransactionFallback is no longer needed.
-      const db = createDatabase(url);
+      const db = createDatabase(url, { cacheNeonPool: false });
       c.set('db', db);
     }
     await next();
-  }
+  },
 );

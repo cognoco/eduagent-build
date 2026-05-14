@@ -36,7 +36,7 @@ test('J-21 parent manages child consent from child detail', async ({
   await expect(page.getByTestId('grace-period-banner')).toBeVisible({
     timeout: 30_000,
   });
-  await expect(page.getByText(/deletion pending/i)).toBeVisible();
+  await expect(page.getByText(/deletion scheduled/i)).toBeVisible();
 
   await pressableClick(page.getByTestId('cancel-deletion-button'));
   await expect(page.getByTestId('withdraw-consent-button')).toBeVisible({
