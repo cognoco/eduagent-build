@@ -206,18 +206,18 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 
 | ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
-| ACCOUNT-01 | Create first profile | ⬜ | — | | | |
-| SUBJECT-08 | Language learning setup | ⬜ | — | | | |
-| ACCOUNT-19 | Consent request during underage profile creation | ⬜ | — | | | |
-| ACCOUNT-20 | Child handoff to parent consent request | ⬜ | — | | | |
-| ACCOUNT-21 | Parent email entry, send / resend / change email | ⬜ | — | | | |
-| ACCOUNT-22 | Consent pending gate | ⬜ | — | | | |
-| ACCOUNT-23 | Consent withdrawn gate | ⬜ | — | | | |
-| ACCOUNT-24 | Post-approval landing | ⬜ | — | | | |
-| ACCOUNT-26 | Regional consent variants (COPPA / GDPR / above threshold) | ⬜ | — | | | |
-| ACCOUNT-27 | Parent consent deny confirmation | ⬜ | — | | | |
-| SUBJECT-16 | Conversation-language picker (mandatory, profile-wide) | ⬜ | — | | | |
-| SUBJECT-17 | Pronouns picker (preset + free-text Other) | ⬜ | — | | | |
+| ACCOUNT-01 | Create first profile | ⚠️ | Blocked | | | 2026-05-14: `flow-review` dev-client startup against local Metro 8083 fails before app UI loads (`SocketTimeoutException`, then dev-launcher ANR). Not marked product failure. |
+| SUBJECT-08 | Language learning setup | ⚠️ | Blocked | | | 2026-05-14: blocked by same `flow-review` dev-client startup failure before app UI loads; language setup could not be reached from end-user path. |
+| ACCOUNT-19 | Consent request during underage profile creation | ⚠️ | Blocked | | | 2026-05-14: blocked by same pre-profile startup/harness failure before profile creation form could be exercised on `flow-review`. |
+| ACCOUNT-20 | Child handoff to parent consent request | ⚠️ | Blocked | | | 2026-05-14: blocked by same pre-profile startup/harness failure before underage consent handoff could be reached on `flow-review`. |
+| ACCOUNT-21 | Parent email entry, send / resend / change email | ✅ | Pass | | | 2026-05-14: seeded pending-consent user showed parent email, resend, change-email, and check-again controls; change-email submit returned to pending gate. |
+| ACCOUNT-22 | Consent pending gate | ✅ | Pass | | | 2026-05-14: seeded `consent-pending` user signs in to `consent-pending-gate`; check-again, resend, change-email, preview controls, and sign-out are present. Current heading is `Hang tight!`. |
+| ACCOUNT-23 | Consent withdrawn gate | ✅ | Pass | | | 2026-05-14: seeded `consent-withdrawn-solo` user signs in to `consent-withdrawn-gate`; `Your account is being closed` copy and `withdrawn-sign-out` are visible. |
+| ACCOUNT-24 | Post-approval landing | ⚠️ | Blocked | | | 2026-05-14: blocked by `flow-review` dev-client startup failure before a post-approval seeded path could be exercised. |
+| ACCOUNT-26 | Regional consent variants (COPPA / GDPR / above threshold) | ⚠️ | Blocked | | | 2026-05-14: stock COPPA/GDPR/above-threshold Maestro flows are currently fragile on this emulator due Back-key sign-in steps; literal-credential rerun was then blocked by `flow-review` dev-client startup failure. |
+| ACCOUNT-27 | Parent consent deny confirmation | ⚠️ | Blocked | | | 2026-05-14: mobile inventory row points at a server-rendered consent-web confirmation, not an in-app mobile screen; no end-user mobile path exercised in this pass. |
+| SUBJECT-16 | Conversation-language picker (mandatory, profile-wide) | ⚠️ | Blocked | | | 2026-05-14: inventory points at `e2e/flows/onboarding/onboarding-fast-path-language.yaml`; reachable route could not be exercised because `flow-review` dev-client startup failed. |
+| SUBJECT-17 | Pronouns picker (preset + free-text Other) | ⚠️ | Blocked | | | 2026-05-14: inventory notes partial fast-path coverage but no dedicated current pronouns YAML; reachable route could not be exercised because `flow-review` dev-client startup failed. |
 
 ---
 
@@ -567,7 +567,7 @@ Update this once a batch is complete to track overall progress.
 | Batch | Section | Items | Status | Notes |
 | --- | --- | --- | --- | --- |
 | 1  | Pre-auth & Auth          | 14 | ❌ | Device (S10e, 2026-05-14): 5 pass, 1 fail, 8 blocked. Main blockers: Clerk dev email quota for email-code flows, MFA/deep-link/slow-network harness gaps, production APK needed for splash. Web smoke: 3 pass, 2 pass-w-issues, 2 blocked. |
-| 2  | First Profile + Consent  | 11 | ⬜ | |
+| 2  | First Profile + Consent  | 12 | ⚠️ | 3 pass, 9 blocked on 2026-05-14 Galaxy S10e emulator/dev-client. Main blocker: `flow-review` local dev-client bundle/startup fails before app UI (`SocketTimeoutException`, dev-launcher ANR); existing pre-profile consent flows also need Back-key sign-in cleanup for this emulator. |
 | 3  | Subject Onboarding       | 12 | ⬜ | |
 | 4  | Learner Home + Resume    |  6 | ⚠️ | 1⚠️ 5⬜ — 2026-05-14 smoke-learner passed locators; screenshot crawl needs splash-wait hardening before visual sign-off. |
 | 5  | Core Learning Sessions   | 12 | ⬜ | |
