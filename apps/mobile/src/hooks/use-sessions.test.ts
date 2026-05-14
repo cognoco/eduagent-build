@@ -856,6 +856,55 @@ describe('useStreamMessage', () => {
     );
   });
 
+  it('waits for async done handling before resolving the stream', async () => {
+    const { streamSSEViaXHR } = require('../lib/sse') as {
+      streamSSEViaXHR: jest.Mock;
+    };
+    let releaseDone!: () => void;
+    const doneGate = new Promise<void>((resolve) => {
+      releaseDone = resolve;
+    });
+
+    streamSSEViaXHR.mockReturnValueOnce({
+      events: (async function* () {
+        yield { type: 'chunk', content: 'Hello' };
+        yield { type: 'done', exchangeCount: 1, escalationRung: 1 };
+      })(),
+      abort: jest.fn(),
+    });
+
+    const { result } = renderHook(() => useStreamMessage('session-1'), {
+      wrapper: createWrapper(),
+    });
+
+    const onDone = jest.fn(async () => {
+      await doneGate;
+    });
+    let settled = false;
+
+    let streamPromise!: Promise<void>;
+    await act(async () => {
+      streamPromise = result.current
+        .stream('Hello', jest.fn(), onDone, 'session-1')
+        .then(() => {
+          settled = true;
+        });
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(onDone).toHaveBeenCalled();
+    });
+    expect(settled).toBe(false);
+
+    releaseDone();
+    await act(async () => {
+      await streamPromise;
+    });
+
+    expect(settled).toBe(true);
+  });
+
   // [BREAK / BUG-629 / I-1] If useStreamMessage stops injecting X-Proxy-Mode
   // on the SSE call, parent-proxy sessions silently bypass server proxy
   // enforcement. Asserts the header is present when getProxyMode returns true.

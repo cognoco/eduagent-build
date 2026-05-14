@@ -399,6 +399,119 @@ describe('useSessionStreaming', () => {
       expect(opts.setIsStreaming).toHaveBeenCalledWith(false);
     });
 
+    it('keeps the session input locked until the low-level stream settles', async () => {
+      let releaseStream!: () => void;
+      let markDoneHandlerComplete!: () => void;
+      const streamGate = new Promise<void>((resolve) => {
+        releaseStream = resolve;
+      });
+      const doneHandlerComplete = new Promise<void>((resolve) => {
+        markDoneHandlerComplete = resolve;
+      });
+      const opts = makeOpts({
+        streamMessage: jest.fn(
+          async (
+            _text: string,
+            onChunk: (accumulated: string) => void,
+            onComplete: (result: Record<string, unknown>) => Promise<void>,
+            _sessionId: string,
+          ) => {
+            onChunk('Helpful answer');
+            await onComplete({
+              aiEventId: 'ai-event-1',
+              exchangeCount: 1,
+              escalationRung: 0,
+              expectedResponseMinutes: 5,
+            });
+            markDoneHandlerComplete();
+            await streamGate;
+          },
+        ),
+      });
+      const { result } = renderHook(() => useSessionStreaming(opts as any));
+
+      let sendPromise!: Promise<void>;
+      await act(async () => {
+        sendPromise = result.current.continueWithMessage('What is algebra?');
+        await doneHandlerComplete;
+      });
+
+      expect(opts.setExchangeCount).toHaveBeenCalledWith(1);
+      expect(opts.setIsStreaming).toHaveBeenCalledWith(true);
+      expect(opts.setIsStreaming).not.toHaveBeenCalledWith(false);
+
+      await act(async () => {
+        releaseStream();
+        await sendPromise;
+      });
+
+      expect(opts.setIsStreaming).toHaveBeenCalledWith(false);
+    });
+
+    it('queues overlapping sends until the active turn fully settles', async () => {
+      let releaseFirstStream!: () => void;
+      let markFirstDoneHandlerComplete!: () => void;
+      const firstStreamGate = new Promise<void>((resolve) => {
+        releaseFirstStream = resolve;
+      });
+      const firstDoneHandlerComplete = new Promise<void>((resolve) => {
+        markFirstDoneHandlerComplete = resolve;
+      });
+      const opts = makeOpts({
+        streamMessage: jest.fn(
+          async (
+            _text: string,
+            onChunk: (accumulated: string) => void,
+            onComplete: (result: Record<string, unknown>) => Promise<void>,
+            _sessionId: string,
+          ) => {
+            onChunk('Helpful answer');
+            await onComplete({
+              aiEventId: 'ai-event-1',
+              exchangeCount: 1,
+              escalationRung: 0,
+              expectedResponseMinutes: 5,
+            });
+
+            if ((opts.streamMessage as jest.Mock).mock.calls.length === 1) {
+              markFirstDoneHandlerComplete();
+              await firstStreamGate;
+            }
+          },
+        ),
+      });
+      const { result } = renderHook(() => useSessionStreaming(opts as any));
+
+      let firstSend!: Promise<void>;
+      await act(async () => {
+        firstSend = result.current.continueWithMessage('First turn');
+        await firstDoneHandlerComplete;
+      });
+
+      const secondSend = result.current.continueWithMessage('Second turn');
+      await Promise.resolve();
+      expect(opts.streamMessage).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        releaseFirstStream();
+        await firstSend;
+        await secondSend;
+      });
+
+      expect(opts.streamMessage).toHaveBeenCalledTimes(2);
+      expect(opts.streamMessage).toHaveBeenNthCalledWith(
+        2,
+        'Second turn',
+        expect.any(Function),
+        expect.any(Function),
+        'new-session-1',
+        expect.objectContaining({
+          idempotencyKey: expect.any(String),
+          onReplay: expect.any(Function),
+        }),
+      );
+    });
+
     it('stores retry payload before ensureSession for crash recovery', async () => {
       const lastRetryPayloadRef = { current: null as any };
       const opts = makeOpts({ lastRetryPayloadRef });

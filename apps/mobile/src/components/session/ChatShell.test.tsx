@@ -1180,7 +1180,8 @@ describe('ChatShell', () => {
   // wrong session. ChatShell now reads useIsFocused — when the screen is
   // not focused, handleSend short-circuits, the input is non-editable, the
   // Send Pressable is disabled, and the wrapping View is removed from the
-  // accessibility tree on web (pointerEvents='none', aria-hidden, tabIndex=-1).
+  // browser layout/accessibility tree on web (display='none',
+  // pointerEvents='none', aria-hidden, tabIndex=-1).
   describe('stale-instance Send guard (BUG-886)', () => {
     afterEach(() => {
       // Restore for the rest of the suite.
@@ -1214,7 +1215,7 @@ describe('ChatShell', () => {
       expect(send.props.accessibilityState).toMatchObject({ disabled: true });
     });
 
-    it('marks the input row aria-hidden + pointerEvents=none on web when unfocused', () => {
+    it('removes the input row from web layout when unfocused', () => {
       const RN = require('react-native');
       const originalPlatform = RN.Platform.OS;
       Object.defineProperty(RN.Platform, 'OS', { get: () => 'web' });
@@ -1230,6 +1231,11 @@ describe('ChatShell', () => {
         });
         expect(row).not.toBeNull();
         expect(row?.props.pointerEvents).toBe('none');
+        expect(row?.props.style).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ display: 'none' }),
+          ]),
+        );
         // RN normalizes `aria-hidden` to `accessibilityElementsHidden` on
         // some host components (especially under jest where the RN Web
         // shim isn't applied). Accept either prop key — the implementation
@@ -1261,6 +1267,11 @@ describe('ChatShell', () => {
 
         const row = screen.getByTestId('chat-input-row');
         expect(row?.props.pointerEvents).toBe('auto');
+        expect(row?.props.style).toEqual(
+          expect.not.arrayContaining([
+            expect.objectContaining({ display: 'none' }),
+          ]),
+        );
         expect(row?.props['aria-hidden']).toBeUndefined();
         expect(row?.props.tabIndex).toBeUndefined();
       } finally {
@@ -1302,22 +1313,39 @@ describe('ChatShell', () => {
       // input.trim() && !isStreaming — so the dormant instance on RN Web still
       // rendered as a filled primary button, which looks interactive. This
       // break test asserts the class condition also gates on isFocused.
-      mockIsFocused = false;
-      const onSend = jest.fn();
-      renderChatShell({ onSend });
+      const RN = require('react-native');
+      const originalPlatform = RN.Platform.OS;
+      Object.defineProperty(RN.Platform, 'OS', { get: () => 'web' });
 
-      // Inject text via fireEvent so the trimmed value is non-empty —
-      // that eliminates input.trim() as the reason for bg-surface-elevated
-      // and isolates the isFocused guard.
-      await act(async () => {
-        fireEvent.changeText(screen.getByTestId('chat-input'), 'hello');
-      });
+      try {
+        mockIsFocused = false;
+        const onSend = jest.fn();
+        renderChatShell({ onSend });
 
-      const send = screen.getByTestId('send-button');
-      // className is a NativeWind prop available as props.className in RNTL.
-      const className: string = send.props.className ?? '';
-      expect(className).not.toContain('bg-primary');
-      expect(className).toContain('bg-surface-elevated');
+        // Inject text via fireEvent so the trimmed value is non-empty —
+        // that eliminates input.trim() as the reason for bg-surface-elevated
+        // and isolates the dormant-web guard.
+        await act(async () => {
+          fireEvent.changeText(
+            screen.getByTestId('chat-input', {
+              includeHiddenElements: true,
+            }),
+            'hello',
+          );
+        });
+
+        const send = screen.getByTestId('send-button', {
+          includeHiddenElements: true,
+        });
+        // className is a NativeWind prop available as props.className in RNTL.
+        const className: string = send.props.className ?? '';
+        expect(className).not.toContain('bg-primary');
+        expect(className).toContain('bg-surface-elevated');
+      } finally {
+        Object.defineProperty(RN.Platform, 'OS', {
+          get: () => originalPlatform,
+        });
+      }
     });
 
     it('still calls onSend when focused [break test for over-strict guard]', async () => {

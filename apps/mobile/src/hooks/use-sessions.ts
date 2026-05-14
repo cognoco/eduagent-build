@@ -342,7 +342,7 @@ export function useStreamMessage(sessionId: string): {
         reason: StreamFallbackReason;
         fallbackText: string;
       };
-    }) => void,
+    }) => void | Promise<void>,
     overrideSessionId?: string,
     options?: {
       homeworkMode?: 'help_me' | 'check_answer';
@@ -385,7 +385,7 @@ export function useStreamMessage(sessionId: string): {
           reason: StreamFallbackReason;
           fallbackText: string;
         };
-      }) => void,
+      }) => void | Promise<void>,
       overrideSessionId?: string,
       options?: {
         homeworkMode?: 'help_me' | 'check_answer';
@@ -467,7 +467,7 @@ export function useStreamMessage(sessionId: string): {
               fallbackText: event.fallbackText,
             };
           } else if (event.type === 'done') {
-            onDone({
+            await onDone({
               exchangeCount: event.exchangeCount,
               escalationRung: event.escalationRung ?? 0,
               expectedResponseMinutes: event.expectedResponseMinutes,

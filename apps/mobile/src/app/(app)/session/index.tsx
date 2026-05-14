@@ -733,10 +733,11 @@ function SessionScreenInner() {
     () => messages.filter((m) => m.role === 'user' && !m.isAutoSent).length,
     [messages],
   );
+  const learnerTurnCount = Math.max(userMessageCount, exchangeCount);
 
   const hasSubject = !!(classifiedSubject?.subjectId || subjectId);
   const conversationStage = getConversationStage(
-    userMessageCount,
+    learnerTurnCount,
     hasSubject,
     effectiveMode,
   );
@@ -1049,7 +1050,7 @@ function SessionScreenInner() {
         isStreaming,
         latestAiMessageId,
         consumedQuickChipMessageId,
-        userMessageCount,
+        userMessageCount: learnerTurnCount,
         showWrongSubjectChip,
         messageFeedback,
         bookmarkState,
