@@ -85,19 +85,29 @@ jest.mock('../services/trial' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock('../inngest/client', () => ({
-  // gc1-allow: Inngest SDK external boundary
-  inngest: {
-    send: jest.fn().mockResolvedValue(undefined),
-  },
-}));
+jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../inngest/client',
+  ) as typeof import('../inngest/client');
+  return {
+    ...actual,
+    inngest: {
+      send: jest.fn().mockResolvedValue(undefined),
+    },
+  };
+});
 
 const mockCaptureException = jest.fn();
 
-jest.mock('../services/sentry', () => ({
-  // gc1-allow: @sentry/cloudflare external boundary
-  captureException: (...args: unknown[]) => mockCaptureException(...args),
-}));
+jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/sentry',
+  ) as typeof import('../services/sentry');
+  return {
+    ...actual,
+    captureException: (...args: unknown[]) => mockCaptureException(...args),
+  };
+});
 
 import { Hono } from 'hono';
 import { revenuecatWebhookRoute } from './revenuecat-webhook';
