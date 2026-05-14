@@ -6,11 +6,17 @@ jest.mock('inngest/hono', () => ({
   serve: jest.fn().mockReturnValue(jest.fn()),
 }));
 
-jest.mock('../inngest/client', () => ({
-  inngest: {
-    send: jest.fn().mockResolvedValue(undefined),
-  },
-}));
+jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../inngest/client',
+  ) as typeof import('../inngest/client');
+  return {
+    ...actual,
+    inngest: {
+      send: jest.fn().mockResolvedValue(undefined),
+    },
+  };
+});
 
 import { Hono } from 'hono';
 import { feedbackRoutes } from './feedback';
