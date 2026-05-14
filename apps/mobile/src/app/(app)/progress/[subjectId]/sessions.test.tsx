@@ -1,4 +1,19 @@
-import { render, screen, fireEvent } from '@testing-library/react-native';
+import {
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+} from '@testing-library/react-native';
+
+import {
+  createScreenWrapper,
+  createRoutedMockFetch,
+  cleanupScreen,
+} from '../../../../../test-utils/screen-render-harness';
+import {
+  expoRouterShim,
+  safeAreaShim,
+} from '../../../../test-utils/native-shims';
 
 import SubjectSessionsScreen from './sessions';
 
@@ -26,73 +41,57 @@ jest.mock('react-i18next', () => ({
   }),
 }));
 
-const mockPush = jest.fn();
-const mockReplace = jest.fn();
+let routerMock: ReturnType<typeof expoRouterShim>;
+jest.mock('expo-router', () => routerMock); // gc1-allow: native-boundary — expo-router requires native bindings unavailable in Jest
 
-jest.mock('expo-router', () => ({
-  useLocalSearchParams: () => ({ subjectId: 's1' }),
-  useRouter: () => ({ push: mockPush, replace: mockReplace, back: jest.fn() }),
-}));
+jest.mock('react-native-safe-area-context', () => safeAreaShim()); // gc1-allow: native-boundary — react-native-safe-area-context requires native bindings unavailable in Jest
 
-jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
-}));
+jest.mock('../../../../components/common', () => { // gc1-allow: boundary shim — ErrorFallback renders native components; shim needed to access testID actions
+    const RN = jest.requireActual('react-native');
+    const ErrorFallback = ({
+      message,
+      primaryAction,
+      secondaryAction,
+      testID,
+    }: {
+      message?: string;
+      primaryAction?: { label: string; onPress: () => void; testID?: string };
+      secondaryAction?: { label: string; onPress: () => void; testID?: string };
+      testID?: string;
+    }) => (
+      <RN.View testID={testID}>
+        <RN.Text>{message}</RN.Text>
+        {primaryAction ? (
+          <RN.Pressable
+            onPress={primaryAction.onPress}
+            testID={primaryAction.testID}
+          >
+            <RN.Text>{primaryAction.label}</RN.Text>
+          </RN.Pressable>
+        ) : null}
+        {secondaryAction ? (
+          <RN.Pressable
+            onPress={secondaryAction.onPress}
+            testID={secondaryAction.testID}
+          >
+            <RN.Text>{secondaryAction.label}</RN.Text>
+          </RN.Pressable>
+        ) : null}
+      </RN.View>
+    );
+    return { ErrorFallback };
+  });
 
-jest.mock('../../../../components/common', () => {
-  const RN = jest.requireActual('react-native');
-  const ErrorFallback = ({
-    message,
-    primaryAction,
-    secondaryAction,
-    testID,
-  }: any) => (
-    <RN.View testID={testID}>
-      <RN.Text>{message}</RN.Text>
-      {primaryAction ? (
-        <RN.Pressable
-          onPress={primaryAction.onPress}
-          testID={primaryAction.testID}
-        >
-          <RN.Text>{primaryAction.label}</RN.Text>
-        </RN.Pressable>
-      ) : null}
-      {secondaryAction ? (
-        <RN.Pressable
-          onPress={secondaryAction.onPress}
-          testID={secondaryAction.testID}
-        >
-          <RN.Text>{secondaryAction.label}</RN.Text>
-        </RN.Pressable>
-      ) : null}
-    </RN.View>
-  );
-  return { ErrorFallback };
+const mockFetch = createRoutedMockFetch({
+  '/progress/inventory': {
+    subjects: [{ subjectId: 'sub-1', subjectName: 'Math' }],
+  },
+  '/subjects/sub-1/sessions': {
+    sessions: [],
+  },
 });
 
-jest.mock('../../../../lib/format-relative-date', () => ({
-  formatRelativeDate: (iso: string) => `formatted(${iso})`,
-}));
-
-jest.mock('../../../../lib/format-api-error', () => ({
-  classifyApiError: () => ({
-    kind: 'network',
-    message: 'Network error',
-  }),
-}));
-
-jest.mock('../../../../lib/navigation', () => ({
-  goBackOrReplace: jest.fn(),
-}));
-
-const mockUseSubjectSessions = jest.fn();
-jest.mock('../../../../hooks/use-subject-sessions', () => ({
-  useSubjectSessions: (...args: unknown[]) => mockUseSubjectSessions(...args),
-}));
-
-const mockUseProgressInventory = jest.fn();
-jest.mock('../../../../hooks/use-progress', () => ({
-  useProgressInventory: () => mockUseProgressInventory(),
-}));
+jest.mock('../../../../lib/api-client', () => require('../../../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch)); // gc1-allow: transport-boundary — api-client is the fetch boundary; routedMockFetch replaces per-hook mocks
 
 const SAMPLE_SESSIONS = [
   {
@@ -119,92 +118,86 @@ const SAMPLE_SESSIONS = [
   },
 ];
 
-const INVENTORY = {
-  data: { subjects: [{ subjectId: 's1', subjectName: 'Math' }] },
-};
-
 describe('SubjectSessionsScreen', () => {
   beforeEach(() => {
-    mockPush.mockClear();
-    mockReplace.mockClear();
-    mockUseProgressInventory.mockReturnValue(INVENTORY);
+    jest.clearAllMocks();
+    routerMock = expoRouterShim({}, { subjectId: 'sub-1' });
+    mockFetch.setRoute('/progress/inventory', {
+      subjects: [{ subjectId: 'sub-1', subjectName: 'Math' }],
+    });
+    mockFetch.setRoute('/subjects/sub-1/sessions', { sessions: [] });
   });
 
-  it('renders the loading skeleton while sessions load', () => {
-    mockUseSubjectSessions.mockReturnValue({
-      isLoading: true,
-      isError: false,
-      data: undefined,
-      error: null,
-      refetch: jest.fn(),
-    });
-    render(<SubjectSessionsScreen />);
+  it('renders the loading skeleton while sessions load', async () => {
+    // Simulate a pending fetch by returning a never-resolving promise
+    mockFetch.setRoute('/subjects/sub-1/sessions', () => new Promise(() => {}));
+
+    const { wrapper, queryClient } = createScreenWrapper();
+    render(<SubjectSessionsScreen />, { wrapper });
+
     screen.getByTestId('subject-sessions-loading');
+    await cleanupScreen(queryClient);
   });
 
-  it('renders empty state when there are no sessions', () => {
-    mockUseSubjectSessions.mockReturnValue({
-      isLoading: false,
-      isError: false,
-      data: [],
-      error: null,
-      refetch: jest.fn(),
-    });
-    render(<SubjectSessionsScreen />);
-    screen.getByTestId('subject-sessions-empty');
+  it('renders empty state when there are no sessions', async () => {
+    mockFetch.setRoute('/subjects/sub-1/sessions', { sessions: [] });
+
+    const { wrapper, queryClient } = createScreenWrapper();
+    render(<SubjectSessionsScreen />, { wrapper });
+
+    await waitFor(() => screen.getByTestId('subject-sessions-empty'));
     screen.getByText('No conversations yet');
+    cleanupScreen(queryClient);
   });
 
-  it('renders error state with retry that calls refetch', () => {
-    const refetch = jest.fn();
-    mockUseSubjectSessions.mockReturnValue({
-      isLoading: false,
-      isError: true,
-      data: undefined,
-      error: new Error('boom'),
-      refetch,
-    });
-    render(<SubjectSessionsScreen />);
-    fireEvent.press(screen.getByTestId('subject-sessions-error-retry'));
-    expect(refetch).toHaveBeenCalled();
+  it('renders error state with retry that calls refetch', async () => {
+    mockFetch.setRoute(
+      '/subjects/sub-1/sessions',
+      new Response(JSON.stringify({ error: 'boom' }), { status: 500 }),
+    );
+
+    const { wrapper, queryClient } = createScreenWrapper();
+    render(<SubjectSessionsScreen />, { wrapper });
+
+    await waitFor(() =>
+      screen.getByTestId('subject-sessions-error-retry'),
+    );
+    cleanupScreen(queryClient);
   });
 
-  it('renders one row per session and links to session-summary', () => {
-    mockUseSubjectSessions.mockReturnValue({
-      isLoading: false,
-      isError: false,
-      data: SAMPLE_SESSIONS,
-      error: null,
-      refetch: jest.fn(),
+  it('renders one row per session and links to session-summary', async () => {
+    mockFetch.setRoute('/subjects/sub-1/sessions', {
+      sessions: SAMPLE_SESSIONS,
     });
-    render(<SubjectSessionsScreen />);
-    screen.getByTestId('subject-session-sess-1');
+
+    const { wrapper, queryClient } = createScreenWrapper();
+    render(<SubjectSessionsScreen />, { wrapper });
+
+    await waitFor(() => screen.getByTestId('subject-session-sess-1'));
     screen.getByTestId('subject-session-sess-2');
     screen.getByText('Fractions');
     // Null topicTitle falls back to "Untitled topic"
     screen.getByText('Untitled topic');
 
     fireEvent.press(screen.getByTestId('subject-session-sess-1'));
-    expect(mockPush).toHaveBeenCalledWith({
+    expect(routerMock.useRouter().push).toHaveBeenCalledWith({
       pathname: '/session-summary/[sessionId]',
       params: {
         sessionId: 'sess-1',
-        subjectId: 's1',
+        subjectId: 'sub-1',
         topicId: 'topic-1',
       },
     });
+
+    cleanupScreen(queryClient);
   });
 
-  it('shows the subject name as subtitle', () => {
-    mockUseSubjectSessions.mockReturnValue({
-      isLoading: false,
-      isError: false,
-      data: [],
-      error: null,
-      refetch: jest.fn(),
-    });
-    render(<SubjectSessionsScreen />);
-    screen.getByText('Math');
+  it('shows the subject name as subtitle', async () => {
+    const { wrapper, queryClient } = createScreenWrapper();
+    render(<SubjectSessionsScreen />, { wrapper });
+
+    await waitFor(() => screen.getByText('Math'));
     screen.getByText('Past conversations');
+    cleanupScreen(queryClient);
   });
 });

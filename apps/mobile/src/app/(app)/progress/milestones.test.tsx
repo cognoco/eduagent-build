@@ -1,8 +1,53 @@
-import { render, screen } from '@testing-library/react-native';
-import { useProgressMilestones } from '../../../hooks/use-progress';
+import { render, screen, waitFor } from '@testing-library/react-native';
+import {
+  createRoutedMockFetch,
+  createScreenWrapper,
+  errorResponses,
+} from '../../../../test-utils/screen-render-harness';
 import MilestonesListScreen from './milestones';
 
-jest.mock('react-i18next', () => ({
+const mockFetch = createRoutedMockFetch({
+  '/progress/milestones': {
+    milestones: [
+      {
+        id: 'm1',
+        profileId: 'p1',
+        milestoneType: 'topic_mastered_count',
+        threshold: 5,
+        subjectId: null,
+        bookId: null,
+        metadata: null,
+        celebratedAt: null,
+        createdAt: '2026-04-10T12:00:00Z',
+      },
+      {
+        id: 'm2',
+        profileId: 'p1',
+        milestoneType: 'session_count',
+        threshold: 10,
+        subjectId: null,
+        bookId: null,
+        metadata: null,
+        celebratedAt: null,
+        createdAt: '2026-04-05T09:00:00Z',
+      },
+    ],
+  },
+});
+
+jest.mock('../../../lib/api-client', () =>
+  require('../../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch),
+);
+
+jest.mock('expo-router', () => // gc1-allow: native-boundary — Expo Router requires native bindings unavailable in Jest
+  require('../../../test-utils/native-shims').expoRouterShim(),
+);
+
+jest.mock('react-native-safe-area-context', () => // gc1-allow: native-boundary — safe-area context requires native bindings unavailable in Jest
+  require('../../../test-utils/native-shims').safeAreaShim(),
+);
+
+jest.mock('react-i18next', () => ({ // gc1-allow: external-boundary — i18next initialisation requires the full i18n provider chain unavailable in Jest
   initReactI18next: { type: '3rdParty', init: jest.fn() },
   useTranslation: () => ({
     t: (key: string, opts?: Record<string, unknown>) => {
@@ -27,75 +72,62 @@ jest.mock('react-i18next', () => ({
   }),
 }));
 
-jest.mock('../../../hooks/use-progress');
-jest.mock('expo-router', () => ({
-  useRouter: () => ({ back: jest.fn(), push: jest.fn(), replace: jest.fn() }),
-}));
-jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0 }),
-}));
-
-const mockMilestones = [
-  {
-    id: 'm1',
-    profileId: 'p1',
-    milestoneType: 'topic_mastered_count' as const,
-    threshold: 5,
-    subjectId: null,
-    bookId: null,
-    metadata: null,
-    celebratedAt: null,
-    createdAt: '2026-04-10T12:00:00Z',
-  },
-  {
-    id: 'm2',
-    profileId: 'p1',
-    milestoneType: 'session_count' as const,
-    threshold: 10,
-    subjectId: null,
-    bookId: null,
-    metadata: null,
-    celebratedAt: null,
-    createdAt: '2026-04-05T09:00:00Z',
-  },
-];
-
 describe('MilestonesListScreen', () => {
   beforeEach(() => {
-    (useProgressMilestones as jest.Mock).mockReturnValue({
-      data: mockMilestones,
-      isLoading: false,
-      isError: false,
-      refetch: jest.fn(),
+    jest.clearAllMocks();
+    mockFetch.setRoute('/progress/milestones', {
+      milestones: [
+        {
+          id: 'm1',
+          profileId: 'p1',
+          milestoneType: 'topic_mastered_count',
+          threshold: 5,
+          subjectId: null,
+          bookId: null,
+          metadata: null,
+          celebratedAt: null,
+          createdAt: '2026-04-10T12:00:00Z',
+        },
+        {
+          id: 'm2',
+          profileId: 'p1',
+          milestoneType: 'session_count',
+          threshold: 10,
+          subjectId: null,
+          bookId: null,
+          metadata: null,
+          celebratedAt: null,
+          createdAt: '2026-04-05T09:00:00Z',
+        },
+      ],
     });
   });
 
-  it('renders milestone cards', () => {
-    render(<MilestonesListScreen />);
-    screen.getByText('5 topics mastered');
-    screen.getByText('10 learning sessions completed');
-    screen.getByTestId('milestones-back');
+  it('renders milestone cards', async () => {
+    const { wrapper } = createScreenWrapper();
+    render(<MilestonesListScreen />, { wrapper });
+    await waitFor(() => {
+      screen.getByText('5 topics mastered');
+      screen.getByText('10 learning sessions completed');
+      screen.getByTestId('milestones-back');
+    });
   });
 
-  it('shows empty state when no milestones', () => {
-    (useProgressMilestones as jest.Mock).mockReturnValue({
-      data: [],
-      isLoading: false,
-      isError: false,
+  it('shows empty state when no milestones', async () => {
+    mockFetch.setRoute('/progress/milestones', { milestones: [] });
+    const { wrapper } = createScreenWrapper();
+    render(<MilestonesListScreen />, { wrapper });
+    await waitFor(() => {
+      screen.getByTestId('milestones-empty');
     });
-    render(<MilestonesListScreen />);
-    screen.getByTestId('milestones-empty');
   });
 
-  it('shows error state with retry button', () => {
-    (useProgressMilestones as jest.Mock).mockReturnValue({
-      data: undefined,
-      isLoading: false,
-      isError: true,
-      error: new Error('Network error'),
-      refetch: jest.fn(),
+  it('shows error state with retry button', async () => {
+    mockFetch.setRoute('/progress/milestones', errorResponses.serverError());
+    const { wrapper } = createScreenWrapper();
+    render(<MilestonesListScreen />, { wrapper });
+    await waitFor(() => {
+      screen.getByTestId('milestones-error');
     });
-    render(<MilestonesListScreen />);
-    screen.getByTestId('milestones-error');
   });
 });

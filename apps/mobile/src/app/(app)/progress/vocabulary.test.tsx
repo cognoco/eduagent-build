@@ -1,8 +1,11 @@
-import { render, screen } from '@testing-library/react-native';
-import { useProgressInventory } from '../../../hooks/use-progress';
+import { screen, waitFor } from '@testing-library/react-native';
+import {
+  createRoutedMockFetch,
+  renderScreen,
+} from '../../../../test-utils/screen-render-harness';
 import VocabularyBrowserScreen from './vocabulary';
 
-jest.mock('react-i18next', () => ({
+jest.mock('react-i18next', () => ({ // gc1-allow: external-boundary i18n framework
   initReactI18next: { type: '3rdParty', init: jest.fn() },
   useTranslation: () => ({
     t: (key: string, opts?: Record<string, unknown>) => {
@@ -46,13 +49,14 @@ jest.mock('react-i18next', () => ({
   }),
 }));
 
-jest.mock('../../../hooks/use-progress');
-jest.mock('expo-router', () => ({
-  useRouter: () => ({ back: jest.fn(), push: jest.fn(), replace: jest.fn() }),
-}));
-jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0 }),
-}));
+jest.mock('expo-router', () => require('../../../test-utils/native-shims').expoRouterShim()); // gc1-allow: native-boundary expo-router
+jest.mock('react-native-safe-area-context', () => require('../../../test-utils/native-shims').safeAreaShim()); // gc1-allow: native-boundary safe-area
+
+const mockFetch = createRoutedMockFetch();
+
+jest.mock('../../../lib/api-client', () => // gc1-allow: transport-boundary api client fetch layer
+  require('../../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch),
+);
 
 const mockInventory = {
   profileId: 'p1',
@@ -97,129 +101,107 @@ const mockInventory = {
 
 describe('VocabularyBrowserScreen', () => {
   beforeEach(() => {
-    (useProgressInventory as jest.Mock).mockReturnValue({
-      data: mockInventory,
-      isLoading: false,
-      isError: false,
-    });
+    jest.clearAllMocks();
+    mockFetch.setRoute('/progress/inventory', mockInventory);
   });
 
-  it('renders subject section and CEFR breakdown', () => {
-    render(<VocabularyBrowserScreen />);
-    screen.getByText('Spanish');
+  it('renders subject section and CEFR breakdown', async () => {
+    renderScreen(<VocabularyBrowserScreen />);
+    await waitFor(() => screen.getByText('Spanish'));
     screen.getByText('A1');
     screen.getByText('6 words');
     screen.getByTestId('vocab-browser-back');
   });
 
-  it('shows empty state when no vocabulary but has language subject', () => {
-    (useProgressInventory as jest.Mock).mockReturnValue({
-      data: {
-        ...mockInventory,
-        global: { ...mockInventory.global, vocabularyTotal: 0 },
-        subjects: [
-          {
-            ...mockInventory.subjects[0],
-            vocabulary: {
-              total: 0,
-              mastered: 0,
-              learning: 0,
-              new: 0,
-              byCefrLevel: {},
-            },
+  it('shows empty state when no vocabulary but has language subject', async () => {
+    mockFetch.setRoute('/progress/inventory', {
+      ...mockInventory,
+      global: { ...mockInventory.global, vocabularyTotal: 0 },
+      subjects: [
+        {
+          ...mockInventory.subjects[0],
+          vocabulary: {
+            total: 0,
+            mastered: 0,
+            learning: 0,
+            new: 0,
+            byCefrLevel: {},
           },
-        ],
-      },
-      isLoading: false,
-      isError: false,
-    });
-    render(<VocabularyBrowserScreen />);
-    screen.getByTestId('vocab-browser-empty');
-  });
-
-  it('shows no-language gate when no language subjects', () => {
-    (useProgressInventory as jest.Mock).mockReturnValue({
-      data: {
-        ...mockInventory,
-        global: { ...mockInventory.global, vocabularyTotal: 0 },
-        subjects: [],
-      },
-      isLoading: false,
-      isError: false,
-    });
-    render(<VocabularyBrowserScreen />);
-    screen.getByTestId('vocab-browser-no-language');
-  });
-
-  it('shows error state with retry and back buttons', () => {
-    (useProgressInventory as jest.Mock).mockReturnValue({
-      data: undefined,
-      isLoading: false,
-      isError: true,
-      error: new Error('Network error'),
-      refetch: jest.fn(),
-    });
-    render(<VocabularyBrowserScreen />);
-    screen.getByTestId('vocab-browser-error');
-  });
-
-  it('shows new learner empty state when no vocab and < 4 sessions', () => {
-    (useProgressInventory as jest.Mock).mockReturnValue({
-      data: {
-        ...mockInventory,
-        global: {
-          ...mockInventory.global,
-          vocabularyTotal: 0,
-          totalSessions: 2,
         },
-        subjects: [
-          {
-            ...mockInventory.subjects[0],
-            vocabulary: {
-              total: 0,
-              mastered: 0,
-              learning: 0,
-              new: 0,
-              byCefrLevel: {},
-            },
-          },
-        ],
-      },
-      isLoading: false,
-      isError: false,
+      ],
     });
-    render(<VocabularyBrowserScreen />);
-    screen.getByTestId('vocab-browser-new-learner');
+    renderScreen(<VocabularyBrowserScreen />);
+    await waitFor(() => screen.getByTestId('vocab-browser-empty'));
+  });
+
+  it('shows no-language gate when no language subjects', async () => {
+    mockFetch.setRoute('/progress/inventory', {
+      ...mockInventory,
+      global: { ...mockInventory.global, vocabularyTotal: 0 },
+      subjects: [],
+    });
+    renderScreen(<VocabularyBrowserScreen />);
+    await waitFor(() => screen.getByTestId('vocab-browser-no-language'));
+  });
+
+  it('shows error state with retry and back buttons', async () => {
+    mockFetch.setRoute(
+      '/progress/inventory',
+      new Response(JSON.stringify({ error: 'Network error' }), { status: 500 }),
+    );
+    renderScreen(<VocabularyBrowserScreen />);
+    await waitFor(() => screen.getByTestId('vocab-browser-error'));
+  });
+
+  it('shows new learner empty state when no vocab and < 4 sessions', async () => {
+    mockFetch.setRoute('/progress/inventory', {
+      ...mockInventory,
+      global: {
+        ...mockInventory.global,
+        vocabularyTotal: 0,
+        totalSessions: 2,
+      },
+      subjects: [
+        {
+          ...mockInventory.subjects[0],
+          vocabulary: {
+            total: 0,
+            mastered: 0,
+            learning: 0,
+            new: 0,
+            byCefrLevel: {},
+          },
+        },
+      ],
+    });
+    renderScreen(<VocabularyBrowserScreen />);
+    await waitFor(() => screen.getByTestId('vocab-browser-new-learner'));
     screen.getByText('Your vocabulary will grow here');
   });
 
-  it('shows standard empty state when no vocab and >= 4 sessions', () => {
-    (useProgressInventory as jest.Mock).mockReturnValue({
-      data: {
-        ...mockInventory,
-        global: {
-          ...mockInventory.global,
-          vocabularyTotal: 0,
-          totalSessions: 10,
-        },
-        subjects: [
-          {
-            ...mockInventory.subjects[0],
-            vocabulary: {
-              total: 0,
-              mastered: 0,
-              learning: 0,
-              new: 0,
-              byCefrLevel: {},
-            },
-          },
-        ],
+  it('shows standard empty state when no vocab and >= 4 sessions', async () => {
+    mockFetch.setRoute('/progress/inventory', {
+      ...mockInventory,
+      global: {
+        ...mockInventory.global,
+        vocabularyTotal: 0,
+        totalSessions: 10,
       },
-      isLoading: false,
-      isError: false,
+      subjects: [
+        {
+          ...mockInventory.subjects[0],
+          vocabulary: {
+            total: 0,
+            mastered: 0,
+            learning: 0,
+            new: 0,
+            byCefrLevel: {},
+          },
+        },
+      ],
     });
-    render(<VocabularyBrowserScreen />);
-    screen.getByTestId('vocab-browser-empty');
+    renderScreen(<VocabularyBrowserScreen />);
+    await waitFor(() => screen.getByTestId('vocab-browser-empty'));
     expect(screen.queryByTestId('vocab-browser-new-learner')).toBeNull();
   });
 });
