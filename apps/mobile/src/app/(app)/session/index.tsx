@@ -79,7 +79,6 @@ import {
 import { useSessionStreaming } from '../../../components/session/use-session-streaming';
 import { useSubjectClassification } from '../../../components/session/use-subject-classification';
 import { useSessionActions } from '../../../components/session/use-session-actions';
-import { SessionMessageActions } from '../../../components/session/SessionMessageActions';
 import { BookmarkNudgeTooltip } from '../../../components/session/BookmarkNudgeTooltip';
 import {
   SessionToolAccessory,
@@ -95,12 +94,12 @@ import { getResumeBannerCopy } from '../../../components/session/resume-banner-c
 import { OutboxFailedBanner } from '../../../components/durability/OutboxFailedBanner';
 import { useTranslation } from 'react-i18next';
 import { SessionErrorBoundary } from './_components/SessionErrorBoundary';
-import { getConfidenceCopy } from './_lib/confidence-copy';
 import { ConfirmationToast } from './_components/ConfirmationToast';
 import { useLearningModeControl } from './_components/LearningModeControl';
 import { useImageBase64 } from './_hooks/use-image-base64';
 import { useBookmarkHandler } from './_hooks/use-bookmark-handler';
 import { useSessionRecovery } from './_hooks/use-session-recovery';
+import { renderSessionMessageActions } from './_components/MessageActionsRenderer';
 
 export default function SessionScreen() {
   return (
@@ -1037,94 +1036,32 @@ function SessionScreenInner() {
     />
   );
 
-  const renderMessageActions = (message: ChatMessage): React.ReactNode => {
-    // [M5] Session-expired message: offer escape actions instead of normal chips.
-    if (message.kind === 'session_expired') {
-      return (
-        <View className="flex-row gap-2 mt-2">
-          <Pressable
-            onPress={handleStartNewSession}
-            className="bg-primary rounded-button px-4 py-2.5 items-center justify-center min-h-[40px]"
-            accessibilityRole="button"
-            accessibilityLabel="Start new session"
-            testID="session-expired-new-session"
-          >
-            <Text className="text-body-sm font-semibold text-text-inverse">
-              Start new session
-            </Text>
-          </Pressable>
-          <Pressable
-            onPress={handleHomeBack}
-            className="bg-surface-elevated rounded-button px-4 py-2.5 items-center justify-center min-h-[40px]"
-            accessibilityRole="button"
-            accessibilityLabel="Go Home"
-            testID="session-expired-go-home"
-          >
-            <Text className="text-body-sm font-semibold text-text-secondary">
-              Go Home
-            </Text>
-          </Pressable>
-        </View>
-      );
-    }
-
-    const messageActions = (
-      <SessionMessageActions
-        message={message}
-        isStreaming={isStreaming}
-        latestAiMessageId={latestAiMessageId}
-        consumedQuickChipMessageId={consumedQuickChipMessageId}
-        userMessageCount={userMessageCount}
-        showWrongSubjectChip={showWrongSubjectChip}
-        messageFeedback={messageFeedback}
-        bookmarkState={bookmarkState}
-        quotaError={quotaError}
-        isOwner={activeProfile?.isOwner === true}
-        stage={conversationStage}
-        handleQuickChip={handleQuickChip}
-        handleMessageFeedback={handleMessageFeedback}
-        onToggleBookmark={handleToggleBookmark}
-        handleReconnect={handleReconnect}
-      />
-    );
-
-    // F6: Confidence indicator — shown only when the LLM reports low confidence
-    // on this specific AI message. Dismissed when the learner taps it (sends a
-    // follow-up) or when a new exchange completes (lowConfidenceMessageId resets).
-    // Copy varies by age bracket so the metacognitive prompt fits the learner's
-    // voice — younger ages get softer phrasing, adults get more direct.
-    const showConfidenceIndicator =
-      message.id === lowConfidenceMessageId &&
-      !message.streaming &&
-      !isStreaming;
-    const confidenceCopy = getConfidenceCopy(activeProfile?.birthYear ?? null);
-    const confidenceIndicator = showConfidenceIndicator ? (
-      <Pressable
-        onPress={() => {
-          setLowConfidenceMessageId(null);
-          void continueWithMessage(confidenceCopy.retryMessage);
-        }}
-        className="rounded-full bg-surface-elevated px-3 py-1.5 self-start mt-1"
-        testID="confidence-low-indicator"
-        accessibilityRole="button"
-        accessibilityLabel={confidenceCopy.accessibilityLabel}
-      >
-        <Text className="text-caption font-semibold text-text-secondary">
-          {confidenceCopy.label}
-        </Text>
-      </Pressable>
-    ) : null;
-
-    if (!messageActions && !confidenceIndicator) return null;
-    if (!messageActions) return confidenceIndicator;
-    if (!confidenceIndicator) return messageActions;
-    return (
-      <View className="gap-1">
-        {messageActions}
-        {confidenceIndicator}
-      </View>
-    );
-  };
+  const renderMessageActions = (message: ChatMessage): React.ReactNode =>
+    renderSessionMessageActions(message, {
+      birthYear: activeProfile?.birthYear ?? null,
+      lowConfidenceMessageId,
+      setLowConfidenceMessageId,
+      continueWithMessage,
+      handleStartNewSession,
+      handleHomeBack,
+      isStreaming,
+      actionProps: {
+        isStreaming,
+        latestAiMessageId,
+        consumedQuickChipMessageId,
+        userMessageCount,
+        showWrongSubjectChip,
+        messageFeedback,
+        bookmarkState,
+        quotaError,
+        isOwner: activeProfile?.isOwner === true,
+        stage: conversationStage,
+        handleQuickChip,
+        handleMessageFeedback,
+        onToggleBookmark: handleToggleBookmark,
+        handleReconnect,
+      },
+    });
 
   return (
     <View className="flex-1">
