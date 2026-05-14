@@ -9,7 +9,7 @@ jest.mock('./llm', () => { // gc1-allow: LLM external boundary (routeAndCall), r
   };
 });
 
-jest.mock('./sentry', () => {
+jest.mock('./sentry', () => { // gc1-allow: requireActual + targeted override (canonical GC1-compliant pattern)
   const actual = jest.requireActual('./sentry') as Record<string, unknown>;
   return {
     ...actual,

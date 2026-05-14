@@ -10,7 +10,7 @@ const mockRouteAndCall = jest.fn();
 const mockRouteAndStream = jest.fn();
 const mockGetRegisteredProviders = jest.fn().mockReturnValue([]);
 
-jest.mock('../services/llm', () => {
+jest.mock('../services/llm', () => { // gc1-allow: requireActual + targeted override (canonical GC1-compliant pattern)
   const actual = jest.requireActual('../services/llm') as Record<string, unknown>;
   return {
     ...actual,
@@ -20,7 +20,7 @@ jest.mock('../services/llm', () => {
   };
 });
 
-jest.mock('../services/test-seed', () => {
+jest.mock('../services/test-seed', () => { // gc1-allow: requireActual + targeted override (canonical GC1-compliant pattern)
   const actual = jest.requireActual('../services/test-seed') as Record<string, unknown>;
   return {
     ...actual,

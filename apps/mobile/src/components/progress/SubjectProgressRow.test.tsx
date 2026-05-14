@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 import { SubjectProgressRow, hasSubjectActivity } from './SubjectProgressRow';
 import type { SubjectInventory } from '@eduagent/schemas';
 
-jest.mock('./AccordionTopicList', () => {
+jest.mock('./AccordionTopicList', () => { // gc1-allow: requireActual + targeted override (canonical GC1-compliant pattern)
   const actual = jest.requireActual<typeof import('./AccordionTopicList')>(
     './AccordionTopicList',
   );

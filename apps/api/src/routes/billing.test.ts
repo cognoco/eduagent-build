@@ -40,7 +40,7 @@ const mockDatabaseModule = createDatabaseModuleMock({
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
-jest.mock('../services/account', () => {
+jest.mock('../services/account', () => { // gc1-allow: requireActual + targeted override (canonical GC1-compliant pattern)
   const actual = jest.requireActual('../services/account') as Record<
     string,
     unknown
@@ -84,7 +84,7 @@ const mockBuildUsageDateLabels = jest.fn((input) => ({
   renewsAtLabel: input.renewsAt ? 'February 15, 2025' : null,
 }));
 
-jest.mock('../services/billing', () => {
+jest.mock('../services/billing', () => { // gc1-allow: requireActual + targeted override (canonical GC1-compliant pattern)
   const actual = jest.requireActual('../services/billing') as Record<
     string,
     unknown
@@ -126,7 +126,7 @@ jest.mock('../services/billing', () => {
 
 const mockReadSubscriptionStatus = jest.fn();
 
-jest.mock('../services/kv', () => {
+jest.mock('../services/kv', () => { // gc1-allow: requireActual + targeted override (canonical GC1-compliant pattern)
   const actual = jest.requireActual('../services/kv') as Record<
     string,
     unknown

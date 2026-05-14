@@ -13,7 +13,7 @@ const mockCaptureException = jest.fn();
 const mockAddBreadcrumb = jest.fn();
 const mockCaptureMessage = jest.fn();
 
-jest.mock('../services/sentry', () => {
+jest.mock('../services/sentry', () => { // gc1-allow: requireActual + targeted override (canonical GC1-compliant pattern)
   const actual = jest.requireActual('../services/sentry') as Record<
     string,
     unknown
@@ -40,7 +40,7 @@ jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 // Mock account + session services — no DB interaction
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/account', () => {
+jest.mock('../services/account', () => { // gc1-allow: requireActual + targeted override (canonical GC1-compliant pattern)
   const actual = jest.requireActual('../services/account') as Record<
     string,
     unknown
@@ -61,7 +61,7 @@ jest.mock('../services/account', () => {
 // Mock profile service — middleware auto-resolves owner profile
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/profile', () => {
+jest.mock('../services/profile', () => { // gc1-allow: requireActual + targeted override (canonical GC1-compliant pattern)
   const actual = jest.requireActual('../services/profile') as Record<
     string,
     unknown
@@ -115,7 +115,7 @@ const mockSafeRefundQuota = jest.fn(
   },
 );
 
-jest.mock('../services/billing', () => {
+jest.mock('../services/billing', () => { // gc1-allow: requireActual + targeted override (canonical GC1-compliant pattern)
   const actual = jest.requireActual('../services/billing') as Record<
     string,
     unknown
@@ -388,7 +388,7 @@ jest.mock('../services/interleaved', () => {
   };
 });
 
-jest.mock('../services/recall-bridge', () => {
+jest.mock('../services/recall-bridge', () => { // gc1-allow: requireActual + targeted override (canonical GC1-compliant pattern)
   const actual = jest.requireActual('../services/recall-bridge') as Record<
     string,
     unknown

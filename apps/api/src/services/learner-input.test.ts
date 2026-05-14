@@ -2,7 +2,7 @@ jest.mock('./llm', () => ({ // gc1-allow: routeAndCall is the LLM external-bound
   routeAndCall: jest.fn(),
 }));
 
-jest.mock('./learner-profile', () => {
+jest.mock('./learner-profile', () => { // gc1-allow: requireActual + targeted override (canonical GC1-compliant pattern)
   const actual = jest.requireActual('./learner-profile') as Record<string, unknown>;
   return {
     ...actual,

@@ -36,7 +36,7 @@ jest.mock(
   }),
 );
 
-jest.mock('../services/account', () => {
+jest.mock('../services/account', () => { // gc1-allow: requireActual + targeted override (canonical GC1-compliant pattern)
   const actual = jest.requireActual(
     '../services/account',
   ) as typeof import('../services/account');
@@ -52,7 +52,7 @@ jest.mock('../services/account', () => {
   };
 });
 
-jest.mock('../services/profile', () => {
+jest.mock('../services/profile', () => { // gc1-allow: requireActual + targeted override (canonical GC1-compliant pattern)
   const actual = jest.requireActual(
     '../services/profile',
   ) as typeof import('../services/profile');
@@ -69,7 +69,7 @@ jest.mock('../services/profile', () => {
   };
 });
 
-jest.mock('../services/streaks', () => {
+jest.mock('../services/streaks', () => { // gc1-allow: requireActual + targeted override (canonical GC1-compliant pattern)
   const actual = jest.requireActual(
     '../services/streaks',
   ) as typeof import('../services/streaks');
@@ -81,7 +81,7 @@ jest.mock('../services/streaks', () => {
   };
 });
 
-jest.mock('../services/llm', () => {
+jest.mock('../services/llm', () => { // gc1-allow: requireActual + targeted override (canonical GC1-compliant pattern)
   const actual = jest.requireActual(
     '../services/llm',
   ) as typeof import('../services/llm');

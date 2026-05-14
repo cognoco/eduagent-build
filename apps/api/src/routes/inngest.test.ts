@@ -2,7 +2,7 @@
 // Inngest Route Tests
 // ---------------------------------------------------------------------------
 
-jest.mock('../inngest', () => {
+jest.mock('../inngest', () => { // gc1-allow: requireActual + targeted override (canonical GC1-compliant pattern)
   const actual = jest.requireActual('../inngest') as Record<string, unknown>;
   return {
     ...actual,

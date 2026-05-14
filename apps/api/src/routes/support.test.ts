@@ -1,4 +1,4 @@
-jest.mock('../services/support/spillover', () => {
+jest.mock('../services/support/spillover', () => { // gc1-allow: requireActual + targeted override (canonical GC1-compliant pattern)
   const actual = jest.requireActual('../services/support/spillover') as Record<
     string,
     unknown

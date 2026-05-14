@@ -48,7 +48,7 @@ const mockFetch = createRoutedMockFetch({
   },
 });
 
-jest.mock('../../../lib/api-client', () =>
+jest.mock('../../../lib/api-client', () => // gc1-allow: api-client shim via mockApiClientFactory test-util (Hono RPC client cannot run in Jest without native fetch + auth chain)
   require('../../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch),
 );
 

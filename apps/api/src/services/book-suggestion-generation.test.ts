@@ -10,7 +10,7 @@ jest.mock('./llm' /* gc1-allow: LLM external boundary */, () => ({
 }));
 
 const loggerWarnMock = jest.fn<(...args: unknown[]) => void>();
-jest.mock('./logger', () => {
+jest.mock('./logger', () => { // gc1-allow: requireActual + targeted override (canonical GC1-compliant pattern)
   const actual = jest.requireActual('./logger') as Record<string, unknown>;
   return {
     ...actual,
