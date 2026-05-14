@@ -80,7 +80,7 @@ import {
 } from './session-crud';
 import { createLogger } from '../logger';
 import { captureException } from '../sentry';
-import { safeWrite } from '../safe-non-core';
+import { safeSend, safeWrite } from '../safe-non-core';
 import {
   buildResumeContext,
   loadPriorSessionMeta,
@@ -373,28 +373,19 @@ async function maybeDispatchReviewCalibration(
 
   if (!payload) return;
 
-  try {
-    await inngest.send({
-      name: 'app/review.calibration.requested',
-      data: payload,
-    });
-  } catch (err) {
-    logger.warn('[session-exchange] review calibration dispatch failed', {
-      event: 'review_calibration.dispatch_failed',
+  await safeSend(
+    () =>
+      inngest.send({
+        name: 'app/review.calibration.requested',
+        data: payload,
+      }),
+    'review.calibration',
+    {
       profileId,
       sessionId: session.id,
       topicId: session.topicId,
-      error: err instanceof Error ? err.message : String(err),
-    });
-    captureException(err, {
-      profileId,
-      extra: {
-        site: 'maybeDispatchReviewCalibration',
-        sessionId: session.id,
-        topicId: session.topicId,
-      },
-    });
-  }
+    },
+  );
 }
 
 async function maybeDispatchTopicProbeExtraction(
@@ -1002,28 +993,27 @@ export async function prepareExchangeContext(
       .map((entry) => entry.content)
       .join('\n');
 
-    inngest
-      .send({
-        name: 'app/ask.classify_silently',
-        data: {
-          sessionId,
-          profileId,
-          classifyInput: [priorUserMessages, userMessage]
-            .filter(Boolean)
-            .join('\n'),
-          exchangeCount: session.exchangeCount + 1,
-        },
-      })
-      .catch((err) => {
-        logger.warn('ask.classify_silently.send_failed', { sessionId, err });
-        captureException(err, {
-          profileId,
-          extra: {
-            event: 'app/ask.classify_silently',
+    // Fire-and-forget by design: this silent-classification observation must
+    // not add Inngest round-trip latency to prepareExchangeContext (which is
+    // on the synchronous /ask exchange hot path). safeSend still routes any
+    // dispatch failure to Sentry; the `void` discards the unresolved promise
+    // explicitly so the floating-promise lint does not fire.
+    void safeSend(
+      () =>
+        inngest.send({
+          name: 'app/ask.classify_silently',
+          data: {
             sessionId,
+            profileId,
+            classifyInput: [priorUserMessages, userMessage]
+              .filter(Boolean)
+              .join('\n'),
+            exchangeCount: session.exchangeCount + 1,
           },
-        });
-      });
+        }),
+      'ask.classify_silently',
+      { sessionId, profileId },
+    );
   }
 
   const [silentSubjectRows, silentTeachingPref] =
@@ -1871,20 +1861,21 @@ export async function processMessage(
           orphanReason: classifyOrphanError(err),
         });
       } catch (persistErr) {
-        await inngest.send({
-          name: 'app/orphan.persist.failed',
-          data: {
-            profileId,
-            sessionId,
-            route: 'session-exchange/process',
-            reason: classifyOrphanError(err),
-            error: String(persistErr),
-          },
-        });
-        captureException(persistErr, {
-          profileId,
-          extra: { phase: 'orphan_persist_failed' },
-        });
+        await safeSend(
+          () =>
+            inngest.send({
+              name: 'app/orphan.persist.failed',
+              data: {
+                profileId,
+                sessionId,
+                route: 'session-exchange/process',
+                reason: classifyOrphanError(err),
+                error: String(persistErr),
+              },
+            }),
+          'orphan.persist.failed',
+          { profileId, sessionId, route: 'session-exchange/process' },
+        );
       }
     }
     throw err;
@@ -2050,20 +2041,21 @@ export async function streamMessage(
               },
             );
           } catch (persistErr) {
-            await inngest.send({
-              name: 'app/orphan.persist.failed',
-              data: {
-                profileId,
-                sessionId,
-                route: 'session-exchange/stream',
-                reason: classifyOrphanError(err),
-                error: String(persistErr),
-              },
-            });
-            captureException(persistErr, {
-              profileId,
-              extra: { phase: 'orphan_persist_failed' },
-            });
+            await safeSend(
+              () =>
+                inngest.send({
+                  name: 'app/orphan.persist.failed',
+                  data: {
+                    profileId,
+                    sessionId,
+                    route: 'session-exchange/stream',
+                    reason: classifyOrphanError(err),
+                    error: String(persistErr),
+                  },
+                }),
+              'orphan.persist.failed',
+              { profileId, sessionId, route: 'session-exchange/stream' },
+            );
           }
         }
         throw err;
@@ -2098,20 +2090,21 @@ export async function streamMessage(
               },
             );
           } catch (persistErr) {
-            await inngest.send({
-              name: 'app/orphan.persist.failed',
-              data: {
-                profileId,
-                sessionId,
-                route: 'session-exchange/fallback',
-                reason: 'llm_empty_or_unparseable',
-                error: String(persistErr),
-              },
-            });
-            captureException(persistErr, {
-              profileId,
-              extra: { phase: 'orphan_persist_failed' },
-            });
+            await safeSend(
+              () =>
+                inngest.send({
+                  name: 'app/orphan.persist.failed',
+                  data: {
+                    profileId,
+                    sessionId,
+                    route: 'session-exchange/fallback',
+                    reason: 'llm_empty_or_unparseable',
+                    error: String(persistErr),
+                  },
+                }),
+              'orphan.persist.failed',
+              { profileId, sessionId, route: 'session-exchange/fallback' },
+            );
           }
         }
         return {

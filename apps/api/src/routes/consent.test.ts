@@ -690,12 +690,15 @@ describe('consent Inngest dispatch observability [A-23]', () => {
     expect(res.status).toBe(201);
 
     // [A-23] Must escalate to Sentry — not just logger.warn — so we can query
-    // how often the GDPR reminder workflow is permanently skipped.
+    // how often the GDPR reminder workflow is permanently skipped. Escalation
+    // runs through safeSend (services/safe-non-core.ts), which tags the
+    // captureException extra with surface + kind.
     expect(mockCaptureException).toHaveBeenCalledWith(
       expect.any(Error),
       expect.objectContaining({
         extra: expect.objectContaining({
-          context: 'consent.requested.inngest_dispatch',
+          surface: 'consent.requested',
+          kind: 'non-core-send',
         }),
       }),
     );
@@ -720,12 +723,15 @@ describe('consent Inngest dispatch observability [A-23]', () => {
     expect(res.status).toBe(200);
 
     // [A-23] Must escalate to Sentry so we can query how often the 7-day
-    // GDPR deletion grace period job is permanently skipped.
+    // GDPR deletion grace period job is permanently skipped. Escalation runs
+    // through safeSend (services/safe-non-core.ts), which tags the
+    // captureException extra with surface + kind.
     expect(mockCaptureException).toHaveBeenCalledWith(
       expect.any(Error),
       expect.objectContaining({
         extra: expect.objectContaining({
-          context: 'consent.revoked.inngest_dispatch',
+          surface: 'consent.revoked',
+          kind: 'non-core-send',
         }),
       }),
     );
