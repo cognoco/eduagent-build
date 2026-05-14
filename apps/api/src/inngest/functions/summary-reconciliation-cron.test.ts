@@ -1,18 +1,28 @@
 const mockGetStepDatabase = jest.fn();
 
-jest.mock('../helpers', () => ({
-  getStepDatabase: () => mockGetStepDatabase(),
-}));
+jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../helpers',
+  ) as typeof import('../helpers');
+  return {
+    ...actual,
+    getStepDatabase: () => mockGetStepDatabase(),
+  };
+});
 
-jest.mock('../client', () => ({
-  inngest: {
-    createFunction: jest.fn((_config, _trigger, handler) => ({
-      fn: handler,
-      _config,
-      _trigger,
-    })),
-  },
-}));
+jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual('../client') as typeof import('../client');
+  return {
+    ...actual,
+    inngest: {
+      createFunction: jest.fn((_config, _trigger, handler) => ({
+        fn: handler,
+        _config,
+        _trigger,
+      })),
+    },
+  };
+});
 
 import { summaryReconciliationCron } from './summary-reconciliation-cron';
 
