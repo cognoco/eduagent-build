@@ -186,16 +186,16 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | AUTH-01 | App launch and auth gate | ✅ | Pass | | | 2026-05-14 Galaxy S10e emulator/dev-client: launch reaches sign-in gate with Google SSO, email, password, and Sign in CTA. Also confirmed on web preview. |
 | AUTH-12 | First-time vs returning sign-in copy | ✅ | Pass | | | Clean launch shows first-time copy (`Welcome to MentoMate` / `sign-in-welcome-first-time`), not returning-user copy. |
 | AUTH-07 | Auth screen navigation (sign-in ↔ sign-up ↔ forgot) | ❌ | Fail | https://www.notion.so/3558bce91f7c811cbe38d45d3181c47a | | Sign-in to sign-up works, but the sign-up screen's return-to-sign-in link is not visible/reachable after scrolling to the primary CTA on the small emulator. Web smoke passed navigation. |
-| AUTH-02 | Sign up with email and password | ❌ | Fail | https://www.notion.so/3358bce91f7c816d8c0ff709538ada08?pvs=1 | | Sign-up screen opens, but after entering credentials the Create account CTA is no longer found/reachable on the small emulator. Web smoke: form + Clerk submit reached, full creation not exercised. |
-| AUTH-03 | Sign-up email verification code | 🚫 | Blocked | | | Blocked behind AUTH-02 on device. Web smoke did not reach verification-code stage either; needs Clerk testing token. |
-| AUTH-04 | Sign in with email and password | ❌ | Fail | https://www.notion.so/3358bce91f7c816d8c0ff709538ada08?pvs=1 | | Seeded-user sign-in could not continue reliably after email entry; password field/submit CTA becomes unreachable on the small emulator. |
+| AUTH-02 | Sign up with email and password | 🚫 | Blocked | | | Sign-up fields and Create account CTA are reachable with normal field-to-field taps, but Clerk dev email quota is exhausted (`monthly limit for email messages in development (100)`), so completion is blocked by environment. Web smoke: form + Clerk submit reached, full creation not exercised. |
+| AUTH-03 | Sign-up email verification code | 🚫 | Blocked | | | Blocked by Clerk dev email quota while submitting AUTH-02; verification-code screen did not appear. Web smoke did not reach this stage either. |
+| AUTH-04 | Sign in with email and password | ✅ | Pass | | | Seeded-user sign-in succeeds with literal credentials and normal field-to-field taps, reaching the expected consent-pending gate. |
 | AUTH-05 | Additional sign-in verification (email/phone/TOTP) | 🚫 | Blocked | | | Required MFA seed scenarios do not exist yet (`mfa-email-code`, `mfa-phone`, `mfa-totp`, backup-code). |
-| AUTH-06 | Forgot password and reset password | ❌ | Fail | https://www.notion.so/3358bce91f7c816d8c0ff709538ada08?pvs=1 | | Forgot-password screen renders and accepts email, but the Send reset code button is not found/reachable after keyboard dismissal on device. Web smoke: screen reachable + back nav works; reset-code completion not exercised. |
+| AUTH-06 | Forgot password and reset password | 🚫 | Blocked | | | Forgot-password screen renders, email entry works, and Send reset code is tappable, but Clerk dev email quota blocks reset-code delivery with the same monthly-limit error as sign-up. Web smoke: screen reachable + back nav works; reset-code completion not exercised. |
 | AUTH-08 | OAuth sign in / sign up (Google, Apple, OpenAI) | ✅ | Pass | | | Android/dev-client: Google SSO button renders and is tappable; OpenAI absent but optional. Web smoke: Google button renders, happy path blocked in web preview. |
-| AUTH-09 | SSO callback completion + fallback | 🚫 | Blocked | | | Airplane-mode broadcast blocked on this emulator (`Permission Denial`); network-failure callback path could not be validated. |
-| HOME-05 | Empty first-user state | 🚫 | Blocked | https://www.notion.so/3358bce91f7c816d8c0ff709538ada08?pvs=1 | | Seeded `onboarding-no-subject` state prepared, but flow blocked at seeded sign-in because password field becomes unreachable after email entry. |
-| AUTH-13 | Deep-link auth redirect preservation (BUG-530) | 🚫 | Blocked | https://www.notion.so/3358bce91f7c816d8c0ff709538ada08?pvs=1 | | Requires successful post-deep-link sign-in; blocked by AUTH-04 small-screen auth form reachability. |
-| AUTH-14 | Sign-in transition spinner + stuck-state recovery | 🚫 | Blocked | https://www.notion.so/3358bce91f7c816d8c0ff709538ada08?pvs=1 | | Requires successful sign-in/controlled slow transition; blocked by AUTH-04 small-screen auth form reachability in this pass. |
+| AUTH-09 | SSO callback completion + fallback | 🚫 | Blocked | https://www.notion.so/3608bce91f7c81cab6c8d96cea8e5b7b | | Airplane-mode broadcast blocked on this emulator (`Permission Denial`); after the failed SSO attempt, dev-client also hit a WebBrowser cleanup crash. |
+| HOME-05 | Empty first-user state | ✅ | Pass | | ✅ 05-14 | Seeded `onboarding-no-subject` reaches learner home; current CTA is `home-action-study-new` and opens create-subject. Inventory updated for testID drift. |
+| AUTH-13 | Deep-link auth redirect preservation (BUG-530) | 🚫 | Blocked | | | Inventory notes this is code-only because ADB deep-link is unreliable on Maestro 2.2.0; no reliable end-user harness available in this pass. |
+| AUTH-14 | Sign-in transition spinner + stuck-state recovery | 🚫 | Blocked | | | Requires controlled slow-network / auth-layout timeout simulation; no reliable end-user harness available in this pass. |
 
 ---
 
@@ -566,7 +566,7 @@ Update this once a batch is complete to track overall progress.
 
 | Batch | Section | Items | Status | Notes |
 | --- | --- | --- | --- | --- |
-| 1  | Pre-auth & Auth          | 14 | ❌ | Device (S10e, 2026-05-14): 3 pass, 4 fail, 7 blocked. Main blocker: auth form controls unreachable on small screen after input. Web smoke: 3 pass, 2 pass-w-issues, 2 blocked. |
+| 1  | Pre-auth & Auth          | 14 | ❌ | Device (S10e, 2026-05-14): 5 pass, 1 fail, 8 blocked. Main blockers: Clerk dev email quota for email-code flows, MFA/deep-link/slow-network harness gaps, production APK needed for splash. Web smoke: 3 pass, 2 pass-w-issues, 2 blocked. |
 | 2  | First Profile + Consent  | 11 | ⬜ | |
 | 3  | Subject Onboarding       | 12 | ⬜ | |
 | 4  | Learner Home + Resume    |  6 | ⚠️ | 1⚠️ 5⬜ — 2026-05-14 smoke-learner passed locators; screenshot crawl needs splash-wait hardening before visual sign-off. |
