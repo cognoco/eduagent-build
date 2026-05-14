@@ -6,7 +6,33 @@ import {
 } from '@testing-library/react-native';
 import type { DashboardData, Profile } from '@eduagent/schemas';
 
+import {
+  createRoutedMockFetch,
+  createScreenWrapper,
+  cleanupScreen,
+} from '../../../../test-utils/screen-render-harness';
+
 import { ParentHomeScreen } from './ParentHomeScreen';
+
+// ─── Transport boundary ───────────────────────────────────────────────────────
+// The routed fetch is module-level so individual tests can call setRoute()
+// before rendering. Default routes cover every query ParentHomeScreen fires on
+// mount (dashboard, subscription, family subscription, learner-profile per child).
+const mockFetch = createRoutedMockFetch({
+  '/dashboard': { children: [], pendingNotices: [], demoMode: false },
+  '/dashboard/demo': { children: [], pendingNotices: [], demoMode: true },
+  '/subscription': { subscription: { tier: 'family' } },
+  '/subscription/family': { family: { profileCount: 2, maxProfiles: 5 } },
+  '/learner-profile': { profile: { accommodationMode: 'none' } },
+});
+
+jest.mock( // gc1-allow: transport-boundary — replaces real fetch with routed mock
+  '../../lib/api-client',
+  () =>
+    require('../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch),
+);
+
+// ─── Native / external boundaries (kept — require native runtime) ─────────────
 
 jest.mock(
   'react-i18next',
@@ -14,61 +40,44 @@ jest.mock(
 );
 
 jest.mock(
-  'react-native-safe-area-context' /* gc1-allow: native module that requires device/simulator to resolve insets */,
-  () => ({
-    useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
-  }),
-);
-
-let mockLinkedChildren: Profile[] = [];
-let mockDashboardData: DashboardData | undefined;
-
-jest.mock(
-  '../../lib/profile' /* gc1-allow: profile context requires full ProfileProvider setup */,
-  () => ({
-    useLinkedChildren: () => mockLinkedChildren,
-  }),
-);
-
-jest.mock(
-  '../../hooks/use-active-profile-role' /* gc1-allow: external hook boundary — wraps profile context + family-links query */,
-  () => ({
-    useActiveProfileRole: () => 'owner',
-  }),
-);
-
-jest.mock(
-  '../../hooks/use-dashboard' /* gc1-allow: external hook boundary — wraps TanStack query that requires QueryClient */,
-  () => ({
-    useDashboard: () => ({ data: mockDashboardData }),
-  }),
-);
-
-jest.mock(
-  '../../hooks/use-progress' /* gc1-allow: external hook boundary — wraps TanStack query that requires QueryClient */,
-  () => ({
-    useLearningResumeTarget: () => ({ data: undefined }),
-  }),
-);
-
-jest.mock(
-  '../../hooks/use-subscription' /* gc1-allow: external hook boundary — wraps TanStack query that requires QueryClient */,
-  () => ({
-    useSubscription: () => ({ data: { tier: 'family' } }),
-    useFamilySubscription: () => ({
-      data: { profileCount: 2, maxProfiles: 5 },
-    }),
-  }),
+  'react-native-safe-area-context', // gc1-allow: native module that requires device/simulator to resolve insets
+  () => require('../../test-utils/native-shims').safeAreaShim(),
 );
 
 const mockPush = jest.fn();
 jest.mock(
-  'expo-router' /* gc1-allow: expo-router requires a native navigation container not available in JSDOM */,
+  'expo-router', // gc1-allow: expo-router requires a native navigation container not available in JSDOM
+  () =>
+    require('../../test-utils/native-shims').expoRouterShim({ push: mockPush }),
+);
+
+jest.mock(
+  '../../lib/theme', // gc1-allow: native ColorScheme not available in JSDOM
   () => ({
-    router: { push: mockPush },
-    useRouter: () => ({ push: mockPush }),
+    useThemeColors: () => ({
+      primary: '#6366f1',
+      textPrimary: '#111827',
+      textSecondary: '#6b7280',
+    }),
   }),
 );
+
+jest.mock(
+  '../../lib/sentry', // gc1-allow: Sentry SDK loads native module config at import — crashes Jest
+  () => ({
+    Sentry: { captureException: jest.fn() },
+  }),
+);
+
+jest.mock(
+  '../../lib/platform-alert', // gc1-allow: wraps Alert.alert which is unavailable in JSDOM
+  () => ({ platformAlert: jest.fn() }),
+);
+
+// ─── WithdrawalCountdownBanner — kept with gc1-allow ─────────────────────────
+// The banner pulls in useRestoreConsent (PUT mutation + multi-query invalidation).
+// The grace-period test asserts prop-passing only, not banner internals, so we
+// keep the lightweight stub to isolate the test from that mutation subtree.
 
 type BannerProps = {
   childrenInGracePeriod: Array<{
@@ -80,7 +89,7 @@ type BannerProps = {
 let capturedBannerProps: BannerProps | null = null;
 
 jest.mock(
-  '../family/WithdrawalCountdownBanner' /* gc1-allow: depends on its own hook tree — isolated here to keep test focused */,
+  '../family/WithdrawalCountdownBanner', // gc1-allow: complex subtree (useRestoreConsent mutation), isolated to keep test focused on prop-passing
   () => ({
     WithdrawalCountdownBanner: (props: BannerProps) => {
       capturedBannerProps = props;
@@ -89,35 +98,7 @@ jest.mock(
   }),
 );
 
-jest.mock(
-  '../../hooks/use-nudges' /* gc1-allow: external hook boundary — wraps TanStack mutation that requires QueryClient */,
-  () => ({
-    useSendNudge: () => ({
-      mutateAsync: jest.fn().mockResolvedValue(undefined),
-    }),
-  }),
-);
-
-jest.mock(
-  '../../lib/platform-alert' /* gc1-allow: wraps Alert.alert which is unavailable in JSDOM */,
-  () => ({ platformAlert: jest.fn() }),
-);
-
-jest.mock(
-  '../../lib/sentry' /* gc1-allow: Sentry SDK loads native module config at import — crashes Jest */,
-  () => ({
-    Sentry: { captureException: jest.fn() },
-  }),
-);
-
-jest.mock(
-  '../../hooks/use-learner-profile' /* gc1-allow: external hook boundary — wraps TanStack query that requires QueryClient */,
-  () => ({
-    useChildLearnerProfile: () => ({
-      data: { accommodationMode: 'none' },
-    }),
-  }),
-);
+// ─── Fixtures ─────────────────────────────────────────────────────────────────
 
 const makeProfile = (overrides: Partial<Profile> = {}): Profile => ({
   id: 'profile-1',
@@ -149,34 +130,57 @@ const CHILD_B = makeProfile({
   isOwner: false,
 });
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
 async function waitForParentTransitionNotice(): Promise<void> {
   await waitFor(() => {
     screen.getByTestId('parent-transition-notice');
   });
 }
 
+// ─── Suite ────────────────────────────────────────────────────────────────────
+
 describe('ParentHomeScreen', () => {
+  let queryClient: ReturnType<typeof createScreenWrapper>['queryClient'];
+
   beforeEach(() => {
     jest.clearAllMocks();
-    mockLinkedChildren = [];
-    mockDashboardData = undefined;
     capturedBannerProps = null;
+    // Reset dashboard to empty (no children) so tests that don't need data
+    // don't accidentally inherit data set by a previous test's setRoute() call.
+    mockFetch.setRoute('/dashboard', {
+      children: [],
+      pendingNotices: [],
+      demoMode: false,
+    });
+  });
+
+  afterEach(() => {
+    cleanupScreen(queryClient);
   });
 
   it('renders greeting with profile first name', () => {
-    render(
-      <ParentHomeScreen
-        activeProfile={makeProfile({ displayName: 'Alex Parent' })}
-      />,
-    );
+    const parent = makeProfile({ displayName: 'Alex Parent' });
+    let wrapper: ReturnType<typeof createScreenWrapper>['wrapper'];
+    ({ queryClient, wrapper } = createScreenWrapper({
+      activeProfile: parent,
+      profiles: [parent],
+    }));
+
+    render(<ParentHomeScreen activeProfile={parent} />, { wrapper });
 
     screen.getByText('Hey Alex');
   });
 
   it('renders one command card per linked child with actions inside it', async () => {
-    mockLinkedChildren = [CHILD_A, CHILD_B];
+    const parent = makeProfile();
+    let wrapper: ReturnType<typeof createScreenWrapper>['wrapper'];
+    ({ queryClient, wrapper } = createScreenWrapper({
+      activeProfile: parent,
+      profiles: [parent, CHILD_A, CHILD_B],
+    }));
 
-    render(<ParentHomeScreen activeProfile={makeProfile()} />);
+    render(<ParentHomeScreen activeProfile={parent} />, { wrapper });
     await waitForParentTransitionNotice();
 
     screen.getByTestId('parent-home-check-child-child-a');
@@ -190,9 +194,14 @@ describe('ParentHomeScreen', () => {
   });
 
   it('routes the child card header to the child profile detail screen', async () => {
-    mockLinkedChildren = [CHILD_A];
+    const parent = makeProfile();
+    let wrapper: ReturnType<typeof createScreenWrapper>['wrapper'];
+    ({ queryClient, wrapper } = createScreenWrapper({
+      activeProfile: parent,
+      profiles: [parent, CHILD_A],
+    }));
 
-    render(<ParentHomeScreen activeProfile={makeProfile()} />);
+    render(<ParentHomeScreen activeProfile={parent} />, { wrapper });
     await waitForParentTransitionNotice();
 
     fireEvent.press(screen.getByTestId('parent-home-check-child-child-a'));
@@ -203,9 +212,14 @@ describe('ParentHomeScreen', () => {
   });
 
   it('routes the progress action to child progress', async () => {
-    mockLinkedChildren = [CHILD_A];
+    const parent = makeProfile();
+    let wrapper: ReturnType<typeof createScreenWrapper>['wrapper'];
+    ({ queryClient, wrapper } = createScreenWrapper({
+      activeProfile: parent,
+      profiles: [parent, CHILD_A],
+    }));
 
-    render(<ParentHomeScreen activeProfile={makeProfile()} />);
+    render(<ParentHomeScreen activeProfile={parent} />, { wrapper });
     await waitForParentTransitionNotice();
 
     fireEvent.press(screen.getByTestId('parent-home-child-progress-child-a'));
@@ -216,9 +230,14 @@ describe('ParentHomeScreen', () => {
   });
 
   it('routes the reports action to the child reports list', async () => {
-    mockLinkedChildren = [CHILD_A];
+    const parent = makeProfile();
+    let wrapper: ReturnType<typeof createScreenWrapper>['wrapper'];
+    ({ queryClient, wrapper } = createScreenWrapper({
+      activeProfile: parent,
+      profiles: [parent, CHILD_A],
+    }));
 
-    render(<ParentHomeScreen activeProfile={makeProfile()} />);
+    render(<ParentHomeScreen activeProfile={parent} />, { wrapper });
     await waitForParentTransitionNotice();
 
     fireEvent.press(screen.getByTestId('parent-home-weekly-report-child-a'));
@@ -228,14 +247,28 @@ describe('ParentHomeScreen', () => {
   });
 
   it('keeps own learning out of parent Home because it has its own tab', () => {
-    render(<ParentHomeScreen activeProfile={makeProfile()} />);
+    const parent = makeProfile();
+    let wrapper: ReturnType<typeof createScreenWrapper>['wrapper'];
+    ({ queryClient, wrapper } = createScreenWrapper({
+      activeProfile: parent,
+      profiles: [parent],
+    }));
+
+    render(<ParentHomeScreen activeProfile={parent} />, { wrapper });
 
     expect(screen.queryByTestId('parent-home-own-learning')).toBeNull();
     expect(screen.queryByText('Continue your own learning')).toBeNull();
   });
 
   it('shows an add-first-child state when no children are linked', () => {
-    render(<ParentHomeScreen activeProfile={makeProfile()} />);
+    const parent = makeProfile();
+    let wrapper: ReturnType<typeof createScreenWrapper>['wrapper'];
+    ({ queryClient, wrapper } = createScreenWrapper({
+      activeProfile: parent,
+      profiles: [parent],
+    }));
+
+    render(<ParentHomeScreen activeProfile={parent} />, { wrapper });
 
     screen.getByTestId('add-first-child-screen');
     expect(screen.queryByTestId('parent-transition-notice')).toBeNull();
@@ -253,8 +286,7 @@ describe('ParentHomeScreen', () => {
   });
 
   it('shows tonight prompts and compact status from dashboard data', async () => {
-    mockLinkedChildren = [CHILD_A];
-    mockDashboardData = {
+    const dashboardData: DashboardData = {
       children: [
         {
           profileId: 'child-a',
@@ -286,8 +318,16 @@ describe('ParentHomeScreen', () => {
       pendingNotices: [],
       demoMode: false,
     };
+    mockFetch.setRoute('/dashboard', dashboardData);
 
-    render(<ParentHomeScreen activeProfile={makeProfile()} />);
+    const parent = makeProfile();
+    let wrapper: ReturnType<typeof createScreenWrapper>['wrapper'];
+    ({ queryClient, wrapper } = createScreenWrapper({
+      activeProfile: parent,
+      profiles: [parent, CHILD_A],
+    }));
+
+    render(<ParentHomeScreen activeProfile={parent} />, { wrapper });
     await waitForParentTransitionNotice();
 
     screen.getByTestId('parent-home-tonight-section');
@@ -302,8 +342,7 @@ describe('ParentHomeScreen', () => {
   });
 
   it('ranks multi-child tonight prompts by sessions — most active child appears first', async () => {
-    mockLinkedChildren = [CHILD_B, CHILD_A]; // intentionally reversed to verify sort
-    mockDashboardData = {
+    const dashboardData: DashboardData = {
       children: [
         {
           profileId: 'child-a',
@@ -359,8 +398,17 @@ describe('ParentHomeScreen', () => {
       pendingNotices: [],
       demoMode: false,
     };
+    mockFetch.setRoute('/dashboard', dashboardData);
 
-    render(<ParentHomeScreen activeProfile={makeProfile()} />);
+    // profiles intentionally reversed (Liam before Emma) to verify sort
+    const parent = makeProfile();
+    let wrapper: ReturnType<typeof createScreenWrapper>['wrapper'];
+    ({ queryClient, wrapper } = createScreenWrapper({
+      activeProfile: parent,
+      profiles: [parent, CHILD_B, CHILD_A],
+    }));
+
+    render(<ParentHomeScreen activeProfile={parent} />, { wrapper });
     await waitForParentTransitionNotice();
 
     const emmaPrompt = screen.getByTestId(
@@ -377,21 +425,27 @@ describe('ParentHomeScreen', () => {
   });
 
   it('shows ParentTransitionNotice after at least one child is linked', async () => {
-    mockLinkedChildren = [CHILD_A];
+    const parent = makeProfile({ id: 'profile-transition' });
+    let wrapper: ReturnType<typeof createScreenWrapper>['wrapper'];
+    ({ queryClient, wrapper } = createScreenWrapper({
+      activeProfile: parent,
+      profiles: [parent, CHILD_A],
+    }));
 
-    render(
-      <ParentHomeScreen
-        activeProfile={makeProfile({ id: 'profile-transition' })}
-      />,
-    );
+    render(<ParentHomeScreen activeProfile={parent} />, { wrapper });
 
     await waitForParentTransitionNotice();
   });
 
   it('pressing nudge card opens NudgeActionSheet for that child', async () => {
-    mockLinkedChildren = [CHILD_A];
+    const parent = makeProfile();
+    let wrapper: ReturnType<typeof createScreenWrapper>['wrapper'];
+    ({ queryClient, wrapper } = createScreenWrapper({
+      activeProfile: parent,
+      profiles: [parent, CHILD_A],
+    }));
 
-    render(<ParentHomeScreen activeProfile={makeProfile()} />);
+    render(<ParentHomeScreen activeProfile={parent} />, { wrapper });
     await waitForParentTransitionNotice();
 
     expect(screen.queryByTestId('nudge-action-sheet-close')).toBeNull();
@@ -402,11 +456,11 @@ describe('ParentHomeScreen', () => {
     expect(mockPush).not.toHaveBeenCalled();
   });
 
-  it('derives childrenInGracePeriod from dashboard and passes it to WithdrawalCountdownBanner', () => {
+  it('derives childrenInGracePeriod from dashboard and passes it to WithdrawalCountdownBanner', async () => {
     const respondedAt = new Date(
       Date.now() - 2 * 24 * 60 * 60 * 1000,
     ).toISOString();
-    mockDashboardData = {
+    const dashboardData: DashboardData = {
       children: [
         {
           profileId: 'child-a',
@@ -435,10 +489,22 @@ describe('ParentHomeScreen', () => {
       pendingNotices: [],
       demoMode: false,
     };
+    mockFetch.setRoute('/dashboard', dashboardData);
 
-    render(<ParentHomeScreen activeProfile={makeProfile()} />);
+    const parent = makeProfile();
+    let wrapper: ReturnType<typeof createScreenWrapper>['wrapper'];
+    ({ queryClient, wrapper } = createScreenWrapper({
+      activeProfile: parent,
+      profiles: [parent],
+    }));
 
-    expect(capturedBannerProps).not.toBeNull();
+    render(<ParentHomeScreen activeProfile={parent} />, { wrapper });
+
+    // Wait for the dashboard query to resolve so childrenInGracePeriod propagates
+    await waitFor(() => {
+      expect(capturedBannerProps).not.toBeNull();
+    });
+
     expect(capturedBannerProps?.childrenInGracePeriod).toHaveLength(1);
     expect(capturedBannerProps?.childrenInGracePeriod[0]).toMatchObject({
       profileId: 'child-a',
