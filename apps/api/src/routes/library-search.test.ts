@@ -22,28 +22,38 @@ jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 // Mock account + profile services (required by auth middleware)
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/account', () => ({
-  ...jest.requireActual('../services/account'),
-  findOrCreateAccount: jest.fn().mockResolvedValue({
-    id: 'test-account-id',
-    clerkUserId: 'user_test',
-    email: 'test@example.com',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  }),
-}));
+jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/account',
+  ) as typeof import('../services/account');
+  return {
+    ...actual,
+    findOrCreateAccount: jest.fn().mockResolvedValue({
+      id: 'test-account-id',
+      clerkUserId: 'user_test',
+      email: 'test@example.com',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }),
+  };
+});
 
-jest.mock('../services/profile', () => ({
-  ...jest.requireActual('../services/profile'),
-  findOwnerProfile: jest.fn().mockResolvedValue(null),
-  getProfile: jest.fn().mockResolvedValue({
-    id: 'test-profile-id',
-    birthYear: 2011,
-    location: null,
-    consentStatus: 'CONSENTED',
-  }),
-  getProfileAge: jest.fn().mockResolvedValue(14),
-}));
+jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/profile',
+  ) as typeof import('../services/profile');
+  return {
+    ...actual,
+    findOwnerProfile: jest.fn().mockResolvedValue(null),
+    getProfile: jest.fn().mockResolvedValue({
+      id: 'test-profile-id',
+      birthYear: 2011,
+      location: null,
+      consentStatus: 'CONSENTED',
+    }),
+    getProfileAge: jest.fn().mockResolvedValue(14),
+  };
+});
 
 // ---------------------------------------------------------------------------
 // Mock library-search service
@@ -51,10 +61,18 @@ jest.mock('../services/profile', () => ({
 
 const mockSearchLibrary = jest.fn();
 
-jest.mock('../services/library-search', () => ({
-  ...jest.requireActual('../services/library-search'),
-  searchLibrary: (...args: unknown[]) => mockSearchLibrary(...args),
-}));
+jest.mock(
+  '../services/library-search' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../services/library-search',
+    ) as typeof import('../services/library-search');
+    return {
+      ...actual,
+      searchLibrary: (...args: unknown[]) => mockSearchLibrary(...args),
+    };
+  },
+);
 
 // ---------------------------------------------------------------------------
 // Imports (after mocks)
