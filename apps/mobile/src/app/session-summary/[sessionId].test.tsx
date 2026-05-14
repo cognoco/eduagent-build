@@ -6,53 +6,43 @@ import {
 } from '@testing-library/react-native';
 import React from 'react';
 import { platformAlert } from '../../lib/platform-alert';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { createRoutedMockFetch } from '../../test-utils/mock-api-routes';
+import {
+  createRoutedMockFetch,
+  createScreenWrapper,
+} from '../../../test-utils/screen-render-harness';
+import { createRouterMockFns } from '../../test-utils/native-shims';
 
-const mockReplace = jest.fn();
-const mockPush = jest.fn();
-const mockBack = jest.fn();
-const mockCanGoBack = jest.fn(() => false);
-const mockParams = {
+// ─── Native boundary shims ────────────────────────────────────────────────────
+
+const routerFns = createRouterMockFns();
+const mockParams: Record<string, string | undefined> = {
   sessionId: '660e8400-e29b-41d4-a716-446655440000',
   subjectName: 'Mathematics',
   exchangeCount: '5',
   escalationRung: '2',
-} as Record<string, string | undefined>;
+};
 
-jest.mock('expo-router', () => ({
-  useRouter: () => ({
-    replace: mockReplace,
-    push: mockPush,
-    back: mockBack,
-    canGoBack: mockCanGoBack,
-  }),
-  useLocalSearchParams: () => mockParams,
-}));
+jest.mock('expo-router', () => // gc1-allow: native-boundary (expo-router requires native file-system modules)
+  require('../../test-utils/native-shims').expoRouterShim(routerFns, mockParams),
+);
 
-jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
-}));
+jest.mock('react-native-safe-area-context', () => // gc1-allow: native-boundary (SafeAreaContext requires native UIKit/View bindings)
+  require('../../test-utils/native-shims').safeAreaShim(),
+);
 
 jest.mock(
   'react-i18next',
-  () => require('../../test-utils/mock-i18n').i18nMock,
+  () => require('../../test-utils/mock-i18n').i18nMock, // gc1-allow: i18n boundary (react-i18next lazy init conflicts with synchronous jest render)
 );
 
-jest.mock('@expo/vector-icons', () => ({
-  Ionicons: () => null,
-}));
-
-jest.mock('../../lib/theme', () => ({
-  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
+jest.mock('../../lib/theme', () => ({ // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
   useThemeColors: () => ({
     muted: '#a3a3a3',
     textInverse: '#0f0f0f',
   }),
 }));
 
-jest.mock('../../lib/sentry', () => ({
-  // gc1-allow: @sentry/react-native native crash handlers
+jest.mock('../../lib/sentry', () => ({ // gc1-allow: @sentry/react-native native crash handlers
   Sentry: {
     addBreadcrumb: jest.fn(),
   },
@@ -63,43 +53,6 @@ jest.mock('../../lib/platform-alert', () => ({
   platformAlert: jest.fn(),
 }));
 
-// [BUG-800] formatApiError stub: returns Error.message verbatim so tests can
-// assert the typed server reason reaches platformAlert.
-jest.mock('../../lib/format-api-error', () => ({
-  ...jest.requireActual('../../lib/format-api-error'),
-  formatApiError: (e: unknown) =>
-    e instanceof Error ? e.message : 'Unknown error',
-}));
-
-jest.mock('../../lib/profile', () => ({
-  // gc1-allow: ProfileProvider uses SecureStore (native)
-  useProfile: () => ({
-    activeProfile: {
-      id: 'test-profile-id',
-      accountId: 'test-account-id',
-      displayName: 'Test Learner',
-      isOwner: true,
-      hasPremiumLlm: false,
-      conversationLanguage: 'en',
-      pronouns: null,
-      consentStatus: null,
-      birthYear: 2012,
-    },
-    profiles: [
-      {
-        id: 'test-profile-id',
-        accountId: 'test-account-id',
-        displayName: 'Test Learner',
-        isOwner: true,
-        birthYear: 2012,
-      },
-    ],
-    setActiveProfileId: jest.fn(),
-    isRestoringId: false,
-  }),
-  isGuardianProfile: () => false,
-}));
-
 // use-parent-proxy uses setProxyMode from api-client (not the RPC useApiClient hook)
 // plus SecureStore reads — not an API hook. Keep as a direct mock.
 const mockUseParentProxy = jest.fn(() => ({
@@ -107,16 +60,14 @@ const mockUseParentProxy = jest.fn(() => ({
   childProfile: null,
   parentProfile: null,
 }));
-jest.mock('../../hooks/use-parent-proxy', () => ({
-  // gc1-allow: SecureStore read/write in useEffect
+jest.mock('../../hooks/use-parent-proxy', () => ({ // gc1-allow: SecureStore read/write in useEffect
   useParentProxy: () => mockUseParentProxy(),
 }));
 
 // use-rating-prompt reads/writes SecureStore and calls expo-store-review —
 // no useApiClient() calls — keep as a direct mock.
 const mockOnSuccessfulRecall = jest.fn();
-jest.mock('../../hooks/use-rating-prompt', () => ({
-  // gc1-allow: expo-store-review + SecureStore native APIs
+jest.mock('../../hooks/use-rating-prompt', () => ({ // gc1-allow: expo-store-review + SecureStore native APIs
   useRatingPrompt: () => ({
     onSuccessfulRecall: mockOnSuccessfulRecall,
   }),
@@ -126,7 +77,7 @@ jest.mock('../../hooks/use-rating-prompt', () => ({
 // analytics). With TanStack Query's synchronous notifyManager in tests, calling
 // mutate() from within a useEffect causes React 19 to throw an invariant error
 // (sync state update from within effect commit). Keep as a no-op direct mock.
-jest.mock('../../hooks/use-depth-evaluation', () => ({
+jest.mock('../../hooks/use-depth-evaluation', () => ({ // gc1-allow: React 19 invariant — sync notifyManager + useEffect mutate crash
   useDepthEvaluation: () => ({ mutate: jest.fn() }),
 }));
 
@@ -134,7 +85,7 @@ const mockReadSummaryDraft = jest.fn();
 const mockWriteSummaryDraft = jest.fn();
 const mockClearSummaryDraft = jest.fn();
 
-jest.mock('../../lib/summary-draft', () => ({
+jest.mock('../../lib/summary-draft', () => ({ // gc1-allow: summary-draft reads/writes SecureStore (native boundary)
   readSummaryDraft: (...args: unknown[]) => mockReadSummaryDraft(...args),
   writeSummaryDraft: (...args: unknown[]) => mockWriteSummaryDraft(...args),
   clearSummaryDraft: (...args: unknown[]) => mockClearSummaryDraft(...args),
@@ -244,36 +195,9 @@ const mockFetch = createRoutedMockFetch({
   'learning-mode': () => ({ mode: 'casual' }),
 });
 
-jest.mock('../../lib/api-client', () =>
+jest.mock('../../lib/api-client', () => // gc1-allow: transport boundary (api-client is the fetch layer, mocked via mockApiClientFactory)
   require('../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch),
 );
-
-// Create a fresh QueryClient per test to prevent cross-test query cache
-// contamination. With fetch-boundary mocks, queries are async and shared
-// client state from previous tests can bleed into the next test.
-function createWrapper() {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: {
-        retry: false,
-        gcTime: 0,
-        // refetchInterval: false here only sets the default; useSessionSummary
-        // overrides it per-query to poll until learnerRecap is set. We supply
-        // learnerRecap in every session-summary response so the polling stops
-        // immediately on the first response.
-        refetchOnWindowFocus: false,
-      },
-    },
-  });
-  return function Wrapper({ children }: { children: React.ReactNode }) {
-    return (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-    );
-  };
-}
-
-// Alias for tests that were already using `Wrapper` directly.
-let Wrapper: ReturnType<typeof createWrapper>;
 
 const SessionSummaryScreen = require('./[sessionId]').default;
 
@@ -312,9 +236,11 @@ describe('SessionSummaryScreen', () => {
     mockTranscriptData = null;
     mockSessionSummaryData = null;
     mockTotalSessions = 0;
-    mockBack.mockClear();
-    mockCanGoBack.mockReset();
-    mockCanGoBack.mockReturnValue(false);
+    routerFns.back.mockClear();
+    routerFns.canGoBack.mockReset();
+    routerFns.canGoBack.mockReturnValue(false);
+    routerFns.push.mockClear();
+    routerFns.replace.mockClear();
     mockOnSuccessfulRecall.mockResolvedValue(undefined);
     // Reset recall-bridge to the default rejection
     mockFetch.setRoute(
@@ -346,13 +272,16 @@ describe('SessionSummaryScreen', () => {
       }
       return { session: null };
     });
-    // Create a fresh wrapper (and QueryClient) per test to prevent cross-test
-    // query cache contamination from async fetch-boundary responses.
-    Wrapper = createWrapper();
   });
 
+  function renderScreen() {
+    const { wrapper, queryClient } = createScreenWrapper();
+    const result = render(<SessionSummaryScreen />, { wrapper });
+    return { ...result, queryClient };
+  }
+
   it('renders session takeaways', () => {
-    render(<SessionSummaryScreen />, { wrapper: Wrapper });
+    renderScreen();
 
     screen.getByTestId('summary-title');
     screen.getByText('Session Complete');
@@ -381,7 +310,7 @@ describe('SessionSummaryScreen', () => {
       messages: [],
     } as unknown as never;
 
-    render(<SessionSummaryScreen />, { wrapper: Wrapper });
+    renderScreen();
 
     // The takeaways block is only rendered when exchanges > 0, so with an
     // explicit 0 the "worked through ... exchanges" copy must NOT appear.
@@ -399,7 +328,7 @@ describe('SessionSummaryScreen', () => {
     mockParams.wallClockSeconds = undefined;
     mockTranscriptData = null;
 
-    render(<SessionSummaryScreen />, { wrapper: Wrapper });
+    renderScreen();
 
     // No "minute - great session!" copy must appear when duration is unknown.
     expect(screen.queryByText(/minute.*great session/i)).toBeNull();
@@ -410,13 +339,13 @@ describe('SessionSummaryScreen', () => {
   it('[BUG-805] renders the duration takeaway once wallClockSeconds is known', () => {
     mockParams.wallClockSeconds = '900';
 
-    render(<SessionSummaryScreen />, { wrapper: Wrapper });
+    renderScreen();
 
     screen.getByText(/15 minutes - great session!/);
   });
 
   it('renders summary input', () => {
-    render(<SessionSummaryScreen />, { wrapper: Wrapper });
+    renderScreen();
 
     screen.getByText('Your Words');
     screen.getByTestId('summary-input');
@@ -427,7 +356,7 @@ describe('SessionSummaryScreen', () => {
     it('renders after two sessions and routes owners to mentor memory', async () => {
       mockTotalSessions = 2;
 
-      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+      renderScreen();
 
       const cue = await screen.findByTestId(
         'session-summary-mentor-memory-cue',
@@ -437,7 +366,7 @@ describe('SessionSummaryScreen', () => {
 
       fireEvent.press(cue);
 
-      expect(mockPush).toHaveBeenCalledWith('/(app)/mentor-memory');
+      expect(routerFns.push).toHaveBeenCalledWith('/(app)/mentor-memory');
     });
 
     it('routes parent-proxy users to the child mentor-memory screen when consented', async () => {
@@ -452,13 +381,13 @@ describe('SessionSummaryScreen', () => {
         parentProfile: { id: 'parent-1', isOwner: true } as never,
       });
 
-      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+      renderScreen();
 
       fireEvent.press(
         await screen.findByTestId('session-summary-mentor-memory-cue'),
       );
 
-      expect(mockPush).toHaveBeenCalledWith({
+      expect(routerFns.push).toHaveBeenCalledWith({
         pathname: '/(app)/child/[profileId]/mentor-memory',
         params: { profileId: 'child-profile-id' },
       });
@@ -469,7 +398,7 @@ describe('SessionSummaryScreen', () => {
       async (totalSessions) => {
         mockTotalSessions = totalSessions;
 
-        render(<SessionSummaryScreen />, { wrapper: Wrapper });
+        renderScreen();
 
         await waitFor(() => {
           expect(screen.queryByTestId('session-takeaways')).not.toBeNull();
@@ -492,7 +421,7 @@ describe('SessionSummaryScreen', () => {
         parentProfile: { id: 'parent-1', isOwner: true } as never,
       });
 
-      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+      renderScreen();
 
       await waitFor(() => {
         expect(screen.queryByTestId('session-takeaways')).not.toBeNull();
@@ -504,7 +433,7 @@ describe('SessionSummaryScreen', () => {
   });
 
   it('disables submit when summary is too short', () => {
-    render(<SessionSummaryScreen />, { wrapper: Wrapper });
+    renderScreen();
 
     fireEvent.changeText(screen.getByTestId('summary-input'), 'Short');
 
@@ -525,7 +454,7 @@ describe('SessionSummaryScreen', () => {
       },
     };
 
-    render(<SessionSummaryScreen />, { wrapper: Wrapper });
+    renderScreen();
 
     fireEvent.changeText(
       screen.getByTestId('summary-input'),
@@ -551,7 +480,7 @@ describe('SessionSummaryScreen', () => {
       },
     };
 
-    render(<SessionSummaryScreen />, { wrapper: Wrapper });
+    renderScreen();
 
     fireEvent.changeText(
       screen.getByTestId('summary-input'),
@@ -565,7 +494,7 @@ describe('SessionSummaryScreen', () => {
 
     fireEvent.press(screen.getByTestId('continue-button'));
     await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
+      expect(routerFns.replace).toHaveBeenCalledWith('/(app)/home');
     });
   });
 
@@ -595,7 +524,7 @@ describe('SessionSummaryScreen', () => {
       exchanges: [],
     };
 
-    render(<SessionSummaryScreen />, { wrapper: Wrapper });
+    renderScreen();
 
     fireEvent.changeText(
       screen.getByTestId('summary-input'),
@@ -611,18 +540,18 @@ describe('SessionSummaryScreen', () => {
 
     await waitFor(() => {
       expect(mockOnSuccessfulRecall).toHaveBeenCalled();
-      expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
+      expect(routerFns.replace).toHaveBeenCalledWith('/(app)/home');
     });
   });
 
   it('persists skip before leaving the screen', async () => {
-    render(<SessionSummaryScreen />, { wrapper: Wrapper });
+    renderScreen();
 
     const skipButton = screen.getByTestId('skip-summary-button');
     fireEvent.press(skipButton);
 
     await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
+      expect(routerFns.replace).toHaveBeenCalledWith('/(app)/home');
     });
   });
 
@@ -638,7 +567,7 @@ describe('SessionSummaryScreen', () => {
       consecutiveSummarySkips: 5,
     };
 
-    render(<SessionSummaryScreen />, { wrapper: Wrapper });
+    renderScreen();
 
     fireEvent.press(screen.getByTestId('skip-summary-button'));
 
@@ -649,7 +578,7 @@ describe('SessionSummaryScreen', () => {
         expect.arrayContaining([expect.objectContaining({ text: 'Got it' })]),
       );
     });
-    expect(mockReplace).not.toHaveBeenCalled();
+    expect(routerFns.replace).not.toHaveBeenCalled();
 
     const promptButtons = (platformAlert as jest.Mock).mock.calls[0]?.[2] as
       | Array<{ text?: string; onPress?: () => void }>
@@ -660,7 +589,7 @@ describe('SessionSummaryScreen', () => {
     okButton?.onPress?.();
 
     await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
+      expect(routerFns.replace).toHaveBeenCalledWith('/(app)/home');
     });
   });
 
@@ -672,7 +601,7 @@ describe('SessionSummaryScreen', () => {
       topicTitle: 'Algebra',
     }));
 
-    render(<SessionSummaryScreen />, { wrapper: Wrapper });
+    renderScreen();
 
     fireEvent.press(screen.getByTestId('skip-summary-button'));
 
@@ -684,13 +613,13 @@ describe('SessionSummaryScreen', () => {
     });
 
     // Should NOT have navigated home yet
-    expect(mockReplace).not.toHaveBeenCalled();
+    expect(routerFns.replace).not.toHaveBeenCalled();
 
     // Press "Done — head home" to navigate
     fireEvent.press(screen.getByTestId('recall-bridge-done-button'));
 
     await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
+      expect(routerFns.replace).toHaveBeenCalledWith('/(app)/home');
     });
   });
 
@@ -702,12 +631,12 @@ describe('SessionSummaryScreen', () => {
       topicTitle: 'Algebra',
     }));
 
-    render(<SessionSummaryScreen />, { wrapper: Wrapper });
+    renderScreen();
 
     fireEvent.press(screen.getByTestId('skip-summary-button'));
 
     await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
+      expect(routerFns.replace).toHaveBeenCalledWith('/(app)/home');
     });
   });
 
@@ -726,7 +655,7 @@ describe('SessionSummaryScreen', () => {
       return { session: null };
     });
 
-    render(<SessionSummaryScreen />, { wrapper: Wrapper });
+    renderScreen();
 
     fireEvent.changeText(
       screen.getByTestId('summary-input'),
@@ -763,7 +692,7 @@ describe('SessionSummaryScreen', () => {
       return { session: null };
     });
 
-    render(<SessionSummaryScreen />, { wrapper: Wrapper });
+    renderScreen();
 
     fireEvent.changeText(
       screen.getByTestId('summary-input'),
@@ -793,7 +722,7 @@ describe('SessionSummaryScreen', () => {
       return { session: null };
     });
 
-    render(<SessionSummaryScreen />, { wrapper: Wrapper });
+    renderScreen();
 
     fireEvent.changeText(
       screen.getByTestId('summary-input'),
@@ -814,7 +743,7 @@ describe('SessionSummaryScreen', () => {
   // BUG-33 Phase 1: Structured sentence starter prompt chips
   describe('summary prompt chips (BUG-33 Phase 1)', () => {
     it('renders all five sentence starter chips', () => {
-      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+      renderScreen();
 
       screen.getByTestId('summary-prompt-chips');
       screen.getByText('Today I learned that...');
@@ -825,7 +754,7 @@ describe('SessionSummaryScreen', () => {
     });
 
     it('tapping a prompt chip pre-fills the text input', () => {
-      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+      renderScreen();
 
       fireEvent.press(screen.getByText('Today I learned that...'));
 
@@ -835,7 +764,7 @@ describe('SessionSummaryScreen', () => {
     });
 
     it('tapping a different prompt chip replaces the input text', () => {
-      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+      renderScreen();
 
       fireEvent.press(screen.getByText('Today I learned that...'));
       fireEvent.press(screen.getByText('The most interesting thing was...'));
@@ -846,7 +775,7 @@ describe('SessionSummaryScreen', () => {
     });
 
     it('each prompt chip has an accessible label matching its text', () => {
-      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+      renderScreen();
 
       screen.getByLabelText('Today I learned that...');
     });
@@ -862,7 +791,7 @@ describe('SessionSummaryScreen', () => {
         },
       };
 
-      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+      renderScreen();
 
       fireEvent.changeText(
         screen.getByTestId('summary-input'),
@@ -889,7 +818,7 @@ describe('SessionSummaryScreen', () => {
       ]),
     );
 
-    render(<SessionSummaryScreen />, { wrapper: Wrapper });
+    renderScreen();
 
     screen.getByTestId('milestone-recap');
     screen.getByText(/Polar Star/);
@@ -908,7 +837,7 @@ describe('SessionSummaryScreen', () => {
       JSON.stringify([1, 2, 'polar_star', null, { foo: 'bar' }, 'persistent']),
     );
 
-    render(<SessionSummaryScreen />, { wrapper: Wrapper });
+    renderScreen();
 
     screen.getByTestId('milestone-recap');
     screen.getByText(/Polar Star/);
@@ -921,12 +850,12 @@ describe('SessionSummaryScreen', () => {
       mockParams.subjectId = 'subject-1';
       mockParams.topicId = 'topic-1';
 
-      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+      renderScreen();
 
       const cta = screen.getByTestId('resume-session-cta');
       fireEvent.press(cta);
 
-      expect(mockPush).toHaveBeenCalledWith({
+      expect(routerFns.push).toHaveBeenCalledWith({
         pathname: '/(app)/session',
         params: {
           mode: 'learning',
@@ -944,7 +873,7 @@ describe('SessionSummaryScreen', () => {
         parentProfile: { id: 'parent-1', isOwner: true } as never,
       });
 
-      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+      renderScreen();
 
       expect(screen.queryByTestId('resume-session-cta')).toBeNull();
     });
@@ -955,7 +884,7 @@ describe('SessionSummaryScreen', () => {
   describe('transcript link visibility [CR-PR129-M5]', () => {
     it('shows the transcript link when the viewer is the session owner (proxy OFF)', () => {
       // Default mockUseParentProxy returns isParentProxy: false (set in beforeEach).
-      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+      renderScreen();
 
       screen.getByTestId('view-transcript-cta');
     });
@@ -967,7 +896,7 @@ describe('SessionSummaryScreen', () => {
         parentProfile: { id: 'parent-1', isOwner: true } as never,
       });
 
-      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+      renderScreen();
 
       expect(screen.queryByTestId('view-transcript-cta')).toBeNull();
     });
@@ -986,7 +915,7 @@ describe('SessionSummaryScreen', () => {
         status: 'submitted',
       };
 
-      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+      renderScreen();
 
       await waitFor(() => {
         screen.getByTestId('summary-submitted');
@@ -1012,7 +941,7 @@ describe('SessionSummaryScreen', () => {
         status: 'accepted',
       };
 
-      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+      renderScreen();
 
       await waitFor(() => {
         screen.getByTestId('summary-submitted');
@@ -1032,7 +961,7 @@ describe('SessionSummaryScreen', () => {
         status: 'skipped',
       };
 
-      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+      renderScreen();
 
       await waitFor(() => {
         screen.getByTestId('summary-skipped-state');
@@ -1051,7 +980,7 @@ describe('SessionSummaryScreen', () => {
         status: 'submitted',
       };
 
-      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+      renderScreen();
 
       await waitFor(() => {
         screen.getByTestId('continue-button');
@@ -1060,7 +989,7 @@ describe('SessionSummaryScreen', () => {
       fireEvent.press(screen.getByTestId('continue-button'));
 
       await waitFor(() => {
-        expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
+        expect(routerFns.replace).toHaveBeenCalledWith('/(app)/home');
       });
     });
 
@@ -1073,7 +1002,7 @@ describe('SessionSummaryScreen', () => {
         status: 'submitted',
       };
 
-      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+      renderScreen();
 
       await waitFor(() => {
         screen.getByTestId('summary-close-button');
@@ -1082,7 +1011,7 @@ describe('SessionSummaryScreen', () => {
       fireEvent.press(screen.getByTestId('summary-close-button'));
 
       await waitFor(() => {
-        expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
+        expect(routerFns.replace).toHaveBeenCalledWith('/(app)/home');
       });
     });
 
@@ -1094,9 +1023,9 @@ describe('SessionSummaryScreen', () => {
         aiFeedback: 'Nice work.',
         status: 'submitted',
       };
-      mockCanGoBack.mockReturnValue(true);
+      routerFns.canGoBack.mockReturnValue(true);
 
-      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+      renderScreen();
 
       await waitFor(() => {
         screen.getByTestId('continue-button');
@@ -1105,9 +1034,9 @@ describe('SessionSummaryScreen', () => {
       fireEvent.press(screen.getByTestId('continue-button'));
 
       await waitFor(() => {
-        expect(mockBack).toHaveBeenCalled();
+        expect(routerFns.back).toHaveBeenCalled();
       });
-      expect(mockReplace).not.toHaveBeenCalledWith('/(app)/home');
+      expect(routerFns.replace).not.toHaveBeenCalledWith('/(app)/home');
     });
   });
 
@@ -1116,7 +1045,7 @@ describe('SessionSummaryScreen', () => {
   // on every exit path, and draft recovery on a previously-skipped session.
   describe('bulletproof drafting [DRAFT-BULLETPROOF-01]', () => {
     it('autosaves the draft after the user types (debounced)', async () => {
-      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+      renderScreen();
 
       fireEvent.changeText(
         screen.getByTestId('summary-input'),
@@ -1143,7 +1072,7 @@ describe('SessionSummaryScreen', () => {
         updatedAt: new Date().toISOString(),
       });
 
-      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+      renderScreen();
 
       await waitFor(() => {
         expect(screen.getByTestId('summary-input').props.value).toBe(
@@ -1153,7 +1082,7 @@ describe('SessionSummaryScreen', () => {
     });
 
     it('a typed-but-unsubmitted draft opens a confirm dialog on close, not a silent skip', async () => {
-      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+      renderScreen();
 
       fireEvent.changeText(
         screen.getByTestId('summary-input'),
@@ -1169,7 +1098,7 @@ describe('SessionSummaryScreen', () => {
     });
 
     it('"Discard" in the confirm dialog clears the draft and then skips the server record', async () => {
-      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+      renderScreen();
 
       fireEvent.changeText(
         screen.getByTestId('summary-input'),
@@ -1191,12 +1120,12 @@ describe('SessionSummaryScreen', () => {
         expect(mockClearSummaryDraft).toHaveBeenCalled();
       });
       await waitFor(() => {
-        expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
+        expect(routerFns.replace).toHaveBeenCalledWith('/(app)/home');
       });
     });
 
     it('"Keep writing" in the confirm dialog does NOT call skip or clear', async () => {
-      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+      renderScreen();
 
       fireEvent.changeText(
         screen.getByTestId('summary-input'),
@@ -1216,7 +1145,7 @@ describe('SessionSummaryScreen', () => {
 
       // Yield one microtask to let any erroneous downstream calls land.
       await Promise.resolve();
-      expect(mockReplace).not.toHaveBeenCalled();
+      expect(routerFns.replace).not.toHaveBeenCalled();
     });
 
     it('"Submit now" in the confirm dialog submits the summary instead of skipping', async () => {
@@ -1230,7 +1159,7 @@ describe('SessionSummaryScreen', () => {
         },
       };
 
-      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+      renderScreen();
 
       fireEvent.changeText(
         screen.getByTestId('summary-input'),
@@ -1254,13 +1183,13 @@ describe('SessionSummaryScreen', () => {
     });
 
     it('empty input + close still performs the silent skip (no dialog)', async () => {
-      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+      renderScreen();
 
       // User types nothing, just taps X.
       fireEvent.press(screen.getByTestId('summary-close-button'));
 
       await waitFor(() => {
-        expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
+        expect(routerFns.replace).toHaveBeenCalledWith('/(app)/home');
       });
       expect(platformAlert).not.toHaveBeenCalled();
     });
@@ -1280,7 +1209,7 @@ describe('SessionSummaryScreen', () => {
         updatedAt: new Date().toISOString(),
       });
 
-      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+      renderScreen();
 
       await waitFor(() => {
         screen.getByTestId('summary-resubmit-banner');
@@ -1300,7 +1229,7 @@ describe('SessionSummaryScreen', () => {
         status: 'submitted',
       };
 
-      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+      renderScreen();
 
       await waitFor(() => {
         expect(mockClearSummaryDraft).toHaveBeenCalled();
