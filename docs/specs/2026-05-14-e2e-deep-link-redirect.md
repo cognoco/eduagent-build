@@ -1,6 +1,6 @@
 # E2E Spec — Deep-link Auth Redirect Preservation
 
-**Status:** Draft 2026-05-14
+**Status:** Draft 2026-05-14 (corrected 2026-05-14: `__test/seed-pending-redirect` → `dev-only/seed-pending-redirect` — Expo Router treats `_`-prefixed paths as private routes; using `dev-only/` so the route is reachable via openLink)
 **Owner:** _TBD — pick up by E2E rotation_
 **Related Notion:** Android E2E Issues Tracker `AUTH-13 Deep-link auth redirect preservation` (High)
 
@@ -48,7 +48,7 @@ The TTL row is the one easy to miss: if a user takes >5 minutes to enter credent
 
 **TTL test mechanism.** Server-side endpoints cannot help here: the `pendingAuthRedirect` record lives entirely on the device (in-memory + sessionStorage on web). Nothing from the network ever writes into it. The three options that actually work, ranked:
 
-1. **Dev-only test seed route inside the mobile app.** Register an Expo Router screen at `apps/mobile/src/app/__test/seed-pending-redirect.tsx`, guarded by `if (process.env.NODE_ENV !== 'production' && Constants.appOwnership === 'expo')` (or a build-time `EXPO_PUBLIC_E2E === 'true'` flag), that reads `path` and `staleMs` from search params and calls `rememberPendingAuthRedirect(path)` with a manually back-dated `savedAt`. Maestro hits it via `openLink: mentomate:///__test/seed-pending-redirect?path=%2F(app)%2Flibrary&staleMs=360000`. Preferred — keeps test-only behaviour in the mobile bundle that already has dev-client variants.
+1. **Dev-only test seed route inside the mobile app.** Register an Expo Router screen at `apps/mobile/src/app/dev-only/seed-pending-redirect.tsx`, guarded by `if (process.env.NODE_ENV !== 'production' && Constants.appOwnership === 'expo')` (or a build-time `EXPO_PUBLIC_E2E === 'true'` flag), that reads `path` and `staleMs` from search params and calls `rememberPendingAuthRedirect(path)` with a manually back-dated `savedAt`. Maestro hits it via `openLink: mentomate:///dev-only/seed-pending-redirect?path=%2F(app)%2Flibrary&staleMs=360000`. Preferred — keeps test-only behaviour in the mobile bundle that already has dev-client variants.
 2. **`EXPO_PUBLIC_PENDING_AUTH_REDIRECT_TTL_MS` override.** Make `PENDING_AUTH_REDIRECT_TTL_MS` read from env with a 5-min default, and set a 2-second value in E2E builds. Simpler, but the production binary diverges from the test binary, and the TTL is no longer the production TTL — so the test is no longer asserting production behaviour. Lower confidence.
 3. **Wait it out (≥5 min).** Honest and high-fidelity, but blows the regression-suite time budget.
 
@@ -81,7 +81,7 @@ This one is shorter — no sign-in detour, just verifying the existing Expo Rout
 | Step | Mechanism | Assertion |
 |---|---|---|
 | Cold start at sign-in | `seed-and-run.sh --no-seed` | sign-in screen visible |
-| Fire `openLink: mentomate:///__test/seed-pending-redirect?path=%2F(app)%2Flibrary&staleMs=360000` | Maestro | screen shows `pending-redirect-seeded` testID confirming the record was written with stale `savedAt` |
+| Fire `openLink: mentomate:///dev-only/seed-pending-redirect?path=%2F(app)%2Flibrary&staleMs=360000` | Maestro | screen shows `pending-redirect-seeded` testID confirming the record was written with stale `savedAt` |
 | Navigate back to sign-in (the seed route auto-redirects) | seed route handler | sign-in screen visible |
 | Sign in | seed-and-run.sh standard | session activated |
 | Wait for navigation | `extendedWaitUntil` | `home-screen` visible (TTL fallback fired), NOT `library-screen` |
@@ -112,7 +112,7 @@ Alternative if a dev-only mobile route is unwelcome: skip flow 3 for now and doc
 - `e2e/flows/auth/deep-link-redirect-signed-out.yaml`
 - `e2e/flows/auth/deep-link-redirect-signed-in.yaml`
 - `e2e/flows/auth/deep-link-redirect-ttl-expired.yaml` (conditional on the dev-only seed route)
-- New dev-only route `apps/mobile/src/app/__test/seed-pending-redirect.tsx` (gated by `NODE_ENV !== 'production'`), if pursuing option 1 of the TTL test mechanism
+- New dev-only route `apps/mobile/src/app/dev-only/seed-pending-redirect.tsx` (gated by `NODE_ENV !== 'production'`), if pursuing option 1 of the TTL test mechanism
 - Unit test on `toInternalAppRedirectPath` malformed-input fallback (likely already exists at `apps/mobile/src/lib/normalize-redirect-path.test.ts` — verify before adding)
 
 ## Non-goals

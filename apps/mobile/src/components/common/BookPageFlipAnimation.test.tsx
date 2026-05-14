@@ -121,6 +121,13 @@ describe('BookPageFlipAnimation', () => {
     // No bare `G` (Group) import from react-native-svg — even if not animated
     // today, importing it invites the next contributor to animate it. Allowed
     // primitives: Svg, Defs, Rect / SvgRect, LinearGradient, Stop, Path, Circle.
+    //
+    // Limitation: this regex matches the FIRST `react-native-svg` import
+    // statement only. If the file ever declares two separate imports from
+    // 'react-native-svg' (e.g. a type-only import plus a value import), a
+    // forbidden symbol smuggled into the second statement would not be
+    // caught. Today the file has a single import clause and this is fine —
+    // revisit if that ever changes.
     const svgImportMatch = stripped.match(
       /import\s+([^;]+?)\s+from\s+['"]react-native-svg['"]/,
     );

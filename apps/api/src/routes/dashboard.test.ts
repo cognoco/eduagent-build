@@ -190,63 +190,83 @@ describe('dashboard routes', () => {
       expect(res.status).toBe(401);
     });
 
-    it('[BUG-62] returns 200 with redacted child for PENDING-consent profile (regression: route used to 403)', async () => {
-      // Regression: commit d1a1f27d5 (2026-05-07) added a route-entry call to
-      // assertChildDashboardDataVisible that threw ForbiddenError (→ 403)
-      // whenever the child's latest consent status was not CONSENTED. The
-      // mobile child-detail screen handles restricted consent by rendering a
-      // dedicated panel using the redacted child object that getChildDetail
-      // returns via redactDashboardChild — but the route-level 403 short-
-      // circuited the response, so parents landed on a generic "Try Again /
-      // Back to dashboard" error fallback instead of the consent-restricted
-      // panel.
-      //
-      // Fix: removed the route-entry assertion. assertParentAccess (the IDOR
-      // guard) still runs. Service-layer redaction zeroes metrics for non-
-      // CONSENTED status, so the response is safe.
-      mockFindConsentState.mockResolvedValueOnce({ status: 'PENDING' });
-      const redactedChild = {
-        profileId: PROFILE_ID,
-        displayName: 'Timmy',
-        consentStatus: 'PENDING',
-        respondedAt: null,
+    // Regression: commit d1a1f27d5 (2026-05-07) added a route-entry call to
+    // assertChildDashboardDataVisible that threw ForbiddenError (→ 403)
+    // whenever the child's latest consent status was not CONSENTED. The
+    // mobile child-detail screen handles restricted consent by rendering a
+    // dedicated panel using the redacted child object that getChildDetail
+    // returns via redactDashboardChild — but the route-level 403 short-
+    // circuited the response, so parents landed on a generic "Try Again /
+    // Back to dashboard" error fallback instead of the consent-restricted
+    // panel.
+    //
+    // Fix: removed the route-entry assertion. assertParentAccess (the IDOR
+    // guard) still runs. Service-layer redaction zeroes metrics for non-
+    // CONSENTED status, so the response is safe. Parameterized across every
+    // non-CONSENTED status so the route is verified to never 403 on any of
+    // the redaction-eligible states.
+    it.each([
+      {
+        status: 'PENDING' as const,
         summary:
           'Timmy: consent is pending. Learning metrics are hidden until consent is active.',
-        sessionsThisWeek: 0,
-        sessionsLastWeek: 0,
-        totalTimeThisWeek: 0,
-        totalTimeLastWeek: 0,
-        exchangesThisWeek: 0,
-        exchangesLastWeek: 0,
-        trend: 'stable' as const,
-        subjects: [],
-        guidedVsImmediateRatio: 0,
-        retentionTrend: 'stable' as const,
-        totalSessions: 0,
-        currentlyWorkingOn: [],
-        progress: null,
-        currentStreak: 0,
-        longestStreak: 0,
-        totalXp: 0,
-      };
-      mockGetChildDetail.mockResolvedValueOnce(redactedChild);
+      },
+      {
+        status: 'PARENTAL_CONSENT_REQUESTED' as const,
+        summary:
+          'Timmy: waiting for parent approval. Learning metrics are hidden until consent is active.',
+      },
+      {
+        status: 'WITHDRAWN' as const,
+        summary:
+          'Timmy: consent has been withdrawn. Learning metrics are hidden.',
+      },
+    ])(
+      '[BUG-62] returns 200 with redacted child for $status consent (regression: route used to 403)',
+      async ({ status, summary }) => {
+        mockFindConsentState.mockResolvedValueOnce({ status });
+        const redactedChild = {
+          profileId: PROFILE_ID,
+          displayName: 'Timmy',
+          consentStatus: status,
+          respondedAt: null,
+          summary,
+          sessionsThisWeek: 0,
+          sessionsLastWeek: 0,
+          totalTimeThisWeek: 0,
+          totalTimeLastWeek: 0,
+          exchangesThisWeek: 0,
+          exchangesLastWeek: 0,
+          trend: 'stable' as const,
+          subjects: [],
+          guidedVsImmediateRatio: 0,
+          retentionTrend: 'stable' as const,
+          totalSessions: 0,
+          currentlyWorkingOn: [],
+          progress: null,
+          currentStreak: 0,
+          longestStreak: 0,
+          totalXp: 0,
+        };
+        mockGetChildDetail.mockResolvedValueOnce(redactedChild);
 
-      const res = await app.request(
-        `/v1/dashboard/children/${PROFILE_ID}`,
-        { headers: AUTH_HEADERS },
-        TEST_ENV,
-      );
+        const res = await app.request(
+          `/v1/dashboard/children/${PROFILE_ID}`,
+          { headers: AUTH_HEADERS },
+          TEST_ENV,
+        );
 
-      expect(res.status).toBe(200);
-      const body = await res.json();
-      expect(body.child).toMatchObject({
-        profileId: PROFILE_ID,
-        displayName: 'Timmy',
-        consentStatus: 'PENDING',
-        sessionsThisWeek: 0,
-        totalSessions: 0,
-      });
-    });
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body.child).toMatchObject({
+          profileId: PROFILE_ID,
+          displayName: 'Timmy',
+          consentStatus: status,
+          sessionsThisWeek: 0,
+          totalSessions: 0,
+        });
+      },
+    );
   });
 
   // -------------------------------------------------------------------------

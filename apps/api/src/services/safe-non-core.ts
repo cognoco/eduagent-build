@@ -10,8 +10,9 @@ function extractProfileId(
 }
 
 /**
- * Fire an Inngest event that is not part of the core user action.
- * Failures are captured in Sentry and logged — never thrown.
+ * Run a non-core async dispatch (Inngest send, webhook, metric emit, etc.)
+ * whose failure must not break the surrounding user action. Failures are
+ * captured in Sentry and logged — never thrown.
  */
 export async function safeSend(
   send: () => Promise<unknown>,
