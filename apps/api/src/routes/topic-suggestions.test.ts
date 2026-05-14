@@ -32,7 +32,7 @@ jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 // Mock account service — resolves Clerk user → local Account
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/account', () => {
+jest.mock('../services/account', () => { // gc1-allow: requireActual + targeted overrides
   const actual = jest.requireActual('../services/account') as Record<
     string,
     unknown
@@ -53,7 +53,7 @@ jest.mock('../services/account', () => {
 // Mock profile service — profile-scope middleware auto-resolves owner profile
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/profile', () => {
+jest.mock('../services/profile', () => { // gc1-allow: requireActual + targeted overrides
   const actual = jest.requireActual('../services/profile') as Record<
     string,
     unknown
@@ -85,7 +85,7 @@ jest.mock('../services/profile', () => {
 // Mock suggestion services — stub for route handler
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/suggestions', () => {
+jest.mock('../services/suggestions', () => { // gc1-allow: requireActual + targeted overrides
   const actual = jest.requireActual('../services/suggestions') as Record<
     string,
     unknown

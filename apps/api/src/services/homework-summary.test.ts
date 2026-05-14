@@ -1,4 +1,4 @@
-jest.mock('./llm', () => {
+jest.mock('./llm', () => { // gc1-allow: LLM external boundary (routeAndCall); requireActual spread applied
   const actual = jest.requireActual('./llm') as Record<string, unknown>;
   return {
     ...actual,

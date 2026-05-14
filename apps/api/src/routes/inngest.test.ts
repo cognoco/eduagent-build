@@ -2,7 +2,7 @@
 // Inngest Route Tests
 // ---------------------------------------------------------------------------
 
-jest.mock('../inngest', () => {
+jest.mock('../inngest', () => { // gc1-allow: requireActual + targeted overrides — keeps Inngest client out of route-mount tests
   const actual = jest.requireActual('../inngest') as Record<string, unknown>;
   return {
     ...actual,
