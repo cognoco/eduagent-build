@@ -5,10 +5,6 @@ import {
   cleanupScreen,
   errorResponses,
 } from '../../../../../test-utils/screen-render-harness';
-import {
-  expoRouterShim,
-  safeAreaShim,
-} from '../../../../test-utils/native-shims';
 
 const mockFetch = createRoutedMockFetch();
 
@@ -16,10 +12,32 @@ jest.mock('../../../../lib/api-client', () => // gc1-allow: transport-boundary �
   require('../../../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch),
 );
 
-let routerMock: ReturnType<typeof expoRouterShim>;
-jest.mock('expo-router', () => routerMock); // gc1-allow: native-boundary — Expo Router requires native bindings unavailable in Jest
+const mockRouterFns = {
+  push: jest.fn(),
+  replace: jest.fn(),
+  back: jest.fn(),
+  navigate: jest.fn(),
+  dismiss: jest.fn(),
+  canGoBack: jest.fn(() => false),
+  setParams: jest.fn(),
+};
+const mockRouterParams: Record<string, string> = {};
+jest.mock('expo-router', () => { // gc1-allow: native-boundary — Expo Router requires native bindings unavailable in Jest
+  const RN = require('react-native');
+  return {
+    useRouter: () => mockRouterFns,
+    useLocalSearchParams: () => mockRouterParams,
+    useGlobalSearchParams: () => mockRouterParams,
+    useSegments: () => [],
+    usePathname: () => '/',
+    Link: RN.Text,
+    useFocusEffect: jest.fn(),
+  };
+});
 
-jest.mock('react-native-safe-area-context', () => safeAreaShim()); // gc1-allow: native-boundary — safe-area context requires native bindings unavailable in Jest
+jest.mock('react-native-safe-area-context', () => // gc1-allow: native-boundary — safe-area context requires native bindings unavailable in Jest
+  require('../../../../test-utils/native-shims').safeAreaShim(),
+);
 
 jest.mock('react-i18next', () => ({ // gc1-allow: external-boundary — i18next initialisation requires the full i18n provider chain unavailable in Jest
   useTranslation: () => ({
@@ -108,7 +126,15 @@ const WEEKLY_REPORT_WITH_PRACTICE = {
 describe('ProgressWeeklyReportDetail', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    routerMock = expoRouterShim({}, { weeklyReportId: 'w-1' });
+    Object.keys(mockRouterParams).forEach((k) => delete (mockRouterParams as Record<string, unknown>)[k]);
+    mockRouterParams.weeklyReportId = 'w-1';
+    mockRouterFns.push.mockClear();
+    mockRouterFns.replace.mockClear();
+    mockRouterFns.back.mockClear();
+    mockRouterFns.navigate.mockClear();
+    mockRouterFns.dismiss.mockClear();
+    mockRouterFns.canGoBack.mockReset().mockImplementation(() => false);
+    mockRouterFns.setParams.mockClear();
     mockFetch.setRoute('/progress/weekly-reports/w-1', WEEKLY_REPORT_RESPONSE);
   });
 
@@ -163,7 +189,7 @@ describe('ProgressWeeklyReportDetail', () => {
     fireEvent.press(screen.getByTestId('progress-weekly-report-error-back'));
 
     // expoRouterShim sets canGoBack() → false by default, so goBackOrReplace calls replace
-    expect(routerMock.useRouter().replace).toHaveBeenCalledWith(
+    expect(mockRouterFns.replace).toHaveBeenCalledWith(
       '/(app)/progress/reports',
     );
     cleanupScreen(queryClient);
@@ -249,7 +275,7 @@ describe('ProgressWeeklyReportDetail', () => {
     fireEvent.press(screen.getByTestId('progress-weekly-report-back'));
 
     // expoRouterShim sets canGoBack() → false by default, so goBackOrReplace calls replace
-    expect(routerMock.useRouter().replace).toHaveBeenCalledWith(
+    expect(mockRouterFns.replace).toHaveBeenCalledWith(
       '/(app)/progress/reports',
     );
     cleanupScreen(queryClient);

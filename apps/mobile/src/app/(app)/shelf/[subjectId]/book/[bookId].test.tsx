@@ -23,18 +23,18 @@ jest.mock('../../../../../lib/api-client', () => // gc1-allow: transport boundar
 // Params are mutable so per-test overrides can supply readOnly / autoStart.
 // ---------------------------------------------------------------------------
 
-const routerFns = createRouterMockFns();
-let currentParams: Record<string, string> = { subjectId: 'sub-1', bookId: 'book-1' };
+const mockRouterFns = createRouterMockFns();
+let mockCurrentParams: Record<string, string> = { subjectId: 'sub-1', bookId: 'book-1' };
 
 jest.mock('expo-router', () => { // gc1-allow: native-boundary — Expo native module unavailable in Jest
   const { expoRouterShim: shim } = require('../../../../../test-utils/native-shims');
-  // Delegate to shim but proxy params through the mutable currentParams ref
-  const base = shim(routerFns, {});
+  // Delegate to shim but proxy params through the mutable mockCurrentParams ref
+  const base = shim(mockRouterFns, {});
   return {
     ...base,
-    useLocalSearchParams: () => currentParams,
-    useGlobalSearchParams: () => currentParams,
-    useRouter: () => routerFns,
+    useLocalSearchParams: () => mockCurrentParams,
+    useGlobalSearchParams: () => mockCurrentParams,
+    useRouter: () => mockRouterFns,
   };
 });
 
@@ -206,8 +206,8 @@ function makeWrapper() {
 describe('BookScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    currentParams = { subjectId: 'sub-1', bookId: 'book-1' };
-    routerFns.canGoBack.mockReturnValue(true);
+    mockCurrentParams = { subjectId: 'sub-1', bookId: 'book-1' };
+    mockRouterFns.canGoBack.mockReturnValue(true);
     makeDefaultRoutes();
   });
 
@@ -252,7 +252,7 @@ describe('BookScreen', () => {
     mockFetch.setRoute('subjects/sub-1/books/book-1', new Response(JSON.stringify({ error: 'Server exploded' }), { status: 500 }));
 
     const { wrapper } = makeWrapper();
-    const { getByTestId, getByText } = render(<BookScreen />, { wrapper });
+    const { getByTestId } = render(<BookScreen />, { wrapper });
 
     await waitFor(() => getByTestId('book-error'));
     // The assertOk-based error surfacing renders an error message
@@ -261,14 +261,14 @@ describe('BookScreen', () => {
     fireEvent.press(getByTestId('book-retry-button'));
     fireEvent.press(getByTestId('book-back-button'));
 
-    expect(routerFns.replace).toHaveBeenCalledWith({
+    expect(mockRouterFns.replace).toHaveBeenCalledWith({
       pathname: '/(app)/shelf/[subjectId]',
       params: { subjectId: 'sub-1' },
     });
   });
 
   it('shows missing-param guidance when route params are incomplete', () => {
-    currentParams = { subjectId: '', bookId: 'book-1' };
+    mockCurrentParams = { subjectId: '', bookId: 'book-1' };
 
     const { wrapper } = makeWrapper();
     const { getByTestId, getByText } = render(<BookScreen />, { wrapper });
@@ -283,8 +283,8 @@ describe('BookScreen', () => {
     // Before the fix, handleBack early-returned when subjectId was missing,
     // leaving the user trapped on the error screen with a button that did
     // nothing.
-    currentParams = { subjectId: '', bookId: 'book-1' };
-    routerFns.canGoBack.mockReturnValue(false);
+    mockCurrentParams = { subjectId: '', bookId: 'book-1' };
+    mockRouterFns.canGoBack.mockReturnValue(false);
 
     const { wrapper } = makeWrapper();
     const { getByTestId } = render(<BookScreen />, { wrapper });
@@ -294,9 +294,9 @@ describe('BookScreen', () => {
     // a silent no-op. With canGoBack=false (deep-link entry), goBackOrReplace
     // falls back to /(app)/library.
     const totalNavCalls =
-      routerFns.back.mock.calls.length + routerFns.replace.mock.calls.length;
+      mockRouterFns.back.mock.calls.length + mockRouterFns.replace.mock.calls.length;
     expect(totalNavCalls).toBeGreaterThan(0);
-    expect(routerFns.replace).toHaveBeenCalledWith('/(app)/library');
+    expect(mockRouterFns.replace).toHaveBeenCalledWith('/(app)/library');
   });
 
   it('[BUG-798 / F-NAV-05] missing bookId only — fallback navigates to subject shelf', () => {
@@ -305,13 +305,13 @@ describe('BookScreen', () => {
     // missing (subjectId still present), the user must reach the subject
     // shelf, not be left stranded. The previous bug report flagged that
     // bookId was "not equally guarded" — this locks the symmetric path.
-    currentParams = { subjectId: 'sub-1', bookId: '' };
+    mockCurrentParams = { subjectId: 'sub-1', bookId: '' };
 
     const { wrapper } = makeWrapper();
     const { getByTestId } = render(<BookScreen />, { wrapper });
     fireEvent.press(getByTestId('book-missing-param-back'));
 
-    expect(routerFns.replace).toHaveBeenCalledWith({
+    expect(mockRouterFns.replace).toHaveBeenCalledWith({
       pathname: '/(app)/shelf/[subjectId]',
       params: { subjectId: 'sub-1' },
     });
@@ -320,17 +320,17 @@ describe('BookScreen', () => {
   it('[BUG-798 / F-NAV-05] missing both params — fallback to library, never silent no-op', () => {
     // Worst case: deep link drops both segments. Must still escape to a
     // working surface (library), not the dreaded silent dead-end.
-    currentParams = { subjectId: '', bookId: '' };
-    routerFns.canGoBack.mockReturnValue(false);
+    mockCurrentParams = { subjectId: '', bookId: '' };
+    mockRouterFns.canGoBack.mockReturnValue(false);
 
     const { wrapper } = makeWrapper();
     const { getByTestId } = render(<BookScreen />, { wrapper });
     fireEvent.press(getByTestId('book-missing-param-back'));
 
     const totalNavCalls =
-      routerFns.back.mock.calls.length + routerFns.replace.mock.calls.length;
+      mockRouterFns.back.mock.calls.length + mockRouterFns.replace.mock.calls.length;
     expect(totalNavCalls).toBeGreaterThan(0);
-    expect(routerFns.replace).toHaveBeenCalledWith('/(app)/library');
+    expect(mockRouterFns.replace).toHaveBeenCalledWith('/(app)/library');
   });
 
   it('renders the compact header on the main view', async () => {
@@ -409,7 +409,7 @@ describe('BookScreen', () => {
     fireEvent.press(getByTestId('book-thin-path-build'));
 
     await waitFor(() => {
-      expect(routerFns.push).toHaveBeenCalledWith({
+      expect(mockRouterFns.push).toHaveBeenCalledWith({
         pathname: '/(app)/session',
         params: expect.objectContaining({
           mode: 'learning',
@@ -456,7 +456,7 @@ describe('BookScreen', () => {
     getByText('▶ Continue: Linear Equations');
 
     fireEvent.press(getByTestId('book-start-learning'));
-    expect(routerFns.push).toHaveBeenCalledWith({
+    expect(mockRouterFns.push).toHaveBeenCalledWith({
       pathname: '/(app)/topic/[topicId]',
       params: { topicId: 'topic-1', subjectId: 'sub-1', bookId: 'book-1' },
     });
@@ -510,7 +510,7 @@ describe('BookScreen', () => {
     getByText('▶ Start: Linear Equations');
 
     fireEvent.press(getByTestId('book-start-learning'));
-    expect(routerFns.push).toHaveBeenCalledWith({
+    expect(mockRouterFns.push).toHaveBeenCalledWith({
       pathname: '/(app)/session',
       params: {
         mode: 'learning',
@@ -564,7 +564,7 @@ describe('BookScreen', () => {
     await waitFor(() => getByTestId('book-screen'));
 
     fireEvent.press(getByTestId('book-start-learning'));
-    expect(routerFns.push).toHaveBeenCalledWith({
+    expect(mockRouterFns.push).toHaveBeenCalledWith({
       pathname: '/(app)/session',
       params: {
         mode: 'learning',
@@ -643,7 +643,7 @@ describe('BookScreen', () => {
 
     fireEvent.press(getByTestId('topics-empty-build'));
     await waitFor(() => {
-      expect(routerFns.push).toHaveBeenCalledWith(
+      expect(mockRouterFns.push).toHaveBeenCalledWith(
         expect.objectContaining({
           pathname: '/(app)/session',
           params: expect.objectContaining({
@@ -694,7 +694,7 @@ describe('BookScreen', () => {
     fireEvent.press(getByTestId('book-sessions-toggle'));
 
     fireEvent.press(getByTestId('session-sess-1'));
-    expect(routerFns.push).toHaveBeenCalledWith({
+    expect(mockRouterFns.push).toHaveBeenCalledWith({
       pathname: '/session-summary/[sessionId]',
       params: {
         sessionId: 'sess-1',
@@ -750,7 +750,7 @@ describe('BookScreen', () => {
     expect(queryByTestId('book-start-learning')).toBeNull();
 
     fireEvent.press(getByTestId('book-complete-review'));
-    expect(routerFns.push).toHaveBeenCalledWith({
+    expect(mockRouterFns.push).toHaveBeenCalledWith({
       pathname: '/(app)/topic/relearn',
       params: {
         topicId: 'topic-2',
@@ -760,7 +760,7 @@ describe('BookScreen', () => {
     });
 
     fireEvent.press(getByTestId('book-complete-next'));
-    expect(routerFns.push).toHaveBeenCalledWith({
+    expect(mockRouterFns.push).toHaveBeenCalledWith({
       pathname: '/(app)/shelf/[subjectId]',
       params: { subjectId: 'sub-1' },
     });
@@ -823,7 +823,7 @@ describe('BookScreen', () => {
     await waitFor(() => getByTestId('book-build-path-link'));
     fireEvent.press(getByTestId('book-build-path-link'));
     await waitFor(() => {
-      expect(routerFns.push).toHaveBeenCalledWith(
+      expect(mockRouterFns.push).toHaveBeenCalledWith(
         expect.objectContaining({
           pathname: '/(app)/session',
           params: expect.objectContaining({
@@ -853,7 +853,7 @@ describe('BookScreen', () => {
   });
 
   it('hides the sticky CTA in read-only mode', async () => {
-    currentParams = { subjectId: 'sub-1', bookId: 'book-1', readOnly: 'true' };
+    mockCurrentParams = { subjectId: 'sub-1', bookId: 'book-1', readOnly: 'true' };
 
     const { wrapper } = makeWrapper();
     const { queryByTestId } = render(<BookScreen />, { wrapper });
@@ -864,13 +864,13 @@ describe('BookScreen', () => {
   });
 
   it('auto-starts the up-next topic when autoStart is true', async () => {
-    currentParams = { subjectId: 'sub-1', bookId: 'book-1', autoStart: 'true' };
+    mockCurrentParams = { subjectId: 'sub-1', bookId: 'book-1', autoStart: 'true' };
 
     const { wrapper } = makeWrapper();
     render(<BookScreen />, { wrapper });
 
     await waitFor(() => {
-      expect(routerFns.push).toHaveBeenCalledWith({
+      expect(mockRouterFns.push).toHaveBeenCalledWith({
         pathname: '/(app)/session',
         params: {
           mode: 'learning',
@@ -959,11 +959,11 @@ describe('BookScreen', () => {
     await waitFor(() => getByTestId('book-screen'));
 
     fireEvent.press(getByTestId('book-back'));
-    expect(routerFns.replace).toHaveBeenCalledWith({
+    expect(mockRouterFns.replace).toHaveBeenCalledWith({
       pathname: '/(app)/shelf/[subjectId]',
       params: { subjectId: 'sub-1' },
     });
-    expect(routerFns.back).not.toHaveBeenCalled();
+    expect(mockRouterFns.back).not.toHaveBeenCalled();
   });
 
   it('logs a breadcrumb and falls back to up next when the latest session topic no longer exists', async () => {

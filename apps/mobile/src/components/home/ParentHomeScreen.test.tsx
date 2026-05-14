@@ -10,7 +10,7 @@ import {
   createRoutedMockFetch,
   createScreenWrapper,
   cleanupScreen,
-} from '../../../../test-utils/screen-render-harness';
+} from '../../../test-utils/screen-render-harness';
 
 import { ParentHomeScreen } from './ParentHomeScreen';
 

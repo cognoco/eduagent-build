@@ -4,10 +4,6 @@ import {
   createScreenWrapper,
   cleanupScreen,
 } from '../../../../../test-utils/screen-render-harness';
-import {
-  expoRouterShim,
-  safeAreaShim,
-} from '../../../../test-utils/native-shims';
 
 import ProgressMonthlyReportDetail from './[reportId]';
 
@@ -20,10 +16,32 @@ jest.mock('../../../../lib/api-client', () => // gc1-allow: transport-boundary �
   require('../../../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch),
 );
 
-let routerMock: ReturnType<typeof expoRouterShim>;
-jest.mock('expo-router', () => routerMock); // gc1-allow: native-boundary — expo-router requires native bindings unavailable in Jest
+const mockRouterFns = {
+  push: jest.fn(),
+  replace: jest.fn(),
+  back: jest.fn(),
+  navigate: jest.fn(),
+  dismiss: jest.fn(),
+  canGoBack: jest.fn(() => false),
+  setParams: jest.fn(),
+};
+const mockRouterParams: Record<string, string> = {};
+jest.mock('expo-router', () => { // gc1-allow: native-boundary — expo-router requires native bindings unavailable in Jest
+  const RN = require('react-native');
+  return {
+    useRouter: () => mockRouterFns,
+    useLocalSearchParams: () => mockRouterParams,
+    useGlobalSearchParams: () => mockRouterParams,
+    useSegments: () => [],
+    usePathname: () => '/',
+    Link: RN.Text,
+    useFocusEffect: jest.fn(),
+  };
+});
 
-jest.mock('react-native-safe-area-context', () => safeAreaShim()); // gc1-allow: native-boundary — react-native-safe-area-context requires native bindings unavailable in Jest
+jest.mock('react-native-safe-area-context', () => // gc1-allow: native-boundary — react-native-safe-area-context requires native bindings unavailable in Jest
+  require('../../../../test-utils/native-shims').safeAreaShim(),
+);
 
 jest.mock('../../../../components/common', () => { // gc1-allow: boundary shim — ErrorFallback renders native components; shim needed to access testID actions
   const RN = jest.requireActual('react-native');
@@ -132,7 +150,15 @@ const PRACTICE_SUMMARY = {
 describe('ProgressMonthlyReportDetail', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    routerMock = expoRouterShim({}, { reportId: 'report-1' });
+    Object.keys(mockRouterParams).forEach((k) => delete (mockRouterParams as Record<string, unknown>)[k]);
+    mockRouterParams.reportId = 'report-1';
+    mockRouterFns.push.mockClear();
+    mockRouterFns.replace.mockClear();
+    mockRouterFns.back.mockClear();
+    mockRouterFns.navigate.mockClear();
+    mockRouterFns.dismiss.mockClear();
+    mockRouterFns.canGoBack.mockReset().mockImplementation(() => false);
+    mockRouterFns.setParams.mockClear();
     mockFetch.setRoute('/progress/reports/report-1', { report: null });
     mockFetch.setRoute('/progress/reports/report-1/view', { viewed: true });
   });
@@ -187,7 +213,7 @@ describe('ProgressMonthlyReportDetail', () => {
     await waitFor(() => screen.getByTestId('progress-report-error-back'));
     fireEvent.press(screen.getByTestId('progress-report-error-back'));
 
-    const router = routerMock.useRouter();
+    const router = mockRouterFns;
     expect(router.replace).toHaveBeenCalledWith('/(app)/progress/reports');
     cleanupScreen(queryClient);
   });
@@ -270,7 +296,7 @@ describe('ProgressMonthlyReportDetail', () => {
     await waitFor(() => screen.getByTestId('progress-report-back'));
     fireEvent.press(screen.getByTestId('progress-report-back'));
 
-    const router = routerMock.useRouter();
+    const router = mockRouterFns;
     expect(router.replace).toHaveBeenCalledWith('/(app)/progress/reports');
     cleanupScreen(queryClient);
   });

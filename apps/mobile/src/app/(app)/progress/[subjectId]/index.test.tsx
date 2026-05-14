@@ -9,7 +9,6 @@ import {
   createRoutedMockFetch,
   createScreenWrapper,
 } from '../../../../../test-utils/screen-render-harness';
-import { safeAreaShim } from '../../../../test-utils/native-shims';
 
 import ProgressSubjectScreen from '.';
 
@@ -65,7 +64,7 @@ jest.mock('expo-router', () => { // gc1-allow: native-boundary — expo-router r
 // ─── react-native-safe-area-context  (native-boundary) ───────────────────────
 
 jest.mock('react-native-safe-area-context', () => // gc1-allow: native-boundary — safe-area context requires native insets
-  safeAreaShim(),
+  require('../../../../test-utils/native-shims').safeAreaShim(),
 );
 
 // ─── Internal lib mocks (gc1-allow per reason below) ─────────────────────────

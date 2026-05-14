@@ -35,7 +35,7 @@ jest.mock('../../../lib/api-client', () => { // gc1-allow: transport boundary â€
   const {
     createRoutedMockFetch: _create,
     mockApiClientFactory: _factory,
-  } = require('../../../../test-utils/screen-render-harness');
+  } = require('../../../test-utils/mock-api-routes');
   // IMPORTANT: Routes are matched by url.includes(pattern) in insertion order.
   // More-specific patterns must come BEFORE general ones to avoid shadowing.
   const _mockFetch = _create({

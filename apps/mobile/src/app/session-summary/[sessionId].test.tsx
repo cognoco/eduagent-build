@@ -4,7 +4,6 @@ import {
   fireEvent,
   waitFor,
 } from '@testing-library/react-native';
-import React from 'react';
 import { platformAlert } from '../../lib/platform-alert';
 import {
   createRoutedMockFetch,
@@ -14,7 +13,7 @@ import { createRouterMockFns } from '../../test-utils/native-shims';
 
 // ─── Native boundary shims ────────────────────────────────────────────────────
 
-const routerFns = createRouterMockFns();
+const mockRouterFns = createRouterMockFns();
 const mockParams: Record<string, string | undefined> = {
   sessionId: '660e8400-e29b-41d4-a716-446655440000',
   subjectName: 'Mathematics',
@@ -23,7 +22,7 @@ const mockParams: Record<string, string | undefined> = {
 };
 
 jest.mock('expo-router', () => // gc1-allow: native-boundary (expo-router requires native file-system modules)
-  require('../../test-utils/native-shims').expoRouterShim(routerFns, mockParams),
+  require('../../test-utils/native-shims').expoRouterShim(mockRouterFns, mockParams),
 );
 
 jest.mock('react-native-safe-area-context', () => // gc1-allow: native-boundary (SafeAreaContext requires native UIKit/View bindings)
@@ -236,11 +235,11 @@ describe('SessionSummaryScreen', () => {
     mockTranscriptData = null;
     mockSessionSummaryData = null;
     mockTotalSessions = 0;
-    routerFns.back.mockClear();
-    routerFns.canGoBack.mockReset();
-    routerFns.canGoBack.mockReturnValue(false);
-    routerFns.push.mockClear();
-    routerFns.replace.mockClear();
+    mockRouterFns.back.mockClear();
+    mockRouterFns.canGoBack.mockReset();
+    mockRouterFns.canGoBack.mockReturnValue(false);
+    mockRouterFns.push.mockClear();
+    mockRouterFns.replace.mockClear();
     mockOnSuccessfulRecall.mockResolvedValue(undefined);
     // Reset recall-bridge to the default rejection
     mockFetch.setRoute(
@@ -365,7 +364,7 @@ describe('SessionSummaryScreen', () => {
 
       fireEvent.press(cue);
 
-      expect(routerFns.push).toHaveBeenCalledWith('/(app)/mentor-memory');
+      expect(mockRouterFns.push).toHaveBeenCalledWith('/(app)/mentor-memory');
     });
 
     it('routes parent-proxy users to the child mentor-memory screen when consented', async () => {
@@ -386,7 +385,7 @@ describe('SessionSummaryScreen', () => {
         await screen.findByTestId('session-summary-mentor-memory-cue'),
       );
 
-      expect(routerFns.push).toHaveBeenCalledWith({
+      expect(mockRouterFns.push).toHaveBeenCalledWith({
         pathname: '/(app)/child/[profileId]/mentor-memory',
         params: { profileId: 'child-profile-id' },
       });
@@ -493,7 +492,7 @@ describe('SessionSummaryScreen', () => {
 
     fireEvent.press(screen.getByTestId('continue-button'));
     await waitFor(() => {
-      expect(routerFns.replace).toHaveBeenCalledWith('/(app)/home');
+      expect(mockRouterFns.replace).toHaveBeenCalledWith('/(app)/home');
     });
   });
 
@@ -539,7 +538,7 @@ describe('SessionSummaryScreen', () => {
 
     await waitFor(() => {
       expect(mockOnSuccessfulRecall).toHaveBeenCalled();
-      expect(routerFns.replace).toHaveBeenCalledWith('/(app)/home');
+      expect(mockRouterFns.replace).toHaveBeenCalledWith('/(app)/home');
     });
   });
 
@@ -550,7 +549,7 @@ describe('SessionSummaryScreen', () => {
     fireEvent.press(skipButton);
 
     await waitFor(() => {
-      expect(routerFns.replace).toHaveBeenCalledWith('/(app)/home');
+      expect(mockRouterFns.replace).toHaveBeenCalledWith('/(app)/home');
     });
   });
 
@@ -577,7 +576,7 @@ describe('SessionSummaryScreen', () => {
         expect.arrayContaining([expect.objectContaining({ text: 'Got it' })]),
       );
     });
-    expect(routerFns.replace).not.toHaveBeenCalled();
+    expect(mockRouterFns.replace).not.toHaveBeenCalled();
 
     const promptButtons = (platformAlert as jest.Mock).mock.calls[0]?.[2] as
       | Array<{ text?: string; onPress?: () => void }>
@@ -588,7 +587,7 @@ describe('SessionSummaryScreen', () => {
     okButton?.onPress?.();
 
     await waitFor(() => {
-      expect(routerFns.replace).toHaveBeenCalledWith('/(app)/home');
+      expect(mockRouterFns.replace).toHaveBeenCalledWith('/(app)/home');
     });
   });
 
@@ -612,13 +611,13 @@ describe('SessionSummaryScreen', () => {
     });
 
     // Should NOT have navigated home yet
-    expect(routerFns.replace).not.toHaveBeenCalled();
+    expect(mockRouterFns.replace).not.toHaveBeenCalled();
 
     // Press "Done — head home" to navigate
     fireEvent.press(screen.getByTestId('recall-bridge-done-button'));
 
     await waitFor(() => {
-      expect(routerFns.replace).toHaveBeenCalledWith('/(app)/home');
+      expect(mockRouterFns.replace).toHaveBeenCalledWith('/(app)/home');
     });
   });
 
@@ -635,7 +634,7 @@ describe('SessionSummaryScreen', () => {
     fireEvent.press(screen.getByTestId('skip-summary-button'));
 
     await waitFor(() => {
-      expect(routerFns.replace).toHaveBeenCalledWith('/(app)/home');
+      expect(mockRouterFns.replace).toHaveBeenCalledWith('/(app)/home');
     });
   });
 
@@ -854,7 +853,7 @@ describe('SessionSummaryScreen', () => {
       const cta = screen.getByTestId('resume-session-cta');
       fireEvent.press(cta);
 
-      expect(routerFns.push).toHaveBeenCalledWith({
+      expect(mockRouterFns.push).toHaveBeenCalledWith({
         pathname: '/(app)/session',
         params: {
           mode: 'learning',
@@ -988,7 +987,7 @@ describe('SessionSummaryScreen', () => {
       fireEvent.press(screen.getByTestId('continue-button'));
 
       await waitFor(() => {
-        expect(routerFns.replace).toHaveBeenCalledWith('/(app)/home');
+        expect(mockRouterFns.replace).toHaveBeenCalledWith('/(app)/home');
       });
     });
 
@@ -1010,7 +1009,7 @@ describe('SessionSummaryScreen', () => {
       fireEvent.press(screen.getByTestId('summary-close-button'));
 
       await waitFor(() => {
-        expect(routerFns.replace).toHaveBeenCalledWith('/(app)/home');
+        expect(mockRouterFns.replace).toHaveBeenCalledWith('/(app)/home');
       });
     });
 
@@ -1022,7 +1021,7 @@ describe('SessionSummaryScreen', () => {
         aiFeedback: 'Nice work.',
         status: 'submitted',
       };
-      routerFns.canGoBack.mockReturnValue(true);
+      mockRouterFns.canGoBack.mockReturnValue(true);
 
       renderScreen();
 
@@ -1033,9 +1032,9 @@ describe('SessionSummaryScreen', () => {
       fireEvent.press(screen.getByTestId('continue-button'));
 
       await waitFor(() => {
-        expect(routerFns.back).toHaveBeenCalled();
+        expect(mockRouterFns.back).toHaveBeenCalled();
       });
-      expect(routerFns.replace).not.toHaveBeenCalledWith('/(app)/home');
+      expect(mockRouterFns.replace).not.toHaveBeenCalledWith('/(app)/home');
     });
   });
 
@@ -1119,7 +1118,7 @@ describe('SessionSummaryScreen', () => {
         expect(mockClearSummaryDraft).toHaveBeenCalled();
       });
       await waitFor(() => {
-        expect(routerFns.replace).toHaveBeenCalledWith('/(app)/home');
+        expect(mockRouterFns.replace).toHaveBeenCalledWith('/(app)/home');
       });
     });
 
@@ -1144,7 +1143,7 @@ describe('SessionSummaryScreen', () => {
 
       // Yield one microtask to let any erroneous downstream calls land.
       await Promise.resolve();
-      expect(routerFns.replace).not.toHaveBeenCalled();
+      expect(mockRouterFns.replace).not.toHaveBeenCalled();
     });
 
     it('"Submit now" in the confirm dialog submits the summary instead of skipping', async () => {
@@ -1188,7 +1187,7 @@ describe('SessionSummaryScreen', () => {
       fireEvent.press(screen.getByTestId('summary-close-button'));
 
       await waitFor(() => {
-        expect(routerFns.replace).toHaveBeenCalledWith('/(app)/home');
+        expect(mockRouterFns.replace).toHaveBeenCalledWith('/(app)/home');
       });
       expect(platformAlert).not.toHaveBeenCalled();
     });

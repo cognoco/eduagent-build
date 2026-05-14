@@ -10,10 +10,6 @@ import {
   createRoutedMockFetch,
   cleanupScreen,
 } from '../../../../../test-utils/screen-render-harness';
-import {
-  expoRouterShim,
-  safeAreaShim,
-} from '../../../../test-utils/native-shims';
 
 import SubjectSessionsScreen from './sessions';
 
@@ -41,10 +37,32 @@ jest.mock('react-i18next', () => ({
   }),
 }));
 
-let routerMock: ReturnType<typeof expoRouterShim>;
-jest.mock('expo-router', () => routerMock); // gc1-allow: native-boundary — expo-router requires native bindings unavailable in Jest
+const mockRouterFns = {
+  push: jest.fn(),
+  replace: jest.fn(),
+  back: jest.fn(),
+  navigate: jest.fn(),
+  dismiss: jest.fn(),
+  canGoBack: jest.fn(() => false),
+  setParams: jest.fn(),
+};
+const mockRouterParams: Record<string, string> = {};
+jest.mock('expo-router', () => { // gc1-allow: native-boundary — expo-router requires native bindings unavailable in Jest
+  const RN = require('react-native');
+  return {
+    useRouter: () => mockRouterFns,
+    useLocalSearchParams: () => mockRouterParams,
+    useGlobalSearchParams: () => mockRouterParams,
+    useSegments: () => [],
+    usePathname: () => '/',
+    Link: RN.Text,
+    useFocusEffect: jest.fn(),
+  };
+});
 
-jest.mock('react-native-safe-area-context', () => safeAreaShim()); // gc1-allow: native-boundary — react-native-safe-area-context requires native bindings unavailable in Jest
+jest.mock('react-native-safe-area-context', () => // gc1-allow: native-boundary — react-native-safe-area-context requires native bindings unavailable in Jest
+  require('../../../../test-utils/native-shims').safeAreaShim(),
+);
 
 jest.mock('../../../../components/common', () => { // gc1-allow: boundary shim — ErrorFallback renders native components; shim needed to access testID actions
     const RN = jest.requireActual('react-native');
@@ -121,7 +139,15 @@ const SAMPLE_SESSIONS = [
 describe('SubjectSessionsScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    routerMock = expoRouterShim({}, { subjectId: 'sub-1' });
+    Object.keys(mockRouterParams).forEach((k) => delete (mockRouterParams as Record<string, unknown>)[k]);
+    mockRouterParams.subjectId = 'sub-1';
+    mockRouterFns.push.mockClear();
+    mockRouterFns.replace.mockClear();
+    mockRouterFns.back.mockClear();
+    mockRouterFns.navigate.mockClear();
+    mockRouterFns.dismiss.mockClear();
+    mockRouterFns.canGoBack.mockReset().mockImplementation(() => false);
+    mockRouterFns.setParams.mockClear();
     mockFetch.setRoute('/progress/inventory', {
       subjects: [{ subjectId: 'sub-1', subjectName: 'Math' }],
     });
@@ -180,7 +206,7 @@ describe('SubjectSessionsScreen', () => {
     screen.getByText('Untitled topic');
 
     fireEvent.press(screen.getByTestId('subject-session-sess-1'));
-    expect(routerMock.useRouter().push).toHaveBeenCalledWith({
+    expect(mockRouterFns.push).toHaveBeenCalledWith({
       pathname: '/session-summary/[sessionId]',
       params: {
         sessionId: 'sess-1',
