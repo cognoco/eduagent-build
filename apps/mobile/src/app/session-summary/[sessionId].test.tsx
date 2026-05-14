@@ -48,7 +48,7 @@ jest.mock('../../lib/sentry', () => ({ // gc1-allow: @sentry/react-native native
   },
 }));
 
-jest.mock('../../lib/platform-alert', () => ({
+jest.mock('../../lib/platform-alert', () => ({ // gc1-allow: platform-alert wraps native Alert API unavailable in Jest
   ...jest.requireActual('../../lib/platform-alert'),
   platformAlert: jest.fn(),
 }));
@@ -275,9 +275,8 @@ describe('SessionSummaryScreen', () => {
   });
 
   function renderScreen() {
-    const { wrapper, queryClient } = createScreenWrapper();
-    const result = render(<SessionSummaryScreen />, { wrapper });
-    return { ...result, queryClient };
+    const { wrapper } = createScreenWrapper();
+    return render(<SessionSummaryScreen />, { wrapper });
   }
 
   it('renders session takeaways', () => {
