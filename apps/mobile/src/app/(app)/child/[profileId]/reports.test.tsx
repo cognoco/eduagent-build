@@ -58,7 +58,12 @@ describe('ChildReportsScreen', () => {
     mockUseChildDetail.mockReturnValue({
       data: { displayName: 'Emma', profileId: 'child-001' },
     });
-    mockUseChildWeeklyReports.mockReturnValue({ data: undefined });
+    mockUseChildWeeklyReports.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
   });
 
   describe('empty state', () => {
