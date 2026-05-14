@@ -128,7 +128,7 @@ The validator must:
 
 ### 3.6 Doppler enforcement design
 
-Lock the design for Playwright config-load behaviour: **(c) fail-closed.** Implementation in P1.
+~~Lock the design for Playwright config-load behaviour: **(c) fail-closed.**~~ **Decided 2026-05-14.** Implementation in P1.
 
 When `TEST_SEED_SECRET` is missing at Playwright project setup, the test run terminates immediately with a clear message: "TEST_SEED_SECRET not found. Wrap your command with `doppler run --project mentomate --config stg --` to load secrets." No silent failure, no warning-then-confused-failure.
 
@@ -136,7 +136,7 @@ When `TEST_SEED_SECRET` is missing at Playwright project setup, the test run ter
 
 The `CLERK_TESTING_TOKEN` env-var slot is vestigial — `@clerk/testing/playwright` fetches a fresh short-lived token via Clerk's Backend API at runtime. Verified: staging Clerk instance has testing mode enabled (sign-up smoke specs pass in the 23m baseline).
 
-Decide in Phase 0: remove the slot from Doppler stg + re-run `pnpm env:sync` to refresh local files? Or leave as P4 cleanup nit? Owner's call. Either way: the four "deferred auth flows" I'd previously flagged (AUTH-05/09/11, ACCOUNT-09 reset, full sign-up) are **not blocked by Clerk** — they're blocked by separate infra (ADB deep-link injection, SecureStore manipulation, network throttling) which is outside this initiative's scope.
+**Decision: defer to P4.** The slot is harmless (placeholder value `"notsetyet"`), removing it now risks an env-sync churn mid-initiative. Clean up in P4 alongside the final CLAUDE.md sync and tooling refresh. The four "deferred auth flows" (AUTH-05/09/11, ACCOUNT-09 reset, full sign-up) are **not blocked by Clerk** — they're blocked by separate infra (ADB deep-link injection, SecureStore manipulation, network throttling) which is outside this initiative's scope.
 
 ## 4. P1 — Web E2E to one green pass (Playwright, `/goal`, 1 session)
 
