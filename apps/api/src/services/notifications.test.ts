@@ -23,7 +23,8 @@ const mockGetDailyNotificationCount = jest.fn();
 const mockLogNotification = jest.fn();
 const mockCheckAndLogRateLimitInternal = jest.fn();
 
-jest.mock('./settings', () => ({
+jest.mock('./settings' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('./settings'),
   getPushToken: (...args: unknown[]) => mockGetPushToken(...args),
   getDailyNotificationCount: (...args: unknown[]) =>
     mockGetDailyNotificationCount(...args),
