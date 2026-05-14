@@ -25,29 +25,38 @@ const mockSubscriptionsUpdate = jest.fn();
 const mockPaymentIntentsCreate = jest.fn();
 const mockPortalCreate = jest.fn();
 
-jest.mock('../../apps/api/src/services/stripe', () => ({
-  createStripeClient: jest.fn().mockImplementation(() => ({
-    customers: {
-      create: (...args: unknown[]) => mockCustomersCreate(...args),
-    },
-    checkout: {
-      sessions: {
-        create: (...args: unknown[]) => mockCheckoutCreate(...args),
-      },
-    },
-    subscriptions: {
-      update: (...args: unknown[]) => mockSubscriptionsUpdate(...args),
-    },
-    paymentIntents: {
-      create: (...args: unknown[]) => mockPaymentIntentsCreate(...args),
-    },
-    billingPortal: {
-      sessions: {
-        create: (...args: unknown[]) => mockPortalCreate(...args),
-      },
-    },
-  })),
-}));
+jest.mock(
+  '../../apps/api/src/services/stripe' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../../apps/api/src/services/stripe',
+    ) as typeof import('../../apps/api/src/services/stripe');
+    return {
+      ...actual,
+      createStripeClient: jest.fn().mockImplementation(() => ({
+        customers: {
+          create: (...args: unknown[]) => mockCustomersCreate(...args),
+        },
+        checkout: {
+          sessions: {
+            create: (...args: unknown[]) => mockCheckoutCreate(...args),
+          },
+        },
+        subscriptions: {
+          update: (...args: unknown[]) => mockSubscriptionsUpdate(...args),
+        },
+        paymentIntents: {
+          create: (...args: unknown[]) => mockPaymentIntentsCreate(...args),
+        },
+        billingPortal: {
+          sessions: {
+            create: (...args: unknown[]) => mockPortalCreate(...args),
+          },
+        },
+      })),
+    };
+  },
+);
 
 import { app } from '../../apps/api/src/index';
 import { getTierConfig } from '../../apps/api/src/services/subscription';
@@ -94,7 +103,7 @@ async function seedSubscription(
     usedToday: number;
     currentPeriodEnd: Date | null;
     cycleResetAt: Date;
-  }>
+  }>,
 ) {
   const db = createIntegrationDb();
   const tier = overrides?.tier ?? 'plus';
@@ -197,7 +206,7 @@ describe('Integration: billing lifecycle routes', () => {
         method: 'GET',
         headers: buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -235,7 +244,7 @@ describe('Integration: billing lifecycle routes', () => {
         method: 'GET',
         headers: buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -260,7 +269,7 @@ describe('Integration: billing lifecycle routes', () => {
         headers: buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }),
         body: JSON.stringify({ tier: 'plus', interval: 'monthly' }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -281,7 +290,7 @@ describe('Integration: billing lifecycle routes', () => {
           tier: 'plus',
           interval: 'monthly',
         }),
-      })
+      }),
     );
 
     const subscription = await loadSubscription(account.id);
@@ -310,14 +319,14 @@ describe('Integration: billing lifecycle routes', () => {
         method: 'POST',
         headers: buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.message).toContain('cancelled');
     expect(body.currentPeriodEnd).toBe(
-      new Date(STRIPE_CURRENT_PERIOD_END * 1000).toISOString()
+      new Date(STRIPE_CURRENT_PERIOD_END * 1000).toISOString(),
     );
 
     const updated = await loadSubscription(account.id);
@@ -337,7 +346,7 @@ describe('Integration: billing lifecycle routes', () => {
         method: 'POST',
         headers: buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(404);
@@ -363,7 +372,7 @@ describe('Integration: billing lifecycle routes', () => {
         method: 'GET',
         headers: buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -390,7 +399,7 @@ describe('Integration: billing lifecycle routes', () => {
         method: 'POST',
         headers: buildAuthHeaders({ sub: AUTH_USER_ID, email: AUTH_EMAIL }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -407,7 +416,7 @@ describe('Integration: billing lifecycle routes', () => {
       {
         method: 'GET',
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(401);
