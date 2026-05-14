@@ -993,7 +993,12 @@ export async function prepareExchangeContext(
       .map((entry) => entry.content)
       .join('\n');
 
-    await safeSend(
+    // Fire-and-forget by design: this silent-classification observation must
+    // not add Inngest round-trip latency to prepareExchangeContext (which is
+    // on the synchronous /ask exchange hot path). safeSend still routes any
+    // dispatch failure to Sentry; the `void` discards the unresolved promise
+    // explicitly so the floating-promise lint does not fire.
+    void safeSend(
       () =>
         inngest.send({
           name: 'app/ask.classify_silently',
