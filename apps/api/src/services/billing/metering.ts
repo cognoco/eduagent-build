@@ -15,6 +15,7 @@ import {
 } from '@eduagent/database';
 import { captureException } from '../sentry';
 import { createLogger } from '../logger';
+import { safeSend } from '../safe-non-core';
 import { inngest } from '../../inngest/client';
 
 const logger = createLogger();
@@ -31,26 +32,26 @@ async function emitOwnershipMismatchEvent(input: {
   subscriptionId: string;
   profileId: string;
 }): Promise<void> {
-  try {
-    await inngest.send({
-      name: 'app/billing.ownership.mismatch',
-      data: {
-        flow: input.flow,
-        subscriptionId: input.subscriptionId,
-        profileId: input.profileId,
-      },
-    });
-  } catch (err) {
-    // Telemetry must never block billing logic. The structured logger.warn
-    // line below is the secondary observable so a transient Inngest outage
-    // does not erase the signal entirely.
-    logger.warn('[metering] Inngest emit failed for ownership mismatch', {
+  // Telemetry must never block billing logic. safeSend captures any Inngest
+  // outage to Sentry and logs it as a structured observable so a transient
+  // failure does not erase the signal entirely.
+  await safeSend(
+    () =>
+      inngest.send({
+        name: 'app/billing.ownership.mismatch',
+        data: {
+          flow: input.flow,
+          subscriptionId: input.subscriptionId,
+          profileId: input.profileId,
+        },
+      }),
+    'billing.ownership.mismatch',
+    {
       flow: input.flow,
       subscriptionId: input.subscriptionId,
       profileId: input.profileId,
-      error: err instanceof Error ? err.message : String(err),
-    });
-  }
+    },
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -68,14 +69,14 @@ export interface DecrementResult {
 async function verifyProfileInSubscriptionAccount(
   db: Database,
   subscriptionId: string,
-  profileId: string
+  profileId: string,
 ): Promise<boolean> {
   const row = await db
     .select({ profileId: profiles.id })
     .from(profiles)
     .innerJoin(subscriptions, eq(subscriptions.accountId, profiles.accountId))
     .where(
-      and(eq(subscriptions.id, subscriptionId), eq(profiles.id, profileId))
+      and(eq(subscriptions.id, subscriptionId), eq(profiles.id, profileId)),
     )
     .limit(1);
 
@@ -90,7 +91,7 @@ async function recordUsageEvent(
   db: Pick<Database, 'insert'>,
   subscriptionId: string,
   profileId: string,
-  delta: 1 | -1
+  delta: 1 | -1,
 ): Promise<void> {
   await db.insert(usageEvents).values({
     subscriptionId,
@@ -118,13 +119,13 @@ async function recordUsageEvent(
 export async function decrementQuota(
   db: Database,
   subscriptionId: string,
-  profileId?: string
+  profileId?: string,
 ): Promise<DecrementResult> {
   if (profileId) {
     const ownsProfile = await verifyProfileInSubscriptionAccount(
       db,
       subscriptionId,
-      profileId
+      profileId,
     );
     if (!ownsProfile) {
       logger.warn('[metering] decrementQuota ownership mismatch', {
@@ -161,8 +162,8 @@ export async function decrementQuota(
         and(
           eq(quotaPools.subscriptionId, subscriptionId),
           sql`${quotaPools.usedThisMonth} < ${quotaPools.monthlyLimit}`,
-          sql`(${quotaPools.dailyLimit} IS NULL OR ${quotaPools.usedToday} < ${quotaPools.dailyLimit})`
-        )
+          sql`(${quotaPools.dailyLimit} IS NULL OR ${quotaPools.usedToday} < ${quotaPools.dailyLimit})`,
+        ),
       )
       .returning();
     if (updated && profileId) {
@@ -228,7 +229,7 @@ export async function decrementQuota(
         remaining: sql`${topUpCredits.remaining} - 1`,
       })
       .where(
-        and(eq(topUpCredits.id, topUp.id), sql`${topUpCredits.remaining} > 0`)
+        and(eq(topUpCredits.id, topUp.id), sql`${topUpCredits.remaining} > 0`),
       )
       .returning();
 
@@ -248,8 +249,8 @@ export async function decrementQuota(
       .where(
         and(
           eq(quotaPools.subscriptionId, subscriptionId),
-          sql`(${quotaPools.dailyLimit} IS NULL OR ${quotaPools.usedToday} < ${quotaPools.dailyLimit})`
-        )
+          sql`(${quotaPools.dailyLimit} IS NULL OR ${quotaPools.usedToday} < ${quotaPools.dailyLimit})`,
+        ),
       )
       .returning();
 
@@ -323,13 +324,13 @@ export interface IncrementResult {
 export async function incrementQuota(
   db: Database,
   subscriptionId: string,
-  profileId?: string
+  profileId?: string,
 ): Promise<IncrementResult> {
   if (profileId) {
     const ownsProfile = await verifyProfileInSubscriptionAccount(
       db,
       subscriptionId,
-      profileId
+      profileId,
     );
     if (!ownsProfile) {
       logger.warn('[metering] incrementQuota ownership mismatch', {
@@ -385,7 +386,7 @@ export async function incrementQuota(
 export async function safeRefundQuota(
   db: Database,
   subscriptionId: string,
-  context: { route: string; profileId?: string; sessionId?: string }
+  context: { route: string; profileId?: string; sessionId?: string },
 ): Promise<{ refunded: boolean }> {
   try {
     const result = await incrementQuota(db, subscriptionId, context.profileId);

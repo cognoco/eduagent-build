@@ -7,10 +7,6 @@ import {
 } from '@eduagent/schemas';
 import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
-import { createLogger } from '../services/logger';
-import { captureException } from '../services/sentry';
-
-const logger = createLogger();
 import {
   scheduleDeletion,
   cancelDeletion,
@@ -18,6 +14,7 @@ import {
 } from '../services/deletion';
 import { generateExport } from '../services/export';
 import { inngest } from '../inngest/client';
+import { safeSend } from '../services/safe-non-core';
 
 type AccountRouteEnv = {
   Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
@@ -32,36 +29,28 @@ export const accountRoutes = new Hono<AccountRouteEnv>()
 
     const profileIds = await getProfileIdsForAccount(db, account.id);
 
-    try {
-      await inngest.send({
-        name: 'app/account.deletion-scheduled',
-        data: {
-          accountId: account.id,
-          profileIds,
-          timestamp: new Date().toISOString(),
-        },
-      });
-    } catch (err) {
-      // [CR-SILENT-RECOVERY-2] Account deletion is GDPR-relevant — escalate to
-      // Sentry alongside structured log so on-call gets paged on aggregate
-      // dispatch-failure spikes. Mirrors the consent.ts:142,270 [A-23] pattern.
-      logger.warn('[account] Failed to dispatch deletion event', {
-        accountId: account.id,
-        error: err instanceof Error ? err.message : String(err),
-      });
-      captureException(err, {
-        extra: {
-          context: 'account.deletion.inngest_dispatch',
-          accountId: account.id,
-        },
-      });
-    }
+    // [CR-SILENT-RECOVERY-2] Account deletion is GDPR-relevant — safeSend
+    // escalates dispatch failures to Sentry so on-call gets paged on aggregate
+    // dispatch-failure spikes. Mirrors the consent.ts [A-23] pattern.
+    await safeSend(
+      () =>
+        inngest.send({
+          name: 'app/account.deletion-scheduled',
+          data: {
+            accountId: account.id,
+            profileIds,
+            timestamp: new Date().toISOString(),
+          },
+        }),
+      'account.deletion',
+      { accountId: account.id },
+    );
 
     return c.json(
       accountDeletionResponseSchema.parse({
         message: 'Deletion scheduled',
         gracePeriodEnds,
-      })
+      }),
     );
   })
   .post('/account/cancel-deletion', async (c) => {
@@ -69,7 +58,7 @@ export const accountRoutes = new Hono<AccountRouteEnv>()
     const account = c.get('account');
     await cancelDeletion(db, account.id);
     return c.json(
-      cancelDeletionResponseSchema.parse({ message: 'Deletion cancelled' })
+      cancelDeletionResponseSchema.parse({ message: 'Deletion cancelled' }),
     );
   })
   .get('/account/export', async (c) => {
