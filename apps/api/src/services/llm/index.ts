@@ -2,6 +2,7 @@ export {
   routeAndCall,
   routeAndStream,
   registerProvider,
+  unregisterProvider,
   getRegisteredProviders,
   CircuitOpenError,
   _resetCircuits,

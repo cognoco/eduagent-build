@@ -9,6 +9,7 @@ import {
   getCurrentLanguageMilestoneId,
 } from './language-curriculum';
 import type { Database } from '@eduagent/database';
+import type { GeneratedTopic } from '@eduagent/schemas';
 
 const PROFILE_ID = 'profile-001';
 const SUBJECT_ID = 'subject-001';
@@ -70,8 +71,8 @@ describe('generateLanguageCurriculum', () => {
 
     expect(topics.length).toBeGreaterThan(0);
     // Should have A1 milestones plus some A2 milestones
-    const a1Topics = topics.filter((t) => t.cefrLevel === 'A1');
-    const a2Topics = topics.filter((t) => t.cefrLevel === 'A2');
+    const a1Topics = topics.filter((t: GeneratedTopic) => t.cefrLevel === 'A1');
+    const a2Topics = topics.filter((t: GeneratedTopic) => t.cefrLevel === 'A2');
     expect(a1Topics.length).toBeGreaterThan(0);
     expect(a2Topics.length).toBeGreaterThan(0);
   });
@@ -80,8 +81,8 @@ describe('generateLanguageCurriculum', () => {
     const topics = generateLanguageCurriculum('fr', 'B1');
 
     expect(topics.length).toBeGreaterThan(0);
-    const b1Topics = topics.filter((t) => t.cefrLevel === 'B1');
-    const b2Topics = topics.filter((t) => t.cefrLevel === 'B2');
+    const b1Topics = topics.filter((t: GeneratedTopic) => t.cefrLevel === 'B1');
+    const b2Topics = topics.filter((t: GeneratedTopic) => t.cefrLevel === 'B2');
     expect(b1Topics.length).toBeGreaterThan(0);
     expect(b2Topics.length).toBeGreaterThan(0);
   });
@@ -89,13 +90,13 @@ describe('generateLanguageCurriculum', () => {
   it('defaults to A1 when starting level is not provided', () => {
     const topics = generateLanguageCurriculum('es');
 
-    const a1Topics = topics.filter((t) => t.cefrLevel === 'A1');
+    const a1Topics = topics.filter((t: GeneratedTopic) => t.cefrLevel === 'A1');
     expect(a1Topics.length).toBeGreaterThan(0);
   });
 
   it('throws for unsupported language code', () => {
     expect(() => generateLanguageCurriculum('xx')).toThrow(
-      'Unsupported language code: xx'
+      'Unsupported language code: xx',
     );
   });
 
@@ -103,7 +104,7 @@ describe('generateLanguageCurriculum', () => {
     const topics = generateLanguageCurriculum('es', 'C2');
 
     // C2 is the last level, so there should be no next-level topics
-    const nonC2 = topics.filter((t) => t.cefrLevel !== 'C2');
+    const nonC2 = topics.filter((t: GeneratedTopic) => t.cefrLevel !== 'C2');
     expect(nonC2).toHaveLength(0);
   });
 
@@ -135,8 +136,8 @@ describe('generateLanguageCurriculum', () => {
   it('generates distinct topics (no duplicate titles within level)', () => {
     const topics = generateLanguageCurriculum('it', 'A1');
     const a1Titles = topics
-      .filter((t) => t.cefrLevel === 'A1')
-      .map((t) => t.title);
+      .filter((t: GeneratedTopic) => t.cefrLevel === 'A1')
+      .map((t: GeneratedTopic) => t.title);
 
     const uniqueTitles = new Set(a1Titles);
     expect(uniqueTitles.size).toBe(a1Titles.length);
@@ -144,9 +145,9 @@ describe('generateLanguageCurriculum', () => {
 
   it('assigns cefrSublevel sequentially starting from 1', () => {
     const topics = generateLanguageCurriculum('es', 'A1');
-    const a1Topics = topics.filter((t) => t.cefrLevel === 'A1');
+    const a1Topics = topics.filter((t: GeneratedTopic) => t.cefrLevel === 'A1');
 
-    a1Topics.forEach((topic, index) => {
+    a1Topics.forEach((topic: GeneratedTopic, index: number) => {
       expect(topic.cefrSublevel).toBe(String(index + 1));
     });
   });
@@ -176,13 +177,13 @@ describe('generateLanguageCurriculum', () => {
 
   it('increases target counts for later milestones in same level', () => {
     const topics = generateLanguageCurriculum('es', 'A1');
-    const a1Topics = topics.filter((t) => t.cefrLevel === 'A1');
+    const a1Topics = topics.filter((t: GeneratedTopic) => t.cefrLevel === 'A1');
 
     if (a1Topics.length >= 2) {
       // Later milestones should have equal or higher word counts
       expect(
-        a1Topics[a1Topics.length - 1].targetWordCount
-      ).toBeGreaterThanOrEqual(a1Topics[0].targetWordCount!);
+        a1Topics[a1Topics.length - 1]!.targetWordCount,
+      ).toBeGreaterThanOrEqual(a1Topics[0]!.targetWordCount!);
     }
   });
 
@@ -204,7 +205,7 @@ describe('generateLanguageCurriculum', () => {
         expect(topic.description).toContain(`Focused ${expectedDisplay}`);
         // No lowercase form should leak through.
         expect(topic.description).not.toContain(
-          `Focused ${expectedDisplay.toLowerCase()} `
+          `Focused ${expectedDisplay.toLowerCase()} `,
         );
       }
     }
@@ -576,7 +577,7 @@ describe('getCurrentLanguageMilestoneId', () => {
     const result = await getCurrentLanguageMilestoneId(
       db,
       PROFILE_ID,
-      SUBJECT_ID
+      SUBJECT_ID,
     );
 
     expect(result).toBeNull();
@@ -618,7 +619,7 @@ describe('getCurrentLanguageMilestoneId', () => {
     const result = await getCurrentLanguageMilestoneId(
       db,
       PROFILE_ID,
-      SUBJECT_ID
+      SUBJECT_ID,
     );
 
     expect(result).toBe('milestone-1');
@@ -638,7 +639,7 @@ describe('getCurrentLanguageMilestoneId', () => {
     const result = await getCurrentLanguageMilestoneId(
       db,
       PROFILE_ID,
-      SUBJECT_ID
+      SUBJECT_ID,
     );
 
     expect(result).toBeNull();

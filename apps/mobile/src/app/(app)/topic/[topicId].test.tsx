@@ -48,10 +48,18 @@ jest.mock('../../../lib/profile', () => ({
 const mockPush = jest.fn();
 const mockGoBackOrReplace = jest.fn();
 const mockPushLearningResumeTarget = jest.fn();
-const mockUseLocalSearchParams = jest.fn(() => ({
-  subjectId: 's1',
-  topicId: 't1',
-}));
+type TopicRouteParams = {
+  subjectId: string;
+  topicId: string;
+  bookId?: string;
+  chapter?: string;
+};
+const mockUseLocalSearchParams = jest.fn(
+  (): TopicRouteParams => ({
+    subjectId: 's1',
+    topicId: 't1',
+  }),
+);
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({
@@ -67,7 +75,12 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
+jest.mock('@expo/vector-icons', () => ({
+  Ionicons: () => null,
+}));
+
 jest.mock('../../../lib/theme', () => ({
+  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
   useThemeColors: () => ({
     primary: '#00b4d8',
     accent: '#00b4d8',
@@ -586,6 +599,26 @@ describe('TopicDetailScreen rendering details', () => {
     expect(mockGoBackOrReplace).toHaveBeenCalled();
   });
 
+  it('falls back to the parent book when opened from a book route', async () => {
+    mockUseLocalSearchParams.mockReturnValue({
+      subjectId: 's1',
+      bookId: 'book-1',
+      topicId: 't1',
+    });
+    setupRoutes({ completionStatus: 'completed' });
+
+    render(<TopicDetailScreen />, { wrapper: TestWrapper });
+
+    await waitFor(() => {
+      screen.getByTestId('topic-detail-back');
+    });
+    fireEvent.press(screen.getByTestId('topic-detail-back'));
+    expect(mockGoBackOrReplace).toHaveBeenCalledWith(expect.anything(), {
+      pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
+      params: { subjectId: 's1', bookId: 'book-1' },
+    });
+  });
+
   it('shows "No sessions yet. Start one below!" when sessions are empty', async () => {
     setupRoutes({ completionStatus: 'not_started', sessions: [] });
 
@@ -653,6 +686,76 @@ describe('TopicDetailScreen rendering details', () => {
     });
   });
 
+  it('shows saved chat bookmarks for this topic', async () => {
+    setupRoutes({
+      bookmarks: [
+        {
+          id: 'bookmark-1',
+          eventId: 'event-1',
+          sessionId: 'session-1',
+          subjectId: 's1',
+          topicId: 't1',
+          subjectName: 'Math',
+          topicTitle: 'Algebra',
+          content: 'This is a saved explanation from chat.',
+          createdAt: '2026-05-13T10:00:00.000Z',
+        },
+      ],
+    });
+
+    render(<TopicDetailScreen />, { wrapper: TestWrapper });
+
+    await waitFor(() => {
+      screen.getByText('Saved from chat');
+    });
+    screen.getByText('This is a saved explanation from chat.');
+  });
+
+  it('hides saved chat section when there are no bookmarks', async () => {
+    setupRoutes({ bookmarks: [] });
+
+    render(<TopicDetailScreen />, { wrapper: TestWrapper });
+
+    await waitFor(() => {
+      screen.getByText('+ Add your first note for this topic');
+    });
+    expect(screen.queryByText('Saved from chat')).toBeNull();
+  });
+
+  it('opens source session when a topic bookmark is pressed', async () => {
+    setupRoutes({
+      bookmarks: [
+        {
+          id: 'bookmark-1',
+          eventId: 'event-1',
+          sessionId: 'session-1',
+          subjectId: 's1',
+          topicId: 't1',
+          subjectName: 'Math',
+          topicTitle: 'Algebra',
+          content: 'Saved chat item.',
+          createdAt: '2026-05-13T10:00:00.000Z',
+        },
+      ],
+    });
+
+    render(<TopicDetailScreen />, { wrapper: TestWrapper });
+
+    await waitFor(() => {
+      screen.getByTestId('bookmark-card-bookmark-1');
+    });
+    fireEvent.press(screen.getByTestId('bookmark-card-bookmark-1'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/session-summary/[sessionId]',
+      params: {
+        sessionId: 'session-1',
+        subjectId: 's1',
+        topicId: 't1',
+      },
+    });
+  });
+
   it('shows "Loading…" disabled CTA while critical data is loading', async () => {
     let resolveProgress!: (r: Response) => void;
     const progressPromise = new Promise<Response>((resolve) => {
@@ -686,84 +789,14 @@ describe('TopicDetailScreen — Saved from chat (bookmarks)', () => {
     TestWrapper = Wrapper;
   });
 
-  it('renders the section when bookmarks exist for the topic', async () => {
-    setupRoutes({
-      bookmarks: [
-        {
-          id: 'bm-1',
-          eventId: 'ev-1',
-          sessionId: 'sess-1',
-          subjectId: 's1',
-          topicId: 't1',
-          subjectName: 'Algebra',
-          topicTitle: 'Linear equations',
-          content: 'The slope is rise over run.',
-          createdAt: '2026-05-01T10:00:00Z',
-        },
-      ],
-    });
-
-    render(<TopicDetailScreen />, { wrapper: TestWrapper });
-
-    await waitFor(() => {
-      screen.getByTestId('topic-bookmarks-section');
-    });
-    screen.getByText('Saved from chat');
-    screen.getByText('The slope is rise over run.');
-  });
-
-  it('hides the section when no bookmarks match the topic', async () => {
-    setupRoutes({ bookmarks: [] });
-
-    render(<TopicDetailScreen />, { wrapper: TestWrapper });
-
-    await waitFor(() => {
-      screen.getByText('+ Add your first note for this topic');
-    });
-    expect(screen.queryByTestId('topic-bookmarks-section')).toBeNull();
-    expect(screen.queryByText('Saved from chat')).toBeNull();
-  });
-
-  it('navigates to the source session when a bookmark is pressed', async () => {
-    setupRoutes({
-      bookmarks: [
-        {
-          id: 'bm-1',
-          eventId: 'ev-1',
-          sessionId: 'sess-1',
-          subjectId: 's1',
-          topicId: 't1',
-          subjectName: 'Algebra',
-          topicTitle: 'Linear equations',
-          content: 'The slope is rise over run.',
-          createdAt: '2026-05-01T10:00:00Z',
-        },
-      ],
-    });
-
-    render(<TopicDetailScreen />, { wrapper: TestWrapper });
-
-    await waitFor(() => {
-      screen.getByTestId('bookmark-card-bm-1');
-    });
-    fireEvent.press(screen.getByTestId('bookmark-card-bm-1'));
-
-    expect(mockPush).toHaveBeenCalledWith(
-      expect.objectContaining({
-        pathname: '/session-summary/[sessionId]',
-        params: expect.objectContaining({ sessionId: 'sess-1' }),
-      }),
-    );
-  });
-
   it('sends topicId on the bookmarks request (server-side filter, not client)', async () => {
     setupRoutes({ bookmarks: [] });
 
     render(<TopicDetailScreen />, { wrapper: TestWrapper });
 
     await waitFor(() => {
-      const bookmarkCall = mockFetch.mock.calls.find(([url]) =>
-        String(url).includes('/bookmarks'),
+      const bookmarkCall = mockFetch.mock.calls.find(
+        ([url]: [unknown, ...unknown[]]) => String(url).includes('/bookmarks'),
       );
       expect(bookmarkCall).toBeTruthy();
       expect(String(bookmarkCall![0])).toContain('topicId=t1');

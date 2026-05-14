@@ -18,6 +18,11 @@ import {
   askClassificationSkippedObserve,
   askClassificationFailedObserve,
 } from './functions/ask-classification-observe';
+import {
+  askGateDecisionObserve,
+  askGateTimeoutObserve,
+} from './functions/ask-gate-observe';
+import { emailBouncedObserve } from './functions/email-bounced-observe';
 import { subjectAutoArchive } from './functions/subject-auto-archive';
 import { bookPreGeneration } from './functions/book-pre-generation';
 import { recallNudge } from './functions/recall-nudge';
@@ -79,6 +84,7 @@ import { memoryFactsEmbedBackfill } from './functions/memory-facts-embed-backfil
 import { reviewCalibrationGrade } from './functions/review-calibration-grade';
 import { topicProbeExtract } from './functions/topic-probe-extract';
 import { streakRecord } from './functions/streak-record';
+import { progressSummaryGeneration } from './functions/progress-summary';
 
 export {
   inngest,
@@ -100,6 +106,9 @@ export {
   askClassificationCompletedObserve,
   askClassificationSkippedObserve,
   askClassificationFailedObserve,
+  askGateDecisionObserve,
+  askGateTimeoutObserve,
+  emailBouncedObserve,
   subjectAutoArchive,
   bookPreGeneration,
   recallNudge,
@@ -140,6 +149,7 @@ export {
   reviewCalibrationGrade,
   topicProbeExtract,
   streakRecord,
+  progressSummaryGeneration,
 };
 
 // All Inngest functions to register with the serve handler
@@ -162,6 +172,9 @@ export const functions = [
   askClassificationCompletedObserve,
   askClassificationSkippedObserve,
   askClassificationFailedObserve,
+  askGateDecisionObserve,
+  askGateTimeoutObserve,
+  emailBouncedObserve,
   subjectAutoArchive,
   bookPreGeneration,
   recallNudge,
@@ -203,4 +216,5 @@ export const functions = [
   reviewCalibrationGrade,
   topicProbeExtract,
   streakRecord,
+  progressSummaryGeneration,
 ];

@@ -26,7 +26,7 @@ const consentStatesQuery = {
   findMany: jest.fn().mockResolvedValue([]),
 };
 
-mockDatabaseModule.db.query = new Proxy(mockDatabaseModule.db.query, {
+mockDatabaseModule.db.query = new Proxy(mockDatabaseModule.db.query as object, {
   get(target, prop, receiver) {
     if (prop === 'familyLinks') return familyLinksQuery;
     if (prop === 'consentStates') return consentStatesQuery;
@@ -68,6 +68,22 @@ jest.mock('../services/dashboard', () => ({
   getChildSubjectTopics: (...args: unknown[]) =>
     mockGetChildSubjectTopics(...args),
 }));
+
+const mockGetProgressSummary = jest.fn().mockResolvedValue({
+  summary: null,
+  generatedAt: null,
+  basedOnLastSessionAt: null,
+  latestSessionId: null,
+  activityState: 'no_recent_activity',
+  nudgeRecommended: true,
+});
+
+jest.mock(
+  '../services/progress-summary' /* gc1-allow: route test isolates progress summary service contract */,
+  () => ({
+    getProgressSummary: (...args: unknown[]) => mockGetProgressSummary(...args),
+  }),
+);
 
 const mockListWeeklyReports = jest.fn().mockResolvedValue([]);
 const mockGetWeeklyReport = jest.fn().mockResolvedValue(null);
@@ -637,6 +653,10 @@ describe('dashboard routes', () => {
       {
         label: 'GET /dashboard/children/:id/progress-history',
         path: `/v1/dashboard/children/${PROFILE_ID}/progress-history`,
+      },
+      {
+        label: 'GET /dashboard/children/:id/progress-summary',
+        path: `/v1/dashboard/children/${PROFILE_ID}/progress-summary`,
       },
       {
         label: 'GET /dashboard/children/:id/subjects/:subjectId',

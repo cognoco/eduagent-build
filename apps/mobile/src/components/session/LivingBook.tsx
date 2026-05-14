@@ -172,7 +172,7 @@ export function LivingBook({
               style={sparkleAnimatedStyle}
               testID="living-book-sparkle"
             >
-              <Ionicons name="sparkles" size={12} color={colors.warning} />
+              <Ionicons name="sparkles" size={12} color={colors.reward} />
             </Animated.View>
           )}
         </View>

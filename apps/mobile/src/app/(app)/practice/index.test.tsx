@@ -36,23 +36,29 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
-jest.mock('../../../lib/theme', () => ({
-  useTheme: () => ({ colorScheme: 'light' }),
-  useThemeColors: () => ({
-    textPrimary: '#ffffff',
-    textSecondary: '#a0a0a0',
-    primary: '#00b4d8',
-    border: '#303030',
-    surface: '#1e1e1e',
-    background: '#faf5ef',
+jest.mock(
+  '../../../lib/theme' /* gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM */,
+  () => ({
+    useTheme: () => ({ colorScheme: 'light' }),
+    useThemeColors: () => ({
+      textPrimary: '#ffffff',
+      textSecondary: '#a0a0a0',
+      primary: '#00b4d8',
+      border: '#303030',
+      surface: '#1e1e1e',
+      background: '#faf5ef',
+    }),
   }),
-}));
+);
 
-jest.mock('../../../lib/navigation', () => ({
-  goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
-  homeHrefForReturnTo: (returnTo: unknown) =>
-    returnTo === 'learner-home' ? '/(app)/home' : '/(app)/home',
-}));
+jest.mock(
+  '../../../lib/navigation' /* gc1-allow: navigation helper mock keeps screen unit-scoped */,
+  () => ({
+    goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
+    homeHrefForReturnTo: (returnTo: unknown) =>
+      returnTo === 'learner-home' ? '/(app)/home' : '/(app)/home',
+  }),
+);
 
 jest.mock('../../../hooks/use-progress', () => ({
   useReviewSummary: () => mockUseReviewSummary(),

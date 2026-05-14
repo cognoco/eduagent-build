@@ -77,9 +77,6 @@ function makeMetrics(
     topicsMastered: 0,
     topicsInProgress: 0,
     booksCompleted: 0,
-    weeklyDeltaTopicsMastered: null,
-    weeklyDeltaVocabularyTotal: null,
-    weeklyDeltaTopicsExplored: null,
     vocabularyTotal: 0,
     vocabularyMastered: 0,
     vocabularyLearning: 0,
@@ -97,6 +94,10 @@ function makeMetrics(
 // ---------------------------------------------------------------------------
 // getActiveSubjectsByRecency [BUG-913]
 // ---------------------------------------------------------------------------
+
+type ActiveSubject = Awaited<
+  ReturnType<typeof getActiveSubjectsByRecency>
+>[number];
 
 describe('getActiveSubjectsByRecency', () => {
   beforeEach(() => {
@@ -130,7 +131,10 @@ describe('getActiveSubjectsByRecency', () => {
 
     const result = await getActiveSubjectsByRecency(db, CHILD_PROFILE_ID);
 
-    expect(result.map((s) => s.name)).toEqual(['Mathematics', 'Biology']);
+    expect(result.map((s: ActiveSubject) => s.name)).toEqual([
+      'Mathematics',
+      'Biology',
+    ]);
     expect(result[0]!.lastSessionAt).not.toBeNull();
     expect(result[1]!.lastSessionAt).toBeNull();
   });
@@ -155,7 +159,10 @@ describe('getActiveSubjectsByRecency', () => {
 
     const result = await getActiveSubjectsByRecency(db, CHILD_PROFILE_ID);
 
-    expect(result.map((s) => s.name)).toEqual(['Science', 'Mathematics']);
+    expect(result.map((s: ActiveSubject) => s.name)).toEqual([
+      'Science',
+      'Mathematics',
+    ]);
   });
 
   it('breaks ties on name (alphabetical) when lastSessionAt is null for all', async () => {
@@ -171,7 +178,7 @@ describe('getActiveSubjectsByRecency', () => {
     const result = await getActiveSubjectsByRecency(db, CHILD_PROFILE_ID);
 
     // All null lastSessionAt → fall back to alphabetical
-    expect(result.map((s) => s.name)).toEqual([
+    expect(result.map((s: ActiveSubject) => s.name)).toEqual([
       'Astronomy',
       'Biology',
       'Zoology',

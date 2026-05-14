@@ -1,6 +1,8 @@
 import nx from '@nx/eslint-plugin';
 import baseConfig from '../../eslint.config.mjs';
 import requireMutateErrorHandling from './eslint-rules/require-mutate-error-handling.mjs';
+import securestoreSafeKey from './eslint-rules/securestore-safe-key.mjs';
+import routerPushAncestorChain from './eslint-rules/router-push-ancestor-chain.mjs';
 
 // Filter out jsx-a11y/accessible-emoji rule (deprecated in v6.6.0, removed in later versions)
 // @nx/eslint-plugin's flat/react config still references it
@@ -16,6 +18,8 @@ const reactConfig = nx.configs['flat/react'].map((config) => {
 const localPlugin = {
   rules: {
     'require-mutate-error-handling': requireMutateErrorHandling,
+    'securestore-safe-key': securestoreSafeKey,
+    'router-push-ancestor-chain': routerPushAncestorChain,
   },
 };
 
@@ -34,6 +38,44 @@ export default [
     plugins: { local: localPlugin },
     rules: {
       'local/require-mutate-error-handling': 'warn',
+    },
+  },
+  // -------------------------------------------------------------------------
+  // GC2 — SecureStore keys must use only [a-zA-Z0-9._-]. iOS Keychain
+  // rejects `:`, `/`, `=`, `+`, space, and non-ASCII chars at runtime, but
+  // unit tests under jsdom/Node pass cleanly so the failure only surfaces
+  // on device. The wrapper at lib/secure-storage already provides
+  // `sanitizeSecureStoreKey()` for dynamic keys; this rule catches static
+  // literals (and the static parts of template strings) before they ship.
+  // Test files excluded — tests may exercise unsafe-key handling paths.
+  // See CLAUDE.md > Repo-Specific Guardrails and the governance audit.
+  // -------------------------------------------------------------------------
+  {
+    files: ['src/**/*.ts', 'src/**/*.tsx'],
+    ignores: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+    plugins: { local: localPlugin },
+    rules: {
+      'local/securestore-safe-key': 'error',
+    },
+  },
+  // -------------------------------------------------------------------------
+  // GC4 — Expo Router's router.push does not synthesise intermediate stack
+  // entries. Pushing a 2+ [param] route from a different stack creates a
+  // 1-deep stack with only the leaf, so router.back() falls through to
+  // Tabs Home. The rule flags `router.push(...)` to a pathname with 2+
+  // [param] segments unless:
+  //   (a) the same enclosing function pushes the parent route first, OR
+  //   (b) the file's own route is already under the parent prefix, OR
+  //   (c) `// gc4-allow: <reason>` annotation is present.
+  // Test files excluded — they exercise navigation patterns but don't ship.
+  // See CLAUDE.md > Repo-Specific Guardrails and the governance audit.
+  // -------------------------------------------------------------------------
+  {
+    files: ['src/**/*.ts', 'src/**/*.tsx'],
+    ignores: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+    plugins: { local: localPlugin },
+    rules: {
+      'local/router-push-ancestor-chain': 'error',
     },
   },
   // Governance Rule 5 — ban hardcoded hex colors in non-token source files.

@@ -145,11 +145,11 @@ describe('listSubjects', () => {
     const result = await listSubjects(db, profileId);
 
     expect(result).toHaveLength(2);
-    expect(result[0].name).toBe('Math');
-    expect(result[1].name).toBe('Science');
-    expect(result[0].curriculumStatus).toBe('ready');
-    expect(result[1].curriculumStatus).toBe('ready');
-    expect(result[0].createdAt).toBe('2025-01-15T10:00:00.000Z');
+    expect(result[0]!.name).toBe('Math');
+    expect(result[1]!.name).toBe('Science');
+    expect(result[0]!.curriculumStatus).toBe('ready');
+    expect(result[1]!.curriculumStatus).toBe('ready');
+    expect(result[0]!.createdAt).toBe('2025-01-15T10:00:00.000Z');
   });
 
   it('marks active subjects as preparing when no generated books or suggestions exist', async () => {
@@ -219,7 +219,7 @@ describe('listSubjects', () => {
     setupScopedRepo({ findManyResult: [older, newer] }); // DB returns older first
     const db = createMockDb();
     const result = await listSubjects(db, profileId);
-    expect(result[0].id).toBe('newer');
+    expect(result[0]!.id).toBe('newer');
   });
 });
 
@@ -327,7 +327,7 @@ describe('createSubjectWithStructure focused_book prewarm', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    sendSpy = jest.spyOn(inngest, 'send').mockResolvedValue(undefined);
+    sendSpy = jest.spyOn(inngest, 'send').mockResolvedValue({ ids: [] });
     captureSpy = jest
       .spyOn(sentry, 'captureException')
       .mockImplementation(() => undefined);

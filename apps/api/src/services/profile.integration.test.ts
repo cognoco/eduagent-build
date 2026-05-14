@@ -39,7 +39,7 @@ function requireDatabaseUrl(): string {
   const url = process.env.DATABASE_URL;
   if (!url) {
     throw new Error(
-      'DATABASE_URL is not set. Create .env.test.local or .env.development.local.'
+      'DATABASE_URL is not set. Create .env.test.local or .env.development.local.',
     );
   }
   return url;
@@ -57,6 +57,10 @@ const PREFIX = 'integration-profile-bug862';
 const ACCOUNT = {
   clerkUserId: `${PREFIX}-user`,
   email: `${PREFIX}@integration.test`,
+};
+const FIRST_PROFILE_ACCOUNT = {
+  clerkUserId: `${PREFIX}-first-profile-user`,
+  email: `${PREFIX}-first-profile@integration.test`,
 };
 
 // ---------------------------------------------------------------------------
@@ -80,7 +84,7 @@ async function seedFixture() {
     familyConfig.monthlyQuota,
     {
       status: 'active',
-    }
+    },
   );
 
   // Create the owner profile (first profile — always allowed, no limit check)
@@ -100,9 +104,12 @@ async function seedFixture() {
 async function cleanup() {
   const db = createIntegrationDb();
   const found = await db.query.accounts.findMany({
-    where: eq(accounts.email, ACCOUNT.email),
+    where: inArray(accounts.email, [
+      ACCOUNT.email,
+      FIRST_PROFILE_ACCOUNT.email,
+    ]),
   });
-  const ids = found.map((a) => a.id);
+  const ids = found.map((a: typeof accounts.$inferSelect) => a.id);
   if (ids.length > 0) {
     await db.delete(accounts).where(inArray(accounts.id, ids));
   }
@@ -125,6 +132,30 @@ afterAll(async () => {
 // ---------------------------------------------------------------------------
 
 describe('[BUG-862] createProfileWithLimitCheck concurrent cap enforcement (integration)', () => {
+  it('[BUG-1100] marks the first profile as owner even when COUNT returns a string', async () => {
+    const db = createIntegrationDb();
+    const [account] = await db
+      .insert(accounts)
+      .values({
+        clerkUserId: FIRST_PROFILE_ACCOUNT.clerkUserId,
+        email: FIRST_PROFILE_ACCOUNT.email,
+      })
+      .returning();
+
+    const profile = await createProfileWithLimitCheck(db, account!.id, {
+      displayName: 'First Owner',
+      birthYear: 2000,
+    });
+
+    expect(profile.isOwner).toBe(true);
+
+    const stored = await db.query.profiles.findFirst({
+      where: eq(profiles.id, profile.id),
+      columns: { isOwner: true },
+    });
+    expect(stored?.isOwner).toBe(true);
+  });
+
   it('[BUG-862] pg_advisory_xact_lock serialises concurrent profile creation — cap is not exceeded', async () => {
     const { account } = await seedFixture();
     const db = createIntegrationDb();
@@ -168,10 +199,11 @@ describe('[BUG-862] createProfileWithLimitCheck concurrent cap enforcement (inte
     // Count successes vs. ProfileLimitErrors
     const successes = results.filter((r) => r.status === 'fulfilled');
     const limitErrors = results.filter(
-      (r) => r.status === 'rejected' && r.reason instanceof ProfileLimitError
+      (r) => r.status === 'rejected' && r.reason instanceof ProfileLimitError,
     );
     const unexpectedErrors = results.filter(
-      (r) => r.status === 'rejected' && !(r.reason instanceof ProfileLimitError)
+      (r) =>
+        r.status === 'rejected' && !(r.reason instanceof ProfileLimitError),
     );
 
     // No unexpected errors
@@ -190,7 +222,7 @@ describe('[BUG-862] createProfileWithLimitCheck concurrent cap enforcement (inte
       console.warn(
         `[BUG-862] ${successes.length} out of 3 concurrent creates succeeded ` +
           `(expected 1). Final profile count: ${afterRow!.n}/4. ` +
-          'pg_advisory_xact_lock may not be scoped to a real transaction.'
+          'pg_advisory_xact_lock may not be scoped to a real transaction.',
       );
     }
 
@@ -219,7 +251,7 @@ describe('[BUG-862] createProfileWithLimitCheck concurrent cap enforcement (inte
       createProfileWithLimitCheck(db, account.id, {
         ...input,
         displayName: 'Over-cap Child',
-      })
+      }),
     ).rejects.toThrow(ProfileLimitError);
   });
 });

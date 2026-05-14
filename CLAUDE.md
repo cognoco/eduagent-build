@@ -2,13 +2,13 @@
 
 ## Snapshot
 
-- Mobile: ~80 screens, 239 test suites, ~2,446 tests
-- API: 43 route groups, 187 test suites, ~3,718 tests, 45 Inngest functions
-- Cross-package integration tests: 43 suites in `tests/integration/`, ~290 cases
+- Mobile: ~80 screens, 255 test suites, ~2,727 tests
+- API: 42 route groups, 187 test suites, ~3,872 tests, 49 Inngest functions
+- Cross-package integration tests: 44 suites in `tests/integration/`, ~290 cases
 - Monorepo: `apps/api`, `apps/mobile`, shared packages in `packages/`
 - Core docs: `docs/project_context.md`, `docs/architecture.md`, relevant spec/plan under `docs/plans/` or `docs/specs/`
 
-> Counts verified 2026-05-11. Test-case totals are a heuristic grep of `it(` / `test(` line starts; jest-reported totals may be slightly higher due to `it.each(...)` expansion at runtime. Re-verify with `git ls-files | grep '\.test\.'` for suite counts.
+> Counts verified 2026-05-14. Test-case totals are a heuristic grep of `it(` / `test(` line starts; jest-reported totals may be slightly higher due to `it.each(...)` expansion at runtime. Re-verify with `git ls-files | grep '\.test\.'` for suite counts.
 
 ## Read This Before Editing
 
@@ -42,7 +42,7 @@ Always use `/commit` for all commits in this repo. Never use `/zdx:commit`, `/my
 Key rules:
 - Use `resolveTabShape()` for tab visibility. Use `isOwner` / `role` for content gating inside screens.
 - `isGuardianProfile()` requires `isOwner` AND at least one non-owner in profiles[].
-- `personaFromBirthYear()` is for theming only, never for feature gating (returns `parent` for all 18+).
+- `computeAgeBracket()` (from `@eduagent/schemas`) is the canonical age-bracket function — use it for theming and age-appropriate copy, never for feature gating. The removed `personaFromBirthYear()` (and related fossils `isLearner`, local `Persona` type) must not be re-introduced — enforced by `persona-fossil-guard.test.ts`.
 - A solo owner and a child on a parent's account see the **same tabs** — they differ only in what's inside More/Progress.
 
 ## Non-Negotiable Engineering Rules
@@ -116,11 +116,11 @@ Changed code is not fixed code. Every fix must be verified, not just applied. Th
 These rules catch bugs that survive type-checking and only surface at runtime. Learned from adversarial review (2026-04-05).
 
 - **No internal mocks in integration tests.** Never `jest.mock` your own database, services, or middleware in integration tests. Mock only true external boundaries (Stripe, Clerk JWKS, email providers, push notification services). Internal mocks hide real bugs.
-- **No new internal `jest.mock()` (GC1 ratchet).** CI fails any PR that adds a relative-path `jest.mock('./...')` or `jest.mock('../...')` line in `*.test.ts` / `*.test.tsx`. Existing legacy sites are grandfathered — this is forward-only. To stub a few named exports of an internal module, use `jest.requireActual()` with targeted overrides (canonical pattern: `apps/api/src/routes/sessions.test.ts:128`). External-boundary mocks (LLM via `routeAndCall`, push, email, Stripe, Clerk JWKS) use bare specifiers and are unaffected. If you genuinely need a new internal mock, append `// gc1-allow: <reason>` on the same line as the `jest.mock(` call — review will check the reason.
+- **No new internal `jest.mock()` (GC1 ratchet).** CI fails any PR that adds a relative-path `jest.mock('./...')` or `jest.mock('../...')` line in `*.test.ts` / `*.test.tsx`. Existing legacy sites are grandfathered — this is forward-only. To stub a few named exports of an internal module, use `jest.requireActual()` with targeted overrides (canonical pattern: `apps/api/src/inngest/functions/interview-persist-curriculum.integration.test.ts`). External-boundary mocks (LLM via `routeAndCall`, push, email, Stripe, Clerk JWKS) use bare specifiers and are unaffected. If you genuinely need a new internal mock, append `// gc1-allow: <reason>` on the same line as the `jest.mock(` call — review will check the reason.
 - **Response bodies are single-use.** Never call both `.json()` and `.text()` on the same `fetch` Response — the body stream is consumed on first read. If you need both JSON parsing with a text fallback, read `.text()` once and `JSON.parse` it manually. Applies to `assertOk`-style helpers, error-extraction middleware, and SSE error handlers.
 - **Classify errors before formatting.** When code branches on error *type* (reconnectable vs. fatal, quota vs. network) and also formats errors for display, classify the **raw** error object first, then format for the user. Never string-match on the output of `formatApiError` — the formatter strips status codes, error codes, and keywords classifiers depend on.
 - **Clean up all artifacts when removing a feature.** Grep the entire project for all references: types, imports, constants, SecureStore keys, commented-out JSX, fallback branches. Orphaned types create false confidence, unreachable fallback branches inflate coverage, leaked storage keys waste device storage forever.
-- **GC6 — Boy-scout internal mocks when editing test files.** Any time you edit a test file (`*.test.ts` / `*.test.tsx` / `*.integration.test.ts`) for any reason, scan it for `jest.mock('./...')`, `jest.mock('../...')`, or `jest.mock('@eduagent/...')` and remove the internal mocks before the edit is complete. Use the real implementation, or convert to `jest.requireActual()` with targeted overrides (canonical pattern: `apps/api/src/routes/sessions.test.ts:128`). Run `/my:sweep-mocks` for the full workflow. The PostToolUse hook at `~/.claude/hooks/post-edit-jest-mock-check.sh` surfaces offending lines after every test-file edit; treat that output as a blocker on task completion, not a follow-up. External-boundary mocks (LLM via `routeAndCall`, Stripe, Clerk JWKS, push, email, Inngest framework) use bare specifiers and are not violations. If an internal mock is genuinely required, annotate with `// gc1-allow: <reason>` on the same `jest.mock(` line. **Why:** GC1 is forward-only and gates *new* violations at lint time; GC6 chips down the legacy backlog opportunistically — every test-file visit is one fewer mock site. **How to apply:** If GC6 sweep would expand scope beyond what the current task can carry, leave the offending mocks but record the deferral in the commit message (file paths + count) so they remain visible.
+- **GC6 — Boy-scout internal mocks when editing test files.** Any time you edit a test file (`*.test.ts` / `*.test.tsx` / `*.integration.test.ts`) for any reason, scan it for `jest.mock('./...')`, `jest.mock('../...')`, or `jest.mock('@eduagent/...')` and remove the internal mocks before the edit is complete. Use the real implementation, or convert to `jest.requireActual()` with targeted overrides (canonical pattern: `apps/api/src/inngest/functions/interview-persist-curriculum.integration.test.ts`). Run `/my:mockfix` for the full workflow. The PostToolUse hook at `~/.claude/hooks/post-edit-jest-mock-check.sh` surfaces offending lines after every test-file edit; treat that output as a blocker on task completion, not a follow-up. External-boundary mocks (LLM via `routeAndCall`, Stripe, Clerk JWKS, push, email, Inngest framework) use bare specifiers and are not violations. If an internal mock is genuinely required, annotate with `// gc1-allow: <reason>` on the same `jest.mock(` line. **Why:** GC1 is forward-only and gates *new* violations at lint time; GC6 chips down the legacy backlog opportunistically — every test-file visit is one fewer mock site. **How to apply:** If GC6 sweep would expand scope beyond what the current task can carry, leave the offending mocks but record the deferral in the commit message (file paths + count) so they remain visible.
 
 ## Secrets Management
 
@@ -183,8 +183,9 @@ cd apps/mobile && pnpm exec tsc --noEmit
 
 # Database
 pnpm run db:push:dev
-pnpm run db:generate
+pnpm run db:generate:dev
 pnpm run db:migrate:dev
+pnpm run db:studio:dev
 
 # LLM Eval Harness
 pnpm eval:llm                    # Tier 1: snapshot prompts (no LLM call)
@@ -196,6 +197,13 @@ pnpm eval:llm --live             # Tier 2: real LLM call + schema validation
 C:/Tools/doppler/doppler.exe run -c stg -- pnpm run test:e2e:web:smoke   # smoke only (~1-2 min)
 C:/Tools/doppler/doppler.exe run -c stg -- pnpm run test:e2e:web         # full suite
 # CLERK_TESTING_TOKEN is currently a placeholder — tests work without it but Clerk may rate-limit.
+
+# Change Class Checker — "you touched X, run Y"
+bash scripts/check-change-class.sh              # advisory: what to validate
+bash scripts/check-change-class.sh --run        # execute all validation
+bash scripts/check-change-class.sh --run --fast  # fast commands only
+bash scripts/check-change-class.sh --branch     # check full branch diff vs main
+# See docs/change-classes.md for the full reference table.
 ```
 
-Last updated: 2026-04-30
+Last updated: 2026-05-13

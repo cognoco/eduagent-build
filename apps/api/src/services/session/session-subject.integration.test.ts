@@ -22,6 +22,7 @@ import {
   subjects,
   type Database,
 } from '@eduagent/database';
+import type { SubjectSession } from '@eduagent/schemas';
 import { getSubjectSessions } from './session-subject';
 
 loadDatabaseEnv(resolve(__dirname, '../../../../..'));
@@ -151,9 +152,9 @@ describeIfDb('getSubjectSessions (integration)', () => {
   it('returns completed and auto_closed sessions with at least one exchange, scoped to profile', async () => {
     const sessions = await getSubjectSessions(db, profileId, subjectId);
 
-    const ids = sessions.map((s) => s.id);
+    const ids = sessions.map((s: SubjectSession) => s.id);
     expect(ids).toEqual(
-      expect.arrayContaining([completedSessionId, autoClosedSessionId])
+      expect.arrayContaining([completedSessionId, autoClosedSessionId]),
     );
     expect(ids).toHaveLength(2);
   });

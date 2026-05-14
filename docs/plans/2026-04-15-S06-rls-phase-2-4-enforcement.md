@@ -1,7 +1,7 @@
 # S-06 RLS — Phase 2-4: Enforcement (Post-Launch Sprint 2+)
 
 > **Parent finding:** `docs/_archive/plans/bug-fix-plan HR.md` → S-06
-> **Prerequisite:** `2026-04-15-S06-rls-phase-0-1-preparatory.md` must be complete and deployed
+> **Prerequisite:** `docs/_archive/plans/done/2026-04-15-S06-rls-phase-0-1-preparatory.md` must be complete and deployed
 > **Created:** 2026-04-15
 > **Risk:** HIGH — Phase 3 enforces RLS. Incorrect policies = data invisible to users or background jobs failing.
 > **Estimated effort:** 3 days

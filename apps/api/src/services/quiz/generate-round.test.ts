@@ -2,6 +2,7 @@ import type { CapitalsQuestion, VocabularyQuestion } from '@eduagent/schemas';
 import type { LibraryItem } from './content-resolver';
 import {
   assembleRound,
+  buildCapitalsDiscoveryRound,
   buildVocabularyDiscoveryQuestions,
   buildCapitalsPrompt,
   extractJsonObject,
@@ -22,7 +23,7 @@ describe('buildCapitalsPrompt', () => {
     expect(prompt).toContain('Paris');
     expect(prompt).toContain('Berlin');
     expect(prompt).toContain('Central Europe');
-    expect(prompt).toContain('11-13');
+    expect(prompt).toContain('13-17');
   });
 
   it('works without a theme preference', () => {
@@ -33,6 +34,16 @@ describe('buildCapitalsPrompt', () => {
     });
 
     expect(prompt).toContain('Choose an age-appropriate theme');
+  });
+
+  it('includes age description for child bracket', () => {
+    const prompt = buildCapitalsPrompt({
+      discoveryCount: 6,
+      ageBracket: 'child',
+      recentAnswers: [],
+    });
+
+    expect(prompt).toContain('under 13');
   });
 });
 
@@ -72,7 +83,9 @@ describe('injectMasteryQuestions', () => {
     const round = injectMasteryQuestions(discovery, mastery, 'capitals');
 
     expect(round.length).toBe(7);
-    const libraryQuestions = round.filter((question) => question.isLibraryItem);
+    const libraryQuestions = round.filter(
+      (question: CapitalsQuestion) => question.isLibraryItem,
+    );
     expect(libraryQuestions).toHaveLength(1);
     expect(libraryQuestions[0]?.country).toBe('France');
     expect(libraryQuestions[0]?.correctAnswer).toBe('Paris');
@@ -95,6 +108,71 @@ describe('injectMasteryQuestions', () => {
 
     expect(round).toHaveLength(1);
     expect(round[0]?.isLibraryItem).toBe(false);
+  });
+});
+
+describe('buildCapitalsDiscoveryRound', () => {
+  it('builds a full capitals round from reference data without an LLM response', () => {
+    const round = buildCapitalsDiscoveryRound({
+      discoveryCount: 8,
+      recentAnswers: [],
+    });
+
+    expect(round.theme).toBeTruthy();
+    expect(round.questions).toHaveLength(8);
+    for (const question of round.questions) {
+      expect(question.type).toBe('capitals');
+      expect(question.isLibraryItem).toBe(false);
+      expect(question.acceptedAliases).toContain(question.correctAnswer);
+      expect(question.distractors).toHaveLength(3);
+      expect(question.distractors).not.toContain(question.correctAnswer);
+    }
+  });
+
+  it('avoids recently answered capitals and existing mastery items', () => {
+    const round = buildCapitalsDiscoveryRound({
+      discoveryCount: 8,
+      recentAnswers: ['Paris', 'Berlin'],
+      excludedCountries: ['Austria'],
+      excludedAnswers: ['Vienna'],
+    });
+
+    const countries = round.questions.map((question) => question.country);
+    const answers = round.questions.map((question) => question.correctAnswer);
+
+    expect(countries).not.toContain('Austria');
+    expect(answers).not.toContain('Paris');
+    expect(answers).not.toContain('Berlin');
+    expect(answers).not.toContain('Vienna');
+  });
+
+  it('prioritizes recently missed capitals even when they were seen recently', () => {
+    const round = buildCapitalsDiscoveryRound({
+      discoveryCount: 4,
+      recentAnswers: ['Paris'],
+      recentlyMissedItems: ['France'],
+    });
+
+    expect(round.questions[0]).toMatchObject({
+      country: 'France',
+      correctAnswer: 'Paris',
+    });
+  });
+
+  it('uses same-region distractors on difficulty bump rounds', () => {
+    const round = buildCapitalsDiscoveryRound({
+      discoveryCount: 4,
+      recentAnswers: [],
+      themePreference: 'Central Europe',
+      difficultyBump: true,
+    });
+
+    expect(round.theme).toBe('Central Europe Capitals');
+    for (const question of round.questions) {
+      expect(question.distractors).toHaveLength(3);
+      expect(new Set(question.distractors).size).toBe(3);
+      expect(question.distractors).not.toContain(question.correctAnswer);
+    }
   });
 });
 
@@ -171,7 +249,7 @@ describe('extractJsonObject', () => {
 
   it('throws UpstreamLlmError when no JSON object is found', () => {
     expect(() => extractJsonObject('No JSON here')).toThrow(
-      'Quiz LLM returned no JSON object'
+      'Quiz LLM returned no JSON object',
     );
   });
 });

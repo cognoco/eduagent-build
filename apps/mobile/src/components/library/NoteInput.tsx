@@ -17,16 +17,16 @@ interface NoteInputProps {
   onSave: (content: string) => void;
   onCancel: () => void;
   initialValue?: string;
-  saving?: boolean;
   placeholder?: string;
+  saving?: boolean;
 }
 
 export function NoteInput({
   onSave,
   onCancel,
   initialValue = '',
-  saving = false,
   placeholder = 'Write your note...',
+  saving = false,
 }: NoteInputProps): React.ReactElement {
   const themeColors = useThemeColors();
   const [text, setText] = useState(initialValue);

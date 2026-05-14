@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import type { Profile } from '@eduagent/schemas';
@@ -13,15 +13,18 @@ import {
 import {
   useLearningResumeTarget,
   useOverallProgress,
+  useProgressInventory,
   useReviewSummary,
 } from '../../hooks/use-progress';
+import { useDashboard } from '../../hooks/use-dashboard';
+import { isInGracePeriod } from '../../lib/consent-grace';
 import { useSubscription } from '../../hooks/use-subscription';
 import { useSubjects } from '../../hooks/use-subjects';
 import { getGreeting } from '../../lib/greeting';
 import { useHasLinkedChildren } from '../../lib/profile';
 import {
-  LEARNER_HOME_HREF,
   LEARNER_HOME_RETURN_TO,
+  homeHrefForReturnTo,
   pushLearningResumeTarget,
 } from '../../lib/navigation';
 import {
@@ -34,15 +37,18 @@ import { FEATURE_FLAGS } from '../../lib/feature-flags';
 import { getSubjectTint } from '../../lib/subject-tints';
 import { useTheme } from '../../lib/theme';
 import { useThemeColors } from '../../lib/theme';
-import { WithdrawalCountdownBanner } from '../family/WithdrawalCountdownBanner';
+import {
+  WithdrawalCountdownBanner,
+  type ChildInGracePeriod,
+} from '../family/WithdrawalCountdownBanner';
 import { NudgeBanner } from '../nudge/NudgeBanner';
 import { CoachBand } from './CoachBand';
 import { ChildQuotaLine } from './ChildQuotaLine';
 import { EarlyAdopterCard } from './EarlyAdopterCard';
 import { ParentHomeScreen } from './ParentHomeScreen';
-import { SubjectCard } from './SubjectCard';
+import { SubjectTile } from './SubjectTile';
+import type { TranslateKey } from '../../i18n';
 
-const HOME_RETURN_PARAMS = { returnTo: LEARNER_HOME_RETURN_TO } as const;
 const CREATE_SUBJECT_FROM_HOME_HREF = '/create-subject' as const;
 
 const DEFAULT_SUBJECT_ICON: React.ComponentProps<typeof Ionicons>['name'] =
@@ -51,8 +57,8 @@ const DEFAULT_SUBJECT_ICON: React.ComponentProps<typeof Ionicons>['name'] =
 type HomeIntentAction = {
   testID: string;
   icon: React.ComponentProps<typeof Ionicons>['name'];
-  titleKey: string;
-  subtitleKey: string;
+  titleKey: TranslateKey;
+  subtitleKey: TranslateKey;
   route:
     | '/create-subject'
     | '/(app)/homework/camera'
@@ -98,6 +104,7 @@ export interface LearnerScreenProps {
   activeProfile: Profile | null;
   now?: Date;
   showParentHome?: boolean;
+  returnToTab?: string;
 }
 
 export function LearnerScreen({
@@ -105,6 +112,7 @@ export function LearnerScreen({
   activeProfile,
   now,
   showParentHome = true,
+  returnToTab = LEARNER_HOME_RETURN_TO,
 }: LearnerScreenProps): React.ReactElement {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
@@ -114,6 +122,8 @@ export function LearnerScreen({
   const { data: resumeTarget } = useLearningResumeTarget();
   const { data: reviewSummary } = useReviewSummary();
   const { data: overallProgress } = useOverallProgress();
+  const { data: progressInventory } = useProgressInventory();
+  const { data: dashboard } = useDashboard();
   const { data: quizDiscovery } = useQuizDiscoveryCard();
   const { data: subscription } = useSubscription();
   const markQuizDiscoverySurfaced = useMarkQuizDiscoverySurfaced();
@@ -127,6 +137,34 @@ export function LearnerScreen({
     activeProfile && !activeProfile.isOwner && profiles.some((p) => p.isOwner),
   );
   const [coachBandDismissed, setCoachBandDismissed] = useState(false);
+  const totalTopicsCompleted = overallProgress?.totalTopicsCompleted ?? null;
+  const totalSessions = progressInventory?.global.totalSessions ?? 0;
+  const childrenInGracePeriod = useMemo((): ChildInGracePeriod[] => {
+    return (dashboard?.children ?? []).flatMap((child) => {
+      if (
+        child.consentStatus === 'WITHDRAWN' &&
+        child.respondedAt != null &&
+        isInGracePeriod(child.respondedAt)
+      ) {
+        return [
+          {
+            profileId: child.profileId,
+            displayName: child.displayName,
+            respondedAt: child.respondedAt,
+          },
+        ];
+      }
+      return [];
+    });
+  }, [dashboard]);
+  const returnParams = useMemo(
+    () => ({ returnTo: returnToTab }),
+    [returnToTab],
+  );
+  const homeHref = useMemo(
+    () => homeHrefForReturnTo(returnToTab),
+    [returnToTab],
+  );
 
   const dismissCoachBand = useCallback(() => {
     setCoachBandDismissed(true);
@@ -271,9 +309,9 @@ export function LearnerScreen({
               ...(recoveryMarker.topicName && {
                 topicName: recoveryMarker.topicName,
               }),
-              ...HOME_RETURN_PARAMS,
+              ...returnParams,
             },
-          } as never);
+          } as Href);
         },
       };
     }
@@ -284,11 +322,7 @@ export function LearnerScreen({
           resumeTarget.topicTitle ?? resumeTarget.subjectName
         }.`,
         onContinue: () =>
-          pushLearningResumeTarget(
-            router,
-            resumeTarget,
-            LEARNER_HOME_RETURN_TO,
-          ),
+          pushLearningResumeTarget(router, resumeTarget, returnToTab),
       };
     }
 
@@ -303,8 +337,8 @@ export function LearnerScreen({
         onContinue: () =>
           router.push({
             pathname: '/(app)/topic/relearn',
-            params: HOME_RETURN_PARAMS,
-          } as never),
+            params: returnParams,
+          } as Href),
       };
     }
 
@@ -317,9 +351,9 @@ export function LearnerScreen({
             pathname: '/(app)/quiz',
             params: {
               activityType: quizDiscovery.activityType,
-              ...HOME_RETURN_PARAMS,
+              ...returnParams,
             },
-          } as never);
+          } as Href);
         },
       };
     }
@@ -339,20 +373,18 @@ export function LearnerScreen({
   const openIntentAction = useCallback(
     (route: HomeIntentAction['route']): void => {
       if (route === '/(app)/homework/camera') {
-        // Seed the back stack before the nested camera route. There is no
-        // homework index screen, so Home is the clear return target.
-        router.push(LEARNER_HOME_HREF as never);
+        router.push(homeHref as Href);
       }
 
       router.push({
         pathname: route,
         params:
           route === '/(app)/session'
-            ? { mode: 'freeform', ...HOME_RETURN_PARAMS }
-            : HOME_RETURN_PARAMS,
-      } as never);
+            ? { mode: 'freeform', ...returnParams }
+            : returnParams,
+      } as Href);
     },
-    [],
+    [homeHref, returnParams],
   );
 
   if (isLoading) {
@@ -369,7 +401,7 @@ export function LearnerScreen({
         }}
         testID="learner-loading-state"
       >
-        <BookPageFlipAnimation size={140} />
+        <BookPageFlipAnimation size={150} />
         {loadingTimedOut && (
           <View className="mt-6 items-center" testID="learner-loading-timeout">
             <Text className="text-body text-text-secondary text-center">
@@ -385,7 +417,7 @@ export function LearnerScreen({
               </Text>
             </Pressable>
             <Pressable
-              onPress={() => router.replace('/(app)/home' as never)}
+              onPress={() => router.replace(homeHref as Href)}
               className="mt-2 min-h-[44px] items-center justify-center px-6 py-2"
               testID="learner-loading-go-home"
             >
@@ -455,7 +487,9 @@ export function LearnerScreen({
             <Text className="text-body-sm text-text-secondary mt-0.5">
               {subtitle}
             </Text>
-            {!isParentProxy ? <ChildQuotaLine /> : null}
+            {!isParentProxy ? (
+              <ChildQuotaLine totalTopicsCompleted={totalTopicsCompleted} />
+            ) : null}
           </View>
         </View>
       </View>
@@ -465,7 +499,7 @@ export function LearnerScreen({
         contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
         showsVerticalScrollIndicator={false}
       >
-        <EarlyAdopterCard />
+        <EarlyAdopterCard totalSessions={totalSessions} />
         {!isParentProxy ? <NudgeBanner /> : null}
 
         {showCoachBand && (
@@ -483,7 +517,9 @@ export function LearnerScreen({
         )}
 
         <View className="px-5">
-          <WithdrawalCountdownBanner />
+          <WithdrawalCountdownBanner
+            childrenInGracePeriod={childrenInGracePeriod}
+          />
         </View>
 
         {!isParentProxy && (
@@ -550,7 +586,7 @@ export function LearnerScreen({
                 contentContainerStyle={{ paddingHorizontal: 20, gap: 12 }}
               >
                 {subjectCards.map((card) => (
-                  <SubjectCard
+                  <SubjectTile
                     key={card.subjectId}
                     {...card}
                     testID={`home-subject-card-${card.subjectId}`}
@@ -558,15 +594,13 @@ export function LearnerScreen({
                       card.isPreparing
                         ? undefined
                         : () => {
-                            // Two-push pattern (CLAUDE.md cross-tab rule):
-                            // unstable_settings only seeds one level deep, so push
-                            // the progress index first then the subject child to
-                            // keep router.back() landing on the progress tab root.
-                            router.push('/(app)/progress' as never);
                             router.push({
                               pathname: '/(app)/progress/[subjectId]',
-                              params: { subjectId: card.subjectId },
-                            } as never);
+                              params: {
+                                subjectId: card.subjectId,
+                                returnTo: returnToTab,
+                              },
+                            } as Href);
                           }
                     }
                   />
@@ -575,7 +609,10 @@ export function LearnerScreen({
                   <Pressable
                     testID="home-add-subject-tile"
                     onPress={() =>
-                      router.push(CREATE_SUBJECT_FROM_HOME_HREF as never)
+                      router.push({
+                        pathname: CREATE_SUBJECT_FROM_HOME_HREF,
+                        params: { returnTo: returnToTab },
+                      } as Href)
                     }
                     className="rounded-2xl border border-dashed border-border items-center justify-center"
                     style={{ width: 96, height: 150, gap: 8 }}
@@ -612,7 +649,10 @@ export function LearnerScreen({
                 <Pressable
                   testID="home-add-first-subject"
                   onPress={() =>
-                    router.push(CREATE_SUBJECT_FROM_HOME_HREF as never)
+                    router.push({
+                      pathname: CREATE_SUBJECT_FROM_HOME_HREF,
+                      params: { returnTo: returnToTab },
+                    } as Href)
                   }
                   className="bg-primary rounded-xl px-5 py-2.5 mt-1"
                   accessibilityRole="button"

@@ -276,6 +276,110 @@ export function useSubjectClassification(
     showConfirmation,
   ]);
 
+  const handleTypeSubject = useCallback(
+    async (typedSubject: string) => {
+      const rawInput = typedSubject.trim();
+      if (
+        !rawInput ||
+        !pendingSubjectResolution ||
+        isStreaming ||
+        pendingClassification
+      ) {
+        return;
+      }
+
+      try {
+        const resolved = await resolveSubject.mutateAsync({ rawInput });
+        const existingSubject = resolved.resolvedName
+          ? availableSubjects.find(
+              (subject) =>
+                subject.name.toLowerCase() ===
+                resolved.resolvedName?.toLowerCase(),
+            )
+          : undefined;
+
+        if (existingSubject) {
+          await handleResolveSubject({
+            subjectId: existingSubject.id,
+            subjectName: existingSubject.name,
+          });
+          return;
+        }
+
+        if (resolved.resolvedName) {
+          const originalText = pendingSubjectResolution.originalText;
+          setPendingSubjectResolution(null);
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: createLocalMessageId('ai'),
+              role: 'assistant',
+              content: `Adding ${resolved.resolvedName} and getting started...`,
+              isSystemPrompt: true,
+            },
+          ]);
+
+          const result = await createSubject.mutateAsync({
+            name: resolved.resolvedName,
+            rawInput,
+            ...(resolved.focus ? { focus: resolved.focus } : {}),
+            ...(resolved.focusDescription
+              ? { focusDescription: resolved.focusDescription }
+              : {}),
+          });
+          setClassifiedSubject({
+            subjectId: result.subject.id,
+            subjectName: result.subject.name,
+          });
+          setShowWrongSubjectChip(false);
+          await continueWithMessage(originalText, {
+            sessionSubjectId: result.subject.id,
+            sessionSubjectName: result.subject.name,
+          });
+          return;
+        }
+
+        if (resolved.suggestions.length > 0) {
+          setPendingSubjectResolution((current) =>
+            current
+              ? {
+                  ...current,
+                  prompt:
+                    resolved.displayMessage ||
+                    'Pick the subject that fits best:',
+                  resolveSuggestions: resolved.suggestions,
+                }
+              : current,
+          );
+          return;
+        }
+
+        showConfirmation(
+          resolved.displayMessage ||
+            "I couldn't match that subject. Try another name.",
+        );
+      } catch {
+        showConfirmation("I couldn't match that subject. Try another name.");
+      }
+    },
+    [
+      availableSubjects,
+      continueWithMessage,
+      createLocalMessageId,
+      createSubject,
+      handleResolveSubject,
+      isStreaming,
+      pendingClassification,
+      pendingSubjectResolution,
+      resolveSubject,
+      setClassifiedSubject,
+      setMessages,
+      setPendingSubjectResolution,
+      setShowWrongSubjectChip,
+      showConfirmation,
+    ],
+  );
+
   const handleSend = useCallback(
     async (
       text: string,
@@ -372,8 +476,9 @@ export function useSubjectClassification(
             ]);
           } else if (effectiveMode === 'freeform') {
             // BUG-31 / F-1: When multiple candidates exist, ask the user which subject
-            // they meant. Single candidate auto-picks. Zero candidates proceed without
-            // subject — continueWithMessage handles the no-subject case.
+            // they meant. Single candidate auto-picks with an override chip.
+            // Zero candidates should still offer a useful subject suggestion or
+            // typed fallback instead of sending the learner into a no-subject chat.
             if (result.candidates.length > 1) {
               const freeformCandidates = result.candidates.map((c) => ({
                 subjectId: c.subjectId,
@@ -402,8 +507,45 @@ export function useSubjectClassification(
               sessionSubjectId = best.subjectId;
               sessionSubjectName = best.subjectName;
             }
-            // If no candidates at all, proceed without subject —
-            // continueWithMessage will show an appropriate error.
+            const suggested = result.suggestedSubjectName ?? null;
+            if (!best && suggested) {
+              openSubjectResolution(
+                text,
+                `This sounds like ${suggested}. Pick a subject below, or tap "+ ${suggested}" to add it.`,
+                availableSubjects.map((candidate) => ({
+                  subjectId: candidate.id,
+                  subjectName: candidate.name,
+                })),
+                suggested,
+              );
+              return;
+            }
+            if (!best) {
+              try {
+                const resolveResult = await resolveSubject.mutateAsync({
+                  rawInput: text,
+                });
+                if (
+                  resolveResult.resolvedName ||
+                  resolveResult.suggestions.length > 0
+                ) {
+                  openSubjectResolution(
+                    text,
+                    resolveResult.displayMessage ||
+                      'Pick a subject that fits, or create your own.',
+                    availableSubjects.map((candidate) => ({
+                      subjectId: candidate.id,
+                      subjectName: candidate.name,
+                    })),
+                    resolveResult.resolvedName,
+                    resolveResult.suggestions ?? [],
+                  );
+                  return;
+                }
+              } catch {
+                // Fall through to no-subject chat only when both classifiers fail.
+              }
+            }
           } else {
             const subjectCandidates =
               result.candidates.length > 0
@@ -582,6 +724,7 @@ export function useSubjectClassification(
     handleResolveSubject,
     handleCreateResolveSuggestion,
     handleCreateSuggestedSubject,
+    handleTypeSubject,
     handleSend,
   };
 }

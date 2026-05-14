@@ -74,7 +74,7 @@ beforeAll(async () => {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
     throw new Error(
-      'DATABASE_URL is not set for session operations integration tests'
+      'DATABASE_URL is not set for session operations integration tests',
     );
   }
 
@@ -99,6 +99,7 @@ describe('session operations integration', () => {
 
     const session = await startSession(db, profileId, subjectId, {
       subjectId,
+      sessionType: 'learning',
       inputMode: 'text',
     });
 
@@ -122,6 +123,8 @@ describe('session operations integration', () => {
 
     const session = await startSession(db, profileId, subjectId, {
       subjectId,
+      sessionType: 'learning',
+      inputMode: 'text',
     });
 
     await db.insert(sessionEvents).values([
@@ -159,16 +162,21 @@ describe('session operations integration', () => {
 
     const transcript = await getSessionTranscript(db, profileId, session.id);
 
-    expect(transcript).not.toBeNull();
-    expect(transcript?.session).toEqual(
+    if (!transcript || transcript.archived) {
+      throw new Error(
+        `Expected a live (non-archived) transcript, got: ${JSON.stringify(transcript)}`,
+      );
+    }
+    const liveTranscript = transcript;
+    expect(liveTranscript.session).toEqual(
       expect.objectContaining({
         sessionId: session.id,
         subjectId,
         milestonesReached: ['persistent'],
         wallClockSeconds: 180,
-      })
+      }),
     );
-    expect(transcript?.exchanges).toEqual([
+    expect(liveTranscript.exchanges).toEqual([
       expect.objectContaining({
         role: 'assistant',
         content: 'Use a diagram first.',
@@ -192,6 +200,8 @@ describe('session operations integration', () => {
 
     const session = await startSession(db, profileId, subjectId, {
       subjectId,
+      sessionType: 'learning',
+      inputMode: 'text',
     });
 
     await db.insert(sessionSummaries).values({
@@ -228,7 +238,7 @@ describe('session operations integration', () => {
             'You connected equivalent fractions to the picture model.',
           sessionState: 'completed',
         }),
-      })
+      }),
     );
   });
 
@@ -239,6 +249,7 @@ describe('session operations integration', () => {
     const session = await startSession(db, profileId, subjectId, {
       subjectId,
       sessionType: 'homework',
+      inputMode: 'text',
       metadata: {
         homework: {
           problemCount: 2,
@@ -277,13 +288,13 @@ describe('session operations integration', () => {
       db,
       profileId,
       session.id,
-      payload
+      payload,
     );
     const secondResult = await syncHomeworkState(
       db,
       profileId,
       session.id,
-      payload
+      payload,
     );
     const events = await db.query.sessionEvents.findMany({
       where: eq(sessionEvents.sessionId, session.id),
@@ -298,22 +309,33 @@ describe('session operations integration', () => {
       'problem-2',
     ]);
     expect(secondResult.metadata).toEqual(firstResult.metadata);
-    expect(events.map((event) => event.eventType)).toEqual(
+    expect(
+      events.map((event: typeof sessionEvents.$inferSelect) => event.eventType),
+    ).toEqual(
       expect.arrayContaining([
         'session_start',
         'ocr_correction',
         'homework_problem_started',
         'homework_problem_completed',
-      ])
+      ]),
     );
     expect(
-      events.filter((event) => event.eventType === 'ocr_correction')
+      events.filter(
+        (event: typeof sessionEvents.$inferSelect) =>
+          event.eventType === 'ocr_correction',
+      ),
     ).toHaveLength(1);
     expect(
-      events.filter((event) => event.eventType === 'homework_problem_started')
+      events.filter(
+        (event: typeof sessionEvents.$inferSelect) =>
+          event.eventType === 'homework_problem_started',
+      ),
     ).toHaveLength(1);
     expect(
-      events.filter((event) => event.eventType === 'homework_problem_completed')
+      events.filter(
+        (event: typeof sessionEvents.$inferSelect) =>
+          event.eventType === 'homework_problem_completed',
+      ),
     ).toHaveLength(1);
     expect(storedRow?.metadata).toMatchObject({
       homework: expect.objectContaining({
@@ -330,6 +352,8 @@ describe('session operations integration', () => {
 
     const session = await startSession(db, profileId, subjectId, {
       subjectId,
+      sessionType: 'learning',
+      inputMode: 'text',
     });
     const flaggedEventId = generateUUIDv7();
 
@@ -364,7 +388,7 @@ describe('session operations integration', () => {
             reason: 'Incorrect information',
           },
         }),
-      ])
+      ]),
     );
   });
 });

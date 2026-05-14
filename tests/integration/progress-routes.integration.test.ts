@@ -48,7 +48,7 @@ afterAll(async () => {
 
 async function createProfileFor(
   user: { userId: string; email: string },
-  displayName: string
+  displayName: string,
 ) {
   return createProfileViaRoute({
     app,
@@ -231,7 +231,7 @@ describe('Integration: progress routes', () => {
           email: PROGRESS_USER.email,
         }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -257,10 +257,10 @@ describe('Integration: progress routes', () => {
         method: 'GET',
         headers: buildAuthHeaders(
           { sub: PROGRESS_USER.userId, email: PROGRESS_USER.email },
-          scenario.profile.id
+          scenario.profile.id,
         ),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -276,7 +276,7 @@ describe('Integration: progress routes', () => {
       totalSessions: 1,
     });
     expect(body.topic.summaryExcerpt).toContain(
-      'Learner can describe the triangle rules'
+      'Learner can describe the triangle rules',
     );
   });
 
@@ -289,10 +289,10 @@ describe('Integration: progress routes', () => {
         method: 'GET',
         headers: buildAuthHeaders(
           { sub: PROGRESS_USER.userId, email: PROGRESS_USER.email },
-          scenario.profile.id
+          scenario.profile.id,
         ),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -316,10 +316,10 @@ describe('Integration: progress routes', () => {
         method: 'GET',
         headers: buildAuthHeaders(
           { sub: PROGRESS_USER.userId, email: PROGRESS_USER.email },
-          scenario.profile.id
+          scenario.profile.id,
         ),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -332,7 +332,7 @@ describe('Integration: progress routes', () => {
       topicTitle: 'Geometry',
     });
     expect(body.nextUpcomingReviewAt).toBe(
-      scenario.futureReviewAt.toISOString()
+      scenario.futureReviewAt.toISOString(),
     );
   });
 
@@ -345,10 +345,10 @@ describe('Integration: progress routes', () => {
         method: 'GET',
         headers: buildAuthHeaders(
           { sub: PROGRESS_USER.userId, email: PROGRESS_USER.email },
-          scenario.profile.id
+          scenario.profile.id,
         ),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -378,10 +378,10 @@ describe('Integration: progress routes', () => {
         method: 'GET',
         headers: buildAuthHeaders(
           { sub: PROGRESS_USER.userId, email: PROGRESS_USER.email },
-          scenario.profile.id
+          scenario.profile.id,
         ),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -404,10 +404,10 @@ describe('Integration: progress routes', () => {
         method: 'GET',
         headers: buildAuthHeaders(
           { sub: PROGRESS_USER.userId, email: PROGRESS_USER.email },
-          scenario.profile.id
+          scenario.profile.id,
         ),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(activeRes.status).toBe(200);
@@ -421,10 +421,10 @@ describe('Integration: progress routes', () => {
         method: 'GET',
         headers: buildAuthHeaders(
           { sub: PROGRESS_USER.userId, email: PROGRESS_USER.email },
-          scenario.profile.id
+          scenario.profile.id,
         ),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(nullRes.status).toBe(200);
@@ -435,7 +435,7 @@ describe('Integration: progress routes', () => {
     const scenario = await createProgressScenario();
     const otherProfile = await createProfileFor(
       OTHER_PROGRESS_USER,
-      'Other Progress Learner'
+      'Other Progress Learner',
     );
     const otherSubject = await seedSubject(otherProfile.id, 'Chemistry');
     const otherCurriculum = await seedCurriculum({
@@ -449,10 +449,10 @@ describe('Integration: progress routes', () => {
         method: 'GET',
         headers: buildAuthHeaders(
           { sub: PROGRESS_USER.userId, email: PROGRESS_USER.email },
-          scenario.profile.id
+          scenario.profile.id,
         ),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(resolveRes.status).toBe(200);
@@ -468,10 +468,10 @@ describe('Integration: progress routes', () => {
         method: 'GET',
         headers: buildAuthHeaders(
           { sub: PROGRESS_USER.userId, email: PROGRESS_USER.email },
-          scenario.profile.id
+          scenario.profile.id,
         ),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(hiddenRes.status).toBe(404);
@@ -481,9 +481,74 @@ describe('Integration: progress routes', () => {
     const res = await app.request(
       '/v1/progress/continue',
       { method: 'GET' },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(401);
+  });
+
+  /**
+   * PR-2 surface-ownership-boundaries: getProfileSessions was extracted from
+   * dashboard.ts to session/session-crud.ts. This test verifies:
+   * 1. The route returns 200 and a scoped session list for the active profile.
+   * 2. Sessions belonging to a different profile are NOT included (scoping).
+   *
+   * Profile-scoping guard is enforced by createScopedRepository inside
+   * getProfileSessions — this test exercises the full call stack so a
+   * regression in the import chain would produce 0 results or a 500.
+   */
+  it('GET /v1/progress/sessions returns sessions scoped to the active profile', async () => {
+    const profile = await createProfileFor(PROGRESS_USER, 'Session Learner');
+    const otherProfile = await createProfileFor(
+      OTHER_PROGRESS_USER,
+      'Other Session Learner',
+    );
+
+    const subject = await seedSubject(profile.id, 'Physics');
+    const otherSubject = await seedSubject(otherProfile.id, 'Chemistry');
+
+    // Seed one completed session for the active profile (exchangeCount >= 1)
+    await seedLearningSession({
+      profileId: profile.id,
+      subjectId: subject.id,
+      overrides: {
+        status: 'completed',
+        exchangeCount: 3,
+        startedAt: new Date(),
+        endedAt: new Date(),
+      },
+    });
+
+    // Seed a session for the OTHER profile — must not appear in response
+    await seedLearningSession({
+      profileId: otherProfile.id,
+      subjectId: otherSubject.id,
+      overrides: {
+        status: 'completed',
+        exchangeCount: 2,
+        startedAt: new Date(),
+        endedAt: new Date(),
+      },
+    });
+
+    const res = await app.request(
+      '/v1/progress/sessions',
+      {
+        method: 'GET',
+        headers: buildAuthHeaders(
+          { sub: PROGRESS_USER.userId, email: PROGRESS_USER.email },
+          profile.id,
+        ),
+      },
+      TEST_ENV,
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.sessions).toHaveLength(1);
+    expect(body.sessions[0]).toMatchObject({
+      subjectId: subject.id,
+      exchangeCount: 3,
+    });
   });
 });

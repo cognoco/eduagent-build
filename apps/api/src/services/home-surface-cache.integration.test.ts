@@ -30,6 +30,7 @@ import {
   readHomeSurfaceCacheData,
 } from './home-surface-cache';
 import type { HomeSurfaceCacheData } from './home-surface-cache';
+import type { HomeCard, HomeCardId } from '@eduagent/schemas';
 
 // ---------------------------------------------------------------------------
 // DB setup — real connection
@@ -41,7 +42,7 @@ function requireDatabaseUrl(): string {
   const url = process.env.DATABASE_URL;
   if (!url) {
     throw new Error(
-      'DATABASE_URL is not set. Create .env.test.local or .env.development.local.'
+      'DATABASE_URL is not set. Create .env.test.local or .env.development.local.',
     );
   }
   return url;
@@ -88,7 +89,7 @@ async function cleanup() {
   const found = await db.query.accounts.findMany({
     where: eq(accounts.email, ACCOUNT.email),
   });
-  const ids = found.map((a) => a.id);
+  const ids = found.map((a: typeof accounts.$inferSelect) => a.id);
   if (ids.length > 0) {
     await db.delete(accounts).where(inArray(accounts.id, ids));
   }
@@ -119,27 +120,30 @@ describe('[BUG-859] mergeHomeSurfaceCacheData concurrent lost-update guard (inte
     // "record an interaction / add a card" operation).  After N=3 concurrent
     // merges the rankedHomeCards array must contain exactly N entries — not
     // fewer (which would happen if the last-writer-wins bug were still present).
-    const makeCard = (label: string) => ({
-      id: `card-${label}` as import('@eduagent/schemas').HomeCardId,
-      type: 'streak' as const,
-      priority: 1,
+    const makeCard = (id: HomeCardId, label: string): HomeCard => ({
+      id,
       title: label,
-      body: label,
-      expiresAt: new Date(Date.now() + 86400_000).toISOString(),
+      subtitle: label,
+      primaryLabel: label,
+      priority: 1,
     });
 
     const mergeAppend =
-      (label: string) =>
+      (id: HomeCardId, label: string) =>
       (current: HomeSurfaceCacheData): HomeSurfaceCacheData => ({
         ...current,
-        rankedHomeCards: [...current.rankedHomeCards, makeCard(label)],
+        rankedHomeCards: [...current.rankedHomeCards, makeCard(id, label)],
       });
 
     // Fire 3 concurrent merges
     const results = await Promise.allSettled([
-      mergeHomeSurfaceCacheData(db, profile.id, mergeAppend('alpha')),
-      mergeHomeSurfaceCacheData(db, profile.id, mergeAppend('beta')),
-      mergeHomeSurfaceCacheData(db, profile.id, mergeAppend('gamma')),
+      mergeHomeSurfaceCacheData(db, profile.id, mergeAppend('study', 'alpha')),
+      mergeHomeSurfaceCacheData(db, profile.id, mergeAppend('review', 'beta')),
+      mergeHomeSurfaceCacheData(
+        db,
+        profile.id,
+        mergeAppend('homework', 'gamma'),
+      ),
     ]);
 
     // None should reject
@@ -147,11 +151,12 @@ describe('[BUG-859] mergeHomeSurfaceCacheData concurrent lost-update guard (inte
     expect(failures).toHaveLength(0);
 
     // Read the committed state and check the invariant
-    const { data } = await readHomeSurfaceCacheData(db, profile.id);
+    const cacheResult = await readHomeSurfaceCacheData(db, profile.id);
+    const data = cacheResult!.data;
     // With SELECT FOR UPDATE serialising merges each card must appear exactly once.
     expect(data.rankedHomeCards).toHaveLength(3);
-    const labels = data.rankedHomeCards.map((c) => c.id).sort();
-    expect(labels).toEqual(['card-alpha', 'card-beta', 'card-gamma']);
+    const labels = data.rankedHomeCards.map((c: HomeCard) => c.id).sort();
+    expect(labels).toEqual(['homework', 'review', 'study']);
   });
 
   it('[BUG-859] first-write idempotency — concurrent merges on a non-existent row create exactly one cache row', async () => {
@@ -161,8 +166,8 @@ describe('[BUG-859] mergeHomeSurfaceCacheData concurrent lost-update guard (inte
     // No prior cache row; two concurrent merges both trigger the
     // INSERT … ON CONFLICT DO NOTHING bootstrap path.
     await Promise.all([
-      mergeHomeSurfaceCacheData(db, profile.id, (c) => c),
-      mergeHomeSurfaceCacheData(db, profile.id, (c) => c),
+      mergeHomeSurfaceCacheData(db, profile.id, (c: HomeSurfaceCacheData) => c),
+      mergeHomeSurfaceCacheData(db, profile.id, (c: HomeSurfaceCacheData) => c),
     ]);
 
     const rows = await db.query.coachingCardCache.findMany({

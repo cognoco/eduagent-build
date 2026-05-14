@@ -90,7 +90,7 @@ async function cleanup() {
   const found = await db.query.accounts.findMany({
     where: eq(accounts.email, ACCOUNT.email),
   });
-  const ids = found.map((a) => a.id);
+  const ids = found.map((a: typeof accounts.$inferSelect) => a.id);
   if (ids.length > 0) {
     // CASCADE deletes profiles → subjects → curricula → books → topics
     await db.delete(accounts).where(inArray(accounts.id, ids));
@@ -554,7 +554,8 @@ describe('resolveFilingResult (integration)', () => {
       where: eq(curriculumTopics.bookId, first.bookId),
     });
     const matchingTopics = allTopics.filter(
-      (t) => t.title.toLowerCase() === 'light reactions',
+      (t: typeof curriculumTopics.$inferSelect) =>
+        t.title.toLowerCase() === 'light reactions',
     );
     expect(matchingTopics).toHaveLength(1);
   });

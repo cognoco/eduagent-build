@@ -36,7 +36,7 @@ const mockDatabaseModule = createDatabaseModuleMock({
   },
 });
 
-jest.mock('@eduagent/database', () => mockDatabaseModule.module);
+jest.mock('@eduagent/database', () => mockDatabaseModule.module); // gc1-allow: database package boundary — prevents real DB connection in unit tests
 
 const mockGenerateBookTopics = jest.fn().mockResolvedValue({
   topics: [
@@ -52,6 +52,7 @@ const mockGenerateBookTopics = jest.fn().mockResolvedValue({
 });
 
 jest.mock('../../services/book-generation', () => ({
+  // gc1-allow: prevents real LLM calls while asserting topic generation boundary
   generateBookTopics: (...args: unknown[]) => mockGenerateBookTopics(...args),
 }));
 
@@ -64,9 +65,11 @@ const mockPersistBookTopics = jest.fn().mockResolvedValue({
 });
 
 jest.mock('../../services/curriculum', () => ({
+  // gc1-allow: prevents real DB writes while asserting curriculum persistence boundary
   persistBookTopics: (...args: unknown[]) => mockPersistBookTopics(...args),
 }));
 
+import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 import { bookPreGeneration } from './book-pre-generation';
 
 // ---------------------------------------------------------------------------
@@ -74,28 +77,21 @@ import { bookPreGeneration } from './book-pre-generation';
 // ---------------------------------------------------------------------------
 
 async function executeSteps(
-  eventData: Record<string, unknown>
+  eventData: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
-  const steps: Record<string, () => Promise<unknown>> = {};
-
-  const mockStep = {
-    run: jest.fn(async (name: string, fn: () => Promise<unknown>) => {
-      steps[name] = fn;
-      return fn();
-    }),
-  };
+  const { step, runCalls } = createInngestStepRunner();
 
   const handler = (bookPreGeneration as any).fn;
   const result = await handler({
     event: { data: eventData, name: 'app/book.topics-generated' },
-    step: mockStep,
+    step,
   });
 
-  return { result, steps, mockStep };
+  return { result, runCalls };
 }
 
 function createEventData(
-  overrides: Record<string, unknown> = {}
+  overrides: Record<string, unknown> = {},
 ): Record<string, unknown> {
   return {
     subjectId: 'subject-001',
@@ -145,7 +141,7 @@ describe('bookPreGeneration', () => {
     expect(triggers).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ event: 'app/book.topics-generated' }),
-      ])
+      ]),
     );
   });
 
@@ -159,7 +155,7 @@ describe('bookPreGeneration', () => {
           status: 'skipped',
           reason: 'book not found',
           timestamp: expect.any(String),
-        })
+        }),
       );
       expect(mockGenerateBookTopics).not.toHaveBeenCalled();
     });
@@ -179,7 +175,7 @@ describe('bookPreGeneration', () => {
           status: 'skipped',
           reason: 'no unbuilt books remaining',
           timestamp: expect.any(String),
-        })
+        }),
       );
       expect(mockGenerateBookTopics).not.toHaveBeenCalled();
     });
@@ -219,13 +215,13 @@ describe('bookPreGeneration', () => {
           status: 'completed',
           generated: ['Ancient Greece'],
           timestamp: expect.any(String),
-        })
+        }),
       );
 
       expect(mockGenerateBookTopics).toHaveBeenCalledWith(
         'Ancient Greece',
         'Gods and heroes',
-        expect.any(Number) // learnerAge derived from birthYear
+        expect.any(Number), // learnerAge derived from birthYear
       );
       expect(mockPersistBookTopics).toHaveBeenCalledWith(
         expect.anything(), // db
@@ -233,7 +229,7 @@ describe('bookPreGeneration', () => {
         'subject-001',
         'book-002',
         expect.any(Array), // topics
-        expect.any(Array) // connections
+        expect.any(Array), // connections
       );
     });
 
@@ -267,7 +263,7 @@ describe('bookPreGeneration', () => {
         expect.objectContaining({
           status: 'completed',
           generated: ['Ancient Greece', 'Roman Empire'],
-        })
+        }),
       );
       expect(mockGenerateBookTopics).toHaveBeenCalledTimes(2);
       expect(mockPersistBookTopics).toHaveBeenCalledTimes(2);
@@ -296,7 +292,7 @@ describe('bookPreGeneration', () => {
       expect(mockGenerateBookTopics).toHaveBeenCalledWith(
         'Ancient Greece',
         '',
-        12 // fallback age
+        12, // fallback age
       );
     });
   });
@@ -321,11 +317,11 @@ describe('bookPreGeneration', () => {
       });
 
       mockGenerateBookTopics.mockRejectedValueOnce(
-        new Error('LLM returned invalid JSON')
+        new Error('LLM returned invalid JSON'),
       );
 
       await expect(executeSteps(createEventData())).rejects.toThrow(
-        'LLM returned invalid JSON'
+        'LLM returned invalid JSON',
       );
     });
 
@@ -348,11 +344,11 @@ describe('bookPreGeneration', () => {
       });
 
       mockPersistBookTopics.mockRejectedValueOnce(
-        new Error('Subject not found')
+        new Error('Subject not found'),
       );
 
       await expect(executeSteps(createEventData())).rejects.toThrow(
-        'Subject not found'
+        'Subject not found',
       );
     });
 
@@ -379,7 +375,7 @@ describe('bookPreGeneration', () => {
       expect(mockGenerateBookTopics).toHaveBeenCalledWith(
         'Ancient Greece',
         '', // description ?? '' fallback
-        expect.any(Number)
+        expect.any(Number),
       );
     });
   });
@@ -416,7 +412,7 @@ describe('bookPreGeneration', () => {
         expect.objectContaining({
           status: 'completed',
           generated: [], // book-002 was already generated, nothing new
-        })
+        }),
       );
     });
 
@@ -448,10 +444,10 @@ describe('bookPreGeneration', () => {
         birthYear: 2014,
       });
 
-      const { mockStep } = (await executeSteps(createEventData())) as any;
+      const { runCalls } = (await executeSteps(createEventData())) as any;
 
-      const stepIds = (mockStep.run.mock.calls as Array<[string, unknown]>).map(
-        (call) => call[0]
+      const stepIds = (runCalls as Array<{ name: string }>).map(
+        (call) => call.name,
       );
       expect(stepIds).toEqual([
         'load-pre-generation-context',

@@ -8,12 +8,13 @@ const mockFormatConsentReminderEmail = jest.fn(
     subject: 'Consent reminder',
     body: `${_days} days left — ${_tokenUrl}`,
     type: 'consent_reminder' as const,
-  })
+  }),
 );
 
 // Fake DB whose query.consentStates.findFirst returns a valid consent token.
 // All values are defined inline inside the factory to avoid Jest hoisting issues.
 jest.mock('../helpers', () => ({
+  // gc1-allow: isolates step-database helper from real DB config reads
   getStepDatabase: jest.fn(() => ({
     query: {
       consentStates: {
@@ -29,24 +30,28 @@ jest.mock('../helpers', () => ({
 }));
 
 jest.mock('../../services/consent', () => ({
+  // gc1-allow: isolates consent-reminder guards from consent service DB access
   getConsentStatus: (...args: unknown[]) => mockGetConsentStatus(...args),
   getProfileConsentState: (...args: unknown[]) =>
     mockGetProfileConsentState(...args),
 }));
 
 jest.mock('../../services/notifications', () => ({
+  // gc1-allow: prevents real email delivery while asserting notification boundary
   sendEmail: (...args: unknown[]) => mockSendEmail(...args),
   formatConsentReminderEmail: (...args: unknown[]) =>
     mockFormatConsentReminderEmail(
-      ...(args as [string, string, number, string])
+      ...(args as [string, string, number, string]),
     ),
 }));
 
 jest.mock('../../services/deletion', () => ({
+  // gc1-allow: prevents destructive profile deletion while asserting the handler boundary
   deleteProfileIfNoConsent: (...args: unknown[]) =>
     mockDeleteProfileIfNoConsent(...args),
 }));
 
+import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 import { consentReminder } from './consent-reminders';
 
 interface ProfileConsentState {
@@ -61,7 +66,7 @@ async function executeHandler(
     status: 'PARENTAL_CONSENT_REQUESTED',
     parentEmail: 'parent@example.com',
     consentType: 'GDPR',
-  }
+  },
 ): Promise<void> {
   let callIndex = 0;
   mockGetConsentStatus.mockImplementation(async () => {
@@ -73,10 +78,7 @@ async function executeHandler(
   // parentEmail is looked up from DB via getProfileConsentState
   mockGetProfileConsentState.mockResolvedValue(profileState);
 
-  const mockStep = {
-    run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
-    sleep: jest.fn(),
-  };
+  const { step } = createInngestStepRunner();
 
   const handler = (consentReminder as any).fn;
   await handler({
@@ -88,7 +90,7 @@ async function executeHandler(
         consentType: 'GDPR',
       },
     },
-    step: mockStep,
+    step,
   });
 }
 
@@ -115,7 +117,7 @@ describe('consentReminder', () => {
     expect(triggers).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ event: 'app/consent.requested' }),
-      ])
+      ]),
     );
   });
 
@@ -216,13 +218,13 @@ describe('consentReminder', () => {
     };
 
     expect(day7Opts.idempotencyKey).toBe(
-      'consent-reminder:profile-1:evt-test-1:day-7'
+      'value(consent-reminder):value(profile-1):value(evt-test-1):value(day-7)',
     );
     expect(day14Opts.idempotencyKey).toBe(
-      'consent-reminder:profile-1:evt-test-1:day-14'
+      'value(consent-reminder):value(profile-1):value(evt-test-1):value(day-14)',
     );
     expect(day25Opts.idempotencyKey).toBe(
-      'consent-reminder:profile-1:evt-test-1:day-25-final'
+      'value(consent-reminder):value(profile-1):value(evt-test-1):value(day-25-final)',
     );
 
     // The keys must be distinct per step — otherwise Resend would dedupe

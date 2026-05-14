@@ -1,3 +1,4 @@
+import type { RecordPracticeActivityEventInput } from './practice-activity-events';
 import { captureException } from './sentry';
 import { createLogger } from './logger';
 
@@ -24,6 +25,12 @@ export interface SafeSendOptions {
    * for longer than that even under downstream stalls.
    */
   timeoutMs?: number;
+}
+
+export interface DeferredActivityEvent {
+  input: RecordPracticeActivityEventInput;
+  surface: string;
+  context?: Record<string, unknown>;
 }
 
 /**
@@ -103,5 +110,29 @@ export async function safeSend(
     });
   } finally {
     if (timeoutHandle) clearTimeout(timeoutHandle);
+  }
+}
+
+/**
+ * Execute a non-core DB write (activity event, audit log, metadata update).
+ * Failures are captured in Sentry and logged — never thrown.
+ */
+export async function safeWrite(
+  fn: () => Promise<unknown>,
+  surface: string,
+  context?: Record<string, unknown>,
+): Promise<void> {
+  try {
+    await fn();
+  } catch (err) {
+    captureException(err, {
+      profileId: extractProfileId(context),
+      extra: { surface, kind: 'non-core-write', ...context },
+    });
+    logger.error('[safe-write] non-core DB write failed', {
+      surface,
+      error: err instanceof Error ? err.message : String(err),
+      ...context,
+    });
   }
 }

@@ -37,12 +37,43 @@ Rules:
   - Cultural topics (Easter, Christmas, Ramadan, Diwali, Thanksgiving) relate to History, Religious Studies, Social Studies, Cultural Studies
   - Current events relate to Social Studies, Geography, Politics, Civics
   - Animals, plants, weather relate to Biology, Science, Nature Studies, Geography
+  - Electricity, circuits, magnetism, inventions, technology history, Tesla/Edison, "War of Currents" relate to Physics, Science, History of Technology, or History
   - Music, art, film relate to Art, Music, Cultural Studies, Media Studies
   - Sports relate to Physical Education, Biology (biomechanics), Physics (motion)
   - Cooking, nutrition relate to Chemistry, Biology, Home Economics
   - "solve 2x + 5 = 15" matches "Algebra", "Math", "Mathematics" etc.
 - When the topic is cross-disciplinary, prefer matching to an enrolled subject with even moderate relevance (confidence >= 0.4) over returning no matches
 `;
+
+function inferSuggestedSubjectName(text: string): string | null {
+  const normalized = text.toLowerCase();
+  if (
+    /\b(war of currents?|tesla|edison|electricity|electric(al)?|circuit|voltage|current|magnetism|electromagnetism)\b/.test(
+      normalized,
+    )
+  ) {
+    return 'Physics';
+  }
+  if (
+    /\b(roman empire|ancient rome|middle ages|world war|battle of|empire|civilization)\b/.test(
+      normalized,
+    )
+  ) {
+    return 'History';
+  }
+  if (
+    /\b(calculus|algebra|geometry|trigonometry|equation|solve)\b/.test(
+      normalized,
+    ) ||
+    /\b\d+\s*[a-z]\b|[a-z]\s*[=+\-*/]\s*\d+|\d+\s*[=+\-*/]\s*[a-z]/i.test(text)
+  ) {
+    return 'Mathematics';
+  }
+  if (/\b(photosynthesis|cells?|dna|evolution|ecosystem)\b/.test(normalized)) {
+    return 'Biology';
+  }
+  return null;
+}
 
 // BS-10 / [IMP-5]: Sanitize user input before LLM interpolation.
 //   1. Strip C0 control characters (other than tab/LF/CR) + DEL.
@@ -72,7 +103,7 @@ function sanitizeLlmInput(text: string, maxLength = 500): string {
 export async function classifySubject(
   db: Database,
   profileId: string,
-  text: string
+  text: string,
 ): Promise<SubjectClassifyResult> {
   // Fetch learner's active subjects
   const subjects = await listSubjects(db, profileId);
@@ -90,19 +121,21 @@ export async function classifySubject(
           },
           { role: 'user', content: `Text to classify:\n${sanitized}` },
         ],
-        1 // Rung 1 = Gemini Flash (fast/cheap)
+        1, // Rung 1 = Gemini Flash (fast/cheap)
       );
       const jsonMatch = suggestResult.response.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]) as Record<string, unknown>;
-        if (
+        const suggested =
           typeof parsed.suggestedSubjectName === 'string' &&
           parsed.suggestedSubjectName.trim()
-        ) {
+            ? parsed.suggestedSubjectName.trim()
+            : inferSuggestedSubjectName(text);
+        if (suggested) {
           return {
             candidates: [],
             needsConfirmation: true,
-            suggestedSubjectName: parsed.suggestedSubjectName.trim(),
+            suggestedSubjectName: suggested,
           };
         }
       }
@@ -123,7 +156,7 @@ export async function classifySubject(
     return {
       candidates: [],
       needsConfirmation: true,
-      suggestedSubjectName: null,
+      suggestedSubjectName: inferSuggestedSubjectName(text),
     };
   }
 
@@ -170,7 +203,7 @@ export async function classifySubject(
       return {
         candidates: [],
         needsConfirmation: true,
-        suggestedSubjectName: null,
+        suggestedSubjectName: inferSuggestedSubjectName(text),
       };
     }
 
@@ -182,14 +215,14 @@ export async function classifySubject(
           typeof m === 'object' &&
           m !== null &&
           'subjectName' in m &&
-          typeof (m as Record<string, unknown>).subjectName === 'string'
+          typeof (m as Record<string, unknown>).subjectName === 'string',
       );
 
     // Map LLM matches to candidates with subjectIds
     const candidates = matches
       .map((m) => {
         const subject = subjects.find(
-          (s) => s.name.toLowerCase() === m.subjectName.toLowerCase()
+          (s) => s.name.toLowerCase() === m.subjectName.toLowerCase(),
         );
         if (!subject) return null;
         return {
@@ -211,7 +244,9 @@ export async function classifySubject(
       suggestedSubjectName:
         typeof parsed.suggestedSubjectName === 'string'
           ? parsed.suggestedSubjectName
-          : null,
+          : topCandidate
+            ? null
+            : (inferSuggestedSubjectName(text) ?? null),
     };
   } catch (err) {
     // S-6 / [AUDIT-SILENT-FAIL]: Log AND escalate. An empty-candidates
@@ -232,7 +267,7 @@ export async function classifySubject(
     return {
       candidates: [],
       needsConfirmation: true,
-      suggestedSubjectName: null,
+      suggestedSubjectName: inferSuggestedSubjectName(text),
     };
   }
 }

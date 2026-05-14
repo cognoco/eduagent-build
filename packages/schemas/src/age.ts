@@ -1,4 +1,4 @@
-export type AgeBracket = 'adolescent' | 'adult';
+export type AgeBracket = 'child' | 'adolescent' | 'adult';
 
 export interface AgeGateProfile {
   role?: 'owner' | 'child' | 'impersonated-child' | string | null;
@@ -7,19 +7,16 @@ export interface AgeGateProfile {
 }
 
 /**
- * Computes an age bracket from birthYear for voice tone selection.
+ * Computes an age bracket from birthYear for consent gating and voice selection.
  *
- * Product is 11+ only — there is no 'child' bracket. Ages below 18 collapse
- * to 'adolescent'; users below 11 should be filtered out at the consent /
- * onboarding boundary, not here.
+ * Three-way model (D-C4-3):
+ *   - 'child'      — under 13 (COPPA/GDPR-K tier; strictest safety framing)
+ *   - 'adolescent' — 13 to 17 inclusive
+ *   - 'adult'      — 18 and above
  *
  * Uses `currentYear - birthYear`, which can overestimate by up to 11 months.
  * Callers that need conservative safety gating (minimum-age checks) should
  * use `<=` thresholds to compensate.
- *
- * @see personaFromBirthYear in apps/mobile/src/lib/profile.ts — mobile-only
- *   UI theme variant with different labels ('teen' | 'learner' | 'parent').
- *   Same thresholds, different purpose. Do not unify.
  */
 export function computeAgeBracket(
   birthYear: number,
@@ -28,6 +25,7 @@ export function computeAgeBracket(
   const year = currentYear ?? new Date().getFullYear();
   const age = year - birthYear;
 
+  if (age < 13) return 'child';
   if (age < 18) return 'adolescent';
   return 'adult';
 }

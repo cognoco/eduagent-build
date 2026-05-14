@@ -187,6 +187,7 @@
         "cta": "Add your first child"
       },
       "childrenHeader": "Children",
+      "familyManagementHeader": "Familienverwaltung",
       "familyToolsHeader": "Family tools",
       "childCard": {
         "statusLine": "{{activity}} · {{focus}} · {{signal}}",
@@ -274,10 +275,11 @@
       "screenTitle": "Lernanpassung",
       "notSureWhichToPick": "Nicht sicher, welche du wählen sollst?",
       "guideActive": "Aktiv",
-      "childScreenTitle": "{{name}}s Lernanpassung"
+      "childScreenTitle": "{{name}}s Lernpräferenzen"
     },
     "learningPreferences": {
-      "rowLabel": "Lernpräferenzen",
+      "sectionHeader": "Dein Lernen",
+      "rowLabel": "Präferenzen",
       "screenTitle": "Lernpräferenzen"
     },
     "mentorMemory": {
@@ -300,8 +302,8 @@
       "viewPlans": "Pläne ansehen",
       "profileLimitTitle": "Profillimit erreicht",
       "profileLimitMessage": "Dein {{plan}}-Plan unterstützt bis zu {{max}} Profile.",
-      "breakdownSharingTitle": "Share usage breakdown with family",
-      "breakdownSharingDescription": "Let everyone in your family see how each profile uses the family pool. Children only see the breakdown when this is on.",
+      "breakdownSharingTitle": "Familiennutzung teilen",
+      "breakdownSharingDescription": "Nutzung pro Profil anzeigen.",
       "breakdownSharingError": "Couldn't update setting. Try again."
     },
     "celebrations": {
@@ -495,7 +497,12 @@
       "finishEarlyLabel": "Sitzung frühzeitig beenden",
       "nextProblemLabel": "Nächste Aufgabe",
       "finishHomeworkLabel": "Hausaufgaben beenden",
-      "endSessionLabel": "Sitzung beenden"
+      "endSessionLabel": "Sitzung beenden",
+      "typeSubjectPlaceholder": "Fach eingeben",
+      "typeSubjectLabel": "Fach eingeben",
+      "useTypedSubject": "Verwenden",
+      "useTypedSubjectLabel": "Eingegebenes Fach verwenden",
+      "addNote": "Notiz hinzufügen"
     },
     "quota": {
       "dailyLimitReached": "Tageslimit erreicht",
@@ -570,7 +577,8 @@
       "writeNote": "Notiz schreiben",
       "cannotSaveTitle": "Notiz nicht gespeichert",
       "cannotSaveMessage": "Notizen können im Moment nicht gespeichert werden. Bitte versuche es erneut.",
-      "saveFailedTitle": "Notiz konnte nicht gespeichert werden"
+      "saveFailedTitle": "Notiz konnte nicht gespeichert werden",
+      "summaryPlaceholder": "Was sollen wir uns aus dieser Sitzung merken?"
     },
     "filingPrompt": {
       "title": "Zur Bibliothek hinzufügen?",
@@ -648,7 +656,8 @@
         "rateLimited": "Zu viele Anfragen – warte einen Moment und versuche es erneut.",
         "validationError": "Etwas ist schiefgelaufen. Bitte versuche eine andere Aktivität.",
         "genericShort": "Etwas ist schiefgelaufen. Versuche es erneut!"
-      }
+      },
+      "buildingRound": "Deine Runde wird erstellt"
     },
     "round": {
       "goBack": "Zurück",
@@ -685,6 +694,53 @@
         "guessWho": "Wer bin ich?",
         "vocabulary": "Vokabeln"
       }
+    },
+    "play": {
+      "noRoundTitle": "Keine Runde geladen",
+      "noRoundBody": "Beim Laden der Quiz-Runde ist etwas schiefgelaufen. Du kannst es erneut versuchen oder zur Quiz-Startseite zurückkehren.",
+      "malformedTitle": "Diese Runde konnte nicht geladen werden",
+      "malformedBody": "Wir haben die Antwortmöglichkeiten für diese Frage nicht erhalten. Versuche eine neue Runde oder komm gleich wieder.",
+      "backToQuizHome": "Zurück zur Quiz-Startseite",
+      "titleGuessWho": "Wer ist wer?",
+      "titleCapitals": "Hauptstädte",
+      "titleVocabulary": "Wortschatz",
+      "quitLabel": "Quiz beenden",
+      "answerCheckFailed": "Antwortprüfung fehlgeschlagen – Ergebnis könnte ungenau sein",
+      "capitalPrompt": "Was ist die Hauptstadt von ...",
+      "translatePrompt": "Übersetze:",
+      "guessWhoPrompt": "Wer ist diese Person?",
+      "checking": "Wird geprüft ...",
+      "typeYourAnswer": "Gib deine Antwort ein",
+      "typeYourAnswerPlaceholder": "Gib deine Antwort ein ...",
+      "submit": "Senden",
+      "foundThemClues_one": "Du hast sie mit {{count}} Hinweis gefunden!",
+      "foundThemClues_other": "Du hast sie mit {{count}} Hinweisen gefunden!",
+      "discoveredIt": "Du hast es entdeckt!",
+      "savedReady": "Gespeichert. Bereit, wenn du es bist.",
+      "savingResult": "Dein Ergebnis wird gespeichert ...",
+      "lockedIn": "Festgelegt. Gut gefunden.",
+      "goodTry": "Guter Versuch.",
+      "theAnswerWas": "Die Antwort war ",
+      "readyForNext": "Bereit für die Nächste",
+      "correct": "Richtig",
+      "notQuite": "Nicht ganz",
+      "seeResults": "Ergebnisse ansehen",
+      "oneMore": "Warte, nur noch eine!",
+      "savingRound": "Deine Runde wird gespeichert ...",
+      "nextQuestion": "Nächste Frage",
+      "notQuiteRight": "Nicht ganz richtig?",
+      "disputeNoted": "Vermerkt – wir prüfen das",
+      "scoringRound": "Deine Runde wird bewertet ...",
+      "couldNotSave": "Deine Runde konnte nicht gespeichert werden",
+      "exit": "Beenden",
+      "pauseHere": "Hier pausieren?",
+      "leaveQuiz": "Dieses Quiz verlassen?",
+      "pauseBody": "Du hast einen Teil dieser Runde beantwortet. Speichere sie jetzt oder mach gleich mit der nächsten Frage weiter.",
+      "leaveBody": "Noch keine Antworten, also gibt es nichts zu speichern.",
+      "keepPlaying": "Weiterspielen",
+      "saveAndFinish": "Speichern und beenden",
+      "leaveWithoutSaving": "Ohne Speichern verlassen",
+      "leaveQuizButton": "Quiz verlassen"
     }
   },
   "dictation": {
@@ -808,6 +864,9 @@
     "loadError": {
       "message": "Deine Bibliothek konnte nicht geladen werden. Bitte versuche es erneut."
     },
+    "staleBanner": {
+      "message": "Gespeicherte Bibliothek wird angezeigt. Tippe zum Aktualisieren."
+    },
     "empty": {
       "title": "Deine Bibliothek ist leer",
       "message": "Starte eine Lernsitzung und deine Fächer werden hier erscheinen.",
@@ -904,6 +963,9 @@
       "message": "Öffne das Regal, wähle das nächste Buch oder wiederhole, was fällig ist.",
       "cta": "Öffnen",
       "accessibilityLabel": "Mit {{subject}} weitermachen"
+    },
+    "bookmarkCard": {
+      "accessibilityLabel": "Gespeichertes Lesezeichen öffnen: {{title}}"
     }
   },
   "topic": {
@@ -1194,7 +1256,11 @@
     "tryCameraAgainLabel": "Kamera erneut versuchen",
     "tryReadingAgainLabel": "Erneut lesen versuchen",
     "classifyErrorTitle": "Fach konnte nicht identifiziert werden",
-    "classifyErrorMessage": "Bitte wähle das Fach aus, zu dem diese Hausaufgabe gehört."
+    "classifyErrorMessage": "Bitte wähle das Fach aus, zu dem diese Hausaufgabe gehört.",
+    "listening": "Höre zu...",
+    "voiceHint": "Sag die Hausaufgabe laut.",
+    "stopDictatingProblemLabel": "Diktat der Aufgabe stoppen",
+    "dictateProblemLabel": "Aufgabe diktieren"
   },
   "progress": {
     "pageTitle": "Meine Lernreise",
@@ -1289,7 +1355,9 @@
       "bars": {
         "sessions": "Sitzungen",
         "time": "Zeit",
-        "topics": "Themen"
+        "topics": "Themen",
+        "quizzes": "Quizze",
+        "reviews": "Wiederholungen"
       }
     },
     "newLearner": {
@@ -1496,6 +1564,19 @@
     "loadTimeout": {
       "title": "Das Laden des Fortschritts dauert zu lange",
       "message": "Prüfe deine Verbindung, versuche es erneut oder gehe zur Startseite."
+    },
+    "guardian": {
+      "sessionCount_one": "{{count}} Sitzung",
+      "sessionCount_other": "{{count}} Sitzungen",
+      "lastStudied": "Zuletzt gelernt am {{date}}",
+      "topicsMastered": "{{mastered}}/{{total}} Themen gemeistert",
+      "summaryFallback": "Noch keine Zusammenfassung verfügbar. Eine erscheint nach der nächsten Sitzung.",
+      "noRecentSessions": "Keine neuen Sitzungen seit {{date}}.",
+      "noRecentSessionsFallback": "Keine neuen Sitzungen seit Längerem.",
+      "staleSummary": "Die Zusammenfassung ist möglicherweise noch nicht auf dem neuesten Stand.",
+      "nudgeCta": "Ein Anstupser könnte {{name}} helfen, neu zu starten.",
+      "nudgeA11y": "{{name}} einen Anstupser senden",
+      "viewAllReports": "Alle Berichte ansehen"
     }
   },
   "onboarding": {
@@ -1583,6 +1664,7 @@
       "totalSessions": "{{count}} Sitzungen",
       "recentActivity": "Letzte Aktivität",
       "noRecentActivity": "Noch keine letzte Aktivität",
+      "lastSessionAgo": "Letzte Sitzung {{time}}",
       "noSessionsYet": "Noch keine Sitzungen",
       "viewAllSessions": "Alle Sitzungen ansehen",
       "subjectsExplored": "Erkundete Fächer",
@@ -1637,6 +1719,9 @@
       "viewSessionFrom": "Sitzung ansehen von",
       "mentorMemoryTitle": "Was der Mentor über {{name}} weiß",
       "mentorMemoryTitleFallback": "Mentor-Gedächtnis",
+      "manageMentorMemoryForChild": "Verwalte, was der Mentor sich über {{name}} merkt",
+      "profileDetails": "Profildetails",
+      "childProfileJoined": "Hinzugefügt {{date}}",
       "setUpMentorMemory": "Mentor-Gedächtnis einrichten",
       "chooseWhatMentorRemembers": "Wähle, was der Mentor sich merkt",
       "viewWhatMentorKnows": "Ansehen, was der Mentor weiß",
@@ -1645,6 +1730,7 @@
       "learningAccommodationTitle": "Lernanpassung für {{name}}",
       "learningAccommodationTitleFallback": "Lernanpassung",
       "learningAccommodationDescription": "Passe an, wie der Mentor begleitet, um den Lernbedürfnissen deines Kindes gerecht zu werden",
+      "noLearningPreferenceSet": "Keine Lernpräferenz festgelegt",
       "toggleDecisionGuide": "Entscheidungshilfe anzeigen",
       "notSureWhichToPick": "Nicht sicher, was du wählen sollst?",
       "pickAccommodation": "Eine Anpassung wählen",
@@ -1659,6 +1745,7 @@
       "checkConsentStatus": "Zustimmungsstatus prüfen",
       "accountTitle": "Konto – {{name}}",
       "accountTitleFallback": "Konto",
+      "childProfileScopeHint": "Fortschritt und Berichte befinden sich in eigenen Tabs, daher enthält diese Seite nur kindbezogene Einstellungen.",
       "deletionPending": "Löschung geplant",
       "deletionCountdown": "Konto wird am {{date}} gelöscht",
       "deletionProcessing": "Löschung wird bearbeitet",
@@ -1791,7 +1878,9 @@
       "monthlyReport": "Monatsbericht",
       "subtitle": "Eine Zusammenfassung des Lernens deines Kindes diesen Monat",
       "totalWords": "Gesamtzahl Wörter",
-      "reportGoneTitle": "Bericht nicht gefunden"
+      "reportGoneTitle": "Bericht nicht gefunden",
+      "testsCompleted": "Tests abgeschlossen",
+      "testPoints": "Testpunkte"
     },
     "session": {
       "error": "Sitzung konnte nicht geladen werden",
@@ -1868,7 +1957,42 @@
       "sendNudge": "{{name}} einen Anstoß geben",
       "openChildProfile": "{{name}}s Profil öffnen",
       "reportGoneTitle": "Dieser Bericht ist nicht mehr verfügbar",
-      "reportGoneBody": "Er wurde möglicherweise archiviert oder entfernt. Alle deine anderen Berichte sind noch sicher."
+      "reportGoneBody": "Er wurde möglicherweise archiviert oder entfernt. Alle deine anderen Berichte sind noch sicher.",
+      "testsCompleted": "Tests abgeschlossen",
+      "testPoints": "Testpunkte"
+    },
+    "practiceSummary": {
+      "title": "Testdetails",
+      "subtitle": "{{count}} Aktivitäten abgeschlossen, davon {{reviews}} Wiederholungen",
+      "accuracy": "Genauigkeit",
+      "reviews": "Wiederholungen",
+      "points": "Punkte",
+      "celebrations": "Feiern",
+      "activityKinds": "Arten",
+      "comparison": "{{activities}} Aktivitäten · {{points}} Punkte · {{celebrations}} Feiern",
+      "byType": "Nach Typ",
+      "bySubject": "Nach Fach",
+      "typeDetail": "{{count}} abgeschlossen · {{points}} Punkte",
+      "typeDetailWithScore": "{{count}} abgeschlossen · {{points}} Punkte · {{accuracy}}%",
+      "subjectDetail": "{{count}} Aktivitäten · {{points}} Punkte · {{types}}",
+      "unknownSubject": "Nicht zugeordnet",
+      "activityTypes": {
+        "quiz": "Quiz",
+        "review": "Wiederholung",
+        "assessment": "Beweisen, dass ich es kann",
+        "dictation": "Diktat",
+        "recitation": "Vortragen",
+        "fluency_drill": "Flüssigkeitsübung"
+      },
+      "activitySubtypes": {
+        "capitals": "Hauptstädte",
+        "guess_who": "Wer ist das?",
+        "vocabulary": "Wortschatz",
+        "assessment": "Beweisen, dass ich es kann",
+        "dictation": "Diktat",
+        "recitation": "Vortragen",
+        "fluency_drill": "Flüssigkeitsübung"
+      }
     }
   },
   "tabs": {
@@ -2103,64 +2227,6 @@
   "warningBody2": "Dies kann nicht rückgängig gemacht werden.",
   "understandDeleteLabel": "Ich verstehe – mein Konto löschen",
   "understandDelete": "Ich verstehe",
-  "privacy": {
-    "title": "Datenschutzrichtlinie",
-    "lastUpdated": "Letzte Aktualisierung: Mai 2025",
-    "s1Title": "Wer wir sind",
-    "s1Body": "EduAgent ist eine KI-gestützte Lernplattform für Lernende ab 11 Jahren. Wir verpflichten uns, deine Privatsphäre zu schützen und deine Daten sorgfältig zu behandeln.",
-    "s2Title": "Welche Daten wir erheben",
-    "s2Body1": "Kontoinformationen: dein Name, deine E-Mail-Adresse und Profildetails, die du bei der Anmeldung angibst.",
-    "s2Body2": "Lerndaten: Sitzungsprotokolle, studierte Themen, Fortschrittsmetriken und Notizen des Mentor-Gedächtnisses.",
-    "s2Body3": "Nutzungsdaten: wie du mit der App interagierst, einschließlich genutzter Funktionen und verbrachter Zeit.",
-    "s2Body4": "Gerätedaten: Gerätetyp, Betriebssystem und App-Version für diagnostische Zwecke.",
-    "s3Title": "Wie wir deine Daten verwenden",
-    "s3Body": "Wir verwenden deine Daten, um personalisierte Lernsitzungen bereitzustellen, deinen Fortschritt zu verfolgen, das Produkt zu verbessern und dir wichtige Kontomitteilungen zu senden. Wir verkaufen deine Daten nicht an Dritte.",
-    "s4Title": "Datenschutz von Kindern",
-    "s4Body1": "Für Nutzer unter 16 Jahren (oder dem in deiner Region geltenden Alter) benötigen wir die Zustimmung der Eltern oder Erziehungsberechtigten, bevor voller Zugriff gewährt wird.",
-    "s4Body2": "Eltern können die Daten ihres Kindes jederzeit über das Eltern-Dashboard überprüfen, korrigieren oder löschen.",
-    "s5Title": "Datenspeicherung",
-    "s5Body": "Wir speichern deine Daten, solange dein Konto aktiv ist. Wenn du dein Konto löschst, werden deine persönlichen Daten innerhalb von 30 Tagen endgültig entfernt.",
-    "s6Title": "Deine Rechte",
-    "s6Body1": "Du hast das Recht, auf deine persönlichen Daten zuzugreifen, sie zu korrigieren oder zu löschen. Du kannst auch eine Kopie deiner Daten anfordern oder die Zustimmung jederzeit widerrufen.",
-    "s6Body2": "Um diese Rechte auszuüben, kontaktiere uns unter privacy@eduagent.app.",
-    "s7Title": "Cookies und Tracking",
-    "s7Body": "Wir verwenden notwendige Cookies, um dich angemeldet zu halten und deine Präferenzen zu speichern. Wir verwenden keine Werbe- oder Tracking-Cookies.",
-    "s8Title": "Drittanbieterdienste",
-    "s8Body1": "Wir nutzen vertrauenswürdige Drittanbieterdienste zum Betrieb der Plattform, einschließlich Authentifizierung (Clerk), KI-Verarbeitung (OpenAI) und Cloud-Infrastruktur.",
-    "s8Body2": "Diese Anbieter sind an Datenverarbeitungsvereinbarungen gebunden und dürfen deine Daten nicht für ihre eigenen Zwecke verwenden.",
-    "s9Title": "Sicherheit",
-    "s9Body": "Wir verwenden branchenübliche Sicherheitsmaßnahmen zum Schutz deiner Daten, einschließlich Verschlüsselung bei der Übertragung und im Ruhezustand.",
-    "s10Title": "Kontaktiere uns",
-    "s10Body": "Wenn du Fragen zu dieser Richtlinie hast, kontaktiere uns bitte unter privacy@eduagent.app."
-  },
-  "terms": {
-    "title": "Nutzungsbedingungen",
-    "lastUpdated": "Letzte Aktualisierung: Mai 2025",
-    "s1Title": "Annahme der Bedingungen",
-    "s1Body": "Durch die Nutzung von EduAgent stimmst du diesen Nutzungsbedingungen zu. Wenn du nicht zustimmst, nutze die App bitte nicht.",
-    "s2Title": "Wer EduAgent nutzen kann",
-    "s2Body": "EduAgent ist für Lernende ab 11 Jahren konzipiert. Nutzer unter 16 Jahren benötigen die Zustimmung der Eltern. Mit der Erstellung eines Kontos bestätigst du, dass du diese Anforderungen erfüllst.",
-    "s3Title": "Dein Konto",
-    "s3Body": "Du bist dafür verantwortlich, deine Kontodaten sicher zu halten. Bitte benachrichtige uns sofort, wenn du glaubst, dass dein Konto kompromittiert wurde.",
-    "s4Title": "Akzeptable Nutzung",
-    "s4Body": "Du darfst EduAgent nur für persönliche, nicht-kommerzielle Lernzwecke nutzen. Du darfst die Plattform nicht missbrauchen, Sicherheitsmaßnahmen umgehen oder sie nutzen, um anderen zu schaden.",
-    "s5Title": "KI-generierte Inhalte",
-    "s5Body": "EduAgent verwendet KI, um Lerninhalte zu generieren. Obwohl wir uns um Genauigkeit bemühen, können KI-Antworten gelegentlich Fehler enthalten. Überprüfe wichtige Informationen immer mit einer vertrauenswürdigen Quelle.",
-    "s6Title": "Abonnements und Abrechnung",
-    "s6Body": "Bezahlte Funktionen sind über Abonnementpläne verfügbar. Abonnements verlängern sich automatisch, sofern sie nicht gekündigt werden. Rückerstattungen werden gemäß der Richtlinie des jeweiligen App Stores gehandhabt.",
-    "s7Title": "Geistiges Eigentum",
-    "s7Body": "Alle Inhalte, Marken und Technologien in EduAgent sind unser Eigentum oder das unserer Lizenzgeber. Du darfst keinen Teil der Plattform ohne unsere schriftliche Genehmigung kopieren, reproduzieren oder verbreiten.",
-    "s8Title": "Datenschutz",
-    "s8Body": "Deine Nutzung von EduAgent unterliegt auch unserer Datenschutzrichtlinie, die Teil dieser Bedingungen ist.",
-    "s9Title": "Haftungsbeschränkung",
-    "s9Body": "EduAgent wird „wie besehen“ bereitgestellt. Wir haften nicht für indirekte, zufällige oder Folgeschäden, die aus deiner Nutzung der Plattform entstehen.",
-    "s10Title": "Änderungen dieser Bedingungen",
-    "s10Body": "Wir können diese Bedingungen von Zeit zu Zeit aktualisieren. Wir werden dich über wesentliche Änderungen informieren. Die fortgesetzte Nutzung der App nach Veröffentlichung der Änderungen gilt als Annahme der neuen Bedingungen.",
-    "s11Title": "Geltendes Recht",
-    "s11Body": "Diese Bedingungen unterliegen den Gesetzen von Norwegen. Alle Streitigkeiten werden vor den Gerichten von Norwegen beigelegt.",
-    "s12Title": "Kontaktiere uns",
-    "s12Body": "Wenn du Fragen zu diesen Bedingungen hast, kontaktiere uns unter legal@eduagent.app."
-  },
   "subscription": {
     "trial": {
       "active": "Testphase aktiv",

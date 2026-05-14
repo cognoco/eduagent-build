@@ -1,5 +1,5 @@
 import { Pressable, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useProfile } from '../../lib/profile';
 import { useProfileSessions } from '../../hooks/use-progress';
@@ -74,7 +74,7 @@ export function RecentSessionsList({
             key={session.sessionId}
             onPress={() => {
               if (isActiveProfile) {
-                router.push(`/session-summary/${session.sessionId}` as never);
+                router.push(`/session-summary/${session.sessionId}` as Href);
                 return;
               }
               router.push({
@@ -83,7 +83,7 @@ export function RecentSessionsList({
                   profileId,
                   sessionId: session.sessionId,
                 },
-              } as never);
+              } as Href);
             }}
             className="bg-surface rounded-card p-4 mt-3"
             accessibilityLabel={t('parentView.index.viewSessionFrom', {

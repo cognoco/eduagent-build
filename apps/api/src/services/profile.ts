@@ -138,18 +138,19 @@ export async function findOwnerProfile(
   }
 
   // Fallback: no owner flag set — pick first profile (defensive edge case).
-  // Should not happen in normal operation — log for observability.
+  // A brand-new account can legitimately have no profiles yet, so only warn
+  // after we know there is a profile row to fall back to.
+  const fallbackRow = await db.query.profiles.findFirst({
+    where: and(eq(profiles.accountId, accountId), isNull(profiles.archivedAt)),
+    orderBy: [asc(profiles.createdAt)],
+  });
+  if (!fallbackRow) return null;
   logger.warn(
     '[findOwnerProfile] No owner profile for account, falling back to oldest profile',
     {
       accountId,
     },
   );
-  const fallbackRow = await db.query.profiles.findFirst({
-    where: and(eq(profiles.accountId, accountId), isNull(profiles.archivedAt)),
-    orderBy: [asc(profiles.createdAt)],
-  });
-  if (!fallbackRow) return null;
   const consentStatus = await getConsentStatus(db, fallbackRow.id);
   return mapProfileRow(fallbackRow, consentStatus);
 }
@@ -269,7 +270,10 @@ export async function createProfileWithLimitCheck(
       .where(
         and(eq(profiles.accountId, accountId), isNull(profiles.archivedAt)),
       );
-    const profileCount = countRow?.count ?? 0;
+    // Neon can deserialize COUNT(*)::int as a string even though the Drizzle
+    // type is `number`. Normalize before comparing so the first profile is
+    // reliably marked as the owner in every runtime.
+    const profileCount = Number(countRow?.count ?? 0);
     const isFirstProfile = profileCount === 0;
 
     // Enforce per-tier profile limits. First profile creation is always allowed.

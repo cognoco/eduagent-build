@@ -21,6 +21,7 @@ jest.mock('inngest/hono', () => ({
 }));
 
 jest.mock('../inngest/client', () => ({
+  // gc1-allow: Inngest SDK external boundary
   inngest: {
     send: jest.fn().mockResolvedValue(undefined),
     createFunction: jest.fn().mockReturnValue(jest.fn()),
@@ -40,7 +41,7 @@ const familyLinksQuery = {
   findMany: jest.fn().mockResolvedValue([]),
 };
 
-mockDatabaseModule.db.query = new Proxy(mockDatabaseModule.db.query, {
+mockDatabaseModule.db.query = new Proxy(mockDatabaseModule.db.query as object, {
   get(target, prop, receiver) {
     if (prop === 'familyLinks') return familyLinksQuery;
     return Reflect.get(target, prop, receiver);
@@ -50,6 +51,7 @@ mockDatabaseModule.db.query = new Proxy(mockDatabaseModule.db.query, {
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
 jest.mock('../services/account', () => ({
+  ...jest.requireActual('../services/account'),
   findOrCreateAccount: jest.fn().mockResolvedValue({
     id: 'test-account-id',
     clerkUserId: 'user_test',
@@ -64,6 +66,7 @@ jest.mock('../services/account', () => ({
 // account regardless of which id is sent so the middleware accepts the
 // header and writes it to the context.
 jest.mock('../services/profile', () => ({
+  ...jest.requireActual('../services/profile'),
   findOwnerProfile: jest.fn().mockResolvedValue(null),
   getProfile: jest
     .fn()
@@ -89,6 +92,7 @@ const mockBuildHumanReadableMemoryExport = jest.fn();
 const mockUpdateAccommodationMode = jest.fn();
 
 jest.mock('../services/learner-profile', () => ({
+  ...jest.requireActual('../services/learner-profile'),
   getOrCreateLearningProfile: (...args: unknown[]) =>
     mockGetOrCreateLearningProfile(...args),
   deleteAllMemory: (...args: unknown[]) => mockDeleteAllMemory(...args),
@@ -107,6 +111,7 @@ jest.mock('../services/learner-profile', () => ({
 }));
 
 jest.mock('../services/learner-input', () => ({
+  ...jest.requireActual('../services/learner-input'),
   parseLearnerInput: jest.fn().mockResolvedValue({
     success: true,
     message: 'Got it!',
@@ -191,7 +196,7 @@ describe('learner-profile routes', () => {
       const res = await app.request(
         `/v1/learner-profile/${OTHER_FAMILY_CHILD_ID}`,
         { headers: PARENT_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(403);
@@ -203,7 +208,7 @@ describe('learner-profile routes', () => {
       // would still 403 (because the mock returns undefined) but would silently
       // break the IDOR contract — this assertion catches that.
       const params = extractDrizzleParamValues(
-        mockFindFamilyLink.mock.calls[0]?.[0]
+        mockFindFamilyLink.mock.calls[0]?.[0],
       );
       expect(params).toContain(PARENT_PROFILE_ID);
       expect(params).toContain(OTHER_FAMILY_CHILD_ID);
@@ -213,7 +218,7 @@ describe('learner-profile routes', () => {
       const res = await app.request(
         `/v1/learner-profile/${OTHER_FAMILY_CHILD_ID}/all`,
         { method: 'DELETE', headers: PARENT_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(403);
@@ -228,7 +233,7 @@ describe('learner-profile routes', () => {
           headers: PARENT_HEADERS,
           body: JSON.stringify({ category: 'interests', value: 'space' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(403);
@@ -243,7 +248,7 @@ describe('learner-profile routes', () => {
           headers: PARENT_HEADERS,
           body: JSON.stringify({ memoryEnabled: false }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(403);
@@ -258,7 +263,7 @@ describe('learner-profile routes', () => {
           headers: PARENT_HEADERS,
           body: JSON.stringify({ consent: 'granted' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(403);
@@ -282,15 +287,17 @@ describe('learner-profile routes', () => {
       const res = await app.request(
         `/v1/learner-profile/${OWN_CHILD_PROFILE_ID}`,
         { headers: PARENT_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
       expect(mockGetOrCreateLearningProfile).toHaveBeenCalledWith(
         expect.anything(),
-        OWN_CHILD_PROFILE_ID
+        OWN_CHILD_PROFILE_ID,
       );
-      const body = (await res.json()) as { profile: { id: string } };
+      const body = (await res.json()) as {
+        profile: { id: string; profileId: string };
+      };
       expect(body.profile.profileId).toBe(OWN_CHILD_PROFILE_ID);
     });
 
@@ -302,7 +309,7 @@ describe('learner-profile routes', () => {
           headers: PARENT_HEADERS,
           body: JSON.stringify({ consent: 'granted' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -310,7 +317,7 @@ describe('learner-profile routes', () => {
         expect.anything(),
         OWN_CHILD_PROFILE_ID,
         undefined,
-        'granted'
+        'granted',
       );
     });
 
@@ -318,7 +325,7 @@ describe('learner-profile routes', () => {
       const res = await app.request(
         `/v1/learner-profile/${OWN_CHILD_PROFILE_ID}/export-text`,
         { headers: PARENT_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -337,14 +344,14 @@ describe('learner-profile routes', () => {
       const res = await app.request(
         '/v1/learner-profile/all',
         { method: 'DELETE', headers: PARENT_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
       expect(mockDeleteAllMemory).toHaveBeenCalledWith(
         expect.anything(),
         PARENT_PROFILE_ID,
-        'test-account-id'
+        'test-account-id',
       );
       // Family-link check is not required for self-scoped routes.
       expect(mockFindFamilyLink).not.toHaveBeenCalled();
@@ -358,7 +365,7 @@ describe('learner-profile routes', () => {
           headers: PARENT_HEADERS,
           body: JSON.stringify({ consent: 'granted' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -366,7 +373,7 @@ describe('learner-profile routes', () => {
         expect.anything(),
         PARENT_PROFILE_ID,
         'test-account-id',
-        'granted'
+        'granted',
       );
       expect(mockFindFamilyLink).not.toHaveBeenCalled();
     });
@@ -379,7 +386,7 @@ describe('learner-profile routes', () => {
           headers: PARENT_HEADERS,
           body: JSON.stringify({ memoryEnabled: false }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -387,7 +394,7 @@ describe('learner-profile routes', () => {
         expect.anything(),
         PARENT_PROFILE_ID,
         'test-account-id',
-        false
+        false,
       );
     });
 
@@ -403,7 +410,7 @@ describe('learner-profile routes', () => {
             suppress: true,
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -414,7 +421,7 @@ describe('learner-profile routes', () => {
         'interests',
         'dinosaurs',
         true,
-        undefined
+        undefined,
       );
     });
 
@@ -422,7 +429,7 @@ describe('learner-profile routes', () => {
       const res = await app.request(
         '/v1/learner-profile',
         { headers: { 'X-Profile-Id': PARENT_PROFILE_ID } },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);
@@ -443,7 +450,7 @@ describe('learner-profile routes', () => {
           headers: PARENT_HEADERS,
           body: JSON.stringify({ accommodationMode: 'short-burst' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -451,7 +458,7 @@ describe('learner-profile routes', () => {
         expect.anything(),
         PARENT_PROFILE_ID,
         'test-account-id',
-        'short-burst'
+        'short-burst',
       );
       expect(mockFindFamilyLink).not.toHaveBeenCalled();
     });
@@ -464,7 +471,7 @@ describe('learner-profile routes', () => {
           headers: PARENT_HEADERS,
           body: JSON.stringify({ accommodationMode: 'invalid-mode' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -490,7 +497,7 @@ describe('learner-profile routes', () => {
           headers: PARENT_HEADERS,
           body: JSON.stringify({ accommodationMode: 'audio-first' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -498,7 +505,7 @@ describe('learner-profile routes', () => {
         expect.anything(),
         OWN_CHILD_PROFILE_ID,
         undefined,
-        'audio-first'
+        'audio-first',
       );
     });
 
@@ -512,7 +519,7 @@ describe('learner-profile routes', () => {
           headers: PARENT_HEADERS,
           body: JSON.stringify({ accommodationMode: 'predictable' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(403);

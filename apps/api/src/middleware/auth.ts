@@ -160,6 +160,20 @@ export const authMiddleware = createMiddleware<AuthEnv>(async (c, next) => {
       });
       captureException(err, { requestPath: c.req.path });
     } else {
+      // [BUG-1] Non-infra (token-validation) failures were previously only
+      // recorded via Sentry breadcrumb — dropped when no exception fires —
+      // so a sustained spike of bad/expired/forged tokens was invisible to
+      // alerting. Emit a structured warn log instead; ops alerts run off
+      // 24h log-aggregation volume. We deliberately do NOT fire a Sentry
+      // `captureMessage` here: under a token-flood (bad clients, brute
+      // force) this path runs on every request and would burn Sentry quota
+      // / bury real signal. `captureException` is reserved for infra.
+      const errorName = err instanceof Error ? err.name : 'Unknown';
+      logger.warn('JWT validation failed', {
+        error: message,
+        errorName,
+        path: c.req.path,
+      });
       addBreadcrumb('JWT validation failed', 'auth');
     }
 

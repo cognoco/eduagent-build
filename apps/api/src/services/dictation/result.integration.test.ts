@@ -1,28 +1,14 @@
-/**
- * Integration: Dictation Result & Streak [BUG-30]
- *
- * Tests the dictation result recording and streak computation against a real
- * database — specifically the dedup guard (uniqueIndex + upsert) that prevents
- * duplicate-date rows from crowding out the 60-row streak window.
- *
- * No mocks of internal services or database.
- */
-
 import { eq, inArray } from 'drizzle-orm';
 import {
   accounts,
-  profiles,
-  dictationResults,
   createDatabase,
+  dictationResults,
+  practiceActivityEvents,
+  profiles,
 } from '@eduagent/database';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import { resolve } from 'path';
-
 import { recordDictationResult, getDictationStreak } from './result';
-
-// ---------------------------------------------------------------------------
-// DB setup — real connection
-// ---------------------------------------------------------------------------
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 
@@ -40,143 +26,206 @@ function createIntegrationDb() {
   return createDatabase(requireDatabaseUrl());
 }
 
-// ---------------------------------------------------------------------------
-// Test identifiers
-// ---------------------------------------------------------------------------
-
 const PREFIX = 'integration-dictation-result';
 const ACCOUNT = {
-  clerkUserId: `${PREFIX}-user1`,
+  clerkUserId: `${PREFIX}-01`,
   email: `${PREFIX}-user1@integration.test`,
 };
 
-// ---------------------------------------------------------------------------
-// Seed helpers
-// ---------------------------------------------------------------------------
+function getServerDate(): string {
+  return new Date().toISOString().slice(0, 10);
+}
 
-async function seedAccountAndProfile() {
+function getPreviousDate(dateStr: string): string {
+  const d = new Date(dateStr);
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
+async function cleanupTestAccounts() {
   const db = createIntegrationDb();
+  const rows = await db.query.accounts.findMany({
+    where: inArray(accounts.email, [ACCOUNT.email]),
+  });
+  if (rows.length > 0) {
+    await db.delete(accounts).where(
+      inArray(
+        accounts.id,
+        rows.map((r) => r.id),
+      ),
+    );
+  }
+}
 
-  const [account] = await db
+let accountId: string;
+let profileId: string;
+
+beforeAll(async () => {
+  await cleanupTestAccounts();
+  const db = createIntegrationDb();
+  const [acct] = await db
     .insert(accounts)
-    .values({ clerkUserId: ACCOUNT.clerkUserId, email: ACCOUNT.email })
+    .values({
+      clerkUserId: ACCOUNT.clerkUserId,
+      email: ACCOUNT.email,
+    })
     .returning();
-
-  const [profile] = await db
+  accountId = acct!.id;
+  const [prof] = await db
     .insert(profiles)
     .values({
-      accountId: account!.id,
-      displayName: 'Dictation Test User',
+      accountId,
+      displayName: 'Integration Learner',
       birthYear: 2010,
       isOwner: true,
     })
     .returning();
-
-  return { account: account!, profile: profile! };
-}
-
-async function cleanup() {
-  const db = createIntegrationDb();
-  const found = await db.query.accounts.findMany({
-    where: eq(accounts.email, ACCOUNT.email),
-  });
-  const ids = found.map((a) => a.id);
-  if (ids.length > 0) {
-    await db.delete(accounts).where(inArray(accounts.id, ids));
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Lifecycle
-// ---------------------------------------------------------------------------
+  profileId = prof!.id;
+});
 
 beforeEach(async () => {
-  await cleanup();
+  const db = createIntegrationDb();
+  await db
+    .delete(practiceActivityEvents)
+    .where(eq(practiceActivityEvents.profileId, profileId));
+  await db
+    .delete(dictationResults)
+    .where(eq(dictationResults.profileId, profileId));
 });
 
 afterAll(async () => {
-  await cleanup();
+  await cleanupTestAccounts();
 });
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
-describe('recordDictationResult (integration) [BUG-30]', () => {
+describe('recordDictationResult (integration)', () => {
   it('inserts a new row for a fresh (profileId, date) pair', async () => {
-    const { profile } = await seedAccountAndProfile();
     const db = createIntegrationDb();
+    const today = getServerDate();
 
-    const row = await recordDictationResult(db, profile.id, {
-      localDate: '2026-05-01',
-      sentenceCount: 5,
-      mistakeCount: 2,
-      mode: 'homework',
-      reviewed: true,
-    });
-
-    expect(row).toBeDefined();
-    expect(row!.sentenceCount).toBe(5);
-    expect(row!.mistakeCount).toBe(2);
-
-    const rows = await db.query.dictationResults.findMany({
-      where: eq(dictationResults.profileId, profile.id),
-    });
-    expect(rows).toHaveLength(1);
-  });
-
-  it('[BREAK] upserts on duplicate (profileId, date) — no duplicate rows', async () => {
-    const { profile } = await seedAccountAndProfile();
-    const db = createIntegrationDb();
-
-    await recordDictationResult(db, profile.id, {
-      localDate: '2026-05-01',
+    await recordDictationResult(db, profileId, {
+      localDate: today,
       sentenceCount: 5,
       mistakeCount: 2,
       mode: 'homework',
       reviewed: false,
     });
 
-    const updated = await recordDictationResult(db, profile.id, {
-      localDate: '2026-05-01',
+    const rows = await db.query.dictationResults.findMany({
+      where: eq(dictationResults.profileId, profileId),
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.sentenceCount).toBe(5);
+    expect(rows[0]!.mistakeCount).toBe(2);
+    expect(rows[0]!.mode).toBe('homework');
+    expect(rows[0]!.reviewed).toBe(false);
+  });
+
+  it('records the practice event at completion time instead of local-date midnight', async () => {
+    const db = createIntegrationDb();
+    const before = new Date();
+
+    const row = await recordDictationResult(db, profileId, {
+      localDate: '2026-05-13',
+      sentenceCount: 5,
+      mistakeCount: 2,
+      mode: 'homework',
+      reviewed: false,
+    });
+
+    const after = new Date();
+    const [event] = await db
+      .select({ completedAt: practiceActivityEvents.completedAt })
+      .from(practiceActivityEvents)
+      .where(eq(practiceActivityEvents.sourceId, row.id));
+
+    expect(event?.completedAt.getTime()).toBeGreaterThanOrEqual(
+      before.getTime(),
+    );
+    expect(event?.completedAt.getTime()).toBeLessThanOrEqual(after.getTime());
+  });
+
+  it('creates separate rows for same date with different modes', async () => {
+    const db = createIntegrationDb();
+    const today = getServerDate();
+
+    await recordDictationResult(db, profileId, {
+      localDate: today,
+      sentenceCount: 5,
+      mistakeCount: 2,
+      mode: 'homework',
+      reviewed: false,
+    });
+
+    const second = await recordDictationResult(db, profileId, {
+      localDate: today,
       sentenceCount: 8,
       mistakeCount: 1,
       mode: 'surprise',
       reviewed: true,
     });
 
-    expect(updated).toBeDefined();
-    expect(updated!.sentenceCount).toBe(8);
-    expect(updated!.mistakeCount).toBe(1);
-    expect(updated!.mode).toBe('surprise');
-    expect(updated!.reviewed).toBe(true);
+    const rows = await db.query.dictationResults.findMany({
+      where: eq(dictationResults.profileId, profileId),
+    });
+    expect(rows).toHaveLength(2);
+    expect(second.sentenceCount).toBe(8);
+    expect(second.mode).toBe('surprise');
+  });
+
+  // [BUG-4] Same (profile_id, date, mode) must be idempotent at the DB layer.
+  // Before the fix, a client retry of the same completion event accumulated
+  // duplicate rows because the table had only a plain index on (profile_id, date)
+  // and the repository performed a bare INSERT with no onConflict handler.
+  it('[BUG-4] same (profileId, date, mode) is idempotent — retry upserts, no duplicate row', async () => {
+    const db = createIntegrationDb();
+    const today = getServerDate();
+
+    const first = await recordDictationResult(db, profileId, {
+      localDate: today,
+      sentenceCount: 5,
+      mistakeCount: 2,
+      mode: 'homework',
+      reviewed: false,
+    });
+
+    // Same (date, mode) — simulates a network retry. The second call must
+    // not create a second row; instead it updates the existing row with the
+    // latest counts/reviewed flag (last write wins).
+    const second = await recordDictationResult(db, profileId, {
+      localDate: today,
+      sentenceCount: 6,
+      mistakeCount: 1,
+      mode: 'homework',
+      reviewed: true,
+    });
 
     const rows = await db.query.dictationResults.findMany({
-      where: eq(dictationResults.profileId, profile.id),
+      where: eq(dictationResults.profileId, profileId),
     });
     expect(rows).toHaveLength(1);
+    expect(rows[0]!.id).toBe(first.id);
+    expect(second.id).toBe(first.id);
+    expect(rows[0]!.sentenceCount).toBe(6);
+    expect(rows[0]!.mistakeCount).toBe(1);
+    expect(rows[0]!.reviewed).toBe(true);
   });
 });
 
-describe('getDictationStreak (integration) [BUG-30]', () => {
-  it('returns streak: 0 when no results exist', async () => {
-    const { profile } = await seedAccountAndProfile();
+describe('getDictationStreak (integration)', () => {
+  it('returns streak 0 and null lastDate when no results exist', async () => {
     const db = createIntegrationDb();
-
-    const result = await getDictationStreak(db, profile.id);
+    const result = await getDictationStreak(db, profileId);
     expect(result).toEqual({ streak: 0, lastDate: null });
   });
 
   it('counts consecutive days correctly', async () => {
-    const { profile } = await seedAccountAndProfile();
     const db = createIntegrationDb();
-
-    const today = new Date().toISOString().slice(0, 10);
+    const today = getServerDate();
     const yesterday = getPreviousDate(today);
     const dayBefore = getPreviousDate(yesterday);
 
-    for (const date of [dayBefore, yesterday, today]) {
-      await recordDictationResult(db, profile.id, {
+    for (const date of [today, yesterday, dayBefore]) {
+      await recordDictationResult(db, profileId, {
         localDate: date,
         sentenceCount: 5,
         mistakeCount: 0,
@@ -185,45 +234,36 @@ describe('getDictationStreak (integration) [BUG-30]', () => {
       });
     }
 
-    const result = await getDictationStreak(db, profile.id);
+    const result = await getDictationStreak(db, profileId);
     expect(result.streak).toBe(3);
     expect(result.lastDate).toBe(today);
   });
 
-  it('streak is not inflated by duplicate-date submissions after upsert', async () => {
-    const { profile } = await seedAccountAndProfile();
+  it('streak is not inflated by duplicate-date rows', async () => {
     const db = createIntegrationDb();
+    const today = getServerDate();
 
-    const today = new Date().toISOString().slice(0, 10);
-
-    await recordDictationResult(db, profile.id, {
+    await recordDictationResult(db, profileId, {
       localDate: today,
       sentenceCount: 5,
-      mistakeCount: 2,
+      mistakeCount: 0,
       mode: 'homework',
-      reviewed: true,
+      reviewed: false,
     });
-
-    await recordDictationResult(db, profile.id, {
+    await recordDictationResult(db, profileId, {
       localDate: today,
       sentenceCount: 8,
-      mistakeCount: 0,
+      mistakeCount: 1,
       mode: 'surprise',
       reviewed: true,
     });
 
     const rows = await db.query.dictationResults.findMany({
-      where: eq(dictationResults.profileId, profile.id),
+      where: eq(dictationResults.profileId, profileId),
     });
-    expect(rows).toHaveLength(1);
+    expect(rows).toHaveLength(2);
 
-    const result = await getDictationStreak(db, profile.id);
+    const result = await getDictationStreak(db, profileId);
     expect(result.streak).toBe(1);
   });
 });
-
-function getPreviousDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  d.setUTCDate(d.getUTCDate() - 1);
-  return d.toISOString().slice(0, 10);
-}

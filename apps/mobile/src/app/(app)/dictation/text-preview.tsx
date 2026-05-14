@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { goBackOrReplace } from '../../../lib/navigation';
@@ -69,7 +69,7 @@ export default function TextPreviewScreen(): React.ReactElement {
       });
       // [F-030] Yield to React render cycle so context state commits before
       // playback screen mounts (same race as dictation/index.tsx).
-      setTimeout(() => router.push('/(app)/dictation/playback' as never), 0);
+      setTimeout(() => router.push('/(app)/dictation/playback' as Href), 0);
     } catch (err) {
       // [BUG-692] Don't show an alert if the user already navigated away.
       if (prepareCancelledRef.current) return;

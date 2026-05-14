@@ -127,6 +127,7 @@ jobs:
     # Always require quality gate to pass before deploying.
     if: |
       always() &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
       needs.api-quality-gate.result == 'success' &&
       (github.event_name == 'push' ||
        (needs.api-confirm-production.result == 'success' || needs.api-confirm-production.result == 'skipped'))
@@ -170,7 +171,24 @@ jobs:
           IS_PRODUCTION: ${{ github.event_name == 'workflow_dispatch' && inputs.api_environment == 'production' }}
           STAGING_SECRET_SET: ${{ secrets.DATABASE_URL_STAGING != '' }}
           PRODUCTION_SECRET_SET: ${{ secrets.DATABASE_URL_PRODUCTION != '' }}
+          API_ENVIRONMENT: ${{ inputs.api_environment }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
+          # [CR-PR129-NEW-6] Defensive guard: if IS_STAGING and IS_PRODUCTION are
+          # both false, the downstream DATABASE_URL ternary falls through to
+          # secrets.DATABASE_URL_PRODUCTION. This can happen if api_environment
+          # is dispatched with an unrecognized value (typo, empty string, or a
+          # value added to the workflow choices but not handled below). Fail
+          # fast here rather than running migrations on production by accident.
+          if [ "$IS_STAGING" != "true" ] && [ "$IS_PRODUCTION" != "true" ]; then
+            echo "✗ Deploy target is neither staging nor production."
+            echo "  event_name='${EVENT_NAME}' api_environment='${API_ENVIRONMENT}'"
+            echo "  IS_STAGING='${IS_STAGING}' IS_PRODUCTION='${IS_PRODUCTION}'"
+            echo "  The DATABASE_URL ternary would silently fall through to"
+            echo "  secrets.DATABASE_URL_PRODUCTION, mis-migrating production."
+            echo "  Accepted api_environment values: 'staging' | 'production' | 'skip'."
+            exit 1
+          fi
           if [ "$IS_STAGING" = "true" ] && [ "$STAGING_SECRET_SET" != "true" ]; then
             echo "✗ Staging deploy but secrets.DATABASE_URL_STAGING is empty or unset."
             echo "  The DATABASE_URL ternary would silently fall through to"

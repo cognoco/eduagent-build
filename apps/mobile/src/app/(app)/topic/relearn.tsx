@@ -6,7 +6,13 @@ import {
   Text,
   View,
 } from 'react-native';
-import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import {
+  Redirect,
+  useLocalSearchParams,
+  useRouter,
+  type Href,
+} from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   useStartRelearn,
@@ -17,7 +23,8 @@ import {
   type OverdueSubject,
   type OverdueTopic,
 } from '../../../hooks/use-progress';
-import { useProfile, personaFromBirthYear } from '../../../lib/profile';
+import { useProfile } from '../../../lib/profile';
+import { computeAgeBracket } from '@eduagent/schemas';
 import { goBackOrReplace, homeHrefForReturnTo } from '../../../lib/navigation';
 import { formatApiError } from '../../../lib/format-api-error';
 import { useParentProxy } from '../../../hooks/use-parent-proxy';
@@ -131,10 +138,13 @@ export default function RelearnScreen() {
   const overdueTopics = useOverdueTopics();
   const { activeProfile } = useProfile();
   const { isParentProxy } = useParentProxy();
-  const persona = personaFromBirthYear(activeProfile?.birthYear);
-  const isLearner = persona === 'learner';
-  const methods = isLearner ? TEACHING_METHODS_LEARNER : TEACHING_METHODS;
-  const copy = isLearner ? COPY_LEARNER : COPY_DEFAULT;
+  const ageBracket =
+    activeProfile?.birthYear != null
+      ? computeAgeBracket(activeProfile.birthYear)
+      : 'adolescent';
+  const isMinor = ageBracket !== 'adult';
+  const methods = isMinor ? TEACHING_METHODS_LEARNER : TEACHING_METHODS;
+  const copy = isMinor ? COPY_LEARNER : COPY_DEFAULT;
 
   const [phase, setPhase] = useState<Phase>(directEntry ? 'method' : 'topics');
   const [selectedSubject, setSelectedSubject] = useState<OverdueSubject | null>(
@@ -197,7 +207,7 @@ export default function RelearnScreen() {
 
   const handleLeave = useCallback(() => {
     if (returnTo) {
-      router.replace(homeHrefForReturnTo(returnTo) as never);
+      router.replace(homeHrefForReturnTo(returnTo) as Href);
       return;
     }
 
@@ -286,7 +296,7 @@ export default function RelearnScreen() {
               ...(result.recap ? { recap: result.recap } : {}),
               ...(returnTo ? { returnTo } : {}),
             },
-          } as never);
+          } as Href);
         },
         onError: (err: unknown) => {
           setError(formatApiError(err));
@@ -324,12 +334,12 @@ export default function RelearnScreen() {
     <View className="px-5 pt-4 pb-3 flex-row items-center">
       <Pressable
         onPress={handleBack}
-        className="me-3 min-h-[44px] min-w-[44px] items-center justify-center"
+        className="me-3 p-2 min-h-[44px] min-w-[44px] items-center justify-center"
         testID="relearn-back"
         accessibilityRole="button"
         accessibilityLabel="Go back"
       >
-        <Text className="text-primary text-h3">&larr;</Text>
+        <Ionicons name="arrow-back" size={26} className="text-primary" />
       </Pressable>
       <Text className="text-h2 font-bold text-text-primary">Relearn Topic</Text>
     </View>

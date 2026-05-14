@@ -1,18 +1,14 @@
-const mockInngestSend = jest.fn().mockResolvedValue(undefined);
+const { createInngestTransportCapture } =
+  require('../../test-utils/inngest-transport-capture') as typeof import('../../test-utils/inngest-transport-capture');
 
-jest.mock('../client', () => { // gc1-allow: keeps the real Inngest function wrapper while stubbing dispatch side effects
-  const realInngest = jest.requireActual('inngest').Inngest;
-  const realInstance = new realInngest({ id: 'eduagent-test' });
-  return {
-    inngest: {
-      createFunction: realInstance.createFunction.bind(realInstance),
-      send: (...args: unknown[]) => mockInngestSend(...args),
-    },
-  };
-});
+const mockInngestTransport = createInngestTransportCapture();
+
+// prettier-ignore
+jest.mock('../client', () => mockInngestTransport.module); // gc1-allow: inngest framework boundary
 
 const mockGetConsentStatus = jest.fn();
 const mockGetProfileForConsentRevocation = jest.fn();
+// prettier-ignore
 jest.mock('../../services/consent', () => ({ // gc1-allow: isolates archive cleanup guards from consent service DB access
   getConsentStatus: (...args: unknown[]) => mockGetConsentStatus(...args),
   getProfileForConsentRevocation: (...args: unknown[]) =>
@@ -20,34 +16,30 @@ jest.mock('../../services/consent', () => ({ // gc1-allow: isolates archive clea
 }));
 
 const mockDeleteProfile = jest.fn().mockResolvedValue(undefined);
+// prettier-ignore
 jest.mock('../../services/deletion', () => ({ // gc1-allow: prevents destructive profile deletion while asserting the handler boundary
   deleteProfile: (...args: unknown[]) => mockDeleteProfile(...args),
 }));
 
+import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 import { archiveCleanup } from './archive-cleanup';
-
-interface MockStep {
-  run: jest.Mock;
-  sleep: jest.Mock;
-}
 
 async function executeArchiveCleanup(profileId = 'profile-001'): Promise<{
   result: unknown;
-  mockStep: MockStep;
+  runCalls: ReturnType<typeof createInngestStepRunner>['runCalls'];
+  sleepCalls: ReturnType<typeof createInngestStepRunner>['sleepCalls'];
 }> {
-  const mockStep: MockStep = {
-    run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
-    sleep: jest.fn().mockResolvedValue(undefined),
-  };
+  const { step, runCalls, sleepCalls } = createInngestStepRunner();
 
-  const handler = (archiveCleanup as { fn: (ctx: unknown) => Promise<unknown> })
-    .fn;
+  const handler = (
+    archiveCleanup as unknown as { fn: (ctx: unknown) => Promise<unknown> }
+  ).fn;
   const result = await handler({
     event: { data: { profileId }, name: 'app/profile.archived' },
-    step: mockStep,
+    step,
   });
 
-  return { result, mockStep };
+  return { result, runCalls, sleepCalls };
 }
 
 beforeEach(() => {
@@ -70,9 +62,12 @@ afterEach(() => {
 
 describe('archiveCleanup', () => {
   it('sleeps for the archive window before checking deletion guards', async () => {
-    const { mockStep } = await executeArchiveCleanup();
+    const { sleepCalls } = await executeArchiveCleanup();
 
-    expect(mockStep.sleep).toHaveBeenCalledWith('archive-window', '30d');
+    expect(sleepCalls).toContainEqual({
+      name: 'archive-window',
+      duration: '30d',
+    });
   });
 
   it('hard-deletes after consent remains withdrawn and 30 days elapsed', async () => {
@@ -80,7 +75,7 @@ describe('archiveCleanup', () => {
 
     expect(mockDeleteProfile).toHaveBeenCalledWith(
       expect.anything(),
-      'profile-delete'
+      'profile-delete',
     );
   });
 

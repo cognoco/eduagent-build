@@ -9,11 +9,14 @@ import {
   ANTHROPIC_SONNET_MODEL,
 } from './router';
 import { createMockProvider } from './providers/mock';
+import { getTextContent, makeChatStreamResult } from './types';
 import type {
   LLMProvider,
   ChatMessage,
   ChatResult,
+  ChatStreamResult,
   ModelConfig,
+  StopReason,
 } from './types';
 
 // [IMP-1] Test helper — returns a ChatResult matching the LLMProvider
@@ -26,16 +29,19 @@ const okResult: ChatResult = { content: 'ok', stopReason: 'stop' };
 function createFailingStreamProvider(id: string): LLMProvider {
   return {
     ...createMockProvider(id),
-    chatStream(): AsyncIterable<string> {
-      return {
-        [Symbol.asyncIterator]() {
-          return {
-            async next(): Promise<IteratorResult<string>> {
-              throw new Error('Stream connection lost');
-            },
-          };
+    chatStream(): ChatStreamResult {
+      return makeChatStreamResult(
+        {
+          [Symbol.asyncIterator]() {
+            return {
+              async next(): Promise<IteratorResult<string>> {
+                throw new Error('Stream connection lost');
+              },
+            };
+          },
         },
-      };
+        Promise.resolve<StopReason>('unknown'),
+      );
     },
   };
 }
@@ -71,9 +77,7 @@ function createTransientFailProvider(
     get callCount() {
       return calls;
     },
-    async chat(
-      ...args: Parameters<LLMProvider['chat']>
-    ): ReturnType<LLMProvider['chat']> {
+    async chat(...args: Parameters<LLMProvider['chat']>): Promise<ChatResult> {
       calls++;
       if (calls <= failCount) {
         throw new Error(`Transient failure #${calls}`);
@@ -629,13 +633,18 @@ describe('LLM Router', () => {
       const receivedMessages: ChatMessage[][] = [];
       const spy: LLMProvider = {
         id: 'gemini',
-        async chat(messages) {
+        async chat(messages: ChatMessage[]) {
           receivedMessages.push(messages);
           return okResult;
         },
-        async *chatStream(messages) {
+        chatStream(messages: ChatMessage[]): ChatStreamResult {
           receivedMessages.push(messages);
-          yield 'ok';
+          return makeChatStreamResult(
+            (async function* () {
+              yield 'ok';
+            })(),
+            Promise.resolve<StopReason>('stop'),
+          );
         },
       };
       registerProvider(spy);
@@ -654,12 +663,17 @@ describe('LLM Router', () => {
       const receivedMessages: ChatMessage[][] = [];
       const spy: LLMProvider = {
         id: 'gemini',
-        async chat(messages) {
+        async chat(messages: ChatMessage[]) {
           receivedMessages.push(messages);
           return okResult;
         },
-        async *chatStream() {
-          yield 'ok';
+        chatStream(): ChatStreamResult {
+          return makeChatStreamResult(
+            (async function* () {
+              yield 'ok';
+            })(),
+            Promise.resolve<StopReason>('stop'),
+          );
         },
       };
       registerProvider(spy);
@@ -673,16 +687,21 @@ describe('LLM Router', () => {
       expect(msgs[0]!.content).not.toContain('young learners');
     });
 
-    it('uses minor framing for child ageBracket', async () => {
+    it('uses minor framing for adolescent ageBracket', async () => {
       const receivedMessages: ChatMessage[][] = [];
       const spy: LLMProvider = {
         id: 'gemini',
-        async chat(messages) {
+        async chat(messages: ChatMessage[]) {
           receivedMessages.push(messages);
           return okResult;
         },
-        async *chatStream() {
-          yield 'ok';
+        chatStream(): ChatStreamResult {
+          return makeChatStreamResult(
+            (async function* () {
+              yield 'ok';
+            })(),
+            Promise.resolve<StopReason>('stop'),
+          );
         },
       };
       registerProvider(spy);
@@ -696,16 +715,49 @@ describe('LLM Router', () => {
       expect(msgs[0]!.content).not.toContain('adult');
     });
 
+    it('uses minor framing for child ageBracket', async () => {
+      const receivedMessages: ChatMessage[][] = [];
+      const spy: LLMProvider = {
+        id: 'gemini',
+        async chat(messages: ChatMessage[]) {
+          receivedMessages.push(messages);
+          return okResult;
+        },
+        chatStream(): ChatStreamResult {
+          return makeChatStreamResult(
+            (async function* () {
+              yield 'ok';
+            })(),
+            Promise.resolve<StopReason>('stop'),
+          );
+        },
+      };
+      registerProvider(spy);
+
+      await routeAndCall([{ role: 'user', content: 'Hello' }], 1, {
+        ageBracket: 'child',
+      });
+
+      const msgs = receivedMessages[0]!;
+      expect(msgs[0]!.content).toContain('for young learners');
+      expect(msgs[0]!.content).not.toContain('adult');
+    });
+
     it('merges preamble into existing system message', async () => {
       const receivedMessages: ChatMessage[][] = [];
       const spy: LLMProvider = {
         id: 'gemini',
-        async chat(messages) {
+        async chat(messages: ChatMessage[]) {
           receivedMessages.push(messages);
           return okResult;
         },
-        async *chatStream() {
-          yield 'ok';
+        chatStream(): ChatStreamResult {
+          return makeChatStreamResult(
+            (async function* () {
+              yield 'ok';
+            })(),
+            Promise.resolve<StopReason>('stop'),
+          );
         },
       };
       registerProvider(spy);
@@ -729,12 +781,17 @@ describe('LLM Router', () => {
       const receivedMessages: ChatMessage[][] = [];
       const spy: LLMProvider = {
         id: 'gemini',
-        async chat(messages) {
+        async chat(messages: ChatMessage[]) {
           receivedMessages.push(messages);
           return okResult;
         },
-        async *chatStream() {
-          yield 'ok';
+        chatStream(): ChatStreamResult {
+          return makeChatStreamResult(
+            (async function* () {
+              yield 'ok';
+            })(),
+            Promise.resolve<StopReason>('stop'),
+          );
         },
       };
       registerProvider(spy);
@@ -766,12 +823,17 @@ describe('LLM Router', () => {
       const receivedMessages: ChatMessage[][] = [];
       const spy: LLMProvider = {
         id: 'gemini',
-        async chat(messages) {
+        async chat(messages: ChatMessage[]) {
           receivedMessages.push(messages);
           return okResult;
         },
-        async *chatStream() {
-          yield 'ok';
+        chatStream(): ChatStreamResult {
+          return makeChatStreamResult(
+            (async function* () {
+              yield 'ok';
+            })(),
+            Promise.resolve<StopReason>('stop'),
+          );
         },
       };
       registerProvider(spy);
@@ -788,12 +850,17 @@ describe('LLM Router', () => {
       const receivedMessages: ChatMessage[][] = [];
       const spy: LLMProvider = {
         id: 'gemini',
-        async chat(messages) {
+        async chat(messages: ChatMessage[]) {
           receivedMessages.push(messages);
           return okResult;
         },
-        async *chatStream() {
-          yield 'ok';
+        chatStream(): ChatStreamResult {
+          return makeChatStreamResult(
+            (async function* () {
+              yield 'ok';
+            })(),
+            Promise.resolve<StopReason>('stop'),
+          );
         },
       };
       registerProvider(spy);
@@ -812,12 +879,17 @@ describe('LLM Router', () => {
       const receivedMessages: ChatMessage[][] = [];
       const spy: LLMProvider = {
         id: 'gemini',
-        async chat(messages) {
+        async chat(messages: ChatMessage[]) {
           receivedMessages.push(messages);
           return okResult;
         },
-        async *chatStream() {
-          yield 'ok';
+        chatStream(): ChatStreamResult {
+          return makeChatStreamResult(
+            (async function* () {
+              yield 'ok';
+            })(),
+            Promise.resolve<StopReason>('stop'),
+          );
         },
       };
       registerProvider(spy);
@@ -827,7 +899,7 @@ describe('LLM Router', () => {
         pronouns: 'she/her',
       });
 
-      const system = receivedMessages[0]![0]!.content;
+      const system = getTextContent(receivedMessages[0]![0]!.content);
       expect(system).toContain(
         'Respond in Spanish unless the learner switches.',
       );
@@ -844,12 +916,17 @@ describe('LLM Router', () => {
       const receivedMessages: ChatMessage[][] = [];
       const spy: LLMProvider = {
         id: 'gemini',
-        async chat(messages) {
+        async chat(messages: ChatMessage[]) {
           receivedMessages.push(messages);
           return okResult;
         },
-        async *chatStream() {
-          yield 'ok';
+        chatStream(): ChatStreamResult {
+          return makeChatStreamResult(
+            (async function* () {
+              yield 'ok';
+            })(),
+            Promise.resolve<StopReason>('stop'),
+          );
         },
       };
       registerProvider(spy);
@@ -865,12 +942,17 @@ describe('LLM Router', () => {
       const receivedMessages: ChatMessage[][] = [];
       const spy: LLMProvider = {
         id: 'gemini',
-        async chat(messages) {
+        async chat(messages: ChatMessage[]) {
           receivedMessages.push(messages);
           return okResult;
         },
-        async *chatStream() {
-          yield 'ok';
+        chatStream(): ChatStreamResult {
+          return makeChatStreamResult(
+            (async function* () {
+              yield 'ok';
+            })(),
+            Promise.resolve<StopReason>('stop'),
+          );
         },
       };
       registerProvider(spy);
@@ -890,12 +972,17 @@ describe('LLM Router', () => {
       const receivedMessages: ChatMessage[][] = [];
       const spy: LLMProvider = {
         id: 'gemini',
-        async chat(messages) {
+        async chat(messages: ChatMessage[]) {
           receivedMessages.push(messages);
           return okResult;
         },
-        async *chatStream() {
-          yield 'ok';
+        chatStream(): ChatStreamResult {
+          return makeChatStreamResult(
+            (async function* () {
+              yield 'ok';
+            })(),
+            Promise.resolve<StopReason>('stop'),
+          );
         },
       };
       registerProvider(spy);

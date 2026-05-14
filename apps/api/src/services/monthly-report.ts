@@ -43,6 +43,7 @@ export function generateMonthlyReportData(
   monthLabel: string,
   thisMonth: ProgressMetrics,
   lastMonth: ProgressMetrics | null,
+  practiceSummary?: ReportPracticeSummary,
 ): MonthlyReportData {
   const topicsMasteredDelta = safeDelta(
     thisMonth.topicsMastered,
@@ -161,6 +162,7 @@ export function generateMonthlyReportData(
       };
     }),
     headlineStat: headlineMode,
+    ...(practiceSummary ? { practiceSummary } : {}),
   });
 }
 

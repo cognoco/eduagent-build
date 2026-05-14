@@ -1,4 +1,5 @@
 import { i18next } from '../i18n';
+import type { TranslateKey } from '../i18n';
 
 /**
  * Centralized error formatter for API and network errors.
@@ -112,7 +113,7 @@ function isGenericServerMessage(message: string): boolean {
  */
 const FRIENDLY_MESSAGE_MAP: Array<{
   pattern: RegExp;
-  key: string;
+  key: TranslateKey;
 }> = [
   {
     pattern: /not configured for language learning/i,

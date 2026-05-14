@@ -30,13 +30,7 @@ jest.mock('../../services/sentry', () => ({
   captureException: (...args: unknown[]) => mockCaptureException(...args),
 }));
 
-jest.mock('../../services/subscription', () => ({
-  getTierConfig: jest.fn().mockReturnValue({
-    monthlyQuota: 100,
-    dailyLimit: 10,
-    maxProfiles: 1,
-  }),
-}));
+// subscription: getTierConfig is a pure static config lookup — use real code.
 
 const mockFindExpiredTrials = jest.fn().mockResolvedValue([]);
 const mockFindSubscriptionsByTrialDateRange = jest.fn().mockResolvedValue([]);
@@ -55,22 +49,7 @@ jest.mock('../../services/billing', () => ({
     mockFindExpiredTrialsByDaysSinceEnd(...args),
 }));
 
-jest.mock('../../services/trial', () => ({
-  getTrialWarningMessage: jest.fn((days: number) => {
-    if (days === 3) return '3 days left of your trial';
-    if (days === 1) return '1 day left of your trial';
-    if (days === 0) return 'Last day of your trial';
-    return null;
-  }),
-  getSoftLandingMessage: jest.fn((days: number) => {
-    if (days === 1) return 'giving you 15/day for 2 more weeks';
-    if (days === 7) return '1 week left of extended access';
-    if (days === 14) return 'tomorrow you move to Free';
-    return null;
-  }),
-  EXTENDED_TRIAL_MONTHLY_EQUIVALENT: 450,
-  TRIAL_EXTENDED_DAYS: 14,
-}));
+// trial: all exports are pure functions / constants — use real code.
 
 const mockSendPushNotification = jest.fn().mockResolvedValue({ sent: true });
 jest.mock('../../services/notifications', () => ({
@@ -93,6 +72,11 @@ jest.mock('../../services/profile', () => ({
 }));
 
 import { trialExpiry } from './trial-expiry';
+import {
+  createInngestStepRunner,
+  type InngestStepRunnerOptions,
+} from '../../test-utils/inngest-step-runner';
+import { getTierConfig } from '../../services/subscription';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -109,32 +93,16 @@ interface TrialExpiryResult {
   softLandingSent: number;
 }
 
-interface TrialExpiryMockStep {
-  run: jest.Mock;
-  sendEvent: jest.Mock;
-  sleep: jest.Mock;
-}
-
-async function executeSteps(): Promise<{
-  result: TrialExpiryResult;
-  mockStep: TrialExpiryMockStep;
-}> {
-  const mockStep: TrialExpiryMockStep = {
-    run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
-    // [SWEEP-J7] Per-trial escalation events now batched and dispatched via
-    // memoized step.sendEvent OUTSIDE the per-trial step.run loop. Bare
-    // inngest.send inside step.run is the forbidden duplicate-event source.
-    sendEvent: jest.fn().mockResolvedValue(undefined),
-    sleep: jest.fn(),
-  };
+async function executeSteps(options?: InngestStepRunnerOptions) {
+  const runner = createInngestStepRunner(options);
 
   const handler = (trialExpiry as any).fn;
   const result = (await handler({
     event: { name: 'inngest/function.invoked' },
-    step: mockStep,
+    step: runner.step,
   })) as TrialExpiryResult;
 
-  return { result, mockStep };
+  return { result, ...runner };
 }
 
 beforeEach(() => {
@@ -225,8 +193,8 @@ describe('trialExpiry', () => {
     expect(mockDowngradeQuotaPool).toHaveBeenCalledWith(
       expect.anything(),
       'sub-2',
-      100,
-      10,
+      getTierConfig('free').monthlyQuota,
+      getTierConfig('free').dailyLimit,
     );
   });
 
@@ -269,10 +237,7 @@ describe('trialExpiry', () => {
         .mockResolvedValueOnce(undefined)
         .mockRejectedValueOnce(new Error('DB constraint violation'));
 
-      const { result, mockStep } = (await executeSteps()) as unknown as {
-        result: { expiredCount: number };
-        mockStep: { sendEvent: jest.Mock };
-      };
+      const { result, sendEventCalls } = await executeSteps();
 
       // Survivor counted; failing trial dropped from the count.
       expect(result.expiredCount).toBe(1);
@@ -291,8 +256,11 @@ describe('trialExpiry', () => {
       // [SWEEP-J7] Escalation event now dispatched via memoized step.sendEvent
       // OUTSIDE the per-trial step.run loop, carrying the array of failure
       // payloads. Bare inngest.send is forbidden — assert it never fires.
-      expect(mockStep.sendEvent).toHaveBeenCalledWith(
-        'escalate-process-expired-trials',
+      const escalationCalls = sendEventCalls.filter(
+        (c) => c.name === 'escalate-process-expired-trials',
+      );
+      expect(escalationCalls).toHaveLength(1);
+      expect(escalationCalls[0]!.payload).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
             name: 'app/billing.trial_expiry_failed',
@@ -321,7 +289,7 @@ describe('trialExpiry', () => {
         .filter((e): e is Record<string, unknown> => e !== null)
         .filter((e) => e.message === 'billing.trial_expiry_failed');
       expect(errorEntries).toHaveLength(1);
-      const ctx = errorEntries[0].context as Record<string, unknown>;
+      const ctx = errorEntries[0]!.context as Record<string, unknown>;
       expect(ctx).toMatchObject({
         step: 'process-expired-trials',
         trialId: 'sub-fail',
@@ -345,22 +313,12 @@ describe('trialExpiry', () => {
         new Error('Primary failure'),
       );
 
-      const failingExecuteSteps = async () => {
-        const mockStep = {
-          run: jest.fn(async (_name: string, fn: () => Promise<unknown>) =>
-            fn(),
-          ),
-          sendEvent: jest
-            .fn()
-            .mockRejectedValueOnce(new Error('Inngest unavailable')),
-          sleep: jest.fn(),
-        };
-        const handler = (trialExpiry as any).fn;
-        return handler({
-          event: { name: 'inngest/function.invoked' },
-          step: mockStep,
+      const failingExecuteSteps = () =>
+        executeSteps({
+          sendEventErrors: {
+            'escalate-process-expired-trials': new Error('Inngest unavailable'),
+          },
         });
-      };
 
       await expect(failingExecuteSteps()).rejects.toThrow(
         'Inngest unavailable',
@@ -510,8 +468,8 @@ describe('trialExpiry', () => {
     expect(mockDowngradeQuotaPool).toHaveBeenCalledWith(
       expect.anything(),
       'sub-6',
-      100,
-      10,
+      getTierConfig('free').monthlyQuota,
+      getTierConfig('free').dailyLimit,
     );
   });
 

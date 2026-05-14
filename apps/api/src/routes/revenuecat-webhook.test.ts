@@ -3,10 +3,12 @@
 // ---------------------------------------------------------------------------
 
 jest.mock('../services/kv', () => ({
+  ...jest.requireActual('../services/kv'),
   writeSubscriptionStatus: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock('../services/billing', () => ({
+  ...jest.requireActual('../services/billing'),
   getSubscriptionByAccountId: jest.fn(),
   getQuotaPool: jest.fn(),
   ensureFreeSubscription: jest.fn().mockResolvedValue({
@@ -33,10 +35,12 @@ jest.mock('../services/billing', () => ({
 }));
 
 jest.mock('../services/account', () => ({
+  ...jest.requireActual('../services/account'),
   findAccountByClerkId: jest.fn(),
 }));
 
 jest.mock('../services/subscription', () => ({
+  ...jest.requireActual('../services/subscription'),
   getTierConfig: jest.fn().mockReturnValue({
     monthlyQuota: 500,
     dailyLimit: null,
@@ -49,10 +53,12 @@ jest.mock('../services/subscription', () => ({
 }));
 
 jest.mock('../services/trial', () => ({
+  ...jest.requireActual('../services/trial'),
   EXTENDED_TRIAL_MONTHLY_EQUIVALENT: 450,
 }));
 
 jest.mock('../inngest/client', () => ({
+  // gc1-allow: Inngest SDK external boundary
   inngest: {
     send: jest.fn().mockResolvedValue(undefined),
   },
@@ -61,11 +67,13 @@ jest.mock('../inngest/client', () => ({
 const mockCaptureException = jest.fn();
 
 jest.mock('../services/sentry', () => ({
+  // gc1-allow: @sentry/cloudflare external boundary
   captureException: (...args: unknown[]) => mockCaptureException(...args),
 }));
 
 import { Hono } from 'hono';
 import { revenuecatWebhookRoute } from './revenuecat-webhook';
+import type { AppVariables } from '../types/hono';
 import { writeSubscriptionStatus } from '../services/kv';
 import {
   getSubscriptionByAccountId,
@@ -88,9 +96,9 @@ import { inngest } from '../inngest/client';
 const mockDb = {} as any;
 const mockKv = { put: jest.fn(), get: jest.fn() } as any;
 
-const app = new Hono()
+const app = new Hono<{ Variables: AppVariables }>()
   .use('*', async (c, next) => {
-    c.set('db', mockDb);
+    c.set('db', mockDb as AppVariables['db']);
     await next();
   })
   .route('/', revenuecatWebhookRoute);
@@ -106,7 +114,7 @@ const TEST_ENV = {
 
 function makeWebhookPayload(
   eventType: string,
-  overrides: Record<string, unknown> = {}
+  overrides: Record<string, unknown> = {},
 ) {
   return {
     api_version: '1.0',
@@ -143,7 +151,7 @@ function mockSubscriptionRow(overrides: Record<string, unknown> = {}) {
 function makeRequest(
   body: unknown,
   env: Record<string, unknown> = TEST_ENV,
-  headers: Record<string, string> = {}
+  headers: Record<string, string> = {},
 ) {
   return app.request(
     '/revenuecat/webhook',
@@ -156,7 +164,7 @@ function makeRequest(
       },
       body: JSON.stringify(body),
     },
-    env
+    env,
   );
 }
 
@@ -169,21 +177,21 @@ beforeEach(() => {
   });
 
   (getSubscriptionByAccountId as jest.Mock).mockResolvedValue(
-    mockSubscriptionRow()
+    mockSubscriptionRow(),
   );
   (getQuotaPool as jest.Mock).mockResolvedValue({
     monthlyLimit: 500,
     usedThisMonth: 42,
   });
   (activateSubscriptionFromRevenuecat as jest.Mock).mockResolvedValue(
-    mockSubscriptionRow()
+    mockSubscriptionRow(),
   );
   (updateSubscriptionFromRevenuecatWebhook as jest.Mock).mockResolvedValue(
-    mockSubscriptionRow()
+    mockSubscriptionRow(),
   );
   (isRevenuecatEventProcessed as jest.Mock).mockResolvedValue(false);
   (ensureFreeSubscription as jest.Mock).mockResolvedValue(
-    mockSubscriptionRow({ tier: 'free' })
+    mockSubscriptionRow({ tier: 'free' }),
   );
   (purchaseTopUpCredits as jest.Mock).mockResolvedValue({
     id: 'topup-1',
@@ -210,7 +218,7 @@ describe('auth validation', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(makeWebhookPayload('INITIAL_PURCHASE')),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(401);
@@ -229,7 +237,7 @@ describe('auth validation', () => {
         },
         body: JSON.stringify(makeWebhookPayload('INITIAL_PURCHASE')),
       },
-      {} // no REVENUECAT_WEBHOOK_SECRET
+      {}, // no REVENUECAT_WEBHOOK_SECRET
     );
 
     expect(res.status).toBe(401);
@@ -248,7 +256,7 @@ describe('auth validation', () => {
         },
         body: JSON.stringify(makeWebhookPayload('INITIAL_PURCHASE')),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(401);
@@ -275,7 +283,7 @@ describe('auth validation', () => {
         },
         body: JSON.stringify(makeWebhookPayload('INITIAL_PURCHASE')),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(401);
@@ -292,7 +300,7 @@ describe('auth validation', () => {
         },
         body: JSON.stringify(makeWebhookPayload('INITIAL_PURCHASE')),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(401);
@@ -311,7 +319,7 @@ describe('auth validation', () => {
         },
         body: JSON.stringify(makeWebhookPayload('INITIAL_PURCHASE')),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     // "Bearer " with empty string should fail verification
@@ -331,7 +339,7 @@ describe('auth validation', () => {
         },
         body: JSON.stringify(makeWebhookPayload('INITIAL_PURCHASE')),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(401);
@@ -411,7 +419,7 @@ describe('idempotency', () => {
       mockDb,
       'acc-1',
       expect.any(String),
-      timestampMs
+      timestampMs,
     );
   });
 
@@ -428,7 +436,7 @@ describe('idempotency', () => {
       mockDb,
       'acc-1',
       expect.any(String),
-      undefined
+      undefined,
     );
   });
 
@@ -450,7 +458,7 @@ describe('idempotency', () => {
       'sub-internal-1',
       500,
       expect.any(Date),
-      'txn_duplicate_123'
+      'txn_duplicate_123',
     );
 
     // KV cache should NOT be refreshed for duplicate transactions
@@ -479,7 +487,7 @@ describe('INITIAL_PURCHASE', () => {
       expect.objectContaining({
         revenuecatOriginalAppUserId: 'clerk_user_123',
         isTrial: false,
-      })
+      }),
     );
   });
 
@@ -531,7 +539,7 @@ describe('INITIAL_PURCHASE', () => {
         extra: expect.objectContaining({
           eventType: 'INITIAL_PURCHASE',
         }),
-      })
+      }),
     );
     // [SEC-11] Verify appUserId is not leaked to Sentry
     const callArgs = (mockCaptureException as jest.Mock).mock.calls[0];
@@ -557,7 +565,7 @@ describe('INITIAL_PURCHASE', () => {
       expect.objectContaining({
         isTrial: true,
         trialEndsAt: new Date(expirationMs).toISOString(),
-      })
+      }),
     );
   });
 
@@ -577,7 +585,7 @@ describe('INITIAL_PURCHASE', () => {
       expect.any(String),
       expect.objectContaining({
         isTrial: false,
-      })
+      }),
     );
   });
 });
@@ -598,7 +606,7 @@ describe('RENEWAL', () => {
         status: 'active',
         cancelledAt: null,
         trialEndsAt: null,
-      })
+      }),
     );
   });
 
@@ -606,7 +614,7 @@ describe('RENEWAL', () => {
     const res = await makeRequest(
       makeWebhookPayload('RENEWAL', {
         product_id: 'com.eduagent.pro.monthly',
-      })
+      }),
     );
     expect(res.status).toBe(200);
     expect(updateQuotaPoolLimit).toHaveBeenCalled();
@@ -624,14 +632,14 @@ describe('RENEWAL', () => {
       mockSubscriptionRow({
         status: 'trial',
         trialEndsAt: new Date(Date.now() + 86400000).toISOString(),
-      })
+      }),
     );
 
     const res = await makeRequest(
       makeWebhookPayload('RENEWAL', {
         period_type: 'NORMAL',
         product_id: 'com.eduagent.plus.monthly',
-      })
+      }),
     );
     expect(res.status).toBe(200);
 
@@ -642,7 +650,7 @@ describe('RENEWAL', () => {
         status: 'active',
         trialEndsAt: null,
         cancelledAt: null,
-      })
+      }),
     );
   });
 });
@@ -662,7 +670,7 @@ describe('CANCELLATION', () => {
       expect.objectContaining({
         status: 'active',
         cancelledAt: expect.any(String),
-      })
+      }),
     );
   });
 
@@ -681,7 +689,7 @@ describe('EXPIRATION', () => {
   it('downgrades to free tier on non-trial expiration', async () => {
     // Default mock: getSubscriptionByAccountId returns status: 'active'
     const res = await makeRequest(
-      makeWebhookPayload('EXPIRATION', { period_type: 'NORMAL' })
+      makeWebhookPayload('EXPIRATION', { period_type: 'NORMAL' }),
     );
     expect(res.status).toBe(200);
 
@@ -691,13 +699,13 @@ describe('EXPIRATION', () => {
       expect.objectContaining({
         status: 'expired',
         tier: 'free',
-      })
+      }),
     );
   });
 
   it('updates quota pool to free tier limit on non-trial expiration', async () => {
     const res = await makeRequest(
-      makeWebhookPayload('EXPIRATION', { period_type: 'NORMAL' })
+      makeWebhookPayload('EXPIRATION', { period_type: 'NORMAL' }),
     );
     expect(res.status).toBe(200);
     expect(updateQuotaPoolLimit).toHaveBeenCalled();
@@ -705,11 +713,11 @@ describe('EXPIRATION', () => {
 
   it('triggers soft landing on trial expiration (period_type TRIAL)', async () => {
     (getSubscriptionByAccountId as jest.Mock).mockResolvedValue(
-      mockSubscriptionRow({ status: 'trial', tier: 'plus' })
+      mockSubscriptionRow({ status: 'trial', tier: 'plus' }),
     );
 
     const res = await makeRequest(
-      makeWebhookPayload('EXPIRATION', { period_type: 'TRIAL' })
+      makeWebhookPayload('EXPIRATION', { period_type: 'TRIAL' }),
     );
     expect(res.status).toBe(200);
 
@@ -717,7 +725,7 @@ describe('EXPIRATION', () => {
     expect(transitionToExtendedTrial).toHaveBeenCalledWith(
       mockDb,
       'sub-internal-1',
-      450
+      450,
     );
     // Should NOT call updateQuotaPoolLimit (soft landing uses transitionToExtendedTrial)
     expect(updateQuotaPoolLimit).not.toHaveBeenCalled();
@@ -725,12 +733,12 @@ describe('EXPIRATION', () => {
 
   it('does NOT trigger soft landing when period_type is NORMAL even if DB status is trial', async () => {
     (getSubscriptionByAccountId as jest.Mock).mockResolvedValue(
-      mockSubscriptionRow({ status: 'trial', tier: 'plus' })
+      mockSubscriptionRow({ status: 'trial', tier: 'plus' }),
     );
 
     // period_type is the authoritative signal — NORMAL means paid-period expiration
     const res = await makeRequest(
-      makeWebhookPayload('EXPIRATION', { period_type: 'NORMAL' })
+      makeWebhookPayload('EXPIRATION', { period_type: 'NORMAL' }),
     );
     expect(res.status).toBe(200);
 
@@ -740,35 +748,35 @@ describe('EXPIRATION', () => {
     expect(updateSubscriptionFromRevenuecatWebhook).toHaveBeenCalledWith(
       mockDb,
       'acc-1',
-      expect.objectContaining({ status: 'expired', tier: 'free' })
+      expect.objectContaining({ status: 'expired', tier: 'free' }),
     );
   });
 
   it('falls back to DB trial status when period_type is absent', async () => {
     (getSubscriptionByAccountId as jest.Mock).mockResolvedValue(
-      mockSubscriptionRow({ status: 'trial', tier: 'plus' })
+      mockSubscriptionRow({ status: 'trial', tier: 'plus' }),
     );
 
     // No period_type → fall back to DB status
     const res = await makeRequest(
-      makeWebhookPayload('EXPIRATION', { period_type: undefined })
+      makeWebhookPayload('EXPIRATION', { period_type: undefined }),
     );
     expect(res.status).toBe(200);
 
     expect(transitionToExtendedTrial).toHaveBeenCalledWith(
       mockDb,
       'sub-internal-1',
-      450
+      450,
     );
   });
 
   it('records eventId for idempotency after trial soft landing', async () => {
     (getSubscriptionByAccountId as jest.Mock).mockResolvedValue(
-      mockSubscriptionRow({ status: 'trial', tier: 'plus' })
+      mockSubscriptionRow({ status: 'trial', tier: 'plus' }),
     );
 
     const res = await makeRequest(
-      makeWebhookPayload('EXPIRATION', { period_type: 'TRIAL' })
+      makeWebhookPayload('EXPIRATION', { period_type: 'TRIAL' }),
     );
     expect(res.status).toBe(200);
 
@@ -778,17 +786,17 @@ describe('EXPIRATION', () => {
       'acc-1',
       expect.objectContaining({
         eventId: expect.any(String),
-      })
+      }),
     );
   });
 
   it('refreshes KV cache after trial soft landing', async () => {
     (getSubscriptionByAccountId as jest.Mock).mockResolvedValue(
-      mockSubscriptionRow({ status: 'trial', tier: 'plus' })
+      mockSubscriptionRow({ status: 'trial', tier: 'plus' }),
     );
 
     const res = await makeRequest(
-      makeWebhookPayload('EXPIRATION', { period_type: 'TRIAL' })
+      makeWebhookPayload('EXPIRATION', { period_type: 'TRIAL' }),
     );
     expect(res.status).toBe(200);
     expect(writeSubscriptionStatus).toHaveBeenCalled();
@@ -809,7 +817,7 @@ describe('BILLING_ISSUE', () => {
       'acc-1',
       expect.objectContaining({
         status: 'past_due',
-      })
+      }),
     );
   });
 
@@ -829,7 +837,7 @@ describe('BILLING_ISSUE', () => {
 
   it('does not emit event when subscription not found', async () => {
     (updateSubscriptionFromRevenuecatWebhook as jest.Mock).mockResolvedValue(
-      null
+      null,
     );
 
     const res = await makeRequest(makeWebhookPayload('BILLING_ISSUE'));
@@ -848,7 +856,7 @@ describe('SUBSCRIBER_ALIAS', () => {
       makeWebhookPayload('SUBSCRIBER_ALIAS', {
         transferred_from: ['old_user'],
         transferred_to: ['new_user'],
-      })
+      }),
     );
     expect(res.status).toBe(200);
   });
@@ -871,7 +879,7 @@ describe('SUBSCRIBER_ALIAS', () => {
           app_user_id: 'user_clerk_abc',
           transferred_from: ['user_clerk_old'],
           transferred_to: ['user_clerk_abc'],
-        })
+        }),
       );
       expect(res.status).toBe(200);
       expect(infoSpy).not.toHaveBeenCalled();
@@ -880,11 +888,11 @@ describe('SUBSCRIBER_ALIAS', () => {
         .map((call) => call[0])
         .filter(
           (arg): arg is string =>
-            typeof arg === 'string' && arg.includes('SUBSCRIBER_ALIAS')
+            typeof arg === 'string' && arg.includes('SUBSCRIBER_ALIAS'),
         );
       expect(aliasLog.length).toBeGreaterThan(0);
 
-      const parsed = JSON.parse(aliasLog[0]) as {
+      const parsed = JSON.parse(aliasLog[0]!) as {
         level: string;
         message: string;
         context?: { appUserId?: unknown; transferredFrom?: unknown };
@@ -910,7 +918,7 @@ describe('PRODUCT_CHANGE', () => {
       makeWebhookPayload('PRODUCT_CHANGE', {
         product_id: 'com.eduagent.plus.monthly',
         new_product_id: 'com.eduagent.family.monthly',
-      })
+      }),
     );
     expect(res.status).toBe(200);
 
@@ -920,7 +928,7 @@ describe('PRODUCT_CHANGE', () => {
       expect.objectContaining({
         tier: 'family',
         status: 'active',
-      })
+      }),
     );
   });
 
@@ -928,7 +936,7 @@ describe('PRODUCT_CHANGE', () => {
     const res = await makeRequest(
       makeWebhookPayload('PRODUCT_CHANGE', {
         new_product_id: 'com.eduagent.pro.yearly',
-      })
+      }),
     );
     expect(res.status).toBe(200);
     expect(updateQuotaPoolLimit).toHaveBeenCalled();
@@ -938,7 +946,7 @@ describe('PRODUCT_CHANGE', () => {
     const res = await makeRequest(
       makeWebhookPayload('PRODUCT_CHANGE', {
         new_product_id: 'com.unknown.product',
-      })
+      }),
     );
     expect(res.status).toBe(200);
     expect(updateSubscriptionFromRevenuecatWebhook).not.toHaveBeenCalled();
@@ -960,7 +968,7 @@ describe('UNCANCELLATION', () => {
       expect.objectContaining({
         status: 'active',
         cancelledAt: null,
-      })
+      }),
     );
   });
 
@@ -995,7 +1003,7 @@ describe('product ID mapping', () => {
       'acc-1',
       expectedTier,
       expect.any(String),
-      expect.any(Object)
+      expect.any(Object),
     );
   });
 });
@@ -1043,13 +1051,13 @@ describe('NON_RENEWING_PURCHASE', () => {
       'sub-internal-1',
       500,
       expect.any(Date),
-      'txn_apple_123'
+      'txn_apple_123',
     );
   });
 
   it('rejects top-up on free tier with 403', async () => {
     (getSubscriptionByAccountId as jest.Mock).mockResolvedValue(
-      mockSubscriptionRow({ tier: 'free', status: 'active' })
+      mockSubscriptionRow({ tier: 'free', status: 'active' }),
     );
 
     const payload = makeWebhookPayload('NON_RENEWING_PURCHASE', {
@@ -1130,7 +1138,7 @@ describe('NON_RENEWING_PURCHASE', () => {
       'sub-internal-1',
       500,
       expect.any(Date),
-      'txn_fallback_123'
+      'txn_fallback_123',
     );
   });
 
@@ -1148,7 +1156,7 @@ describe('NON_RENEWING_PURCHASE', () => {
       'sub-internal-1',
       500,
       expect.any(Date),
-      'txn_google_123'
+      'txn_google_123',
     );
   });
 

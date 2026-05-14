@@ -30,6 +30,8 @@ let mockProfileData: Record<string, unknown> = {
   interests: [],
 };
 
+let mockActiveProfileBirthYear: number | undefined;
+
 const mockPlatformAlert = jest.fn();
 
 jest.mock('react-native-safe-area-context', () => ({
@@ -51,6 +53,7 @@ jest.mock('expo-router', () => ({
 }));
 
 jest.mock('../../lib/profile', () => ({
+  ...jest.requireActual('../../lib/profile'),
   useProfile: () => ({
     activeProfile: {
       id: 'test-profile-id',
@@ -61,9 +64,11 @@ jest.mock('../../lib/profile', () => ({
       conversationLanguage: 'en',
       pronouns: null,
       consentStatus: null,
+      get birthYear() {
+        return mockActiveProfileBirthYear;
+      },
     },
   }),
-  personaFromBirthYear: () => 'learner',
   ProfileContext: {
     Provider: ({ children }: { children: React.ReactNode }) => children,
   },
@@ -83,26 +88,31 @@ const mockFetch = createRoutedMockFetch({
 });
 
 jest.mock('../../lib/api-client', () =>
+  // gc1-allow: Clerk useAuth() external boundary
   require('../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch),
 );
 
 // use-parent-proxy uses setProxyMode from api-client (not the RPC useApiClient hook)
 // plus SecureStore reads — not an API hook. Keep as a direct mock.
 jest.mock('../../hooks/use-parent-proxy', () => ({
+  // gc1-allow: SecureStore native boundary
   useParentProxy: () => ({ isParentProxy: false }),
 }));
 
 // use-active-profile-role is derived from useProfile + useParentProxy — no API calls.
 let mockActiveRole: 'owner' | 'child' | 'impersonated-child' | null = 'owner';
 jest.mock('../../hooks/use-active-profile-role', () => ({
+  ...jest.requireActual('../../hooks/use-active-profile-role'),
   useActiveProfileRole: () => mockActiveRole,
 }));
 
 jest.mock('../../lib/platform-alert', () => ({
+  ...jest.requireActual('../../lib/platform-alert'),
   platformAlert: (...args: unknown[]) => mockPlatformAlert(...args),
 }));
 
 jest.mock('../../lib/sentry', () => ({
+  // gc1-allow: @sentry/react-native external boundary
   Sentry: { captureException: jest.fn() },
 }));
 
@@ -111,6 +121,7 @@ jest.mock('../../lib/sentry', () => ({
 // Strategy: mock TellMentorInput to expose a testID-tagged submit button so
 // we can trigger onSubmit directly without depending on TellMentorInput internals.
 jest.mock('../../components/tell-mentor-input', () => ({
+  ...jest.requireActual('../../components/tell-mentor-input'),
   TellMentorInput: ({
     onSubmit,
     onChangeText,
@@ -300,6 +311,44 @@ describe('MentorMemoryScreen — accommodation helper copy is role-gated [BUG-91
 
     expect(screen.queryByTestId('accommodation-badge')).toBeNull();
     expect(screen.queryByTestId('accommodation-set-by-parent')).toBeNull();
+  });
+});
+
+describe('MentorMemoryScreen — accommodation badge text by age bracket', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockProfileData = {
+      ...mockProfileBase,
+      interests: [],
+      accommodationMode: 'audio-first',
+    };
+  });
+
+  afterEach(() => {
+    mockActiveProfileBirthYear = undefined;
+  });
+
+  it('shows young label for child bracket', async () => {
+    mockActiveProfileBirthYear = new Date().getFullYear() - 10;
+    render(<MentorMemoryScreen />, { wrapper: makeWrapper() });
+    const badge = await screen.findByTestId('accommodation-badge');
+    expect(badge).toHaveTextContent(
+      'Your mentor uses a special way to teach you!',
+    );
+  });
+
+  it('shows mid label for adolescent bracket', async () => {
+    mockActiveProfileBirthYear = new Date().getFullYear() - 15;
+    render(<MentorMemoryScreen />, { wrapper: makeWrapper() });
+    const badge = await screen.findByTestId('accommodation-badge');
+    expect(badge).toHaveTextContent(/Learning style: Audio-First/);
+  });
+
+  it('shows mid label when birthYear is null (adolescent fallback)', async () => {
+    mockActiveProfileBirthYear = undefined;
+    render(<MentorMemoryScreen />, { wrapper: makeWrapper() });
+    const badge = await screen.findByTestId('accommodation-badge');
+    expect(badge).toHaveTextContent(/Learning style: Audio-First/);
   });
 });
 

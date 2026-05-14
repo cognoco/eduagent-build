@@ -51,6 +51,17 @@ module.exports = {
     // ActivityIndicator has the same Platform.OS module-eval capture pattern.
     '(?:^|[\\\\/])Libraries/Components/ActivityIndicator/ActivityIndicator$':
       '<rootDir>/apps/mobile/jest.activity-indicator-mock.js',
+    // Nativewind pnpm haste-map resolution fix — see jest.nativewind-mock.js for rationale.
+    // pnpm stores nativewind under a content-addressed path whose dist build requires 'react'
+    // via a path Jest cannot resolve without native Metro transforms, yielding:
+    //   Cannot find module 'react' from '.../nativewind/dist/index.js'
+    // Mapping the bare specifier to a shim prevents the resolution failure without
+    // affecting any test that manually mocks 'nativewind' via jest.mock().
+    '^nativewind$': '<rootDir>/apps/mobile/jest.nativewind-mock.js',
+    // react-native-fit-image pnpm haste-map resolution fix — see jest.fit-image-mock.js.
+    // react-native-markdown-display depends on react-native-fit-image, which pnpm places
+    // under a hashed path where Jest cannot resolve 'react' without native transforms.
+    '^react-native-fit-image$': '<rootDir>/apps/mobile/jest.fit-image-mock.js',
   },
   transform: {
     '\\.[jt]sx?$': [

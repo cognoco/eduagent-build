@@ -8,6 +8,7 @@ import {
   monthlyReportHeadlineSchema,
   weeklyReportSummarySchema,
   weeklyReportRecordSchema,
+  reportPracticeSummarySchema,
 } from './snapshots';
 import { consentStatusSchema } from './consent';
 
@@ -613,10 +614,34 @@ export type TopicProgressEndpointResponse = z.infer<
   typeof topicProgressEndpointResponseSchema
 >;
 
+const emptyProgressOverviewPracticeSummary = {
+  quizzesCompleted: 0,
+  reviewsCompleted: 0,
+  totals: {
+    activitiesCompleted: 0,
+    reviewsCompleted: 0,
+    pointsEarned: 0,
+    celebrations: 0,
+    distinctActivityTypes: 0,
+  },
+  scores: {
+    scoredActivities: 0,
+    score: 0,
+    total: 0,
+    accuracy: null,
+  },
+  byType: [],
+  bySubject: [],
+};
+
 export const progressOverviewResponseSchema = z.object({
   subjects: z.array(subjectProgressSchema),
   totalTopicsCompleted: z.number().int(),
   totalTopicsVerified: z.number().int(),
+  practiceActivityCount: z.number().int().min(0).default(0),
+  practiceSummary: reportPracticeSummarySchema.default(
+    emptyProgressOverviewPracticeSummary,
+  ),
 });
 export type ProgressOverviewResponse = z.infer<
   typeof progressOverviewResponseSchema
@@ -719,6 +744,16 @@ export const childProgressHistoryResponseSchema = z.object({
 export type ChildProgressHistoryResponse = z.infer<
   typeof childProgressHistoryResponseSchema
 >;
+
+export const progressSummarySchema = z.object({
+  summary: z.string().max(500).nullable(),
+  generatedAt: z.string().datetime().nullable(),
+  basedOnLastSessionAt: z.string().datetime().nullable(),
+  latestSessionId: z.string().uuid().nullable(),
+  activityState: z.enum(['fresh', 'no_recent_activity', 'stale']),
+  nudgeRecommended: z.boolean(),
+});
+export type ProgressSummary = z.infer<typeof progressSummarySchema>;
 
 // GET /dashboard/children/:profileId/subjects/:subjectId
 export const childSubjectTopicsResponseSchema = z.object({

@@ -53,7 +53,7 @@ function mockRetentionCardRow(
     xpStatus: string;
     nextReviewAt: Date | null;
     easeFactor: number;
-  }>
+  }>,
 ) {
   return {
     id: 'card-1',
@@ -133,7 +133,7 @@ function setupScopedRepo({
       findCurrentForToday: jest
         .fn()
         .mockResolvedValue(
-          streakRow ? applyStreakDecay(streakRow, today) : null
+          streakRow ? applyStreakDecay(streakRow, today) : null,
         ),
     },
   });
@@ -242,7 +242,7 @@ describe('precomputeCoachingCard', () => {
     if (card.type === 'insight') {
       expect(card.topicId).toBe(topicId);
       expect(['strength', 'growth_area', 'pattern', 'milestone']).toContain(
-        card.insightType
+        card.insightType,
       );
     }
   });
@@ -520,7 +520,7 @@ describe('precomputeCoachingCard', () => {
       expect.any(Error),
       expect.objectContaining({
         extra: expect.objectContaining({ surface: 'coaching-cards' }),
-      })
+      }),
     );
   });
 });
@@ -576,8 +576,8 @@ describe('writeCoachingCardCache', () => {
     await writeCoachingCardCache(db, profileId, card);
 
     // expiresAt is now passed to update().set() instead of insert().values()
-    const setCall = (db.update as jest.Mock).mock.results[0].value.set;
-    const setValues = setCall.mock.calls[0][0];
+    const setCall = (db.update as jest.Mock).mock.results[0]!.value.set;
+    const setValues = setCall.mock.calls[0]![0];
     const expiresAt = setValues.expiresAt as Date;
     const expected = new Date(NOW.getTime() + 24 * 60 * 60 * 1000);
     expect(expiresAt.getTime()).toBe(expected.getTime());
@@ -621,7 +621,7 @@ describe('readCoachingCardCache', () => {
       updatedAt: NOW,
     };
     (db.query.coachingCardCache.findFirst as jest.Mock).mockResolvedValue(
-      expiredRow
+      expiredRow,
     );
 
     const result = await readCoachingCardCache(db, profileId);
@@ -653,7 +653,7 @@ describe('readCoachingCardCache', () => {
       updatedAt: NOW,
     };
     (db.query.coachingCardCache.findFirst as jest.Mock).mockResolvedValue(
-      validRow
+      validRow,
     );
 
     const result = await readCoachingCardCache(db, profileId);
@@ -694,9 +694,9 @@ describe('getCoachingCardForProfile', () => {
     expect(result.card).toBeNull();
     expect(result.fallback).not.toBeNull();
     expect(result.fallback!.actions).toHaveLength(3);
-    expect(result.fallback!.actions[0].key).toBe('continue_learning');
-    expect(result.fallback!.actions[1].key).toBe('start_new_topic');
-    expect(result.fallback!.actions[2].key).toBe('review_progress');
+    expect(result.fallback!.actions[0]!.key).toBe('continue_learning');
+    expect(result.fallback!.actions[1]!.key).toBe('start_new_topic');
+    expect(result.fallback!.actions[2]!.key).toBe('review_progress');
   });
 
   it('returns cold-start fallback when profile has 0 sessions', async () => {

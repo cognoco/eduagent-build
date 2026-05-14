@@ -15,6 +15,7 @@ import {
   useTopicParkingLot,
   computeFilingRefetchInterval,
 } from './use-sessions';
+import { queryKeys } from '../lib/query-keys';
 
 const mockFetch = jest.fn();
 
@@ -371,6 +372,42 @@ describe('useCloseSession', () => {
     const body = JSON.parse(fetchInit.body as string);
     expect(body.milestonesReached).toEqual(['polar_star', 'comet']);
   });
+
+  it('invalidates progress-derived queries after closing a session', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          message: 'Session closed',
+          sessionId: 'session-1',
+          wallClockSeconds: 600,
+        }),
+        { status: 200 },
+      ),
+    );
+
+    const { result } = renderHook(() => useCloseSession('session-1'), {
+      wrapper: createWrapper(),
+    });
+    const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries');
+
+    await act(async () => {
+      await result.current.mutateAsync({ reason: 'user_ended' });
+    });
+
+    // PR-10: ['sessions'] was a no-op (top segment 'sessions' matches no registered
+    // key; session keys use 'session', 'session-transcript', etc.) — removed.
+    // Verify it is NOT called so the no-op deletion stays clean.
+    expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ['sessions'] });
+
+    // These broad invalidations remain (PR-10 deferred — session-close storm).
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['progress'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['dashboard'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['retention'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ['language-progress'],
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['resume-nudge'] });
+  });
 });
 
 describe('useSyncHomeworkState', () => {
@@ -462,6 +499,46 @@ describe('useSetSessionInputMode', () => {
     const [, fetchInit] = mockFetch.mock.calls[0] as [string, RequestInit];
     const body = JSON.parse(fetchInit.body as string);
     expect(body.inputMode).toBe('voice');
+  });
+
+  // [PR-10] Guard: the old ['sessions'] invalidation was a no-op (top segment
+  // 'sessions' matches no registered key). Verify it was removed and only the
+  // transcript invalidation fires.
+  it('[PR-10] does not call no-op ["sessions"] invalidation on input-mode change', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          session: {
+            id: 'session-1',
+            subjectId: 'subject-1',
+            sessionType: 'learning',
+            status: 'active',
+            escalationRung: 1,
+            exchangeCount: 0,
+            startedAt: '2025-01-01T00:00:00Z',
+            lastActivityAt: '2025-01-01T00:00:00Z',
+            endedAt: null,
+            durationSeconds: null,
+            inputMode: 'text',
+          },
+        }),
+        { status: 200 },
+      ),
+    );
+
+    const { result } = renderHook(() => useSetSessionInputMode('session-1'), {
+      wrapper: createWrapper(),
+    });
+    const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries');
+
+    await act(async () => {
+      await result.current.mutateAsync({ inputMode: 'text' });
+    });
+
+    expect(invalidateSpy).not.toHaveBeenCalledWith({ queryKey: ['sessions'] });
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ['session-transcript', 'session-1'],
+    });
   });
 });
 
@@ -566,6 +643,39 @@ describe('useSubmitSummary', () => {
     expect(result.current.data?.summary.status).toBe('accepted');
   });
 
+  it('invalidates progress after accepting a summary', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          summary: {
+            id: 'summary-1',
+            sessionId: 'session-1',
+            content: 'Gravity pulls objects toward Earth',
+            aiFeedback: 'Clear and accurate summary.',
+            status: 'accepted',
+          },
+        }),
+        { status: 200 },
+      ),
+    );
+
+    const { result } = renderHook(() => useSubmitSummary('session-1'), {
+      wrapper: createWrapper(),
+    });
+    const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries');
+
+    await act(async () => {
+      await result.current.mutateAsync({
+        content: 'Gravity pulls objects toward Earth',
+      });
+    });
+
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ['session-summary', 'session-1'],
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['progress'] });
+  });
+
   it('handles submission error', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response('API error 422', {
@@ -629,6 +739,38 @@ describe('useSkipSummary', () => {
     await waitFor(() => {
       expect(result.current.data?.summary.status).toBe('skipped');
     });
+  });
+
+  it('invalidates progress after skipping a summary', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          summary: {
+            id: 'summary-1',
+            sessionId: 'session-1',
+            content: '',
+            aiFeedback: null,
+            status: 'skipped',
+          },
+          consecutiveSummarySkips: 1,
+        }),
+        { status: 200 },
+      ),
+    );
+
+    const { result } = renderHook(() => useSkipSummary('session-1'), {
+      wrapper: createWrapper(),
+    });
+    const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries');
+
+    await act(async () => {
+      await result.current.mutateAsync();
+    });
+
+    expect(invalidateSpy).toHaveBeenCalledWith({
+      queryKey: ['session-summary', 'session-1'],
+    });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['progress'] });
   });
 });
 
@@ -866,6 +1008,7 @@ describe('useStreamMessage', () => {
       events: (async function* () {
         yield {
           type: 'error',
+          code: 'LLM_UNAVAILABLE',
           message:
             'Something went wrong while generating a reply. Please try again.',
         };
@@ -888,6 +1031,7 @@ describe('useStreamMessage', () => {
 
     expect((caught as Error).name).toBe('UpstreamError');
     expect((caught as Error & { status?: number }).status).toBe(502);
+    expect((caught as Error & { code?: string }).code).toBe('LLM_UNAVAILABLE');
   });
 });
 
@@ -956,5 +1100,37 @@ describe('computeFilingRefetchInterval', () => {
 
   it('returns false for undefined (data not yet loaded)', () => {
     expect(computeFilingRefetchInterval(undefined)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Profile-switch cache isolation
+// ---------------------------------------------------------------------------
+
+describe('profile-switch cache isolation', () => {
+  it('sessions.detail — same session ID, different profiles produce different keys', () => {
+    const keyA = queryKeys.sessions.detail('sess-1', 'profile-A');
+    const keyB = queryKeys.sessions.detail('sess-1', 'profile-B');
+    expect(keyA).not.toEqual(keyB);
+    expect(keyA).toEqual(['session', 'sess-1', 'profile-A']);
+  });
+
+  it('sessions.transcript — same session, different profiles are isolated', () => {
+    const keyA = queryKeys.sessions.transcript('sess-1', 'profile-A');
+    const keyB = queryKeys.sessions.transcript('sess-1', 'profile-B');
+    expect(keyA).not.toEqual(keyB);
+    expect(keyA).toEqual(['session-transcript', 'sess-1', 'profile-A']);
+  });
+
+  it('sessions.summary — same session, different profiles are isolated', () => {
+    const keyA = queryKeys.sessions.summary('sess-1', 'profile-A');
+    const keyB = queryKeys.sessions.summary('sess-1', 'profile-B');
+    expect(keyA).not.toEqual(keyB);
+  });
+
+  it('sessions.parkingLot — same session, undefined profile is isolated from defined', () => {
+    const keyDefined = queryKeys.sessions.parkingLot('sess-1', 'profile-A');
+    const keyUndefined = queryKeys.sessions.parkingLot('sess-1', undefined);
+    expect(keyDefined).not.toEqual(keyUndefined);
   });
 });

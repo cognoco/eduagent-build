@@ -4,7 +4,9 @@ import {
   type LLMProvider,
   type ChatMessage,
   type ModelConfig,
+  type StopReason,
 } from './llm';
+import { makeChatStreamResult } from './llm/types';
 import {
   shouldParkQuestion,
   formatParkedQuestionForContext,
@@ -17,18 +19,18 @@ import {
 
 /** Creates a mock provider that returns a specific classification */
 function createClassifierMock(
-  classification: 'tangential' | 'relevant'
+  classification: 'tangential' | 'relevant',
 ): LLMProvider {
   return {
     id: 'gemini',
-    async chat(
-      _messages: ChatMessage[],
-      _config: ModelConfig
-    ): Promise<string> {
-      return classification;
+    async chat(_messages: ChatMessage[], _config: ModelConfig) {
+      return { content: classification, stopReason: 'stop' as StopReason };
     },
-    async *chatStream(): AsyncIterable<string> {
-      yield classification;
+    chatStream() {
+      const s = (async function* () {
+        yield classification;
+      })();
+      return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
     },
   };
 }
@@ -47,7 +49,7 @@ describe('shouldParkQuestion', () => {
 
     const result = await shouldParkQuestion(
       'How does blockchain work?',
-      'Quadratic Equations'
+      'Quadratic Equations',
     );
 
     expect(result).toBe(true);
@@ -58,7 +60,7 @@ describe('shouldParkQuestion', () => {
 
     const result = await shouldParkQuestion(
       'What about the discriminant?',
-      'Quadratic Equations'
+      'Quadratic Equations',
     );
 
     expect(result).toBe(false);
@@ -67,18 +69,24 @@ describe('shouldParkQuestion', () => {
   it('handles response with extra whitespace', async () => {
     const provider: LLMProvider = {
       id: 'gemini',
-      async chat(): Promise<string> {
-        return '  tangential  \n';
+      async chat() {
+        return {
+          content: '  tangential  \n',
+          stopReason: 'stop' as StopReason,
+        };
       },
-      async *chatStream(): AsyncIterable<string> {
-        yield 'tangential';
+      chatStream() {
+        const s = (async function* () {
+          yield 'tangential';
+        })();
+        return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
       },
     };
     registerProvider(provider);
 
     const result = await shouldParkQuestion(
       'What about CSS animations?',
-      'JavaScript Variables'
+      'JavaScript Variables',
     );
 
     expect(result).toBe(true);
@@ -87,18 +95,24 @@ describe('shouldParkQuestion', () => {
   it('handles response with surrounding text', async () => {
     const provider: LLMProvider = {
       id: 'gemini',
-      async chat(): Promise<string> {
-        return 'The question is tangential to the topic.';
+      async chat() {
+        return {
+          content: 'The question is tangential to the topic.',
+          stopReason: 'stop' as StopReason,
+        };
       },
-      async *chatStream(): AsyncIterable<string> {
-        yield 'tangential';
+      chatStream() {
+        const s = (async function* () {
+          yield 'tangential';
+        })();
+        return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
       },
     };
     registerProvider(provider);
 
     const result = await shouldParkQuestion(
       'How do databases work?',
-      'CSS Flexbox'
+      'CSS Flexbox',
     );
 
     expect(result).toBe(true);
@@ -154,7 +168,7 @@ describe('formatParkedQuestionForContext', () => {
     // Should include first 10
     expect(result).toContain(`1. Question 1`);
     expect(result).toContain(
-      `${MAX_PARKING_LOT_PER_TOPIC}. Question ${MAX_PARKING_LOT_PER_TOPIC}`
+      `${MAX_PARKING_LOT_PER_TOPIC}. Question ${MAX_PARKING_LOT_PER_TOPIC}`,
     );
 
     // Should NOT include question 11+
@@ -169,7 +183,7 @@ describe('formatParkedQuestionForContext', () => {
       { length: MAX_PARKING_LOT_PER_TOPIC },
       (_, i) => ({
         question: `Question ${i + 1}`,
-      })
+      }),
     );
 
     const result = formatParkedQuestionForContext(questions);

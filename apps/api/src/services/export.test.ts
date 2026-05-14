@@ -208,9 +208,9 @@ describe('generateExport', () => {
     const result = await generateExport(db, 'account-1');
 
     expect(result.profiles).toHaveLength(1);
-    expect(result.profiles[0].displayName).toBe('Alice');
-    expect(result.profiles[0].birthYear).toBe(1990);
-    expect(result.profiles[0].createdAt).toBe('2025-01-15T10:00:00.000Z');
+    expect(result.profiles[0]!.displayName).toBe('Alice');
+    expect(result.profiles[0]!.birthYear).toBe(1990);
+    expect(result.profiles[0]!.createdAt).toBe('2025-01-15T10:00:00.000Z');
   });
 
   it('includes consent states with mapped dates', async () => {
@@ -220,10 +220,10 @@ describe('generateExport', () => {
     const result = await generateExport(db, 'account-1');
 
     expect(result.consentStates).toHaveLength(1);
-    expect(result.consentStates[0].consentType).toBe('GDPR');
-    expect(result.consentStates[0].status).toBe('CONSENTED');
-    expect(result.consentStates[0].requestedAt).toBe(
-      '2025-01-15T10:00:00.000Z'
+    expect(result.consentStates[0]!.consentType).toBe('GDPR');
+    expect(result.consentStates[0]!.status).toBe('CONSENTED');
+    expect(result.consentStates[0]!.requestedAt).toBe(
+      '2025-01-15T10:00:00.000Z',
     );
   });
 
@@ -313,18 +313,22 @@ describe('generateExport', () => {
 
     const result = await generateExport(db, 'account-1');
 
-    const aiRow = result.sessionEvents.find(
-      (e) => (e as Record<string, unknown>)['eventType'] === 'ai_response'
-    ) as Record<string, unknown> | undefined;
-    expect(aiRow).toEqual(expect.objectContaining({}));
+    expect(result.sessionEvents).toBeDefined();
+    const events = result.sessionEvents as Record<string, unknown>[];
+
+    const aiRow = events.find(
+      (e: Record<string, unknown>) => e['eventType'] === 'ai_response',
+    );
+    expect(aiRow).toBeDefined();
     expect(aiRow!['content']).toBe('Great job today!');
     expect(aiRow!['content']).not.toContain('"signals"');
     expect(aiRow!['content']).not.toContain('"ui_hints"');
 
     // user_message rows must be left untouched
-    const userRow = result.sessionEvents.find(
-      (e) => (e as Record<string, unknown>)['eventType'] === 'user_message'
-    ) as Record<string, unknown> | undefined;
+    const userRow = events.find(
+      (e: Record<string, unknown>) => e['eventType'] === 'user_message',
+    );
+    expect(userRow).toBeDefined();
     expect(userRow!['content']).toBe('What is gravity?');
   });
 

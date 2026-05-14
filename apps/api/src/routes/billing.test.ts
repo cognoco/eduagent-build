@@ -107,8 +107,7 @@ jest.mock('../services/billing', () => ({
     mockGetUsageBreakdownForProfile(...args),
   getUsageEventsAvailableSince: (...args: unknown[]) =>
     mockGetUsageEventsAvailableSince(...args),
-  buildUsageDateLabels: (...args: unknown[]) =>
-    mockBuildUsageDateLabels(...args),
+  buildUsageDateLabels: (input: unknown) => mockBuildUsageDateLabels(input),
 }));
 
 // ---------------------------------------------------------------------------
@@ -240,7 +239,7 @@ describe('billing routes', () => {
       const res = await app.request(
         '/v1/subscription',
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -264,7 +263,7 @@ describe('billing routes', () => {
       const res = await app.request(
         '/v1/subscription',
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -283,14 +282,14 @@ describe('billing routes', () => {
         mockSubscription({
           cancelledAt: '2025-01-20T00:00:00.000Z',
           status: 'active',
-        })
+        }),
       );
       mockGetQuotaPool.mockResolvedValue(mockQuotaPool());
 
       const res = await app.request(
         '/v1/subscription',
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -298,7 +297,7 @@ describe('billing routes', () => {
       const body = await res.json();
       expect(body.subscription.cancelAtPeriodEnd).toBe(true);
       expect(body.subscription.currentPeriodEnd).toBe(
-        '2025-02-15T00:00:00.000Z'
+        '2025-02-15T00:00:00.000Z',
       );
     });
 
@@ -315,7 +314,7 @@ describe('billing routes', () => {
   describe('POST /v1/subscription/checkout', () => {
     it('creates Stripe checkout session and returns URL', async () => {
       mockGetSubscriptionByAccountId.mockResolvedValue(
-        mockSubscription({ stripeCustomerId: 'cus_existing' })
+        mockSubscription({ stripeCustomerId: 'cus_existing' }),
       );
       mockCheckoutCreate.mockResolvedValue({
         url: 'https://checkout.stripe.com/session_123',
@@ -329,7 +328,7 @@ describe('billing routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ tier: 'plus', interval: 'monthly' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -341,7 +340,7 @@ describe('billing routes', () => {
 
     it('creates a new Stripe customer if none exists', async () => {
       mockGetSubscriptionByAccountId.mockResolvedValue(
-        mockSubscription({ stripeCustomerId: null })
+        mockSubscription({ stripeCustomerId: null }),
       );
       mockCustomersCreate.mockResolvedValue({ id: 'cus_new' });
       mockCheckoutCreate.mockResolvedValue({
@@ -356,17 +355,17 @@ describe('billing routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ tier: 'plus', interval: 'yearly' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
       expect(mockCustomersCreate).toHaveBeenCalledWith(
-        expect.objectContaining({ email: 'test@example.com' })
+        expect.objectContaining({ email: 'test@example.com' }),
       );
       expect(mockLinkStripeCustomer).toHaveBeenCalledWith(
         expect.anything(),
         'test-account-id',
-        'cus_new'
+        'cus_new',
       );
     });
 
@@ -378,7 +377,7 @@ describe('billing routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ tier: 'invalid', interval: 'monthly' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -392,7 +391,7 @@ describe('billing routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ tier: 'plus', interval: 'weekly' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -406,7 +405,7 @@ describe('billing routes', () => {
           body: JSON.stringify({ tier: 'plus', interval: 'monthly' }),
           headers: { 'Content-Type': 'application/json' },
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);
@@ -434,7 +433,7 @@ describe('billing routes', () => {
           method: 'POST',
           headers: AUTH_HEADERS,
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -447,7 +446,7 @@ describe('billing routes', () => {
       });
       expect(mockMarkSubscriptionCancelled).toHaveBeenCalledWith(
         expect.anything(),
-        'sub-1'
+        'sub-1',
       );
     });
 
@@ -460,7 +459,7 @@ describe('billing routes', () => {
           method: 'POST',
           headers: AUTH_HEADERS,
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(404);
@@ -468,7 +467,7 @@ describe('billing routes', () => {
 
     it('returns 404 when subscription has no Stripe ID', async () => {
       mockGetSubscriptionByAccountId.mockResolvedValue(
-        mockSubscription({ stripeSubscriptionId: null })
+        mockSubscription({ stripeSubscriptionId: null }),
       );
 
       const res = await app.request(
@@ -477,7 +476,7 @@ describe('billing routes', () => {
           method: 'POST',
           headers: AUTH_HEADERS,
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(404);
@@ -487,7 +486,7 @@ describe('billing routes', () => {
       const res = await app.request(
         '/v1/subscription/cancel',
         { method: 'POST' },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);
@@ -513,7 +512,7 @@ describe('billing routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ amount: 500 }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -532,7 +531,7 @@ describe('billing routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ amount: 999 }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -546,7 +545,7 @@ describe('billing routes', () => {
           body: JSON.stringify({ amount: 500 }),
           headers: { 'Content-Type': 'application/json' },
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);
@@ -564,7 +563,7 @@ describe('billing routes', () => {
       const res = await app.request(
         '/v1/usage',
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -588,7 +587,7 @@ describe('billing routes', () => {
       const res = await app.request(
         '/v1/usage',
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -629,7 +628,7 @@ describe('billing routes', () => {
       const res = await app.request(
         '/v1/usage',
         { headers: { ...AUTH_HEADERS, 'X-Profile-Id': childProfileId } },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -646,7 +645,7 @@ describe('billing routes', () => {
       // aggregate — preventing children from inferring siblings' activity.
       expect(body.usage.usedToday).toBe(3);
       expect(mockBuildUsageDateLabels).toHaveBeenCalledWith(
-        expect.objectContaining({ locale: 'nb' })
+        expect.objectContaining({ locale: 'nb' }),
       );
     });
 
@@ -673,20 +672,20 @@ describe('billing routes', () => {
           method: 'POST',
           headers: AUTH_HEADERS,
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
 
       const body = await res.json();
       expect(body.portalUrl).toBe(
-        'https://billing.stripe.com/portal_session_123'
+        'https://billing.stripe.com/portal_session_123',
       );
     });
 
     it('returns 404 when no Stripe customer exists', async () => {
       mockGetSubscriptionByAccountId.mockResolvedValue(
-        mockSubscription({ stripeCustomerId: null })
+        mockSubscription({ stripeCustomerId: null }),
       );
 
       const res = await app.request(
@@ -695,7 +694,7 @@ describe('billing routes', () => {
           method: 'POST',
           headers: AUTH_HEADERS,
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(404);
@@ -705,7 +704,7 @@ describe('billing routes', () => {
       const res = await app.request(
         '/v1/subscription/portal',
         { method: 'POST' },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);
@@ -723,7 +722,7 @@ describe('billing routes', () => {
       const res = await app.request(
         '/v1/subscription/status',
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -744,7 +743,7 @@ describe('billing routes', () => {
       const res = await app.request(
         '/v1/subscription/status',
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -775,7 +774,7 @@ describe('billing routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({}),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(201);
@@ -794,7 +793,7 @@ describe('billing routes', () => {
           body: JSON.stringify({}),
           headers: { 'Content-Type': 'application/json' },
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);
@@ -808,7 +807,7 @@ describe('billing routes', () => {
   describe('GET /v1/subscription/family', () => {
     it('returns family pool status and members', async () => {
       mockGetSubscriptionByAccountId.mockResolvedValue(
-        mockSubscription({ tier: 'family' })
+        mockSubscription({ tier: 'family' }),
       );
       mockGetFamilyPoolStatus.mockResolvedValue({
         tier: 'family',
@@ -839,7 +838,7 @@ describe('billing routes', () => {
       const res = await app.request(
         '/v1/subscription/family',
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -859,7 +858,7 @@ describe('billing routes', () => {
       const res = await app.request(
         '/v1/subscription/family',
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(404);
@@ -872,7 +871,7 @@ describe('billing routes', () => {
       const res = await app.request(
         '/v1/subscription/family',
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(404);
@@ -892,7 +891,7 @@ describe('billing routes', () => {
   describe('POST /v1/subscription/family/add', () => {
     it('adds a profile to the family subscription', async () => {
       mockGetSubscriptionByAccountId.mockResolvedValue(
-        mockSubscription({ tier: 'family' })
+        mockSubscription({ tier: 'family' }),
       );
       mockAddProfileToSubscription.mockResolvedValue({ profileCount: 3 });
 
@@ -905,7 +904,7 @@ describe('billing routes', () => {
             profileId: '550e8400-e29b-41d4-a716-446655440000',
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -928,7 +927,7 @@ describe('billing routes', () => {
             profileId: '550e8400-e29b-41d4-a716-446655440000',
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(403);
@@ -946,7 +945,7 @@ describe('billing routes', () => {
             profileId: '550e8400-e29b-41d4-a716-446655440000',
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(404);
@@ -960,7 +959,7 @@ describe('billing routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ profileId: 'not-a-uuid' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -976,7 +975,7 @@ describe('billing routes', () => {
           }),
           headers: { 'Content-Type': 'application/json' },
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);
@@ -1008,7 +1007,7 @@ describe('billing routes', () => {
     it('removes a same-account non-owner profile from the family subscription', async () => {
       mockOwnerProfile();
       mockGetSubscriptionByAccountId.mockResolvedValue(
-        mockSubscription({ tier: 'family' })
+        mockSubscription({ tier: 'family' }),
       );
       mockRemoveProfileFromSubscription.mockResolvedValue({
         removedProfileId: '550e8400-e29b-41d4-a716-446655440000',
@@ -1023,14 +1022,14 @@ describe('billing routes', () => {
             profileId: '550e8400-e29b-41d4-a716-446655440000',
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
       expect(mockRemoveProfileFromSubscription).toHaveBeenCalledWith(
         expect.anything(),
         'sub-1',
-        '550e8400-e29b-41d4-a716-446655440000'
+        '550e8400-e29b-41d4-a716-446655440000',
       );
       const body = await res.json();
       expect(body).toEqual({
@@ -1067,7 +1066,7 @@ describe('billing routes', () => {
             profileId: '550e8400-e29b-41d4-a716-446655440000',
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(403);
@@ -1077,7 +1076,7 @@ describe('billing routes', () => {
     it('returns 403 when profile cannot be removed', async () => {
       mockOwnerProfile();
       mockGetSubscriptionByAccountId.mockResolvedValue(
-        mockSubscription({ tier: 'family' })
+        mockSubscription({ tier: 'family' }),
       );
       mockRemoveProfileFromSubscription.mockResolvedValue(null);
 
@@ -1090,7 +1089,7 @@ describe('billing routes', () => {
             profileId: '550e8400-e29b-41d4-a716-446655440000',
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(403);
@@ -1109,7 +1108,7 @@ describe('billing routes', () => {
             profileId: '550e8400-e29b-41d4-a716-446655440000',
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(404);
@@ -1125,7 +1124,7 @@ describe('billing routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ profileId: 'not-a-uuid' }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -1141,7 +1140,7 @@ describe('billing routes', () => {
           }),
           headers: { 'Content-Type': 'application/json' },
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);

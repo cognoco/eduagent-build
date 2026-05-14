@@ -1,6 +1,11 @@
 import { getSubjectTint, SUBJECT_TINT_PALETTE } from './subject-tints';
 
 describe('getSubjectTint', () => {
+  it('keeps the subject palette limited to five colors per scheme', () => {
+    expect(SUBJECT_TINT_PALETTE.light).toHaveLength(5);
+    expect(SUBJECT_TINT_PALETTE.dark).toHaveLength(5);
+  });
+
   it('returns a tint object for a valid UUID', () => {
     const tint = getSubjectTint('a1b2c3d4-e5f6-7890-abcd-ef1234567890', 'dark');
     expect(tint).toHaveProperty('solid');

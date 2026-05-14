@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { pressableClick } from '../../helpers/pressable';
 import { seedAndSignIn } from '../../helpers/seed-and-sign-in';
 import { pressableClick } from '../../helpers/pressable';
 

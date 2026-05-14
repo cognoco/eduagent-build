@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import * as Notifications from 'expo-notifications';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { useProfile } from '../lib/profile';
 
@@ -42,7 +42,7 @@ export function useNotificationResponseHandler(): void {
               queryKey: ['nudges', 'unread', profileId],
             });
           }
-          router.push('/(app)/home' as never);
+          router.push('/(app)/home' as Href);
         }
       },
     );

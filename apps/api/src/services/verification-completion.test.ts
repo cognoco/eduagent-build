@@ -141,11 +141,11 @@ describe('processEvaluateCompletion', () => {
 
     // Should update retention card (rung advances from 2 to 3)
     expect(db.update).toHaveBeenCalled();
-    const setFn = (db.update as jest.Mock).mock.results[0].value.set;
+    const setFn = (db.update as jest.Mock).mock.results[0]!.value.set;
     expect(setFn).toHaveBeenCalledWith(
       expect.objectContaining({
         evaluateDifficultyRung: 3, // advanced from 2
-      })
+      }),
     );
   });
 
@@ -186,11 +186,11 @@ describe('processEvaluateCompletion', () => {
 
     await processEvaluateCompletion(db, profileId, sessionId, topicId);
 
-    const setFn = (db.update as jest.Mock).mock.results[0].value.set;
+    const setFn = (db.update as jest.Mock).mock.results[0]!.value.set;
     expect(setFn).toHaveBeenCalledWith(
       expect.objectContaining({
         evaluateDifficultyRung: 1, // lowered
-      })
+      }),
     );
   });
 
@@ -345,11 +345,11 @@ describe('processEvaluateCompletion', () => {
 
     await processEvaluateCompletion(db, profileId, sessionId, topicId);
 
-    const setFn = (db.update as jest.Mock).mock.results[0].value.set;
+    const setFn = (db.update as jest.Mock).mock.results[0]!.value.set;
     expect(setFn).toHaveBeenCalledWith(
       expect.objectContaining({
         evaluateDifficultyRung: 1,
-      })
+      }),
     );
   });
 
@@ -384,11 +384,11 @@ describe('processEvaluateCompletion', () => {
     await processEvaluateCompletion(db, profileId, sessionId, topicId);
 
     // Default rung 1, on success advances to 2
-    const setFn = (db.update as jest.Mock).mock.results[0].value.set;
+    const setFn = (db.update as jest.Mock).mock.results[0]!.value.set;
     expect(setFn).toHaveBeenCalledWith(
       expect.objectContaining({
         evaluateDifficultyRung: 2,
-      })
+      }),
     );
   });
 
@@ -477,7 +477,7 @@ describe('processEvaluateCompletion', () => {
     expect(eventUpdateSetSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         structuredAssessment: expect.objectContaining({ type: 'evaluate' }),
-      })
+      }),
     );
 
     // The where clause for the event update must reference 'event-assessment', not 'event-latest'.
@@ -488,7 +488,7 @@ describe('processEvaluateCompletion', () => {
     // We collect all non-circular leaf string/number values from queryChunks recursively.
     function extractParamValues(
       node: unknown,
-      visited = new WeakSet<object>()
+      visited = new WeakSet<object>(),
     ): string[] {
       if (node === null || node === undefined) return [];
       if (typeof node !== 'object') return [String(node)];
@@ -554,11 +554,11 @@ describe('processEvaluateCompletion', () => {
 
     await processEvaluateCompletion(db, profileId, sessionId, topicId);
 
-    const setFn = (db.update as jest.Mock).mock.results[0].value.set;
+    const setFn = (db.update as jest.Mock).mock.results[0]!.value.set;
     expect(setFn).toHaveBeenCalledWith(
       expect.objectContaining({
         evaluateDifficultyRung: 4, // stays at 4, doesn't go to 5
-      })
+      }),
     );
   });
 });
@@ -615,7 +615,7 @@ describe('processTeachBackCompletion', () => {
 
     // Should update the event with structured assessment
     expect(db.update).toHaveBeenCalled();
-    const setFn = (db.update as jest.Mock).mock.results[0].value.set;
+    const setFn = (db.update as jest.Mock).mock.results[0]!.value.set;
     expect(setFn).toHaveBeenCalledWith(
       expect.objectContaining({
         structuredAssessment: expect.objectContaining({
@@ -625,7 +625,7 @@ describe('processTeachBackCompletion', () => {
           clarity: 5,
           sm2Quality: 4,
         }),
-      })
+      }),
     );
   });
 
@@ -685,12 +685,12 @@ describe('processTeachBackCompletion', () => {
     expect(eventUpdateSetSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         structuredAssessment: expect.objectContaining({ type: 'teach_back' }),
-      })
+      }),
     );
 
     function extractParamValues(
       node: unknown,
-      visited = new WeakSet<object>()
+      visited = new WeakSet<object>(),
     ): string[] {
       if (node === null || node === undefined) return [];
       if (typeof node !== 'object') return [String(node)];

@@ -6,7 +6,7 @@ import {
   View,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -176,7 +176,7 @@ export default function VocabularyListScreen() {
           }}
           secondaryAction={{
             label: t('vocabulary.noSubject.backToProgress'),
-            onPress: () => router.replace('/(app)/progress' as never),
+            onPress: () => router.replace('/(app)/progress' as Href),
             testID: 'vocabulary-empty-back',
           }}
           testID="vocabulary-no-subject"

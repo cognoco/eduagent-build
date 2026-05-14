@@ -87,7 +87,7 @@ Do not build a generic "tap to retry notifications" banner until the hook expose
 |---|---|---|---|
 | Permission denied | User denied notifications in OS dialog | Settings-oriented notification status | Open settings and grant permission |
 | Expo token service outage | Expo token request fails repeatedly | Temporary setup issue with retry affordance | Retry now or wait for backoff |
-| EduAgent API unavailable | Token is fetched but API registration fails | Temporary setup issue with retry affordance | Retry; server-side metric flags registration failures |
+| MentoMate API unavailable | Token is fetched but API registration fails | Temporary setup issue with retry affordance | Retry; server-side metric flags registration failures |
 | Unsupported local/dev runtime | Emulator or missing project ID cannot register push | No production-facing warning | None; suppress as unsupported |
 | Registration succeeds after retry | Backoff or manual retry succeeds | Notification status clears | No further action |
 

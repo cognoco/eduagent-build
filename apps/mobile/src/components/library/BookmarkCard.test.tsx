@@ -1,71 +1,61 @@
 import { fireEvent, render } from '@testing-library/react-native';
 import { BookmarkCard } from './BookmarkCard';
 
-jest.mock('../../lib/theme', () => ({
-  useThemeColors: () => ({
-    primary: '#00b4d8',
-    textPrimary: '#111',
-    textSecondary: '#999',
+jest.mock('@expo/vector-icons', () => ({
+  Ionicons: () => null,
+}));
+
+jest.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string, opts?: Record<string, unknown>) => {
+      if (key === 'library.bookmarkCard.accessibilityLabel') {
+        return `Saved from chat. ${opts?.sourceLine}.`;
+      }
+      return key;
+    },
   }),
 }));
 
 describe('BookmarkCard', () => {
-  const baseProps = {
-    bookmarkId: 'bm-1',
-    content: 'The Calvin cycle uses CO₂ to build glucose.',
-    createdAt: '2026-05-01T10:00:00Z',
-    subjectName: 'Biology',
-    topicTitle: 'Photosynthesis',
-  };
-
-  it('renders the content excerpt', () => {
-    const { getByTestId } = render(<BookmarkCard {...baseProps} />);
-    expect(getByTestId('bookmark-card-bm-1-content').props.children).toBe(
-      baseProps.content,
+  it('renders saved message content and source line', () => {
+    const { getByText } = render(
+      <BookmarkCard
+        bookmarkId="bookmark-1"
+        content="Savannas are grasslands with scattered trees."
+        sourceLine="From chat · May 13"
+      />,
     );
+
+    getByText('Savannas are grasslands with scattered trees.');
+    getByText('From chat · May 13');
   });
 
-  it('formats the source line with topic title when available', () => {
-    const { getByTestId } = render(<BookmarkCard {...baseProps} />);
-    const sourceText: string = getByTestId('bookmark-card-bm-1-source').props
-      .children;
-    expect(sourceText).toContain('Saved from chat');
-    expect(sourceText).toContain('Photosynthesis');
-  });
-
-  it('falls back to subject name when topic title is missing', () => {
-    const { getByTestId } = render(
-      <BookmarkCard {...baseProps} topicTitle={null} />,
-    );
-    const sourceText: string = getByTestId('bookmark-card-bm-1-source').props
-      .children;
-    expect(sourceText).toContain('Biology');
-  });
-
-  it('omits context when both topic and subject are missing', () => {
-    const { getByTestId } = render(
-      <BookmarkCard {...baseProps} topicTitle={null} subjectName={null} />,
-    );
-    const sourceText: string = getByTestId('bookmark-card-bm-1-source').props
-      .children;
-    expect(sourceText).toMatch(/^Saved from chat · \w+ \d+$/);
-  });
-
-  it('calls onPress when pressed', () => {
+  it('calls onPress when tapped', () => {
     const onPress = jest.fn();
     const { getByTestId } = render(
-      <BookmarkCard {...baseProps} onPress={onPress} />,
+      <BookmarkCard
+        bookmarkId="bookmark-1"
+        content="Saved explanation"
+        sourceLine="From chat · Today"
+        onPress={onPress}
+      />,
     );
-    fireEvent.press(getByTestId('bookmark-card-bm-1'));
+
+    fireEvent.press(getByTestId('bookmark-card-bookmark-1'));
     expect(onPress).toHaveBeenCalledTimes(1);
   });
 
-  it('uses a custom testID when provided', () => {
+  it('uses localized accessibility copy for the source line', () => {
     const { getByTestId } = render(
-      <BookmarkCard {...baseProps} testID="custom-id" />,
+      <BookmarkCard
+        bookmarkId="bookmark-1"
+        content="Saved explanation"
+        sourceLine="From chat · Today"
+      />,
     );
-    getByTestId('custom-id');
-    getByTestId('custom-id-content');
-    getByTestId('custom-id-source');
+
+    expect(
+      getByTestId('bookmark-card-bookmark-1').props.accessibilityLabel,
+    ).toBe('Saved from chat. From chat · Today.');
   });
 });

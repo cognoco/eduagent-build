@@ -12,6 +12,7 @@
 // ---------------------------------------------------------------------------
 
 import { buildCuratedMemoryView } from '../curated-memory';
+import type { MemoryCategory } from '@eduagent/schemas';
 import {
   type MemoryProjection,
   PROJECTION_OPT_OUT,
@@ -303,9 +304,9 @@ describe('drift guard — every MemoryProjection field is wired or opted out', (
 
     for (const key of allProjectionKeys) {
       if (PROJECTION_OPT_OUT.has(key)) continue; // explicitly opted out
-      if (selfViewKeys.has(key)) continue; // present in self-view
+      if (selfViewKeys.has(String(key))) continue; // present in self-view
       // Not in self-view and not opted out → drift
-      unwired.push(key);
+      unwired.push(String(key));
     }
 
     expect(unwired).toEqual([]);
@@ -365,7 +366,7 @@ describe('drift guard — every MemoryProjection field is wired or opted out', (
 
     const view = toCuratedView(projection);
     const categories = view.categories;
-    const labels = categories.map((c) => c.label);
+    const labels = categories.map((c: MemoryCategory) => c.label);
 
     expect(labels).toContain('Interests');
     expect(labels).toContain('Strengths');

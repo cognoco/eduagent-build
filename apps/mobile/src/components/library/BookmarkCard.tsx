@@ -1,15 +1,11 @@
 import { Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useThemeColors } from '../../lib/theme';
-import { withOpacity } from '../../lib/color-opacity';
-import { formatBookmarkSourceLine } from '../../lib/format-bookmark-source';
+import { useTranslation } from 'react-i18next';
 
 interface BookmarkCardProps {
   bookmarkId: string;
   content: string;
-  createdAt: string;
-  subjectName?: string | null;
-  topicTitle?: string | null;
+  sourceLine: string;
   onPress?: () => void;
   testID?: string;
 }
@@ -17,21 +13,12 @@ interface BookmarkCardProps {
 export function BookmarkCard({
   bookmarkId,
   content,
-  createdAt,
-  subjectName,
-  topicTitle,
+  sourceLine,
   onPress,
   testID,
 }: BookmarkCardProps): React.ReactElement {
-  const themeColors = useThemeColors();
+  const { t } = useTranslation();
   const cardTestID = testID ?? `bookmark-card-${bookmarkId}`;
-  const tint = withOpacity(themeColors.primary, 0.08);
-  const tintBorder = withOpacity(themeColors.primary, 0.35);
-  const sourceLine = formatBookmarkSourceLine({
-    createdAt,
-    subjectName,
-    topicTitle,
-  });
 
   return (
     <Pressable
@@ -39,52 +26,24 @@ export function BookmarkCard({
       disabled={!onPress}
       testID={cardTestID}
       accessibilityRole={onPress ? 'button' : undefined}
-      accessibilityLabel={`Bookmark. ${sourceLine}.`}
-      style={{
-        marginHorizontal: 20,
-        marginBottom: 8,
-        borderRadius: 12,
-        paddingHorizontal: 16,
-        paddingVertical: 12,
-        backgroundColor: tint,
-        borderWidth: 1,
-        borderColor: tintBorder,
-      }}
+      accessibilityLabel={t('library.bookmarkCard.accessibilityLabel', {
+        sourceLine,
+      })}
+      className="mx-5 mb-2 rounded-card bg-surface px-4 py-3 border border-surface-elevated"
     >
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          marginBottom: 4,
-        }}
-      >
-        <Ionicons
-          name="bookmark"
-          size={14}
-          color={themeColors.primary}
-          accessibilityElementsHidden
-          importantForAccessibility="no-hide-descendants"
-        />
-        <Text
-          style={{
-            fontSize: 12,
-            color: themeColors.primary,
-            marginStart: 6,
-            flex: 1,
-          }}
-          numberOfLines={1}
-          testID={`${cardTestID}-source`}
-        >
-          {sourceLine}
-        </Text>
+      <View className="flex-row items-start">
+        <View className="w-8 h-8 rounded-full bg-primary/10 items-center justify-center me-3 mt-0.5">
+          <Ionicons name="bookmark" size={16} className="text-primary" />
+        </View>
+        <View className="flex-1 min-w-0">
+          <Text className="text-body-sm text-text-primary" numberOfLines={3}>
+            {content}
+          </Text>
+          <Text className="text-caption text-text-tertiary mt-1">
+            {sourceLine}
+          </Text>
+        </View>
       </View>
-      <Text
-        style={{ fontSize: 14, color: themeColors.textPrimary }}
-        numberOfLines={3}
-        testID={`${cardTestID}-content`}
-      >
-        {content}
-      </Text>
     </Pressable>
   );
 }

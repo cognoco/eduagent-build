@@ -14,18 +14,6 @@ jest.mock(
 );
 
 jest.mock(
-  '../../lib/theme' /* gc1-allow: theme hook reads native ColorScheme — not available in JSDOM */,
-  () => ({
-    useThemeColors: () => ({
-      textPrimary: '#ffffff',
-      textSecondary: '#94a3b8',
-      primary: '#00b4d8',
-    }),
-    useTheme: () => ({ colorScheme: 'light' }),
-  }),
-);
-
-jest.mock(
   'react-native-safe-area-context' /* gc1-allow: native module that requires device/simulator to resolve insets */,
   () => ({
     useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
@@ -82,10 +70,22 @@ jest.mock(
   }),
 );
 
+type BannerProps = {
+  childrenInGracePeriod: Array<{
+    profileId: string;
+    displayName: string;
+    respondedAt: string;
+  }>;
+};
+let capturedBannerProps: BannerProps | null = null;
+
 jest.mock(
   '../family/WithdrawalCountdownBanner' /* gc1-allow: depends on its own hook tree — isolated here to keep test focused */,
   () => ({
-    WithdrawalCountdownBanner: () => null,
+    WithdrawalCountdownBanner: (props: BannerProps) => {
+      capturedBannerProps = props;
+      return null;
+    },
   }),
 );
 
@@ -149,11 +149,18 @@ const CHILD_B = makeProfile({
   isOwner: false,
 });
 
+async function waitForParentTransitionNotice(): Promise<void> {
+  await waitFor(() => {
+    screen.getByTestId('parent-transition-notice');
+  });
+}
+
 describe('ParentHomeScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockLinkedChildren = [];
     mockDashboardData = undefined;
+    capturedBannerProps = null;
   });
 
   it('renders greeting with profile first name', () => {
@@ -166,18 +173,58 @@ describe('ParentHomeScreen', () => {
     screen.getByText('Hey Alex');
   });
 
-  it('renders one command card per linked child with actions inside it', () => {
+  it('renders one command card per linked child with actions inside it', async () => {
     mockLinkedChildren = [CHILD_A, CHILD_B];
 
     render(<ParentHomeScreen activeProfile={makeProfile()} />);
+    await waitForParentTransitionNotice();
 
     screen.getByTestId('parent-home-check-child-child-a');
     screen.getByTestId('parent-home-check-child-child-b');
+    screen.getByTestId('parent-home-child-progress-child-a');
     screen.getByTestId('parent-home-weekly-report-child-a');
     screen.getByTestId('parent-home-weekly-report-child-b');
     screen.getByTestId('parent-home-send-nudge-child-a');
     screen.getByTestId('parent-home-send-nudge-child-b');
     screen.getByText('Children');
+  });
+
+  it('routes the child card header to the child profile detail screen', async () => {
+    mockLinkedChildren = [CHILD_A];
+
+    render(<ParentHomeScreen activeProfile={makeProfile()} />);
+    await waitForParentTransitionNotice();
+
+    fireEvent.press(screen.getByTestId('parent-home-check-child-child-a'));
+    expect(mockPush).toHaveBeenLastCalledWith({
+      pathname: '/(app)/child/[profileId]',
+      params: { profileId: 'child-a' },
+    });
+  });
+
+  it('routes the progress action to child progress', async () => {
+    mockLinkedChildren = [CHILD_A];
+
+    render(<ParentHomeScreen activeProfile={makeProfile()} />);
+    await waitForParentTransitionNotice();
+
+    fireEvent.press(screen.getByTestId('parent-home-child-progress-child-a'));
+    expect(mockPush).toHaveBeenLastCalledWith({
+      pathname: '/(app)/progress',
+      params: { profileId: 'child-a' },
+    });
+  });
+
+  it('routes the reports action to the child reports list', async () => {
+    mockLinkedChildren = [CHILD_A];
+
+    render(<ParentHomeScreen activeProfile={makeProfile()} />);
+    await waitForParentTransitionNotice();
+
+    fireEvent.press(screen.getByTestId('parent-home-weekly-report-child-a'));
+
+    expect(mockPush).toHaveBeenCalledTimes(1);
+    expect(mockPush).toHaveBeenLastCalledWith('/(app)/child/child-a/reports');
   });
 
   it('keeps own learning out of parent Home because it has its own tab', () => {
@@ -191,6 +238,7 @@ describe('ParentHomeScreen', () => {
     render(<ParentHomeScreen activeProfile={makeProfile()} />);
 
     screen.getByTestId('add-first-child-screen');
+    expect(screen.queryByTestId('parent-transition-notice')).toBeNull();
     screen.getByText('Your family dashboard starts here');
     screen.getByText(
       'Add your first child profile and this screen will turn into tonight prompts, weekly recaps, nudges, and progress cards.',
@@ -198,10 +246,13 @@ describe('ParentHomeScreen', () => {
 
     fireEvent.press(screen.getByTestId('add-first-child-cta'));
 
-    expect(mockPush).toHaveBeenCalledWith('/create-profile?for=child');
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/create-profile',
+      params: { for: 'child' },
+    });
   });
 
-  it('shows tonight prompts and compact status from dashboard data', () => {
+  it('shows tonight prompts and compact status from dashboard data', async () => {
     mockLinkedChildren = [CHILD_A];
     mockDashboardData = {
       children: [
@@ -237,13 +288,20 @@ describe('ParentHomeScreen', () => {
     };
 
     render(<ParentHomeScreen activeProfile={makeProfile()} />);
+    await waitForParentTransitionNotice();
 
     screen.getByTestId('parent-home-tonight-section');
     screen.getByText('Ask Emma: what made Fractions click today?');
-    screen.getByText('18 min this week · Fractions · confidence improving');
+    screen.getByText('Fractions · 18 min this week');
+
+    fireEvent.press(screen.getByTestId('parent-home-tonight-child-a-primary'));
+    expect(mockPush).toHaveBeenLastCalledWith({
+      pathname: '/(app)/progress',
+      params: { profileId: 'child-a' },
+    });
   });
 
-  it('ranks multi-child tonight prompts by sessions — most active child appears first', () => {
+  it('ranks multi-child tonight prompts by sessions — most active child appears first', async () => {
     mockLinkedChildren = [CHILD_B, CHILD_A]; // intentionally reversed to verify sort
     mockDashboardData = {
       children: [
@@ -303,6 +361,7 @@ describe('ParentHomeScreen', () => {
     };
 
     render(<ParentHomeScreen activeProfile={makeProfile()} />);
+    await waitForParentTransitionNotice();
 
     const emmaPrompt = screen.getByTestId(
       'parent-home-tonight-child-a-primary',
@@ -317,27 +376,74 @@ describe('ParentHomeScreen', () => {
     );
   });
 
-  it('shows ParentTransitionNotice', async () => {
+  it('shows ParentTransitionNotice after at least one child is linked', async () => {
+    mockLinkedChildren = [CHILD_A];
+
     render(
       <ParentHomeScreen
         activeProfile={makeProfile({ id: 'profile-transition' })}
       />,
     );
 
-    await waitFor(() => {
-      screen.getByTestId('parent-transition-notice');
-    });
+    await waitForParentTransitionNotice();
   });
 
-  it('pressing nudge card opens NudgeActionSheet for that child', () => {
+  it('pressing nudge card opens NudgeActionSheet for that child', async () => {
     mockLinkedChildren = [CHILD_A];
 
     render(<ParentHomeScreen activeProfile={makeProfile()} />);
+    await waitForParentTransitionNotice();
 
     expect(screen.queryByTestId('nudge-action-sheet-close')).toBeNull();
 
     fireEvent.press(screen.getByTestId('parent-home-send-nudge-child-a'));
 
     screen.getByTestId('nudge-action-sheet-close');
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('derives childrenInGracePeriod from dashboard and passes it to WithdrawalCountdownBanner', () => {
+    const respondedAt = new Date(
+      Date.now() - 2 * 24 * 60 * 60 * 1000,
+    ).toISOString();
+    mockDashboardData = {
+      children: [
+        {
+          profileId: 'child-a',
+          displayName: 'Emma',
+          consentStatus: 'WITHDRAWN',
+          respondedAt,
+          summary: '',
+          sessionsThisWeek: 0,
+          sessionsLastWeek: 0,
+          totalTimeThisWeek: 0,
+          totalTimeLastWeek: 0,
+          exchangesThisWeek: 0,
+          exchangesLastWeek: 0,
+          trend: 'stable',
+          subjects: [],
+          guidedVsImmediateRatio: 0,
+          retentionTrend: 'stable',
+          totalSessions: 0,
+          currentlyWorkingOn: [],
+          progress: null,
+          currentStreak: 0,
+          longestStreak: 0,
+          totalXp: 0,
+        },
+      ],
+      pendingNotices: [],
+      demoMode: false,
+    };
+
+    render(<ParentHomeScreen activeProfile={makeProfile()} />);
+
+    expect(capturedBannerProps).not.toBeNull();
+    expect(capturedBannerProps?.childrenInGracePeriod).toHaveLength(1);
+    expect(capturedBannerProps?.childrenInGracePeriod[0]).toMatchObject({
+      profileId: 'child-a',
+      displayName: 'Emma',
+      respondedAt,
+    });
   });
 });

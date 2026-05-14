@@ -1,30 +1,35 @@
 import { computeAgeBracket, isAdultOwner, type AgeBracket } from './age.js';
 
 describe('computeAgeBracket', () => {
-  it('returns adolescent for ages under 18 (including 11-12, since product is 11+)', () => {
-    expect(computeAgeBracket(2015, 2026)).toBe('adolescent');
-    expect(computeAgeBracket(2014, 2026)).toBe('adolescent');
-    expect(computeAgeBracket(2012, 2026)).toBe('adolescent');
-    expect(computeAgeBracket(2009, 2026)).toBe('adolescent');
+  it('returns child for ages under 13', () => {
+    expect(computeAgeBracket(2015, 2026)).toBe('child'); // age 11
+    expect(computeAgeBracket(2014, 2026)).toBe('child'); // age 12
+  });
+
+  it('returns adolescent for ages 13 to 17 inclusive', () => {
+    expect(computeAgeBracket(2013, 2026)).toBe('adolescent'); // age 13
+    expect(computeAgeBracket(2012, 2026)).toBe('adolescent'); // age 14
+    expect(computeAgeBracket(2009, 2026)).toBe('adolescent'); // age 17
   });
 
   it('returns adult for ages 18 and above', () => {
-    expect(computeAgeBracket(2008, 2026)).toBe('adult');
-    expect(computeAgeBracket(1990, 2026)).toBe('adult');
+    expect(computeAgeBracket(2008, 2026)).toBe('adult'); // age 18
+    expect(computeAgeBracket(1990, 2026)).toBe('adult'); // age 36
   });
 
   it('uses current year when currentYear not provided', () => {
     const thisYear = new Date().getFullYear();
     expect(computeAgeBracket(thisYear - 20)).toBe('adult');
-    expect(computeAgeBracket(thisYear - 10)).toBe('adolescent');
+    expect(computeAgeBracket(thisYear - 15)).toBe('adolescent');
+    expect(computeAgeBracket(thisYear - 10)).toBe('child');
   });
 
-  it("AgeBracket type does not include 'child' (BUG-642 [P-2])", () => {
-    // Compile-time guard: this assignment must not type-check if 'child' is added back.
-    // The Exclude<...,never> is a constant true at type level, but the runtime
-    // assertion proves we cannot construct a 'child' bracket value.
-    const allowed: ReadonlyArray<AgeBracket> = ['adolescent', 'adult'];
-    expect(allowed).toEqual(['adolescent', 'adult']);
+  it('AgeBracket is the three-way union (D-C4-3)', () => {
+    const all: ReadonlyArray<AgeBracket> = ['child', 'adolescent', 'adult'];
+    expect(all).toHaveLength(3);
+    expect(all).toContain('child');
+    expect(all).toContain('adolescent');
+    expect(all).toContain('adult');
   });
 });
 

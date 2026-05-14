@@ -3,6 +3,7 @@ import {
   accounts,
   createDatabase,
   profiles,
+  practiceActivityEvents,
   quizMissedItems,
   quizRounds,
   subjects,
@@ -39,7 +40,7 @@ const llmProviderCalls: Array<{
 function createVocabularyProvider(): LLMProvider {
   return {
     id: 'gemini',
-    async chat(messages, config) {
+    async chat(messages: ChatMessage[], config: ModelConfig) {
       llmProviderCalls.push({ messages, config });
       return { content: llmResponse, stopReason: 'stop' };
     },
@@ -79,7 +80,7 @@ async function cleanupTestAccounts() {
     await db.delete(accounts).where(
       inArray(
         accounts.id,
-        rows.map((row) => row.id),
+        rows.map((row: typeof accounts.$inferSelect) => row.id),
       ),
     );
   }
@@ -255,6 +256,7 @@ describe('vocabulary quiz round lifecycle (integration)', () => {
     const round = await generateQuizRound({
       db,
       profileId: profile.id,
+      subjectId: subject.id,
       activityType: 'vocabulary',
       birthYear: profile.birthYear,
       themePreference: undefined,
@@ -297,51 +299,59 @@ describe('vocabulary quiz round lifecycle (integration)', () => {
       `Maximum CEFR level: ${context.cefrCeiling}`,
     );
     const masteryQuestions = round.questions.filter(
-      (question): question is Extract<QuizQuestion, { type: 'vocabulary' }> =>
+      (
+        question: QuizQuestion,
+      ): question is Extract<QuizQuestion, { type: 'vocabulary' }> =>
         question.type === 'vocabulary' && question.isLibraryItem,
     );
     expect(masteryQuestions).toHaveLength(3);
 
     const masteryIds = masteryQuestions.map(
-      (question) => question.vocabularyId!,
+      (question: Extract<QuizQuestion, { type: 'vocabulary' }>) =>
+        question.vocabularyId!,
     );
     const beforeCards = await db.query.vocabularyRetentionCards.findMany({
       where: inArray(vocabularyRetentionCards.vocabularyId, masteryIds),
     });
     const beforeById = new Map(
-      beforeCards.map((card) => [card.vocabularyId, card] as const),
+      beforeCards.map(
+        (card: typeof vocabularyRetentionCards.$inferSelect) =>
+          [card.vocabularyId, card] as const,
+      ),
     );
 
     let wrongDiscoveryRecorded = false;
     const masteryQualityById = new Map<string, number>();
-    const results = round.questions.map((question, index) => {
-      if (question.type === 'vocabulary' && question.isLibraryItem) {
-        const quality = masteryQualityById.size === 1 ? 2 : 4;
-        masteryQualityById.set(question.vocabularyId!, quality);
+    const results = round.questions.map(
+      (question: QuizQuestion, index: number) => {
+        if (question.type === 'vocabulary' && question.isLibraryItem) {
+          const quality = masteryQualityById.size === 1 ? 2 : 4;
+          masteryQualityById.set(question.vocabularyId!, quality);
+          return {
+            questionIndex: index,
+            correct: quality === 4,
+            answerGiven:
+              quality === 4 ? question.correctAnswer : question.distractors[0]!,
+            timeMs: 1500,
+          };
+        }
+
+        const answerGiven =
+          !wrongDiscoveryRecorded && question.type === 'vocabulary'
+            ? question.distractors[0]!
+            : question.correctAnswer;
+        if (!wrongDiscoveryRecorded && question.type === 'vocabulary') {
+          wrongDiscoveryRecorded = true;
+        }
+
         return {
           questionIndex: index,
-          correct: quality === 4,
-          answerGiven:
-            quality === 4 ? question.correctAnswer : question.distractors[0]!,
-          timeMs: 1500,
+          correct: answerGiven === question.correctAnswer,
+          answerGiven,
+          timeMs: 1800,
         };
-      }
-
-      const answerGiven =
-        !wrongDiscoveryRecorded && question.type === 'vocabulary'
-          ? question.distractors[0]!
-          : question.correctAnswer;
-      if (!wrongDiscoveryRecorded && question.type === 'vocabulary') {
-        wrongDiscoveryRecorded = true;
-      }
-
-      return {
-        questionIndex: index,
-        correct: answerGiven === question.correctAnswer,
-        answerGiven,
-        timeMs: 1800,
-      };
-    });
+      },
+    );
 
     const completion = await completeQuizRound(
       db,
@@ -357,7 +367,9 @@ describe('vocabulary quiz round lifecycle (integration)', () => {
     expect(afterCards).toHaveLength(3);
 
     for (const card of afterCards) {
-      const before = beforeById.get(card.vocabularyId);
+      const before = beforeById.get(card.vocabularyId) as
+        | typeof vocabularyRetentionCards.$inferSelect
+        | undefined;
       expect(before).toEqual(expect.objectContaining({}));
 
       const expected = sm2({
@@ -393,13 +405,30 @@ describe('vocabulary quiz round lifecycle (integration)', () => {
       ),
     });
     expect(storedRound?.status).toBe('completed');
+    expect(storedRound?.subjectId).toBe(subject.id);
+
+    const [practiceEvent] = await db
+      .select({
+        subjectId: practiceActivityEvents.subjectId,
+        activityType: practiceActivityEvents.activityType,
+        activitySubtype: practiceActivityEvents.activitySubtype,
+      })
+      .from(practiceActivityEvents)
+      .where(eq(practiceActivityEvents.sourceId, round.id));
+    expect(practiceEvent).toEqual({
+      subjectId: subject.id,
+      activityType: 'quiz',
+      activitySubtype: 'vocabulary',
+    });
 
     const missedItems = await db.query.quizMissedItems.findMany({
       where: eq(quizMissedItems.sourceRoundId, round.id),
     });
     expect(missedItems.length).toBeGreaterThanOrEqual(1);
     expect(
-      missedItems.some((item) => item.questionText.startsWith('Translate: ')),
+      missedItems.some((item: typeof quizMissedItems.$inferSelect) =>
+        item.questionText.startsWith('Translate: '),
+      ),
     ).toBe(true);
   }, 15_000);
 });

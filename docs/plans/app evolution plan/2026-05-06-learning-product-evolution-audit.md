@@ -9,7 +9,7 @@
 
 ## Product Direction
 
-EduAgent should not feel like "AI tutor with setup screens." The stronger product promise is:
+MentoMate should not feel like "AI tutor with setup screens." The stronger product promise is:
 
 > Get unstuck now, use the knowledge actively, and still remember it later.
 
@@ -169,7 +169,7 @@ The Mentor posture is directionally aligned. The first session should reuse this
 - `apps/mobile/src/app/(app)/dictation/*`
 
 **Implication**
-EduAgent already has more active-practice machinery than the first-run UX reveals. The first-turn redesign should surface that strength immediately.
+MentoMate already has more active-practice machinery than the first-run UX reveals. The first-turn redesign should surface that strength immediately.
 
 ### 6. Progress, Retention, And Proof Surfaces
 
@@ -394,7 +394,7 @@ Treat Slice 3 as exposure, not redesign. Do not let it grow into a Progress tab 
 - **PDF / YouTube / transcript / general document ingestion confirmed missing.** Zero references to `pdf`, `pdf-parse`, `youtube`, `.vtt`, or video-transcript tooling. `transcript-purge-cron.ts` handles session transcript cleanup, not ingestion. Notes are scoped to `topicId`, bookmarks to `sessionId/eventId`. No `Material`, `Document`, `Source`, or `Asset` schema in `packages/schemas/`.
 
 **Desired**
-- Learner can paste/upload/link material and EduAgent turns it into questions / explanations / drills / projects / recall checks / study plan.
+- Learner can paste/upload/link material and MentoMate turns it into questions / explanations / drills / projects / recall checks / study plan.
 
 **Change size:** **XL** (confirmed)
 
@@ -521,7 +521,7 @@ Includes:
 
 ### Slice 4 — Bring-Your-Own-Material Expansion
 
-**Goal:** Make EduAgent the layer above courses and notes.
+**Goal:** Make MentoMate the layer above courses and notes.
 
 Includes:
 - paste/upload/link material

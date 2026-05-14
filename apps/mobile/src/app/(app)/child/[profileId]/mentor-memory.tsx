@@ -11,6 +11,7 @@ import {
 import { platformAlert } from '../../../../lib/platform-alert';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { Translate } from '../../../../i18n';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { InterestContext } from '@eduagent/schemas';
@@ -45,7 +46,7 @@ import { useUpdateInterestsContext } from '../../../../hooks/use-onboarding-dime
 
 function confidenceDetail(
   confidence: 'low' | 'medium' | 'high' | undefined,
-  t: (key: string) => string,
+  t: Translate,
 ): string | undefined {
   if (!confidence) return undefined;
   return t(`parentView.mentorMemory.confidence.${confidence}`);
@@ -396,6 +397,12 @@ export default function ChildMentorMemoryScreen() {
                 value={profile?.memoryCollectionEnabled ?? false}
                 onValueChange={handleToggleCollection}
                 disabled={isLoading || toggleCollection.isPending}
+                accessibilityLabel={t(
+                  'parentView.mentorMemory.learnAboutChild',
+                )}
+                accessibilityHint={t(
+                  'parentView.mentorMemory.learnAboutChildDescription',
+                )}
               />
             </View>
             <View className="flex-row items-center justify-between mt-4">
@@ -411,6 +418,12 @@ export default function ChildMentorMemoryScreen() {
                 value={profile?.memoryInjectionEnabled ?? false}
                 onValueChange={handleToggleInjection}
                 disabled={isLoading || toggleInjection.isPending}
+                accessibilityLabel={t(
+                  'parentView.mentorMemory.useWhatMentorKnows',
+                )}
+                accessibilityHint={t(
+                  'parentView.mentorMemory.useWhatMentorKnowsDescription',
+                )}
               />
             </View>
           </View>

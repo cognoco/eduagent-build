@@ -44,7 +44,10 @@ type Override = {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const repoRoot = resolve(__dirname, '..');
-const outputDir = resolve(repoRoot, 'docs/plans/2026-05-04-c1-mock-inventory');
+const outputDir = resolve(
+  repoRoot,
+  'docs/_archive/plans/done/2026-05-04-c1-mock-inventory',
+);
 const checkMode = process.argv.includes('--check');
 
 const sliceTitles: Record<SliceId, string> = {
@@ -318,7 +321,7 @@ function listTestFiles(): string[] {
     {
       cwd: repoRoot,
       encoding: 'utf-8',
-    }
+    },
   );
 
   return output
@@ -356,7 +359,7 @@ function getSlice(file: string): SliceId | null {
 
 function findMocks(
   file: string,
-  source: string
+  source: string,
 ): Array<{ line: number; specifier: string }> {
   const matches: Array<{ line: number; specifier: string }> = [];
   const pattern = /jest\.mock\s*\(\s*['"]([^'"]+)['"]/g;
@@ -455,7 +458,7 @@ function classify(
   file: string,
   line: number,
   specifier: string,
-  slice: SliceId
+  slice: SliceId,
 ): Override & { basis: Basis } {
   const key = `${file}:${line}`;
   const normalized = specifier.replace(/\\/g, '/');
@@ -576,13 +579,13 @@ function classify(
 
 function renderTsv(rows: Row[]): string {
   const header = ['location', 'specifier', 'category', 'basis', 'reason'].join(
-    '\t'
+    '\t',
   );
   const body = rows
     .map((row) =>
       [row.location, row.specifier, row.category, row.basis, row.reason].join(
-        '\t'
-      )
+        '\t',
+      ),
     )
     .join('\n');
   return `${header}\n${body}\n`;
@@ -635,7 +638,7 @@ ${sliceLines}
 
 function groupCount<T>(
   items: T[],
-  keyFn: (item: T) => string
+  keyFn: (item: T) => string,
 ): Record<string, number> {
   return items.reduce<Record<string, number>>((acc, item) => {
     const key = keyFn(item);
@@ -692,11 +695,14 @@ function main(): void {
   const commit = git(['rev-parse', '--short', 'HEAD']);
   const branch = git(['branch', '--show-current']);
   const summary = renderSummary(rows, commit, branch);
-  const bySlice = rows.reduce<Record<SliceId, Row[]>>((acc, row) => {
-    acc[row.slice] ??= [];
-    acc[row.slice].push(row);
-    return acc;
-  }, {} as Record<SliceId, Row[]>);
+  const bySlice = rows.reduce<Record<SliceId, Row[]>>(
+    (acc, row) => {
+      acc[row.slice] ??= [];
+      acc[row.slice].push(row);
+      return acc;
+    },
+    {} as Record<SliceId, Row[]>,
+  );
 
   mkdirSync(outputDir, { recursive: true });
 
@@ -712,7 +718,7 @@ function main(): void {
   ];
 
   const staleFiles = filesToWrite.filter(
-    (entry) => !writeFileChecked(entry.path, entry.content)
+    (entry) => !writeFileChecked(entry.path, entry.content),
   );
 
   if (checkMode && staleFiles.length > 0) {
@@ -722,7 +728,7 @@ function main(): void {
     throw new Error(
       `C1 mock inventory artifacts are out of date. Regenerate them with:\n` +
         `pnpm exec tsx scripts/generate-c1-mock-inventory.ts\n\n` +
-        `Stale files:\n${names}`
+        `Stale files:\n${names}`,
     );
   }
 
@@ -731,7 +737,7 @@ function main(): void {
   console.log(
     `${
       checkMode ? 'Verified' : 'Generated'
-    } C1 mock inventory: ${total} rows across ${fileCount} files.`
+    } C1 mock inventory: ${total} rows across ${fileCount} files.`,
   );
 }
 

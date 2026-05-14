@@ -27,12 +27,18 @@ type HomeworkTrackingMetadata = SessionMetadata & {
   };
 };
 
+export type HomeworkSyncResultMetadata = HomeworkSessionMetadata & {
+  loggedCorrectionIds: string[];
+  loggedStartedProblemIds: string[];
+  loggedCompletedProblemIds: string[];
+};
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
 export function getHomeworkTrackingMetadata(
-  metadata: unknown
+  metadata: unknown,
 ): HomeworkTrackingMetadata {
   if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
     return {};
@@ -48,8 +54,8 @@ export async function syncHomeworkState(
   db: Database,
   profileId: string,
   sessionId: string,
-  input: HomeworkStateSyncInput
-): Promise<{ metadata: HomeworkSessionMetadata }> {
+  input: HomeworkStateSyncInput,
+): Promise<{ metadata: HomeworkSyncResultMetadata }> {
   const repo = createScopedRepository(db, profileId);
   const row = await repo.sessions.findFirst(eq(learningSessions.id, sessionId));
   if (!row) {
@@ -57,7 +63,7 @@ export async function syncHomeworkState(
   }
   if (row.sessionType !== 'homework') {
     throw new Error(
-      'Homework state sync is only available for homework sessions'
+      'Homework state sync is only available for homework sessions',
     );
   }
 
@@ -65,10 +71,10 @@ export async function syncHomeworkState(
   const existingHomework = existingMetadata.homework;
   const loggedCorrectionIds = new Set(existingHomework?.loggedCorrectionIds);
   const loggedStartedProblemIds = new Set(
-    existingHomework?.loggedStartedProblemIds
+    existingHomework?.loggedStartedProblemIds,
   );
   const loggedCompletedProblemIds = new Set(
-    existingHomework?.loggedCompletedProblemIds
+    existingHomework?.loggedCompletedProblemIds,
   );
 
   const eventsToInsert: Array<typeof sessionEvents.$inferInsert> = [];
@@ -161,8 +167,8 @@ export async function syncHomeworkState(
     .where(
       and(
         eq(learningSessions.id, sessionId),
-        eq(learningSessions.profileId, profileId)
-      )
+        eq(learningSessions.profileId, profileId),
+      ),
     );
 
   if (eventsToInsert.length > 0) {

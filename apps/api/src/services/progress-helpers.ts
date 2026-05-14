@@ -1,4 +1,4 @@
-// Shared helpers for date formatting and progress snapshot math.
+// Shared helpers for date formatting, progress snapshot math, and coaching nudges.
 // Used by dashboard, weekly-progress-push, and weekly-report services.
 
 import { eq, and, gte, inArray, desc } from 'drizzle-orm';
@@ -142,4 +142,90 @@ export async function getActiveSubjectsByRecency(
     if (aMs !== bMs) return bMs - aMs;
     return a.name.localeCompare(b.name);
   });
+}
+
+// ---------------------------------------------------------------------------
+// Trend helpers — extracted from dashboard.ts (PR-2 surface-ownership-boundaries)
+// ---------------------------------------------------------------------------
+
+/** Minimum completed sessions before trend signals carry meaning. [F-PV-03] */
+export const MIN_TREND_SESSIONS = 3;
+
+/**
+ * Calculates retention trend as a snapshot heuristic.
+ * Compares strong count vs weak+fading count across all subjects.
+ * Returns 'stable' when totalSessions < MIN_TREND_SESSIONS — the signal is
+ * noise at low N.
+ */
+export function calculateRetentionTrend(
+  subjectRetentionData: Array<{
+    status: 'strong' | 'fading' | 'weak' | 'forgotten';
+  }>,
+  totalSessions?: number,
+): 'improving' | 'declining' | 'stable' {
+  if (
+    subjectRetentionData.length === 0 ||
+    (totalSessions ?? 0) < MIN_TREND_SESSIONS
+  )
+    return 'stable';
+  const strongCount = subjectRetentionData.filter(
+    (s) => s.status === 'strong',
+  ).length;
+  const weakCount = subjectRetentionData.filter(
+    (s) =>
+      s.status === 'weak' || s.status === 'fading' || s.status === 'forgotten',
+  ).length;
+  if (strongCount > weakCount) return 'improving';
+  if (strongCount < weakCount) return 'declining';
+  return 'stable';
+}
+
+/**
+ * Calculates the trend between current and previous values.
+ */
+export function calculateTrend(
+  current: number,
+  previous: number,
+): 'up' | 'down' | 'stable' {
+  if (current > previous) return 'up';
+  if (current < previous) return 'down';
+  return 'stable';
+}
+
+/**
+ * Calculates the guided-vs-immediate ratio.
+ *
+ * Returns 0-1 ratio where 1 means all problems were guided.
+ * Returns 0 if totalCount is 0.
+ */
+export function calculateGuidedRatio(guided: number, total: number): number {
+  if (total === 0) return 0;
+  return Math.min(1, Math.max(0, guided / total));
+}
+
+export function buildProgressGuidance(
+  childName: string,
+  subjectNames: string[],
+  sessionsThisWeek: number,
+  previousSessions: number,
+  currentStreak?: number,
+): string | null {
+  const primarySubject = subjectNames[0];
+
+  if (sessionsThisWeek === 0 && primarySubject) {
+    // [BUG-523] A non-zero streak proves recent activity — "Quiet week" would
+    // contradict the visible streak badge. Show an encouraging nudge instead.
+    if ((currentStreak ?? 0) > 0) {
+      return `${childName} has a ${
+        currentStreak ?? 0
+      }-day streak — keep it going with ${primarySubject}!`;
+    }
+    return `Quiet week — maybe suggest a quick session on ${primarySubject}?`;
+  }
+
+  if (sessionsThisWeek < previousSessions && primarySubject) {
+    return `${childName} is still building knowledge. ${primarySubject} might be a good next nudge.`;
+  }
+
+  return null;
 }

@@ -11,6 +11,7 @@ import {
   dedupPairKey,
   runDedupForProfile,
   type DedupPassArgs,
+  type DedupEventTuple,
 } from './dedup-pass';
 
 describe('dedupPairKey', () => {
@@ -118,18 +119,6 @@ function makeArgs(opts: {
     onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
   };
 
-  const _txSelect = {
-    from: jest.fn().mockReturnThis(),
-    where: jest.fn().mockReturnThis(),
-    limit: jest
-      .fn()
-      .mockResolvedValue(
-        opts.candidates && opts.candidates.length > 0
-          ? [opts.candidates[0]]
-          : [],
-      ),
-  };
-
   let txSelectCallCount = 0;
   const txSelectFn = jest.fn().mockImplementation(() => {
     txSelectCallCount += 1;
@@ -161,10 +150,6 @@ function makeArgs(opts: {
     };
   });
 
-  const _fakeApplyDedupAction = jest
-    .fn()
-    .mockResolvedValue(opts.actionOutcome ?? { kind: 'keep_both' as const });
-
   const fakeDb = {
     select: jest.fn().mockReturnValue(memoSelect),
     insert: jest.fn().mockReturnValue(insertChain),
@@ -183,11 +168,9 @@ function makeArgs(opts: {
           delete: jest
             .fn()
             .mockReturnValue({ where: jest.fn().mockResolvedValue(undefined) }),
-          insert: jest
-            .fn()
-            .mockReturnValue({
-              values: jest.fn().mockResolvedValue(undefined),
-            }),
+          insert: jest.fn().mockReturnValue({
+            values: jest.fn().mockResolvedValue(undefined),
+          }),
         };
         return cb(tx);
       }),
@@ -229,7 +212,9 @@ describe('runDedupForProfile', () => {
     const { report, events } = await runDedupForProfile(args);
     expect(report.skippedNoEmbedding).toBe(1);
     expect(
-      events.some((e) => e.name === 'memory.dedup.skipped_no_embedding'),
+      events.some(
+        (e: DedupEventTuple) => e.name === 'memory.dedup.skipped_no_embedding',
+      ),
     ).toBe(true);
   });
 
@@ -251,13 +236,11 @@ describe('runDedupForProfile', () => {
     } as unknown as ScopedRepository;
 
     const fakeDb = {
-      select: jest
-        .fn()
-        .mockReturnValue({
-          from: jest.fn().mockReturnThis(),
-          where: jest.fn().mockReturnThis(),
-          limit: jest.fn().mockResolvedValue([]),
-        }),
+      select: jest.fn().mockReturnValue({
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockResolvedValue([]),
+      }),
       insert: jest.fn(),
       transaction: jest.fn(),
     } as unknown as Database;
@@ -317,10 +300,14 @@ describe('runDedupForProfile', () => {
     expect(report.capHit).toBe(true);
     expect(report.cappedSkipped).toBe(1);
     expect(report.llmCalls).toBe(0);
-    expect(events.some((e) => e.name === 'memory.dedup.capped_skip')).toBe(
-      true,
-    );
-    expect(events.some((e) => e.name === 'memory.dedup.cap_hit')).toBe(true);
+    expect(
+      events.some(
+        (e: DedupEventTuple) => e.name === 'memory.dedup.capped_skip',
+      ),
+    ).toBe(true);
+    expect(
+      events.some((e: DedupEventTuple) => e.name === 'memory.dedup.cap_hit'),
+    ).toBe(true);
   });
 
   it('increments merges when LLM returns merge action', async () => {
@@ -347,19 +334,15 @@ describe('runDedupForProfile', () => {
 
     let txSelectCount = 0;
     const fakeDb = {
-      select: jest
-        .fn()
-        .mockReturnValue({
-          from: jest.fn().mockReturnThis(),
-          where: jest.fn().mockReturnThis(),
-          limit: jest.fn().mockResolvedValue([]),
-        }),
-      insert: jest
-        .fn()
-        .mockReturnValue({
-          values: jest.fn().mockReturnThis(),
-          onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
-        }),
+      select: jest.fn().mockReturnValue({
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockResolvedValue([]),
+      }),
+      insert: jest.fn().mockReturnValue({
+        values: jest.fn().mockReturnThis(),
+        onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
+      }),
       transaction: jest
         .fn()
         .mockImplementation(async (cb: (tx: unknown) => Promise<unknown>) => {
@@ -374,17 +357,13 @@ describe('runDedupForProfile', () => {
                 );
               }),
             })),
-            insert: jest
-              .fn()
-              .mockReturnValue({
-                values: jest.fn().mockResolvedValue(undefined),
-              }),
-            update: jest
-              .fn()
-              .mockReturnValue({
-                set: jest.fn().mockReturnThis(),
-                where: jest.fn().mockResolvedValue(undefined),
-              }),
+            insert: jest.fn().mockReturnValue({
+              values: jest.fn().mockResolvedValue(undefined),
+            }),
+            update: jest.fn().mockReturnValue({
+              set: jest.fn().mockReturnThis(),
+              where: jest.fn().mockResolvedValue(undefined),
+            }),
           };
           return cb(tx);
         }),
@@ -412,7 +391,9 @@ describe('runDedupForProfile', () => {
     });
 
     expect(report.merges).toBe(1);
-    expect(events.some((e) => e.name === 'memory.fact.merged')).toBe(true);
+    expect(
+      events.some((e: DedupEventTuple) => e.name === 'memory.fact.merged'),
+    ).toBe(true);
   });
 
   it('increments supersedes when LLM returns supersede action', async () => {
@@ -434,19 +415,15 @@ describe('runDedupForProfile', () => {
     let txSelectCount = 0;
 
     const fakeDb = {
-      select: jest
-        .fn()
-        .mockReturnValue({
-          from: jest.fn().mockReturnThis(),
-          where: jest.fn().mockReturnThis(),
-          limit: jest.fn().mockResolvedValue([]),
-        }),
-      insert: jest
-        .fn()
-        .mockReturnValue({
-          values: jest.fn().mockReturnThis(),
-          onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
-        }),
+      select: jest.fn().mockReturnValue({
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockResolvedValue([]),
+      }),
+      insert: jest.fn().mockReturnValue({
+        values: jest.fn().mockReturnThis(),
+        onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
+      }),
       transaction: jest
         .fn()
         .mockImplementation(async (cb: (tx: unknown) => Promise<unknown>) => {
@@ -461,17 +438,13 @@ describe('runDedupForProfile', () => {
                 );
               }),
             })),
-            insert: jest
-              .fn()
-              .mockReturnValue({
-                values: jest.fn().mockResolvedValue(undefined),
-              }),
-            update: jest
-              .fn()
-              .mockReturnValue({
-                set: jest.fn().mockReturnThis(),
-                where: jest.fn().mockResolvedValue(undefined),
-              }),
+            insert: jest.fn().mockReturnValue({
+              values: jest.fn().mockResolvedValue(undefined),
+            }),
+            update: jest.fn().mockReturnValue({
+              set: jest.fn().mockReturnThis(),
+              where: jest.fn().mockResolvedValue(undefined),
+            }),
           };
           return cb(tx);
         }),
@@ -499,7 +472,9 @@ describe('runDedupForProfile', () => {
     });
 
     expect(report.supersedes).toBe(1);
-    expect(events.some((e) => e.name === 'memory.fact.merged')).toBe(true);
+    expect(
+      events.some((e: DedupEventTuple) => e.name === 'memory.fact.merged'),
+    ).toBe(true);
   });
 
   it('increments keptBoth when LLM returns keep_both action', async () => {
@@ -521,19 +496,15 @@ describe('runDedupForProfile', () => {
     let txSelectCount = 0;
 
     const fakeDb = {
-      select: jest
-        .fn()
-        .mockReturnValue({
-          from: jest.fn().mockReturnThis(),
-          where: jest.fn().mockReturnThis(),
-          limit: jest.fn().mockResolvedValue([]),
-        }),
-      insert: jest
-        .fn()
-        .mockReturnValue({
-          values: jest.fn().mockReturnThis(),
-          onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
-        }),
+      select: jest.fn().mockReturnValue({
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockResolvedValue([]),
+      }),
+      insert: jest.fn().mockReturnValue({
+        values: jest.fn().mockReturnThis(),
+        onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
+      }),
       transaction: jest
         .fn()
         .mockImplementation(async (cb: (tx: unknown) => Promise<unknown>) => {
@@ -548,17 +519,13 @@ describe('runDedupForProfile', () => {
                 );
               }),
             })),
-            insert: jest
-              .fn()
-              .mockReturnValue({
-                values: jest.fn().mockResolvedValue(undefined),
-              }),
-            update: jest
-              .fn()
-              .mockReturnValue({
-                set: jest.fn().mockReturnThis(),
-                where: jest.fn().mockResolvedValue(undefined),
-              }),
+            insert: jest.fn().mockReturnValue({
+              values: jest.fn().mockResolvedValue(undefined),
+            }),
+            update: jest.fn().mockReturnValue({
+              set: jest.fn().mockReturnThis(),
+              where: jest.fn().mockResolvedValue(undefined),
+            }),
           };
           return cb(tx);
         }),
@@ -610,19 +577,15 @@ describe('runDedupForProfile', () => {
     let txSelectCount = 0;
 
     const fakeDb = {
-      select: jest
-        .fn()
-        .mockReturnValue({
-          from: jest.fn().mockReturnThis(),
-          where: jest.fn().mockReturnThis(),
-          limit: jest.fn().mockResolvedValue([]),
-        }),
-      insert: jest
-        .fn()
-        .mockReturnValue({
-          values: jest.fn().mockReturnThis(),
-          onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
-        }),
+      select: jest.fn().mockReturnValue({
+        from: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockResolvedValue([]),
+      }),
+      insert: jest.fn().mockReturnValue({
+        values: jest.fn().mockReturnThis(),
+        onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
+      }),
       transaction: jest
         .fn()
         .mockImplementation(async (cb: (tx: unknown) => Promise<unknown>) => {
@@ -637,22 +600,16 @@ describe('runDedupForProfile', () => {
                 );
               }),
             })),
-            insert: jest
-              .fn()
-              .mockReturnValue({
-                values: jest.fn().mockResolvedValue(undefined),
-              }),
-            update: jest
-              .fn()
-              .mockReturnValue({
-                set: jest.fn().mockReturnThis(),
-                where: jest.fn().mockResolvedValue(undefined),
-              }),
-            delete: jest
-              .fn()
-              .mockReturnValue({
-                where: jest.fn().mockResolvedValue(undefined),
-              }),
+            insert: jest.fn().mockReturnValue({
+              values: jest.fn().mockResolvedValue(undefined),
+            }),
+            update: jest.fn().mockReturnValue({
+              set: jest.fn().mockReturnThis(),
+              where: jest.fn().mockResolvedValue(undefined),
+            }),
+            delete: jest.fn().mockReturnValue({
+              where: jest.fn().mockResolvedValue(undefined),
+            }),
           };
           return cb(tx);
         }),

@@ -1,5 +1,5 @@
 import { View, Text, Pressable, ScrollView } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import {
@@ -177,7 +177,7 @@ export default function SubjectTopicsScreen() {
                     subjectId: subjectId ?? '',
                     subjectName: subjectName ?? '',
                   },
-                } as never)
+                } as Href)
               }
               className="bg-surface rounded-card p-4 mt-3"
               accessibilityLabel={t('parentView.subjects.viewTopicDetails', {

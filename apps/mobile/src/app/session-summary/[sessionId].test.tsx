@@ -1,5 +1,6 @@
 import {
   act,
+  cleanup,
   render,
   screen,
   fireEvent,
@@ -45,6 +46,7 @@ jest.mock('@expo/vector-icons', () => ({
 }));
 
 jest.mock('../../lib/theme', () => ({
+  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
   useThemeColors: () => ({
     muted: '#a3a3a3',
     textInverse: '#0f0f0f',
@@ -52,23 +54,27 @@ jest.mock('../../lib/theme', () => ({
 }));
 
 jest.mock('../../lib/sentry', () => ({
+  // gc1-allow: @sentry/react-native native crash handlers
   Sentry: {
     addBreadcrumb: jest.fn(),
   },
 }));
 
 jest.mock('../../lib/platform-alert', () => ({
+  ...jest.requireActual('../../lib/platform-alert'),
   platformAlert: jest.fn(),
 }));
 
 // [BUG-800] formatApiError stub: returns Error.message verbatim so tests can
 // assert the typed server reason reaches platformAlert.
 jest.mock('../../lib/format-api-error', () => ({
+  ...jest.requireActual('../../lib/format-api-error'),
   formatApiError: (e: unknown) =>
     e instanceof Error ? e.message : 'Unknown error',
 }));
 
 jest.mock('../../lib/profile', () => ({
+  // gc1-allow: ProfileProvider uses SecureStore (native)
   useProfile: () => ({
     activeProfile: {
       id: 'test-profile-id',
@@ -93,7 +99,6 @@ jest.mock('../../lib/profile', () => ({
     setActiveProfileId: jest.fn(),
     isRestoringId: false,
   }),
-  personaFromBirthYear: () => 'learner',
   isGuardianProfile: () => false,
 }));
 
@@ -105,6 +110,7 @@ const mockUseParentProxy = jest.fn(() => ({
   parentProfile: null,
 }));
 jest.mock('../../hooks/use-parent-proxy', () => ({
+  // gc1-allow: SecureStore read/write in useEffect
   useParentProxy: () => mockUseParentProxy(),
 }));
 
@@ -112,6 +118,7 @@ jest.mock('../../hooks/use-parent-proxy', () => ({
 // no useApiClient() calls — keep as a direct mock.
 const mockOnSuccessfulRecall = jest.fn();
 jest.mock('../../hooks/use-rating-prompt', () => ({
+  // gc1-allow: expo-store-review + SecureStore native APIs
   useRatingPrompt: () => ({
     onSuccessfulRecall: mockOnSuccessfulRecall,
   }),
@@ -128,6 +135,7 @@ jest.mock('../../hooks/use-depth-evaluation', () => ({
 const mockReadSummaryDraft = jest.fn();
 const mockWriteSummaryDraft = jest.fn();
 const mockClearSummaryDraft = jest.fn();
+let resolveDefaultSummaryDraftReads: Array<() => void> = [];
 
 jest.mock('../../lib/summary-draft', () => ({
   readSummaryDraft: (...args: unknown[]) => mockReadSummaryDraft(...args),
@@ -260,6 +268,7 @@ function createWrapper() {
       },
     },
   });
+  activeQueryClient = queryClient;
   return function Wrapper({ children }: { children: React.ReactNode }) {
     return (
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
@@ -269,14 +278,29 @@ function createWrapper() {
 
 // Alias for tests that were already using `Wrapper` directly.
 let Wrapper: ReturnType<typeof createWrapper>;
+let activeQueryClient: QueryClient | null = null;
 
 const SessionSummaryScreen = require('./[sessionId]').default;
+
+async function settleAsyncWork(): Promise<void> {
+  await Promise.resolve();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  await Promise.resolve();
+}
 
 async function pressAsync(
   element: Parameters<typeof fireEvent.press>[0],
 ): Promise<void> {
   await act(async () => {
     fireEvent.press(element);
+    await settleAsyncWork();
+    await settleAsyncWork();
+  });
+}
+
+async function flushAsyncEffects(): Promise<void> {
+  await act(async () => {
+    await settleAsyncWork();
   });
 }
 
@@ -284,7 +308,13 @@ describe('SessionSummaryScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (platformAlert as jest.Mock).mockClear();
-    mockReadSummaryDraft.mockResolvedValue(null);
+    resolveDefaultSummaryDraftReads = [];
+    mockReadSummaryDraft.mockImplementation(
+      () =>
+        new Promise<null>((resolve) => {
+          resolveDefaultSummaryDraftReads.push(() => resolve(null));
+        }),
+    );
     mockWriteSummaryDraft.mockResolvedValue(undefined);
     mockClearSummaryDraft.mockResolvedValue(undefined);
     mockUseParentProxy.mockReturnValue({
@@ -352,6 +382,22 @@ describe('SessionSummaryScreen', () => {
     // Create a fresh wrapper (and QueryClient) per test to prevent cross-test
     // query cache contamination from async fetch-boundary responses.
     Wrapper = createWrapper();
+  });
+
+  afterEach(async () => {
+    const draftResolvers = resolveDefaultSummaryDraftReads;
+    resolveDefaultSummaryDraftReads = [];
+
+    await act(async () => {
+      for (const resolveDraftRead of draftResolvers) {
+        resolveDraftRead();
+      }
+      await settleAsyncWork();
+      await settleAsyncWork();
+    });
+    cleanup();
+    activeQueryClient?.clear();
+    activeQueryClient = null;
   });
 
   it('renders session takeaways', () => {
@@ -724,7 +770,7 @@ describe('SessionSummaryScreen', () => {
         );
       }
       if (url.includes('/summary')) {
-        return { summary: null };
+        return { summary: { learnerRecap: 'mock-recap' } };
       }
       return { session: null };
     });
@@ -761,7 +807,7 @@ describe('SessionSummaryScreen', () => {
         );
       }
       if (url.includes('/summary')) {
-        return { summary: null };
+        return { summary: { learnerRecap: 'mock-recap' } };
       }
       return { session: null };
     });
@@ -791,7 +837,7 @@ describe('SessionSummaryScreen', () => {
         );
       }
       if (url.includes('/summary')) {
-        return { summary: null };
+        return { summary: { learnerRecap: 'mock-recap' } };
       }
       return { session: null };
     });
@@ -1119,7 +1165,9 @@ describe('SessionSummaryScreen', () => {
   // on every exit path, and draft recovery on a previously-skipped session.
   describe('bulletproof drafting [DRAFT-BULLETPROOF-01]', () => {
     it('autosaves the draft after the user types (debounced)', async () => {
+      mockReadSummaryDraft.mockResolvedValue(null);
       render(<SessionSummaryScreen />, { wrapper: Wrapper });
+      await flushAsyncEffects();
 
       fireEvent.changeText(
         screen.getByTestId('summary-input'),
@@ -1147,6 +1195,7 @@ describe('SessionSummaryScreen', () => {
       });
 
       render(<SessionSummaryScreen />, { wrapper: Wrapper });
+      await flushAsyncEffects();
 
       await waitFor(() => {
         expect(screen.getByTestId('summary-input').props.value).toBe(
@@ -1190,6 +1239,8 @@ describe('SessionSummaryScreen', () => {
       );
       await act(async () => {
         discard.onPress();
+        await settleAsyncWork();
+        await settleAsyncWork();
       });
 
       await waitFor(() => {
@@ -1253,6 +1304,8 @@ describe('SessionSummaryScreen', () => {
       );
       await act(async () => {
         submit.onPress();
+        await settleAsyncWork();
+        await settleAsyncWork();
       });
 
       await waitFor(() => {
@@ -1288,6 +1341,7 @@ describe('SessionSummaryScreen', () => {
       });
 
       render(<SessionSummaryScreen />, { wrapper: Wrapper });
+      await flushAsyncEffects();
 
       await waitFor(() => {
         screen.getByTestId('summary-resubmit-banner');

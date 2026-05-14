@@ -4,6 +4,7 @@ import {
   useGlobalSearchParams,
   useLocalSearchParams,
   useRouter,
+  type Href,
 } from 'expo-router';
 import { View } from 'react-native';
 import { useAuth } from '@clerk/clerk-expo';
@@ -74,7 +75,7 @@ export default function AuthRoutesLayout() {
     }
 
     lastRedirectedPathRef.current = redirectTargetRef.current;
-    router.replace(redirectTargetRef.current as never);
+    router.replace(redirectTargetRef.current as Href);
   }, [isLoaded, isSignedIn, router]);
 
   if (!isLoaded) return null;

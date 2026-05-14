@@ -129,6 +129,11 @@ export function useSubmitAnswer(assessmentId: string) {
       void queryClient.invalidateQueries({
         queryKey: ['assessment', targetAssessmentId],
       });
+      // PR-10 deferred: broad ['progress'] — assessment answer updates topic
+      // progress and subject progress, but subjectId, topicId, and activeProfileId
+      // are not available in this hook's closure (useSubmitAnswer only receives
+      // assessmentId). Narrowing requires resolving the assessment's subject/topic
+      // first, which would add an extra fetch. Keep broad.
       void queryClient.invalidateQueries({ queryKey: ['progress'] });
     },
   });

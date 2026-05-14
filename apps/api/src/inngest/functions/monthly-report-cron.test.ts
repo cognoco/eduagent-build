@@ -6,6 +6,11 @@ import {
   createDatabaseModuleMock,
   createTransactionalMockDb,
 } from '../../test-utils/database-module';
+import {
+  createInngestStepRunner,
+  type InngestStepRunnerOptions,
+} from '../../test-utils/inngest-step-runner';
+import type { ChildStruggleLine } from '../../services/notifications';
 
 // ---------------------------------------------------------------------------
 // Mock DB setup
@@ -105,7 +110,10 @@ const mockDatabaseModule = createDatabaseModuleMock({
   },
 });
 
-jest.mock('@eduagent/database', () => mockDatabaseModule.module);
+jest.mock(
+  '@eduagent/database' /* gc1-allow: external-boundary */,
+  () => mockDatabaseModule.module,
+);
 
 // ---------------------------------------------------------------------------
 // Service mocks
@@ -132,13 +140,29 @@ const mockGenerateReportHighlights = jest.fn().mockResolvedValue({
   comparison: null,
 });
 const mockListEligibleSelfReportProfileIds = jest.fn().mockResolvedValue([]);
+import { emptyPracticeActivitySummary } from '../../test-utils/practice-activity-summary-fixture';
 
-jest.mock('../../services/monthly-report', () => ({
-  generateMonthlyReportData: (...args: unknown[]) =>
-    mockGenerateMonthlyReportData(...args),
-  generateReportHighlights: (...args: unknown[]) =>
-    mockGenerateReportHighlights(...args),
-}));
+const mockGetPracticeActivitySummary = jest
+  .fn()
+  .mockResolvedValue(emptyPracticeActivitySummary);
+
+jest.mock(
+  '../../services/monthly-report' /* gc1-allow: external-boundary — generateReportHighlights calls LLM */,
+  () => ({
+    generateMonthlyReportData: (...args: unknown[]) =>
+      mockGenerateMonthlyReportData(...args),
+    generateReportHighlights: (...args: unknown[]) =>
+      mockGenerateReportHighlights(...args),
+  }),
+);
+
+jest.mock(
+  '../../services/practice-activity-summary' /* gc1-allow: unit test boundary */,
+  () => ({
+    getPracticeActivitySummary: (...args: unknown[]) =>
+      mockGetPracticeActivitySummary(...args),
+  }),
+);
 
 jest.mock(
   '../../services/solo-progress-reports' /* gc1-allow: unit test boundary */,
@@ -150,47 +174,68 @@ jest.mock(
 
 const mockGetSnapshotsInRange = jest.fn().mockResolvedValue([]);
 
-jest.mock('../../services/snapshot-aggregation', () => ({
-  getSnapshotsInRange: (...args: unknown[]) => mockGetSnapshotsInRange(...args),
-}));
+jest.mock(
+  '../../services/snapshot-aggregation' /* gc1-allow: external-boundary — DB-dependent */,
+  () => ({
+    getSnapshotsInRange: (...args: unknown[]) =>
+      mockGetSnapshotsInRange(...args),
+  }),
+);
 
 const mockSendPushNotification = jest.fn().mockResolvedValue({ sent: true });
 const mockSendEmail = jest.fn().mockResolvedValue({ sent: true });
-const mockFormatMonthlyProgressEmail = jest.fn((to: string, body: string) => ({
-  to,
-  subject: "This month's learning report",
-  body,
-  type: 'monthly_progress',
-}));
+const mockFormatMonthlyProgressEmail = jest.fn(
+  (to: string, body: string, _struggleLines: ChildStruggleLine[]) => ({
+    to,
+    subject: "This month's learning report",
+    body,
+    type: 'monthly_progress',
+  }),
+);
 
-jest.mock('../../services/notifications', () => ({
-  sendPushNotification: (...args: unknown[]) =>
-    mockSendPushNotification(...args),
-  sendEmail: (...args: unknown[]) => mockSendEmail(...args),
-  formatMonthlyProgressEmail: (...args: unknown[]) =>
-    mockFormatMonthlyProgressEmail(...args),
-}));
+jest.mock(
+  '../../services/notifications' /* gc1-allow: external-boundary — push/email delivery */,
+  () => ({
+    sendPushNotification: (...args: unknown[]) =>
+      mockSendPushNotification(...args),
+    sendEmail: (...args: unknown[]) => mockSendEmail(...args),
+    formatMonthlyProgressEmail: (
+      to: string,
+      body: string,
+      struggleLines: ChildStruggleLine[],
+    ) => mockFormatMonthlyProgressEmail(to, body, struggleLines),
+  }),
+);
 
 // [BUG-699-FOLLOWUP] 24h dedup gate. Default 0 so existing tests keep sending;
 // individual tests override to simulate a prior successful send (replay path).
 const mockGetRecentNotificationCount = jest.fn().mockResolvedValue(0);
 
-jest.mock('../../services/settings', () => ({
-  getRecentNotificationCount: (...args: unknown[]) =>
-    mockGetRecentNotificationCount(...args),
-}));
+jest.mock(
+  '../../services/settings' /* gc1-allow: external-boundary — DB-dependent */,
+  () => ({
+    getRecentNotificationCount: (...args: unknown[]) =>
+      mockGetRecentNotificationCount(...args),
+  }),
+);
 
 const mockCaptureException = jest.fn();
 
-jest.mock('../../services/sentry', () => ({
-  captureException: (...args: unknown[]) => mockCaptureException(...args),
-}));
+jest.mock(
+  '../../services/sentry' /* gc1-allow: external-boundary — observability */,
+  () => ({
+    captureException: (...args: unknown[]) => mockCaptureException(...args),
+  }),
+);
 
-jest.mock('../helpers', () => ({
-  getStepDatabase: jest.fn().mockReturnValue(mockMonthlyReportDb),
-  getStepResendApiKey: jest.fn().mockReturnValue('resend-test-key'),
-  resetDatabaseUrl: jest.fn(),
-}));
+jest.mock(
+  '../helpers' /* gc1-allow: external-boundary — DB connection factory */,
+  () => ({
+    getStepDatabase: jest.fn().mockReturnValue(mockMonthlyReportDb),
+    getStepResendApiKey: jest.fn().mockReturnValue('resend-test-key'),
+    resetDatabaseUrl: jest.fn(),
+  }),
+);
 
 import {
   monthlyReportCron,
@@ -247,8 +292,7 @@ const SAMPLE_METRICS = {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Simulate Inngest step runner for cron functions */
-interface CronResult {
+interface MonthlyReportCronResult {
   status: string;
   queuedPairs: number;
   totalPairs?: number;
@@ -256,47 +300,46 @@ interface CronResult {
   failedBatches?: number;
 }
 
-interface CronMockStep {
-  run: jest.Mock;
-  sendEvent: jest.Mock;
-  sleep: jest.Mock;
+interface MonthlyReportGenerateResult {
+  status: string;
+  parentId?: string;
+  childId?: string;
+  reason?: string;
 }
 
-async function executeCronSteps(): Promise<{
-  result: CronResult;
-  mockStep: CronMockStep;
+async function executeCronSteps(
+  stepOptions?: InngestStepRunnerOptions,
+): Promise<{
+  result: MonthlyReportCronResult;
+  runner: ReturnType<typeof createInngestStepRunner>;
 }> {
-  const mockStep: CronMockStep = {
-    run: jest.fn(async (name: string, fn: () => Promise<unknown>) => fn()),
-    sendEvent: jest.fn().mockResolvedValue(undefined),
-    sleep: jest.fn(),
-  };
+  const runner = createInngestStepRunner(stepOptions);
 
   const handler = (monthlyReportCron as any).fn;
   const result = (await handler({
     event: { name: 'inngest/function.invoked' },
-    step: mockStep,
-  })) as CronResult;
+    step: runner.step,
+  })) as MonthlyReportCronResult;
 
-  return { result, mockStep };
+  return { result, runner };
 }
 
-/** Simulate Inngest step runner for the generate event handler */
 async function executeGenerateSteps(
   eventData: Record<string, unknown>,
-): Promise<Record<string, unknown>> {
-  const mockStep = {
-    run: jest.fn(async (name: string, fn: () => Promise<unknown>) => fn()),
-    sleep: jest.fn(),
-  };
+  stepOptions?: InngestStepRunnerOptions,
+): Promise<{
+  result: MonthlyReportGenerateResult;
+  runner: ReturnType<typeof createInngestStepRunner>;
+}> {
+  const runner = createInngestStepRunner(stepOptions);
 
   const handler = (monthlyReportGenerate as any).fn;
   const result = await handler({
     event: { data: eventData, name: 'app/monthly-report.generate' },
-    step: mockStep,
+    step: runner.step,
   });
 
-  return { result, mockStep };
+  return { result, runner };
 }
 
 function makeGenerateEvent(
@@ -431,23 +474,27 @@ describe('monthlyReportCron', () => {
         '11111111-1111-4111-8111-111111111111',
       ]);
 
-      const { mockStep, result } = await executeCronSteps();
+      const { runner, result } = await executeCronSteps();
 
       expect(result).toMatchObject({ status: 'completed', queuedPairs: 2 });
-      expect(mockStep.sendEvent).toHaveBeenCalledWith(
-        'fan-out-monthly-reports-0',
+      expect(runner.sendEventCalls).toEqual(
         expect.arrayContaining([
-          expect.objectContaining({
-            name: 'app/monthly-report.generate',
-            data: { parentId: 'parent-001', childId: 'child-001' },
-          }),
-          expect.objectContaining({
-            name: 'app/monthly-report.generate',
-            data: {
-              parentId: '11111111-1111-4111-8111-111111111111',
-              childId: '11111111-1111-4111-8111-111111111111',
-            },
-          }),
+          {
+            name: 'fan-out-monthly-reports-0',
+            payload: expect.arrayContaining([
+              expect.objectContaining({
+                name: 'app/monthly-report.generate',
+                data: { parentId: 'parent-001', childId: 'child-001' },
+              }),
+              expect.objectContaining({
+                name: 'app/monthly-report.generate',
+                data: {
+                  parentId: '11111111-1111-4111-8111-111111111111',
+                  childId: '11111111-1111-4111-8111-111111111111',
+                },
+              }),
+            ]),
+          },
         ]),
       );
     });
@@ -464,19 +511,23 @@ describe('monthlyReportCron', () => {
         { childProfileId: 'child-002' },
       ]);
 
-      const { mockStep } = await executeCronSteps();
+      const { runner } = await executeCronSteps();
 
-      expect(mockStep.sendEvent).toHaveBeenCalledWith(
-        'fan-out-monthly-reports-0',
+      expect(runner.sendEventCalls).toEqual(
         expect.arrayContaining([
-          expect.objectContaining({
-            name: 'app/monthly-report.generate',
-            data: { parentId: 'parent-001', childId: 'child-001' },
-          }),
-          expect.objectContaining({
-            name: 'app/monthly-report.generate',
-            data: { parentId: 'parent-002', childId: 'child-002' },
-          }),
+          {
+            name: 'fan-out-monthly-reports-0',
+            payload: expect.arrayContaining([
+              expect.objectContaining({
+                name: 'app/monthly-report.generate',
+                data: { parentId: 'parent-001', childId: 'child-001' },
+              }),
+              expect.objectContaining({
+                name: 'app/monthly-report.generate',
+                data: { parentId: 'parent-002', childId: 'child-002' },
+              }),
+            ]),
+          },
         ]),
       );
     });
@@ -514,15 +565,15 @@ describe('monthlyReportCron', () => {
       ).mockResolvedValue(links);
       mockSelectDistinctWhere.mockResolvedValue(activeRows);
 
-      const { mockStep, result } = await executeCronSteps();
+      const { runner, result } = await executeCronSteps();
 
       expect(result).toMatchObject({ status: 'completed', queuedPairs: 201 });
-      expect(mockStep.sendEvent).toHaveBeenCalledTimes(2);
+      expect(runner.sendEventCalls).toHaveLength(2);
       // First batch is 200, second batch is 1
-      const firstCall = mockStep.sendEvent.mock.calls[0][1];
-      const secondCall = mockStep.sendEvent.mock.calls[1][1];
-      expect(firstCall).toHaveLength(200);
-      expect(secondCall).toHaveLength(1);
+      const firstPayload = runner.sendEventCalls[0]!.payload as unknown[];
+      const secondPayload = runner.sendEventCalls[1]!.payload as unknown[];
+      expect(firstPayload).toHaveLength(200);
+      expect(secondPayload).toHaveLength(1);
     });
   });
 
@@ -550,25 +601,19 @@ describe('monthlyReportCron', () => {
       ).mockResolvedValue(links);
       mockSelectDistinctWhere.mockResolvedValue(activeRows);
 
-      let sendEventCalls = 0;
-      const mockStep = {
-        run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
-        sendEvent: jest.fn(async (label: string) => {
-          sendEventCalls += 1;
-          if (label === 'fan-out-monthly-reports-200') {
-            throw new Error('transient inngest 500');
-          }
-        }),
-        sleep: jest.fn(),
-      };
+      const runner = createInngestStepRunner({
+        sendEventErrors: {
+          'fan-out-monthly-reports-200': new Error('transient inngest 500'),
+        },
+      });
 
       const handler = (monthlyReportCron as any).fn;
-      const result = (await handler({
+      const result: MonthlyReportCronResult = await handler({
         event: { name: 'inngest/function.invoked' },
-        step: mockStep,
-      })) as CronResult;
+        step: runner.step,
+      });
 
-      expect(sendEventCalls).toBe(3);
+      expect(runner.sendEventCalls).toHaveLength(3);
       expect(result.status).toBe('partial');
       expect(result.failedBatches).toBe(1);
       expect(result.queuedBatches).toBe(2);
@@ -715,6 +760,28 @@ describe('monthlyReportGenerate', () => {
         expect.any(String), // monthLabel from toLocaleDateString
         SAMPLE_METRICS,
         SAMPLE_METRICS, // previousMetrics from last snapshot of previous window
+        expect.objectContaining({
+          totals: expect.objectContaining({ activitiesCompleted: 0 }),
+        }),
+      );
+    });
+
+    it('loads practice summary for the prior month and adjacent previous month', async () => {
+      await executeGenerateSteps(makeGenerateEvent());
+
+      expect(mockGetPracticeActivitySummary).toHaveBeenCalledWith(
+        mockMonthlyReportDb,
+        {
+          profileId: 'child-001',
+          period: {
+            start: new Date('2026-03-01T00:00:00.000Z'),
+            endExclusive: new Date('2026-04-01T00:00:00.000Z'),
+          },
+          previousPeriod: {
+            start: new Date('2026-02-01T00:00:00.000Z'),
+            endExclusive: new Date('2026-03-01T00:00:00.000Z'),
+          },
+        },
       );
     });
 
@@ -875,6 +942,9 @@ describe('monthlyReportGenerate', () => {
         expect.any(String),
         SAMPLE_METRICS,
         null, // previousMetrics is null
+        expect.objectContaining({
+          totals: expect.objectContaining({ activitiesCompleted: 0 }),
+        }),
       );
     });
 
@@ -922,6 +992,9 @@ describe('monthlyReportGenerate', () => {
         expect.any(String),
         SAMPLE_METRICS,
         null,
+        expect.objectContaining({
+          totals: expect.objectContaining({ activitiesCompleted: 0 }),
+        }),
       );
     });
 
@@ -1233,6 +1306,9 @@ describe('monthlyReportGenerate', () => {
         expect.any(String),
         laterMetrics, // last() snapshot used
         null,
+        expect.objectContaining({
+          totals: expect.objectContaining({ activitiesCompleted: 0 }),
+        }),
       );
     });
   });

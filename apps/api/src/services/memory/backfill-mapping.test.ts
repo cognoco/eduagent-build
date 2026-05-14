@@ -1,6 +1,7 @@
 import {
   buildBackfillRowsForProfile,
   normalizeMemoryText,
+  type MemoryFactInsert,
 } from './backfill-mapping';
 
 describe('memory facts backfill mapping', () => {
@@ -37,18 +38,20 @@ describe('memory facts backfill mapping', () => {
     });
 
     expect(result.malformed).toEqual([]);
-    expect(result.rows.map((row) => row.category)).toEqual([
+    expect(result.rows.map((row: MemoryFactInsert) => row.category)).toEqual([
       'strength',
       'struggle',
       'interest',
       'communication_note',
       'suppressed',
     ]);
-    expect(result.rows.find((row) => row.category === 'interest')).toEqual(
+    expect(
+      result.rows.find((row: MemoryFactInsert) => row.category === 'interest'),
+    ).toEqual(
       expect.objectContaining({
         text: 'space',
         observedAt: new Date('2026-04-29T10:00:00.000Z'),
-      })
+      }),
     );
   });
 });

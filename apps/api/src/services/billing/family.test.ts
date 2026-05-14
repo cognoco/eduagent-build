@@ -12,7 +12,7 @@ jest.mock('@eduagent/database', () => {
 import type { Database } from '@eduagent/database';
 
 import * as settingsService from '../settings';
-import { getUsageBreakdownForProfile } from './family';
+import { getUsageBreakdownForProfile, type UsageBreakdown } from './family';
 
 function createUsageBreakdownDb(input: {
   viewer: {
@@ -48,20 +48,20 @@ function createUsageBreakdownDb(input: {
           isOwner: input.viewer.isOwner,
           accountId: 'account-1',
         },
-      ])
+      ]),
     )
     .mockReturnValueOnce(
       selectLimit(
         input.viewer.familyOwnerProfileId
           ? [{ id: input.viewer.familyOwnerProfileId }]
-          : []
-      )
+          : [],
+      ),
     )
     .mockReturnValueOnce(
-      selectLimit(input.viewer.hasChildLink ? [{ id: 'parent-link-1' }] : [])
+      selectLimit(input.viewer.hasChildLink ? [{ id: 'parent-link-1' }] : []),
     )
     .mockReturnValueOnce(
-      selectLimit(input.viewer.isChild ? [{ id: 'child-link-1' }] : [])
+      selectLimit(input.viewer.isChild ? [{ id: 'child-link-1' }] : []),
     )
     .mockReturnValueOnce({
       from: jest.fn().mockReturnValue({
@@ -128,11 +128,11 @@ describe('getUsageBreakdownForProfile family-pool sharing', () => {
     });
 
     expect(result.isOwnerBreakdownViewer).toBe(true);
-    expect(result.byProfile.map((row) => row.profile_id)).toEqual([
-      'owner-1',
-      'coparent-1',
-      'child-1',
-    ]);
+    expect(
+      result.byProfile.map(
+        (row: UsageBreakdown['byProfile'][number]) => row.profile_id,
+      ),
+    ).toEqual(['owner-1', 'coparent-1', 'child-1']);
     expect(result.familyAggregate).toEqual({ used: 22, limit: 100 });
   });
 
@@ -270,7 +270,11 @@ describe('getUsageBreakdownForProfile family-pool sharing', () => {
     });
 
     expect(result.isOwnerBreakdownViewer).toBe(false);
-    expect(result.byProfile.map((row) => row.profile_id)).toEqual(['adult-1']);
+    expect(
+      result.byProfile.map(
+        (row: UsageBreakdown['byProfile'][number]) => row.profile_id,
+      ),
+    ).toEqual(['adult-1']);
     expect(result.familyAggregate).toBeNull();
   });
 });

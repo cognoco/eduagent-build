@@ -22,6 +22,12 @@ import {
   substituteHistory,
   type HistoryTurn,
 } from '../fixtures/exchange-histories';
+import {
+  HISTORY_APP_HELP_MEMORY,
+  HISTORY_APP_HELP_MODES,
+  HISTORY_APP_HELP_NOTES,
+  HISTORY_APP_HELP_PREFERENCES,
+} from '../fixtures/exchange-histories-app-help';
 import type { FlowDefinition, PromptMessages, Scenario } from '../runner/types';
 
 // ---------------------------------------------------------------------------
@@ -317,6 +323,66 @@ const SCENARIO_SPECS: readonly ScenarioSpec[] = [
     },
     appliesTo: () => true,
   },
+  {
+    id: 'S16-app-help-notes',
+    purpose: 'App-help: user asks where to find notes mid-session',
+    history: HISTORY_APP_HELP_NOTES,
+    contextOverrides: {
+      escalationRung: 1,
+      sessionType: 'learning',
+      verificationType: 'standard',
+      exchangeCount: 1,
+      isFirstEncounter: false,
+      isFirstSessionOfSubject: false,
+      retentionStatus: { status: 'new' },
+    },
+    appliesTo: () => true,
+  },
+  {
+    id: 'S17-app-help-preferences',
+    purpose: 'App-help: user asks how to change learning preferences',
+    history: HISTORY_APP_HELP_PREFERENCES,
+    contextOverrides: {
+      escalationRung: 1,
+      sessionType: 'learning',
+      verificationType: 'standard',
+      exchangeCount: 1,
+      isFirstEncounter: false,
+      isFirstSessionOfSubject: false,
+      retentionStatus: { status: 'new' },
+    },
+    appliesTo: () => true,
+  },
+  {
+    id: 'S18-app-help-modes',
+    purpose: 'App-help: user asks about Explorer vs Challenge mode',
+    history: HISTORY_APP_HELP_MODES,
+    contextOverrides: {
+      escalationRung: 1,
+      sessionType: 'learning',
+      verificationType: 'standard',
+      exchangeCount: 1,
+      isFirstEncounter: false,
+      isFirstSessionOfSubject: false,
+      retentionStatus: { status: 'new' },
+    },
+    appliesTo: () => true,
+  },
+  {
+    id: 'S19-app-help-memory',
+    purpose: 'App-help: user asks where to see mentor memory',
+    history: HISTORY_APP_HELP_MEMORY,
+    contextOverrides: {
+      escalationRung: 1,
+      sessionType: 'learning',
+      verificationType: 'standard',
+      exchangeCount: 1,
+      isFirstEncounter: false,
+      isFirstSessionOfSubject: false,
+      retentionStatus: { status: 'new' },
+    },
+    appliesTo: () => true,
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -542,7 +608,7 @@ export const exchangesFlow: FlowDefinition<ExchangeScenarioInput> = {
     const history = input.context.exchangeHistory;
     const lastUserIndex = (() => {
       for (let i = history.length - 1; i >= 0; i--) {
-        if (history[i].role === 'user') return i;
+        if (history[i]!.role === 'user') return i;
       }
       return -1;
     })();

@@ -101,6 +101,26 @@ const WEEKLY_REPORT = {
   createdAt: '2026-05-11T00:00:00.000Z',
 };
 
+const PRACTICE_SUMMARY = {
+  quizzesCompleted: 2,
+  reviewsCompleted: 1,
+  totals: {
+    activitiesCompleted: 3,
+    reviewsCompleted: 1,
+    pointsEarned: 20,
+    celebrations: 1,
+    distinctActivityTypes: 2,
+  },
+  scores: {
+    scoredActivities: 0,
+    score: 0,
+    total: 0,
+    accuracy: null,
+  },
+  byType: [],
+  bySubject: [],
+};
+
 describe('ProgressWeeklyReportDetail', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -200,6 +220,46 @@ describe('ProgressWeeklyReportDetail', () => {
     screen.getByText('5');
     screen.getByText('Time on app');
     screen.getByText('1h 15m');
+    screen.getByTestId('progress-weekly-report-metric-sessions');
+    screen.getByTestId('progress-weekly-report-metric-minutes');
+    screen.getByTestId('progress-weekly-report-metric-tests');
+    screen.getByTestId('progress-weekly-report-metric-test-points');
+  });
+
+  it('renders the practice summary card when practice data is present', () => {
+    mockUseProfileWeeklyReportDetail.mockReturnValue({
+      data: {
+        ...WEEKLY_REPORT,
+        reportData: {
+          ...WEEKLY_REPORT.reportData,
+          practiceSummary: PRACTICE_SUMMARY,
+        },
+      },
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: mockRefetch,
+    });
+
+    render(<ProgressWeeklyReportDetail />);
+
+    screen.getByTestId('progress-weekly-report-practice-summary');
+  });
+
+  it('hides the practice summary card when practice data is absent', () => {
+    mockUseProfileWeeklyReportDetail.mockReturnValue({
+      data: WEEKLY_REPORT,
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: mockRefetch,
+    });
+
+    render(<ProgressWeeklyReportDetail />);
+
+    expect(
+      screen.queryByTestId('progress-weekly-report-practice-summary'),
+    ).toBeNull();
   });
 
   it('shows the reportGone state when data is null and there is no loading or error', () => {

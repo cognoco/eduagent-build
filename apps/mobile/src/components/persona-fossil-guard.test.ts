@@ -9,19 +9,7 @@ import { resolve } from 'node:path';
 // Remove entries from KNOWN_SITES as P7 migrates each file.
 
 const KNOWN_SITES = new Set<string>([
-  'apps/mobile/src/lib/profile.ts',
-  'apps/mobile/src/lib/consent-copy.ts',
-  'apps/mobile/src/lib/consent-copy.test.ts',
   'apps/mobile/src/app/create-profile.test.tsx',
-  'apps/mobile/src/app/(app)/_layout.tsx',
-  'apps/mobile/src/app/(app)/_layout.test.tsx',
-  'apps/mobile/src/app/(app)/session/index.tsx',
-  'apps/mobile/src/app/(app)/mentor-memory.tsx',
-  'apps/mobile/src/app/(app)/mentor-memory.test.tsx',
-  'apps/mobile/src/app/(app)/topic/relearn.tsx',
-  'apps/mobile/src/app/(app)/topic/relearn.test.tsx',
-  'apps/mobile/src/app/session-summary/[sessionId].tsx',
-  'apps/mobile/src/app/session-summary/[sessionId].test.tsx',
 ]);
 
 const FOSSIL_PATTERNS: RegExp[] = [

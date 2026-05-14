@@ -38,7 +38,7 @@ export const guessWhoFlow: FlowDefinition<GuessWhoPromptParams> = {
       recentAnswers: profile.recentQuizAnswers.guessWho,
       topicTitles: profile.libraryTopics,
       themePreference: undefined,
-      interests: toInterests(profile.interests),
+      interests: toInterests(profile.interests.map((e) => e.label)),
       libraryTopics: profile.libraryTopics,
       ageYears: profile.ageYears,
     };
@@ -67,14 +67,14 @@ export const guessWhoFlow: FlowDefinition<GuessWhoPromptParams> = {
 
   async runLive(
     _input: GuessWhoPromptParams,
-    messages: PromptMessages
+    messages: PromptMessages,
   ): Promise<string> {
     return callLlm(
       [
         { role: 'system', content: messages.system },
         { role: 'user', content: messages.user ?? 'Generate the quiz round.' },
       ],
-      { flow: 'quiz-guess-who', rung: 1 }
+      { flow: 'quiz-guess-who', rung: 1 },
     );
   },
 };

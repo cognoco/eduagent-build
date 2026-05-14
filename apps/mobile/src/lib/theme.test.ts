@@ -1,6 +1,6 @@
 import { renderHook } from '@testing-library/react-native';
 import React from 'react';
-import { tokens, accentPresets } from './design-tokens';
+import { tokens, accentPresets, type AccentPreset } from './design-tokens';
 import { ThemeContext, useTheme, useThemeColors, useTokenVars } from './theme';
 import type { ThemeContextValue } from './theme';
 
@@ -87,7 +87,7 @@ describe('useThemeColors', () => {
       wrapper: createWrapper(ctx),
     });
 
-    const preset = accentPresets.find((p) => p.id === presetId)!;
+    const preset = accentPresets.find((p: AccentPreset) => p.id === presetId)!;
     expect(result.current.primary).toBe(preset.light.primary);
   });
 

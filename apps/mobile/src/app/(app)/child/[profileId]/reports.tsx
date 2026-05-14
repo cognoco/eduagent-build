@@ -1,6 +1,7 @@
 import { Pressable, ScrollView, Text, View } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import type { WeeklyReportSummary } from '@eduagent/schemas';
 import { useChildDetail } from '../../../../hooks/use-dashboard';
 import {
   useChildReports,
@@ -8,6 +9,7 @@ import {
 } from '../../../../hooks/use-progress';
 import { FAMILY_HOME_PATH, goBackOrReplace } from '../../../../lib/navigation';
 import { useTranslation } from 'react-i18next';
+import { ReportsList } from '../../../../components/progress/ReportsList';
 
 /** Returns the formatted next report date and a human-friendly time context. */
 export function getNextReportInfo(now = new Date()): {
@@ -43,6 +45,57 @@ export function getNextReportInfo(now = new Date()): {
   return { date: formattedDate, timeContext };
 }
 
+function formatReportWeek(reportWeek: string): string {
+  const start = new Date(`${reportWeek}T00:00:00Z`);
+  if (Number.isNaN(start.getTime())) return 'Latest week';
+  const end = new Date(start.getTime());
+  end.setUTCDate(end.getUTCDate() + 6);
+  const startLabel = start.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  });
+  const endLabel = end.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+  return `${startLabel} – ${endLabel}`;
+}
+
+function ReportsHeaderSummary({
+  latestReport,
+}: {
+  latestReport: WeeklyReportSummary | undefined;
+}): React.ReactElement | null {
+  if (!latestReport?.headlineStat) return null;
+  const { headlineStat, thisWeek } = latestReport;
+  return (
+    <View
+      testID="reports-header-summary"
+      className="bg-coaching-card rounded-card p-5 mt-4"
+    >
+      <Text className="text-caption text-text-secondary">
+        {formatReportWeek(latestReport.reportWeek)}
+      </Text>
+      <Text className="text-h3 font-semibold text-text-primary mt-2">
+        {headlineStat.label}: {headlineStat.value}
+      </Text>
+      {headlineStat.comparison ? (
+        <Text className="text-body-sm text-text-secondary mt-1">
+          {headlineStat.comparison}
+        </Text>
+      ) : null}
+      {thisWeek ? (
+        <Text className="text-caption text-text-secondary mt-2">
+          {thisWeek.totalSessions} sessions · {thisWeek.totalActiveMinutes} min
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
 export default function ChildReportsScreen(): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
@@ -69,6 +122,15 @@ export default function ChildReportsScreen(): React.ReactElement {
   } = useChildWeeklyReports(profileId);
   const childName = child?.displayName ?? t('parentView.index.yourChild');
 
+  const combinedLoading = isLoading || weeklyLoading;
+  const hasAnyData =
+    (reports?.length ?? 0) > 0 || (weeklyReports?.length ?? 0) > 0;
+  // [CCR finding, 2026-05-14] Prior version was `!hasAnyData && isError`,
+  // which silently swallowed weekly-only failures: weekly down + monthly up
+  // showed neither an error banner nor a retry path. The retry handler
+  // already calls both refetches, so widening this condition is sufficient.
+  const combinedError = !hasAnyData && (isError || weeklyError);
+
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
       <ScrollView
@@ -90,9 +152,7 @@ export default function ChildReportsScreen(): React.ReactElement {
             accessibilityLabel={t('common.goBack')}
             testID="child-reports-back"
           >
-            <Text className="text-body font-semibold text-primary">
-              {'\u2190'}
-            </Text>
+            <Text className="text-body font-semibold text-primary">{'←'}</Text>
           </Pressable>
           <View className="flex-1">
             <Text className="text-h2 font-bold text-text-primary">
@@ -104,123 +164,15 @@ export default function ChildReportsScreen(): React.ReactElement {
           </View>
         </View>
 
-        {weeklyLoading ? (
-          <View className="bg-surface rounded-card p-4 mt-4">
-            <Text className="text-body-sm text-text-secondary">
-              {t('parentView.reports.loadingWeeklySnapshots')}
-            </Text>
-          </View>
-        ) : weeklyError && !weeklyReports ? (
-          <View
-            className="bg-surface rounded-card p-4 mt-4"
-            testID="weekly-reports-error"
-          >
-            <Text className="text-body font-semibold text-text-primary">
-              {t('parentView.reports.couldNotLoadWeeklySnapshots')}
-            </Text>
-            <Text className="text-body-sm text-text-secondary mt-1">
-              {t('parentView.reports.checkConnectionRetry')}
-            </Text>
-            <Pressable
-              onPress={() => void weeklyRefetch()}
-              className="bg-primary rounded-button px-4 py-3 mt-3 items-center min-h-[48px] justify-center"
-              accessibilityRole="button"
-              accessibilityLabel={t('parentView.reports.retryWeeklySnapshots')}
-              testID="weekly-reports-error-retry"
-            >
-              <Text className="text-body font-semibold text-text-inverse">
-                {t('common.tryAgain')}
-              </Text>
-            </Pressable>
-          </View>
-        ) : weeklyReports && weeklyReports.length > 0 ? (
-          <View className="mt-4">
-            <Text
-              className="text-body font-semibold text-text-primary mb-2"
-              testID="weekly-reports-heading"
-            >
-              {t('parentView.reports.weeklySnapshots')}
-            </Text>
-            {weeklyReports.map((report) => (
-              <Pressable
-                key={report.id}
-                className="bg-surface rounded-card p-4 mb-3"
-                testID={`weekly-report-card-${report.id}`}
-                onPress={() =>
-                  router.push({
-                    pathname:
-                      '/(app)/child/[profileId]/weekly-report/[weeklyReportId]',
-                    params: { profileId, weeklyReportId: report.id },
-                  } as never)
-                }
-                accessibilityRole="button"
-                accessibilityLabel={`${t(
-                  'parentView.reports.weekOf',
-                )} ${new Date(
-                  `${report.reportWeek}T00:00:00Z`,
-                ).toLocaleDateString(undefined, {
-                  month: 'short',
-                  day: 'numeric',
-                })}. ${report.headlineStat.label}: ${
-                  report.headlineStat.value
-                }`}
-              >
-                <View className="flex-row items-start justify-between">
-                  <View className="flex-1 me-3">
-                    <Text className="text-body font-semibold text-text-primary">
-                      {t('parentView.reports.weekOf')}{' '}
-                      {new Date(
-                        `${report.reportWeek}T00:00:00Z`,
-                      ).toLocaleDateString(undefined, {
-                        month: 'short',
-                        day: 'numeric',
-                      })}
-                    </Text>
-                    <Text className="text-body-sm text-text-secondary mt-1">
-                      {report.headlineStat.label}: {report.headlineStat.value}
-                    </Text>
-                    <Text className="text-caption text-text-secondary mt-1">
-                      {report.headlineStat.comparison}
-                    </Text>
-                  </View>
-                  {!report.viewedAt ? (
-                    <View className="bg-accent/15 rounded-full px-3 py-1">
-                      <Text className="text-caption font-semibold text-accent">
-                        {t('parentView.reports.newBadge')}
-                      </Text>
-                    </View>
-                  ) : null}
-                </View>
-              </Pressable>
-            ))}
-          </View>
-        ) : (
-          <View
-            className="bg-surface rounded-card p-4 mt-4"
-            testID="weekly-reports-empty"
-          >
-            <Text className="text-body font-semibold text-text-primary">
-              {t('parentView.reports.weeklySnapshots')}
-            </Text>
-            <Text className="text-body-sm text-text-secondary mt-1">
-              {t('parentView.reports.weeklySnapshotsEmpty', {
-                name: childName,
-              })}
-            </Text>
-          </View>
-        )}
+        <ReportsHeaderSummary latestReport={weeklyReports?.[0]} />
 
-        <Text className="text-body font-semibold text-text-primary mt-4 mb-2">
-          {t('parentView.reports.monthlyReports')}
-        </Text>
-
-        {isLoading ? (
+        {combinedLoading ? (
           <View className="bg-surface rounded-card p-4 mt-4">
             <Text className="text-body-sm text-text-secondary">
               {t('parentView.reports.loadingReports')}
             </Text>
           </View>
-        ) : isError && !reports ? (
+        ) : combinedError ? (
           // [EP15-I3] Prior version destructured only `data, isLoading`.
           // On API failure users saw the "no reports yet" empty state and
           // thought their child had no learning activity, when really the
@@ -237,7 +189,10 @@ export default function ChildReportsScreen(): React.ReactElement {
             </Text>
             <View className="flex-row gap-3 mt-4">
               <Pressable
-                onPress={() => void refetch()}
+                onPress={() => {
+                  void refetch();
+                  void weeklyRefetch();
+                }}
                 className="bg-primary rounded-button px-4 py-3 items-center flex-1 min-h-[48px] justify-center"
                 accessibilityRole="button"
                 accessibilityLabel={t('parentView.reports.retryReports')}
@@ -267,54 +222,31 @@ export default function ChildReportsScreen(): React.ReactElement {
               </Pressable>
             </View>
           </View>
-        ) : reports && reports.length > 0 ? (
-          reports.map((report) => (
-            <Pressable
-              key={report.id}
-              onPress={() => {
+        ) : hasAnyData ? (
+          <View className="mt-4">
+            <ReportsList
+              monthlyReports={reports ?? []}
+              weeklyReports={weeklyReports ?? []}
+              onPressMonthly={(reportId) => {
                 if (!profileId) return;
                 router.push({
                   pathname: '/(app)/child/[profileId]/report/[reportId]',
-                  params: { profileId, reportId: report.id },
-                } as never);
+                  params: { profileId, reportId },
+                } as Href);
               }}
-              className="bg-surface rounded-card p-4 mt-4"
-              accessibilityRole="button"
-              accessibilityLabel={t('parentView.reports.openReport', {
-                month: report.reportMonth,
-              })}
-              testID={`report-card-${report.id}`}
-            >
-              <View className="flex-row items-start justify-between">
-                <View className="flex-1 me-3">
-                  <Text className="text-body font-semibold text-text-primary">
-                    {new Date(
-                      `${report.reportMonth}T00:00:00Z`,
-                    ).toLocaleDateString(undefined, {
-                      month: 'long',
-                      year: 'numeric',
-                    })}
-                  </Text>
-                  <Text className="text-body-sm text-text-secondary mt-1">
-                    {report.headlineStat.label}: {report.headlineStat.value}
-                  </Text>
-                  <Text className="text-caption text-text-secondary mt-1">
-                    {report.headlineStat.comparison}
-                  </Text>
-                </View>
-                {!report.viewedAt ? (
-                  <View className="bg-accent/15 rounded-full px-3 py-1">
-                    <Text className="text-caption font-semibold text-accent">
-                      {t('parentView.reports.newBadge')}
-                    </Text>
-                  </View>
-                ) : null}
-              </View>
-            </Pressable>
-          ))
+              onPressWeekly={(reportId) => {
+                router.push({
+                  pathname:
+                    '/(app)/child/[profileId]/weekly-report/[weeklyReportId]',
+                  params: { profileId, weeklyReportId: reportId },
+                } as Href);
+              }}
+              showNewBadge
+            />
+          </View>
         ) : (
           <View
-            className="bg-surface rounded-card p-5 mt-4 items-center"
+            className="bg-surface rounded-card p-4 mt-4 items-center"
             testID="child-reports-empty"
           >
             {(() => {

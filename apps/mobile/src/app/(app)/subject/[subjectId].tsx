@@ -1,6 +1,7 @@
 import { View, Text, Pressable, ScrollView } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AnalogyDomainPicker, ErrorFallback } from '../../../components/common';
@@ -71,14 +72,14 @@ export default function SubjectSettingsScreen() {
             router.replace({
               pathname: '/(app)/shelf/[subjectId]',
               params: { subjectId },
-            } as never)
+            } as Href)
           }
           className="me-3 p-2 min-h-[44px] min-w-[44px] items-center justify-center"
           testID="subject-settings-back"
           accessibilityLabel={t('common.goBack')}
           accessibilityRole="button"
         >
-          <Text className="text-primary text-h3">&larr;</Text>
+          <Ionicons name="arrow-back" size={26} className="text-primary" />
         </Pressable>
         <Text
           className="text-h2 font-bold text-text-primary flex-1"

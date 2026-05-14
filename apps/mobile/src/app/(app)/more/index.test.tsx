@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import React from 'react';
+import { Text } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const mockPush = jest.fn();
@@ -117,14 +118,26 @@ describe('MoreScreen landing', () => {
       isOwner: true,
       birthYear: 1990,
     };
-    mockProfiles = [mockActiveProfile];
+    mockProfiles = [
+      mockActiveProfile,
+      {
+        id: 'profile-2',
+        displayName: 'Sam',
+        isOwner: false,
+        birthYear: 2015,
+      },
+    ];
     mockIsParentProxy = false;
   });
 
   it('renders the master/detail landing rows', () => {
-    render(<MoreScreen />, { wrapper: createWrapper() });
+    const { root } = render(<MoreScreen />, { wrapper: createWrapper() });
 
     screen.getByTestId('more-row-learning-preferences');
+    screen.getByText('Your learning');
+    screen.getByText('Preferences');
+    screen.getByTestId('more-row-mentor-memory');
+    screen.getByTestId('more-row-mentor-language');
     screen.getByTestId('add-child-link');
     screen.getByTestId('more-row-notifications');
     screen.getByTestId('more-row-account');
@@ -135,6 +148,25 @@ describe('MoreScreen landing', () => {
       screen.queryByTestId('learning-accommodation-section-header'),
     ).toBeNull();
     expect(screen.queryByTestId('mentor-memory-link')).toBeNull();
+    screen.getByTestId('family-breakdown-sharing-toggle');
+    screen.getByText('Share family usage');
+    screen.getByText('Show usage per profile.');
+
+    const textValues = root
+      .findAllByType(Text)
+      .map((node: { props: { children: unknown } }) => node.props.children);
+    expect(textValues.indexOf('Your learning')).toBeLessThan(
+      textValues.indexOf('Preferences'),
+    );
+    expect(textValues.indexOf('Preferences')).toBeLessThan(
+      textValues.indexOf('Mentor memory'),
+    );
+    expect(textValues.indexOf('Mentor memory')).toBeLessThan(
+      textValues.indexOf('Mentor language'),
+    );
+    expect(textValues.indexOf('Mentor language')).toBeLessThan(
+      textValues.indexOf('Profile'),
+    );
   });
 
   it('navigates to the learning-preferences screen', () => {
@@ -188,7 +220,10 @@ describe('MoreScreen landing', () => {
 
     fireEvent.press(screen.getByTestId('add-child-link'));
 
-    expect(mockPush).toHaveBeenCalledWith('/create-profile?for=child');
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/create-profile',
+      params: { for: 'child' },
+    });
   });
 
   it('hides sign out in impersonation', () => {

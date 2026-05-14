@@ -46,16 +46,19 @@ const mockUseLearningResumeTarget = jest.fn();
 const mockStartFirstCurriculumMutateAsync = jest.fn();
 
 jest.mock('../../../../../hooks/use-books', () => ({
+  ...jest.requireActual('../../../../../hooks/use-books'),
   useBookWithTopics: () => mockUseBookWithTopics(),
   useBooks: () => mockUseBooks(),
   useGenerateBookTopics: () => mockUseGenerateBookTopics(),
 }));
 
 jest.mock('../../../../../hooks/use-book-sessions', () => ({
+  ...jest.requireActual('../../../../../hooks/use-book-sessions'),
   useBookSessions: () => mockUseBookSessions(),
 }));
 
 jest.mock('../../../../../hooks/use-notes', () => ({
+  ...jest.requireActual('../../../../../hooks/use-notes'),
   useBookNotes: () => mockUseBookNotes(),
   useCreateNote: () => ({ mutate: jest.fn(), isPending: false }),
   useUpdateNote: () => ({ mutate: jest.fn(), isPending: false }),
@@ -63,14 +66,17 @@ jest.mock('../../../../../hooks/use-notes', () => ({
 }));
 
 jest.mock('../../../../../hooks/use-retention', () => ({
+  ...jest.requireActual('../../../../../hooks/use-retention'),
   useRetentionTopics: () => mockUseRetentionTopics(),
 }));
 
 jest.mock('../../../../../hooks/use-curriculum', () => ({
+  ...jest.requireActual('../../../../../hooks/use-curriculum'),
   useCurriculum: () => mockUseCurriculum(),
 }));
 
 jest.mock('../../../../../hooks/use-progress', () => ({
+  ...jest.requireActual('../../../../../hooks/use-progress'),
   useLearningResumeTarget: () => mockUseLearningResumeTarget(),
 }));
 
@@ -85,16 +91,19 @@ jest.mock(
 );
 
 jest.mock('../../../../../hooks/use-subjects', () => ({
+  ...jest.requireActual('../../../../../hooks/use-subjects'),
   useSubjects: () => ({
     data: [{ id: 'sub-1', name: 'Mathematics' }],
   }),
 }));
 
 jest.mock('../../../../../hooks/use-move-topic', () => ({
+  ...jest.requireActual('../../../../../hooks/use-move-topic'),
   useMoveTopic: () => ({ mutate: jest.fn(), isPending: false }),
 }));
 
 jest.mock('../../../../../lib/theme', () => ({
+  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
   useThemeColors: () => ({
     accent: '#00bfa5',
     primary: '#0d9488',
@@ -107,11 +116,13 @@ jest.mock('../../../../../lib/theme', () => ({
 }));
 
 jest.mock('../../../../../lib/format-api-error', () => ({
+  ...jest.requireActual('../../../../../lib/format-api-error'),
   formatApiError: (error: unknown) =>
     error instanceof Error ? error.message : 'Unknown error',
 }));
 
 jest.mock('../../../../../components/common', () => ({
+  // gc1-allow: Reanimated worklets + react-native-svg cannot run in JSDOM
   BookPageFlipAnimation: () => null,
   MagicPenAnimation: () => null,
   CelebrationAnimation: () => null,
@@ -539,7 +550,7 @@ describe('BookScreen', () => {
     fireEvent.press(getByTestId('book-start-learning'));
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/topic/[topicId]',
-      params: { topicId: 'topic-1', subjectId: 'sub-1' },
+      params: { topicId: 'topic-1', subjectId: 'sub-1', bookId: 'book-1' },
     });
   });
 

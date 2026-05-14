@@ -11,9 +11,15 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
+import {
+  Redirect,
+  useLocalSearchParams,
+  useRouter,
+  type Href,
+} from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
+import type { Translate } from '../../../i18n';
 
 import type { QuizActivityType, QuizStats } from '@eduagent/schemas';
 
@@ -24,6 +30,7 @@ import { useReviewSummary } from '../../../hooks/use-progress';
 import { useParentProxy } from '../../../hooks/use-parent-proxy';
 import { useAssessmentEligibleTopics } from '../../../hooks/use-assessments';
 import { useTheme, useThemeColors } from '../../../lib/theme';
+import { getSubjectTint } from '../../../lib/subject-tints';
 
 const PRACTICE_WEB_MAX_WIDTH = 560;
 
@@ -38,26 +45,26 @@ function usePracticeColors() {
     muted: theme.textSecondary,
     line: theme.border,
     surface: theme.surface,
-    reviewBg: isDark ? '#1a2e24' : '#effcf5',
-    reviewBorder: isDark ? '#2a5040' : '#b9ddc8',
+    reviewBg: theme.practiceReviewBg,
+    reviewBorder: theme.practiceReviewBorder,
     mint: theme.practiceMint,
-    quizBg: isDark ? '#1a2030' : '#f2f7ff',
-    quizBorder: isDark ? '#2a3a58' : '#b8ccec',
-    quiz: isDark ? '#5b8fd6' : '#386dbe',
-    dictationBg: isDark ? '#2a2518' : '#fff6df',
-    dictationBorder: isDark ? '#5a4a2a' : '#e6c883',
-    dictation: isDark ? '#d89830' : '#b46f00',
-    reciteBg: isDark ? '#221a30' : '#f4efff',
-    reciteBorder: isDark ? '#3a2a58' : '#c7bdf1',
-    recite: isDark ? '#9080e0' : '#7058c8',
-    history: isDark ? '#d06a82' : '#b64a62',
-    historyBorder: isDark ? '#4a2a34' : '#edbdc7',
-    chipBg: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.86)',
+    quizBg: theme.practiceQuizBg,
+    quizBorder: theme.practiceQuizBorder,
+    quiz: theme.practiceQuiz,
+    dictationBg: theme.practiceDictationBg,
+    dictationBorder: theme.practiceDictationBorder,
+    dictation: theme.practiceDictation,
+    reciteBg: theme.practiceReciteBg,
+    reciteBorder: theme.practiceReciteBorder,
+    recite: theme.practiceRecite,
+    history: theme.practiceHistory,
+    historyBorder: theme.practiceHistoryBorder,
+    chipBg: theme.practiceChipBg,
     chipText: theme.textPrimary,
     chipStrongText: theme.textInverse,
     primaryButtonBg: isDark ? theme.textPrimary : theme.practiceDarkTeal,
     xpPillBg: theme.practiceDarkTeal,
-    quizOptionBg: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.76)',
+    quizOptionBg: theme.practiceQuizOptionBg,
   };
 }
 
@@ -65,10 +72,7 @@ function pointerStyle(): StyleProp<ViewStyle> {
   return Platform.OS === 'web' ? ({ cursor: 'pointer' } as ViewStyle) : null;
 }
 
-function formatTimeUntil(
-  isoDate: string,
-  t: (key: string, opts?: Record<string, unknown>) => string,
-): string {
+function formatTimeUntil(isoDate: string, t: Translate): string {
   const diff = new Date(isoDate).getTime() - Date.now();
 
   if (diff <= 0) return t('practiceHub.review.timeSoon');
@@ -84,7 +88,7 @@ function formatTimeUntil(
 function getActivityCue(
   quizStats: QuizStats[] | undefined,
   activityType: QuizActivityType,
-  t: (key: string, opts?: Record<string, unknown>) => string,
+  t: Translate,
 ): string | null {
   const stats = quizStats?.find((stat) => stat.activityType === activityType);
 
@@ -112,7 +116,7 @@ function getActivityCue(
 
 function getQuizStatCue(
   stats: QuizStats | undefined,
-  t: (key: string, opts?: Record<string, unknown>) => string,
+  t: Translate,
 ): string | null {
   if (!stats) return null;
 
@@ -291,6 +295,7 @@ export default function PracticeScreen(): React.ReactElement {
   const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
   const insets = useSafeAreaInsets();
   const { isParentProxy } = useParentProxy();
+  const { colorScheme } = useTheme();
   const colors = usePracticeColors();
   const { data: reviewSummary, isError: reviewError } = useReviewSummary();
   const { data: quizStats, isError: statsError } = useQuizStats();
@@ -387,13 +392,13 @@ export default function PracticeScreen(): React.ReactElement {
     router.push({
       pathname: '/(app)/quiz',
       params: practiceReturnParams,
-    } as never);
+    } as Href);
 
   const openQuizActivity = (activityType: 'capitals' | 'guess_who') => {
     router.push({
       pathname: '/(app)/quiz/launch',
       params: { activityType, ...practiceReturnParams },
-    } as never);
+    } as Href);
   };
 
   const openVocabularyQuiz = (
@@ -408,12 +413,12 @@ export default function PracticeScreen(): React.ReactElement {
         languageName,
         ...practiceReturnParams,
       },
-    } as never);
+    } as Href);
   };
 
   const openAssessment = () => {
     if (assessmentCount > 0) {
-      router.push('/(app)/practice/assessment-picker' as never);
+      router.push('/(app)/practice/assessment-picker' as Href);
       return;
     }
 
@@ -421,11 +426,11 @@ export default function PracticeScreen(): React.ReactElement {
       router.push({
         pathname: '/(app)/shelf/[subjectId]',
         params: { subjectId: nextStudySubject.id },
-      } as never);
+      } as Href);
       return;
     }
 
-    router.push('/(app)/library' as never);
+    router.push('/(app)/library' as Href);
   };
 
   if (isParentProxy) return <Redirect href="/(app)/home" />;
@@ -497,7 +502,7 @@ export default function PracticeScreen(): React.ReactElement {
                   params: {
                     ...(returnTo ? { returnTo } : {}),
                   },
-                } as never)
+                } as Href)
               }
               accessibilityRole="button"
               accessibilityLabel={t('practiceHub.review.title')}
@@ -590,7 +595,7 @@ export default function PracticeScreen(): React.ReactElement {
                 <Pressable
                   testID="review-empty-browse"
                   className="mt-3"
-                  onPress={() => router.push('/(app)/library' as never)}
+                  onPress={() => router.push('/(app)/library' as Href)}
                 >
                   <Text className="text-body-sm text-primary font-semibold">
                     {t('practiceHub.review.browseTopics')}
@@ -626,7 +631,11 @@ export default function PracticeScreen(): React.ReactElement {
                     { backgroundColor: colors.mint },
                   ]}
                 >
-                  <Ionicons name="checkmark" size={24} color="#ffffff" />
+                  <Ionicons
+                    name="checkmark"
+                    size={24}
+                    color={colors.chipStrongText}
+                  />
                 </View>
                 <View className="flex-1">
                   <Text className="text-body font-semibold text-text-primary">
@@ -790,6 +799,7 @@ export default function PracticeScreen(): React.ReactElement {
                   ),
                   t,
                 );
+                const tint = getSubjectTint(subject.id, colorScheme);
                 return (
                   <Pressable
                     key={subject.id}
@@ -797,8 +807,8 @@ export default function PracticeScreen(): React.ReactElement {
                     style={[
                       styles.practiceModeCard,
                       {
-                        borderColor: colors.quizBorder,
-                        backgroundColor: colors.quizBg,
+                        borderColor: tint.solid + '33',
+                        backgroundColor: tint.soft,
                       },
                       pointerStyle(),
                     ]}
@@ -815,7 +825,7 @@ export default function PracticeScreen(): React.ReactElement {
                       <View
                         style={[
                           styles.smallIconCircle,
-                          { backgroundColor: colors.quiz },
+                          { backgroundColor: tint.solid },
                         ]}
                       >
                         <Text className="text-body font-bold text-text-inverse">
@@ -849,7 +859,7 @@ export default function PracticeScreen(): React.ReactElement {
                   },
                   pointerStyle(),
                 ]}
-                onPress={() => router.push('/(app)/dictation' as never)}
+                onPress={() => router.push('/(app)/dictation' as Href)}
                 accessibilityRole="button"
                 accessibilityLabel={t('practiceHub.dictation.title')}
                 testID="practice-dictation"
@@ -889,7 +899,7 @@ export default function PracticeScreen(): React.ReactElement {
                   router.push({
                     pathname: '/(app)/session',
                     params: { mode: 'recitation' },
-                  } as never)
+                  } as Href)
                 }
                 accessibilityRole="button"
                 accessibilityLabel={t('practiceHub.recitation.title')}
@@ -940,7 +950,7 @@ export default function PracticeScreen(): React.ReactElement {
                 router.push({
                   pathname: '/(app)/quiz/history',
                   params: practiceReturnParams,
-                } as never)
+                } as Href)
               }
               accessibilityRole="button"
               accessibilityLabel={t('practiceHub.history.title')}

@@ -1,8 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Pressable, ScrollView, Text, View } from 'react-native';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import type { AccommodationMode, CelebrationLevel } from '@eduagent/schemas';
 
@@ -32,7 +32,7 @@ export default function AccommodationScreen(): React.ReactElement {
   const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();
-  const { profiles } = useProfile();
+  const { activeProfile, profiles } = useProfile();
   const [showGuide, setShowGuide] = useState(false);
 
   const { childProfileId } = useLocalSearchParams<{
@@ -43,13 +43,17 @@ export default function AccommodationScreen(): React.ReactElement {
   const childProfile = isChildMode
     ? profiles.find((p) => p.id === childProfileId)
     : undefined;
+  const canEditChildPreferences =
+    isChildMode &&
+    activeProfile?.isOwner === true &&
+    childProfile?.isOwner === false;
   const childName = childProfile?.displayName;
 
   const selfLearner = useLearnerProfile();
   const childLearner = useChildLearnerProfile(
-    isChildMode ? childProfileId : undefined,
+    canEditChildPreferences ? childProfileId : undefined,
   );
-  const learnerQuery = isChildMode ? childLearner : selfLearner;
+  const learnerQuery = canEditChildPreferences ? childLearner : selfLearner;
   const {
     data: learnerProfile,
     isError: learnerProfileError,
@@ -60,9 +64,11 @@ export default function AccommodationScreen(): React.ReactElement {
 
   const selfCelebration = useCelebrationLevel();
   const childCelebration = useChildCelebrationLevel(
-    isChildMode ? childProfileId : undefined,
+    canEditChildPreferences ? childProfileId : undefined,
   );
-  const celebrationQuery = isChildMode ? childCelebration : selfCelebration;
+  const celebrationQuery = canEditChildPreferences
+    ? childCelebration
+    : selfCelebration;
   const { data: celebrationLevel = 'big_only', isLoading: celebrationLoading } =
     celebrationQuery;
 
@@ -70,6 +76,13 @@ export default function AccommodationScreen(): React.ReactElement {
   const updateChildCelebration = useUpdateChildCelebrationLevel();
 
   const currentMode = learnerProfile?.accommodationMode ?? 'none';
+
+  useEffect(() => {
+    if (!activeProfile) return;
+    if (isChildMode && !canEditChildPreferences) {
+      router.replace('/(app)/more' as Href);
+    }
+  }, [activeProfile, canEditChildPreferences, isChildMode, router]);
 
   const handleBack = useCallback(() => {
     goBackOrReplace(router, '/(app)/more/learning-preferences' as const);
@@ -79,7 +92,10 @@ export default function AccommodationScreen(): React.ReactElement {
     (mode: AccommodationMode) => {
       if (mode === currentMode) return;
       updateAccommodation.mutate(
-        { accommodationMode: mode, ...(isChildMode ? { childProfileId } : {}) },
+        {
+          accommodationMode: mode,
+          ...(canEditChildPreferences ? { childProfileId } : {}),
+        },
         {
           onError: () => {
             platformAlert(
@@ -90,12 +106,18 @@ export default function AccommodationScreen(): React.ReactElement {
         },
       );
     },
-    [currentMode, updateAccommodation, t, isChildMode, childProfileId],
+    [
+      currentMode,
+      updateAccommodation,
+      t,
+      canEditChildPreferences,
+      childProfileId,
+    ],
   );
 
   const handleSelectCelebrationLevel = (next: CelebrationLevel): void => {
     if (celebrationLevel === next) return;
-    if (isChildMode) {
+    if (canEditChildPreferences) {
       updateChildCelebration.mutate(
         { childProfileId, celebrationLevel: next },
         {
@@ -119,11 +141,11 @@ export default function AccommodationScreen(): React.ReactElement {
     }
   };
 
-  const celebrationPending = isChildMode
+  const celebrationPending = canEditChildPreferences
     ? updateChildCelebration.isPending
     : updateSelfCelebration.isPending;
 
-  const title = isChildMode
+  const title = canEditChildPreferences
     ? t('more.accommodation.childScreenTitle', { name: childName })
     : t('more.accommodation.sectionHeader');
 
@@ -132,12 +154,12 @@ export default function AccommodationScreen(): React.ReactElement {
       <View className="px-5 pt-4 pb-2 flex-row items-center">
         <Pressable
           onPress={handleBack}
-          className="me-3 py-2 pe-2"
+          className="me-3 p-2 min-h-[44px] min-w-[44px] items-center justify-center"
           accessibilityRole="button"
           accessibilityLabel={t('common.goBack')}
           testID="accommodation-back"
         >
-          <Text className="text-primary text-body font-semibold">{'←'}</Text>
+          <Ionicons name="arrow-back" size={24} color={colors.primary} />
         </Pressable>
         <Text
           className="text-h2 font-bold text-text-primary flex-1"

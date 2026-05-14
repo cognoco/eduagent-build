@@ -74,6 +74,18 @@ const KNOWN_DRIFT = new Set([
   'accent-swatch-indigo',
   // Parent/teen view switcher
   'switch-to-teen',
+  // Parent child-detail flows still reference selectors from the previous
+  // all-in-one child detail page. The current child detail route is scoped to
+  // profile settings, while reports, consent, and subject drill-down moved to
+  // separate surfaces/components. Track this as E2E drift until the parent
+  // Maestro flows are rewritten against the current navigation model.
+  'subject-card-Mathematics',
+  'child-reports-link',
+  'consent-section',
+  'withdraw-consent-button',
+  'grace-period-banner',
+  'cancel-deletion-button',
+  'subject-raw-input-Mathematics',
   // Password toggle on sign-in (removed or renamed in PasswordInput)
   'sign-in-password-toggle',
   // Library refactor in progress: empty-state component removed

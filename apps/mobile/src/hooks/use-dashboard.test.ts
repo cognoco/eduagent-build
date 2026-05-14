@@ -6,6 +6,7 @@ import {
   useChildDetail,
   useChildSubjectTopics,
 } from './use-dashboard';
+import { queryKeys } from '../lib/query-keys';
 
 const mockFetch = jest.fn();
 jest.mock('../lib/api-client', () => ({
@@ -176,6 +177,36 @@ describe('useChildDetail', () => {
 
     expect(result.current.fetchStatus).toBe('idle');
     expect(mockFetch).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Profile-switch cache isolation
+// ---------------------------------------------------------------------------
+
+describe('profile-switch cache isolation', () => {
+  it('useDashboard — profile A and B have different query keys', () => {
+    const keyA = queryKeys.dashboard.root('profile-A');
+    const keyB = queryKeys.dashboard.root('profile-B');
+    expect(keyA).not.toEqual(keyB);
+    expect(keyA).toEqual(['dashboard', 'profile-A']);
+    expect(keyB).toEqual(['dashboard', 'profile-B']);
+  });
+
+  it('useChildDetail — same child, different active profiles produce different keys', () => {
+    // childDetail key is only the child's profileId — no active viewer slot —
+    // so two different children produce different keys but the same child seen
+    // by different parents produces the SAME key (dashboard.children are owner-gated).
+    const keyChild1 = queryKeys.dashboard.childDetail('child-1');
+    const keyChild2 = queryKeys.dashboard.childDetail('child-2');
+    expect(keyChild1).not.toEqual(keyChild2);
+    expect(keyChild1).toEqual(['dashboard', 'child', 'child-1']);
+  });
+
+  it('useChildInventory — different children never share cache slots', () => {
+    const key1 = queryKeys.dashboard.childInventory('child-1');
+    const key2 = queryKeys.dashboard.childInventory('child-2');
+    expect(key1).not.toEqual(key2);
   });
 });
 

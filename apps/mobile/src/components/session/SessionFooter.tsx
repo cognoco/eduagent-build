@@ -7,7 +7,7 @@ import type { useFiling } from '../../hooks/use-filing';
 import type { useCreateNote } from '../../hooks/use-notes';
 import { formatApiError } from '../../lib/format-api-error';
 import { platformAlert } from '../../lib/platform-alert';
-import type { Router } from 'expo-router';
+import type { Href, Router } from 'expo-router';
 import type { useThemeColors } from '../../lib/theme';
 
 export interface SessionFooterProps {
@@ -24,6 +24,7 @@ export interface SessionFooterProps {
     filedBookId?: string,
   ) => void;
   router: Router;
+  homeHref?: Href;
   sessionExpired: boolean;
   notePromptOffered: boolean;
   showNoteInput: boolean;
@@ -49,6 +50,7 @@ export function SessionFooter({
   setFilingDismissed,
   navigateToSessionSummary,
   router,
+  homeHref = '/(app)/home' as Href,
   sessionExpired,
   notePromptOffered,
   showNoteInput,
@@ -85,7 +87,7 @@ export function SessionFooter({
             {t('session.expired.message')}
           </Text>
           <Pressable
-            onPress={() => router.replace('/(app)/home' as never)}
+            onPress={() => router.replace(homeHref as Href)}
             className="bg-primary rounded-button py-3 items-center"
             testID="session-expired-go-home"
             accessibilityRole="button"
@@ -118,7 +120,9 @@ export function SessionFooter({
       {showNoteInput ? (
         <View className="px-4 mb-2">
           <NoteInput
-            placeholder="Summarize this in your own words..."
+            placeholder={t('session.notePrompt.summaryPlaceholder', {
+              defaultValue: 'Summarize this in your own words...',
+            })}
             onSave={(content) => {
               if (!topicId) {
                 platformAlert(

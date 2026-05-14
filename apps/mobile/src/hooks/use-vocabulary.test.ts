@@ -6,6 +6,7 @@ import {
   useCreateVocabulary,
   useReviewVocabulary,
 } from './use-vocabulary';
+import { queryKeys } from '../lib/query-keys';
 
 const mockFetch = jest.fn();
 jest.mock('../lib/api-client', () => ({
@@ -280,5 +281,31 @@ describe('useReviewVocabulary', () => {
     );
 
     invalidateSpy.mockRestore();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Profile-switch cache isolation
+// ---------------------------------------------------------------------------
+
+describe('profile-switch cache isolation', () => {
+  it('vocabulary.subject — same subject, different profiles produce different keys', () => {
+    const keyA = queryKeys.vocabulary.subject('profile-A', 'sub-1');
+    const keyB = queryKeys.vocabulary.subject('profile-B', 'sub-1');
+    expect(keyA).not.toEqual(keyB);
+    expect(keyA).toEqual(['vocabulary', 'profile-A', 'sub-1']);
+  });
+
+  it('languageProgress.subject — same subject, different profiles are isolated', () => {
+    const keyA = queryKeys.languageProgress.subject('profile-A', 'sub-1');
+    const keyB = queryKeys.languageProgress.subject('profile-B', 'sub-1');
+    expect(keyA).not.toEqual(keyB);
+    expect(keyA).toEqual(['language-progress', 'profile-A', 'sub-1']);
+  });
+
+  it('vocabulary.subject — undefined vs defined profile are isolated', () => {
+    const keyDefined = queryKeys.vocabulary.subject('profile-A', 'sub-1');
+    const keyUndefined = queryKeys.vocabulary.subject(undefined, 'sub-1');
+    expect(keyDefined).not.toEqual(keyUndefined);
   });
 });

@@ -58,8 +58,24 @@ export {
   flagContent,
   claimSessionForFilingRetry,
   getResumeNudgeCandidate,
+  // Profile session list (extracted from dashboard.ts — PR-2)
+  getProfileSessions,
+  getSessionMetadata,
+  formatSessionDisplayTitle,
+  parseEngagementSignal,
 } from './session-crud';
-export type { ResumeNudgeCandidate } from './session-crud';
+export type {
+  ResumeNudgeCandidate,
+  ChildSession,
+  ChildSessionDrillScore,
+} from './session-crud';
+
+// Analytics (session-event aggregation primitives — extracted from dashboard.ts — PR-2)
+export {
+  countGuidedMetrics,
+  countGuidedMetricsBatch,
+} from './session-analytics';
+export type { GuidedMetrics } from './session-analytics';
 
 // Exchange (message processing)
 export {

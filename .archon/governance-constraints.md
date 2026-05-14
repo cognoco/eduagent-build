@@ -30,7 +30,7 @@ Organized by change kind. When a section's trigger applies, treat the listed con
 **Constraints:**
 
 - **The pre-commit hook runs `pnpm exec tsc --build`**, which traverses the entire project-reference graph and type-checks every included file. Adding a new tsconfig to `references[]` means committing to its files being type-check clean — forever, on every commit, repo-wide.
-- **`tsconfig.spec.json` is intentionally NOT in the reference graph** because ~279 test files have known type errors. Jest uses it directly (`jest.config.cjs` → `tsconfig`). If you add a new spec-like config, follow the same pattern: jest references it directly; `tsconfig.json` does not.
+- **`tsconfig.spec.json` IS now in the reference graph** (added after the ~279 test type errors were fixed in P3f). Jest also references it directly (`jest.config.cjs` → `tsconfig`). Integration tests (`*.integration.test.ts`) are excluded via the `exclude` pattern in `tsconfig.spec.json`. Any new test-file type errors will block all commits via `tsc --build`.
 - **Adding `composite: true` to a tsconfig forces it into the build graph.** Don't set `composite: true` on a config that has known errors.
 - **`tsc --noEmit` (per-package typecheck targets) and `tsc --build` (pre-commit) walk different file sets.** A change that's clean under `nx run mobile:typecheck` may still break `tsc --build` if it adds files to the project-reference graph.
 
@@ -75,7 +75,7 @@ Organized by change kind. When a section's trigger applies, treat the listed con
 
 **Constraints:**
 
-- **CI requires a `## Rollback` section** for any plan (`docs/plans/*.md`, excluding `docs/plans/done/`) or SQL migration that contains `DROP`, `ALTER`, `DELETE`, or `TRUNCATE`. The rollback section must specify reversibility, data loss, and recovery procedure. If rollback is impossible, say so explicitly.
+- **CI requires a `## Rollback` section** for any plan (`docs/plans/*.md` — active plans only; archived plans under `docs/_archive/plans/done/` are not scanned) or SQL migration that contains `DROP`, `ALTER`, `DELETE`, or `TRUNCATE`. The rollback section must specify reversibility, data loss, and recovery procedure. If rollback is impossible, say so explicitly.
 - **Never run `drizzle-kit push` against staging or production.** Dev iteration uses push; staging/prod uses committed migration SQL plus `drizzle-kit migrate`.
 - **A worker deploy does not migrate Neon.** Apply the target migration before shipping code that reads new columns.
 - **Reads must use `createScopedRepository(profileId)`** when the query operates on a single scoped table. Multi-table joins through a parent chain (e.g. `learning_sessions → curriculum_topics → curriculum_books → subjects`) use direct `db.select()` and enforce `profileId` via the parent ancestor. Don't write a route handler that calls `db.select()` directly — G5 will block it.
@@ -139,7 +139,7 @@ Organized by change kind. When a section's trigger applies, treat the listed con
 | Pattern | Why it failed | Right approach |
 |---|---|---|
 | Bare nested ESLint re-export | Glob resolution semantics silently disabled G1-G5 | Don't add nested configs unless every glob is rewritten |
-| `tsconfig.spec.json` in `references[]` | `tsc --build` (pre-commit) hit ~279 test type errors | Reference from jest only, never from the project graph |
+| `tsconfig.spec.json` in `references[]` (pre-P3f) | `tsc --build` hit ~279 test type errors — now fixed | Post-P3f: reference is intentional; keep test files type-clean |
 | New `jest.mock('./foo')` in a refactor | GC1 ratchet blocked the PR | Use `jest.requireActual()` with targeted override |
 | `.skip()` to land a half-finished test | G7 fails the build | Don't add skipped tests — file a follow-up instead |
 | `console.warn` in silent recovery path | "Silent recovery without escalation" rule | Emit a structured metric or Inngest event |

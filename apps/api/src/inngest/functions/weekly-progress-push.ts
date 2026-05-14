@@ -45,7 +45,9 @@ import {
   getLatestSnapshotOnOrBefore,
 } from '../../services/snapshot-aggregation';
 import { generateWeeklyReportData } from '../../services/weekly-report';
+import { getPracticeActivitySummary } from '../../services/practice-activity-summary';
 import { captureException } from '../../services/sentry';
+import { buildLegacyEmailIdempotencyKey } from '../../services/dedupe-key';
 
 import {
   isoDate,
@@ -347,11 +349,26 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
 
             // [BUG-524] Persist the weekly report before building the push summary.
             // Uses onConflictDoNothing so re-runs for the same week are idempotent.
+            const weekEndDate = new Date(weekStartDate);
+            weekEndDate.setUTCDate(weekEndDate.getUTCDate() + 7);
+            const previousWeekStart = subtractDays(weekStartDate, 7);
+            const practiceSummary = await getPracticeActivitySummary(db, {
+              profileId: link.childProfileId,
+              period: {
+                start: weekStartDate,
+                endExclusive: weekEndDate,
+              },
+              previousPeriod: {
+                start: previousWeekStart,
+                endExclusive: weekStartDate,
+              },
+            });
             const reportData = generateWeeklyReportData(
               name,
               reportWeek,
               latest.metrics,
               cappedPrevious?.metrics ?? null,
+              practiceSummary,
             );
             await db
               .insert(weeklyReports)
@@ -516,7 +533,11 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
             );
             return sendEmail(emailPayload, {
               resendApiKey: getStepResendApiKey(),
-              idempotencyKey: `weekly-${parentId}-${prepared.reportWeek}`,
+              idempotencyKey: buildLegacyEmailIdempotencyKey(
+                'weekly',
+                parentId,
+                prepared.reportWeek,
+              ),
             });
           },
         );

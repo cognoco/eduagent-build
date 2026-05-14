@@ -50,22 +50,10 @@ const mockDatabaseModule = createDatabaseModuleMock({
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
-jest.mock('../../services/subscription', () => ({
-  getTierConfig: jest.fn((tier: string) => {
-    const configs: Record<
-      string,
-      { monthlyQuota: number; dailyLimit: number | null }
-    > = {
-      free: { monthlyQuota: 100, dailyLimit: 10 },
-      plus: { monthlyQuota: 500, dailyLimit: null },
-      family: { monthlyQuota: 1500, dailyLimit: null },
-      pro: { monthlyQuota: 3000, dailyLimit: null },
-    };
-    return configs[tier] ?? configs.free;
-  }),
-}));
+// subscription: getTierConfig is a pure static config lookup — use real code.
 
 import { quotaReset } from './quota-reset';
+import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -80,33 +68,19 @@ interface QuotaResetResult {
   timestamp: string;
 }
 
-interface QuotaResetMockStep {
-  run: jest.Mock;
-  sleep: jest.Mock;
-}
-
 async function executeSteps(): Promise<{
   result: QuotaResetResult;
-  mockStep: QuotaResetMockStep;
-  stepResults: Record<string, unknown>;
+  runner: ReturnType<typeof createInngestStepRunner>;
 }> {
-  const stepResults: Record<string, unknown> = {};
-  const mockStep: QuotaResetMockStep = {
-    run: jest.fn(async (name: string, fn: () => Promise<unknown>) => {
-      const result = await fn();
-      stepResults[name] = result;
-      return result;
-    }),
-    sleep: jest.fn(),
-  };
+  const runner = createInngestStepRunner();
 
   const handler = (quotaReset as any).fn;
   const result = (await handler({
     event: { name: 'inngest/function.invoked' },
-    step: mockStep,
+    step: runner.step,
   })) as QuotaResetResult;
 
-  return { result, mockStep, stepResults };
+  return { result, runner };
 }
 
 beforeEach(() => {
@@ -153,10 +127,12 @@ describe('quotaReset', () => {
   });
 
   it('runs daily reset step before monthly reset step', async () => {
-    const { mockStep } = await executeSteps();
+    const { runner } = await executeSteps();
 
-    const stepNames = mockStep.run.mock.calls.map((call: unknown[]) => call[0]);
-    expect(stepNames).toEqual(['reset-daily-quotas', 'reset-expired-cycles']);
+    expect(runner.runNames()).toEqual([
+      'reset-daily-quotas',
+      'reset-expired-cycles',
+    ]);
   });
 
   it('resets quota pools whose cycle has elapsed', async () => {

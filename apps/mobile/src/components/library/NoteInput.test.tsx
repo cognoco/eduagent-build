@@ -1,16 +1,6 @@
 import { render, fireEvent } from '@testing-library/react-native';
 import { NoteInput } from './NoteInput';
 
-jest.mock('../../lib/theme', () => ({
-  useThemeColors: () => ({
-    textSecondary: '#999',
-    primary: '#00bcd4',
-    error: '#f44',
-    warning: '#ff9800',
-    success: '#4caf50',
-  }),
-}));
-
 jest.mock('../../hooks/use-speech-recognition', () => ({
   useSpeechRecognition: () => ({
     status: 'idle',

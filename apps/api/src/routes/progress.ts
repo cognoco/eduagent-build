@@ -19,7 +19,7 @@ import {
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
 import { notFound } from '../errors';
-import { getProfileSessions } from '../services/dashboard';
+import { getProfileSessions } from '../services/session/session-crud';
 import {
   getMonthlyReportForProfile,
   listMonthlyReportsForProfile,

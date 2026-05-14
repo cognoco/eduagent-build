@@ -44,7 +44,7 @@ async function seedProfile(suffix = '') {
 
 function makeEntry(
   id: string,
-  overrides: Partial<OutboxSpilloverEntry> = {}
+  overrides: Partial<OutboxSpilloverEntry> = {},
 ): OutboxSpilloverEntry {
   return {
     id,
@@ -74,10 +74,9 @@ describeIf('recordOutboxSpillover (integration)', () => {
       .from(supportMessages)
       .where(eq(supportMessages.profileId, profile.id));
     expect(rows).toHaveLength(2);
-    expect(rows.map((r) => r.clientId).sort()).toEqual([
-      'entry-a1',
-      'entry-a2',
-    ]);
+    expect(
+      rows.map((r: typeof supportMessages.$inferSelect) => r.clientId).sort(),
+    ).toEqual(['entry-a1', 'entry-a2']);
   });
 
   it('duplicate entries are idempotent — second call returns { written: 0 }', async () => {
@@ -118,8 +117,8 @@ describeIf('recordOutboxSpillover (integration)', () => {
       .where(
         and(
           eq(supportMessages.profileId, profileA.id),
-          eq(supportMessages.clientId, sharedClientId)
-        )
+          eq(supportMessages.clientId, sharedClientId),
+        ),
       );
     const rowsB = await db
       .select()
@@ -127,8 +126,8 @@ describeIf('recordOutboxSpillover (integration)', () => {
       .where(
         and(
           eq(supportMessages.profileId, profileB.id),
-          eq(supportMessages.clientId, sharedClientId)
-        )
+          eq(supportMessages.clientId, sharedClientId),
+        ),
       );
 
     expect(rowsA).toHaveLength(1);

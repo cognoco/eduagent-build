@@ -8,13 +8,14 @@ import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
+import { queryKeys } from '../lib/query-keys';
 
 export function useVocabulary(subjectId: string) {
   const client = useApiClient();
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['vocabulary', activeProfile?.id, subjectId],
+    queryKey: queryKeys.vocabulary.subject(activeProfile?.id, subjectId),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -76,6 +77,11 @@ export function useReviewVocabulary(subjectId: string) {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['vocabulary'] });
+      // PR-10 deferred: broad ['language-progress'] — review affects the per-subject
+      // language progress for `subjectId`, which maps to
+      // queryKeys.languageProgress.subject(activeProfileId, subjectId). But
+      // activeProfileId is not available here (useReviewVocabulary does not call
+      // useProfile). Keep broad until a workflow test proves the precise key.
       void queryClient.invalidateQueries({ queryKey: ['language-progress'] });
     },
   });
@@ -96,6 +102,8 @@ export function useDeleteVocabulary(subjectId: string) {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['vocabulary'] });
+      // PR-10 deferred: broad ['language-progress'] — same reason as
+      // useReviewVocabulary above: activeProfileId not in scope here.
       void queryClient.invalidateQueries({ queryKey: ['language-progress'] });
     },
   });

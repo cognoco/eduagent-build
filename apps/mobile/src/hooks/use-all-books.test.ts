@@ -1,7 +1,7 @@
 import { renderHook, waitFor } from '@testing-library/react-native';
 import { QueryClient } from '@tanstack/react-query';
 import { createQueryWrapper } from '../test-utils/app-hook-test-utils';
-import { useAllBooks } from './use-all-books';
+import { useAllBooks, type EnrichedBook } from './use-all-books';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -132,17 +132,23 @@ describe('useAllBooks', () => {
     expect(result.current.isError).toBe(false);
 
     // Verify enrichment: each book has subjectId + subjectName attached
-    const algebra = result.current.books.find((b) => b.book.id === 'b1');
+    const algebra = result.current.books.find(
+      (b: EnrichedBook) => b.book.id === 'b1',
+    );
     expect(algebra).not.toBeUndefined();
     expect(algebra!.subjectId).toBe('s1');
     expect(algebra!.subjectName).toBe('Math');
     expect(algebra!.status).toBe('IN_PROGRESS'); // topicsGenerated = true
 
     // b2 (Geometry, topicsGenerated=false) should NOT appear
-    const geometry = result.current.books.find((b) => b.book.id === 'b2');
+    const geometry = result.current.books.find(
+      (b: EnrichedBook) => b.book.id === 'b2',
+    );
     expect(geometry).toBeUndefined();
 
-    const physics = result.current.books.find((b) => b.book.id === 'b3');
+    const physics = result.current.books.find(
+      (b: EnrichedBook) => b.book.id === 'b3',
+    );
     expect(physics).not.toBeUndefined();
     expect(physics!.subjectId).toBe('s2');
     expect(physics!.subjectName).toBe('Science');
@@ -176,10 +182,10 @@ describe('useAllBooks', () => {
     expect(result.current.books[0]!.book.id).toBe('b1');
     // Unbuilt books are excluded from the count
     expect(
-      result.current.books.find((b) => b.book.id === 'b2'),
+      result.current.books.find((b: EnrichedBook) => b.book.id === 'b2'),
     ).toBeUndefined();
     expect(
-      result.current.books.find((b) => b.book.id === 'b3'),
+      result.current.books.find((b: EnrichedBook) => b.book.id === 'b3'),
     ).toBeUndefined();
   });
 

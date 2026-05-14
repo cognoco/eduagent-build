@@ -57,15 +57,20 @@ export function formatActivityLabel(activityType: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-// Product targets 11+ only — 'child' bracket removed in Agent 2's dead-code
-// cleanup. See docs/specs/2026-04-18-llm-personalization-audit.md.
-export type AgeBracket = 'adolescent' | 'adult';
+import type { AgeBracket } from '@eduagent/schemas';
+export type { AgeBracket };
 
 export function describeAgeBracket(ageBracket: AgeBracket): string {
   switch (ageBracket) {
+    case 'child':
+      return 'under 13';
     case 'adolescent':
-      return '11-13';
-    default:
-      return '14+';
+      return '13-17';
+    case 'adult':
+      return '18+';
+    default: {
+      const exhaustive: never = ageBracket;
+      throw new Error(`Unexpected ageBracket: ${exhaustive}`);
+    }
   }
 }

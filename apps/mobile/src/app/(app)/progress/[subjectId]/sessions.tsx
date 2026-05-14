@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTranslation } from 'react-i18next';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ErrorFallback } from '../../../../components/common';
 import { useSubjectSessions } from '../../../../hooks/use-subject-sessions';
@@ -48,12 +49,12 @@ export default function SubjectSessionsScreen(): React.ReactElement {
                 `/(app)/progress/${subjectId ?? ''}` as never,
               )
             }
-            className="me-3 py-2 pe-2"
+            className="me-3 p-2 min-h-[44px] min-w-[44px] items-center justify-center"
             accessibilityRole="button"
             accessibilityLabel={t('common.goBack')}
             testID="subject-sessions-back"
           >
-            <Text className="text-body font-semibold text-primary">{'←'}</Text>
+            <Ionicons name="arrow-back" size={24} className="text-primary" />
           </Pressable>
           <View className="flex-1">
             <Text className="text-h2 font-bold text-text-primary">
@@ -147,7 +148,7 @@ export default function SubjectSessionsScreen(): React.ReactElement {
                       ...(subjectId ? { subjectId } : {}),
                       ...(session.topicId ? { topicId: session.topicId } : {}),
                     },
-                  } as never)
+                  } as Href)
                 }
                 className="bg-surface rounded-card p-4 mt-3"
                 accessibilityRole="button"

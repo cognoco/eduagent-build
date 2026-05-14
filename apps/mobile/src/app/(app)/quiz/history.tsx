@@ -1,9 +1,10 @@
 import { View, Text, Pressable, FlatList } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { i18next } from '../../../i18n';
 import { useRecentRounds } from '../../../hooks/use-quiz';
+import { goBackOrReplace } from '../../../lib/navigation';
 import { useThemeColors } from '../../../lib/theme';
 import { ErrorFallback } from '../../../components/common/ErrorFallback';
 import { extractLanguageFromTheme } from '../../../lib/extract-vocabulary-language';
@@ -69,7 +70,7 @@ export default function QuizHistoryScreen() {
         }}
         secondaryAction={{
           label: t('common.goBack'),
-          onPress: () => router.replace(backHref as never),
+          onPress: () => router.replace(backHref as Href),
           testID: 'quiz-history-go-back',
         }}
         testID="quiz-history-error"
@@ -96,7 +97,7 @@ export default function QuizHistoryScreen() {
             router.push({
               pathname: '/(app)/quiz',
               params: returnParams,
-            } as never)
+            } as Href)
           }
         >
           <Text className="text-on-primary font-semibold">
@@ -128,7 +129,7 @@ export default function QuizHistoryScreen() {
       >
         <Pressable
           testID="quiz-history-back"
-          onPress={() => router.replace(backHref as never)}
+          onPress={() => goBackOrReplace(router, '/(app)/quiz')}
           className="min-h-[44px] min-w-[44px] items-center justify-center"
           accessibilityRole="button"
           accessibilityLabel={t('quiz.history.goBack')}
@@ -177,8 +178,8 @@ export default function QuizHistoryScreen() {
                   onPress={() =>
                     router.push({
                       pathname: '/(app)/quiz/[roundId]',
-                      params: { roundId: round.id, ...returnParams },
-                    } as never)
+                      params: { roundId: round.id },
+                    } as Href)
                   }
                   accessibilityRole="button"
                   accessibilityLabel={t('quiz.history.rowLabel', {

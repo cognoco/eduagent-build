@@ -51,6 +51,8 @@ import {
   quizMissedItems,
   quizMasteryItems,
   memoryFacts,
+  practiceActivityEvents,
+  celebrationEvents,
 } from './schema/index';
 
 // [BUG-704 / P-8] Single source of truth for the runtime DB enum
@@ -768,9 +770,25 @@ export function createScopedRepository(db: Database, profileId: string) {
         mode: 'homework' | 'surprise';
         reviewed: boolean;
       }) {
+        // [BUG-4] Idempotent on (profile_id, date, mode): a retry of the
+        // same completion event upserts the latest counts/reviewed flag
+        // rather than creating a duplicate row. Backed by
+        // uniq_dictation_results_profile_date_mode in the schema.
         const [row] = await db
           .insert(dictationResults)
           .values({ profileId, ...values })
+          .onConflictDoUpdate({
+            target: [
+              dictationResults.profileId,
+              dictationResults.date,
+              dictationResults.mode,
+            ],
+            set: {
+              sentenceCount: values.sentenceCount,
+              mistakeCount: values.mistakeCount,
+              reviewed: values.reviewed,
+            },
+          })
           .returning();
         return row;
       },
@@ -1094,6 +1112,22 @@ export function createScopedRepository(db: Database, profileId: string) {
             ),
           )
           .returning({ id: quizMasteryItems.id });
+      },
+    },
+
+    practiceActivityEvents: {
+      async findMany(extraWhere?: SQL) {
+        return db.query.practiceActivityEvents.findMany({
+          where: scopedWhere(practiceActivityEvents, extraWhere),
+        });
+      },
+    },
+
+    celebrationEvents: {
+      async findMany(extraWhere?: SQL) {
+        return db.query.celebrationEvents.findMany({
+          where: scopedWhere(celebrationEvents, extraWhere),
+        });
       },
     },
   };

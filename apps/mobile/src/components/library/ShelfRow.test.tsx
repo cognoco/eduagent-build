@@ -5,25 +5,22 @@ import { ShelfRow } from './ShelfRow';
 // Mocks
 // ---------------------------------------------------------------------------
 
-jest.mock('../../lib/theme', () => ({
-  useThemeColors: () => ({
-    textPrimary: '#1a1a1a',
-    textSecondary: '#525252',
-    surfaceElevated: '#f3ede4',
-    warning: '#a16207',
-    muted: '#a3a3a3',
-    retentionStrong: '#15803d',
-    retentionFading: '#a16207',
-    retentionWeak: '#ea580c',
-    retentionForgotten: '#737373',
-    success: '#15803d',
+jest.mock(
+  '../../lib/theme' /* gc1-allow: ThemeProvider requires native env; unit test cannot render it */,
+  () => ({
+    useThemeColors: () => ({
+      retentionWeak: '#b45309',
+      success: '#16a34a',
+      textPrimary: '#111827',
+      textSecondary: '#6b7280',
+      warning: '#d97706',
+    }),
+    useSubjectTint: () => ({
+      solid: '#2f6fbd',
+      soft: '#edf3ff',
+    }),
   }),
-  useSubjectTint: () => ({
-    name: 'teal',
-    solid: '#0f766e',
-    soft: 'rgba(15,118,110,0.14)',
-  }),
-}));
+);
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -57,9 +54,9 @@ describe('ShelfRow', () => {
     screen.getByText('3 books · 18/32 topics');
   });
 
-  it('renders the tinted icon tile (no emoji)', () => {
+  it('renders the subject bookshelf motif', () => {
     render(<ShelfRow {...defaultProps} />);
-    screen.getByTestId('shelf-row-icon-sub-math');
+    screen.getByTestId('shelf-row-bookshelf-sub-math');
   });
 
   it('opens the subject shelf when header is pressed', () => {

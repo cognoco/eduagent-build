@@ -123,11 +123,21 @@ const CONVERSATION_LANGUAGE_NAMES: Record<ConversationLanguage, string> = {
 };
 
 function getSafetyPreamble(ageBracket?: AgeBracket): string {
-  if (ageBracket === 'adult') {
-    return `You are an educational AI assistant. The current learner is an adult. ${SAFETY_RULES}`;
+  // Defence-in-depth: undefined (unknown age) takes the minor-safe path.
+  if (ageBracket === undefined) {
+    return `You are an educational AI assistant for young learners. ${SAFETY_RULES}`;
   }
-  // Default to minor-safe framing (defence-in-depth for missing age data)
-  return `You are an educational AI assistant for young learners. ${SAFETY_RULES}`;
+  switch (ageBracket) {
+    case 'adult':
+      return `You are an educational AI assistant. The current learner is an adult. ${SAFETY_RULES}`;
+    case 'child':
+    case 'adolescent':
+      return `You are an educational AI assistant for young learners. ${SAFETY_RULES}`;
+    default: {
+      const exhaustive: never = ageBracket;
+      throw new Error(`Unexpected ageBracket: ${String(exhaustive)}`);
+    }
+  }
 }
 
 // BKT-C.1 — build the personalization lines that prepend the safety preamble.
@@ -420,6 +430,11 @@ function canAttempt(providerId: string): boolean {
 /** Exported for testing only */
 export function _resetCircuits(): void {
   circuits.clear();
+}
+
+/** Exported for testing only — removes a single provider by ID */
+export function unregisterProvider(id: string): void {
+  providers.delete(id);
 }
 
 /** Exported for testing only */

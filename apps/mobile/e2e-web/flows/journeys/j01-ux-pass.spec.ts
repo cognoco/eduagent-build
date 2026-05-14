@@ -1,8 +1,7 @@
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
-import { seedAndSignIn } from '../../helpers/seed-and-sign-in';
-import { resetSeededAccounts } from '../../helpers/test-seed';
+import { readSeedData } from '../../helpers/seed-data';
 
 const shotDir = path.join(
   process.cwd(),
@@ -14,7 +13,7 @@ const shotDir = path.join(
 );
 
 async function capture(page: Page, name: string): Promise<void> {
-  await page.waitForLoadState('networkidle');
+  await expect(page.locator('body')).toBeVisible({ timeout: 30_000 });
   await page.screenshot({
     path: path.join(shotDir, `${name}.png`),
     fullPage: true,
@@ -24,12 +23,7 @@ async function capture(page: Page, name: string): Promise<void> {
 test('single learner UX screenshot crawl', async ({ page }) => {
   test.setTimeout(180_000);
   await mkdir(shotDir, { recursive: true });
-  const seed = await seedAndSignIn(page, {
-    scenario: 'onboarding-complete',
-    alias: 'manual-learner-ux',
-    landingTestId: 'learner-screen',
-    landingPath: '/home',
-  });
+  const seed = await readSeedData('solo-learner');
   const subjectId = seed.ids.subjectId;
 
   await page.goto('/home', { waitUntil: 'commit' });
@@ -46,6 +40,9 @@ test('single learner UX screenshot crawl', async ({ page }) => {
   await capture(page, '03-study-new-click');
 
   await page.goto('/library', { waitUntil: 'commit' });
+  // Wait for the subjects query + /library/retention to settle before asserting.
+  // Without this, the shelf-row testID poll can race the first paint on slow CI.
+  await page.waitForLoadState('networkidle');
   await expect(page.getByTestId(`shelf-row-header-${subjectId}`)).toBeVisible({
     timeout: 30_000,
   });
@@ -113,8 +110,4 @@ test('single learner UX screenshot crawl', async ({ page }) => {
 
   await page.goto('/subscription', { waitUntil: 'commit' });
   await capture(page, '24-subscription');
-});
-
-test.afterAll(async () => {
-  await resetSeededAccounts();
 });

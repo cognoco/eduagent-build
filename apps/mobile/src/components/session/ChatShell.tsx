@@ -16,7 +16,7 @@ import {
   Vibration,
   Platform,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -613,7 +613,7 @@ export function ChatShell({
               }
               const fallback = (backFallback ?? '/(app)/home') as '/(app)/home';
               if (backBehavior === 'replace') {
-                router.replace(fallback as never);
+                router.replace(fallback as Href);
                 return;
               }
 
@@ -723,7 +723,7 @@ export function ChatShell({
                 className="items-center py-4"
                 testID="thinking-bulb-animation"
               >
-                <DeskLampAnimation size={120} />
+                <DeskLampAnimation size={80} />
               </View>
             )}
             {showIdleAnim && (
@@ -732,7 +732,7 @@ export function ChatShell({
                 testID="idle-pen-animation"
                 exiting={FadeOut.duration(200)}
               >
-                <MagicPenAnimation size={88} color={colors.primary} />
+                <MagicPenAnimation size={80} color={colors.primary} />
               </Animated.View>
             )}
             {footer}

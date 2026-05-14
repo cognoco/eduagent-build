@@ -34,11 +34,30 @@ import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
 import { getApiUrl } from '../lib/api';
+import { UpstreamError } from '../lib/api-errors';
+import { queryKeys } from '../lib/query-keys';
 import {
   streamSSEViaXHR,
   type FluencyDrillEvent,
   type StreamFallbackReason,
 } from '../lib/sse';
+
+function invalidateSessionDerivedQueries(
+  queryClient: ReturnType<typeof useQueryClient>,
+): void {
+  // PR-10 deferred: broad ['progress'], ['dashboard'], ['retention'],
+  // ['language-progress'], ['resume-nudge'] — session-close touches many surfaces
+  // (summary, profile sessions list, progress overview, progress inventory,
+  // progress milestones, dashboard child views, retention subject/topic, resume
+  // nudge). A workflow test enumerating all surfaces is required before narrowing.
+  // The old ['sessions'] call was a no-op (top segment is 'sessions' but all
+  // session keys use 'session', 'session-transcript', etc.) — removed PR 10.
+  void queryClient.invalidateQueries({ queryKey: ['progress'] });
+  void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+  void queryClient.invalidateQueries({ queryKey: ['retention'] });
+  void queryClient.invalidateQueries({ queryKey: ['language-progress'] });
+  void queryClient.invalidateQueries({ queryKey: ['resume-nudge'] });
+}
 
 type FilingStatus =
   | 'filing_pending'
@@ -136,7 +155,7 @@ export function useStartSession(subjectId: string): UseMutationResult<
       return (await res.json()) as SessionStartResult;
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['sessions'] });
+      invalidateSessionDerivedQueries(queryClient);
     },
   });
 }
@@ -175,7 +194,7 @@ export function useStartFirstCurriculumSession(
       return (await res.json()) as SessionStartResult;
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['sessions'] });
+      invalidateSessionDerivedQueries(queryClient);
     },
   });
 }
@@ -199,7 +218,12 @@ export function useSetSessionInputMode(
       void queryClient.invalidateQueries({
         queryKey: ['session-transcript', sessionId],
       });
-      void queryClient.invalidateQueries({ queryKey: ['sessions'] });
+      // Input mode changes only mutate the session row/transcript metadata.
+      // Progress, dashboard, retention, language-progress, and resume-nudge
+      // data derive from completed learning activity, not this preference flip.
+      // The old ['sessions'] call here was a no-op (top segment 'sessions' matches
+      // no registered key; session keys use 'session', 'session-transcript', etc.)
+      // — removed PR 10.
     },
   });
 }
@@ -222,7 +246,7 @@ export function useClearContinuationDepth(
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['session', sessionId] });
-      void queryClient.invalidateQueries({ queryKey: ['sessions'] });
+      invalidateSessionDerivedQueries(queryClient);
     },
   });
 }
@@ -247,7 +271,7 @@ export function useSyncHomeworkState(
       return (await res.json()) as { metadata: HomeworkSessionMetadata };
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['sessions'] });
+      invalidateSessionDerivedQueries(queryClient);
     },
   });
 }
@@ -296,7 +320,7 @@ export function useCloseSession(sessionId: string): UseMutationResult<
       return (await res.json()) as unknown as CloseResult;
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['sessions'] });
+      invalidateSessionDerivedQueries(queryClient);
     },
   });
 }
@@ -455,12 +479,11 @@ export function useStreamMessage(sessionId: string): {
               fallback,
             });
           } else if (event.type === 'error') {
-            const streamError = new Error(event.message) as Error & {
-              status?: number;
-            };
-            streamError.name = 'UpstreamError';
-            streamError.status = 502;
-            throw streamError;
+            throw new UpstreamError(
+              event.message,
+              event.code ?? 'UPSTREAM_ERROR',
+              502,
+            );
           }
         }
       } finally {
@@ -487,7 +510,7 @@ export function useSessionTranscript(
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['session-transcript', sessionId, activeProfile?.id],
+    queryKey: queryKeys.sessions.transcript(sessionId, activeProfile?.id),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -520,7 +543,7 @@ export function useSession(
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['session', sessionId, activeProfile?.id],
+    queryKey: queryKeys.sessions.detail(sessionId, activeProfile?.id),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -614,7 +637,7 @@ export function useParkingLot(
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['parking-lot', sessionId, activeProfile?.id],
+    queryKey: queryKeys.sessions.parkingLot(sessionId, activeProfile?.id),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -641,7 +664,11 @@ export function useTopicParkingLot(
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['parking-lot', 'topic', subjectId, topicId, activeProfile?.id],
+    queryKey: queryKeys.sessions.topicParkingLot(
+      subjectId,
+      topicId,
+      activeProfile?.id,
+    ),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -694,7 +721,7 @@ export function useSessionSummary(
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['session-summary', sessionId, activeProfile?.id],
+    queryKey: queryKeys.sessions.summary(sessionId, activeProfile?.id),
     queryFn: async ({ signal: querySignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {
@@ -735,6 +762,7 @@ export function useSubmitSummary(
       void queryClient.invalidateQueries({
         queryKey: ['session-summary', sessionId],
       });
+      invalidateSessionDerivedQueries(queryClient);
     },
   });
 }
@@ -757,6 +785,7 @@ export function useSkipSummary(
       void queryClient.invalidateQueries({
         queryKey: ['session-summary', sessionId],
       });
+      invalidateSessionDerivedQueries(queryClient);
     },
   });
 }

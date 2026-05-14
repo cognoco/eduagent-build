@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
+import { pressableClick } from '../../helpers/pressable';
 import { authStateDir } from '../../helpers/runtime';
 import { readSeedData } from '../../helpers/seed-data';
 
@@ -10,7 +11,6 @@ test('J-17 parent opens a session recap and copies the conversation prompt', asy
 }) => {
   const seed = await readSeedData('owner-with-children');
   const childProfileId = seed.ids.child1ProfileId;
-  const subjectId = seed.ids.subject1Id;
   const sessionId = seed.ids.session1Id;
 
   await page.goto('/home', { waitUntil: 'commit' });
@@ -18,22 +18,20 @@ test('J-17 parent opens a session recap and copies the conversation prompt', asy
     timeout: 60_000,
   });
 
-  await page.getByTestId(`parent-home-check-child-${childProfileId}`).click();
-  await expect(page.getByTestId('child-detail-scroll')).toBeVisible({
+  await pressableClick(
+    page.getByTestId(`parent-home-child-progress-${childProfileId}`),
+  );
+  await expect(page.getByTestId('progress-screen')).toBeVisible({
     timeout: 30_000,
   });
-  await page.getByTestId(`subject-card-${subjectId}`).click();
-  await page
-    .getByRole('link', { name: /view mathematics topic 1 details/i })
-    .click();
-  const topicDetail = page.getByTestId('topic-detail-screen');
-  await expect(
-    topicDetail.getByTestId(`session-card-${sessionId}`),
-  ).toBeVisible({
+  const sessionCard = page
+    .getByTestId('progress-screen')
+    .getByTestId(`session-card-${sessionId}`);
+  await expect(sessionCard).toBeVisible({
     timeout: 30_000,
   });
 
-  await topicDetail.getByTestId(`session-card-${sessionId}`).click();
+  await pressableClick(sessionCard);
   const copyConversation = page.getByRole('button', {
     name: /copy conversation/i,
   });
@@ -42,7 +40,7 @@ test('J-17 parent opens a session recap and copies the conversation prompt', asy
   });
   await expect(page.getByTestId('narrative-unavailable')).toHaveCount(0);
 
-  await copyConversation.click();
+  await pressableClick(copyConversation);
   await expect(page.getByTestId('session-recap-copy-prompt-toast')).toBeVisible(
     { timeout: 30_000 },
   );

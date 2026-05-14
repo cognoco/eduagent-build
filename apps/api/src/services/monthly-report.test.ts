@@ -11,7 +11,11 @@ jest.mock('./sentry', () => ({
 }));
 
 import type { Database } from '@eduagent/database';
-import type { ProgressMetrics, MonthlyReportData } from '@eduagent/schemas';
+import type {
+  ProgressMetrics,
+  MonthlyReportData,
+  SubjectMonthlyDetail,
+} from '@eduagent/schemas';
 import { ForbiddenError } from '@eduagent/schemas';
 import { routeAndCall } from './llm';
 import {
@@ -75,9 +79,6 @@ function makeMetrics(
     topicsMastered: 0,
     topicsInProgress: 0,
     booksCompleted: 0,
-    weeklyDeltaTopicsMastered: null,
-    weeklyDeltaVocabularyTotal: null,
-    weeklyDeltaTopicsExplored: null,
     vocabularyTotal: 0,
     vocabularyMastered: 0,
     vocabularyLearning: 0,
@@ -672,8 +673,12 @@ describe('generateMonthlyReportData — subject breakdowns', () => {
       lastMonth,
     );
 
-    const math = result.subjects.find((s) => s.subjectName === 'Math');
-    const sci = result.subjects.find((s) => s.subjectName === 'Science');
+    const math = result.subjects.find(
+      (s: SubjectMonthlyDetail) => s.subjectName === 'Math',
+    );
+    const sci = result.subjects.find(
+      (s: SubjectMonthlyDetail) => s.subjectName === 'Science',
+    );
 
     expect(math?.topicsMastered).toBe(3); // 4 - 1
     expect(math?.activeMinutes).toBe(50); // 80 - 30
@@ -853,6 +858,7 @@ describe('generateReportHighlights — LLM success', () => {
       provider: 'mock',
       model: 'mock-model',
       latencyMs: 42,
+      stopReason: 'stop' as const,
     });
 
     const result = await generateReportHighlights(reportData);
@@ -875,6 +881,7 @@ describe('generateReportHighlights — LLM success', () => {
       provider: 'mock',
       model: 'mock-model',
       latencyMs: 10,
+      stopReason: 'stop' as const,
     });
 
     const result = await generateReportHighlights(reportData);
@@ -893,6 +900,7 @@ describe('generateReportHighlights — LLM success', () => {
       provider: 'mock',
       model: 'mock-model',
       latencyMs: 10,
+      stopReason: 'stop' as const,
     });
 
     const result = await generateReportHighlights(reportData);
@@ -911,6 +919,7 @@ describe('generateReportHighlights — LLM success', () => {
       provider: 'mock',
       model: 'mock-model',
       latencyMs: 10,
+      stopReason: 'stop' as const,
     });
 
     const result = await generateReportHighlights(reportData);
@@ -927,6 +936,7 @@ describe('generateReportHighlights — LLM success', () => {
       provider: 'mock',
       model: 'mock-model',
       latencyMs: 10,
+      stopReason: 'stop' as const,
     });
 
     const result = await generateReportHighlights(reportData);
@@ -943,6 +953,7 @@ describe('generateReportHighlights — LLM success', () => {
       provider: 'mock',
       model: 'mock-model',
       latencyMs: 10,
+      stopReason: 'stop' as const,
     });
 
     const result = await generateReportHighlights(reportData);
@@ -960,6 +971,7 @@ describe('generateReportHighlights — LLM success', () => {
       provider: 'mock',
       model: 'mock-model',
       latencyMs: 10,
+      stopReason: 'stop' as const,
     });
 
     const result = await generateReportHighlights(reportData);
@@ -976,6 +988,7 @@ describe('generateReportHighlights — LLM success', () => {
       provider: 'mock',
       model: 'mock-model',
       latencyMs: 10,
+      stopReason: 'stop' as const,
     });
 
     const result = await generateReportHighlights(reportData);
@@ -1031,6 +1044,7 @@ describe('generateReportHighlights — error fallback', () => {
       provider: 'mock',
       model: 'mock-model',
       latencyMs: 10,
+      stopReason: 'stop' as const,
     });
 
     const result = await generateReportHighlights(reportData);

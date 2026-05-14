@@ -12,8 +12,6 @@ import { clearJWKSCache } from '../middleware/jwt';
 // Mock database module — middleware creates a stub db per request
 // ---------------------------------------------------------------------------
 
-import { TEST_BOOK_ID } from '@eduagent/test-utils';
-
 import {
   createDatabaseModuleMock,
   createTransactionalMockDb,

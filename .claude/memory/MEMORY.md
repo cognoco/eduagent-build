@@ -1,14 +1,13 @@
-# EduAgent Project Memory
+# Mentomate Project Memory
 
 ## Implementation Status
 
 - [project_implementation_phase.md](_archive/project_implementation_phase.md) — Epics 0-16 COMPLETE. LLM tuning phase COMPLETE (all 4 agents merged).
 - [project_session_lifecycle_decisions.md](project_session_lifecycle_decisions.md) — Wall-clock for users, active time internal. Adaptive silence. Hard caps removed.
 
-## Active Work (2026-05-04)
+## Consistency Cleanup
 
-- Active branch: **`consistency`**. Stage 2 decision burndown COMPLETE (13/13). Stage 3 execution next.
-- Consistency cleanup plan: `docs/audit/cleanup-plan.md` (single source of truth).
+- `docs/audit/cleanup-plan.md` is the single source of truth for the consistency cleanup track. Status per PR lives there; do not duplicate state into memory.
 
 ## Product Constraint — Strictly 11+
 
@@ -48,7 +47,7 @@ Two production dead-code branches removed 2026-04-19 in commit `970a82a5`: `AgeB
 - [feedback_parallel_agents.md](feedback_parallel_agents.md) — Parallel agents in same tree, no worktrees. Coordinator commits sequentially.
 - [feedback_fast_iteration.md](feedback_fast_iteration.md) — 60-min feedback loops unacceptable. CI gates, but optimize speed.
 - [feedback_fix_verification_rules.md](feedback_fix_verification_rules.md) — Changed ≠ verified. Break tests, finding IDs, no silent recovery.
-- [feedback_sweep_for_same_bug.md](feedback_sweep_for_same_bug.md) — After fixing a bug, sweep codebase for same pattern. **Direct precursor of CLAUDE.md `Sweep when you fix` rule (added 2026-05-03).**
+- [feedback_sweep_for_same_bug.md](feedback_sweep_for_same_bug.md) — When a bug could be pattern-shaped, sweep the codebase for sibling instances before declaring done. **Direct precursor of CLAUDE.md `Sweep when you fix` rule (added 2026-05-03); strengthened 2026-05-12.**
 - [feedback_just_do_it.md](feedback_just_do_it.md) — Clear action commands = execute immediately, don't gate on confirmations.
 - [feedback_autonomous_speccing.md](feedback_autonomous_speccing.md) — Decide small stuff yourself, only ask on genuinely big trade-offs.
 - [feedback_agents_commit_push.md](feedback_agents_commit_push.md) — Subagents never commit by default; coordinator commits via `/commit`. Exception: user-instructed one-off subagent commits are OK.
@@ -114,9 +113,10 @@ Two production dead-code branches removed 2026-04-19 in commit `970a82a5`: `AgeB
 - [feedback_spec_failure_modes.md](feedback_spec_failure_modes.md) — Every spec needs Failure Modes table.
 - [feedback_five_root_causes.md](feedback_five_root_causes.md) — 5 systemic root causes.
 - [feedback_comment_not_delete.md](feedback_comment_not_delete.md) — Comment out, don't delete unreleased UI features.
-- [feedback_testing_no_mocks.md](feedback_testing_no_mocks.md) — Prefer real solutions; don't add new `jest.mock()` unless existing pattern requires it. External-boundary mocks (LLM API, Inngest framework) OK.
+- [feedback_testing_no_mocks.md](feedback_testing_no_mocks.md) — No new internal `jest.mock()` (GC1 ratchet). External-boundary mocks (Stripe, Clerk JWKS, Inngest, LLM providers) OK per CLAUDE.md.
 - [feedback_precommit_typecheck.md](feedback_precommit_typecheck.md) — Run tsc + lint before committing.
 - [feedback_e2e_never_skip.md](feedback_e2e_never_skip.md) — Never skip E2E tests.
+- [feedback_e2e_release_gate.md](feedback_e2e_release_gate.md) — Release-blocking E2E means full suite, failure ledger, investigate each failure, fix real bugs or stale tests, repeat until green.
 - [feedback_batch_pr_fixes.md](feedback_batch_pr_fixes.md) — Batch PR fixes, validate locally, push once.
 - [feedback_emulator_issues_doc.md](feedback_emulator_issues_doc.md) — ALWAYS read e2e-emulator-issues.md before emulator work.
 - [feedback_eas_no_retry.md](feedback_eas_no_retry.md) — NEVER retry eas build without checking dashboard first.
@@ -127,6 +127,7 @@ Two production dead-code branches removed 2026-04-19 in commit `970a82a5`: `AgeB
 - [feedback_adversarial_review_patterns.md](feedback_adversarial_review_patterns.md) — Body double-consumption, classify-before-format, dead code cleanup.
 - [feedback_llm_prompt_injection_surfacing.md](feedback_llm_prompt_injection_surfacing.md) — LLM reads user A → surfaces to user B = injection vector.
 - [feedback_verify_full_ci.md](feedback_verify_full_ci.md) — On CI failure, run full validation.
+- [feedback_pr_required_checks.md](feedback_pr_required_checks.md) — Missing required PR checks can be branch-protection/workflow-trigger drift; diagnose before changing product tests.
 - [feedback_thorough_investigation.md](feedback_thorough_investigation.md) — NEVER take shortcuts in codebase analysis.
 - [feedback_verify_before_declaring_done.md](feedback_verify_before_declaring_done.md) — Never declare a fix done without testing it first.
 - [feedback_verify_before_marking_done.md](feedback_verify_before_marking_done.md) — Never mark bugs Done in Notion unless 100% confident.

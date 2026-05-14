@@ -5,7 +5,7 @@ import {
   Pressable,
   ActivityIndicator,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
@@ -383,7 +383,7 @@ export default function SessionDetailScreen() {
       <View className="mx-4 mt-6" testID="session-detail-ctas">
         {continueTopicHref ? (
           <Pressable
-            onPress={() => router.push(continueTopicHref as never)}
+            onPress={() => router.push(continueTopicHref as Href)}
             className="rounded-lg bg-primary px-4 py-3 items-center min-h-[48px] justify-center mb-2"
             accessibilityRole="button"
             accessibilityLabel={

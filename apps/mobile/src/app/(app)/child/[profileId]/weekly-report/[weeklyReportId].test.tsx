@@ -38,23 +38,35 @@ jest.mock('@sentry/react-native', () => ({
 }));
 
 jest.mock('../../../../../lib/navigation', () => ({
+  // gc1-allow: imports expo-router Router type; goBackOrReplace calls router.back which requires native navigation context
   goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
 }));
 
 jest.mock('../../../../../lib/format-api-error', () => ({
+  // gc1-allow: depends on i18next instance requiring full i18n init — cannot run in JSDOM without setup
   classifyApiError: (e: unknown) => ({
     message: (e as Error)?.message ?? 'error',
   }),
 }));
 
 jest.mock('../../../../../components/common', () => ({
+  // gc1-allow: barrel exports RN components including Reanimated animations — cannot render in JSDOM
   ErrorFallback: () => null,
+}));
+
+// prettier-ignore
+jest.mock('../../../../../components/nudge/NudgeActionSheet', () => ({ // gc1-allow: screen test verifies sheet invocation without native sheet behavior
+  NudgeActionSheet: ({ childName }: { childName: string }) => {
+    const { Text } = require('react-native');
+    return <Text testID="nudge-action-sheet">Nudge {childName}</Text>;
+  },
 }));
 
 const mockUseChildWeeklyReportDetail = jest.fn();
 const mockMarkViewedMutateAsync = jest.fn();
 
 jest.mock('../../../../../hooks/use-progress', () => ({
+  // gc1-allow: wraps api-client fetch boundary — needs network stub in unit tests
   useChildWeeklyReportDetail: (...args: unknown[]) =>
     mockUseChildWeeklyReportDetail(...args),
   useMarkWeeklyReportViewed: () => ({
@@ -76,6 +88,7 @@ function makeReport(
       vocabularyTotal: number;
     };
     headlineStat: { label: string; value: number; comparison: string };
+    practiceSummary: typeof PRACTICE_SUMMARY;
   }>,
 ) {
   return {
@@ -101,9 +114,30 @@ function makeReport(
         value: 2,
         comparison: 'up from 1 last week',
       },
+      practiceSummary: overrides?.practiceSummary,
     },
   };
 }
+
+const PRACTICE_SUMMARY = {
+  quizzesCompleted: 2,
+  reviewsCompleted: 1,
+  totals: {
+    activitiesCompleted: 3,
+    reviewsCompleted: 1,
+    pointsEarned: 20,
+    celebrations: 1,
+    distinctActivityTypes: 2,
+  },
+  scores: {
+    scoredActivities: 0,
+    score: 0,
+    total: 0,
+    accuracy: null,
+  },
+  byType: [],
+  bySubject: [],
+};
 
 describe('ChildWeeklyReportDetailScreen', () => {
   beforeEach(() => {
@@ -134,6 +168,34 @@ describe('ChildWeeklyReportDetailScreen', () => {
     expect(
       screen.getByTestId('child-weekly-report-metric-vocabulary'),
     ).toBeTruthy();
+  });
+
+  it('renders the practice summary card when practice data is present', () => {
+    mockUseChildWeeklyReportDetail.mockReturnValue({
+      data: makeReport({ practiceSummary: PRACTICE_SUMMARY }),
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+
+    render(<ChildWeeklyReportDetailScreen />);
+
+    screen.getByTestId('child-weekly-report-practice-summary');
+  });
+
+  it('hides the practice summary card when practice data is absent', () => {
+    mockUseChildWeeklyReportDetail.mockReturnValue({
+      data: makeReport(),
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+
+    render(<ChildWeeklyReportDetailScreen />);
+
+    expect(
+      screen.queryByTestId('child-weekly-report-practice-summary'),
+    ).toBeNull();
   });
 
   // BUG-903 (c): Heading must show the full date range, not just weekStart.
@@ -198,6 +260,33 @@ describe('ChildWeeklyReportDetailScreen', () => {
 
     screen.getByTestId('child-weekly-report-empty-note');
     screen.getByText('parentView.weeklyReport.sendNudge:{"name":"Emma"}');
+  });
+
+  it('[BUG-903] empty week CTA opens the nudge sheet instead of navigating', () => {
+    mockUseChildWeeklyReportDetail.mockReturnValue({
+      data: makeReport({
+        thisWeek: {
+          totalSessions: 0,
+          totalActiveMinutes: 0,
+          topicsMastered: 0,
+          vocabularyTotal: 0,
+        },
+        headlineStat: {
+          label: 'Topics mastered',
+          value: 0,
+          comparison: "No activity this week — that's OK. A nudge can help.",
+        },
+      }),
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+
+    render(<ChildWeeklyReportDetailScreen />);
+    fireEvent.press(screen.getByTestId('child-weekly-report-open-child'));
+
+    screen.getByTestId('nudge-action-sheet');
+    expect(mockPush).not.toHaveBeenCalled();
   });
 
   // BUG-903 (b): "Open child" CTA navigates to /(app)/child/[id].

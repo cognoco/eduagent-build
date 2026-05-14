@@ -204,6 +204,9 @@ apps/mobile/e2e/scripts/run-logs/**/*.log
 # Codex tool logs (local-only)
 .codex/
 
+# BMAD working artifacts (scratch specs, test designs — canonical docs live in docs/)
+_bmad-output/
+
 # Superpowers brainstorm tool scratch artifacts (HTML drafts, server PIDs,
 # state files — local-only, never source of truth)
 .superpowers/
@@ -234,6 +237,10 @@ apps/api/.notion-*.json
 /bug_ids.json
 .scratch/
 .claude/logs/diagnostics.jsonl
+# Archon init-tracing run-specific telemetry — written per workflow run, never
+# repo-wide config. Excluded so it doesn't get accidentally committed by future
+# cleanup-PR workflow runs.
+.claude/logfire-resource-attributes.json
 .gstack/
 
 # Native build credentials — provisioned via EAS / CI build secrets, never committed.

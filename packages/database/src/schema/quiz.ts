@@ -11,6 +11,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { generateUUIDv7 } from '../utils/uuid';
 import { profiles } from './profiles';
+import { subjects } from './subjects';
 
 export const quizActivityTypeEnum = pgEnum('quiz_activity_type', [
   'capitals',
@@ -33,6 +34,9 @@ export const quizRounds = pgTable(
     profileId: uuid('profile_id')
       .notNull()
       .references(() => profiles.id, { onDelete: 'cascade' }),
+    subjectId: uuid('subject_id').references(() => subjects.id, {
+      onDelete: 'set null',
+    }),
     activityType: quizActivityTypeEnum('activity_type').notNull(),
     theme: text('theme').notNull(),
     questions: jsonb('questions').notNull().default([]),
@@ -56,6 +60,10 @@ export const quizRounds = pgTable(
     index('idx_quiz_rounds_profile_activity').on(
       table.profileId,
       table.activityType,
+    ),
+    index('idx_quiz_rounds_profile_subject').on(
+      table.profileId,
+      table.subjectId,
     ),
     index('idx_quiz_rounds_profile_status').on(table.profileId, table.status),
   ],

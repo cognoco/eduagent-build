@@ -227,7 +227,7 @@ jest.mock('@clerk/clerk-expo/token-cache', () => ({
 jest.mock('expo-web-browser', () => ({
   warmUpAsync: jest.fn().mockResolvedValue(undefined),
   coolDownAsync: jest.fn().mockResolvedValue(undefined),
-  maybeCompleteAuthSession: jest.fn(),
+  maybeCompleteAuthSession: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock('expo-linking', () => ({
@@ -321,9 +321,12 @@ if (typeof global.structuredClone === 'undefined') {
 const _savedFormData = (global as Record<string, unknown>).__nodeFormData as
   | typeof FormData
   | undefined;
+const testGlobal = globalThis as typeof globalThis & {
+  FormData?: typeof FormData;
+};
 if (_savedFormData) {
   beforeEach(() => {
-    global.FormData = _savedFormData;
+    testGlobal.FormData = _savedFormData;
   });
 }
 

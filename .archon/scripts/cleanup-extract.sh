@@ -40,6 +40,52 @@ safe_field() {
         | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
 }
 
+# Expand brace patterns like `prefix{a,b,c}suffix` into one path per option.
+# Authors of docs/audit/cleanup-plan.md routinely use brace shorthand in the
+# Files-claimed column (e.g. `packages/{database,schemas}/README.md`).
+# Without expansion, downstream consumers (scope-guard, Files Summary table,
+# Notion follow-up filer) see a literal token that no real file matches.
+#
+# Supports cartesian products across multiple groups on the same path
+# (e.g. `{a,b}/{c,d}.ts` → 4 paths). Does NOT support nested braces;
+# the cleanup-plan format has never used them, and supporting them invites
+# parser ambiguity. Tokens without braces pass through unchanged.
+#
+# Pure bash (no eval) — the input is a controlled markdown file, but treating
+# it as code via `eval echo $pattern` would still be a foot-gun if someone
+# ever pastes a shell metachar into a path cell. Safer to walk the regex.
+expand_braces() {
+    local pat="$1"
+    if [[ "$pat" =~ ^([^{}]*)\{([^{}]+)\}(.*)$ ]]; then
+        local prefix="${BASH_REMATCH[1]}"
+        local options="${BASH_REMATCH[2]}"
+        local suffix="${BASH_REMATCH[3]}"
+        local opt
+        # Split on commas WITHOUT pathname expansion. Plain `for opt in $options`
+        # word-splits AND glob-expands each token against the working directory,
+        # so an option containing `*`, `?`, or `[` would silently expand to
+        # filesystem matches. `read -ra` with IFS=',' splits on commas only.
+        local _opts
+        IFS=',' read -ra _opts <<< "$options"
+        for opt in "${_opts[@]}"; do
+            # Trim whitespace from each option
+            opt="${opt#"${opt%%[![:space:]]*}"}"
+            opt="${opt%"${opt##*[![:space:]]}"}"
+            # Skip empty options from accidental `{a,,b}` shorthand — without
+            # this guard, the empty string emits `prefix + suffix` (the brace
+            # group silently erased) which looks like a valid path.
+            [[ -z "$opt" ]] && continue
+            # Recurse on suffix to expand any further brace groups (cartesian).
+            local expanded
+            while IFS= read -r expanded; do
+                printf '%s%s%s\n' "$prefix" "$opt" "$expanded"
+            done < <(expand_braces "$suffix")
+        done
+    else
+        printf '%s\n' "$pat"
+    fi
+}
+
 # Normalize PR number: PR-08, PR-8, 08, 8 → 08 (two-digit zero-padded).
 # Optional lowercase letter suffix is preserved for sub-PRs: PR-15a, 15b, etc.
 pr_token="$(echo "$raw_pr" | grep -oE '[0-9]+[a-z]*' | head -1)"
@@ -91,7 +137,7 @@ cluster_title="$(sed -n "${cluster_header_line}p" "$PLAN" | sed 's/^###[[:space:
 
 # Extract cluster metadata (Severity, Headline)
 cluster_block="$(sed -n "${cluster_header_line},${next_section_line}p" "$PLAN")"
-cluster_severity="$(echo "$cluster_block" | grep -oE '\*\*(RED|YELLOW-RED|YELLOW|GREEN-YELLOW|GREEN)\*\*' | head -1 | tr -d '*')"
+cluster_severity="$(echo "$cluster_block" | grep -oE '\*\*(RED|YELLOW-RED|YELLOW|GREEN-YELLOW|GREEN)\*\*' | head -1 | tr -d '*' || true)"
 cluster_severity="${cluster_severity:-UNKNOWN}"
 
 # ── Step 3: Phase details from cluster table ───────────────────────────
@@ -114,10 +160,22 @@ for pid in "${phase_ids[@]}"; do
     p_files="$(safe_field "$phase_row" 7)"
     p_notes="$(safe_field "$phase_row" 8)"
 
-    # Extract individual file paths from backticks (no mapfile — macOS bash 3.x compat)
+    # Extract individual file paths from backticks (no mapfile — macOS bash 3.x compat).
+    # Then expand any brace shorthand (e.g. `packages/{a,b}/README.md` → 2 paths)
+    # so the work-order, Files Summary table, and scope-guard all see literal paths.
+    #
+    # ORDERING CAVEAT: the extension filter (`\.[a-zA-Z][a-zA-Z0-9]*$`) runs on
+    # the RAW brace token, not on expanded paths. Tokens ending in `}` (e.g.
+    # `apps/{api,mobile}` or `src/{a.ts,b.tsx}` where the extension is inside
+    # the brace group) are dropped here BEFORE expansion. The cleanup-plan
+    # format has never used those shapes; if it ever does, move the extension
+    # filter to a post-expansion pass.
     files=()
-    while IFS= read -r _f; do
-        [[ -n "$_f" ]] && files+=("$_f")
+    while IFS= read -r _raw; do
+        [[ -z "$_raw" ]] && continue
+        while IFS= read -r _expanded; do
+            [[ -n "$_expanded" ]] && files+=("$_expanded")
+        done < <(expand_braces "$_raw")
     done < <(echo "$p_files" | grep -oE '`[^`]+`' | tr -d '`' | grep -E '\.[a-zA-Z][a-zA-Z0-9]*$' || true)
     for f in ${files[@]+"${files[@]}"}; do
         all_files_claimed+=("$f")

@@ -8,13 +8,20 @@
 // ---------------------------------------------------------------------------
 
 import { createDatabaseModuleMock } from '../../test-utils/database-module';
+import {
+  createInngestStepRunner,
+  type InngestStepRunnerOptions,
+} from '../../test-utils/inngest-step-runner';
 
 const mockDatabaseModule = createDatabaseModuleMock({ includeActual: true });
 
-jest.mock('@eduagent/database', () => mockDatabaseModule.module);
+jest.mock(
+  '@eduagent/database' /* gc1-allow: external-boundary */,
+  () => mockDatabaseModule.module,
+);
 
 const mockInngestSend = jest.fn().mockResolvedValue(undefined);
-jest.mock('../client', () => {
+jest.mock('../client' /* gc1-allow: external-boundary */, () => {
   const realInngest = jest.requireActual('inngest').Inngest;
   const realInstance = new realInngest({ id: 'eduagent-test' });
   return {
@@ -29,37 +36,54 @@ const mockGetConsentStatus = jest.fn();
 const mockGetProfileDisplayName = jest.fn();
 const mockGetProfileForConsentRevocation = jest.fn();
 const mockGetFamilyOwnerProfileId = jest.fn();
-const mockCalculateAge = jest.fn();
-jest.mock('../../services/consent', () => ({
-  calculateAge: (...args: unknown[]) => mockCalculateAge(...args),
-  getFamilyOwnerProfileId: (...args: unknown[]) =>
-    mockGetFamilyOwnerProfileId(...args),
-  getConsentStatus: (...args: unknown[]) => mockGetConsentStatus(...args),
-  getProfileForConsentRevocation: (...args: unknown[]) =>
-    mockGetProfileForConsentRevocation(...args),
-  getProfileDisplayName: (...args: unknown[]) =>
-    mockGetProfileDisplayName(...args),
-}));
+jest.mock(
+  '../../services/consent' /* gc1-allow: external-boundary — DB-dependent; calculateAge is real */,
+  () => {
+    const actual = jest.requireActual('../../services/consent') as Record<
+      string,
+      unknown
+    >;
+    return {
+      calculateAge: actual.calculateAge,
+      getFamilyOwnerProfileId: (...args: unknown[]) =>
+        mockGetFamilyOwnerProfileId(...args),
+      getConsentStatus: (...args: unknown[]) => mockGetConsentStatus(...args),
+      getProfileForConsentRevocation: (...args: unknown[]) =>
+        mockGetProfileForConsentRevocation(...args),
+      getProfileDisplayName: (...args: unknown[]) =>
+        mockGetProfileDisplayName(...args),
+    };
+  },
+);
 
 const mockDeleteProfile = jest.fn().mockResolvedValue(undefined);
-jest.mock('../../services/deletion', () => ({
-  deleteProfile: (...args: unknown[]) => mockDeleteProfile(...args),
-}));
+jest.mock(
+  '../../services/deletion' /* gc1-allow: external-boundary — DB-dependent */,
+  () => ({
+    deleteProfile: (...args: unknown[]) => mockDeleteProfile(...args),
+  }),
+);
 
 const mockSendPushNotification = jest.fn().mockResolvedValue({ sent: true });
-jest.mock('../../services/notifications', () => ({
-  sendPushNotification: (...args: unknown[]) =>
-    mockSendPushNotification(...args),
-}));
+jest.mock(
+  '../../services/notifications' /* gc1-allow: external-boundary — push delivery */,
+  () => ({
+    sendPushNotification: (...args: unknown[]) =>
+      mockSendPushNotification(...args),
+  }),
+);
 
 const mockGetRecentNotificationCount = jest.fn().mockResolvedValue(0);
 const mockGetWithdrawalArchivePreference = jest.fn().mockResolvedValue('never');
-jest.mock('../../services/settings', () => ({
-  getRecentNotificationCount: (...args: unknown[]) =>
-    mockGetRecentNotificationCount(...args),
-  getWithdrawalArchivePreference: (...args: unknown[]) =>
-    mockGetWithdrawalArchivePreference(...args),
-}));
+jest.mock(
+  '../../services/settings' /* gc1-allow: external-boundary — DB-dependent */,
+  () => ({
+    getRecentNotificationCount: (...args: unknown[]) =>
+      mockGetRecentNotificationCount(...args),
+    getWithdrawalArchivePreference: (...args: unknown[]) =>
+      mockGetWithdrawalArchivePreference(...args),
+  }),
+);
 
 const mockRecordPendingNotice = jest.fn().mockResolvedValue(undefined);
 jest.mock('../../services/notices' /* gc1-allow: DB insert boundary */, () => ({
@@ -68,34 +92,28 @@ jest.mock('../../services/notices' /* gc1-allow: DB insert boundary */, () => ({
 
 import { consentRevocation } from './consent-revocation';
 
-interface MockStep {
-  run: jest.Mock;
-  sleep: jest.Mock;
-  sendEvent: jest.Mock;
-}
-
-async function executeRevocation(eventData: {
-  childProfileId: string;
-  parentProfileId: string;
-}): Promise<{ result: unknown; mockStep: MockStep }> {
-  const mockStep: MockStep = {
-    run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
-    sleep: jest.fn().mockResolvedValue(undefined),
-    sendEvent: jest.fn().mockResolvedValue(undefined),
-  };
+async function executeRevocation(
+  eventData: {
+    childProfileId: string;
+    parentProfileId: string;
+  },
+  stepOptions?: InngestStepRunnerOptions,
+) {
+  const runner = createInngestStepRunner(stepOptions);
 
   const handler = (
-    consentRevocation as { fn: (ctx: unknown) => Promise<unknown> }
+    consentRevocation as unknown as { fn: (ctx: unknown) => Promise<unknown> }
   ).fn;
   const result = await handler({
     event: { data: eventData, name: 'app/consent.revoked' },
-    step: mockStep,
+    step: runner.step,
   });
 
-  return { result, mockStep };
+  return { result, runner };
 }
 
 beforeEach(() => {
+  jest.useFakeTimers({ now: new Date('2026-01-15T00:00:00.000Z') });
   jest.clearAllMocks();
   process.env['DATABASE_URL'] = 'postgresql://test:test@localhost/test';
   mockGetConsentStatus.mockResolvedValue('WITHDRAWN');
@@ -106,11 +124,11 @@ beforeEach(() => {
     archivedAt: null,
   });
   mockGetFamilyOwnerProfileId.mockResolvedValue('parent-001');
-  mockCalculateAge.mockReturnValue(8);
   mockGetWithdrawalArchivePreference.mockResolvedValue('never');
 });
 
 afterEach(() => {
+  jest.useRealTimers();
   delete process.env['DATABASE_URL'];
 });
 
@@ -130,13 +148,17 @@ describe('consentRevocation', () => {
   });
 
   it('sleeps at the 6-day warning mark and the 1-day grace end', async () => {
-    const { mockStep } = await executeRevocation({
+    const { runner } = await executeRevocation({
       childProfileId: 'child-001',
       parentProfileId: 'parent-001',
     });
 
-    expect(mockStep.sleep).toHaveBeenCalledWith('warning-mark', '6d');
-    expect(mockStep.sleep).toHaveBeenCalledWith('grace-end', '1d');
+    expect(runner.sleepCalls).toEqual(
+      expect.arrayContaining([
+        { name: 'warning-mark', duration: '6d' },
+        { name: 'grace-end', duration: '1d' },
+      ]),
+    );
   });
 
   it('sends a consent_warning push to the parent at the 6-day mark', async () => {
@@ -206,7 +228,7 @@ describe('consentRevocation', () => {
 
   describe('happy path — still WITHDRAWN', () => {
     it('pushes child, deletes profile, pushes parent in order', async () => {
-      const { result, mockStep } = await executeRevocation({
+      const { result, runner } = await executeRevocation({
         childProfileId: 'child-001',
         parentProfileId: 'parent-001',
       });
@@ -250,8 +272,7 @@ describe('consentRevocation', () => {
       );
 
       // Step ordering: notify-child before delete-child-profile before notify-parent
-      const stepNames = mockStep.run.mock.calls.map((c) => c[0]);
-      expect(stepNames).toEqual([
+      expect(runner.runNames()).toEqual([
         'clear-unread-nudges',
         'send-warning-push',
         'check-restoration',
@@ -267,7 +288,11 @@ describe('consentRevocation', () => {
 
   it('hard-deletes conservatively when birth-year-only age is 13', async () => {
     mockGetWithdrawalArchivePreference.mockResolvedValue('auto');
-    mockCalculateAge.mockReturnValue(13);
+    mockGetProfileForConsentRevocation.mockResolvedValue({
+      displayName: 'Liam',
+      birthYear: 2013,
+      archivedAt: null,
+    });
 
     const { result } = await executeRevocation({
       childProfileId: 'child-boundary',
@@ -386,30 +411,34 @@ describe('consentRevocation', () => {
 describe('archive path — auto preference, age 14', () => {
   it('archives profile and emits schedule-archive-cleanup event via step.sendEvent', async () => {
     mockGetWithdrawalArchivePreference.mockResolvedValue('auto');
-    // age 14 → archive (auto + age >= 13)
-    mockCalculateAge.mockReturnValue(14);
+    mockGetProfileForConsentRevocation.mockResolvedValue({
+      displayName: 'Liam',
+      birthYear: 2012,
+      archivedAt: null,
+    });
 
-    const { result, mockStep } = await executeRevocation({
+    const { result, runner } = await executeRevocation({
       childProfileId: 'child-014',
       parentProfileId: 'parent-001',
     });
 
     expect(result).toEqual({ status: 'archived', childProfileId: 'child-014' });
 
-    // archive-child-profile step must have run
-    const stepRunNames = mockStep.run.mock.calls.map((c: unknown[]) => c[0]);
-    expect(stepRunNames).toContain('archive-child-profile');
+    expect(runner.runNames()).toContain('archive-child-profile');
 
-    // schedule-archive-cleanup must be dispatched via step.sendEvent (not step.run)
-    expect(mockStep.sendEvent).toHaveBeenCalledWith(
-      'schedule-archive-cleanup',
-      expect.objectContaining({
-        name: 'app/profile.archived',
-        data: expect.objectContaining({
-          profileId: 'child-014',
-          parentProfileId: 'parent-001',
-        }),
-      }),
+    expect(runner.sendEventCalls).toEqual(
+      expect.arrayContaining([
+        {
+          name: 'schedule-archive-cleanup',
+          payload: expect.objectContaining({
+            name: 'app/profile.archived',
+            data: expect.objectContaining({
+              profileId: 'child-014',
+              parentProfileId: 'parent-001',
+            }),
+          }),
+        },
+      ]),
     );
 
     // delete must NOT have been called
@@ -418,7 +447,11 @@ describe('archive path — auto preference, age 14', () => {
 
   it('records archive notice against the resolved owner profile', async () => {
     mockGetWithdrawalArchivePreference.mockResolvedValue('auto');
-    mockCalculateAge.mockReturnValue(14);
+    mockGetProfileForConsentRevocation.mockResolvedValue({
+      displayName: 'Liam',
+      birthYear: 2012,
+      archivedAt: null,
+    });
     mockGetFamilyOwnerProfileId.mockResolvedValue('owner-profile-001');
 
     await executeRevocation({

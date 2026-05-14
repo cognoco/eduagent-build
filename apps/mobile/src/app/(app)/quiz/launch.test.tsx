@@ -67,6 +67,7 @@ jest.mock('../../../i18n', () => {
 });
 
 const mockReplace = jest.fn();
+const mockGoBackOrReplace = jest.fn();
 const mockSetRound = jest.fn();
 const mockSetActivityType = jest.fn();
 const mockSetSubjectId = jest.fn();
@@ -112,15 +113,35 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
-jest.mock('../../../lib/theme', () => ({
-  useThemeColors: () => ({
-    primary: '#00b4d8',
-    textPrimary: '#111827',
-    textSecondary: '#6b7280',
-    textInverse: '#ffffff',
-    danger: '#ef4444',
+jest.mock(
+  '../../../lib/theme' /* gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM */,
+  () => ({
+    useThemeColors: () => ({
+      primary: '#00b4d8',
+      textPrimary: '#111827',
+      textSecondary: '#6b7280',
+      textInverse: '#ffffff',
+      danger: '#ef4444',
+    }),
   }),
-}));
+);
+
+jest.mock(
+  '../../../lib/navigation' /* gc1-allow: navigation helper mock keeps screen unit-scoped */,
+  () => ({
+    goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
+  }),
+);
+
+jest.mock(
+  '../../../components/common/DeskLampAnimation' /* gc1-allow: DeskLampAnimation is native-animated SVG; stub prevents native module crash */,
+  () => ({
+    DeskLampAnimation: ({ testID }: { testID?: string }) => {
+      const { Text } = require('react-native');
+      return <Text testID={testID}>thinking lamp</Text>;
+    },
+  }),
+);
 
 jest.mock('../../../hooks/use-quiz', () => ({
   useGenerateRound: () => mockGenerateRound,
@@ -273,6 +294,9 @@ describe('QuizLaunchScreen', () => {
 
     it('does NOT show the error panel before 30s elapses', () => {
       render(<QuizLaunchScreen />);
+
+      screen.getByTestId('quiz-launch-thinking-lamp');
+      screen.getByText('quiz.launch.buildingRound');
 
       act(() => {
         jest.advanceTimersByTime(29_999);

@@ -1,9 +1,11 @@
 import {
+  act,
   render,
   screen,
   fireEvent,
   waitFor,
 } from '@testing-library/react-native';
+import { useFocusEffect } from 'expo-router';
 
 import ProgressSubjectScreen from '.';
 
@@ -116,6 +118,9 @@ const mockPushLearningResumeTarget = jest.fn();
 const mockLocalSearchParams = jest.fn(() => ({ subjectId: 's1' }));
 
 jest.mock('expo-router', () => ({
+  useFocusEffect: jest.fn((callback: () => void) => {
+    callback();
+  }),
   useRouter: () => ({ back: jest.fn(), replace: mockReplace, push: mockPush }),
   useLocalSearchParams: () => mockLocalSearchParams(),
 }));
@@ -270,6 +275,7 @@ function mockHooks({
 } = {}) {
   const inventoryRefetch = jest.fn();
   const subjectProgressRefetch = jest.fn();
+  const resumeTargetRefetch = jest.fn();
   const languageProgressRefetch = jest.fn();
 
   mockUseProgressInventory.mockReturnValue({
@@ -290,6 +296,7 @@ function mockHooks({
 
   mockUseLearningResumeTarget.mockReturnValue({
     data: null,
+    refetch: resumeTargetRefetch,
   });
 
   mockUseLanguageProgress.mockReturnValue({
@@ -305,7 +312,12 @@ function mockHooks({
     isPending: false,
   });
 
-  return { inventoryRefetch, subjectProgressRefetch, languageProgressRefetch };
+  return {
+    inventoryRefetch,
+    languageProgressRefetch,
+    resumeTargetRefetch,
+    subjectProgressRefetch,
+  };
 }
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
@@ -412,6 +424,25 @@ describe('ProgressSubjectScreen', () => {
       mockHooks();
       render(<ProgressSubjectScreen />);
       screen.getByText('Math');
+    });
+
+    it('refreshes subject progress when the mounted progress tab focuses again', () => {
+      const refs = mockHooks();
+      render(<ProgressSubjectScreen />);
+
+      expect(refs.inventoryRefetch).not.toHaveBeenCalled();
+
+      const focusCallback = (useFocusEffect as jest.Mock).mock.calls.at(
+        -1,
+      )?.[0] as () => void;
+      act(() => {
+        focusCallback();
+      });
+
+      expect(refs.inventoryRefetch).toHaveBeenCalled();
+      expect(refs.subjectProgressRefetch).toHaveBeenCalled();
+      expect(refs.resumeTargetRefetch).toHaveBeenCalled();
+      expect(refs.languageProgressRefetch).toHaveBeenCalled();
     });
 
     it('shows topics mastered / total heading', () => {

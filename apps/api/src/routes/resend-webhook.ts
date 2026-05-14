@@ -10,8 +10,28 @@ import { ERROR_CODES } from '@eduagent/schemas';
 import { apiError } from '../errors';
 import { inngest } from '../inngest/client';
 import { createLogger } from '../services/logger';
+import { safeSend } from '../services/safe-non-core';
+import { captureException } from '../services/sentry';
 
 const logger = createLogger();
+
+// ---------------------------------------------------------------------------
+// [CCR-PR120-M7] Svix-id replay deduplication
+//
+// Signature + timestamp checks reject forgeries and events older than 5
+// minutes, but they do NOT stop replay of a captured valid request within
+// that window. Each replay would re-fire side-effects (Inngest events for
+// bounce/complaint, log entries, downstream email-bounced-observe runs).
+//
+// Fix: persist each accepted svix-id in IDEMPOTENCY_KV with a TTL that
+// matches the timestamp tolerance window. On a duplicate svix-id, reject
+// with 409 instead of re-processing.
+// ---------------------------------------------------------------------------
+
+const SVIX_DEDUP_PREFIX = 'svix-dedup:resend:';
+// Match the signature timestamp tolerance window (5 minutes). Once a request
+// is older than this it would fail timestamp verification anyway.
+const SVIX_DEDUP_TTL_SECONDS = 5 * 60;
 
 // ---------------------------------------------------------------------------
 // Svix signature verification (Resend uses Svix for webhook signing)
@@ -190,20 +210,25 @@ async function handleEmailBounced(
     emailId: data.email_id,
   });
 
-  // Telemetry-only event — no Inngest handler registered; consumed by observability tooling.
+  // Observability event — consumed by email-bounced-observe.ts (structured-log terminus).
   // [SEC-6 / BUG-722] Inngest event payloads are persisted in the Inngest
   // dashboard (third-party processor). Recipient email is bystander PII for
   // bounce/complaint observability — mask it before crossing the trust boundary.
   // emailId still uniquely identifies the message for support investigation.
-  await inngest.send({
-    name: 'app/email.bounced',
-    data: {
-      type: eventType,
-      to: maskEmail(data.to),
-      emailId: data.email_id ?? null,
-      timestamp: new Date().toISOString(),
-    },
-  });
+  await safeSend(
+    () =>
+      inngest.send({
+        name: 'app/email.bounced',
+        data: {
+          type: eventType,
+          to: maskEmail(data.to),
+          emailId: data.email_id ?? null,
+          timestamp: new Date().toISOString(),
+        },
+      }),
+    'resend-webhook.email-bounced',
+    { emailId: data.email_id },
+  );
 }
 
 /** email.delivered — log for delivery confirmation audit trail */
@@ -240,6 +265,8 @@ interface ResendWebhookPayload {
 export const resendWebhookRoute = new Hono<{
   Bindings: {
     RESEND_WEBHOOK_SECRET?: string;
+    IDEMPOTENCY_KV?: KVNamespace;
+    ENVIRONMENT?: string;
   };
 }>().post('/webhooks/resend', async (c) => {
   const webhookId = c.req.header('svix-id');
@@ -290,6 +317,75 @@ export const resendWebhookRoute = new Hono<{
     );
   }
 
+  // [CCR-PR120-M7] Replay guard. Signature is valid, but a captured request
+  // can still be replayed within the 5-minute timestamp window without this.
+  const dedupKv = c.env.IDEMPOTENCY_KV;
+  const dedupKey = `${SVIX_DEDUP_PREFIX}${webhookId}`;
+  if (dedupKv) {
+    let alreadySeen = false;
+    try {
+      alreadySeen = (await dedupKv.get(dedupKey)) !== null;
+    } catch (err) {
+      // KV read failure must not silently weaken replay protection.
+      // (CLAUDE.md: "Silent recovery without escalation is banned.")
+      logger.warn('[resend] svix-id dedup read failed; allowing request', {
+        event: 'resend.dedup_lookup_failed',
+        webhookId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      captureException(err, {
+        extra: { context: 'resend-webhook.dedup.get', webhookId },
+      });
+      await safeSend(
+        () =>
+          inngest.send({
+            name: 'app/resend-webhook.dedup_lookup_failed',
+            data: {
+              webhookId,
+              timestamp: new Date().toISOString(),
+            },
+          }),
+        'resend-webhook.dedup-lookup-failed',
+      );
+    }
+    if (alreadySeen) {
+      logger.warn('[resend] Replay detected — duplicate svix-id rejected', {
+        event: 'resend.replay_rejected',
+        webhookId,
+      });
+      return apiError(
+        c,
+        409,
+        ERROR_CODES.CONFLICT,
+        'Webhook already processed (svix-id replay)',
+      );
+    }
+  } else if (
+    c.env.ENVIRONMENT === 'production' ||
+    c.env.ENVIRONMENT === 'staging'
+  ) {
+    // Binding missing in deployed environments must surface — production
+    // without dedup means the protection is silently off.
+    logger.warn(
+      '[resend] IDEMPOTENCY_KV not bound — svix-id replay protection disabled',
+      {
+        event: 'resend.dedup_kv_missing',
+        environment: c.env.ENVIRONMENT,
+      },
+    );
+    await safeSend(
+      () =>
+        inngest.send({
+          name: 'app/resend-webhook.dedup_kv_missing',
+          data: {
+            environment: c.env.ENVIRONMENT,
+            timestamp: new Date().toISOString(),
+          },
+        }),
+      'resend-webhook.dedup-kv-missing',
+    );
+  }
+
   // Parse payload — rawBody already read, parse manually
   let payload: ResendWebhookPayload;
   try {
@@ -321,5 +417,31 @@ export const resendWebhookRoute = new Hono<{
       break;
   }
 
+  // [CCR-PR120-M7] Record the svix-id AFTER processing. KV writes are
+  // fire-and-forget: if KV is briefly unavailable we still return 200 (the
+  // event was processed), but we'd lose dedup for this id. Acceptable: Resend
+  // does not retry on 2xx, so a 5xx from us here would cause an actual
+  // duplicate retry — worse than a missed dedup record.
+  if (dedupKv) {
+    void dedupKv
+      .put(dedupKey, '1', { expirationTtl: SVIX_DEDUP_TTL_SECONDS })
+      .catch((err: unknown) => {
+        logger.warn('[resend] svix-id dedup write failed', {
+          event: 'resend.dedup_write_failed',
+          webhookId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        captureException(err, {
+          extra: { context: 'resend-webhook.dedup.put', webhookId },
+        });
+      });
+  }
+
   return c.json({ received: true });
 });
+
+// Internal exports for tests.
+export const __internal = {
+  SVIX_DEDUP_PREFIX,
+  SVIX_DEDUP_TTL_SECONDS,
+};

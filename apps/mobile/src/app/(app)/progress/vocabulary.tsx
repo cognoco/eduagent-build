@@ -1,6 +1,6 @@
 import { ScrollView, Text, View, Pressable } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ErrorFallback } from '../../../components/common';
 import { useProgressInventory } from '../../../hooks/use-progress';
@@ -35,7 +35,7 @@ function SubjectVocabSection({
   return (
     <Pressable
       onPress={() =>
-        router.push(`/(app)/vocabulary/${subject.subjectId}` as never)
+        router.push(`/(app)/vocabulary/${subject.subjectId}` as Href)
       }
       accessibilityRole="button"
       accessibilityLabel={t('progress.vocabulary.viewSubjectLabel', {
@@ -186,7 +186,7 @@ export default function VocabularyBrowserScreen(): React.ReactElement {
               {t('progress.vocabulary.noLanguageMessage')}
             </Text>
             <Pressable
-              onPress={() => router.replace('/(app)/progress' as never)}
+              onPress={() => router.replace('/(app)/progress' as Href)}
               className="mt-4 rounded-lg bg-primary px-6 py-3"
               accessibilityRole="button"
               accessibilityLabel={t('common.goBack')}
@@ -209,7 +209,7 @@ export default function VocabularyBrowserScreen(): React.ReactElement {
               {t('progress.vocabulary.newLearnerSubtitle')}
             </Text>
             <Pressable
-              onPress={() => router.replace('/(app)/progress' as never)}
+              onPress={() => router.replace('/(app)/progress' as Href)}
               className="bg-background rounded-button px-5 py-3 mt-4"
               accessibilityRole="button"
               accessibilityLabel={t('common.goBack')}
@@ -232,7 +232,7 @@ export default function VocabularyBrowserScreen(): React.ReactElement {
               {emptyMessage}
             </Text>
             <Pressable
-              onPress={() => router.replace('/(app)/progress' as never)}
+              onPress={() => router.replace('/(app)/progress' as Href)}
               className="bg-background rounded-button px-5 py-3 mt-4"
               accessibilityRole="button"
               accessibilityLabel={t('progress.vocabulary.emptyBackLabel')}

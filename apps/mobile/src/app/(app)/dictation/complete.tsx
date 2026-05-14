@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import * as ImagePicker from 'expo-image-picker';
@@ -96,7 +96,7 @@ export default function DictationCompleteScreen(): React.ReactElement {
           {t('dictation.complete.noSessionMessage')}
         </Text>
         <Pressable
-          onPress={() => router.replace('/(app)/dictation' as never)}
+          onPress={() => router.replace('/(app)/dictation' as Href)}
           className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center mt-6"
           accessibilityRole="button"
           accessibilityLabel={t('dictation.complete.startDictation')}
@@ -206,7 +206,7 @@ export default function DictationCompleteScreen(): React.ReactElement {
       if (data) {
         setData({ ...data, reviewResult });
       }
-      router.push('/(app)/dictation/review' as never);
+      router.push('/(app)/dictation/review' as Href);
     } catch (err) {
       // [BUG-692] Don't pop an alert if the user already navigated away.
       if (reviewCancelledRef.current) return;
@@ -262,13 +262,13 @@ export default function DictationCompleteScreen(): React.ReactElement {
         {
           text: t('dictation.complete.continueWithoutSaving'),
           style: 'cancel',
-          onPress: () => router.replace('/(app)/practice' as never),
+          onPress: () => router.replace('/(app)/practice' as Href),
         },
       ]);
       return;
     }
 
-    router.replace('/(app)/practice' as never);
+    router.replace('/(app)/practice' as Href);
   };
 
   return (
@@ -401,7 +401,7 @@ export default function DictationCompleteScreen(): React.ReactElement {
             </Pressable>
 
             <Pressable
-              onPress={() => router.replace('/(app)/dictation' as never)}
+              onPress={() => router.replace('/(app)/dictation' as Href)}
               className="py-3 items-center"
               testID="complete-try-again"
               accessibilityRole="button"

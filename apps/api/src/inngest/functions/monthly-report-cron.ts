@@ -33,6 +33,7 @@ import {
   generateMonthlyReportData,
   generateReportHighlights,
 } from '../../services/monthly-report';
+import { getPracticeActivitySummary } from '../../services/practice-activity-summary';
 import { listEligibleSelfReportProfileIds } from '../../services/solo-progress-reports';
 import { getSnapshotsInRange } from '../../services/snapshot-aggregation';
 import {
@@ -43,6 +44,7 @@ import {
 } from '../../services/notifications';
 import { getRecentNotificationCount } from '../../services/settings';
 import { captureException } from '../../services/sentry';
+import { buildLegacyEmailIdempotencyKey } from '../../services/dedupe-key';
 import { progressMetricsSchema } from '@eduagent/schemas';
 
 // [BUG-848] Validate the JSONB `metrics` column at runtime instead of casting.
@@ -293,6 +295,25 @@ export const monthlyReportGenerate = inngest.createFunction(
           ? child.displayName
           : (child.displayName ?? 'Your child');
 
+        const previousMonthStart = monthRangeStart(lastMonthStart, -1);
+        const practiceSummary = await getPracticeActivitySummary(db, {
+          profileId: childId,
+          period: {
+            start: lastMonthStart,
+            endExclusive: new Date(
+              Date.UTC(
+                lastMonthStart.getUTCFullYear(),
+                lastMonthStart.getUTCMonth() + 1,
+                1,
+              ),
+            ),
+          },
+          previousPeriod: {
+            start: previousMonthStart,
+            endExclusive: lastMonthStart,
+          },
+        });
+
         let reportData = generateMonthlyReportData(
           childDisplayName,
           lastMonthStart.toLocaleDateString(undefined, {
@@ -301,6 +322,7 @@ export const monthlyReportGenerate = inngest.createFunction(
           }),
           thisMonthMetrics,
           previousMetrics,
+          practiceSummary,
         );
 
         const llmContent = await generateReportHighlights(reportData);
@@ -450,7 +472,11 @@ export const monthlyReportGenerate = inngest.createFunction(
           );
           await sendEmail(emailPayload, {
             resendApiKey: getStepResendApiKey(),
-            idempotencyKey: `monthly-${parentId}-${reportResult.reportMonth}`,
+            idempotencyKey: buildLegacyEmailIdempotencyKey(
+              'monthly',
+              parentId,
+              reportResult.reportMonth,
+            ),
           });
         } else {
           // Expected: OAuth-only accounts or Clerk not exposing email field.

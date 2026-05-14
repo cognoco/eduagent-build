@@ -21,7 +21,7 @@ import {
   type Database,
   xpLedger,
 } from '@eduagent/database';
-import type { ProgressMetrics } from '@eduagent/schemas';
+import type { ProgressMetrics, TopicProgress } from '@eduagent/schemas';
 import { like } from 'drizzle-orm';
 import { ForbiddenError } from '../errors';
 import {
@@ -104,9 +104,6 @@ function buildProgressMetrics(
     topicsMastered: 0,
     topicsInProgress: 0,
     booksCompleted: 0,
-    weeklyDeltaTopicsMastered: null,
-    weeklyDeltaVocabularyTotal: null,
-    weeklyDeltaTopicsExplored: null,
     vocabularyTotal: 0,
     vocabularyMastered: 0,
     vocabularyLearning: 0,
@@ -210,7 +207,7 @@ async function seedCurriculum(
 
   return {
     curriculumId: curriculum!.id,
-    topicIds: topics.map((topic) => topic.id),
+    topicIds: topics.map((topic: { id: string }) => topic.id),
   };
 }
 
@@ -1049,7 +1046,7 @@ describe('dashboard service integration', () => {
       subjectId,
       topicId: topicId1!,
       status: 'passed',
-      masteryScore: '0.80',
+      masteryScore: 0.8,
     });
     await seedRetentionCard({
       profileId: childProfileId,
@@ -1079,8 +1076,12 @@ describe('dashboard service integration', () => {
       subjectId,
     );
 
-    const plantCells = topics.find((topic) => topic.topicId === topicId1);
-    const animalCells = topics.find((topic) => topic.topicId === topicId2);
+    const plantCells = topics.find(
+      (topic: TopicProgress) => topic.topicId === topicId1,
+    );
+    const animalCells = topics.find(
+      (topic: TopicProgress) => topic.topicId === topicId2,
+    );
 
     expect(plantCells).toEqual(
       expect.objectContaining({

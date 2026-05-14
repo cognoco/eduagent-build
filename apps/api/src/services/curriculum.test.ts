@@ -4,7 +4,9 @@ import {
   type LLMProvider,
   type ChatMessage,
   type ModelConfig,
+  type StopReason,
 } from './llm';
+import { makeChatStreamResult } from './llm/types';
 import {
   generateCurriculum,
   getCurriculum,
@@ -56,17 +58,17 @@ const sampleTopicPreview = JSON.stringify({
 function createCurriculumMockProvider(): LLMProvider {
   return {
     id: 'gemini',
-    async chat(
-      _messages: ChatMessage[],
-      _config: ModelConfig,
-    ): Promise<string> {
-      return `Here is your curriculum:\n${sampleTopics}`;
+    async chat(_messages: ChatMessage[], _config: ModelConfig) {
+      return {
+        content: `Here is your curriculum:\n${sampleTopics}`,
+        stopReason: 'stop' as StopReason,
+      };
     },
-    async *chatStream(
-      _messages: ChatMessage[],
-      _config: ModelConfig,
-    ): AsyncIterable<string> {
-      yield sampleTopics;
+    chatStream(_messages: ChatMessage[], _config: ModelConfig) {
+      const s = (async function* () {
+        yield sampleTopics;
+      })();
+      return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
     },
   };
 }
@@ -74,11 +76,14 @@ function createCurriculumMockProvider(): LLMProvider {
 function createAddTopicMockProvider(): LLMProvider {
   return {
     id: 'gemini',
-    async chat(): Promise<string> {
-      return sampleTopicPreview;
+    async chat() {
+      return { content: sampleTopicPreview, stopReason: 'stop' as StopReason };
     },
-    async *chatStream(): AsyncIterable<string> {
-      yield sampleTopicPreview;
+    chatStream() {
+      const s = (async function* () {
+        yield sampleTopicPreview;
+      })();
+      return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
     },
   };
 }
@@ -247,8 +252,8 @@ describe('generateCurriculum', () => {
     const topics = await generateCurriculum(defaultInput);
 
     expect(topics).toHaveLength(2);
-    expect(topics[0].title).toBe('Variables & Types');
-    expect(topics[1].relevance).toBe('core');
+    expect(topics[0]!.title).toBe('Variables & Types');
+    expect(topics[1]!.relevance).toBe('core');
   });
 
   it('returns typed topic objects', async () => {
@@ -267,11 +272,17 @@ describe('generateCurriculum', () => {
     // Temporarily register a provider that returns non-JSON
     const badProvider: LLMProvider = {
       id: 'gemini',
-      async chat(): Promise<string> {
-        return 'Sorry, I cannot generate a curriculum right now.';
+      async chat() {
+        return {
+          content: 'Sorry, I cannot generate a curriculum right now.',
+          stopReason: 'stop' as StopReason,
+        };
       },
-      async *chatStream(): AsyncIterable<string> {
-        yield 'nope';
+      chatStream() {
+        const s = (async function* () {
+          yield 'nope';
+        })();
+        return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
       },
     };
     registerProvider(badProvider);
@@ -323,8 +334,8 @@ describe('getCurriculum', () => {
     expect(result!.subjectId).toBe(SUBJECT_ID);
     expect(result!.version).toBe(1);
     expect(result!.topics).toHaveLength(2);
-    expect(result!.topics[0].title).toBe('Variables & Types');
-    expect(result!.topics[1].title).toBe('Functions');
+    expect(result!.topics[0]!.title).toBe('Variables & Types');
+    expect(result!.topics[1]!.title).toBe('Functions');
     expect(result!.generatedAt).toBe('2025-01-15T10:00:00.000Z');
   });
 
@@ -355,7 +366,7 @@ describe('getCurriculum', () => {
       chapter: null,
       skipped: true,
     });
-    expect(result!.topics[0].source).toBeUndefined();
+    expect(result!.topics[0]!.source).toBeUndefined();
   });
 });
 
@@ -429,8 +440,8 @@ describe('addCurriculumTopic', () => {
       expect(result.topic.relevance).toBe('recommended');
     }
 
-    const insertedValues = (db.insert as jest.Mock).mock.results[0].value.values
-      .mock.calls[0][0];
+    const insertedValues = (db.insert as jest.Mock).mock.results[0]!.value
+      .values.mock.calls[0]![0];
     expect(insertedValues.source).toBe('user');
     // BD-08: sortOrder is now a SQL expression (atomic COALESCE), not a JS number
     expect(insertedValues.sortOrder).not.toBeUndefined();
@@ -468,12 +479,20 @@ describe('addCurriculumTopic', () => {
   it('falls back to default preview when LLM fails', async () => {
     const failProvider: LLMProvider = {
       id: 'gemini',
-      async chat(): Promise<string> {
+      async chat() {
         throw new Error('LLM unavailable');
       },
-      // eslint-disable-next-line require-yield
-      async *chatStream(): AsyncIterable<string> {
-        throw new Error('LLM unavailable');
+      chatStream() {
+        const s: AsyncIterable<string> = {
+          [Symbol.asyncIterator]() {
+            return {
+              next(): Promise<IteratorResult<string>> {
+                return Promise.reject(new Error('LLM unavailable'));
+              },
+            };
+          },
+        };
+        return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
       },
     };
     registerProvider(failProvider);
@@ -671,12 +690,15 @@ describe('challengeCurriculum', () => {
     let capturedMessages: ChatMessage[] = [];
     registerProvider({
       id: 'gemini',
-      async chat(messages: ChatMessage[]): Promise<string> {
+      async chat(messages: ChatMessage[]) {
         capturedMessages = messages;
-        return sampleTopics;
+        return { content: sampleTopics, stopReason: 'stop' as StopReason };
       },
-      async *chatStream(): AsyncIterable<string> {
-        yield sampleTopics;
+      chatStream() {
+        const s = (async function* () {
+          yield sampleTopics;
+        })();
+        return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
       },
     });
 
@@ -892,8 +914,8 @@ describe('adaptCurriculumFromPerformance', () => {
     // db.insert is called for the adaptation audit row (last call)
     expect(db.insert).toHaveBeenCalled();
     const insertCalls = (db.insert as jest.Mock).mock.results;
-    const lastInsert = insertCalls[insertCalls.length - 1];
-    const insertedValues = lastInsert.value.values.mock.calls[0][0];
+    const lastInsert = insertCalls[insertCalls.length - 1]!;
+    const insertedValues = lastInsert.value.values.mock.calls[0]![0];
     expect(insertedValues.profileId).toBe(PROFILE_ID);
     expect(insertedValues.subjectId).toBe(SUBJECT_ID);
     expect(insertedValues.topicId).toBe(TOPIC_B);
@@ -1354,8 +1376,8 @@ describe('getBooks (BUG-884)', () => {
 
     const result = await getBooks(db, PROFILE_ID, SUBJECT_ID);
     expect(result).toHaveLength(1);
-    expect(result[0].topicCount).toBe(0);
-    expect(result[0].status).toBe('NOT_STARTED');
+    expect(result[0]!.topicCount).toBe(0);
+    expect(result[0]!.status).toBe('NOT_STARTED');
   });
 
   it('collapses near-duplicate book titles before returning the shelf list', async () => {
@@ -1392,8 +1414,8 @@ describe('getBooks (BUG-884)', () => {
     const result = await getBooks(db, PROFILE_ID, SUBJECT_ID);
 
     expect(result).toHaveLength(1);
-    expect(result[0].id).toBe('book-mesopotamia');
-    expect(result[0].title).toBe('Mesopotamia');
+    expect(result[0]!.id).toBe('book-mesopotamia');
+    expect(result[0]!.title).toBe('Mesopotamia');
   });
 
   // BUG-884 break test: orphan curriculum_topics rows from prior curriculum
@@ -1428,7 +1450,7 @@ describe('getBooks (BUG-884)', () => {
     });
 
     const result = await getBooks(db, PROFILE_ID, SUBJECT_ID);
-    expect(result[0].topicCount).toBe(0);
+    expect(result[0]!.topicCount).toBe(0);
 
     // Inspect the captured WHERE arg — it must reference the latest
     // curriculumId. Drizzle's expression objects have circular refs, so we

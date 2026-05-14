@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { FlatList, Pressable, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import type { BookProgressStatus, BookSuggestion } from '@eduagent/schemas';
@@ -35,14 +35,14 @@ export default function ShelfScreen() {
   // than an array. The ?? operator only catches null/undefined, not objects.
   const books = Array.isArray(booksQuery.data) ? booksQuery.data : [];
   const subject = subjectsQuery.data?.find((s) => s.id === subjectId);
-  const shelfTint = useSubjectTint(subject?.name ?? subjectId ?? 'shelf');
+  const shelfTint = useSubjectTint(subjectId ?? 'shelf');
 
   const { data: suggestionsData } = useBookSuggestions(subjectId);
   const bookSuggestions = suggestionsData?.suggestions ?? [];
   const filing = useFiling();
 
   const handleBack = useCallback(() => {
-    router.replace('/(app)/library' as never);
+    router.replace('/(app)/library' as Href);
   }, [router]);
 
   // Filing overlay: show spinner + skip button after 15s (same pattern as pick-book)
@@ -96,7 +96,7 @@ export default function ShelfScreen() {
           subjectId: result.shelfId,
           bookId: result.bookId,
         },
-      } as never);
+      } as Href);
     } catch (err) {
       filingInFlight.current = false;
       const classified = classifyApiError(err);
@@ -188,7 +188,7 @@ export default function ShelfScreen() {
         router.push({
           pathname: '/(app)/pick-book/[subjectId]',
           params: { subjectId },
-        } as never)
+        } as Href)
       }
       className={className}
       style={{ borderColor: shelfTint.solid }}
@@ -214,7 +214,7 @@ export default function ShelfScreen() {
         style={{ paddingTop: insets.top }}
         testID="shelf-loading"
       >
-        <BookPageFlipAnimation size={140} color={themeColors.accent} />
+        <BookPageFlipAnimation size={150} color={themeColors.accent} />
         <Text className="text-h3 font-semibold text-text-primary mt-4 text-center">
           {t('library.shelf.loadingTitle')}
         </Text>
@@ -244,7 +244,7 @@ export default function ShelfScreen() {
     const actions = recoveryActions(classified, {
       retry: handleRetry,
       goBack: handleBack,
-      goHome: () => router.replace('/(app)/home' as never),
+      goHome: () => router.replace('/(app)/home' as Href),
     });
 
     return (
@@ -323,7 +323,7 @@ export default function ShelfScreen() {
             router.push({
               pathname: '/(app)/subject/[subjectId]',
               params: { subjectId },
-            } as never)
+            } as Href)
           }
           className="p-2 -me-2"
           accessibilityLabel={t('library.shelf.settingsAccessibilityLabel')}
@@ -379,7 +379,7 @@ export default function ShelfScreen() {
               router.push({
                 pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
                 params: { subjectId, bookId: item.id },
-              } as never)
+              } as Href)
             }
           />
         )}
@@ -454,7 +454,7 @@ export default function ShelfScreen() {
           className="absolute inset-0 bg-background/80 items-center justify-center"
           testID="shelf-filing-overlay"
         >
-          <BookPageFlipAnimation size={140} color={themeColors.accent} />
+          <BookPageFlipAnimation size={150} color={themeColors.accent} />
           <Text className="text-body-sm text-text-secondary mt-3">
             {t('library.shelf.organizing')}
           </Text>
@@ -468,7 +468,7 @@ export default function ShelfScreen() {
                 router.replace({
                   pathname: '/(app)/shelf/[subjectId]',
                   params: { subjectId },
-                } as never);
+                } as Href);
               }}
               className="mt-6 bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
               testID="shelf-filing-skip"

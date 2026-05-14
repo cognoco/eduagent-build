@@ -1,12 +1,12 @@
-name: execute-cleanup-pr-merged
+name: execute-cleanup-pr
 description: |
   Execute a cleanup-plan.md work package by PR number.
-  Usage: archon workflow run execute-cleanup-pr-merged --branch cleanup-pr-XX "PR-16"
+  Usage: archon workflow run execute-cleanup-pr --branch cleanup-pr-XX "PR-16"
   Input: PR identifier (e.g. "PR-08", "PR-15", "08", "15")
   Output: GitHub PR ready for human review.
 
-  DRAFT — not yet replacing execute-cleanup-pr-{claude,codex}.yaml.
-  Replaces the dual-flavor bake-off with a single merged flow.
+  Canonical cleanup-PR workflow. Replaced the earlier dual-flavor
+  execute-cleanup-pr-{claude,codex}.yaml variants with a single merged flow.
   Audit + rationale: .archon/workflow-audit.md (Phase D).
 
   Provider/model selection (verify with audit doc):
@@ -24,9 +24,11 @@ description: |
     and we keep model-family consistency with reviewers).
 
   Structural change vs current flavors:
-  - `risk-class` runs BEFORE `validate`. `validate` is now gated by
-    `risk-class != 'tiny'`, mirroring code-review/test-coverage.
-    Saves ~$0.22 + 120s per tiny PR.
+  - `risk-class` runs BEFORE `validate`. `validate` and `re-validate` are
+    now gated by `risk-class != 'tiny'`, mirroring code-review/test-coverage.
+    Saves ~$0.44 + 240s per tiny PR (both LLM validates skipped).
+    `review-scope` and `push` use `trigger_rule: none_failed_min_one_success`
+    so the skipped validates don't cascade-skip the rest of the workflow.
 
   Flow:
   1. Parse cleanup-plan.md → deterministic extraction (shell)
@@ -54,7 +56,7 @@ nodes:
   # ── PHASE 0: INIT ────────────────────────────────────────────────────
 
   - id: init-tracing
-    bash: ./.archon/scripts/init-tracing.sh --workflow execute-cleanup-pr-merged "$ARGUMENTS"
+    bash: ./.archon/scripts/init-tracing.sh --workflow execute-cleanup-pr "$ARGUMENTS"
 
   # ── PHASE 1: EXTRACT ─────────────────────────────────────────────────
   # Deterministic shell parser. Produces work-order.md, patterns.md,
@@ -172,7 +174,7 @@ nodes:
   - id: review-scope
     command: cleanup-pr-review-scope
     depends_on: [risk-class, validate]
-    trigger_rule: all_success   # validate must succeed before reviews fan out (one_success previously let a failed validate slip past — risk-class always succeeds)
+    trigger_rule: none_failed_min_one_success   # validate failure blocks reviews; validate skipped (tiny) is OK. one_success previously let a failed validate slip past (risk-class always succeeds); all_success cascade-skipped tiny PRs into orphaning the whole post-implement chain (no push, no PR).
     context: fresh
     idle_timeout: 300000
     provider: claude
@@ -233,7 +235,12 @@ nodes:
     modelReasoningEffort: high
 
   # ── PHASE 5.5: SCOPE GUARD + RE-VALIDATE (post-fix) ──────────────────
-  # Same idle_timeout cap on re-validate as on validate.
+  # scope-guard-post-fix always runs (cheap shell, catches file drift from
+  # fix-locally). re-validate is gated by risk-class != 'tiny' for symmetry
+  # with validate: same Claude/sonnet/low cost, same rationale. Defense-in-
+  # depth for tiny PRs is preserved by scope-guard-post-fix, pre-commit
+  # hooks (lint-staged, tsc --build, scripts/pre-commit-tests.sh), and
+  # ci-watch-and-fix.
 
   - id: scope-guard-post-fix
     depends_on: [fix-locally]
@@ -242,6 +249,7 @@ nodes:
   - id: re-validate
     command: cleanup-validate
     depends_on: [scope-guard-post-fix]
+    when: "$risk-class.output != 'tiny'"
     context: fresh
     idle_timeout: 300000
     provider: claude
@@ -249,9 +257,13 @@ nodes:
     modelReasoningEffort: low
 
   # ── PHASE 6: PUSH + CREATE PR ─────────────────────────────────────────
+  # push includes risk-class in deps so none_failed_min_one_success has an
+  # always-succeeding anchor when re-validate is skipped (tiny). re-validate
+  # failure still blocks push for non-tiny PRs.
 
   - id: push
-    depends_on: [re-validate]
+    depends_on: [risk-class, re-validate]
+    trigger_rule: none_failed_min_one_success
     bash: ./.archon/scripts/push.sh
 
   - id: create-pr

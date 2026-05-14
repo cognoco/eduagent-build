@@ -473,7 +473,7 @@ describe('useLinkedChildren', () => {
     await waitFor(() => {
       expect(result.current.profile.isLoading).toBe(false);
     });
-    expect(result.current.linked.map((p) => p.id)).toEqual([
+    expect(result.current.linked.map((p: Profile) => p.id)).toEqual([
       'child-newer-created',
       'child-older-created',
     ]);

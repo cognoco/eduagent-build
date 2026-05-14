@@ -58,7 +58,12 @@ describe('ChildReportsScreen', () => {
     mockUseChildDetail.mockReturnValue({
       data: { displayName: 'Emma', profileId: 'child-001' },
     });
-    mockUseChildWeeklyReports.mockReturnValue({ data: undefined });
+    mockUseChildWeeklyReports.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
   });
 
   describe('empty state', () => {
@@ -174,9 +179,83 @@ describe('ChildReportsScreen', () => {
         '/(app)/child/child-001',
       );
     });
+
+    // [CCR finding, 2026-05-14] Break test for the weekly-only failure case:
+    // before the fix, monthly success + weekly failure hid the weekly error
+    // entirely (no banner, no retry). Now combinedError = (isError || weeklyError)
+    // when there's no data from either source.
+    it('renders error card when weekly fails and monthly returns empty', () => {
+      const monthlyRefetch = jest.fn();
+      const weeklyRefetch = jest.fn();
+      mockUseChildReports.mockReturnValue({
+        data: [],
+        isLoading: false,
+        isError: false,
+        refetch: monthlyRefetch,
+      });
+      mockUseChildWeeklyReports.mockReturnValue({
+        data: undefined,
+        isLoading: false,
+        isError: true,
+        refetch: weeklyRefetch,
+      });
+
+      render(<ChildReportsScreen />);
+
+      screen.getByTestId('child-reports-error');
+
+      fireEvent.press(screen.getByTestId('child-reports-error-retry'));
+      // The retry handler kicks off BOTH refetches so whichever endpoint
+      // failed gets re-attempted.
+      expect(monthlyRefetch).toHaveBeenCalled();
+      expect(weeklyRefetch).toHaveBeenCalled();
+    });
   });
 
   describe('reports list', () => {
+    it('renders reports header summary from latest weekly report', () => {
+      mockUseChildWeeklyReports.mockReturnValue({
+        data: [
+          {
+            id: 'wr-1',
+            reportWeek: '2026-05-05',
+            viewedAt: null,
+            createdAt: '2026-05-12T03:00:00Z',
+            headlineStat: {
+              label: 'Topics mastered',
+              value: '4',
+              comparison: '+2 vs last week',
+            },
+            thisWeek: {
+              totalSessions: 5,
+              totalActiveMinutes: 120,
+              topicsMastered: 4,
+              topicsExplored: 8,
+              vocabularyTotal: 50,
+              streakBest: 3,
+            },
+          },
+        ],
+        isLoading: false,
+        isError: false,
+        refetch: jest.fn(),
+      });
+      mockUseChildReports.mockReturnValue({
+        data: [],
+        isLoading: false,
+        isError: false,
+        refetch: jest.fn(),
+      });
+
+      render(<ChildReportsScreen />);
+
+      screen.getByTestId('reports-header-summary');
+      expect(screen.getAllByText('Topics mastered: 4').length).toBeGreaterThan(
+        0,
+      );
+      expect(screen.getAllByText('+2 vs last week').length).toBeGreaterThan(0);
+    });
+
     it('renders report cards when reports exist', () => {
       mockUseChildReports.mockReturnValue({
         data: [

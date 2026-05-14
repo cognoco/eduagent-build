@@ -5,6 +5,7 @@ import {
   MATCH_CONFIDENCE_FLOOR,
 } from '../../src/services/session/session-crud';
 import { routeAndCall } from '../../src/services/llm/router';
+import { getTextContent } from '../../src/services/llm/types';
 import type { EvalProfile } from '../fixtures/profiles';
 import { bootstrapLlmProviders } from '../runner/llm-bootstrap';
 import type { FlowDefinition, PromptMessages, Scenario } from '../runner/types';
@@ -161,7 +162,7 @@ export const topicIntentMatcherFlow: FlowDefinition<TopicIntentMatcherInput> = {
   },
 
   enumerateScenarios(
-    profile: EvalProfile
+    profile: EvalProfile,
   ): Array<Scenario<TopicIntentMatcherInput>> | null {
     if (profile.id !== '11yo-czech-animals') return null;
     return FIXTURES;
@@ -170,8 +171,8 @@ export const topicIntentMatcherFlow: FlowDefinition<TopicIntentMatcherInput> = {
   buildPrompt(input: TopicIntentMatcherInput): PromptMessages {
     const [system, user] = buildTopicIntentMatcherMessages(input);
     return {
-      system: system?.content ?? '',
-      user: user?.content ?? '',
+      system: getTextContent(system?.content ?? ''),
+      user: getTextContent(user?.content ?? ''),
       notes: [
         `Expected title: ${input.expectedTitle ?? 'null'}`,
         `Confidence floor: ${MATCH_CONFIDENCE_FLOOR}`,
@@ -183,7 +184,7 @@ export const topicIntentMatcherFlow: FlowDefinition<TopicIntentMatcherInput> = {
 
   async runLive(
     input: TopicIntentMatcherInput,
-    messages: PromptMessages
+    messages: PromptMessages,
   ): Promise<string> {
     bootstrapLlmProviders();
     const result = await routeAndCall(
@@ -192,10 +193,10 @@ export const topicIntentMatcherFlow: FlowDefinition<TopicIntentMatcherInput> = {
         { role: 'user', content: messages.user ?? '' },
       ],
       1,
-      { flow: 'topic-intent-matcher', llmTier: 'flash' }
+      { flow: 'topic-intent-matcher', llmTier: 'flash' },
     );
     const parsed = topicIntentEvalResponseSchema.safeParse(
-      JSON.parse(result.response.match(/\{[\s\S]*\}/)?.[0] ?? result.response)
+      JSON.parse(result.response.match(/\{[\s\S]*\}/)?.[0] ?? result.response),
     );
     if (!parsed.success) {
       throw new Error('Topic matcher response failed schema validation');
@@ -209,7 +210,7 @@ export const topicIntentMatcherFlow: FlowDefinition<TopicIntentMatcherInput> = {
       const actualTitle =
         input.topics.find((topic) => topic.id === actualId)?.title ?? 'null';
       throw new Error(
-        `Expected ${input.expectedTitle ?? 'null'}, got ${actualTitle}`
+        `Expected ${input.expectedTitle ?? 'null'}, got ${actualTitle}`,
       );
     }
     return result.response;

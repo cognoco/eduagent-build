@@ -4,6 +4,7 @@ import { apiBaseUrl, appBaseUrl, runId } from './e2e-web/helpers/runtime';
 
 const e2eWebDir = path.join(process.cwd(), 'apps', 'mobile', 'e2e-web');
 const shouldStartLocalApi = process.env.PLAYWRIGHT_SKIP_LOCAL_API !== '1';
+const usesSharedStagingApi = process.env.PLAYWRIGHT_SKIP_LOCAL_API === '1';
 
 export default defineConfig({
   testDir: e2eWebDir,
@@ -11,7 +12,9 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  workers: process.env.CI ? 4 : undefined,
+  // Shared staging can edge-block parallel authenticated bursts; local API runs
+  // keep parallel workers because they do not traverse the staging gateway.
+  workers: process.env.CI ? (usesSharedStagingApi ? 1 : 4) : undefined,
   reporter: [
     ['line'],
     [

@@ -16,7 +16,6 @@
 // Valid UUID constants (weekly handler validates parentId via z.string().uuid())
 // ---------------------------------------------------------------------------
 const PARENT_ID = 'aaaaaaaa-0000-4000-8000-000000000001';
-const _PARENT_ID_2 = 'aaaaaaaa-0000-4000-8000-000000000002';
 const CHILD_ID_A = 'bbbbbbbb-0000-4000-8000-000000000001';
 const CHILD_ID_B = 'bbbbbbbb-0000-4000-8000-000000000002';
 const CHILD_ID_RESTRICTED = 'cccccccc-0000-4000-8000-000000000001';
@@ -32,18 +31,11 @@ jest.mock('../../services/sentry' /* gc1-allow: unit test boundary */, () => ({
 }));
 
 // Inngest client — external framework boundary
-jest.mock('../client' /* gc1-allow: unit test boundary */, () => ({
-  inngest: {
-    createFunction: jest.fn(
-      (config: unknown, trigger: unknown, fn: unknown) => ({
-        fn,
-        opts: config,
-        _trigger: trigger,
-      }),
-    ),
-    send: jest.fn().mockResolvedValue(undefined),
-  },
-}));
+import { createInngestTransportCapture } from '../../test-utils/inngest-transport-capture';
+import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
+
+const mockInngestTransport = createInngestTransportCapture();
+jest.mock('../client', () => mockInngestTransport.module); // gc1-allow: inngest framework boundary
 
 // Internal services used by the generate handlers — we intercept them here
 // using jest.requireActual patterns would be awkward since these are async
@@ -55,8 +47,6 @@ jest.mock('../client' /* gc1-allow: unit test boundary */, () => ({
 // and sendEmail are both stubbed via jest.mock on the service barrel.
 // This is acceptable for Inngest handler control-flow tests because the
 // services themselves are tested in isolation in notifications.test.ts.
-// gc1-allow: handler control-flow test; services tested in their own unit suites
-
 const mockSendPushNotification = jest.fn().mockResolvedValue({ sent: true });
 const mockSendEmail = jest
   .fn()
@@ -124,6 +114,20 @@ jest.mock( // gc1-allow: handler control-flow test; services tested in own suite
   () => ({
     generateWeeklyReportData: (...args: unknown[]) =>
       mockGenerateWeeklyReportData(...args),
+  }),
+);
+
+import { emptyPracticeActivitySummary } from '../../test-utils/practice-activity-summary-fixture';
+
+const mockGetPracticeActivitySummary = jest
+  .fn()
+  .mockResolvedValue(emptyPracticeActivitySummary);
+// prettier-ignore
+jest.mock( // gc1-allow: handler control-flow test; service tested separately
+  '../../services/practice-activity-summary',
+  () => ({
+    getPracticeActivitySummary: (...args: unknown[]) =>
+      mockGetPracticeActivitySummary(...args),
   }),
 );
 
@@ -246,9 +250,7 @@ async function executeWeeklyGenerate(
 ): Promise<unknown> {
   (getStepDatabase as jest.Mock).mockReturnValue(db);
 
-  const mockStep = {
-    run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
-  };
+  const { step } = createInngestStepRunner();
 
   const handler = (
     weeklyProgressPushGenerate as unknown as {
@@ -261,20 +263,18 @@ async function executeWeeklyGenerate(
       name: 'app/weekly-progress-push.generate',
       data: { parentId },
     },
-    step: mockStep,
+    step,
   });
 }
 
 async function executeMonthlyGenerate(
   parentId: string,
   childId: string,
-  db: ReturnType<typeof buildMockDb>,
+  db: ReturnType<typeof buildMonthlyMockDb>,
 ): Promise<unknown> {
   (getStepDatabase as jest.Mock).mockReturnValue(db);
 
-  const mockStep = {
-    run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
-  };
+  const { step } = createInngestStepRunner();
 
   const handler = (
     monthlyReportGenerate as unknown as {
@@ -287,7 +287,7 @@ async function executeMonthlyGenerate(
       name: 'app/monthly-report.generate',
       data: { parentId, childId },
     },
-    step: mockStep,
+    step,
   });
 }
 
@@ -322,6 +322,7 @@ const SAMPLE_METRICS = {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockInngestTransport.clear();
   resetDbState();
   mockGetStepResendApiKey.mockReturnValue('test-resend-key');
 
@@ -491,7 +492,7 @@ describe('Email digest channel — weekly', () => {
   });
 
   // Break test 6: Resend Idempotency-Key set per parentId + reportWeek
-  it('(T6) sets Resend Idempotency-Key as weekly-{parentId}-{reportWeek}', async () => {
+  it('(T6) sets Resend Idempotency-Key from weekly + parentId + reportWeek', async () => {
     const db = buildMockDb();
     db.query.consentStates.findFirst = jest.fn().mockResolvedValue({
       status: 'CONSENTED',
@@ -822,7 +823,7 @@ describe('Email digest channel — monthly', () => {
   });
 
   // Break test 6 (monthly): Resend Idempotency-Key set per parentId + reportMonth
-  it('(T6-monthly) sets Resend Idempotency-Key as monthly-{parentId}-{reportMonth}', async () => {
+  it('(T6-monthly) sets Resend Idempotency-Key from monthly + parentId + reportMonth', async () => {
     const db = buildMonthlyMockDb();
 
     await executeMonthlyGenerate('parent-xyz', 'child-001', db);

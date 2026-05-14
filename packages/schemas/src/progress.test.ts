@@ -1,5 +1,6 @@
 import {
   childSessionSchema,
+  progressOverviewResponseSchema,
   streakCardSchema,
   insightCardSchema,
   reviewDueCardSchema,
@@ -186,5 +187,19 @@ describe('childSessionSchema', () => {
     };
 
     expect(childSessionSchema.parse(session).drills).toEqual(session.drills);
+  });
+});
+
+describe('progressOverviewResponseSchema', () => {
+  it('defaults practiceSummary for older API payloads', () => {
+    const parsed = progressOverviewResponseSchema.parse({
+      subjects: [],
+      totalTopicsCompleted: 0,
+      totalTopicsVerified: 0,
+    });
+
+    expect(parsed.practiceActivityCount).toBe(0);
+    expect(parsed.practiceSummary.totals.activitiesCompleted).toBe(0);
+    expect(parsed.practiceSummary.byType).toEqual([]);
   });
 });

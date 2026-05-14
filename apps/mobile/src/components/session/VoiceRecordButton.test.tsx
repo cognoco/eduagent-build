@@ -15,15 +15,6 @@ jest.mock('../../lib/haptics', () => ({
   hapticSuccess: () => mockHapticSuccess(),
 }));
 
-jest.mock('../../lib/theme', () => ({
-  useThemeColors: () => ({
-    muted: '#888',
-    primary: '#007AFF',
-    textInverse: '#fff',
-    textSecondary: '#666',
-  }),
-}));
-
 jest.mock('@expo/vector-icons', () => {
   const { Text } = require('react-native');
   return {
