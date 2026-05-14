@@ -5,22 +5,44 @@
 
 // Mocks must be declared before any imports.
 
-jest.mock('./milestone-detection', () => ({
-  detectMilestones: jest.fn().mockReturnValue([]),
-  storeMilestones: jest.fn().mockResolvedValue([]),
-}));
+jest.mock('./milestone-detection' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    './milestone-detection',
+  ) as typeof import('./milestone-detection');
+  return {
+    ...actual,
+    detectMilestones: jest.fn().mockReturnValue([]),
+    storeMilestones: jest.fn().mockResolvedValue([]),
+  };
+});
 
-jest.mock('./celebrations', () => ({
-  queueCelebration: jest.fn().mockResolvedValue(undefined),
-}));
+jest.mock('./celebrations' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    './celebrations',
+  ) as typeof import('./celebrations');
+  return {
+    ...actual,
+    queueCelebration: jest.fn().mockResolvedValue(undefined),
+  };
+});
 
-jest.mock('./language-curriculum', () => ({
-  getCurrentLanguageProgress: jest.fn().mockResolvedValue(null),
-}));
+jest.mock('./language-curriculum' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    './language-curriculum',
+  ) as typeof import('./language-curriculum');
+  return {
+    ...actual,
+    getCurrentLanguageProgress: jest.fn().mockResolvedValue(null),
+  };
+});
 
-jest.mock('./sentry', () => ({
-  captureException: jest.fn(),
-}));
+jest.mock('./sentry' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual('./sentry') as typeof import('./sentry');
+  return {
+    ...actual,
+    captureException: jest.fn(),
+  };
+});
 
 import type { Database } from '@eduagent/database';
 import {
