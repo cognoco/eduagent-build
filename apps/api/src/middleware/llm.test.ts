@@ -1,12 +1,15 @@
 jest.mock('../services/llm', () => ({
+  ...jest.requireActual('../services/llm'),
   registerProvider: jest.fn(),
 }));
 
 jest.mock('../services/llm/providers/gemini', () => ({
+  ...jest.requireActual('../services/llm/providers/gemini'),
   createGeminiProvider: jest.fn().mockReturnValue({ id: 'gemini' }),
 }));
 
 jest.mock('../services/llm/providers/openai', () => ({
+  ...jest.requireActual('../services/llm/providers/openai'),
   createOpenAIProvider: jest.fn().mockReturnValue({ id: 'openai' }),
 }));
 

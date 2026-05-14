@@ -1,6 +1,13 @@
-jest.mock('../services/support/spillover', () => ({
-  recordOutboxSpillover: jest.fn(),
-}));
+jest.mock('../services/support/spillover', () => { // gc1-allow: requireActual + targeted override for recordOutboxSpillover side effect
+  const actual = jest.requireActual('../services/support/spillover') as Record<
+    string,
+    unknown
+  >;
+  return {
+    ...actual,
+    recordOutboxSpillover: jest.fn(),
+  };
+});
 
 import { Hono } from 'hono';
 import { supportRoutes } from './support';

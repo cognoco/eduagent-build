@@ -8,21 +8,18 @@ import {
 } from '../test-utils/jwks-interceptor';
 import { clearJWKSCache } from '../middleware/jwt';
 
-jest.mock('inngest/hono', () => ({
-  // gc1-allow: Inngest framework boundary
+jest.mock('inngest/hono', () => ({ // gc1-allow: Inngest framework boundary
   serve: jest.fn().mockReturnValue(jest.fn()),
 }));
 
-jest.mock('../inngest/client', () => ({
-  // gc1-allow: Inngest SDK external boundary
+jest.mock('../inngest/client', () => ({ // gc1-allow: Inngest SDK external boundary
   inngest: {
     send: jest.fn().mockResolvedValue(undefined),
     createFunction: jest.fn().mockReturnValue(jest.fn()),
   },
 }));
 
-jest.mock('../services/sentry', () => ({
-  // gc1-allow: @sentry/cloudflare external boundary
+jest.mock('../services/sentry', () => ({ // gc1-allow: @sentry/cloudflare external boundary
   captureException: jest.fn(),
   addBreadcrumb: jest.fn(),
 }));

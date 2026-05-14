@@ -14,7 +14,8 @@ const mockDatabaseModule = createDatabaseModuleMock();
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
-jest.mock('../services/account', () => ({
+jest.mock('../services/account', () => ({ // gc1-allow: findOrCreateAccount fires Stripe/Inngest side-effects via accountMiddleware; stub isolates route tests from billing chain
+  ...jest.requireActual('../services/account') as Record<string, unknown>,
   findOrCreateAccount: jest.fn().mockResolvedValue({
     id: 'test-account-id',
     clerkUserId: 'user_test',
@@ -24,7 +25,8 @@ jest.mock('../services/account', () => ({
   }),
 }));
 
-jest.mock('../services/profile', () => ({
+jest.mock('../services/profile', () => ({ // gc1-allow: profileScopeMiddleware calls getProfile/findOwnerProfile; stub controls middleware-injected profileId for route-layer assertions
+  ...jest.requireActual('../services/profile') as Record<string, unknown>,
   findOwnerProfile: jest.fn().mockResolvedValue(null),
   getProfile: jest.fn().mockResolvedValue({
     id: 'test-profile-id',
@@ -34,7 +36,8 @@ jest.mock('../services/profile', () => ({
   }),
 }));
 
-jest.mock('../services/retention-data', () => ({
+jest.mock('../services/retention-data', () => ({ // gc1-allow: retention-data is the SUT service boundary; stubs let each test control per-case return values without a live DB
+  ...jest.requireActual('../services/retention-data') as Record<string, unknown>,
   getSubjectRetention: jest.fn(),
   getAllSubjectsRetention: jest.fn(),
   getTopicRetention: jest.fn(),

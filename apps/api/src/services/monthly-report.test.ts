@@ -3,10 +3,12 @@
 // ---------------------------------------------------------------------------
 
 jest.mock('./llm', () => ({
+  ...jest.requireActual('./llm'),
   routeAndCall: jest.fn(),
 }));
 
 jest.mock('./sentry', () => ({
+  ...jest.requireActual('./sentry'),
   captureException: jest.fn(),
 }));
 

@@ -2,10 +2,16 @@
 // Inngest Route Tests
 // ---------------------------------------------------------------------------
 
-jest.mock('../inngest', () => ({
-  inngest: { id: 'test-inngest' },
-  functions: [],
-}));
+jest.mock('../inngest', () => { // gc1-allow: requireActual + targeted overrides — keeps Inngest client out of route-mount tests
+  const actual = jest.requireActual('../inngest') as Record<string, unknown>;
+  return {
+    ...actual,
+    // Override the live Inngest client and full function list so route-mount
+    // tests don't instantiate 49 real functions or the CF-env middleware.
+    inngest: { id: 'test-inngest' },
+    functions: [],
+  };
+});
 
 jest.mock('inngest/hono', () => ({
   serve: jest.fn().mockReturnValue((_c: unknown) => new Response('OK')),

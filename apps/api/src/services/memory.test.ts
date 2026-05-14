@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------
 
 const mockGenerateEmbedding = jest.fn();
-jest.mock('./embeddings', () => ({
+jest.mock('./embeddings', () => ({ // gc1-allow: generateEmbedding calls Voyage AI REST API — true external boundary, relative import required
   generateEmbedding: (...args: unknown[]) => mockGenerateEmbedding(...args),
 }));
 

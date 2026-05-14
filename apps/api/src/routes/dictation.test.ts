@@ -20,6 +20,7 @@ const meteringFixture = createRouteMeteringFixture(mockDatabaseModule.db, {
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
 jest.mock('../services/account', () => ({
+  ...jest.requireActual('../services/account'),
   findOrCreateAccount: jest.fn().mockResolvedValue({
     id: 'test-account-id',
     clerkUserId: 'user_test',
@@ -30,6 +31,7 @@ jest.mock('../services/account', () => ({
 }));
 
 jest.mock('../services/profile', () => ({
+  ...jest.requireActual('../services/profile'),
   findOwnerProfile: jest.fn().mockResolvedValue(null),
   getProfile: jest.fn().mockResolvedValue({
     id: 'test-profile-id',
@@ -40,8 +42,9 @@ jest.mock('../services/profile', () => ({
   }),
 }));
 
-// Mock the dictation services — they are the internal boundary
+// Stub dictation service functions — real implementations call the LLM (external boundary).
 jest.mock('../services/dictation', () => ({
+  ...jest.requireActual('../services/dictation'),
   prepareHomework: jest.fn(),
   generateDictation: jest.fn(),
   reviewDictation: jest.fn(),
