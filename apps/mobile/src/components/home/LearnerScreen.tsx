@@ -46,7 +46,7 @@ import { CoachBand } from './CoachBand';
 import { ChildQuotaLine } from './ChildQuotaLine';
 import { EarlyAdopterCard } from './EarlyAdopterCard';
 import { ParentHomeScreen } from './ParentHomeScreen';
-import { SubjectCard } from './SubjectCard';
+import { SubjectTile } from './SubjectTile';
 import type { TranslateKey } from '../../i18n';
 
 const CREATE_SUBJECT_FROM_HOME_HREF = '/create-subject' as const;
@@ -586,7 +586,7 @@ export function LearnerScreen({
                 contentContainerStyle={{ paddingHorizontal: 20, gap: 12 }}
               >
                 {subjectCards.map((card) => (
-                  <SubjectCard
+                  <SubjectTile
                     key={card.subjectId}
                     {...card}
                     testID={`home-subject-card-${card.subjectId}`}
