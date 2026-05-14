@@ -255,6 +255,8 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         sessionMode:
           session.sessionType === 'homework' ? 'homework' : 'freeform',
       });
+      // core-send: user-initiated filing retry — dispatch must throw on
+      // failure so the user is not told "queued" when nothing was queued.
       await inngest.send({ name: 'app/filing.retry', data: retryPayload });
 
       const updatedSession = await getSession(db, profileId, sessionId);
@@ -360,12 +362,11 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       return sum + exchange.content.split(/\s+/).filter(Boolean).length;
     }, 0);
 
-    // [A-1] Observability events — consumed by ask-gate-observe.ts (decision +
-    // timeout). [BUG-653] Inngest events are observability-only — never fail
-    // the request when their delivery hiccups (network blip, rate-limit, partial
-    // outage). The depth result is already in hand and is what the client asked
-    // for. safeSend satisfies the CLAUDE.md "Silent Recovery Without Escalation
-    // Is Banned" rule by routing dispatch failures through Sentry.
+    // [A-1] [BUG-653] Observability events — consumed by ask-gate-observe.ts.
+    // safeSend isolates the dispatch: the depth result is already in hand and is
+    // what the client asked for; a dispatch hiccup must not fail the request.
+    // Both events are independent calls so a failure on the first does not
+    // suppress the second.
     await safeSend(
       () =>
         inngest.send({
@@ -380,7 +381,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             topicCount: result.topics.length,
           },
         }),
-      'sessions.evaluate-depth.gate_decision_dispatch',
+      'ask.gate_decision',
       { sessionId, profileId, method: result.method },
     );
 
@@ -394,7 +395,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
               exchangeCount: transcript.session.exchangeCount,
             },
           }),
-        'sessions.evaluate-depth.gate_timeout_dispatch',
+        'ask.gate_timeout',
         { sessionId, profileId },
       );
     }

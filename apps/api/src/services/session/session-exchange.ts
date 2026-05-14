@@ -379,7 +379,7 @@ async function maybeDispatchReviewCalibration(
         name: 'app/review.calibration.requested',
         data: payload,
       }),
-    'review_calibration.dispatch',
+    'review.calibration',
     {
       profileId,
       sessionId: session.id,
@@ -993,28 +993,27 @@ export async function prepareExchangeContext(
       .map((entry) => entry.content)
       .join('\n');
 
-    inngest
-      .send({
-        name: 'app/ask.classify_silently',
-        data: {
-          sessionId,
-          profileId,
-          classifyInput: [priorUserMessages, userMessage]
-            .filter(Boolean)
-            .join('\n'),
-          exchangeCount: session.exchangeCount + 1,
-        },
-      })
-      .catch((err) => {
-        logger.warn('ask.classify_silently.send_failed', { sessionId, err });
-        captureException(err, {
-          profileId,
-          extra: {
-            event: 'app/ask.classify_silently',
+    // Fire-and-forget by design: this silent-classification observation must
+    // not add Inngest round-trip latency to prepareExchangeContext (which is
+    // on the synchronous /ask exchange hot path). safeSend still routes any
+    // dispatch failure to Sentry; the `void` discards the unresolved promise
+    // explicitly so the floating-promise lint does not fire.
+    void safeSend(
+      () =>
+        inngest.send({
+          name: 'app/ask.classify_silently',
+          data: {
             sessionId,
+            profileId,
+            classifyInput: [priorUserMessages, userMessage]
+              .filter(Boolean)
+              .join('\n'),
+            exchangeCount: session.exchangeCount + 1,
           },
-        });
-      });
+        }),
+      'ask.classify_silently',
+      { sessionId, profileId },
+    );
   }
 
   const [silentSubjectRows, silentTeachingPref] =
@@ -1877,7 +1876,7 @@ export async function processMessage(
                 error: String(persistErr),
               },
             }),
-          'orphan_persist_failed_dispatch',
+          'orphan.persist.failed',
           { profileId, sessionId, route: 'session-exchange/process' },
         );
         captureException(persistErr, {
@@ -2061,7 +2060,7 @@ export async function streamMessage(
                     error: String(persistErr),
                   },
                 }),
-              'orphan_persist_failed_dispatch',
+              'orphan.persist.failed',
               { profileId, sessionId, route: 'session-exchange/stream' },
             );
             captureException(persistErr, {
@@ -2114,7 +2113,7 @@ export async function streamMessage(
                     error: String(persistErr),
                   },
                 }),
-              'orphan_persist_failed_dispatch',
+              'orphan.persist.failed',
               { profileId, sessionId, route: 'session-exchange/fallback' },
             );
             captureException(persistErr, {

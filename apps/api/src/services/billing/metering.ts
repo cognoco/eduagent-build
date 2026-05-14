@@ -45,7 +45,7 @@ async function emitOwnershipMismatchEvent(input: {
           profileId: input.profileId,
         },
       }),
-    'billing.ownership_mismatch_dispatch',
+    'billing.ownership.mismatch',
     {
       flow: input.flow,
       subscriptionId: input.subscriptionId,

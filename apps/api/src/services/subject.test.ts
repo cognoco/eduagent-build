@@ -458,9 +458,8 @@ describe('createSubjectWithStructure focused_book prewarm', () => {
 
     expect(result.bookId).toBe(uuidBookId);
     expect(captureSpy).toHaveBeenCalledWith(dispatchError, {
-      profileId: uuidProfileId,
       extra: {
-        surface: 'subject_prewarm_dispatch',
+        surface: 'subject.curriculum-prewarm',
         kind: 'non-core-send',
         profileId: uuidProfileId,
         subjectId: uuidSubjectId,

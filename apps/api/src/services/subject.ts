@@ -116,7 +116,7 @@ async function dispatchCurriculumPrewarm(args: {
         name: 'app/subject.curriculum-prewarm-requested',
         data,
       }),
-    'subject_prewarm_dispatch',
+    'subject.curriculum-prewarm',
     {
       profileId: args.profileId,
       subjectId: args.subjectId,
@@ -142,7 +142,7 @@ async function dispatchCurriculumRetry(args: {
         name: 'app/subject.curriculum-retry-requested',
         data,
       }),
-    'subject_retry_dispatch',
+    'subject.curriculum-retry',
     {
       profileId: args.profileId,
       subjectId: args.subjectId,

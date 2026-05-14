@@ -43,8 +43,8 @@ describe('safeSend', () => {
     expect(mockCaptureException).toHaveBeenCalledTimes(1);
     const [capturedErr, capturedCtx] = mockCaptureException.mock.calls[0];
     expect(capturedErr).toBe(boom);
-    // profileId MUST be at the top level so sentry.ts promotes it to a tag.
-    expect(capturedCtx.profileId).toBe('prof-1');
+    // Aligned with main's contract: context is spread into `extra` only.
+    // sentry.ts is responsible for promoting profileId to a tag from `extra`.
     expect(capturedCtx.extra).toMatchObject({
       surface: 'unit.test',
       kind: 'non-core-send',
@@ -57,16 +57,6 @@ describe('safeSend', () => {
       profileId: 'prof-1',
       sessionId: 'sess-1',
     });
-  });
-
-  it('omits profileId at the top level when context has no string profileId', async () => {
-    const boom = new Error('inngest down');
-    const send = jest.fn().mockRejectedValue(boom);
-
-    await safeSend(send, 'unit.test', { sessionId: 'sess-1' });
-
-    const [, capturedCtx] = mockCaptureException.mock.calls[0];
-    expect(capturedCtx.profileId).toBeUndefined();
   });
 
   // -------------------------------------------------------------------------
@@ -99,7 +89,6 @@ describe('safeSend', () => {
       const [capturedErr, capturedCtx] = mockCaptureException.mock.calls[0];
       expect(capturedErr).toBeInstanceOf(Error);
       expect((capturedErr as Error).message).toMatch(/timed out/i);
-      expect(capturedCtx.profileId).toBe('prof-1');
       expect(capturedCtx.extra).toMatchObject({
         surface: 'unit.test.hang',
         kind: 'non-core-send-timeout',

@@ -4,12 +4,6 @@ import { createLogger } from './logger';
 
 const logger = createLogger();
 
-function extractProfileId(
-  context?: Record<string, unknown>,
-): string | undefined {
-  return typeof context?.profileId === 'string' ? context.profileId : undefined;
-}
-
 const DEFAULT_TIMEOUT_MS = 2000;
 const TIMEOUT_SENTINEL: unique symbol = Symbol('safe-send-timeout');
 
@@ -55,7 +49,6 @@ export async function safeSend(
     .catch((err: unknown) => {
       if (!timedOut) throw err;
       captureException(err, {
-        profileId: extractProfileId(context),
         extra: {
           surface,
           kind: 'non-core-send-late-rejection',
@@ -84,7 +77,6 @@ export async function safeSend(
         `[safe-send] non-core dispatch timed out after ${timeoutMs}ms`,
       );
       captureException(timeoutErr, {
-        profileId: extractProfileId(context),
         extra: {
           surface,
           kind: 'non-core-send-timeout',
@@ -100,7 +92,6 @@ export async function safeSend(
     }
   } catch (err) {
     captureException(err, {
-      profileId: extractProfileId(context),
       extra: { surface, kind: 'non-core-send', ...context },
     });
     logger.error('[safe-send] non-core Inngest dispatch failed', {
@@ -126,7 +117,6 @@ export async function safeWrite(
     await fn();
   } catch (err) {
     captureException(err, {
-      profileId: extractProfileId(context),
       extra: { surface, kind: 'non-core-write', ...context },
     });
     logger.error('[safe-write] non-core DB write failed', {
