@@ -22,13 +22,21 @@ const mockGetEmailFrom = jest.fn();
 const mockGetStepSupportEmail = jest.fn();
 const mockLoggerWarn = jest.fn();
 
-jest.mock('../../services/notifications', () => ({
-  sendEmail: (...args: unknown[]) => mockSendEmail(...args),
-}));
+jest.mock(
+  '../../services/notifications' /* gc1-allow: pattern-a conversion */,
+  () => ({
+    ...jest.requireActual('../../services/notifications'),
+    sendEmail: (...args: unknown[]) => mockSendEmail(...args),
+  }),
+);
 
-jest.mock('../../services/sentry', () => ({
-  captureException: (...args: unknown[]) => mockCaptureException(...args),
-}));
+jest.mock(
+  '../../services/sentry' /* gc1-allow: pattern-a conversion */,
+  () => ({
+    ...jest.requireActual('../../services/sentry'),
+    captureException: (...args: unknown[]) => mockCaptureException(...args),
+  }),
+);
 
 jest.mock('../../services/logger', () => ({
   createLogger: () => ({
@@ -39,7 +47,8 @@ jest.mock('../../services/logger', () => ({
   }),
 }));
 
-jest.mock('../helpers', () => ({
+jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../helpers'),
   getStepResendApiKey: () => mockGetResendApiKey(),
   getStepEmailFrom: () => mockGetEmailFrom(),
   getStepSupportEmail: () => mockGetStepSupportEmail(),
@@ -396,7 +405,8 @@ describe('[BUG-767 / A-24] handler is registered with serve()', () => {
     // Mock client/createFunction once for this isolated import so we don't
     // collide with the test module's mocks above.
     jest.isolateModules(() => {
-      jest.doMock('../client', () => ({
+      jest.doMock('../client' /* gc1-allow: pattern-a conversion */, () => ({
+        ...jest.requireActual('../client'),
         inngest: {
           createFunction: jest.fn((cfg, _trigger, handler) => ({
             fn: handler,

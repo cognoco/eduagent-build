@@ -12,9 +12,13 @@
 // ---------------------------------------------------------------------------
 
 const mockCaptureException = jest.fn();
-jest.mock('../../services/sentry', () => ({
-  captureException: (...args: unknown[]) => mockCaptureException(...args),
-}));
+jest.mock(
+  '../../services/sentry' /* gc1-allow: pattern-a conversion */,
+  () => ({
+    ...jest.requireActual('../../services/sentry'),
+    captureException: (...args: unknown[]) => mockCaptureException(...args),
+  }),
+);
 
 const mockLoggerWarn = jest.fn();
 const mockLoggerError = jest.fn();
@@ -27,7 +31,8 @@ jest.mock('../../services/logger', () => ({
   }),
 }));
 
-jest.mock('../client', () => ({
+jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../client'),
   inngest: {
     createFunction: jest.fn((_config, _trigger, handler) => ({
       fn: handler,
@@ -72,7 +77,7 @@ describe('notificationSuppressedObserve', () => {
         profileId,
         notificationType: 'daily_reminder',
         reason: 'dedup_check_failed',
-      })
+      }),
     );
     expect(mockCaptureException).not.toHaveBeenCalled();
   });
@@ -82,7 +87,7 @@ describe('notificationSuppressedObserve', () => {
   // the run completed and burying the signal — this asserts we throw + Sentry.
   it('throws and reports to Sentry on a malformed payload (no silent recovery)', async () => {
     await expect(invoke({ totally: 'wrong-shape' })).rejects.toThrow(
-      /invalid event payload/i
+      /invalid event payload/i,
     );
 
     expect(mockCaptureException).toHaveBeenCalledTimes(1);
@@ -92,11 +97,11 @@ describe('notificationSuppressedObserve', () => {
         extra: expect.objectContaining({
           context: 'notification-suppressed-observe:invalid_payload',
         }),
-      })
+      }),
     );
     expect(mockLoggerError).toHaveBeenCalledWith(
       '[notification-suppressed] invalid event payload',
-      expect.objectContaining({ issues: expect.any(Array) })
+      expect.objectContaining({ issues: expect.any(Array) }),
     );
   });
 });

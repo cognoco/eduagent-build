@@ -1,4 +1,5 @@
-jest.mock('../config', () => ({
+jest.mock('../config' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../config'),
   validateEnv: jest.fn(),
   validateProductionBindings: jest.fn(),
 }));

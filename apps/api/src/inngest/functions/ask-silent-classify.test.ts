@@ -14,12 +14,17 @@
 const mockClassifySubject = jest.fn();
 const mockGetStepDatabase = jest.fn();
 
-jest.mock('../../services/subject-classify', () => ({
-  // gc1-allow: external service boundary — prevents real LLM calls in unit tests
-  classifySubject: (...args: unknown[]) => mockClassifySubject(...args),
-}));
+jest.mock(
+  '../../services/subject-classify' /* gc1-allow: pattern-a conversion */,
+  () => ({
+    ...jest.requireActual('../../services/subject-classify'),
+    // gc1-allow: external service boundary — prevents real LLM calls in unit tests
+    classifySubject: (...args: unknown[]) => mockClassifySubject(...args),
+  }),
+);
 
-jest.mock('../helpers', () => ({
+jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../helpers'),
   // gc1-allow: isolates step-database helper from real DB config reads
   getStepDatabase: () => mockGetStepDatabase(),
 }));

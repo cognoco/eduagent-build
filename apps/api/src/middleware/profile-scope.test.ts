@@ -1,7 +1,8 @@
 import { Hono } from 'hono';
 import type { AppVariables } from '../types/hono';
 
-jest.mock('../services/sentry', () => ({
+jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../services/sentry'),
   captureException: jest.fn(),
   addBreadcrumb: jest.fn(),
 }));

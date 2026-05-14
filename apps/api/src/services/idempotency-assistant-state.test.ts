@@ -13,7 +13,8 @@ import { like } from 'drizzle-orm';
 import type { Database } from '@eduagent/database';
 import { lookupAssistantTurnState } from './idempotency-assistant-state';
 
-jest.mock('./sentry', () => ({
+jest.mock('./sentry' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('./sentry'),
   captureException: jest.fn(),
   addBreadcrumb: jest.fn(),
 }));

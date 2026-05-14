@@ -45,9 +45,13 @@ import {
 
 const mockCaptureException = jest.fn();
 
-jest.mock('../../apps/api/src/services/sentry', () => ({
-  captureException: (...args: unknown[]) => mockCaptureException(...args),
-}));
+jest.mock(
+  '../../apps/api/src/services/sentry' /* gc1-allow: pattern-a conversion */,
+  () => ({
+    ...jest.requireActual('../../apps/api/src/services/sentry'),
+    captureException: (...args: unknown[]) => mockCaptureException(...args),
+  }),
+);
 
 import { sessionCompleted } from '../../apps/api/src/inngest/functions/session-completed';
 
@@ -82,7 +86,7 @@ interface ChainResult {
 }
 
 async function executeChain(
-  eventData: Record<string, unknown>
+  eventData: Record<string, unknown>,
 ): Promise<ChainResult> {
   const mockStep = {
     run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
@@ -276,7 +280,7 @@ async function loadRetentionCard(profileId: string, topicId: string) {
   return db.query.retentionCards.findFirst({
     where: and(
       eq(retentionCards.profileId, profileId),
-      eq(retentionCards.topicId, topicId)
+      eq(retentionCards.topicId, topicId),
     ),
   });
 }
@@ -314,7 +318,7 @@ async function loadXpEntry(profileId: string, topicId: string) {
   return db.query.xpLedger.findFirst({
     where: and(
       eq(xpLedger.profileId, profileId),
-      eq(xpLedger.topicId, topicId)
+      eq(xpLedger.topicId, topicId),
     ),
   });
 }
@@ -391,12 +395,12 @@ describe('Integration: Session-Completed Chain (P0-008)', () => {
           step: 'embed-new-memory-facts',
           status: 'ok',
         }),
-      ])
+      ]),
     );
 
     const retentionCard = await loadRetentionCard(
       scenario.profileId,
-      scenario.topicId!
+      scenario.topicId!,
     );
     expect(retentionCard).not.toBeNull();
     expect(retentionCard!.repetitions).toBeGreaterThanOrEqual(4);
@@ -441,7 +445,7 @@ describe('Integration: Session-Completed Chain (P0-008)', () => {
 
     // Verify the Authorization header used the right API key
     expect(voyageCalls[0].headers['Authorization']).toBe(
-      'Bearer voyage-test-key'
+      'Bearer voyage-test-key',
     );
   });
 
@@ -462,12 +466,12 @@ describe('Integration: Session-Completed Chain (P0-008)', () => {
     expect(result.status).toBe('completed');
     expect(
       result.outcomes.find((outcome) => outcome.step === 'update-retention')
-        ?.status
+        ?.status,
     ).toBe('skipped');
     expect(
       result.outcomes.find(
-        (outcome) => outcome.step === 'update-needs-deepening'
-      )?.status
+        (outcome) => outcome.step === 'update-needs-deepening',
+      )?.status,
     ).toBe('skipped');
 
     const summary = await loadSummary(scenario.sessionId);
@@ -505,7 +509,7 @@ describe('Integration: Session-Completed Chain (P0-008)', () => {
       clerkUserIds: [skippedScenario.clerkUserId],
     });
     const skippedIdentityIndex = createdScenarioIdentities.findIndex(
-      (identity) => identity.email === skippedScenario.email
+      (identity) => identity.email === skippedScenario.email,
     );
     if (skippedIdentityIndex >= 0) {
       createdScenarioIdentities.splice(skippedIdentityIndex, 1);
@@ -535,7 +539,7 @@ describe('Integration: Session-Completed Chain (P0-008)', () => {
 
     // Override Voyage AI to return a 503 for the next call
     voyageHandle.nextResponse(
-      () => new Response('Service Unavailable', { status: 503 })
+      () => new Response('Service Unavailable', { status: 503 }),
     );
 
     const result = await executeChain({
@@ -551,7 +555,7 @@ describe('Integration: Session-Completed Chain (P0-008)', () => {
 
     expect(result.status).toBe('completed-with-errors');
     expect(
-      result.outcomes.find((outcome) => outcome.step === 'generate-embeddings')
+      result.outcomes.find((outcome) => outcome.step === 'generate-embeddings'),
     ).toMatchObject({
       status: 'failed',
       error: expect.stringContaining('503'),
@@ -561,7 +565,7 @@ describe('Integration: Session-Completed Chain (P0-008)', () => {
       expect.objectContaining({
         message: expect.stringContaining('503'),
       }),
-      expect.objectContaining({ profileId: scenario.profileId })
+      expect.objectContaining({ profileId: scenario.profileId }),
     );
 
     // Rest of the chain still completed

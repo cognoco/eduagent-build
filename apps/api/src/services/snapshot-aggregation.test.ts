@@ -5,20 +5,30 @@
 
 // Mocks must be declared before any imports.
 
-jest.mock('./milestone-detection', () => ({
-  detectMilestones: jest.fn().mockReturnValue([]),
-  storeMilestones: jest.fn().mockResolvedValue([]),
-}));
+jest.mock(
+  './milestone-detection' /* gc1-allow: pattern-a conversion */,
+  () => ({
+    ...jest.requireActual('./milestone-detection'),
+    detectMilestones: jest.fn().mockReturnValue([]),
+    storeMilestones: jest.fn().mockResolvedValue([]),
+  }),
+);
 
-jest.mock('./celebrations', () => ({
+jest.mock('./celebrations' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('./celebrations'),
   queueCelebration: jest.fn().mockResolvedValue(undefined),
 }));
 
-jest.mock('./language-curriculum', () => ({
-  getCurrentLanguageProgress: jest.fn().mockResolvedValue(null),
-}));
+jest.mock(
+  './language-curriculum' /* gc1-allow: pattern-a conversion */,
+  () => ({
+    ...jest.requireActual('./language-curriculum'),
+    getCurrentLanguageProgress: jest.fn().mockResolvedValue(null),
+  }),
+);
 
-jest.mock('./sentry', () => ({
+jest.mock('./sentry' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('./sentry'),
   captureException: jest.fn(),
 }));
 

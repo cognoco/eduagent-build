@@ -6,7 +6,8 @@ import type { Database } from '@eduagent/database';
 
 const mockCaptureException = jest.fn();
 
-jest.mock('./sentry', () => ({
+jest.mock('./sentry' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('./sentry'),
   captureException: (...args: unknown[]) => mockCaptureException(...args),
 }));
 

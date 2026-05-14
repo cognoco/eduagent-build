@@ -4,20 +4,29 @@ const mockGetStepVoyageApiKey = jest.fn();
 const mockPurgeSessionTranscript = jest.fn();
 const mockCaptureException = jest.fn();
 
-jest.mock('../helpers', () => ({
+jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../helpers'),
   getStepDatabase: () => mockGetStepDatabase(),
   getStepRetentionPurgeEnabled: () => mockGetStepRetentionPurgeEnabled(),
   getStepVoyageApiKey: () => mockGetStepVoyageApiKey(),
 }));
 
-jest.mock('../../services/transcript-purge', () => ({
-  purgeSessionTranscript: (...args: unknown[]) =>
-    mockPurgeSessionTranscript(...args),
-}));
+jest.mock(
+  '../../services/transcript-purge' /* gc1-allow: pattern-a conversion */,
+  () => ({
+    ...jest.requireActual('../../services/transcript-purge'),
+    purgeSessionTranscript: (...args: unknown[]) =>
+      mockPurgeSessionTranscript(...args),
+  }),
+);
 
-jest.mock('../../services/sentry', () => ({
-  captureException: (...args: unknown[]) => mockCaptureException(...args),
-}));
+jest.mock(
+  '../../services/sentry' /* gc1-allow: pattern-a conversion */,
+  () => ({
+    ...jest.requireActual('../../services/sentry'),
+    captureException: (...args: unknown[]) => mockCaptureException(...args),
+  }),
+);
 
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 import {

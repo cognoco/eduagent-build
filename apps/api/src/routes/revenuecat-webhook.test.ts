@@ -48,7 +48,8 @@ jest.mock('../inngest/client', () => ({
 
 const mockCaptureException = jest.fn();
 
-jest.mock('../services/sentry', () => ({
+jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../services/sentry'),
   // gc1-allow: @sentry/cloudflare external boundary
   captureException: (...args: unknown[]) => mockCaptureException(...args),
 }));

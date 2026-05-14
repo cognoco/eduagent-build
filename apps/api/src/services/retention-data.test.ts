@@ -9,7 +9,8 @@ const mockDatabaseModule = createDatabaseModuleMock({
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
-jest.mock('./retention', () => ({
+jest.mock('./retention' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('./retention'),
   processRecallResult: jest.fn(),
   getRetentionStatus: jest.fn().mockReturnValue('weak'),
   isTopicStable: jest.fn().mockReturnValue(false),
@@ -23,11 +24,13 @@ jest.mock('./adaptive-teaching', () => ({
     .mockReturnValue({ atCapacity: false, shouldPromote: false }),
 }));
 
-jest.mock('./xp', () => ({
+jest.mock('./xp' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('./xp'),
   syncXpLedgerStatus: jest.fn().mockResolvedValue(undefined),
 }));
 
-jest.mock('./sentry', () => ({
+jest.mock('./sentry' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('./sentry'),
   captureException: jest.fn(),
   addBreadcrumb: jest.fn(),
 }));

@@ -12,7 +12,8 @@ jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
 // [BREAK] Sentry is a true external boundary — mock it to assert escalation.
 const mockCaptureException = jest.fn();
-jest.mock('./sentry', () => ({
+jest.mock('./sentry' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('./sentry'),
   captureException: (...args: unknown[]) => mockCaptureException(...args),
 }));
 

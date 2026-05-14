@@ -22,9 +22,13 @@ import { clearFetchCalls } from './fetch-interceptor';
 
 const mockVerifyWebhookSignature = jest.fn();
 
-jest.mock('../../apps/api/src/services/stripe', () => ({
-  verifyWebhookSignature: mockVerifyWebhookSignature,
-}));
+jest.mock(
+  '../../apps/api/src/services/stripe' /* gc1-allow: pattern-a conversion */,
+  () => ({
+    ...jest.requireActual('../../apps/api/src/services/stripe'),
+    verifyWebhookSignature: mockVerifyWebhookSignature,
+  }),
+);
 
 import { app } from '../../apps/api/src/index';
 import { getTierConfig } from '../../apps/api/src/services/subscription';

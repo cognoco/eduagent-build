@@ -1,4 +1,5 @@
-jest.mock('./parking-lot', () => ({
+jest.mock('./parking-lot' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('./parking-lot'),
   MAX_PARKING_LOT_PER_TOPIC: 10,
 }));
 

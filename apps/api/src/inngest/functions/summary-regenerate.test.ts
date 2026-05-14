@@ -4,28 +4,45 @@ const mockGenerateAndStoreLlmSummary = jest.fn();
 const mockGenerateLearnerRecap = jest.fn();
 const mockCaptureException = jest.fn();
 
-jest.mock('../helpers', () => ({
+jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../helpers'),
   getStepDatabase: () => mockGetStepDatabase(),
 }));
 
-jest.mock('../../services/summaries', () => ({
-  createPendingSessionSummary: (...args: unknown[]) =>
-    mockCreatePendingSessionSummary(...args),
-}));
+jest.mock(
+  '../../services/summaries' /* gc1-allow: pattern-a conversion */,
+  () => ({
+    ...jest.requireActual('../../services/summaries'),
+    createPendingSessionSummary: (...args: unknown[]) =>
+      mockCreatePendingSessionSummary(...args),
+  }),
+);
 
-jest.mock('../../services/session-llm-summary', () => ({
-  generateAndStoreLlmSummary: (...args: unknown[]) =>
-    mockGenerateAndStoreLlmSummary(...args),
-}));
+jest.mock(
+  '../../services/session-llm-summary' /* gc1-allow: pattern-a conversion */,
+  () => ({
+    ...jest.requireActual('../../services/session-llm-summary'),
+    generateAndStoreLlmSummary: (...args: unknown[]) =>
+      mockGenerateAndStoreLlmSummary(...args),
+  }),
+);
 
-jest.mock('../../services/session-recap', () => ({
-  generateLearnerRecap: (...args: unknown[]) =>
-    mockGenerateLearnerRecap(...args),
-}));
+jest.mock(
+  '../../services/session-recap' /* gc1-allow: pattern-a conversion */,
+  () => ({
+    ...jest.requireActual('../../services/session-recap'),
+    generateLearnerRecap: (...args: unknown[]) =>
+      mockGenerateLearnerRecap(...args),
+  }),
+);
 
-jest.mock('../../services/sentry', () => ({
-  captureException: (...args: unknown[]) => mockCaptureException(...args),
-}));
+jest.mock(
+  '../../services/sentry' /* gc1-allow: pattern-a conversion */,
+  () => ({
+    ...jest.requireActual('../../services/sentry'),
+    captureException: (...args: unknown[]) => mockCaptureException(...args),
+  }),
+);
 
 import {
   sessionSummaryCreate,
