@@ -295,7 +295,7 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | LEARN-10 | Book detail + start learning from book | ✅ | Pass | | | 2026-05-14 WSL full Playwright web: J-11 passed book detail to start-learning path. |
 | LEARN-11 | Manage subject status (active / paused / archived) | ✅ | Pass | none | | 2026-05-14: targeted seeded Playwright web pass opened Library > Manage subjects and verified pause, resume, archive, restore, and close controls all responded. |
 | LEARN-12 | Topic detail | ✅ | Pass | none | | 2026-05-14: targeted seeded Playwright web pass reached topic detail from the end-user path Library > shelf > book > topic row and verified the detail surface plus back control. |
-| ACCOUNT-18 | Subject analogy preference after setup | ⬜ |  | | | 2026-05-14: not covered by hosted Playwright web smoke run 25852959340 or the targeted WSL web probes run so far. This is an inventory coverage gap, not an observed product failure; needs a targeted WSL web probe or native/mobile pass. |
+| ACCOUNT-18 | Subject analogy preference after setup | ✅ | Pass | | | 2026-05-14 targeted WSL Playwright web: opened a seeded subject settings screen after setup, rendered `analogy-domain-picker`, selected Sports, and the row visibly switched to Active. |
 | LEARN-25 | Library inline search (PR #144) | ✅ | Pass | none | | 2026-05-14: targeted seeded Playwright web pass filled Library search, observed search results/empty handling, cleared search, and returned to the shelf list. |
 
 ---
@@ -426,7 +426,7 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | ID | Flow | Tested | Result | Bugs | Doc Updated | Notes |
 | --- | --- | --- | --- | --- | --- | --- |
 | ACCOUNT-11 | Privacy & Data sub-screen: delete account typed-confirmation flow with 7-day grace | ⚠️ | Pass w/ issues | | | 2026-05-14 WSL Playwright web probe: `/more/privacy` rendered Delete account. The typed destructive confirmation and 7-day grace state were not completed. |
-| ACCOUNT-12 | Scheduled deletion state: keep account / cancel deletion | ⬜ |  | | | 2026-05-14: not covered by hosted Playwright web smoke run 25852959340 or the targeted WSL web probes run so far. This is an inventory coverage gap, not an observed product failure; needs a targeted WSL web probe or native/mobile pass. |
+| ACCOUNT-12 | Scheduled deletion state: keep account / cancel deletion | ❌ | Fail | https://www.notion.so/3608bce91f7c81b89765e17ec7a18ef3 | | 2026-05-14 targeted WSL Playwright web: `account-deletion-scheduled` seed opened `/delete-account`, but the screen showed the initial destructive delete warning instead of `delete-account-scheduled` with Keep account / cancel deletion controls. |
 
 ---
 
@@ -440,11 +440,11 @@ A final pass to confirm coverage of these is captured in **Batch 17**.
 | HOME-07 | Add-first-child gate | ✅ | Pass | | | 2026-05-14 WSL full Playwright web: J-15 family-plan parent with no children sees add-first-child CTA. |
 | ACCOUNT-02 | Create additional profile (generic) | ⚠️ | Pass w/ issues | | | 2026-05-14 WSL Playwright web probe: `/profiles` rendered existing Test Learner profile and `+ Add profile`; More also rendered Add a child profile. Creation form submission was not completed. |
 | ACCOUNT-03 | Add child profile from More / Profiles | ⚠️ | Pass w/ issues | | | 2026-05-14 WSL Playwright web probe: `/more` rendered Add a child profile and `/profiles` rendered `+ Add profile`; child profile creation was not completed. |
-| ACCOUNT-05 | Family-plan + max-profile gating | ⬜ |  | | | 2026-05-14: not covered by hosted Playwright web smoke run 25852959340 or the targeted WSL web probes run so far. This is an inventory coverage gap, not an observed product failure; needs a targeted WSL web probe or native/mobile pass. |
+| ACCOUNT-05 | Family-plan + max-profile gating | ✅ | Pass | | | 2026-05-14 targeted WSL Playwright web: family subscriber saw Add child in More, a maxed family-pool response blocked the add-child path, and the user-facing max-profile alert appeared. |
 | ACCOUNT-25 | Parent consent management for a child | ⬜ |  | | | 2026-05-14: not covered by hosted Playwright web smoke run 25852959340 or the targeted WSL web probes run so far. This is an inventory coverage gap, not an observed product failure; needs a targeted WSL web probe or native/mobile pass. |
-| ACCOUNT-16 | Child mentor memory | ⬜ |  | | | 2026-05-14: not covered by hosted Playwright web smoke run 25852959340 or the targeted WSL web probes run so far. This is an inventory coverage gap, not an observed product failure; needs a targeted WSL web probe or native/mobile pass. |
-| ACCOUNT-17 | Child memory consent prompt | ⬜ |  | | | 2026-05-14: not covered by hosted Playwright web smoke run 25852959340 or the targeted WSL web probes run so far. This is an inventory coverage gap, not an observed product failure; needs a targeted WSL web probe or native/mobile pass. |
-| ACCOUNT-30 | Impersonated-child guard across More hub, Account/Profile, and Privacy & Data | ⬜ |  | | | 2026-05-14: not covered by hosted Playwright web smoke run 25852959340 or the targeted WSL web probes run so far. This is an inventory coverage gap, not an observed product failure; needs a targeted WSL web probe or native/mobile pass. |
+| ACCOUNT-16 | Child mentor memory | ✅ | Pass | | | 2026-05-14 targeted WSL Playwright web: parent opened a populated child's mentor memory screen, saw Controls, interests (Soccer/History), strengths/struggles/notes, privacy actions, and the correction affordance. |
+| ACCOUNT-17 | Child memory consent prompt | ✅ | Pass | | | 2026-05-14 targeted WSL Playwright web: parent opened a child mentor-memory screen with pending memory consent and saw both `memory-consent-grant` and `memory-consent-decline`. |
+| ACCOUNT-30 | Impersonated-child guard across More hub, Account/Profile, and Privacy & Data | ✅ | Pass | | | 2026-05-14 targeted WSL Playwright web: parent switched into child proxy mode via Profiles, saw `proxy-banner`, More hid Sign out, Account hid Subscription, and Privacy & Data hid Export and Delete account. |
 
 ---
 
