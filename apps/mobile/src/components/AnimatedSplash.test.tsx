@@ -8,14 +8,7 @@ import { AnimatedSplash } from './AnimatedSplash';
 beforeEach(() => {
   const reanimated = require('react-native-reanimated');
   reanimated.useReducedMotion = () => false;
-  reanimated.withTiming = (
-    value: unknown,
-    _options?: unknown,
-    callback?: (finished: boolean) => void,
-  ) => {
-    callback?.(true);
-    return value;
-  };
+  reanimated.withTiming = (value: unknown) => value;
 });
 
 afterEach(() => {
@@ -24,6 +17,17 @@ afterEach(() => {
 });
 
 describe('AnimatedSplash', () => {
+  const completeTimingCallbacksSynchronously = () => {
+    require('react-native-reanimated').withTiming = (
+      value: unknown,
+      _options?: unknown,
+      callback?: (finished: boolean) => void,
+    ) => {
+      callback?.(true);
+      return value;
+    };
+  };
+
   it('renders without crashing', () => {
     const onComplete = jest.fn();
     const { getByTestId } = render(<AnimatedSplash onComplete={onComplete} />);
@@ -38,6 +42,7 @@ describe('AnimatedSplash', () => {
 
   it('calls onComplete when reduced motion is enabled', () => {
     require('react-native-reanimated').useReducedMotion = () => true;
+    completeTimingCallbacksSynchronously();
 
     const onComplete = jest.fn();
     render(<AnimatedSplash onComplete={onComplete} />);
@@ -76,14 +81,36 @@ describe('AnimatedSplash', () => {
   it('calls onComplete on tap (skip)', () => {
     const onComplete = jest.fn();
     const { getByTestId } = render(<AnimatedSplash onComplete={onComplete} />);
-    // The Pressable wraps the full splash area — press on the root
-    fireEvent.press(getByTestId('animated-splash'));
+
+    fireEvent.press(getByTestId('animated-splash-skip'));
     expect(onComplete).toHaveBeenCalledTimes(1);
+  });
+
+  it('removes the splash from the tree after tap-to-skip', () => {
+    const onComplete = jest.fn();
+    const { getByTestId, queryByTestId } = render(
+      <AnimatedSplash onComplete={onComplete} />,
+    );
+
+    fireEvent.press(getByTestId('animated-splash-skip'));
+
+    expect(queryByTestId('animated-splash')).toBeNull();
+  });
+
+  it('removes the splash from the tree after animation completion', () => {
+    completeTimingCallbacksSynchronously();
+
+    const onComplete = jest.fn();
+    const { queryByTestId } = render(
+      <AnimatedSplash onComplete={onComplete} />,
+    );
+
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    expect(queryByTestId('animated-splash')).toBeNull();
   });
 
   it('stops accepting touches when the fade-out phase begins', () => {
     jest.useFakeTimers();
-    require('react-native-reanimated').withTiming = (value: unknown) => value;
 
     const onComplete = jest.fn();
     const { getByTestId } = render(<AnimatedSplash onComplete={onComplete} />);
@@ -100,14 +127,16 @@ describe('AnimatedSplash', () => {
 
   it('delivers completion from the watchdog when animation callbacks are dropped', () => {
     jest.useFakeTimers();
-    require('react-native-reanimated').withTiming = (value: unknown) => value;
 
     const onComplete = jest.fn();
-    render(<AnimatedSplash onComplete={onComplete} />);
+    const { queryByTestId } = render(
+      <AnimatedSplash onComplete={onComplete} />,
+    );
 
     act(() => {
       jest.advanceTimersByTime(3300);
     });
     expect(onComplete).toHaveBeenCalledTimes(1);
+    expect(queryByTestId('animated-splash')).toBeNull();
   });
 });

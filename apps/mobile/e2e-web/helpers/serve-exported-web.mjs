@@ -122,7 +122,10 @@ const envFilesToOverride = ['.env.local', '.env.development.local'].map(
 );
 const require = createRequire(import.meta.url);
 const { defaultApiUrl } = require('./e2e-defaults.js');
-const apiUrl = process.env.PLAYWRIGHT_API_URL ?? defaultApiUrl;
+const apiUrl =
+  process.env.PLAYWRIGHT_API_URL ??
+  process.env.EXPO_PUBLIC_API_URL ??
+  defaultApiUrl;
 process.env.EXPO_PUBLIC_API_URL = apiUrl;
 const generatedEnvFiles = new Set();
 

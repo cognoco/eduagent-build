@@ -318,13 +318,12 @@ jobs:
       - name: Resolve staging API URL
         id: resolve-url
         run: |
-          # Use the STAGING_API_URL secret if configured; default to workers.dev URL.
-          # The custom domain (api-stg.mentomate.com) is the preferred target but
-          # requires the secret to be set in GitHub Actions.
+          # Use the STAGING_API_URL secret if configured; default to the custom
+          # domain routed in apps/api/wrangler.toml.
           if [ -n "${{ secrets.STAGING_API_URL }}" ]; then
             RESOLVED_URL="${{ secrets.STAGING_API_URL }}"
           else
-            RESOLVED_URL="https://mentomate-api-stg.zwizzly.workers.dev"
+            RESOLVED_URL="https://api-stg.mentomate.com"
           fi
           echo "url=${RESOLVED_URL}" >> "$GITHUB_OUTPUT"
           echo "Staging API URL: ${RESOLVED_URL}"
@@ -420,6 +419,89 @@ jobs:
                 `_This issue was created automatically by the Deploy workflow. Close it once staging is healthy._`,
               ].join('\n'),
               labels: ['deploy-failure', 'smoke-test', 'automated'],
+            });
+
+  api-production-smoke-test:
+    name: Smoke Test — Production API
+    needs: api-deploy
+    # Only run after an approved production deploy. Keep this read-only:
+    # /v1/health proves the custom domain is routed to the fresh Worker and
+    # env validation passed without exercising user data.
+    if: |
+      needs.api-deploy.result == 'success' &&
+      github.event_name == 'workflow_dispatch' &&
+      inputs.api_environment == 'production'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve production API URL
+        id: resolve-url
+        run: |
+          if [ -n "${{ secrets.PRODUCTION_API_URL }}" ]; then
+            RESOLVED_URL="${{ secrets.PRODUCTION_API_URL }}"
+          else
+            RESOLVED_URL="https://api.mentomate.com"
+          fi
+          echo "url=${RESOLVED_URL}" >> "$GITHUB_OUTPUT"
+          echo "Production API URL: ${RESOLVED_URL}"
+
+      - name: Smoke — GET /v1/health (200, status ok)
+        env:
+          PRODUCTION_API_URL: ${{ steps.resolve-url.outputs.url }}
+        run: |
+          for attempt in 1 2 3 4 5; do
+            echo "Attempt ${attempt}: hitting ${PRODUCTION_API_URL}/v1/health"
+            HTTP_CODE=$(curl -s --max-time 15 -o /tmp/health.json -w "%{http_code}" \
+              "${PRODUCTION_API_URL}/v1/health") || HTTP_CODE=000
+            echo "HTTP status: ${HTTP_CODE}"
+            if [ "${HTTP_CODE}" = "200" ]; then
+              break
+            fi
+            if [ "${attempt}" -eq 5 ]; then
+              echo "✗ /v1/health returned ${HTTP_CODE} after 5 attempts"
+              cat /tmp/health.json || true
+              exit 1
+            fi
+            sleep 5
+          done
+          STATUS=$(python3 -c "import json; print(json.load(open('/tmp/health.json')).get('status',''))")
+          echo "status field: ${STATUS}"
+          if [ "${STATUS}" != "ok" ]; then
+            echo "✗ /v1/health body.status = '${STATUS}', expected 'ok'"
+            cat /tmp/health.json
+            exit 1
+          fi
+          echo "✓ /v1/health OK"
+
+      - name: Notify on production smoke test failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const branch = context.ref.replace('refs/heads/', '');
+            const sha = context.sha.slice(0, 8);
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Smoke test failure: production API (${sha})`,
+              body: [
+                `## Production Smoke Test Failed`,
+                ``,
+                `The production API deployed successfully but failed the read-only health check.`,
+                ``,
+                `| Field | Value |`,
+                `|-------|-------|`,
+                `| Environment | \`production\` |`,
+                `| Branch | \`${branch}\` |`,
+                `| Commit | \`${sha}\` |`,
+                `| Run | [View run](${runUrl}) |`,
+                `| Triggered by | @${context.actor} |`,
+                ``,
+                `**Action required:** Check the run log, verify the custom domain route, and confirm production env validation passed.`,
+                ``,
+                `_This issue was created automatically by the Deploy workflow. Close it once production is healthy._`,
+              ].join('\n'),
+              labels: ['deploy-failure', 'smoke-test', 'production', 'automated'],
             });
 
   # ---------------------------------------------------------------------------

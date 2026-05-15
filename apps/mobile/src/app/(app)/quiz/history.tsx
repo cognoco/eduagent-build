@@ -3,11 +3,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { i18next } from '../../../i18n';
+import { ErrorFallback } from '../../../components/common/ErrorFallback';
+import { TimeoutLoader } from '../../../components/common/TimeoutLoader';
 import { useRecentRounds } from '../../../hooks/use-quiz';
+import { extractLanguageFromTheme } from '../../../lib/extract-vocabulary-language';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { useThemeColors } from '../../../lib/theme';
-import { ErrorFallback } from '../../../components/common/ErrorFallback';
-import { extractLanguageFromTheme } from '../../../lib/extract-vocabulary-language';
 import { useScreenTopInset } from '../../../lib/use-screen-top-inset';
 
 // [F-037] Friendly date label — "Today" / "Yesterday" / locale long date.
@@ -46,12 +47,43 @@ export default function QuizHistoryScreen() {
   if (isLoading) {
     return (
       <View
-        testID="quiz-history-loading"
-        className="flex-1 items-center justify-center"
+        testID="quiz-history-loading-screen"
+        className="flex-1 bg-background"
       >
-        <Text className="text-on-surface-muted">
-          {t('quiz.history.loadingText')}
-        </Text>
+        <View
+          className="flex-row items-center px-4 pb-4"
+          style={{ paddingTop: insets.top + 16 }}
+        >
+          <Pressable
+            testID="quiz-history-loading-back"
+            onPress={() => router.replace(backHref as Href)}
+            className="min-h-[44px] min-w-[44px] items-center justify-center"
+            accessibilityRole="button"
+            accessibilityLabel={t('quiz.history.goBack')}
+          >
+            <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
+          </Pressable>
+          <Text className="text-on-surface ml-4 text-xl font-bold">
+            {t('quiz.history.title')}
+          </Text>
+        </View>
+        <TimeoutLoader
+          isLoading
+          testID="quiz-history-loading"
+          loadingLabel={t('quiz.history.loadingText')}
+          title={t('quiz.history.errorTitle')}
+          message={t('quiz.history.errorMessage')}
+          primaryAction={{
+            label: t('common.retry'),
+            onPress: () => void refetch(),
+            testID: 'quiz-history-timeout-retry',
+          }}
+          secondaryAction={{
+            label: t('common.goBack'),
+            onPress: () => router.replace(backHref as Href),
+            testID: 'quiz-history-timeout-go-back',
+          }}
+        />
       </View>
     );
   }

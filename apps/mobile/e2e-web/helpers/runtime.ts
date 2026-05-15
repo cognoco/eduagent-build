@@ -20,7 +20,9 @@ export const seedEmailPrefix =
 process.env.PLAYWRIGHT_EMAIL_PREFIX = seedEmailPrefix;
 
 export const apiBaseUrl = trimTrailingSlash(
-  process.env.PLAYWRIGHT_API_URL ?? defaultApiUrl,
+  process.env.PLAYWRIGHT_API_URL ??
+    process.env.EXPO_PUBLIC_API_URL ??
+    defaultApiUrl,
 );
 
 export const appBaseUrl = trimTrailingSlash(

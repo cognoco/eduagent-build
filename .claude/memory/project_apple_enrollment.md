@@ -1,15 +1,11 @@
 ---
-name: Apple Developer enrollment pending
-description: Applied ~2026-03-13, still not processed as of 2026-03-27. Both stores blocked — Apple pending, Google flagged.
+name: Apple Developer account available
+description: Apple Developer account is available as of 2026-05-15; old March 2026 enrollment blocker is resolved.
 type: project
 ---
 
-Apple Developer Program enrollment applied ~2026-03-13, still pending as of 2026-03-27 (2+ weeks). No action available — just waiting.
+Apple Developer Program access is available as of 2026-05-15.
 
 **Why:** Required for App Store submission and iOS In-App Purchase testing via StoreKit 2.
 
-**How to apply:** Both app stores are currently blocked:
-- Apple: enrollment pending (no ETA)
-- Google Play: account flagged/disabled (appeal in progress)
-
-Don't plan store-specific launch tasks until at least one store account is available. All code and infrastructure is ready — the blockers are purely administrative.
+**How to apply:** Do not treat Apple enrollment as a launch blocker. The remaining Apple-side work is App Store Connect app setup, subscription/product creation, RevenueCat connection, sandbox purchase testing, and EAS submit credentials/IDs.

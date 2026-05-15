@@ -66,9 +66,9 @@ jobs:
       # NOTE: switching E2E_API_URL from *.workers.dev to a custom domain
       # (e.g. api-test.mentomate.com) will also change Playwright from 1 → 4
       # workers via the usesSharedStagingApi check in playwright.config.ts.
-      EXPO_PUBLIC_API_URL: ${{ vars.E2E_API_URL || 'https://mentomate-api-stg.zwizzly.workers.dev' }}
+      EXPO_PUBLIC_API_URL: ${{ vars.E2E_API_URL || 'https://api-stg.mentomate.com' }}
       EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY_PREVIEW }}
-      PLAYWRIGHT_API_URL: ${{ vars.E2E_API_URL || 'https://mentomate-api-stg.zwizzly.workers.dev' }}
+      PLAYWRIGHT_API_URL: ${{ vars.E2E_API_URL || 'https://api-stg.mentomate.com' }}
       PLAYWRIGHT_SKIP_LOCAL_API: '1'
       PLAYWRIGHT_TEST_SEED_SECRET: ${{ secrets.TEST_SEED_SECRET }}
       CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
@@ -112,7 +112,7 @@ jobs:
       - name: Reset seeded staging accounts (always)
         if: always()
         env:
-          PLAYWRIGHT_API_URL: ${{ vars.E2E_API_URL || 'https://mentomate-api-stg.zwizzly.workers.dev' }}
+          PLAYWRIGHT_API_URL: ${{ vars.E2E_API_URL || 'https://api-stg.mentomate.com' }}
           PLAYWRIGHT_TEST_SEED_SECRET: ${{ secrets.TEST_SEED_SECRET }}
           PLAYWRIGHT_RUN_ID: ${{ env.PLAYWRIGHT_RUN_ID }}
         run: |

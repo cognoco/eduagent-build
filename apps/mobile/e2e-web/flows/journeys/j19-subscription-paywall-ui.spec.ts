@@ -27,9 +27,9 @@ test('J-19 free-tier learner sees subscription paywall with static tier comparis
 }) => {
   // ── 1. Navigate to More tab and open Subscription via the nav row ──────────
   await page.goto('/more', { waitUntil: 'commit' });
-  await expect(
-    page.getByRole('button', { name: 'Profile', exact: true }),
-  ).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByTestId('more-row-account')).toBeVisible({
+    timeout: 60_000,
+  });
 
   await pressableClick(page.getByTestId('more-row-account'));
   await expect(page.getByTestId('more-account-scroll')).toBeVisible({

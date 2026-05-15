@@ -33,7 +33,7 @@ tags:
       id: "learner-screen"
     timeout: 15000
 
-# 3. Navigate to freeform session via intent-ask (replaced coaching-card-primary)
+# 3. Navigate to freeform session via home-ask-anything (replaced coaching-card-primary)
 - tapOn:
     id: "home-ask-anything"
 

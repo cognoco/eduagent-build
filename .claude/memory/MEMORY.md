@@ -75,11 +75,11 @@ Two production dead-code branches removed 2026-04-19 in commit `970a82a5`: `AgeB
 - [project_inngest_staging.md](project_inngest_staging.md) — Inngest sync URL is `/v1/inngest` (not `/inngest`). Staging synced 2026-04-17.
 - [project_deploy_safety.md](project_deploy_safety.md) — deploy.yml uses drizzle-kit migrate (not push --force) for prod.
 
-## Store Publishing — BOTH BLOCKED (2026-03-27)
+## Store Publishing
 
-- [project_apple_enrollment.md](project_apple_enrollment.md) — Apple enrollment pending since ~2026-03-13.
-- [google_play_publishing.md](google_play_publishing.md) — Account flagged/disabled 2026-03-26, appeal in progress.
-- [project_revenuecat_setup.md](project_revenuecat_setup.md) — RevenueCat project created, store connections blocked.
+- [project_apple_enrollment.md](project_apple_enrollment.md) — Apple Developer account available as of 2026-05-15; old enrollment blocker resolved.
+- [google_play_publishing.md](google_play_publishing.md) — Google Play account available as of 2026-05-15; old flagged-account blocker resolved.
+- [project_revenuecat_setup.md](project_revenuecat_setup.md) — RevenueCat project exists; remaining work is store product/connection/webhook setup.
 
 ## Brand & UX Decisions
 

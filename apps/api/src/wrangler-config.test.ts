@@ -12,12 +12,25 @@
  *   BUG-784            [CFG-4] — when a root [[kv_namespaces]] block declares
  *     preview_id, it must differ from id. Equal IDs cause `wrangler dev --remote`
  *     to write to the live namespace, polluting production KV with dev data.
+ *   CFG-13 — public API origins must use the configured custom domains, not
+ *     legacy workers.dev URLs that bypass custom-domain WAF/routing assumptions.
  */
 
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const WRANGLER_TOML_PATH = join(__dirname, '..', 'wrangler.toml');
+
+function getTableSection(toml: string, tableName: string): string {
+  const escaped = tableName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const section = toml.match(
+    new RegExp(`^\\[${escaped}\\]([\\s\\S]*?)(?=^\\[|$)`, 'm'),
+  );
+  if (!section?.[1]) {
+    throw new Error(`Missing wrangler.toml section [${tableName}]`);
+  }
+  return section[1];
+}
 
 describe('wrangler.toml config guards', () => {
   let content: string;
@@ -90,6 +103,24 @@ describe('wrangler.toml config guards', () => {
       const block = findKvBlock(getRootSection(content), 'COACHING_KV');
       expect(block).not.toBeNull();
       checkBlock(block!);
+    });
+  });
+
+  describe('[CFG-13] custom domain origins', () => {
+    it('staging API_ORIGIN uses the staging custom domain', () => {
+      const stagingVars = getTableSection(content, 'env.staging.vars');
+      expect(stagingVars).toMatch(
+        /^API_ORIGIN\s*=\s*"https:\/\/api-stg\.mentomate\.com"/m,
+      );
+      expect(stagingVars).not.toMatch(/workers\.dev/);
+    });
+
+    it('production API_ORIGIN uses the production custom domain', () => {
+      const productionVars = getTableSection(content, 'env.production.vars');
+      expect(productionVars).toMatch(
+        /^API_ORIGIN\s*=\s*"https:\/\/api\.mentomate\.com"/m,
+      );
+      expect(productionVars).not.toMatch(/workers\.dev/);
     });
   });
 });

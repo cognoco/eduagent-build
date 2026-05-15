@@ -29,9 +29,19 @@ test('J-13 pending consent blocks app until parent approval completes', async ({
       approvalPage.getByRole('button', { name: 'Approve' }),
     ).toBeVisible({ timeout: 30_000 });
     await approvalPage.getByRole('button', { name: 'Approve' }).click();
-    await expect(approvalPage.getByText(/family account ready!/i)).toBeVisible({
-      timeout: 30_000,
-    });
+    await expect(approvalPage.locator('body')).toContainText(
+      /family account ready|you may now close this tab/i,
+      { timeout: 30_000 },
+    );
+    await expect(
+      approvalPage.getByRole('link', { name: /open mentomate|progress/i }),
+    ).toHaveAttribute('href', /mentomate:\/\/home/);
+    await expect(
+      approvalPage.getByRole('link', { name: /google play/i }),
+    ).toBeVisible();
+    await expect(
+      approvalPage.getByRole('link', { name: /app store/i }),
+    ).toBeVisible();
 
     await pressableClick(page.getByTestId('consent-check-again'));
 
