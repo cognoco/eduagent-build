@@ -10,7 +10,7 @@
 // transcript hydration).
 // ---------------------------------------------------------------------------
 
-import { render } from '@testing-library/react-native';
+import { fireEvent, render } from '@testing-library/react-native';
 import { MessageBubble } from './MessageBubble';
 
 // react-native-markdown-display renders <Text> children verbatim in our
@@ -123,5 +123,25 @@ describe('verification badge styling', () => {
       />,
     );
     expect(queryByText(/CLEARED/)).toBeNull();
+  });
+});
+
+describe('MessageBubble collapse affordance', () => {
+  it('uses an icon-only collapse control for long assistant messages', () => {
+    const { getByTestId, queryByText } = render(
+      <MessageBubble
+        sender="assistant"
+        content="Long answer with enough layout height to become collapsible."
+      />,
+    );
+
+    fireEvent(getByTestId('message-ai-content'), 'layout', {
+      nativeEvent: { layout: { height: 220 } },
+    });
+
+    const toggle = getByTestId('message-collapse-toggle');
+    expect(toggle.props.className).toContain('min-h-[32px]');
+    expect(queryByText('Show less')).toBeNull();
+    expect(queryByText('Show more')).toBeNull();
   });
 });

@@ -62,7 +62,7 @@ export function VoiceRecordButton({
       <Pressable
         onPress={handlePress}
         disabled={disabled}
-        className={`rounded-full p-3 min-h-[44px] min-w-[44px] items-center justify-center ${
+        className={`h-[52px] w-[52px] rounded-input items-center justify-center ${
           isListening ? 'bg-danger' : 'bg-surface-elevated'
         }`}
         accessibilityLabel={isListening ? 'Stop recording' : 'Start recording'}

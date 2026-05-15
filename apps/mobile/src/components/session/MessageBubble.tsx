@@ -349,6 +349,7 @@ export function MessageBubble({
         ) : isAI ? (
           <View
             onLayout={handleContentLayout}
+            testID="message-ai-content"
             style={
               isCollapsible && !isExpanded
                 ? { maxHeight: COLLAPSE_THRESHOLD, overflow: 'hidden' }
@@ -396,7 +397,7 @@ export function MessageBubble({
         {showCollapseToggle && (
           <Pressable
             onPress={() => setIsExpanded((prev) => !prev)}
-            className="mt-2 flex-row items-center justify-center py-1"
+            className="self-end mt-1 min-h-[32px] min-w-[32px] items-center justify-center rounded-full"
             accessibilityLabel={
               isExpanded ? 'Collapse message' : 'Expand message'
             }
@@ -408,9 +409,6 @@ export function MessageBubble({
               size={14}
               color={colors.accent}
             />
-            <Text className="text-caption text-accent ml-1">
-              {isExpanded ? 'Show less' : 'Show more'}
-            </Text>
           </Pressable>
         )}
         {actions ? <View className="mt-3">{actions}</View> : null}
