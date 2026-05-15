@@ -106,7 +106,6 @@ jest.mock('../services/billing' /* gc1-allow: pattern-a conversion */, () => {
       mockAddProfileToSubscription(...args),
     removeProfileFromSubscription: (...args: unknown[]) =>
       mockRemoveProfileFromSubscription(...args),
-    ProfileRemovalNotImplementedError: MockProfileRemovalNotImplementedError,
     getFamilyPoolStatus: (...args: unknown[]) =>
       mockGetFamilyPoolStatus(...args),
     getUsageBreakdownForProfile: (...args: unknown[]) =>

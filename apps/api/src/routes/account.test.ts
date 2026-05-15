@@ -188,8 +188,8 @@ describe('account routes', () => {
 
       expect(res.status).toBe(200);
       expect(body.message).toBe('Deletion scheduled');
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to dispatch deletion event'),
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[safe-send] non-core Inngest dispatch failed'),
       );
 
       // Sentry escalation: assert the deliberate call from safeSend happened

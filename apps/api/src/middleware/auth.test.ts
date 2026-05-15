@@ -22,14 +22,16 @@ jest.mock('../services/logger' /* gc1-allow: pattern-a conversion */, () => {
   const actual = jest.requireActual(
     '../services/logger',
   ) as typeof import('../services/logger');
+  const instance = {
+    debug: jest.fn(),
+    info: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+  };
   return {
     ...actual,
-    createLogger: jest.fn(() => ({
-      debug: jest.fn(),
-      info: jest.fn(),
-      warn: jest.fn(),
-      error: jest.fn(),
-    })),
+    __loggerInstance: instance,
+    createLogger: jest.fn(() => instance),
   };
 });
 

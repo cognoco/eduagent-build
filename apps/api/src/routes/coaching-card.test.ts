@@ -14,38 +14,32 @@ const mockDatabaseModule = createDatabaseModuleMock();
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
+const mockFindOrCreateAccount = jest.fn();
 jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
   const actual = jest.requireActual(
     '../services/account',
   ) as typeof import('../services/account');
   return {
     ...actual,
-    findOrCreateAccount: jest.fn().mockResolvedValue({
-      id: 'test-account-id',
-      clerkUserId: 'user_test',
-      email: 'test@example.com',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }),
+    findOrCreateAccount: (...args: unknown[]) =>
+      mockFindOrCreateAccount(...args),
   };
 });
 
+const mockFindOwnerProfile = jest.fn();
+const mockGetProfile = jest.fn();
 jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
   const actual = jest.requireActual(
     '../services/profile',
   ) as typeof import('../services/profile');
   return {
     ...actual,
-    findOwnerProfile: jest.fn().mockResolvedValue(null),
-    getProfile: jest.fn().mockResolvedValue({
-      id: 'test-profile-id',
-      birthYear: null,
-      location: null,
-      consentStatus: 'CONSENTED',
-    }),
+    findOwnerProfile: (...args: unknown[]) => mockFindOwnerProfile(...args),
+    getProfile: (...args: unknown[]) => mockGetProfile(...args),
   };
 });
 
+const mockGetCoachingCardForProfile = jest.fn();
 jest.mock(
   '../services/coaching-cards' /* gc1-allow: pattern-a conversion */,
   () => {
@@ -54,7 +48,8 @@ jest.mock(
     ) as typeof import('../services/coaching-cards');
     return {
       ...actual,
-      getCoachingCardForProfile: jest.fn(),
+      getCoachingCardForProfile: (...args: unknown[]) =>
+        mockGetCoachingCardForProfile(...args),
     };
   },
 );

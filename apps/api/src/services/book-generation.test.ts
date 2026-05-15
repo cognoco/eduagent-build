@@ -1,6 +1,11 @@
+const mockRouteAndCall = jest.fn();
+
 jest.mock('./llm' /* gc1-allow: pattern-a conversion */, () => {
   const actual = jest.requireActual('./llm') as typeof import('./llm');
-  return { ...actual, routeAndCall: jest.fn() };
+  return {
+    ...actual,
+    routeAndCall: (...args: unknown[]) => mockRouteAndCall(...args),
+  };
 });
 
 import { detectSubjectType, generateBookTopics } from './book-generation';

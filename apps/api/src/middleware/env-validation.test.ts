@@ -3,6 +3,7 @@ jest.mock('../config' /* gc1-allow: pattern-a conversion */, () => {
   return {
     ...actual,
     validateEnv: jest.fn(),
+    validateProductionBindings: jest.fn(),
   };
 });
 
