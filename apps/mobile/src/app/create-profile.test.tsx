@@ -277,6 +277,46 @@ describe('CreateProfileScreen', () => {
     });
   });
 
+  it('optimistically writes the new profile into scoped profiles cache', async () => {
+    const newProfile = {
+      id: 'new-id',
+      accountId: 'a1',
+      displayName: 'Sam',
+      avatarUrl: null,
+      birthYear: 2000,
+      location: null,
+      isOwner: true,
+      hasPremiumLlm: false,
+      consentStatus: null,
+      createdAt: '2026-02-16T00:00:00Z',
+      updatedAt: '2026-02-16T00:00:00Z',
+    };
+
+    queryClient.setQueryDefaults(['profiles', 'clerk-user-test'], {
+      gcTime: Infinity,
+    });
+    queryClient.setQueryData(['profiles', 'clerk-user-test'], []);
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ profile: newProfile }), { status: 200 }),
+    );
+
+    render(<CreateProfileScreen />, { wrapper: Wrapper });
+
+    fireEvent.changeText(screen.getByTestId('create-profile-name'), 'Sam');
+    fireEvent.press(screen.getByTestId('create-profile-birthdate'));
+    await act(() => {
+      datePickerOnChange?.({ type: 'set' }, new Date(2000, 5, 15));
+    });
+
+    fireEvent.press(screen.getByTestId('create-profile-submit'));
+
+    await waitFor(() => {
+      expect(queryClient.getQueryData(['profiles', 'clerk-user-test'])).toEqual(
+        [newProfile],
+      );
+    });
+  });
+
   it('redirects to consent screen for child under 16', async () => {
     const newProfile = {
       id: 'child-id',

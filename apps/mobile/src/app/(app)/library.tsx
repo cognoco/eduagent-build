@@ -163,7 +163,7 @@ export default function LibraryScreen() {
   // ---- Data hooks ---------------------------------------------------------
   const subjectsQuery = useSubjects({ includeInactive: true });
   const activeSubjectsFallbackQuery = useSubjects({
-    enabled: !Array.isArray(subjectsQuery.data),
+    enabled: subjectsQuery.isError && !Array.isArray(subjectsQuery.data),
   });
   const hasSubjectData =
     Array.isArray(subjectsQuery.data) ||

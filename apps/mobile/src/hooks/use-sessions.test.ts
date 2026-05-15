@@ -23,7 +23,8 @@ jest.mock('@clerk/clerk-expo', () => ({
   useAuth: () => ({ getToken: jest.fn().mockResolvedValue('test-token') }),
 }));
 
-jest.mock('../lib/api-client', () => ({
+// prettier-ignore
+jest.mock('../lib/api-client', () => ({ // gc1-allow: hook tests need a Hono client wired to controllable fetch
   useApiClient: () => {
     const { hc } = require('hono/client');
     return hc('http://localhost', {
@@ -48,16 +49,19 @@ jest.mock('../lib/api-client', () => ({
   ) => (key ? { ...headers, 'X-Idempotency-Key': key } : headers),
 }));
 
-jest.mock('../lib/api', () => ({
+// prettier-ignore
+jest.mock('../lib/api', () => ({ // gc1-allow: stream tests need a stable local API origin
   getApiUrl: () => 'http://localhost:8787',
 }));
 
-jest.mock('../lib/sse', () => ({
+// prettier-ignore
+jest.mock('../lib/sse', () => ({ // gc1-allow: stream tests drive the external SSE boundary with deterministic events
   parseSSEStream: jest.fn(),
   streamSSEViaXHR: jest.fn(),
 }));
 
-jest.mock('../lib/profile', () => ({
+// prettier-ignore
+jest.mock('../lib/profile', () => ({ // gc1-allow: session hook tests need a fixed active profile without provider setup
   useProfile: () => ({
     activeProfile: { id: 'test-profile-id' },
   }),
@@ -854,6 +858,55 @@ describe('useStreamMessage', () => {
         escalationRung: 1,
       }),
     );
+  });
+
+  it('waits for async done handling before resolving the stream', async () => {
+    const { streamSSEViaXHR } = require('../lib/sse') as {
+      streamSSEViaXHR: jest.Mock;
+    };
+    let releaseDone!: () => void;
+    const doneGate = new Promise<void>((resolve) => {
+      releaseDone = resolve;
+    });
+
+    streamSSEViaXHR.mockReturnValueOnce({
+      events: (async function* () {
+        yield { type: 'chunk', content: 'Hello' };
+        yield { type: 'done', exchangeCount: 1, escalationRung: 1 };
+      })(),
+      abort: jest.fn(),
+    });
+
+    const { result } = renderHook(() => useStreamMessage('session-1'), {
+      wrapper: createWrapper(),
+    });
+
+    const onDone = jest.fn(async () => {
+      await doneGate;
+    });
+    let settled = false;
+
+    let streamPromise!: Promise<void>;
+    await act(async () => {
+      streamPromise = result.current
+        .stream('Hello', jest.fn(), onDone, 'session-1')
+        .then(() => {
+          settled = true;
+        });
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(onDone).toHaveBeenCalled();
+    });
+    expect(settled).toBe(false);
+
+    releaseDone();
+    await act(async () => {
+      await streamPromise;
+    });
+
+    expect(settled).toBe(true);
   });
 
   // [BREAK / BUG-629 / I-1] If useStreamMessage stops injecting X-Proxy-Mode

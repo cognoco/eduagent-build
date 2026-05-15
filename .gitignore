@@ -95,6 +95,7 @@ temp/*
 
 # Local work-in-progress notes / coordination artifacts
 _wip/
+_scratchpad.md
 
 # Archon runtime artifacts
 .archon/state/

@@ -436,7 +436,7 @@ export function MagicPenAnimation({
   const steelDeepColor = '#9aa3ad';
   const slitColor = '#5a6470';
 
-  // The visible pen travel uses React Native core Animated. Reanimated SVG
+  // The visible pen travel uses Reanimated shared values.
   // The pen is drawn horizontally with the writing tip at (88, 50) inside a
   // 100×100 viewBox, then rotated ~32–45° clockwise. The empirical offsets
   // below place the rotated tip onto the writing path with minimal drift

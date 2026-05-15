@@ -21,15 +21,22 @@ if (typeof WebSocket === 'undefined') {
   neonConfig.webSocketConstructor = require('ws');
 }
 
-/**
- * Options accepted by createDatabase. Currently unused — kept for backward
- * compatibility with callers that pass an empty options object.
- */
-export type CreateDatabaseOptions = Record<string, never>;
+export interface CreateDatabaseOptions {
+  /**
+   * Reuse a Neon WebSocket pool across calls for the same connection string.
+   * Disable this for per-request Cloudflare Worker clients; workerd treats
+   * pooled WebSocket I/O as request-context-bound and can reject later requests.
+   */
+  cacheNeonPool?: boolean;
+}
 
-// Neon's WebSocket Pool cannot be reused across Cloudflare Worker requests.
-// Store the pool behind the Drizzle handle so request middleware can close it
-// after the handler has finished without exposing transport details to callers.
+// Module-level pool cache — survives across requests within the same Cloudflare
+// Worker isolate. Non-Worker callers can opt into this default to avoid repeated
+// Neon WebSocket handshakes.
+const neonPoolCache = new Map<string, NeonPool>();
+
+// Per-request Neon pools must be closed by request middleware. Store those
+// pools behind the Drizzle handle without exposing transport details to callers.
 const neonPoolsByDatabase = new WeakMap<object, NeonPool>();
 
 // [BUG-MIGRATE-0014 / RLS-PHASE-0] CI runs integration tests against a vanilla
@@ -68,17 +75,28 @@ function looksLikeNeon(url: string): boolean {
  */
 export function createDatabase(
   databaseUrl: string,
-  // options parameter kept for backward-compatibility; currently unused
-  _options: CreateDatabaseOptions = {},
+  options: CreateDatabaseOptions = {},
 ) {
   if (looksLikeNeon(databaseUrl)) {
-    const pool = new NeonPool({
-      connectionString: databaseUrl,
-      connectionTimeoutMillis: 10_000,
-    });
-    const db = drizzleNeon(pool, { schema });
-    neonPoolsByDatabase.set(db as object, pool);
-    return db;
+    if (options.cacheNeonPool === false) {
+      const pool = new NeonPool({
+        connectionString: databaseUrl,
+        connectionTimeoutMillis: 10_000,
+      });
+      const db = drizzleNeon(pool, { schema });
+      neonPoolsByDatabase.set(db as object, pool);
+      return db;
+    }
+
+    let pool = neonPoolCache.get(databaseUrl);
+    if (!pool) {
+      pool = new NeonPool({
+        connectionString: databaseUrl,
+        connectionTimeoutMillis: 10_000,
+      });
+      neonPoolCache.set(databaseUrl, pool);
+    }
+    return drizzleNeon(pool, { schema });
   }
   // drizzle-orm/node-postgres builds the underlying pg Pool internally when
   // given a connection string via the config-object form, avoiding the need

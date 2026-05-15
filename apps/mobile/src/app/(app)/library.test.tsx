@@ -244,6 +244,29 @@ describe('LibraryScreen', () => {
     screen.getByTestId('library-loading');
   });
 
+  it('does not enable the active-subject fallback query during initial loading', () => {
+    mockUseSubjects.mockImplementation(
+      (options?: { includeInactive?: boolean; enabled?: boolean }) =>
+        options?.includeInactive
+          ? { data: undefined, isLoading: true, isError: false }
+          : {
+              data: undefined,
+              isLoading: false,
+              isError: false,
+              refetch: jest.fn(),
+            },
+    );
+    mockUseOverallProgress.mockReturnValue({
+      data: undefined,
+      isLoading: true,
+    });
+
+    render(<LibraryScreen />, { wrapper: TestWrapper });
+
+    expect(mockUseSubjects).toHaveBeenCalledWith({ includeInactive: true });
+    expect(mockUseSubjects).toHaveBeenCalledWith({ enabled: false });
+  });
+
   it('[BUG-634 / M-2] does not crash when subjectsQuery.data is a non-array (stale shape / error payload)', () => {
     // Repro: TanStack Query select transform is bypassed when enabled=false,
     // so the cached value can be a non-array. Without the Array.isArray guard

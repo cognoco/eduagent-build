@@ -9,6 +9,7 @@ import {
   createDatabase,
   type Database,
 } from '@eduagent/database';
+import { captureException } from '../services/sentry';
 
 export type DatabaseEnv = {
   Bindings: { DATABASE_URL: string };
@@ -54,7 +55,11 @@ function wrapStreamingResponseForDatabaseClose(
         }
         controller.enqueue(value);
       } catch (err) {
-        await closeOnce().catch(() => undefined);
+        await closeOnce().catch((closeErr) => {
+          captureException(closeErr, {
+            extra: { phase: 'sse-stream-error-close' },
+          });
+        });
         controller.error(err);
       }
     },
@@ -78,7 +83,7 @@ export const databaseMiddleware = createMiddleware<DatabaseEnv>(
     if (url) {
       // Phase 0.0 (RLS plan 2026-04-27): neon-serverless WS driver — real ACID
       // transactions; onTransactionFallback is no longer needed.
-      db = createDatabase(url);
+      db = createDatabase(url, { cacheNeonPool: false });
       c.set('db', db);
     }
     try {
