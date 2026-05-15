@@ -120,7 +120,7 @@ type Variables = {
   profileId: string;
   profileMeta: ProfileMeta | undefined;
   subscriptionId: string;
-  subscriptionTier: SubscriptionTier;
+  subscriptionTier: SubscriptionTier | undefined;
   llmTier: LLMTier;
 };
 

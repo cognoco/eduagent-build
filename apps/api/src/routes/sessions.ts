@@ -112,7 +112,7 @@ type SessionRouteEnv = {
     db: Database;
     profileId: string | undefined;
     subscriptionId: string;
-    subscriptionTier: SubscriptionTier;
+    subscriptionTier: SubscriptionTier | undefined;
     llmTier: LLMTier;
   };
 };
