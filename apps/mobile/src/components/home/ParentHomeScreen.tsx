@@ -26,7 +26,12 @@ import {
 import { getGreeting, getTimeOfDay } from '../../lib/greeting';
 import { platformAlert } from '../../lib/platform-alert';
 import { useLinkedChildren } from '../../lib/profile';
-import { useThemeColors } from '../../lib/theme';
+import { useTheme, useThemeColors } from '../../lib/theme';
+import { getSubjectTintMap } from '../../lib/subject-tints';
+import {
+  SUBJECT_TINT_PALETTE,
+  type SubjectTint,
+} from '../../lib/design-tokens';
 import { MentomateLogo } from '../MentomateLogo';
 import {
   WithdrawalCountdownBanner,
@@ -694,6 +699,7 @@ export function ParentHomeScreen({
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
+  const { colorScheme } = useTheme();
   const role = useActiveProfileRole();
   const linkedChildren = useLinkedChildren();
   const { data: dashboard } = useDashboard();
@@ -798,6 +804,32 @@ export function ParentHomeScreen({
       }),
     });
   }
+  const tonightPrompts = useMemo(
+    () => buildTonightPrompts(linkedChildren, dashboard, t),
+    [linkedChildren, dashboard, t],
+  );
+  const promptTintsByKey = useMemo(() => {
+    const tints = new Map<string, SubjectTint>();
+    const palette = SUBJECT_TINT_PALETTE[colorScheme];
+
+    if (linkedChildren.length === 1) {
+      tonightPrompts.forEach((prompt, index) => {
+        const tint = palette[index % palette.length] ?? palette[0];
+        if (tint) tints.set(prompt.key, tint);
+      });
+      return tints;
+    }
+
+    const childTintsById = getSubjectTintMap(
+      tonightPrompts.map((prompt) => prompt.childId),
+      colorScheme,
+    );
+    tonightPrompts.forEach((prompt) => {
+      const tint = childTintsById.get(prompt.childId);
+      if (tint) tints.set(prompt.key, tint);
+    });
+    return tints;
+  }, [colorScheme, linkedChildren.length, tonightPrompts]);
 
   const navigateToCreateChildProfile = useCallback(() => {
     if (Platform.OS === 'web') {
@@ -906,8 +938,8 @@ export function ParentHomeScreen({
 
   return (
     <View className="flex-1 bg-background" testID="parent-home-screen">
-      <View className="px-5" style={{ paddingTop: insets.top + 12 }}>
-        <View className="flex-row items-center justify-between mb-3">
+      <View className="px-5" style={{ paddingTop: insets.top + 4 }}>
+        <View className="flex-row items-center justify-between mb-2">
           <MentomateLogo size="sm" orientation="horizontal" />
           <Pressable
             onPress={() => router.push('/(app)/more/account' as Href)}
@@ -940,33 +972,37 @@ export function ParentHomeScreen({
         }}
         showsVerticalScrollIndicator={false}
       >
-        <View className="mt-4">
-          <WithdrawalCountdownBanner
-            childrenInGracePeriod={childrenInGracePeriod}
-          />
-        </View>
-        {linkedChildren.length > 0 ? (
-          <ParentTransitionNotice
-            profileId={activeProfile?.id}
-            childNames={childNames}
-          />
+        {childrenInGracePeriod.length > 0 ? (
+          <View className="mt-3">
+            <WithdrawalCountdownBanner
+              childrenInGracePeriod={childrenInGracePeriod}
+            />
+          </View>
         ) : null}
 
         {linkedChildren.length > 0 ? (
-          <View className="mt-5" testID="parent-home-tonight-section">
+          <View className="mt-4" testID="parent-home-tonight-section">
             <Text className="text-h3 font-bold text-text-primary mb-3">
               {t(tonightTitleKey(now))}
             </Text>
             <View style={{ gap: 10 }}>
-              {buildTonightPrompts(linkedChildren, dashboard, t).map(
-                (prompt) => (
+              <ParentTransitionNotice
+                profileId={activeProfile?.id}
+                childNames={childNames}
+              />
+              {tonightPrompts.map((prompt) => {
+                const tint = promptTintsByKey.get(prompt.key);
+                return (
                   <Pressable
                     key={`tonight-${prompt.key}`}
                     onPress={() => pushChildProgress(prompt.childId)}
-                    className="bg-coaching-card rounded-card px-4 py-3 flex-row items-start"
-                    style={
-                      Platform.OS === 'web' ? { cursor: 'pointer' } : undefined
-                    }
+                    className="rounded-card px-4 py-3 flex-row items-start"
+                    style={({ pressed }) => ({
+                      backgroundColor: tint?.soft ?? colors.coachingCard,
+                      borderColor: tint ? tint.solid + '33' : colors.border,
+                      borderWidth: 1,
+                      opacity: pressed ? 0.76 : 1,
+                    })}
                     accessibilityRole="button"
                     accessibilityLabel={prompt.text}
                     testID={`parent-home-tonight-${prompt.key}`}
@@ -974,15 +1010,15 @@ export function ParentHomeScreen({
                     <Ionicons
                       name="chatbubble-outline"
                       size={18}
-                      color={colors.textSecondary}
+                      color={tint?.solid ?? colors.textSecondary}
                       style={{ marginTop: 2 }}
                     />
                     <Text className="text-body-sm text-text-primary ms-3 flex-1">
                       {prompt.text}
                     </Text>
                   </Pressable>
-                ),
-              )}
+                );
+              })}
             </View>
           </View>
         ) : null}

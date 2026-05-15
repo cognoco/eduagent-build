@@ -175,6 +175,21 @@ async function waitForParentTransitionNotice(): Promise<void> {
   });
 }
 
+function resolvedBackgroundColor(testID: string): unknown {
+  const style = screen.getByTestId(testID).props.style as unknown;
+  const resolved = (
+    typeof style === 'function' ? style({ pressed: false }) : style
+  ) as
+    | Record<string, unknown>
+    | Array<Record<string, unknown> | null | undefined>;
+
+  if (Array.isArray(resolved)) {
+    return resolved.find((entry) => entry?.backgroundColor)?.backgroundColor;
+  }
+
+  return resolved?.backgroundColor;
+}
+
 describe('ParentHomeScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -324,6 +339,13 @@ describe('ParentHomeScreen', () => {
     expect(
       screen.queryByText('Emma: What made Fractions click today?'),
     ).toBeNull();
+    expect(
+      new Set([
+        resolvedBackgroundColor('parent-home-tonight-child-a-primary'),
+        resolvedBackgroundColor('parent-home-tonight-child-a-trickiest'),
+        resolvedBackgroundColor('parent-home-tonight-child-a-tomorrow'),
+      ]).size,
+    ).toBe(3);
     screen.getByText('Fractions · 18 min this week');
     screen.getByText('Emma · 18 min this week');
     screen.getByText('2 of 5 profiles used');

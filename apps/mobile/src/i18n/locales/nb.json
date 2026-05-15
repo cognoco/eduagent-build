@@ -177,7 +177,7 @@
       },
       "encouragementNote": "Nudger er korte, milde oppmuntringer en vei.",
       "transitionNoticeTitle": "Du veileder nå {{childNames}}",
-      "transitionNoticeBody": "Trykk Hjem når som helst for å se fremgangen og din egen læring.",
+      "transitionNoticeBody": "Prøv et av disse innsjekkingsspørsmålene i kveld.",
       "cards": {
         "checkChild": "Se hvordan det går med {{childName}}",
         "checkChildFallback": "Trykk for å se ukens fremgang",
