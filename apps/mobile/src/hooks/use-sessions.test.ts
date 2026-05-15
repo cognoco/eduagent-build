@@ -23,7 +23,8 @@ jest.mock('@clerk/clerk-expo', () => ({
   useAuth: () => ({ getToken: jest.fn().mockResolvedValue('test-token') }),
 }));
 
-jest.mock('../lib/api-client', () => ({
+// prettier-ignore
+jest.mock('../lib/api-client', () => ({ // gc1-allow: hook tests need a Hono client wired to controllable fetch
   useApiClient: () => {
     const { hc } = require('hono/client');
     return hc('http://localhost', {
@@ -48,16 +49,19 @@ jest.mock('../lib/api-client', () => ({
   ) => (key ? { ...headers, 'X-Idempotency-Key': key } : headers),
 }));
 
-jest.mock('../lib/api', () => ({
+// prettier-ignore
+jest.mock('../lib/api', () => ({ // gc1-allow: stream tests need a stable local API origin
   getApiUrl: () => 'http://localhost:8787',
 }));
 
-jest.mock('../lib/sse', () => ({
+// prettier-ignore
+jest.mock('../lib/sse', () => ({ // gc1-allow: stream tests drive the external SSE boundary with deterministic events
   parseSSEStream: jest.fn(),
   streamSSEViaXHR: jest.fn(),
 }));
 
-jest.mock('../lib/profile', () => ({
+// prettier-ignore
+jest.mock('../lib/profile', () => ({ // gc1-allow: session hook tests need a fixed active profile without provider setup
   useProfile: () => ({
     activeProfile: { id: 'test-profile-id' },
   }),

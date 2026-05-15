@@ -29,7 +29,8 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
-jest.mock('../../lib/math-format', () => ({
+// prettier-ignore
+jest.mock('../../lib/math-format', () => ({ // gc1-allow: render tests only need deterministic math text passthrough
   formatMathContent: (s: string) => s,
 }));
 
@@ -57,7 +58,8 @@ let mockSttState = {
   isListening: false,
 };
 
-jest.mock('../../hooks/use-speech-recognition', () => ({
+// prettier-ignore
+jest.mock('../../hooks/use-speech-recognition', () => ({ // gc1-allow: voice hook touches native recording APIs outside component scope
   useSpeechRecognition: () => ({
     ...mockSttState,
     startListening: mockStartListening,
@@ -74,7 +76,8 @@ const mockStopSpeaking = jest.fn();
 const mockReplay = jest.fn();
 const mockSetRate = jest.fn();
 
-jest.mock('../../hooks/use-text-to-speech', () => ({
+// prettier-ignore
+jest.mock('../../hooks/use-text-to-speech', () => ({ // gc1-allow: voice output hook touches native speech APIs outside component scope
   useTextToSpeech: () => ({
     isSpeaking: false,
     rate: 1.0,
@@ -86,7 +89,8 @@ jest.mock('../../hooks/use-text-to-speech', () => ({
 }));
 
 // Stub animated SVG components to avoid reanimated timer leaks in tests
-jest.mock('../common', () => ({
+// prettier-ignore
+jest.mock('../common', () => ({ // gc1-allow: animated shared components leak timers in this shell render suite
   DeskLampAnimation: () => null,
   MagicPenAnimation: () => null,
 }));

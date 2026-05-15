@@ -151,29 +151,16 @@ jobs:
         run: bash scripts/check-prompt-markers.sh
 
       # GC1 ratchet (Tier 1): block PRs that add NEW relative-path jest.mock()
-      # calls in test files. Existing legacy sites are grandfathered. To allow
-      # a legitimate new internal mock, add `// gc1-allow: <reason>` on the
-      # same line as the jest.mock(...) call. See CLAUDE.md → "Code Quality
-      # Guards" → "No new internal jest.mock()".
+      # calls in test files unless the factory uses Pattern A (spreads
+      # jest.requireActual of the same specifier) or the line carries a
+      # `// gc1-allow: <reason>` sticker. Same TypeScript detector the
+      # pre-commit hook in `.husky/pre-commit` uses, so rules can't drift.
+      # See CLAUDE.md → "Code Quality Guards" → "No new internal jest.mock()".
       - name: GC1 — no new internal jest.mock
         if: github.event_name == 'pull_request'
         env:
-          BASE_REF: ${{ github.base_ref }}
-        run: |
-          set -euo pipefail
-          # Exclude the GC1 detector's own test file — its fixtures are
-          # literal "jest.mock(...)" strings used to test the detector, not
-          # real jest.mock calls.
-          violations=$(git diff "origin/${BASE_REF}...HEAD" -- '*.test.ts' '*.test.tsx' ':!scripts/check-gc1-pattern-a.test.ts' \
-            | grep -E '^\+[^+]' \
-            | grep -E "jest\.mock\(['\"\`]\.\.?/" \
-            | grep -iv 'gc1-allow' \
-            || true)
-          if [ -n "$violations" ]; then
-            echo "::error::New internal jest.mock() call(s) detected. Use jest.requireActual() with targeted overrides, or add '// gc1-allow: <reason>' on the same line if external-boundary justified. See CLAUDE.md → 'No new internal jest.mock()'."
-            echo "$violations"
-            exit 1
-          fi
+          GITHUB_BASE_REF: ${{ github.base_ref }}
+        run: pnpm exec tsx scripts/check-gc1-pattern-a.ts
 
       # Structural-regression guards under scripts/ (BUG-979 / BUG-974). Nx
       # does not pick these up — they live outside any project — so we run

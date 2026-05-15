@@ -767,6 +767,27 @@ describe('SignInScreen', () => {
     });
   });
 
+  it('keeps the session-expired banner across an auth screen remount', async () => {
+    markSessionExpired();
+
+    const firstRender = render(<SignInScreen />);
+
+    await waitFor(() => {
+      screen.getByText(
+        'Your session expired. Sign in again to continue learning.',
+      );
+    });
+
+    firstRender.unmount();
+    render(<SignInScreen />);
+
+    await waitFor(() => {
+      screen.getByText(
+        'Your session expired. Sign in again to continue learning.',
+      );
+    });
+  });
+
   // ---------------------------------------------------------------------------
   // SSO sign-in
   // ---------------------------------------------------------------------------

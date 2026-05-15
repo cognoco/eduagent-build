@@ -6,22 +6,22 @@ import {
 import { QuotaExceededError } from '../../lib/api-client';
 
 // Mock session components barrel (animateResponse)
-jest.mock('../session', () => ({
-  // gc1-allow: barrel exports RN components (ChatShell, MessageBubble, animations) — cannot render in JSDOM
+// prettier-ignore
+jest.mock('../session', () => ({ // gc1-allow: barrel exports RN components (ChatShell, MessageBubble, animations) cannot render in JSDOM
   animateResponse: jest.fn(() => jest.fn()),
 }));
 
 // Mock session recovery
 const mockWriteRecoveryMarker = jest.fn().mockResolvedValue(undefined);
-jest.mock('../../lib/session-recovery', () => ({
-  // gc1-allow: uses Expo SecureStore (native storage) — cannot be exercised in JSDOM
+// prettier-ignore
+jest.mock('../../lib/session-recovery', () => ({ // gc1-allow: uses Expo SecureStore native storage that cannot be exercised in JSDOM
   writeSessionRecoveryMarker: (...args: unknown[]) =>
     mockWriteRecoveryMarker(...args),
 }));
 
 // Mock format-api-error
-jest.mock('../../lib/format-api-error', () => ({
-  // gc1-allow: depends on i18next instance requiring full i18n init — cannot run in JSDOM without setup
+// prettier-ignore
+jest.mock('../../lib/format-api-error', () => ({ // gc1-allow: depends on i18next instance requiring full i18n init outside this hook test
   formatApiError: (err: unknown) =>
     err instanceof Error ? err.message : 'Unknown error',
 }));
