@@ -1,0 +1,16 @@
+{
+  "scope": "mobile",
+  "verifiedAt": "2026-05-15T06:56:38Z",
+  "verifiedBy": "Zuzana Kopečná @ ZLY-Orion",
+  "command": "pnpm exec jest --config apps/mobile/jest.config.cjs --testMatch \"**/apps/mobile/src/app/**/child/**/index.test.tsx\" --testMatch \"**/apps/mobile/src/app/**/quiz/**/launch.test.tsx\" --testMatch \"**/apps/mobile/src/app/**/quiz/**/play.test.tsx\" --testMatch \"**/apps/mobile/src/app/**/sign-in.test.tsx\" --testMatch \"**/apps/mobile/src/app/**/sign-up.test.tsx\" --testMatch \"**/apps/mobile/src/app/e2e-testid-integrity.test.ts\" --testMatch \"**/apps/mobile/src/app/**/pick-book/**/[subjectId].test.tsx\" --runInBand --forceExit --no-coverage",
+  "passed": true,
+  "testFiles": {
+    "apps/mobile/src/app/(app)/child/[profileId]/index.test.tsx": "22cb0f27151aa1792d3258be2a7c193c5d8e355c",
+    "apps/mobile/src/app/(app)/quiz/launch.test.tsx": "d19d7eb0da334c029ce755f8f06f4188446eb28e",
+    "apps/mobile/src/app/(app)/quiz/play.test.tsx": "44f1f59419f7ba4b6751527c6a3df74ffc9218f8",
+    "apps/mobile/src/app/(auth)/sign-in.test.tsx": "2614dda18f65797341b48555f3b13cb09a7b945f",
+    "apps/mobile/src/app/(auth)/sign-up.test.tsx": "8ea4072b5193348f241f9f60908a066894810d87",
+    "apps/mobile/src/app/e2e-testid-integrity.test.ts": "f8e7810aef55c051a22646136c755304f866af10",
+    "apps/mobile/src/app/(app)/pick-book/[subjectId].test.tsx": "a45f82e106e28a0646f7e4afed2b0bd00e3101c8"
+  }
+}
