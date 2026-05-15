@@ -49,9 +49,9 @@ export default function SubjectTopicsScreen() {
   const subjectId = Array.isArray(rawSubjectId)
     ? rawSubjectId[0]
     : rawSubjectId;
-  const backHref = profileId
-    ? (`/(app)/child/${profileId}` as const)
-    : ('/(app)/more' as const);
+  const backHref: Href = profileId
+    ? (`/(app)/child/${profileId}` as Href)
+    : ('/(app)/more' as Href);
   const {
     data: topics,
     isLoading,

@@ -125,7 +125,9 @@ describe('seed engagement signals', () => {
       'utf8',
     );
     const allowedSignals = new Set<string>(ENGAGEMENT_SIGNALS);
-    const matches = [...source.matchAll(/engagementSignal:\s*'([^']+)'/g)];
+    const matches = [
+      ...source.matchAll(/engagementSignal:\s*['"]([^'"]+)['"]/g),
+    ];
 
     expect(matches.length).toBeGreaterThan(0);
     expect(
