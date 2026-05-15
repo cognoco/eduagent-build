@@ -1950,6 +1950,7 @@
       "weeklySnapshot": "Resumo semanal",
       "monthlyReport": "Relatório mensal",
       "newBadge": "Novo",
+      "backToLatest": "Voltar ao relatório mais recente",
       "nextReportIn": "Próximo relatório em {{timeContext}}",
       "noReportScheduled": "Nenhum relatório agendado",
       "subtitle": "Resumos de aprendizado mensais e semanais",

@@ -76,7 +76,7 @@ export function ShelfRow({
   const showFinished = isFinished && !needsReview;
 
   return (
-    <View style={{ marginBottom: 12, opacity: isInactive ? 0.65 : 1 }}>
+    <View style={{ opacity: isInactive ? 0.65 : 1 }}>
       <Pressable
         testID={testID ?? `shelf-row-header-${subjectId}`}
         onPress={() => onPress(subjectId)}
@@ -92,29 +92,24 @@ export function ShelfRow({
               : '',
           action: t('library.row.shelfActionOpen'),
         })}
-        style={({ pressed }) => ({
-          backgroundColor: tint.soft,
-          borderColor: tint.solid + '33',
-          borderRadius: 16,
-          borderWidth: 1,
+        style={{
           flexDirection: 'row',
-          alignItems: 'flex-start',
-          minHeight: 108,
+          alignItems: 'center',
+          paddingVertical: 12,
           paddingHorizontal: 16,
-          paddingVertical: 18,
-          opacity: pressed ? 0.76 : 1,
-        })}
+          gap: 12,
+        }}
       >
         <SubjectBookshelfMotif
           testID={`shelf-row-bookshelf-${subjectId}`}
           tint={tint}
         />
 
-        <View style={{ flex: 1, marginLeft: 14, minWidth: 0 }}>
+        <View style={{ flex: 1 }}>
           <Text
             style={{
-              fontSize: 19,
-              fontWeight: '700',
+              fontSize: 15,
+              fontWeight: 'bold',
               color: colors.textPrimary,
             }}
             numberOfLines={1}
@@ -123,113 +118,103 @@ export function ShelfRow({
           </Text>
           <Text
             style={{
-              fontSize: 15,
+              fontSize: 12,
               color: isUnstarted ? tint.solid : colors.textSecondary,
-              fontWeight: isUnstarted ? '600' : '400',
-              marginTop: 4,
+              fontWeight: isUnstarted ? '500' : 'normal',
+              marginTop: 1,
             }}
             numberOfLines={1}
           >
             {subtitle}
           </Text>
-
-          <View
-            style={{
-              alignItems: 'center',
-              flexDirection: 'row',
-              flexWrap: 'wrap',
-              gap: 8,
-              marginTop: 10,
-            }}
-          >
-            {statusChip ? (
-              <View
-                testID={statusChip.testID}
-                style={{
-                  paddingHorizontal: 10,
-                  paddingVertical: 4,
-                  borderRadius: 999,
-                  backgroundColor: statusChip.backgroundColor,
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: 12,
-                    fontWeight: '700',
-                    color: statusChip.color,
-                  }}
-                >
-                  {statusChip.label}
-                </Text>
-              </View>
-            ) : null}
-
-            {needsReview ? (
-              <View
-                testID={`shelf-row-review-${subjectId}`}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 4,
-                  paddingHorizontal: 10,
-                  paddingVertical: 4,
-                  borderRadius: 999,
-                  backgroundColor: colors.retentionWeak + '22',
-                }}
-              >
-                <Ionicons
-                  name="refresh-circle"
-                  size={13}
-                  color={colors.retentionWeak}
-                />
-                <Text
-                  style={{
-                    fontSize: 12,
-                    fontWeight: '700',
-                    color: colors.retentionWeak,
-                  }}
-                >
-                  {t('library.row.review')}
-                </Text>
-              </View>
-            ) : null}
-
-            {showFinished ? (
-              <View
-                testID={`shelf-row-finished-${subjectId}`}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 4,
-                  paddingHorizontal: 10,
-                  paddingVertical: 4,
-                  borderRadius: 999,
-                  backgroundColor: colors.success + '22',
-                }}
-              >
-                <Ionicons
-                  name="checkmark-circle"
-                  size={13}
-                  color={colors.success}
-                />
-                <Text
-                  style={{
-                    fontSize: 12,
-                    fontWeight: '700',
-                    color: colors.success,
-                  }}
-                >
-                  {t('library.row.finished')}
-                </Text>
-              </View>
-            ) : null}
-          </View>
         </View>
 
-        <View style={{ paddingTop: 8 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          {statusChip ? (
+            <View
+              testID={statusChip.testID}
+              style={{
+                paddingHorizontal: 8,
+                paddingVertical: 2,
+                borderRadius: 10,
+                backgroundColor: statusChip.backgroundColor,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 11,
+                  fontWeight: '500',
+                  color: statusChip.color,
+                }}
+              >
+                {statusChip.label}
+              </Text>
+            </View>
+          ) : null}
+
+          {needsReview ? (
+            <View
+              testID={`shelf-row-review-${subjectId}`}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 3,
+                paddingHorizontal: 8,
+                paddingVertical: 2,
+                borderRadius: 10,
+                backgroundColor: colors.retentionWeak + '22',
+              }}
+            >
+              <Ionicons
+                name="refresh-circle"
+                size={12}
+                color={colors.retentionWeak}
+              />
+              <Text
+                style={{
+                  fontSize: 11,
+                  fontWeight: '600',
+                  color: colors.retentionWeak,
+                }}
+              >
+                {t('library.row.review')}
+              </Text>
+            </View>
+          ) : null}
+
+          {showFinished ? (
+            <View
+              testID={`shelf-row-finished-${subjectId}`}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 3,
+                paddingHorizontal: 8,
+                paddingVertical: 2,
+                borderRadius: 10,
+                backgroundColor: colors.success + '22',
+              }}
+            >
+              <Ionicons
+                name="checkmark-circle"
+                size={12}
+                color={colors.success}
+              />
+              <Text
+                style={{
+                  fontSize: 11,
+                  fontWeight: '600',
+                  color: colors.success,
+                }}
+              >
+                {t('library.row.finished')}
+              </Text>
+            </View>
+          ) : null}
+
           <Ionicons
             name="chevron-forward"
-            size={22}
+            size={16}
             color={colors.textSecondary}
             accessibilityElementsHidden
             importantForAccessibility="no-hide-descendants"

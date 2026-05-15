@@ -59,6 +59,20 @@ describe('ShelfRow', () => {
     screen.getByTestId('shelf-row-bookshelf-sub-math');
   });
 
+  it('keeps each shelf as a compact horizontal row', () => {
+    render(<ShelfRow {...defaultProps} />);
+
+    const header = screen.getByTestId('shelf-row-header-sub-math');
+    expect(header.props.style).toEqual(
+      expect.objectContaining({
+        alignItems: 'center',
+        flexDirection: 'row',
+        paddingVertical: 12,
+      }),
+    );
+    expect(header.props.style).not.toHaveProperty('minHeight');
+  });
+
   it('opens the subject shelf when header is pressed', () => {
     const onPress = jest.fn();
     render(<ShelfRow {...defaultProps} onPress={onPress} />);

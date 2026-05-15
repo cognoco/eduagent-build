@@ -240,7 +240,7 @@ describe('ParentHomeScreen', () => {
     fireEvent.press(screen.getByTestId('parent-home-check-child-child-a'));
     expect(mockPush).toHaveBeenLastCalledWith({
       pathname: '/(app)/child/[profileId]',
-      params: { profileId: 'child-a' },
+      params: { profileId: 'child-a', mode: 'settings' },
     });
   });
 
@@ -253,7 +253,7 @@ describe('ParentHomeScreen', () => {
     fireEvent.press(screen.getByTestId('parent-home-child-progress-child-a'));
     expect(mockPush).toHaveBeenLastCalledWith({
       pathname: '/(app)/child/[profileId]',
-      params: { profileId: 'child-a' },
+      params: { profileId: 'child-a', mode: 'progress' },
     });
   });
 
@@ -353,7 +353,7 @@ describe('ParentHomeScreen', () => {
     fireEvent.press(screen.getByTestId('parent-home-tonight-child-a-primary'));
     expect(mockPush).toHaveBeenLastCalledWith({
       pathname: '/(app)/child/[profileId]',
-      params: { profileId: 'child-a' },
+      params: { profileId: 'child-a', mode: 'progress' },
     });
   });
 

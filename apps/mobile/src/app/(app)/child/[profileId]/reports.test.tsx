@@ -256,6 +256,72 @@ describe('ChildReportsScreen', () => {
       expect(screen.getAllByText('+2 vs last week').length).toBeGreaterThan(0);
     });
 
+    it('opens older weekly reports inline and can return to the latest report', () => {
+      mockUseChildWeeklyReports.mockReturnValue({
+        data: [
+          {
+            id: 'wr-latest',
+            reportWeek: '2026-05-11',
+            viewedAt: '2026-05-12T03:00:00Z',
+            createdAt: '2026-05-18T03:00:00Z',
+            headlineStat: {
+              label: 'Topics mastered',
+              value: '4',
+              comparison: '+2 vs last week',
+            },
+            thisWeek: {
+              totalSessions: 5,
+              totalActiveMinutes: 120,
+              topicsMastered: 4,
+              topicsExplored: 8,
+              vocabularyTotal: 50,
+              streakBest: 3,
+            },
+          },
+          {
+            id: 'wr-older',
+            reportWeek: '2026-05-04',
+            viewedAt: null,
+            createdAt: '2026-05-11T03:00:00Z',
+            headlineStat: {
+              label: 'Topics mastered',
+              value: '1',
+              comparison: '+1 vs last week',
+            },
+            thisWeek: {
+              totalSessions: 2,
+              totalActiveMinutes: 30,
+              topicsMastered: 1,
+              topicsExplored: 2,
+              vocabularyTotal: 10,
+              streakBest: 1,
+            },
+          },
+        ],
+        isLoading: false,
+        isError: false,
+        refetch: jest.fn(),
+      });
+      mockUseChildReports.mockReturnValue({
+        data: [],
+        isLoading: false,
+        isError: false,
+        refetch: jest.fn(),
+      });
+
+      render(<ChildReportsScreen />);
+
+      screen.getByText('Topics mastered: 4');
+      fireEvent.press(screen.getByTestId('weekly-report-card-wr-older'));
+
+      screen.getByText('Topics mastered: 1');
+      screen.getByTestId('child-reports-back-to-latest');
+      expect(mockPush).not.toHaveBeenCalled();
+
+      fireEvent.press(screen.getByTestId('child-reports-back-to-latest'));
+      screen.getByText('Topics mastered: 4');
+    });
+
     it('renders report cards when reports exist', () => {
       mockUseChildReports.mockReturnValue({
         data: [

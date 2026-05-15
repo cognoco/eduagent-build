@@ -1925,6 +1925,7 @@
       "weeklySnapshot": "Resumen semanal",
       "monthlyReport": "Informe mensual",
       "newBadge": "Nuevo",
+      "backToLatest": "Volver al informe más reciente",
       "nextReportIn": "Próximo informe en {{timeContext}}",
       "noReportScheduled": "No hay informe programado",
       "subtitle": "Resúmenes de aprendizaje mensuales y semanales",
