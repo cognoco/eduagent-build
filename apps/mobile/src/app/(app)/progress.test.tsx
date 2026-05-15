@@ -136,7 +136,7 @@ jest.mock('react-i18next', () => ({
         const count = opts?.count as number;
         return `${count} practice point${count === 1 ? '' : 's'}`;
       }
-      if (key === 'progress.recentFocus.title') return 'Recent focus';
+      if (key === 'progress.recentFocus.title') return 'Recent sessions';
       if (key === 'progress.recentFocus.showAll') return 'Show all sessions';
       if (key === 'progress.recentFocus.empty')
         return 'Recent sessions will appear here once learning gets going.';
@@ -557,7 +557,7 @@ describe('ProgressScreen — progressive disclosure', () => {
     expect(refs.refreshSnapshot).toHaveBeenCalled();
     expect(refs.monthlyReportsRefetch).toHaveBeenCalled();
     expect(refs.weeklyReportsRefetch).toHaveBeenCalled();
-    expect(refs.milestonesRefetch).toHaveBeenCalled();
+    expect(refs.milestonesRefetch).not.toHaveBeenCalled();
   });
 
   it('keeps the focus refresh callback stable across render updates', () => {
@@ -652,6 +652,35 @@ describe('ProgressScreen — progressive disclosure', () => {
     screen.getByText('45 practice points');
   });
 
+  it('opens the latest report card even when a legacy summary has no metrics', () => {
+    mockHooks({
+      inventory: {
+        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 2 },
+        subjects: [fullSubject],
+      },
+      weeklyReports: [
+        {
+          id: 'weekly-legacy',
+          reportWeek: '2026-05-11',
+          viewedAt: null,
+          createdAt: '2026-05-17T00:00:00Z',
+          headlineStat: {
+            label: 'sessions this week',
+            value: 4,
+            comparison: 'steady rhythm',
+          },
+        },
+      ],
+    });
+
+    render(<ProgressScreen />);
+
+    screen.getByTestId('progress-latest-report-card');
+    screen.getByText('4 sessions this week');
+    expect(screen.getAllByText('steady rhythm').length).toBeGreaterThan(0);
+    expect(screen.queryByTestId('progress-latest-report-empty')).toBeNull();
+  });
+
   it('falls back to monthly report summary when no weekly report exists', () => {
     mockHooks({
       inventory: {
@@ -690,7 +719,7 @@ describe('ProgressScreen — progressive disclosure', () => {
     expect(screen.getAllByText('+3 from last month').length).toBeGreaterThan(0);
   });
 
-  it('shows recent focus from recent sessions and expands to the reused session list', () => {
+  it('shows recent sessions and expands to the reused session list', () => {
     mockHooks({
       inventory: {
         global: { ...baseGlobal, totalSessions: 5, topicsMastered: 2 },
@@ -744,7 +773,7 @@ describe('ProgressScreen — progressive disclosure', () => {
 
     render(<ProgressScreen />);
 
-    screen.getByText('Recent focus');
+    screen.getByText('Recent sessions');
     screen.getByText('Fractions');
     screen.getByText('Practiced comparing fractions.');
     screen.getByText('Biology');
@@ -982,7 +1011,7 @@ describe('ProgressScreen — progressive disclosure', () => {
     screen.getByText('My progress');
     screen.getByText('You learned 3 topics. Steady wins.');
     screen.getByText('Latest report');
-    screen.getByText('Recent focus');
+    screen.getByText('Recent sessions');
     expect(screen.queryByText('Your growth')).toBeNull();
     expect(screen.queryByText('Weekly report')).toBeNull();
   });
@@ -1001,8 +1030,23 @@ describe('ProgressScreen — progressive disclosure', () => {
     screen.getByText('My progress');
     screen.getByText('4 practice lessons');
     screen.getByText('Latest report');
-    screen.getByText('Recent focus');
+    screen.getByText('Recent sessions');
     expect(screen.queryByText('Your week')).toBeNull();
+  });
+
+  it('does not render the recent milestones block on the progress overview', () => {
+    mockHooks({
+      inventory: {
+        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 1 },
+        subjects: [fullSubject],
+      },
+    });
+
+    render(<ProgressScreen />);
+
+    screen.getByText('Recent sessions');
+    expect(screen.queryByTestId('progress-milestones-see-all')).toBeNull();
+    expect(screen.queryByTestId('milestones-teaser')).toBeNull();
   });
 
   it('uses current focus areas as recent focus fallback when sessions are absent', () => {

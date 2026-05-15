@@ -31,7 +31,8 @@ function formatDateOnly(
   isoDate: string,
   options: Intl.DateTimeFormatOptions,
 ): string {
-  return new Date(`${isoDate}T00:00:00Z`).toLocaleDateString(undefined, {
+  const dateOnly = /^\d{4}-\d{2}$/.test(isoDate) ? `${isoDate}-01` : isoDate;
+  return new Date(`${dateOnly}T00:00:00Z`).toLocaleDateString(undefined, {
     ...options,
     timeZone: 'UTC',
   });

@@ -1625,7 +1625,7 @@
       "practicePoints_other": "{{count}} practice points"
     },
     "recentFocus": {
-      "title": "Recent focus",
+      "title": "Recent sessions",
       "showAll": "Show all sessions",
       "empty": "Recent sessions will appear here once learning gets going.",
       "error": "We couldn't load recent sessions right now.",
