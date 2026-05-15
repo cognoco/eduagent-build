@@ -141,6 +141,7 @@ export async function signIn(
   try {
     // Tap through the post-approval landing if it appears (fresh SecureStore)
     const postApproval = page.getByTestId('post-approval-continue');
+    const landing = page.getByTestId(options.landingTestId);
     const first = await waitForSignedInReady(page, options, {
       allowPostApproval: true,
     });

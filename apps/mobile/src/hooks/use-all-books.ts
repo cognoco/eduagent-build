@@ -1,6 +1,10 @@
 import { useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import type { CurriculumBook, BookProgressStatus } from '@eduagent/schemas';
+import type {
+  CurriculumBook,
+  BookProgressStatus,
+  GetAllProfileBooksResponse,
+} from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
@@ -13,14 +17,6 @@ export interface EnrichedBook {
   topicCount: number;
   completedCount: number;
   status: BookProgressStatus;
-}
-
-interface LibraryBooksResponse {
-  subjects: Array<{
-    subjectId: string;
-    subjectName: string;
-    books: CurriculumBook[];
-  }>;
 }
 
 /**
@@ -52,7 +48,7 @@ export function useAllBooks(): {
       try {
         const res = await client.library.books.$get({}, { init: { signal } });
         await assertOk(res);
-        return (await res.json()) as LibraryBooksResponse;
+        return (await res.json()) as GetAllProfileBooksResponse;
       } finally {
         cleanup();
       }

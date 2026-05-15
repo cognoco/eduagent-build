@@ -9,18 +9,12 @@ import type {
   CurriculumBook,
   BookWithTopics,
   BookTopicGenerateInput,
+  GetAllProfileBooksResponse,
 } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
-
-interface LibraryBooksResponse {
-  subjects: Array<{
-    subjectId: string;
-    books: CurriculumBook[];
-  }>;
-}
 
 export function useBooks(
   subjectId: string | undefined,
@@ -33,11 +27,12 @@ export function useBooks(
     queryKey: ['books', subjectId, activeProfile?.id],
     initialData: () => {
       if (!activeProfile?.id || !subjectId) return undefined;
-      const cachedLibrary = queryClient.getQueryData<LibraryBooksResponse>([
-        'library',
-        'books',
-        activeProfile.id,
-      ]);
+      const cachedLibrary =
+        queryClient.getQueryData<GetAllProfileBooksResponse>([
+          'library',
+          'books',
+          activeProfile.id,
+        ]);
       return cachedLibrary?.subjects.find((s) => s.subjectId === subjectId)
         ?.books;
     },
