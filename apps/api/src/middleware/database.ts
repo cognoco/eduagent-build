@@ -58,7 +58,11 @@ function wrapStreamingResponseForDatabaseClose(
       try {
         const { done, value } = await reader.read();
         if (done) {
-          await closeOnce();
+          await closeOnce().catch((closeErr) => {
+            captureException(closeErr, {
+              extra: { phase: 'sse-stream-done-close' },
+            });
+          });
           controller.close();
           return;
         }
@@ -76,7 +80,11 @@ function wrapStreamingResponseForDatabaseClose(
       try {
         await reader.cancel(reason);
       } finally {
-        await closeOnce();
+        await closeOnce().catch((closeErr) => {
+          captureException(closeErr, {
+            extra: { phase: 'sse-stream-cancel-close' },
+          });
+        });
       }
     },
   });

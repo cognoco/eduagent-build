@@ -15,7 +15,7 @@ const mockSentryScope = {
   setExtra: mockSentrySetExtra,
 };
 
-jest.mock('@eduagent/database', () => mockDatabaseModule.module);
+jest.mock('@eduagent/database', () => mockDatabaseModule.module); // gc1-allow: database middleware unit test needs closeDatabase/createDatabase spies
 jest.mock('@sentry/cloudflare', () => ({
   withScope: (cb: (scope: typeof mockSentryScope) => void) =>
     cb(mockSentryScope),
@@ -132,6 +132,67 @@ describe('databaseMiddleware', () => {
     expect(closeDatabase).not.toHaveBeenCalled();
     await res.body?.cancel('client disconnected');
     expect(closeDatabase).toHaveBeenCalledWith(mockDatabaseModule.db);
+  });
+
+  it('reports close failures after successful SSE body consumption without failing the response', async () => {
+    const closeErr = new Error('close failed');
+    mockDatabaseModule.closeDatabase.mockRejectedValueOnce(closeErr);
+    const app = new Hono<{
+      Bindings: { DATABASE_URL: string };
+      Variables: { db: unknown };
+    }>();
+    app.use('*', databaseMiddleware);
+    app.get('/stream', () => {
+      const stream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode('data: ok\n\n'));
+          controller.close();
+        },
+      });
+      return new Response(stream, {
+        headers: { 'Content-Type': 'text/event-stream' },
+      });
+    });
+
+    const res = await app.request('/stream', {}, TEST_ENV);
+
+    await expect(res.text()).resolves.toBe('data: ok\n\n');
+    expect(mockSentrySetExtra).toHaveBeenCalledWith(
+      'phase',
+      'sse-stream-done-close',
+    );
+    expect(mockSentryCaptureException).toHaveBeenCalledWith(closeErr);
+  });
+
+  it('reports close failures after SSE body cancellation', async () => {
+    const closeErr = new Error('close failed');
+    mockDatabaseModule.closeDatabase.mockRejectedValueOnce(closeErr);
+    const app = new Hono<{
+      Bindings: { DATABASE_URL: string };
+      Variables: { db: unknown };
+    }>();
+    app.use('*', databaseMiddleware);
+    app.get('/stream', () => {
+      const stream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode('data: ok\n\n'));
+        },
+      });
+      return new Response(stream, {
+        headers: { 'Content-Type': 'text/event-stream' },
+      });
+    });
+
+    const res = await app.request('/stream', {}, TEST_ENV);
+
+    await expect(res.body?.cancel('client disconnected')).resolves.toBe(
+      undefined,
+    );
+    expect(mockSentrySetExtra).toHaveBeenCalledWith(
+      'phase',
+      'sse-stream-cancel-close',
+    );
+    expect(mockSentryCaptureException).toHaveBeenCalledWith(closeErr);
   });
 
   it('reports close failures after an SSE stream read error', async () => {
