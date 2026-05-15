@@ -24,12 +24,16 @@ const WRANGLER_TOML_PATH = join(__dirname, '..', 'wrangler.toml');
 function getTableSection(toml: string, tableName: string): string {
   const escaped = tableName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const section = toml.match(
-    new RegExp(`^\\[${escaped}\\]([\\s\\S]*?)(?=^\\[|$)`, 'm'),
+    new RegExp(`^\\[${escaped}\\]([\\s\\S]*?)(?=^\\[|$(?![\\r\\n]))`, 'm'),
   );
-  if (!section?.[1]) {
+  if (!section) {
     throw new Error(`Missing wrangler.toml section [${tableName}]`);
   }
-  return section[1];
+  const tableBody = section[1];
+  if (tableBody === undefined) {
+    throw new Error(`Missing wrangler.toml section body [${tableName}]`);
+  }
+  return tableBody;
 }
 
 describe('wrangler.toml config guards', () => {
