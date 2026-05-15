@@ -147,6 +147,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
+          if [[ "${{ needs.changes.result }}" != "success" ]]; then
+            echo "Change detection failed — failing closed"
+            exit 1
+          fi
           if [[ "${{ needs.run-smoke.result }}" == "failure" || "${{ needs.run-smoke.result }}" == "cancelled" ]]; then
             echo "E2E smoke tests failed"
             exit 1

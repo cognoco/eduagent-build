@@ -112,9 +112,11 @@ runs:
           - SHOULD_FIX — pattern drift from conventions, missing validation, poor error handling
           - CONSIDER — better naming, small optimizations
 
-          Write the comment to a temp file (avoids shell escaping issues), then post it:
+          Use the Write tool to write your review to /tmp/review.md, then post it
+          with: gh pr comment ${{ github.event.pull_request.number }} --body-file /tmp/review.md
 
-          cat > /tmp/review.md << 'ENDREVIEW'
+          Review comment format (write this to /tmp/review.md):
+
           ## Claude Code Review: {VERDICT}
 
           **{one-line summary}** | {N} blocking | {M} total findings
@@ -146,14 +148,11 @@ runs:
           - Rules source: CLAUDE.md, docs/project_context.md
 
           </details>
-          ENDREVIEW
-          gh pr comment ${{ github.event.pull_request.number }} --body-file /tmp/review.md
 
           If a severity level has zero findings, omit that section entirely (header and table).
 
           If the verdict is APPROVED with zero findings, use this shorter format instead:
 
-          cat > /tmp/review.md << 'ENDREVIEW'
           ## Claude Code Review: APPROVED
 
           **No issues found.** All changes align with project conventions.
@@ -165,14 +164,13 @@ runs:
           - Rules source: CLAUDE.md, docs/project_context.md
 
           </details>
-          ENDREVIEW
-          gh pr comment ${{ github.event.pull_request.number }} --body-file /tmp/review.md
 
           IMPORTANT:
-          - Post exactly ONE comment via gh pr comment --body-file. Do not post multiple.
+          - Use the Write tool to write /tmp/review.md, then gh pr comment --body-file to post it.
+          - Post exactly ONE comment. Do not post multiple.
           - Do not post inline comments or use any other output mechanism.
           - Do not output review text as conversation messages.
 
         claude_args: >-
           --max-turns 10
-          --allowedTools "Read,Grep,Glob,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr checks:*)"
+          --allowedTools "Write,Read,Grep,Glob,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr checks:*)"
