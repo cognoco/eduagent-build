@@ -857,6 +857,11 @@
     "subtitleGuardianNoTopics": "あなたの個人ライブラリ・{{subjectCount}}科目",
     "statusPaused": "一時停止中",
     "statusArchived": "アーカイブ済み",
+    "sections": {
+      "active": "学習中の棚",
+      "paused": "一時停止中の棚",
+      "archived": "アーカイブ済みの棚"
+    },
     "loadTimeout": {
       "title": "ライブラリの読み込みに時間がかかりすぎています",
       "message": "接続を確認して、もう一度お試しください。"
@@ -1576,7 +1581,8 @@
       "staleSummary": "概要には、最新のアクティビティがまだ反映されていない場合があります。",
       "nudgeCta": "{{name}}さんにリマインダーを送って再開を促しましょう。",
       "nudgeA11y": "{{name}}さんにリマインダーを送信",
-      "viewAllReports": "すべてのレポートを表示"
+      "viewAllReports": "すべてのレポートを表示",
+      "subjectsTitle": "科目"
     }
   },
   "onboarding": {

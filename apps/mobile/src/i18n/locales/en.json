@@ -927,6 +927,11 @@
     "subtitleGuardianNoTopics": "Your personal library · {{subjectCount}} subjects",
     "statusPaused": "Paused",
     "statusArchived": "Archived",
+    "sections": {
+      "active": "Active shelves",
+      "paused": "Paused shelves",
+      "archived": "Archived shelves"
+    },
     "loadTimeout": {
       "title": "Library is taking too long to load",
       "message": "Check your connection and try again."
@@ -1405,7 +1410,8 @@
       "staleSummary": "Summary may not reflect the latest activity yet.",
       "nudgeCta": "A short nudge might help {{name}} restart",
       "nudgeA11y": "Send {{name}} a nudge",
-      "viewAllReports": "View all reports"
+      "viewAllReports": "View all reports",
+      "subjectsTitle": "Subjects"
     },
     "weeklyReport": {
       "thisWeekSoFar": "This week so far",

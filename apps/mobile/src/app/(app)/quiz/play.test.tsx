@@ -209,6 +209,15 @@ describe('QuizPlayScreen', () => {
     });
   });
 
+  it('does not auto-prefetch another round while the learner is playing', async () => {
+    render(<QuizPlayScreen />);
+
+    await waitFor(() => {
+      expect(mockPrefetchMutate).not.toHaveBeenCalled();
+      expect(mockSetPrefetchedRoundId).not.toHaveBeenCalled();
+    });
+  });
+
   // [BUG-928] Path 7 spec: "Question header: '1 of 7' + dot indicators +
   // elapsed seconds". The previous F-Q-13 implementation hid the timer for
   // anxiety, but this is a count-UP timer so motivation > anxiety.

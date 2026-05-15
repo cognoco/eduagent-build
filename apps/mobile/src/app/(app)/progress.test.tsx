@@ -851,6 +851,42 @@ describe('ProgressScreen — progressive disclosure', () => {
     screen.getByText('5 sessions · 30 min');
   });
 
+  it('uses compact subject breakdown cards when a child has many subjects', () => {
+    const manySubjects = Array.from({ length: 7 }, (_, index) => ({
+      ...fullSubject,
+      subjectId: `s${index + 1}`,
+      subjectName: `Subject ${index + 1}`,
+      lastSessionAt: '2026-05-01T10:00:00Z',
+    }));
+
+    mockLinkedChildren = [makeLinkedChild()];
+    mockHooks({
+      inventory: {
+        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 3 },
+        subjects: [fullSubject],
+      },
+    });
+    (useChildInventory as jest.Mock).mockReturnValue({
+      data: {
+        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 3 },
+        subjects: manySubjects,
+        currentlyWorkingOn: [],
+      },
+      isLoading: false,
+      isError: false,
+      isRefetching: false,
+      refetch: jest.fn(),
+    });
+
+    render(<ProgressScreen />);
+
+    screen.getByTestId('progress-subject-card-s1');
+    screen.getByTestId('progress-subject-card-s7');
+    screen.getByText('Subject 7');
+    screen.getAllByText('3/10 topics mastered');
+    expect(screen.queryByText(/Last studied/)).toBeNull();
+  });
+
   it('does not render report cards for parent viewing child', () => {
     mockLinkedChildren = [makeLinkedChild()];
     mockHooks({

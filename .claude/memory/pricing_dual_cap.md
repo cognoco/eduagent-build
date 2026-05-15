@@ -26,3 +26,5 @@ Free tier uses a **dual-cap model: 10 questions/day AND 100 questions/month** (c
 - Response headers: `X-Quota-Remaining` (only set when dailyLimit is non-null)
 - Integration test seed accounts use Plus tier (700) — expect `X-Quota-Remaining: '699'` after 1 message
 - This is A/B testable — numbers can change without architectural changes
+- Product invariant (2026-05-15): quota must count visible learner/user questions or deliberate user-triggered AI actions only. Do not burn quota for invisible reports, book/topic generation, summaries, telemetry, or automatic prefetch/background work. If an internal LLM task needs cost protection, add separate abuse/rate limiting instead of consuming the learner's visible-question pool.
+- Parent-proxy invariant (2026-05-15): when a parent is viewing a child profile, metered LLM routes must reject before subscription lookup or quota decrement. A blocked proxy action must not consume the child's or family's visible-question pool.

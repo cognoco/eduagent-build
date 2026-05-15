@@ -44,8 +44,7 @@ const mockGetOwnedFamilyPoolBreakdownSharing = jest.fn();
 const mockUpsertFamilyPoolBreakdownSharing = jest.fn();
 const mockUpsertLearningMode = jest.fn();
 
-jest.mock('../services/settings', () => {
-  // gc1-allow: requireActual + targeted overrides — intercepts upsertLearningMode/getOwnedFamilyPoolBreakdownSharing/upsertFamilyPoolBreakdownSharing to keep unit test deterministic without a real DB
+jest.mock('../services/settings' /* gc1-allow: pattern-a conversion */, () => {
   const actual = jest.requireActual('../services/settings');
   return {
     ...actual,
@@ -58,15 +57,17 @@ jest.mock('../services/settings', () => {
 });
 
 const mockClearSessionStaticContextForProfile = jest.fn();
-jest.mock('../services/session/session-cache', () => {
-  // gc1-allow: requireActual + targeted override — intercepts clearSessionStaticContextForProfile to verify cache invalidation fires on learning-mode change
-  const actual = jest.requireActual('../services/session/session-cache');
-  return {
-    ...actual,
-    clearSessionStaticContextForProfile: (...args: unknown[]) =>
-      mockClearSessionStaticContextForProfile(...args),
-  };
-});
+jest.mock(
+  '../services/session/session-cache' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual('../services/session/session-cache');
+    return {
+      ...actual,
+      clearSessionStaticContextForProfile: (...args: unknown[]) =>
+        mockClearSessionStaticContextForProfile(...args),
+    };
+  },
+);
 
 const mockCaptureException = jest.fn();
 jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => {

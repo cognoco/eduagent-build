@@ -84,8 +84,7 @@ jest.mock('../services/streaks' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-jest.mock('../services/llm', () => {
-  // gc1-allow: LLM external boundary (routeAndCall); requireActual spread applied
+jest.mock('../services/llm' /* gc1-allow: LLM external boundary */, () => {
   const actual = jest.requireActual(
     '../services/llm',
   ) as typeof import('../services/llm');

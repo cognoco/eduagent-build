@@ -152,6 +152,7 @@ jest.mock('../services/subject' /* gc1-allow: pattern-a conversion */, () => {
 const mockEnsureFreeSubscription = jest.fn();
 const mockGetQuotaPool = jest.fn();
 const mockDecrementQuota = jest.fn();
+const mockSafeRefundQuota = jest.fn();
 const mockGetTopUpCreditsRemaining = jest.fn().mockResolvedValue(0);
 
 jest.mock('../services/billing' /* gc1-allow: pattern-a conversion */, () => {
@@ -164,6 +165,7 @@ jest.mock('../services/billing' /* gc1-allow: pattern-a conversion */, () => {
       mockEnsureFreeSubscription(...args),
     getQuotaPool: (...args: unknown[]) => mockGetQuotaPool(...args),
     decrementQuota: (...args: unknown[]) => mockDecrementQuota(...args),
+    safeRefundQuota: (...args: unknown[]) => mockSafeRefundQuota(...args),
     getTopUpCreditsRemaining: (...args: unknown[]) =>
       mockGetTopUpCreditsRemaining(...args),
     createSubscription: jest.fn(),
@@ -297,6 +299,7 @@ beforeEach(() => {
     remainingTopUp: 0,
     remainingDaily: null,
   });
+  mockSafeRefundQuota.mockResolvedValue({ refunded: true });
   mockGetTopUpCreditsRemaining.mockResolvedValue(0);
 });
 
@@ -329,6 +332,54 @@ describe('metering middleware', () => {
 
       expect(mockDecrementQuota).not.toHaveBeenCalled();
     });
+
+    it.each([
+      [
+        'book suggestion generation/read surface',
+        'GET',
+        '/v1/subjects/00000000-0000-4000-8000-000000000101/book-suggestions',
+        undefined,
+      ],
+      [
+        'manual book topic generation',
+        'POST',
+        '/v1/subjects/00000000-0000-4000-8000-000000000101/books/00000000-0000-4000-8000-000000000102/generate-topics',
+        { priorKnowledge: 'some' },
+      ],
+      [
+        'learner monthly reports list',
+        'GET',
+        '/v1/progress/reports',
+        undefined,
+      ],
+      [
+        'parent progress summary read',
+        'GET',
+        '/v1/dashboard/children/00000000-0000-4000-8000-000000000103/progress-summary',
+        undefined,
+      ],
+    ])(
+      'does not burn visible-question quota for %s',
+      async (_label, method, path, body) => {
+        const res = await app.request(
+          path,
+          {
+            method,
+            headers: AUTH_HEADERS,
+            body: body === undefined ? undefined : JSON.stringify(body),
+          },
+          TEST_ENV,
+        );
+
+        expect(mockDecrementQuota).not.toHaveBeenCalled();
+        expect(mockEnsureFreeSubscription).not.toHaveBeenCalled();
+        // The route may still reject because its own fixtures are not seeded;
+        // this test is only the metering boundary guard.
+        expect(
+          [200, 400, 401, 403, 404, 405, 409, 500].includes(res.status),
+        ).toBe(true);
+      },
+    );
 
     // [BUG-763] GET /v1/quiz/* is DB-only and must not decrement quota.
     // Before fix: classifier did `LLM_ROUTE_PATTERNS.filter(p => !p.source.includes('quiz'))`
@@ -379,6 +430,144 @@ describe('metering middleware', () => {
   // -----------------------------------------------------------------------
 
   describe('LLM routes with quota available', () => {
+    it('rejects parent-proxy LLM requests before quota lookup/decrement', async () => {
+      const res = await app.request(
+        '/v1/sessions/session-1/messages',
+        {
+          method: 'POST',
+          headers: { ...AUTH_HEADERS, 'X-Proxy-Mode': 'true' },
+          body: JSON.stringify({ message: 'hello' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body.code).toBe('PROXY_MODE');
+      expect(mockEnsureFreeSubscription).not.toHaveBeenCalled();
+      expect(mockGetQuotaPool).not.toHaveBeenCalled();
+      expect(mockDecrementQuota).not.toHaveBeenCalled();
+    });
+
+    it('rejects unresolved profile-only LLM routes before quota lookup/decrement', async () => {
+      const { findOwnerProfile } = jest.requireMock('../services/profile') as {
+        findOwnerProfile: jest.Mock;
+      };
+      findOwnerProfile.mockResolvedValueOnce(null);
+
+      const res = await app.request(
+        '/v1/dictation/prepare-homework',
+        {
+          method: 'POST',
+          headers: makeAuthHeaders(),
+          body: JSON.stringify({ text: 'Hello world.' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.code).toBe('VALIDATION_ERROR');
+      expect(mockEnsureFreeSubscription).not.toHaveBeenCalled();
+      expect(mockGetQuotaPool).not.toHaveBeenCalled();
+      expect(mockDecrementQuota).not.toHaveBeenCalled();
+    });
+
+    it('rejects non-owner child-profile LLM requests before quota lookup/decrement', async () => {
+      const { getProfile } = jest.requireMock('../services/profile') as {
+        getProfile: jest.Mock;
+      };
+      getProfile.mockResolvedValueOnce({
+        id: 'child-profile-id',
+        birthYear: 2012,
+        location: 'EU',
+        consentStatus: 'CONSENTED',
+        hasPremiumLlm: false,
+        conversationLanguage: null,
+        isOwner: false,
+      });
+
+      const res = await app.request(
+        '/v1/sessions/session-1/messages',
+        {
+          method: 'POST',
+          headers: { ...AUTH_HEADERS, 'X-Profile-Id': 'child-profile-id' },
+          body: JSON.stringify({ message: 'hello' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body.code).toBe('PROXY_MODE');
+      expect(mockEnsureFreeSubscription).not.toHaveBeenCalled();
+      expect(mockGetQuotaPool).not.toHaveBeenCalled();
+      expect(mockDecrementQuota).not.toHaveBeenCalled();
+    });
+
+    it('returns idempotency replays before quota lookup/decrement', async () => {
+      fakeKV.store.set('idem:test-profile-id:session:retry-key', '1');
+
+      const res = await app.request(
+        '/v1/sessions/session-1/messages',
+        {
+          method: 'POST',
+          headers: { ...AUTH_HEADERS, 'Idempotency-Key': 'retry-key' },
+          body: JSON.stringify({ message: 'hello' }),
+        },
+        { ...TEST_ENV, IDEMPOTENCY_KV: fakeKV.namespace },
+      );
+
+      expect(res.status).toBe(200);
+      expect(res.headers.get('Idempotency-Replay')).toBe('true');
+      const body = await res.json();
+      expect(body).toMatchObject({
+        replayed: true,
+        clientId: 'retry-key',
+        status: 'persisted',
+      });
+      expect(mockEnsureFreeSubscription).not.toHaveBeenCalled();
+      expect(mockGetQuotaPool).not.toHaveBeenCalled();
+      expect(mockDecrementQuota).not.toHaveBeenCalled();
+    });
+
+    it('refunds quota when a metered route rejects before producing an answer', async () => {
+      mockEnsureFreeSubscription.mockResolvedValue(mockSubscription());
+      mockGetQuotaPool.mockResolvedValue(mockQuota({ usedThisMonth: 100 }));
+      mockDecrementQuota.mockResolvedValue({
+        success: true,
+        source: 'monthly',
+        remainingMonthly: 399,
+        remainingTopUp: 0,
+        remainingDaily: null,
+      });
+
+      const res = await app.request(
+        '/v1/sessions/session-1/messages',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({}),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(400);
+      expect(mockDecrementQuota).toHaveBeenCalledWith(
+        expect.anything(),
+        'sub-1',
+        'test-profile-id',
+      );
+      expect(mockSafeRefundQuota).toHaveBeenCalledWith(
+        expect.anything(),
+        'sub-1',
+        expect.objectContaining({
+          route: 'metering.POST./v1/sessions/session-1/messages',
+          profileId: 'test-profile-id',
+        }),
+      );
+    });
+
     it('[BUG-623 / A-6] decrements quota for POST /sessions/:id/recall-bridge', async () => {
       mockEnsureFreeSubscription.mockResolvedValue(mockSubscription());
       mockGetQuotaPool.mockResolvedValue(mockQuota({ usedThisMonth: 100 }));

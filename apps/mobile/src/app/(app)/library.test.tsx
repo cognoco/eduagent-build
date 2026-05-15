@@ -79,6 +79,7 @@ jest.mock(
 jest.mock(
   '../../lib/theme' /* gc1-allow: theme hooks require native ColorScheme unavailable in JSDOM */,
   () => ({
+    useTheme: () => ({ colorScheme: 'light' }),
     useThemeColors: () => ({
       accent: '#2563eb',
       border: '#e5e7eb',

@@ -50,16 +50,14 @@ import {
   useRefreshProgressSnapshot,
 } from '../../../hooks/use-progress';
 import { useSubjects } from '../../../hooks/use-subjects';
-import {
-  getLearningSubjectTint,
-  type LearningSubjectTint,
-} from '../../../lib/learning-subject-tints';
+import type { LearningSubjectTint } from '../../../lib/learning-subject-tints';
 import { pushLearningResumeTarget } from '../../../lib/navigation';
 import { copyRegisterFor, type CopyRegister } from '../../../lib/copy-register';
 import { useLinkedChildren, useProfile } from '../../../lib/profile';
 import { buildGrowthData, isProfileStale } from '../../../lib/progress';
 import { bucketAccountAge, hashProfileId, track } from '../../../lib/analytics';
-import { useThemeColors } from '../../../lib/theme';
+import { useTheme } from '../../../lib/theme';
+import { getSubjectTint, getSubjectTintMap } from '../../../lib/subject-tints';
 
 function heroCopy(
   input: {
@@ -175,15 +173,31 @@ function LoadingBlock(): React.ReactElement {
 function SubjectBreakdownCard({
   subject,
   tint,
+  compact = false,
 }: {
   subject: SubjectInventory;
   tint: LearningSubjectTint;
+  compact?: boolean;
 }): React.ReactElement {
   const { t } = useTranslation();
+  const timeLabel = formatMinutes(
+    subject.wallClockMinutes ?? subject.activeMinutes,
+  );
+  const sessionsLabel = t('progress.guardian.sessionCount', {
+    count: subject.sessionsCount,
+  });
+  const topicsLabel =
+    subject.topics.total != null
+      ? t('progress.guardian.topicsMastered', {
+          mastered: subject.topics.mastered,
+          total: subject.topics.total,
+        })
+      : null;
+
   return (
     <View
       testID={`progress-subject-card-${subject.subjectId}`}
-      className="rounded-card p-4 mt-3"
+      className={`rounded-card ${compact ? 'p-3 mt-2' : 'p-4 mt-3'}`}
       style={{
         backgroundColor: tint.soft,
         borderColor: tint.solid + '33',
@@ -202,26 +216,25 @@ function SubjectBreakdownCard({
             {subject.subjectName}
           </Text>
           <Text className="text-body-sm text-text-secondary mt-1">
-            {t('progress.guardian.sessionCount', {
-              count: subject.sessionsCount,
-            })}{' '}
-            · {formatMinutes(subject.wallClockMinutes ?? subject.activeMinutes)}
+            {sessionsLabel} · {timeLabel}
           </Text>
+          {compact && topicsLabel ? (
+            <Text className="text-caption text-text-secondary mt-1">
+              {topicsLabel}
+            </Text>
+          ) : null}
         </View>
       </View>
-      {subject.lastSessionAt ? (
+      {!compact && subject.lastSessionAt ? (
         <Text className="text-caption text-text-secondary mt-1">
           {t('progress.guardian.lastStudied', {
             date: formatRelativeDate(subject.lastSessionAt),
           })}
         </Text>
       ) : null}
-      {subject.topics.total != null ? (
+      {!compact && topicsLabel ? (
         <Text className="text-caption text-text-secondary mt-1">
-          {t('progress.guardian.topicsMastered', {
-            mastered: subject.topics.mastered,
-            total: subject.topics.total,
-          })}
+          {topicsLabel}
         </Text>
       ) : null}
     </View>
@@ -282,7 +295,7 @@ export default function ProgressScreen(): React.ReactElement {
     profileId?: string;
   }>();
   const insets = useSafeAreaInsets();
-  const themeColors = useThemeColors();
+  const { colorScheme } = useTheme();
   const { activeProfile } = useProfile();
   const linkedChildren = useLinkedChildren();
   const hasLinked = linkedChildren.length > 0;
@@ -508,6 +521,14 @@ export default function ProgressScreen(): React.ReactElement {
     (child) => child.id === selectedProfileId,
   );
   const selectedChildName = selectedChild?.displayName;
+  const progressSubjectTintsById = useMemo(
+    () =>
+      getSubjectTintMap(
+        inventory?.subjects.map((subject) => subject.subjectId) ?? [],
+        colorScheme,
+      ),
+    [inventory?.subjects, colorScheme],
+  );
 
   const handleEmptyProgressAction = () => {
     if (activeProfile) {
@@ -784,17 +805,6 @@ export default function ProgressScreen(): React.ReactElement {
                     </Text>
                   </Pressable>
                 ) : null}
-                {inventory?.subjects?.length ? (
-                  <View testID="progress-subject-breakdown" className="mt-3">
-                    {inventory.subjects.map((subject, index) => (
-                      <SubjectBreakdownCard
-                        key={subject.subjectId}
-                        subject={subject}
-                        tint={getLearningSubjectTint(index, themeColors)}
-                      />
-                    ))}
-                  </View>
-                ) : null}
                 {selectedProfileId ? (
                   <Pressable
                     testID="progress-view-all-reports"
@@ -811,6 +821,27 @@ export default function ProgressScreen(): React.ReactElement {
                       {t('progress.guardian.viewAllReports')}
                     </Text>
                   </Pressable>
+                ) : null}
+                {inventory?.subjects?.length ? (
+                  <View testID="progress-subject-breakdown" className="mt-5">
+                    <Text className="text-caption font-bold text-text-secondary mb-2">
+                      {t('progress.guardian.subjectsTitle')}
+                    </Text>
+                    {inventory.subjects.map((subject) => {
+                      const compact = inventory.subjects.length >= 7;
+                      return (
+                        <SubjectBreakdownCard
+                          key={subject.subjectId}
+                          subject={subject}
+                          tint={
+                            progressSubjectTintsById.get(subject.subjectId) ??
+                            getSubjectTint(subject.subjectId, colorScheme)
+                          }
+                          compact={compact}
+                        />
+                      );
+                    })}
+                  </View>
                 ) : null}
               </>
             ) : null}

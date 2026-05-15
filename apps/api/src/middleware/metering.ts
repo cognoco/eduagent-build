@@ -15,20 +15,28 @@
 // ---------------------------------------------------------------------------
 
 import { createMiddleware } from 'hono/factory';
+import type { Context } from 'hono';
 import type { Database } from '@eduagent/database';
 import { ERROR_CODES } from '@eduagent/schemas';
 import type { SubscriptionTier, SubscriptionStatus } from '@eduagent/schemas';
 import type { Account } from '../services/account';
 import type { LLMTier } from '../services/subscription';
 import type { ProfileMeta } from './profile-scope';
+import { assertNotProxyMode } from './proxy-guard';
 import {
   ensureFreeSubscription,
   getQuotaPool,
   decrementQuota,
   getTopUpCreditsRemaining,
+  safeRefundQuota,
 } from '../services/billing';
 import { getTierConfig } from '../services/subscription';
 import { checkQuota } from '../services/metering';
+import {
+  buildIdempotencyCacheKey,
+  MAX_IDEMPOTENCY_KEY_LENGTH,
+} from '../services/idempotency-marker';
+import { lookupAssistantTurnState } from '../services/idempotency-assistant-state';
 import {
   readSubscriptionStatus,
   writeSubscriptionStatus,
@@ -43,7 +51,7 @@ const logger = createLogger();
 // ---------------------------------------------------------------------------
 
 export type MeteringEnv = {
-  Bindings: { SUBSCRIPTION_KV?: KVNamespace };
+  Bindings: { SUBSCRIPTION_KV?: KVNamespace; IDEMPOTENCY_KV?: KVNamespace };
   Variables: {
     db: Database;
     account: Account;
@@ -97,6 +105,16 @@ const LLM_ROUTE_PATTERNS_POST_ONLY = [
   /\/sessions\/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\/retry-filing\/?$/,
 ];
 
+const PROFILE_REQUIRED_BEFORE_METERING_PATTERNS = [
+  /\/dictation\/prepare-homework\/?$/,
+  /\/dictation\/review\/?$/,
+];
+
+const IDEMPOTENT_SESSION_ROUTE_PATTERNS = [
+  /\/sessions\/[^/]+\/messages\/?$/,
+  /\/sessions\/[^/]+\/stream\/?$/,
+];
+
 function isLlmRoute(path: string, method: string): boolean {
   // GET methods never decrement quota for POST-only endpoints. The any-method
   // list is what bills GET requests (SSE streams, recall-bridge, etc.).
@@ -107,6 +125,90 @@ function isLlmRoute(path: string, method: string): boolean {
     LLM_ROUTE_PATTERNS_ANY_METHOD.some((pattern) => pattern.test(path)) ||
     LLM_ROUTE_PATTERNS_POST_ONLY.some((pattern) => pattern.test(path))
   );
+}
+
+function shouldReturnProfileRequiredBeforeMetering(path: string): boolean {
+  return PROFILE_REQUIRED_BEFORE_METERING_PATTERNS.some((pattern) =>
+    pattern.test(path),
+  );
+}
+
+function isIdempotentSessionRoute(path: string): boolean {
+  return IDEMPOTENT_SESSION_ROUTE_PATTERNS.some((pattern) =>
+    pattern.test(path),
+  );
+}
+
+function profileRequiredResponse(c: Context<MeteringEnv>): Response {
+  return c.json(
+    {
+      code: ERROR_CODES.VALIDATION_ERROR,
+      message: 'Profile required — no profile resolved for this request',
+    },
+    400,
+  );
+}
+
+function shouldRefundAfterHandler(status: number): boolean {
+  return status >= 400;
+}
+
+async function maybeReplayIdempotentSessionRequest(
+  c: Context<MeteringEnv>,
+  db: Database,
+  profileId: string | undefined,
+): Promise<Response | null> {
+  if (!isIdempotentSessionRoute(c.req.path)) return null;
+
+  const key = c.req.header('Idempotency-Key')?.trim();
+  if (!key) return null;
+
+  if (key.length > MAX_IDEMPOTENCY_KEY_LENGTH) {
+    return c.json(
+      {
+        code: ERROR_CODES.INVALID_IDEMPOTENCY_KEY,
+        message: `Idempotency-Key exceeds ${MAX_IDEMPOTENCY_KEY_LENGTH} characters`,
+      },
+      400,
+    );
+  }
+
+  if (!profileId) return null;
+
+  const kv = c.env?.IDEMPOTENCY_KV;
+  if (!kv) return null;
+
+  let existing: string | null = null;
+  try {
+    existing = await kv.get(
+      buildIdempotencyCacheKey(profileId, 'session', key),
+    );
+  } catch (error) {
+    logger.warn('[metering] Idempotency replay lookup failed', {
+      event: 'metering.idempotency_replay_lookup_failed',
+      profileId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
+
+  if (!existing) return null;
+
+  const state = await lookupAssistantTurnState({
+    db,
+    profileId,
+    flow: 'session',
+    key,
+  });
+
+  c.header('Idempotency-Replay', 'true');
+  return c.json({
+    replayed: true,
+    clientId: key,
+    status: 'persisted',
+    assistantTurnReady: state.assistantTurnReady,
+    latestExchangeId: state.latestExchangeId,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -199,6 +301,33 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
     const db = c.get('db');
     const kv = c.env?.SUBSCRIPTION_KV;
     const freeTier = getTierConfig('free');
+    const profileMeta = c.get('profileMeta');
+    const profileId = c.get('profileId');
+    const proxyModeHeader = c.req.header('X-Proxy-Mode') === 'true';
+
+    if (
+      (!profileId || !profileMeta) &&
+      !proxyModeHeader &&
+      shouldReturnProfileRequiredBeforeMetering(c.req.path)
+    ) {
+      return profileRequiredResponse(c);
+    }
+
+    // Metering runs before route handlers. Run the proxy guard here too so a
+    // parent viewing a child profile cannot burn quota on a request that the
+    // endpoint would later reject.
+    assertNotProxyMode(c);
+
+    if (!profileId) {
+      return profileRequiredResponse(c);
+    }
+
+    const idempotentReplay = await maybeReplayIdempotentSessionRequest(
+      c,
+      db,
+      profileId,
+    );
+    if (idempotentReplay) return idempotentReplay;
 
     // 1. Try KV cache for fast quota check (I4: wrapped in try/catch)
     let cached: CachedSubscriptionStatus | null = null;
@@ -303,8 +432,6 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
     }
 
     // 4. Attempt to decrement quota (atomic, handles top-up FIFO fallback + daily guard)
-    const profileMeta = c.get('profileMeta');
-    const profileId = c.get('profileId');
     const decrement = await decrementQuota(db, subscriptionId, profileId);
 
     if (!decrement.success) {
@@ -339,6 +466,23 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
     const baseLlmTier = getTierConfig(tier).llmTier;
     c.set('llmTier', profileMeta?.hasPremiumLlm ? 'premium' : baseLlmTier);
 
+    // Set quota headers for client-side UI
+    const remaining = decrement.remainingMonthly + decrement.remainingTopUp;
+    c.header('X-Quota-Remaining', String(remaining));
+    c.header('X-Quota-Warning-Level', result.warningLevel);
+    if (decrement.remainingDaily !== null) {
+      c.header('X-Daily-Remaining', String(decrement.remainingDaily));
+    }
+
+    await next();
+    if (shouldRefundAfterHandler(c.res.status)) {
+      await safeRefundQuota(db, subscriptionId, {
+        route: `metering.${c.req.method}.${c.req.path}`,
+        profileId,
+      });
+      return;
+    }
+
     // I7 fix: Update KV cache after decrement so next request sees fresh count.
     // Derive from the atomic DB result (decrement.remainingMonthly/Daily) to
     // avoid stale-read races under concurrency — two requests reading the same
@@ -365,16 +509,6 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
         usedToday: atomicUsedToday,
       });
     }
-
-    // Set quota headers for client-side UI
-    const remaining = decrement.remainingMonthly + decrement.remainingTopUp;
-    c.header('X-Quota-Remaining', String(remaining));
-    c.header('X-Quota-Warning-Level', result.warningLevel);
-    if (decrement.remainingDaily !== null) {
-      c.header('X-Daily-Remaining', String(decrement.remainingDaily));
-    }
-
-    await next();
     return;
   },
 );
