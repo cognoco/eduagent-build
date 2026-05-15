@@ -40,6 +40,20 @@ jest.mock(
   }),
 );
 
+jest.mock(
+  '../../../../lib/platform-alert' /* gc1-allow: confirmation callback is the behavior under test, not the native alert renderer */,
+  () => ({
+    platformAlert: (
+      _title: string,
+      _message?: string,
+      buttons?: Array<{ style?: string; onPress?: () => void }>,
+    ) => {
+      const action = buttons?.find((button) => button.style !== 'cancel');
+      action?.onPress?.();
+    },
+  }),
+);
+
 // ---------------------------------------------------------------------------
 // Profile (IDOR guard — profiles must include child-001)
 // ---------------------------------------------------------------------------
@@ -89,6 +103,30 @@ jest.mock(
 );
 
 // ---------------------------------------------------------------------------
+// Consent hooks
+// ---------------------------------------------------------------------------
+
+const mockUseChildConsentStatus = jest.fn();
+const mockRevokeMutate = jest.fn();
+const mockRestoreMutate = jest.fn();
+
+jest.mock(
+  '../../../../hooks/use-consent' /* gc1-allow: query/mutation hooks require API client and QueryClientProvider; child detail only owns rendering and invocation */,
+  () => ({
+    useChildConsentStatus: (...args: unknown[]) =>
+      mockUseChildConsentStatus(...args),
+    useRevokeConsent: () => ({
+      mutate: mockRevokeMutate,
+      isPending: false,
+    }),
+    useRestoreConsent: () => ({
+      mutate: mockRestoreMutate,
+      isPending: false,
+    }),
+  }),
+);
+
+// ---------------------------------------------------------------------------
 // Module under test (required AFTER all mocks are set up)
 // ---------------------------------------------------------------------------
 
@@ -128,6 +166,17 @@ function setupDefaultMocks() {
       memoryConsentStatus: 'granted',
       updatedAt: null,
     },
+  });
+
+  mockUseChildConsentStatus.mockReturnValue({
+    data: {
+      consentStatus: 'CONSENTED',
+      respondedAt: '2026-01-01T00:00:00.000Z',
+      consentType: 'GDPR',
+    },
+    isLoading: false,
+    isError: false,
+    refetch: jest.fn(),
   });
 }
 
@@ -222,7 +271,7 @@ describe('ChildDetailScreen — profile overview', () => {
     screen.getByTestId('child-profile-details');
   });
 
-  it('does not duplicate progress, reports, subjects, recent sessions, or consent sections', () => {
+  it('does not duplicate progress, reports, subjects, or recent sessions', () => {
     mockUseChildDetail.mockReturnValue({
       data: {
         displayName: 'Emma',
@@ -258,6 +307,66 @@ describe('ChildDetailScreen — profile overview', () => {
     expect(screen.queryByTestId('child-weekly-headline-card')).toBeNull();
     expect(screen.queryByTestId('child-reports-button')).toBeNull();
     expect(screen.queryByTestId('growth-teaser')).toBeNull();
-    expect(screen.queryByTestId('consent-section')).toBeNull();
+    screen.getByTestId('consent-section');
+  });
+
+  it('renders parent consent management for a consented child', () => {
+    render(<ChildDetailScreen />);
+
+    screen.getByTestId('consent-section');
+    screen.getByTestId('withdraw-consent-button');
+    expect(screen.queryByTestId('grace-period-banner')).toBeNull();
+  });
+
+  it('invokes consent revocation from the withdraw confirmation', () => {
+    render(<ChildDetailScreen />);
+
+    fireEvent.press(screen.getByTestId('withdraw-consent-button'));
+
+    expect(mockRevokeMutate).toHaveBeenCalledWith(
+      undefined,
+      expect.objectContaining({ onError: expect.any(Function) }),
+    );
+  });
+
+  it('renders the grace-period restore action for a withdrawn child', () => {
+    mockUseChildConsentStatus.mockReturnValue({
+      data: {
+        consentStatus: 'WITHDRAWN',
+        respondedAt: new Date().toISOString(),
+        consentType: 'GDPR',
+      },
+      isLoading: false,
+      isError: false,
+    });
+
+    render(<ChildDetailScreen />);
+
+    screen.getByTestId('grace-period-banner');
+    fireEvent.press(screen.getByTestId('cancel-deletion-button'));
+
+    expect(mockRestoreMutate).toHaveBeenCalledWith(
+      undefined,
+      expect.objectContaining({ onError: expect.any(Function) }),
+    );
+  });
+
+  it('keeps consent management visible and retryable when consent status fails to load', () => {
+    const refetch = jest.fn();
+    mockUseChildConsentStatus.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      refetch,
+    });
+
+    render(<ChildDetailScreen />);
+
+    screen.getByTestId('consent-section');
+    screen.getByTestId('consent-status-error');
+
+    fireEvent.press(screen.getByTestId('consent-status-retry'));
+
+    expect(refetch).toHaveBeenCalledTimes(1);
   });
 });
