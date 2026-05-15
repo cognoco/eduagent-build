@@ -32,7 +32,6 @@ import {
 import { NudgeActionSheet } from '../../../components/nudge/NudgeActionSheet';
 import {
   MetricCard,
-  MilestoneCard,
   RecentSessionsList,
   ReportsList,
   SubjectProgressRow,
@@ -45,7 +44,6 @@ import {
   useLearningResumeTarget,
   useOverallProgress,
   useProgressInventory,
-  useProgressMilestones,
   useProfileReports,
   useProfileSessions,
   useProfileWeeklyReports,
@@ -136,22 +134,6 @@ function heroCopy(
   };
 }
 
-const MILESTONE_THRESHOLDS = [1, 3, 5, 10, 25, 50, 100];
-
-export function getNextMilestoneLabel(
-  totalSessions: number,
-  t: Translate,
-): string {
-  const next = MILESTONE_THRESHOLDS.find(
-    (threshold) => threshold > totalSessions,
-  );
-  if (next === undefined) {
-    return t('progress.milestones.allReached');
-  }
-  const remaining = next - totalSessions;
-  return t('progress.milestones.nextMilestone', { count: remaining });
-}
-
 function LoadingBlock(): React.ReactElement {
   return (
     <>
@@ -220,9 +202,10 @@ type LatestReport =
 
 function formatReportDate(report: LatestReport): string {
   if (report.kind === 'monthly') {
-    return new Date(
-      `${report.report.reportMonth}-01T00:00:00Z`,
-    ).toLocaleDateString(undefined, {
+    const reportMonth = /^\d{4}-\d{2}$/.test(report.report.reportMonth)
+      ? `${report.report.reportMonth}-01`
+      : report.report.reportMonth;
+    return new Date(`${reportMonth}T00:00:00Z`).toLocaleDateString(undefined, {
       month: 'long',
       timeZone: 'UTC',
       year: 'numeric',
@@ -319,7 +302,7 @@ function LatestReportCard({
               </Text>
             </Pressable>
           </View>
-        ) : latestReport && metrics ? (
+        ) : latestReport ? (
           <Pressable
             onPress={onOpen}
             accessibilityRole="button"
@@ -338,26 +321,30 @@ function LatestReportCard({
             <Text className="text-body-sm text-text-secondary mt-1">
               {latestReport.report.headlineStat.comparison}
             </Text>
-            <View className="flex-row gap-3 mt-4">
-              <MetricCard
-                label={t('progress.latestReport.sessions')}
-                value={String(metrics.totalSessions)}
-              />
-              <MetricCard
-                label={t('progress.latestReport.time')}
-                value={formatMinutes(metrics.totalActiveMinutes)}
-              />
-            </View>
-            <View className="flex-row gap-3 mt-3">
-              <MetricCard
-                label={t('progress.latestReport.topics')}
-                value={String(metrics.topicsMastered)}
-              />
-              <MetricCard
-                label={t('progress.latestReport.words')}
-                value={String(metrics.vocabularyTotal)}
-              />
-            </View>
+            {metrics ? (
+              <>
+                <View className="flex-row gap-3 mt-4">
+                  <MetricCard
+                    label={t('progress.latestReport.sessions')}
+                    value={String(metrics.totalSessions)}
+                  />
+                  <MetricCard
+                    label={t('progress.latestReport.time')}
+                    value={formatMinutes(metrics.totalActiveMinutes)}
+                  />
+                </View>
+                <View className="flex-row gap-3 mt-3">
+                  <MetricCard
+                    label={t('progress.latestReport.topics')}
+                    value={String(metrics.topicsMastered)}
+                  />
+                  <MetricCard
+                    label={t('progress.latestReport.words')}
+                    value={String(metrics.vocabularyTotal)}
+                  />
+                </View>
+              </>
+            ) : null}
             {practiceTotals &&
             (practiceTotals.activitiesCompleted > 0 ||
               practiceTotals.pointsEarned > 0) ? (
@@ -577,7 +564,6 @@ export default function ProgressScreen(): React.ReactElement {
     selectedProfileId || activeProfile?.id,
   );
   const resumeTargetQuery = useLearningResumeTarget();
-  const milestonesQuery = useProgressMilestones(5);
   const subjectsQuery = useSubjects();
   const {
     mutateAsync: refreshProgressSnapshot,
@@ -597,7 +583,6 @@ export default function ProgressScreen(): React.ReactElement {
   );
 
   const refetchInventory = inventoryQuery.refetch;
-  const refetchMilestones = milestonesQuery.refetch;
   const refetchMonthlyReports = monthlyReportsQuery.refetch;
   const refetchWeeklyReports = weeklyReportsQuery.refetch;
   const refetchChildSummary = childSummaryQuery.refetch;
@@ -621,13 +606,11 @@ export default function ProgressScreen(): React.ReactElement {
         refetchMonthlyReports(),
         refetchWeeklyReports(),
         ...(!isViewingSelf ? [refetchChildSummary()] : []),
-        ...(isViewingSelf ? [refetchMilestones()] : []),
       ]);
     },
     [
       isViewingSelf,
       refetchInventory,
-      refetchMilestones,
       refetchMonthlyReports,
       refetchWeeklyReports,
       refetchChildSummary,
@@ -1016,6 +999,42 @@ export default function ProgressScreen(): React.ReactElement {
               }}
             />
 
+            {selectedProfileId && hasAnyReports ? (
+              <View
+                className="bg-surface rounded-card p-4 mt-6"
+                testID="reports-list-card"
+              >
+                <View className="flex-row items-center justify-between mb-1">
+                  <Text className="text-body font-semibold text-text-primary">
+                    {t('progress.previousReports.title')}
+                  </Text>
+                  <Pressable
+                    onPress={() =>
+                      router.push(
+                        isViewingSelf
+                          ? ('/(app)/progress/reports' as Href)
+                          : (`/(app)/child/${selectedProfileId}/reports` as Href),
+                      )
+                    }
+                    accessibilityRole="button"
+                    accessibilityLabel={t('progress.previousReports.viewAll')}
+                    testID="progress-reports-link"
+                  >
+                    <Text className="text-body-sm text-primary font-semibold">
+                      {t('progress.previousReports.viewAll')}
+                    </Text>
+                  </Pressable>
+                </View>
+                <ReportsList
+                  monthlyReports={monthlyReportsQuery.data ?? []}
+                  weeklyReports={weeklyReportsQuery.data ?? []}
+                  limit={2}
+                  onPressMonthly={handleOpenMonthlyReport}
+                  onPressWeekly={handleOpenWeeklyReport}
+                />
+              </View>
+            ) : null}
+
             {!isViewingSelf ? (
               <>
                 {childSummaryQuery.data ? (
@@ -1039,7 +1058,7 @@ export default function ProgressScreen(): React.ReactElement {
                     </Text>
                   </Pressable>
                 ) : null}
-                {selectedProfileId ? (
+                {selectedProfileId && !hasAnyReports ? (
                   <Pressable
                     testID="progress-view-all-reports"
                     onPress={() =>
@@ -1090,118 +1109,30 @@ export default function ProgressScreen(): React.ReactElement {
               />
             ) : null}
 
-            {selectedProfileId && hasAnyReports ? (
-              <View
-                className="bg-surface rounded-card p-4 mt-6"
-                testID="reports-list-card"
-              >
-                <View className="flex-row items-center justify-between mb-1">
-                  <Text className="text-body font-semibold text-text-primary">
-                    {t('progress.previousReports.title')}
-                  </Text>
-                  <Pressable
-                    onPress={() =>
-                      router.push(
-                        isViewingSelf
-                          ? ('/(app)/progress/reports' as Href)
-                          : (`/(app)/child/${selectedProfileId}/reports` as Href),
-                      )
-                    }
-                    accessibilityRole="button"
-                    accessibilityLabel={t('progress.previousReports.viewAll')}
-                    testID="progress-reports-link"
-                  >
-                    <Text className="text-body-sm text-primary font-semibold">
-                      {t('progress.previousReports.viewAll')}
-                    </Text>
-                  </Pressable>
-                </View>
-                <ReportsList
-                  monthlyReports={monthlyReportsQuery.data ?? []}
-                  weeklyReports={weeklyReportsQuery.data ?? []}
-                  limit={2}
-                  onPressMonthly={handleOpenMonthlyReport}
-                  onPressWeekly={handleOpenWeeklyReport}
-                />
-              </View>
-            ) : null}
-
             {isViewingSelf ? (
-              <>
-                <View className="flex-row items-center justify-between mt-6 mb-2">
-                  <Text className="text-h3 font-semibold text-text-primary">
-                    {t('progress.milestones.recentTitle')}
-                  </Text>
-                  {milestonesQuery.data ? (
-                    <Pressable
-                      onPress={() =>
-                        router.push('/(app)/progress/milestones' as Href)
-                      }
-                      accessibilityRole="button"
-                      accessibilityLabel={t('progress.milestones.seeAll')}
-                      testID="progress-milestones-see-all"
-                    >
-                      <Text className="text-body-sm text-primary font-medium">
-                        {t('progress.milestones.seeAllLink')}
-                      </Text>
-                    </Pressable>
-                  ) : null}
-                </View>
-                {milestonesQuery.isError && !milestonesQuery.data ? (
-                  <ErrorFallback
-                    variant="card"
-                    message={classifyApiError(milestonesQuery.error).message}
-                    primaryAction={{
-                      label: t('common.tryAgain'),
-                      onPress: () => void milestonesQuery.refetch(),
-                      testID: 'progress-milestones-error-retry',
-                    }}
-                    testID="progress-milestones-error"
-                  />
-                ) : milestonesQuery.data && milestonesQuery.data.length > 0 ? (
-                  milestonesQuery.data.map((milestone) => (
-                    <View key={milestone.id} className="mt-3">
-                      <MilestoneCard milestone={milestone} />
-                    </View>
-                  ))
-                ) : (
-                  <View
-                    className="bg-surface rounded-card px-4 py-3"
-                    testID="milestones-teaser"
-                  >
-                    <Text className="text-caption text-text-secondary text-center">
-                      {getNextMilestoneLabel(
-                        inventory?.global.totalSessions ?? 0,
-                        t,
-                      )}
-                    </Text>
-                  </View>
-                )}
-
-                <Pressable
-                  onPress={() => router.push('/(app)/progress/saved' as Href)}
-                  className="bg-surface rounded-card p-4 mt-6 flex-row items-center justify-between"
-                  accessibilityRole="button"
-                  accessibilityLabel={t('progress.saved.viewLabel')}
-                  testID="progress-saved-link"
-                >
-                  <View className="flex-row items-center gap-3">
-                    <Ionicons
-                      name="bookmark"
-                      size={20}
-                      className="text-primary"
-                    />
-                    <Text className="text-body font-medium text-text-primary">
-                      {t('progress.saved.title')}
-                    </Text>
-                  </View>
+              <Pressable
+                onPress={() => router.push('/(app)/progress/saved' as Href)}
+                className="bg-surface rounded-card p-4 mt-6 flex-row items-center justify-between"
+                accessibilityRole="button"
+                accessibilityLabel={t('progress.saved.viewLabel')}
+                testID="progress-saved-link"
+              >
+                <View className="flex-row items-center gap-3">
                   <Ionicons
-                    name="chevron-forward"
-                    size={18}
-                    className="text-text-tertiary"
+                    name="bookmark"
+                    size={20}
+                    className="text-primary"
                   />
-                </Pressable>
-              </>
+                  <Text className="text-body font-medium text-text-primary">
+                    {t('progress.saved.title')}
+                  </Text>
+                </View>
+                <Ionicons
+                  name="chevron-forward"
+                  size={18}
+                  className="text-text-tertiary"
+                />
+              </Pressable>
             ) : null}
 
             {isViewingSelf ? (
