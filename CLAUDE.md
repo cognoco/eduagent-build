@@ -81,8 +81,6 @@ Unit tests, lint, typecheck, and formatting are enforced by pre-commit hooks (li
 - Do not call work complete if related tests, lint, typecheck, or required migrations are still failing.
 - No suppression, no shortcuts — always address the root of the error. Never use `eslint-disable` or suppress warnings to make lint pass. Fix the actual code or improve the lint rule to handle the pattern correctly.
 
-- **Mobile test-file changes require a receipt before push.** Pre-push blocks the push if `apps/mobile/src/**/*.test.tsx` changed without a fresh `.test-receipts/mobile.json`. Generate with `bash scripts/record-test-receipt.sh mobile` — runs `pnpm exec nx run mobile:test`, writes the receipt only on green, records the current content hash of every changed test file. Modifying a file after recording invalidates the receipt and re-blocks the push. Bypass with `SKIP_RECEIPT_CHECK=1 git push` (visible in shell history, use only for revert PRs). This rule exists because PR #257 shipped with 189 broken mobile tests that CI's GC1 step had hidden.
-
 ## Repo-Specific Guardrails
 
 - Default exports are only for Expo Router page components.

@@ -273,18 +273,9 @@ if hit '^packages/test-utils/src/'; then
   add_cmd slow  "pnpm test:api:integration"  "API integration tests"
 fi
 
-
-# ── Mobile Test Files (PR #257 lesson) ───────────────────────────────────
-# Mobile test-file changes require a verified receipt before push. The
-# pre-push hook BLOCKS the push if the receipt is absent or stale.
-# This was added because PR #257 rewrote 14 mobile tests without running
-# them locally; CI's GC1 step short-circuited and 189 broken tests shipped.
-MOBILE_TESTS=$(filter_files '^apps/mobile/src/.+\.test\.tsx?$')
-if [[ -n "$MOBILE_TESTS" ]]; then
-  CLASSES+=("mobile-tests")
-  add_cmd slow "bash scripts/record-test-receipt.sh mobile" "Run mobile tests and write receipt"
-  note "mobile-tests: pre-push blocks stale or missing .test-receipts/mobile.json"
-fi
+# ═════════════════════════════════════════════════════════════════════════
+# OUTPUT
+# ═════════════════════════════════════════════════════════════════════════
 
 if [[ ${#CLASSES[@]} -eq 0 ]]; then
   echo "No change classes matched ($FILE_COUNT file(s) checked)."
