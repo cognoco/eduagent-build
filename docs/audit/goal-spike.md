@@ -47,7 +47,7 @@ Here are identified use cases ranked by suitability for a /goal showcase:
     8. EduAgent → MentoMate naming sweep
     Sweep user-facing docs/code strings from EduAgent to MentoMate while preserving intentional @eduagent/* package names. Useful and easy to measure with grep/allowlists, but not a flagship showcase: mostly mechanical, less representative of sustained autonomous engineering.
 
-## Claude Code - Opus 4.6¨
+## Claude Code - Opus 4.6
 1. Cross-Repo A11y + Type Safety Sweep
 
   Add two ESLint rules (testID↔accessibilityLabel pairing, re-enable
@@ -76,10 +76,6 @@ Here are identified use cases ranked by suitability for a /goal showcase:
   Reshape parent home into a JTBD intent picker, delete Family tab, add
   Progress segmented control, build Nudge system with
   rate-limiting/consent/quiet-hours. Full spec exists with 11 checkpointed
-  phases.
-
-  Most ambitious option (~40-60 hours). Excellent phased structure with
-  natural stopping points, but the schema migration in phase 8 raises
   phases.
 
   Most ambitious option (~40-60 hours). Excellent phased structure with
@@ -114,7 +110,7 @@ Here are identified use cases ranked by suitability for a /goal showcase:
    --live passes), but too small (~8-12 hours) to showcase sustained
   autonomous execution.
 
-  ## Pi - qwen3.6-max
+## Pi - qwen3.6-max
   Here are the top candidates, ranked by "hours of autonomous work ×    
  clear exit metrics × low risk of going off the rails":                
                                                                        
@@ -206,33 +202,33 @@ Here are identified use cases ranked by suitability for a /goal showcase:
  showcase or a spectacular mess. Lower value as a product-feature demo 
  though.
 
- ## Codex - GPT-5.5 high
- 1. Cross-Repo Test Boundary Integrity
+## Codex - GPT-5.5 high
+1. Cross-Repo Test Boundary Integrity
      Drain high-risk internal mocks across API, Inngest, integration, and
      mobile tests. Best showcase because it is systemic, measurable, and
      long-running: inventory counts go down, guardrails go up, and real
      contract coverage replaces brittle mocks.
-  2. LLM Structured Envelope Completion
+2. LLM Structured Envelope Completion
      Finish migrating remaining evaluate / teach_back free-text JSON
      assessment paths into llmResponseEnvelopeSchema. Strong because it
      crosses schemas, prompts, parser logic, session completion, eval
      snapshots, and architecture rules, with a crisp exit: no EVAL-
      MIGRATION TODOs and eval/type tests pass.
-  3. Silent Recovery / Observability Ratchet
+3. Silent Recovery / Observability Ratchet
      Sweep fallback, catch, console.warn, and best-effort recovery paths
      across auth, billing, webhooks, sessions, and background jobs. Good
      because it targets a known recurring quality class: failures that look
      “handled” but disappear without structured telemetry or user recovery.
-  4. Mobile Screen Harness + UI Contract Hardening
+4. Mobile Screen Harness + UI Contract Hardening
      Build a shared screen render harness with QueryClient, profile/auth
      fixtures, routed API mocks, native-boundary shims, and clean teardown.
      Good because mobile has the largest mock volume and this would reduce
      open handles, hook mocks, --forceExit, and route-contract drift.
-  5. Homework Overhaul Phase B
+5. Homework Overhaul Phase B
      Multi-problem OCR cards, per-problem homework modes, metadata, summary
      extraction, and parent display. Best product-facing showcase, but less
      purely “quality” than the top four.
-  6. Bring-Your-Own Material v1
+6. Bring-Your-Own Material v1
      Add upload/paste/link material ingestion and convert it into study
      paths. Flashy and large, but weaker as a /goal spike because storage,
      parsing, retrieval, and UX scope need more product decisions before

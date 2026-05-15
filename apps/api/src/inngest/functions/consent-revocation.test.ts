@@ -39,15 +39,15 @@ const mockGetProfileDisplayName = jest.fn();
 const mockGetProfileForConsentRevocation = jest.fn();
 const mockGetFamilyOwnerProfileId = jest.fn();
 jest.mock(
-  '../../services/consent' /* gc1-allow: pattern-a conversion */,
+  '../../services/consent' /* gc1-allow: pattern-a conversion — DB-backed; calculateAge kept real */,
   () => {
     const actual = jest.requireActual(
       '../../services/consent',
     ) as typeof import('../../services/consent');
     return {
       ...actual,
-      // Keep calculateAge real for production-equivalent date math; override
-      // DB-backed consent lookups below so this remains a unit test.
+      // consentRevocation only reaches calculateAge plus the four DB-backed
+      // functions below; add an override here if the SUT gains another call.
       getFamilyOwnerProfileId: (...args: unknown[]) =>
         mockGetFamilyOwnerProfileId(...args),
       getConsentStatus: (...args: unknown[]) => mockGetConsentStatus(...args),

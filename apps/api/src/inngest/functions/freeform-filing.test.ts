@@ -111,6 +111,8 @@ jest.mock('../../services/filing' /* gc1-allow: pattern-a conversion */, () => {
   ) as typeof import('../../services/filing');
   return {
     ...actual,
+    // Only these three are exercised by freeform-filing; remaining DB-backed
+    // exports are real and must get explicit overrides if the SUT grows.
     buildLibraryIndex: (...args: unknown[]) => mockBuildLibraryIndex(...args),
     fileToLibrary: (...args: unknown[]) => mockFileToLibrary(...args),
     resolveFilingResult: (...args: unknown[]) =>

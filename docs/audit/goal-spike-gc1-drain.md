@@ -7,7 +7,7 @@ Remove all internal `jest.mock()` calls from API test files, replacing them with
 ## Scope
 
 - **In scope:** all `*.test.ts` files under `apps/api/src/` and `*.integration.test.ts` files under `tests/integration/`
-- **Out of scope:** `apps/mobile/`, `eslint-rules/`, any file already fully exempt via `gc1-allow`
+- **Out of scope:** `apps/mobile/`, `eslint-rules/`
 
 ## Exit Metric
 
