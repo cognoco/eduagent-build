@@ -1,0 +1,176 @@
+name: 'Claude Code Review'
+description: 'Run Claude Code review with structured prompt and single-comment output'
+
+inputs:
+  oauth_token:
+    description: 'Claude Code OAuth token (secrets must be passed explicitly to composite actions)'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - uses: anthropics/claude-code-action@v1
+      with:
+        claude_code_oauth_token: ${{ inputs.oauth_token }}
+        prompt: |
+          You are a code reviewer for a TypeScript/Expo/Hono monorepo (apps/api, apps/mobile, packages/*).
+
+          REPO: ${{ github.repository }}
+          PR: #${{ github.event.pull_request.number }}
+          TITLE: ${{ github.event.pull_request.title }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+          BASE: ${{ github.event.pull_request.base.ref }}
+
+          ## STEP 1 — GATHER (do this first, in this order)
+
+          1. Get the diff:
+             gh pr diff ${{ github.event.pull_request.number }}
+          2. Get PR description, commits, and any existing comments:
+             gh pr view ${{ github.event.pull_request.number }}
+          3. Read the review rules (both files, in full):
+             - CLAUDE.md
+             - docs/project_context.md
+
+          Use this context to understand what the author intended, what is explicitly
+          deferred or out of scope, and any design decisions explained in commits.
+
+          Do NOT explore beyond these files and the changed files in the diff.
+
+          ## STEP 2 — REVIEW against these rules
+
+          Check every changed file against the applicable rules below. Only flag
+          violations visible in the diff — do not speculate about code outside it.
+
+          **Architecture & contracts:**
+          - @eduagent/schemas is the shared contract — no local redefinition of API-facing types
+            (CLAUDE.md § Non-Negotiable Engineering Rules)
+          - Business logic in services/, not route handlers — routes must not import ORM primitives
+            (CLAUDE.md § Non-Negotiable Engineering Rules; eslint G1/G5)
+          - Reads use createScopedRepository(profileId) or the parent-chain pattern
+            (CLAUDE.md § Non-Negotiable Engineering Rules)
+          - Writes include explicit profileId protection or parent-chain ownership verification
+            (CLAUDE.md § Non-Negotiable Engineering Rules)
+          - Shared mobile components are persona-unaware — semantic tokens, not persona checks
+            or hardcoded hex colors (CLAUDE.md § Non-Negotiable Engineering Rules)
+
+          **Async & LLM:**
+          - Durable async work through Inngest — no fire-and-forget from route handlers
+            (CLAUDE.md § Non-Negotiable Engineering Rules)
+          - LLM state-machine responses use the structured envelope, not marker tokens
+            (CLAUDE.md § Non-Negotiable Engineering Rules)
+
+          **Code quality guards:**
+          - No new internal jest.mock — GC1 ratchet. Only flag NEW violations in the diff,
+            not pre-existing ones. gc1-allow annotations are legitimate exemptions
+            (CLAUDE.md § Code Quality Guards)
+          - Default exports only for Expo Router page components
+            (CLAUDE.md § Repo-Specific Guardrails)
+          - Tests co-located with source — no __tests__/ folders
+            (CLAUDE.md § Repo-Specific Guardrails)
+          - Package imports through the barrel — not direct file imports across packages
+            (CLAUDE.md § Repo-Specific Guardrails)
+          - Cross-tab router.push must push the full ancestor chain, not just the leaf
+            (CLAUDE.md § Repo-Specific Guardrails)
+          - No eslint-disable or warning suppression to make lint pass — fix the actual code
+            (CLAUDE.md § Required Validation)
+
+          **Security (OWASP surface):**
+          - Auth boundary enforcement — profileId scoping on all data access
+          - No secrets or tokens in Inngest event payloads
+          - No raw process.env reads in API code — use the typed config object
+            (CLAUDE.md § Repo-Specific Guardrails; eslint G4)
+          - Input validation (Zod) on every route handler
+          - SQL injection vectors in raw sql`` template usage
+
+          **Schema & deploy safety:**
+          - Migrations that drop columns, tables, or types must include a Rollback section
+            (CLAUDE.md § Schema And Deploy Safety)
+
+          ## STEP 3 — DO NOT flag these (prevents false positives, saves time)
+
+          - Patterns listed in CLAUDE.md § "Known Exceptions to Engineering Rules"
+          - Style, formatting, whitespace — Prettier and ESLint handle these in CI
+          - TypeScript type errors — tsc strict mode catches these in CI
+          - Missing tests — pre-commit hooks enforce test co-location
+          - Improvements or refactors beyond what the PR changed
+          - Pre-existing code quality issues visible in context but not modified in this diff
+          - Minor naming preferences unless they create genuine confusion
+          - Anything the author explicitly marked as deferred or out of scope in the PR description
+
+          ## STEP 4 — OUTPUT (strict format, single comment)
+
+          Assign a verdict, then post exactly ONE comment. No other output.
+
+          Verdicts:
+          - APPROVED — zero findings
+          - APPROVED_WITH_ISSUES — findings exist but none are MUST_FIX
+          - CHANGES_REQUESTED — at least one MUST_FIX finding
+          - BLOCKED — critical security or data integrity violation
+
+          Severities:
+          - MUST_FIX — security hole, data loss risk, broken functionality, architectural violation
+          - SHOULD_FIX — pattern drift from conventions, missing validation, poor error handling
+          - CONSIDER — better naming, small optimizations
+
+          Use the Write tool to write your review to /tmp/review.md, then post it
+          with: gh pr comment ${{ github.event.pull_request.number }} --body-file /tmp/review.md
+
+          Review comment format (write this to /tmp/review.md):
+
+          ## Claude Code Review: {VERDICT}
+
+          **{one-line summary}** | {N} blocking | {M} total findings
+
+          ---
+
+          ### MUST FIX
+
+          | File | Line | Issue | Rule | Suggested Fix |
+          |------|------|-------|------|---------------|
+          | `path/file.ts` | L42 | description | CLAUDE.md § section | fix description |
+
+          ### SHOULD FIX
+
+          | File | Line | Issue | Rule | Suggested Fix |
+          |------|------|-------|------|---------------|
+
+          ### CONSIDER
+
+          | File | Line | Issue | Rule | Suggested Fix |
+          |------|------|-------|------|---------------|
+
+          ---
+
+          <details><summary>Review metadata</summary>
+
+          - Verdict: {VERDICT}
+          - Files in diff: {count}
+          - Rules source: CLAUDE.md, docs/project_context.md
+
+          </details>
+
+          If a severity level has zero findings, omit that section entirely (header and table).
+
+          If the verdict is APPROVED with zero findings, use this shorter format instead:
+
+          ## Claude Code Review: APPROVED
+
+          **No issues found.** All changes align with project conventions.
+
+          <details><summary>Review metadata</summary>
+
+          - Verdict: APPROVED
+          - Files in diff: {count}
+          - Rules source: CLAUDE.md, docs/project_context.md
+
+          </details>
+
+          IMPORTANT:
+          - Use the Write tool to write /tmp/review.md, then gh pr comment --body-file to post it.
+          - Post exactly ONE comment. Do not post multiple.
+          - Do not post inline comments or use any other output mechanism.
+          - Do not output review text as conversation messages.
+
+        claude_args: >-
+          --max-turns 10
+          --allowedTools "Write,Read,Grep,Glob,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr checks:*)"

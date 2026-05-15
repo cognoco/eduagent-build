@@ -17,11 +17,14 @@ on:
 # makes "forgot to declare" fail closed.
 permissions: {}
 
+# Cancel in-flight reviews when a new push arrives on the same PR.
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   claude-review:
     runs-on: ubuntu-latest
-    # Advisory — SDK may crash on infrastructure issues; do not block PRs
-    continue-on-error: true
     permissions:
       contents: read
       pull-requests: write
@@ -34,89 +37,38 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Prepare Claude Code install directory
-        run: mkdir -p "$HOME/.local/bin"
-
       - name: Run Claude Code Review (token 1)
-        id: claude-review
+        id: review-1
         continue-on-error: true
-        uses: anthropics/claude-code-action@v1
+        uses: ./.github/actions/claude-review
         with:
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          show_full_output: true
-          prompt: |
-            REPO: ${{ github.repository }}
-            PR NUMBER: ${{ github.event.pull_request.number }}
+          oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 
-            Please review this pull request with a focus on:
-            - Code quality and adherence to the project's CLAUDE.md conventions
-            - Potential bugs or logic errors
-            - Security implications (OWASP top 10)
-            - TypeScript strict mode compliance
-
-            Note: The PR branch is already checked out in the current working directory.
-
-            Use `gh pr comment` for top-level feedback.
-            Use `mcp__github_inline_comment__create_inline_comment` to highlight specific code issues.
-            Only post GitHub comments — don't submit review text as messages.
-
-          claude_args: |
-            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Read,Glob,Grep"
-
-      # Fallback to token 2 if token 1's account hit its monthly quota (429).
-      # `outcome` reflects the step result before `continue-on-error`, so it
-      # captures the 429 even though the job is advisory. Use `always()` so the
-      # fallback still runs after an advisory failure.
-      - name: Run Claude Code Review (token 2 fallback)
-        id: claude-review-2
-        if: always() && steps.claude-review.outcome == 'failure'
+      # Fallback: token 1 hit its quota (429) or otherwise failed.
+      # continue-on-error keeps the job green so we can check outcome directly.
+      - name: Run Claude Code Review (token 2 — fallback)
+        id: review-2
+        if: steps.review-1.outcome == 'failure'
         continue-on-error: true
-        uses: anthropics/claude-code-action@v1
+        uses: ./.github/actions/claude-review
         with:
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN_2 }}
-          show_full_output: true
-          prompt: |
-            REPO: ${{ github.repository }}
-            PR NUMBER: ${{ github.event.pull_request.number }}
+          oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN_2 }}
 
-            Please review this pull request with a focus on:
-            - Code quality and adherence to the project's CLAUDE.md conventions
-            - Potential bugs or logic errors
-            - Security implications (OWASP top 10)
-            - TypeScript strict mode compliance
-
-            Note: The PR branch is already checked out in the current working directory.
-
-            Use `gh pr comment` for top-level feedback.
-            Use `mcp__github_inline_comment__create_inline_comment` to highlight specific code issues.
-            Only post GitHub comments — don't submit review text as messages.
-
-          claude_args: |
-            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Read,Glob,Grep"
-
-      - name: Run Claude Code Review (token 3 fallback)
-        id: claude-review-3
-        if: always() && steps.claude-review.outcome == 'failure' && steps.claude-review-2.outcome == 'failure'
+      - name: Run Claude Code Review (token 3 — fallback)
+        id: review-3
+        if: steps.review-1.outcome == 'failure' && steps.review-2.outcome == 'failure'
         continue-on-error: true
-        uses: anthropics/claude-code-action@v1
+        uses: ./.github/actions/claude-review
         with:
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN_3 }}
-          show_full_output: true
-          prompt: |
-            REPO: ${{ github.repository }}
-            PR NUMBER: ${{ github.event.pull_request.number }}
+          oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN_3 }}
 
-            Please review this pull request with a focus on:
-            - Code quality and adherence to the project's CLAUDE.md conventions
-            - Potential bugs or logic errors
-            - Security implications (OWASP top 10)
-            - TypeScript strict mode compliance
-
-            Note: The PR branch is already checked out in the current working directory.
-
-            Use `gh pr comment` for top-level feedback.
-            Use `mcp__github_inline_comment__create_inline_comment` to highlight specific code issues.
-            Only post GitHub comments — don't submit review text as messages.
-
-          claude_args: |
-            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Read,Glob,Grep"
+      - name: Verify review completed
+        if: always()
+        run: |
+          if [[ "${{ steps.review-1.outcome }}" == "success" ]] || \
+             [[ "${{ steps.review-2.outcome }}" == "success" ]] || \
+             [[ "${{ steps.review-3.outcome }}" == "success" ]]; then
+            echo "::notice::Review completed successfully"
+          else
+            echo "::warning::All review tokens exhausted — review skipped"
+          fi
