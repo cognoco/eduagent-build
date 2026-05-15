@@ -21,11 +21,14 @@ if (typeof WebSocket === 'undefined') {
   neonConfig.webSocketConstructor = require('ws');
 }
 
-/**
- * Options accepted by createDatabase. Currently unused — kept for backward
- * compatibility with callers that pass an empty options object.
- */
-export type CreateDatabaseOptions = Record<string, never>;
+export interface CreateDatabaseOptions {
+  /**
+   * Reuse a Neon WebSocket pool across calls for the same connection string.
+   * Disable this for per-request Cloudflare Worker clients; workerd treats
+   * pooled WebSocket I/O as request-context-bound and can reject later requests.
+   */
+  cacheNeonPool?: boolean;
+}
 
 // Module-level pool cache — survives across requests within the same Cloudflare
 // Worker isolate. Without this, every request creates a fresh NeonPool and
@@ -71,10 +74,19 @@ function looksLikeNeon(url: string): boolean {
  */
 export function createDatabase(
   databaseUrl: string,
-  // options parameter kept for backward-compatibility; currently unused
-  _options: CreateDatabaseOptions = {},
+  options: CreateDatabaseOptions = {},
 ) {
   if (looksLikeNeon(databaseUrl)) {
+    if (options.cacheNeonPool === false) {
+      return drizzleNeon(
+        new NeonPool({
+          connectionString: databaseUrl,
+          connectionTimeoutMillis: 10_000,
+        }),
+        { schema },
+      );
+    }
+
     let pool = neonPoolCache.get(databaseUrl);
     if (!pool) {
       pool = new NeonPool({

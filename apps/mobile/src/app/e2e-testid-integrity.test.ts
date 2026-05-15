@@ -74,12 +74,6 @@ const KNOWN_DRIFT = new Set([
   'accent-swatch-indigo',
   // Parent/teen view switcher
   'switch-to-teen',
-  // Parent child-detail flows still reference consent selectors that are being
-  // rewritten against the current navigation model.
-  'consent-section',
-  'withdraw-consent-button',
-  'grace-period-banner',
-  'cancel-deletion-button',
   // Password toggle on sign-in (removed or renamed in PasswordInput)
   'sign-in-password-toggle',
   // Library refactor in progress: empty-state component removed

@@ -1,12 +1,12 @@
 {
   "scope": "mobile",
-  "verifiedAt": "2026-05-15T07:12:58Z",
+  "verifiedAt": "2026-05-15T07:19:32Z",
   "verifiedBy": "Zuzana Kopečná @ ZLY-Orion",
   "command": "pnpm exec jest --config apps/mobile/jest.config.cjs --testMatch \"**/apps/mobile/src/app/**/child/**/index.test.tsx\" --testMatch \"**/apps/mobile/src/app/**/progress.test.tsx\" --testMatch \"**/apps/mobile/src/app/e2e-testid-integrity.test.ts\" --testMatch \"**/apps/mobile/src/app/**/pick-book/**/[subjectId].test.tsx\" --runInBand --forceExit --no-coverage",
   "passed": true,
   "testFiles": {
-    "apps/mobile/src/app/(app)/child/[profileId]/index.test.tsx": "ff050b97c33b75990fa85645cebbe7f281b1d719",
-    "apps/mobile/src/app/e2e-testid-integrity.test.ts": "f8e7810aef55c051a22646136c755304f866af10",
+    "apps/mobile/src/app/(app)/child/[profileId]/index.test.tsx": "8e630e5bb286e72e534f299f9c2629e4fdecc2f9",
+    "apps/mobile/src/app/e2e-testid-integrity.test.ts": "5a27cf8d48011d98b365e850c3ca02e399b58cb7",
     "apps/mobile/src/app/(app)/pick-book/[subjectId].test.tsx": "a45f82e106e28a0646f7e4afed2b0bd00e3101c8"
   }
 }

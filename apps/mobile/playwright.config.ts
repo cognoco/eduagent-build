@@ -106,7 +106,7 @@ export default defineConfig({
       name: 'later-phases',
       dependencies: ['setup'],
       testMatch:
-        /flows[\\/](journeys[\\/](j0[89]|j1[0-9])-.*|auth[\\/]w03-.*|navigation[\\/]w0[1-5]-.*)\.spec\.ts/,
+        /flows[\\/](journeys[\\/](j0[89]|j1[0-9]|j2[0-9])-.*|auth[\\/]w03-.*|navigation[\\/]w0[1-5]-.*)\.spec\.ts/,
     },
   ],
 });
