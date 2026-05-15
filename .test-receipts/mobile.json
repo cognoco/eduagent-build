@@ -1,12 +1,10 @@
 {
   "scope": "mobile",
-  "verifiedAt": "2026-05-15T11:04:43Z",
+  "verifiedAt": "2026-05-15T11:20:05Z",
   "verifiedBy": "Zuzana Kopečná @ ZLY-Orion",
-  "command": "pnpm exec jest --config apps/mobile/jest.config.cjs --cacheDirectory=.tmp/jest-cache-receipt-parallel --no-coverage --forceExit",
+  "command": "pnpm exec nx run mobile:test",
   "passed": true,
   "testFiles": {
-    "apps/mobile/src/app/(app)/subscription.test.tsx": "4483793cbec48cae6b06749424409e31815b5810",
-    "apps/mobile/src/app/delete-account.test.tsx": "78acd7b835fcba4b1cf5a02ca00b608249e9c8b7",
-    "apps/mobile/src/hooks/use-account.test.ts": "f55b2a8d4a8faba67d10a45a74609cfa02fe5915"
+    "apps/mobile/src/app/delete-account.test.tsx": "78acd7b835fcba4b1cf5a02ca00b608249e9c8b7"
   }
 }
