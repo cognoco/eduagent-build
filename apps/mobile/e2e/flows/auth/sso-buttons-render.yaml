@@ -1,0 +1,67 @@
+# Flow AUTH-10: SSO Buttons Render (strict)
+#
+# Validates: on Android, the sign-in screen renders the correct SSO buttons
+# given platform + env. Stricter than sso-buttons.yaml — apple-sso-button MUST
+# NOT appear (Android suite), and openai-sso-button is REQUIRED (the APK must
+# be built with EXPO_PUBLIC_CLERK_OPENAI_SSO_KEY set).
+#
+# Why a separate flow:
+#   sso-buttons.yaml marks openai-sso-button as `optional: true`, which lets a
+#   broken Clerk strategy lookup (getOpenAISSOStrategy at sign-in.tsx:329) ship
+#   invisibly. This flow asserts the real contract on Android: Google + OpenAI
+#   visible, Apple hidden.
+#
+# Pre-req (no wrapper can verify — surfaced via the assertion below):
+#   The dev-client APK must be built with EXPO_PUBLIC_CLERK_OPENAI_SSO_KEY set.
+#   EXPO_PUBLIC_* env vars are baked into the JS bundle at build time, so a
+#   missing key cannot be remediated at run time. If the openai-sso-button
+#   assertion fails, rebuild the APK with the env var present.
+#
+# testIDs verified against source:
+#   sign-in-screen      apps/mobile/src/app/(auth)/sign-in.tsx:1128
+#   google-sso-button   apps/mobile/src/app/(auth)/sign-in.tsx:1238 (gated Platform.OS !== 'ios')
+#   apple-sso-button    apps/mobile/src/app/(auth)/sign-in.tsx:1251 (gated Platform.OS === 'ios')
+#   openai-sso-button   apps/mobile/src/app/(auth)/sign-in.tsx:1264 (gated openAIStrategy truthy)
+#
+# Run command:
+#   ./e2e/scripts/seed-and-run.sh --no-seed e2e/flows/auth/sso-buttons-render.yaml
+#
+# Tags: nightly, auth
+appId: com.mentomate.app
+tags:
+  - nightly
+  - auth
+---
+- extendedWaitUntil:
+    visible:
+      id: "sign-in-screen"
+    timeout: 120000
+
+- takeScreenshot: sso-buttons-render-01-sign-in
+
+# Google: must be visible on Android (Platform.OS !== 'ios' gate at sign-in.tsx:1230)
+- assertVisible:
+    id: "google-sso-button"
+
+- assertVisible:
+    text: "Continue with Google"
+
+# Apple: must NOT be visible on Android (Platform.OS === 'ios' gate at sign-in.tsx:1243)
+- assertNotVisible:
+    id: "apple-sso-button"
+
+# OpenAI: must be visible when openAIStrategy resolves. If this fails the APK
+# was built without EXPO_PUBLIC_CLERK_OPENAI_SSO_KEY — rebuild and rerun.
+- scrollUntilVisible:
+    element:
+      id: "openai-sso-button"
+    direction: UP
+    timeout: 5000
+
+- assertVisible:
+    id: "openai-sso-button"
+
+- assertVisible:
+    text: "Continue with OpenAI"
+
+- takeScreenshot: sso-buttons-render-02-all-buttons-asserted

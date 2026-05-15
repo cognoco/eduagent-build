@@ -11,13 +11,14 @@
 // ---------------------------------------------------------------------------
 
 import { createMiddleware } from 'hono/factory';
-import { validateEnv } from '../config';
+import { validateEnv, validateProductionBindings } from '../config';
+import type { Env, ProductionBindings } from '../config';
 import { createLogger } from '../services/logger';
 
 const logger = createLogger();
 
 type EnvValidationEnv = {
-  Bindings: Record<string, string | undefined>;
+  Bindings: Record<string, string | undefined> & ProductionBindings;
 };
 
 let validated = false;
@@ -32,22 +33,52 @@ export const envValidationMiddleware = createMiddleware<EnvValidationEnv>(
         process.env['NODE_ENV'] !== 'test' &&
         c.env?.ENVIRONMENT !== 'development'
       ) {
+        let parsedEnv: Env;
         try {
-          validateEnv(c.env as Record<string, string | undefined>);
+          parsedEnv = validateEnv(
+            c.env as unknown as Record<string, string | undefined>,
+          );
         } catch (err) {
           const message =
             err instanceof Error
               ? err.message
               : 'Environment validation failed';
-          // [logging sweep] structured logger so PII fields land as JSON context
           logger.error('[env-validation]', { message });
           return c.json({ code: 'ENV_VALIDATION_ERROR', message }, 500);
+        }
+
+        const bindingResult = validateProductionBindings(
+          parsedEnv,
+          c.env as ProductionBindings,
+        );
+        if (bindingResult.missing.length > 0) {
+          // Production deploy gate: refuse to serve traffic when a binding
+          // gating replay-dedup / idempotency is absent. The override flag
+          // is checked inside validateProductionBindings.
+          const message = `Production environment missing required bindings: ${bindingResult.missing.join(', ')}. Set the binding in wrangler.toml or opt into the prelaunch override flag (e.g. ALLOW_MISSING_IDEMPOTENCY_KV='true') to bypass — see config.ts for the risk this carries.`;
+          logger.error('[env-validation] binding gate failed', {
+            event: 'env-validation.binding_gate_failed',
+            missing: bindingResult.missing,
+          });
+          return c.json({ code: 'ENV_VALIDATION_ERROR', message }, 500);
+        }
+        if (bindingResult.overrideApplied) {
+          // Loud structured warning so the override is queryable in
+          // telemetry. CLAUDE.md "Silent recovery without escalation is
+          // banned" applies — running prod without IDEMPOTENCY_KV is a
+          // real risk and must be visible.
+          logger.warn(
+            '[env-validation] production running without IDEMPOTENCY_KV — prelaunch override active',
+            {
+              event: 'env-validation.idempotency_kv_override_active',
+            },
+          );
         }
       }
       validated = true;
     }
     await next();
-  }
+  },
 );
 
 /** Reset validation state — only for testing */

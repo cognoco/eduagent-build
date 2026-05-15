@@ -39,10 +39,10 @@ const KNOWN_DRIFT = new Set([
   'location-eu',
   'location-other',
   // Library/learning screens renamed during route restructuring
+  // library-screen: FIXED — testID added to apps/mobile/src/app/(app)/library.tsx root View
+  // home-screen: FIXED — testID added to apps/mobile/src/app/(app)/home.tsx root View
   'library-scroll',
-  'library-screen',
   'library-tab',
-  'home-screen',
   'learn-new-screen',
   'shelf-book-list',
   // Session summary
@@ -98,6 +98,10 @@ const KNOWN_DRIFT = new Set([
   // learner-screen and parent-home-screen — safe to leave in place, but the
   // Maestro flows can drop these branches in a follow-up cleanup.
   'dashboard-scroll',
+  // DRAFT slow-net flows (first-curriculum-polling-timeout, sse-reconnect-banner)
+  // use this sentinel for testIDs that need to be added to source code before
+  // the flow can run. Each flow's header lists the prerequisite work.
+  '<PLACEHOLDER_TESTID>',
 ]);
 
 function collectFiles(dir: string, ext: string): string[] {

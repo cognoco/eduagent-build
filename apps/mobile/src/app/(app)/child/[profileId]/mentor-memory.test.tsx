@@ -221,3 +221,46 @@ describe('ChildMentorMemoryScreen — interest context rows', () => {
     ).toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// [BUG-907] Mentor Memory CONTROLS switches must expose an accessibilityLabel.
+//
+// Before fix: the two Switch components ("Learn about child" / "Use what the
+// mentor knows") rendered with role=switch but no label — VoiceOver and
+// TalkBack announced them as "switch, off/on" with no context.
+// ---------------------------------------------------------------------------
+
+describe('[BUG-907] CONTROLS switches expose accessibilityLabel', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    setupDefaultMocks();
+  });
+
+  it('labels the "Learn about child" switch with the adjacent caption', () => {
+    render(<ChildMentorMemoryScreen />);
+
+    const learnSwitch = screen.getByLabelText(
+      'parentView.mentorMemory.learnAboutChild',
+    );
+    expect(learnSwitch.props.accessibilityLabel).toBe(
+      'parentView.mentorMemory.learnAboutChild',
+    );
+    expect(learnSwitch.props.accessibilityHint).toBe(
+      'parentView.mentorMemory.learnAboutChildDescription',
+    );
+  });
+
+  it('labels the "Use what the mentor knows" switch with the adjacent caption', () => {
+    render(<ChildMentorMemoryScreen />);
+
+    const useSwitch = screen.getByLabelText(
+      'parentView.mentorMemory.useWhatMentorKnows',
+    );
+    expect(useSwitch.props.accessibilityLabel).toBe(
+      'parentView.mentorMemory.useWhatMentorKnows',
+    );
+    expect(useSwitch.props.accessibilityHint).toBe(
+      'parentView.mentorMemory.useWhatMentorKnowsDescription',
+    );
+  });
+});

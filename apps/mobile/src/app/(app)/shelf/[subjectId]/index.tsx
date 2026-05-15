@@ -214,7 +214,7 @@ export default function ShelfScreen() {
         style={{ paddingTop: insets.top }}
         testID="shelf-loading"
       >
-        <BookPageFlipAnimation size={140} color={themeColors.accent} />
+        <BookPageFlipAnimation size={150} color={themeColors.accent} />
         <Text className="text-h3 font-semibold text-text-primary mt-4 text-center">
           {t('library.shelf.loadingTitle')}
         </Text>
@@ -454,7 +454,7 @@ export default function ShelfScreen() {
           className="absolute inset-0 bg-background/80 items-center justify-center"
           testID="shelf-filing-overlay"
         >
-          <BookPageFlipAnimation size={140} color={themeColors.accent} />
+          <BookPageFlipAnimation size={150} color={themeColors.accent} />
           <Text className="text-body-sm text-text-secondary mt-3">
             {t('library.shelf.organizing')}
           </Text>

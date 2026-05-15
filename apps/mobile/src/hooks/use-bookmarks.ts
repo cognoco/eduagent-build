@@ -23,12 +23,14 @@ export function useBookmarks(options?: {
   subjectId?: string;
   topicId?: string;
   limit?: number;
-  enabled?: boolean;
 }): UseInfiniteQueryResult<InfiniteData<BookmarkListResponse>, Error> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
 
   return useInfiniteQuery({
+    // Order: ['bookmarks', profileId, subjectId, topicId]. useCreateBookmark
+    // and useDeleteBookmark invalidate by the prefix ['bookmarks', profileId],
+    // so prefix-match invalidation still fires after this filter is appended.
     queryKey: [
       'bookmarks',
       activeProfile?.id,
@@ -57,7 +59,7 @@ export function useBookmarks(options?: {
       }
     },
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
-    enabled: !!activeProfile && (options?.enabled ?? true),
+    enabled: !!activeProfile,
   });
 }
 

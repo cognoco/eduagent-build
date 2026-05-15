@@ -14,32 +14,31 @@ const mockDatabaseModule = createDatabaseModuleMock();
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
+const mockFindOrCreateAccount = jest.fn();
 jest.mock('../services/account', () => ({
-  findOrCreateAccount: jest.fn().mockResolvedValue({
-    id: 'test-account-id',
-    clerkUserId: 'user_test',
-    email: 'test@example.com',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  }),
+  ...(jest.requireActual('../services/account') as Record<string, unknown>),
+  findOrCreateAccount: (...args: unknown[]) => mockFindOrCreateAccount(...args),
 }));
 
+const mockFindOwnerProfile = jest.fn();
+const mockGetProfile = jest.fn();
 jest.mock('../services/profile', () => ({
-  findOwnerProfile: jest.fn().mockResolvedValue(null),
-  getProfile: jest.fn().mockResolvedValue({
-    id: 'test-profile-id',
-    birthYear: null,
-    location: null,
-    consentStatus: 'CONSENTED',
-  }),
+  ...(jest.requireActual('../services/profile') as Record<string, unknown>),
+  findOwnerProfile: (...args: unknown[]) => mockFindOwnerProfile(...args),
+  getProfile: (...args: unknown[]) => mockGetProfile(...args),
 }));
 
+const mockGetCoachingCardForProfile = jest.fn();
 jest.mock('../services/coaching-cards', () => ({
-  getCoachingCardForProfile: jest.fn(),
+  ...(jest.requireActual('../services/coaching-cards') as Record<
+    string,
+    unknown
+  >),
+  getCoachingCardForProfile: (...args: unknown[]) =>
+    mockGetCoachingCardForProfile(...args),
 }));
 
 import { app } from '../index';
-import { getCoachingCardForProfile } from '../services/coaching-cards';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 
 const TEST_ENV = { ...BASE_AUTH_ENV };
@@ -57,6 +56,22 @@ afterAll(() => {
 beforeEach(() => {
   clearJWKSCache();
   jest.clearAllMocks();
+
+  // Default happy-path returns — tests that need different values override per-test.
+  mockFindOrCreateAccount.mockResolvedValue({
+    id: 'test-account-id',
+    clerkUserId: 'user_test',
+    email: 'test@example.com',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  });
+  mockFindOwnerProfile.mockResolvedValue(null);
+  mockGetProfile.mockResolvedValue({
+    id: 'test-profile-id',
+    birthYear: null,
+    location: null,
+    consentStatus: 'CONSENTED',
+  });
 });
 
 describe('coaching card routes', () => {
@@ -66,7 +81,7 @@ describe('coaching card routes', () => {
 
   describe('GET /v1/coaching-card', () => {
     it('returns 200 with coaching card on warm path', async () => {
-      (getCoachingCardForProfile as jest.Mock).mockResolvedValue({
+      mockGetCoachingCardForProfile.mockResolvedValue({
         coldStart: false,
         card: {
           id: 'a0000001-0000-4000-a000-000000000001',
@@ -87,7 +102,7 @@ describe('coaching card routes', () => {
       const res = await app.request(
         '/v1/coaching-card',
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -100,7 +115,7 @@ describe('coaching card routes', () => {
     });
 
     it('returns 200 with cold-start fallback', async () => {
-      (getCoachingCardForProfile as jest.Mock).mockResolvedValue({
+      mockGetCoachingCardForProfile.mockResolvedValue({
         coldStart: true,
         card: null,
         fallback: {
@@ -127,7 +142,7 @@ describe('coaching card routes', () => {
       const res = await app.request(
         '/v1/coaching-card',
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);

@@ -21,7 +21,7 @@
 #
 # Environment variables (optional):
 #   API_URL          — API base URL (default: http://localhost:8787)
-#   EMAIL            — Test user email (default: test-e2e@example.com)
+#   EMAIL            — Test user email (default: test-e2e+clerk_test@example.com)
 #   MAESTRO_PATH     — Path to maestro binary (default: /c/tools/maestro/bin/maestro)
 #   METRO_URL        — Metro server URL for dev-client (default: http://10.0.2.2:8082)
 #                      Uses bundle proxy by default (BUG-7: OkHttp chunked encoding fails on 8081)
@@ -43,9 +43,66 @@ set -euo pipefail
 cleanup() {
   echo ""
   echo "[seed-and-run] INTERRUPTED — exiting immediately."
+  slow_net_restore 2>/dev/null || true
   exit 130
 }
 trap cleanup INT TERM
+
+# ── Slow-network shaping (NETWORK_DELAY_MS / NETWORK_SPEED / NETWORK_KILL_AFTER_MS) ──
+# See docs/specs/2026-05-14-e2e-slow-network-sim.md.
+# All env vars default to empty/0 → these helpers are no-ops unless opted in.
+emulator_console_cmd() {
+  local cmd="$1"
+  local port="${EMULATOR_CONSOLE_PORT:-5554}"
+  local token
+  token=$(cat "$HOME/.emulator_console_auth_token" 2>/dev/null || echo "")
+  # Git Bash bundled netcat does not support -q; -w sets a per-read timeout.
+  printf 'auth %s\n%s\nquit\n' "$token" "$cmd" \
+    | "${NETCAT:-/c/Program Files/Git/usr/bin/nc.exe}" -w 2 localhost "$port" >/dev/null 2>&1 || true
+}
+
+apply_network_speed() {
+  local speed="${NETWORK_SPEED:-}"
+  if [ -n "$speed" ]; then
+    emulator_console_cmd "network speed ${speed}"
+    echo "[seed-and-run] Applied network speed=${speed}"
+  fi
+}
+
+apply_network_delay() {
+  local delay="${NETWORK_DELAY_MS:-0}"
+  if [ "$delay" -gt 0 ] 2>/dev/null; then
+    emulator_console_cmd "network delay ${delay}"
+    echo "[seed-and-run] Applied network delay=${delay}ms"
+  fi
+}
+
+schedule_network_kill() {
+  local kill_ms="${NETWORK_KILL_AFTER_MS:-0}"
+  if [ "$kill_ms" -gt 0 ] 2>/dev/null; then
+    (
+      sleep "$((kill_ms / 1000))"
+      "$ADB" $DEVICE_FLAG shell settings put global airplane_mode_on 1 >/dev/null 2>&1 || true
+      "$ADB" $DEVICE_FLAG shell am broadcast -a android.intent.action.AIRPLANE_MODE --ez state true >/dev/null 2>&1 || true
+      echo "[seed-and-run] NETWORK_KILL_AFTER_MS=${kill_ms} reached — enabling airplane mode."
+    ) &
+  fi
+}
+
+slow_net_restore() {
+  emulator_console_cmd "network delay none" || true
+  emulator_console_cmd "network speed full" || true
+  # Disable airplane mode (harmless if it wasn't enabled).
+  if [ -n "${ADB:-}" ]; then
+    "$ADB" $DEVICE_FLAG shell settings put global airplane_mode_on 0 >/dev/null 2>&1 || true
+    "$ADB" $DEVICE_FLAG shell am broadcast -a android.intent.action.AIRPLANE_MODE --ez state false >/dev/null 2>&1 || true
+  fi
+  echo "[seed-and-run] Network restored (delay=none, airplane=off)."
+}
+
+# Compose with any prior EXIT trap so other wrappers' cleanup still runs.
+PRIOR_EXIT_TRAP=$(trap -p EXIT | sed "s/^trap -- '//;s/' EXIT\$//")
+trap 'slow_net_restore; eval "${PRIOR_EXIT_TRAP:-:}"' EXIT
 
 # Prevent Git Bash (MSYS) from converting Unix paths like /sdcard/ to Windows paths.
 # Without this, adb shell commands get mangled paths (e.g., /sdcard/ → C:/Program Files/Git/sdcard/).
@@ -68,7 +125,7 @@ EXTRA_ARGS=("$@")
 
 # ── Config ──
 API_URL="${API_URL:-http://localhost:8787}"
-EMAIL="${EMAIL:-test-e2e@example.com}"
+EMAIL="${EMAIL:-test-e2e+clerk_test@example.com}"
 MAESTRO="${MAESTRO_PATH:-/c/tools/maestro/bin/maestro}"
 METRO_URL="${METRO_URL:-http://10.0.2.2:8082}"
 ADB="${ADB_PATH:-/c/Android/Sdk/platform-tools/adb.exe}"
@@ -223,10 +280,24 @@ check_emulator
 # ── Set up adb reverse for Metro access ──
 # The emulator can reach the host via 10.0.2.2, but adb reverse is more reliable
 # (avoids firewall issues, works with both 10.0.2.2 and localhost URLs).
-$ADB $DEVICE_FLAG reverse tcp:8081 tcp:8081 2>/dev/null || true
-$ADB $DEVICE_FLAG reverse tcp:8082 tcp:8082 2>/dev/null || true
+# Always reverse the two well-known ports (regular Metro 8081, bundle proxy
+# 8082) AND the port parsed from METRO_URL — otherwise running against a
+# non-default Metro (e.g. 8083 when 8081/8082 are taken by another branch's
+# dev server) fails with SocketTimeoutException + dev-launcher ANR on WHPX.
+METRO_PORT=$(echo "$METRO_URL" | sed -n 's#.*:\([0-9][0-9]*\)\(/.*\)\?$#\1#p')
+REVERSED_PORTS=""
+reverse_port() {
+  local port="$1"
+  [ -z "$port" ] && return
+  case " $REVERSED_PORTS " in *" $port "*) return ;; esac
+  REVERSED_PORTS="$REVERSED_PORTS $port"
+  $ADB $DEVICE_FLAG reverse tcp:"$port" tcp:"$port" 2>/dev/null || true
+}
+reverse_port 8081
+reverse_port 8082
+reverse_port "${METRO_PORT:-}"
 
-echo "[seed-and-run] Emulator OK. Ports forwarded. Timeouts: launcher=${LAUNCHER_TIMEOUT}s, bundle=${BUNDLE_TIMEOUT}s"
+echo "[seed-and-run] Emulator OK. Ports forwarded:${REVERSED_PORTS}. METRO_URL=${METRO_URL}. Timeouts: launcher=${LAUNCHER_TIMEOUT}s, bundle=${BUNDLE_TIMEOUT}s"
 
 # ── UI_MODE: switch system theme if requested ──
 if [ "${UI_MODE:-}" = "light" ]; then
@@ -580,6 +651,12 @@ fi
 
 echo "[seed-and-run] App on sign-in screen."
 
+# Apply slow-network shaping after the app is up so the bundle download itself
+# runs at full speed. The EXIT trap (slow_net_restore) handles cleanup.
+apply_network_speed
+apply_network_delay
+schedule_network_kill
+
 if [ $NO_SEED -eq 1 ]; then
   # ── No-seed mode: skip API seeding, run Maestro with minimal env vars ──
   echo "[seed-and-run] --no-seed mode: skipping seed API call."
@@ -595,6 +672,12 @@ if [ $NO_SEED -eq 1 ]; then
   CMD+=("${FLOW_FILE}")
   echo "[seed-and-run] Running: ${CMD[*]}"
   reset_maestro_driver
+  # When slow-network shaping is active, we must NOT exec — exec replaces the
+  # shell, which would skip the EXIT trap that restores network state.
+  if [ "${NETWORK_DELAY_MS:-0}" -gt 0 ] 2>/dev/null || [ -n "${NETWORK_SPEED:-}" ] || [ "${NETWORK_KILL_AFTER_MS:-0}" -gt 0 ] 2>/dev/null; then
+    "${CMD[@]}"
+    exit "$?"
+  fi
   exec "${CMD[@]}"
 fi
 
@@ -662,4 +745,10 @@ CMD+=("${FLOW_FILE}")
 echo "[seed-and-run] Running: ${CMD[*]}"
 
 reset_maestro_driver
+# When slow-network shaping is active, the EXIT trap must run to restore
+# network state, so don't replace the shell with exec.
+if [ "${NETWORK_DELAY_MS:-0}" -gt 0 ] 2>/dev/null || [ -n "${NETWORK_SPEED:-}" ] || [ "${NETWORK_KILL_AFTER_MS:-0}" -gt 0 ] 2>/dev/null; then
+  "${CMD[@]}"
+  exit "$?"
+fi
 exec "${CMD[@]}"

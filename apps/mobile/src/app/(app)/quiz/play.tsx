@@ -133,6 +133,7 @@ export default function QuizPlayScreen(): React.ReactElement {
   const answerSubmittedRef = useRef(false);
   const roundSubmittedRef = useRef(false);
   const pendingResultsNavigateRef = useRef(false);
+  const clearRoundAfterExitRef = useRef(false);
   // [F-Q-07] Tracks whether correctAnswer was captured via handleCheckGuessWhoAnswer
   // so the onResolved skip-path only fires a background check when needed.
   const correctAnswerCapturedRef = useRef(false);
@@ -224,6 +225,15 @@ export default function QuizPlayScreen(): React.ReactElement {
     };
   }, []);
 
+  useEffect(() => {
+    return () => {
+      if (!clearRoundAfterExitRef.current) return;
+      setRound(null);
+      setPrefetchedRoundId(null);
+      setCompletionResult(null);
+    };
+  }, [setCompletionResult, setPrefetchedRoundId, setRound]);
+
   // [CR-1] Callback for server-side answer checking, declared before the
   // early return so the rules-of-hooks invariant is satisfied.
   // [F-Q-07] When the answer is wrong, capture correctAnswer from the server
@@ -282,9 +292,13 @@ export default function QuizPlayScreen(): React.ReactElement {
   const handleQuit = () => {
     setQuitConfirmVisible(true);
   };
-  const handleConfirmQuit = () => {
+  const handleLeaveRoundForQuizHome = () => {
+    clearRoundAfterExitRef.current = true;
     setQuitConfirmVisible(false);
-    router.replace(exitHref as Href);
+    router.replace('/(app)/quiz' as Href);
+  };
+  const handleConfirmQuit = () => {
+    handleLeaveRoundForQuizHome();
   };
   const handleSaveAndQuit = () => {
     if (resultsRef.current.length === 0) return;
@@ -483,7 +497,7 @@ export default function QuizPlayScreen(): React.ReactElement {
       >
         <View className="flex-row items-center justify-between mb-6">
           <Pressable
-            onPress={handleQuit}
+            onPress={handleLeaveRoundForQuizHome}
             className="min-h-[44px] min-w-[44px] items-center justify-center"
             accessibilityRole="button"
             accessibilityLabel={t('quiz.play.quitLabel')}
@@ -501,7 +515,7 @@ export default function QuizPlayScreen(): React.ReactElement {
             {t('quiz.play.malformedBody')}
           </Text>
           <Pressable
-            onPress={handleQuit}
+            onPress={handleLeaveRoundForQuizHome}
             className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center"
             accessibilityRole="button"
             accessibilityLabel={t('quiz.play.backToQuizHome')}

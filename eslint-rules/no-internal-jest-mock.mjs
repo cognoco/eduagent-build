@@ -43,6 +43,42 @@ const rule = {
       return line.includes('gc1-allow');
     }
 
+    // Pattern A: the factory argument of `jest.mock(spec, factory)` spreads
+    // `jest.requireActual(spec)` — either inline (`...jest.requireActual(...)`)
+    // or via a named local (`const actual = jest.requireActual(...); return
+    // { ...actual, … }`). This is the canonical GC1-compliant shape; a mock
+    // that follows it preserves real behaviour and stubs only what's named.
+    function factoryIsPatternA(node, specifier) {
+      const factory = node.arguments[1];
+      if (!factory) return false;
+      const text = sourceCode.getText(factory);
+      const escaped = specifier.replace(/[.+*?^$()[\]{}|\\]/g, '\\$&');
+      // Trailing `)` left open so multi-line `requireActual(\n  '<spec>',\n) as
+      // typeof import(...)` still matches — trailing comma + type cast wrap
+      // the closing paren.
+      const requireRe = new RegExp(
+        `jest\\.requireActual\\(\\s*['"\`]${escaped}['"\`]`,
+      );
+      if (!requireRe.test(text)) return false;
+      if (
+        new RegExp(
+          `\\.\\.\\.\\s*jest\\.requireActual\\(\\s*['"\`]${escaped}`,
+        ).test(text)
+      ) {
+        return true;
+      }
+      const named = text.match(
+        new RegExp(
+          `(?:const|let|var)\\s+(\\w+)\\s*(?::[^=]+)?=\\s*jest\\.requireActual\\(\\s*['"\`]${escaped}`,
+        ),
+      );
+      if (named) {
+        const name = named[1];
+        if (new RegExp(`\\.\\.\\.\\s*${name}\\b`).test(text)) return true;
+      }
+      return false;
+    }
+
     function check(node) {
       const arg = node.arguments[0];
       if (!arg || arg.type !== 'Literal' || typeof arg.value !== 'string') {
@@ -51,6 +87,9 @@ const rule = {
       const specifier = arg.value;
       if (specifier.startsWith('./') || specifier.startsWith('../')) {
         if (hasGc1AllowOnLine(node) || hasGc1AllowOnLine(arg)) {
+          return;
+        }
+        if (factoryIsPatternA(node, specifier)) {
           return;
         }
         context.report({

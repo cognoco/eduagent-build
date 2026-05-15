@@ -14,9 +14,10 @@ import { createDatabaseModuleMock } from '../test-utils/database-module';
 
 const mockDatabaseModule = createDatabaseModuleMock();
 
-jest.mock('@eduagent/database', () => mockDatabaseModule.module);
+jest.mock('@eduagent/database', () => mockDatabaseModule.module); // gc1-allow: unit test — real Neon DB unavailable; db injected via middleware chain
 
 jest.mock('../services/account', () => ({
+  // gc1-allow: DB-dependent service; mocked to keep test a unit test of metering middleware
   findOrCreateAccount: jest.fn().mockResolvedValue({
     id: 'test-account-id',
     clerkUserId: 'user_test',
@@ -28,7 +29,7 @@ jest.mock('../services/account', () => ({
 
 // Mock session service (to prevent actual session operations)
 jest.mock('../services/session', () => ({
-  // gc1-allow: processMessage/streamMessage/evaluateSessionDepth call LLM
+  // gc1-allow: processMessage/streamMessage/evaluateSessionDepth call LLM; entire module stubbed to prevent LLM side-effects in metering unit test
   processMessage: jest
     .fn()
     .mockResolvedValue({ reply: 'test', exchangeCount: 1 }),
@@ -45,6 +46,7 @@ jest.mock('../services/session', () => ({
   submitSummary: jest.fn(),
   // [BUG-653] evaluateSessionDepth + getSessionTranscript needed for the
   // metering coverage on POST /sessions/:id/evaluate-depth.
+
   getSessionTranscript: jest.fn().mockResolvedValue({
     session: {
       sessionId: 'session-1',
@@ -85,7 +87,7 @@ jest.mock('../services/session', () => ({
 
 // Mock recall bridge service so we can exercise the route without an LLM call.
 jest.mock('../services/recall-bridge', () => ({
-  // gc1-allow: LLM external boundary (routeAndCall)
+  // gc1-allow: generateRecallBridge calls LLM via routeAndCall; stubbed to prevent real LLM call in metering unit test
   generateRecallBridge: jest
     .fn()
     .mockResolvedValue({ questions: ['Q?'], generated: true }),
@@ -93,6 +95,7 @@ jest.mock('../services/recall-bridge', () => ({
 
 // Mock profile service
 jest.mock('../services/profile', () => ({
+  // gc1-allow: DB-dependent service; mocked to keep test a unit test of metering middleware
   findOwnerProfile: jest.fn().mockResolvedValue({
     id: 'test-profile-id',
     birthYear: 2010,
@@ -107,6 +110,7 @@ jest.mock('../services/profile', () => ({
 
 // Mock subject service for route coverage
 jest.mock('../services/subject', () => ({
+  // gc1-allow: DB-dependent service; mocked to keep test a unit test of metering middleware
   listSubjects: jest.fn().mockResolvedValue([]),
   getSubject: jest.fn().mockResolvedValue({
     id: 'subject-1',
@@ -128,6 +132,7 @@ const mockDecrementQuota = jest.fn();
 const mockGetTopUpCreditsRemaining = jest.fn().mockResolvedValue(0);
 
 jest.mock('../services/billing', () => ({
+  // gc1-allow: billing service is the system under observation; controlled stubs are required to drive quota states (exhausted/available/top-up) that would need real DB state to reproduce
   ensureFreeSubscription: (...args: unknown[]) =>
     mockEnsureFreeSubscription(...args),
   getQuotaPool: (...args: unknown[]) => mockGetQuotaPool(...args),

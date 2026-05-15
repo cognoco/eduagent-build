@@ -4,6 +4,7 @@ import {
   isProfileInDedupRollout,
   isTopicIntentMatcherEnabled,
   validateEnv,
+  validateProductionBindings,
   validateProductionKeys,
 } from './config';
 import type { Env } from './config';
@@ -29,6 +30,7 @@ describe('validateProductionKeys', () => {
     MAX_DEDUP_LLM_CALLS_PER_SESSION: 10,
     MEMORY_FACTS_DEDUP_ROLLOUT_PCT: 0,
     MATCHER_ENABLED: 'false',
+    ALLOW_MISSING_IDEMPOTENCY_KV: 'false',
   };
 
   it('returns empty array for development environment', () => {
@@ -360,6 +362,80 @@ describe('validateEnv', () => {
     expect(env.MEMORY_FACTS_DEDUP_ROLLOUT_PCT).toBe(25);
   });
 
+  // Cloudflare Workers passes env values as raw strings — verify every
+  // z.coerce.number() key actually coerces (not just accepts a JS number).
+  // Catches a regression from z.coerce.number() → z.number() that would
+  // otherwise reject valid string-typed env in production.
+  describe('z.coerce.number() env keys parse raw strings', () => {
+    const rawStringEnv: Record<string, string> = {
+      ENVIRONMENT: 'development',
+      DATABASE_URL: 'postgresql://localhost/test',
+      MEMORY_FACTS_DEDUP_ENABLED: 'true',
+      MEMORY_FACTS_DEDUP_THRESHOLD: '0.42',
+      MAX_DEDUP_LLM_CALLS_PER_SESSION: '15',
+      MEMORY_FACTS_DEDUP_ROLLOUT_PCT: '50',
+    };
+
+    it('coerces MEMORY_FACTS_DEDUP_THRESHOLD from string to float', () => {
+      const env = validateEnv(rawStringEnv);
+      expect(env.MEMORY_FACTS_DEDUP_THRESHOLD).toBe(0.42);
+      expect(typeof env.MEMORY_FACTS_DEDUP_THRESHOLD).toBe('number');
+    });
+
+    it('coerces MAX_DEDUP_LLM_CALLS_PER_SESSION from string to integer', () => {
+      const env = validateEnv(rawStringEnv);
+      expect(env.MAX_DEDUP_LLM_CALLS_PER_SESSION).toBe(15);
+      expect(typeof env.MAX_DEDUP_LLM_CALLS_PER_SESSION).toBe('number');
+      expect(Number.isInteger(env.MAX_DEDUP_LLM_CALLS_PER_SESSION)).toBe(true);
+    });
+
+    it('coerces MEMORY_FACTS_DEDUP_ROLLOUT_PCT from string to integer', () => {
+      const env = validateEnv(rawStringEnv);
+      expect(env.MEMORY_FACTS_DEDUP_ROLLOUT_PCT).toBe(50);
+      expect(typeof env.MEMORY_FACTS_DEDUP_ROLLOUT_PCT).toBe('number');
+      expect(Number.isInteger(env.MEMORY_FACTS_DEDUP_ROLLOUT_PCT)).toBe(true);
+    });
+
+    it('enforces THRESHOLD min/max bounds on string inputs', () => {
+      expect(() =>
+        validateEnv({ ...rawStringEnv, MEMORY_FACTS_DEDUP_THRESHOLD: '-0.1' }),
+      ).toThrow('Invalid environment');
+      expect(() =>
+        validateEnv({ ...rawStringEnv, MEMORY_FACTS_DEDUP_THRESHOLD: '2.5' }),
+      ).toThrow('Invalid environment');
+    });
+
+    it('enforces MAX_DEDUP_LLM_CALLS_PER_SESSION min/max bounds on string inputs', () => {
+      expect(() =>
+        validateEnv({ ...rawStringEnv, MAX_DEDUP_LLM_CALLS_PER_SESSION: '-1' }),
+      ).toThrow('Invalid environment');
+      expect(() =>
+        validateEnv({
+          ...rawStringEnv,
+          MAX_DEDUP_LLM_CALLS_PER_SESSION: '101',
+        }),
+      ).toThrow('Invalid environment');
+    });
+
+    it('enforces ROLLOUT_PCT 0-100 bounds on string inputs', () => {
+      expect(() =>
+        validateEnv({ ...rawStringEnv, MEMORY_FACTS_DEDUP_ROLLOUT_PCT: '-1' }),
+      ).toThrow('Invalid environment');
+      expect(() =>
+        validateEnv({ ...rawStringEnv, MEMORY_FACTS_DEDUP_ROLLOUT_PCT: '101' }),
+      ).toThrow('Invalid environment');
+    });
+
+    it('rejects non-numeric string for coerced number env keys', () => {
+      expect(() =>
+        validateEnv({
+          ...rawStringEnv,
+          MEMORY_FACTS_DEDUP_THRESHOLD: 'not-a-number',
+        }),
+      ).toThrow('Invalid environment');
+    });
+  });
+
   it('isMemoryFactsDedupEnabled returns true only for "true"', () => {
     expect(isMemoryFactsDedupEnabled('true')).toBe(true);
     expect(isMemoryFactsDedupEnabled('false')).toBe(false);
@@ -381,6 +457,139 @@ describe('validateEnv', () => {
     expect(isTopicIntentMatcherEnabled('false')).toBe(false);
     expect(isTopicIntentMatcherEnabled(undefined)).toBe(false);
     expect(isTopicIntentMatcherEnabled('yes')).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ALLOW_MISSING_IDEMPOTENCY_KV — prelaunch override flag for the production
+// IDEMPOTENCY_KV deploy gate.
+// ---------------------------------------------------------------------------
+
+describe('ALLOW_MISSING_IDEMPOTENCY_KV env flag', () => {
+  it('defaults to "false" when unset', () => {
+    const env = validateEnv({
+      ENVIRONMENT: 'development',
+      DATABASE_URL: 'postgresql://localhost/test',
+    });
+    expect(env.ALLOW_MISSING_IDEMPOTENCY_KV).toBe('false');
+  });
+
+  it('parses "true" verbatim for the prelaunch override', () => {
+    const env = validateEnv({
+      ENVIRONMENT: 'development',
+      DATABASE_URL: 'postgresql://localhost/test',
+      ALLOW_MISSING_IDEMPOTENCY_KV: 'true',
+    });
+    expect(env.ALLOW_MISSING_IDEMPOTENCY_KV).toBe('true');
+  });
+
+  it('rejects invalid values', () => {
+    expect(() =>
+      validateEnv({
+        ENVIRONMENT: 'development',
+        DATABASE_URL: 'postgresql://localhost/test',
+        ALLOW_MISSING_IDEMPOTENCY_KV: 'yes',
+      }),
+    ).toThrow('Invalid environment');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// validateProductionBindings — production KV-binding gate.
+//
+// IDEMPOTENCY_KV gates the at-most-once replay dedup window for state-
+// mutating idempotent routes. Without it, the middleware silently falls
+// through to the downstream handler — leaving a real duplicate-side-effect
+// window. Production must refuse to serve traffic in that posture unless
+// the prelaunch override is explicitly opted into.
+// ---------------------------------------------------------------------------
+
+describe('validateProductionBindings', () => {
+  const PROD_ENV: Env = {
+    ENVIRONMENT: 'production',
+    DATABASE_URL: 'postgresql://prod/db',
+    APP_URL: 'https://www.mentomate.com',
+    API_ORIGIN: 'https://api.mentomate.com',
+    LOG_LEVEL: 'info',
+    EMAIL_FROM: 'noreply@mentomate.com',
+    EMPTY_REPLY_GUARD_ENABLED: 'true',
+    RETENTION_PURGE_ENABLED: 'false',
+    MEMORY_FACTS_READ_ENABLED: 'false',
+    MEMORY_FACTS_RELEVANCE_RETRIEVAL: 'false',
+    MEMORY_FACTS_DEDUP_ENABLED: 'false',
+    MEMORY_FACTS_DEDUP_THRESHOLD: 0.15,
+    MAX_DEDUP_LLM_CALLS_PER_SESSION: 10,
+    MEMORY_FACTS_DEDUP_ROLLOUT_PCT: 0,
+    MATCHER_ENABLED: 'false',
+    ALLOW_MISSING_IDEMPOTENCY_KV: 'false',
+  };
+
+  const fakeKv = {} as unknown;
+
+  it('returns no missing bindings in development', () => {
+    const { missing, overrideApplied } = validateProductionBindings(
+      { ...PROD_ENV, ENVIRONMENT: 'development' },
+      {},
+    );
+    expect(missing).toEqual([]);
+    expect(overrideApplied).toBe(false);
+  });
+
+  it('returns no missing bindings in staging (replay dedup is production-only)', () => {
+    const { missing, overrideApplied } = validateProductionBindings(
+      { ...PROD_ENV, ENVIRONMENT: 'staging' },
+      {},
+    );
+    expect(missing).toEqual([]);
+    expect(overrideApplied).toBe(false);
+  });
+
+  it('reports IDEMPOTENCY_KV missing in production without override', () => {
+    const { missing, overrideApplied } = validateProductionBindings(
+      PROD_ENV,
+      {},
+    );
+    expect(missing).toContain('IDEMPOTENCY_KV');
+    expect(overrideApplied).toBe(false);
+  });
+
+  it('returns no missing bindings when IDEMPOTENCY_KV is present in production', () => {
+    const { missing, overrideApplied } = validateProductionBindings(PROD_ENV, {
+      IDEMPOTENCY_KV: fakeKv,
+    });
+    expect(missing).toEqual([]);
+    expect(overrideApplied).toBe(false);
+  });
+
+  it('honours ALLOW_MISSING_IDEMPOTENCY_KV=true override and flags overrideApplied', () => {
+    const { missing, overrideApplied } = validateProductionBindings(
+      { ...PROD_ENV, ALLOW_MISSING_IDEMPOTENCY_KV: 'true' },
+      {},
+    );
+    expect(missing).toEqual([]);
+    expect(overrideApplied).toBe(true);
+  });
+
+  it('does NOT flag overrideApplied when the binding is actually present', () => {
+    const { missing, overrideApplied } = validateProductionBindings(
+      { ...PROD_ENV, ALLOW_MISSING_IDEMPOTENCY_KV: 'true' },
+      { IDEMPOTENCY_KV: fakeKv },
+    );
+    expect(missing).toEqual([]);
+    expect(overrideApplied).toBe(false);
+  });
+
+  it('ignores the override flag outside production', () => {
+    const { missing, overrideApplied } = validateProductionBindings(
+      {
+        ...PROD_ENV,
+        ENVIRONMENT: 'staging',
+        ALLOW_MISSING_IDEMPOTENCY_KV: 'true',
+      },
+      {},
+    );
+    expect(missing).toEqual([]);
+    expect(overrideApplied).toBe(false);
   });
 });
 

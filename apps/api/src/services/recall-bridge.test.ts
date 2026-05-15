@@ -17,11 +17,11 @@ const mockDatabaseModule = createDatabaseModuleMock({
   },
 });
 
-jest.mock('@eduagent/database', () => mockDatabaseModule.module);
+jest.mock('@eduagent/database', () => mockDatabaseModule.module); // gc1-allow: DB dependency injection, no real DB in unit test environment
 
 const mockRouteAndCall = jest.fn();
 
-jest.mock('./llm', () => ({
+jest.mock('./llm' /* gc1-allow: LLM external boundary */, () => ({
   routeAndCall: (...args: unknown[]) => mockRouteAndCall(...args),
 }));
 
@@ -245,7 +245,7 @@ describe('generateRecallBridge', () => {
 
     const messages = mockRouteAndCall.mock.calls[0][0];
     const systemMessage = messages.find(
-      (m: { role: string }) => m.role === 'system'
+      (m: { role: string }) => m.role === 'system',
     );
     expect(systemMessage.content).toContain('Trigonometry');
     expect(systemMessage.content).toContain('Angles, sine, cosine, tangent');

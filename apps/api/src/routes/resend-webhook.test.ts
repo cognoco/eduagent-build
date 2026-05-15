@@ -18,6 +18,15 @@ jest.mock('../services/logger', () => ({
   }),
 }));
 
+jest.mock(
+  '../services/sentry' /* gc1-allow: Sentry is an external observability boundary — SDK calls, not internal service logic. Same pattern as routes/account.test.ts */,
+  () => ({
+    captureException: jest.fn(),
+    captureMessage: jest.fn(),
+    addBreadcrumb: jest.fn(),
+  }),
+);
+
 import { Hono } from 'hono';
 import { resendWebhookRoute, verifyResendSignature } from './resend-webhook';
 import { inngest } from '../inngest/client';
@@ -599,5 +608,239 @@ describe('malformed payload', () => {
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.code).toBe('VALIDATION_ERROR');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [CCR-PR120-M7] Svix-id replay deduplication
+// ---------------------------------------------------------------------------
+
+type KVNamespaceLike = {
+  get: jest.Mock<Promise<string | null>, [key: string]>;
+  put: jest.Mock<
+    Promise<void>,
+    [key: string, value: string, opts?: { expirationTtl?: number }]
+  >;
+};
+
+function makeFakeKV(): KVNamespaceLike {
+  const store = new Map<string, string>();
+  return {
+    get: jest.fn(async (key: string) => store.get(key) ?? null),
+    put: jest.fn(async (key: string, value: string) => {
+      store.set(key, value);
+    }),
+  };
+}
+
+describe('[CCR-PR120-M7] svix-id replay dedup', () => {
+  beforeEach(() => {
+    (inngest.send as jest.Mock).mockClear();
+    mockLoggerWarn.mockClear();
+  });
+
+  it('first request with valid signature is accepted and records the svix-id', async () => {
+    const kv = makeFakeKV();
+    const env = { ...TEST_ENV, IDEMPOTENCY_KV: kv };
+
+    const rawBody = JSON.stringify({
+      type: 'email.delivered',
+      data: { to: 'user@example.com' },
+    });
+    const id = 'msg_first_request';
+    const ts = nowTimestamp();
+    const sig = await signPayload(rawBody, id, ts);
+
+    const res = await app.request(
+      '/webhooks/resend',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'svix-id': id,
+          'svix-timestamp': ts,
+          'svix-signature': sig,
+        },
+        body: rawBody,
+      },
+      env,
+    );
+
+    expect(res.status).toBe(200);
+    expect(kv.get).toHaveBeenCalledWith(`svix-dedup:resend:${id}`);
+    // KV write is fire-and-forget — flush microtasks so the promise resolves.
+    await new Promise((r) => setImmediate(r));
+    expect(kv.put).toHaveBeenCalledTimes(1);
+    expect(kv.put).toHaveBeenCalledWith(
+      `svix-dedup:resend:${id}`,
+      '1',
+      expect.objectContaining({ expirationTtl: 300 }),
+    );
+  });
+
+  it('REPLAY: second request with same svix-id is rejected 409 and side-effects suppressed', async () => {
+    const kv = makeFakeKV();
+    const env = { ...TEST_ENV, IDEMPOTENCY_KV: kv };
+
+    const rawBody = JSON.stringify({
+      type: 'email.bounced',
+      data: { email_id: 'e_replay', to: 'a@b.com' },
+    });
+    const id = 'msg_replay';
+    const ts = nowTimestamp();
+    const sig = await signPayload(rawBody, id, ts);
+
+    // First request: succeeds, writes dedup record
+    const first = await app.request(
+      '/webhooks/resend',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'svix-id': id,
+          'svix-timestamp': ts,
+          'svix-signature': sig,
+        },
+        body: rawBody,
+      },
+      env,
+    );
+    expect(first.status).toBe(200);
+    await new Promise((r) => setImmediate(r));
+    expect(inngest.send).toHaveBeenCalledTimes(1);
+
+    // Second identical request (replay): rejected with 409
+    (inngest.send as jest.Mock).mockClear();
+    const second = await app.request(
+      '/webhooks/resend',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'svix-id': id,
+          'svix-timestamp': ts,
+          'svix-signature': sig,
+        },
+        body: rawBody,
+      },
+      env,
+    );
+    expect(second.status).toBe(409);
+    const body = await second.json();
+    expect(body.code).toBe('CONFLICT');
+    // CRITICAL: no Inngest event must be emitted on replay — the whole point
+    // is to prevent duplicate side-effects.
+    expect(inngest.send).not.toHaveBeenCalled();
+  });
+
+  it('REPLAY break-test: removing dedup makes the replay re-process (proves test is real)', async () => {
+    // Same scenario as above but using TEST_ENV (no KV). Without the dedup
+    // guard the second request slips through and emits another Inngest event.
+    const rawBody = JSON.stringify({
+      type: 'email.bounced',
+      data: { email_id: 'e_no_kv', to: 'a@b.com' },
+    });
+    const id = 'msg_no_kv_replay';
+    const ts = nowTimestamp();
+    const sig = await signPayload(rawBody, id, ts);
+
+    const headers = {
+      'Content-Type': 'application/json',
+      'svix-id': id,
+      'svix-timestamp': ts,
+      'svix-signature': sig,
+    };
+
+    const first = await app.request(
+      '/webhooks/resend',
+      { method: 'POST', headers, body: rawBody },
+      TEST_ENV,
+    );
+    expect(first.status).toBe(200);
+
+    const second = await app.request(
+      '/webhooks/resend',
+      { method: 'POST', headers, body: rawBody },
+      TEST_ENV,
+    );
+    // Without KV dedup, replay succeeds — this confirms the previous test's
+    // 409 came from dedup, not from some other rejection path.
+    expect(second.status).toBe(200);
+    expect(inngest.send).toHaveBeenCalledTimes(2);
+  });
+
+  it('KV missing in production surfaces an Inngest observability event', async () => {
+    const env = { ...TEST_ENV, ENVIRONMENT: 'production' };
+
+    const res = await makeRequest(
+      { type: 'email.delivered', data: { to: 'a@b.com' } },
+      {},
+      env,
+    );
+
+    expect(res.status).toBe(200);
+    // Should have logged a warning + emitted the missing-KV signal
+    expect(mockLoggerWarn).toHaveBeenCalledWith(
+      '[resend] IDEMPOTENCY_KV not bound — svix-id replay protection disabled',
+      expect.objectContaining({ environment: 'production' }),
+    );
+    expect(inngest.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'app/resend-webhook.dedup_kv_missing',
+        data: expect.objectContaining({ environment: 'production' }),
+      }),
+    );
+  });
+
+  it('KV missing in dev is silent (no warning, no Inngest signal)', async () => {
+    const res = await makeRequest({
+      type: 'email.delivered',
+      data: { to: 'a@b.com' },
+    });
+
+    expect(res.status).toBe(200);
+    const warnsAboutMissingKv = mockLoggerWarn.mock.calls.some(
+      (call) =>
+        typeof call[0] === 'string' &&
+        call[0].includes('IDEMPOTENCY_KV not bound'),
+    );
+    expect(warnsAboutMissingKv).toBe(false);
+    const signalsMissingKv = (inngest.send as jest.Mock).mock.calls.some(
+      (call) => call[0]?.name === 'app/resend-webhook.dedup_kv_missing',
+    );
+    expect(signalsMissingKv).toBe(false);
+  });
+
+  it('KV read failure does NOT silently weaken protection (logs + Inngest signal)', async () => {
+    const kv: KVNamespaceLike = {
+      get: jest.fn().mockRejectedValue(new Error('kv read boom')),
+      put: jest.fn().mockResolvedValue(undefined),
+    };
+    const env = { ...TEST_ENV, IDEMPOTENCY_KV: kv };
+
+    const res = await makeRequest(
+      { type: 'email.delivered', data: { to: 'a@b.com' } },
+      {},
+      env,
+    );
+
+    // Falls through to processing rather than 500-ing — webhook stays functional.
+    expect(res.status).toBe(200);
+    expect(mockLoggerWarn).toHaveBeenCalledWith(
+      '[resend] svix-id dedup read failed; allowing request',
+      expect.objectContaining({ error: 'kv read boom' }),
+    );
+    expect(inngest.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'app/resend-webhook.dedup_lookup_failed',
+      }),
+    );
+  });
+
+  it('records dedup with TTL matching the 5-minute signature window', async () => {
+    const { __internal } = require('./resend-webhook') as {
+      __internal: { SVIX_DEDUP_TTL_SECONDS: number };
+    };
+    expect(__internal.SVIX_DEDUP_TTL_SECONDS).toBe(300);
   });
 });

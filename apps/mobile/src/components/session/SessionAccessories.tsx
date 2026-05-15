@@ -34,7 +34,7 @@ export function SessionToolAccessory({
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: 6 }}
+        contentContainerStyle={{ gap: 6, alignItems: 'center' }}
         testID="session-quick-chips"
       >
         {onAddNote ? (

@@ -337,8 +337,10 @@ async function handlePaymentFailed(
   if (updated) {
     await refreshKvCache(kv, db, updated.accountId);
 
-    // Observed by payment-failed-observe.ts. Keep this direct so Stripe retries
-    // the webhook if Inngest dispatch is temporarily unavailable.
+    // core-send: payment-failed alert — observed by payment-failed-observe.ts.
+    // Kept direct so a dispatch failure throws to the Stripe webhook handler,
+    // which then returns non-2xx → Stripe retries the webhook. A swallowed
+    // dispatch would lose the payment-failure signal entirely.
     await inngest.send({
       name: 'app/payment.failed',
       data: {

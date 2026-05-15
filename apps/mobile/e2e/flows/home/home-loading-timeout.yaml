@@ -1,0 +1,68 @@
+# Flow HOME-08: Home Loading Timeout Fallback (slow-network)
+#
+# Validates: when the home screen's profile query stays in-flight for >10s,
+# the `home-loading-timeout` view is shown. Tapping `home-loading-retry`
+# dismisses it (resets loadingTimedOut → false) — the timeout view disappears,
+# confirming the retry interaction works.
+#
+# Source: apps/mobile/src/app/(app)/home.tsx
+#   - setTimeout(..., 10_000) at line 62 sets `loadingTimedOut = true`
+#   - testID "home-loading-timeout" at line 89
+#   - testID "home-loading-retry" at line 99 (calls setLoadingTimedOut(false))
+#
+# testIDs verified against source:
+#   home-loading-timeout   apps/mobile/src/app/(app)/home.tsx line 89
+#   home-loading-retry     apps/mobile/src/app/(app)/home.tsx line 99
+#
+# Mechanism: NETWORK_DELAY_MS=12000 injects 12s RTT via the emulator console,
+# ensuring the profiles query stays in-flight long enough for the 10s timer to fire.
+# NETWORK_DELAY_MS = 10000 (home timer) + 2000 (margin) = 12000 ms.
+#
+# Run command:
+#   NETWORK_DELAY_MS=12000 ./e2e/scripts/seed-and-run.sh onboarding-complete e2e/flows/home/home-loading-timeout.yaml
+#
+# Tags: weekly, home, slow-net
+appId: com.mentomate.app
+tags:
+  - weekly
+  - home
+  - slow-net
+---
+# ── Step 1: Sign in with seeded credentials ──
+# seed-and-run.sh has brought the app to the sign-in screen and seeded the
+# onboarding-complete scenario. NETWORK_DELAY_MS was applied after app launch
+# so Metro bundle loaded at full speed. Reuses the canonical sign-in flow
+# (testIDs: sign-in-email, sign-in-password, sign-in-button — verified at
+# apps/mobile/src/app/(auth)/sign-in.tsx:1293, 1311, 1334).
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+
+- takeScreenshot: home-timeout-01-after-sign-in
+
+# ── Step 2: Wait for home-loading-timeout to appear ──
+# With 12s network delay the profiles query cannot complete before the 10s timer
+# fires. Total wait: 25s covers the 10s timer + sign-in redirect RTT.
+- extendedWaitUntil:
+    visible:
+      id: "home-loading-timeout"
+    timeout: 25000
+
+- takeScreenshot: home-timeout-02-timeout-visible
+
+- assertVisible:
+    id: "home-loading-timeout"
+
+# ── Step 3: Tap retry ──
+- tapOn:
+    id: "home-loading-retry"
+
+- takeScreenshot: home-timeout-03-after-retry
+
+# ── Step 4: Assert timeout view is gone after retry ──
+# setLoadingTimedOut(false) unmounts the timeout view immediately. The screen
+# returns to the spinner (still loading under 12s delay) or to home content.
+# Either way, home-loading-timeout must no longer be visible.
+- assertNotVisible:
+    id: "home-loading-timeout"
+
+- takeScreenshot: home-timeout-04-timeout-dismissed

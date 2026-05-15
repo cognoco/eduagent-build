@@ -10,6 +10,7 @@ import { computeTrialEndDate } from './trial';
 import { getTierConfig } from './subscription';
 import { createLogger } from './logger';
 import { captureException } from './sentry';
+import { safeSend } from './safe-non-core';
 import { inngest } from '../inngest/client';
 
 const logger = createLogger();
@@ -51,7 +52,7 @@ function mapAccountRow(row: typeof accounts.$inferSelect): Account {
  */
 export async function findAccountByClerkId(
   db: Database,
-  clerkUserId: string
+  clerkUserId: string,
 ): Promise<Account | null> {
   const row = await db.query.accounts.findFirst({
     where: eq(accounts.clerkUserId, clerkUserId),
@@ -76,7 +77,7 @@ export async function findOrCreateAccount(
   db: Database,
   clerkUserId: string,
   email: string,
-  timezone?: string | null
+  timezone?: string | null,
 ): Promise<Account> {
   const existing = await findAccountByClerkId(db, clerkUserId);
   if (existing) return existing;
@@ -147,27 +148,24 @@ export async function findOrCreateAccount(
         clerkUserId,
       },
     });
-    try {
-      await inngest.send({
-        name: 'app/billing.trial_subscription_failed',
-        data: {
-          accountId: row.id,
-          clerkUserId,
-          reason: error instanceof Error ? error.message : String(error),
-          timestamp: new Date().toISOString(),
-        },
-      });
-    } catch (sendError) {
-      // Inngest failure must not mask the primary error path — log and
-      // continue. The structured log + Sentry capture above already cover
-      // the primary failure; the missed Inngest dispatch is itself logged
-      // here so a separate observability rule can alert on it.
-      logger.error('billing.trial_subscription_failed_dispatch_failed', {
-        accountId: row.id,
-        sendError:
-          sendError instanceof Error ? sendError.message : String(sendError),
-      });
-    }
+    // Inngest failure must not mask the primary error path. The structured
+    // log + Sentry capture above already cover the primary failure; safeSend
+    // separately logs/escalates the missed dispatch so a follow-up handler
+    // can retry/alert without coupling to the lazy-provision path.
+    await safeSend(
+      () =>
+        inngest.send({
+          name: 'app/billing.trial_subscription_failed',
+          data: {
+            accountId: row.id,
+            clerkUserId,
+            reason: error instanceof Error ? error.message : String(error),
+            timestamp: new Date().toISOString(),
+          },
+        }),
+      'billing.trial_subscription_failed',
+      { accountId: row.id, clerkUserId },
+    );
   }
 
   return mapAccountRow(row);

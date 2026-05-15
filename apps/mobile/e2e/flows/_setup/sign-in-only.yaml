@@ -20,16 +20,17 @@ appId: com.mentomate.app
     id: "sign-in-email"
 - inputText: ${EMAIL}
 
-# Dismiss keyboard (pressKey: back is reliable when keyboard IS open — see BUG-5 notes)
-- pressKey: back
+# Dismiss keyboard before tapping the next field. hideKeyboard is a no-op
+# when the keyboard is closed, so it never falls through to Android Back
+# (the failure mode of the prior `pressKey: back` pattern).
+- hideKeyboard
 
 # 3. Enter password
 - tapOn:
     id: "sign-in-password"
 - inputText: ${PASSWORD}
 
-# Dismiss keyboard
-- pressKey: back
+- hideKeyboard
 
 # 4. Wait for sign-in button and tap it
 - extendedWaitUntil:

@@ -1,6 +1,7 @@
 const mockGenerateEmbedding = jest.fn();
 
 jest.mock('./embeddings', () => {
+  // gc1-allow: generateEmbedding calls Voyage AI REST API (external boundary; no key in test env)
   const actual = jest.requireActual('./embeddings') as Record<string, unknown>;
   return {
     ...actual,
@@ -83,7 +84,7 @@ describe('buildSummaryEmbeddingText', () => {
         reEntryRecommendation:
           'Resume with one more equivalent-fractions example and ask for the rule aloud.',
       },
-      'You connected pictures to the fraction rule.'
+      'You connected pictures to the fraction rule.',
     );
 
     expect(text).toContain('Narrative: Worked through fractions');
@@ -113,18 +114,18 @@ describe('purgeSessionTranscript', () => {
       db,
       'profile-1',
       'summary-1',
-      'voyage-key'
+      'voyage-key',
     );
 
     expect(result).toEqual(
       expect.objectContaining({
         status: 'skipped',
         reason: 'invalid_llm_summary',
-      })
+      }),
     );
     expect(mockGenerateEmbedding).not.toHaveBeenCalled();
     expect(
-      (db as unknown as { transaction: jest.Mock }).transaction
+      (db as unknown as { transaction: jest.Mock }).transaction,
     ).not.toHaveBeenCalled();
   });
 
@@ -145,7 +146,7 @@ describe('purgeSessionTranscript', () => {
         },
         learnerRecap: 'You connected pictures to the fraction rule.',
         purgedAt: null,
-      }
+      },
     );
 
     mockGenerateEmbedding.mockResolvedValue({
@@ -159,19 +160,19 @@ describe('purgeSessionTranscript', () => {
       db,
       'profile-1',
       'summary-1',
-      'voyage-key'
+      'voyage-key',
     );
 
     expect(mockGenerateEmbedding).toHaveBeenCalledWith(
       expect.stringContaining('Narrative: Worked through fractions'),
-      'voyage-key'
+      'voyage-key',
     );
     expect(insertValues).toHaveBeenCalledWith(
       expect.objectContaining({
         sessionId: 'session-1',
         profileId: 'profile-1',
         embedding: [0.1, 0.2],
-      })
+      }),
     );
     expect(onConflictDoUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -180,7 +181,7 @@ describe('purgeSessionTranscript', () => {
           content: expect.any(String),
           embedding: [0.1, 0.2],
         }),
-      })
+      }),
     );
     expect(updateWhere).toHaveBeenCalled();
     expect(result).toEqual(
@@ -191,7 +192,7 @@ describe('purgeSessionTranscript', () => {
         eventsDeleted: 2,
         embeddingRowsReplaced: 1,
         purgedAt: expect.any(Date),
-      })
+      }),
     );
   });
 
@@ -226,14 +227,14 @@ describe('purgeSessionTranscript', () => {
       db,
       'profile-1',
       'summary-1',
-      'voyage-key'
+      'voyage-key',
     );
 
     expect(result).toEqual(
       expect.objectContaining({
         status: 'skipped',
         reason: 'already_purged',
-      })
+      }),
     );
     expect(insertValues).not.toHaveBeenCalled();
     expect(deleteEmbeddingsReturning).not.toHaveBeenCalled();
@@ -261,14 +262,14 @@ describe('purgeSessionTranscript', () => {
       db,
       'profile-1',
       'summary-1',
-      'voyage-key'
+      'voyage-key',
     );
 
     expect(result).toEqual(
       expect.objectContaining({
         status: 'skipped',
         reason: 'missing_learner_recap',
-      })
+      }),
     );
     expect(mockGenerateEmbedding).not.toHaveBeenCalled();
   });
@@ -292,15 +293,15 @@ describe('purgeSessionTranscript', () => {
     });
 
     mockGenerateEmbedding.mockRejectedValueOnce(
-      new Error('Voyage unavailable')
+      new Error('Voyage unavailable'),
     );
 
     await expect(
-      purgeSessionTranscript(db, 'profile-1', 'summary-1', 'voyage-key')
+      purgeSessionTranscript(db, 'profile-1', 'summary-1', 'voyage-key'),
     ).rejects.toThrow('Voyage unavailable');
 
     expect(
-      (db as unknown as { transaction: jest.Mock }).transaction
+      (db as unknown as { transaction: jest.Mock }).transaction,
     ).not.toHaveBeenCalled();
     expect(insertValues).not.toHaveBeenCalled();
     expect(updateWhere).not.toHaveBeenCalled();

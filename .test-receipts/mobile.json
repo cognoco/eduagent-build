@@ -1,0 +1,12 @@
+{
+  "scope": "mobile",
+  "verifiedAt": "2026-05-15T07:05:13Z",
+  "verifiedBy": "Lord Vetinari @ ramtop",
+  "command": "pnpm exec nx run mobile:test",
+  "passed": true,
+  "testFiles": {
+    "apps/mobile/src/app/(app)/library.test.tsx": "c5fccd569a1022a5572c5eba06a41c1cd879aa1a",
+    "apps/mobile/src/components/common/MagicPenAnimation.test.tsx": "648579af675c9ab7669f9af1a13faf7575a02af7",
+    "apps/mobile/src/components/home/LearnerScreen.test.tsx": "e7f10507c1752949680c5903e69d37f31d39703a"
+  }
+}

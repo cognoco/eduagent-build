@@ -5,6 +5,11 @@
 For background, conventions, and the full troubleshooting matrix, READ
 `docs/E2Edocs/e2e-runbook.md` FIRST. This skill is the operational shortcut.
 
+**The failure-handling loop (run → note failures → classify → fix code OR
+fix test, never weaken → repeat) and the mock-on-touch rule live in
+`/my:run-tests`. Read that before touching any failing test.** This skill
+covers only the E2E-specific runner: emulator + Metro + Maestro setup.
+
 ## Arguments
 
 $ARGUMENTS — Optional: flow file path relative to repo root (e.g.,
@@ -119,13 +124,20 @@ C:/Tools/doppler/doppler.exe run -c stg -- bash apps/mobile/e2e/scripts/seed-and
 
 ## Categorize failures
 
+Use the three-way classification from `/my:run-tests` (real bug / test drift / env). E2E adds one extra category in front:
+
 - **Infrastructure failure** (emulator offline, Metro 404, Maestro driver
-  timeout): see runbook troubleshooting matrix. **15-min hard limit** on
-  infra debugging — if not resolved, stop and report.
-- **App bug** (wrong text, missing element, navigation error): report with
-  testID and observed state. Do NOT modify app code to make tests pass.
-- **Test bug** (outdated testID, deprecated `_setup` reference): fix the
-  test to match current app UI. App is source of truth.
+  timeout, UIAutomator lock): see runbook troubleshooting matrix.
+  **15-min hard limit** on infra debugging — if not resolved, stop and report.
+- **Real bug** (wrong text, missing element, navigation error, server 500):
+  fix the production code. Do NOT modify the test or weaken assertions.
+- **Test drift** (outdated testID, screen renamed, removed feature): rewrite
+  the assertion against the current real UI. If the screen genuinely no
+  longer exists, delete the whole flow file, not just the failing step.
+
+For mock-touching tests opened during the loop (any Jest test you crack
+open in support of an E2E failure), apply the GC6 mock-on-touch sweep from
+`/my:run-tests`.
 
 ## Known issues to mention if relevant
 
@@ -136,6 +148,17 @@ C:/Tools/doppler/doppler.exe run -c stg -- bash apps/mobile/e2e/scripts/seed-and
   the broken assertion.
 - "Maestro driver did not start up in time" almost always means UIAutomator
   lock from a non-graceful kill of a previous Maestro run. Recovery: `adb reboot`.
+
+## Update documentation after every run
+
+Before you report back:
+
+- **Pass/fail/blocked state of a flow changed** → update the flow table in `docs/flows/plans/2026-05-01-flow-revision-plan.md` (Tested, Result, Bugs, Notes columns).
+- **New infra symptom encountered or workaround learned** → add a row to the troubleshooting matrix in `docs/E2Edocs/e2e-runbook.md`.
+- **You touched a Jest test in support of an E2E failure** → see the documentation block in `/my:run-tests` (inventory regen, harness table, etc.).
+- **You filed or resolved a Notion bug for an E2E failure** → update the Notion row per `/my:fix-notion-bugs`.
+
+If none of the above applies, say so in the report. Silence is ambiguous.
 
 ## NEVER do
 

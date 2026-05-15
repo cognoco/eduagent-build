@@ -11,9 +11,6 @@ import {
   ERROR_CODES,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
-import { createLogger } from '../services/logger';
-
-const logger = createLogger();
 import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
 import { requireProfileId } from '../middleware/profile-scope';
@@ -35,7 +32,7 @@ import {
 } from '../services/consent';
 import { notFound, forbidden, apiError } from '../errors';
 import { inngest } from '../inngest/client';
-import { captureException } from '../services/sentry';
+import { safeSend } from '../services/safe-non-core';
 
 // [BUG-655 / A-11] /consent/respond is unauthenticated (a parent clicks an
 // emailed link, no session). The token is a 122-bit UUID so brute-force is
@@ -185,30 +182,22 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
       // Dispatch Inngest event for reminder workflow
       // NOTE: parentEmail is intentionally omitted — PII must not be in event payloads.
       // The consent-reminders function looks up parentEmail from the DB.
-      // Wrapped in try-catch: consent request must succeed even if Inngest is unreachable
-      // (same pattern as session close — BUG-54).
-      try {
-        await inngest.send({
-          name: 'app/consent.requested',
-          data: {
-            profileId: result.consentState.profileId,
-            consentType: result.consentState.consentType,
-            timestamp: new Date().toISOString(),
-          },
-        });
-      } catch (err) {
-        // [A-23] logger.warn alone is invisible in prod — escalate to Sentry so
-        // we can query how often the GDPR reminder workflow is permanently skipped.
-        logger.warn(
-          '[consent] Failed to dispatch Inngest event — reminder workflow skipped',
-        );
-        captureException(err, {
-          extra: {
-            context: 'consent.requested.inngest_dispatch',
-            profileId: result.consentState.profileId,
-          },
-        });
-      }
+      // safeSend wrapper: consent request must succeed even if Inngest is unreachable
+      // (same pattern as session close — BUG-54). [A-23] escalates failures to Sentry
+      // so we can query how often the GDPR reminder workflow is permanently skipped.
+      await safeSend(
+        () =>
+          inngest.send({
+            name: 'app/consent.requested',
+            data: {
+              profileId: result.consentState.profileId,
+              consentType: result.consentState.consentType,
+              timestamp: new Date().toISOString(),
+            },
+          }),
+        'consent.requested',
+        { profileId: result.consentState.profileId },
+      );
 
       return c.json(
         consentRequestResultSchema.parse({
@@ -346,30 +335,23 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
       const state = await revokeConsent(db, childProfileId, parentProfileId);
 
       // Schedule 7-day grace period deletion via Inngest
-      // Wrapped in try-catch: revocation must succeed even if Inngest is unreachable
-      // (same pattern as consent request — BUG-64, session close — BUG-54).
-      try {
-        await inngest.send({
-          name: 'app/consent.revoked',
-          data: {
-            childProfileId,
-            parentProfileId,
-            timestamp: new Date().toISOString(),
-          },
-        });
-      } catch (err) {
-        // [A-23] logger.warn alone is invisible in prod — escalate to Sentry so
-        // we can query how often the GDPR 7-day deletion grace period is skipped.
-        logger.warn(
-          '[consent] Failed to dispatch Inngest revocation event — grace period job skipped',
-        );
-        captureException(err, {
-          extra: {
-            context: 'consent.revoked.inngest_dispatch',
-            childProfileId,
-          },
-        });
-      }
+      // safeSend wrapper: revocation must succeed even if Inngest is unreachable
+      // (same pattern as consent request — BUG-64, session close — BUG-54). [A-23]
+      // escalates failures to Sentry so we can query how often the GDPR 7-day
+      // deletion grace period job is skipped.
+      await safeSend(
+        () =>
+          inngest.send({
+            name: 'app/consent.revoked',
+            data: {
+              childProfileId,
+              parentProfileId,
+              timestamp: new Date().toISOString(),
+            },
+          }),
+        'consent.revoked',
+        { childProfileId, parentProfileId },
+      );
 
       return c.json(
         consentActionResultSchema.parse({

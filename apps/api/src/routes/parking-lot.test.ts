@@ -1,11 +1,12 @@
 jest.mock('../services/parking-lot-data', () => ({
+  ...jest.requireActual('../services/parking-lot-data'),
   getParkingLotItems: jest.fn(),
   getParkingLotItemsForTopic: jest.fn(),
   addParkingLotItem: jest.fn(),
-  MAX_ITEMS_PER_TOPIC: 10,
 }));
 
 jest.mock('../services/session', () => ({
+  ...jest.requireActual('../services/session'),
   getSession: jest.fn(),
 }));
 
@@ -76,7 +77,7 @@ describe('GET /sessions/:sessionId/parking-lot', () => {
     expect(mockGetParkingLotItems).toHaveBeenCalledWith(
       {},
       'test-profile-id',
-      TEST_SESSION_ID
+      TEST_SESSION_ID,
     );
   });
 
@@ -110,7 +111,7 @@ describe('GET /subjects/:subjectId/topics/:topicId/parking-lot', () => {
     const app = createApp();
 
     const res = await app.request(
-      `/subjects/${TEST_SUBJECT_ID}/topics/${TEST_TOPIC_ID}/parking-lot`
+      `/subjects/${TEST_SUBJECT_ID}/topics/${TEST_TOPIC_ID}/parking-lot`,
     );
 
     expect(res.status).toBe(200);
@@ -119,7 +120,7 @@ describe('GET /subjects/:subjectId/topics/:topicId/parking-lot', () => {
     expect(mockGetParkingLotItemsForTopic).toHaveBeenCalledWith(
       {},
       'test-profile-id',
-      TEST_TOPIC_ID
+      TEST_TOPIC_ID,
     );
   });
 
@@ -127,7 +128,7 @@ describe('GET /subjects/:subjectId/topics/:topicId/parking-lot', () => {
     const app = createApp(NO_PROFILE);
 
     const res = await app.request(
-      `/subjects/${TEST_SUBJECT_ID}/topics/${TEST_TOPIC_ID}/parking-lot`
+      `/subjects/${TEST_SUBJECT_ID}/topics/${TEST_TOPIC_ID}/parking-lot`,
     );
 
     expect(res.status).toBe(400);

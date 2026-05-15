@@ -129,7 +129,7 @@ export default function HomeScreen(): React.ReactElement {
   }
 
   return (
-    <View className="flex-1">
+    <View className="flex-1" testID="home-screen">
       <LearnerScreen profiles={profiles} activeProfile={activeProfile} />
       {CelebrationOverlay}
       {firstNotice && visibleNoticeId === firstNotice.id ? (

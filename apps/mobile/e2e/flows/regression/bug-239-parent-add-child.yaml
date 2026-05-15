@@ -58,7 +58,7 @@ tags:
 - tapOn:
     id: "create-profile-name"
 - inputText: "BugTest Child"
-- pressKey: back
+- hideKeyboard
 
 # 7. Select birth date (child under 16 — triggers consent requirement)
 - tapOn:

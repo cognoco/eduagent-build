@@ -4,6 +4,7 @@ import { z } from 'zod';
 import type { Database } from '@eduagent/database';
 import {
   createBookmarkSchema,
+  bookmarkListQuerySchema,
   bookmarkListResponseSchema,
   sessionBookmarkListResponseSchema,
 } from '@eduagent/schemas';
@@ -31,13 +32,6 @@ type BookmarkRouteEnv = {
 
 const bookmarkIdParamSchema = z.object({
   id: z.string().uuid(),
-});
-
-const bookmarkListQuerySchema = z.object({
-  cursor: z.string().uuid().optional(),
-  limit: z.coerce.number().int().min(1).max(50).optional(),
-  subjectId: z.string().uuid().optional(),
-  topicId: z.string().uuid().optional(),
 });
 
 const sessionBookmarksQuerySchema = z.object({

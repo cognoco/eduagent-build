@@ -1,5 +1,6 @@
 import { Pressable, View, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { SubjectBookshelfMotif } from '../common/SubjectBookshelfMotif';
 
 export interface SubjectTileProps {
   subjectId: string;
@@ -25,7 +26,6 @@ export function SubjectTile({
   topicsTotal = 0,
   tintSolid,
   tintSoft,
-  icon,
   onPress,
   testID,
 }: SubjectTileProps) {
@@ -43,12 +43,11 @@ export function SubjectTile({
       className="w-[142px] rounded-2xl bg-surface border border-border p-3.5 pb-4"
       style={[{ gap: 10 }, isPreparing && { opacity: 0.7 }]}
     >
-      <View
-        testID={`${testID}-icon`}
-        className="w-[38px] h-[38px] rounded-xl items-center justify-center"
-        style={{ backgroundColor: tintSoft }}
-      >
-        <Ionicons name={icon} size={20} color={tintSolid} />
+      <View testID={`${testID}-icon`} className="items-start">
+        <SubjectBookshelfMotif
+          tint={{ solid: tintSolid, soft: tintSoft }}
+          testID={`${testID}-bookshelf`}
+        />
       </View>
       <View>
         <Text className="text-[15px] font-bold text-text-primary">{name}</Text>

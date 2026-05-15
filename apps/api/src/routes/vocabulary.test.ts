@@ -15,6 +15,8 @@ const mockDatabaseModule = createDatabaseModuleMock();
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
 jest.mock('../services/account', () => ({
+  // gc1-allow: findOrCreateAccount fires Stripe/Inngest side-effects via accountMiddleware; stub isolates route tests from billing chain
+  ...(jest.requireActual('../services/account') as Record<string, unknown>),
   findOrCreateAccount: jest.fn().mockResolvedValue({
     id: 'test-account-id',
     clerkUserId: 'user_test',
@@ -25,6 +27,8 @@ jest.mock('../services/account', () => ({
 }));
 
 jest.mock('../services/profile', () => ({
+  // gc1-allow: profileScopeMiddleware calls getProfile/findOwnerProfile; stub controls middleware-injected profileId for route-layer assertions
+  ...(jest.requireActual('../services/profile') as Record<string, unknown>),
   findOwnerProfile: jest.fn().mockResolvedValue(null),
   getProfile: jest.fn().mockResolvedValue({
     id: 'a0000000-0000-4000-a000-000000000001',
@@ -35,6 +39,8 @@ jest.mock('../services/profile', () => ({
 }));
 
 jest.mock('../services/vocabulary', () => ({
+  // gc1-allow: vocabulary service is the SUT boundary; stubs let each test control per-case return values without a live DB
+  ...(jest.requireActual('../services/vocabulary') as Record<string, unknown>),
   listVocabulary: jest.fn().mockResolvedValue([
     {
       id: '770e8400-e29b-41d4-a716-446655440000',
@@ -135,7 +141,7 @@ describe('vocabulary routes', () => {
       const res = await app.request(
         `/v1/subjects/${SUBJECT_ID}/vocabulary`,
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -148,13 +154,13 @@ describe('vocabulary routes', () => {
 
     it('[FIX-API-6] returns 404 when SubjectNotFoundError is thrown (typed instanceof)', async () => {
       (listVocabulary as jest.Mock).mockRejectedValueOnce(
-        new SubjectNotFoundError()
+        new SubjectNotFoundError(),
       );
 
       const res = await app.request(
         `/v1/subjects/${SUBJECT_ID}/vocabulary`,
         { headers: AUTH_HEADERS },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(404);
@@ -166,7 +172,7 @@ describe('vocabulary routes', () => {
       const res = await app.request(
         `/v1/subjects/${SUBJECT_ID}/vocabulary`,
         {},
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);
@@ -187,7 +193,7 @@ describe('vocabulary routes', () => {
             cefrLevel: 'A1',
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(201);
@@ -208,7 +214,7 @@ describe('vocabulary routes', () => {
             translation: 'hello',
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -216,7 +222,7 @@ describe('vocabulary routes', () => {
 
     it('[FIX-API-6] returns 404 when SubjectNotFoundError is thrown on create (typed instanceof)', async () => {
       (createVocabulary as jest.Mock).mockRejectedValueOnce(
-        new SubjectNotFoundError()
+        new SubjectNotFoundError(),
       );
 
       const res = await app.request(
@@ -229,7 +235,7 @@ describe('vocabulary routes', () => {
             translation: 'hello',
           }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(404);
@@ -247,7 +253,7 @@ describe('vocabulary routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ quality: 4 }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -260,7 +266,7 @@ describe('vocabulary routes', () => {
 
     it('[FIX-API-6] returns 404 when VocabularyNotFoundError is thrown on review (typed instanceof)', async () => {
       (reviewVocabulary as jest.Mock).mockRejectedValueOnce(
-        new VocabularyNotFoundError()
+        new VocabularyNotFoundError(),
       );
 
       const res = await app.request(
@@ -270,7 +276,7 @@ describe('vocabulary routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ quality: 4 }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(404);
@@ -280,7 +286,7 @@ describe('vocabulary routes', () => {
 
     it('returns 422 when review input is semantically invalid', async () => {
       (reviewVocabulary as jest.Mock).mockRejectedValueOnce(
-        new Error('Review failed')
+        new Error('Review failed'),
       );
 
       const res = await app.request(
@@ -290,7 +296,7 @@ describe('vocabulary routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ quality: 4 }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(422);
@@ -304,7 +310,7 @@ describe('vocabulary routes', () => {
           headers: AUTH_HEADERS,
           body: JSON.stringify({ quality: 8 }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(400);
@@ -318,7 +324,7 @@ describe('vocabulary routes', () => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ quality: 4 }),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);
@@ -335,7 +341,7 @@ describe('vocabulary routes', () => {
           method: 'DELETE',
           headers: AUTH_HEADERS,
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -354,7 +360,7 @@ describe('vocabulary routes', () => {
           method: 'DELETE',
           headers: AUTH_HEADERS,
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(404);
@@ -369,7 +375,7 @@ describe('vocabulary routes', () => {
           method: 'DELETE',
           headers: AUTH_HEADERS,
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       const [, profileId, subjectId, vocabularyId] = (
@@ -386,7 +392,7 @@ describe('vocabulary routes', () => {
         {
           method: 'DELETE',
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);

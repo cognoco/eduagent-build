@@ -70,7 +70,7 @@ tags:
 
 - inputText: "The sun is warm. Birds can sing."
 
-- pressKey: back
+- hideKeyboard
 
 - tapOn:
     id: "text-preview-start"

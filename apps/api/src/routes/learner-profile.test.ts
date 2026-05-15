@@ -21,7 +21,7 @@ jest.mock('inngest/hono', () => ({
 }));
 
 jest.mock('../inngest/client', () => ({
-  // gc1-allow: Inngest SDK external boundary
+  // gc1-allow: Inngest SDK external boundary — client wraps inngest package
   inngest: {
     send: jest.fn().mockResolvedValue(undefined),
     createFunction: jest.fn().mockReturnValue(jest.fn()),
@@ -48,7 +48,7 @@ mockDatabaseModule.db.query = new Proxy(mockDatabaseModule.db.query as object, {
   },
 });
 
-jest.mock('@eduagent/database', () => mockDatabaseModule.module);
+jest.mock('@eduagent/database', () => mockDatabaseModule.module); // gc1-allow: unit-level route test — no DB available; createDatabaseModuleMock provides controlled familyLinks stub for IDOR assertions
 
 jest.mock('../services/account', () => ({
   ...jest.requireActual('../services/account'),

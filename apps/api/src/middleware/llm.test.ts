@@ -1,12 +1,15 @@
 jest.mock('../services/llm', () => ({
+  ...jest.requireActual('../services/llm'),
   registerProvider: jest.fn(),
 }));
 
 jest.mock('../services/llm/providers/gemini', () => ({
+  ...jest.requireActual('../services/llm/providers/gemini'),
   createGeminiProvider: jest.fn().mockReturnValue({ id: 'gemini' }),
 }));
 
 jest.mock('../services/llm/providers/openai', () => ({
+  ...jest.requireActual('../services/llm/providers/openai'),
   createOpenAIProvider: jest.fn().mockReturnValue({ id: 'openai' }),
 }));
 
@@ -82,7 +85,7 @@ describe('llmMiddleware', () => {
     const next = jest.fn();
 
     await expect(llmMiddleware(c, next)).rejects.toThrow(
-      'At least one LLM API key is required'
+      'At least one LLM API key is required',
     );
     expect(registerProvider).not.toHaveBeenCalled();
     expect(next).not.toHaveBeenCalled();
@@ -94,7 +97,7 @@ describe('llmMiddleware', () => {
     const next = jest.fn();
 
     await expect(llmMiddleware(c, next)).rejects.toThrow(
-      'At least one LLM API key is required'
+      'At least one LLM API key is required',
     );
     expect(registerProvider).not.toHaveBeenCalled();
   });
@@ -105,7 +108,7 @@ describe('llmMiddleware', () => {
     const next = jest.fn();
 
     await expect(llmMiddleware(c, next)).rejects.toThrow(
-      'At least one LLM API key is required'
+      'At least one LLM API key is required',
     );
     expect(registerProvider).not.toHaveBeenCalled();
     expect(next).not.toHaveBeenCalled();
@@ -117,7 +120,7 @@ describe('llmMiddleware', () => {
     const next = jest.fn();
 
     await expect(llmMiddleware(c, next)).rejects.toThrow(
-      'At least one LLM API key is required'
+      'At least one LLM API key is required',
     );
     expect(registerProvider).not.toHaveBeenCalled();
     expect(next).not.toHaveBeenCalled();
@@ -133,7 +136,7 @@ describe('llmMiddleware', () => {
 
     expect(registerProvider).not.toHaveBeenCalled();
     expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('No LLM API keys set')
+      expect.stringContaining('No LLM API keys set'),
     );
     expect(next).toHaveBeenCalled();
 
@@ -150,7 +153,7 @@ describe('llmMiddleware', () => {
 
     expect(registerProvider).not.toHaveBeenCalled();
     expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('No LLM API keys set')
+      expect.stringContaining('No LLM API keys set'),
     );
     expect(next).toHaveBeenCalled();
 

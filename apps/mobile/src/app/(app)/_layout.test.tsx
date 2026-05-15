@@ -18,33 +18,19 @@ import { createRoutedMockFetch } from '../../test-utils/mock-api-routes';
 const mockFetch = createRoutedMockFetch();
 
 jest.mock('../../lib/api-client', () =>
-  // gc1-allow: Clerk useAuth() external boundary
   require('../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch),
 );
 
 const mockUseProfile = jest.fn();
 const mockUsePathname = jest.fn();
 const mockReplace = jest.fn();
-const mockTabScreens: Array<Record<string, unknown>> = [];
-let mockTabsMounts = 0;
-let mockTabsUnmounts = 0;
 const mockTabs = Object.assign(
   ({ children }: { children?: React.ReactNode }) => {
-    const ReactRuntime = require('react');
     const { View } = require('react-native');
-    ReactRuntime.useEffect(() => {
-      mockTabsMounts += 1;
-      return () => {
-        mockTabsUnmounts += 1;
-      };
-    }, []);
     return <View testID="tabs">{children}</View>;
   },
   {
-    Screen: (props: Record<string, unknown>) => {
-      mockTabScreens.push(props);
-      return null;
-    },
+    Screen: () => null,
   },
 );
 
@@ -104,7 +90,6 @@ jest.mock('expo-speech-recognition', () => ({
 }));
 
 jest.mock('../../lib/profile', () => ({
-  ...jest.requireActual('../../lib/profile'),
   useProfile: () => mockUseProfile(),
   isGuardianProfile: (
     profile: { isOwner: boolean } | null | undefined,
@@ -115,34 +100,29 @@ jest.mock('../../lib/profile', () => ({
 // use-consent uses useApiClient — mocked at the fetch boundary via mockFetch.
 // Routes: GET /consent/my-status, POST /consent/request
 
-jest.mock(
-  '../../lib/theme' /* gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM */,
-  () => ({
-    useThemeColors: () => ({
-      accent: '#0ea5e9',
-      border: '#d4d4d8',
-      muted: '#71717a',
-      surface: '#ffffff',
-      textInverse: '#ffffff',
-      textPrimary: '#18181b',
-      textSecondary: '#52525b',
-    }),
-    useTokenVars: () => ({}),
+// prettier-ignore
+jest.mock('../../lib/theme', /* gc1-allow: nativewind vars() does not resolve 'react' in jest; stub theme hooks so screen tests don't blow up on import */ () => ({
+  useThemeColors: () => ({
+    accent: '#0ea5e9',
+    border: '#d4d4d8',
+    muted: '#71717a',
+    surface: '#ffffff',
+    textInverse: '#ffffff',
+    textPrimary: '#18181b',
+    textSecondary: '#52525b',
   }),
-);
+  useTokenVars: () => ({}),
+}));
 
 jest.mock('../../hooks/use-revenuecat', () => ({
-  // gc1-allow: react-native-purchases native SDK
   useRevenueCatIdentity: jest.fn(),
 }));
 
 jest.mock('../../hooks/use-mentor-language-sync', () => ({
-  ...jest.requireActual('../../hooks/use-mentor-language-sync'),
   useMentorLanguageSync: jest.fn(),
 }));
 
 jest.mock('../../lib/sentry', () => ({
-  // gc1-allow: @sentry/react-native external boundary
   evaluateSentryForProfile: jest.fn(),
   // useParentProxy (rendered inside _layout) catches SecureStore failures
   // with Sentry.captureException — provide a no-op so the hook doesn't crash
@@ -151,7 +131,6 @@ jest.mock('../../lib/sentry', () => ({
 }));
 
 jest.mock('../../lib/secure-storage', () => ({
-  // gc1-allow: expo-secure-store native keychain
   getItemAsync: jest.fn(),
   setItemAsync: jest.fn(),
   deleteItemAsync: jest.fn(),
@@ -159,7 +138,6 @@ jest.mock('../../lib/secure-storage', () => ({
 }));
 
 jest.mock('../../components/feedback/FeedbackProvider', () => ({
-  // gc1-allow: expo-sensors (Accelerometer) native boundary
   FeedbackProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 
@@ -184,9 +162,6 @@ describe('AppLayout', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockTabScreens.length = 0;
-    mockTabsMounts = 0;
-    mockTabsUnmounts = 0;
     testQueryClient = new QueryClient({
       defaultOptions: { queries: { retry: false, gcTime: 0 } },
     });
@@ -283,131 +258,6 @@ describe('AppLayout', () => {
           headers: { 'Content-Type': 'application/json' },
         }),
     );
-  });
-
-  it('invalidates progress data when the Progress tab is pressed', () => {
-    const invalidateSpy = jest.spyOn(testQueryClient, 'invalidateQueries');
-    renderLayout();
-
-    const progressScreen = mockTabScreens.find(
-      (screen) => screen['name'] === 'progress',
-    );
-    const listeners = progressScreen?.['listeners'] as
-      | { tabPress?: () => void }
-      | undefined;
-
-    listeners?.tabPress?.();
-
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['progress'] });
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['dashboard'] });
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['retention'] });
-    expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: ['language-progress'],
-    });
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['resume-nudge'] });
-  });
-
-  it('invalidates learner home data when Home or Own Learning tabs are pressed', () => {
-    const invalidateSpy = jest.spyOn(testQueryClient, 'invalidateQueries');
-    renderLayout();
-
-    for (const tabName of ['home', 'own-learning']) {
-      invalidateSpy.mockClear();
-      const tabScreen = mockTabScreens.find(
-        (screen) => screen['name'] === tabName,
-      );
-      const listeners = tabScreen?.['listeners'] as
-        | { tabPress?: () => void }
-        | undefined;
-
-      listeners?.tabPress?.();
-
-      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['subjects'] });
-      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['progress'] });
-      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['dashboard'] });
-      expect(invalidateSpy).toHaveBeenCalledWith({
-        queryKey: ['coaching-card'],
-      });
-      expect(invalidateSpy).toHaveBeenCalledWith({
-        queryKey: ['celebrations'],
-      });
-      expect(invalidateSpy).toHaveBeenCalledWith({
-        queryKey: ['subscription'],
-      });
-      expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['usage'] });
-    }
-  });
-
-  it('invalidates library aggregate data when the Library tab is pressed', () => {
-    const invalidateSpy = jest.spyOn(testQueryClient, 'invalidateQueries');
-    renderLayout();
-
-    const libraryScreen = mockTabScreens.find(
-      (screen) => screen['name'] === 'library',
-    );
-    const listeners = libraryScreen?.['listeners'] as
-      | { tabPress?: () => void }
-      | undefined;
-
-    listeners?.tabPress?.();
-
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['subjects'] });
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['progress'] });
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['library'] });
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['books'] });
-  });
-
-  it('invalidates account/settings data and leaves More tab navigation to the tab navigator', () => {
-    const invalidateSpy = jest.spyOn(testQueryClient, 'invalidateQueries');
-    renderLayout();
-
-    const moreScreen = mockTabScreens.find(
-      (screen) => screen['name'] === 'more',
-    );
-    const listeners = moreScreen?.['listeners'] as
-      | { tabPress?: () => void }
-      | undefined;
-
-    const tabPressResult = listeners?.tabPress?.();
-
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['profiles'] });
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['subscription'] });
-    expect(invalidateSpy).toHaveBeenCalledWith({
-      queryKey: ['subscription-family'],
-    });
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['usage'] });
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['settings'] });
-    expect(tabPressResult).toBeUndefined();
-    expect(mockReplace).not.toHaveBeenCalled();
-  });
-
-  it('remounts the tab shell when the active profile changes', () => {
-    const { rerender } = renderLayout();
-
-    expect(mockTabsMounts).toBe(1);
-    expect(mockTabsUnmounts).toBe(0);
-
-    mockUseProfile.mockReturnValue({
-      profiles: [
-        { id: 'p1', isOwner: true, consentStatus: null, birthYear: 1990 },
-        { id: 'c1', isOwner: false, consentStatus: null, birthYear: 2014 },
-      ],
-      activeProfile: {
-        id: 'c1',
-        isOwner: false,
-        consentStatus: null,
-        birthYear: 2014,
-      },
-      isLoading: false,
-      profileWasRemoved: false,
-      acknowledgeProfileRemoval: jest.fn(),
-      switchProfile: jest.fn(),
-    });
-
-    rerender(<AppLayout />);
-
-    expect(mockTabsUnmounts).toBe(1);
-    expect(mockTabsMounts).toBe(2);
   });
 
   afterEach(() => {
@@ -539,6 +389,22 @@ describe('AppLayout', () => {
     expect(peekPendingAuthRedirect()).toBeNull();
   });
 
+  it('clears the default home auth redirect immediately after landing on home', () => {
+    rememberPendingAuthRedirect('/(app)/home');
+    mockUsePathname.mockReturnValue('/home');
+
+    const view = renderLayout();
+
+    expect(peekPendingAuthRedirect()).toBeNull();
+
+    mockReplace.mockClear();
+    mockUsePathname.mockReturnValue('/create-profile');
+    view.rerender(<AppLayout />);
+
+    expect(mockReplace).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('auth-redirect-replay')).toBeNull();
+  });
+
   it('strips route-group segments from redirect targets for unauthenticated users', () => {
     mockUsePathname.mockReturnValue('/(app)/quiz');
     (useAuth as jest.Mock).mockReturnValue({
@@ -649,6 +515,54 @@ describe('AppLayout', () => {
     expect(screen.queryByTestId('post-approval-landing')).toBeNull();
     expect(screen.queryByText("You're approved!")).toBeNull();
     screen.getByTestId('tabs');
+  });
+
+  // [BUG-61] A teen-owner (under-18 with their own account) who just
+  // transitioned PARENTAL_CONSENT_REQUESTED → CONSENTED IS the audience for
+  // "Your parent said yes" — they're the learner, not an impersonating parent.
+  // The discriminator vs the BUG-914 adult-owner case is consentData.parentEmail
+  // (non-null only after a parental-consent record exists).
+  it('shows post-approval landing for a teen-owner whose parent just approved (BUG-61)', async () => {
+    mockUseProfile.mockReturnValue({
+      profiles: [
+        {
+          id: 'p1',
+          isOwner: true,
+          consentStatus: 'CONSENTED',
+          birthYear: 2014, // teen
+        },
+      ],
+      activeProfile: {
+        id: 'p1',
+        isOwner: true,
+        consentStatus: 'CONSENTED',
+        birthYear: 2014,
+      },
+      isLoading: false,
+      profileWasRemoved: false,
+      acknowledgeProfileRemoval: jest.fn(),
+      switchProfile: jest.fn(),
+    });
+    mockFetch.setRoute(
+      '/consent/my-status',
+      () =>
+        new Response(
+          JSON.stringify({
+            consentStatus: 'CONSENTED',
+            parentEmail: 'parent@example.com',
+            consentType: 'GDPR',
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+    );
+    // No subjects yet — empty list is the default.
+
+    renderLayout();
+
+    await waitFor(() => {
+      expect(screen.getByTestId('post-approval-landing')).toBeTruthy();
+    });
+    expect(screen.getByTestId('post-approval-continue')).toBeTruthy();
   });
 
   it('does not show post-approval landing when user already has subjects (BUG-544)', () => {

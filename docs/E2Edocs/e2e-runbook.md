@@ -216,9 +216,9 @@ The Doppler `-c stg` config matches the seed endpoint's `TEST_SEED_SECRET`.
 
 | Env var | When | Why |
 |---|---|---|
-| `METRO_URL=http://10.0.2.2:8081` | Always | Overrides the script default of `:8082` (the BUG-7 bundle proxy, empirically unnecessary since 2026-04-30) |
-| `TEMP=C:/tools/maestro/tmp` | Windows only | Java jansi.dll extraction fails on Unicode usernames |
-| `TMP=C:/tools/maestro/tmp` | Windows only | Same as TEMP — both must be set |
+| `METRO_URL=http://10.0.2.2:8081` | Always | Overrides the script default of `:8082` (the BUG-7 bundle proxy, empirically unnecessary since 2026-04-30). The harness parses the port from this URL and `adb reverse`s it automatically, so non-default ports such as `:8083` work when another branch holds `:8081`/`:8082`. The preflight check uses the same value. |
+| `TEMP=C:/tools/maestro/tmp` | Windows only | Java jansi.dll extraction otherwise hits `C:\Users\ZuzanaKopečná\AppData\...` and fails on the Unicode `č`. |
+| `TMP=C:/tools/maestro/tmp` | Windows only | Same as TEMP — both must be set. |
 
 ### Warning: `pnpm test:e2e:smoke` is currently broken on Windows
 
@@ -283,6 +283,12 @@ emulator process too — it leaves AVD lock files that can break the next boot.
 | Bundle takes >30s to download | 1-vCPU emulator on WHPX-under-Hyper-V | Expected on this machine; see snapshot doc § HVCI / Hyper-V context |
 | `adb shell` writes appear at `C:/Program Files/Git/...` | MSYS path mangling | Set `MSYS_NO_PATHCONV=1` for the call (or for the whole shell session) |
 | `taskkill /PID 1234` fails with `C:/Program Files/Git/PID` | MSYS mangling on `/PID` | Use PowerShell `Stop-Process -Id <pid> -Force` instead |
+| `${METRO_URL}` shows up literally in Maestro output | Env var not exported into Maestro context | Set `METRO_URL` in shell AND pass `-e METRO_URL=...` to maestro if calling it directly |
+| `quick-check.yaml` passes 6/7 with "Sign up" failing | Known UI drift (not infra) | Ignore; documented in snapshot doc § "Three bugs found" |
+| `Maestro driver did not start up in time` | UIAutomator lock from a previous non-graceful kill | `adb reboot` and re-run |
+| Bluetooth fails to start in emulator log | Bluetooth packet streamer never initializes on this AVD | Harmless on `E2E_Device_2`; ignore |
+| `Could not connect to bundle proxy on 8082` | `seed-and-run.sh` defaulted to BUG-7 proxy port | Override with `METRO_URL=http://10.0.2.2:8081` |
+| Dev-client shows `java.net.SocketTimeoutException` after starting Metro on a non-default port (e.g. `--port 8083`) | The emulator's `10.0.2.2:<port>` alias is unreliable on WHPX; ports need an explicit `adb reverse` | Set `METRO_URL=http://10.0.2.2:<port>` when invoking `seed-and-run.sh`. The harness now parses the port and adds `adb reverse tcp:<port> tcp:<port>` automatically (in addition to 8081/8082). The preflight derives its check port from `METRO_URL` too. If the symptom still appears, verify with `adb reverse --list` that the port is forwarded. |
 
 ---
 

@@ -62,6 +62,7 @@ jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 // ---------------------------------------------------------------------------
 
 jest.mock('../services/account', () => ({
+  // gc1-allow: requireActual spread + targeted override; findOrCreateAccount stubbed to avoid DB in route unit tests
   ...jest.requireActual('../services/account'),
   findOrCreateAccount: jest.fn().mockResolvedValue({
     id: 'test-account-id',
@@ -73,6 +74,7 @@ jest.mock('../services/account', () => ({
 }));
 
 jest.mock('../services/profile', () => ({
+  // gc1-allow: requireActual spread + targeted override; profile lookup functions stubbed to avoid DB in route unit tests
   ...jest.requireActual('../services/profile'),
   findOwnerProfile: jest.fn().mockResolvedValue({
     id: 'test-profile-id',
@@ -97,6 +99,7 @@ jest.mock('../services/profile', () => ({
 }));
 
 jest.mock('../services/consent', () => {
+  // gc1-allow: requireActual used for error classes (instanceof checks); service functions stubbed to avoid DB in route unit tests
   const actual = jest.requireActual('../services/consent') as Record<
     string,
     unknown
@@ -690,12 +693,15 @@ describe('consent Inngest dispatch observability [A-23]', () => {
     expect(res.status).toBe(201);
 
     // [A-23] Must escalate to Sentry — not just logger.warn — so we can query
-    // how often the GDPR reminder workflow is permanently skipped.
+    // how often the GDPR reminder workflow is permanently skipped. Escalation
+    // runs through safeSend (services/safe-non-core.ts), which tags the
+    // captureException extra with surface + kind.
     expect(mockCaptureException).toHaveBeenCalledWith(
       expect.any(Error),
       expect.objectContaining({
         extra: expect.objectContaining({
-          context: 'consent.requested.inngest_dispatch',
+          surface: 'consent.requested',
+          kind: 'non-core-send',
         }),
       }),
     );
@@ -720,12 +726,15 @@ describe('consent Inngest dispatch observability [A-23]', () => {
     expect(res.status).toBe(200);
 
     // [A-23] Must escalate to Sentry so we can query how often the 7-day
-    // GDPR deletion grace period job is permanently skipped.
+    // GDPR deletion grace period job is permanently skipped. Escalation runs
+    // through safeSend (services/safe-non-core.ts), which tags the
+    // captureException extra with surface + kind.
     expect(mockCaptureException).toHaveBeenCalledWith(
       expect.any(Error),
       expect.objectContaining({
         extra: expect.objectContaining({
-          context: 'consent.revoked.inngest_dispatch',
+          surface: 'consent.revoked',
+          kind: 'non-core-send',
         }),
       }),
     );

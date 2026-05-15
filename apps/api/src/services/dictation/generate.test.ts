@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 jest.mock('../llm', () => ({
+  // gc1-allow: external LLM boundary — routeAndCall is the sole entry point to all LLM providers
   routeAndCall: jest.fn(),
 }));
 
@@ -67,7 +68,7 @@ describe('generateDictation', () => {
       generateDictation({
         nativeLanguage: 'en',
         ageYears: 8,
-      })
+      }),
     ).rejects.toThrow();
   });
 
@@ -83,7 +84,7 @@ describe('generateDictation', () => {
       generateDictation({
         nativeLanguage: 'en',
         ageYears: 9,
-      })
+      }),
     ).rejects.toThrow();
   });
 
@@ -110,7 +111,7 @@ describe('generateDictation', () => {
       generateDictation({
         nativeLanguage: 'en',
         ageYears: 8,
-      })
+      }),
     ).rejects.toThrow();
   });
 

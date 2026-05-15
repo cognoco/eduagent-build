@@ -30,6 +30,7 @@ jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 // ---------------------------------------------------------------------------
 
 jest.mock('../services/account', () => ({
+  // gc1-allow: DB-dependent internal service; route unit test has no real DB
   findOrCreateAccount: jest.fn().mockResolvedValue({
     id: 'test-account-id',
     clerkUserId: 'user_test',
@@ -44,6 +45,7 @@ jest.mock('../services/account', () => ({
 // ---------------------------------------------------------------------------
 
 jest.mock('../services/profile', () => ({
+  // gc1-allow: DB-dependent internal service; route unit test has no real DB
   findOwnerProfile: jest.fn().mockResolvedValue({
     id: 'test-profile-id',
     accountId: 'test-account-id',
@@ -96,23 +98,26 @@ jest.mock(
 );
 
 // ---------------------------------------------------------------------------
-// Mock LLM services — registerProvider for llm middleware
+// Mock LLM services — routeAndCall is the external LLM HTTP boundary;
+// all other exports (registerProvider, _clearProviders, etc.) run real code.
 // ---------------------------------------------------------------------------
 
+const mockRouteAndCall = jest.fn();
 jest.mock('../services/llm', () => ({
-  routeAndCall: jest.fn(),
-  registerProvider: jest.fn(),
-  getRegisteredProviders: jest.fn().mockReturnValue([]),
-  _clearProviders: jest.fn(),
-  _resetCircuits: jest.fn(),
+  ...(jest.requireActual('../services/llm') as Record<string, unknown>),
+  routeAndCall: (...args: unknown[]) => mockRouteAndCall(...args),
 }));
 
 // ---------------------------------------------------------------------------
 // Mock Sentry (used by global error handler)
+// captureException delegates to @sentry/cloudflare which is the real external
+// boundary; override only captureException to prevent Sentry SDK init noise.
 // ---------------------------------------------------------------------------
 
+const mockCaptureException = jest.fn();
 jest.mock('../services/sentry', () => ({
-  captureException: jest.fn(),
+  ...(jest.requireActual('../services/sentry') as Record<string, unknown>),
+  captureException: (...args: unknown[]) => mockCaptureException(...args),
 }));
 
 // ---------------------------------------------------------------------------

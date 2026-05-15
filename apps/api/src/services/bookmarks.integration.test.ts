@@ -1,8 +1,8 @@
 import { resolve } from 'path';
-import { like } from 'drizzle-orm';
-
+import { loadDatabaseEnv } from '@eduagent/test-utils';
 import {
   accounts,
+  bookmarks,
   createDatabase,
   curricula,
   curriculumBooks,
@@ -14,9 +14,7 @@ import {
   subjects,
   type Database,
 } from '@eduagent/database';
-import type { Bookmark, SessionBookmark } from '@eduagent/schemas';
-import { loadDatabaseEnv } from '@eduagent/test-utils';
-
+import { like } from 'drizzle-orm';
 import {
   createBookmark,
   deleteBookmark,
@@ -35,11 +33,11 @@ let db: Database;
 let profileId: string;
 let otherProfileId: string;
 let subjectId: string;
+let otherSubjectId: string;
 let sessionId: string;
 let aiEventId: string;
 let aiEventId2: string;
 let topicId: string;
-let otherTopicId: string;
 
 async function seedTestData(): Promise<void> {
   const [account] = await db
@@ -91,19 +89,19 @@ async function seedTestData(): Promise<void> {
     .returning({ id: subjects.id });
   subjectId = subject!.id;
 
+  // Seed a curriculum chain so we can attach a real topicId to bookmarks.
+  // bookmarks.topicId references curriculum_topics(id) with ON DELETE SET NULL,
+  // so a non-null topicId must point at an existing row.
   const [curriculum] = await db
     .insert(curricula)
-    .values({
-      subjectId,
-      version: 1,
-    })
+    .values({ subjectId, version: 1 })
     .returning({ id: curricula.id });
 
   const [book] = await db
     .insert(curriculumBooks)
     .values({
       subjectId,
-      title: 'Biology foundations',
+      title: 'Algebra I',
       sortOrder: 0,
     })
     .returning({ id: curriculumBooks.id });
@@ -113,33 +111,33 @@ async function seedTestData(): Promise<void> {
     .values({
       curriculumId: curriculum!.id,
       bookId: book!.id,
-      title: 'Calvin cycle',
-      description: 'Carbon fixation and glucose building',
+      title: 'Linear equations',
+      description: 'Solving equations of the form ax + b = c.',
       sortOrder: 0,
-      estimatedMinutes: 12,
+      estimatedMinutes: 20,
     })
     .returning({ id: curriculumTopics.id });
   topicId = topic!.id;
 
-  const [otherTopic] = await db
-    .insert(curriculumTopics)
+  // Seed a subject for the other profile so we can write a cross-profile
+  // bookmark row directly into the bookmarks table without triggering the
+  // subjects FK ON DELETE CASCADE.
+  const [otherSubject] = await db
+    .insert(subjects)
     .values({
-      curriculumId: curriculum!.id,
-      bookId: book!.id,
-      title: 'Light reactions',
-      description: 'Converting light energy',
-      sortOrder: 1,
-      estimatedMinutes: 10,
+      profileId: otherProfileId,
+      name: 'Mathematics (other)',
+      status: 'active',
+      pedagogyMode: 'socratic',
     })
-    .returning({ id: curriculumTopics.id });
-  otherTopicId = otherTopic!.id;
+    .returning({ id: subjects.id });
+  otherSubjectId = otherSubject!.id;
 
   const [session] = await db
     .insert(learningSessions)
     .values({
       profileId,
       subjectId,
-      topicId,
       status: 'completed',
     })
     .returning({ id: learningSessions.id });
@@ -151,7 +149,6 @@ async function seedTestData(): Promise<void> {
       sessionId,
       profileId,
       subjectId,
-      topicId,
       eventType: 'ai_response',
       content:
         'The Calvin cycle uses CO₂ to build glucose through carbon fixation.',
@@ -165,7 +162,6 @@ async function seedTestData(): Promise<void> {
       sessionId,
       profileId,
       subjectId,
-      topicId: otherTopicId,
       eventType: 'ai_response',
       content: 'Photosynthesis converts light energy into chemical energy.',
     })
@@ -197,8 +193,7 @@ describeIfDb('Bookmarks (integration)', () => {
       'The Calvin cycle uses CO₂ to build glucose through carbon fixation.',
     );
     expect(bookmark.subjectName).toBe('Mathematics');
-    expect(bookmark.topicId).toBe(topicId);
-    expect(bookmark.topicTitle).toBe('Calvin cycle');
+    expect(bookmark.topicTitle).toBeNull();
     expect(bookmark.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
   });
 
@@ -236,17 +231,6 @@ describeIfDb('Bookmarks (integration)', () => {
     expect(result.nextCursor).toBeNull();
   });
 
-  it('filters bookmarks by topicId', async () => {
-    const result = await listBookmarks(db, profileId, { topicId });
-
-    expect(result.bookmarks).toHaveLength(1);
-    expect(result.bookmarks[0]).toMatchObject({
-      eventId: aiEventId,
-      topicId,
-      topicTitle: 'Calvin cycle',
-    });
-  });
-
   it('cursor pagination', async () => {
     const page1 = await listBookmarks(db, profileId, { limit: 1 });
     expect(page1.bookmarks.length).toBe(1);
@@ -268,9 +252,7 @@ describeIfDb('Bookmarks (integration)', () => {
       sessionId,
     );
     expect(sessionBookmarks.length).toBe(2);
-    const eventIds = sessionBookmarks
-      .map((b: SessionBookmark) => b.eventId)
-      .sort();
+    const eventIds = sessionBookmarks.map((b) => b.eventId).sort();
     expect(eventIds).toEqual([aiEventId, aiEventId2].sort());
     for (const row of sessionBookmarks) {
       expect(typeof row.bookmarkId).toBe('string');
@@ -289,9 +271,9 @@ describeIfDb('Bookmarks (integration)', () => {
   it('deletes bookmark', async () => {
     await deleteBookmark(db, profileId, createdBookmarkId);
     const result = await listBookmarks(db, profileId, {});
-    expect(
-      result.bookmarks.every((b: Bookmark) => b.id !== createdBookmarkId),
-    ).toBe(true);
+    expect(result.bookmarks.every((b) => b.id !== createdBookmarkId)).toBe(
+      true,
+    );
   });
 
   // Break test for the delete scoping guarantee: the DELETE WHERE clause
@@ -305,5 +287,103 @@ describeIfDb('Bookmarks (integration)', () => {
     ).rejects.toThrow('Bookmark not found');
     // Cleanup to keep the suite self-contained.
     await deleteBookmark(db, profileId, bookmark.id);
+  });
+
+  describe('listBookmarks topicId filter', () => {
+    // Direct-insert bookmark rows so we can assign explicit topicIds without
+    // having to drag session_events.topicId wiring through this test. The
+    // service-under-test only reads from `bookmarks`, so this is sufficient.
+    let inScopeBookmarkId: string;
+    let outOfScopeBookmarkId: string;
+    let nullTopicBookmarkId: string;
+    let crossProfileBookmarkId: string;
+
+    beforeAll(async () => {
+      const [inScope] = await db
+        .insert(bookmarks)
+        .values({
+          profileId,
+          sessionId,
+          eventId: generateUUIDv7(),
+          subjectId,
+          topicId,
+          content: 'In-scope bookmark for the active topic',
+        })
+        .returning({ id: bookmarks.id });
+      inScopeBookmarkId = inScope!.id;
+
+      const [outOfScope] = await db
+        .insert(bookmarks)
+        .values({
+          profileId,
+          sessionId,
+          eventId: generateUUIDv7(),
+          subjectId,
+          topicId: null,
+          content: 'Same profile, but no topic set',
+        })
+        .returning({ id: bookmarks.id });
+      outOfScopeBookmarkId = outOfScope!.id;
+
+      const [nullTopic] = await db
+        .insert(bookmarks)
+        .values({
+          profileId,
+          sessionId,
+          eventId: generateUUIDv7(),
+          subjectId,
+          topicId: null,
+          content: 'Another null-topic bookmark for the same profile',
+        })
+        .returning({ id: bookmarks.id });
+      nullTopicBookmarkId = nullTopic!.id;
+
+      // Break-test row: another profile owns a bookmark with the SAME topicId.
+      // The service must not leak it when the active profile filters by topic.
+      const [crossProfile] = await db
+        .insert(bookmarks)
+        .values({
+          profileId: otherProfileId,
+          sessionId,
+          eventId: generateUUIDv7(),
+          subjectId: otherSubjectId,
+          topicId,
+          content: "Other profile's bookmark on the same topic",
+        })
+        .returning({ id: bookmarks.id });
+      crossProfileBookmarkId = crossProfile!.id;
+    });
+
+    it('returns only bookmarks for the active profile and topic', async () => {
+      const result = await listBookmarks(db, profileId, { topicId });
+
+      const ids = result.bookmarks.map((b) => b.id);
+      expect(ids).toContain(inScopeBookmarkId);
+      expect(ids).not.toContain(outOfScopeBookmarkId);
+      expect(ids).not.toContain(nullTopicBookmarkId);
+      // Profile-isolation break test: other profile's row with the SAME
+      // topicId must not appear in this profile's results.
+      expect(ids).not.toContain(crossProfileBookmarkId);
+
+      // Sanity: the bookmark we got back must actually carry the requested topicId.
+      for (const bookmark of result.bookmarks) {
+        expect(bookmark.topicId).toBe(topicId);
+      }
+    });
+
+    it('cross-profile request for the same topicId returns the other profile only', async () => {
+      const result = await listBookmarks(db, otherProfileId, { topicId });
+      const ids = result.bookmarks.map((b) => b.id);
+      expect(ids).toContain(crossProfileBookmarkId);
+      expect(ids).not.toContain(inScopeBookmarkId);
+    });
+
+    it('no topicId filter returns null-topic bookmarks too', async () => {
+      const result = await listBookmarks(db, profileId, {});
+      const ids = result.bookmarks.map((b) => b.id);
+      expect(ids).toContain(inScopeBookmarkId);
+      expect(ids).toContain(outOfScopeBookmarkId);
+      expect(ids).toContain(nullTopicBookmarkId);
+    });
   });
 });

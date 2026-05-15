@@ -23,8 +23,8 @@ const mockDatabaseModule = createDatabaseModuleMock({
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
-jest.mock('../services/account' /* gc1-allow: unit test boundary */, () => ({
-  // gc1-allow: stubs findOrCreateAccount — avoids real Clerk/DB round-trip in unit tests for settings routes
+jest.mock('../services/account', () => ({
+  // gc1-allow: findOrCreateAccount calls real Clerk+DB; requireActual would fire live network in unit tests
   findOrCreateAccount: jest.fn().mockResolvedValue({
     id: 'test-account-id',
     clerkUserId: 'user_test',
@@ -38,8 +38,8 @@ const mockGetOwnedFamilyPoolBreakdownSharing = jest.fn();
 const mockUpsertFamilyPoolBreakdownSharing = jest.fn();
 const mockUpsertLearningMode = jest.fn();
 
-jest.mock('../services/settings' /* gc1-allow: unit test boundary */, () => {
-  // gc1-allow: uses requireActual with targeted overrides for getOwnedFamilyPoolBreakdownSharing/upsertFamilyPoolBreakdownSharing — canonical partial-mock pattern from CLAUDE.md
+jest.mock('../services/settings', () => {
+  // gc1-allow: requireActual + targeted overrides — intercepts upsertLearningMode/getOwnedFamilyPoolBreakdownSharing/upsertFamilyPoolBreakdownSharing to keep unit test deterministic without a real DB
   const actual = jest.requireActual('../services/settings');
   return {
     ...actual,
@@ -52,21 +52,19 @@ jest.mock('../services/settings' /* gc1-allow: unit test boundary */, () => {
 });
 
 const mockClearSessionStaticContextForProfile = jest.fn();
-jest.mock(
-  '../services/session/session-cache' /* gc1-allow: unit test boundary */,
-  () => {
-    // gc1-allow: partial mock via requireActual — intercepts clearSessionStaticContextForProfile to verify cache invalidation fires on learning-mode change
-    const actual = jest.requireActual('../services/session/session-cache');
-    return {
-      ...actual,
-      clearSessionStaticContextForProfile: (...args: unknown[]) =>
-        mockClearSessionStaticContextForProfile(...args),
-    };
-  },
-);
+jest.mock('../services/session/session-cache', () => {
+  // gc1-allow: requireActual + targeted override — intercepts clearSessionStaticContextForProfile to verify cache invalidation fires on learning-mode change
+  const actual = jest.requireActual('../services/session/session-cache');
+  return {
+    ...actual,
+    clearSessionStaticContextForProfile: (...args: unknown[]) =>
+      mockClearSessionStaticContextForProfile(...args),
+  };
+});
 
 const mockCaptureException = jest.fn();
-jest.mock('../services/sentry' /* gc1-allow: unit test boundary */, () => ({
+jest.mock('../services/sentry', () => ({
+  // gc1-allow: sentry is a real external egress service; pure stub captures calls for assertion without firing real SDK
   captureException: (...args: unknown[]) => mockCaptureException(...args),
 }));
 

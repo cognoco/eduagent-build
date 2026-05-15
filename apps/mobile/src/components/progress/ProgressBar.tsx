@@ -1,9 +1,11 @@
 import { View } from 'react-native';
+import type { ViewStyle } from 'react-native';
 
 interface ProgressBarProps {
   value: number;
   max: number;
   fillClassName?: string;
+  fillColor?: string;
   testID?: string;
 }
 
@@ -11,6 +13,7 @@ export function ProgressBar({
   value,
   max,
   fillClassName = 'bg-primary',
+  fillColor,
   testID,
 }: ProgressBarProps): React.ReactElement {
   const safeMax = Math.max(1, max);
@@ -26,7 +29,12 @@ export function ProgressBar({
     >
       <View
         className={`h-full rounded-full ${fillClassName}`}
-        style={{ width: `${widthPct}%` }}
+        style={
+          {
+            width: `${widthPct}%`,
+            ...(fillColor ? { backgroundColor: fillColor } : {}),
+          } as ViewStyle
+        }
       />
     </View>
   );

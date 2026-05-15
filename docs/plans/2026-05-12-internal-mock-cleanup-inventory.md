@@ -1,7 +1,7 @@
 # Internal Mock Cleanup Inventory
 
-**Date:** 2026-05-12  
-**Status:** Inventory + cleanup in progress; P0 and focused P1/P2 cleanup slices verified 2026-05-12  
+**Date:** 2026-05-12 (last refreshed 2026-05-14)
+**Status:** Framework complete (Phases 0-4); P0 drained; opportunistic P1/P2 cleanup ongoing via batch + on-touch (GC6).
 **Goal:** Reduce internal mocks that hide route/service/background-job contract drift while preserving true external boundary shims.
 
 ## Why
@@ -33,14 +33,36 @@ Raw rows are written to `docs/plans/2026-05-12-internal-mock-cleanup-inventory.c
 | API eval-llm tests | 0 | 1 | Eval harness LLM transport mock is classified as an external boundary. |
 | **Total** | **615** | **441** | **1,056 mock call rows across 281 test files, including 1,055 `jest.mock(...)` rows.** |
 
-Risk-class counts from the CSV:
+**Refreshed 2026-05-14** (after Phase 4 guard relocation + batch 6b boy-scout sweeps):
+
+| Area | Internal-ish mocks | External mocks |
+| --- | ---: | ---: |
+| Mobile tests | 304 | 335 |
+| API Inngest tests | 127 | 51 |
+| API route + top-level integration tests | 104 | 44 |
+| API service/middleware unit tests | 83 | 25 |
+| API eval-llm tests | 0 | 1 |
+| **Total** | **618** | **456** |
+
+Refreshed risk-class counts:
 
 | Risk class | Count |
 | --- | ---: |
 | `P0` | 0 |
-| `P1` | 307 |
-| `P2` | 308 |
-| `P3` | 441 |
+| `P1` | 314 |
+| `P2` | 304 |
+| `P3` | 456 |
+
+Per-target deltas (top targets):
+
+| Target | Count 2026-05-12 | Count 2026-05-14 |
+| --- | ---: | ---: |
+| `@eduagent/database` | 54 | 55 |
+| `../lib/profile` | 26 | 26 |
+| `../lib/api-client` | 23 | 23 |
+| `../services/account` | 23 | 22 |
+| `../helpers` | 22 | 23 |
+| `../services/profile` | 18 | — (dropped from top 10) |
 
 Top internal-ish mocked targets:
 
@@ -96,7 +118,7 @@ Mobile internal-ish groups:
 
 ## Current Guardrails
 
-- `apps/api/src/services/llm/integration-mock-guard.test.ts` now prevents non-allowlisted internal mocks in API integration tests across `apps/api/**/*.integration.test.ts` and `tests/integration/**/*.integration.test.ts`. The allowlist is currently empty; allowed boundary mocks are limited to Sentry, Stripe, and Inngest transport/client.
+- `apps/api/src/test-utils/integration-mock-guard.test.ts` (moved 2026-05-14 from `services/llm/`) prevents non-allowlisted internal mocks in API integration tests across `apps/api/**/*.integration.test.ts` and `tests/integration/**/*.integration.test.ts`. The `KNOWN_OFFENDERS` set is empty; allowed boundary mocks are limited to `services/sentry` and `services/stripe`. Inngest transport boundary use is supported via the shared `apps/api/src/test-utils/inngest-transport-capture.ts` helper, not via `jest.mock('../../inngest/client')`.
 - The raw CSV originally classified two P0 integration rows:
   - `apps/api/src/services/book-suggestion-generation.integration.test.ts:14` mocking `./llm`
   - `apps/api/src/services/nudge.integration.test.ts:38` mocking `./notifications`

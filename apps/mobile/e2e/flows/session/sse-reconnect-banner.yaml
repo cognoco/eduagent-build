@@ -1,0 +1,104 @@
+# Flow SESSION-SSE: SSE Reconnect Banner (slow-network + network kill) — DRAFT
+#
+# Status: DRAFT — blocked on two missing prerequisites:
+#
+#   1. Seed scenario `session-active` does not exist. Available scenarios are
+#      defined in apps/api/src/services/test-seed.ts (SeedScenario union).
+#      The closest available scenario is `learning-active`, but it is not
+#      guaranteed to produce an active SSE session connection with a running
+#      chat session that would trigger the reconnect banner on network kill.
+#      `session-with-transcript` exists but represents a completed session.
+#      BLOCKED ON: new seed scenario `session-active` (or equivalent that
+#      places the user mid-session in the session chat shell with SSE active).
+#
+#   2. testID for the SSE reconnect banner does not exist in the current
+#      codebase. Grep of apps/mobile/src/ found no match for:
+#      sse-reconnect, reconnect-banner, reconnectable-banner.
+#      The banner testID must be added to the session chat shell component.
+#      BLOCKED ON: testID `sse-reconnect-banner` (or equivalent) added to
+#      the session chat shell where the SSE `reconnectable` error state is
+#      rendered.
+#
+# Once both prerequisites ship:
+#   1. Replace `learning-active` below with `session-active`.
+#   2. Replace `<PLACEHOLDER_TESTID>` with the real testID.
+#   3. Remove the DRAFT status from this header.
+#
+# Mechanism:
+#   NETWORK_DELAY_MS=4000 — injects 4s RTT; slow enough to break SSE keep-alive
+#     but the session chat shell is still reachable initially.
+#   NETWORK_KILL_AFTER_MS=6000 — enables airplane mode 6s after seed-and-run.sh
+#     applies the delay; this severs the SSE connection fully, triggering the
+#     reconnect banner in the session chat shell.
+#
+# Run command (once unblocked):
+#   NETWORK_DELAY_MS=4000 NETWORK_KILL_AFTER_MS=6000 ./e2e/scripts/seed-and-run.sh session-active e2e/flows/session/sse-reconnect-banner.yaml
+#
+# Interim run command (falls back to learning-active; flow WILL FAIL at
+# assertVisible if the session doesn't auto-start or the banner testID is absent):
+#   NETWORK_DELAY_MS=4000 NETWORK_KILL_AFTER_MS=6000 ./e2e/scripts/seed-and-run.sh learning-active e2e/flows/session/sse-reconnect-banner.yaml
+#
+# Tags: weekly, session, slow-net
+appId: com.mentomate.app
+tags:
+  - weekly
+  - session
+  - slow-net
+---
+# ── Step 1: Sign in with seeded credentials ──
+# Reuses the canonical sign-in flow.
+- runFlow:
+    file: ../_setup/seed-and-sign-in.yaml
+
+- takeScreenshot: sse-reconnect-01-after-sign-in
+
+# ── Step 2: Navigate to active session ──
+# With `session-active` seed, the user should land in or near the session chat
+# shell. With `learning-active` fallback, we need to navigate into a session.
+# Maestro YAML has no OR/anyOf construct inside extendedWaitUntil — fallbacks
+# are checked sequentially with `optional: true`.
+- extendedWaitUntil:
+    visible:
+      id: "session-chat-shell"
+    timeout: 25000
+    optional: true
+
+- extendedWaitUntil:
+    visible:
+      id: "home-screen"
+    timeout: 5000
+    optional: true
+
+- extendedWaitUntil:
+    visible:
+      id: "home-loading-timeout"
+    timeout: 5000
+    optional: true
+
+- takeScreenshot: sse-reconnect-02-on-app
+
+# ── Step 3: Wait for SSE reconnect banner ──
+# BLOCKED: testID `sse-reconnect-banner` does not yet exist in the codebase.
+# The network kill (airplane mode via NETWORK_KILL_AFTER_MS=6000) should
+# sever the SSE connection and trigger the reconnect banner. Replace
+# <PLACEHOLDER_TESTID> once the testID is added to the session chat shell.
+# See DRAFT notice at the top of this file.
+#
+# Total wait: 20s covers the 6s network kill delay + SSE keep-alive timeout.
+- extendedWaitUntil:
+    visible:
+      id: "<PLACEHOLDER_TESTID>"
+    timeout: 20000
+
+- takeScreenshot: sse-reconnect-03-banner-visible
+
+- assertVisible:
+    id: "<PLACEHOLDER_TESTID>"
+
+# ── Step 4: Restore network and assert session resumes ──
+# The slow_net_restore EXIT trap in seed-and-run.sh will disable airplane mode
+# on script exit. For mid-flow restore, a runScript step would be needed, but
+# Maestro 2.2.0 runScript has known issues (Issue 13 in seed-and-run.sh header).
+# For now, simply assert the banner remains visible until the flow exits and
+# the trap fires. Document for future work: mid-flow restore via runScript.
+- takeScreenshot: sse-reconnect-04-done

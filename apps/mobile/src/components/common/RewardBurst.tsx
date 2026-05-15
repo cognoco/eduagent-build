@@ -235,7 +235,7 @@ export function RewardBurst({
         ]}
       >
         {intensity === 'hero' ? (
-          <BrandCelebration size={84} testID={`${testID ?? 'reward'}-brand`} />
+          <BrandCelebration size={80} testID={`${testID ?? 'reward'}-brand`} />
         ) : null}
         <Text style={styles.badgeText}>{message ?? config.label}</Text>
       </Animated.View>

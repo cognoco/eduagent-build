@@ -1,12 +1,21 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { relative, resolve } from 'node:path';
 
-// [BUG-743 / T-1] Regression guard. Per CLAUDE.md "No Internal Mocks in
-// Integration Tests": integration tests must not jest.mock internal modules
-// (database, services, middleware) — only true external boundaries (Stripe,
-// Sentry, Clerk JWKS, email providers, push notifications).
+// Integration-test internal-mock guard.
+//
+// Per CLAUDE.md "No Internal Mocks in Integration Tests": integration tests
+// must not jest.mock internal modules (database, services, middleware) — only
+// true external boundaries (Stripe, Sentry, Clerk JWKS, email providers, push
+// notifications, LLM providers via the registry, Inngest transport capture).
+//
 // Internal mocks hide real prompt drift, envelope contract drift, ownership,
 // event-chain, and shape-of-response bugs.
+//
+// Originally added as BUG-743 (LLM channel). Now scans every
+// `*.integration.test.ts` file in `apps/api` and `tests/integration` for any
+// internal jest.mock specifier and fails CI on non-allowlisted offenders.
+// Forward-only: KNOWN_OFFENDERS is a shrinking punch list, never a permanent
+// carve-out.
 
 const KNOWN_OFFENDERS = new Set<string>();
 const ALLOWED_INTERNAL_BOUNDARY_MOCKS = [
@@ -14,7 +23,7 @@ const ALLOWED_INTERNAL_BOUNDARY_MOCKS = [
   /(?:^|\/)services\/stripe$/,
 ];
 
-const REPO_ROOT = resolve(__dirname, '../../../../..');
+const REPO_ROOT = resolve(__dirname, '../../../..');
 const INTEGRATION_TEST_ROOTS = ['apps/api', 'tests/integration'];
 const SKIPPED_DIRS = new Set([
   '.git',
@@ -101,7 +110,7 @@ function mockCallSnippet(specifier: string): string {
   return `jest.${'mock'}('${specifier}', () => ({}));`;
 }
 
-describe('integration tests — BUG-743 internal mock guard', () => {
+describe('integration tests — internal mock guard', () => {
   const files = listIntegrationTests();
 
   it('finds at least one integration test (sanity)', () => {
@@ -131,6 +140,9 @@ describe('integration tests — BUG-743 internal mock guard', () => {
     expect(
       sourceInternalMockSpecifiers(mockCallSnippet('../../inngest/client')),
     ).toEqual(['../../inngest/client']);
+    expect(
+      sourceInternalMockSpecifiers(mockCallSnippet('@eduagent/database')),
+    ).toEqual(['@eduagent/database']);
   });
 
   it('does not introduce non-allowlisted internal jest.mock calls in integration tests', () => {
@@ -143,7 +155,7 @@ describe('integration tests — BUG-743 internal mock guard', () => {
     const newOffenders = offenders.filter((o) => !KNOWN_OFFENDERS.has(o.file));
     if (newOffenders.length > 0) {
       throw new Error(
-        `[BUG-743] New internal mock(s) found in integration tests:\n` +
+        `New internal mock(s) found in integration tests:\n` +
           newOffenders
             .map((o) => `  - ${o.file}: jest.mock('${o.specifier}')`)
             .join('\n') +

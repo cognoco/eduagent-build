@@ -1,7 +1,7 @@
 import {
   boolean,
   date,
-  index,
+  uniqueIndex,
   integer,
   pgEnum,
   pgTable,
@@ -34,7 +34,16 @@ export const dictationResults = pgTable(
       .notNull()
       .defaultNow(),
   },
+  // [BUG-4] Unique on (profile_id, date, mode) so a client retry of the same
+  // dictation completion is idempotent at the DB layer. A learner can still
+  // legitimately do two dictations on the same day in different modes
+  // (homework + surprise) — those land in separate rows. The index also
+  // backs the streak query, which scans by (profile_id, date desc).
   (table) => [
-    index('idx_dictation_results_profile_date').on(table.profileId, table.date),
+    uniqueIndex('uniq_dictation_results_profile_date_mode').on(
+      table.profileId,
+      table.date,
+      table.mode,
+    ),
   ],
 );

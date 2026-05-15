@@ -65,7 +65,7 @@ tags:
 - tapOn:
     id: "chat-input"
 - inputText: "The Road Not Taken by Robert Frost"
-- pressKey: back
+- hideKeyboard
 - pressKey: Enter
 
 # Verify the message rendered in the chat list

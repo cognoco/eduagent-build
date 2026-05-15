@@ -2,10 +2,7 @@
 // Stripe Webhook Route — Tests
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/stripe', () => ({
-  // gc1-allow: Stripe SDK external boundary
-  verifyWebhookSignature: jest.fn(),
-}));
+jest.mock('../services/stripe', () => ({ verifyWebhookSignature: jest.fn() })); // gc1-allow: thin wrapper over stripe external SDK — real impl makes HTTPS calls to Stripe API
 
 jest.mock('../services/kv', () => ({
   ...jest.requireActual('../services/kv'),
@@ -48,16 +45,10 @@ jest.mock('../services/subscription', () => ({
 }));
 
 jest.mock('../inngest/client', () => ({
-  // gc1-allow: Inngest SDK external boundary
-  inngest: {
-    send: jest.fn().mockResolvedValue(undefined),
-  },
-}));
+  inngest: { send: jest.fn().mockResolvedValue(undefined) },
+})); // gc1-allow: Inngest framework boundary — real send() dispatches to Inngest cloud
 
-jest.mock('../services/sentry', () => ({
-  // gc1-allow: @sentry/cloudflare external boundary
-  captureException: jest.fn(),
-}));
+jest.mock('../services/sentry', () => ({ captureException: jest.fn() })); // gc1-allow: thin wrapper over @sentry/cloudflare external SDK
 
 import { Hono } from 'hono';
 import { stripeWebhookRoute } from './stripe-webhook';

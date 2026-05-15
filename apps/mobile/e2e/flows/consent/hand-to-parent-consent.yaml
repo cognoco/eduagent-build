@@ -34,12 +34,12 @@ tags:
 - tapOn:
     id: "sign-in-email"
 - inputText: ${EMAIL}
-- pressKey: back
+- hideKeyboard
 
 - tapOn:
     id: "sign-in-password"
 - inputText: ${PASSWORD}
-- pressKey: back
+- hideKeyboard
 
 - extendedWaitUntil:
     visible:
@@ -65,7 +65,7 @@ tags:
 - tapOn:
     id: "create-profile-name"
 - inputText: "Consent Test Child"
-- pressKey: Back
+- hideKeyboard
 
 # 7. Open date picker and select child birth year (2014 = ~12 years old → triggers COPPA)
 #    Session 22 technique: year header → year list → scroll → select → OK
@@ -150,7 +150,7 @@ tags:
 - tapOn:
     id: "consent-email"
 - inputText: "parent-e2e@example.com"
-- pressKey: back
+- hideKeyboard
 
 # 21. Submit consent request
 - tapOn:

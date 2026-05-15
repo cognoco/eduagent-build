@@ -542,7 +542,7 @@ export default function LibraryScreen() {
           className="items-center justify-center py-16 px-5"
           testID="library-empty"
         >
-          <BookPageFlipAnimation size={100} color={themeColors.accent} />
+          <BookPageFlipAnimation size={150} color={themeColors.accent} />
           <Text className="text-h3 font-semibold text-text-primary mt-4 text-center">
             {t('library.empty.title')}
           </Text>
@@ -550,7 +550,12 @@ export default function LibraryScreen() {
             {t('library.empty.message')}
           </Text>
           <Pressable
-            onPress={() => router.replace('/(app)')}
+            onPress={() =>
+              router.push({
+                pathname: '/create-subject',
+                params: { returnTo: 'library' },
+              } as Href)
+            }
             className="bg-primary rounded-button px-6 py-3 mt-6 items-center"
             testID="library-empty-go-home"
           >
@@ -726,7 +731,11 @@ export default function LibraryScreen() {
   // ---- Root render --------------------------------------------------------
 
   return (
-    <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
+    <View
+      className="flex-1 bg-background"
+      style={{ paddingTop: insets.top }}
+      testID="library-screen"
+    >
       {/* Header */}
       <View
         className="px-5 pt-4 pb-3 flex-row items-center justify-between"

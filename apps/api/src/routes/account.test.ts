@@ -14,6 +14,7 @@ jest.mock('inngest/hono', () => ({
 }));
 
 jest.mock('../inngest/client', () => ({
+  ...jest.requireActual('../inngest/client'),
   inngest: {
     send: jest.fn().mockResolvedValue(undefined),
     createFunction: jest.fn().mockReturnValue(jest.fn()),
@@ -21,6 +22,7 @@ jest.mock('../inngest/client', () => ({
 }));
 
 jest.mock('../services/sentry', () => ({
+  ...jest.requireActual('../services/sentry'),
   captureException: jest.fn(),
   addBreadcrumb: jest.fn(),
 }));
@@ -51,6 +53,7 @@ jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 // ---------------------------------------------------------------------------
 
 jest.mock('../services/account', () => ({
+  ...jest.requireActual('../services/account'),
   findOrCreateAccount: jest.fn().mockResolvedValue({
     id: 'test-account-id',
     clerkUserId: 'user_test',
@@ -61,9 +64,10 @@ jest.mock('../services/account', () => ({
 }));
 
 jest.mock('../services/deletion', () => ({
+  ...jest.requireActual('../services/deletion'),
   scheduleDeletion: jest.fn().mockResolvedValue({
     gracePeriodEnds: new Date(
-      Date.now() + 7 * 24 * 60 * 60 * 1000
+      Date.now() + 7 * 24 * 60 * 60 * 1000,
     ).toISOString(),
   }),
   cancelDeletion: jest.fn().mockResolvedValue(undefined),
@@ -71,6 +75,7 @@ jest.mock('../services/deletion', () => ({
 }));
 
 jest.mock('../services/export', () => ({
+  ...jest.requireActual('../services/export'),
   generateExport: jest.fn().mockResolvedValue({
     account: {
       email: 'test@example.com',
@@ -121,7 +126,7 @@ describe('account routes', () => {
           method: 'POST',
           headers: makeAuthHeaders(),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -133,12 +138,13 @@ describe('account routes', () => {
     });
 
     // [CR-SILENT-RECOVERY-2] Break test: deletion-event dispatch failure must
-    // be escalated via BOTH a structured log AND a Sentry capture. logger.warn
-    // alone is not sufficient for a GDPR-relevant action — on-call needs
-    // aggregate spike alerting (mirrors consent.ts:142,270 [A-23]).
-    it('still returns 200 and escalates via logger.warn + captureException when dispatch fails', async () => {
-      // eslint-disable-next-line @typescript-eslint/no-empty-function
-      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    // be escalated via BOTH a structured log AND a Sentry capture. A
+    // GDPR-relevant action cannot recover silently — on-call needs aggregate
+    // spike alerting (mirrors consent.ts:142,270 [A-23]). Escalation runs
+    // through safeSend (services/safe-non-core.ts), which logs via
+    // logger.error → console.error.
+    it('still returns 200 and escalates via logger.error + captureException when dispatch fails', async () => {
+      const errorSpy = jest.spyOn(console, 'error').mockImplementation();
       (captureException as jest.Mock).mockClear();
 
       const dispatchError = new Error('Inngest unavailable');
@@ -150,38 +156,38 @@ describe('account routes', () => {
           method: 'POST',
           headers: makeAuthHeaders(),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       const body = await res.json();
 
       expect(res.status).toBe(200);
       expect(body.message).toBe('Deletion scheduled');
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to dispatch deletion event')
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[safe-send] non-core Inngest dispatch failed'),
       );
 
-      // Sentry escalation: assert the deliberate call from this catch block
-      // happened with the raw error and a queryable context tag. (Other
-      // middleware in the request path may also call captureException — e.g.
-      // profile-scope middleware itself escalates if findOwnerProfile fails
-      // against the stubbed DB. We only care that our specific call is one
-      // of them.)
+      // Sentry escalation: assert the deliberate call from safeSend happened
+      // with the raw error and a queryable surface tag. (Other middleware in
+      // the request path may also call captureException — e.g. profile-scope
+      // middleware itself escalates if findOwnerProfile fails against the
+      // stubbed DB. We only care that our specific call is one of them.)
       expect(captureException).toHaveBeenCalledWith(dispatchError, {
         extra: {
-          context: 'account.deletion.inngest_dispatch',
+          surface: 'account.deletion',
+          kind: 'non-core-send',
           accountId: 'test-account-id',
         },
       });
 
-      warnSpy.mockRestore();
+      errorSpy.mockRestore();
     });
 
     it('returns 401 without auth header', async () => {
       const res = await app.request(
         '/v1/account/delete',
         { method: 'POST' },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);
@@ -200,7 +206,7 @@ describe('account routes', () => {
           method: 'POST',
           headers: makeAuthHeaders(),
         },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);
@@ -213,7 +219,7 @@ describe('account routes', () => {
       const res = await app.request(
         '/v1/account/cancel-deletion',
         { method: 'POST' },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(401);
@@ -229,7 +235,7 @@ describe('account routes', () => {
       const res = await app.request(
         '/v1/account/export',
         { headers: makeAuthHeaders() },
-        TEST_ENV
+        TEST_ENV,
       );
 
       expect(res.status).toBe(200);

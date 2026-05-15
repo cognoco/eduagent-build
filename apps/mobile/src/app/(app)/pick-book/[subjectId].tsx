@@ -313,7 +313,7 @@ export default function PickBookScreen(): React.ReactElement {
         style={{ paddingTop: insets.top }}
         testID="pick-book-loading"
       >
-        <MagicPenAnimation size={140} color={colors.accent} />
+        <MagicPenAnimation size={150} color={colors.accent} />
         <Text className="text-body text-text-secondary mt-4">
           {LOADING_MESSAGES[loadingMessageIndex]}
         </Text>
@@ -595,7 +595,7 @@ export default function PickBookScreen(): React.ReactElement {
           className="absolute inset-0 bg-background/80 items-center justify-center"
           testID="pick-book-filing-overlay"
         >
-          <BookPageFlipAnimation size={140} color={colors.accent} />
+          <BookPageFlipAnimation size={150} color={colors.accent} />
           <Text className="text-body-sm text-text-secondary mt-3">
             Organizing your library...
           </Text>

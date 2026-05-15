@@ -1,10 +1,19 @@
 jest.mock('./llm', () => ({
+  // gc1-allow: routeAndCall is the LLM external-boundary proxy; requires controlled stub to avoid real LLM calls in unit tests
   routeAndCall: jest.fn(),
 }));
 
-jest.mock('./learner-profile', () => ({
-  applyAnalysis: jest.fn(),
-}));
+jest.mock('./learner-profile', () => {
+  // gc1-allow: requireActual + targeted override for applyAnalysis side effect
+  const actual = jest.requireActual('./learner-profile') as Record<
+    string,
+    unknown
+  >;
+  return {
+    ...actual,
+    applyAnalysis: jest.fn(),
+  };
+});
 
 import { routeAndCall } from './llm';
 import { applyAnalysis } from './learner-profile';
@@ -56,7 +65,7 @@ describe('parseLearnerInput — LLM success path', () => {
       db,
       profileId,
       'I love dinosaurs',
-      'learner'
+      'learner',
     );
     expect(result.success).toBe(true);
     expect(result.fieldsUpdated).toContain('interests');
@@ -65,7 +74,7 @@ describe('parseLearnerInput — LLM success path', () => {
       profileId,
       expect.objectContaining({ interests: ['dinosaurs'], confidence: 'high' }),
       null,
-      'learner'
+      'learner',
     );
   });
 
@@ -91,7 +100,7 @@ describe('parseLearnerInput — LLM success path', () => {
       db,
       profileId,
       'I prefer short explanations',
-      'learner'
+      'learner',
     );
     expect(result.success).toBe(true);
     expect(result.fieldsUpdated).toContain('communicationNotes');
@@ -123,7 +132,7 @@ describe('parseLearnerInput — LLM success path', () => {
         strengths: [{ topic: 'reading', subject: null, source: 'parent' }],
       }),
       null,
-      'parent'
+      'parent',
     );
   });
 });
@@ -146,7 +155,7 @@ describe('parseLearnerInput — fallback path', () => {
       db,
       profileId,
       'I love space exploration',
-      'learner'
+      'learner',
     );
     expect(result.success).toBe(true);
     // fallbackAnalysis should pick up "I love space exploration" via regex
@@ -158,7 +167,7 @@ describe('parseLearnerInput — fallback path', () => {
         confidence: 'high',
       }),
       null,
-      'learner'
+      'learner',
     );
   });
 
@@ -173,7 +182,7 @@ describe('parseLearnerInput — fallback path', () => {
       db,
       profileId,
       'I enjoy math puzzles',
-      'learner'
+      'learner',
     );
     expect(result.success).toBe(true);
     expect(mockApplyAnalysis).toHaveBeenCalledWith(
@@ -181,7 +190,7 @@ describe('parseLearnerInput — fallback path', () => {
       profileId,
       expect.objectContaining({ interests: ['math puzzles'] }),
       null,
-      'learner'
+      'learner',
     );
   });
 
@@ -196,7 +205,7 @@ describe('parseLearnerInput — fallback path', () => {
       db,
       profileId,
       'I struggle with fractions',
-      'learner'
+      'learner',
     );
     expect(result.success).toBe(true);
     expect(mockApplyAnalysis).toHaveBeenCalledWith(
@@ -206,7 +215,7 @@ describe('parseLearnerInput — fallback path', () => {
         struggles: [{ topic: 'fractions', subject: null, source: 'learner' }],
       }),
       null,
-      'learner'
+      'learner',
     );
   });
 
@@ -221,7 +230,7 @@ describe('parseLearnerInput — fallback path', () => {
       db,
       profileId,
       'I learn best when it is quiet',
-      'learner'
+      'learner',
     );
     expect(result.success).toBe(true);
     expect(mockApplyAnalysis).toHaveBeenCalledWith(
@@ -231,7 +240,7 @@ describe('parseLearnerInput — fallback path', () => {
         communicationNotes: ['I learn best when it is quiet'],
       }),
       null,
-      'learner'
+      'learner',
     );
   });
 });
@@ -260,7 +269,7 @@ describe('parseLearnerInput — error path', () => {
       db,
       profileId,
       'I love robots',
-      'learner'
+      'learner',
     );
     expect(result.success).toBe(false);
     expect(result.message).toBe('Something went wrong. Please try again.');
@@ -313,7 +322,7 @@ describe('parseLearnerInput structured logging', () => {
         db,
         profileId,
         'I love robots',
-        'learner'
+        'learner',
       );
       expect(result.success).toBe(false);
 
@@ -323,7 +332,7 @@ describe('parseLearnerInput structured logging', () => {
         .map((call) => call[0])
         .find(
           (arg): arg is string =>
-            typeof arg === 'string' && arg.includes('parseLearnerInput failed')
+            typeof arg === 'string' && arg.includes('parseLearnerInput failed'),
         );
       expect(typeof logArg).toBe('string');
       const parsed = JSON.parse(logArg!) as {

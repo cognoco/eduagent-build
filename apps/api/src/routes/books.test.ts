@@ -113,7 +113,7 @@ jest.mock('inngest/hono', () => ({
 }));
 
 jest.mock('../inngest/client', () => ({
-  // gc1-allow: Inngest SDK external boundary
+  // gc1-allow: Inngest SDK external boundary — inngest.send() dispatches to external Inngest service; cannot be exercised without a live Inngest dev-server
   inngest: {
     send: jest.fn().mockResolvedValue(undefined),
     createFunction: jest.fn().mockReturnValue(jest.fn()),

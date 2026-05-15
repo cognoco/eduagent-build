@@ -51,6 +51,8 @@ export const filingRoutes = new Hono<FilingRouteEnv>()
     async (c) => {
       const profileId = requireProfileId(c.get('profileId'));
       const { sessionId, sessionMode } = c.req.valid('json');
+      // core-send: user-initiated filing retry — dispatch must throw on
+      // failure so the user is not told "queued" when nothing was queued.
       await inngest.send({
         name: 'app/filing.retry',
         data: { sessionId, sessionMode, profileId },
@@ -231,8 +233,9 @@ export const filingRoutes = new Hono<FilingRouteEnv>()
       await markTopicSuggestionUsed(db, profileId, body.usedTopicSuggestionId);
     }
 
-    // Fire async suggestion generation — await to prevent silent event loss
-    // (session-completed chain waits 60s for this event via waitForEvent)
+    // core-send: filing.completed — the session-completed chain waits 60s for
+    // this event via waitForEvent. Silent dispatch loss would hang that chain
+    // until timeout and leave the user with a broken post-filing flow.
     await inngest
       .send({
         name: 'app/filing.completed',
