@@ -13,7 +13,7 @@ test('J-06 parent opens child progress and returns home', async ({ page }) => {
   });
 
   await pressableClick(
-    page.getByTestId(`parent-home-check-child-${childProfileId}`),
+    page.getByTestId(`parent-home-child-progress-${childProfileId}`),
   );
   await expect(page.getByTestId('progress-screen')).toBeVisible({
     timeout: 30_000,

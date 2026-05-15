@@ -16,7 +16,7 @@ test('J-07 parent → child progress → session recap → back to parent home',
   });
 
   await pressableClick(
-    page.getByTestId(`parent-home-check-child-${childProfileId}`),
+    page.getByTestId(`parent-home-child-progress-${childProfileId}`),
   );
   await expect(page.getByTestId('progress-screen')).toBeVisible({
     timeout: 30_000,
