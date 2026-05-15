@@ -7,6 +7,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import type { DashboardChild } from '@eduagent/schemas';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -74,6 +75,8 @@ function formatJoinedDate(isoDate: string | null | undefined): string | null {
   });
 }
 
+type DashboardSubject = DashboardChild['subjects'][number];
+
 function RowLink({
   icon,
   title,
@@ -139,12 +142,7 @@ function SubjectCard({
   subject,
 }: {
   profileId: string;
-  subject: {
-    subjectId?: string;
-    name: string;
-    retentionStatus: string;
-    rawInput?: string | null;
-  };
+  subject: DashboardSubject;
 }): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
@@ -603,9 +601,9 @@ export default function ChildDetailScreen(): React.ReactElement {
                 defaultValue: 'Subjects',
               })}
             </Text>
-            {child.subjects.map((subject) => (
+            {child.subjects.map((subject, index) => (
               <SubjectCard
-                key={subject.subjectId ?? subject.name}
+                key={subject.subjectId ?? index}
                 profileId={profileId}
                 subject={subject}
               />
