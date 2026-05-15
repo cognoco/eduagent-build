@@ -168,18 +168,40 @@ export default function PickBookScreen(): React.ReactElement {
     ? suggestions.filter((s) => s.category === null)
     : [];
   const subject = subjects?.find((s) => s.id === subjectId);
+  const suggestionsError =
+    suggestionsQuery.isError && !suggestionsQuery.data
+      ? classifyApiError(suggestionsQuery.error)
+      : null;
+  const suggestionsErrorStatus =
+    suggestionsQuery.error &&
+    typeof suggestionsQuery.error === 'object' &&
+    'status' in suggestionsQuery.error &&
+    typeof suggestionsQuery.error.status === 'number'
+      ? suggestionsQuery.error.status
+      : undefined;
+  const suggestionsErrorBlocksManualEntry =
+    suggestionsErrorStatus === 401 ||
+    suggestionsErrorStatus === 403 ||
+    suggestionsErrorStatus === 404 ||
+    suggestionsErrorStatus === 410;
+  const canContinueWithoutSuggestions =
+    !suggestionsErrorBlocksManualEntry &&
+    (suggestionsError?.category === 'network' ||
+      suggestionsError?.category === 'server' ||
+      suggestionsError?.category === 'unknown');
 
   // BUG-318: Auto-open custom input when suggestions load empty — the user
   // shouldn't have to find and tap "Something else..." when there's nothing to pick.
   useEffect(() => {
     if (
       !suggestionsQuery.isLoading &&
-      !suggestionsQuery.isError &&
+      (canContinueWithoutSuggestions || !suggestionsQuery.isError) &&
       suggestions.length === 0
     ) {
       setShowCustomInput(true);
     }
   }, [
+    canContinueWithoutSuggestions,
     suggestionsQuery.isLoading,
     suggestionsQuery.isError,
     suggestions.length,
@@ -343,9 +365,8 @@ export default function PickBookScreen(): React.ReactElement {
   // For the two common recovery shapes we want a Retry + Go Back pair on this
   // screen, so build the actions directly rather than delegating to
   // recoveryActions (which defaults secondary to Go Home for retry cases).
-  if (suggestionsQuery.isError && !suggestionsQuery.data) {
-    const classified = classifyApiError(suggestionsQuery.error);
-    const canRetry = classified.recovery === 'retry';
+  if (suggestionsError && !canContinueWithoutSuggestions) {
+    const canRetry = suggestionsError.recovery === 'retry';
 
     return (
       <View
@@ -355,7 +376,7 @@ export default function PickBookScreen(): React.ReactElement {
       >
         <ErrorFallback
           variant="centered"
-          message={classified.message}
+          message={suggestionsError.message}
           primaryAction={
             canRetry
               ? {
@@ -419,6 +440,31 @@ export default function PickBookScreen(): React.ReactElement {
         <Text className="text-body text-text-secondary mb-6">
           Pick what interests you
         </Text>
+
+        {canContinueWithoutSuggestions ? (
+          <View
+            className="bg-surface rounded-card px-4 py-4 mb-6 border border-border"
+            testID="pick-book-suggestions-inline-error"
+          >
+            <Text className="text-body font-semibold text-text-primary mb-2">
+              Suggestions did not load
+            </Text>
+            <Text className="text-body-sm text-text-secondary mb-3">
+              You can still type the book or topic you want to add.
+            </Text>
+            <Pressable
+              onPress={() => void suggestionsQuery.refetch()}
+              className="self-start px-1 py-2 min-h-[40px] justify-center"
+              testID="pick-book-inline-retry"
+              accessibilityRole="button"
+              accessibilityLabel="Try again"
+            >
+              <Text className="text-body font-semibold text-primary">
+                Try again
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
 
         {/* Flat grid — no books yet (first visit / narrow subject) */}
         {!hasAnyBook && (
@@ -502,7 +548,7 @@ export default function PickBookScreen(): React.ReactElement {
             users (and us, in OTA-built APKs without log access) can tell
             whether suggestions are loading, cooling down, or genuinely
             failing rather than seeing one silent dead-end string. */}
-        {suggestions.length === 0 && (
+        {suggestions.length === 0 && !canContinueWithoutSuggestions && (
           <View
             className="bg-surface rounded-card px-4 py-6 items-center mb-6"
             testID="pick-book-empty"

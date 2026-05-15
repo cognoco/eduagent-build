@@ -1144,6 +1144,59 @@ describe('BookScreen', () => {
     expect(retryCallCount).toBe(1);
   });
 
+  it('lets the learner set up the book after generation times out', async () => {
+    mockUseBookWithTopics.mockReturnValue(
+      makeBookQuery({
+        data: {
+          book: {
+            id: 'book-1',
+            title: 'Algebra',
+            emoji: '📐',
+            topicsGenerated: false,
+            description: 'Basic algebra',
+          },
+          topics: [],
+          completedTopicCount: 0,
+        },
+      }),
+    );
+
+    mockGenerateMutate.mockImplementationOnce(
+      (_input: unknown, callbacks: { onError: (error: Error) => void }) => {
+        callbacks.onError(new Error('initial failure'));
+      },
+    );
+
+    const { getByTestId } = render(<BookScreen />);
+
+    await waitFor(() => {
+      getByTestId('book-gen-build-path');
+    });
+
+    fireEvent.press(getByTestId('book-gen-build-path'));
+
+    await waitFor(() => {
+      expect(mockStartFirstCurriculumMutateAsync).toHaveBeenCalledWith({
+        bookId: 'book-1',
+        sessionType: 'learning',
+        inputMode: 'text',
+      });
+      expect(mockPush).toHaveBeenCalledWith(
+        expect.objectContaining({
+          pathname: '/(app)/session',
+          params: expect.objectContaining({
+            mode: 'learning',
+            subjectId: 'sub-1',
+            bookId: 'book-1',
+            sessionId: 'session-1',
+            topicId: 'topic-1',
+            subjectName: 'Algebra',
+          }),
+        }),
+      );
+    });
+  });
+
   // Back button explicitly replaces with the shelf grid (one screen up).
   // router.back() falls through to the Tabs navigator's `firstRoute` (Home)
   // when the inner stack lacks a sibling `index` — common after cross-tab

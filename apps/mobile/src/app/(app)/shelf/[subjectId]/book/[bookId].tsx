@@ -1164,6 +1164,18 @@ export default function BookScreen() {
               </Text>
             </Pressable>
             <Pressable
+              onPress={handleBuildLearningPath}
+              disabled={startFirstCurriculumSession.isPending}
+              className="bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center mb-3"
+              accessibilityRole="button"
+              accessibilityLabel="Set up this book"
+              testID="book-gen-build-path"
+            >
+              <Text className="text-text-primary text-body font-semibold">
+                Set up this book
+              </Text>
+            </Pressable>
+            <Pressable
               onPress={handleBack}
               className="px-5 py-3"
               testID="book-gen-back"

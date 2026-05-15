@@ -328,10 +328,35 @@ describe('PickBookScreen', () => {
     );
   });
 
-  it('shows error message and retry button on fetch error', async () => {
+  it('keeps manual entry available when suggestions fetch fails', async () => {
     mockFetch.setRoute('/book-suggestions', () =>
       Promise.resolve(
         new Response(JSON.stringify({ message: 'Failed' }), { status: 500 }),
+      ),
+    );
+
+    const { getByTestId, getByText, queryByTestId } = render(
+      <PickBookScreen />,
+      {
+        wrapper: TestWrapper,
+      },
+    );
+
+    await waitFor(() => {
+      getByTestId('pick-book-suggestions-inline-error');
+    });
+    expect(queryByTestId('pick-book-error')).toBeNull();
+    getByText('Suggestions did not load');
+    getByTestId('pick-book-inline-retry');
+    getByTestId('pick-book-custom-input');
+  });
+
+  it('keeps blocking error state for not-found suggestions errors', async () => {
+    mockFetch.setRoute('/book-suggestions', () =>
+      Promise.resolve(
+        new Response(JSON.stringify({ message: 'Subject not found' }), {
+          status: 404,
+        }),
       ),
     );
 
@@ -342,8 +367,7 @@ describe('PickBookScreen', () => {
     await waitFor(() => {
       getByTestId('pick-book-error');
     });
-    // UX-DE-M11: recoveryActions maps retry → "Try Again" label (app-wide convention)
-    getByText('Try Again');
+    getByText('Go Back');
     getByTestId('pick-book-back-button');
   });
 

@@ -422,13 +422,29 @@ export default function ShelfScreen() {
                 {t('library.shelf.emptyMessage')}
               </Text>
               <Pressable
-                onPress={handleRetry}
+                onPress={() =>
+                  router.push({
+                    pathname: '/(app)/pick-book/[subjectId]',
+                    params: { subjectId },
+                  } as Href)
+                }
                 className="bg-primary rounded-button px-6 py-3 items-center min-h-[48px] justify-center mb-3 w-full"
+                testID="shelf-empty-pick-book"
+                accessibilityRole="button"
+                accessibilityLabel={t('library.shelf.emptyPickTitle')}
+              >
+                <Text className="text-text-inverse text-body font-semibold">
+                  {t('library.shelf.emptyPickTitle')}
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={handleRetry}
+                className="bg-surface-elevated rounded-button px-6 py-3 items-center min-h-[48px] justify-center mb-3 w-full"
                 testID="shelf-empty-retry"
                 accessibilityRole="button"
                 accessibilityLabel={t('common.retry')}
               >
-                <Text className="text-text-inverse text-body font-semibold">
+                <Text className="text-text-primary text-body font-semibold">
                   {t('common.retry')}
                 </Text>
               </Pressable>
