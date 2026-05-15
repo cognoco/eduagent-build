@@ -62,6 +62,9 @@ export default defineConfig({
     {
       command: 'node e2e-web/helpers/serve-exported-web.mjs',
       url: appBaseUrl,
+      // Always true: Playwright's stdio pipe management kills the server
+      // under multi-worker load. CI runners are ephemeral so stale-server
+      // risk from a previous job is negligible.
       reuseExistingServer: true,
       stdout: 'pipe',
       stderr: 'pipe',

@@ -17,6 +17,7 @@ export const seedEmailPrefix =
   process.env.PLAYWRIGHT_EMAIL_PREFIX ?? `pw-${runId}-`;
 process.env.PLAYWRIGHT_EMAIL_PREFIX = seedEmailPrefix;
 
+// Keep in sync with serve-exported-web.mjs (same ternary).
 const defaultApiUrl =
   process.env.PLAYWRIGHT_SKIP_LOCAL_API === '1'
     ? 'https://api-test.mentomate.com'

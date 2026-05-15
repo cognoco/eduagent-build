@@ -2,7 +2,7 @@ import http from 'node:http';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { createReadStream } from 'node:fs';
-import { access, stat, readFile, writeFile, rename, rm } from 'node:fs/promises';
+import { access, readFile, writeFile, rename, rm } from 'node:fs/promises';
 import { statSync } from 'node:fs';
 import { constants as fsConstants } from 'node:fs';
 
@@ -43,38 +43,17 @@ async function fileExists(filePath) {
   }
 }
 
-async function resolveAssetPath(urlPath) {
-  const safePath = path.normalize(urlPath).replace(/^(\.\.[/\\])+/, '');
-  let candidate = path.join(distDir, safePath);
-
-  // [I-17] Path traversal containment — reject any resolved path that escapes distDir
-  const resolvedCandidate = path.resolve(candidate);
-  const resolvedDist = path.resolve(distDir);
-  if (!resolvedCandidate.startsWith(resolvedDist + path.sep) && resolvedCandidate !== resolvedDist) {
-    return null;
-  }
-
-  if (await fileExists(candidate)) {
-    const candidateStats = await stat(candidate);
-    if (candidateStats.isDirectory()) {
-      candidate = path.join(candidate, 'index.html');
-    }
-    return candidate;
-  }
-
-  if (!path.extname(candidate)) {
-    return path.join(distDir, 'index.html');
-  }
-
-  return null;
-}
-
 async function startServer() {
+  // Sync handler: statSync is intentional — the async version caused the
+  // server process to die under concurrent Playwright workers due to
+  // unhandled async rejections in Node's http.createServer callback.
+  // For a local static file server the event-loop cost is negligible.
   const server = http.createServer((request, response) => {
     const url = new URL(request.url ?? '/', `http://${host}:${port}`);
     const safePath = path.normalize(url.pathname).replace(/^(\.\.[/\\])+/, '');
     let candidate = path.join(distDir, safePath);
 
+    // [I-17] Path traversal containment
     const resolvedCandidate = path.resolve(candidate);
     const resolvedDist = path.resolve(distDir);
     if (!resolvedCandidate.startsWith(resolvedDist + path.sep) && resolvedCandidate !== resolvedDist) {
@@ -103,6 +82,8 @@ async function startServer() {
       if (!response.headersSent) {
         response.statusCode = 500;
         response.end('Internal Server Error');
+      } else {
+        response.destroy();
       }
     });
     stream.pipe(response);
@@ -134,6 +115,7 @@ const envFilesToOverride = ['.env.local', '.env.development.local'].map(
     backupPath: path.join(projectRoot, `${name}.e2e-bak`),
   })
 );
+// Keep in sync with runtime.ts (same ternary).
 const defaultApiUrl =
   process.env.PLAYWRIGHT_SKIP_LOCAL_API === '1'
     ? 'https://api-test.mentomate.com'
