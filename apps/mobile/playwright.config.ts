@@ -4,9 +4,10 @@ import { apiBaseUrl, appBaseUrl, runId } from './e2e-web/helpers/runtime';
 
 const e2eWebDir = path.join(process.cwd(), 'apps', 'mobile', 'e2e-web');
 const shouldStartLocalApi = process.env.PLAYWRIGHT_SKIP_LOCAL_API !== '1';
-// CI sets PLAYWRIGHT_API_URL=<workers.dev URL> → true → 1 worker.
-// Custom domain (api-test.mentomate.com) → false → full parallelism.
-// If CI ever drops PLAYWRIGHT_API_URL, update this check.
+// *.workers.dev URLs are platform-rate-limited → 1 worker.
+// Custom domains (api-test.mentomate.com) are not → full parallelism.
+// If CI switches from workers.dev to a custom domain, 4 workers is correct
+// (the custom domain's zone has no rate-limiting).
 const usesSharedStagingApi =
   process.env.PLAYWRIGHT_SKIP_LOCAL_API === '1' &&
   apiBaseUrl.includes('.workers.dev');

@@ -90,8 +90,8 @@ async function startServer() {
   });
 
   server.on('error', (err) => {
-    console.error(`[serve] server error: ${err.message}`);
-    if (err.code !== 'EADDRINUSE') process.exit(1);
+    console.error(`[serve] fatal: ${err.message}`);
+    process.exit(1);
   });
 
   server.keepAliveTimeout = 0;
@@ -116,11 +116,9 @@ const envFilesToOverride = ['.env.local', '.env.development.local'].map(
     backupPath: path.join(projectRoot, `${name}.e2e-bak`),
   })
 );
-// Keep in sync with runtime.ts (same ternary).
-const defaultApiUrl =
-  process.env.PLAYWRIGHT_SKIP_LOCAL_API === '1'
-    ? 'https://api-test.mentomate.com'
-    : 'http://127.0.0.1:8787';
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
+const { defaultApiUrl } = require('./e2e-defaults.js');
 const apiUrl = process.env.PLAYWRIGHT_API_URL ?? defaultApiUrl;
 process.env.EXPO_PUBLIC_API_URL = apiUrl;
 const generatedEnvFiles = new Set();

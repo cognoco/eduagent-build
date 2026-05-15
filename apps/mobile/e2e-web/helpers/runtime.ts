@@ -17,14 +17,10 @@ export const seedEmailPrefix =
   process.env.PLAYWRIGHT_EMAIL_PREFIX ?? `pw-${runId}-`;
 process.env.PLAYWRIGHT_EMAIL_PREFIX = seedEmailPrefix;
 
-// Keep in sync with serve-exported-web.mjs (same ternary).
-const defaultApiUrl =
-  process.env.PLAYWRIGHT_SKIP_LOCAL_API === '1'
-    ? 'https://api-test.mentomate.com'
-    : 'http://127.0.0.1:8787';
+const { defaultApiUrl } = require('./e2e-defaults.js');
 
 export const apiBaseUrl = trimTrailingSlash(
-  process.env.PLAYWRIGHT_API_URL ?? defaultApiUrl,
+  process.env.PLAYWRIGHT_API_URL ?? (defaultApiUrl as string),
 );
 
 export const appBaseUrl = trimTrailingSlash(
