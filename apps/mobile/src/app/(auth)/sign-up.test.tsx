@@ -103,6 +103,29 @@ describe('SignUpScreen', () => {
     }
   });
 
+  it('keeps the return-to-sign-in link directly with the primary CTA', () => {
+    render(<SignUpScreen />);
+
+    const content = screen.getByTestId('sign-up-content');
+    const siblings = content.children as {
+      props?: { testID?: string };
+    }[];
+    const signUpButtonIndex = siblings.findIndex(
+      (c) => c?.props?.testID === 'sign-up-button',
+    );
+    const signInRowIndex = siblings.findIndex(
+      (c) => c?.props?.testID === 'sign-up-back-to-sign-in-row',
+    );
+    const termsIndex = siblings.findIndex(
+      (c) => c?.props?.testID === 'sign-up-terms-copy',
+    );
+
+    expect(signUpButtonIndex).toBeGreaterThanOrEqual(0);
+    expect(signInRowIndex).toBe(signUpButtonIndex + 1);
+    expect(termsIndex).toBe(signInRowIndex + 1);
+    screen.getByTestId('sign-in-link');
+  });
+
   it('renders OpenAI SSO when configured', () => {
     process.env.EXPO_PUBLIC_CLERK_OPENAI_SSO_KEY = 'openai';
 
