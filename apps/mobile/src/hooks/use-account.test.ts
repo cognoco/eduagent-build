@@ -1,9 +1,10 @@
-import { renderHook, act } from '@testing-library/react-native';
+import { renderHook, act, waitFor } from '@testing-library/react-native';
 import { QueryClient } from '@tanstack/react-query';
 import { createQueryWrapper } from '../test-utils/app-hook-test-utils';
 import {
   useDeleteAccount,
   useCancelDeletion,
+  useDeletionStatus,
   useExportData,
 } from './use-account';
 
@@ -126,6 +127,68 @@ describe('useCancelDeletion', () => {
         'Unable to cancel deletion',
       );
     });
+  });
+});
+
+describe('useDeletionStatus', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    queryClient?.clear();
+  });
+
+  it('calls GET /account/deletion-status', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          scheduled: true,
+          deletionScheduledAt: '2026-02-17T00:00:00.000Z',
+          gracePeriodEnds: '2026-02-24T00:00:00.000Z',
+        }),
+        { status: 200 },
+      ),
+    );
+
+    const { result } = renderHook(() => useDeletionStatus(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    expect(mockFetch).toHaveBeenCalled();
+    expect(result.current.data?.scheduled).toBe(true);
+    expect(result.current.data?.gracePeriodEnds).toBe(
+      '2026-02-24T00:00:00.000Z',
+    );
+  });
+
+  it('surfaces errors when GET /account/deletion-status returns non-2xx', async () => {
+    mockFetch.mockImplementation(
+      () =>
+        new Response(
+          JSON.stringify({
+            code: 'INTERNAL_ERROR',
+            message: 'Unable to load deletion status',
+          }),
+          { status: 500 },
+        ),
+    );
+
+    const { result } = renderHook(() => useDeletionStatus(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isError).toBe(true);
+    });
+    expect(result.current.error?.message).toBe(
+      'Unable to load deletion status',
+    );
+    expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 });
 

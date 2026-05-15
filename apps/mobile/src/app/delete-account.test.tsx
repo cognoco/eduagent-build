@@ -29,21 +29,46 @@ jest.mock('react-native-safe-area-context', () => ({
 const mockDeleteMutateAsync = jest.fn();
 const mockCancelMutateAsync = jest.fn();
 let mockDeleteIsPending = false;
+type MockDeletionStatus = {
+  data: {
+    scheduled: boolean;
+    deletionScheduledAt: string | null;
+    gracePeriodEnds: string | null;
+  };
+  isLoading: boolean;
+  isError: boolean;
+  refetch: jest.Mock;
+};
+const mockDeletionStatusRefetch = jest.fn();
+let mockDeletionStatus: MockDeletionStatus = {
+  data: {
+    scheduled: false,
+    deletionScheduledAt: null,
+    gracePeriodEnds: null,
+  },
+  isLoading: false,
+  isError: false,
+  refetch: mockDeletionStatusRefetch,
+};
 
-jest.mock('../hooks/use-account', () => ({
-  useDeleteAccount: () => ({
-    mutateAsync: mockDeleteMutateAsync,
-    isPending: mockDeleteIsPending,
+jest.mock(
+  '../hooks/use-account',
+  /* gc1-allow: screen tests mock account hooks to avoid full QueryClient/provider setup around the Expo Router page */ () => ({
+    useDeleteAccount: () => ({
+      mutateAsync: mockDeleteMutateAsync,
+      isPending: mockDeleteIsPending,
+    }),
+    useCancelDeletion: () => ({
+      mutateAsync: mockCancelMutateAsync,
+      isPending: false,
+    }),
+    useDeletionStatus: () => mockDeletionStatus,
   }),
-  useCancelDeletion: () => ({
-    mutateAsync: mockCancelMutateAsync,
-    isPending: false,
-  }),
-}));
+);
 
 // prettier-ignore
 jest.mock('../lib/theme', /* gc1-allow: nativewind vars() does not resolve 'react' in jest; stub theme hooks so screen tests don't blow up on import */ () => ({
-  useThemeColors: () => ({ accent: '#0ea5e9', background: '#18181b', border: '#d4d4d8', muted: '#71717a', surface: '#ffffff', textInverse: '#ffffff', textPrimary: '#18181b', textSecondary: '#52525b' }),
+  useThemeColors: () => ({ accent: '#0ea5e9', background: '#18181b', border: '#d4d4d8', muted: '#71717a', primary: '#0ea5e9', surface: '#ffffff', textInverse: '#ffffff', textPrimary: '#18181b', textSecondary: '#52525b' }),
   useTheme: () => ({ colorScheme: 'dark' }),
   useTokenVars: () => ({}),
 }));
@@ -78,6 +103,16 @@ describe('DeleteAccountScreen', () => {
     jest.clearAllMocks();
     mockCanGoBack.mockReturnValue(true);
     mockDeleteIsPending = false;
+    mockDeletionStatus = {
+      data: {
+        scheduled: false,
+        deletionScheduledAt: null,
+        gracePeriodEnds: null,
+      },
+      isLoading: false,
+      isError: false,
+      refetch: mockDeletionStatusRefetch,
+    };
   });
 
   afterEach(() => {
@@ -91,6 +126,164 @@ describe('DeleteAccountScreen', () => {
     screen.getByTestId('delete-account-confirm');
     screen.getByTestId('delete-account-cancel');
     screen.getByText(/7-day grace period/);
+  });
+
+  it('opens directly into scheduled state when deletion is already pending', async () => {
+    mockDeletionStatus = {
+      data: {
+        scheduled: true,
+        deletionScheduledAt: '2026-02-17T00:00:00.000Z',
+        gracePeriodEnds: '2026-02-24T00:00:00.000Z',
+      },
+      isLoading: false,
+      isError: false,
+      refetch: mockDeletionStatusRefetch,
+    };
+
+    render(<DeleteAccountScreen />, { wrapper: Wrapper });
+
+    await waitFor(() => {
+      screen.getByTestId('delete-account-scheduled');
+    });
+    screen.getByTestId('delete-account-keep');
+    expect(screen.queryByTestId('delete-account-confirm')).toBeNull();
+  });
+
+  it('blocks the destructive flow when deletion status fails to load', () => {
+    mockDeletionStatus = {
+      data: {
+        scheduled: false,
+        deletionScheduledAt: null,
+        gracePeriodEnds: null,
+      },
+      isLoading: false,
+      isError: true,
+      refetch: mockDeletionStatusRefetch,
+    };
+
+    render(<DeleteAccountScreen />, { wrapper: Wrapper });
+
+    screen.getByTestId('delete-account-status-error');
+    expect(screen.queryByTestId('delete-account-confirm')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('delete-account-status-retry'));
+
+    expect(mockDeletionStatusRefetch).toHaveBeenCalledTimes(1);
+    expect(mockDeleteMutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('returns to the warning when a refetch reports deletion is no longer scheduled', async () => {
+    mockDeletionStatus = {
+      data: {
+        scheduled: true,
+        deletionScheduledAt: '2026-02-17T00:00:00.000Z',
+        gracePeriodEnds: '2026-02-24T00:00:00.000Z',
+      },
+      isLoading: false,
+      isError: false,
+      refetch: mockDeletionStatusRefetch,
+    };
+
+    const { rerender } = render(<DeleteAccountScreen />, { wrapper: Wrapper });
+
+    await waitFor(() => {
+      screen.getByTestId('delete-account-scheduled');
+    });
+
+    mockDeletionStatus = {
+      data: {
+        scheduled: false,
+        deletionScheduledAt: null,
+        gracePeriodEnds: null,
+      },
+      isLoading: false,
+      isError: false,
+      refetch: mockDeletionStatusRefetch,
+    };
+
+    rerender(<DeleteAccountScreen />);
+
+    await waitFor(() => {
+      screen.getByTestId('delete-account-confirm');
+    });
+    expect(screen.queryByTestId('delete-account-scheduled')).toBeNull();
+  });
+
+  it('ignores one stale unscheduled refetch after a local deletion schedule', async () => {
+    mockDeleteMutateAsync.mockResolvedValue({
+      message: 'Deletion scheduled',
+      gracePeriodEnds: '2026-02-24T00:00:00.000Z',
+    });
+
+    const { rerender } = render(<DeleteAccountScreen />, { wrapper: Wrapper });
+
+    advanceToConfirmedState();
+    fireEvent.press(screen.getByTestId('delete-account-confirm-final'));
+
+    await waitFor(() => {
+      screen.getByTestId('delete-account-scheduled');
+    });
+
+    mockDeletionStatus = {
+      data: {
+        scheduled: true,
+        deletionScheduledAt: '2026-02-17T00:00:00.000Z',
+        gracePeriodEnds: '2026-02-24T00:00:00.000Z',
+      },
+      isLoading: false,
+      isError: false,
+      refetch: mockDeletionStatusRefetch,
+    };
+    rerender(<DeleteAccountScreen />);
+
+    await waitFor(() => {
+      screen.getByTestId('delete-account-scheduled');
+    });
+
+    mockDeletionStatus = {
+      data: {
+        scheduled: false,
+        deletionScheduledAt: null,
+        gracePeriodEnds: null,
+      },
+      isLoading: false,
+      isError: false,
+      refetch: mockDeletionStatusRefetch,
+    };
+    rerender(<DeleteAccountScreen />);
+
+    await waitFor(() => {
+      screen.getByTestId('delete-account-scheduled');
+    });
+    expect(screen.queryByTestId('delete-account-confirm')).toBeNull();
+  });
+
+  it('keeps typed confirmation when a refetch reports deletion is scheduled', async () => {
+    const { rerender } = render(<DeleteAccountScreen />, { wrapper: Wrapper });
+
+    advanceToConfirmedState();
+    screen.getByTestId('delete-account-confirming');
+
+    mockDeletionStatus = {
+      data: {
+        scheduled: true,
+        deletionScheduledAt: '2026-02-17T00:00:00.000Z',
+        gracePeriodEnds: '2026-02-24T00:00:00.000Z',
+      },
+      isLoading: false,
+      isError: false,
+      refetch: mockDeletionStatusRefetch,
+    };
+
+    rerender(<DeleteAccountScreen />);
+
+    await waitFor(() => {
+      screen.getByTestId('delete-account-confirming');
+    });
+    expect(screen.queryByTestId('delete-account-scheduled')).toBeNull();
+    expect(screen.getByTestId('delete-account-confirm-input').props.value).toBe(
+      'DELETE',
+    );
   });
 
   it('schedules deletion and shows grace period after typed confirmation', async () => {

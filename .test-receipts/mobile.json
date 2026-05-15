@@ -1,12 +1,12 @@
 {
   "scope": "mobile",
-  "verifiedAt": "2026-05-15T07:49:05Z",
+  "verifiedAt": "2026-05-15T10:02:17Z",
   "verifiedBy": "Zuzana Kopečná @ ZLY-Orion",
-  "command": "pnpm exec jest --config apps/mobile/jest.config.cjs --testMatch \"**/apps/mobile/src/**/*.(spec|test).[jt]s?(x)\" --runInBand --forceExit --no-coverage",
+  "command": "pnpm exec nx run mobile:test",
   "passed": true,
   "testFiles": {
-    "apps/mobile/src/app/(app)/child/[profileId]/index.test.tsx": "8e630e5bb286e72e534f299f9c2629e4fdecc2f9",
-    "apps/mobile/src/app/e2e-testid-integrity.test.ts": "5a27cf8d48011d98b365e850c3ca02e399b58cb7",
-    "apps/mobile/src/app/(app)/pick-book/[subjectId].test.tsx": "a45f82e106e28a0646f7e4afed2b0bd00e3101c8"
+    "apps/mobile/src/app/(app)/subscription.test.tsx": "4483793cbec48cae6b06749424409e31815b5810",
+    "apps/mobile/src/app/delete-account.test.tsx": "7c2bb205f22073d480bd4f1a43e8b40e12bb16bf",
+    "apps/mobile/src/hooks/use-account.test.ts": "f55b2a8d4a8faba67d10a45a74609cfa02fe5915"
   }
 }

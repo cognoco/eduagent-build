@@ -1,17 +1,55 @@
 import type { Database } from '@eduagent/database';
+import { ConflictError, NotFoundError } from '../errors';
+import { captureException } from './sentry';
 import {
   scheduleDeletion,
   cancelDeletion,
+  getDeletionStatus,
   isDeletionCancelled,
   executeDeletion,
   getProfileIdsForAccount,
   deleteProfileIfNoConsent,
 } from './deletion';
 
-function createMockDb({
-  findFirstResult = undefined as Record<string, unknown> | undefined,
-  profilesResult = [] as Array<{ id: string }>,
-} = {}): Database {
+jest.mock('./sentry', () => ({ captureException: jest.fn() })); // gc1-allow: Sentry is an external telemetry boundary.
+
+function createMockDb(
+  options: {
+    findFirstResult?: Record<string, unknown>;
+    profilesResult?: Array<{ id: string }>;
+    updateReturning?: Array<{ deletionScheduledAt: Date | null }>;
+    updateReturningSequence?: Array<
+      Array<{ deletionScheduledAt: Date | null }>
+    >;
+  } = {},
+): Database {
+  const findFirstResult = Object.prototype.hasOwnProperty.call(
+    options,
+    'findFirstResult',
+  )
+    ? options.findFirstResult
+    : {
+        deletionScheduledAt: null,
+        deletionCancelledAt: null,
+      };
+  const profilesResult = options.profilesResult ?? [];
+  const updateReturning = options.updateReturning ?? [
+    { deletionScheduledAt: new Date() },
+  ];
+  const updateReturningMock = jest.fn();
+  for (const returning of options.updateReturningSequence ?? [
+    updateReturning,
+  ]) {
+    updateReturningMock.mockResolvedValueOnce(returning);
+  }
+  updateReturningMock.mockResolvedValue(updateReturning);
+  const updateWhereMock = jest.fn().mockReturnValue({
+    returning: updateReturningMock,
+  });
+  const updateSetMock = jest.fn().mockReturnValue({
+    where: updateWhereMock,
+  });
+
   return {
     query: {
       accounts: {
@@ -22,9 +60,7 @@ function createMockDb({
       },
     },
     update: jest.fn().mockReturnValue({
-      set: jest.fn().mockReturnValue({
-        where: jest.fn().mockResolvedValue(undefined),
-      }),
+      set: updateSetMock,
     }),
     delete: jest.fn().mockReturnValue({
       where: jest.fn().mockResolvedValue(undefined),
@@ -33,6 +69,10 @@ function createMockDb({
 }
 
 describe('scheduleDeletion', () => {
+  beforeEach(() => {
+    (captureException as jest.Mock).mockClear();
+  });
+
   it('returns a grace period end date 7 days in the future', async () => {
     const db = createMockDb();
     const before = Date.now();
@@ -51,7 +91,7 @@ describe('scheduleDeletion', () => {
     const result = await scheduleDeletion(db, 'account-1');
     expect(() => new Date(result.gracePeriodEnds)).not.toThrow();
     expect(new Date(result.gracePeriodEnds).toISOString()).toBe(
-      result.gracePeriodEnds
+      result.gracePeriodEnds,
     );
   });
 
@@ -59,6 +99,97 @@ describe('scheduleDeletion', () => {
     const db = createMockDb();
     await scheduleDeletion(db, 'account-1');
     expect(db.update).toHaveBeenCalled();
+  });
+
+  it('throws and does not claim scheduled when the account is missing', async () => {
+    const db = createMockDb({
+      findFirstResult: undefined,
+      updateReturning: [],
+    });
+
+    await expect(
+      scheduleDeletion(db, 'missing-account'),
+    ).rejects.toBeInstanceOf(NotFoundError);
+    expect(db.update).toHaveBeenCalled();
+  });
+
+  it('does not move the deadline when deletion is already scheduled', async () => {
+    const db = createMockDb({
+      findFirstResult: {
+        deletionScheduledAt: new Date('2026-02-17T00:00:00.000Z'),
+        deletionCancelledAt: null,
+      },
+      updateReturning: [],
+    });
+
+    const result = await scheduleDeletion(db, 'account-1');
+
+    expect(result).toEqual({
+      gracePeriodEnds: '2026-02-24T00:00:00.000Z',
+      scheduledNow: false,
+    });
+    expect(db.update).toHaveBeenCalled();
+  });
+
+  it('retries once when a concurrent cancel wins the fallback read', async () => {
+    const db = createMockDb({
+      findFirstResult: {
+        deletionScheduledAt: new Date('2026-02-17T00:00:00.000Z'),
+        deletionCancelledAt: new Date('2026-02-18T00:00:00.000Z'),
+      },
+      updateReturningSequence: [
+        [],
+        [{ deletionScheduledAt: new Date('2026-02-19T00:00:00.000Z') }],
+      ],
+    });
+
+    const result = await scheduleDeletion(db, 'account-1');
+
+    expect(result).toEqual({
+      gracePeriodEnds: '2026-02-26T00:00:00.000Z',
+      scheduledNow: true,
+    });
+    expect(db.update).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not reschedule when cancellation timestamp equals scheduled timestamp', async () => {
+    const db = createMockDb({
+      findFirstResult: {
+        deletionScheduledAt: new Date('2026-02-17T00:00:00.000Z'),
+        deletionCancelledAt: new Date('2026-02-17T00:00:00.000Z'),
+      },
+      updateReturning: [],
+    });
+
+    const result = await scheduleDeletion(db, 'account-1');
+
+    expect(result).toEqual({
+      gracePeriodEnds: '2026-02-24T00:00:00.000Z',
+      scheduledNow: false,
+    });
+  });
+
+  it('throws a typed conflict and escalates when retry exhaustion leaves the account unscheduled', async () => {
+    const db = createMockDb({
+      findFirstResult: {
+        deletionScheduledAt: new Date('2026-02-17T00:00:00.000Z'),
+        deletionCancelledAt: new Date('2026-02-18T00:00:00.000Z'),
+      },
+      updateReturningSequence: [[], []],
+    });
+
+    await expect(scheduleDeletion(db, 'account-1')).rejects.toBeInstanceOf(
+      ConflictError,
+    );
+
+    expect(db.update).toHaveBeenCalledTimes(2);
+    expect(captureException).toHaveBeenCalledWith(expect.any(ConflictError), {
+      extra: {
+        surface: 'account.deletion',
+        reason: 'schedule-retry-exhausted',
+        accountId: 'account-1',
+      },
+    });
   });
 });
 
@@ -113,6 +244,95 @@ describe('isDeletionCancelled', () => {
     });
     const result = await isDeletionCancelled(db, 'account-1');
     expect(result).toBe(false);
+  });
+
+  it('returns false when cancellation timestamp equals scheduled timestamp', async () => {
+    const db = createMockDb({
+      findFirstResult: {
+        deletionScheduledAt: new Date('2025-01-10T00:00:00Z'),
+        deletionCancelledAt: new Date('2025-01-10T00:00:00Z'),
+      },
+    });
+    const result = await isDeletionCancelled(db, 'account-1');
+    expect(result).toBe(false);
+  });
+});
+
+describe('getDeletionStatus', () => {
+  it('returns unscheduled when no deletion is pending', async () => {
+    const db = createMockDb({
+      findFirstResult: {
+        deletionScheduledAt: null,
+        deletionCancelledAt: null,
+      },
+    });
+
+    const result = await getDeletionStatus(db, 'account-1');
+
+    expect(result).toEqual({
+      scheduled: false,
+      deletionScheduledAt: null,
+      gracePeriodEnds: null,
+    });
+  });
+
+  it('returns scheduled status with derived grace period end', async () => {
+    const db = createMockDb({
+      findFirstResult: {
+        deletionScheduledAt: new Date('2026-02-17T00:00:00.000Z'),
+        deletionCancelledAt: null,
+      },
+    });
+
+    const result = await getDeletionStatus(db, 'account-1');
+
+    expect(result).toEqual({
+      scheduled: true,
+      deletionScheduledAt: '2026-02-17T00:00:00.000Z',
+      gracePeriodEnds: '2026-02-24T00:00:00.000Z',
+    });
+  });
+
+  it('returns scheduled when cancellation timestamp equals scheduled timestamp', async () => {
+    const db = createMockDb({
+      findFirstResult: {
+        deletionScheduledAt: new Date('2026-02-17T00:00:00.000Z'),
+        deletionCancelledAt: new Date('2026-02-17T00:00:00.000Z'),
+      },
+    });
+
+    const result = await getDeletionStatus(db, 'account-1');
+
+    expect(result).toEqual({
+      scheduled: true,
+      deletionScheduledAt: '2026-02-17T00:00:00.000Z',
+      gracePeriodEnds: '2026-02-24T00:00:00.000Z',
+    });
+  });
+
+  it('returns unscheduled when deletion was cancelled after scheduling', async () => {
+    const db = createMockDb({
+      findFirstResult: {
+        deletionScheduledAt: new Date('2026-02-17T00:00:00.000Z'),
+        deletionCancelledAt: new Date('2026-02-18T00:00:00.000Z'),
+      },
+    });
+
+    const result = await getDeletionStatus(db, 'account-1');
+
+    expect(result).toEqual({
+      scheduled: false,
+      deletionScheduledAt: null,
+      gracePeriodEnds: null,
+    });
+  });
+
+  it('throws when the account is missing', async () => {
+    const db = createMockDb({ findFirstResult: undefined });
+
+    await expect(
+      getDeletionStatus(db, 'missing-account'),
+    ).rejects.toBeInstanceOf(NotFoundError);
   });
 });
 
