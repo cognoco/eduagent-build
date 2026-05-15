@@ -9,6 +9,8 @@
     "apps/mobile/src/components/session/session-types.test.ts": "6aac22c880763c16dd7308946fdf4b004d749176",
     "apps/mobile/src/components/session/use-session-streaming.test.ts": "5142bbb8b2fa7de15d3dac7d66ffbf906a6bfda4",
     "apps/mobile/src/hooks/use-sessions.test.ts": "066ab66ae6457210ad0be88e761298e9382c1cc7",
+    "apps/mobile/src/app/(app)/library.test.tsx": "899f5a274a3a9c1026bf8e22ded3b5666e21fefb",
+    "apps/mobile/src/app/create-subject.test.tsx": "3fbecb0f71a16b0f30813f53f9eb8394fe4b7348",
     "apps/mobile/src/lib/auth-expiry.test.ts": "62525d2f47d41d62a5deb8e073b06592bd69585b",
     "apps/mobile/src/app/(auth)/sign-up.test.tsx": "10c849fbcfe93d5c9f4cc89f0a64f6496fc961e9",
     "apps/mobile/src/app/(auth)/sign-in.test.tsx": "74acba7f891420f18f74d2349ac7307e6fd2f9b4",
