@@ -177,7 +177,7 @@
       },
       "encouragementNote": "Nudges sind sanfte Ermutigungen in eine Richtung.",
       "transitionNoticeTitle": "Du begleitest jetzt {{childNames}}",
-      "transitionNoticeBody": "Tippe jederzeit auf Home, um den Fortschritt und dein eigenes Lernen zu sehen.",
+      "transitionNoticeBody": "Probiere heute Abend eine dieser Einstiegsfragen aus.",
       "cards": {
         "checkChild": "Schau nach, wie es {{childName}} geht",
         "checkChildFallback": "Tippe, um den Fortschritt dieser Woche zu sehen",

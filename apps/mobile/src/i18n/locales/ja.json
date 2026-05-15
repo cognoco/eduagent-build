@@ -177,7 +177,7 @@
       },
       "encouragementNote": "ナッジは短い応援メッセージです。返信は必要ありません。",
       "transitionNoticeTitle": "{{childNames}}のメンターになりました",
-      "transitionNoticeBody": "ホームをタップして、いつでも進捗と自分の学習を確認できます。",
+      "transitionNoticeBody": "今夜、この会話のきっかけを1つ試してみましょう。",
       "cards": {
         "checkChild": "{{childName}}さんの様子を見る",
         "checkChildFallback": "今週の進み具合を見る",

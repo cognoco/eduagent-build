@@ -49,7 +49,7 @@ export function ParentTransitionNotice({
 
   return (
     <View
-      className="bg-primary-soft rounded-card px-4 py-3.5 mt-4"
+      className="bg-primary-soft rounded-card px-4 py-3.5"
       testID="parent-transition-notice"
       accessibilityRole="alert"
     >

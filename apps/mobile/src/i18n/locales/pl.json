@@ -177,7 +177,7 @@
       },
       "encouragementNote": "Zachęty to krótkie, łagodne wiadomości w jedną stronę.",
       "transitionNoticeTitle": "Teraz mentorujesz {{childNames}}",
-      "transitionNoticeBody": "Naciśnij Start w dowolnym momencie, aby sprawdzić postępy i swoją naukę.",
+      "transitionNoticeBody": "Wypróbuj dziś wieczorem jedno z tych pytań na początek rozmowy.",
       "cards": {
         "checkChild": "Sprawdź, jak idzie {{childName}}",
         "checkChildFallback": "Dotknij, aby zobaczyć postępy z tego tygodnia",
