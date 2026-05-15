@@ -1,3 +1,4 @@
+import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -69,6 +70,7 @@ function ReportsHeaderSummary({
 }: {
   latestReport: WeeklyReportSummary | undefined;
 }): React.ReactElement | null {
+  const { t } = useTranslation();
   if (!latestReport?.headlineStat) return null;
   const { headlineStat, thisWeek } = latestReport;
   return (
@@ -88,9 +90,40 @@ function ReportsHeaderSummary({
         </Text>
       ) : null}
       {thisWeek ? (
-        <Text className="text-caption text-text-secondary mt-2">
-          {thisWeek.totalSessions} sessions · {thisWeek.totalActiveMinutes} min
-        </Text>
+        <View className="flex-row flex-wrap mt-3" style={{ gap: 18 }}>
+          <View>
+            <Text className="text-caption text-text-secondary">
+              {t('parentView.weeklyReport.sessionsThisWeek')}
+            </Text>
+            <Text className="text-body font-semibold text-text-primary mt-1">
+              {thisWeek.totalSessions}
+            </Text>
+          </View>
+          <View>
+            <Text className="text-caption text-text-secondary">
+              {t('parentView.weeklyReport.timeOnApp')}
+            </Text>
+            <Text className="text-body font-semibold text-text-primary mt-1">
+              {thisWeek.totalActiveMinutes} min
+            </Text>
+          </View>
+          <View>
+            <Text className="text-caption text-text-secondary">
+              {t('parentView.weeklyReport.topicsMastered')}
+            </Text>
+            <Text className="text-body font-semibold text-text-primary mt-1">
+              {thisWeek.topicsMastered}
+            </Text>
+          </View>
+          <View>
+            <Text className="text-caption text-text-secondary">
+              {t('parentView.weeklyReport.totalWordsKnown')}
+            </Text>
+            <Text className="text-body font-semibold text-text-primary mt-1">
+              {thisWeek.vocabularyTotal}
+            </Text>
+          </View>
+        </View>
       ) : null}
     </View>
   );
@@ -121,6 +154,9 @@ export default function ChildReportsScreen(): React.ReactElement {
     refetch: weeklyRefetch,
   } = useChildWeeklyReports(profileId);
   const childName = child?.displayName ?? t('parentView.index.yourChild');
+  const [selectedWeeklyReportId, setSelectedWeeklyReportId] = useState<
+    string | null
+  >(null);
 
   const combinedLoading = isLoading || weeklyLoading;
   const hasAnyData =
@@ -130,6 +166,26 @@ export default function ChildReportsScreen(): React.ReactElement {
   // showed neither an error banner nor a retry path. The retry handler
   // already calls both refetches, so widening this condition is sufficient.
   const combinedError = !hasAnyData && (isError || weeklyError);
+  const latestWeeklyReport = weeklyReports?.[0];
+  const selectedWeeklyReport = useMemo(() => {
+    if (!weeklyReports?.length) return undefined;
+    return (
+      weeklyReports.find((report) => report.id === selectedWeeklyReportId) ??
+      latestWeeklyReport
+    );
+  }, [latestWeeklyReport, selectedWeeklyReportId, weeklyReports]);
+  const remainingWeeklyReports = useMemo(
+    () =>
+      (weeklyReports ?? []).filter(
+        (report) => report.id !== selectedWeeklyReport?.id,
+      ),
+    [selectedWeeklyReport?.id, weeklyReports],
+  );
+  const hasOtherReports =
+    remainingWeeklyReports.length > 0 || (reports?.length ?? 0) > 0;
+  const isViewingLatestWeeklyReport =
+    !!selectedWeeklyReport &&
+    selectedWeeklyReport.id === latestWeeklyReport?.id;
 
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
@@ -164,7 +220,22 @@ export default function ChildReportsScreen(): React.ReactElement {
           </View>
         </View>
 
-        <ReportsHeaderSummary latestReport={weeklyReports?.[0]} />
+        <ReportsHeaderSummary latestReport={selectedWeeklyReport} />
+        {selectedWeeklyReport && !isViewingLatestWeeklyReport ? (
+          <Pressable
+            onPress={() =>
+              setSelectedWeeklyReportId(latestWeeklyReport?.id ?? null)
+            }
+            className="self-start mt-3 px-1 py-2"
+            accessibilityRole="button"
+            accessibilityLabel={t('parentView.reports.backToLatest')}
+            testID="child-reports-back-to-latest"
+          >
+            <Text className="text-body-sm font-semibold text-primary">
+              {t('parentView.reports.backToLatest')}
+            </Text>
+          </Pressable>
+        ) : null}
 
         {combinedLoading ? (
           <View className="bg-surface rounded-card p-4 mt-4">
@@ -222,11 +293,11 @@ export default function ChildReportsScreen(): React.ReactElement {
               </Pressable>
             </View>
           </View>
-        ) : hasAnyData ? (
+        ) : hasAnyData && hasOtherReports ? (
           <View className="mt-4">
             <ReportsList
               monthlyReports={reports ?? []}
-              weeklyReports={weeklyReports ?? []}
+              weeklyReports={remainingWeeklyReports}
               onPressMonthly={(reportId) => {
                 if (!profileId) return;
                 router.push({
@@ -235,12 +306,7 @@ export default function ChildReportsScreen(): React.ReactElement {
                 } as Href);
               }}
               onPressWeekly={(reportId) => {
-                if (!profileId) return;
-                router.push({
-                  pathname:
-                    '/(app)/child/[profileId]/weekly-report/[weeklyReportId]',
-                  params: { profileId, weeklyReportId: reportId },
-                } as Href);
+                setSelectedWeeklyReportId(reportId);
               }}
               showNewBadge
             />

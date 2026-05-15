@@ -1925,6 +1925,7 @@
       "weeklySnapshot": "週次スナップショット",
       "monthlyReport": "月次レポート",
       "newBadge": "新規",
+      "backToLatest": "最新のレポートに戻る",
       "nextReportIn": "次のレポートまで{{timeContext}}",
       "noReportScheduled": "レポートの予定はありません",
       "subtitle": "月次および週次の学習要約",

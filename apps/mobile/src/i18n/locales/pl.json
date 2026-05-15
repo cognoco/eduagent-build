@@ -1950,6 +1950,7 @@
       "weeklySnapshot": "Migawka tygodniowa",
       "monthlyReport": "Raport miesięczny",
       "newBadge": "Nowy",
+      "backToLatest": "Wróć do najnowszego raportu",
       "nextReportIn": "Następny raport za {{timeContext}}",
       "noReportScheduled": "Brak zaplanowanego raportu",
       "subtitle": "Miesięczne i tygodniowe podsumowania nauki",
