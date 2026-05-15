@@ -1,11 +1,11 @@
 {
   "scope": "mobile",
-  "verifiedAt": "2026-05-14T20:29:33Z",
+  "verifiedAt": "2026-05-15T07:07:58Z",
   "verifiedBy": "Zuzana Kopečná @ ZLY-ORION",
-  "command": "pnpm exec jest --config apps/mobile/jest.config.cjs --runInBand --forceExit --testMatch \"**/apps/mobile/src/**/*.test.ts?(x)\"",
+  "command": "pnpm exec jest --config apps/mobile/jest.config.cjs --runInBand --forceExit --testMatch \"**/apps/mobile/src/**/*.(spec|test).[jt]s?(x)\"",
   "passed": true,
   "testFiles": {
-    "apps/mobile/src/app/(app)/library.test.tsx": "899f5a274a3a9c1026bf8e22ded3b5666e21fefb",
+    "apps/mobile/src/app/(app)/library.test.tsx": "7bfebfdb482a907c5707f6428883eb81b860209e",
     "apps/mobile/src/app/create-subject.test.tsx": "3fbecb0f71a16b0f30813f53f9eb8394fe4b7348",
     "apps/mobile/src/lib/auth-expiry.test.ts": "62525d2f47d41d62a5deb8e073b06592bd69585b",
     "apps/mobile/src/app/(auth)/sign-up.test.tsx": "10c849fbcfe93d5c9f4cc89f0a64f6496fc961e9",
