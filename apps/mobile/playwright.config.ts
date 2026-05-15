@@ -3,6 +3,7 @@ import { defineConfig } from '@playwright/test';
 import { apiBaseUrl, appBaseUrl, runId } from './e2e-web/helpers/runtime';
 
 const e2eWebDir = path.join(process.cwd(), 'apps', 'mobile', 'e2e-web');
+const mobileDir = path.join(process.cwd(), 'apps', 'mobile');
 const shouldStartLocalApi = process.env.PLAYWRIGHT_SKIP_LOCAL_API !== '1';
 const includeP1BCoverage = process.env.PLAYWRIGHT_INCLUDE_P1B === '1';
 // *.workers.dev URLs are platform-rate-limited → 1 worker.
@@ -56,6 +57,7 @@ export default defineConfig({
       ? [
           {
             command: 'pnpm --dir ../api exec wrangler dev --port 8787',
+            cwd: mobileDir,
             url: `${apiBaseUrl}/v1/health`,
             reuseExistingServer: !process.env.CI,
             stdout: 'pipe' as const,
@@ -66,6 +68,7 @@ export default defineConfig({
       : []),
     {
       command: 'node e2e-web/helpers/serve-exported-web.mjs',
+      cwd: mobileDir,
       url: appBaseUrl,
       // CI (false): always export a fresh bundle — prevents stale API URL
       // from a prior run being silently reused. Safe at 1 worker (CI smoke).

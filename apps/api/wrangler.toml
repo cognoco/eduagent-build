@@ -29,7 +29,7 @@ compatibility_flags = ["nodejs_compat"]
 [vars]
 ENVIRONMENT = "development"
 # These vars have defaults in config.ts but can be overridden per environment:
-#   APP_URL       = "https://app.mentomate.com"
+#   APP_URL       = "https://www.mentomate.com"
 #   LOG_LEVEL     = "info"          (debug | info | warn | error)
 #   EMAIL_FROM    = "noreply@mentomate.com"
 
@@ -68,12 +68,18 @@ ENVIRONMENT = "development"
 #
 # --- Email (Resend) ---
 #   RESEND_API_KEY            Resend transactional email API key
+#   RESEND_WEBHOOK_SECRET     Resend webhook signing secret
 #
 # --- Testing ---
 #   TEST_SEED_SECRET          Shared secret for /__test/* routes (dev/staging only)
 #
 # --- Observability ---
 #   SENTRY_DSN                Sentry error tracking DSN
+#
+# --- Prelaunch overrides ---
+#   ALLOW_MISSING_IDEMPOTENCY_KV
+#     Set to "true" only if production must launch before IDEMPOTENCY_KV is
+#     bound. Production otherwise refuses traffic when the binding is missing.
 
 # =============================================================================
 # KV Namespaces (Zwizzly account)
@@ -97,13 +103,9 @@ id = "db6f91e2639e44ce931f63f858593f3c"
 # TODO [BUG-12]: Create "IDEMPOTENCY_KV" namespace in the Zwizzly Cloudflare
 # account (Workers & Pages → KV → Create) and uncomment the binding below for
 # all three environments. apps/api/src/routes/resend-webhook.ts:322 reads
-# c.env.IDEMPOTENCY_KV for svix-id replay deduplication; until this binding
-# exists the route gracefully degrades to alerting-only mode (Inngest event
-# app/resend-webhook.dedup_kv_missing fires on every request in staging /
-# production). That is the deliberate launch posture — replay is signed +
-# timestamp-windowed already, so the marginal exposure is a 5-minute replay
-# window — but the dedup itself is OFF in every deployed environment until
-# the namespace exists. See BUG-12 (Notion) for tracking.
+# c.env.IDEMPOTENCY_KV for svix-id replay deduplication. Production env
+# validation refuses traffic without this binding unless Doppler prd explicitly
+# sets ALLOW_MISSING_IDEMPOTENCY_KV="true" as a prelaunch override.
 #
 # [[kv_namespaces]]
 # binding = "IDEMPOTENCY_KV"
@@ -127,7 +129,7 @@ routes = [
 [env.staging.vars]
 ENVIRONMENT = "staging"
 APP_URL = "https://www.mentomate.com"
-API_ORIGIN = "https://mentomate-api-stg.zwizzly.workers.dev"
+API_ORIGIN = "https://api-stg.mentomate.com"
 LOG_LEVEL = "warn"
 EMAIL_FROM = "staging-noreply@mentomate.com"
 
@@ -177,9 +179,11 @@ binding = "COACHING_KV"
 id = "76b36f4748fe4d77b27387a5bebf4be6"
 
 # TODO [BUG-12]: Add IDEMPOTENCY_KV production binding before any traffic that
-# would re-trigger billing/consent side-effects on replay. Pre-launch (no
-# active users) the alerting-only posture is acceptable. Once enabled, the
-# Inngest signal app/resend-webhook.dedup_kv_missing should stop firing.
+# would re-trigger billing/consent side-effects on replay. If production must
+# launch before this namespace exists, set ALLOW_MISSING_IDEMPOTENCY_KV="true"
+# in Doppler prd and treat the resulting env-validation warning as a temporary
+# launch exception. Once enabled, the Inngest signal
+# app/resend-webhook.dedup_kv_missing should stop firing.
 # [[env.production.kv_namespaces]]
 # binding = "IDEMPOTENCY_KV"
 # id = "<replace-after-namespace-creation>"

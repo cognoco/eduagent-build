@@ -150,27 +150,38 @@ export function AnimatedSplash({ onComplete }: AnimatedSplashProps) {
   const wordOp = useSharedValue(0);
   const fade = useSharedValue(1);
   const [acceptsTouches, setAcceptsTouches] = useState(true);
+  const [hasExited, setHasExited] = useState(false);
 
   // Use a ref so the effect closure always calls the latest onComplete
   // without re-triggering the animation choreography on prop identity changes.
   const onCompleteRef = useRef(onComplete);
   const completionDeliveredRef = useRef(false);
+  const mountedRef = useRef(true);
   onCompleteRef.current = onComplete;
+
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
   const done = useCallback(() => {
     if (completionDeliveredRef.current) return;
     completionDeliveredRef.current = true;
     if (__DEV__)
       console.log('[Splash] done() called — animation completed normally');
-    setAcceptsTouches(false);
+    if (mountedRef.current) {
+      setAcceptsTouches(false);
+      setHasExited(true);
+    }
     onCompleteRef.current();
   }, []);
 
   // Tap to skip
   const skip = useCallback(() => {
     setAcceptsTouches(false);
-    fade.value = withTiming(0, { duration: 200 }, (finished) => {
-      if (finished) runOnJS(done)();
-    });
+    fade.value = 0;
+    done();
   }, [done, fade]);
 
   // --- Choreography ---
@@ -408,13 +419,19 @@ export function AnimatedSplash({ onComplete }: AnimatedSplashProps) {
   const containerStyle = useAnimatedStyle(() => ({ opacity: fade.value }));
   const wordmarkStyle = useAnimatedStyle(() => ({ opacity: wordOp.value }));
 
+  if (hasExited) return null;
+
   return (
     <Animated.View
       style={[styles.container, { backgroundColor: C.bg }, containerStyle]}
       testID="animated-splash"
       pointerEvents={acceptsTouches ? 'auto' : 'none'}
     >
-      <Pressable onPress={skip} style={styles.pressable}>
+      <Pressable
+        onPress={skip}
+        style={styles.pressable}
+        testID="animated-splash-skip"
+      >
         <Svg width={ICON_SIZE} height={ICON_SIZE} viewBox="-5 -15 130 130">
           <Defs>
             <LinearGradient id="splash-arc" x1="0" y1="1" x2="1" y2="0">

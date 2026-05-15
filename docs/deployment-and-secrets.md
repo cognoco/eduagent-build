@@ -13,8 +13,8 @@ How CI/CD pipelines, secret management, and deployments work across all three en
 
 ┌─────────────┐         ┌──────────────────┐        ┌─────────────────────┐
 │  CLOUDFLARE │────────▶│  Workers Runtime │───────▶│  Staging / Prod API │
-│  (secrets)  │         │  env bindings    │        │  mentomate-api-stg  │
-└─────────────┘         └──────────────────┘        │  mentomate-api-prd  │
+│  (secrets)  │         │  env bindings    │        │  custom domains     │
+└─────────────┘         └──────────────────┘        │  api*.mentomate.com │
                                                     └─────────────────────┘
 ```
 
@@ -90,11 +90,11 @@ Push to main
 ┌─────────────────────────────────────────┐
 │  api-quality-gate                       │
 │  ├─ Spins up PostgreSQL 16 (test DB)    │
-│  ├─ pnpm install + db:push (test DB)   │
+│  ├─ pnpm install + db:migrate (test DB)│
 │  ├─ Lint (nx run api:lint)             │
 │  ├─ Typecheck (nx run api:typecheck)   │
-│  ├─ Unit tests (nx run api:test)       │
-│  └─ Integration tests (api:test:integ) │
+│  └─ Push-to-main skips unit/integration │
+│     here because PR CI already ran them │
 └──────────────┬──────────────────────────┘
                │ all pass
                ▼
@@ -102,8 +102,16 @@ Push to main
 │  api-deploy                             │
 │  ├─ environment: staging (auto-approve) │
 │  ├─ nx run api:build                   │
+│  ├─ verify DB target + db:migrate      │
 │  └─ wrangler deploy --env staging      │
 │     → deploys "mentomate-api-stg"      │
+└─────────────────────────────────────────┘
+               │ deployed
+               ▼
+┌─────────────────────────────────────────┐
+│  api-smoke-test                         │
+│  └─ GET https://api-stg.mentomate.com   │
+│     /v1/health plus auth route checks   │
 └─────────────────────────────────────────┘
 ```
 
@@ -114,8 +122,9 @@ Secrets come from **three sources**:
 1. **Non-sensitive vars** — committed in `wrangler.toml` under `[env.staging.vars]`:
    ```toml
    ENVIRONMENT = "staging"
-   APP_URL = "https://staging.mentomate.com"
-   LOG_LEVEL = "debug"
+   APP_URL = "https://www.mentomate.com"
+   API_ORIGIN = "https://api-stg.mentomate.com"
+   LOG_LEVEL = "warn"
    EMAIL_FROM = "staging-noreply@mentomate.com"
    ```
 
@@ -134,6 +143,10 @@ Secrets come from **three sources**:
 ### Worker name
 
 `mentomate-api-stg`
+
+### Public URL
+
+`https://api-stg.mentomate.com`
 
 ### KV namespaces
 
@@ -174,8 +187,16 @@ Manual dispatch (api_environment=production)
 ┌─────────────────────────────────────────┐
 │  api-deploy                             │
 │  ├─ nx run api:build                   │
+│  ├─ verify DB target + db:migrate      │
 │  └─ wrangler deploy --env production   │
 │     → deploys "mentomate-api-prd"      │
+└─────────────────────────────────────────┘
+               │ deployed
+               ▼
+┌─────────────────────────────────────────┐
+│  api-production-smoke-test              │
+│  └─ GET https://api.mentomate.com       │
+│     /v1/health                          │
 └─────────────────────────────────────────┘
 ```
 
@@ -183,7 +204,7 @@ Manual dispatch (api_environment=production)
 
 Same pattern as staging:
 
-- **`[env.production.vars]`** in `wrangler.toml`: `APP_URL=https://app.mentomate.com`, `LOG_LEVEL=info`, `EMAIL_FROM=noreply@mentomate.com`
+- **`[env.production.vars]`** in `wrangler.toml`: `APP_URL=https://www.mentomate.com`, `API_ORIGIN=https://api.mentomate.com`, `LOG_LEVEL=info`, `EMAIL_FROM=noreply@mentomate.com`
 - **Workers Secrets**: synced from Doppler `prd` config via `pnpm secrets:sync prd`
 - **GitHub Actions secret**: `DATABASE_URL_PRODUCTION` is used for production migrations in `deploy.yml`
 
@@ -193,10 +214,18 @@ Same pattern as staging:
 
 - `CLERK_SECRET_KEY`
 - `CLERK_JWKS_URL`
+- `CLERK_AUDIENCE`
 - `GEMINI_API_KEY`
 - `VOYAGE_API_KEY`
 - `RESEND_API_KEY`
+- `RESEND_WEBHOOK_SECRET`
+- `API_ORIGIN`
 - `REVENUECAT_WEBHOOK_SECRET`
+
+Production also requires the `IDEMPOTENCY_KV` binding unless Doppler `prd`
+explicitly sets `ALLOW_MISSING_IDEMPOTENCY_KV=true` as a temporary prelaunch
+override. Without the binding or override, env validation returns a 500 before
+serving traffic.
 
 ### Approval gate
 
@@ -207,6 +236,10 @@ Same pattern as staging:
 ### Worker name
 
 `mentomate-api-prd`
+
+### Public URL
+
+`https://api.mentomate.com`
 
 ### KV namespaces
 
@@ -219,9 +252,9 @@ Same pattern as staging:
 
 ## Database Schema Rollouts
 
-Cloudflare Worker deploys do **not** update the Neon schema. New columns,
-tables, indexes, or constraints must be applied to the target database
-separately from `wrangler deploy`.
+Cloudflare Worker deploys do **not** update the Neon schema by themselves.
+The GitHub deploy workflow applies committed migrations to the selected target
+database before `wrangler deploy`; direct local `wrangler deploy` does not.
 
 ### What each command is for
 
@@ -230,24 +263,26 @@ separately from `wrangler deploy`.
 - **Important:** a green API build or mobile build does **not** mean the target
   Neon database is ready for the new code.
 
-### Current workflow caveat
+### Current workflow
 
-`.github/workflows/deploy.yml` validates the API against an ephemeral Postgres
-service, but it does **not** currently apply staging or production migrations
-to the real Neon database. Until that is automated, treat DB migration as a
-required manual release step.
+`.github/workflows/deploy.yml` validates committed migration SQL against an
+ephemeral Postgres service, verifies the target Neon host, baselines the
+migration journal when needed, and then runs `drizzle-kit migrate` against the
+selected staging or production database before deploying the Worker.
 
 ### Release checklist when schema changes
 
 1. Generate and commit the migration SQL under `apps/api/drizzle/`.
-2. Point `DATABASE_URL` at the target environment and run
-   `pnpm --filter @eduagent/database db:migrate`.
-3. **Verify migration succeeded** before proceeding — new columns must exist
+2. Prefer `.github/workflows/deploy.yml`, which applies the target migration
+   before deploying the Worker.
+3. If deploying outside the workflow, point `DATABASE_URL` at the target
+   environment and run `pnpm --filter @eduagent/database db:migrate`.
+4. **Verify migration succeeded** before proceeding — new columns must exist
    before the Workers bundle that references them is deployed. A deploy-first
    ordering causes `column "..." does not exist` 500s on every affected route.
-4. Deploy the API worker with `wrangler deploy`.
-5. Rebuild or at least re-test the mobile app if the API contract changed.
-6. Check Sentry and the affected API route immediately after rollout for
+5. Deploy the API worker with `wrangler deploy`.
+6. Rebuild or at least re-test the mobile app if the API contract changed.
+7. Check Sentry and the affected API route immediately after rollout for
    `column "... does not exist"` or similar schema drift errors.
 
 ### Known migration-to-code dependencies
@@ -304,7 +339,7 @@ Store submission:   eas build --profile production → AAB  → Google Play Cons
                                                    → IPA  → App Store Connect
 ```
 
-After a successful production build, `eas submit` can automatically upload the AAB/IPA to the respective store — but both store accounts must be active first (currently blocked: Apple enrollment pending, Google Play account under review).
+After a successful production build, `eas submit` can upload the AAB/IPA to the respective store. Apple Developer and Google Play access is available as of 2026-05-15; the remaining work is to create the App Store Connect / Play Console app records and provide the real submit metadata.
 
 ### Build profiles (`apps/mobile/eas.json`)
 
@@ -363,16 +398,24 @@ These values are synced from Doppler (dev/stg/prd configs) into the correspondin
 
 The only GitHub secret needed for CI-triggered builds is `EXPO_TOKEN` (authenticates `eas build`).
 
+`apps/mobile/app.json` has the Sentry Expo plugin configured with
+`uploadSourceMaps: true`, but every committed EAS profile currently sets
+`SENTRY_DISABLE_AUTO_UPLOAD=true`. That means source-map upload is intentionally
+disabled until Sentry auth/project upload credentials are ready; do not remove
+the flag casually.
+
 ### API URL mapping
 
 Each EAS build profile points to the correct environment-specific Cloudflare Worker:
 
 | EAS Profile | Worker | URL |
 |-------------|--------|-----|
-| `preview` | `mentomate-api-stg` | `https://mentomate-api-stg.zwizzly.workers.dev` |
-| `production` | `mentomate-api-prd` | `https://mentomate-api-prd.zwizzly.workers.dev` |
+| `preview` | `mentomate-api-stg` | `https://api-stg.mentomate.com` |
+| `production` | `mentomate-api-prd` | `https://api.mentomate.com` |
 
-The fallback URL in `apps/mobile/src/lib/api.ts` (used when no env var is set in a non-dev build) also points to the staging worker.
+The fallback URL in `apps/mobile/src/lib/api.ts` is dev-only. Production builds
+fail fast if `EXPO_PUBLIC_API_URL` is missing instead of silently talking to
+staging.
 
 ### Local development
 
@@ -482,10 +525,12 @@ All secrets managed in Doppler (project: `mentomate`, configs: `dev` / `stg` / `
 | **Auth (Clerk)** | `CLERK_SECRET_KEY` | Yes |
 | | `CLERK_PUBLISHABLE_KEY` | No |
 | | `CLERK_JWKS_URL` | Yes |
-| | `CLERK_AUDIENCE` | No |
+| | `CLERK_AUDIENCE` | Yes |
 | **LLM** | `GEMINI_API_KEY` | Yes |
 | | `VOYAGE_API_KEY` | Yes |
 | **Email** | `RESEND_API_KEY` | Yes |
+| | `RESEND_WEBHOOK_SECRET` | Yes |
+| **API** | `API_ORIGIN` | Yes |
 | **Payments** | `REVENUECAT_WEBHOOK_SECRET` | Yes |
 | | `STRIPE_SECRET_KEY` | No (dormant) |
 | | `STRIPE_WEBHOOK_SECRET` | No (dormant) |
@@ -495,6 +540,7 @@ All secrets managed in Doppler (project: `mentomate`, configs: `dev` / `stg` / `
 | | `INNGEST_EVENT_KEY` | No |
 | **Observability** | `SENTRY_DSN` | No |
 | **Testing** | `TEST_SEED_SECRET` | No (dev/staging only) |
+| **Prelaunch override** | `ALLOW_MISSING_IDEMPOTENCY_KV` | Only if temporarily launching without the production KV binding |
 
 GitHub Actions secrets (set in GitHub, not Doppler):
 
@@ -503,6 +549,10 @@ GitHub Actions secrets (set in GitHub, not Doppler):
 | `CLOUDFLARE_API_TOKEN` | `deploy.yml` — authenticates `wrangler deploy` |
 | `DATABASE_URL_STAGING` | `deploy.yml` — staging Neon migrations before staging deploys |
 | `DATABASE_URL_PRODUCTION` | `deploy.yml` — production Neon migrations before production deploys |
+| `DATABASE_URL_STAGING_HOST` | `deploy.yml` — expected host guard for staging DB target verification |
+| `DATABASE_URL_PRODUCTION_HOST` | `deploy.yml` — expected host guard for production DB target verification |
+| `STAGING_API_URL` | Optional deploy smoke override; defaults to `https://api-stg.mentomate.com` |
+| `PRODUCTION_API_URL` | Optional deploy smoke override; defaults to `https://api.mentomate.com` |
 | `EXPO_TOKEN` | `deploy.yml`, `mobile-ci.yml` — authenticates EAS CLI |
 | `CLAUDE_CODE_OAUTH_TOKEN` | `claude.yml`, `claude-code-review.yml` — AI review |
 | `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY` | `e2e-ci.yml` — Clerk auth in E2E tests |
@@ -574,9 +624,9 @@ If wrangler is not authenticated, the sync skips gracefully (does not break `pnp
 | **Secret source** | Doppler → local files + Worker | Doppler → Worker via sync script | Doppler → Worker via sync script |
 | **Secret truth** | Doppler `dev` config | Doppler `stg` config | Doppler `prd` config |
 | **Sync command** | `pnpm env:sync` (auto on install) | `pnpm secrets:sync stg` | `pnpm secrets:sync prd` |
-| **Approval gate** | None | None (auto after tests) | GitHub Environment rule |
+| **Approval gate** | None | None (auto after quality gate) | GitHub Environment rule |
 | **Worker name** | `mentomate-api-dev` | `mentomate-api-stg` | `mentomate-api-prd` |
-| **Config validation** | Zod parse (lenient) | Zod parse (lenient) | Zod + required keys check |
+| **Config validation** | Zod parse (lenient) | Zod + Clerk auth keys | Zod + production required keys + production binding gate |
 | **Deploy command** | `wrangler dev` | `wrangler deploy --env staging` | `wrangler deploy --env production` |
 
 ### Mobile (EAS Build)

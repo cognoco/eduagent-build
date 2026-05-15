@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import QuizHistoryScreen from './history';
 
 const mockPush = jest.fn();
@@ -94,6 +94,10 @@ describe('QuizHistoryScreen', () => {
     });
   });
 
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   it('navigates back to quiz index via goBackOrReplace', () => {
     render(<QuizHistoryScreen />);
     fireEvent.press(screen.getByTestId('quiz-history-back'));
@@ -121,6 +125,31 @@ describe('QuizHistoryScreen', () => {
     });
     render(<QuizHistoryScreen />);
     expect(screen.getByTestId('quiz-history-loading')).toBeTruthy();
+    screen.getByText('quiz.history.loadingText');
+    screen.getByTestId('quiz-history-loading-back');
+  });
+
+  it('turns the loading state into retry and back actions after timeout', () => {
+    jest.useFakeTimers();
+    const refetch = jest.fn();
+    mockUseRecentRounds.mockReturnValue({
+      data: undefined,
+      isLoading: true,
+      isError: false,
+      refetch,
+    });
+
+    render(<QuizHistoryScreen />);
+
+    act(() => {
+      jest.advanceTimersByTime(15_000);
+    });
+
+    fireEvent.press(screen.getByTestId('quiz-history-timeout-retry'));
+    expect(refetch).toHaveBeenCalled();
+
+    fireEvent.press(screen.getByTestId('quiz-history-timeout-go-back'));
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/quiz');
   });
 
   it('shows empty state with try-quiz CTA', () => {

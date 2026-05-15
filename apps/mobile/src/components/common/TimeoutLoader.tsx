@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { ErrorFallback } from './ErrorFallback';
 
@@ -22,6 +22,10 @@ interface TimeoutLoaderProps {
   primaryAction: TimeoutLoaderAction;
   /** Optional secondary action for the ErrorFallback (e.g. Go Back). */
   secondaryAction?: TimeoutLoaderAction;
+  /** Optional label shown next to the spinner before timeout. */
+  loadingLabel?: string;
+  /** Optional supporting text shown before timeout. */
+  loadingDescription?: string;
   /** testID forwarded to the spinner View. */
   testID?: string;
 }
@@ -38,6 +42,8 @@ export function TimeoutLoader({
   message,
   primaryAction,
   secondaryAction,
+  loadingLabel,
+  loadingDescription,
   testID,
 }: TimeoutLoaderProps) {
   const { t } = useTranslation();
@@ -70,10 +76,20 @@ export function TimeoutLoader({
 
   return (
     <View
-      className="flex-1 bg-background items-center justify-center"
+      className="flex-1 bg-background items-center justify-center px-6"
       testID={testID}
     >
       <ActivityIndicator size="large" />
+      {loadingLabel ? (
+        <Text className="text-h3 font-semibold text-text-primary text-center mt-4">
+          {loadingLabel}
+        </Text>
+      ) : null}
+      {loadingDescription ? (
+        <Text className="text-body-sm text-text-secondary text-center mt-2">
+          {loadingDescription}
+        </Text>
+      ) : null}
     </View>
   );
 }

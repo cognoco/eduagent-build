@@ -454,16 +454,14 @@ export default function RootLayout() {
     };
   }, []);
 
-  // Splash stays visible until BOTH conditions are met:
-  //   1. The animated splash sequence has completed (or timed out)
-  //   2. Clerk has finished initializing (app content is ready to render)
-  // This prevents the white-screen gap that occurs when the splash dismisses
-  // before ClerkLoaded resolves — especially on slower devices or with larger
-  // JS bundles where Clerk init can take > 3 seconds.
+  // The animated splash must unmount as soon as its own sequence completes.
+  // Keeping the absolute overlay mounted while Clerk finishes can leave a
+  // faded React Native Web Pressable in the pointer-event path after the app
+  // screen looks ready.
   const [animDone, setAnimDone] = useState(false);
   const [clerkReady, setClerkReady] = useState(false);
   const [clerkTimedOut, setClerkTimedOut] = useState(false);
-  const showSplash = !animDone || !clerkReady;
+  const showSplash = !animDone;
 
   const onAnimComplete = useCallback(() => {
     if (__DEV__) console.log('[Splash] Animation complete');

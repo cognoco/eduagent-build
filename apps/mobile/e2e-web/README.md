@@ -8,8 +8,8 @@ Shared staging full suite:
 
 ```bash
 CI=1 PLAYWRIGHT_SKIP_LOCAL_API=1 \
-  PLAYWRIGHT_API_URL="https://mentomate-api-stg.zwizzly.workers.dev" \
-  EXPO_PUBLIC_API_URL="https://mentomate-api-stg.zwizzly.workers.dev" \
+  PLAYWRIGHT_API_URL="https://api-stg.mentomate.com" \
+  EXPO_PUBLIC_API_URL="https://api-stg.mentomate.com" \
   doppler run --project mentomate --config stg -- \
   pnpm run test:e2e:web --reporter=list,json
 ```
@@ -18,15 +18,17 @@ Target opt-in P1B coverage without retries:
 
 ```bash
 CI=1 PLAYWRIGHT_SKIP_LOCAL_API=1 PLAYWRIGHT_INCLUDE_P1B=1 \
-  PLAYWRIGHT_API_URL="https://mentomate-api-stg.zwizzly.workers.dev" \
-  EXPO_PUBLIC_API_URL="https://mentomate-api-stg.zwizzly.workers.dev" \
+  PLAYWRIGHT_API_URL="https://api-stg.mentomate.com" \
+  EXPO_PUBLIC_API_URL="https://api-stg.mentomate.com" \
   doppler run --project mentomate --config stg -- \
   pnpm exec playwright test -c apps/mobile/playwright.config.ts \
   apps/mobile/e2e-web/flows/journeys/j20-vocabulary-quiz-answer-mapping.spec.ts \
   --project=later-phases --workers=1 --retries=0 --reporter=list
 ```
 
-Local API mode starts `wrangler dev` unless `PLAYWRIGHT_SKIP_LOCAL_API=1` is set. The web server rewrites `.env.local` and `.env.development.local` before `expo export` so the built web bundle uses `PLAYWRIGHT_API_URL`, then restores those files after export.
+Local API mode starts `wrangler dev` unless `PLAYWRIGHT_SKIP_LOCAL_API=1` is set. The API server and Expo export are launched from `apps/mobile`, so `pnpm --dir ../api exec wrangler dev --port 8787` targets `apps/api` and `node e2e-web/helpers/serve-exported-web.mjs` serves `apps/mobile/dist`.
+
+Before `expo export`, the web server rewrites `apps/mobile/.env.local` and `apps/mobile/.env.development.local` so the built web bundle uses the same API URL as the Playwright seed helpers. Set `PLAYWRIGHT_API_URL` to override it; `EXPO_PUBLIC_API_URL` is accepted as a fallback for compatibility. If neither is set, local mode uses `http://127.0.0.1:8787` and staging mode uses the default shared test API.
 
 ## Safety
 
