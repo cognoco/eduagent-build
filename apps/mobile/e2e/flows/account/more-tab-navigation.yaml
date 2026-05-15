@@ -139,6 +139,13 @@ tags:
     optional: true  # justified: OK dismissal only needed when a system dialog or export confirmation appears; not always shown
 - takeScreenshot: nav-export-data
 
+# Dismiss the Android share sheet (if export succeeded) and return to Privacy
+- pressKey: back
+- extendedWaitUntil:
+    visible:
+      id: "more-privacy-scroll"
+    timeout: 10000
+
 - scrollUntilVisible:
     element:
       id: "more-row-delete-account"

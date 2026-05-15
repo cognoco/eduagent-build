@@ -296,6 +296,8 @@ reverse_port() {
 reverse_port 8081
 reverse_port 8082
 reverse_port "${METRO_PORT:-}"
+API_PORT=$(echo "$API_URL" | sed -n 's#.*:\([0-9][0-9]*\)\(/.*\)\?$#\1#p')
+reverse_port "${API_PORT:-8787}"
 
 echo "[seed-and-run] Emulator OK. Ports forwarded:${REVERSED_PORTS}. METRO_URL=${METRO_URL}. Timeouts: launcher=${LAUNCHER_TIMEOUT}s, bundle=${BUNDLE_TIMEOUT}s"
 
