@@ -172,23 +172,8 @@ export default function PickBookScreen(): React.ReactElement {
     suggestionsQuery.isError && !suggestionsQuery.data
       ? classifyApiError(suggestionsQuery.error)
       : null;
-  const suggestionsErrorStatus =
-    suggestionsQuery.error &&
-    typeof suggestionsQuery.error === 'object' &&
-    'status' in suggestionsQuery.error &&
-    typeof suggestionsQuery.error.status === 'number'
-      ? suggestionsQuery.error.status
-      : undefined;
-  const suggestionsErrorBlocksManualEntry =
-    suggestionsErrorStatus === 401 ||
-    suggestionsErrorStatus === 403 ||
-    suggestionsErrorStatus === 404 ||
-    suggestionsErrorStatus === 410;
   const canContinueWithoutSuggestions =
-    !suggestionsErrorBlocksManualEntry &&
-    (suggestionsError?.category === 'network' ||
-      suggestionsError?.category === 'server' ||
-      suggestionsError?.category === 'unknown');
+    suggestionsError !== null && !suggestionsError.blocksManualEntry;
 
   // BUG-318: Auto-open custom input when suggestions load empty — the user
   // shouldn't have to find and tap "Something else..." when there's nothing to pick.

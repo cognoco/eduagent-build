@@ -708,7 +708,7 @@ export default function LibraryScreen() {
             {shelfGroups.map((group) => (
               <View key={group.status}>
                 {showShelfGroupLabels ? (
-                  <Text className="text-caption font-bold uppercase text-text-secondary mt-1 mb-2">
+                  <Text className="text-caption font-bold text-text-secondary mt-1 mb-2">
                     {t(`library.sections.${group.status}`)}
                   </Text>
                 ) : null}
