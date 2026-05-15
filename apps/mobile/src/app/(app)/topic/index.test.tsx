@@ -3,8 +3,10 @@ import TopicIndexRedirect from './index';
 
 const mockReplace = jest.fn();
 const mockUseFocusEffect = jest.fn();
+const mockUsePathname = jest.fn(() => '/topic');
 jest.mock('expo-router', () => ({
   useRouter: () => ({ replace: mockReplace }),
+  usePathname: () => mockUsePathname(),
   useFocusEffect: (callback: () => void) => mockUseFocusEffect(callback),
 }));
 
@@ -12,6 +14,7 @@ describe('TopicIndexRedirect [BUG-685]', () => {
   beforeEach(() => {
     mockReplace.mockClear();
     mockUseFocusEffect.mockClear();
+    mockUsePathname.mockReturnValue('/topic');
   });
 
   it('renders the placeholder view', () => {
@@ -20,8 +23,22 @@ describe('TopicIndexRedirect [BUG-685]', () => {
   });
 
   it('does not replace while mounted behind a deep-linked sibling route', () => {
+    mockUsePathname.mockReturnValue('/topic/recall-test');
     render(<TopicIndexRedirect />);
-    expect(mockUseFocusEffect).toHaveBeenCalledTimes(1);
+
+    const focusCallback = mockUseFocusEffect.mock.calls[0]?.[0] as () => void;
+    focusCallback();
+
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('does not replace while mounted behind direct relearn route', () => {
+    mockUsePathname.mockReturnValue('/topic/relearn');
+    render(<TopicIndexRedirect />);
+
+    const focusCallback = mockUseFocusEffect.mock.calls[0]?.[0] as () => void;
+    focusCallback();
+
     expect(mockReplace).not.toHaveBeenCalled();
   });
 

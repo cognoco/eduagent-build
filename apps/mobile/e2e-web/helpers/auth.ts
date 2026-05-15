@@ -155,7 +155,7 @@ export async function signIn(
     }
 
     if (first === 'post-approval') {
-      await postApproval.click();
+      await pressableClick(postApproval);
       const second = await waitForSignedInReady(page, options, {
         allowPostApproval: false,
       });
@@ -174,6 +174,24 @@ export async function signIn(
       await page.waitForURL((url) => url.pathname === options.landingPath, {
         timeout: 60_000,
       });
+    }
+
+    // The approval interstitial can appear just after the landing route becomes
+    // visible on freshly seeded accounts. Clear that late arrival before tests
+    // start pressing controls underneath it.
+    if (
+      await postApproval
+        .waitFor({ state: 'visible', timeout: 2_000 })
+        .then(() => true)
+        .catch(() => false)
+    ) {
+      await pressableClick(postApproval);
+      await landing.waitFor({ state: 'visible', timeout: 60_000 });
+      if (options.landingPath) {
+        await page.waitForURL((url) => url.pathname === options.landingPath, {
+          timeout: 60_000,
+        });
+      }
     }
   } finally {
     page.off('pageerror', onPageError);

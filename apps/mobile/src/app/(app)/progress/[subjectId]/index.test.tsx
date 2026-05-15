@@ -851,6 +851,26 @@ describe('ProgressSubjectScreen', () => {
       screen.getByText('Needs a quick refresh.');
     });
 
+    it('shows the retention card when retention is weak even if activity counters are empty', () => {
+      mockHooks({
+        inventoryData: {
+          subjects: [{ ...fullSubject, sessionsCount: 0 }],
+        },
+        subjectProgressData: {
+          retentionStatus: 'weak',
+          urgencyScore: 0,
+          topicsCompleted: 0,
+          topicsVerified: 0,
+          lastSessionAt: null,
+        },
+      });
+
+      render(<ProgressSubjectScreen />);
+
+      screen.getByTestId('progress-subject-retention-card');
+      screen.getByText('Needs a quick refresh.');
+    });
+
     it('does not show a strong-retention card for a subject with no activity or due reviews', () => {
       mockHooks({
         inventoryData: {

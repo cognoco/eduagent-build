@@ -82,6 +82,7 @@ export default function ProgressSubjectScreen(): React.ReactElement {
   const hasRetentionSignal =
     !!legacyProgress &&
     ((subject?.sessionsCount ?? 0) > 0 ||
+      legacyProgress.retentionStatus !== 'strong' ||
       legacyProgress.urgencyScore > 0 ||
       legacyProgress.topicsCompleted > 0 ||
       legacyProgress.topicsVerified > 0 ||

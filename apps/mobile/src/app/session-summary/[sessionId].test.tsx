@@ -627,6 +627,38 @@ describe('SessionSummaryScreen', () => {
     });
   });
 
+  it('replaces home after a freshly submitted summary even when history can go back', async () => {
+    mockCanGoBack.mockReturnValue(true);
+    mockSubmitResult = {
+      summary: {
+        id: 'summary-1',
+        sessionId: '660e8400-e29b-41d4-a716-446655440000',
+        content: 'I learned about quadratic equations and factoring methods',
+        aiFeedback: 'Well done.',
+        status: 'accepted',
+      },
+    };
+
+    render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+    fireEvent.changeText(
+      screen.getByTestId('summary-input'),
+      'I learned about quadratic equations and factoring methods',
+    );
+    await pressAsync(screen.getByTestId('submit-summary-button'));
+
+    await waitFor(() => {
+      screen.getByTestId('continue-button');
+    });
+
+    await pressAsync(screen.getByTestId('continue-button'));
+
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
+    });
+    expect(mockBack).not.toHaveBeenCalled();
+  });
+
   it('triggers the rating prompt hook before leaving a recall summary', async () => {
     mockSubmitResult = {
       summary: {

@@ -64,6 +64,15 @@ test('J-11 learner → Library → shelf → book → start learning', async ({
     timeout: 30_000,
   });
   await pressableClick(page.getByTestId('send-button'));
+  await page
+    .getByTestId('thinking-bulb-animation')
+    .waitFor({ state: 'visible', timeout: 30_000 })
+    .catch(() => {
+      // Fast responses can finish before Playwright observes the spinner.
+    });
+  await expect(page.getByTestId('thinking-bulb-animation')).toBeHidden({
+    timeout: 60_000,
+  });
 
   await expect(page.getByText('Session screen crashed')).toBeHidden();
   await expect(page.getByTestId('quick-chip-explain_differently')).toBeVisible({

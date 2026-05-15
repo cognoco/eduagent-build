@@ -423,7 +423,7 @@ describe('LibraryScreen', () => {
     fireEvent.press(screen.getByTestId('library-empty-go-home'));
 
     expect(mockPush).toHaveBeenCalledWith({
-      pathname: '/(app)/create-subject',
+      pathname: '/create-subject',
       params: { returnTo: 'library' },
     });
   });

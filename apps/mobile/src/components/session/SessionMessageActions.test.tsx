@@ -2,6 +2,7 @@ import { render } from '@testing-library/react-native';
 import { SessionMessageActions } from './SessionMessageActions';
 import type { SessionMessageActionsProps } from './SessionMessageActions';
 import type { ChatMessage } from '../session';
+import { tokens } from '../../lib/design-tokens';
 
 const baseMessage: ChatMessage = {
   id: 'ai-1',
@@ -82,6 +83,22 @@ describe('SessionMessageActions stage gating', () => {
     expect(
       getByTestId('message-feedback-controls-evt-1').props.className,
     ).toContain('ms-auto');
+  });
+
+  it('uses semantic theme color props for the bookmark icon', () => {
+    const { getByTestId } = render(
+      <SessionMessageActions
+        {...defaultProps}
+        stage="teaching"
+        bookmarkState={{ 'evt-1': 'bookmark-1' }}
+        onToggleBookmark={jest.fn()}
+      />,
+    );
+
+    const bookmarkButton = getByTestId('bookmark-toggle-evt-1');
+    const icon = bookmarkButton.findByProps({ name: 'bookmark' });
+    expect(icon.props.color).toBe(tokens.light.colors.primary);
+    expect(icon.props.className).toBeUndefined();
   });
 
   it('hides bookmark toggle when the assistant message has no eventId', () => {

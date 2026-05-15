@@ -15,14 +15,32 @@ import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
 
+interface LibraryBooksResponse {
+  subjects: Array<{
+    subjectId: string;
+    books: CurriculumBook[];
+  }>;
+}
+
 export function useBooks(
   subjectId: string | undefined,
 ): UseQueryResult<CurriculumBook[]> {
   const client = useApiClient();
   const { activeProfile } = useProfile();
+  const queryClient = useQueryClient();
 
   return useQuery({
     queryKey: ['books', subjectId, activeProfile?.id],
+    initialData: () => {
+      if (!activeProfile?.id || !subjectId) return undefined;
+      const cachedLibrary = queryClient.getQueryData<LibraryBooksResponse>([
+        'library',
+        'books',
+        activeProfile.id,
+      ]);
+      return cachedLibrary?.subjects.find((s) => s.subjectId === subjectId)
+        ?.books;
+    },
     queryFn: async ({ signal: querySignal }) => {
       if (!subjectId) throw new Error('subjectId is required');
       const { signal, cleanup } = combinedSignal(querySignal);
