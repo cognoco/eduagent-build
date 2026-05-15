@@ -1,0 +1,515 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Progress Report Hub Mock</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #fbf7f2;
+        --surface: #fffaf6;
+        --ink: #171717;
+        --muted: #68625f;
+        --line: #e9ded4;
+        --teal: #22aa93;
+        --teal-soft: #e4f4ed;
+        --purple: #8d6ce8;
+        --purple-soft: #f0eaff;
+        --sand: #f1eae2;
+        --white: #ffffff;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: #262322;
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+        color: var(--ink);
+      }
+
+      .phone {
+        width: 390px;
+        min-height: 844px;
+        background: var(--bg);
+        overflow: hidden;
+        position: relative;
+      }
+
+      .scroll {
+        padding: 36px 22px 104px;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: 38px;
+        line-height: 1.04;
+        letter-spacing: 0;
+      }
+
+      h2 {
+        font-size: 23px;
+        line-height: 1.18;
+        letter-spacing: 0;
+      }
+
+      h3 {
+        font-size: 18px;
+        line-height: 1.25;
+        letter-spacing: 0;
+      }
+
+      .subtitle {
+        margin-top: 8px;
+        color: var(--muted);
+        font-size: 16px;
+        line-height: 1.35;
+      }
+
+      .tabs {
+        display: flex;
+        gap: 10px;
+        margin-top: 24px;
+      }
+
+      .tab {
+        min-height: 48px;
+        padding: 0 24px;
+        display: grid;
+        place-items: center;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: var(--white);
+        font-size: 18px;
+        font-weight: 750;
+      }
+
+      .tab.active {
+        background: var(--teal);
+        color: var(--white);
+        border-color: var(--teal);
+      }
+
+      .section {
+        margin-top: 28px;
+      }
+
+      .section-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+
+      .link {
+        color: var(--teal);
+        font-size: 14px;
+        font-weight: 750;
+        white-space: nowrap;
+      }
+
+      .card {
+        background: var(--surface);
+        border-radius: 8px;
+        padding: 20px;
+        border: 1px solid rgba(0, 0, 0, 0.03);
+      }
+
+      .summary-card {
+        background: var(--sand);
+      }
+
+      .big-number {
+        font-size: 29px;
+        line-height: 1.12;
+        font-weight: 850;
+      }
+
+      .body {
+        color: var(--muted);
+        font-size: 18px;
+        line-height: 1.42;
+        margin-top: 10px;
+      }
+
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 18px;
+      }
+
+      .chip {
+        background: rgba(255, 255, 255, 0.72);
+        border-radius: 999px;
+        padding: 8px 12px;
+        font-size: 14px;
+        font-weight: 750;
+      }
+
+      .chip.teal {
+        color: var(--teal);
+      }
+
+      .report-shell {
+        background: var(--purple-soft);
+        border-color: #ddcffd;
+      }
+
+      .eyebrow {
+        color: var(--muted);
+        font-size: 14px;
+        font-weight: 750;
+      }
+
+      .report-title {
+        margin-top: 8px;
+        font-size: 24px;
+        line-height: 1.16;
+        font-weight: 850;
+      }
+
+      .report-note {
+        margin-top: 8px;
+        color: var(--muted);
+        font-size: 16px;
+        line-height: 1.35;
+      }
+
+      .stat-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 18px 20px;
+        margin-top: 22px;
+        padding-top: 18px;
+        border-top: 1px solid rgba(141, 108, 232, 0.2);
+      }
+
+      .stat-label {
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.25;
+      }
+
+      .stat-value {
+        margin-top: 6px;
+        font-size: 24px;
+        font-weight: 850;
+      }
+
+      .quiet-note {
+        margin-top: 18px;
+        padding: 14px;
+        background: rgba(255, 255, 255, 0.66);
+        border-radius: 8px;
+        color: var(--muted);
+        font-size: 15px;
+        line-height: 1.35;
+      }
+
+      .focus-card {
+        background: var(--white);
+      }
+
+      .focus-strip {
+        margin-top: 14px;
+        padding: 14px;
+        background: var(--teal-soft);
+        border-radius: 8px;
+      }
+
+      .mini-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 7px;
+        margin-top: 10px;
+      }
+
+      .mini-chip {
+        background: rgba(255, 255, 255, 0.68);
+        border-radius: 999px;
+        padding: 7px 10px;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 650;
+      }
+
+      .focus-list {
+        display: grid;
+        gap: 10px;
+        margin-top: 14px;
+      }
+
+      .focus-item {
+        display: grid;
+        grid-template-columns: 36px 1fr;
+        gap: 10px;
+        align-items: start;
+        padding: 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--surface);
+      }
+
+      .focus-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 999px;
+        display: grid;
+        place-items: center;
+        background: var(--purple-soft);
+        color: var(--purple);
+        font-weight: 850;
+      }
+
+      .focus-title {
+        font-size: 15px;
+        font-weight: 850;
+      }
+
+      .focus-detail {
+        margin-top: 3px;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.3;
+      }
+
+      .privacy-note {
+        margin-top: 12px;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.35;
+      }
+
+      .report-list {
+        display: grid;
+        gap: 10px;
+      }
+
+      .report-row {
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 14px;
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 12px;
+        align-items: center;
+      }
+
+      .row-title {
+        font-size: 15px;
+        font-weight: 800;
+      }
+
+      .row-sub {
+        margin-top: 4px;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.25;
+      }
+
+      .arrow {
+        color: var(--teal);
+        font-size: 24px;
+        font-weight: 500;
+      }
+
+      .bottom-nav {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 82px;
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        align-items: center;
+        background: var(--white);
+        border-top: 1px solid var(--line);
+      }
+
+      .nav-item {
+        text-align: center;
+        color: #55504e;
+        font-size: 12px;
+        font-weight: 650;
+      }
+
+      .nav-icon {
+        font-size: 22px;
+        line-height: 1;
+        margin-bottom: 5px;
+      }
+
+      .nav-item.active {
+        color: var(--purple);
+      }
+    </style>
+  </head>
+  <body>
+    <main class="phone" aria-label="Progress report hub static mock">
+      <div class="scroll">
+        <h1>TestKid's progress</h1>
+        <p class="subtitle">A quick view now, then the latest report.</p>
+
+        <div class="tabs" aria-hidden="true">
+          <div class="tab active">TestKid</div>
+          <div class="tab">Mine</div>
+        </div>
+
+        <section class="section">
+          <div class="card summary-card">
+            <p class="big-number">32 sessions completed</p>
+            <p class="body">
+              The learning rhythm is visible, even before mastery catches up.
+            </p>
+            <div class="chips">
+              <span class="chip">32 sessions</span>
+              <span class="chip">34h 52m</span>
+              <span class="chip">8-day streak</span>
+              <span class="chip teal">3 words -></span>
+              <span class="chip">9 practice lessons</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-head">
+            <h2>Latest report</h2>
+            <span class="link">Open report</span>
+          </div>
+          <div class="card report-shell">
+            <p class="eyebrow">May 11 - May 17, 2026</p>
+            <p class="report-title">2 topics mastered</p>
+            <p class="report-note">
+              TestKid came back to Programming twice and finished the week with
+              steady practice.
+            </p>
+            <div class="stat-grid">
+              <div>
+                <p class="stat-label">Sessions this week</p>
+                <p class="stat-value">4</p>
+              </div>
+              <div>
+                <p class="stat-label">Time learning</p>
+                <p class="stat-value">1h 25m</p>
+              </div>
+              <div>
+                <p class="stat-label">Topics explored</p>
+                <p class="stat-value">5</p>
+              </div>
+              <div>
+                <p class="stat-label">Words known</p>
+                <p class="stat-value">3</p>
+              </div>
+              <div>
+                <p class="stat-label">Practice lessons</p>
+                <p class="stat-value">9</p>
+              </div>
+              <div>
+                <p class="stat-label">Practice points</p>
+                <p class="stat-value">42</p>
+              </div>
+            </div>
+            <p class="quiet-note">
+              Good week for keeping the rhythm. Next: one shorter review before
+              starting a new topic.
+            </p>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="card focus-card">
+            <div class="section-head" style="margin-bottom: 0">
+              <h2>Recent focus</h2>
+              <span class="link">Show all sessions</span>
+            </div>
+            <p class="subtitle">
+              A quick glance at what has been studied most recently.
+            </p>
+            <div class="focus-strip">
+              <p class="eyebrow">Most recent topics</p>
+              <div class="mini-chips">
+                <span class="mini-chip">Programming</span>
+                <span class="mini-chip">Loops</span>
+                <span class="mini-chip">Fractions</span>
+              </div>
+            </div>
+            <div class="focus-list">
+              <div class="focus-item">
+                <div class="focus-icon">P</div>
+                <div>
+                  <p class="focus-title">Programming</p>
+                  <p class="focus-detail">
+                    Latest summary: practiced loops and talked through where
+                    the logic got tricky.
+                  </p>
+                </div>
+              </div>
+              <div class="focus-item">
+                <div class="focus-icon">M</div>
+                <div>
+                  <p class="focus-title">Mathematics</p>
+                  <p class="focus-detail">
+                    Latest summary: reviewed fractions and compared two ways to
+                    solve the same problem.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <p class="privacy-note">
+              Parent view shows session summaries only. Your own sessions can
+              open fully and be resumed.
+            </p>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-head">
+            <h2>Reports</h2>
+            <span class="link">View all</span>
+          </div>
+          <div class="report-list">
+            <div class="report-row">
+              <div>
+                <p class="row-title">Week of May 11</p>
+                <p class="row-sub">2 topics mastered - 9 practice lessons</p>
+              </div>
+              <span class="arrow">›</span>
+            </div>
+            <div class="report-row">
+              <div>
+                <p class="row-title">April monthly report</p>
+                <p class="row-sub">12 sessions - strongest in Mathematics</p>
+              </div>
+              <span class="arrow">›</span>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <nav class="bottom-nav" aria-hidden="true">
+        <div class="nav-item"><div class="nav-icon">⌂</div>Home</div>
+        <div class="nav-item"><div class="nav-icon">□</div>Learning</div>
+        <div class="nav-item"><div class="nav-icon">▱</div>Library</div>
+        <div class="nav-item active"><div class="nav-icon">▮▮▮</div>Progress</div>
+        <div class="nav-item"><div class="nav-icon">☰</div>More</div>
+      </nav>
+    </main>
+  </body>
+</html>

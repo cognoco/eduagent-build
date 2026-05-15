@@ -151,6 +151,29 @@
       "greeting": "こんにちは、{{displayName}}",
       "accountLink": "アカウントを開く",
       "intentHeader": "今なにをしますか？",
+      "familySummary": {
+        "children_one": "{{count}} child",
+        "children_other": "{{count}} children",
+        "withParent_one": "You + {{count}} child",
+        "withParent_other": "You + {{count}} children",
+        "parentOnly": "You",
+        "withMinutes_one": "{{childCount}} · {{count}} min this week",
+        "withMinutes_other": "{{childCount}} · {{count}} min this week",
+        "withSessions_one": "{{childCount}} · {{count}} session this week",
+        "withSessions_other": "{{childCount}} · {{count}} sessions this week",
+        "noActivity": "{{childCount}} · no sessions this week",
+        "childMinutes_one": "Children: {{count}} min this week",
+        "childMinutes_other": "Children: {{count}} min this week",
+        "childSessions_one": "Children: {{count}} session this week",
+        "childSessions_other": "Children: {{count}} sessions this week",
+        "childNoActivity": "Children: no sessions this week",
+        "parentLearningWithTopic": "You: {{topicTitle}} in {{subjectName}}",
+        "parentLearningWithSubject": "You: {{subjectName}}",
+        "parentExampleLead": "You lead by example.",
+        "parentExampleNudge": "Show them how it's done: start a quick session.",
+        "attentionChild": "{{childName}} may need attention",
+        "profileLimit": "{{count}} of {{max}} profiles used"
+      },
       "encouragementNote": "ナッジは短い応援メッセージです。返信は必要ありません。",
       "transitionNoticeTitle": "{{childNames}}のメンターになりました",
       "transitionNoticeBody": "ホームをタップして、いつでも進捗と自分の学習を確認できます。",
@@ -171,15 +194,15 @@
         "sessions_other": "今週 {{count}} セッション"
       },
       "tonight": {
-        "titleMorning": "今朝",
-        "titleAfternoon": "今日の午後",
-        "titleEvening": "今夜",
-        "promptWithTopic": "{{childName}}に聞いてみて：今日{{topic}}がわかった瞬間はいつだった？",
-        "promptNoActivity": "{{childName}}に聞いてみて：今夜始めやすくするには何があったらいい？",
-        "promptFallback": "{{childName}}に聞いてみて：昨日より楽に感じたことは何だった？",
-        "promptTrickiestWithTopic": "{{childName}}に聞いてみて：今{{topic}}で一番難しいところはどこ？",
-        "promptTomorrow": "{{childName}}に聞いてみて：明日は何に集中しようか？",
-        "promptCurious": "{{childName}}に聞いてみて：何か気になっていることはある？"
+        "titleMorning": "会話のきっかけ",
+        "titleAfternoon": "会話のきっかけ",
+        "titleEvening": "会話のきっかけ",
+        "promptWithTopic": "今日{{topic}}がわかった瞬間はいつだった？",
+        "promptNoActivity": "今夜始めやすくするには何があったらいい？",
+        "promptFallback": "昨日より楽に感じたことは何だった？",
+        "promptTrickiestWithTopic": "今{{topic}}で一番難しいところはどこ？",
+        "promptTomorrow": "明日は何に集中しようか？",
+        "promptCurious": "何か気になっていることはある？"
       },
       "empty": {
         "title": "Your family dashboard starts here",
@@ -1269,6 +1292,9 @@
   },
   "progress": {
     "pageTitle": "私の学習の旅",
+    "pageTitleMine": "自分の進捗",
+    "pageTitleProfile": "{{name}}さんの進捗",
+    "pageTitleFallbackName": "お子さま",
     "pageSubtitle": "実際に知っていることを反映した進捗。",
     "ownProfilePill": "自分",
     "startLearning": "学習を開始",
@@ -1385,6 +1411,8 @@
     },
     "stats": {
       "sessions": "{{count}}セッション",
+      "practiceLessons_one": "練習 {{count}}回",
+      "practiceLessons_other": "練習 {{count}}回",
       "streak": "{{count}}日間のストリーク",
       "viewVocabCount": "{{count}}語の語彙を表示",
       "viewVocab": "語彙を表示",
@@ -1560,10 +1588,47 @@
         "vocabularyGrowth": "語彙の成長"
       }
     },
+    "growthSnapshot": {
+      "latestWeek": "直近の週",
+      "recentWeeks": "最近の週",
+      "sessions_one": "{{count}}セッション",
+      "sessions_other": "{{count}}セッション",
+      "topicsExplored_one": "{{count}}個のトピックを探索",
+      "topicsExplored_other": "{{count}}個のトピックを探索",
+      "topicsLearned_one": "{{count}}個のトピックを学習",
+      "topicsLearned_other": "{{count}}個のトピックを学習",
+      "topicsMastered_one": "{{count}}個のトピックを習得",
+      "topicsMastered_other": "{{count}}個のトピックを習得",
+      "wordsAdded_one": "{{count}}語追加",
+      "wordsAdded_other": "{{count}}語追加",
+      "weekDetail": "{{sessions}}セッション · {{time}} · {{topics}}トピック · {{words}}語"
+    },
     "previousReports": {
       "title": "Previous reports",
       "subtitle": "Weekly and monthly snapshots from your learning.",
       "viewAll": "View all reports"
+    },
+    "latestReport": {
+      "title": "Latest report",
+      "open": "Open report",
+      "openWithDate": "Open report for {{date}}",
+      "empty": "Your next weekly or monthly report will appear here once there is enough learning to summarize.",
+      "error": "We couldn't load the latest report right now.",
+      "sessions": "Sessions",
+      "time": "Time",
+      "topics": "Topics",
+      "words": "Words",
+      "practiceLessons_one": "{{count}} practice lesson",
+      "practiceLessons_other": "{{count}} practice lessons",
+      "practicePoints_one": "{{count}} practice point",
+      "practicePoints_other": "{{count}} practice points"
+    },
+    "recentFocus": {
+      "title": "Recent focus",
+      "showAll": "Show all sessions",
+      "empty": "Recent sessions will appear here once learning gets going.",
+      "error": "We couldn't load recent sessions right now.",
+      "sessionFallback": "Studied {{date}}"
     },
     "loadingTitle": "学習の道のりを読み込み中",
     "loadTimeout": {

@@ -7,7 +7,12 @@ import {
   View,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import type { ProgressSummary, SubjectInventory } from '@eduagent/schemas';
+import type {
+  ChildSession,
+  MonthlyReportSummary,
+  ProgressSummary,
+  WeeklyReportSummary,
+} from '@eduagent/schemas';
 import type { Translate } from '../../../i18n';
 import { platformAlert } from '../../../lib/platform-alert';
 import { classifyApiError } from '../../../lib/format-api-error';
@@ -26,22 +31,18 @@ import {
 } from '../../../lib/format-relative-date';
 import { NudgeActionSheet } from '../../../components/nudge/NudgeActionSheet';
 import {
-  CurrentlyWorkingOnCard,
-  GrowthChart,
+  MetricCard,
   MilestoneCard,
   RecentSessionsList,
   ReportsList,
-  WeeklyDeltaChip,
 } from '../../../components/progress';
-import { SubjectBookshelfMotif } from '../../../components/common/SubjectBookshelfMotif';
 import { ProgressPillRow } from '../../../components/progress/ProgressPillRow';
 import { useActiveProfileRole } from '../../../hooks/use-active-profile-role';
 import {
   useChildInventory,
-  useChildProgressHistory,
   useChildProgressSummary,
   useLearningResumeTarget,
-  useProgressHistory,
+  useOverallProgress,
   useProgressInventory,
   useProgressMilestones,
   useProfileReports,
@@ -50,14 +51,11 @@ import {
   useRefreshProgressSnapshot,
 } from '../../../hooks/use-progress';
 import { useSubjects } from '../../../hooks/use-subjects';
-import type { LearningSubjectTint } from '../../../lib/learning-subject-tints';
 import { pushLearningResumeTarget } from '../../../lib/navigation';
 import { copyRegisterFor, type CopyRegister } from '../../../lib/copy-register';
 import { useLinkedChildren, useProfile } from '../../../lib/profile';
-import { buildGrowthData, isProfileStale } from '../../../lib/progress';
+import { isProfileStale } from '../../../lib/progress';
 import { bucketAccountAge, hashProfileId, track } from '../../../lib/analytics';
-import { useTheme } from '../../../lib/theme';
-import { getSubjectTint, getSubjectTintMap } from '../../../lib/subject-tints';
 
 function heroCopy(
   input: {
@@ -170,77 +168,6 @@ function LoadingBlock(): React.ReactElement {
   );
 }
 
-function SubjectBreakdownCard({
-  subject,
-  tint,
-  compact = false,
-}: {
-  subject: SubjectInventory;
-  tint: LearningSubjectTint;
-  compact?: boolean;
-}): React.ReactElement {
-  const { t } = useTranslation();
-  const timeLabel = formatMinutes(
-    subject.wallClockMinutes ?? subject.activeMinutes,
-  );
-  const sessionsLabel = t('progress.guardian.sessionCount', {
-    count: subject.sessionsCount,
-  });
-  const topicsLabel =
-    subject.topics.total != null
-      ? t('progress.guardian.topicsMastered', {
-          mastered: subject.topics.mastered,
-          total: subject.topics.total,
-        })
-      : null;
-
-  return (
-    <View
-      testID={`progress-subject-card-${subject.subjectId}`}
-      className={`rounded-card ${compact ? 'p-3 mt-2' : 'p-4 mt-3'}`}
-      style={{
-        backgroundColor: tint.soft,
-        borderColor: tint.solid + '33',
-        borderWidth: 1,
-      }}
-    >
-      <View className="flex-row items-start">
-        <View className="me-3">
-          <SubjectBookshelfMotif
-            testID={`progress-subject-bookshelf-${subject.subjectId}`}
-            tint={tint}
-          />
-        </View>
-        <View className="flex-1">
-          <Text className="text-body font-semibold text-text-primary">
-            {subject.subjectName}
-          </Text>
-          <Text className="text-body-sm text-text-secondary mt-1">
-            {sessionsLabel} · {timeLabel}
-          </Text>
-          {compact && topicsLabel ? (
-            <Text className="text-caption text-text-secondary mt-1">
-              {topicsLabel}
-            </Text>
-          ) : null}
-        </View>
-      </View>
-      {!compact && subject.lastSessionAt ? (
-        <Text className="text-caption text-text-secondary mt-1">
-          {t('progress.guardian.lastStudied', {
-            date: formatRelativeDate(subject.lastSessionAt),
-          })}
-        </Text>
-      ) : null}
-      {!compact && topicsLabel ? (
-        <Text className="text-caption text-text-secondary mt-1">
-          {topicsLabel}
-        </Text>
-      ) : null}
-    </View>
-  );
-}
-
 function ProgressSummaryHeader({
   summary,
 }: {
@@ -286,6 +213,295 @@ function ProgressSummaryHeader({
   );
 }
 
+type LatestReport =
+  | { kind: 'weekly'; report: WeeklyReportSummary }
+  | { kind: 'monthly'; report: MonthlyReportSummary };
+
+function formatReportDate(report: LatestReport): string {
+  if (report.kind === 'monthly') {
+    return new Date(
+      `${report.report.reportMonth}-01T00:00:00Z`,
+    ).toLocaleDateString(undefined, {
+      month: 'long',
+      timeZone: 'UTC',
+      year: 'numeric',
+    });
+  }
+
+  const start = new Date(`${report.report.reportWeek}T00:00:00Z`);
+  const end = new Date(start);
+  end.setUTCDate(start.getUTCDate() + 6);
+  const startLabel = start.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  });
+  const endLabel = end.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  });
+  return `${startLabel} - ${endLabel}`;
+}
+
+function getLatestReport(
+  weeklyReports: WeeklyReportSummary[] | undefined,
+  monthlyReports: MonthlyReportSummary[] | undefined,
+): LatestReport | null {
+  const weekly = weeklyReports?.[0];
+  if (weekly) return { kind: 'weekly', report: weekly };
+  const monthly = monthlyReports?.[0];
+  return monthly ? { kind: 'monthly', report: monthly } : null;
+}
+
+function LatestReportCard({
+  latestReport,
+  isError,
+  isLoading,
+  onOpen,
+  onRetry,
+}: {
+  latestReport: LatestReport | null;
+  isError: boolean;
+  isLoading: boolean;
+  onOpen: () => void;
+  onRetry: () => void;
+}): React.ReactElement {
+  const { t } = useTranslation();
+  const metrics =
+    latestReport?.kind === 'weekly'
+      ? latestReport.report.thisWeek
+      : latestReport?.report.thisMonth;
+  const practiceTotals = latestReport?.report.practiceSummary?.totals;
+
+  return (
+    <View className="mt-6" testID="progress-latest-report-section">
+      <View className="flex-row items-center justify-between mb-2">
+        <Text className="text-h3 font-semibold text-text-primary">
+          {t('progress.latestReport.title')}
+        </Text>
+        {latestReport ? (
+          <Pressable
+            onPress={onOpen}
+            accessibilityRole="button"
+            accessibilityLabel={t('progress.latestReport.open')}
+            testID="progress-latest-report-open"
+          >
+            <Text className="text-body-sm text-primary font-semibold">
+              {t('progress.latestReport.open')}
+            </Text>
+          </Pressable>
+        ) : null}
+      </View>
+
+      <View className="bg-surface rounded-card p-4">
+        {isLoading && !latestReport ? (
+          <>
+            <View className="bg-border rounded h-5 w-1/2 mb-3" />
+            <View className="bg-border rounded h-4 w-full mb-2" />
+            <View className="bg-border rounded h-4 w-2/3" />
+          </>
+        ) : isError && !latestReport ? (
+          <View testID="progress-latest-report-error">
+            <Text className="text-body text-text-secondary mb-3">
+              {t('progress.latestReport.error')}
+            </Text>
+            <Pressable
+              onPress={onRetry}
+              className="bg-background rounded-button px-4 py-3 items-center self-start"
+              accessibilityRole="button"
+              accessibilityLabel={t('common.tryAgain')}
+              testID="progress-latest-report-retry"
+            >
+              <Text className="text-body-sm font-semibold text-text-primary">
+                {t('common.tryAgain')}
+              </Text>
+            </Pressable>
+          </View>
+        ) : latestReport && metrics ? (
+          <Pressable
+            onPress={onOpen}
+            accessibilityRole="button"
+            accessibilityLabel={t('progress.latestReport.openWithDate', {
+              date: formatReportDate(latestReport),
+            })}
+            testID="progress-latest-report-card"
+          >
+            <Text className="text-body-sm text-text-secondary">
+              {formatReportDate(latestReport)}
+            </Text>
+            <Text className="text-h2 font-bold text-text-primary mt-2">
+              {latestReport.report.headlineStat.value}{' '}
+              {latestReport.report.headlineStat.label}
+            </Text>
+            <Text className="text-body-sm text-text-secondary mt-1">
+              {latestReport.report.headlineStat.comparison}
+            </Text>
+            <View className="flex-row gap-3 mt-4">
+              <MetricCard
+                label={t('progress.latestReport.sessions')}
+                value={String(metrics.totalSessions)}
+              />
+              <MetricCard
+                label={t('progress.latestReport.time')}
+                value={formatMinutes(metrics.totalActiveMinutes)}
+              />
+            </View>
+            <View className="flex-row gap-3 mt-3">
+              <MetricCard
+                label={t('progress.latestReport.topics')}
+                value={String(metrics.topicsMastered)}
+              />
+              <MetricCard
+                label={t('progress.latestReport.words')}
+                value={String(metrics.vocabularyTotal)}
+              />
+            </View>
+            {practiceTotals &&
+            (practiceTotals.activitiesCompleted > 0 ||
+              practiceTotals.pointsEarned > 0) ? (
+              <View className="flex-row flex-wrap gap-2 mt-4">
+                <View className="bg-background rounded-full px-3 py-1.5">
+                  <Text className="text-caption font-semibold text-text-primary">
+                    {t('progress.latestReport.practiceLessons', {
+                      count: practiceTotals.activitiesCompleted,
+                    })}
+                  </Text>
+                </View>
+                <View className="bg-background rounded-full px-3 py-1.5">
+                  <Text className="text-caption font-semibold text-text-primary">
+                    {t('progress.latestReport.practicePoints', {
+                      count: practiceTotals.pointsEarned,
+                    })}
+                  </Text>
+                </View>
+              </View>
+            ) : null}
+          </Pressable>
+        ) : (
+          <Text
+            className="text-body text-text-secondary"
+            testID="progress-latest-report-empty"
+          >
+            {t('progress.latestReport.empty')}
+          </Text>
+        )}
+      </View>
+    </View>
+  );
+}
+
+function sessionFocusTitle(session: ChildSession): string {
+  return (
+    session.homeworkSummary?.displayTitle ??
+    session.topicTitle ??
+    session.subjectName ??
+    session.displayTitle ??
+    'Learning session'
+  );
+}
+
+function RecentFocusCard({
+  sessions,
+  fallbackItems,
+  isLoading,
+  isError,
+  onRetry,
+  onShowAll,
+}: {
+  sessions: ChildSession[] | undefined;
+  fallbackItems: string[];
+  isLoading: boolean;
+  isError: boolean;
+  onRetry: () => void;
+  onShowAll: () => void;
+}): React.ReactElement {
+  const { t } = useTranslation();
+  const focusSessions = sessions?.slice(0, 2) ?? [];
+  const fallbackFocus =
+    focusSessions.length === 0 ? fallbackItems.slice(0, 2) : [];
+
+  return (
+    <View className="mt-6" testID="progress-recent-focus-card">
+      <View className="flex-row items-center justify-between mb-2">
+        <Text className="text-h3 font-semibold text-text-primary">
+          {t('progress.recentFocus.title')}
+        </Text>
+        <Pressable
+          onPress={onShowAll}
+          accessibilityRole="button"
+          accessibilityLabel={t('progress.recentFocus.showAll')}
+          testID="progress-show-all-sessions"
+        >
+          <Text className="text-body-sm text-primary font-semibold">
+            {t('progress.recentFocus.showAll')}
+          </Text>
+        </Pressable>
+      </View>
+
+      <View className="bg-surface rounded-card p-4">
+        {isLoading ? (
+          <>
+            <View className="bg-border rounded h-5 w-2/3 mb-3" />
+            <View className="bg-border rounded h-4 w-full mb-2" />
+            <View className="bg-border rounded h-4 w-1/2" />
+          </>
+        ) : isError ? (
+          <View testID="progress-recent-focus-error">
+            <Text className="text-body text-text-secondary mb-3">
+              {t('progress.recentFocus.error')}
+            </Text>
+            <Pressable
+              onPress={onRetry}
+              className="bg-background rounded-button px-4 py-3 items-center self-start"
+              accessibilityRole="button"
+              accessibilityLabel={t('common.tryAgain')}
+              testID="progress-recent-focus-retry"
+            >
+              <Text className="text-body-sm font-semibold text-text-primary">
+                {t('common.tryAgain')}
+              </Text>
+            </Pressable>
+          </View>
+        ) : focusSessions.length > 0 ? (
+          focusSessions.map((session, index) => (
+            <View
+              key={session.sessionId}
+              className={index === 0 ? '' : 'border-t border-border mt-3 pt-3'}
+            >
+              <Text className="text-body font-semibold text-text-primary">
+                {sessionFocusTitle(session)}
+              </Text>
+              <Text
+                className="text-body-sm text-text-secondary mt-1"
+                numberOfLines={2}
+              >
+                {session.displaySummary ??
+                  session.highlight ??
+                  t('progress.recentFocus.sessionFallback', {
+                    date: formatRelativeDate(session.startedAt),
+                  })}
+              </Text>
+            </View>
+          ))
+        ) : fallbackFocus.length > 0 ? (
+          fallbackFocus.map((item, index) => (
+            <View key={item} className={index === 0 ? '' : 'mt-3'}>
+              <Text className="text-body font-semibold text-text-primary">
+                {item}
+              </Text>
+            </View>
+          ))
+        ) : (
+          <Text className="text-body text-text-secondary">
+            {t('progress.recentFocus.empty')}
+          </Text>
+        )}
+      </View>
+    </View>
+  );
+}
+
 export default function ProgressScreen(): React.ReactElement {
   const { t } = useTranslation();
   const role = useActiveProfileRole();
@@ -295,7 +511,6 @@ export default function ProgressScreen(): React.ReactElement {
     profileId?: string;
   }>();
   const insets = useSafeAreaInsets();
-  const { colorScheme } = useTheme();
   const { activeProfile } = useProfile();
   const linkedChildren = useLinkedChildren();
   const hasLinked = linkedChildren.length > 0;
@@ -309,9 +524,10 @@ export default function ProgressScreen(): React.ReactElement {
       (requestedProfileId === activeProfile?.id ||
         linkedChildren.some((child) => child.id === requestedProfileId));
     if (knownRequestedProfileId) return requestedProfileId;
-    return (hasLinked ? linkedChildren[0]?.id : activeProfile?.id) ?? '';
+    return activeProfile?.id ?? '';
   });
   const [showProgressNudge, setShowProgressNudge] = useState(false);
+  const [showAllSessions, setShowAllSessions] = useState(false);
 
   useEffect(() => {
     if (!requestedProfileId) return;
@@ -323,23 +539,13 @@ export default function ProgressScreen(): React.ReactElement {
     }
   }, [requestedProfileId, activeProfile?.id, linkedChildren]);
 
-  // Re-seed when linked children load after mount (query-cache race).
-  const mountedWithoutChildren = useRef(!hasLinked);
+  // Re-seed when activeProfile loads after mount.
   useEffect(() => {
     if (requestedProfileId) return;
-    if (mountedWithoutChildren.current && hasLinked && linkedChildren[0]?.id) {
-      mountedWithoutChildren.current = false;
-      setSelectedProfileId(linkedChildren[0].id);
-    }
-  }, [hasLinked, linkedChildren, requestedProfileId]);
-
-  // Re-seed when activeProfile loads after mount (no linked children path).
-  useEffect(() => {
-    if (requestedProfileId) return;
-    if (!hasLinked && !selectedProfileId && activeProfile?.id) {
+    if (!selectedProfileId && activeProfile?.id) {
       setSelectedProfileId(activeProfile.id);
     }
-  }, [hasLinked, selectedProfileId, activeProfile?.id, requestedProfileId]);
+  }, [selectedProfileId, activeProfile?.id, requestedProfileId]);
 
   const isViewingSelf =
     selectedProfileId === activeProfile?.id ||
@@ -354,17 +560,11 @@ export default function ProgressScreen(): React.ReactElement {
     ? ownInventoryQuery
     : childInventoryQuery;
 
-  const ownHistoryQuery = useProgressHistory({ granularity: 'weekly' });
-  const childHistoryQuery = useChildProgressHistory(
-    isViewingSelf ? undefined : selectedProfileId,
-    { granularity: 'weekly' },
-    { enabled: !isViewingSelf },
-  );
-  const historyQuery = isViewingSelf ? ownHistoryQuery : childHistoryQuery;
   const childSummaryQuery = useChildProgressSummary(
     isViewingSelf ? undefined : selectedProfileId,
     { enabled: !isViewingSelf },
   );
+  const overallProgressQuery = useOverallProgress();
 
   const profileSessionsQuery = useProfileSessions(
     selectedProfileId || activeProfile?.id,
@@ -395,12 +595,7 @@ export default function ProgressScreen(): React.ReactElement {
     t,
   );
 
-  const growthData = useMemo(
-    () => buildGrowthData(historyQuery.data ?? undefined),
-    [historyQuery.data],
-  );
   const refetchInventory = inventoryQuery.refetch;
-  const refetchHistory = historyQuery.refetch;
   const refetchMilestones = milestonesQuery.refetch;
   const refetchMonthlyReports = monthlyReportsQuery.refetch;
   const refetchWeeklyReports = weeklyReportsQuery.refetch;
@@ -422,7 +617,6 @@ export default function ProgressScreen(): React.ReactElement {
 
       await Promise.all([
         refetchInventory(),
-        refetchHistory(),
         refetchMonthlyReports(),
         refetchWeeklyReports(),
         ...(!isViewingSelf ? [refetchChildSummary()] : []),
@@ -431,7 +625,6 @@ export default function ProgressScreen(): React.ReactElement {
     },
     [
       isViewingSelf,
-      refetchHistory,
       refetchInventory,
       refetchMilestones,
       refetchMonthlyReports,
@@ -489,6 +682,10 @@ export default function ProgressScreen(): React.ReactElement {
   const hasAnyReports =
     (monthlyReportsQuery.data?.length ?? 0) > 0 ||
     (weeklyReportsQuery.data?.length ?? 0) > 0;
+  const latestReport = useMemo(
+    () => getLatestReport(weeklyReportsQuery.data, monthlyReportsQuery.data),
+    [monthlyReportsQuery.data, weeklyReportsQuery.data],
+  );
   const sessionCount =
     profileSessionsQuery.data?.length ?? inventory?.global.totalSessions ?? 0;
   const lastSessionAt =
@@ -521,13 +718,88 @@ export default function ProgressScreen(): React.ReactElement {
     (child) => child.id === selectedProfileId,
   );
   const selectedChildName = selectedChild?.displayName;
-  const progressSubjectTintsById = useMemo(
-    () =>
-      getSubjectTintMap(
-        inventory?.subjects.map((subject) => subject.subjectId) ?? [],
-        colorScheme,
-      ),
-    [inventory?.subjects, colorScheme],
+  const progressPageTitle = isViewingSelf
+    ? t('progress.pageTitleMine')
+    : t('progress.pageTitleProfile', {
+        name: selectedChildName ?? t('progress.pageTitleFallbackName'),
+      });
+  const practiceActivityCount = isViewingSelf
+    ? (overallProgressQuery.data?.practiceActivityCount ?? 0)
+    : 0;
+
+  useEffect(() => {
+    setShowAllSessions(false);
+  }, [selectedProfileId]);
+
+  const handleOpenLatestReport = useCallback(() => {
+    if (!latestReport || !selectedProfileId) return;
+
+    if (isViewingSelf) {
+      router.push(
+        latestReport.kind === 'weekly'
+          ? ({
+              pathname: '/(app)/progress/weekly-report/[weeklyReportId]',
+              params: { weeklyReportId: latestReport.report.id },
+            } as Href)
+          : ({
+              pathname: '/(app)/progress/reports/[reportId]',
+              params: { reportId: latestReport.report.id },
+            } as Href),
+      );
+      return;
+    }
+
+    router.push(
+      latestReport.kind === 'weekly'
+        ? ({
+            pathname: '/(app)/child/[profileId]/weekly-report/[weeklyReportId]',
+            params: {
+              profileId: selectedProfileId,
+              weeklyReportId: latestReport.report.id,
+            },
+          } as Href)
+        : ({
+            pathname: '/(app)/child/[profileId]/report/[reportId]',
+            params: {
+              profileId: selectedProfileId,
+              reportId: latestReport.report.id,
+            },
+          } as Href),
+    );
+  }, [isViewingSelf, latestReport, router, selectedProfileId]);
+
+  const handleOpenMonthlyReport = useCallback(
+    (reportId: string) => {
+      if (isViewingSelf) {
+        router.push({
+          pathname: '/(app)/progress/reports/[reportId]',
+          params: { reportId },
+        } as Href);
+        return;
+      }
+      router.push({
+        pathname: '/(app)/child/[profileId]/report/[reportId]',
+        params: { profileId: selectedProfileId, reportId },
+      } as Href);
+    },
+    [isViewingSelf, router, selectedProfileId],
+  );
+
+  const handleOpenWeeklyReport = useCallback(
+    (weeklyReportId: string) => {
+      if (isViewingSelf) {
+        router.push({
+          pathname: '/(app)/progress/weekly-report/[weeklyReportId]',
+          params: { weeklyReportId },
+        } as Href);
+        return;
+      }
+      router.push({
+        pathname: '/(app)/child/[profileId]/weekly-report/[weeklyReportId]',
+        params: { profileId: selectedProfileId, weeklyReportId },
+      } as Href);
+    },
+    [isViewingSelf, router, selectedProfileId],
   );
 
   const handleEmptyProgressAction = () => {
@@ -560,17 +832,13 @@ export default function ProgressScreen(): React.ReactElement {
         contentContainerStyle={{ paddingBottom: insets.bottom + 28 }}
         refreshControl={
           <RefreshControl
-            refreshing={
-              isRefreshingSnapshot ||
-              inventoryQuery.isRefetching ||
-              historyQuery.isRefetching
-            }
+            refreshing={isRefreshingSnapshot || inventoryQuery.isRefetching}
             onRefresh={() => void handleRefresh()}
           />
         }
       >
         <Text className="text-h1 font-bold text-text-primary mt-4">
-          {t('progress.pageTitle')}
+          {progressPageTitle}
         </Text>
         <Text className="text-body-sm text-text-secondary mt-1 mb-4">
           {t('progress.pageSubtitle')}
@@ -671,6 +939,15 @@ export default function ProgressScreen(): React.ReactElement {
                       })}
                     </Text>
                   </View>
+                  {practiceActivityCount > 0 ? (
+                    <View className="bg-background rounded-full px-3 py-1.5">
+                      <Text className="text-caption font-semibold text-text-primary">
+                        {t('progress.stats.practiceLessons', {
+                          count: practiceActivityCount,
+                        })}
+                      </Text>
+                    </View>
+                  ) : null}
                   <View className="bg-background rounded-full px-3 py-1.5">
                     <Text className="text-caption font-semibold text-text-primary">
                       {/* [M5] || intentional: totalWallClockMinutes defaults to 0 for
@@ -719,68 +996,24 @@ export default function ProgressScreen(): React.ReactElement {
                   ) : null}
                 </View>
               ) : null}
-              {inventory ? (
-                <View className="flex-row flex-wrap gap-2 mt-3">
-                  <WeeklyDeltaChip
-                    metric="topicsMastered"
-                    value={inventory.global.weeklyDeltaTopicsMastered}
-                  />
-                  <WeeklyDeltaChip
-                    metric="vocabularyTotal"
-                    value={inventory.global.weeklyDeltaVocabularyTotal}
-                  />
-                  <WeeklyDeltaChip
-                    metric="topicsExplored"
-                    value={inventory.global.weeklyDeltaTopicsExplored}
-                  />
-                </View>
-              ) : null}
             </View>
 
-            {selectedProfileId &&
-            isViewingSelf &&
-            progressSurfaceState === 'ready' ? (
-              <View
-                className="bg-surface rounded-card p-4 mt-6"
-                testID="reports-list-card"
-              >
-                <View className="flex-row items-center justify-between mb-1">
-                  <Text className="text-body font-semibold text-text-primary">
-                    {t('progress.previousReports.title')}
-                  </Text>
-                  <Pressable
-                    onPress={() =>
-                      router.push('/(app)/progress/reports' as Href)
-                    }
-                    accessibilityRole="button"
-                    accessibilityLabel={t('progress.previousReports.viewAll')}
-                    testID="progress-reports-link"
-                  >
-                    <Text className="text-body-sm text-primary font-semibold">
-                      {t('progress.previousReports.viewAll')}
-                    </Text>
-                  </Pressable>
-                </View>
-                <ReportsList
-                  monthlyReports={monthlyReportsQuery.data ?? []}
-                  weeklyReports={weeklyReportsQuery.data ?? []}
-                  limit={3}
-                  onPressMonthly={(reportId) =>
-                    router.push({
-                      pathname: '/(app)/progress/reports/[reportId]',
-                      params: { reportId },
-                    } as Href)
-                  }
-                  onPressWeekly={(reportId) =>
-                    router.push({
-                      pathname:
-                        '/(app)/progress/weekly-report/[weeklyReportId]',
-                      params: { weeklyReportId: reportId },
-                    } as Href)
-                  }
-                />
-              </View>
-            ) : null}
+            <LatestReportCard
+              latestReport={latestReport}
+              isLoading={
+                weeklyReportsQuery.isLoading || monthlyReportsQuery.isLoading
+              }
+              isError={
+                weeklyReportsQuery.isError || monthlyReportsQuery.isError
+              }
+              onOpen={handleOpenLatestReport}
+              onRetry={() => {
+                void Promise.all([
+                  weeklyReportsQuery.refetch(),
+                  monthlyReportsQuery.refetch(),
+                ]);
+              }}
+            />
 
             {!isViewingSelf ? (
               <>
@@ -805,81 +1038,59 @@ export default function ProgressScreen(): React.ReactElement {
                     </Text>
                   </Pressable>
                 ) : null}
-                {selectedProfileId ? (
-                  <Pressable
-                    testID="progress-view-all-reports"
-                    onPress={() =>
-                      router.push(
-                        `/(app)/child/${selectedProfileId}/reports` as Href,
-                      )
-                    }
-                    className="bg-surface rounded-button px-4 py-3 mt-4 items-center min-h-[48px] justify-center"
-                    accessibilityRole="button"
-                    accessibilityLabel={t('progress.guardian.viewAllReports')}
-                  >
-                    <Text className="text-body font-semibold text-primary">
-                      {t('progress.guardian.viewAllReports')}
-                    </Text>
-                  </Pressable>
-                ) : null}
-                {inventory?.subjects?.length ? (
-                  <View testID="progress-subject-breakdown" className="mt-5">
-                    <Text className="text-caption font-bold text-text-secondary mb-2">
-                      {t('progress.guardian.subjectsTitle')}
-                    </Text>
-                    {inventory.subjects.map((subject) => {
-                      const compact = inventory.subjects.length >= 7;
-                      return (
-                        <SubjectBreakdownCard
-                          key={subject.subjectId}
-                          subject={subject}
-                          tint={
-                            progressSubjectTintsById.get(subject.subjectId) ??
-                            getSubjectTint(subject.subjectId, colorScheme)
-                          }
-                          compact={compact}
-                        />
-                      );
-                    })}
-                  </View>
-                ) : null}
               </>
             ) : null}
 
-            {inventory?.currentlyWorkingOn?.length ? (
-              <CurrentlyWorkingOnCard
-                items={inventory.currentlyWorkingOn}
-                register={register}
-                testID="progress-currently-working-on"
-              />
-            ) : null}
+            <RecentFocusCard
+              sessions={profileSessionsQuery.data}
+              fallbackItems={inventory?.currentlyWorkingOn ?? []}
+              isLoading={profileSessionsQuery.isLoading}
+              isError={profileSessionsQuery.isError}
+              onRetry={() => void profileSessionsQuery.refetch()}
+              onShowAll={() => setShowAllSessions(true)}
+            />
 
-            <View className="mt-6">
-              <GrowthChart
-                title={t(`progress.register.${register}.growthTitle`)}
-                subtitle={t(`progress.register.${register}.growthSubtitle`)}
-                data={growthData}
-                register={register}
-                emptyMessage={
-                  // [F-043] Distinguish brand-new users from users who have
-                  // sessions but no mastery data yet (mastery takes repeat exposures).
-                  // When totalSessions >= 3, hint that topic mastery unlocks the chart.
-                  (inventory?.global.totalSessions ?? 0) >= 3
-                    ? t('progress.growth.emptyFoundation')
-                    : (inventory?.global.totalSessions ?? 0) > 0
-                      ? t('progress.growth.emptyInProgress', {
-                          count: inventory?.global.totalSessions ?? 0,
-                        })
-                      : t('progress.growth.emptyJustStarted')
-                }
-              />
-            </View>
-
-            {selectedProfileId ? (
+            {selectedProfileId && showAllSessions ? (
               <RecentSessionsList
                 profileId={selectedProfileId}
                 sessionsQuery={profileSessionsQuery}
               />
+            ) : null}
+
+            {selectedProfileId && hasAnyReports ? (
+              <View
+                className="bg-surface rounded-card p-4 mt-6"
+                testID="reports-list-card"
+              >
+                <View className="flex-row items-center justify-between mb-1">
+                  <Text className="text-body font-semibold text-text-primary">
+                    {t('progress.previousReports.title')}
+                  </Text>
+                  <Pressable
+                    onPress={() =>
+                      router.push(
+                        isViewingSelf
+                          ? ('/(app)/progress/reports' as Href)
+                          : (`/(app)/child/${selectedProfileId}/reports` as Href),
+                      )
+                    }
+                    accessibilityRole="button"
+                    accessibilityLabel={t('progress.previousReports.viewAll')}
+                    testID="progress-reports-link"
+                  >
+                    <Text className="text-body-sm text-primary font-semibold">
+                      {t('progress.previousReports.viewAll')}
+                    </Text>
+                  </Pressable>
+                </View>
+                <ReportsList
+                  monthlyReports={monthlyReportsQuery.data ?? []}
+                  weeklyReports={weeklyReportsQuery.data ?? []}
+                  limit={2}
+                  onPressMonthly={handleOpenMonthlyReport}
+                  onPressWeekly={handleOpenWeeklyReport}
+                />
+              </View>
             ) : null}
 
             {isViewingSelf ? (

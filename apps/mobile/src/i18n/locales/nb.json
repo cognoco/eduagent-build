@@ -151,6 +151,29 @@
       "greeting": "Hei {{displayName}}",
       "accountLink": "Åpne konto",
       "intentHeader": "Hva trenger du akkurat nå?",
+      "familySummary": {
+        "children_one": "{{count}} child",
+        "children_other": "{{count}} children",
+        "withParent_one": "You + {{count}} child",
+        "withParent_other": "You + {{count}} children",
+        "parentOnly": "You",
+        "withMinutes_one": "{{childCount}} · {{count}} min this week",
+        "withMinutes_other": "{{childCount}} · {{count}} min this week",
+        "withSessions_one": "{{childCount}} · {{count}} session this week",
+        "withSessions_other": "{{childCount}} · {{count}} sessions this week",
+        "noActivity": "{{childCount}} · no sessions this week",
+        "childMinutes_one": "Children: {{count}} min this week",
+        "childMinutes_other": "Children: {{count}} min this week",
+        "childSessions_one": "Children: {{count}} session this week",
+        "childSessions_other": "Children: {{count}} sessions this week",
+        "childNoActivity": "Children: no sessions this week",
+        "parentLearningWithTopic": "You: {{topicTitle}} in {{subjectName}}",
+        "parentLearningWithSubject": "You: {{subjectName}}",
+        "parentExampleLead": "You lead by example.",
+        "parentExampleNudge": "Show them how it's done: start a quick session.",
+        "attentionChild": "{{childName}} may need attention",
+        "profileLimit": "{{count}} of {{max}} profiles used"
+      },
       "encouragementNote": "Nudger er korte, milde oppmuntringer en vei.",
       "transitionNoticeTitle": "Du veileder nå {{childNames}}",
       "transitionNoticeBody": "Trykk Hjem når som helst for å se fremgangen og din egen læring.",
@@ -171,15 +194,15 @@
         "sessions_other": "{{count}} økter denne uken"
       },
       "tonight": {
-        "titleMorning": "I morges",
-        "titleAfternoon": "I ettermiddag",
-        "titleEvening": "I kveld",
-        "promptWithTopic": "Spør {{childName}}: hva gjorde at {{topic}} ga mening i dag?",
-        "promptNoActivity": "Spør {{childName}}: hva ville gjort det lett å starte i kveld?",
-        "promptFallback": "Spør {{childName}}: hva føltes lettere i dag enn i går?",
-        "promptTrickiestWithTopic": "Spør {{childName}}: hva er det vanskeligste med {{topic}} akkurat nå?",
-        "promptTomorrow": "Spør {{childName}}: hva bør vi fokusere på i morgen?",
-        "promptCurious": "Spør {{childName}}: er det noe de er nysgjerrige på?"
+        "titleMorning": "Samtalestartere",
+        "titleAfternoon": "Samtalestartere",
+        "titleEvening": "Samtalestartere",
+        "promptWithTopic": "Hva gjorde at {{topic}} ga mening i dag?",
+        "promptNoActivity": "Hva ville gjort det lett å starte i kveld?",
+        "promptFallback": "Hva føltes lettere i dag enn i går?",
+        "promptTrickiestWithTopic": "Hva er det vanskeligste med {{topic}} akkurat nå?",
+        "promptTomorrow": "Hva bør vi fokusere på i morgen?",
+        "promptCurious": "Er det noe du er nysgjerrig på?"
       },
       "empty": {
         "title": "Your family dashboard starts here",
@@ -1269,6 +1292,9 @@
   },
   "progress": {
     "pageTitle": "Min læringsreise",
+    "pageTitleMine": "Min fremgang",
+    "pageTitleProfile": "{{name}}s fremgang",
+    "pageTitleFallbackName": "Barnet ditt",
     "pageSubtitle": "Fremgang som reflekterer hva du faktisk kan.",
     "ownProfilePill": "Meg",
     "startLearning": "Start læring",
@@ -1385,6 +1411,8 @@
     },
     "stats": {
       "sessions": "{{count}} økter",
+      "practiceLessons_one": "{{count}} øving",
+      "practiceLessons_other": "{{count}} øvinger",
       "streak": "{{count}}-dagers streak",
       "viewVocabCount": "Se {{count}} vokabularord",
       "viewVocab": "Se vokabular",
@@ -1560,10 +1588,47 @@
         "vocabularyGrowth": "vokabularvekst"
       }
     },
+    "growthSnapshot": {
+      "latestWeek": "Siste uke",
+      "recentWeeks": "Nylige uker",
+      "sessions_one": "{{count}} økt",
+      "sessions_other": "{{count}} økter",
+      "topicsExplored_one": "{{count}} tema utforsket",
+      "topicsExplored_other": "{{count}} temaer utforsket",
+      "topicsLearned_one": "{{count}} tema lært",
+      "topicsLearned_other": "{{count}} temaer lært",
+      "topicsMastered_one": "{{count}} tema mestret",
+      "topicsMastered_other": "{{count}} temaer mestret",
+      "wordsAdded_one": "{{count}} ord lagt til",
+      "wordsAdded_other": "{{count}} ord lagt til",
+      "weekDetail": "{{sessions}} økter · {{time}} · {{topics}} temaer · {{words}} ord"
+    },
     "previousReports": {
       "title": "Previous reports",
       "subtitle": "Weekly and monthly snapshots from your learning.",
       "viewAll": "View all reports"
+    },
+    "latestReport": {
+      "title": "Latest report",
+      "open": "Open report",
+      "openWithDate": "Open report for {{date}}",
+      "empty": "Your next weekly or monthly report will appear here once there is enough learning to summarize.",
+      "error": "We couldn't load the latest report right now.",
+      "sessions": "Sessions",
+      "time": "Time",
+      "topics": "Topics",
+      "words": "Words",
+      "practiceLessons_one": "{{count}} practice lesson",
+      "practiceLessons_other": "{{count}} practice lessons",
+      "practicePoints_one": "{{count}} practice point",
+      "practicePoints_other": "{{count}} practice points"
+    },
+    "recentFocus": {
+      "title": "Recent focus",
+      "showAll": "Show all sessions",
+      "empty": "Recent sessions will appear here once learning gets going.",
+      "error": "We couldn't load recent sessions right now.",
+      "sessionFallback": "Studied {{date}}"
     },
     "loadingTitle": "Laster læringsreisen din",
     "loadTimeout": {

@@ -17,7 +17,7 @@ import type {
   OverdueTopic,
   OverdueTopicsResponse,
   ProgressSummary,
-  ProgressHistory,
+  ReportPracticeSummary,
   ChildSession,
   SubjectProgress,
   TopicProgress,
@@ -37,12 +37,6 @@ import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
 import { queryKeys } from '../lib/query-keys';
-
-interface ProgressHistoryQuery {
-  from?: string;
-  to?: string;
-  granularity?: 'daily' | 'weekly';
-}
 
 export interface NextReviewTopic {
   topicId: string;
@@ -98,6 +92,8 @@ export interface OverallProgressResponse {
   }[];
   totalTopicsCompleted: number;
   totalTopicsVerified: number;
+  practiceActivityCount?: number;
+  practiceSummary?: ReportPracticeSummary;
 }
 
 export function useOverallProgress(): UseQueryResult<OverallProgressResponse> {
@@ -389,39 +385,6 @@ export function useProgressInventory(): UseQueryResult<KnowledgeInventory> {
   });
 }
 
-export function useProgressHistory(
-  query?: ProgressHistoryQuery,
-): UseQueryResult<ProgressHistory> {
-  const client = useApiClient();
-  const { activeProfile } = useProfile();
-
-  return useQuery({
-    queryKey: queryKeys.progress.history(activeProfile?.id, query),
-    queryFn: async ({ signal: querySignal }) => {
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const res = await client.progress.history.$get(
-          {
-            query: {
-              ...(query?.from ? { from: query.from } : {}),
-              ...(query?.to ? { to: query.to } : {}),
-              ...(query?.granularity ? { granularity: query.granularity } : {}),
-            },
-          },
-          { init: { signal } },
-        );
-        await assertOk(res);
-        return (await res.json()) as ProgressHistory;
-      } finally {
-        cleanup();
-      }
-    },
-    enabled: !!activeProfile,
-    // [BUG-503] History data is weekly; no need to refetch within the same visit.
-    staleTime: 5 * 60 * 1000,
-  });
-}
-
 export function useProgressMilestones(
   limit = 5,
 ): UseQueryResult<MilestoneRecord[]> {
@@ -616,47 +579,6 @@ export function useChildInventory(
           inventory: KnowledgeInventory | null;
         };
         return data.inventory;
-      } finally {
-        cleanup();
-      }
-    },
-    enabled:
-      (options?.enabled ?? true) &&
-      !!activeProfile &&
-      activeProfile.isOwner === true &&
-      !!childProfileId,
-  });
-}
-
-export function useChildProgressHistory(
-  childProfileId: string | undefined,
-  query?: ProgressHistoryQuery,
-  options?: { enabled?: boolean },
-): UseQueryResult<ProgressHistory | null> {
-  const client = useApiClient();
-  const { activeProfile } = useProfile();
-
-  return useQuery({
-    queryKey: queryKeys.dashboard.childHistory(childProfileId, query),
-    queryFn: async ({ signal: querySignal }) => {
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const res = await client.dashboard.children[':profileId'][
-          'progress-history'
-        ].$get(
-          {
-            param: { profileId: childProfileId ?? '' },
-            query: {
-              ...(query?.from ? { from: query.from } : {}),
-              ...(query?.to ? { to: query.to } : {}),
-              ...(query?.granularity ? { granularity: query.granularity } : {}),
-            },
-          },
-          { init: { signal } },
-        );
-        await assertOk(res);
-        const data = (await res.json()) as { history: ProgressHistory | null };
-        return data.history;
       } finally {
         cleanup();
       }

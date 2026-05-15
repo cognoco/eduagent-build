@@ -18,6 +18,7 @@ import type { Translate, TranslateKey } from '../../i18n';
 
 import { useActiveProfileRole } from '../../hooks/use-active-profile-role';
 import { useDashboard } from '../../hooks/use-dashboard';
+import { useLearningResumeTarget } from '../../hooks/use-progress';
 import {
   useFamilySubscription,
   useSubscription,
@@ -32,8 +33,6 @@ import {
   type ChildInGracePeriod,
 } from '../family/WithdrawalCountdownBanner';
 import { NudgeActionSheet } from '../nudge/NudgeActionSheet';
-import { useChildLearnerProfile } from '../../hooks/use-learner-profile';
-import { ACCOMMODATION_OPTIONS } from '../../lib/accommodation-options';
 import { ParentTransitionNotice } from './ParentTransitionNotice';
 
 const MAX_TONIGHT_PROMPTS = 3;
@@ -94,39 +93,226 @@ function formatChildSnapshot(
   return `${focus} · ${activity}`;
 }
 
+function formatFamilyActivitySummary(
+  children: Profile[],
+  dashboard: DashboardData | undefined,
+  hasParentLearning: boolean,
+  t: Translate,
+): string {
+  if (hasParentLearning) {
+    if (children.length === 0) {
+      return t('home.parent.familySummary.parentOnly');
+    }
+
+    return t('home.parent.familySummary.withParent', {
+      count: children.length,
+    });
+  }
+
+  const totals = familyChildActivityTotals(dashboard);
+  const memberCount = t('home.parent.familySummary.children', {
+    count: children.length,
+  });
+
+  if (totals.minutesThisWeek > 0) {
+    return t('home.parent.familySummary.withMinutes', {
+      childCount: memberCount,
+      count: totals.minutesThisWeek,
+    });
+  }
+
+  if (totals.sessionsThisWeek > 0) {
+    return t('home.parent.familySummary.withSessions', {
+      childCount: memberCount,
+      count: totals.sessionsThisWeek,
+    });
+  }
+
+  return t('home.parent.familySummary.noActivity', {
+    childCount: memberCount,
+  });
+}
+
+function familyChildActivityTotals(dashboard: DashboardData | undefined): {
+  sessionsThisWeek: number;
+  minutesThisWeek: number;
+} {
+  const dashboardChildren = dashboard?.children ?? [];
+  return {
+    sessionsThisWeek: dashboardChildren.reduce(
+      (sum, child) => sum + child.sessionsThisWeek,
+      0,
+    ),
+    minutesThisWeek: dashboardChildren.reduce(
+      (sum, child) => sum + child.totalTimeThisWeek,
+      0,
+    ),
+  };
+}
+
+function formatFamilyChildActivityDetail(
+  dashboard: DashboardData | undefined,
+  t: Translate,
+): string {
+  const totals = familyChildActivityTotals(dashboard);
+
+  if (totals.minutesThisWeek > 0) {
+    return t('home.parent.familySummary.childMinutes', {
+      count: totals.minutesThisWeek,
+    });
+  }
+
+  if (totals.sessionsThisWeek > 0) {
+    return t('home.parent.familySummary.childSessions', {
+      count: totals.sessionsThisWeek,
+    });
+  }
+
+  return t('home.parent.familySummary.childNoActivity');
+}
+
+function formatParentLearningSummary(
+  resumeTarget:
+    | {
+        subjectName: string;
+        topicTitle: string | null;
+        lastActivityAt: string | null;
+      }
+    | null
+    | undefined,
+  t: Translate,
+): string | null {
+  if (!resumeTarget?.lastActivityAt) return null;
+
+  if (resumeTarget.topicTitle) {
+    return t('home.parent.familySummary.parentLearningWithTopic', {
+      topicTitle: resumeTarget.topicTitle,
+      subjectName: resumeTarget.subjectName,
+    });
+  }
+
+  return t('home.parent.familySummary.parentLearningWithSubject', {
+    subjectName: resumeTarget.subjectName,
+  });
+}
+
+function formatParentExampleSummary(
+  hasParentLearning: boolean,
+  childCount: number,
+  t: Translate,
+): string | null {
+  if (hasParentLearning) {
+    return t('home.parent.familySummary.parentExampleLead');
+  }
+
+  if (childCount > 0) {
+    return t('home.parent.familySummary.parentExampleNudge');
+  }
+
+  return null;
+}
+
+function childAttentionScore(
+  dashboardChild: DashboardChild | undefined,
+): number {
+  if (!dashboardChild) return 0;
+
+  const weakestRetention = dashboardChild.subjects.some((subject) =>
+    ['forgotten', 'weak'].includes(subject.retentionStatus),
+  );
+  if (dashboardChild.retentionTrend === 'declining' || weakestRetention) {
+    return 3;
+  }
+
+  const fadingRetention = dashboardChild.subjects.some(
+    (subject) => subject.retentionStatus === 'fading',
+  );
+  if (dashboardChild.trend === 'down' || fadingRetention) {
+    return 2;
+  }
+
+  if (
+    dashboardChild.totalSessions > 0 &&
+    dashboardChild.sessionsThisWeek === 0
+  ) {
+    return 1;
+  }
+
+  return 0;
+}
+
+function formatFamilyAttentionSummary(
+  children: Profile[],
+  dashboard: DashboardData | undefined,
+  t: Translate,
+): string | null {
+  const mostNeedsAttention = children
+    .map((child) => ({
+      child,
+      score: childAttentionScore(findDashboardChild(dashboard, child.id)),
+    }))
+    .filter((entry) => entry.score > 0)
+    .sort((a, b) => b.score - a.score)[0];
+
+  if (!mostNeedsAttention) return null;
+
+  return t('home.parent.familySummary.attentionChild', {
+    childName: firstNameOf(mostNeedsAttention.child.displayName),
+  });
+}
+
 interface TonightPrompt {
   key: string;
   childId: string;
   text: string;
 }
 
+function promptText(
+  childName: string,
+  body: string,
+  includeChildName: boolean,
+): string {
+  return includeChildName ? `${childName}: ${body}` : body;
+}
+
 function primaryPromptFor(
   child: Profile,
   dashboardChild: DashboardChild | undefined,
   t: Translate,
+  includeChildName: boolean,
 ): string {
   const childName = firstNameOf(child.displayName);
   const focus =
     dashboardChild?.currentlyWorkingOn[0] ?? dashboardChild?.subjects[0]?.name;
 
   if (focus) {
-    return t('home.parent.tonight.promptWithTopic', {
+    return promptText(
       childName,
-      topic: focus,
-    });
+      t('home.parent.tonight.promptWithTopic', { topic: focus }),
+      includeChildName,
+    );
   }
 
   if (dashboardChild && dashboardChild.sessionsThisWeek === 0) {
-    return t('home.parent.tonight.promptNoActivity', { childName });
+    return promptText(
+      childName,
+      t('home.parent.tonight.promptNoActivity'),
+      includeChildName,
+    );
   }
 
-  return t('home.parent.tonight.promptFallback', { childName });
+  return promptText(
+    childName,
+    t('home.parent.tonight.promptFallback'),
+    includeChildName,
+  );
 }
 
 function buildSingleChildPrompts(
   child: Profile,
   dashboardChild: DashboardChild | undefined,
   t: Translate,
+  includeChildName: boolean,
 ): TonightPrompt[] {
   const childName = firstNameOf(child.displayName);
   const focus =
@@ -135,7 +321,7 @@ function buildSingleChildPrompts(
     {
       key: `${child.id}-primary`,
       childId: child.id,
-      text: primaryPromptFor(child, dashboardChild, t),
+      text: primaryPromptFor(child, dashboardChild, t, includeChildName),
     },
   ];
 
@@ -143,27 +329,42 @@ function buildSingleChildPrompts(
     prompts.push({
       key: `${child.id}-trickiest`,
       childId: child.id,
-      text: t('home.parent.tonight.promptTrickiestWithTopic', {
+      text: promptText(
         childName,
-        topic: focus,
-      }),
+        t('home.parent.tonight.promptTrickiestWithTopic', {
+          topic: focus,
+        }),
+        includeChildName,
+      ),
     });
     prompts.push({
       key: `${child.id}-tomorrow`,
       childId: child.id,
-      text: t('home.parent.tonight.promptTomorrow', { childName }),
+      text: promptText(
+        childName,
+        t('home.parent.tonight.promptTomorrow'),
+        includeChildName,
+      ),
     });
   } else if (dashboardChild && dashboardChild.sessionsThisWeek > 0) {
     prompts.push({
       key: `${child.id}-tomorrow`,
       childId: child.id,
-      text: t('home.parent.tonight.promptTomorrow', { childName }),
+      text: promptText(
+        childName,
+        t('home.parent.tonight.promptTomorrow'),
+        includeChildName,
+      ),
     });
   } else {
     prompts.push({
       key: `${child.id}-curious`,
       childId: child.id,
-      text: t('home.parent.tonight.promptCurious', { childName }),
+      text: promptText(
+        childName,
+        t('home.parent.tonight.promptCurious'),
+        includeChildName,
+      ),
     });
   }
 
@@ -182,6 +383,7 @@ function buildTonightPrompts(
       first,
       findDashboardChild(dashboard, first.id),
       t,
+      false,
     );
   }
 
@@ -196,7 +398,12 @@ function buildTonightPrompts(
   return ranked.slice(0, MAX_TONIGHT_PROMPTS).map((child) => ({
     key: `${child.id}-primary`,
     childId: child.id,
-    text: primaryPromptFor(child, findDashboardChild(dashboard, child.id), t),
+    text: primaryPromptFor(
+      child,
+      findDashboardChild(dashboard, child.id),
+      t,
+      true,
+    ),
   }));
 }
 
@@ -248,7 +455,6 @@ function ChildActionButton({
 function ChildCommandCard({
   child,
   dashboardChild,
-  highlight,
   onOpenProfile,
   onOpenProgress,
   onOpenReports,
@@ -257,7 +463,6 @@ function ChildCommandCard({
 }: {
   child: Profile;
   dashboardChild: DashboardChild | undefined;
-  highlight: boolean;
   onOpenProfile: () => void;
   onOpenProgress: () => void;
   onOpenReports: () => void;
@@ -267,11 +472,7 @@ function ChildCommandCard({
   const colors = useThemeColors();
 
   return (
-    <View
-      className={`rounded-card px-4 py-4 ${
-        highlight ? 'bg-primary-soft' : 'bg-surface'
-      }`}
-    >
+    <View className="rounded-card px-4 py-4 bg-surface">
       <Pressable
         onPress={onOpenProfile}
         className="flex-row items-center bg-background rounded-button px-3 py-3"
@@ -340,52 +541,6 @@ function ChildCommandCard({
   );
 }
 
-function ChildAccommodationRow({
-  childProfileId,
-  childName,
-}: {
-  childProfileId: string;
-  childName: string;
-}): React.ReactElement {
-  const { t } = useTranslation();
-  const colors = useThemeColors();
-  const router = useRouter();
-  const { data: learnerProfile } = useChildLearnerProfile(childProfileId);
-
-  const activeOption = ACCOMMODATION_OPTIONS.find(
-    (o) => o.mode === (learnerProfile?.accommodationMode ?? 'none'),
-  );
-
-  return (
-    <Pressable
-      onPress={() =>
-        router.push(
-          `/(app)/more/accommodation?childProfileId=${childProfileId}`,
-        )
-      }
-      className="flex-row items-center justify-between bg-surface rounded-card px-4 py-3.5 mb-2"
-      style={Platform.OS === 'web' ? { cursor: 'pointer' } : undefined}
-      accessibilityRole="button"
-      accessibilityLabel={t('more.accommodation.childScreenTitle', {
-        name: childName,
-      })}
-      testID={`child-accommodation-row-${childProfileId}`}
-    >
-      <View className="flex-1 pr-3">
-        <Text className="text-body font-semibold text-text-primary">
-          {t('more.accommodation.childScreenTitle', { name: childName })}
-        </Text>
-        {activeOption ? (
-          <Text className="text-body-sm text-text-secondary mt-0.5">
-            {activeOption.title} — {activeOption.description}
-          </Text>
-        ) : null}
-      </View>
-      <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
-    </Pressable>
-  );
-}
-
 export function ParentHomeScreen({
   activeProfile,
   now,
@@ -397,6 +552,7 @@ export function ParentHomeScreen({
   const role = useActiveProfileRole();
   const linkedChildren = useLinkedChildren();
   const { data: dashboard } = useDashboard();
+  const { data: parentResumeTarget } = useLearningResumeTarget();
   const { data: subscription } = useSubscription();
   const { data: familyData } = useFamilySubscription(
     subscription?.tier === 'family' || subscription?.tier === 'pro',
@@ -437,6 +593,30 @@ export function ParentHomeScreen({
     birthYear: activeProfile?.birthYear,
   });
   const hasNoLinkedChildren = linkedChildren.length === 0;
+  const parentLearningSummary = formatParentLearningSummary(
+    parentResumeTarget,
+    t,
+  );
+  const familyActivitySummary = formatFamilyActivitySummary(
+    linkedChildren,
+    dashboard,
+    parentLearningSummary !== null,
+    t,
+  );
+  const childActivityDetail =
+    parentLearningSummary && linkedChildren.length > 0
+      ? formatFamilyChildActivityDetail(dashboard, t)
+      : null;
+  const parentExampleSummary = formatParentExampleSummary(
+    parentLearningSummary !== null,
+    linkedChildren.length,
+    t,
+  );
+  const attentionSummary = formatFamilyAttentionSummary(
+    linkedChildren,
+    dashboard,
+    t,
+  );
 
   const navigateToCreateChildProfile = useCallback(() => {
     if (Platform.OS === 'web') {
@@ -527,7 +707,7 @@ export function ParentHomeScreen({
   const pushChildProgress = useCallback(
     (childProfileId: string): void => {
       router.push({
-        pathname: '/(app)/progress',
+        pathname: '/(app)/child/[profileId]',
         params: { profileId: childProfileId },
       } as Href);
     },
@@ -659,12 +839,11 @@ export function ParentHomeScreen({
             </View>
           ) : null}
 
-          {linkedChildren.map((child, index) => (
+          {linkedChildren.map((child) => (
             <ChildCommandCard
               key={child.id}
               child={child}
               dashboardChild={findDashboardChild(dashboard, child.id)}
-              highlight={index === 0}
               onOpenProfile={() => pushChildProfile(child.id)}
               onOpenProgress={() => pushChildProgress(child.id)}
               onOpenReports={() => pushChildReports(child.id)}
@@ -679,13 +858,42 @@ export function ParentHomeScreen({
         </Text>
 
         <View style={{ gap: 10 }}>
-          {linkedChildren.map((child) => (
-            <ChildAccommodationRow
-              key={`accommodation-${child.id}`}
-              childProfileId={child.id}
-              childName={child.displayName}
-            />
-          ))}
+          <View
+            className="bg-primary-soft rounded-card px-4 py-3.5"
+            testID="parent-home-family-summary"
+          >
+            <Text className="text-body font-semibold text-text-primary">
+              {familyActivitySummary}
+            </Text>
+            {childActivityDetail ? (
+              <Text className="text-body-sm text-text-secondary mt-1">
+                {childActivityDetail}
+              </Text>
+            ) : null}
+            {parentLearningSummary ? (
+              <Text className="text-body-sm text-text-secondary mt-1">
+                {parentLearningSummary}
+              </Text>
+            ) : null}
+            {parentExampleSummary ? (
+              <Text className="text-body-sm text-text-secondary mt-1">
+                {parentExampleSummary}
+              </Text>
+            ) : null}
+            {attentionSummary ? (
+              <Text className="text-body-sm text-text-secondary mt-1">
+                {attentionSummary}
+              </Text>
+            ) : null}
+            {familyData ? (
+              <Text className="text-body-sm text-text-secondary mt-1">
+                {t('home.parent.familySummary.profileLimit', {
+                  count: familyData.profileCount,
+                  max: familyData.maxProfiles,
+                })}
+              </Text>
+            ) : null}
+          </View>
 
           {showAddChild ? (
             <Pressable

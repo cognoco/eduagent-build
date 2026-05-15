@@ -1,14 +1,19 @@
-import { act, render, screen, waitFor } from '@testing-library/react-native';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react-native';
 import { useFocusEffect } from 'expo-router';
 import type { Profile } from '@eduagent/schemas';
 import {
   fetchLearningResumeTarget,
   useChildInventory,
-  useChildProgressHistory,
   useChildProgressSummary,
   useLearningResumeTarget,
+  useOverallProgress,
   useProgressInventory,
-  useProgressHistory,
   useProgressMilestones,
   useProfileSessions,
   useProfileReports,
@@ -50,6 +55,10 @@ jest.mock('react-i18next', () => ({
         return `Progress unlocks after you study ${opts?.subject ?? ''}`;
       if (key === 'progress.empty.withSubjectSubtitle')
         return `Study a topic in ${opts?.subject ?? ''} first.`;
+      if (key === 'progress.pageTitleMine') return 'My progress';
+      if (key === 'progress.pageTitleProfile')
+        return `${opts?.name ?? ''}'s progress`;
+      if (key === 'progress.pageTitleFallbackName') return 'Your child';
       if (key === 'progress.register.child.weekTitle') return 'Your week';
       if (key === 'progress.register.child.monthTitle') return 'Your month';
       if (key === 'progress.register.child.growthTitle')
@@ -79,8 +88,62 @@ jest.mock('react-i18next', () => ({
         return 'Currently working on';
       if (key === 'progress.register.adult.currentlyWorkingOnDetected')
         return 'Detected from recent sessions';
+      if (key === 'progress.growthSnapshot.latestWeek') return 'Latest week';
+      if (key === 'progress.growthSnapshot.recentWeeks') return 'Recent weeks';
+      if (key === 'progress.growthSnapshot.sessions') {
+        const count = opts?.count as number;
+        return `${count} session${count === 1 ? '' : 's'}`;
+      }
+      if (key === 'progress.growthSnapshot.topicsExplored') {
+        const count = opts?.count as number;
+        return `${count} topic${count === 1 ? '' : 's'} explored`;
+      }
+      if (key === 'progress.growthSnapshot.topicsLearned') {
+        const count = opts?.count as number;
+        return `${count} topic${count === 1 ? '' : 's'} learned`;
+      }
+      if (key === 'progress.growthSnapshot.topicsMastered') {
+        const count = opts?.count as number;
+        return `${count} topic${count === 1 ? '' : 's'} mastered`;
+      }
+      if (key === 'progress.growthSnapshot.wordsAdded') {
+        const count = opts?.count as number;
+        return `${count} word${count === 1 ? '' : 's'} added`;
+      }
+      if (key === 'progress.growthSnapshot.weekDetail')
+        return `${opts?.sessions ?? 0} sessions · ${opts?.time ?? ''} · ${
+          opts?.topics ?? 0
+        } topics · ${opts?.words ?? 0} words`;
       if (key === 'progress.currentlyWorkingOn.andNMore')
         return `and ${opts?.count ?? ''} more`;
+      if (key === 'progress.latestReport.title') return 'Latest report';
+      if (key === 'progress.latestReport.open') return 'Open report';
+      if (key === 'progress.latestReport.openWithDate')
+        return `Open report for ${opts?.date ?? ''}`;
+      if (key === 'progress.latestReport.empty')
+        return 'Your next weekly or monthly report will appear here once there is enough learning to summarize.';
+      if (key === 'progress.latestReport.error')
+        return "We couldn't load the latest report right now.";
+      if (key === 'progress.latestReport.sessions') return 'Sessions';
+      if (key === 'progress.latestReport.time') return 'Time';
+      if (key === 'progress.latestReport.topics') return 'Topics';
+      if (key === 'progress.latestReport.words') return 'Words';
+      if (key === 'progress.latestReport.practiceLessons') {
+        const count = opts?.count as number;
+        return `${count} practice lesson${count === 1 ? '' : 's'}`;
+      }
+      if (key === 'progress.latestReport.practicePoints') {
+        const count = opts?.count as number;
+        return `${count} practice point${count === 1 ? '' : 's'}`;
+      }
+      if (key === 'progress.recentFocus.title') return 'Recent focus';
+      if (key === 'progress.recentFocus.showAll') return 'Show all sessions';
+      if (key === 'progress.recentFocus.empty')
+        return 'Recent sessions will appear here once learning gets going.';
+      if (key === 'progress.recentFocus.error')
+        return "We couldn't load recent sessions right now.";
+      if (key === 'progress.recentFocus.sessionFallback')
+        return `Studied ${opts?.date ?? ''}`;
       // New learner
       if (key === 'progress.newLearner.title') {
         const count = opts?.count as number;
@@ -107,6 +170,10 @@ jest.mock('react-i18next', () => ({
       if (key === 'progress.stats.sessions') {
         const count = opts?.count as number;
         return `${count} sessions`;
+      }
+      if (key === 'progress.stats.practiceLessons') {
+        const count = opts?.count as number;
+        return `${count} practice ${count === 1 ? 'lesson' : 'lessons'}`;
       }
       if (key === 'progress.stats.streak') {
         const count = opts?.count as number;
@@ -324,6 +391,10 @@ function mockHooks(
       | undefined;
     isLoading?: boolean;
     isError?: boolean;
+    practiceActivityCount?: number;
+    sessions?: unknown[];
+    monthlyReports?: unknown[];
+    weeklyReports?: unknown[];
   } = {},
 ) {
   const {
@@ -331,9 +402,12 @@ function mockHooks(
     inventory,
     isLoading = false,
     isError = false,
+    practiceActivityCount = 0,
+    sessions,
+    monthlyReports = [],
+    weeklyReports = [],
   } = overrides;
   const inventoryRefetch = jest.fn();
-  const historyRefetch = jest.fn();
   const milestonesRefetch = jest.fn();
   const refreshSnapshot = jest.fn().mockResolvedValue(undefined);
   const monthlyReportsRefetch = jest.fn();
@@ -346,11 +420,6 @@ function mockHooks(
     error: isError ? new Error('fail') : null,
     refetch: inventoryRefetch,
   });
-  (useProgressHistory as jest.Mock).mockReturnValue({
-    data: undefined,
-    isRefetching: false,
-    refetch: historyRefetch,
-  });
   (useProgressMilestones as jest.Mock).mockReturnValue({
     data: [],
     refetch: milestonesRefetch,
@@ -359,9 +428,21 @@ function mockHooks(
     mutateAsync: refreshSnapshot,
     isPending: false,
   });
+  (useOverallProgress as jest.Mock).mockReturnValue({
+    data: {
+      subjects: [],
+      totalTopicsCompleted: inventory?.global.topicsMastered ?? 0,
+      totalTopicsVerified: 0,
+      practiceActivityCount,
+    },
+    isLoading: false,
+    isError: false,
+    refetch: jest.fn(),
+  });
   (useProfileSessions as jest.Mock).mockReturnValue({
     data:
-      inventory && inventory.global.totalSessions > 0
+      sessions ??
+      (inventory && inventory.global.totalSessions > 0
         ? [
             {
               sessionId: 'session-1',
@@ -385,19 +466,19 @@ function mockHooks(
               engagementSignal: null,
             },
           ]
-        : [],
+        : []),
     isLoading: false,
     isError: false,
     refetch: jest.fn(),
   });
   (useProfileReports as jest.Mock).mockReturnValue({
-    data: [],
+    data: monthlyReports,
     isLoading: false,
     isError: false,
     refetch: monthlyReportsRefetch,
   });
   (useProfileWeeklyReports as jest.Mock).mockReturnValue({
-    data: [],
+    data: weeklyReports,
     isLoading: false,
     isError: false,
     refetch: weeklyReportsRefetch,
@@ -406,11 +487,6 @@ function mockHooks(
     data: childInventory ?? null,
     isLoading: false,
     isError: false,
-    isRefetching: false,
-    refetch: jest.fn(),
-  });
-  (useChildProgressHistory as jest.Mock).mockReturnValue({
-    data: null,
     isRefetching: false,
     refetch: jest.fn(),
   });
@@ -426,7 +502,6 @@ function mockHooks(
   (fetchLearningResumeTarget as jest.Mock).mockResolvedValue(null);
 
   return {
-    historyRefetch,
     inventoryRefetch,
     milestonesRefetch,
     monthlyReportsRefetch,
@@ -479,7 +554,6 @@ describe('ProgressScreen — progressive disclosure', () => {
       expect(refs.inventoryRefetch).toHaveBeenCalled();
     });
     expect(refs.refreshSnapshot).toHaveBeenCalled();
-    expect(refs.historyRefetch).toHaveBeenCalled();
     expect(refs.monthlyReportsRefetch).toHaveBeenCalled();
     expect(refs.weeklyReportsRefetch).toHaveBeenCalled();
     expect(refs.milestonesRefetch).toHaveBeenCalled();
@@ -518,79 +592,200 @@ describe('ProgressScreen — progressive disclosure', () => {
     screen.getByText('5 sessions completed');
   });
 
-  it('renders weekly delta chips when the learner has prior-week deltas', () => {
+  it('renders latest report from the weekly report summary without detail fetches', () => {
     mockHooks({
       inventory: {
-        global: {
-          ...baseGlobal,
-          totalSessions: 5,
-          topicsMastered: 4,
-          vocabularyTotal: 12,
-          weeklyDeltaTopicsMastered: 3,
-          weeklyDeltaVocabularyTotal: 12,
-          weeklyDeltaTopicsExplored: 2,
+        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 2 },
+        subjects: [fullSubject],
+      },
+      weeklyReports: [
+        {
+          id: 'weekly-1',
+          reportWeek: '2026-05-11',
+          viewedAt: null,
+          createdAt: '2026-05-17T00:00:00Z',
+          headlineStat: {
+            label: 'topics mastered',
+            value: 2,
+            comparison: '+2 this week',
+          },
+          thisWeek: {
+            totalSessions: 4,
+            totalActiveMinutes: 95,
+            topicsMastered: 2,
+            topicsExplored: 6,
+            vocabularyTotal: 12,
+            streakBest: 3,
+          },
+          practiceSummary: {
+            quizzesCompleted: 0,
+            reviewsCompleted: 0,
+            totals: {
+              activitiesCompleted: 3,
+              reviewsCompleted: 1,
+              pointsEarned: 45,
+              celebrations: 0,
+              distinctActivityTypes: 2,
+            },
+            scores: {
+              scoredActivities: 0,
+              score: 0,
+              total: 0,
+              accuracy: null,
+            },
+            byType: [],
+            bySubject: [],
+          },
         },
-        subjects: [fullSubject],
-      },
+      ],
     });
 
     render(<ProgressScreen />);
 
-    screen.getByTestId('progress-weekly-delta-topicsMastered');
-    screen.getByText('+3 topics this week');
-    screen.getByTestId('progress-weekly-delta-vocabularyTotal');
-    screen.getByText('+12 words this week');
-    screen.getByTestId('progress-weekly-delta-topicsExplored');
-    screen.getByText('+2 topics explored this week');
+    screen.getByTestId('progress-latest-report-card');
+    screen.getByText('Latest report');
+    screen.getByText('2 topics mastered');
+    expect(screen.getAllByText('+2 this week').length).toBeGreaterThan(0);
+    screen.getByText('1h 35m');
+    screen.getByText('3 practice lessons');
+    screen.getByText('45 practice points');
   });
 
-  it('hides weekly delta chips when no prior-week snapshot exists', () => {
+  it('falls back to monthly report summary when no weekly report exists', () => {
     mockHooks({
       inventory: {
-        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 3 },
+        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 2 },
         subjects: [fullSubject],
       },
+      monthlyReports: [
+        {
+          id: 'monthly-1',
+          reportMonth: '2026-05',
+          viewedAt: null,
+          createdAt: '2026-06-01T00:00:00Z',
+          headlineStat: {
+            label: 'sessions completed',
+            value: 8,
+            comparison: '+3 from last month',
+          },
+          highlights: [],
+          nextSteps: [],
+          thisMonth: {
+            totalSessions: 8,
+            totalActiveMinutes: 120,
+            topicsMastered: 3,
+            topicsExplored: 9,
+            vocabularyTotal: 20,
+            streakBest: 4,
+          },
+        },
+      ],
     });
 
     render(<ProgressScreen />);
 
-    expect(
-      screen.queryByTestId('progress-weekly-delta-topicsMastered'),
-    ).toBeNull();
-    expect(
-      screen.queryByTestId('progress-weekly-delta-vocabularyTotal'),
-    ).toBeNull();
-    expect(
-      screen.queryByTestId('progress-weekly-delta-topicsExplored'),
-    ).toBeNull();
+    screen.getByTestId('progress-latest-report-card');
+    screen.getByText('8 sessions completed');
+    expect(screen.getAllByText('+3 from last month').length).toBeGreaterThan(0);
   });
 
-  it('hides zero weekly delta chips — no discouraging "+0" pills', () => {
+  it('shows recent focus from recent sessions and expands to the reused session list', () => {
+    mockHooks({
+      inventory: {
+        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 2 },
+        subjects: [fullSubject],
+      },
+      sessions: [
+        {
+          sessionId: 'session-1',
+          subjectId: 'subject-1',
+          subjectName: 'Math',
+          topicId: 'topic-1',
+          topicTitle: 'Fractions',
+          sessionType: 'learning',
+          startedAt: '2026-05-15T10:00:00Z',
+          endedAt: null,
+          exchangeCount: 3,
+          escalationRung: 1,
+          durationSeconds: 600,
+          wallClockSeconds: 600,
+          displayTitle: 'Learning',
+          displaySummary: 'Practiced comparing fractions.',
+          homeworkSummary: null,
+          highlight: null,
+          narrative: null,
+          conversationPrompt: null,
+          engagementSignal: null,
+        },
+        {
+          sessionId: 'session-2',
+          subjectId: 'subject-2',
+          subjectName: 'Biology',
+          topicId: null,
+          topicTitle: null,
+          sessionType: 'learning',
+          startedAt: '2026-05-14T10:00:00Z',
+          endedAt: null,
+          exchangeCount: 2,
+          escalationRung: 1,
+          durationSeconds: 300,
+          wallClockSeconds: 300,
+          displayTitle: 'Learning',
+          displaySummary: null,
+          homeworkSummary: null,
+          highlight: 'Talked through cells.',
+          narrative: null,
+          conversationPrompt: null,
+          engagementSignal: null,
+        },
+      ],
+    });
+
+    render(<ProgressScreen />);
+
+    screen.getByText('Recent focus');
+    screen.getByText('Fractions');
+    screen.getByText('Practiced comparing fractions.');
+    screen.getByText('Biology');
+    expect(screen.queryByTestId('recent-sessions-list')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('progress-show-all-sessions'));
+
+    screen.getByTestId('recent-sessions-list');
+    screen.getByTestId('session-card-session-1');
+  });
+
+  it('renders empty latest report and recent focus states without duplicate surfaces', () => {
+    mockLinkedChildren = [makeLinkedChild()];
+    mockSearchParams = { profileId: 'child-1' };
     mockHooks({
       inventory: {
         global: {
           ...baseGlobal,
           totalSessions: 5,
           topicsMastered: 3,
-          weeklyDeltaTopicsMastered: 0,
-          weeklyDeltaVocabularyTotal: 0,
-          weeklyDeltaTopicsExplored: 0,
         },
         subjects: [fullSubject],
+        currentlyWorkingOn: [],
       },
+      childInventory: {
+        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 3 },
+        subjects: [fullSubject],
+        currentlyWorkingOn: [],
+      },
+      sessions: [],
     });
 
     render(<ProgressScreen />);
 
+    screen.getByTestId('progress-latest-report-empty');
+    screen.getByText(
+      'Recent sessions will appear here once learning gets going.',
+    );
     expect(
       screen.queryByTestId('progress-weekly-delta-topicsMastered'),
     ).toBeNull();
-    expect(
-      screen.queryByTestId('progress-weekly-delta-vocabularyTotal'),
-    ).toBeNull();
-    expect(
-      screen.queryByTestId('progress-weekly-delta-topicsExplored'),
-    ).toBeNull();
+    expect(screen.queryByTestId('progress-currently-working-on')).toBeNull();
   });
 
   it('shows full view when totalSessions is 3', () => {
@@ -649,6 +844,27 @@ describe('ProgressScreen — progressive disclosure', () => {
     screen.getByTestId('progress-pill-child-1');
     expect(useChildInventory).toHaveBeenCalledWith('child-1', {
       enabled: true,
+    });
+  });
+
+  it('defaults the bottom progress tab to the parent profile even when children exist', () => {
+    mockLinkedChildren = [childProgressProfile];
+    mockHooks({
+      inventory: {
+        global: { ...baseGlobal, totalSessions: 2 },
+        subjects: [fullSubject],
+      },
+      childInventory: {
+        global: { ...baseGlobal, totalSessions: 6, topicsMastered: 2 },
+        subjects: [fullSubject],
+      },
+    });
+
+    render(<ProgressScreen />);
+
+    screen.getByText('My progress');
+    expect(useChildInventory).toHaveBeenCalledWith(undefined, {
+      enabled: false,
     });
   });
 
@@ -762,10 +978,10 @@ describe('ProgressScreen — progressive disclosure', () => {
 
     render(<ProgressScreen />);
 
+    screen.getByText('My progress');
     screen.getByText('You learned 3 topics. Steady wins.');
-    screen.getByText('What you learned');
-    // Weekly/Monthly report card titles (WeeklyReportCard/MonthlyReportCard) were removed
-    // in PR-6 (reports dedup). Register-aware growth chart title still present.
+    screen.getByText('Latest report');
+    screen.getByText('Recent focus');
     expect(screen.queryByText('Your growth')).toBeNull();
     expect(screen.queryByText('Weekly report')).toBeNull();
   });
@@ -776,30 +992,40 @@ describe('ProgressScreen — progressive disclosure', () => {
         global: { ...baseGlobal, totalSessions: 5, topicsMastered: 3 },
         subjects: [fullSubject],
       },
+      practiceActivityCount: 4,
     });
 
     render(<ProgressScreen />);
 
-    screen.getByText('Your growth');
-    // Weekly/Monthly report card titles (WeeklyReportCard/MonthlyReportCard) were removed
-    // in PR-6 (reports dedup). Register-aware growth chart title still present.
+    screen.getByText('My progress');
+    screen.getByText('4 practice lessons');
+    screen.getByText('Latest report');
+    screen.getByText('Recent focus');
     expect(screen.queryByText('Your week')).toBeNull();
   });
 
-  it('renders currently working on when inventory has current focus areas', () => {
+  it('uses current focus areas as recent focus fallback when sessions are absent', () => {
+    mockLinkedChildren = [makeLinkedChild()];
+    mockSearchParams = { profileId: 'child-1' };
     mockHooks({
       inventory: {
         global: { ...baseGlobal, totalSessions: 5, topicsMastered: 1 },
         subjects: [fullSubject],
         currentlyWorkingOn: ['Fractions', 'Decimals'],
       },
+      childInventory: {
+        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 1 },
+        subjects: [fullSubject],
+        currentlyWorkingOn: ['Fractions', 'Decimals'],
+      },
+      sessions: [],
     });
     render(<ProgressScreen />);
 
-    screen.getByTestId('progress-currently-working-on');
-    screen.getByText('Currently working on');
+    screen.getByTestId('progress-recent-focus-card');
     screen.getByText('Fractions');
     screen.getByText('Decimals');
+    expect(screen.queryByTestId('progress-currently-working-on')).toBeNull();
   });
 
   it('keeps currently working on hidden when inventory has no focus areas', () => {
@@ -823,13 +1049,15 @@ describe('ProgressScreen — progressive disclosure', () => {
     expect(screen.queryByTestId('progress-new-learner-teaser')).toBeNull();
   });
 
-  it('renders subject breakdown for parent viewing child', () => {
+  it('uses the shared progress hub for parent viewing child without subject breakdown', () => {
     mockLinkedChildren = [makeLinkedChild()];
+    mockSearchParams = { profileId: 'child-1' };
     mockHooks({
       inventory: {
         global: { ...baseGlobal, totalSessions: 5, topicsMastered: 3 },
         subjects: [fullSubject],
       },
+      practiceActivityCount: 4,
     });
     (useChildInventory as jest.Mock).mockReturnValue({
       data: {
@@ -845,55 +1073,42 @@ describe('ProgressScreen — progressive disclosure', () => {
 
     render(<ProgressScreen />);
 
-    screen.getByTestId('progress-subject-breakdown');
-    screen.getByTestId('progress-subject-card-s1');
-    screen.getByText('Math');
-    screen.getByText('5 sessions · 30 min');
+    screen.getByText("Emma's progress");
+    expect(screen.queryByText('4 practice lessons')).toBeNull();
+    screen.getByTestId('progress-latest-report-section');
+    screen.getByTestId('progress-recent-focus-card');
+    expect(screen.queryByTestId('progress-subject-breakdown')).toBeNull();
   });
 
-  it('uses compact subject breakdown cards when a child has many subjects', () => {
-    const manySubjects = Array.from({ length: 7 }, (_, index) => ({
-      ...fullSubject,
-      subjectId: `s${index + 1}`,
-      subjectName: `Subject ${index + 1}`,
-      lastSessionAt: '2026-05-01T10:00:00Z',
-    }));
-
+  it('reuses report preview for parent viewing child when summaries exist', () => {
     mockLinkedChildren = [makeLinkedChild()];
+    mockSearchParams = { profileId: 'child-1' };
     mockHooks({
       inventory: {
         global: { ...baseGlobal, totalSessions: 5, topicsMastered: 3 },
         subjects: [fullSubject],
       },
-    });
-    (useChildInventory as jest.Mock).mockReturnValue({
-      data: {
-        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 3 },
-        subjects: manySubjects,
-        currentlyWorkingOn: [],
-      },
-      isLoading: false,
-      isError: false,
-      isRefetching: false,
-      refetch: jest.fn(),
-    });
-
-    render(<ProgressScreen />);
-
-    screen.getByTestId('progress-subject-card-s1');
-    screen.getByTestId('progress-subject-card-s7');
-    screen.getByText('Subject 7');
-    screen.getAllByText('3/10 topics mastered');
-    expect(screen.queryByText(/Last studied/)).toBeNull();
-  });
-
-  it('does not render report cards for parent viewing child', () => {
-    mockLinkedChildren = [makeLinkedChild()];
-    mockHooks({
-      inventory: {
-        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 3 },
-        subjects: [fullSubject],
-      },
+      weeklyReports: [
+        {
+          id: 'weekly-child-1',
+          reportWeek: '2026-05-11',
+          viewedAt: null,
+          createdAt: '2026-05-17T00:00:00Z',
+          headlineStat: {
+            label: 'topics mastered',
+            value: 1,
+            comparison: '+1 this week',
+          },
+          thisWeek: {
+            totalSessions: 2,
+            totalActiveMinutes: 30,
+            topicsMastered: 1,
+            topicsExplored: 2,
+            vocabularyTotal: 0,
+            streakBest: 1,
+          },
+        },
+      ],
     });
     (useChildInventory as jest.Mock).mockReturnValue({
       data: {
@@ -911,11 +1126,13 @@ describe('ProgressScreen — progressive disclosure', () => {
 
     expect(screen.queryByTestId('progress-weekly-report-tracker')).toBeNull();
     expect(screen.queryByTestId('progress-monthly-report-tracker')).toBeNull();
-    screen.getByTestId('progress-view-all-reports');
+    screen.getByTestId('reports-list-card');
+    screen.getByTestId('progress-reports-link');
   });
 
   it('renders progress summary freshness states for parent viewing child', () => {
     mockLinkedChildren = [makeLinkedChild()];
+    mockSearchParams = { profileId: 'child-1' };
     mockHooks({
       inventory: {
         global: { ...baseGlobal, totalSessions: 5, topicsMastered: 3 },
@@ -957,6 +1174,7 @@ describe('ProgressScreen — progressive disclosure', () => {
 
   it('renders deterministic fallback when no progress summary exists', () => {
     mockLinkedChildren = [makeLinkedChild()];
+    mockSearchParams = { profileId: 'child-1' };
     mockHooks({
       inventory: {
         global: { ...baseGlobal, totalSessions: 5, topicsMastered: 3 },

@@ -151,6 +151,29 @@
       "greeting": "Hola, {{displayName}}",
       "accountLink": "Abrir cuenta",
       "intentHeader": "¿Qué necesitas ahora?",
+      "familySummary": {
+        "children_one": "{{count}} child",
+        "children_other": "{{count}} children",
+        "withParent_one": "You + {{count}} child",
+        "withParent_other": "You + {{count}} children",
+        "parentOnly": "You",
+        "withMinutes_one": "{{childCount}} · {{count}} min this week",
+        "withMinutes_other": "{{childCount}} · {{count}} min this week",
+        "withSessions_one": "{{childCount}} · {{count}} session this week",
+        "withSessions_other": "{{childCount}} · {{count}} sessions this week",
+        "noActivity": "{{childCount}} · no sessions this week",
+        "childMinutes_one": "Children: {{count}} min this week",
+        "childMinutes_other": "Children: {{count}} min this week",
+        "childSessions_one": "Children: {{count}} session this week",
+        "childSessions_other": "Children: {{count}} sessions this week",
+        "childNoActivity": "Children: no sessions this week",
+        "parentLearningWithTopic": "You: {{topicTitle}} in {{subjectName}}",
+        "parentLearningWithSubject": "You: {{subjectName}}",
+        "parentExampleLead": "You lead by example.",
+        "parentExampleNudge": "Show them how it's done: start a quick session.",
+        "attentionChild": "{{childName}} may need attention",
+        "profileLimit": "{{count}} of {{max}} profiles used"
+      },
       "encouragementNote": "Los nudges son ánimos suaves de una sola dirección.",
       "transitionNoticeTitle": "Ahora guías a {{childNames}}",
       "transitionNoticeBody": "Toca Inicio en cualquier momento para ver su progreso y tu aprendizaje.",
@@ -171,15 +194,15 @@
         "sessions_other": "{{count}} sesiones esta semana"
       },
       "tonight": {
-        "titleMorning": "Esta mañana",
-        "titleAfternoon": "Esta tarde",
-        "titleEvening": "Esta noche",
-        "promptWithTopic": "Pregunta a {{childName}}: ¿qué hizo que {{topic}} tuviera sentido hoy?",
-        "promptNoActivity": "Pregunta a {{childName}}: ¿qué haría que empezar fuera fácil esta noche?",
-        "promptFallback": "Pregunta a {{childName}}: ¿qué se sintió más fácil hoy que ayer?",
-        "promptTrickiestWithTopic": "Pregunta a {{childName}}: ¿cuál es la parte más difícil de {{topic}} ahora mismo?",
-        "promptTomorrow": "Pregunta a {{childName}}: ¿en qué deberíamos enfocarnos mañana?",
-        "promptCurious": "Pregunta a {{childName}}: ¿hay algo que les genere curiosidad?"
+        "titleMorning": "Ideas para conversar",
+        "titleAfternoon": "Ideas para conversar",
+        "titleEvening": "Ideas para conversar",
+        "promptWithTopic": "¿Qué hizo que {{topic}} tuviera sentido hoy?",
+        "promptNoActivity": "¿Qué haría que empezar fuera fácil esta noche?",
+        "promptFallback": "¿Qué se sintió más fácil hoy que ayer?",
+        "promptTrickiestWithTopic": "¿Cuál es la parte más difícil de {{topic}} ahora mismo?",
+        "promptTomorrow": "¿En qué deberíamos enfocarnos mañana?",
+        "promptCurious": "¿Hay algo que te genere curiosidad?"
       },
       "empty": {
         "title": "Your family dashboard starts here",
@@ -1269,6 +1292,9 @@
   },
   "progress": {
     "pageTitle": "Mi Viaje de Aprendizaje",
+    "pageTitleMine": "Mi progreso",
+    "pageTitleProfile": "Progreso de {{name}}",
+    "pageTitleFallbackName": "Tu hijo",
     "pageSubtitle": "Un progreso que refleja lo que realmente sabes.",
     "ownProfilePill": "Lo mío",
     "startLearning": "Empezar a aprender",
@@ -1385,6 +1411,8 @@
     },
     "stats": {
       "sessions": "{{count}} sesiones",
+      "practiceLessons_one": "{{count}} práctica",
+      "practiceLessons_other": "{{count}} prácticas",
       "streak": "racha de {{count}} días",
       "viewVocabCount": "Ver {{count}} palabras de vocabulario",
       "viewVocab": "Ver vocabulario",
@@ -1560,10 +1588,47 @@
         "vocabularyGrowth": "crecimiento de vocabulario"
       }
     },
+    "growthSnapshot": {
+      "latestWeek": "Última semana",
+      "recentWeeks": "Semanas recientes",
+      "sessions_one": "{{count}} sesión",
+      "sessions_other": "{{count}} sesiones",
+      "topicsExplored_one": "{{count}} tema explorado",
+      "topicsExplored_other": "{{count}} temas explorados",
+      "topicsLearned_one": "{{count}} tema aprendido",
+      "topicsLearned_other": "{{count}} temas aprendidos",
+      "topicsMastered_one": "{{count}} tema dominado",
+      "topicsMastered_other": "{{count}} temas dominados",
+      "wordsAdded_one": "{{count}} palabra añadida",
+      "wordsAdded_other": "{{count}} palabras añadidas",
+      "weekDetail": "{{sessions}} sesiones · {{time}} · {{topics}} temas · {{words}} palabras"
+    },
     "previousReports": {
       "title": "Previous reports",
       "subtitle": "Weekly and monthly snapshots from your learning.",
       "viewAll": "View all reports"
+    },
+    "latestReport": {
+      "title": "Latest report",
+      "open": "Open report",
+      "openWithDate": "Open report for {{date}}",
+      "empty": "Your next weekly or monthly report will appear here once there is enough learning to summarize.",
+      "error": "We couldn't load the latest report right now.",
+      "sessions": "Sessions",
+      "time": "Time",
+      "topics": "Topics",
+      "words": "Words",
+      "practiceLessons_one": "{{count}} practice lesson",
+      "practiceLessons_other": "{{count}} practice lessons",
+      "practicePoints_one": "{{count}} practice point",
+      "practicePoints_other": "{{count}} practice points"
+    },
+    "recentFocus": {
+      "title": "Recent focus",
+      "showAll": "Show all sessions",
+      "empty": "Recent sessions will appear here once learning gets going.",
+      "error": "We couldn't load recent sessions right now.",
+      "sessionFallback": "Studied {{date}}"
     },
     "loadingTitle": "Cargando tu ruta de aprendizaje",
     "loadTimeout": {

@@ -4,7 +4,11 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react-native';
-import type { DashboardData, Profile } from '@eduagent/schemas';
+import type {
+  DashboardData,
+  LearningResumeTarget,
+  Profile,
+} from '@eduagent/schemas';
 
 import { ParentHomeScreen } from './ParentHomeScreen';
 
@@ -22,6 +26,7 @@ jest.mock(
 
 let mockLinkedChildren: Profile[] = [];
 let mockDashboardData: DashboardData | undefined;
+let mockParentResumeTarget: LearningResumeTarget | null | undefined;
 
 jest.mock(
   '../../lib/profile' /* gc1-allow: profile context requires full ProfileProvider setup */,
@@ -47,7 +52,7 @@ jest.mock(
 jest.mock(
   '../../hooks/use-progress' /* gc1-allow: external hook boundary — wraps TanStack query that requires QueryClient */,
   () => ({
-    useLearningResumeTarget: () => ({ data: undefined }),
+    useLearningResumeTarget: () => ({ data: mockParentResumeTarget }),
   }),
 );
 
@@ -149,6 +154,21 @@ const CHILD_B = makeProfile({
   isOwner: false,
 });
 
+const makeResumeTarget = (
+  overrides: Partial<LearningResumeTarget> = {},
+): LearningResumeTarget => ({
+  subjectId: '11111111-1111-4111-8111-111111111111',
+  subjectName: 'Math',
+  topicId: '22222222-2222-4222-8222-222222222222',
+  topicTitle: 'Fractions',
+  sessionId: null,
+  resumeFromSessionId: null,
+  resumeKind: 'recent_topic',
+  lastActivityAt: '2026-05-15T08:00:00.000Z',
+  reason: 'recent_topic',
+  ...overrides,
+});
+
 async function waitForParentTransitionNotice(): Promise<void> {
   await waitFor(() => {
     screen.getByTestId('parent-transition-notice');
@@ -160,6 +180,7 @@ describe('ParentHomeScreen', () => {
     jest.clearAllMocks();
     mockLinkedChildren = [];
     mockDashboardData = undefined;
+    mockParentResumeTarget = undefined;
     capturedBannerProps = null;
   });
 
@@ -187,6 +208,11 @@ describe('ParentHomeScreen', () => {
     screen.getByTestId('parent-home-send-nudge-child-a');
     screen.getByTestId('parent-home-send-nudge-child-b');
     screen.getByText('Children');
+    screen.getByText('Your family');
+    screen.getByTestId('parent-home-family-summary');
+    screen.getByText("Show them how it's done: start a quick session.");
+    expect(screen.queryByTestId('child-accommodation-row-child-a')).toBeNull();
+    expect(screen.queryByTestId('child-accommodation-row-child-b')).toBeNull();
   });
 
   it('routes the child card header to the child profile detail screen', async () => {
@@ -202,7 +228,7 @@ describe('ParentHomeScreen', () => {
     });
   });
 
-  it('routes the progress action to child progress', async () => {
+  it('routes the progress action to the child quick progress screen', async () => {
     mockLinkedChildren = [CHILD_A];
 
     render(<ParentHomeScreen activeProfile={makeProfile()} />);
@@ -210,7 +236,7 @@ describe('ParentHomeScreen', () => {
 
     fireEvent.press(screen.getByTestId('parent-home-child-progress-child-a'));
     expect(mockPush).toHaveBeenLastCalledWith({
-      pathname: '/(app)/progress',
+      pathname: '/(app)/child/[profileId]',
       params: { profileId: 'child-a' },
     });
   });
@@ -227,11 +253,12 @@ describe('ParentHomeScreen', () => {
     expect(mockPush).toHaveBeenLastCalledWith('/(app)/child/child-a/reports');
   });
 
-  it('keeps own learning out of parent Home because it has its own tab', () => {
+  it('keeps parent learning out of the family summary when there is no parent activity', () => {
     render(<ParentHomeScreen activeProfile={makeProfile()} />);
 
     expect(screen.queryByTestId('parent-home-own-learning')).toBeNull();
     expect(screen.queryByText('Continue your own learning')).toBeNull();
+    expect(screen.queryByText('You: Fractions in Math')).toBeNull();
   });
 
   it('shows an add-first-child state when no children are linked', () => {
@@ -291,14 +318,65 @@ describe('ParentHomeScreen', () => {
     await waitForParentTransitionNotice();
 
     screen.getByTestId('parent-home-tonight-section');
-    screen.getByText('Ask Emma: what made Fractions click today?');
+    screen.getByText('Conversation starters');
+    screen.getByText('What made Fractions click today?');
+    expect(
+      screen.queryByText('Emma: What made Fractions click today?'),
+    ).toBeNull();
     screen.getByText('Fractions · 18 min this week');
+    screen.getByText('1 child · 18 min this week');
+    screen.getByText('2 of 5 profiles used');
 
     fireEvent.press(screen.getByTestId('parent-home-tonight-child-a-primary'));
     expect(mockPush).toHaveBeenLastCalledWith({
-      pathname: '/(app)/progress',
+      pathname: '/(app)/child/[profileId]',
       params: { profileId: 'child-a' },
     });
+  });
+
+  it('includes the parent in the family summary when they have been learning', async () => {
+    mockLinkedChildren = [CHILD_A];
+    mockParentResumeTarget = makeResumeTarget();
+    mockDashboardData = {
+      children: [
+        {
+          profileId: 'child-a',
+          displayName: 'Emma',
+          consentStatus: null,
+          respondedAt: null,
+          summary: 'Emma is building confidence.',
+          sessionsThisWeek: 2,
+          sessionsLastWeek: 1,
+          totalTimeThisWeek: 18,
+          totalTimeLastWeek: 8,
+          exchangesThisWeek: 10,
+          exchangesLastWeek: 5,
+          trend: 'up',
+          subjects: [
+            { subjectId: 'subject-a', name: 'Math', retentionStatus: 'strong' },
+          ],
+          guidedVsImmediateRatio: 0.5,
+          retentionTrend: 'improving',
+          totalSessions: 4,
+          weeklyHeadline: undefined,
+          currentlyWorkingOn: ['Fractions'],
+          progress: null,
+          currentStreak: 0,
+          longestStreak: 0,
+          totalXp: 0,
+        },
+      ],
+      pendingNotices: [],
+      demoMode: false,
+    };
+
+    render(<ParentHomeScreen activeProfile={makeProfile()} />);
+    await waitForParentTransitionNotice();
+
+    screen.getByText('You + 1 child');
+    screen.getByText('Children: 18 min this week');
+    screen.getByText('You: Fractions in Math');
+    screen.getByText('You lead by example.');
   });
 
   it('ranks multi-child tonight prompts by sessions — most active child appears first', async () => {
@@ -347,7 +425,7 @@ describe('ParentHomeScreen', () => {
           subjects: [],
           guidedVsImmediateRatio: 0,
           retentionTrend: 'stable',
-          totalSessions: 0,
+          totalSessions: 3,
           weeklyHeadline: undefined,
           currentlyWorkingOn: [],
           progress: null,
@@ -369,11 +447,14 @@ describe('ParentHomeScreen', () => {
     const liamPrompt = screen.getByTestId(
       'parent-home-tonight-child-b-primary',
     );
+    screen.getByText('Emma: What made Math click today?');
+    screen.getByText('Liam: What would make starting feel easy tonight?');
     const allPrompts = screen.getAllByTestId(/^parent-home-tonight-/);
     // Emma (5 sessions) must appear before Liam (0 sessions) regardless of input order
     expect(allPrompts.indexOf(emmaPrompt)).toBeLessThan(
       allPrompts.indexOf(liamPrompt),
     );
+    screen.getByText('Liam may need attention');
   });
 
   it('shows ParentTransitionNotice after at least one child is linked', async () => {
