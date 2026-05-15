@@ -459,6 +459,14 @@ export function ChatShell({
     }
   }, [isStreaming, isListening, stopListening, startListening, stopSpeaking]);
 
+  const handleEnableVoiceAndRecord = useCallback(async () => {
+    if (isStreaming) return;
+    if (!isVoiceEnabled) {
+      setVoiceEnabled(true);
+    }
+    await handleVoicePress();
+  }, [handleVoicePress, isStreaming, isVoiceEnabled, setVoiceEnabled]);
+
   // BUG-359: Gate to prevent late STT updates from re-populating the
   // transcript after the user taps Discard. Set on discard, cleared on
   // re-record or new recording.
@@ -947,11 +955,8 @@ export function ChatShell({
               // can't distinguish the two states. Use a distinct testID.
               <Pressable
                 testID="voice-enable-button"
-                onPress={handleVoicePress}
-                onLongPress={() => {
-                  setIsVoiceEnabled(true);
-                  void handleVoicePress();
-                }}
+                onPress={() => void handleEnableVoiceAndRecord()}
+                onLongPress={() => void handleEnableVoiceAndRecord()}
                 disabled={
                   isStreaming || speechStatus === 'requesting_permission'
                 }

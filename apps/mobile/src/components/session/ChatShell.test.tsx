@@ -357,6 +357,20 @@ describe('ChatShell', () => {
       expect(mockStartListening).toHaveBeenCalled();
     });
 
+    it('enables voice mode and starts listening from the compact mic button', async () => {
+      const onInputModeChange = jest.fn();
+      renderChatShell({ onInputModeChange });
+
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('voice-enable-button'));
+      });
+
+      expect(onInputModeChange).toHaveBeenCalledWith('voice');
+      expect(mockStartListening).toHaveBeenCalled();
+      screen.getByTestId('voice-record-button');
+      expect(screen.queryByTestId('voice-enable-button')).toBeNull();
+    });
+
     it('stops TTS when starting to record', async () => {
       renderChatShell({ verificationType: 'teach_back' });
 
