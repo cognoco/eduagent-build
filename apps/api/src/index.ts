@@ -3,7 +3,11 @@ import { cors } from 'hono/cors';
 import { HTTPException } from 'hono/http-exception';
 import * as Sentry from '@sentry/cloudflare';
 
-import { ERROR_CODES, LlmStreamError } from '@eduagent/schemas';
+import {
+  ERROR_CODES,
+  LlmStreamError,
+  type SubscriptionTier,
+} from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 
 import { captureException } from './services/sentry';
@@ -116,6 +120,7 @@ type Variables = {
   profileId: string;
   profileMeta: ProfileMeta | undefined;
   subscriptionId: string;
+  subscriptionTier: SubscriptionTier;
   llmTier: LLMTier;
 };
 

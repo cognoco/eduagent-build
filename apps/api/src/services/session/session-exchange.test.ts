@@ -2,6 +2,7 @@ import {
   buildExchangeHistory,
   mergeMemoryContexts,
   computeCorrectStreak,
+  resolveExchangeLlmRouting,
   type ExchangeHistoryEvent,
 } from './session-exchange';
 
@@ -304,5 +305,44 @@ describe('computeCorrectStreak', () => {
     // Scanning backwards: first event (index 2) = correct → streak 1;
     // second event (index 1) = false → break. Result: 1.
     expect(computeCorrectStreak(events, 2)).toBe(1);
+  });
+});
+
+describe('resolveExchangeLlmRouting', () => {
+  it('keeps plus on standard routing below the hard-turn rung', () => {
+    expect(
+      resolveExchangeLlmRouting({
+        subscriptionTier: 'plus',
+        requestedLlmTier: 'standard',
+        effectiveRung: 3,
+      }),
+    ).toEqual({ llmTier: 'standard' });
+  });
+
+  it('prefers Claude for plus hard turns at rung 4+', () => {
+    expect(
+      resolveExchangeLlmRouting({
+        subscriptionTier: 'plus',
+        requestedLlmTier: 'standard',
+        effectiveRung: 4,
+      }),
+    ).toEqual({
+      llmTier: 'standard',
+      preferredProvider: 'anthropic',
+      routingReason: 'plus_hard_turn_claude',
+    });
+  });
+
+  it('does not override explicit premium profiles or add-ons', () => {
+    expect(
+      resolveExchangeLlmRouting({
+        subscriptionTier: 'plus',
+        requestedLlmTier: 'premium',
+        effectiveRung: 4,
+      }),
+    ).toEqual({
+      llmTier: 'premium',
+      routingReason: 'premium_profile_or_addon',
+    });
   });
 });

@@ -13,6 +13,7 @@ import type {
   ChatMessage,
   EscalationRung,
   MessagePart,
+  PreferredLlmProvider,
   RouteResult,
   StreamResult,
 } from './llm';
@@ -133,6 +134,10 @@ export interface ExchangeContext {
   homeworkMode?: HomeworkMode;
   /** Subscription-derived LLM tier — controls model routing (flash/standard/premium) */
   llmTier?: LLMTier;
+  /** Optional provider preference for experiment-style routing; router still falls back safely. */
+  preferredLlmProvider?: PreferredLlmProvider;
+  /** Human-readable routing reason stored in session metadata for observability. */
+  llmRoutingReason?: string;
   // BKT-C.1 — profile-level personalization surfaced to the router. Separate
   // from the per-subject `nativeLanguage` (used for L1-aware grammar in
   // language-learning flows). `conversationLanguage` applies universally; in
@@ -217,6 +222,7 @@ export interface ExchangeStreamResult {
   newEscalationRung: EscalationRung;
   provider: string;
   model: string;
+  fallbackUsed?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -328,6 +334,7 @@ export async function processExchange(
     context.escalationRung,
     {
       llmTier: context.llmTier,
+      preferredProvider: context.preferredLlmProvider,
       ageBracket,
       // BKT-C.1 — forward profile-level personalization to the router so the
       // safety preamble carries it on every provider uniformly.
@@ -396,6 +403,7 @@ export async function streamExchange(
     context.escalationRung,
     {
       llmTier: context.llmTier,
+      preferredProvider: context.preferredLlmProvider,
       ageBracket,
       conversationLanguage: context.conversationLanguage,
       pronouns: context.pronouns,
@@ -412,6 +420,9 @@ export async function streamExchange(
     newEscalationRung: context.escalationRung,
     provider: result.provider,
     model: result.model,
+    get fallbackUsed() {
+      return result.fallbackUsed;
+    },
   };
 }
 

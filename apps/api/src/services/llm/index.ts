@@ -17,6 +17,7 @@ export { getTextContent } from './types';
 export { extractFirstJsonObject } from './extract-json';
 export { normalizeStopReason } from './stop-reason';
 export type { StopReason, StopReasonProvider } from './stop-reason';
+export type { PreferredLlmProvider } from './router';
 export {
   parseEnvelope,
   isRecognizedMarker,

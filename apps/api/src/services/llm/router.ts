@@ -17,6 +17,8 @@ import { createLogger } from '../logger';
 
 const logger = createLogger();
 
+export type PreferredLlmProvider = 'gemini' | 'openai' | 'anthropic';
+
 // ---------------------------------------------------------------------------
 // [LLM-TRUNCATE-01] llm.stop_reason metric emission (Phase 1 Task 3)
 //
@@ -222,7 +224,13 @@ export const ANTHROPIC_SONNET_MODEL = 'claude-sonnet-4-20250514';
 function getModelConfig(
   rung: EscalationRung,
   llmTier: LLMTier = 'standard',
+  preferredProvider?: PreferredLlmProvider,
 ): ModelConfig {
+  const preferredConfig = preferredProvider
+    ? getPreferredProviderConfig(rung, llmTier, preferredProvider)
+    : null;
+  if (preferredConfig) return preferredConfig;
+
   // Premium tier: route to Anthropic Sonnet when the provider is registered.
   // Falls through to standard routing if Anthropic keys are not configured.
   if (llmTier === 'premium' && providers.has('anthropic')) {
@@ -269,6 +277,36 @@ function getModelConfig(
   };
 }
 
+function getPreferredProviderConfig(
+  rung: EscalationRung,
+  llmTier: LLMTier,
+  preferredProvider: PreferredLlmProvider,
+): ModelConfig | null {
+  if (!providers.has(preferredProvider)) return null;
+
+  const isLight = llmTier === 'flash' || rung <= 2;
+  switch (preferredProvider) {
+    case 'gemini':
+      return {
+        provider: 'gemini',
+        model: isLight ? 'gemini-2.5-flash' : 'gemini-2.5-pro',
+        maxTokens: MIN_REPLY_MAX_TOKENS,
+      };
+    case 'openai':
+      return {
+        provider: 'openai',
+        model: isLight ? 'gpt-4o-mini' : 'gpt-4o',
+        maxTokens: MIN_REPLY_MAX_TOKENS,
+      };
+    case 'anthropic':
+      return {
+        provider: 'anthropic',
+        model: ANTHROPIC_SONNET_MODEL,
+        maxTokens: MIN_REPLY_MAX_TOKENS,
+      };
+  }
+}
+
 /**
  * Fallback config when primary provider fails. Returns null if no fallback.
  *
@@ -282,6 +320,15 @@ function getFallbackConfig(
   rung: EscalationRung,
 ): ModelConfig | null {
   if (primary.provider === 'anthropic' && providers.has('gemini')) {
+    const isLight = rung <= 2;
+    return {
+      provider: 'gemini',
+      model: isLight ? 'gemini-2.5-flash' : 'gemini-2.5-pro',
+      maxTokens: MIN_REPLY_MAX_TOKENS,
+    };
+  }
+
+  if (primary.provider === 'openai' && providers.has('gemini')) {
     const isLight = rung <= 2;
     return {
       provider: 'gemini',
@@ -494,6 +541,7 @@ export async function routeAndCall(
   _options?: {
     correlationId?: string;
     llmTier?: LLMTier;
+    preferredProvider?: PreferredLlmProvider;
     ageBracket?: AgeBracket;
     // BKT-C.1 — profile-level personalization. Optional so existing callers
     // compile unchanged; wired through session-exchange.ts from the active
@@ -512,7 +560,11 @@ export async function routeAndCall(
     conversationLanguage: _options?.conversationLanguage,
     pronouns: _options?.pronouns,
   });
-  const config = getModelConfig(rung, _options?.llmTier);
+  const config = getModelConfig(
+    rung,
+    _options?.llmTier,
+    _options?.preferredProvider,
+  );
   const provider = providers.get(config.provider);
   if (!provider) {
     throw new Error(`No provider registered for: ${config.provider}`);
@@ -783,6 +835,7 @@ export async function routeAndStream(
   rung: EscalationRung = 1,
   options?: {
     llmTier?: LLMTier;
+    preferredProvider?: PreferredLlmProvider;
     ageBracket?: AgeBracket;
     // BKT-C.1 — same personalization as routeAndCall.
     conversationLanguage?: ConversationLanguage;
@@ -796,7 +849,11 @@ export async function routeAndStream(
     conversationLanguage: options?.conversationLanguage,
     pronouns: options?.pronouns,
   });
-  const config = getModelConfig(rung, options?.llmTier);
+  const config = getModelConfig(
+    rung,
+    options?.llmTier,
+    options?.preferredProvider,
+  );
   const provider = providers.get(config.provider);
   if (!provider) {
     throw new Error(`No provider registered for: ${config.provider}`);
