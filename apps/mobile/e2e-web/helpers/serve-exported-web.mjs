@@ -1,5 +1,6 @@
 import http from 'node:http';
 import path from 'node:path';
+import { createRequire } from 'node:module';
 import { spawn } from 'node:child_process';
 import { createReadStream } from 'node:fs';
 import { access, readFile, writeFile, rename, rm } from 'node:fs/promises';
@@ -50,8 +51,7 @@ async function startServer() {
   // For a local static file server the event-loop cost is negligible.
   const server = http.createServer((request, response) => {
     const url = new URL(request.url ?? '/', `http://${host}:${port}`);
-    const safePath = path.normalize(url.pathname).replace(/^(\.\.[/\\])+/, '');
-    let candidate = path.join(distDir, safePath);
+    let candidate = path.join(distDir, path.normalize(url.pathname));
 
     // [I-17] Path traversal containment
     const resolvedCandidate = path.resolve(candidate);
@@ -116,7 +116,6 @@ const envFilesToOverride = ['.env.local', '.env.development.local'].map(
     backupPath: path.join(projectRoot, `${name}.e2e-bak`),
   })
 );
-import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const { defaultApiUrl } = require('./e2e-defaults.js');
 const apiUrl = process.env.PLAYWRIGHT_API_URL ?? defaultApiUrl;

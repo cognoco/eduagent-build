@@ -46,9 +46,11 @@ PLAYWRIGHT_SKIP_LOCAL_API=1 doppler run --project mentomate --config stg -- \
 
 # Wait for "Static Expo web preview ready on http://127.0.0.1:19006"
 
-# Terminal 2: run tests
-CI=1 PLAYWRIGHT_SKIP_LOCAL_API=1 doppler run --project mentomate --config stg -- \
-  pnpm run test:e2e:web --workers=2
+# Terminal 2: run tests (--retries and --workers are CLI overrides;
+# do NOT set CI=1 — it would set reuseExistingServer=false and reject
+# the already-running server)
+PLAYWRIGHT_SKIP_LOCAL_API=1 doppler run --project mentomate --config stg -- \
+  pnpm run test:e2e:web --retries=1 --workers=2
 ```
 
 ### CI impact
