@@ -52,7 +52,7 @@ import { insertSessionEvent } from './session-events';
 import { getSubject } from '../subject';
 import { createPendingSessionSummary } from '../summaries';
 import { incrementSummarySkips } from '../settings';
-import { persistBookTopics } from '../curriculum';
+import { claimBookForGeneration, persistBookTopics } from '../curriculum';
 import { generateBookTopics } from '../book-generation';
 import { getProfileAge } from '../profile';
 import { computeActiveSeconds } from './session-context-builders';
@@ -245,6 +245,7 @@ export async function startSession(
 
 const FIRST_CURRICULUM_SESSION_WAIT_MS = 25_000;
 const FIRST_CURRICULUM_SESSION_POLL_MS = 750;
+const BOOK_GENERATION_TIMEOUT_MS = 20_000;
 export const MATCHER_TIMEOUT_MS = 1500;
 export const MATCH_CONFIDENCE_FLOOR = 0.6;
 
@@ -413,46 +414,63 @@ async function materializeFocusedBookTopics(
   subjectId: string,
   bookId: string,
 ): Promise<void> {
-  const [book] = await db
-    .select({
-      id: curriculumBooks.id,
-      title: curriculumBooks.title,
-      description: curriculumBooks.description,
-    })
-    .from(curriculumBooks)
-    .innerJoin(subjects, eq(subjects.id, curriculumBooks.subjectId))
-    .where(
-      and(
-        eq(curriculumBooks.id, bookId),
-        eq(curriculumBooks.subjectId, subjectId),
-        eq(subjects.profileId, profileId),
-      ),
-    )
-    .limit(1);
+  const book = await claimBookForGeneration(db, profileId, subjectId, bookId);
 
   if (!book) {
-    throw new NotFoundError('Book');
+    const [existingBook] = await db
+      .select({ id: curriculumBooks.id })
+      .from(curriculumBooks)
+      .innerJoin(subjects, eq(subjects.id, curriculumBooks.subjectId))
+      .where(
+        and(
+          eq(curriculumBooks.id, bookId),
+          eq(curriculumBooks.subjectId, subjectId),
+          eq(subjects.profileId, profileId),
+        ),
+      )
+      .limit(1);
+    if (!existingBook) {
+      throw new NotFoundError('Book');
+    }
+    return;
   }
 
-  const learnerAge = await getProfileAge(db, profileId);
-  const result = await generateBookTopics(
-    book.title,
-    book.description ?? '',
-    learnerAge,
-  );
+  try {
+    const learnerAge = await getProfileAge(db, profileId);
+    const result = await Promise.race([
+      generateBookTopics(book.title, book.description ?? '', learnerAge),
+      new Promise<never>((_resolve, reject) => {
+        setTimeout(
+          () => reject(new CurriculumSessionNotReadyError()),
+          BOOK_GENERATION_TIMEOUT_MS,
+        );
+      }),
+    ]);
 
-  if (result.topics.length === 0) {
-    throw new CurriculumSessionNotReadyError();
+    if (result.topics.length === 0) {
+      throw new CurriculumSessionNotReadyError();
+    }
+
+    await persistBookTopics(
+      db,
+      profileId,
+      subjectId,
+      bookId,
+      result.topics,
+      result.connections,
+    );
+  } catch (error) {
+    await db
+      .update(curriculumBooks)
+      .set({ topicsGenerated: false, updatedAt: new Date() })
+      .where(
+        and(
+          eq(curriculumBooks.id, bookId),
+          eq(curriculumBooks.subjectId, subjectId),
+        ),
+      );
+    throw error;
   }
-
-  await persistBookTopics(
-    db,
-    profileId,
-    subjectId,
-    bookId,
-    result.topics,
-    result.connections,
-  );
 }
 
 async function verifyTopicBelongsToSubject(

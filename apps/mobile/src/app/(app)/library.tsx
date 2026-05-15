@@ -530,13 +530,13 @@ export default function LibraryScreen() {
           </Text>
           <Pressable
             onPress={() =>
-              router.push({
+              router.replace({
                 pathname: '/create-subject',
                 params: { returnTo: 'library' },
               } as Href)
             }
             className="bg-primary rounded-button px-6 py-3 mt-6 items-center"
-            testID="library-empty-go-home"
+            testID="library-empty-create-subject"
           >
             <Text className="text-text-inverse text-body font-semibold">
               {t('library.empty.goHome')}

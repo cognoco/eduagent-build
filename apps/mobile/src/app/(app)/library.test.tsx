@@ -19,6 +19,7 @@ jest.mock(
 );
 
 const mockPush = jest.fn();
+const mockReplace = jest.fn();
 const mockUseSubjects = jest.fn();
 const mockUseOverallProgress = jest.fn();
 const mockUseAllBooks = jest.fn();
@@ -26,7 +27,7 @@ const mockUseLibrarySearch = jest.fn();
 const mockUpdateSubjectMutateAsync = jest.fn();
 
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ push: mockPush, replace: jest.fn() }),
+  useRouter: () => ({ push: mockPush, replace: mockReplace }),
 }));
 
 jest.mock('react-native-safe-area-context', () => ({
@@ -363,9 +364,9 @@ describe('LibraryScreen', () => {
 
     render(<LibraryScreen />, { wrapper: TestWrapper });
 
-    fireEvent.press(screen.getByTestId('library-empty-go-home'));
+    fireEvent.press(screen.getByTestId('library-empty-create-subject'));
 
-    expect(mockPush).toHaveBeenCalledWith({
+    expect(mockReplace).toHaveBeenCalledWith({
       pathname: '/create-subject',
       params: { returnTo: 'library' },
     });
