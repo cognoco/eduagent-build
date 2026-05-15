@@ -1,7 +1,7 @@
-# Progress analytics - index, subject detail, milestones empty state
+# Progress analytics - index, subject detail, recent sessions expansion
 # Tags: nightly, progress
 # Seed: learning-active
-# Covers: progress index rendering, subject drill-down, milestones empty state
+# Covers: progress index rendering, subject drill-down, recent sessions list
 # Usage: ./scripts/seed-and-run.sh learning-active flows/progress/progress-analytics.yaml
 appId: com.mentomate.app
 tags:
@@ -37,30 +37,32 @@ tags:
 - tapOn:
     id: "progress-subject-back"
 
+- scrollUntilVisible:
+    element:
+      id: "progress-show-all-sessions"
+    direction: DOWN
+    timeout: 10000
+
 - extendedWaitUntil:
     visible:
-      id: "progress-milestones-see-all"
+      id: "progress-show-all-sessions"
     timeout: 10000
 
 - tapOn:
-    id: "progress-milestones-see-all"
+    id: "progress-show-all-sessions"
+
+- scrollUntilVisible:
+    element:
+      id: "recent-sessions-list"
+    direction: DOWN
+    timeout: 10000
 
 - extendedWaitUntil:
     visible:
-      id: "milestones-back"
+      id: "recent-sessions-list"
     timeout: 10000
 
 - assertVisible:
-    id: "milestones-empty"
+    id: "recent-sessions-list"
 
-- takeScreenshot: 03-milestones-empty
-
-- tapOn:
-    id: "milestones-back"
-
-- extendedWaitUntil:
-    visible:
-      id: "journey-subject-${SUBJECT_ID}"
-    timeout: 10000
-
-- takeScreenshot: 04-back-to-index
+- takeScreenshot: 03-recent-sessions-expanded
