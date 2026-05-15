@@ -449,6 +449,30 @@ describe('metering middleware', () => {
       expect(mockDecrementQuota).not.toHaveBeenCalled();
     });
 
+    it('rejects unresolved profile-only LLM routes before quota lookup/decrement', async () => {
+      const { findOwnerProfile } = jest.requireMock('../services/profile') as {
+        findOwnerProfile: jest.Mock;
+      };
+      findOwnerProfile.mockResolvedValueOnce(null);
+
+      const res = await app.request(
+        '/v1/dictation/prepare-homework',
+        {
+          method: 'POST',
+          headers: makeAuthHeaders(),
+          body: JSON.stringify({ text: 'Hello world.' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.code).toBe('VALIDATION_ERROR');
+      expect(mockEnsureFreeSubscription).not.toHaveBeenCalled();
+      expect(mockGetQuotaPool).not.toHaveBeenCalled();
+      expect(mockDecrementQuota).not.toHaveBeenCalled();
+    });
+
     it('rejects non-owner child-profile LLM requests before quota lookup/decrement', async () => {
       const { getProfile } = jest.requireMock('../services/profile') as {
         getProfile: jest.Mock;

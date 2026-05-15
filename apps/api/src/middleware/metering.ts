@@ -105,6 +105,11 @@ const LLM_ROUTE_PATTERNS_POST_ONLY = [
   /\/sessions\/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\/retry-filing\/?$/,
 ];
 
+const PROFILE_REQUIRED_BEFORE_METERING_PATTERNS = [
+  /\/dictation\/prepare-homework\/?$/,
+  /\/dictation\/review\/?$/,
+];
+
 const IDEMPOTENT_SESSION_ROUTE_PATTERNS = [
   /\/sessions\/[^/]+\/messages\/?$/,
   /\/sessions\/[^/]+\/stream\/?$/,
@@ -122,9 +127,25 @@ function isLlmRoute(path: string, method: string): boolean {
   );
 }
 
+function shouldReturnProfileRequiredBeforeMetering(path: string): boolean {
+  return PROFILE_REQUIRED_BEFORE_METERING_PATTERNS.some((pattern) =>
+    pattern.test(path),
+  );
+}
+
 function isIdempotentSessionRoute(path: string): boolean {
   return IDEMPOTENT_SESSION_ROUTE_PATTERNS.some((pattern) =>
     pattern.test(path),
+  );
+}
+
+function profileRequiredResponse(c: Context<MeteringEnv>): Response {
+  return c.json(
+    {
+      code: ERROR_CODES.VALIDATION_ERROR,
+      message: 'Profile required — no profile resolved for this request',
+    },
+    400,
   );
 }
 
@@ -280,11 +301,24 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
     const freeTier = getTierConfig('free');
     const profileMeta = c.get('profileMeta');
     const profileId = c.get('profileId');
+    const proxyModeHeader = c.req.header('X-Proxy-Mode') === 'true';
+
+    if (
+      (!profileId || !profileMeta) &&
+      !proxyModeHeader &&
+      shouldReturnProfileRequiredBeforeMetering(c.req.path)
+    ) {
+      return profileRequiredResponse(c);
+    }
 
     // Metering runs before route handlers. Run the proxy guard here too so a
     // parent viewing a child profile cannot burn quota on a request that the
     // endpoint would later reject.
     assertNotProxyMode(c);
+
+    if (!profileId) {
+      return profileRequiredResponse(c);
+    }
 
     const idempotentReplay = await maybeReplayIdempotentSessionRequest(
       c,
