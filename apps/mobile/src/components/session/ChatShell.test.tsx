@@ -25,8 +25,9 @@ jest.mock('@react-navigation/native', () => ({
   useIsFocused: () => mockIsFocused,
 }));
 
+let mockSafeAreaInsets = { top: 0, bottom: 0, left: 0, right: 0 };
 jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+  useSafeAreaInsets: () => mockSafeAreaInsets,
 }));
 
 // prettier-ignore
@@ -126,6 +127,7 @@ function renderChatShell(
 // microtasks) under fake-time. Removed.
 beforeEach(() => {
   jest.clearAllMocks();
+  mockSafeAreaInsets = { top: 0, bottom: 0, left: 0, right: 0 };
   mockGetMicrophonePermissionStatus.mockResolvedValue({
     granted: true,
     canAskAgain: true,
@@ -176,7 +178,9 @@ describe('ChatShell', () => {
     // [BUG-965] Voice-OFF state shows the long-press-to-enable button, NOT
     // the recording button. Distinct testIDs let E2E flows assert each
     // state's presence/absence without ambiguity.
-    screen.getByTestId('voice-enable-button');
+    const button = screen.getByTestId('voice-enable-button');
+    expect(button.props.className).toContain('h-[52px]');
+    expect(button.props.className).toContain('w-[52px]');
     expect(screen.queryByTestId('voice-record-button')).toBeNull();
   });
 
@@ -223,8 +227,26 @@ describe('ChatShell', () => {
   it('renders text input and send button', () => {
     renderChatShell();
 
-    screen.getByTestId('chat-input');
-    screen.getByTestId('send-button');
+    const input = screen.getByTestId('chat-input');
+    const send = screen.getByTestId('send-button');
+    expect(input.props.className).toContain('min-h-[52px]');
+    expect(send.props.className).toContain('h-[52px]');
+    expect(send.props.className).toContain('w-[52px]');
+  });
+
+  it('keeps bottom safe-area padding below quick tools, not between tools and input', () => {
+    const { Text } = require('react-native');
+    mockSafeAreaInsets = { top: 0, bottom: 34, left: 0, right: 0 };
+    renderChatShell({
+      belowInput: <Text testID="quick-tools">Quick tools</Text>,
+    });
+
+    const row = screen.getByTestId('chat-input-row');
+    expect(row.props.style).toEqual(
+      expect.arrayContaining([expect.objectContaining({ paddingBottom: 8 })]),
+    );
+    const belowInputSafeArea = screen.getByTestId('below-input-safe-area');
+    expect(belowInputSafeArea.props.style).toEqual({ paddingBottom: 34 });
   });
 
   it('calls onSend when send button is pressed with text', () => {

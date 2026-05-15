@@ -910,12 +910,12 @@ export function ChatShell({
             aria-hidden={isWebDormant ? true : undefined}
             tabIndex={isWebDormant ? -1 : undefined}
             style={[
-              { paddingBottom: Math.max(insets.bottom, 8) },
+              { paddingBottom: belowInput ? 8 : Math.max(insets.bottom, 8) },
               isWebDormant ? { display: 'none' } : undefined,
             ]}
           >
             <TextInput
-              className="flex-1 bg-background rounded-input px-4 py-3 text-body text-text-primary me-2"
+              className="min-h-[52px] flex-1 bg-background rounded-input px-4 py-3 text-body text-text-primary me-2"
               placeholder={resolvedPlaceholder}
               placeholderTextColor={colors.muted}
               value={input}
@@ -960,7 +960,7 @@ export function ChatShell({
                 disabled={
                   isStreaming || speechStatus === 'requesting_permission'
                 }
-                className="w-9 h-9 rounded-full bg-surface-elevated items-center justify-center me-2"
+                className="h-[52px] w-[52px] rounded-input bg-surface-elevated items-center justify-center me-2"
                 accessibilityLabel="Enable voice message"
                 accessibilityRole="button"
               >
@@ -977,7 +977,7 @@ export function ChatShell({
               // guard — belt-and-braces against any path that bypasses the
               // wrapping View's pointerEvents/aria-hidden treatment.
               disabled={!input.trim() || isStreaming || isWebDormant}
-              className={`rounded-button px-5 py-3 min-h-[44px] min-w-[44px] items-center justify-center ${
+              className={`h-[52px] w-[52px] rounded-button items-center justify-center ${
                 input.trim() && !isStreaming && !isWebDormant
                   ? 'bg-primary'
                   : 'bg-surface-elevated'
@@ -999,7 +999,15 @@ export function ChatShell({
           </View>
         </View>
       )}
-      {belowInput}
+      {belowInput ? (
+        <View
+          className="bg-surface"
+          style={{ paddingBottom: Math.max(insets.bottom, 8) }}
+          testID="below-input-safe-area"
+        >
+          {belowInput}
+        </View>
+      ) : null}
     </KeyboardAvoidingView>
   );
 }

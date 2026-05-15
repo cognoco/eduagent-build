@@ -44,7 +44,9 @@ describe('VoiceRecordButton', () => {
       />,
     );
 
-    screen.getByTestId('voice-record-button');
+    const button = screen.getByTestId('voice-record-button');
+    expect(button.props.className).toContain('h-[52px]');
+    expect(button.props.className).toContain('w-[52px]');
     // Icon is a11y-hidden — must use includeHiddenElements to find it
     screen.getByText('mic', { includeHiddenElements: true });
   });

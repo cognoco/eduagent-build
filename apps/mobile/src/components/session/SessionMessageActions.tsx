@@ -120,33 +120,32 @@ export function SessionMessageActions({
   }
 
   return (
-    <View className="gap-2">
-      {messageControlChips.length > 0 && (
-        <View className="flex-row flex-wrap gap-2">
-          {messageControlChips.map((chip) => {
-            return (
-              <Pressable
-                key={`${message.id}-${chip.id}`}
-                onPress={() => void handleQuickChip(chip.id, message.id)}
-                disabled={isStreaming}
-                className="rounded-full bg-surface-elevated px-3 py-1.5"
-                testID={`quick-chip-${chip.id}`}
-                // [BUG-874] Without an explicit role + label, screen readers
-                // and keyboard users hear plain text for these chips. RN's
-                // accessibilityRole="button" maps to role="button" on web.
-                accessibilityRole="button"
-                accessibilityLabel={chip.label}
-              >
-                <Text className="text-caption font-semibold text-text-secondary">
-                  {chip.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      )}
+    <View className="flex-row flex-wrap gap-2 items-center">
+      {messageControlChips.map((chip) => {
+        return (
+          <Pressable
+            key={`${message.id}-${chip.id}`}
+            onPress={() => void handleQuickChip(chip.id, message.id)}
+            disabled={isStreaming}
+            className="rounded-full bg-surface-elevated px-3 py-1.5"
+            testID={`quick-chip-${chip.id}`}
+            // [BUG-874] Without an explicit role + label, screen readers
+            // and keyboard users hear plain text for these chips. RN's
+            // accessibilityRole="button" maps to role="button" on web.
+            accessibilityRole="button"
+            accessibilityLabel={chip.label}
+          >
+            <Text className="text-caption font-semibold text-text-secondary">
+              {chip.label}
+            </Text>
+          </Pressable>
+        );
+      })}
       {showFeedbackButtons && (
-        <View className="flex-row flex-wrap gap-2 items-center">
+        <View
+          className="ms-auto flex-row gap-2 items-center"
+          testID={`message-feedback-controls-${feedbackTestIdSuffix}`}
+        >
           {/* [BUG-874] Each feedback chip needs explicit role + label so
               screen readers announce them as interactive buttons rather than
               plain text. accessibilityState.selected reflects the toggle
@@ -156,8 +155,8 @@ export function SessionMessageActions({
             disabled={feedbackState === 'incorrect' || isStreaming}
             className={
               feedbackState === 'helpful'
-                ? 'rounded-full bg-primary/15 px-3 py-1.5'
-                : 'rounded-full bg-surface-elevated px-3 py-1.5'
+                ? 'h-9 w-9 rounded-full bg-primary/15 items-center justify-center'
+                : 'h-9 w-9 rounded-full bg-surface-elevated items-center justify-center'
             }
             testID={`message-feedback-helpful-${feedbackTestIdSuffix}`}
             accessibilityRole="button"
@@ -167,23 +166,32 @@ export function SessionMessageActions({
               disabled: feedbackState === 'incorrect' || isStreaming,
             }}
           >
-            <Text
-              className={
-                feedbackState === 'helpful'
-                  ? 'text-caption font-semibold text-primary'
-                  : 'text-caption font-semibold text-text-secondary'
-              }
+            <View
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
             >
-              Helpful
-            </Text>
+              <Ionicons
+                name={
+                  feedbackState === 'helpful'
+                    ? 'thumbs-up'
+                    : 'thumbs-up-outline'
+                }
+                size={18}
+                className={
+                  feedbackState === 'helpful'
+                    ? 'text-primary'
+                    : 'text-text-secondary'
+                }
+              />
+            </View>
           </Pressable>
           <Pressable
             onPress={() => void handleMessageFeedback(message, 'not_helpful')}
             disabled={feedbackState === 'incorrect' || isStreaming}
             className={
               feedbackState === 'not_helpful'
-                ? 'rounded-full bg-warning/15 px-3 py-1.5'
-                : 'rounded-full bg-surface-elevated px-3 py-1.5'
+                ? 'h-9 w-9 rounded-full bg-warning/15 items-center justify-center'
+                : 'h-9 w-9 rounded-full bg-surface-elevated items-center justify-center'
             }
             testID={`message-feedback-not-helpful-${feedbackTestIdSuffix}`}
             accessibilityRole="button"
@@ -193,23 +201,32 @@ export function SessionMessageActions({
               disabled: feedbackState === 'incorrect' || isStreaming,
             }}
           >
-            <Text
-              className={
-                feedbackState === 'not_helpful'
-                  ? 'text-caption font-semibold text-warning'
-                  : 'text-caption font-semibold text-text-secondary'
-              }
+            <View
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
             >
-              Not helpful
-            </Text>
+              <Ionicons
+                name={
+                  feedbackState === 'not_helpful'
+                    ? 'thumbs-down'
+                    : 'thumbs-down-outline'
+                }
+                size={18}
+                className={
+                  feedbackState === 'not_helpful'
+                    ? 'text-warning'
+                    : 'text-text-secondary'
+                }
+              />
+            </View>
           </Pressable>
           <Pressable
             onPress={() => void handleMessageFeedback(message, 'incorrect')}
             disabled={isStreaming}
             className={
               feedbackState === 'incorrect'
-                ? 'rounded-full bg-danger/15 px-3 py-1.5'
-                : 'rounded-full bg-surface-elevated px-3 py-1.5'
+                ? 'h-9 w-9 rounded-full bg-danger/15 items-center justify-center'
+                : 'h-9 w-9 rounded-full bg-surface-elevated items-center justify-center'
             }
             testID={`message-feedback-incorrect-${feedbackTestIdSuffix}`}
             accessibilityRole="button"
@@ -219,15 +236,24 @@ export function SessionMessageActions({
               disabled: isStreaming,
             }}
           >
-            <Text
-              className={
-                feedbackState === 'incorrect'
-                  ? 'text-caption font-semibold text-danger'
-                  : 'text-caption font-semibold text-text-secondary'
-              }
+            <View
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
             >
-              That&apos;s incorrect
-            </Text>
+              <Ionicons
+                name={
+                  feedbackState === 'incorrect'
+                    ? 'alert-circle'
+                    : 'alert-circle-outline'
+                }
+                size={18}
+                className={
+                  feedbackState === 'incorrect'
+                    ? 'text-danger'
+                    : 'text-text-secondary'
+                }
+              />
+            </View>
           </Pressable>
           {message.eventId && onToggleBookmark ? (
             <Pressable
