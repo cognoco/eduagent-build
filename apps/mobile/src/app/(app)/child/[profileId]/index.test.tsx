@@ -176,6 +176,7 @@ function setupDefaultMocks() {
     },
     isLoading: false,
     isError: false,
+    refetch: jest.fn(),
   });
 }
 
@@ -348,5 +349,24 @@ describe('ChildDetailScreen — profile overview', () => {
       undefined,
       expect.objectContaining({ onError: expect.any(Function) }),
     );
+  });
+
+  it('keeps consent management visible and retryable when consent status fails to load', () => {
+    const refetch = jest.fn();
+    mockUseChildConsentStatus.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      refetch,
+    });
+
+    render(<ChildDetailScreen />);
+
+    screen.getByTestId('consent-section');
+    screen.getByTestId('consent-status-error');
+
+    fireEvent.press(screen.getByTestId('consent-status-retry'));
+
+    expect(refetch).toHaveBeenCalledTimes(1);
   });
 });

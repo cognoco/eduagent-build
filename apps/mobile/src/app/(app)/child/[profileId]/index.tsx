@@ -157,32 +157,33 @@ function ConsentManagementSection({
   const consentStatus = consent.data?.consentStatus ?? null;
   const hasConsentRecord =
     consent.isLoading ||
+    consent.isError ||
     consentStatus === 'CONSENTED' ||
     consentStatus === 'WITHDRAWN';
 
   if (!hasConsentRecord) return null;
 
   const isWithdrawn = consentStatus === 'WITHDRAWN';
-  const daysRemaining = getGracePeriodDaysRemaining(
-    consent.data?.respondedAt ?? null,
-  );
+  const daysRemaining = isWithdrawn
+    ? getGracePeriodDaysRemaining(consent.data?.respondedAt ?? null)
+    : 0;
 
   const handleWithdraw = (): void => {
     setError('');
     platformAlert(
-      t('parentView.index.withdrawConsentTitle', {
-        name: childName,
+      t('parentView.index.withdrawConsentConfirmTitle', {
+        childName,
         defaultValue: `Withdraw consent for ${childName}?`,
       }),
       t('parentView.index.withdrawConsentBody', {
-        name: childName,
+        childName,
         defaultValue:
           'Learning access will pause and account deletion will be scheduled. You can cancel during the grace period.',
       }),
       [
         { text: t('common.cancel'), style: 'cancel' },
         {
-          text: t('parentView.index.withdrawConsentAction', {
+          text: t('parentView.index.confirmWithdrawConsent', {
             defaultValue: 'Withdraw',
           }),
           style: 'destructive',
@@ -230,7 +231,30 @@ function ConsentManagementSection({
         </Text>
       ) : null}
 
-      {consent.isLoading ? (
+      {consent.isError ? (
+        <View
+          className="bg-danger/10 border border-danger/30 rounded-card px-3 py-3 mt-4"
+          accessibilityRole="alert"
+          testID="consent-status-error"
+        >
+          <Text className="text-body-sm text-danger">
+            {t('parentView.index.consentStatusError', {
+              defaultValue: 'Could not load consent status. Please try again.',
+            })}
+          </Text>
+          <Pressable
+            onPress={() => void consent.refetch()}
+            className="bg-surface rounded-button px-4 py-3 min-h-[44px] items-center justify-center mt-3"
+            accessibilityRole="button"
+            accessibilityLabel={t('common.tryAgain')}
+            testID="consent-status-retry"
+          >
+            <Text className="text-body font-semibold text-text-primary">
+              {t('common.tryAgain')}
+            </Text>
+          </Pressable>
+        </View>
+      ) : consent.isLoading ? (
         <View className="py-4 items-start">
           <ActivityIndicator testID="consent-status-loading" />
         </View>
