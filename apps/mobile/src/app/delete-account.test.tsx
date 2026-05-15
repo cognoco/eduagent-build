@@ -209,6 +209,55 @@ describe('DeleteAccountScreen', () => {
     expect(screen.queryByTestId('delete-account-scheduled')).toBeNull();
   });
 
+  it('ignores one stale unscheduled refetch after a local deletion schedule', async () => {
+    mockDeleteMutateAsync.mockResolvedValue({
+      message: 'Deletion scheduled',
+      gracePeriodEnds: '2026-02-24T00:00:00.000Z',
+    });
+
+    const { rerender } = render(<DeleteAccountScreen />, { wrapper: Wrapper });
+
+    advanceToConfirmedState();
+    fireEvent.press(screen.getByTestId('delete-account-confirm-final'));
+
+    await waitFor(() => {
+      screen.getByTestId('delete-account-scheduled');
+    });
+
+    mockDeletionStatus = {
+      data: {
+        scheduled: true,
+        deletionScheduledAt: '2026-02-17T00:00:00.000Z',
+        gracePeriodEnds: '2026-02-24T00:00:00.000Z',
+      },
+      isLoading: false,
+      isError: false,
+      refetch: mockDeletionStatusRefetch,
+    };
+    rerender(<DeleteAccountScreen />);
+
+    await waitFor(() => {
+      screen.getByTestId('delete-account-scheduled');
+    });
+
+    mockDeletionStatus = {
+      data: {
+        scheduled: false,
+        deletionScheduledAt: null,
+        gracePeriodEnds: null,
+      },
+      isLoading: false,
+      isError: false,
+      refetch: mockDeletionStatusRefetch,
+    };
+    rerender(<DeleteAccountScreen />);
+
+    await waitFor(() => {
+      screen.getByTestId('delete-account-scheduled');
+    });
+    expect(screen.queryByTestId('delete-account-confirm')).toBeNull();
+  });
+
   it('keeps typed confirmation when a refetch reports deletion is scheduled', async () => {
     const { rerender } = render(<DeleteAccountScreen />, { wrapper: Wrapper });
 

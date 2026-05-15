@@ -22,6 +22,10 @@ module.exports = {
   setupFiles: ['<rootDir>/apps/mobile/jest.polyfills.js'],
   setupFilesAfterEnv: ['<rootDir>/apps/mobile/src/test-setup.ts'],
   testMatch: ['**/apps/mobile/src/**/*.(spec|test).[jt]s?(x)'],
+  // The full Expo/RN mobile suite includes integration-style hook and screen
+  // tests that legitimately run past Jest's 5s default on Windows workers.
+  // Keep focused waits narrow in individual tests; this cap prevents the
+  // receipt/pre-push full-suite run from failing unrelated long mobile suites.
   testTimeout: 30000,
   modulePathIgnorePatterns: ['\\.claude/worktrees'],
   moduleNameMapper: {

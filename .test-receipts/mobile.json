@@ -1,12 +1,12 @@
 {
   "scope": "mobile",
-  "verifiedAt": "2026-05-15T09:45:37Z",
+  "verifiedAt": "2026-05-15T10:02:17Z",
   "verifiedBy": "Zuzana Kopečná @ ZLY-Orion",
   "command": "pnpm exec nx run mobile:test",
   "passed": true,
   "testFiles": {
     "apps/mobile/src/app/(app)/subscription.test.tsx": "4483793cbec48cae6b06749424409e31815b5810",
-    "apps/mobile/src/app/delete-account.test.tsx": "0de3df4e03d83559ed7612b983f357759d64f5b6",
+    "apps/mobile/src/app/delete-account.test.tsx": "7c2bb205f22073d480bd4f1a43e8b40e12bb16bf",
     "apps/mobile/src/hooks/use-account.test.ts": "f55b2a8d4a8faba67d10a45a74609cfa02fe5915"
   }
 }

@@ -56,14 +56,15 @@ export default function DeleteAccountScreen() {
   useEffect(() => {
     if (deletionStatus.data?.scheduled === true) {
       if (stage === 'confirming') return;
-      locallyScheduledRef.current = false;
       setGracePeriodEnds(deletionStatus.data.gracePeriodEnds);
       setStage('scheduled');
     } else if (
       deletionStatus.data?.scheduled === false &&
-      stage === 'scheduled' &&
-      !locallyScheduledRef.current
+      stage === 'scheduled'
     ) {
+      if (locallyScheduledRef.current) {
+        return;
+      }
       setGracePeriodEnds(null);
       setStage('initial');
     }
@@ -110,6 +111,7 @@ export default function DeleteAccountScreen() {
     setError('');
     try {
       await cancelDeletion.mutateAsync();
+      locallyScheduledRef.current = false;
       await queryClient.invalidateQueries({
         queryKey: ['account', 'deletion-status'],
       });
