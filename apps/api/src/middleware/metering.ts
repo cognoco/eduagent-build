@@ -154,11 +154,22 @@ function shouldRefundAfterHandler(status: number): boolean {
   return status >= 400;
 }
 
-function withoutQuotaHeaders(response: Response): Response {
+function withQuotaHeaders(
+  response: Response,
+  headersToSet: {
+    remaining: number;
+    warningLevel: string;
+    remainingDaily: number | null;
+  },
+): Response {
   const headers = new Headers(response.headers);
-  headers.delete('X-Quota-Remaining');
-  headers.delete('X-Quota-Warning-Level');
-  headers.delete('X-Daily-Remaining');
+  headers.set('X-Quota-Remaining', String(headersToSet.remaining));
+  headers.set('X-Quota-Warning-Level', headersToSet.warningLevel);
+  if (headersToSet.remainingDaily !== null) {
+    headers.set('X-Daily-Remaining', String(headersToSet.remainingDaily));
+  } else {
+    headers.delete('X-Daily-Remaining');
+  }
   return new Response(response.body, {
     status: response.status,
     statusText: response.statusText,
@@ -477,23 +488,20 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
     const baseLlmTier = getTierConfig(tier).llmTier;
     c.set('llmTier', profileMeta?.hasPremiumLlm ? 'premium' : baseLlmTier);
 
-    // Set quota headers for client-side UI
-    const remaining = decrement.remainingMonthly + decrement.remainingTopUp;
-    c.header('X-Quota-Remaining', String(remaining));
-    c.header('X-Quota-Warning-Level', result.warningLevel);
-    if (decrement.remainingDaily !== null) {
-      c.header('X-Daily-Remaining', String(decrement.remainingDaily));
-    }
-
     await next();
     if (shouldRefundAfterHandler(c.res.status)) {
       await safeRefundQuota(db, subscriptionId, {
         route: `metering.${c.req.method}.${c.req.path}`,
         profileId,
       });
-      c.res = withoutQuotaHeaders(c.res);
       return;
     }
+
+    c.res = withQuotaHeaders(c.res, {
+      remaining: decrement.remainingMonthly + decrement.remainingTopUp,
+      warningLevel: result.warningLevel,
+      remainingDaily: decrement.remainingDaily,
+    });
 
     // I7 fix: Update KV cache after decrement so next request sees fresh count.
     // Derive from the atomic DB result (decrement.remainingMonthly/Daily) to
