@@ -585,7 +585,26 @@ export default function SignUpScreen() {
             testID="sign-up-button"
           />
 
-          <Text className="text-caption text-text-secondary text-center mt-3 px-2">
+          <View
+            className="flex-row justify-center items-center mt-3 mb-3"
+            testID="sign-up-back-to-sign-in-row"
+          >
+            <Text className="text-body-sm text-text-secondary">
+              Already have an account?{' '}
+            </Text>
+            <Button
+              variant="tertiary"
+              size="small"
+              label="Sign in"
+              onPress={() => router.replace('/(auth)/sign-in')}
+              testID="sign-in-link"
+            />
+          </View>
+
+          <Text
+            className="text-caption text-text-secondary text-center px-2 mb-8"
+            testID="sign-up-terms-copy"
+          >
             By signing up, you agree to our{' '}
             <Text
               className="text-primary"
@@ -604,19 +623,6 @@ export default function SignUpScreen() {
             </Text>
             .
           </Text>
-
-          <View className="flex-row justify-center items-center mt-6 mb-8">
-            <Text className="text-body-sm text-text-secondary">
-              Already have an account?{' '}
-            </Text>
-            <Button
-              variant="tertiary"
-              size="small"
-              label="Sign in"
-              onPress={() => router.replace('/(auth)/sign-in')}
-              testID="sign-in-link"
-            />
-          </View>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>

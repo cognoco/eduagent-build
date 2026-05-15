@@ -7,6 +7,9 @@
   "testFiles": {
     "apps/mobile/src/app/(app)/library.test.tsx": "899f5a274a3a9c1026bf8e22ded3b5666e21fefb",
     "apps/mobile/src/app/create-subject.test.tsx": "3fbecb0f71a16b0f30813f53f9eb8394fe4b7348",
+    "apps/mobile/src/lib/auth-expiry.test.ts": "62525d2f47d41d62a5deb8e073b06592bd69585b",
+    "apps/mobile/src/app/(auth)/sign-up.test.tsx": "10c849fbcfe93d5c9f4cc89f0a64f6496fc961e9",
+    "apps/mobile/src/app/(auth)/sign-in.test.tsx": "74acba7f891420f18f74d2349ac7307e6fd2f9b4",
     "apps/mobile/src/app/(app)/quiz/launch.test.tsx": "69e57eb0e9455bb7ed27b28bb410435e9112dabf",
     "apps/mobile/src/app/(app)/quiz/play.test.tsx": "84312c1bb4383bebcf91b010a361302cf6c405fc"
   }
