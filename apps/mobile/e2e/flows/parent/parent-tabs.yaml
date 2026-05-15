@@ -44,7 +44,7 @@ tags:
     visible:
       id: "shelves-list"
     timeout: 10000
-    optional: true
+    optional: true  # justified: shelves-list may still be loading data on tab switch; extendedWaitUntil with optional avoids false failure on slow emulators
 
 # 7. Screenshot: Library tab
 - takeScreenshot: parent-tabs-02-library
@@ -78,20 +78,17 @@ tags:
     direction: DOWN
     timeout: 10000
 
-# 11. Verify learning mode section (first section in More screen)
+# 11. Verify first settings row is always above the fold
 - assertVisible:
-    id: "learning-accommodation-section-header"
-    optional: true
+    id: "more-row-learning-preferences"
 
 # 12. Verify notifications section
 - assertVisible:
     text: "Notifications"
-    optional: true
 
 # 13. Verify account section
 - assertVisible:
     text: "Account"
-    optional: true
 
 # 14. Screenshot: More tab (settings)
 - takeScreenshot: parent-tabs-04-more

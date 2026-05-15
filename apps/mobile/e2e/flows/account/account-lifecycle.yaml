@@ -28,13 +28,22 @@ tags:
 - tapOn:
     text: "More"
 
-# 4. Wait for settings screen — Learning Mode is always above the fold
+# 4. Wait for More tab index — first settings row is always above the fold
 - extendedWaitUntil:
     visible:
-      id: "learning-accommodation-section-header"
+      id: "more-row-learning-preferences"
+    timeout: 15000
+
+# 5. Navigate to Account sub-screen — more-row-profile has moved there
+- tapOn:
+    id: "more-row-account"
+
+- extendedWaitUntil:
+    visible:
+      id: "more-account-scroll"
     timeout: 10000
 
-# 5. Look for profile section
+# 6. Look for profile section inside Account sub-screen
 - scrollUntilVisible:
     element:
       id: "more-row-profile"
@@ -52,12 +61,10 @@ tags:
     visible:
       text: "Display name"
     timeout: 10000
-    optional: true
 
 # 9. Verify profile info is displayed
 - assertVisible:
     text: "Display name"
-    optional: true
 
 # 10. Screenshot
 - takeScreenshot: account-lifecycle-complete

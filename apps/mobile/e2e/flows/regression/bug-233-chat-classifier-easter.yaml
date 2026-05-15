@@ -69,7 +69,7 @@ tags:
     visible:
       id: "session-subject-resolution"
     timeout: 5000
-    optional: true
+    optional: true  # justified: session-subject-resolution only appears when LLM cannot auto-classify to an enrolled subject; classifier result varies per LLM response
 
 # 9. Screenshot for visual verification
 - takeScreenshot: bug-233-easter-classifier-response

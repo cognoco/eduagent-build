@@ -48,13 +48,13 @@ tags:
 # 3a. Try tapping the first homework button by text label
 - tapOn:
     text: "HW"
-    optional: true
+    optional: true  # justified: dual-path navigation — either "HW" text button or home-action-homework renders depending on home layout; only one will be present
 
 # 3b. Fallback — if the home homework action is showing, it navigates to the
 #     camera screen too.
 - tapOn:
     id: "home-action-homework"
-    optional: true
+    optional: true  # justified: second arm of dual-path tap; only one of the two paths (3a or 3b) will match
 
 # ──────────────────────────────────────────────────
 # 4. Permission phase — first-request camera access prompt
@@ -66,7 +66,7 @@ tags:
     visible:
       text: "Camera Access Needed"
     timeout: 10000
-    optional: true
+    optional: true  # justified: permission screen only shows on first-ever camera request; skipped if already granted or auto-granted on emulator
 
 - takeScreenshot: camera-ocr-02-permission
 
@@ -75,7 +75,7 @@ tags:
 #     that Maestro cannot interact with — hence optional.
 - tapOn:
     id: "grant-permission-button"
-    optional: true
+    optional: true  # justified: CI/emulator may auto-grant permission or show an OS-level dialog Maestro cannot tap
 
 # ──────────────────────────────────────────────────
 # 5. Viewfinder phase
@@ -86,22 +86,22 @@ tags:
     visible:
       id: "camera-view"
     timeout: 10000
-    optional: true
+    optional: true  # justified: camera hardware variation — viewfinder only appears when CameraView initialises successfully; absent on emulator without camera support
 
 - takeScreenshot: camera-ocr-03-viewfinder
 
 # 5a. Verify viewfinder controls are present
 - assertVisible:
     id: "capture-button"
-    optional: true
+    optional: true  # justified: camera hardware — capture-button only renders when CameraView is active
 
 - assertVisible:
     id: "flash-toggle"
-    optional: true
+    optional: true  # justified: camera hardware — flash-toggle only renders when CameraView is active
 
 - assertVisible:
     id: "close-button"
-    optional: true
+    optional: true  # justified: camera hardware — close-button only renders when CameraView is active
 
 # ──────────────────────────────────────────────────
 # 6. Capture — tap the shutter button
@@ -110,7 +110,7 @@ tags:
 # ──────────────────────────────────────────────────
 - tapOn:
     id: "capture-button"
-    optional: true
+    optional: true  # justified: camera hardware — capture-button only tappable when CameraView rendered successfully
 
 # ──────────────────────────────────────────────────
 # 7. Preview phase
@@ -121,24 +121,24 @@ tags:
     visible:
       text: "Photo captured"
     timeout: 10000
-    optional: true
+    optional: true  # justified: camera hardware — preview phase only reached after a successful capture; emulator may not produce a real photo
 
 - takeScreenshot: camera-ocr-04-preview
 
 - assertVisible:
     id: "retake-button"
-    optional: true
+    optional: true  # justified: camera hardware — retake-button only present in preview phase
 
 - assertVisible:
     id: "camera-use-this-button"
-    optional: true
+    optional: true  # justified: camera hardware — camera-use-this-button only present in preview phase
 
 # ──────────────────────────────────────────────────
 # 8. Confirm photo — tap "Use this" to start OCR processing
 # ──────────────────────────────────────────────────
 - tapOn:
     id: "camera-use-this-button"
-    optional: true
+    optional: true  # justified: camera hardware — only tappable if preview phase was reached
 
 # ──────────────────────────────────────────────────
 # 9. Processing phase
@@ -149,7 +149,7 @@ tags:
     visible:
       text: "Reading your"
     timeout: 5000
-    optional: true
+    optional: true  # justified: camera/OCR — processing text only appears if photo was captured; may be too brief to catch on emulator
 
 - takeScreenshot: camera-ocr-05-processing
 
@@ -162,26 +162,26 @@ tags:
     visible:
       id: "result-text-input"
     timeout: 15000
-    optional: true
+    optional: true  # justified: OCR result — only present when OCR succeeds; OCR is expected to fail on emulator (no real image content)
 
 - takeScreenshot: camera-ocr-06-result
 
 - assertVisible:
     id: "result-text-input"
-    optional: true
+    optional: true  # justified: OCR result — shown only when OCR succeeds
 
 - assertVisible:
     id: "confirm-button"
-    optional: true
+    optional: true  # justified: OCR result — confirm-button shown only when OCR succeeds
 
 - assertVisible:
     id: "retake-button"
-    optional: true
+    optional: true  # justified: OCR result — retake-button in result phase shown only when OCR succeeds
 
 # 10a. Verify the "Here's what I see:" label
 - assertVisible:
     text: "Here's what I see:"
-    optional: true
+    optional: true  # justified: OCR result label — shown only when OCR succeeds
 
 # ──────────────────────────────────────────────────
 # 11. Error phase (fallback path)
@@ -196,49 +196,49 @@ tags:
     visible:
       id: "retry-button"
     timeout: 10000
-    optional: true
+    optional: true  # justified: OCR error path — retry-button only visible when OCR fails; mutually exclusive with result phase (section 10)
 
 - takeScreenshot: camera-ocr-07-error-first
 
 # 11a. Tap retry to trigger second OCR attempt
 - tapOn:
     id: "retry-button"
-    optional: true
+    optional: true  # justified: OCR error path — only tappable when error phase was reached
 
 # 11b. After second failure, manual fallback appears
 - extendedWaitUntil:
     visible:
       id: "manual-input"
     timeout: 15000
-    optional: true
+    optional: true  # justified: OCR fallback — manual-input only appears after 2+ consecutive OCR failures
 
 - takeScreenshot: camera-ocr-08-manual-fallback
 
 # 11c. Verify manual input controls
 - assertVisible:
     id: "manual-input"
-    optional: true
+    optional: true  # justified: OCR fallback — only present after 2+ OCR failures
 
 - assertVisible:
     id: "try-camera-again-button"
-    optional: true
+    optional: true  # justified: OCR fallback — try-camera-again-button only present in manual fallback phase
 
 - assertVisible:
     text: "Want to type it out instead?"
-    optional: true
+    optional: true  # justified: OCR fallback — label only present in manual fallback phase
 
 # 11d. Type a problem manually and verify continue button enables
 - tapOn:
     id: "manual-input"
-    optional: true
+    optional: true  # justified: OCR fallback — manual-input only tappable after 2+ OCR failures
 
 - inputText:
     text: "Solve: 2x + 5 = 15"
-    optional: true
+    optional: true  # justified: OCR fallback — inputText only applicable when manual-input field is focused
 
 - assertVisible:
     id: "manual-continue-button"
-    optional: true
+    optional: true  # justified: OCR fallback — manual-continue-button only rendered when manual-input has text content
 
 - takeScreenshot: camera-ocr-09-manual-typed
 

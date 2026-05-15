@@ -18,22 +18,22 @@ tags:
 
 - tapOn: "More Tab"
 
-# Wait for the More screen to render — the Learning Mode section header is
-# always above the fold; sign-out-button lives at the bottom of the scroll,
-# so use the section header as the screen-loaded signal instead.
+# Wait for the More tab index to render — the first settings row is always
+# above the fold; sign-out-button lives at the bottom of the scroll,
+# so use it as the screen-loaded signal instead.
 - extendedWaitUntil:
     visible:
-      id: "learning-accommodation-section-header"
-    timeout: 10000
+      id: "more-row-learning-preferences"
+    timeout: 15000
 
 - scrollUntilVisible:
     element:
-      id: "mentor-memory-link"
+      id: "more-row-mentor-memory"
     direction: DOWN
     timeout: 10000
 
 - tapOn:
-    id: "mentor-memory-link"
+    id: "more-row-mentor-memory"
 
 - extendedWaitUntil:
     visible:
@@ -47,12 +47,12 @@ tags:
 
 - pressKey: back
 
-# Back returns to More — confirm the screen by its header, then verify
+# Back returns to More — confirm the screen by its first settings row, then verify
 # sign-out-button is reachable by scrolling to it.
 - extendedWaitUntil:
     visible:
-      id: "learning-accommodation-section-header"
-    timeout: 10000
+      id: "more-row-learning-preferences"
+    timeout: 15000
 
 - scrollUntilVisible:
     element:

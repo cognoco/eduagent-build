@@ -93,10 +93,10 @@ tags:
       id: "home-coach-band"
     direction: DOWN
     timeout: 5000
-    optional: true
+    optional: true  # justified: home-coach-band only renders when a resumable session exists; data-dependent on session state from seed
 
 - assertVisible:
     id: "home-coach-band-continue"
-    optional: true
+    optional: true  # justified: home-coach-band-continue is nested inside data-gated coach-band; absent when no resumable session
 
 - takeScreenshot: home-layout-05-coach-band

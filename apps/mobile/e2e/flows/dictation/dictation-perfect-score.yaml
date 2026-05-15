@@ -122,12 +122,12 @@ tags:
     visible:
       text: "dictation-test-image"
     timeout: 10000
-    optional: true
+    optional: true  # justified: system image picker may not surface "dictation-test-image" as visible text on all Android versions
 
 - tapOn:
     index: 0
     text: "Photos"
-    optional: true
+    optional: true  # justified: "Photos" album tab may need to be tapped to reveal images; not shown on all Android picker implementations
 
 # Wait for LLM to return and navigate to review-celebration (no mistakes path).
 - extendedWaitUntil:

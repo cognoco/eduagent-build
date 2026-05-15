@@ -1,3 +1,11 @@
+# DEFERRED:M1-COMPREHENSIVE — Full rewrite required.
+# PHASE 3 (More-screen assertions) references stale sub-screen content.
+# PHASE 5 (Theme Switching) references completely removed feature:
+#   "Teen (Dark)", "Parent (Light)", "Eager Learner (Calm)" — zero matches in source.
+#   "switch-to-teen" testID confirmed removed (in e2e-testid-integrity known-removed list).
+#   "(parent)" route group no longer exists (dashboard.tsx is a Redirect stub).
+# Hard tapOn calls in PHASE 5 (lines 234, 246, 262) will crash — not just optional assertions.
+#
 # Post-Auth Comprehensive E2E — dev-client variant
 # Signs in with seeded test user, then tests all major post-auth screens.
 # Prerequisite: API running at localhost:8787 with learning-active seed data.
@@ -87,11 +95,11 @@ tags:
 # The coaching card should be visible (AdaptiveEntryCard for teen persona)
 - assertVisible:
     text: "Help with an assignment"
-    optional: true
+    optional: true  # justified: deferred flow
 
 - assertVisible:
     text: "Just ask something"
-    optional: true
+    optional: true  # justified: deferred flow
 
 # Verify the intent card stack exists (replaced add-subject-button + coaching card)
 - assertVisible:
@@ -112,7 +120,7 @@ tags:
 
 - extendedWaitUntil:
     visible:
-      id: "learning-accommodation-section-header"
+      id: "more-row-learning-preferences"
     timeout: 15000
 
 - takeScreenshot: 04-more-screen-top
@@ -120,13 +128,13 @@ tags:
 # ── Legacy theme section (optional on current builds) ──
 - assertVisible:
     text: "Teen (Dark)"
-    optional: true
+    optional: true  # justified: deferred flow
 - assertVisible:
     text: "Eager Learner (Calm)"
-    optional: true
+    optional: true  # justified: deferred flow
 - assertVisible:
     text: "Parent (Light)"
-    optional: true
+    optional: true  # justified: deferred flow
 
 # ── Notifications section ──
 - assertVisible:
@@ -140,7 +148,7 @@ tags:
     end: "50%,40%"
 
 - assertVisible:
-    id: "learning-accommodation-section-header"
+    id: "more-row-learning-preferences"
 
 - takeScreenshot: 05-more-screen-middle
 
@@ -227,8 +235,8 @@ tags:
 
 - extendedWaitUntil:
     visible:
-      id: "learning-accommodation-section-header"
-    timeout: 10000
+      id: "more-row-learning-preferences"
+    timeout: 15000
 
 # Switch to Eager Learner theme (stays in learner route group — safe)
 - tapOn: "Eager Learner (Calm)"
@@ -240,8 +248,8 @@ tags:
 # Settings top to be visible before tapping.
 - extendedWaitUntil:
     visible:
-      id: "learning-accommodation-section-header"
-    timeout: 10000
+      id: "more-row-learning-preferences"
+    timeout: 15000
 
 - tapOn: "Teen (Dark)"
 - takeScreenshot: 11-theme-teen-restored
@@ -256,8 +264,8 @@ tags:
 - tapOn: "More"
 - extendedWaitUntil:
     visible:
-      id: "learning-accommodation-section-header"
-    timeout: 10000
+      id: "more-row-learning-preferences"
+    timeout: 15000
 
 - tapOn: "Parent (Light)"
 

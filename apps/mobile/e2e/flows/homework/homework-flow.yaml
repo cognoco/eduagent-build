@@ -33,14 +33,14 @@ tags:
 # 4. Camera permission dialog may appear — dismiss it
 - tapOn:
     id: "grant-permission-button"
-    optional: true
+    optional: true  # justified: system camera permission dialog only appears on first run or after permission reset; not shown every time
 
 # 5. If camera screen appears instead of chat, close it (router.back()
 #    returns to home). Then try coaching card again.
 #    Note: homework-ready scenario should route to homework chat, not camera.
 - tapOn:
     id: "close-button"
-    optional: true
+    optional: true  # justified: camera screen occasionally appears before homework chat depending on routing state; recovery via close
 
 # 6. Wait for chat screen (may land directly or after camera dismiss)
 - extendedWaitUntil:

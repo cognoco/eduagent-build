@@ -64,7 +64,7 @@ tags:
 # 6. Optional: server loading indicator may flash briefly
 - assertVisible:
     id: "library-search-server-loading"
-    optional: true
+    optional: true  # justified: library-search-server-loading is a transient loading indicator; may have already dismissed before this step
 
 # 7. Verify the matching shelf is still present (search did not hide it)
 - assertVisible:

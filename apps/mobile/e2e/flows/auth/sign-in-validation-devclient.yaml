@@ -72,10 +72,9 @@ tags:
 - hideKeyboard
 
 # Verify the password show/hide toggle (testID = {testID}-toggle)
-# BUG-4: Toggle testID not found by Maestro — may be Pressable testID issue on Android
 - assertVisible:
     id: "sign-in-password-toggle"
-    optional: true
+    optional: true  # justified: BUG-4 — Pressable testID not reliably found by Maestro on Android; "Show" text assertion below is the reliable fallback
 
 # Verify toggle via text instead (Show/Hide)
 - assertVisible: "Show"

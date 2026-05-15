@@ -20,35 +20,17 @@ tags:
 - tapOn:
     text: "More"
 
+# Wait for More tab index — first settings row is always above the fold
 - extendedWaitUntil:
     visible:
-      id: "learning-accommodation-section-header"
-    timeout: 30000
+      id: "more-row-learning-preferences"
+    timeout: 15000
 
+# Assert all More index navigation rows
 - assertVisible:
-    id: "accommodation-mode-none"
-- scrollUntilVisible:
-    element:
-      id: "accommodation-mode-short-burst"
-    direction: DOWN
-    timeout: 15000
-    speed: 50
-    visibilityPercentage: 40
-- scrollUntilVisible:
-    element:
-      id: "accommodation-mode-audio-first"
-    direction: DOWN
-    timeout: 15000
-    speed: 50
-    visibilityPercentage: 40
-- scrollUntilVisible:
-    element:
-      id: "accommodation-mode-predictable"
-    direction: DOWN
-    timeout: 15000
-    speed: 50
-    visibilityPercentage: 40
-
+    id: "more-row-mentor-memory"
+- assertVisible:
+    id: "more-row-mentor-language"
 - scrollUntilVisible:
     element:
       id: "more-row-notifications"
@@ -58,6 +40,13 @@ tags:
     visibilityPercentage: 40
 - assertVisible:
     id: "more-row-account"
+- scrollUntilVisible:
+    element:
+      id: "sign-out-button"
+    direction: DOWN
+    timeout: 15000
+    speed: 50
+    visibilityPercentage: 40
 - assertVisible:
     id: "more-row-privacy"
 - assertVisible:
@@ -147,9 +136,14 @@ tags:
     id: "more-row-export"
 - tapOn:
     text: "OK"
-    optional: true
+    optional: true  # justified: OK dismissal only needed when a system dialog or export confirmation appears; not always shown
 - takeScreenshot: nav-export-data
 
+- scrollUntilVisible:
+    element:
+      id: "more-row-delete-account"
+    direction: DOWN
+    timeout: 10000
 - tapOn:
     id: "more-row-delete-account"
 - extendedWaitUntil:

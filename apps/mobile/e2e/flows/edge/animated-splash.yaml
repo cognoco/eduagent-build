@@ -48,12 +48,12 @@ tags:
 # Both 8081 and 8082 are shown; tap 8082 first (bundle proxy), fallback to 8081.
 - tapOn:
     text: "http://10.0.2.2:8082"
-    optional: true
+    optional: true  # justified: port 8082 (bundle proxy) shown in dev-client; may not be present if only port 8081 is listed
 
 # Fallback: tap port 8081 if 8082 not found
 - tapOn:
     text: "http://10.0.2.2:8081"
-    optional: true
+    optional: true  # justified: port 8081 is the Metro fallback; exactly one of 8082 or 8081 will be listed in dev-client launcher
 
 # Wait for JS bundle to load and "Continue" overlay to appear.
 # Bundle is cached by Metro, so this should be fast (5-15s).

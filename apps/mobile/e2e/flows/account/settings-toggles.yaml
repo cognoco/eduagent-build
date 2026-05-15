@@ -30,11 +30,11 @@ tags:
 - tapOn:
     text: "More"
 
-# 4. Wait for More screen to load
+# 4. Wait for More tab index to load
 - extendedWaitUntil:
     visible:
-      id: "learning-accommodation-section-header"
-    timeout: 10000
+      id: "more-row-learning-preferences"
+    timeout: 15000
 
 - takeScreenshot: settings-initial
 

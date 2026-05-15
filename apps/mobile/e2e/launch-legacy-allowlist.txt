@@ -1,0 +1,31 @@
+# Flows that legitimately use launchApp or _setup/launch-devclient.yaml
+# because they test cold-start behavior, release builds, ExpoGo, or are
+# blocked stubs awaiting infrastructure.
+#
+# Validated 2026-05-16 during M1-A drift repair.
+
+# Infrastructure helpers
+flows/_setup/launch-devclient.yaml
+flows/_setup/launch-expogo.yaml
+flows/_setup/launch-release.yaml
+
+# Already migrated (no launchApp/launch-devclient reference)
+flows/app-launch-devclient.yaml
+
+# Tests clean-SecureStore first-time welcome heading
+flows/auth/welcome-text-first-time.yaml
+
+# BLOCKED stubs — launchApp with stopApp:false is a parser-required no-op
+flows/auth/sign-in-mfa-totp.yaml
+flows/auth/sign-in-mfa-phone.yaml
+flows/auth/sign-in-mfa-email-code.yaml
+flows/auth/sign-in-mfa-backup-code.yaml
+
+# BLOCKED stub — RevenueCat sandbox automation not available
+flows/billing/top-up.yaml
+
+# Tests animated splash on cold launch with clearState — cold-start is the test
+flows/edge/animated-splash.yaml
+
+# DEFERRED:M1-COMPREHENSIVE — full rewrite needed (theme picker removed, stale More-screen refs)
+flows/post-auth-comprehensive-devclient.yaml

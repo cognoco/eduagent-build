@@ -1,0 +1,23 @@
+# Flows where optional: true is systematically justified.
+# These vary by device state, OS version, or persona routing — optional is correct.
+
+# System-level dialog dismissals (Android 13+ permissions, ANR, Bluetooth)
+flows/_setup/dismiss-notifications.yaml
+flows/_setup/dismiss-anr.yaml
+flows/_setup/dismiss-bluetooth.yaml
+flows/_setup/dismiss-devtools.yaml
+flows/_setup/dismiss-post-approval.yaml
+
+# Persona routing in seed-and-sign-in.yaml
+# Post-auth landing can be one of 3 screens (learner-screen, dashboard-scroll,
+# parent-home-screen) depending on seed scenario — optional waits are by design.
+flows/_setup/seed-and-sign-in.yaml
+
+# Return-to-home helpers — same persona routing variability
+flows/_setup/return-to-home.yaml
+
+# Sign-in-only — post-auth screen depends on user state
+flows/_setup/sign-in-only.yaml
+
+# Nav-to-sign-in — dismiss/consent dialogs vary by device state
+flows/_setup/nav-to-sign-in.yaml

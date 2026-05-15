@@ -42,15 +42,14 @@ tags:
       id: "shelves-list"
     timeout: 5000
     # shelves-list is the Library v3 single-pane shelf list (library-tab-shelves removed in PR #144)
-    optional: true
 
 # Tap More tab → verify it navigates
 - tapOn:
     id: "tab-more"
 - extendedWaitUntil:
     visible:
-      id: "learning-accommodation-section-header"
-    timeout: 5000
+      id: "more-row-learning-preferences"
+    timeout: 15000
 
 # Return to Home tab
 - tapOn:
@@ -193,10 +192,10 @@ tags:
 # optional: regression guard; depends on step 14 (learner-screen) succeeding first.
 - tapOn:
     id: "tab-library"
-    optional: true
+    optional: true  # justified: regression guard — taps are best-effort after session; tab may lag on slow devices
 - tapOn:
     id: "tab-home"
-    optional: true
+    optional: true  # justified: return-to-home tap paired with tab-library above; both are post-session regression guards
 
 # 15. Screenshot
 - takeScreenshot: core-learning-complete

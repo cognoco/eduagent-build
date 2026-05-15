@@ -1,0 +1,15 @@
+# Navigate to More tab → Help sub-screen.
+# Precondition: bottom tab bar visible.
+# Postcondition: Help scroll container visible.
+appId: com.mentomate.app
+---
+- runFlow:
+    file: nav-to-more.yaml
+
+- tapOn:
+    id: "more-row-help"
+
+- extendedWaitUntil:
+    visible:
+      id: "more-help-scroll"
+    timeout: 10000

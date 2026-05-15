@@ -105,18 +105,18 @@ tags:
     visible:
       id: "quiz-launch-loading"
     timeout: 10000
-    optional: true
+    optional: true  # justified: loading screen is transient; fast devices/network may skip it before Maestro polls
 
 # 7. Dismiss challenge banner if present
 - extendedWaitUntil:
     visible:
       id: "quiz-challenge-start"
     timeout: 5000
-    optional: true
+    optional: true  # justified: challenge banner only appears on difficulty-bump runs, not every session
 
 - tapOn:
     id: "quiz-challenge-start"
-    optional: true
+    optional: true  # justified: only tappable when challenge banner appeared (line above)
 
 # 8. Wait for play screen
 - extendedWaitUntil:
@@ -150,7 +150,7 @@ tags:
 # This assertion is optional per the architecture note above.
 - assertVisible:
     text: "Answer check failed"
-    optional: true
+    optional: true  # justified: LLM/architecture — warning only fires when checkAnswer mutation throws; on fresh LLM round the mutation succeeds so warning is absent (see ARCHITECTURE NOTE)
 
 - takeScreenshot: quiz-check-fail-04-warning-check
 
@@ -164,22 +164,21 @@ tags:
 # 13. Quit back to quiz index (cleanup)
 - tapOn:
     id: "quiz-play-quit"
-    optional: true
 
 - extendedWaitUntil:
     visible:
       id: "quiz-quit-modal-backdrop"
     timeout: 5000
-    optional: true
+    optional: true  # justified: quit modal timing — brief delay between quit tap and modal appearance is possible
 
 - tapOn:
     id: "quiz-quit-confirm"
-    optional: true
+    optional: true  # justified: confirm tap only applicable when quit modal appeared
 
 - extendedWaitUntil:
     visible:
       id: "quiz-index-screen"
     timeout: 10000
-    optional: true
+    optional: true  # justified: return to index depends on modal confirmation completing
 
 - takeScreenshot: quiz-check-fail-06-done

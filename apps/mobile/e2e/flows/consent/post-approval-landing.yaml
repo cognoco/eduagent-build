@@ -67,7 +67,6 @@ tags:
 # 7. Verify supporting text
 - assertVisible:
     text: "Your parent said yes"
-    optional: true
 
 # 8. Screenshot of post-approval landing
 - takeScreenshot: post-approval-landing
