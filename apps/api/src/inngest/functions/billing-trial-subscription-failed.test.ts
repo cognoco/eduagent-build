@@ -15,7 +15,10 @@ const { createInngestTransportCapture } =
 
 const mockInngestTransport = createInngestTransportCapture();
 
-jest.mock('../client', () => mockInngestTransport.module); // gc1-allow: inngest framework boundary
+jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual('../client') as typeof import('../client');
+  return { ...actual, ...mockInngestTransport.module };
+});
 
 import { billingTrialSubscriptionFailed } from './billing-trial-subscription-failed';
 

@@ -235,6 +235,7 @@ export default function ChildReportsScreen(): React.ReactElement {
                 } as Href);
               }}
               onPressWeekly={(reportId) => {
+                if (!profileId) return;
                 router.push({
                   pathname:
                     '/(app)/child/[profileId]/weekly-report/[weeklyReportId]',

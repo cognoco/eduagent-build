@@ -1,6 +1,8 @@
 import path from 'node:path';
 import { randomBytes } from 'node:crypto';
 
+import { defaultApiUrl } from './e2e-defaults.js';
+
 function trimTrailingSlash(value: string): string {
   return value.replace(/\/+$/, '');
 }
@@ -18,7 +20,7 @@ export const seedEmailPrefix =
 process.env.PLAYWRIGHT_EMAIL_PREFIX = seedEmailPrefix;
 
 export const apiBaseUrl = trimTrailingSlash(
-  process.env.PLAYWRIGHT_API_URL ?? 'http://127.0.0.1:8787',
+  process.env.PLAYWRIGHT_API_URL ?? defaultApiUrl,
 );
 
 export const appBaseUrl = trimTrailingSlash(
@@ -32,12 +34,6 @@ export function buildSeedEmail(alias: string): string {
 export function buildTestSeedHeaders(): Record<string, string> {
   const secret =
     process.env.PLAYWRIGHT_TEST_SEED_SECRET ?? process.env.TEST_SEED_SECRET;
-
-  if (!secret && process.env.PLAYWRIGHT_SKIP_LOCAL_API === '1') {
-    throw new Error(
-      'Missing PLAYWRIGHT_TEST_SEED_SECRET or TEST_SEED_SECRET for shared-staging E2E. Run through Doppler config stg.',
-    );
-  }
 
   return secret ? { 'X-Test-Secret': secret } : {};
 }

@@ -5,14 +5,17 @@
 import { jest } from '@jest/globals';
 
 const routeAndCallMock = jest.fn<(...args: unknown[]) => Promise<unknown>>();
-jest.mock('./llm' /* gc1-allow: LLM external boundary */, () => ({
-  routeAndCall: (...args: unknown[]) => routeAndCallMock(...args),
-}));
+jest.mock('./llm' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual('./llm') as typeof import('./llm');
+  return {
+    ...actual,
+    routeAndCall: (...args: unknown[]) => routeAndCallMock(...args),
+  };
+});
 
 const loggerWarnMock = jest.fn<(...args: unknown[]) => void>();
-jest.mock('./logger', () => {
-  // gc1-allow: requireActual + targeted override to capture warn calls
-  const actual = jest.requireActual('./logger') as Record<string, unknown>;
+jest.mock('./logger' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual('./logger') as typeof import('./logger');
   return {
     ...actual,
     createLogger: () => ({

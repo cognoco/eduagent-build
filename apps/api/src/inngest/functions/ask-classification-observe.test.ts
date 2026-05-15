@@ -3,12 +3,15 @@
 // ---------------------------------------------------------------------------
 
 const mockCaptureException = jest.fn();
-jest.mock(
-  '../../services/sentry' /* gc1-allow: observability test isolates Sentry */,
-  () => ({
+jest.mock('../../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../../services/sentry',
+  ) as typeof import('../../services/sentry');
+  return {
+    ...actual,
     captureException: (...args: unknown[]) => mockCaptureException(...args),
-  }),
-);
+  };
+});
 
 const consoleLogSpy = jest
   .spyOn(console, 'log')
@@ -20,7 +23,10 @@ const consoleErrorSpy = jest
 import { createInngestTransportCapture } from '../../test-utils/inngest-transport-capture';
 
 const mockInngestTransport = createInngestTransportCapture();
-jest.mock('../client', () => mockInngestTransport.module); // gc1-allow: inngest framework boundary
+jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual('../client') as typeof import('../client');
+  return { ...actual, ...mockInngestTransport.module };
+});
 
 import {
   askClassificationCompletedObserve,

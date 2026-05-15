@@ -1,20 +1,41 @@
-jest.mock('../services/sentry', () => ({
-  captureException: jest.fn(),
-  addBreadcrumb: jest.fn(),
-}));
+jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/sentry',
+  ) as typeof import('../services/sentry');
+  return {
+    ...actual,
+    captureException: jest.fn(),
+    addBreadcrumb: jest.fn(),
+  };
+});
 
-jest.mock('../services/logger', () => ({
-  createLogger: () => ({
-    info: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
-    debug: jest.fn(),
-  }),
-}));
+jest.mock('../services/logger' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/logger',
+  ) as typeof import('../services/logger');
+  return {
+    ...actual,
+    createLogger: () => ({
+      info: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
+      debug: jest.fn(),
+    }),
+  };
+});
 
-jest.mock('../services/idempotency-assistant-state', () => ({
-  lookupAssistantTurnState: jest.fn(),
-}));
+jest.mock(
+  '../services/idempotency-assistant-state' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../services/idempotency-assistant-state',
+    ) as typeof import('../services/idempotency-assistant-state');
+    return {
+      ...actual,
+      lookupAssistantTurnState: jest.fn(),
+    };
+  },
+);
 
 import { Hono } from 'hono';
 import { idempotencyPreflight } from './idempotency';
@@ -71,7 +92,7 @@ describe('idempotencyPreflight middleware', () => {
       const res = await app.request(
         '/test',
         { method: 'POST' },
-        { IDEMPOTENCY_KV: kv }
+        { IDEMPOTENCY_KV: kv },
       );
 
       expect(res.status).toBe(200);
@@ -93,7 +114,7 @@ describe('idempotencyPreflight middleware', () => {
           method: 'POST',
           headers: { 'Idempotency-Key': longKey },
         },
-        { IDEMPOTENCY_KV: kv }
+        { IDEMPOTENCY_KV: kv },
       );
 
       expect(res.status).toBe(400);
@@ -116,7 +137,7 @@ describe('idempotencyPreflight middleware', () => {
           method: 'POST',
           headers: { 'Idempotency-Key': exactKey },
         },
-        { IDEMPOTENCY_KV: kv }
+        { IDEMPOTENCY_KV: kv },
       );
 
       expect(res.status).toBe(200);
@@ -137,7 +158,7 @@ describe('idempotencyPreflight middleware', () => {
           method: 'POST',
           headers: { 'Idempotency-Key': 'abc-123' },
         },
-        { IDEMPOTENCY_KV: kv }
+        { IDEMPOTENCY_KV: kv },
       );
 
       expect(res.status).toBe(200);
@@ -147,7 +168,7 @@ describe('idempotencyPreflight middleware', () => {
       expect(mockAddBreadcrumb).toHaveBeenCalledWith(
         'idempotency preflight skipped: profile missing',
         'idempotency',
-        'warning'
+        'warning',
       );
     });
   });
@@ -162,7 +183,7 @@ describe('idempotencyPreflight middleware', () => {
           method: 'POST',
           headers: { 'Idempotency-Key': 'abc-123' },
         },
-        {}
+        {},
       );
 
       expect(res.status).toBe(200);
@@ -171,7 +192,7 @@ describe('idempotencyPreflight middleware', () => {
       expect(mockAddBreadcrumb).toHaveBeenCalledWith(
         'idempotency preflight skipped: binding missing',
         'idempotency',
-        'warning'
+        'warning',
       );
     });
   });
@@ -187,7 +208,7 @@ describe('idempotencyPreflight middleware', () => {
           method: 'POST',
           headers: { 'Idempotency-Key': 'abc-123' },
         },
-        { IDEMPOTENCY_KV: kv }
+        { IDEMPOTENCY_KV: kv },
       );
 
       expect(res.status).toBe(200);
@@ -210,7 +231,7 @@ describe('idempotencyPreflight middleware', () => {
           method: 'POST',
           headers: { 'Idempotency-Key': 'abc-123' },
         },
-        { IDEMPOTENCY_KV: kv }
+        { IDEMPOTENCY_KV: kv },
       );
 
       expect(res.status).toBe(200);
@@ -225,11 +246,11 @@ describe('idempotencyPreflight middleware', () => {
             flow: 'session',
             key: 'abc-123',
           }),
-        })
+        }),
       );
       expect(mockAddBreadcrumb).toHaveBeenCalledWith(
         'idempotency preflight lookup failed',
-        'idempotency'
+        'idempotency',
       );
     });
   });
@@ -250,7 +271,7 @@ describe('idempotencyPreflight middleware', () => {
           method: 'POST',
           headers: { 'Idempotency-Key': 'abc-123' },
         },
-        { IDEMPOTENCY_KV: kv }
+        { IDEMPOTENCY_KV: kv },
       );
 
       expect(res.headers.get('Idempotency-Replay')).toBe('true');
@@ -267,7 +288,7 @@ describe('idempotencyPreflight middleware', () => {
           profileId: 'profile-1',
           flow: 'session',
           key: 'abc-123',
-        })
+        }),
       );
     });
   });
@@ -288,7 +309,7 @@ describe('idempotencyPreflight middleware', () => {
           method: 'POST',
           headers: { 'Idempotency-Key': 'abc-123' },
         },
-        { IDEMPOTENCY_KV: kv }
+        { IDEMPOTENCY_KV: kv },
       );
 
       expect(res.headers.get('Idempotency-Replay')).toBe('true');

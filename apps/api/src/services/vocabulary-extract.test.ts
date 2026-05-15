@@ -2,11 +2,22 @@
 // Vocabulary Extraction — Tests [4A.4]
 // ---------------------------------------------------------------------------
 
-jest.mock('./llm', () => ({ routeAndCall: jest.fn() })); // gc1-allow: routeAndCall is the external LLM boundary; unit tests must not make real provider calls
-jest.mock('./sentry', () => ({
-  captureException: jest.fn(),
-  addBreadcrumb: jest.fn(),
-})); // gc1-allow: sentry.ts wraps @sentry/cloudflare (external error-tracking service); unit tests must not emit real Sentry events
+jest.mock('./llm' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual('./llm') as typeof import('./llm');
+  return {
+    ...actual,
+    routeAndCall: jest.fn(),
+  };
+});
+
+jest.mock('./sentry' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual('./sentry') as typeof import('./sentry');
+  return {
+    ...actual,
+    captureException: jest.fn(),
+    addBreadcrumb: jest.fn(),
+  };
+});
 
 import { extractVocabularyFromTranscript } from './vocabulary-extract';
 import { routeAndCall } from './llm';

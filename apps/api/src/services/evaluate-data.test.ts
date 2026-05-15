@@ -13,10 +13,16 @@ const mockDatabaseModule = createDatabaseModuleMock({
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
-jest.mock('./evaluate', () => ({
-  shouldTriggerEvaluate: jest.fn(),
-  handleEvaluateFailure: jest.fn(),
-}));
+jest.mock('./evaluate' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    './evaluate',
+  ) as typeof import('./evaluate');
+  return {
+    ...actual,
+    shouldTriggerEvaluate: jest.fn(),
+    handleEvaluateFailure: jest.fn(),
+  };
+});
 
 import type { Database } from '@eduagent/database';
 import { createScopedRepository } from '@eduagent/database';
@@ -269,7 +275,7 @@ describe('processEvaluateFailureEscalation', () => {
       db,
       profileId,
       topicId,
-      1
+      1,
     );
 
     expect(result.action).toBe('reveal_flaw');
@@ -296,7 +302,7 @@ describe('processEvaluateFailureEscalation', () => {
       db,
       profileId,
       topicId,
-      2
+      2,
     );
 
     expect(result.action).toBe('lower_difficulty');
@@ -337,7 +343,7 @@ describe('processEvaluateFailureEscalation', () => {
       db,
       profileId,
       topicId,
-      1
+      1,
     );
 
     expect(result.action).toBe('reveal_flaw');

@@ -2,15 +2,21 @@
 // Monthly Report Service Tests
 // ---------------------------------------------------------------------------
 
-jest.mock('./llm', () => ({
-  ...jest.requireActual('./llm'),
-  routeAndCall: jest.fn(),
-}));
+jest.mock('./llm' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual('./llm') as typeof import('./llm');
+  return {
+    ...actual,
+    routeAndCall: jest.fn(),
+  };
+});
 
-jest.mock('./sentry', () => ({
-  ...jest.requireActual('./sentry'),
-  captureException: jest.fn(),
-}));
+jest.mock('./sentry' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual('./sentry') as typeof import('./sentry');
+  return {
+    ...actual,
+    captureException: jest.fn(),
+  };
+});
 
 import type { Database } from '@eduagent/database';
 import type {

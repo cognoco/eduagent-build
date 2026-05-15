@@ -12,48 +12,68 @@ const mockCreateSubscription = jest.fn().mockResolvedValue({
   tier: 'plus',
   status: 'trial',
 });
-jest.mock('./billing', () => ({
-  ...jest.requireActual('./billing'),
-  createSubscription: (...args: unknown[]) => mockCreateSubscription(...args),
-}));
+jest.mock('./billing' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual('./billing') as typeof import('./billing');
+  return {
+    ...actual,
+    createSubscription: (...args: unknown[]) => mockCreateSubscription(...args),
+  };
+});
 
 // Mock the trial service — computeTrialEndDate
 const mockComputeTrialEndDate = jest
   .fn()
   .mockReturnValue(new Date('2025-01-29T23:59:59.999Z'));
-jest.mock('./trial', () => ({
-  ...jest.requireActual('./trial'),
-  computeTrialEndDate: (...args: unknown[]) => mockComputeTrialEndDate(...args),
-}));
+jest.mock('./trial' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual('./trial') as typeof import('./trial');
+  return {
+    ...actual,
+    computeTrialEndDate: (...args: unknown[]) =>
+      mockComputeTrialEndDate(...args),
+  };
+});
 
 // Mock the subscription service — getTierConfig
-jest.mock('./subscription', () => ({
-  ...jest.requireActual('./subscription'),
-  getTierConfig: jest.fn().mockReturnValue({
-    monthlyQuota: 500,
-    dailyLimit: null,
-    maxProfiles: 1,
-    priceMonthly: 18.99,
-    priceYearly: 168,
-    topUpPrice: 10,
-    topUpAmount: 500,
-  }),
-}));
+jest.mock('./subscription' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    './subscription',
+  ) as typeof import('./subscription');
+  return {
+    ...actual,
+    getTierConfig: jest.fn().mockReturnValue({
+      monthlyQuota: 500,
+      dailyLimit: null,
+      maxProfiles: 1,
+      priceMonthly: 18.99,
+      priceYearly: 168,
+      topUpPrice: 10,
+      topUpAmount: 500,
+    }),
+  };
+});
 
 // [BUG-837 / F-SVC-003] The trial-creation catch path now escalates via
 // inngest event + sentry capture + structured log. Mock the dispatch
 // surfaces so tests can assert escalation without a real Inngest client.
 const mockInngestSend = jest.fn().mockResolvedValue(undefined);
-jest.mock('../inngest/client', () => ({
-  // gc1-allow: Inngest SDK external boundary
-  inngest: { send: (...args: unknown[]) => mockInngestSend(...args) },
-}));
+jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../inngest/client',
+  ) as typeof import('../inngest/client');
+  return {
+    ...actual,
+    inngest: { send: (...args: unknown[]) => mockInngestSend(...args) },
+  };
+});
 
 const mockCaptureException = jest.fn();
-jest.mock('./sentry', () => ({
-  // gc1-allow: @sentry/cloudflare external boundary
-  captureException: (...args: unknown[]) => mockCaptureException(...args),
-}));
+jest.mock('./sentry' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual('./sentry') as typeof import('./sentry');
+  return {
+    ...actual,
+    captureException: (...args: unknown[]) => mockCaptureException(...args),
+  };
+});
 
 const NOW = new Date('2025-01-15T10:00:00.000Z');
 

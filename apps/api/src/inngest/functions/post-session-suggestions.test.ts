@@ -9,15 +9,27 @@
 
 const mockRouteAndCall = jest.fn();
 
-jest.mock('../../services/llm' /* gc1-allow: LLM external boundary */, () => ({
-  routeAndCall: (...args: unknown[]) => mockRouteAndCall(...args),
-}));
+jest.mock('../../services/llm' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../../services/llm',
+  ) as typeof import('../../services/llm');
+  return {
+    ...actual,
+    routeAndCall: (...args: unknown[]) => mockRouteAndCall(...args),
+  };
+});
 
 jest.mock(
-  '../../services/llm/sanitize' /* gc1-allow: LLM sanitization boundary */,
-  () => ({
-    sanitizeXmlValue: (s: string) => s,
-  }),
+  '../../services/llm/sanitize' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/llm/sanitize',
+    ) as typeof import('../../services/llm/sanitize');
+    return {
+      ...actual,
+      sanitizeXmlValue: (s: string) => s,
+    };
+  },
 );
 
 const mockDb = {
@@ -30,18 +42,27 @@ const mockDb = {
   insert: jest.fn(),
 };
 
-jest.mock(
-  '../helpers' /* gc1-allow: isolates DB connection in unit tests */,
-  () => ({
+jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../helpers',
+  ) as typeof import('../helpers');
+  return {
+    ...actual,
     getStepDatabase: () => mockDb,
-  }),
-);
+  };
+});
 
 import { createInngestTransportCapture } from '../../test-utils/inngest-transport-capture';
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 
 const mockInngestTransport = createInngestTransportCapture();
-jest.mock('../client', () => mockInngestTransport.module); // gc1-allow: inngest framework boundary
+jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual('../client') as typeof import('../client');
+  return {
+    ...actual,
+    ...mockInngestTransport.module,
+  };
+});
 
 import { postSessionSuggestions } from './post-session-suggestions';
 

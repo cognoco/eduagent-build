@@ -2,53 +2,95 @@
 // Stripe Webhook Route — Tests
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/stripe', () => ({ verifyWebhookSignature: jest.fn() })); // gc1-allow: thin wrapper over stripe external SDK — real impl makes HTTPS calls to Stripe API
+jest.mock('../services/stripe' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/stripe',
+  ) as typeof import('../services/stripe');
+  return {
+    ...actual,
+    verifyWebhookSignature: jest.fn(),
+  };
+});
 
-jest.mock('../services/kv', () => ({
-  ...jest.requireActual('../services/kv'),
-  writeSubscriptionStatus: jest.fn().mockResolvedValue(undefined),
-}));
+jest.mock('../services/kv' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/kv',
+  ) as typeof import('../services/kv');
+  return {
+    ...actual,
+    writeSubscriptionStatus: jest.fn().mockResolvedValue(undefined),
+  };
+});
 
-jest.mock('../services/billing', () => ({
-  ...jest.requireActual('../services/billing'),
-  updateSubscriptionFromWebhook: jest.fn(),
-  getSubscriptionByAccountId: jest.fn(),
-  ensureFreeSubscription: jest.fn(),
-  getQuotaPool: jest.fn(),
-  activateSubscriptionFromCheckout: jest.fn(),
-  updateQuotaPoolLimit: jest.fn(),
-}));
+jest.mock('../services/billing' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/billing',
+  ) as typeof import('../services/billing');
+  return {
+    ...actual,
+    updateSubscriptionFromWebhook: jest.fn(),
+    getSubscriptionByAccountId: jest.fn(),
+    ensureFreeSubscription: jest.fn(),
+    getQuotaPool: jest.fn(),
+    activateSubscriptionFromCheckout: jest.fn(),
+    updateQuotaPoolLimit: jest.fn(),
+  };
+});
 
-jest.mock('../services/subscription', () => ({
-  ...jest.requireActual('../services/subscription'),
-  getTierConfig: jest.fn((tier: string) =>
-    tier === 'free'
-      ? {
-          monthlyQuota: 100,
-          dailyLimit: 10,
-          maxProfiles: 1,
-          priceMonthly: 0,
-          priceYearly: 0,
-          topUpPrice: 0,
-          topUpAmount: 0,
-        }
-      : {
-          monthlyQuota: 500,
-          dailyLimit: null,
-          maxProfiles: 1,
-          priceMonthly: 18.99,
-          priceYearly: 168,
-          topUpPrice: 10,
-          topUpAmount: 500,
-        },
-  ),
-}));
+jest.mock(
+  '../services/subscription' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../services/subscription',
+    ) as typeof import('../services/subscription');
+    return {
+      ...actual,
+      getTierConfig: jest.fn((tier: string) =>
+        tier === 'free'
+          ? {
+              monthlyQuota: 100,
+              dailyLimit: 10,
+              maxProfiles: 1,
+              priceMonthly: 0,
+              priceYearly: 0,
+              topUpPrice: 0,
+              topUpAmount: 0,
+            }
+          : {
+              monthlyQuota: 500,
+              dailyLimit: null,
+              maxProfiles: 1,
+              priceMonthly: 18.99,
+              priceYearly: 168,
+              topUpPrice: 10,
+              topUpAmount: 500,
+            },
+      ),
+    };
+  },
+);
 
-jest.mock('../inngest/client', () => ({
-  inngest: { send: jest.fn().mockResolvedValue(undefined) },
-})); // gc1-allow: Inngest framework boundary — real send() dispatches to Inngest cloud
+jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../inngest/client',
+  ) as typeof import('../inngest/client');
+  return {
+    ...actual,
+    inngest: {
+      send: jest.fn().mockResolvedValue(undefined),
+    },
+  };
+});
 
-jest.mock('../services/sentry', () => ({ captureException: jest.fn() })); // gc1-allow: thin wrapper over @sentry/cloudflare external SDK
+jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/sentry',
+  ) as typeof import('../services/sentry');
+  return {
+    ...actual,
+    captureException: jest.fn(),
+  };
+});
 
 import { Hono } from 'hono';
 import { stripeWebhookRoute } from './stripe-webhook';

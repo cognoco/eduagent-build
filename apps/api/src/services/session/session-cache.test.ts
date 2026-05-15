@@ -17,43 +17,79 @@ jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
 const mockFetchPriorTopics = jest.fn();
 const mockFetchCrossSubjectHighlights = jest.fn();
-jest.mock('../prior-learning' /* gc1-allow: unit test boundary */, () => ({
-  fetchPriorTopics: (...args: unknown[]) => mockFetchPriorTopics(...args),
-  fetchCrossSubjectHighlights: (...args: unknown[]) =>
-    mockFetchCrossSubjectHighlights(...args),
-  buildPriorLearningContext: jest.fn(),
-  buildCrossSubjectContext: jest.fn(),
-}));
+jest.mock('../prior-learning' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../prior-learning',
+  ) as typeof import('../prior-learning');
+  return {
+    ...actual,
+    fetchPriorTopics: (...args: unknown[]) => mockFetchPriorTopics(...args),
+    fetchCrossSubjectHighlights: (...args: unknown[]) =>
+      mockFetchCrossSubjectHighlights(...args),
+    buildPriorLearningContext: jest.fn(),
+    buildCrossSubjectContext: jest.fn(),
+  };
+});
 
 const mockGetTeachingPreference = jest.fn();
-jest.mock('../retention-data' /* gc1-allow: unit test boundary */, () => ({
-  getTeachingPreference: (...args: unknown[]) =>
-    mockGetTeachingPreference(...args),
-}));
+jest.mock('../retention-data' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../retention-data',
+  ) as typeof import('../retention-data');
+  return {
+    ...actual,
+    getTeachingPreference: (...args: unknown[]) =>
+      mockGetTeachingPreference(...args),
+  };
+});
 
 const mockGetLearningMode = jest.fn();
-jest.mock('../settings' /* gc1-allow: unit test boundary */, () => ({
-  getLearningMode: (...args: unknown[]) => mockGetLearningMode(...args),
-}));
+jest.mock('../settings' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../settings',
+  ) as typeof import('../settings');
+  return {
+    ...actual,
+    getLearningMode: (...args: unknown[]) => mockGetLearningMode(...args),
+  };
+});
 
 const mockGetLearningProfile = jest.fn();
-jest.mock('../learner-profile' /* gc1-allow: unit test boundary */, () => ({
-  getLearningProfile: (...args: unknown[]) => mockGetLearningProfile(...args),
-  buildMemoryBlock: jest.fn(),
-  buildAccommodationBlock: jest.fn(),
-}));
+jest.mock('../learner-profile' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../learner-profile',
+  ) as typeof import('../learner-profile');
+  return {
+    ...actual,
+    getLearningProfile: (...args: unknown[]) => mockGetLearningProfile(...args),
+    buildMemoryBlock: jest.fn(),
+    buildAccommodationBlock: jest.fn(),
+  };
+});
 
 const mockGetSubject = jest.fn();
-jest.mock('../subject' /* gc1-allow: unit test boundary */, () => ({
-  // gc1-allow: mutex unit test — controls getSubject call count to verify single supplementary fan-out
-  getSubject: (...args: unknown[]) => mockGetSubject(...args),
-}));
+jest.mock('../subject' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../subject',
+  ) as typeof import('../subject');
+  return {
+    ...actual,
+    // gc1-allow: mutex unit test — controls getSubject call count to verify single supplementary fan-out
+    getSubject: (...args: unknown[]) => mockGetSubject(...args),
+  };
+});
 
 const mockLoadProfileRowById = jest.fn();
-jest.mock('../profile' /* gc1-allow: unit test boundary */, () => ({
-  // gc1-allow: mutex unit test — controls loadProfileRowById call count to verify single supplementary fan-out
-  loadProfileRowById: (...args: unknown[]) => mockLoadProfileRowById(...args),
-}));
+jest.mock('../profile' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../profile',
+  ) as typeof import('../profile');
+  return {
+    ...actual,
+    // gc1-allow: mutex unit test — controls loadProfileRowById call count to verify single supplementary fan-out
+    loadProfileRowById: (...args: unknown[]) => mockLoadProfileRowById(...args),
+  };
+});
 
 import {
   clearSessionStaticContextForProfile,

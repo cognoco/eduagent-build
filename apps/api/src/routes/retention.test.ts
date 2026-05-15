@@ -14,47 +14,59 @@ const mockDatabaseModule = createDatabaseModuleMock();
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
-jest.mock('../services/account', () => ({
-  // gc1-allow: findOrCreateAccount fires Stripe/Inngest side-effects via accountMiddleware; stub isolates route tests from billing chain
-  ...(jest.requireActual('../services/account') as Record<string, unknown>),
-  findOrCreateAccount: jest.fn().mockResolvedValue({
-    id: 'test-account-id',
-    clerkUserId: 'user_test',
-    email: 'test@example.com',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  }),
-}));
+jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/account',
+  ) as typeof import('../services/account');
+  return {
+    ...actual,
+    findOrCreateAccount: jest.fn().mockResolvedValue({
+      id: 'test-account-id',
+      clerkUserId: 'user_test',
+      email: 'test@example.com',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }),
+  };
+});
 
-jest.mock('../services/profile', () => ({
-  // gc1-allow: profileScopeMiddleware calls getProfile/findOwnerProfile; stub controls middleware-injected profileId for route-layer assertions
-  ...(jest.requireActual('../services/profile') as Record<string, unknown>),
-  findOwnerProfile: jest.fn().mockResolvedValue(null),
-  getProfile: jest.fn().mockResolvedValue({
-    id: 'test-profile-id',
-    birthYear: null,
-    location: null,
-    consentStatus: 'CONSENTED',
-  }),
-}));
+jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/profile',
+  ) as typeof import('../services/profile');
+  return {
+    ...actual,
+    findOwnerProfile: jest.fn().mockResolvedValue(null),
+    getProfile: jest.fn().mockResolvedValue({
+      id: 'test-profile-id',
+      birthYear: null,
+      location: null,
+      consentStatus: 'CONSENTED',
+    }),
+  };
+});
 
-jest.mock('../services/retention-data', () => ({
-  // gc1-allow: retention-data is the SUT service boundary; stubs let each test control per-case return values without a live DB
-  ...(jest.requireActual('../services/retention-data') as Record<
-    string,
-    unknown
-  >),
-  getSubjectRetention: jest.fn(),
-  getAllSubjectsRetention: jest.fn(),
-  getTopicRetention: jest.fn(),
-  processRecallTest: jest.fn(),
-  startRelearn: jest.fn(),
-  getSubjectNeedsDeepening: jest.fn(),
-  getTeachingPreference: jest.fn(),
-  setTeachingPreference: jest.fn(),
-  deleteTeachingPreference: jest.fn(),
-  getStableTopics: jest.fn(),
-}));
+jest.mock(
+  '../services/retention-data' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../services/retention-data',
+    ) as typeof import('../services/retention-data');
+    return {
+      ...actual,
+      getSubjectRetention: jest.fn(),
+      getAllSubjectsRetention: jest.fn(),
+      getTopicRetention: jest.fn(),
+      processRecallTest: jest.fn(),
+      startRelearn: jest.fn(),
+      getSubjectNeedsDeepening: jest.fn(),
+      getTeachingPreference: jest.fn(),
+      setTeachingPreference: jest.fn(),
+      deleteTeachingPreference: jest.fn(),
+      getStableTopics: jest.fn(),
+    };
+  },
+);
 
 import { app } from '../index';
 import {

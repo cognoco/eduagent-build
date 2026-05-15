@@ -2,10 +2,10 @@
 // Stub the LLM router — true external boundary, requireActual pattern
 // ---------------------------------------------------------------------------
 
-jest.mock('../llm', () => ({
-  ...(jest.requireActual('../llm') as object),
-  routeAndCall: jest.fn(),
-}));
+jest.mock('../llm' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual('../llm') as typeof import('../llm');
+  return { ...actual, routeAndCall: jest.fn() };
+});
 
 import { routeAndCall } from '../llm';
 import { prepareHomework } from './prepare-homework';

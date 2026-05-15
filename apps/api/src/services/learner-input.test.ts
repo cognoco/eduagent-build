@@ -1,14 +1,15 @@
-jest.mock('./llm', () => ({
-  // gc1-allow: routeAndCall is the LLM external-boundary proxy; requires controlled stub to avoid real LLM calls in unit tests
-  routeAndCall: jest.fn(),
-}));
+jest.mock('./llm' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual('./llm') as typeof import('./llm');
+  return {
+    ...actual,
+    routeAndCall: jest.fn(),
+  };
+});
 
-jest.mock('./learner-profile', () => {
-  // gc1-allow: requireActual + targeted override for applyAnalysis side effect
-  const actual = jest.requireActual('./learner-profile') as Record<
-    string,
-    unknown
-  >;
+jest.mock('./learner-profile' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    './learner-profile',
+  ) as typeof import('./learner-profile');
   return {
     ...actual,
     applyAnalysis: jest.fn(),

@@ -164,10 +164,10 @@ Sort by descending count, tier appropriately, work simple → hard.
 
 Use this template for every file-level conversion sub-agent. Fill in `<TARGET_FILE>` and `<EXPECTED_SHADOW_COUNT>`.
 
-```
+```text
 You're converting shadow jest.mock() calls in ONE test file to Pattern A.
 
-REPO ROOT: /Users/vetinari/_dev/eduagent-build/goal/mock-claude
+REPO ROOT: <REPO_ROOT>
 TARGET FILE: <TARGET_FILE>
 EXPECTED SHADOW MOCKS IN THIS FILE: <EXPECTED_SHADOW_COUNT>
 
@@ -197,7 +197,7 @@ Three required components:
 1. Read the target file. Identify every shadow mock (test against the criteria above).
 2. Convert each to Pattern A as shown.
 3. Run targeted tests:
-   `cd /Users/vetinari/_dev/eduagent-build/goal/mock-claude && pnpm exec jest --config apps/api/jest.config.ts --findRelatedTests <TARGET_FILE> --no-coverage`
+   `cd <REPO_ROOT> && pnpm exec jest --config apps/api/jest.config.ts --findRelatedTests <TARGET_FILE> --no-coverage`
 4. If tests pass, report SUCCESS.
 5. If tests fail, fix and re-run. Max 2 attempts. If still failing, report FAILURE with output.
 

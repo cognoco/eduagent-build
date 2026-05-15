@@ -27,7 +27,7 @@ tags:
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
     env:
-      SEED_SCENARIO: "parent-with-children"
+      SEED_SCENARIO: 'parent-with-children'
       API_URL: ${API_URL}
 
 # 2. Parent owners land on LearnerScreen; enter the Family dashboard.
@@ -41,18 +41,18 @@ tags:
 #    past child detail, see consent-management fix).
 #    parent-home-check-child-${CHILD_PROFILE_ID} is the IntentCard on ParentHomeScreen.
 - tapOn:
-    id: "parent-home-check-child-${CHILD_PROFILE_ID}"
+    id: 'parent-home-check-child-${CHILD_PROFILE_ID}'
 
 # 5. Wait for child detail screen
 - extendedWaitUntil:
     visible:
-      id: "child-detail-scroll"
+      id: 'child-detail-scroll'
     timeout: 10000
 
 # 6. Verify "Subjects" heading
 - extendedWaitUntil:
     visible:
-      text: "Subjects"
+      text: 'Subjects'
     timeout: 5000
     optional: true
 
@@ -61,7 +61,7 @@ tags:
 
 # 8. Verify subject name is visible (seed-dependent)
 - assertVisible:
-    text: "Mathematics"
+    text: 'Mathematics'
     optional: true
 
 # 9. Check for rawInput subtitle — "Your child searched for" text
@@ -69,12 +69,12 @@ tags:
 #    If the seed includes a subject with rawInput (e.g., "ants" → "Biology — Entomology"),
 #    this assertion will pass. Otherwise it's optional until seed is updated.
 - assertVisible:
-    text: "Your child searched for"
+    text: 'Your child searched for'
     optional: true
 
 # 10. Check for the specific rawInput testID pattern
 - assertVisible:
-    id: "subject-raw-input-Mathematics"
+    id: 'subject-raw-input-${SUBJECT_ID}'
     optional: true
 
 # 11. Screenshot: subject cards (captures rawInput subtitle if present)
@@ -82,7 +82,7 @@ tags:
 
 # 12. Navigate back to dashboard
 - tapOn:
-    id: "back-button"
+    id: 'back-button'
 
 # 13. Final screenshot
 - takeScreenshot: raw-input-audit-04-back-to-dashboard

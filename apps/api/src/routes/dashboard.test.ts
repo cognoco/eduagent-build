@@ -44,10 +44,16 @@ const mockFindOrCreateAccount = jest.fn().mockResolvedValue({
   updatedAt: new Date().toISOString(),
 });
 
-jest.mock('../services/account', () => ({
-  ...jest.requireActual('../services/account'),
-  findOrCreateAccount: (...args: unknown[]) => mockFindOrCreateAccount(...args),
-}));
+jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/account',
+  ) as typeof import('../services/account');
+  return {
+    ...actual,
+    findOrCreateAccount: (...args: unknown[]) =>
+      mockFindOrCreateAccount(...args),
+  };
+});
 
 const mockFindOwnerProfile = jest.fn().mockResolvedValue(null);
 const mockGetProfile = jest.fn().mockResolvedValue({
@@ -57,24 +63,34 @@ const mockGetProfile = jest.fn().mockResolvedValue({
   consentStatus: 'CONSENTED',
 });
 
-jest.mock('../services/profile', () => ({
-  ...jest.requireActual('../services/profile'),
-  findOwnerProfile: (...args: unknown[]) => mockFindOwnerProfile(...args),
-  getProfile: (...args: unknown[]) => mockGetProfile(...args),
-}));
+jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/profile',
+  ) as typeof import('../services/profile');
+  return {
+    ...actual,
+    findOwnerProfile: (...args: unknown[]) => mockFindOwnerProfile(...args),
+    getProfile: (...args: unknown[]) => mockGetProfile(...args),
+  };
+});
 
 const mockGetChildrenForParent = jest.fn().mockResolvedValue([]);
 const mockGetChildDetail = jest.fn().mockResolvedValue(null);
 const mockGetChildSubjectTopics = jest.fn().mockResolvedValue([]);
 
-jest.mock('../services/dashboard', () => ({
-  ...jest.requireActual('../services/dashboard'),
-  getChildrenForParent: (...args: unknown[]) =>
-    mockGetChildrenForParent(...args),
-  getChildDetail: (...args: unknown[]) => mockGetChildDetail(...args),
-  getChildSubjectTopics: (...args: unknown[]) =>
-    mockGetChildSubjectTopics(...args),
-}));
+jest.mock('../services/dashboard' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/dashboard',
+  ) as typeof import('../services/dashboard');
+  return {
+    ...actual,
+    getChildrenForParent: (...args: unknown[]) =>
+      mockGetChildrenForParent(...args),
+    getChildDetail: (...args: unknown[]) => mockGetChildDetail(...args),
+    getChildSubjectTopics: (...args: unknown[]) =>
+      mockGetChildSubjectTopics(...args),
+  };
+});
 
 const mockGetProgressSummary = jest.fn().mockResolvedValue({
   summary: null,
@@ -99,15 +115,23 @@ const mockMarkWeeklyReportViewed = jest.fn().mockResolvedValue(undefined);
 // NOTE: This is a route-unit test — shallow-mocking the weekly-report service
 // is intentional here. Integration coverage for the service layer lives in the
 // Inngest integration test (weekly-progress-push.integration.test.ts).
-jest.mock('../services/weekly-report', () => ({
-  ...jest.requireActual('../services/weekly-report'),
-  listWeeklyReportsForParentChild: (...args: unknown[]) =>
-    mockListWeeklyReports(...args),
-  getWeeklyReportForParentChild: (...args: unknown[]) =>
-    mockGetWeeklyReport(...args),
-  markWeeklyReportViewed: (...args: unknown[]) =>
-    mockMarkWeeklyReportViewed(...args),
-}));
+jest.mock(
+  '../services/weekly-report' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../services/weekly-report',
+    ) as typeof import('../services/weekly-report');
+    return {
+      ...actual,
+      listWeeklyReportsForParentChild: (...args: unknown[]) =>
+        mockListWeeklyReports(...args),
+      getWeeklyReportForParentChild: (...args: unknown[]) =>
+        mockGetWeeklyReport(...args),
+      markWeeklyReportViewed: (...args: unknown[]) =>
+        mockMarkWeeklyReportViewed(...args),
+    };
+  },
+);
 
 import { app } from '../index';
 import { ForbiddenError } from '../errors';

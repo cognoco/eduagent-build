@@ -23,16 +23,22 @@ const mockDatabaseModule = createDatabaseModuleMock({
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
-jest.mock('../services/account', () => ({
-  // gc1-allow: findOrCreateAccount calls real Clerk+DB; requireActual would fire live network in unit tests
-  findOrCreateAccount: jest.fn().mockResolvedValue({
-    id: 'test-account-id',
-    clerkUserId: 'user_test',
-    email: 'test@example.com',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  }),
-}));
+jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/account',
+  ) as typeof import('../services/account');
+  return {
+    ...actual,
+    // gc1-allow: stubs findOrCreateAccount — avoids real Clerk/DB round-trip in unit tests for settings routes
+    findOrCreateAccount: jest.fn().mockResolvedValue({
+      id: 'test-account-id',
+      clerkUserId: 'user_test',
+      email: 'test@example.com',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }),
+  };
+});
 
 const mockGetOwnedFamilyPoolBreakdownSharing = jest.fn();
 const mockUpsertFamilyPoolBreakdownSharing = jest.fn();
@@ -63,10 +69,15 @@ jest.mock('../services/session/session-cache', () => {
 });
 
 const mockCaptureException = jest.fn();
-jest.mock('../services/sentry', () => ({
-  // gc1-allow: sentry is a real external egress service; pure stub captures calls for assertion without firing real SDK
-  captureException: (...args: unknown[]) => mockCaptureException(...args),
-}));
+jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/sentry',
+  ) as typeof import('../services/sentry');
+  return {
+    ...actual,
+    captureException: (...args: unknown[]) => mockCaptureException(...args),
+  };
+});
 
 import { app } from '../index';
 import { BASE_AUTH_ENV, makeAuthHeaders } from '../test-utils/test-env';

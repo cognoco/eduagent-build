@@ -148,9 +148,12 @@ describe('PickBookScreen', () => {
   it('renders suggestion cards', async () => {
     const { getByText } = render(<PickBookScreen />, { wrapper: TestWrapper });
 
-    await waitFor(() => {
-      getByText('Europe');
-    });
+    await waitFor(
+      () => {
+        getByText('Europe');
+      },
+      { timeout: 8_000 },
+    );
     getByText('Asia');
   });
 

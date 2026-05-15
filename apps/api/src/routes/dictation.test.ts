@@ -19,39 +19,54 @@ const meteringFixture = createRouteMeteringFixture(mockDatabaseModule.db, {
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
-jest.mock('../services/account', () => ({
-  ...jest.requireActual('../services/account'),
-  findOrCreateAccount: jest.fn().mockResolvedValue({
-    id: 'test-account-id',
-    clerkUserId: 'user_test',
-    email: 'test@example.com',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  }),
-}));
+jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/account',
+  ) as typeof import('../services/account');
+  return {
+    ...actual,
+    findOrCreateAccount: jest.fn().mockResolvedValue({
+      id: 'test-account-id',
+      clerkUserId: 'user_test',
+      email: 'test@example.com',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }),
+  };
+});
 
-jest.mock('../services/profile', () => ({
-  ...jest.requireActual('../services/profile'),
-  findOwnerProfile: jest.fn().mockResolvedValue(null),
-  getProfile: jest.fn().mockResolvedValue({
-    id: 'test-profile-id',
-    birthYear: 2016,
-    location: null,
-    consentStatus: 'CONSENTED',
-    hasPremiumLlm: false,
-  }),
-}));
+jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/profile',
+  ) as typeof import('../services/profile');
+  return {
+    ...actual,
+    findOwnerProfile: jest.fn().mockResolvedValue(null),
+    getProfile: jest.fn().mockResolvedValue({
+      id: 'test-profile-id',
+      birthYear: 2016,
+      location: null,
+      consentStatus: 'CONSENTED',
+      hasPremiumLlm: false,
+    }),
+  };
+});
 
-// Stub dictation service functions — real implementations call the LLM (external boundary).
-jest.mock('../services/dictation', () => ({
-  ...jest.requireActual('../services/dictation'),
-  prepareHomework: jest.fn(),
-  generateDictation: jest.fn(),
-  reviewDictation: jest.fn(),
-  recordDictationResult: jest.fn(),
-  getDictationStreak: jest.fn(),
-  fetchGenerateContext: jest.fn(),
-}));
+// Mock the dictation services — they are the internal boundary
+jest.mock('../services/dictation' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/dictation',
+  ) as typeof import('../services/dictation');
+  return {
+    ...actual,
+    prepareHomework: jest.fn(),
+    generateDictation: jest.fn(),
+    reviewDictation: jest.fn(),
+    recordDictationResult: jest.fn(),
+    getDictationStreak: jest.fn(),
+    fetchGenerateContext: jest.fn(),
+  };
+});
 
 import { app } from '../index';
 import {

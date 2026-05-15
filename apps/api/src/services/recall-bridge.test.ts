@@ -21,9 +21,13 @@ jest.mock('@eduagent/database', () => mockDatabaseModule.module); // gc1-allow: 
 
 const mockRouteAndCall = jest.fn();
 
-jest.mock('./llm' /* gc1-allow: LLM external boundary */, () => ({
-  routeAndCall: (...args: unknown[]) => mockRouteAndCall(...args),
-}));
+jest.mock('./llm' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual('./llm') as typeof import('./llm');
+  return {
+    ...actual,
+    routeAndCall: (...args: unknown[]) => mockRouteAndCall(...args),
+  };
+});
 
 import { generateRecallBridge } from './recall-bridge';
 

@@ -7,11 +7,21 @@ import { createDatabaseModuleMock } from '../test-utils/database-module';
 const mockDatabaseModule = createDatabaseModuleMock({
   db: { mock: true },
 });
-const mockCaptureException = jest.fn();
+const mockSentryCaptureException = jest.fn();
+const mockSentrySetExtra = jest.fn();
+const mockSentryScope = {
+  setUser: jest.fn(),
+  setTag: jest.fn(),
+  setExtra: mockSentrySetExtra,
+};
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
-jest.mock('../services/sentry', () => ({
-  captureException: (...args: unknown[]) => mockCaptureException(...args),
+jest.mock('@sentry/cloudflare', () => ({
+  withScope: (cb: (scope: typeof mockSentryScope) => void) =>
+    cb(mockSentryScope),
+  captureException: (...args: unknown[]) => mockSentryCaptureException(...args),
+  captureMessage: jest.fn(),
+  addBreadcrumb: jest.fn(),
 }));
 
 import { Hono } from 'hono';
@@ -146,9 +156,58 @@ describe('databaseMiddleware', () => {
     const res = await app.request('/stream', {}, TEST_ENV);
 
     await expect(res.text()).rejects.toThrow();
-    expect(mockCaptureException).toHaveBeenCalledWith(closeErr, {
-      extra: { phase: 'sse-stream-error-close' },
+    expect(mockSentrySetExtra).toHaveBeenCalledWith(
+      'phase',
+      'sse-stream-error-close',
+    );
+    expect(mockSentryCaptureException).toHaveBeenCalledWith(closeErr);
+  });
+
+  it('falls back to normal close when an SSE body reader is unavailable', async () => {
+    const app = new Hono<{
+      Bindings: { DATABASE_URL: string };
+      Variables: { db: unknown };
+    }>();
+    app.use('*', databaseMiddleware);
+    app.get('/stream', () => {
+      const stream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode('data: ok\n\n'));
+        },
+      });
+      const res = new Response(stream, {
+        headers: { 'Content-Type': 'text/event-stream' },
+      });
+      jest.spyOn(res.body!, 'getReader').mockImplementation(() => {
+        throw new Error('body locked');
+      });
+      return res;
     });
+
+    await app.request('/stream', {}, TEST_ENV);
+
+    expect(closeDatabase).toHaveBeenCalledWith(mockDatabaseModule.db);
+  });
+
+  it('reports close failures after a non-streaming response', async () => {
+    const closeErr = new Error('close failed');
+    mockDatabaseModule.closeDatabase.mockRejectedValueOnce(closeErr);
+    const app = new Hono<{
+      Bindings: { DATABASE_URL: string };
+      Variables: { db: unknown };
+    }>();
+    app.use('*', databaseMiddleware);
+    app.get('/test', (c) => c.json({ ok: true }));
+
+    const res = await app.request('/test', {}, TEST_ENV);
+    await Promise.resolve();
+
+    expect(res.status).toBe(200);
+    expect(mockSentrySetExtra).toHaveBeenCalledWith(
+      'phase',
+      'request-db-close',
+    );
+    expect(mockSentryCaptureException).toHaveBeenCalledWith(closeErr);
   });
 
   it('skips database creation when DATABASE_URL is missing', async () => {

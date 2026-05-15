@@ -3,10 +3,15 @@
 // ---------------------------------------------------------------------------
 
 const mockGenerateEmbedding = jest.fn();
-jest.mock('./embeddings', () => ({
-  // gc1-allow: generateEmbedding calls Voyage AI REST API — true external boundary, relative import required
-  generateEmbedding: (...args: unknown[]) => mockGenerateEmbedding(...args),
-}));
+jest.mock('./embeddings' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    './embeddings',
+  ) as typeof import('./embeddings');
+  return {
+    ...actual,
+    generateEmbedding: (...args: unknown[]) => mockGenerateEmbedding(...args),
+  };
+});
 
 const mockFindSimilarTopics = jest.fn();
 

@@ -20,7 +20,11 @@ async function closeDatabaseWithFallback(
   c: Context<DatabaseEnv>,
   db: Database,
 ): Promise<void> {
-  const closePromise = closeDatabase(db);
+  const closePromise = closeDatabase(db).catch((err) => {
+    captureException(err, {
+      extra: { phase: 'request-db-close' },
+    });
+  });
   try {
     c.executionCtx.waitUntil(closePromise);
   } catch {
@@ -37,7 +41,12 @@ function wrapStreamingResponseForDatabaseClose(
   if (!contentType.toLowerCase().includes('text/event-stream')) return false;
   if (!response.body) return false;
 
-  const reader = response.body.getReader();
+  let reader: ReadableStreamDefaultReader<Uint8Array>;
+  try {
+    reader = response.body.getReader();
+  } catch {
+    return false;
+  }
   let closePromise: Promise<void> | undefined;
   const closeOnce = () => {
     closePromise ??= closeDatabase(db);

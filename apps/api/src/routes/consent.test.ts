@@ -6,36 +6,54 @@ jest.mock('inngest/hono', () => ({
   serve: jest.fn().mockReturnValue(jest.fn()),
 }));
 
-jest.mock('../inngest/client', () => ({
-  // gc1-allow: Inngest SDK external boundary
-  inngest: {
-    send: jest.fn().mockResolvedValue(undefined),
-    createFunction: jest.fn().mockReturnValue(jest.fn()),
-  },
-}));
+jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../inngest/client',
+  ) as typeof import('../inngest/client');
+  return {
+    ...actual,
+    inngest: {
+      send: jest.fn().mockResolvedValue(undefined),
+      createFunction: jest.fn().mockReturnValue(jest.fn()),
+    },
+  };
+});
 
 const mockCaptureException = jest.fn();
 
-jest.mock('../services/sentry', () => ({
-  // gc1-allow: @sentry/cloudflare external boundary
-  captureException: (...args: unknown[]) => mockCaptureException(...args),
-}));
+jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/sentry',
+  ) as typeof import('../services/sentry');
+  return {
+    ...actual,
+    captureException: (...args: unknown[]) => mockCaptureException(...args),
+  };
+});
 
-jest.mock('../services/notifications', () => ({
-  // gc1-allow: email + push notification external boundary
-  sendEmail: jest.fn().mockResolvedValue({ sent: true }),
-  formatConsentRequestEmail: jest.fn().mockReturnValue({
-    to: 'parent@example.com',
-    subject: 'Test',
-    body: 'Test',
-    type: 'consent_request',
-  }),
-  sendPushNotification: jest.fn().mockResolvedValue({ sent: true }),
-  formatReviewReminderBody: jest.fn(),
-  formatDailyReminderBody: jest.fn(),
-  formatConsentReminderEmail: jest.fn(),
-  MAX_DAILY_PUSH: 3,
-}));
+jest.mock(
+  '../services/notifications' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../services/notifications',
+    ) as typeof import('../services/notifications');
+    return {
+      ...actual,
+      sendEmail: jest.fn().mockResolvedValue({ sent: true }),
+      formatConsentRequestEmail: jest.fn().mockReturnValue({
+        to: 'parent@example.com',
+        subject: 'Test',
+        body: 'Test',
+        type: 'consent_request',
+      }),
+      sendPushNotification: jest.fn().mockResolvedValue({ sent: true }),
+      formatReviewReminderBody: jest.fn(),
+      formatDailyReminderBody: jest.fn(),
+      formatConsentReminderEmail: jest.fn(),
+      MAX_DAILY_PUSH: 3,
+    };
+  },
+);
 
 // ---------------------------------------------------------------------------
 // Real JWT + real auth middleware — no jwt module mock
@@ -61,58 +79,57 @@ jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 // Mock account + consent services — no DB interaction
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/account', () => ({
-  // gc1-allow: requireActual spread + targeted override; findOrCreateAccount stubbed to avoid DB in route unit tests
-  ...jest.requireActual('../services/account'),
-  findOrCreateAccount: jest.fn().mockResolvedValue({
-    id: 'test-account-id',
-    clerkUserId: 'user_test',
-    email: 'test@example.com',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  }),
-}));
-
-jest.mock('../services/profile', () => ({
-  // gc1-allow: requireActual spread + targeted override; profile lookup functions stubbed to avoid DB in route unit tests
-  ...jest.requireActual('../services/profile'),
-  findOwnerProfile: jest.fn().mockResolvedValue({
-    id: 'test-profile-id',
-    birthYear: 2010,
-    location: 'EU',
-    consentStatus: 'CONSENTED',
-  }),
-  getProfile: jest.fn().mockResolvedValue({
-    id: 'test-profile-id',
-    accountId: 'test-account-id',
-    displayName: 'Test User',
-    avatarUrl: null,
-    isOwner: false,
-    consentStatus: null,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  }),
-  listProfiles: jest.fn().mockResolvedValue([]),
-  createProfile: jest.fn(),
-  updateProfile: jest.fn(),
-  switchProfile: jest.fn(),
-}));
-
-jest.mock('../services/consent', () => {
-  // gc1-allow: requireActual used for error classes (instanceof checks); service functions stubbed to avoid DB in route unit tests
-  const actual = jest.requireActual('../services/consent') as Record<
-    string,
-    unknown
-  >;
+jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/account',
+  ) as typeof import('../services/account');
   return {
-    // Preserve real error classes so instanceof checks work in route handlers
-    ConsentResendLimitError: actual.ConsentResendLimitError,
-    EmailDeliveryError: actual.EmailDeliveryError,
-    ConsentTokenNotFoundError: actual.ConsentTokenNotFoundError,
-    ConsentAlreadyProcessedError: actual.ConsentAlreadyProcessedError,
-    ConsentTokenExpiredError: actual.ConsentTokenExpiredError,
-    ConsentNotAuthorizedError: actual.ConsentNotAuthorizedError,
-    ConsentRecordNotFoundError: actual.ConsentRecordNotFoundError,
+    ...actual,
+    findOrCreateAccount: jest.fn().mockResolvedValue({
+      id: 'test-account-id',
+      clerkUserId: 'user_test',
+      email: 'test@example.com',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }),
+  };
+});
+
+jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/profile',
+  ) as typeof import('../services/profile');
+  return {
+    ...actual,
+    findOwnerProfile: jest.fn().mockResolvedValue({
+      id: 'test-profile-id',
+      birthYear: 2010,
+      location: 'EU',
+      consentStatus: 'CONSENTED',
+    }),
+    getProfile: jest.fn().mockResolvedValue({
+      id: 'test-profile-id',
+      accountId: 'test-account-id',
+      displayName: 'Test User',
+      avatarUrl: null,
+      isOwner: false,
+      consentStatus: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }),
+    listProfiles: jest.fn().mockResolvedValue([]),
+    createProfile: jest.fn(),
+    updateProfile: jest.fn(),
+    switchProfile: jest.fn(),
+  };
+});
+
+jest.mock('../services/consent' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/consent',
+  ) as typeof import('../services/consent');
+  return {
+    ...actual,
     checkConsentRequired: jest.fn().mockReturnValue({
       required: true,
       consentType: 'GDPR',

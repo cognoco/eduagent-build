@@ -51,10 +51,20 @@ const mockGenerateBookTopics = jest.fn().mockResolvedValue({
   connections: [],
 });
 
-jest.mock('../../services/book-generation', () => ({
-  // gc1-allow: prevents real LLM calls while asserting topic generation boundary
-  generateBookTopics: (...args: unknown[]) => mockGenerateBookTopics(...args),
-}));
+jest.mock(
+  '../../services/book-generation' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/book-generation',
+    ) as typeof import('../../services/book-generation');
+    return {
+      ...actual,
+      // gc1-allow: prevents real LLM calls while asserting topic generation boundary
+      generateBookTopics: (...args: unknown[]) =>
+        mockGenerateBookTopics(...args),
+    };
+  },
+);
 
 const mockPersistBookTopics = jest.fn().mockResolvedValue({
   book: { id: 'book-2', title: 'Next Book' },
@@ -64,10 +74,19 @@ const mockPersistBookTopics = jest.fn().mockResolvedValue({
   completedTopicCount: 0,
 });
 
-jest.mock('../../services/curriculum', () => ({
-  // gc1-allow: prevents real DB writes while asserting curriculum persistence boundary
-  persistBookTopics: (...args: unknown[]) => mockPersistBookTopics(...args),
-}));
+jest.mock(
+  '../../services/curriculum' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/curriculum',
+    ) as typeof import('../../services/curriculum');
+    return {
+      ...actual,
+      // gc1-allow: prevents real DB writes while asserting curriculum persistence boundary
+      persistBookTopics: (...args: unknown[]) => mockPersistBookTopics(...args),
+    };
+  },
+);
 
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 import { bookPreGeneration } from './book-pre-generation';

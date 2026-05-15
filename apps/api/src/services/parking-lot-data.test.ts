@@ -1,6 +1,12 @@
-jest.mock('./parking-lot', () => ({
-  MAX_PARKING_LOT_PER_TOPIC: 10,
-}));
+jest.mock('./parking-lot' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    './parking-lot',
+  ) as typeof import('./parking-lot');
+  return {
+    ...actual,
+    MAX_PARKING_LOT_PER_TOPIC: 10,
+  };
+});
 
 import type { Database } from '@eduagent/database';
 import {

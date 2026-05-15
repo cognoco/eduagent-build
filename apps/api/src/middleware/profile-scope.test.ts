@@ -1,10 +1,16 @@
 import { Hono } from 'hono';
 import type { AppVariables } from '../types/hono';
 
-jest.mock('../services/sentry', () => ({
-  captureException: jest.fn(),
-  addBreadcrumb: jest.fn(),
-}));
+jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/sentry',
+  ) as typeof import('../services/sentry');
+  return {
+    ...actual,
+    captureException: jest.fn(),
+    addBreadcrumb: jest.fn(),
+  };
+});
 
 import {
   profileScopeMiddleware,
@@ -14,37 +20,43 @@ import {
 import { HTTPException } from 'hono/http-exception';
 import { captureException } from '../services/sentry';
 
-jest.mock('../services/profile', () => ({
-  getProfile: jest.fn().mockImplementation((_db, profileId, accountId) => {
-    // Only return profile when it "belongs" to the account
-    if (profileId === 'valid-profile-id' && accountId === 'test-account-id') {
-      return Promise.resolve({
-        id: 'valid-profile-id',
-        accountId: 'test-account-id',
-        displayName: 'Test',
-        birthYear: 2014,
-        location: 'EU',
-        consentStatus: 'CONSENTED',
-        isOwner: true,
-      });
-    }
-    return Promise.resolve(null);
-  }),
-  findOwnerProfile: jest.fn().mockImplementation((_db, accountId) => {
-    if (accountId === 'test-account-id') {
-      return Promise.resolve({
-        id: 'owner-profile-id',
-        accountId: 'test-account-id',
-        displayName: 'Owner',
-        birthYear: 2014,
-        location: 'EU',
-        consentStatus: 'CONSENTED',
-        isOwner: true,
-      });
-    }
-    return Promise.resolve(null);
-  }),
-}));
+jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/profile',
+  ) as typeof import('../services/profile');
+  return {
+    ...actual,
+    getProfile: jest.fn().mockImplementation((_db, profileId, accountId) => {
+      // Only return profile when it "belongs" to the account
+      if (profileId === 'valid-profile-id' && accountId === 'test-account-id') {
+        return Promise.resolve({
+          id: 'valid-profile-id',
+          accountId: 'test-account-id',
+          displayName: 'Test',
+          birthYear: 2014,
+          location: 'EU',
+          consentStatus: 'CONSENTED',
+          isOwner: true,
+        });
+      }
+      return Promise.resolve(null);
+    }),
+    findOwnerProfile: jest.fn().mockImplementation((_db, accountId) => {
+      if (accountId === 'test-account-id') {
+        return Promise.resolve({
+          id: 'owner-profile-id',
+          accountId: 'test-account-id',
+          displayName: 'Owner',
+          birthYear: 2014,
+          location: 'EU',
+          consentStatus: 'CONSENTED',
+          isOwner: true,
+        });
+      }
+      return Promise.resolve(null);
+    }),
+  };
+});
 
 describe('profileScopeMiddleware', () => {
   function createApp(): Hono<{ Variables: AppVariables }> {

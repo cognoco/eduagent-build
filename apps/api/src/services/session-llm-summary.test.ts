@@ -1,8 +1,7 @@
 const mockRouteAndCall = jest.fn();
 const mockCaptureException = jest.fn();
 
-jest.mock('./llm', () => {
-  // gc1-allow: LLM external boundary (routeAndCall), requireActual spread applied
+jest.mock('./llm' /* gc1-allow: pattern-a conversion */, () => {
   const actual = jest.requireActual('./llm') as Record<string, unknown>;
   return {
     ...actual,
@@ -10,8 +9,7 @@ jest.mock('./llm', () => {
   };
 });
 
-jest.mock('./sentry', () => {
-  // gc1-allow: wraps @sentry/cloudflare external boundary; requireActual spread applied
+jest.mock('./sentry' /* gc1-allow: pattern-a conversion */, () => {
   const actual = jest.requireActual('./sentry') as Record<string, unknown>;
   return {
     ...actual,

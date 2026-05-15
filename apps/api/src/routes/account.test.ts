@@ -13,19 +13,29 @@ jest.mock('inngest/hono', () => ({
   serve: jest.fn().mockReturnValue(jest.fn()),
 }));
 
-jest.mock('../inngest/client', () => ({
-  ...jest.requireActual('../inngest/client'),
-  inngest: {
-    send: jest.fn().mockResolvedValue(undefined),
-    createFunction: jest.fn().mockReturnValue(jest.fn()),
-  },
-}));
+jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../inngest/client',
+  ) as typeof import('../inngest/client');
+  return {
+    ...actual,
+    inngest: {
+      send: jest.fn().mockResolvedValue(undefined),
+      createFunction: jest.fn().mockReturnValue(jest.fn()),
+    },
+  };
+});
 
-jest.mock('../services/sentry', () => ({
-  ...jest.requireActual('../services/sentry'),
-  captureException: jest.fn(),
-  addBreadcrumb: jest.fn(),
-}));
+jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/sentry',
+  ) as typeof import('../services/sentry');
+  return {
+    ...actual,
+    captureException: jest.fn(),
+    addBreadcrumb: jest.fn(),
+  };
+});
 
 // ---------------------------------------------------------------------------
 // Mock database module — middleware creates a stub db per request
@@ -52,40 +62,55 @@ jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 // Mock account, deletion, and export services — no DB interaction
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/account', () => ({
-  ...jest.requireActual('../services/account'),
-  findOrCreateAccount: jest.fn().mockResolvedValue({
-    id: 'test-account-id',
-    clerkUserId: 'user_test',
-    email: 'test@example.com',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  }),
-}));
-
-jest.mock('../services/deletion', () => ({
-  ...jest.requireActual('../services/deletion'),
-  scheduleDeletion: jest.fn().mockResolvedValue({
-    gracePeriodEnds: new Date(
-      Date.now() + 7 * 24 * 60 * 60 * 1000,
-    ).toISOString(),
-  }),
-  cancelDeletion: jest.fn().mockResolvedValue(undefined),
-  getProfileIdsForAccount: jest.fn().mockResolvedValue(['profile-1']),
-}));
-
-jest.mock('../services/export', () => ({
-  ...jest.requireActual('../services/export'),
-  generateExport: jest.fn().mockResolvedValue({
-    account: {
+jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/account',
+  ) as typeof import('../services/account');
+  return {
+    ...actual,
+    findOrCreateAccount: jest.fn().mockResolvedValue({
+      id: 'test-account-id',
+      clerkUserId: 'user_test',
       email: 'test@example.com',
       createdAt: new Date().toISOString(),
-    },
-    profiles: [],
-    consentStates: [],
-    exportedAt: new Date().toISOString(),
-  }),
-}));
+      updatedAt: new Date().toISOString(),
+    }),
+  };
+});
+
+jest.mock('../services/deletion' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/deletion',
+  ) as typeof import('../services/deletion');
+  return {
+    ...actual,
+    scheduleDeletion: jest.fn().mockResolvedValue({
+      gracePeriodEnds: new Date(
+        Date.now() + 7 * 24 * 60 * 60 * 1000,
+      ).toISOString(),
+    }),
+    cancelDeletion: jest.fn().mockResolvedValue(undefined),
+    getProfileIdsForAccount: jest.fn().mockResolvedValue(['profile-1']),
+  };
+});
+
+jest.mock('../services/export' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/export',
+  ) as typeof import('../services/export');
+  return {
+    ...actual,
+    generateExport: jest.fn().mockResolvedValue({
+      account: {
+        email: 'test@example.com',
+        createdAt: new Date().toISOString(),
+      },
+      profiles: [],
+      consentStates: [],
+      exportedAt: new Date().toISOString(),
+    }),
+  };
+});
 
 import { app } from '../index';
 import { inngest } from '../inngest/client';

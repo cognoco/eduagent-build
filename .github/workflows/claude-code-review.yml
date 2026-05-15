@@ -39,6 +39,7 @@ jobs:
 
       - name: Run Claude Code Review (token 1)
         id: claude-review
+        continue-on-error: true
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -64,13 +65,12 @@ jobs:
 
       # Fallback to token 2 if token 1's account hit its monthly quota (429).
       # `outcome` reflects the step result before `continue-on-error`, so it
-      # captures the 429 even though the job is advisory. The leading
-      # `failure()` is required: without a status check function, GitHub
-      # defaults the `if:` to `success()` and skips this step after step 1
-      # fails.
+      # captures the 429 even though the job is advisory. Use `always()` so the
+      # fallback still runs after an advisory failure.
       - name: Run Claude Code Review (token 2 fallback)
         id: claude-review-2
-        if: failure() && steps.claude-review.outcome == 'failure'
+        if: always() && steps.claude-review.outcome == 'failure'
+        continue-on-error: true
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN_2 }}
@@ -96,7 +96,8 @@ jobs:
 
       - name: Run Claude Code Review (token 3 fallback)
         id: claude-review-3
-        if: failure() && steps.claude-review.outcome == 'failure' && steps.claude-review-2.outcome == 'failure'
+        if: always() && steps.claude-review.outcome == 'failure' && steps.claude-review-2.outcome == 'failure'
+        continue-on-error: true
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN_3 }}
