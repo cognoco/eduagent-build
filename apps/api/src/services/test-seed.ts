@@ -397,6 +397,7 @@ async function createSubjectWithCurriculum(
   name: string,
   status: 'active' | 'paused' | 'archived' = 'active',
   topicCount = 3,
+  rawInput?: string,
 ): Promise<{
   subjectId: string;
   curriculumId: string;
@@ -409,6 +410,7 @@ async function createSubjectWithCurriculum(
     profileId,
     name,
     status,
+    rawInput,
   });
 
   const curriculumId = generateUUIDv7();
@@ -786,6 +788,9 @@ async function seedParentWithChildren(
     db,
     childProfileId,
     'Mathematics',
+    'active',
+    3,
+    'fractions homework',
   );
 
   // Link the session to the first curriculum topic so getChildSubjectTopics
@@ -871,7 +876,14 @@ async function seedParentMultiChild(
   });
 
   const { subjectId: subject1Id, topicIds: child1TopicIds } =
-    await createSubjectWithCurriculum(db, child1ProfileId, 'Mathematics');
+    await createSubjectWithCurriculum(
+      db,
+      child1ProfileId,
+      'Mathematics',
+      'active',
+      3,
+      'fractions homework',
+    );
   const child1TopicId = child1TopicIds[0];
   if (!child1TopicId) {
     throw new Error('Mathematics seed subject is missing a topic');
@@ -902,7 +914,7 @@ async function seedParentMultiChild(
     narrative:
       'Emma compared fractions with growing confidence and explained why the larger denominator did not always mean the larger value.',
     conversationPrompt: 'Which fraction felt easiest to compare today?',
-    engagementSignal: 'engaged',
+    engagementSignal: 'focused',
     status: 'accepted',
   });
 
@@ -960,7 +972,7 @@ async function seedParentMultiChild(
       'Lucas worked through photosynthesis step by step and linked each ingredient to what the plant needs to survive.',
     conversationPrompt:
       'Can you point out where the plant gets its energy from?',
-    engagementSignal: 'steady',
+    engagementSignal: 'focused',
     status: 'accepted',
   });
 
@@ -2082,7 +2094,7 @@ async function seedSessionWithTranscript(
     narrative:
       'The learner worked through Pythagoras step-by-step with growing confidence.',
     conversationPrompt: 'Can you think of a real-world use for this theorem?',
-    engagementSignal: 'engaged',
+    engagementSignal: 'focused',
     status: 'accepted',
   });
 
@@ -2220,7 +2232,7 @@ async function seedParentProxy(
     narrative:
       'The learner understood photosynthesis as a conversion process and made the colour-absorption link independently.',
     conversationPrompt: 'What would happen to a plant kept in the dark?',
-    engagementSignal: 'engaged',
+    engagementSignal: 'curious',
     status: 'accepted',
   });
 
@@ -2397,7 +2409,9 @@ async function seedParentWithWeeklyReport(
     ids: {
       ...base.ids,
       childId: childProfileId,
+      // reportId and weeklyReportId intentionally share one progress_reports row.
       reportId,
+      weeklyReportId: reportId,
     },
   };
 }
@@ -2434,7 +2448,7 @@ async function seedParentSessionWithRecap(
       'The learner approached algebra methodically and self-corrected on the second equation without prompting.',
     conversationPrompt:
       'Can you spot any connection between this and the last topic?',
-    engagementSignal: 'engaged',
+    engagementSignal: 'curious',
     status: 'accepted',
   });
 

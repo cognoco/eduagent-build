@@ -74,12 +74,6 @@ const KNOWN_DRIFT = new Set([
   'accent-swatch-indigo',
   // Parent/teen view switcher
   'switch-to-teen',
-  // Parent child-detail subject/report flows still reference selectors from the
-  // previous all-in-one child detail page. Consent management is live again on
-  // child detail; keep only the selectors that remain intentionally absent.
-  'subject-card-Mathematics',
-  'child-reports-link',
-  'subject-raw-input-Mathematics',
   // Password toggle on sign-in (removed or renamed in PasswordInput)
   'sign-in-password-toggle',
   // Library refactor in progress: empty-state component removed

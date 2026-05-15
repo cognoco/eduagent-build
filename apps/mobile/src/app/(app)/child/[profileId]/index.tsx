@@ -7,15 +7,15 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import type { DashboardChild } from '@eduagent/schemas';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import {
-  useChildDetail,
-  useChildSessions,
-} from '../../../../hooks/use-dashboard';
+import { RecentSessionsList } from '../../../../components/progress';
+import { useChildDetail } from '../../../../hooks/use-dashboard';
 import { useChildLearnerProfile } from '../../../../hooks/use-learner-profile';
+import { useProfileSessions } from '../../../../hooks/use-progress';
 import {
   useChildConsentStatus,
   useRestoreConsent,
@@ -75,6 +75,8 @@ function formatJoinedDate(isoDate: string | null | undefined): string | null {
   });
 }
 
+type DashboardSubject = DashboardChild['subjects'][number];
+
 function RowLink({
   icon,
   title,
@@ -132,6 +134,90 @@ function InfoRow({
         {value}
       </Text>
     </View>
+  );
+}
+
+function SubjectCard({
+  profileId,
+  subject,
+}: {
+  profileId: string;
+  subject: DashboardSubject;
+}): React.ReactElement {
+  const { t } = useTranslation();
+  const router = useRouter();
+  const colors = useThemeColors();
+  const subjectId =
+    typeof subject.subjectId === 'string' ? subject.subjectId.trim() : '';
+  const canOpen = subjectId.length > 0;
+  const rawInput =
+    subject.rawInput &&
+    subject.rawInput.trim().toLowerCase() !== subject.name.trim().toLowerCase()
+      ? subject.rawInput.trim()
+      : null;
+
+  const content = (
+    <View className="flex-row items-center justify-between">
+      <View className="flex-1 pe-3">
+        <Text className="text-body font-semibold text-text-primary">
+          {subject.name}
+        </Text>
+        {rawInput ? (
+          <Text
+            className="text-caption text-text-secondary mt-1"
+            testID={canOpen ? `subject-raw-input-${subjectId}` : undefined}
+          >
+            {t('parentView.index.subjectRawInputAudit', {
+              rawInput,
+              defaultValue: `Your child searched for "${rawInput}"`,
+            })}
+          </Text>
+        ) : null}
+      </View>
+      <View className="rounded-full bg-primary-soft px-3 py-1">
+        <Text className="text-caption font-semibold text-primary">
+          {t(`parentView.retention.${subject.retentionStatus}`, {
+            defaultValue: subject.retentionStatus,
+          })}
+        </Text>
+      </View>
+      {canOpen ? (
+        <Ionicons
+          name="chevron-forward"
+          size={18}
+          color={colors.textSecondary}
+          style={{ marginLeft: 10 }}
+        />
+      ) : null}
+    </View>
+  );
+
+  if (!canOpen) {
+    return <View className="bg-surface rounded-card p-4 mt-3">{content}</View>;
+  }
+
+  return (
+    <Pressable
+      onPress={() =>
+        router.push({
+          pathname: '/(app)/child/[profileId]/subjects/[subjectId]',
+          params: {
+            profileId,
+            subjectId,
+            subjectName: subject.name,
+          },
+        } as Href)
+      }
+      className="bg-surface rounded-card p-4 mt-3"
+      accessibilityRole="button"
+      accessibilityLabel={t('parentView.index.openSubjectProgress', {
+        subject: subject.name,
+        defaultValue: `Open ${subject.name} progress`,
+      })}
+      testID={`subject-card-${subjectId}`}
+    >
+      {content}
+    </Pressable>
   );
 }
 
@@ -351,9 +437,9 @@ export default function ChildDetailScreen(): React.ReactElement {
     isError,
     refetch,
   } = useChildDetail(profileId);
-  const sessions = useChildSessions(profileId);
+  const sessionsQuery = useProfileSessions(profileId);
   const { data: learnerProfile } = useChildLearnerProfile(profileId);
-  const lastSessionAt = sessions.data?.[0]?.startedAt ?? null;
+  const lastSessionAt = sessionsQuery.data?.[0]?.startedAt ?? null;
   const lastSessionLabel = formatLastSession(lastSessionAt);
   const joinedLabel = formatJoinedDate(ownedProfile?.createdAt);
   const activeAccommodation = ACCOMMODATION_OPTIONS.find(
@@ -490,6 +576,46 @@ export default function ChildDetailScreen(): React.ReactElement {
         contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
         testID="child-detail-scroll"
       >
+        <RowLink
+          icon="document-text-outline"
+          title={t('parentView.reports.title', {
+            defaultValue: 'Reports',
+          })}
+          subtitle={t('parentView.index.reportsSubtitle', {
+            name: childName,
+            defaultValue: `Weekly and monthly updates for ${childName}`,
+          })}
+          onPress={() =>
+            router.push({
+              pathname: '/(app)/child/[profileId]/reports',
+              params: { profileId },
+            } as Href)
+          }
+          testID="child-reports-link"
+        />
+
+        {child?.subjects && child.subjects.length > 0 ? (
+          <View className="mt-6" testID="child-subjects-section">
+            <Text className="text-h3 font-semibold text-text-primary mb-1">
+              {t('parentView.index.subjects', {
+                defaultValue: 'Subjects',
+              })}
+            </Text>
+            {child.subjects.map((subject, index) => (
+              <SubjectCard
+                key={subject.subjectId ?? index}
+                profileId={profileId}
+                subject={subject}
+              />
+            ))}
+          </View>
+        ) : null}
+
+        <RecentSessionsList
+          profileId={profileId}
+          sessionsQuery={sessionsQuery}
+        />
+
         {profileId && child?.displayName ? (
           <RowLink
             icon="options-outline"

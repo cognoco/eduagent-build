@@ -49,6 +49,9 @@ export default function SubjectTopicsScreen() {
   const subjectId = Array.isArray(rawSubjectId)
     ? rawSubjectId[0]
     : rawSubjectId;
+  const backHref: Href = profileId
+    ? (`/(app)/child/${profileId}` as Href)
+    : ('/(app)/more' as Href);
   const {
     data: topics,
     isLoading,
@@ -77,7 +80,7 @@ export default function SubjectTopicsScreen() {
           {t('parentView.subjects.unableToLoadSubject')}
         </Text>
         <Pressable
-          onPress={() => goBackOrReplace(router, '/(app)/more' as const)}
+          onPress={() => goBackOrReplace(router, backHref)}
           className="bg-primary rounded-button px-6 py-3 items-center min-h-[48px] justify-center"
           accessibilityRole="button"
           accessibilityLabel={t('common.goBack')}
@@ -111,7 +114,7 @@ export default function SubjectTopicsScreen() {
           testID="retry-topics"
         />
         <Pressable
-          onPress={() => goBackOrReplace(router, '/(app)/more' as const)}
+          onPress={() => goBackOrReplace(router, backHref)}
           className="mt-3 py-3 px-6 min-h-[44px] items-center justify-center"
           accessibilityRole="button"
           accessibilityLabel={t('common.goBack')}
@@ -129,7 +132,7 @@ export default function SubjectTopicsScreen() {
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
       <View className="px-5 pt-4 pb-2 flex-row items-center">
         <Pressable
-          onPress={() => goBackOrReplace(router, '/(app)/more' as const)}
+          onPress={() => goBackOrReplace(router, backHref)}
           className="me-3 py-2 pe-2"
           accessibilityLabel={t('common.goBack')}
           accessibilityRole="button"
