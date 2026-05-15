@@ -59,6 +59,21 @@ describe('bundle safety', () => {
     expect(violations).toEqual([]);
   });
 
+  it('session components do not import their own barrel', () => {
+    const sessionDir = path.join(SRC_DIR, 'components', 'session');
+    const sourceFiles = getAllSourceFiles(sessionDir);
+    const violations: string[] = [];
+
+    for (const file of sourceFiles) {
+      const content = fs.readFileSync(file, 'utf-8');
+      if (/from\s+['"]\.\.\/session['"]/.test(content)) {
+        violations.push(path.relative(SRC_DIR, file));
+      }
+    }
+
+    expect(violations).toEqual([]);
+  });
+
   it('metro.config.js has blockList excluding test files', () => {
     const config = fs.readFileSync(METRO_CONFIG, 'utf-8');
     expect(config).toMatch(/blockList/);

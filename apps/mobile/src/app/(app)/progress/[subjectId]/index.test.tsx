@@ -267,7 +267,15 @@ function mockHooks({
   inventoryIsLoading = false,
   inventoryIsError = false,
   inventoryError = null as Error | null,
-  subjectProgressData = undefined as { retentionStatus: string } | undefined,
+  subjectProgressData = undefined as
+    | {
+        retentionStatus: string;
+        urgencyScore?: number;
+        topicsCompleted?: number;
+        topicsVerified?: number;
+        lastSessionAt?: string | null;
+      }
+    | undefined,
   subjectProgressIsError = false,
   languageProgressData = undefined as Record<string, unknown> | undefined,
   languageProgressIsLoading = false,
@@ -821,6 +829,47 @@ describe('ProgressSubjectScreen', () => {
       mockHooks({ subjectProgressData: { retentionStatus: 'weak' } });
       render(<ProgressSubjectScreen />);
       screen.getByText('Needs a quick refresh.');
+    });
+
+    it('shows the retention card for overdue retention even when no completed sessions are recorded', () => {
+      mockHooks({
+        inventoryData: {
+          subjects: [{ ...fullSubject, sessionsCount: 0 }],
+        },
+        subjectProgressData: {
+          retentionStatus: 'weak',
+          urgencyScore: 2,
+          topicsCompleted: 0,
+          topicsVerified: 0,
+          lastSessionAt: null,
+        },
+      });
+
+      render(<ProgressSubjectScreen />);
+
+      screen.getByTestId('progress-subject-retention-card');
+      screen.getByText('Needs a quick refresh.');
+    });
+
+    it('does not show a strong-retention card for a subject with no activity or due reviews', () => {
+      mockHooks({
+        inventoryData: {
+          subjects: [{ ...fullSubject, sessionsCount: 0 }],
+        },
+        subjectProgressData: {
+          retentionStatus: 'strong',
+          urgencyScore: 0,
+          topicsCompleted: 0,
+          topicsVerified: 0,
+          lastSessionAt: null,
+        },
+      });
+
+      render(<ProgressSubjectScreen />);
+
+      expect(
+        screen.queryByTestId('progress-subject-retention-card'),
+      ).toBeNull();
     });
 
     it('opens the shelf when the retention card is pressed without a resume target', () => {

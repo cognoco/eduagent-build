@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import type { ChatMessage } from '../session';
+import type { ChatMessage } from './ChatShell';
 import type { useClassifySubject } from '../../hooks/use-classify-subject';
 import type { useResolveSubject } from '../../hooks/use-resolve-subject';
 import type { useCreateSubject } from '../../hooks/use-subjects';

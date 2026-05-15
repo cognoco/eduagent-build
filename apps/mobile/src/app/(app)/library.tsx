@@ -557,7 +557,7 @@ export default function LibraryScreen() {
           <Pressable
             onPress={() =>
               router.push({
-                pathname: '/create-subject',
+                pathname: '/(app)/create-subject',
                 params: { returnTo: 'library' },
               } as Href)
             }
@@ -629,7 +629,7 @@ export default function LibraryScreen() {
               <Pressable
                 onPress={() =>
                   router.push({
-                    pathname: '/create-subject',
+                    pathname: '/(app)/create-subject',
                     params: { returnTo: 'library' },
                   } as Href)
                 }

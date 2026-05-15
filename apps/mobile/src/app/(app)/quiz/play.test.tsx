@@ -6,6 +6,7 @@ import {
 } from '@testing-library/react-native';
 
 const mockReplace = jest.fn();
+const mockDismissTo = jest.fn();
 const mockSetPrefetchedRoundId = jest.fn();
 const mockSetCompletionResult = jest.fn();
 const mockSetRound = jest.fn();
@@ -16,7 +17,7 @@ const mockPlatformAlert = jest.fn();
 const mockSentryCapture = jest.fn();
 
 jest.mock('expo-router', () => ({
-  useRouter: () => ({ replace: mockReplace }),
+  useRouter: () => ({ replace: mockReplace, dismissTo: mockDismissTo }),
 }));
 
 jest.mock('react-native-safe-area-context', () => ({
@@ -1135,15 +1136,17 @@ describe('QuizPlayScreen — error feedback [BUG-799 / BUG-806]', () => {
       }),
     ).not.toBeNull();
     expect(mockReplace).not.toHaveBeenCalled();
+    expect(mockDismissTo).not.toHaveBeenCalled();
   });
 
-  it('[BUG-892] Confirming the quit modal replaces to /quiz', () => {
+  it('[BUG-892] Confirming the quit modal dismisses to the quiz index', () => {
     render(<QuizPlayScreen />);
 
     fireEvent.press(screen.getByTestId('quiz-play-quit'));
     fireEvent.press(screen.getByTestId('quiz-quit-confirm'));
 
-    expect(mockReplace).toHaveBeenCalledWith('/(app)/quiz');
+    expect(mockDismissTo).toHaveBeenCalledWith('/(app)/quiz');
+    expect(mockReplace).not.toHaveBeenCalledWith('/(app)/quiz');
   });
 
   it('confirming quit returns to quiz index when launched from Practice', () => {
@@ -1153,7 +1156,8 @@ describe('QuizPlayScreen — error feedback [BUG-799 / BUG-806]', () => {
     fireEvent.press(screen.getByTestId('quiz-play-quit'));
     fireEvent.press(screen.getByTestId('quiz-quit-confirm'));
 
-    expect(mockReplace).toHaveBeenCalledWith('/(app)/quiz');
+    expect(mockDismissTo).toHaveBeenCalledWith('/(app)/quiz');
+    expect(mockReplace).not.toHaveBeenCalledWith('/(app)/practice');
   });
 
   it('[QUIZ-11] malformed fallback back button returns directly to quiz index', () => {
@@ -1177,7 +1181,8 @@ describe('QuizPlayScreen — error feedback [BUG-799 / BUG-806]', () => {
 
     fireEvent.press(screen.getByTestId('quiz-play-malformed-back'));
 
-    expect(mockReplace).toHaveBeenCalledWith('/(app)/quiz');
+    expect(mockDismissTo).toHaveBeenCalledWith('/(app)/quiz');
+    expect(mockReplace).not.toHaveBeenCalledWith('/(app)/quiz');
     expect(screen.queryByTestId('quiz-quit-confirm')).toBeNull();
   });
 

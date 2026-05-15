@@ -6,8 +6,7 @@ import type {
   HomeworkProblem,
 } from '@eduagent/schemas';
 import type { FluencyDrillEvent } from '../../lib/sse';
-import type { ChatMessage } from '../session';
-import { animateResponse } from '../session';
+import { animateResponse, type ChatMessage } from './ChatShell';
 import type {
   useStreamMessage,
   useStartSession,
