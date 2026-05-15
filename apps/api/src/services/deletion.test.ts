@@ -1,4 +1,6 @@
 import type { Database } from '@eduagent/database';
+import { ConflictError, NotFoundError } from '../errors';
+import { captureException } from './sentry';
 import {
   scheduleDeletion,
   cancelDeletion,
@@ -8,6 +10,8 @@ import {
   getProfileIdsForAccount,
   deleteProfileIfNoConsent,
 } from './deletion';
+
+jest.mock('./sentry', () => ({ captureException: jest.fn() })); // gc1-allow: Sentry is an external telemetry boundary.
 
 function createMockDb(
   options: {
@@ -65,6 +69,10 @@ function createMockDb(
 }
 
 describe('scheduleDeletion', () => {
+  beforeEach(() => {
+    (captureException as jest.Mock).mockClear();
+  });
+
   it('returns a grace period end date 7 days in the future', async () => {
     const db = createMockDb();
     const before = Date.now();
@@ -99,9 +107,9 @@ describe('scheduleDeletion', () => {
       updateReturning: [],
     });
 
-    await expect(scheduleDeletion(db, 'missing-account')).rejects.toThrow(
-      'account not found: missing-account',
-    );
+    await expect(
+      scheduleDeletion(db, 'missing-account'),
+    ).rejects.toBeInstanceOf(NotFoundError);
     expect(db.update).toHaveBeenCalled();
   });
 
@@ -158,6 +166,29 @@ describe('scheduleDeletion', () => {
     expect(result).toEqual({
       gracePeriodEnds: '2026-02-24T00:00:00.000Z',
       scheduledNow: false,
+    });
+  });
+
+  it('throws a typed conflict and escalates when retry exhaustion leaves the account unscheduled', async () => {
+    const db = createMockDb({
+      findFirstResult: {
+        deletionScheduledAt: new Date('2026-02-17T00:00:00.000Z'),
+        deletionCancelledAt: new Date('2026-02-18T00:00:00.000Z'),
+      },
+      updateReturningSequence: [[], []],
+    });
+
+    await expect(scheduleDeletion(db, 'account-1')).rejects.toBeInstanceOf(
+      ConflictError,
+    );
+
+    expect(db.update).toHaveBeenCalledTimes(2);
+    expect(captureException).toHaveBeenCalledWith(expect.any(ConflictError), {
+      extra: {
+        surface: 'account.deletion',
+        reason: 'schedule-retry-exhausted',
+        accountId: 'account-1',
+      },
     });
   });
 });
@@ -299,9 +330,9 @@ describe('getDeletionStatus', () => {
   it('throws when the account is missing', async () => {
     const db = createMockDb({ findFirstResult: undefined });
 
-    await expect(getDeletionStatus(db, 'missing-account')).rejects.toThrow(
-      'account not found: missing-account',
-    );
+    await expect(
+      getDeletionStatus(db, 'missing-account'),
+    ).rejects.toBeInstanceOf(NotFoundError);
   });
 });
 

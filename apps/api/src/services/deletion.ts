@@ -6,6 +6,8 @@
 import { and, eq, isNull, or, sql } from 'drizzle-orm';
 import { accounts, profiles, type Database } from '@eduagent/database';
 import type { AccountDeletionStatusResponse } from '@eduagent/schemas';
+import { ConflictError, NotFoundError } from '../errors';
+import { captureException } from './sentry';
 
 const GRACE_PERIOD_DAYS = 7;
 const GRACE_PERIOD_MS = GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000;
@@ -31,7 +33,15 @@ export async function scheduleDeletion(
     }
   }
 
-  throw new Error(`account deletion scheduling failed: ${accountId}`);
+  const error = new ConflictError('Account deletion scheduling conflict');
+  captureException(error, {
+    extra: {
+      surface: 'account.deletion',
+      reason: 'schedule-retry-exhausted',
+      accountId,
+    },
+  });
+  throw error;
 }
 
 async function tryScheduleDeletion(
@@ -89,7 +99,7 @@ export async function getDeletionStatus(
     where: eq(accounts.id, accountId),
   });
   if (!row) {
-    throw new Error(`account not found: ${accountId}`);
+    throw new NotFoundError('Account');
   }
 
   const scheduledAt = row.deletionScheduledAt ?? null;

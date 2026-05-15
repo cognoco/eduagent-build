@@ -17,6 +17,7 @@ import {
 import { generateExport } from '../services/export';
 import { inngest } from '../inngest/client';
 import { safeSend } from '../services/safe-non-core';
+import { NotFoundError } from '../errors';
 
 type AccountRouteEnv = {
   Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
@@ -30,7 +31,10 @@ export const accountRoutes = new Hono<AccountRouteEnv>()
     try {
       const status = await getDeletionStatus(db, account.id);
       return c.json(accountDeletionStatusResponseSchema.parse(status));
-    } catch {
+    } catch (err) {
+      if (!(err instanceof NotFoundError)) {
+        throw err;
+      }
       return c.json({ code: 'NOT_FOUND', message: 'Account not found' }, 404);
     }
   })
