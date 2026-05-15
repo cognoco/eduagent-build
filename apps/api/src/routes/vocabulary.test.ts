@@ -14,8 +14,9 @@ const mockDatabaseModule = createDatabaseModuleMock();
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
-jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => ({
-  ...jest.requireActual('../services/account'),
+jest.mock('../services/account', () => ({
+  // gc1-allow: findOrCreateAccount fires Stripe/Inngest side-effects via accountMiddleware; stub isolates route tests from billing chain
+  ...(jest.requireActual('../services/account') as Record<string, unknown>),
   findOrCreateAccount: jest.fn().mockResolvedValue({
     id: 'test-account-id',
     clerkUserId: 'user_test',
@@ -25,8 +26,9 @@ jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => ({
   }),
 }));
 
-jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => ({
-  ...jest.requireActual('../services/profile'),
+jest.mock('../services/profile', () => ({
+  // gc1-allow: profileScopeMiddleware calls getProfile/findOwnerProfile; stub controls middleware-injected profileId for route-layer assertions
+  ...(jest.requireActual('../services/profile') as Record<string, unknown>),
   findOwnerProfile: jest.fn().mockResolvedValue(null),
   getProfile: jest.fn().mockResolvedValue({
     id: 'a0000000-0000-4000-a000-000000000001',
@@ -36,70 +38,67 @@ jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => ({
   }),
 }));
 
-// prettier-ignore
-jest.mock( // gc1-allow: pattern-a conversion
-  '../services/vocabulary' /* gc1-allow: pattern-a conversion */,
-  () => ({
-    ...jest.requireActual('../services/vocabulary'),
-    listVocabulary: jest.fn().mockResolvedValue([
-      {
-        id: '770e8400-e29b-41d4-a716-446655440000',
-        profileId: 'a0000000-0000-4000-a000-000000000001',
-        subjectId: '550e8400-e29b-41d4-a716-446655440000',
-        term: 'hola',
-        termNormalized: 'hola',
-        translation: 'hello',
-        type: 'word',
-        cefrLevel: 'A1',
-        milestoneId: null,
-        mastered: false,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      },
-    ]),
-    createVocabulary: jest.fn().mockResolvedValue({
+jest.mock('../services/vocabulary', () => ({
+  // gc1-allow: vocabulary service is the SUT boundary; stubs let each test control per-case return values without a live DB
+  ...(jest.requireActual('../services/vocabulary') as Record<string, unknown>),
+  listVocabulary: jest.fn().mockResolvedValue([
+    {
       id: '770e8400-e29b-41d4-a716-446655440000',
       profileId: 'a0000000-0000-4000-a000-000000000001',
       subjectId: '550e8400-e29b-41d4-a716-446655440000',
-      term: 'buenos dias',
-      termNormalized: 'buenos dias',
-      translation: 'good morning',
-      type: 'chunk',
+      term: 'hola',
+      termNormalized: 'hola',
+      translation: 'hello',
+      type: 'word',
       cefrLevel: 'A1',
       milestoneId: null,
       mastered: false,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-    }),
-    reviewVocabulary: jest.fn().mockResolvedValue({
-      vocabulary: {
-        id: '770e8400-e29b-41d4-a716-446655440000',
-        profileId: 'a0000000-0000-4000-a000-000000000001',
-        subjectId: '550e8400-e29b-41d4-a716-446655440000',
-        term: 'hola',
-        termNormalized: 'hola',
-        translation: 'hello',
-        type: 'word',
-        cefrLevel: 'A1',
-        milestoneId: null,
-        mastered: false,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      },
-      retention: {
-        vocabularyId: '770e8400-e29b-41d4-a716-446655440000',
-        easeFactor: 2.5,
-        intervalDays: 1,
-        repetitions: 1,
-        lastReviewedAt: new Date().toISOString(),
-        nextReviewAt: new Date().toISOString(),
-        failureCount: 0,
-        consecutiveSuccesses: 1,
-      },
-    }),
-    deleteVocabulary: jest.fn().mockResolvedValue(true),
+    },
+  ]),
+  createVocabulary: jest.fn().mockResolvedValue({
+    id: '770e8400-e29b-41d4-a716-446655440000',
+    profileId: 'a0000000-0000-4000-a000-000000000001',
+    subjectId: '550e8400-e29b-41d4-a716-446655440000',
+    term: 'buenos dias',
+    termNormalized: 'buenos dias',
+    translation: 'good morning',
+    type: 'chunk',
+    cefrLevel: 'A1',
+    milestoneId: null,
+    mastered: false,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   }),
-);
+  reviewVocabulary: jest.fn().mockResolvedValue({
+    vocabulary: {
+      id: '770e8400-e29b-41d4-a716-446655440000',
+      profileId: 'a0000000-0000-4000-a000-000000000001',
+      subjectId: '550e8400-e29b-41d4-a716-446655440000',
+      term: 'hola',
+      termNormalized: 'hola',
+      translation: 'hello',
+      type: 'word',
+      cefrLevel: 'A1',
+      milestoneId: null,
+      mastered: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    },
+    retention: {
+      vocabularyId: '770e8400-e29b-41d4-a716-446655440000',
+      easeFactor: 2.5,
+      intervalDays: 1,
+      repetitions: 1,
+      lastReviewedAt: new Date().toISOString(),
+      nextReviewAt: new Date().toISOString(),
+      failureCount: 0,
+      consecutiveSuccesses: 1,
+    },
+  }),
+  deleteVocabulary: jest.fn().mockResolvedValue(true),
+}));
 
 import { app } from '../index';
 import {

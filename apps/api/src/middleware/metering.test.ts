@@ -14,7 +14,7 @@ import { createDatabaseModuleMock } from '../test-utils/database-module';
 
 const mockDatabaseModule = createDatabaseModuleMock();
 
-jest.mock('@eduagent/database', () => mockDatabaseModule.module);
+jest.mock('@eduagent/database', () => mockDatabaseModule.module); // gc1-allow: unit test — real Neon DB unavailable; db injected via middleware chain
 
 jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => ({
   ...jest.requireActual('../services/account'),
@@ -47,6 +47,7 @@ jest.mock('../services/session' /* gc1-allow: pattern-a conversion */, () => ({
   submitSummary: jest.fn(),
   // [BUG-653] evaluateSessionDepth + getSessionTranscript needed for the
   // metering coverage on POST /sessions/:id/evaluate-depth.
+
   getSessionTranscript: jest.fn().mockResolvedValue({
     session: {
       sessionId: 'session-1',

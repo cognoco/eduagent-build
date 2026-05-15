@@ -95,7 +95,7 @@ tags:
 # "sune") is compared by the LLM against these sentences, so mistakes.length > 0.
 - inputText: "The sun is warm."
 
-- pressKey: back
+- hideKeyboard
 
 - tapOn:
     id: "text-preview-start"

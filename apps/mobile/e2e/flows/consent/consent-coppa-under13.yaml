@@ -30,12 +30,12 @@ tags:
 - tapOn:
     id: "sign-in-email"
 - inputText: ${EMAIL}
-- pressKey: back
+- hideKeyboard
 
 - tapOn:
     id: "sign-in-password"
 - inputText: ${PASSWORD}
-- pressKey: back
+- hideKeyboard
 
 - extendedWaitUntil:
     visible:
@@ -57,7 +57,7 @@ tags:
 - tapOn:
     id: "create-profile-name"
 - inputText: "COPPA Test Child"
-- pressKey: back
+- hideKeyboard
 
 # Open date picker
 - tapOn:
@@ -143,7 +143,7 @@ tags:
 - tapOn:
     id: "consent-email"
 - inputText: "parent-coppa-e2e@example.com"
-- pressKey: back
+- hideKeyboard
 
 # Submit consent request
 - extendedWaitUntil:

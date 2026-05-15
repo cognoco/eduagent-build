@@ -67,6 +67,16 @@ tags:
 
 - assertVisible:
     id: "sign-up-button"
+
+# The "Already have an account? Sign in" row sits BELOW the primary CTA;
+# scrollUntilVisible above parks the viewport at the button, so a second
+# scroll is needed to bring the link on-screen before asserting/tapping it.
+- scrollUntilVisible:
+    element:
+      id: "sign-in-link"
+    direction: DOWN
+    timeout: 5000
+
 - assertVisible:
     id: "sign-in-link"
 

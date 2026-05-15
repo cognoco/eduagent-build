@@ -20,35 +20,47 @@ const familyLinksQuery = {
   findMany: jest.fn().mockResolvedValue([]),
 };
 
+const mockFindConsentState = jest.fn().mockResolvedValue(undefined);
+const consentStatesQuery = {
+  findFirst: (...args: unknown[]) => mockFindConsentState(...args),
+  findMany: jest.fn().mockResolvedValue([]),
+};
+
 mockDatabaseModule.db.query = new Proxy(mockDatabaseModule.db.query as object, {
   get(target, prop, receiver) {
     if (prop === 'familyLinks') return familyLinksQuery;
+    if (prop === 'consentStates') return consentStatesQuery;
     return Reflect.get(target, prop, receiver);
   },
 });
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
-jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => ({
+const mockFindOrCreateAccount = jest.fn().mockResolvedValue({
+  id: 'test-account-id',
+  clerkUserId: 'user_test',
+  email: 'test@example.com',
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+});
+
+jest.mock('../services/account', () => ({
   ...jest.requireActual('../services/account'),
-  findOrCreateAccount: jest.fn().mockResolvedValue({
-    id: 'test-account-id',
-    clerkUserId: 'user_test',
-    email: 'test@example.com',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  }),
+  findOrCreateAccount: (...args: unknown[]) => mockFindOrCreateAccount(...args),
 }));
 
-jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => ({
+const mockFindOwnerProfile = jest.fn().mockResolvedValue(null);
+const mockGetProfile = jest.fn().mockResolvedValue({
+  id: 'test-profile-id',
+  birthYear: null,
+  location: null,
+  consentStatus: 'CONSENTED',
+});
+
+jest.mock('../services/profile', () => ({
   ...jest.requireActual('../services/profile'),
-  findOwnerProfile: jest.fn().mockResolvedValue(null),
-  getProfile: jest.fn().mockResolvedValue({
-    id: 'test-profile-id',
-    birthYear: null,
-    location: null,
-    consentStatus: 'CONSENTED',
-  }),
+  findOwnerProfile: (...args: unknown[]) => mockFindOwnerProfile(...args),
+  getProfile: (...args: unknown[]) => mockGetProfile(...args),
 }));
 
 const mockGetChildrenForParent = jest.fn().mockResolvedValue([]);
@@ -138,6 +150,10 @@ describe('dashboard routes', () => {
       parentProfileId: 'test-profile-id',
       childProfileId: PROFILE_ID,
     });
+    // Reset the mock queue (clearAllMocks does NOT clear mockResolvedValueOnce
+    // queues), then restore the default.
+    mockFindConsentState.mockReset();
+    mockFindConsentState.mockResolvedValue(undefined);
   });
 
   // -------------------------------------------------------------------------
@@ -206,6 +222,103 @@ describe('dashboard routes', () => {
 
       expect(res.status).toBe(401);
     });
+
+    // Regression: commit d1a1f27d5 (2026-05-07) added a route-entry call to
+    // assertChildDashboardDataVisible that threw ForbiddenError (→ 403)
+    // whenever the child's latest consent status was not CONSENTED. The
+    // mobile child-detail screen handles restricted consent by rendering a
+    // dedicated panel using the redacted child object that getChildDetail
+    // returns via redactDashboardChild — but the route-level 403 short-
+    // circuited the response, so parents landed on a generic "Try Again /
+    // Back to dashboard" error fallback instead of the consent-restricted
+    // panel.
+    //
+    // Fix: removed the route-entry assertion. assertParentAccess (the IDOR
+    // guard) still runs. Service-layer redaction zeroes metrics for non-
+    // CONSENTED status, so the response is safe. Parameterized across every
+    // non-CONSENTED status so the route is verified to never 403 on any of
+    // the redaction-eligible states.
+    //
+    // Contract split (so this test is not the only guard):
+    //   - THIS test (route-unit) only proves: the route returns 200 instead
+    //     of 403 for every non-CONSENTED status, and surfaces whatever
+    //     getChildDetail returns. It mocks getChildDetail with an already-
+    //     redacted payload, so it does NOT verify that redactDashboardChild
+    //     actually zeroes restricted fields.
+    //   - The redaction-correctness guarantee lives in the service
+    //     integration test:
+    //       apps/api/src/services/dashboard.integration.test.ts
+    //         → "redacts dashboard learning metrics for $status consent"
+    //     That test seeds a real session (exchangeCount: 8,
+    //     wallClockSeconds: 660) for each non-CONSENTED status, calls the
+    //     real getChildDetail against a real DB, and asserts that every
+    //     learning metric is zeroed and the summary copy is replaced —
+    //     so a regression that stopped zeroing fields fails there.
+    //   - Together these two tests cover the full "no 403, and metrics are
+    //     actually hidden" contract for non-CONSENTED children. Do not
+    //     weaken either one without re-checking the other still holds.
+    it.each([
+      {
+        status: 'PENDING' as const,
+        summary:
+          'Timmy: consent is pending. Learning metrics are hidden until consent is active.',
+      },
+      {
+        status: 'PARENTAL_CONSENT_REQUESTED' as const,
+        summary:
+          'Timmy: waiting for parent approval. Learning metrics are hidden until consent is active.',
+      },
+      {
+        status: 'WITHDRAWN' as const,
+        summary:
+          'Timmy: consent has been withdrawn. Learning metrics are hidden.',
+      },
+    ])(
+      '[BUG-62] returns 200 with redacted child for $status consent (regression: route used to 403)',
+      async ({ status, summary }) => {
+        mockFindConsentState.mockResolvedValueOnce({ status });
+        const redactedChild = {
+          profileId: PROFILE_ID,
+          displayName: 'Timmy',
+          consentStatus: status,
+          respondedAt: null,
+          summary,
+          sessionsThisWeek: 0,
+          sessionsLastWeek: 0,
+          totalTimeThisWeek: 0,
+          totalTimeLastWeek: 0,
+          exchangesThisWeek: 0,
+          exchangesLastWeek: 0,
+          trend: 'stable' as const,
+          subjects: [],
+          guidedVsImmediateRatio: 0,
+          retentionTrend: 'stable' as const,
+          totalSessions: 0,
+          currentlyWorkingOn: [],
+          progress: null,
+          currentStreak: 0,
+          longestStreak: 0,
+          totalXp: 0,
+        };
+        mockGetChildDetail.mockResolvedValueOnce(redactedChild);
+
+        const res = await app.request(
+          `/v1/dashboard/children/${PROFILE_ID}`,
+          { headers: AUTH_HEADERS },
+          TEST_ENV,
+        );
+
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body.child).toMatchObject({
+          profileId: PROFILE_ID,
+          displayName: 'Timmy',
+          consentStatus: status,
+          sessionsThisWeek: 0,
+          totalSessions: 0,
+        });
+      },
+    );
   });
 
   // -------------------------------------------------------------------------

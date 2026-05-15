@@ -183,8 +183,9 @@ export default function LibraryScreen() {
 
   const progressQuery = useOverallProgress();
 
-  // [M19] Timeout escape for subjects/progress loading spinner
-  const isSubjectsLoading = subjectsQuery.isLoading || progressQuery.isLoading;
+  // [M19] Timeout escape for the subject list loading spinner. Progress is
+  // optional for this screen; the shelves can render while progress catches up.
+  const isSubjectsLoading = subjectsQuery.isLoading;
   const [subjectsLoadTimedOut, setSubjectsLoadTimedOut] = useState(false);
   useEffect(() => {
     if (!isSubjectsLoading) {
@@ -454,7 +455,7 @@ export default function LibraryScreen() {
   // ---- Main content -------------------------------------------------------
 
   const renderContent = (): React.ReactElement => {
-    if (subjectsQuery.isLoading || progressQuery.isLoading) {
+    if (subjectsQuery.isLoading) {
       if (subjectsLoadTimedOut) {
         return (
           <ErrorFallback
@@ -465,7 +466,6 @@ export default function LibraryScreen() {
               label: t('common.retry'),
               onPress: () => {
                 void subjectsQuery.refetch();
-                void progressQuery.refetch();
               },
               testID: 'library-load-timeout-retry',
             }}
@@ -481,11 +481,8 @@ export default function LibraryScreen() {
       return renderShimmerSkeleton();
     }
 
-    if (
-      (subjectsQuery.isError && !subjectsQuery.data) ||
-      (progressQuery.isError && !progressQuery.data)
-    ) {
-      const libraryLoadError = subjectsQuery.error ?? progressQuery.error;
+    if (subjectsQuery.isError && !subjectsQuery.data) {
+      const libraryLoadError = subjectsQuery.error;
       return (
         <View
           className="flex-1 items-center justify-center px-5 py-12"
@@ -524,7 +521,7 @@ export default function LibraryScreen() {
           className="items-center justify-center py-16 px-5"
           testID="library-empty"
         >
-          <BookPageFlipAnimation size={100} color={themeColors.accent} />
+          <BookPageFlipAnimation size={150} color={themeColors.accent} />
           <Text className="text-h3 font-semibold text-text-primary mt-4 text-center">
             {t('library.empty.title')}
           </Text>
@@ -532,7 +529,12 @@ export default function LibraryScreen() {
             {t('library.empty.message')}
           </Text>
           <Pressable
-            onPress={() => router.replace('/(app)')}
+            onPress={() =>
+              router.push({
+                pathname: '/create-subject',
+                params: { returnTo: 'library' },
+              } as Href)
+            }
             className="bg-primary rounded-button px-6 py-3 mt-6 items-center"
             testID="library-empty-go-home"
           >
@@ -705,7 +707,11 @@ export default function LibraryScreen() {
   // ---- Root render --------------------------------------------------------
 
   return (
-    <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
+    <View
+      className="flex-1 bg-background"
+      style={{ paddingTop: insets.top }}
+      testID="library-screen"
+    >
       {/* Header */}
       <View
         className="px-5 pt-4 pb-3 flex-row items-center justify-between"

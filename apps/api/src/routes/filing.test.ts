@@ -124,26 +124,22 @@ jest.mock('../services/session' /* gc1-allow: pattern-a conversion */, () => ({
 }));
 
 // ---------------------------------------------------------------------------
-// Mock LLM services — routeAndCall + registerProvider for llm middleware
+// Mock LLM services — stub routeAndCall; all other exports via requireActual
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/llm' /* gc1-allow: pattern-a conversion */, () => ({
-  ...jest.requireActual('../services/llm'),
-  // gc1-allow: LLM routeAndCall external boundary
+jest.mock('../services/llm', () => ({
+  // gc1-allow: routeAndCall is the LLM provider HTTP boundary
+  ...(jest.requireActual('../services/llm') as Record<string, unknown>),
   routeAndCall: jest.fn().mockResolvedValue({ text: 'mocked' }),
-  registerProvider: jest.fn(),
-  getRegisteredProviders: jest.fn().mockReturnValue([]),
-  _clearProviders: jest.fn(),
-  _resetCircuits: jest.fn(),
 }));
 
 // ---------------------------------------------------------------------------
 // Mock Sentry
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => ({
-  ...jest.requireActual('../services/sentry'),
-  // gc1-allow: @sentry/cloudflare external boundary
+jest.mock('../services/sentry', () => ({
+  // gc1-allow: thin wrapper for @sentry/cloudflare external boundary
+  ...(jest.requireActual('../services/sentry') as Record<string, unknown>),
   captureException: jest.fn(),
 }));
 

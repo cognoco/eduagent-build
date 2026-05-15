@@ -82,7 +82,7 @@ tags:
     optional: true
 
 # 4. Dismiss keyboard so cancel/submit buttons are visible
-- pressKey: back
+- hideKeyboard
 
 # 5. Verify cancel button is present (mandatory — core UI element)
 - assertVisible:

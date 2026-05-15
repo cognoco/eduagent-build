@@ -39,8 +39,8 @@ const mockGetOwnedFamilyPoolBreakdownSharing = jest.fn();
 const mockUpsertFamilyPoolBreakdownSharing = jest.fn();
 const mockUpsertLearningMode = jest.fn();
 
-jest.mock('../services/settings' /* gc1-allow: unit test boundary */, () => {
-  // gc1-allow: uses requireActual with targeted overrides for getOwnedFamilyPoolBreakdownSharing/upsertFamilyPoolBreakdownSharing — canonical partial-mock pattern from CLAUDE.md
+jest.mock('../services/settings', () => {
+  // gc1-allow: requireActual + targeted overrides — intercepts upsertLearningMode/getOwnedFamilyPoolBreakdownSharing/upsertFamilyPoolBreakdownSharing to keep unit test deterministic without a real DB
   const actual = jest.requireActual('../services/settings');
   return {
     ...actual,
@@ -53,22 +53,19 @@ jest.mock('../services/settings' /* gc1-allow: unit test boundary */, () => {
 });
 
 const mockClearSessionStaticContextForProfile = jest.fn();
-// prettier-ignore
-jest.mock( // gc1-allow: pattern-a conversion
-  '../services/session/session-cache' /* gc1-allow: unit test boundary */,
-  () => {
-    // gc1-allow: partial mock via requireActual — intercepts clearSessionStaticContextForProfile to verify cache invalidation fires on learning-mode change
-    const actual = jest.requireActual('../services/session/session-cache');
-    return {
-      ...actual,
-      clearSessionStaticContextForProfile: (...args: unknown[]) =>
-        mockClearSessionStaticContextForProfile(...args),
-    };
-  },
-);
+jest.mock('../services/session/session-cache', () => {
+  // gc1-allow: requireActual + targeted override — intercepts clearSessionStaticContextForProfile to verify cache invalidation fires on learning-mode change
+  const actual = jest.requireActual('../services/session/session-cache');
+  return {
+    ...actual,
+    clearSessionStaticContextForProfile: (...args: unknown[]) =>
+      mockClearSessionStaticContextForProfile(...args),
+  };
+});
 
 const mockCaptureException = jest.fn();
-jest.mock('../services/sentry' /* gc1-allow: unit test boundary */, () => ({
+jest.mock('../services/sentry', () => ({
+  // gc1-allow: sentry is a real external egress service; pure stub captures calls for assertion without firing real SDK
   ...jest.requireActual('../services/sentry'),
   captureException: (...args: unknown[]) => mockCaptureException(...args),
 }));

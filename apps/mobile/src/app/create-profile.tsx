@@ -17,6 +17,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQueryClient } from '@tanstack/react-query';
 import { useApiClient } from '../lib/api-client';
+import { assertOk } from '../lib/assert-ok';
 import { useProfile, type Profile } from '../lib/profile';
 import { useThemeColors } from '../lib/theme';
 import { goBackOrReplace } from '../lib/navigation';
@@ -163,6 +164,7 @@ export default function CreateProfileScreen() {
       };
 
       const res = await client.profiles.$post({ json: body });
+      await assertOk(res);
       const result = (await res.json()) as { profile: Profile };
 
       // BUG-264: Optimistically add the new profile to the query cache BEFORE
@@ -170,8 +172,14 @@ export default function CreateProfileScreen() {
       // stale data (empty array for first-time users), causing activeProfile to
       // be null briefly, which remounts CreateProfileGate and flashes the
       // welcome screen again.
-      queryClient.setQueryData<Profile[]>(['profiles'], (old) =>
-        old ? [...old, result.profile] : [result.profile],
+      queryClient.setQueriesData<Profile[]>(
+        {
+          predicate: (query) => String(query.queryKey[0]) === 'profiles',
+        },
+        (old) =>
+          old && !old.some((profile) => profile.id === result.profile.id)
+            ? [...old, result.profile]
+            : (old ?? [result.profile]),
       );
       await queryClient.invalidateQueries({ queryKey: ['profiles'] });
 
@@ -198,15 +206,12 @@ export default function CreateProfileScreen() {
         result.profile.consentStatus === 'PENDING' ||
         result.profile.consentStatus === 'PARENTAL_CONSENT_REQUESTED';
 
-      const switchResult = await switchProfile(result.profile.id);
-      if (switchResult?.success === false) {
-        platformAlert(
-          'Profile created',
-          switchResult.error ??
-            'We created the profile, but could not switch to it automatically. You can switch from the Profiles screen.',
-        );
-      }
-
+      // Navigate FIRST — switchProfile triggers a nav-tree remount via
+      // setActiveProfileId; any router call that fires after the remount
+      // starts operates on a torn-down navigator and silently no-ops on web.
+      // The profile context's isLoading guard prevents CreateProfileGate from
+      // flashing during the switch window (profiles.length > 0 &&
+      // activeProfile === null stays true until the switch completes).
       if (needsConsentFlow) {
         router.replace({
           pathname: '/consent',
@@ -214,6 +219,15 @@ export default function CreateProfileScreen() {
         });
       } else {
         handleClose();
+      }
+
+      const switchResult = await switchProfile(result.profile.id);
+      if (switchResult?.success === false) {
+        platformAlert(
+          'Profile created',
+          switchResult.error ??
+            'We created the profile, but could not switch to it automatically. You can switch from the Profiles screen.',
+        );
       }
     } catch (err: unknown) {
       // [BUG-947] PROFILE_LIMIT_EXCEEDED is an upgrade gate, not a server fault.

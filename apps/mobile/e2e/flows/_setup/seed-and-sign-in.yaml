@@ -59,12 +59,13 @@ appId: com.mentomate.app
 # Visual audit: email field with keyboard open (BUG-24 regression guard)
 - takeScreenshot: signin-02-email-keyboard-open
 
-# BUG-3 + BUG-20 + BUG-24: Dismiss keyboard so password field is visible.
-# On E2E_Device_2, keyboard covers entire form including heading text.
-# pressKey: back safely dismisses keyboard (guaranteed open after inputText).
-# Note: BUG-5 warns about back-key exiting app when keyboard is NOT open,
-# but here the keyboard IS open (immediately after inputText), so this is safe.
-- pressKey: back
+# Dismiss keyboard so password field is visible. On E2E_Device_2 the keyboard
+# covers the form including the heading. `hideKeyboard` is a Maestro built-in
+# that is a no-op when the keyboard is closed, so it never falls through to
+# the Android Back action — replaces the prior `pressKey: back` pattern which
+# was fragile when inputText completed before the keyboard rendered (the case
+# that blocked the consent/pre-profile flows on 2026-05-14).
+- hideKeyboard
 
 - tapOn:
     id: "sign-in-password"
@@ -74,7 +75,7 @@ appId: com.mentomate.app
 - takeScreenshot: signin-03-password-keyboard-open
 
 # Dismiss keyboard before tapping sign-in button (same pattern as above)
-- pressKey: back
+- hideKeyboard
 
 # Wait for keyboard to fully dismiss and sign-in button to be visible
 - extendedWaitUntil:

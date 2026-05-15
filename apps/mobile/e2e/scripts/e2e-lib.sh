@@ -27,6 +27,18 @@ fi
 export TEMP="${TEMP:-/tmp}"
 export TMP="${TMP:-/tmp}"
 
+# Safety net: any prior batch that crashed mid-flow with NETWORK_DELAY_MS active
+# would leave the emulator's network shaping on, silently flaking every flow that
+# follows. Reset at batch start. No-op if no token / port unreachable.
+reset_network_delay() {
+  local port="${EMULATOR_CONSOLE_PORT:-5554}"
+  local token
+  token=$(cat "$HOME/.emulator_console_auth_token" 2>/dev/null || echo "")
+  printf 'auth %s\nnetwork delay none\nnetwork speed full\nquit\n' "$token" \
+    | "${NETCAT:-/c/Program Files/Git/usr/bin/nc.exe}" -w 2 localhost "$port" >/dev/null 2>&1 || true
+}
+reset_network_delay
+
 PASS_COUNT=0
 FAIL_COUNT=0
 SKIP_COUNT=0

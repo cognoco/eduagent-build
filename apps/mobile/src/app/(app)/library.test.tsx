@@ -354,6 +354,23 @@ describe('LibraryScreen', () => {
     screen.getByText('Your library will grow as you learn');
   });
 
+  it('routes empty-state learners to subject creation', () => {
+    mockUseSubjects.mockReturnValue({ data: [], isLoading: false });
+    mockUseOverallProgress.mockReturnValue({
+      data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
+      isLoading: false,
+    });
+
+    render(<LibraryScreen />, { wrapper: TestWrapper });
+
+    fireEvent.press(screen.getByTestId('library-empty-go-home'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/create-subject',
+      params: { returnTo: 'library' },
+    });
+  });
+
   it('renders shelf rows for each subject', () => {
     mockUseSubjects.mockReturnValue({
       data: [{ id: 'sub-1', name: 'History', status: 'active' }],

@@ -22,13 +22,14 @@ const mockDatabaseModule = createDatabaseModuleMock({
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
-jest.mock('../services/account' /* gc1-allow: unit test boundary */, () => ({
+jest.mock('../services/account', () => ({
+  // gc1-allow: findOrCreateAccount stubbed to avoid real Clerk/DB round-trip in route unit test; requireActual preserves all other exports
   ...jest.requireActual('../services/account'),
-  // gc1-allow: stubs findOrCreateAccount — avoids real Clerk/DB round-trip
   findOrCreateAccount: jest.fn().mockResolvedValue({
     id: 'test-account-id',
     clerkUserId: 'user_test',
     email: 'test@example.com',
+    timezone: null,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   }),
@@ -39,9 +40,9 @@ const mockListUnreadNudges = jest.fn();
 const mockMarkNudgeRead = jest.fn();
 const mockMarkAllNudgesRead = jest.fn();
 
-jest.mock('../services/nudge' /* gc1-allow: unit test boundary */, () => ({
+jest.mock('../services/nudge', () => ({
+  // gc1-allow: all four service functions stubbed — route unit test exercises HTTP layer only; real nudge service requires live DB transactions + push notifications
   ...jest.requireActual('../services/nudge'),
-  // gc1-allow: stubs all nudge service functions — tests exercise HTTP layer, not DB
   createNudge: (...args: unknown[]) => mockCreateNudge(...args),
   listUnreadNudges: (...args: unknown[]) => mockListUnreadNudges(...args),
   markNudgeRead: (...args: unknown[]) => mockMarkNudgeRead(...args),

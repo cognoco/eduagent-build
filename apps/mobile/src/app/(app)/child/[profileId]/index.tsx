@@ -1,17 +1,30 @@
-import { useMemo } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import type { DashboardChild } from '@eduagent/schemas';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import {
-  useChildDetail,
-  useChildSessions,
-} from '../../../../hooks/use-dashboard';
+import { RecentSessionsList } from '../../../../components/progress';
+import { useChildDetail } from '../../../../hooks/use-dashboard';
 import { useChildLearnerProfile } from '../../../../hooks/use-learner-profile';
+import { useProfileSessions } from '../../../../hooks/use-progress';
+import {
+  useChildConsentStatus,
+  useRestoreConsent,
+  useRevokeConsent,
+} from '../../../../hooks/use-consent';
 import { ACCOMMODATION_OPTIONS } from '../../../../lib/accommodation-options';
+import { getGracePeriodDaysRemaining } from '../../../../lib/consent-grace';
 import { FAMILY_HOME_PATH, goBackOrReplace } from '../../../../lib/navigation';
+import { platformAlert } from '../../../../lib/platform-alert';
 import { useProfile } from '../../../../lib/profile';
 import { useThemeColors } from '../../../../lib/theme';
 
@@ -61,6 +74,8 @@ function formatJoinedDate(isoDate: string | null | undefined): string | null {
     year: 'numeric',
   });
 }
+
+type DashboardSubject = DashboardChild['subjects'][number];
 
 function RowLink({
   icon,
@@ -122,6 +137,282 @@ function InfoRow({
   );
 }
 
+function SubjectCard({
+  profileId,
+  subject,
+}: {
+  profileId: string;
+  subject: DashboardSubject;
+}): React.ReactElement {
+  const { t } = useTranslation();
+  const router = useRouter();
+  const colors = useThemeColors();
+  const subjectId =
+    typeof subject.subjectId === 'string' ? subject.subjectId.trim() : '';
+  const canOpen = subjectId.length > 0;
+  const rawInput =
+    subject.rawInput &&
+    subject.rawInput.trim().toLowerCase() !== subject.name.trim().toLowerCase()
+      ? subject.rawInput.trim()
+      : null;
+
+  const content = (
+    <View className="flex-row items-center justify-between">
+      <View className="flex-1 pe-3">
+        <Text className="text-body font-semibold text-text-primary">
+          {subject.name}
+        </Text>
+        {rawInput ? (
+          <Text
+            className="text-caption text-text-secondary mt-1"
+            testID={canOpen ? `subject-raw-input-${subjectId}` : undefined}
+          >
+            {t('parentView.index.subjectRawInputAudit', {
+              rawInput,
+              defaultValue: `Your child searched for "${rawInput}"`,
+            })}
+          </Text>
+        ) : null}
+      </View>
+      <View className="rounded-full bg-primary-soft px-3 py-1">
+        <Text className="text-caption font-semibold text-primary">
+          {t(`parentView.retention.${subject.retentionStatus}`, {
+            defaultValue: subject.retentionStatus,
+          })}
+        </Text>
+      </View>
+      {canOpen ? (
+        <Ionicons
+          name="chevron-forward"
+          size={18}
+          color={colors.textSecondary}
+          style={{ marginLeft: 10 }}
+        />
+      ) : null}
+    </View>
+  );
+
+  if (!canOpen) {
+    return <View className="bg-surface rounded-card p-4 mt-3">{content}</View>;
+  }
+
+  return (
+    <Pressable
+      onPress={() =>
+        router.push({
+          pathname: '/(app)/child/[profileId]/subjects/[subjectId]',
+          params: {
+            profileId,
+            subjectId,
+            subjectName: subject.name,
+          },
+        } as Href)
+      }
+      className="bg-surface rounded-card p-4 mt-3"
+      accessibilityRole="button"
+      accessibilityLabel={t('parentView.index.openSubjectProgress', {
+        subject: subject.name,
+        defaultValue: `Open ${subject.name} progress`,
+      })}
+      testID={`subject-card-${subjectId}`}
+    >
+      {content}
+    </Pressable>
+  );
+}
+
+function consentMutationErrorMessage(err: unknown): string {
+  return err instanceof Error
+    ? err.message
+    : 'Could not update consent. Please try again.';
+}
+
+function ConsentManagementSection({
+  childProfileId,
+  childName,
+}: {
+  childProfileId: string;
+  childName: string;
+}): React.ReactElement | null {
+  const { t } = useTranslation();
+  const consent = useChildConsentStatus(childProfileId);
+  const revokeConsent = useRevokeConsent(childProfileId);
+  const restoreConsent = useRestoreConsent(childProfileId);
+  const [error, setError] = useState('');
+
+  const consentStatus = consent.data?.consentStatus ?? null;
+  const hasConsentRecord =
+    consent.isLoading ||
+    consent.isError ||
+    consentStatus === 'CONSENTED' ||
+    consentStatus === 'WITHDRAWN';
+
+  if (!hasConsentRecord) return null;
+
+  const isWithdrawn = consentStatus === 'WITHDRAWN';
+  const daysRemaining = isWithdrawn
+    ? getGracePeriodDaysRemaining(consent.data?.respondedAt ?? null)
+    : 0;
+
+  const handleWithdraw = (): void => {
+    setError('');
+    platformAlert(
+      t('parentView.index.withdrawConsentConfirmTitle', {
+        childName,
+        defaultValue: `Withdraw consent for ${childName}?`,
+      }),
+      t('parentView.index.withdrawConsentBody', {
+        childName,
+        defaultValue:
+          'Learning access will pause and account deletion will be scheduled. You can cancel during the grace period.',
+      }),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('parentView.index.confirmWithdrawConsent', {
+            defaultValue: 'Withdraw',
+          }),
+          style: 'destructive',
+          onPress: () => {
+            revokeConsent.mutate(undefined, {
+              onError: (err) => setError(consentMutationErrorMessage(err)),
+            });
+          },
+        },
+      ],
+    );
+  };
+
+  const handleRestore = (): void => {
+    setError('');
+    restoreConsent.mutate(undefined, {
+      onError: (err) => setError(consentMutationErrorMessage(err)),
+    });
+  };
+
+  return (
+    <View
+      className="bg-surface rounded-card px-4 py-4 mt-3"
+      testID="consent-section"
+    >
+      <Text className="text-body font-semibold text-text-primary">
+        {t('parentView.index.consentTitle', {
+          defaultValue: 'Consent',
+        })}
+      </Text>
+      <Text className="text-body-sm text-text-secondary mt-1">
+        {t('parentView.index.consentDescription', {
+          name: childName,
+          defaultValue: `Manage parental consent for ${childName}.`,
+        })}
+      </Text>
+
+      {error !== '' ? (
+        <Text
+          className="text-body-sm text-danger mt-3"
+          accessibilityRole="alert"
+          testID="consent-management-error"
+        >
+          {error}
+        </Text>
+      ) : null}
+
+      {consent.isError ? (
+        <View
+          className="bg-danger/10 border border-danger/30 rounded-card px-3 py-3 mt-4"
+          accessibilityRole="alert"
+          testID="consent-status-error"
+        >
+          <Text className="text-body-sm text-danger">
+            {t('parentView.index.consentStatusError', {
+              defaultValue: 'Could not load consent status. Please try again.',
+            })}
+          </Text>
+          <Pressable
+            onPress={() => void consent.refetch()}
+            className="bg-surface rounded-button px-4 py-3 min-h-[44px] items-center justify-center mt-3"
+            accessibilityRole="button"
+            accessibilityLabel={t('common.tryAgain')}
+            testID="consent-status-retry"
+          >
+            <Text className="text-body font-semibold text-text-primary">
+              {t('common.tryAgain')}
+            </Text>
+          </Pressable>
+        </View>
+      ) : consent.isLoading ? (
+        <View className="py-4 items-start">
+          <ActivityIndicator testID="consent-status-loading" />
+        </View>
+      ) : isWithdrawn ? (
+        <View
+          className="bg-warning/10 border border-warning/30 rounded-card px-3 py-3 mt-4"
+          accessibilityRole="alert"
+          testID="grace-period-banner"
+        >
+          <Text className="text-body font-semibold text-warning">
+            {t('parentView.index.deletionPending', {
+              defaultValue: 'Deletion pending',
+            })}
+          </Text>
+          <Text className="text-body-sm text-text-secondary mt-1">
+            {daysRemaining > 0
+              ? t('parentView.index.deletionGraceDays', {
+                  count: daysRemaining,
+                  defaultValue: `${daysRemaining} day${daysRemaining === 1 ? '' : 's'} left to cancel deletion.`,
+                })
+              : t('parentView.index.deletionGraceFallback', {
+                  defaultValue:
+                    'Deletion is scheduled. Try cancelling now if this was a mistake.',
+                })}
+          </Text>
+          <Pressable
+            onPress={handleRestore}
+            disabled={restoreConsent.isPending}
+            className="bg-warning rounded-button px-4 py-3 min-h-[44px] items-center justify-center mt-3"
+            accessibilityRole="button"
+            accessibilityLabel={t('parentView.index.cancelDeletion', {
+              defaultValue: 'Cancel deletion',
+            })}
+            testID="cancel-deletion-button"
+          >
+            {restoreConsent.isPending ? (
+              <ActivityIndicator testID="cancel-deletion-loading" />
+            ) : (
+              <Text className="text-body font-semibold text-text-inverse">
+                {t('parentView.index.cancelDeletion', {
+                  defaultValue: 'Cancel deletion',
+                })}
+              </Text>
+            )}
+          </Pressable>
+        </View>
+      ) : (
+        <Pressable
+          onPress={handleWithdraw}
+          disabled={revokeConsent.isPending}
+          className="border border-danger rounded-button px-4 py-3 min-h-[44px] items-center justify-center mt-4"
+          accessibilityRole="button"
+          accessibilityLabel={t('parentView.index.withdrawConsent', {
+            defaultValue: 'Withdraw consent',
+          })}
+          testID="withdraw-consent-button"
+        >
+          {revokeConsent.isPending ? (
+            <ActivityIndicator testID="withdraw-consent-loading" />
+          ) : (
+            <Text className="text-body font-semibold text-danger">
+              {t('parentView.index.withdrawConsent', {
+                defaultValue: 'Withdraw consent',
+              })}
+            </Text>
+          )}
+        </Pressable>
+      )}
+    </View>
+  );
+}
+
 export default function ChildDetailScreen(): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
@@ -146,9 +437,9 @@ export default function ChildDetailScreen(): React.ReactElement {
     isError,
     refetch,
   } = useChildDetail(profileId);
-  const sessions = useChildSessions(profileId);
+  const sessionsQuery = useProfileSessions(profileId);
   const { data: learnerProfile } = useChildLearnerProfile(profileId);
-  const lastSessionAt = sessions.data?.[0]?.startedAt ?? null;
+  const lastSessionAt = sessionsQuery.data?.[0]?.startedAt ?? null;
   const lastSessionLabel = formatLastSession(lastSessionAt);
   const joinedLabel = formatJoinedDate(ownedProfile?.createdAt);
   const activeAccommodation = ACCOMMODATION_OPTIONS.find(
@@ -285,6 +576,46 @@ export default function ChildDetailScreen(): React.ReactElement {
         contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
         testID="child-detail-scroll"
       >
+        <RowLink
+          icon="document-text-outline"
+          title={t('parentView.reports.title', {
+            defaultValue: 'Reports',
+          })}
+          subtitle={t('parentView.index.reportsSubtitle', {
+            name: childName,
+            defaultValue: `Weekly and monthly updates for ${childName}`,
+          })}
+          onPress={() =>
+            router.push({
+              pathname: '/(app)/child/[profileId]/reports',
+              params: { profileId },
+            } as Href)
+          }
+          testID="child-reports-link"
+        />
+
+        {child?.subjects && child.subjects.length > 0 ? (
+          <View className="mt-6" testID="child-subjects-section">
+            <Text className="text-h3 font-semibold text-text-primary mb-1">
+              {t('parentView.index.subjects', {
+                defaultValue: 'Subjects',
+              })}
+            </Text>
+            {child.subjects.map((subject, index) => (
+              <SubjectCard
+                key={subject.subjectId ?? index}
+                profileId={profileId}
+                subject={subject}
+              />
+            ))}
+          </View>
+        ) : null}
+
+        <RecentSessionsList
+          profileId={profileId}
+          sessionsQuery={sessionsQuery}
+        />
+
         {profileId && child?.displayName ? (
           <RowLink
             icon="options-outline"
@@ -335,6 +666,11 @@ export default function ChildDetailScreen(): React.ReactElement {
             testID="child-profile-details"
           />
         ) : null}
+
+        <ConsentManagementSection
+          childProfileId={profileId}
+          childName={childName}
+        />
 
         <View className="mt-5 rounded-card bg-primary-soft px-4 py-3">
           <View className="flex-row items-start">

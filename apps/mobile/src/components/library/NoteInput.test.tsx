@@ -63,4 +63,26 @@ describe('NoteInput', () => {
     fireEvent.changeText(getByTestId('note-text-input'), longText);
     getByText(/getting long/i);
   });
+
+  it('renders default placeholder when none provided', () => {
+    const { getByTestId } = render(
+      <NoteInput onSave={jest.fn()} onCancel={jest.fn()} />,
+    );
+    expect(getByTestId('note-text-input').props.placeholder).toBe(
+      'Write your note...',
+    );
+  });
+
+  it('renders custom placeholder when provided', () => {
+    const { getByTestId } = render(
+      <NoteInput
+        onSave={jest.fn()}
+        onCancel={jest.fn()}
+        placeholder="Summarize this in your own words..."
+      />,
+    );
+    expect(getByTestId('note-text-input').props.placeholder).toBe(
+      'Summarize this in your own words...',
+    );
+  });
 });

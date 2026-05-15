@@ -2,15 +2,19 @@
 // OCR Provider — Tests
 // ---------------------------------------------------------------------------
 
-jest.mock('./llm' /* gc1-allow: pattern-a conversion */, () => ({
-  ...jest.requireActual('./llm'),
-  routeAndCall: jest.fn().mockResolvedValue({
-    response: '{"text":"Solve for x: 2x + 5 = 13","confidence":0.81}',
-    provider: 'gemini',
-    model: 'gemini-2.5-flash',
-    latencyMs: 120,
-  }),
-}));
+jest.mock('./llm', () => {
+  // gc1-allow: LLM external boundary (routeAndCall); requireActual spread applied
+  const actual = jest.requireActual('./llm') as Record<string, unknown>;
+  return {
+    ...actual,
+    routeAndCall: jest.fn().mockResolvedValue({
+      response: '{"text":"Solve for x: 2x + 5 = 13","confidence":0.81}',
+      provider: 'gemini',
+      model: 'gemini-2.5-flash',
+      latencyMs: 120,
+    }),
+  };
+});
 
 import {
   GeminiOcrProvider,

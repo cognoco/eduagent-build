@@ -2,21 +2,30 @@
 // Subject Classification — Tests (Story 10.20)
 // ---------------------------------------------------------------------------
 
-jest.mock('./llm' /* gc1-allow: pattern-a conversion */, () => ({
-  ...jest.requireActual('./llm'),
-  routeAndCall: jest.fn(),
-}));
+jest.mock(
+  './llm', // gc1-allow: routeAndCall is the LLM API gateway (external boundary); real calls hit the network and require API keys
+  () => ({
+    ...jest.requireActual('./llm'),
+    routeAndCall: jest.fn(),
+  }),
+);
 
-jest.mock('./subject' /* gc1-allow: pattern-a conversion */, () => ({
-  ...jest.requireActual('./subject'),
-  listSubjects: jest.fn(),
-}));
+jest.mock(
+  './subject', // gc1-allow: listSubjects requires a live DB connection; DB-dep unit test cannot exercise the real implementation
+  () => ({
+    ...jest.requireActual('./subject'),
+    listSubjects: jest.fn(),
+  }),
+);
 
-jest.mock('./sentry' /* gc1-allow: pattern-a conversion */, () => ({
-  ...jest.requireActual('./sentry'),
-  captureException: jest.fn(),
-  addBreadcrumb: jest.fn(),
-}));
+jest.mock(
+  './sentry', // gc1-allow: captureException wraps @sentry/cloudflare (external Sentry SDK); real calls would phone home in tests
+  () => ({
+    ...jest.requireActual('./sentry'),
+    captureException: jest.fn(),
+    addBreadcrumb: jest.fn(),
+  }),
+);
 
 import { classifySubject } from './subject-classify';
 import { routeAndCall } from './llm';

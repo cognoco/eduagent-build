@@ -47,10 +47,14 @@ import {
   llmSummarySchema,
   engagementSignalSchema,
 } from '@eduagent/schemas';
+import { NotFoundError } from '../../errors';
 import { insertSessionEvent } from './session-events';
 import { getSubject } from '../subject';
 import { createPendingSessionSummary } from '../summaries';
 import { incrementSummarySkips } from '../settings';
+import { persistBookTopics } from '../curriculum';
+import { generateBookTopics } from '../book-generation';
+import { getProfileAge } from '../profile';
 import { computeActiveSeconds } from './session-context-builders';
 import { mapSessionRow } from './session-events';
 import { clearSessionStaticContext } from './session-cache';
@@ -403,6 +407,54 @@ async function findFirstAvailableTopicId(
   return topic?.id;
 }
 
+async function materializeFocusedBookTopics(
+  db: Database,
+  profileId: string,
+  subjectId: string,
+  bookId: string,
+): Promise<void> {
+  const [book] = await db
+    .select({
+      id: curriculumBooks.id,
+      title: curriculumBooks.title,
+      description: curriculumBooks.description,
+    })
+    .from(curriculumBooks)
+    .innerJoin(subjects, eq(subjects.id, curriculumBooks.subjectId))
+    .where(
+      and(
+        eq(curriculumBooks.id, bookId),
+        eq(curriculumBooks.subjectId, subjectId),
+        eq(subjects.profileId, profileId),
+      ),
+    )
+    .limit(1);
+
+  if (!book) {
+    throw new NotFoundError('Book');
+  }
+
+  const learnerAge = await getProfileAge(db, profileId);
+  const result = await generateBookTopics(
+    book.title,
+    book.description ?? '',
+    learnerAge,
+  );
+
+  if (result.topics.length === 0) {
+    throw new CurriculumSessionNotReadyError();
+  }
+
+  await persistBookTopics(
+    db,
+    profileId,
+    subjectId,
+    bookId,
+    result.topics,
+    result.connections,
+  );
+}
+
 async function verifyTopicBelongsToSubject(
   db: Database,
   profileId: string,
@@ -682,6 +734,7 @@ const sessionCrudDependencies = {
   findFirstAvailableTopicId,
   loadLatestCompletedDraftSignals,
   loadSubjectStructureType,
+  materializeFocusedBookTopics,
   matchTopicByIntent,
   startSession,
 };
@@ -726,9 +779,10 @@ export async function startFirstCurriculumSession(
 ): Promise<LearningSession> {
   const startedAt = Date.now();
   const deadline = Date.now() + FIRST_CURRICULUM_SESSION_WAIT_MS;
+  let focusedBookMaterializeAttempted = false;
 
   while (Date.now() <= deadline) {
-    const [topicId, extractedSignals] = await Promise.all([
+    const [initialTopicId, extractedSignals] = await Promise.all([
       sessionCrudDependencies.findFirstAvailableTopicId(
         db,
         profileId,
@@ -741,6 +795,23 @@ export async function startFirstCurriculumSession(
         subjectId,
       ),
     ]);
+    let topicId = initialTopicId;
+
+    if (!topicId && input.bookId && !focusedBookMaterializeAttempted) {
+      focusedBookMaterializeAttempted = true;
+      await sessionCrudDependencies.materializeFocusedBookTopics(
+        db,
+        profileId,
+        subjectId,
+        input.bookId,
+      );
+      topicId = await sessionCrudDependencies.findFirstAvailableTopicId(
+        db,
+        profileId,
+        subjectId,
+        input.bookId,
+      );
+    }
 
     if (topicId) {
       const topicAvailableMs = Date.now() - startedAt;

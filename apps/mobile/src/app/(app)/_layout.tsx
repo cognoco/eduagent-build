@@ -1,5 +1,5 @@
 import React from 'react';
-import { Tabs, Redirect, usePathname, useRouter, type Href } from 'expo-router';
+import { Tabs, Redirect, usePathname, useRouter } from 'expo-router';
 import {
   View,
   Text,
@@ -10,7 +10,7 @@ import {
   Platform,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import type { Translate } from '../../i18n';
+import type { TFunction } from 'i18next';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth, useClerk, useUser } from '@clerk/clerk-expo';
 import { useQueryClient } from '@tanstack/react-query';
@@ -117,6 +117,7 @@ const FULL_SCREEN_ROUTES = new Set([
 ]);
 
 const PENDING_AUTH_REDIRECT_SETTLE_MS = 1_000;
+const DEFAULT_AUTH_REDIRECT_PATH = '/(app)/home';
 
 const iconMap: Record<
   string,
@@ -252,7 +253,7 @@ function canSwitchFromConsentGate(
 export function buildSwitchProfileConfirmation(params: {
   activeProfile: { id: string } | null;
   profiles: ReadonlyArray<{ id: string; displayName: string }>;
-  t: Translate;
+  t: TFunction;
 }): {
   target: { id: string; displayName: string };
   title: string;
@@ -296,15 +297,20 @@ export function buildSwitchProfileConfirmation(params: {
 function usePostApprovalLanding(
   profileId: string | undefined,
   consentStatus: string | null | undefined,
-  // [BUG-914] Only child profiles ever see the post-approval celebration —
-  // parents (owners) approve consent FOR a child, never receive it, and
-  // an impersonating parent isn't the audience for "Your parent said yes"
-  // either. Gating on the discriminated role lets all role-aware copy
-  // sites (more.tsx, mentor-memory.tsx, this hook) speak one vocabulary.
+  // [BUG-914] Suppress the "Your parent said yes" celebration for an
+  // impersonating parent — they aren't the audience.
+  // [BUG-61] Teen-owners (11-17 with their own account) who transitioned
+  // PARENTAL_CONSENT_REQUESTED → CONSENTED ARE the audience and have
+  // role === 'owner'. Discriminator vs adult-owners: a parental consent record
+  // exists (parentEmail is set). Adult-owners with no parental consent flow
+  // have parentEmail === null and never see the celebration.
   role: ActiveProfileRole | null,
 ): [boolean, () => void] {
   const isConsented = !!profileId && consentStatus === 'CONSENTED';
-  const isChildProfile = role === 'child';
+  const { data: consentData } = useConsentStatus();
+  const hadParentalConsentFlow = !!consentData?.parentEmail;
+  const acceptsPostApproval =
+    role === 'child' || (role === 'owner' && hadParentalConsentFlow);
   const [shouldShow, setShouldShow] = React.useState(false);
   const [checked, setChecked] = React.useState(false);
   // [IMP-2] Only query subjects once we know the screen should show — avoids
@@ -312,11 +318,11 @@ function usePostApprovalLanding(
   // key is already set to 'true'. For new users, the query fires after the
   // SecureStore async read completes.
   const subjects = useSubjects({
-    enabled: isConsented && isChildProfile && checked && shouldShow,
+    enabled: isConsented && acceptsPostApproval && checked && shouldShow,
   });
 
   React.useEffect(() => {
-    if (!profileId || consentStatus !== 'CONSENTED' || !isChildProfile) {
+    if (!profileId || consentStatus !== 'CONSENTED' || !acceptsPostApproval) {
       setChecked(true);
       setShouldShow(false);
       return;
@@ -332,7 +338,7 @@ function usePostApprovalLanding(
         setChecked(true);
       }
     })();
-  }, [profileId, consentStatus, isChildProfile]);
+  }, [profileId, consentStatus, acceptsPostApproval]);
 
   const dismiss = React.useCallback(() => {
     if (!profileId) return;
@@ -347,7 +353,11 @@ function usePostApprovalLanding(
   const subjectsReady = !subjects.isLoading;
   const hasSubjects = (subjects.data?.length ?? 0) > 0;
   return [
-    isChildProfile && checked && subjectsReady && shouldShow && !hasSubjects,
+    acceptsPostApproval &&
+      checked &&
+      subjectsReady &&
+      shouldShow &&
+      !hasSubjects,
     dismiss,
   ];
 }
@@ -570,6 +580,7 @@ function CreateProfileGate(): React.ReactElement {
   const queryClient = useQueryClient();
   const { profiles } = useProfile();
   const { t } = useTranslation();
+  const isPushingRef = React.useRef(false);
 
   const handleSignOut = async () => {
     try {
@@ -588,18 +599,13 @@ function CreateProfileGate(): React.ReactElement {
   };
 
   const handleGetStarted = React.useCallback(() => {
-    if (Platform.OS === 'web') {
-      const webLocation = globalThis as typeof globalThis & {
-        location?: { assign: (url: string) => void };
-      };
-
-      if (webLocation.location) {
-        webLocation.location.assign('/create-profile');
-        return;
-      }
-    }
-
+    if (isPushingRef.current) return;
+    isPushingRef.current = true;
     router.push('/create-profile');
+    // Reset after navigation settles to allow re-entry if user backs out
+    setTimeout(() => {
+      isPushingRef.current = false;
+    }, 1000);
   }, [router]);
 
   return (
@@ -682,10 +688,9 @@ function ConsentWithdrawnGate(): React.ReactElement {
       setRefreshing(false);
     }
   };
-  const ageBracket =
-    activeProfile?.birthYear != null
-      ? computeAgeBracket(activeProfile.birthYear)
-      : 'adolescent';
+  const ageBracket = activeProfile?.birthYear
+    ? computeAgeBracket(activeProfile.birthYear)
+    : 'adult';
   const copy = getConsentWithdrawnCopy(ageBracket);
 
   return (
@@ -809,10 +814,9 @@ function ConsentPendingGate(): React.ReactElement {
   const { data: consentData } = useConsentStatus();
   const resendMutation = useRequestConsent();
   const { user } = useUser();
-  const ageBracket =
-    activeProfile?.birthYear != null
-      ? computeAgeBracket(activeProfile.birthYear)
-      : 'adolescent';
+  const ageBracket = activeProfile?.birthYear
+    ? computeAgeBracket(activeProfile.birthYear)
+    : 'adult';
   const copy = getConsentPendingCopy(ageBracket);
   const [checking, setChecking] = React.useState(false);
   const [previewMode, setPreviewMode] = React.useState<
@@ -832,12 +836,10 @@ function ConsentPendingGate(): React.ReactElement {
     activeProfile?.consentStatus === 'PARENTAL_CONSENT_REQUESTED';
 
   const refreshConsentGate = React.useCallback(async () => {
-    await queryClient.invalidateQueries({
-      predicate: (query) => {
-        const key = String(query.queryKey[0]);
-        return key === 'profiles' || key === 'consent-status';
-      },
-    });
+    await Promise.all([
+      queryClient.refetchQueries({ queryKey: ['profiles'] }),
+      queryClient.refetchQueries({ queryKey: ['consent-status'] }),
+    ]);
   }, [queryClient]);
 
   const onCheckAgain = async () => {
@@ -1345,55 +1347,6 @@ export default function AppLayout() {
     () => computeVisibleTabs(tabShape),
     [tabShape],
   );
-  const profileNavigationKey = activeProfile
-    ? `${activeProfile.id}:${isParentProxy ? 'proxy' : 'direct'}`
-    : 'no-active-profile';
-  const refreshLearningTabQueries = React.useCallback(() => {
-    void queryClient.invalidateQueries({ queryKey: ['subjects'] });
-    // PR-10 deferred: broad ['progress'] and ['dashboard'] — tab-focus refresh
-    // fires for any user returning to the learning tab; the full set of progress
-    // and dashboard keys for the active profile is not enumerable without a
-    // workflow test that seeds and asserts every registered sub-key.
-    void queryClient.invalidateQueries({ queryKey: ['progress'] });
-    void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-    void queryClient.invalidateQueries({ queryKey: ['coaching-card'] });
-    void queryClient.invalidateQueries({ queryKey: ['celebrations'] });
-    void queryClient.invalidateQueries({ queryKey: ['subscription'] });
-    void queryClient.invalidateQueries({ queryKey: ['usage'] });
-  }, [queryClient]);
-  const refreshLibraryTabQueries = React.useCallback(() => {
-    void queryClient.invalidateQueries({ queryKey: ['subjects'] });
-    // PR-10 deferred: broad ['progress'] — library tab refresh needs subject
-    // progress entries, but the set of active subjects/profiles is not known
-    // at the call site without iterating all active cache keys.
-    void queryClient.invalidateQueries({ queryKey: ['progress'] });
-    void queryClient.invalidateQueries({ queryKey: ['library'] });
-    void queryClient.invalidateQueries({ queryKey: ['books'] });
-  }, [queryClient]);
-  const refreshMoreTabQueries = React.useCallback(() => {
-    void queryClient.invalidateQueries({ queryKey: ['profiles'] });
-    void queryClient.invalidateQueries({ queryKey: ['subscription'] });
-    void queryClient.invalidateQueries({ queryKey: ['subscription-family'] });
-    void queryClient.invalidateQueries({ queryKey: ['usage'] });
-    void queryClient.invalidateQueries({ queryKey: ['settings'] });
-  }, [queryClient]);
-  const handleMoreTabPress = React.useCallback(() => {
-    refreshMoreTabQueries();
-  }, [refreshMoreTabQueries]);
-  const refreshProgressTabQueries = React.useCallback(() => {
-    // PR-10 deferred: broad ['progress'], ['dashboard'], ['retention'],
-    // ['language-progress'], ['resume-nudge'] — progress tab refresh fires on
-    // tab focus and must refresh the entire progress surface for the active
-    // profile including all sub-keys (overview, inventory, history, milestones,
-    // profile sessions, profile reports, topic progress per subject, etc.).
-    // Enumerating all keys requires a workflow test that seeds every registered
-    // sub-key and asserts staleness after the refresh call. Keep broad.
-    void queryClient.invalidateQueries({ queryKey: ['progress'] });
-    void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-    void queryClient.invalidateQueries({ queryKey: ['retention'] });
-    void queryClient.invalidateQueries({ queryKey: ['language-progress'] });
-    void queryClient.invalidateQueries({ queryKey: ['resume-nudge'] });
-  }, [queryClient]);
 
   // Sync Clerk auth state with RevenueCat identity (runs on auth change)
   useRevenueCatIdentity();
@@ -1444,6 +1397,11 @@ export default function AppLayout() {
       return;
     }
 
+    if (pendingAuthRedirect === DEFAULT_AUTH_REDIRECT_PATH) {
+      clearPendingAuthRedirect();
+      return;
+    }
+
     // W-03: on web we can briefly land on the requested route before a later
     // mount-time redirect snaps the tab shell back to /home. Keep the pending
     // redirect alive until the target path stays stable for a short window so
@@ -1468,7 +1426,7 @@ export default function AppLayout() {
     }
 
     replayedAuthRedirectRef.current = pendingAuthRedirect;
-    router.replace(pendingAuthRedirect as Href);
+    router.replace(pendingAuthRedirect as never);
   }, [currentAppPath, pendingAuthRedirect, router]);
 
   // Auto-dismiss profile-switched toast after 5 seconds
@@ -1695,7 +1653,6 @@ export default function AppLayout() {
            (immersive screens like session, onboarding, homework).
          ──────────────────────────────────────────────────────────── */}
         <Tabs
-          key={profileNavigationKey}
           screenOptions={({ route }) => {
             const isVisible = visibleTabs.has(route.name);
             const isFullScreen = FULL_SCREEN_ROUTES.has(route.name);
@@ -1735,9 +1692,6 @@ export default function AppLayout() {
         >
           <Tabs.Screen
             name="home"
-            listeners={{
-              tabPress: refreshLearningTabQueries,
-            }}
             options={{
               title: t('tabs.home'),
               tabBarButtonTestID: 'tab-home',
@@ -1754,9 +1708,6 @@ export default function AppLayout() {
           />
           <Tabs.Screen
             name="own-learning"
-            listeners={{
-              tabPress: refreshLearningTabQueries,
-            }}
             options={{
               title: t('tabs.myLearning'),
               tabBarButtonTestID: 'tab-my-learning',
@@ -1768,9 +1719,6 @@ export default function AppLayout() {
           />
           <Tabs.Screen
             name="library"
-            listeners={{
-              tabPress: refreshLibraryTabQueries,
-            }}
             options={{
               title: t('tabs.library'),
               tabBarButtonTestID: 'tab-library',
@@ -1782,9 +1730,6 @@ export default function AppLayout() {
           />
           <Tabs.Screen
             name="progress"
-            listeners={{
-              tabPress: refreshProgressTabQueries,
-            }}
             options={{
               title: t('tabs.progress'),
               tabBarButtonTestID: 'tab-progress',
@@ -1796,9 +1741,6 @@ export default function AppLayout() {
           />
           <Tabs.Screen
             name="more"
-            listeners={{
-              tabPress: handleMoreTabPress,
-            }}
             options={{
               title: t('tabs.more'),
               tabBarButtonTestID: 'tab-more',

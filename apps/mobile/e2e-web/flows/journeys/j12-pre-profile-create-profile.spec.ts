@@ -19,7 +19,7 @@ test('J-12 new user → create profile → lands on learner home', async ({
 
   await page.getByTestId('create-profile-name').fill('Casey');
   await page.getByTestId('create-profile-birthdate-input').fill('2000-05-01');
-  await page.getByTestId('create-profile-submit').click();
+  await pressableClick(page.getByTestId('create-profile-submit'));
 
   await expect(page.getByTestId('learner-screen')).toBeVisible({
     timeout: 30_000,

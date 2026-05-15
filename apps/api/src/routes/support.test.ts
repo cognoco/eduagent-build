@@ -1,11 +1,14 @@
-// prettier-ignore
-jest.mock( // gc1-allow: pattern-a conversion
-  '../services/support/spillover' /* gc1-allow: pattern-a conversion */,
-  () => ({
-    ...jest.requireActual('../services/support/spillover'),
+jest.mock('../services/support/spillover', () => {
+  // gc1-allow: requireActual + targeted override for recordOutboxSpillover side effect
+  const actual = jest.requireActual('../services/support/spillover') as Record<
+    string,
+    unknown
+  >;
+  return {
+    ...actual,
     recordOutboxSpillover: jest.fn(),
-  }),
-);
+  };
+});
 
 import { Hono } from 'hono';
 import { supportRoutes } from './support';

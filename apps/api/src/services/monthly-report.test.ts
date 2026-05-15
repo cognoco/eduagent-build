@@ -2,12 +2,12 @@
 // Monthly Report Service Tests
 // ---------------------------------------------------------------------------
 
-jest.mock('./llm' /* gc1-allow: pattern-a conversion */, () => ({
+jest.mock('./llm', () => ({
   ...jest.requireActual('./llm'),
   routeAndCall: jest.fn(),
 }));
 
-jest.mock('./sentry' /* gc1-allow: pattern-a conversion */, () => ({
+jest.mock('./sentry', () => ({
   ...jest.requireActual('./sentry'),
   captureException: jest.fn(),
 }));

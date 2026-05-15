@@ -1,0 +1,75 @@
+# Flow AUTH-13a: Deep-link Auth Redirect — Signed-out bounce
+#
+# Validates: when a signed-out user opens mentomate:///library via an external
+# deep link, the (app)/_layout.tsx bounce persists the target in
+# pendingAuthRedirect, routes to sign-in, and after successful authentication
+# the user lands on library-screen (NOT home-screen).
+#
+# Mechanism:
+#   1. seed-and-run.sh seeds an onboarding-complete user and brings the app to
+#      the sign-in screen (pm clear → launch → wait for sign-in-screen).
+#   2. Maestro fires openLink for mentomate:///library. Expo Router resolves
+#      this to /(app)/library; the (app) layout's signed-out check at
+#      apps/mobile/src/app/(app)/_layout.tsx:~1455-1463 calls
+#      rememberPendingAuthRedirect('/(app)/library') and redirects to
+#      /sign-in?redirectTo=...
+#   3. The flow signs in via the canonical _setup/sign-in-only.yaml.
+#   4. (auth)/_layout.tsx reads the pending record and router.replace to
+#      /(app)/library — landing on library-screen, not home-screen.
+#
+# testIDs verified against source:
+#   sign-in-screen    apps/mobile/src/app/(auth)/sign-in.tsx (root View with testID)
+#   sign-in-email     apps/mobile/src/app/(auth)/sign-in.tsx:1293
+#   sign-in-password  apps/mobile/src/app/(auth)/sign-in.tsx:1311
+#   sign-in-button    apps/mobile/src/app/(auth)/sign-in.tsx:1334
+#   library-screen    apps/mobile/src/app/(app)/library.tsx (root View)
+#   home-screen       apps/mobile/src/app/(app)/home.tsx:132
+#
+# Run command:
+#   ./e2e/scripts/seed-and-run.sh onboarding-complete e2e/flows/auth/deep-link-redirect-signed-out.yaml
+#
+# Tags: nightly, auth
+appId: com.mentomate.app
+tags:
+  - nightly
+  - auth
+---
+# ── Step 1: Confirm we are on the sign-in screen ──
+- extendedWaitUntil:
+    visible:
+      id: "sign-in-screen"
+    timeout: 120000
+
+- takeScreenshot: deep-link-signed-out-01-sign-in-screen
+
+# ── Step 2: Fire the deep link while signed out ──
+# (app)/_layout.tsx intercepts, calls rememberPendingAuthRedirect, redirects
+# back to sign-in. The visible screen should still be sign-in-screen.
+- openLink: "mentomate:///library"
+
+- extendedWaitUntil:
+    visible:
+      id: "sign-in-screen"
+    timeout: 5000
+
+- takeScreenshot: deep-link-signed-out-02-after-open-link
+
+# ── Step 3: Sign in via canonical sign-in flow ──
+# sign-in-only.yaml uses the correct testIDs (sign-in-email/password/button)
+# and the hideKeyboard pattern. It has NO post-auth return-to-home recovery,
+# so the pending-redirect replace will not be defeated.
+- runFlow:
+    file: ../_setup/sign-in-only.yaml
+
+- takeScreenshot: deep-link-signed-out-03-after-sign-in
+
+# ── Step 4: Assert post-auth landing is library, not home ──
+- extendedWaitUntil:
+    visible:
+      id: "library-screen"
+    timeout: 15000
+
+- assertNotVisible:
+    id: "home-screen"
+
+- takeScreenshot: deep-link-signed-out-04-landed-on-library

@@ -10,25 +10,34 @@ const mockRouteAndCall = jest.fn();
 const mockRouteAndStream = jest.fn();
 const mockGetRegisteredProviders = jest.fn().mockReturnValue([]);
 
-jest.mock('../services/llm' /* gc1-allow: pattern-a conversion */, () => ({
-  ...jest.requireActual('../services/llm'),
-  routeAndCall: (...args: unknown[]) => mockRouteAndCall(...args),
-  routeAndStream: (...args: unknown[]) => mockRouteAndStream(...args),
-  getRegisteredProviders: () => mockGetRegisteredProviders(),
-}));
+jest.mock('../services/llm', () => {
+  // gc1-allow: LLM external boundary (routeAndCall); requireActual spread applied
+  const actual = jest.requireActual('../services/llm') as Record<
+    string,
+    unknown
+  >;
+  return {
+    ...actual,
+    routeAndCall: (...args: unknown[]) => mockRouteAndCall(...args),
+    routeAndStream: (...args: unknown[]) => mockRouteAndStream(...args),
+    getRegisteredProviders: () => mockGetRegisteredProviders(),
+  };
+});
 
-// prettier-ignore
-jest.mock( // gc1-allow: pattern-a conversion
-  '../services/test-seed' /* gc1-allow: pattern-a conversion */,
-  () => ({
-    ...jest.requireActual('../services/test-seed'),
+jest.mock('../services/test-seed', () => {
+  // gc1-allow: requireActual + targeted overrides for seed/reset side effects
+  const actual = jest.requireActual('../services/test-seed') as Record<
+    string,
+    unknown
+  >;
+  return {
+    ...actual,
     seedScenario: jest.fn(),
     resetDatabase: jest.fn(),
     debugAccountsByEmail: jest.fn(),
     debugSubjectsByClerkUserId: jest.fn(),
-    VALID_SCENARIOS: ['default'],
-  }),
-);
+  };
+});
 
 import { testSeedRoutes } from './test-seed';
 

@@ -61,6 +61,7 @@ import {
 import type { LLMTier } from '../services/subscription';
 import { notFound, apiError } from '../errors';
 import { inngest } from '../inngest/client';
+import { safeSend } from '../services/safe-non-core';
 import { safeRefundQuota } from '../services/billing';
 import {
   startInterleavedSession,
@@ -254,6 +255,8 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         sessionMode:
           session.sessionType === 'homework' ? 'homework' : 'freeform',
       });
+      // core-send: user-initiated filing retry — dispatch must throw on
+      // failure so the user is not told "queued" when nothing was queued.
       await inngest.send({ name: 'app/filing.retry', data: retryPayload });
 
       const updatedSession = await getSession(db, profileId, sessionId);
@@ -359,45 +362,42 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       return sum + exchange.content.split(/\s+/).filter(Boolean).length;
     }, 0);
 
-    // [A-1] Observability events — consumed by ask-gate-observe.ts (decision +
-    // timeout); awaited per CLAUDE.md "Silent recovery without escalation" rule.
-    // [BUG-653] Inngest events are observability-only — never fail the request
-    // when their delivery hiccups (network blip, rate-limit, partial outage).
-    // The depth result is already in hand and is what the client asked for.
-    try {
-      await inngest.send({
-        name: 'app/ask.gate_decision',
-        data: {
-          sessionId,
-          meaningful: result.meaningful,
-          reason: result.reason,
-          method: result.method,
-          exchangeCount: transcript.session.exchangeCount,
-          learnerWordCount,
-          topicCount: result.topics.length,
-        },
-      });
-
-      if (result.method === 'fail_open') {
-        await inngest.send({
-          name: 'app/ask.gate_timeout',
+    // [A-1] [BUG-653] Observability events — consumed by ask-gate-observe.ts.
+    // safeSend isolates the dispatch: the depth result is already in hand and is
+    // what the client asked for; a dispatch hiccup must not fail the request.
+    // Both events are independent calls so a failure on the first does not
+    // suppress the second.
+    await safeSend(
+      () =>
+        inngest.send({
+          name: 'app/ask.gate_decision',
           data: {
             sessionId,
+            meaningful: result.meaningful,
+            reason: result.reason,
+            method: result.method,
             exchangeCount: transcript.session.exchangeCount,
+            learnerWordCount,
+            topicCount: result.topics.length,
           },
-        });
-      }
-    } catch (err) {
-      // Capture so the silent-recovery rule (CLAUDE.md → "Silent Recovery
-      // Without Escalation is Banned") is satisfied — failures here surface
-      // in Sentry rather than disappearing into stdout.
-      captureException(err, {
-        extra: {
-          context: 'sessions.evaluate-depth.inngest_send',
-          sessionId,
-          method: result.method,
-        },
-      });
+        }),
+      'ask.gate_decision',
+      { sessionId, profileId, method: result.method },
+    );
+
+    if (result.method === 'fail_open') {
+      await safeSend(
+        () =>
+          inngest.send({
+            name: 'app/ask.gate_timeout',
+            data: {
+              sessionId,
+              exchangeCount: transcript.session.exchangeCount,
+            },
+          }),
+        'ask.gate_timeout',
+        { sessionId, profileId },
+      );
     }
 
     return c.json(result);

@@ -16,7 +16,7 @@
 #
 # Environment variables (optional):
 #   API_URL          — API base URL (default: http://localhost:8787)
-#   EMAIL            — Test user email (default: test-e2e@example.com)
+#   EMAIL            — Test user email (default: test-e2e+clerk_test@example.com)
 #   MAESTRO_PATH     — Path to maestro binary (default: /c/tools/maestro/bin/maestro)
 #   APP_TIMEOUT      — Seconds to wait for sign-in screen (default: 30)
 #
@@ -55,7 +55,7 @@ EXTRA_ARGS=("$@")
 
 # ── Config ──
 API_URL="${API_URL:-http://localhost:8787}"
-EMAIL="${EMAIL:-test-e2e@example.com}"
+EMAIL="${EMAIL:-test-e2e+clerk_test@example.com}"
 MAESTRO="${MAESTRO_PATH:-/c/tools/maestro/bin/maestro}"
 ADB="${ADB_PATH:-/c/Android/Sdk/platform-tools/adb.exe}"
 APP_ID="com.mentomate.app"

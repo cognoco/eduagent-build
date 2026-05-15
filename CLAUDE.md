@@ -2,13 +2,13 @@
 
 ## Snapshot
 
-- Mobile: ~80 screens, 251 test suites, ~2594 tests
-- API: 42 route groups, 187 test suites, ~3780 tests, 48 Inngest functions
-- Cross-package integration tests: 43 suites in `tests/integration/`, ~290 cases
+- Mobile: ~80 screens, 255 test suites, ~2,727 tests
+- API: 42 route groups, 187 test suites, ~3,872 tests, 49 Inngest functions
+- Cross-package integration tests: 44 suites in `tests/integration/`, ~290 cases
 - Monorepo: `apps/api`, `apps/mobile`, shared packages in `packages/`
 - Core docs: `docs/project_context.md`, `docs/architecture.md`, relevant spec/plan under `docs/plans/` or `docs/specs/`
 
-> Counts verified 2026-05-13. Test-case totals are a heuristic grep of `it(` / `test(` line starts; jest-reported totals may be slightly higher due to `it.each(...)` expansion at runtime. Re-verify with `git ls-files | grep '\.test\.'` for suite counts.
+> Counts verified 2026-05-14. Test-case totals are a heuristic grep of `it(` / `test(` line starts; jest-reported totals may be slightly higher due to `it.each(...)` expansion at runtime. Re-verify with `git ls-files | grep '\.test\.'` for suite counts.
 
 ## Read This Before Editing
 
@@ -53,6 +53,7 @@ Key rules:
 - Writes must include explicit `profileId` protection or verify ownership through the parent chain before updating child records.
 - Shared mobile components stay persona-unaware. Use semantic tokens and CSS variables, not persona checks or hardcoded hex colors. Exception: brand-fixed hex values are acceptable inside SVG-internal animation and celebration components (`*Animation.tsx`, `*Celebration.tsx`, `AnimatedSplash.tsx`, `MentomateLogo.tsx`) when the file annotates the brand intent.
 - Durable async work goes through Inngest. Do not fire-and-forget background work from route handlers.
+- Non-core Inngest dispatches (telemetry, post-success notifications, observability events) go through `safeSend()` in `apps/api/src/services/safe-non-core.ts` so a dispatch failure is captured in Sentry but never throws and never breaks the user action. Bare `inngest.send(...)` is reserved for CORE flows where dispatch failure must short-circuit the user action — those sites carry a `// core-send: <reason>` comment on the line(s) immediately above the call. Forward-only ratchet test: `apps/api/src/services/safe-non-core.guard.test.ts`.
 - LLM responses that drive state-machine decisions (close interview, hold escalation, trigger UI widget) must use the structured response envelope (`llmResponseEnvelopeSchema` from `@eduagent/schemas`). Parse with `parseEnvelope()` from `services/llm/envelope.ts`. Never embed `[MARKER]` tokens or JSON blobs in free-text replies. Every envelope signal must have a server-side hard cap (e.g., `MAX_INTERVIEW_EXCHANGES = 4`) so the flow terminates even if the LLM never emits the signal. See `docs/architecture.md` → "LLM Response Envelope" for the full contract.
 - When changing LLM prompts (`apps/api/src/services/**/*-prompts.ts` or `apps/api/src/services/llm/*.ts`), run the eval harness (`pnpm eval:llm`) to snapshot before/after, and `pnpm eval:llm --live` (Tier 2) to validate real LLM responses against `expectedResponseSchema`. The pre-commit hook only checks that snapshot files are staged — it does NOT run the harness. Harness code: `apps/api/eval-llm/`.
 - Subagents must never run `git add`, `git commit`, or `git push` — except (a) the `/commit` skill, which runs as an authorized `context: fork` subagent, and (b) when the commit is a step prescribed by a structured workflow. All other subagents write code, run tests, and report which files they changed. The coordinator commits their work using `/commit`.
@@ -79,6 +80,8 @@ Unit tests, lint, typecheck, and formatting are enforced by pre-commit hooks (li
 - Run integration tests when changing DB behavior, auth/profile scoping, Inngest flows, or cross-package contracts. The pre-commit hook intentionally skips `.integration.test.` files.
 - Do not call work complete if related tests, lint, typecheck, or required migrations are still failing.
 - No suppression, no shortcuts — always address the root of the error. Never use `eslint-disable` or suppress warnings to make lint pass. Fix the actual code or improve the lint rule to handle the pattern correctly.
+
+- **Mobile test-file changes require a receipt before push.** Pre-push blocks the push if `apps/mobile/src/**/*.test.tsx` changed without a fresh `.test-receipts/mobile.json`. Generate with `bash scripts/record-test-receipt.sh mobile` — runs `pnpm exec nx run mobile:test`, writes the receipt only on green, records the current content hash of every changed test file. Modifying a file after recording invalidates the receipt and re-blocks the push. Bypass with `SKIP_RECEIPT_CHECK=1 git push` (visible in shell history, use only for revert PRs). This rule exists because PR #257 shipped with 189 broken mobile tests that CI's GC1 step had hidden.
 
 ## Repo-Specific Guardrails
 

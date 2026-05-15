@@ -227,7 +227,7 @@ jest.mock('@clerk/clerk-expo/token-cache', () => ({
 jest.mock('expo-web-browser', () => ({
   warmUpAsync: jest.fn().mockResolvedValue(undefined),
   coolDownAsync: jest.fn().mockResolvedValue(undefined),
-  maybeCompleteAuthSession: jest.fn(),
+  maybeCompleteAuthSession: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock('expo-linking', () => ({
@@ -330,13 +330,30 @@ if (_savedFormData) {
   });
 }
 
-// Force TanStack Query to notify synchronously in tests.
+// Force TanStack Query to notify synchronously in tests, wrapped in act().
 // The default scheduler uses setTimeout(cb, 0) which causes React state updates
-// to fire after act() boundaries, triggering "not wrapped in act()" warnings.
+// to fire after act() boundaries. Even a synchronous scheduler still triggers
+// "not wrapped in act()" warnings when notifications arrive from async-resolved
+// promises (mutation onError/onSuccess), because the synchronous cb() runs from
+// a microtask that's outside the original fireEvent's act window. Wrapping the
+// scheduler's cb in act() makes those updates act-safe.
 
 const { notifyManager } = require('@tanstack/react-query');
+const { act } = require('@testing-library/react-native');
 notifyManager.setScheduler((cb: () => void) => {
-  cb();
+  const maybeActPromise = act(() => {
+    cb();
+  });
+  if (
+    maybeActPromise &&
+    typeof (maybeActPromise as Promise<void>).catch === 'function'
+  ) {
+    (maybeActPromise as Promise<void>).catch((err) => {
+      setTimeout(() => {
+        throw err;
+      }, 0);
+    });
+  }
 });
 
 // Note: TextInput native component stubs (AndroidTextInputNativeComponent,

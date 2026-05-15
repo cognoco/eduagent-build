@@ -50,9 +50,10 @@ tags:
     id: "create-subject-name"
 - inputText: "Photosynthesis"
 
-# Dismiss keyboard so submit button is visible (autoFocus keeps keyboard open)
-# pressKey: back reliably dismisses keyboard when it IS open (BUG-5 safe here)
-- pressKey: back
+# Dismiss keyboard so submit button is visible (autoFocus keeps keyboard open).
+# hideKeyboard is a no-op when the keyboard is closed, so it cannot fall
+# through to Android Back like the prior pressKey: back did.
+- hideKeyboard
 
 # Wait for layout to settle after keyboard dismissal
 - extendedWaitUntil:

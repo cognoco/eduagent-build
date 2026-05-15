@@ -757,7 +757,8 @@ describe('CameraScreen', () => {
     await waitFor(() => {
       const allCalls = fetchCallsMatching(mockFetch, 'subjects');
       const createCall = allCalls.find(
-        (c) => c.init?.method === 'POST' && !c.url.includes('classify'),
+        (c: { url: string; init?: { method?: string } }) =>
+          c.init?.method === 'POST' && !c.url.includes('classify'),
       );
       const body = extractJsonBody<{ name: string; rawInput: string }>(
         createCall?.init,

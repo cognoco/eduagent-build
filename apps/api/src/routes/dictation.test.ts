@@ -19,7 +19,7 @@ const meteringFixture = createRouteMeteringFixture(mockDatabaseModule.db, {
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
-jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => ({
+jest.mock('../services/account', () => ({
   ...jest.requireActual('../services/account'),
   findOrCreateAccount: jest.fn().mockResolvedValue({
     id: 'test-account-id',
@@ -30,7 +30,7 @@ jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => ({
   }),
 }));
 
-jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => ({
+jest.mock('../services/profile', () => ({
   ...jest.requireActual('../services/profile'),
   findOwnerProfile: jest.fn().mockResolvedValue(null),
   getProfile: jest.fn().mockResolvedValue({
@@ -42,20 +42,16 @@ jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => ({
   }),
 }));
 
-// Mock the dictation services — they are the internal boundary
-// prettier-ignore
-jest.mock( // gc1-allow: pattern-a conversion
-  '../services/dictation' /* gc1-allow: pattern-a conversion */,
-  () => ({
-    ...jest.requireActual('../services/dictation'),
-    prepareHomework: jest.fn(),
-    generateDictation: jest.fn(),
-    reviewDictation: jest.fn(),
-    recordDictationResult: jest.fn(),
-    getDictationStreak: jest.fn(),
-    fetchGenerateContext: jest.fn(),
-  }),
-);
+// Stub dictation service functions — real implementations call the LLM (external boundary).
+jest.mock('../services/dictation', () => ({
+  ...jest.requireActual('../services/dictation'),
+  prepareHomework: jest.fn(),
+  generateDictation: jest.fn(),
+  reviewDictation: jest.fn(),
+  recordDictationResult: jest.fn(),
+  getDictationStreak: jest.fn(),
+  fetchGenerateContext: jest.fn(),
+}));
 
 import { app } from '../index';
 import {

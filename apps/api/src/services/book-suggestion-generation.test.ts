@@ -11,15 +11,19 @@ jest.mock('./llm' /* gc1-allow: LLM external boundary */, () => ({
 }));
 
 const loggerWarnMock = jest.fn<(...args: unknown[]) => void>();
-jest.mock('./logger' /* gc1-allow: metric verification */, () => ({
-  ...jest.requireActual<typeof import('./logger')>('./logger'),
-  createLogger: () => ({
-    warn: (...args: unknown[]) => loggerWarnMock(...args),
-    info: jest.fn(),
-    error: jest.fn(),
-    debug: jest.fn(),
-  }),
-}));
+jest.mock('./logger', () => {
+  // gc1-allow: requireActual + targeted override to capture warn calls
+  const actual = jest.requireActual('./logger') as Record<string, unknown>;
+  return {
+    ...actual,
+    createLogger: () => ({
+      warn: (...args: unknown[]) => loggerWarnMock(...args),
+      info: jest.fn(),
+      error: jest.fn(),
+      debug: jest.fn(),
+    }),
+  };
+});
 
 import {
   generateCategorizedBookSuggestions,

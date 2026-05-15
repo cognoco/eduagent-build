@@ -1,25 +1,17 @@
-jest.mock('../services/llm' /* gc1-allow: pattern-a conversion */, () => ({
+jest.mock('../services/llm', () => ({
   ...jest.requireActual('../services/llm'),
   registerProvider: jest.fn(),
 }));
 
-// prettier-ignore
-jest.mock( // gc1-allow: pattern-a conversion
-  '../services/llm/providers/gemini' /* gc1-allow: pattern-a conversion */,
-  () => ({
-    ...jest.requireActual('../services/llm/providers/gemini'),
-    createGeminiProvider: jest.fn().mockReturnValue({ id: 'gemini' }),
-  }),
-);
+jest.mock('../services/llm/providers/gemini', () => ({
+  ...jest.requireActual('../services/llm/providers/gemini'),
+  createGeminiProvider: jest.fn().mockReturnValue({ id: 'gemini' }),
+}));
 
-// prettier-ignore
-jest.mock( // gc1-allow: pattern-a conversion
-  '../services/llm/providers/openai' /* gc1-allow: pattern-a conversion */,
-  () => ({
-    ...jest.requireActual('../services/llm/providers/openai'),
-    createOpenAIProvider: jest.fn().mockReturnValue({ id: 'openai' }),
-  }),
-);
+jest.mock('../services/llm/providers/openai', () => ({
+  ...jest.requireActual('../services/llm/providers/openai'),
+  createOpenAIProvider: jest.fn().mockReturnValue({ id: 'openai' }),
+}));
 
 import { registerProvider } from '../services/llm';
 import { createGeminiProvider } from '../services/llm/providers/gemini';

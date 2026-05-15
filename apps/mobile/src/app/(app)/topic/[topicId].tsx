@@ -203,7 +203,6 @@ export default function TopicDetailScreen() {
     subjectId,
     topicId,
     limit: 50,
-    enabled: !!subjectId && !!topicId,
   });
   const { mutate: createNote, isPending: creatingNote } = useCreateNote(
     subjectId,

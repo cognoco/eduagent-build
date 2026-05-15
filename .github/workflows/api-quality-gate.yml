@@ -2,14 +2,6 @@ name: API Quality Gate
 
 on:
   pull_request:
-    paths:
-      - 'apps/api/**'
-      - 'packages/**'
-      - 'pnpm-lock.yaml'
-      - 'tsconfig*.json'
-      - 'eslint.config.*'
-      - 'nx.json'
-      - '.github/workflows/api-quality-gate.yml'
 
 permissions:
   actions: read

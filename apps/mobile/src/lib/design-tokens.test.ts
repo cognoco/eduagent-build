@@ -1,4 +1,9 @@
-import { tokens, tokensToCssVars, accentPresets } from './design-tokens';
+import {
+  tokens,
+  tokensToCssVars,
+  accentPresets,
+  type AccentPreset,
+} from './design-tokens';
 
 function hexToRgb(hex: string): [number, number, number] {
   const normalized = hex.replace('#', '');
@@ -95,7 +100,9 @@ describe('accent preset merging', () => {
     const base = tokens.dark;
     const baseVars = tokensToCssVars(base);
 
-    const nonDefaultPreset = accentPresets.find((p) => p.id === 'electric');
+    const nonDefaultPreset = accentPresets.find(
+      (p: AccentPreset) => p.id === 'electric',
+    );
     expect(nonDefaultPreset).not.toBeUndefined();
     if (!nonDefaultPreset) return;
 

@@ -33,9 +33,11 @@ describe('databaseMiddleware', () => {
 
     await app.request('/test', {}, TEST_ENV);
 
-    // Phase 0.0: neon-serverless driver — createDatabase only needs the URL.
-    // onTransactionFallback no longer exists; the WS driver throws natively.
-    expect(createDatabase).toHaveBeenCalledWith(TEST_ENV.DATABASE_URL);
+    // Request middleware must not reuse a Neon WebSocket pool across separate
+    // Cloudflare Worker request contexts.
+    expect(createDatabase).toHaveBeenCalledWith(TEST_ENV.DATABASE_URL, {
+      cacheNeonPool: false,
+    });
   });
 
   it('stores db instance in context variables', async () => {

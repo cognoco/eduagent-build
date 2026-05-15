@@ -36,14 +36,14 @@ tags:
 - inputText: ${EMAIL}
 
 # Dismiss keyboard (pressKey: back — keyboard is open after inputText)
-- pressKey: back
+- hideKeyboard
 
 - tapOn:
     id: "sign-in-password"
 - inputText: ${PASSWORD}
 
 # Dismiss keyboard (pressKey: back — keyboard is open after inputText)
-- pressKey: back
+- hideKeyboard
 
 # Wait for sign-in button to be visible after keyboard dismissal
 - extendedWaitUntil:

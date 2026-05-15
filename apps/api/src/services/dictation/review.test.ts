@@ -1,17 +1,16 @@
 // ---------------------------------------------------------------------------
-// Mock the LLM router — true external boundary
+// Mock the LLM router — true external boundary (routeAndCall is the LLM
+// provider HTTP call; requireActual preserves all other llm exports)
 // ---------------------------------------------------------------------------
 
-jest.mock('../llm' /* gc1-allow: pattern-a conversion */, () => ({
-  ...jest.requireActual('../llm'),
-  routeAndCall: jest.fn(),
+const mockRouteAndCall = jest.fn();
+jest.mock('../llm', () => ({
+  ...(jest.requireActual('../llm') as Record<string, unknown>),
+  routeAndCall: (...args: unknown[]) => mockRouteAndCall(...args),
 }));
 
-import { routeAndCall } from '../llm';
 import { reviewDictation, buildReviewSystemPrompt } from './review';
 import type { DictationSentence } from '@eduagent/schemas';
-
-const mockRouteAndCall = routeAndCall as jest.Mock;
 
 const SENTENCES: DictationSentence[] = [
   {

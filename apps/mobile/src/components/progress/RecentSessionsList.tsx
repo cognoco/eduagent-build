@@ -1,11 +1,13 @@
 import { Pressable, Text, View } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import type { UseQueryResult } from '@tanstack/react-query';
+import type { ChildSession } from '@eduagent/schemas';
 import { useProfile } from '../../lib/profile';
-import { useProfileSessions } from '../../hooks/use-progress';
 
 type ReportingComponentProps = {
   profileId: string;
+  sessionsQuery: UseQueryResult<ChildSession[]>;
 };
 
 function formatSessionDate(iso: string): string {
@@ -27,11 +29,11 @@ function formatDuration(seconds: number | null): string {
 
 export function RecentSessionsList({
   profileId,
+  sessionsQuery,
 }: ReportingComponentProps): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
   const { activeProfile } = useProfile();
-  const sessionsQuery = useProfileSessions(profileId);
   const sessions = sessionsQuery.data ?? [];
   const isActiveProfile = activeProfile?.id === profileId;
 

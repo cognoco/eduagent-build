@@ -38,39 +38,56 @@ jest.mock( // gc1-allow: pattern-a conversion
   }),
 );
 
-jest.mock('../services/account' /* gc1-allow: unit test boundary */, () => ({
-  ...jest.requireActual('../services/account'),
-  findOrCreateAccount: jest.fn().mockResolvedValue({
-    id: 'test-account-id',
-    clerkUserId: 'user_test',
-    email: 'test@example.com',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  }),
-}));
+jest.mock('../services/account', () => {
+  // gc1-allow: requireActual + targeted overrides
+  const actual = jest.requireActual(
+    '../services/account',
+  ) as typeof import('../services/account');
+  return {
+    ...actual,
+    findOrCreateAccount: jest.fn().mockResolvedValue({
+      id: 'test-account-id',
+      clerkUserId: 'user_test',
+      email: 'test@example.com',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }),
+  };
+});
 
-jest.mock('../services/profile' /* gc1-allow: unit test boundary */, () => ({
-  ...jest.requireActual('../services/profile'),
-  findOwnerProfile: jest.fn().mockResolvedValue(null),
-  getProfile: jest.fn().mockResolvedValue({
-    id: 'test-profile-id',
-    birthYear: 2014,
-    location: null,
-    consentStatus: 'CONSENTED',
-    hasPremiumLlm: false,
-  }),
-}));
+jest.mock('../services/profile', () => {
+  // gc1-allow: requireActual + targeted overrides
+  const actual = jest.requireActual(
+    '../services/profile',
+  ) as typeof import('../services/profile');
+  return {
+    ...actual,
+    findOwnerProfile: jest.fn().mockResolvedValue(null),
+    getProfile: jest.fn().mockResolvedValue({
+      id: 'test-profile-id',
+      birthYear: 2014,
+      location: null,
+      consentStatus: 'CONSENTED',
+      hasPremiumLlm: false,
+    }),
+  };
+});
 
-jest.mock('../services/streaks' /* gc1-allow: unit test boundary */, () => ({
-  ...jest.requireActual('../services/streaks'),
-  recordSessionActivity: jest
-    .fn()
-    .mockResolvedValue({ currentStreak: 1, longestStreak: 1 }),
-}));
+jest.mock('../services/streaks', () => {
+  // gc1-allow: requireActual + targeted overrides
+  const actual = jest.requireActual(
+    '../services/streaks',
+  ) as typeof import('../services/streaks');
+  return {
+    ...actual,
+    recordSessionActivity: jest
+      .fn()
+      .mockResolvedValue({ currentStreak: 1, longestStreak: 1 }),
+  };
+});
 
-jest.mock('../services/llm' /* gc1-allow: unit test boundary */, () => {
-  // Using jest.requireActual here is the canonical pattern (GC1 rule) for
-  // preserving named exports that are not being stubbed.
+jest.mock('../services/llm', () => {
+  // gc1-allow: LLM external boundary (routeAndCall); requireActual spread applied
   const actual = jest.requireActual(
     '../services/llm',
   ) as typeof import('../services/llm');

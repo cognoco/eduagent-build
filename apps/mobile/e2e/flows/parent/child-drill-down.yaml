@@ -24,7 +24,7 @@ tags:
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
     env:
-      SEED_SCENARIO: "parent-with-children"
+      SEED_SCENARIO: 'parent-with-children'
       API_URL: ${API_URL}
 
 # 2. Parent owners land on LearnerScreen; enter the Family dashboard.
@@ -36,7 +36,7 @@ tags:
 #    CHILD_PROFILE_ID is injected by the seed-and-sign-in helper.
 - extendedWaitUntil:
     visible:
-      id: "parent-home-check-child-${CHILD_PROFILE_ID}"
+      id: 'parent-home-check-child-${CHILD_PROFILE_ID}'
     timeout: 10000
     optional: true
 
@@ -48,38 +48,38 @@ tags:
 #    NOTE: Do NOT double-tap — double router.push navigates past child detail
 #    (BUG-70 consent-management fix).
 - tapOn:
-    id: "parent-home-check-child-${CHILD_PROFILE_ID}"
+    id: 'parent-home-check-child-${CHILD_PROFILE_ID}'
 
 # 6. Wait for child detail screen
 - extendedWaitUntil:
     visible:
-      id: "child-detail-scroll"
+      id: 'child-detail-scroll'
     timeout: 10000
 
 # 7. Verify "Subjects" heading is present
 - extendedWaitUntil:
     visible:
-      text: "Subjects"
+      text: 'Subjects'
     timeout: 5000
     optional: true
 
 # 8. Verify "Recent Sessions" heading is present
 - assertVisible:
-    text: "Recent Sessions"
+    text: 'Recent Sessions'
     optional: true
 
 # 9. Screenshot: child detail with subjects and sessions
 - takeScreenshot: parent-drill-down-02-child-detail
 
 # 10. Tap the seeded subject card.
-# parent-with-children seeds a single subject named "Mathematics".
+# seed-and-run.sh exports SUBJECT_ID for the seeded Mathematics subject.
 - tapOn:
-    id: "subject-card-Mathematics"
+    id: 'subject-card-${SUBJECT_ID}'
 
 # 11. Wait for subject topics screen
 - extendedWaitUntil:
     visible:
-      id: "subject-topics-scroll"
+      id: 'subject-topics-scroll'
     timeout: 10000
 
 # 12. Screenshot: subject topics list
@@ -87,44 +87,44 @@ tags:
 
 # 13. Tap the first topic card in the seeded topic list.
 - tapOn:
-    id: "subject-topics-scroll"
-    point: "50%,30%"
+    id: 'subject-topics-scroll'
+    point: '50%,30%'
 
 # 14. Wait for topic detail screen
 - extendedWaitUntil:
     visible:
-      id: "topic-detail-screen"
+      id: 'topic-detail-screen'
     timeout: 10000
 
 # 15. Verify topic understanding card is present (renamed from topic-status-card in current source)
 - assertVisible:
-    id: "topic-understanding-card"
+    id: 'topic-understanding-card'
 
 # 15a. Verify topic retention card when data is present
 - assertVisible:
-    id: "topic-retention-card"
-    optional: true   # only rendered when retention data exists — permitted use of optional
+    id: 'topic-retention-card'
+    optional: true # only rendered when retention data exists — permitted use of optional
 
 # 16. Verify session history heading
 - assertVisible:
-    text: "Session History"
+    text: 'Session History'
 
 # 17. Screenshot: topic detail with status, mastery, retention
 - takeScreenshot: parent-drill-down-04-topic-detail
 
 # 18. Navigate back to child detail
 - tapOn:
-    id: "back-button"
+    id: 'back-button'
 
 # 19. Navigate back to child detail (from subject topics)
 - tapOn:
-    id: "back-button"
+    id: 'back-button'
     optional: true
 
 # 20. Wait for child detail to reappear
 - extendedWaitUntil:
     visible:
-      id: "child-detail-scroll"
+      id: 'child-detail-scroll'
     timeout: 10000
 
 # 21. Tap the first recent session card to view session detail.
@@ -132,19 +132,19 @@ tags:
 #     Navigate to the first visible session card via dynamic testID env var.
 #     If SESSION_ID is not set by the seed, fall back to tapping by index via point.
 - tapOn:
-    id: "session-card-${SESSION_ID}"
+    id: 'session-card-${SESSION_ID}'
     optional: true
 
 # 21b. Fallback: tap the first session card by coordinate if SESSION_ID is not set
 - tapOn:
-    id: "child-detail-scroll"
-    point: "50%,78%"
+    id: 'child-detail-scroll'
+    point: '50%,78%'
     optional: true
 
 # 22. Wait for session detail screen (child/[profileId]/session/[sessionId].tsx)
 - extendedWaitUntil:
     visible:
-      id: "session-metadata"
+      id: 'session-metadata'
     timeout: 10000
 
 # 23. Screenshot: session detail screen
@@ -152,15 +152,15 @@ tags:
 
 # 24. Navigate back to child detail
 - tapOn:
-    id: "session-detail-back-to-child"
+    id: 'session-detail-back-to-child'
     optional: true
 - tapOn:
-    id: "back-button"
+    id: 'back-button'
     optional: true
 
 # 25. Navigate back to dashboard
 - tapOn:
-    id: "back-button"
+    id: 'back-button'
     optional: true
 
 # 26. Final screenshot: back on dashboard
@@ -184,15 +184,15 @@ tags:
 - runFlow:
     when:
       visible:
-        id: "parent-home-screen"
+        id: 'parent-home-screen'
     file: ../_setup/switch-to-child.yaml
     env:
-      CHILD_NAME: "Proxy Child"
+      CHILD_NAME: 'Proxy Child'
 
 # 28. Wait for learner home in child (proxy) context
 - extendedWaitUntil:
     visible:
-      id: "learner-screen"
+      id: 'learner-screen'
     timeout: 15000
     optional: true
 
@@ -200,39 +200,39 @@ tags:
 #     The parent-proxy seed creates a completed session (SESSION_ID) for the child.
 #     Navigate to it via History tab or direct session card.
 - tapOn:
-    text: "More"
+    text: 'More'
 
 - extendedWaitUntil:
     visible:
-      text: "More"
+      text: 'More'
     timeout: 10000
 
 # 30. Scroll to and tap "History" (recent sessions row in More)
 - scrollUntilVisible:
     element:
-      text: "History"
+      text: 'History'
     direction: DOWN
     timeout: 10000
     optional: true
 
 - tapOn:
-    text: "History"
+    text: 'History'
     optional: true
 
 # 31. If History is not available, fall back to tapping the session card on learner home
 - tapOn:
-    id: "learner-screen"
+    id: 'learner-screen'
     optional: true
 
 # 32. Attempt to tap the seeded session card directly from learner home
 - tapOn:
-    id: "session-card-${SESSION_ID}"
+    id: 'session-card-${SESSION_ID}'
     optional: true
 
 # 33. Wait for session summary to load (summary-title is the stable landing anchor)
 - extendedWaitUntil:
     visible:
-      id: "summary-title"
+      id: 'summary-title'
     timeout: 15000
     optional: true
 
@@ -241,7 +241,7 @@ tags:
 #     !isParentProxy. In proxy mode (active profile = child, owner = parent)
 #     the element must be absent from the view hierarchy entirely.
 - assertNotVisible:
-    id: "view-transcript-cta"
+    id: 'view-transcript-cta'
 
 # 35. Screenshot: session summary in proxy mode (no transcript link)
 - takeScreenshot: parent-drill-down-07-proxy-no-transcript

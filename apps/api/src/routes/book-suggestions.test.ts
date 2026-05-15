@@ -100,25 +100,26 @@ jest.mock( // gc1-allow: pattern-a conversion
 );
 
 // ---------------------------------------------------------------------------
-// Mock LLM services — registerProvider for llm middleware
+// Mock LLM services — routeAndCall is the external LLM HTTP boundary;
+// all other exports (registerProvider, _clearProviders, etc.) run real code.
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/llm' /* gc1-allow: pattern-a conversion */, () => ({
-  ...jest.requireActual('../services/llm'),
-  routeAndCall: jest.fn(),
-  registerProvider: jest.fn(),
-  getRegisteredProviders: jest.fn().mockReturnValue([]),
-  _clearProviders: jest.fn(),
-  _resetCircuits: jest.fn(),
+const mockRouteAndCall = jest.fn();
+jest.mock('../services/llm', () => ({
+  ...(jest.requireActual('../services/llm') as Record<string, unknown>),
+  routeAndCall: (...args: unknown[]) => mockRouteAndCall(...args),
 }));
 
 // ---------------------------------------------------------------------------
 // Mock Sentry (used by global error handler)
+// captureException delegates to @sentry/cloudflare which is the real external
+// boundary; override only captureException to prevent Sentry SDK init noise.
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => ({
-  ...jest.requireActual('../services/sentry'),
-  captureException: jest.fn(),
+const mockCaptureException = jest.fn();
+jest.mock('../services/sentry', () => ({
+  ...(jest.requireActual('../services/sentry') as Record<string, unknown>),
+  captureException: (...args: unknown[]) => mockCaptureException(...args),
 }));
 
 // ---------------------------------------------------------------------------

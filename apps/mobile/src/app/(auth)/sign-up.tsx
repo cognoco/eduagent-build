@@ -427,189 +427,202 @@ export default function SignUpScreen() {
         keyboardDismissMode="interactive"
         testID="sign-up-scroll"
       >
-        {/* Brand logo at top of screen */}
-        <View className="items-center mt-4 mb-4">
-          <MentomateLogo size="md" />
-        </View>
-        {/* Spacer: see sign-in.tsx BUG-24 comment */}
-        <View className="flex-1" style={{ minHeight: 20 }} />
-        <Text className="text-h2 font-bold text-text-primary mb-1">
-          Create account
-        </Text>
-        <Text className="text-body-sm text-text-secondary mb-6">
-          Start your learning journey
-        </Text>
-
-        {fromSignIn === '1' && (
-          <View
-            className="bg-primary/10 rounded-card px-4 py-3 mb-4"
-            accessibilityRole="alert"
-          >
-            <Text className="text-body-sm text-text-primary">
-              We couldn't find an account with that email. Create one below to
-              get started.
-            </Text>
+        <View testID="sign-up-content">
+          {/* Brand logo at top of screen — keep margins tight so the primary CTA
+            stays above the first viewport on small phones (~5.8"). BUG-959:
+            no flex-1 spacer between logo and heading — guarded by the
+            'does not insert a flex-1 spacer' test in sign-up.test.tsx. */}
+          <View className="items-center mt-2 mb-2">
+            <MentomateLogo size="sm" />
           </View>
-        )}
-
-        {error !== '' && (
-          <View
-            className="bg-danger/10 rounded-card px-4 py-3 mb-4"
-            accessibilityRole="alert"
+          <Text
+            className="text-h2 font-bold text-text-primary mb-1"
+            testID="sign-up-heading"
           >
-            <Text className="text-danger text-body-sm">{error}</Text>
-          </View>
-        )}
+            Create account
+          </Text>
+          <Text className="text-body-sm text-text-secondary mb-4">
+            Start your learning journey
+          </Text>
 
-        {activationFailureContext === 'oauth' && pendingSessionActivationId ? (
-          <>
+          {fromSignIn === '1' && (
+            <View
+              className="bg-primary/10 rounded-card px-4 py-3 mb-4"
+              accessibilityRole="alert"
+            >
+              <Text className="text-body-sm text-text-primary">
+                We couldn't find an account with that email. Create one below to
+                get started.
+              </Text>
+            </View>
+          )}
+
+          {error !== '' && (
+            <View
+              className="bg-danger/10 rounded-card px-4 py-3 mb-4"
+              accessibilityRole="alert"
+            >
+              <Text className="text-danger text-body-sm">{error}</Text>
+            </View>
+          )}
+
+          {activationFailureContext === 'oauth' &&
+          pendingSessionActivationId ? (
+            <>
+              <View className="mb-3">
+                <Button
+                  variant="secondary"
+                  label="Try Again"
+                  onPress={() => void retrySessionActivation()}
+                  disabled={loading || oauthLoading !== null}
+                  testID="sign-up-oauth-retry"
+                />
+              </View>
+              <View className="mb-4">
+                <Button
+                  variant="tertiary"
+                  label="Try another method"
+                  onPress={() => {
+                    clearActivationFailure();
+                    setError('');
+                  }}
+                  testID="sign-up-oauth-clear"
+                />
+              </View>
+            </>
+          ) : null}
+
+          {Platform.OS !== 'ios' && (
             <View className="mb-3">
               <Button
                 variant="secondary"
-                label="Try Again"
-                onPress={() => void retrySessionActivation()}
-                disabled={loading || oauthLoading !== null}
-                testID="sign-up-oauth-retry"
+                label="Continue with Google"
+                onPress={() => onSSOPress('oauth_google')}
+                disabled={oauthLoading !== null}
+                loading={oauthLoading === 'oauth_google'}
+                testID="sign-up-google-sso"
               />
             </View>
-            <View className="mb-6">
+          )}
+
+          {Platform.OS === 'ios' && (
+            <View className="mb-3">
               <Button
-                variant="tertiary"
-                label="Try another method"
-                onPress={() => {
-                  clearActivationFailure();
-                  setError('');
-                }}
-                testID="sign-up-oauth-clear"
+                variant="secondary"
+                label="Continue with Apple"
+                onPress={() => onSSOPress('oauth_apple')}
+                disabled={oauthLoading !== null}
+                loading={oauthLoading === 'oauth_apple'}
+                testID="sign-up-apple-sso"
               />
             </View>
-          </>
-        ) : null}
+          )}
 
-        {Platform.OS !== 'ios' && (
-          <View className="mb-6">
-            <Button
-              variant="secondary"
-              label="Continue with Google"
-              onPress={() => onSSOPress('oauth_google')}
-              disabled={oauthLoading !== null}
-              loading={oauthLoading === 'oauth_google'}
-              testID="sign-up-google-sso"
-            />
+          {openAIStrategy ? (
+            <View className="mb-3">
+              <Button
+                variant="secondary"
+                label="Continue with OpenAI"
+                onPress={() => onSSOPress(openAIStrategy)}
+                disabled={oauthLoading !== null}
+                loading={oauthLoading === openAIStrategy}
+                testID="sign-up-openai-sso"
+              />
+            </View>
+          ) : null}
+
+          <View className="flex-row items-center mb-3">
+            <View className="flex-1 h-px bg-border" />
+            <Text className="text-body-sm text-text-secondary mx-4">
+              or continue with email
+            </Text>
+            <View className="flex-1 h-px bg-border" />
           </View>
-        )}
 
-        {Platform.OS === 'ios' && (
-          <View className="mb-6">
-            <Button
-              variant="secondary"
-              label="Continue with Apple"
-              onPress={() => onSSOPress('oauth_apple')}
-              disabled={oauthLoading !== null}
-              loading={oauthLoading === 'oauth_apple'}
-              testID="sign-up-apple-sso"
-            />
-          </View>
-        )}
-
-        {openAIStrategy ? (
-          <View className="mb-6">
-            <Button
-              variant="secondary"
-              label="Continue with OpenAI"
-              onPress={() => onSSOPress(openAIStrategy)}
-              disabled={oauthLoading !== null}
-              loading={oauthLoading === openAIStrategy}
-              testID="sign-up-openai-sso"
-            />
-          </View>
-        ) : null}
-
-        <View className="flex-row items-center mb-6">
-          <View className="flex-1 h-px bg-border" />
-          <Text className="text-body-sm text-text-secondary mx-4">
-            or continue with email
-          </Text>
-          <View className="flex-1 h-px bg-border" />
-        </View>
-
-        <View onLayout={onFieldLayout('email')}>
-          <Text className="text-body-sm font-semibold text-text-secondary mb-1">
-            Email
-          </Text>
-          <TextInput
-            className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-4"
-            autoCapitalize="none"
-            autoComplete="email"
-            keyboardType="email-address"
-            placeholder="you@example.com"
-            placeholderTextColor={colors.muted}
-            value={emailAddress}
-            onChangeText={setEmailAddress}
-            editable={!loading}
-            testID="sign-up-email"
-            onFocus={onFieldFocus('email')}
-          />
-        </View>
-
-        <View onLayout={onFieldLayout('password')}>
-          <Text className="text-body-sm font-semibold text-text-secondary mb-1">
-            Password
-          </Text>
-          <View className="mb-6">
-            <PasswordInput
-              value={password}
-              onChangeText={setPassword}
-              placeholder="Create a password"
+          <View onLayout={onFieldLayout('email')}>
+            <Text className="text-body-sm font-semibold text-text-secondary mb-1">
+              Email
+            </Text>
+            <TextInput
+              className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-4"
+              autoCapitalize="none"
+              autoComplete="email"
+              keyboardType="email-address"
+              placeholder="you@example.com"
+              placeholderTextColor={colors.muted}
+              value={emailAddress}
+              onChangeText={setEmailAddress}
               editable={!loading}
-              testID="sign-up-password"
-              showRequirements
-              onSubmitEditing={onSignUpPress}
-              onFocus={onFieldFocus('password')}
+              testID="sign-up-email"
+              onFocus={onFieldFocus('email')}
             />
           </View>
-        </View>
 
-        <Button
-          variant="primary"
-          label="Sign up"
-          onPress={onSignUpPress}
-          disabled={!canSubmitSignUp}
-          loading={loading}
-          testID="sign-up-button"
-        />
+          <View onLayout={onFieldLayout('password')}>
+            <Text className="text-body-sm font-semibold text-text-secondary mb-1">
+              Password
+            </Text>
+            <View className="mb-4">
+              <PasswordInput
+                value={password}
+                onChangeText={setPassword}
+                placeholder="Create a password"
+                editable={!loading}
+                testID="sign-up-password"
+                showRequirements
+                onSubmitEditing={onSignUpPress}
+                onFocus={onFieldFocus('password')}
+              />
+            </View>
+          </View>
 
-        <Text className="text-caption text-text-secondary text-center mt-3 px-2">
-          By signing up, you agree to our{' '}
-          <Text
-            className="text-primary"
-            onPress={() => router.push('/terms')}
-            accessibilityRole="link"
-          >
-            Terms of Service
-          </Text>{' '}
-          and{' '}
-          <Text
-            className="text-primary"
-            onPress={() => router.push('/privacy')}
-            accessibilityRole="link"
-          >
-            Privacy Policy
-          </Text>
-          .
-        </Text>
-
-        <View className="flex-row justify-center items-center mt-6 mb-8">
-          <Text className="text-body-sm text-text-secondary">
-            Already have an account?{' '}
-          </Text>
           <Button
-            variant="tertiary"
-            size="small"
-            label="Sign in"
-            onPress={() => router.replace('/(auth)/sign-in')}
-            testID="sign-in-link"
+            variant="primary"
+            label="Sign up"
+            onPress={onSignUpPress}
+            disabled={!canSubmitSignUp}
+            loading={loading}
+            testID="sign-up-button"
           />
+
+          <View
+            className="flex-row justify-center items-center mt-3 mb-3"
+            testID="sign-up-back-to-sign-in-row"
+          >
+            <Text className="text-body-sm text-text-secondary">
+              Already have an account?{' '}
+            </Text>
+            <Button
+              variant="tertiary"
+              size="small"
+              label="Sign in"
+              onPress={() => router.replace('/(auth)/sign-in')}
+              testID="sign-in-link"
+            />
+          </View>
+
+          <Text
+            className="text-caption text-text-secondary text-center px-2 mb-8"
+            testID="sign-up-terms-copy"
+          >
+            By signing up, you agree to our{' '}
+            <Text
+              className="text-primary"
+              onPress={() => router.push('/terms')}
+              accessibilityRole="link"
+            >
+              Terms of Service
+            </Text>{' '}
+            and{' '}
+            <Text
+              className="text-primary"
+              onPress={() => router.push('/privacy')}
+              accessibilityRole="link"
+            >
+              Privacy Policy
+            </Text>
+            .
+          </Text>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>

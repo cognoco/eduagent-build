@@ -144,7 +144,7 @@ describe('recordDictationResult (integration)', () => {
     expect(event?.completedAt.getTime()).toBeLessThanOrEqual(after.getTime());
   });
 
-  it('creates separate rows for duplicate (profileId, date) inserts', async () => {
+  it('creates separate rows for same date with different modes', async () => {
     const db = createIntegrationDb();
     const today = getServerDate();
 
@@ -170,6 +170,44 @@ describe('recordDictationResult (integration)', () => {
     expect(rows).toHaveLength(2);
     expect(second.sentenceCount).toBe(8);
     expect(second.mode).toBe('surprise');
+  });
+
+  // [BUG-4] Same (profile_id, date, mode) must be idempotent at the DB layer.
+  // Before the fix, a client retry of the same completion event accumulated
+  // duplicate rows because the table had only a plain index on (profile_id, date)
+  // and the repository performed a bare INSERT with no onConflict handler.
+  it('[BUG-4] same (profileId, date, mode) is idempotent — retry upserts, no duplicate row', async () => {
+    const db = createIntegrationDb();
+    const today = getServerDate();
+
+    const first = await recordDictationResult(db, profileId, {
+      localDate: today,
+      sentenceCount: 5,
+      mistakeCount: 2,
+      mode: 'homework',
+      reviewed: false,
+    });
+
+    // Same (date, mode) — simulates a network retry. The second call must
+    // not create a second row; instead it updates the existing row with the
+    // latest counts/reviewed flag (last write wins).
+    const second = await recordDictationResult(db, profileId, {
+      localDate: today,
+      sentenceCount: 6,
+      mistakeCount: 1,
+      mode: 'homework',
+      reviewed: true,
+    });
+
+    const rows = await db.query.dictationResults.findMany({
+      where: eq(dictationResults.profileId, profileId),
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.id).toBe(first.id);
+    expect(second.id).toBe(first.id);
+    expect(rows[0]!.sentenceCount).toBe(6);
+    expect(rows[0]!.mistakeCount).toBe(1);
+    expect(rows[0]!.reviewed).toBe(true);
   });
 });
 

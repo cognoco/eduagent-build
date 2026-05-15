@@ -40,6 +40,10 @@ describe('getConversationStage', () => {
     expect(getConversationStage(1, true, 'freeform')).toBe('orienting');
   });
 
+  it('returns teaching after the first learner message in scoped learning mode', () => {
+    expect(getConversationStage(1, true, 'learning')).toBe('teaching');
+  });
+
   it('returns greeting when no subject and userMessageCount < 2', () => {
     expect(getConversationStage(0, false, 'freeform')).toBe('greeting');
     expect(getConversationStage(1, false, 'freeform')).toBe('greeting');

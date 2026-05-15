@@ -39,10 +39,10 @@ const KNOWN_DRIFT = new Set([
   'location-eu',
   'location-other',
   // Library/learning screens renamed during route restructuring
+  // library-screen: FIXED — testID added to apps/mobile/src/app/(app)/library.tsx root View
+  // home-screen: FIXED — testID added to apps/mobile/src/app/(app)/home.tsx root View
   'library-scroll',
-  'library-screen',
   'library-tab',
-  'home-screen',
   'learn-new-screen',
   'shelf-book-list',
   // Session summary
@@ -74,18 +74,6 @@ const KNOWN_DRIFT = new Set([
   'accent-swatch-indigo',
   // Parent/teen view switcher
   'switch-to-teen',
-  // Parent child-detail flows still reference selectors from the previous
-  // all-in-one child detail page. The current child detail route is scoped to
-  // profile settings, while reports, consent, and subject drill-down moved to
-  // separate surfaces/components. Track this as E2E drift until the parent
-  // Maestro flows are rewritten against the current navigation model.
-  'subject-card-Mathematics',
-  'child-reports-link',
-  'consent-section',
-  'withdraw-consent-button',
-  'grace-period-banner',
-  'cancel-deletion-button',
-  'subject-raw-input-Mathematics',
   // Password toggle on sign-in (removed or renamed in PasswordInput)
   'sign-in-password-toggle',
   // Library refactor in progress: empty-state component removed
@@ -98,6 +86,10 @@ const KNOWN_DRIFT = new Set([
   // learner-screen and parent-home-screen — safe to leave in place, but the
   // Maestro flows can drop these branches in a follow-up cleanup.
   'dashboard-scroll',
+  // DRAFT slow-net flows (first-curriculum-polling-timeout, sse-reconnect-banner)
+  // use this sentinel for testIDs that need to be added to source code before
+  // the flow can run. Each flow's header lists the prerequisite work.
+  '<PLACEHOLDER_TESTID>',
 ]);
 
 function collectFiles(dir: string, ext: string): string[] {

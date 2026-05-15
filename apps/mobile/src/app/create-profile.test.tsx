@@ -56,6 +56,13 @@ jest.mock('../lib/api-client', () => ({
 
 const mockSwitchProfile = jest.fn().mockResolvedValue(undefined);
 
+// prettier-ignore
+jest.mock('../lib/theme', /* gc1-allow: nativewind vars() does not resolve 'react' in jest; stub theme hooks so screen tests don't blow up on import */ () => ({
+  useThemeColors: () => ({ accent: '#0ea5e9', background: '#18181b', border: '#d4d4d8', muted: '#71717a', surface: '#ffffff', textInverse: '#ffffff', textPrimary: '#18181b', textSecondary: '#52525b' }),
+  useTheme: () => ({ colorScheme: 'dark' }),
+  useTokenVars: () => ({}),
+}));
+
 // BUG-301: Made per-test overridable so isParentAddingChild can be tested.
 const mockUseProfile = jest.fn();
 jest.mock('../lib/profile', () => ({
@@ -267,6 +274,46 @@ describe('CreateProfileScreen', () => {
 
     await waitFor(() => {
       expect(mockBack).toHaveBeenCalled();
+    });
+  });
+
+  it('optimistically writes the new profile into scoped profiles cache', async () => {
+    const newProfile = {
+      id: 'new-id',
+      accountId: 'a1',
+      displayName: 'Sam',
+      avatarUrl: null,
+      birthYear: 2000,
+      location: null,
+      isOwner: true,
+      hasPremiumLlm: false,
+      consentStatus: null,
+      createdAt: '2026-02-16T00:00:00Z',
+      updatedAt: '2026-02-16T00:00:00Z',
+    };
+
+    queryClient.setQueryDefaults(['profiles', 'clerk-user-test'], {
+      gcTime: Infinity,
+    });
+    queryClient.setQueryData(['profiles', 'clerk-user-test'], []);
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ profile: newProfile }), { status: 200 }),
+    );
+
+    render(<CreateProfileScreen />, { wrapper: Wrapper });
+
+    fireEvent.changeText(screen.getByTestId('create-profile-name'), 'Sam');
+    fireEvent.press(screen.getByTestId('create-profile-birthdate'));
+    await act(() => {
+      datePickerOnChange?.({ type: 'set' }, new Date(2000, 5, 15));
+    });
+
+    fireEvent.press(screen.getByTestId('create-profile-submit'));
+
+    await waitFor(() => {
+      expect(queryClient.getQueryData(['profiles', 'clerk-user-test'])).toEqual(
+        [newProfile],
+      );
     });
   });
 
