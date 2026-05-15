@@ -213,6 +213,7 @@ jest.mock('react-i18next', () => ({
       if (key === 'progress.guardian.nudgeA11y')
         return `Send ${opts?.name ?? ''} a nudge`;
       if (key === 'progress.guardian.viewAllReports') return 'View all reports';
+      if (key === 'progress.guardian.subjectsTitle') return 'Subjects';
       // Common fallbacks
       if (key === 'common.tryAgain') return 'Try again';
       if (key === 'common.goBack') return 'Go Back';
@@ -1049,7 +1050,7 @@ describe('ProgressScreen — progressive disclosure', () => {
     expect(screen.queryByTestId('progress-new-learner-teaser')).toBeNull();
   });
 
-  it('uses the shared progress hub for parent viewing child without subject breakdown', () => {
+  it('uses the shared progress hub for parent viewing child with subject breakdown', () => {
     mockLinkedChildren = [makeLinkedChild()];
     mockSearchParams = { profileId: 'child-1' };
     mockHooks({
@@ -1077,7 +1078,9 @@ describe('ProgressScreen — progressive disclosure', () => {
     expect(screen.queryByText('4 practice lessons')).toBeNull();
     screen.getByTestId('progress-latest-report-section');
     screen.getByTestId('progress-recent-focus-card');
-    expect(screen.queryByTestId('progress-subject-breakdown')).toBeNull();
+    screen.getByTestId('progress-subject-breakdown');
+    screen.getByTestId('progress-subject-s1-bookshelf');
+    screen.getByText('Subjects');
   });
 
   it('reuses report preview for parent viewing child when summaries exist', () => {

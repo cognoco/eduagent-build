@@ -35,6 +35,7 @@ import {
   MilestoneCard,
   RecentSessionsList,
   ReportsList,
+  SubjectProgressRow,
 } from '../../../components/progress';
 import { ProgressPillRow } from '../../../components/progress/ProgressPillRow';
 import { useActiveProfileRole } from '../../../hooks/use-active-profile-role';
@@ -1037,6 +1038,38 @@ export default function ProgressScreen(): React.ReactElement {
                       })}
                     </Text>
                   </Pressable>
+                ) : null}
+                {selectedProfileId ? (
+                  <Pressable
+                    testID="progress-view-all-reports"
+                    onPress={() =>
+                      router.push(
+                        `/(app)/child/${selectedProfileId}/reports` as Href,
+                      )
+                    }
+                    className="bg-surface rounded-button px-4 py-3 mt-4 items-center min-h-[48px] justify-center"
+                    accessibilityRole="button"
+                    accessibilityLabel={t('progress.guardian.viewAllReports')}
+                  >
+                    <Text className="text-body font-semibold text-primary">
+                      {t('progress.guardian.viewAllReports')}
+                    </Text>
+                  </Pressable>
+                ) : null}
+                {inventory?.subjects?.length ? (
+                  <View testID="progress-subject-breakdown" className="mt-5">
+                    <Text className="text-caption font-bold uppercase text-text-secondary mb-2">
+                      {t('progress.guardian.subjectsTitle')}
+                    </Text>
+                    {inventory.subjects.map((subject) => (
+                      <View key={subject.subjectId} className="mt-3">
+                        <SubjectProgressRow
+                          subject={subject}
+                          testID={`progress-subject-${subject.subjectId}`}
+                        />
+                      </View>
+                    ))}
+                  </View>
                 ) : null}
               </>
             ) : null}
