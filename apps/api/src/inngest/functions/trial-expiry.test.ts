@@ -13,7 +13,7 @@ jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 // jest.requireActual for createFunction so the function-definition shape
 // stays identical to production.
 const mockInngestSend = jest.fn().mockResolvedValue(undefined);
-jest.mock('../client', () => {
+jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
   const realInngest = jest.requireActual('inngest').Inngest;
   const realInstance = new realInngest({ id: 'eduagent-test' });
   return {

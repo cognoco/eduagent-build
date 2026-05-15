@@ -11,6 +11,7 @@
 
 const mockCaptureException = jest.fn();
 jest.mock('../../services/sentry' /* gc1-allow: unit test boundary */, () => ({
+  ...jest.requireActual('../../services/sentry'),
   captureException: (...args: unknown[]) => mockCaptureException(...args),
 }));
 
@@ -46,6 +47,7 @@ const mockDb = {
   })),
 };
 jest.mock('../helpers' /* gc1-allow: unit test boundary */, () => ({
+  ...jest.requireActual('../helpers'),
   getStepDatabase: () => mockDb,
   getStepResendApiKey: () => 'resend-test-key',
 }));

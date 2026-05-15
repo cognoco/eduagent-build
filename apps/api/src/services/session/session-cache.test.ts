@@ -18,6 +18,7 @@ jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 const mockFetchPriorTopics = jest.fn();
 const mockFetchCrossSubjectHighlights = jest.fn();
 jest.mock('../prior-learning' /* gc1-allow: unit test boundary */, () => ({
+  ...jest.requireActual('../prior-learning'),
   fetchPriorTopics: (...args: unknown[]) => mockFetchPriorTopics(...args),
   fetchCrossSubjectHighlights: (...args: unknown[]) =>
     mockFetchCrossSubjectHighlights(...args),
@@ -27,17 +28,20 @@ jest.mock('../prior-learning' /* gc1-allow: unit test boundary */, () => ({
 
 const mockGetTeachingPreference = jest.fn();
 jest.mock('../retention-data' /* gc1-allow: unit test boundary */, () => ({
+  ...jest.requireActual('../retention-data'),
   getTeachingPreference: (...args: unknown[]) =>
     mockGetTeachingPreference(...args),
 }));
 
 const mockGetLearningMode = jest.fn();
 jest.mock('../settings' /* gc1-allow: unit test boundary */, () => ({
+  ...jest.requireActual('../settings'),
   getLearningMode: (...args: unknown[]) => mockGetLearningMode(...args),
 }));
 
 const mockGetLearningProfile = jest.fn();
 jest.mock('../learner-profile' /* gc1-allow: unit test boundary */, () => ({
+  ...jest.requireActual('../learner-profile'),
   getLearningProfile: (...args: unknown[]) => mockGetLearningProfile(...args),
   buildMemoryBlock: jest.fn(),
   buildAccommodationBlock: jest.fn(),
@@ -45,12 +49,14 @@ jest.mock('../learner-profile' /* gc1-allow: unit test boundary */, () => ({
 
 const mockGetSubject = jest.fn();
 jest.mock('../subject' /* gc1-allow: unit test boundary */, () => ({
+  ...jest.requireActual('../subject'),
   // gc1-allow: mutex unit test — controls getSubject call count to verify single supplementary fan-out
   getSubject: (...args: unknown[]) => mockGetSubject(...args),
 }));
 
 const mockLoadProfileRowById = jest.fn();
 jest.mock('../profile' /* gc1-allow: unit test boundary */, () => ({
+  ...jest.requireActual('../profile'),
   // gc1-allow: mutex unit test — controls loadProfileRowById call count to verify single supplementary fan-out
   loadProfileRowById: (...args: unknown[]) => mockLoadProfileRowById(...args),
 }));

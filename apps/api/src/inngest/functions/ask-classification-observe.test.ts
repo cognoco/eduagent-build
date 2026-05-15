@@ -20,7 +20,10 @@ const consoleErrorSpy = jest
 import { createInngestTransportCapture } from '../../test-utils/inngest-transport-capture';
 
 const mockInngestTransport = createInngestTransportCapture();
-jest.mock('../client', () => mockInngestTransport.module); // gc1-allow: inngest framework boundary
+jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../client'),
+  ...mockInngestTransport.module,
+})); // gc1-allow: inngest framework boundary
 
 import {
   askClassificationCompletedObserve,

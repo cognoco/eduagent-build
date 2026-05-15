@@ -4,7 +4,7 @@ jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => ({
   addBreadcrumb: jest.fn(),
 }));
 
-jest.mock('../services/logger', () => ({
+jest.mock('../services/logger' /* gc1-allow: pattern-a conversion */, () => ({
   createLogger: () => ({
     info: jest.fn(),
     warn: jest.fn(),

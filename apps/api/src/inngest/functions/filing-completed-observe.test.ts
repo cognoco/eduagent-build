@@ -23,7 +23,8 @@ jest.mock(
   }),
 );
 
-jest.mock('../client', () => ({
+jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../client'),
   inngest: {
     createFunction: jest.fn(
       (

@@ -23,10 +23,12 @@ jest.mock('@eduagent/database', () => ({
 }));
 
 jest.mock('../helpers' /* gc1-allow: controls step DB boundary */, () => ({
+  ...jest.requireActual('../helpers'),
   getStepDatabase: () => mockGetStepDatabase(),
 }));
 
 jest.mock('../client' /* gc1-allow: capture registered handler */, () => ({
+  ...jest.requireActual('../client'),
   inngest: {
     createFunction: jest.fn((_opts, _trigger, fn) =>
       Object.assign(fn, { fn, opts: _opts, trigger: _trigger }),
@@ -53,6 +55,7 @@ jest.mock(/* gc1-allow: deterministic branch control */ '../../services/progress
 }));
 
 jest.mock('../../services/sentry' /* gc1-allow: assert capture */, () => ({
+  ...jest.requireActual('../../services/sentry'),
   captureException: (...args: unknown[]) => mockCaptureException(...args),
 }));
 

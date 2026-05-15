@@ -10,6 +10,7 @@
 const mockRouteAndCall = jest.fn();
 
 jest.mock('../../services/llm' /* gc1-allow: LLM external boundary */, () => ({
+  ...jest.requireActual('../../services/llm'),
   routeAndCall: (...args: unknown[]) => mockRouteAndCall(...args),
 }));
 
@@ -41,7 +42,10 @@ import { createInngestTransportCapture } from '../../test-utils/inngest-transpor
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 
 const mockInngestTransport = createInngestTransportCapture();
-jest.mock('../client', () => mockInngestTransport.module); // gc1-allow: inngest framework boundary
+jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../client'),
+  ...mockInngestTransport.module,
+})); // gc1-allow: inngest framework boundary
 
 import { postSessionSuggestions } from './post-session-suggestions';
 

@@ -3,7 +3,8 @@ import { accountMiddleware } from './account';
 import type { AppVariables } from '../types/hono';
 
 // Mock the account service
-jest.mock('../services/account', () => ({
+jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../services/account'),
   findOrCreateAccount: jest.fn().mockResolvedValue({
     id: 'test-account-id',
     clerkUserId: 'user_test',

@@ -9,7 +9,8 @@ const consoleLogSpy = jest
   .spyOn(console, 'log')
   .mockImplementation(() => undefined);
 
-jest.mock('../client', () => ({
+jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../client'),
   inngest: {
     createFunction: jest.fn(
       (_opts: unknown, _trigger: unknown, fn: unknown) => {
@@ -18,7 +19,7 @@ jest.mock('../client', () => ({
           trigger: _trigger,
           fn,
         });
-      }
+      },
     ),
   },
 }));

@@ -17,7 +17,7 @@ jest.mock('./retention' /* gc1-allow: pattern-a conversion */, () => ({
   canRetestTopic: jest.fn().mockReturnValue(true),
 }));
 
-jest.mock('./adaptive-teaching', () => ({
+jest.mock('./adaptive-teaching' /* gc1-allow: pattern-a conversion */, () => ({
   canExitNeedsDeepening: jest.fn(),
   checkNeedsDeepeningCapacity: jest
     .fn()

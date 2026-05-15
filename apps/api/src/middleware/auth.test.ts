@@ -51,11 +51,12 @@ const loggerMock = (
 // Mock jwt.ts — avoids real Web Crypto / JWKS calls in unit tests
 // ---------------------------------------------------------------------------
 
-jest.mock('./jwt', () =>
-  require('../test-utils/auth-fixture').createJwtModuleMock({
+jest.mock('./jwt' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('./jwt'),
+  ...require('../test-utils/auth-fixture').createJwtModuleMock({
     payload: { sub: 'user_default' },
   }),
-);
+}));
 
 const jwtMock = require('./jwt') as {
   verifyJWT: jest.Mock;

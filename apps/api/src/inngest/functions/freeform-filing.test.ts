@@ -109,7 +109,8 @@ jest.mock(
   }),
 );
 
-jest.mock('../../services/llm', () => ({
+jest.mock('../../services/llm' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../../services/llm'),
   routeAndCall: jest.fn().mockResolvedValue({ text: 'mocked' }),
 }));
 

@@ -87,6 +87,7 @@ jest.mock(
 
 const mockRecordPendingNotice = jest.fn().mockResolvedValue(undefined);
 jest.mock('../../services/notices' /* gc1-allow: DB insert boundary */, () => ({
+  ...jest.requireActual('../../services/notices'),
   recordPendingNotice: (...args: unknown[]) => mockRecordPendingNotice(...args),
 }));
 

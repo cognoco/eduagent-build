@@ -22,14 +22,17 @@ jest.mock(
 
 const mockLoggerWarn = jest.fn();
 const mockLoggerError = jest.fn();
-jest.mock('../../services/logger', () => ({
-  createLogger: () => ({
-    warn: (...args: unknown[]) => mockLoggerWarn(...args),
-    error: (...args: unknown[]) => mockLoggerError(...args),
-    info: jest.fn(),
-    debug: jest.fn(),
+jest.mock(
+  '../../services/logger' /* gc1-allow: pattern-a conversion */,
+  () => ({
+    createLogger: () => ({
+      warn: (...args: unknown[]) => mockLoggerWarn(...args),
+      error: (...args: unknown[]) => mockLoggerError(...args),
+      info: jest.fn(),
+      debug: jest.fn(),
+    }),
   }),
-}));
+);
 
 jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => ({
   ...jest.requireActual('../client'),

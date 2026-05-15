@@ -35,7 +35,10 @@ import { createInngestTransportCapture } from '../../test-utils/inngest-transpor
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 
 const mockInngestTransport = createInngestTransportCapture();
-jest.mock('../client', () => mockInngestTransport.module); // gc1-allow: inngest framework boundary
+jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../client'),
+  ...mockInngestTransport.module,
+})); // gc1-allow: inngest framework boundary
 
 // Internal services used by the generate handlers — we intercept them here
 // using jest.requireActual patterns would be awkward since these are async
@@ -231,6 +234,7 @@ function buildMockDb(
 
 const mockGetStepResendApiKey = jest.fn(() => 'test-resend-key');
 jest.mock('../helpers' /* gc1-allow: unit test boundary */, () => ({
+  ...jest.requireActual('../helpers'),
   getStepDatabase: jest.fn(),
   resetDatabaseUrl: jest.fn(),
   getStepResendApiKey: () => mockGetStepResendApiKey(),

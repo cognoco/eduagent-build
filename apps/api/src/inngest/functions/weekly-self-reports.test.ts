@@ -98,14 +98,17 @@ jest.mock(
 );
 
 jest.mock('../../services/sentry' /* gc1-allow: unit test boundary */, () => ({
+  ...jest.requireActual('../../services/sentry'),
   captureException: (...args: unknown[]) => mockCaptureException(...args),
 }));
 
 jest.mock('../helpers' /* gc1-allow: unit test boundary */, () => ({
+  ...jest.requireActual('../helpers'),
   getStepDatabase: jest.fn().mockReturnValue(mockDb),
 }));
 
 jest.mock('../client' /* gc1-allow: unit test boundary */, () => ({
+  ...jest.requireActual('../client'),
   inngest: {
     createFunction: jest.fn(
       (config: unknown, trigger: unknown, fn: unknown) => ({

@@ -13,7 +13,7 @@ const mockFormatConsentReminderEmail = jest.fn(
 
 // Fake DB whose query.consentStates.findFirst returns a valid consent token.
 // All values are defined inline inside the factory to avoid Jest hoisting issues.
-jest.mock('../helpers', () => ({
+jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => ({
   // gc1-allow: isolates step-database helper from real DB config reads
   getStepDatabase: jest.fn(() => ({
     query: {

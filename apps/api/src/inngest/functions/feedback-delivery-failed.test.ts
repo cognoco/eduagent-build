@@ -38,14 +38,17 @@ jest.mock(
   }),
 );
 
-jest.mock('../../services/logger', () => ({
-  createLogger: () => ({
-    debug: jest.fn(),
-    info: jest.fn(),
-    warn: (...args: unknown[]) => mockLoggerWarn(...args),
-    error: jest.fn(),
+jest.mock(
+  '../../services/logger' /* gc1-allow: pattern-a conversion */,
+  () => ({
+    createLogger: () => ({
+      debug: jest.fn(),
+      info: jest.fn(),
+      warn: (...args: unknown[]) => mockLoggerWarn(...args),
+      error: jest.fn(),
+    }),
   }),
-}));
+);
 
 jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => ({
   ...jest.requireActual('../helpers'),
@@ -58,7 +61,10 @@ import { createInngestTransportCapture } from '../../test-utils/inngest-transpor
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 
 const mockInngestTransport = createInngestTransportCapture();
-jest.mock('../client', () => mockInngestTransport.module); // gc1-allow: inngest framework boundary
+jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../client'),
+  ...mockInngestTransport.module,
+})); // gc1-allow: inngest framework boundary
 
 import { feedbackDeliveryFailed } from './feedback-delivery-failed';
 

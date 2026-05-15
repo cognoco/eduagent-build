@@ -15,7 +15,8 @@ import {
 import { HTTPException } from 'hono/http-exception';
 import { captureException } from '../services/sentry';
 
-jest.mock('../services/profile', () => ({
+jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../services/profile'),
   getProfile: jest.fn().mockImplementation((_db, profileId, accountId) => {
     // Only return profile when it "belongs" to the account
     if (profileId === 'valid-profile-id' && accountId === 'test-account-id') {
