@@ -87,6 +87,7 @@ describe('classifyApiError', () => {
     const result = classifyApiError(err);
     expect(result.category).toBe('network');
     expect(result.recovery).toBe('retry');
+    expect(result.blocksManualEntry).toBe(false);
     expect(result.message).toContain('offline');
   });
 
@@ -95,6 +96,7 @@ describe('classifyApiError', () => {
     const result = classifyApiError(err);
     expect(result.category).toBe('not-found');
     expect(result.recovery).toBe('go-back');
+    expect(result.blocksManualEntry).toBe(true);
   });
 
   it('classifies ResourceGoneError as not-found / go-back', () => {
@@ -166,6 +168,16 @@ describe('classifyApiError', () => {
     expect(result.recovery).toBe('go-back');
     // Applies FRIENDLY_MESSAGE_MAP translation
     expect(result.message).toContain('session');
+  });
+
+  it('classifies Error objects with status 404 as not-found / go-back', () => {
+    const err = Object.assign(new Error('Subject not found'), {
+      status: 404,
+    });
+    const result = classifyApiError(err);
+    expect(result.category).toBe('not-found');
+    expect(result.recovery).toBe('go-back');
+    expect(result.blocksManualEntry).toBe(true);
   });
 
   it('classifies API error 401 as auth / sign-out', () => {
@@ -568,6 +580,7 @@ describe('recoveryActions', () => {
     message: 'test',
     category: 'unknown',
     recovery: 'retry',
+    blocksManualEntry: false,
   };
   const retry = jest.fn();
   const goBack = jest.fn();

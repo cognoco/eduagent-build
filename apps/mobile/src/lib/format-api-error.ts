@@ -256,11 +256,41 @@ function parseApiBody(message: string): {
  * - `category` — what kind of error it is (drives icon / heading choice in UI)
  * - `recovery` — what the user should do next (drives which action buttons to show)
  * - `message` — kid-friendly body text (reuses all FRIENDLY_MESSAGE_MAP logic)
+ * - `blocksManualEntry` — true when the current resource/profile context is
+ *   invalid enough that screens should not keep manual fallback entry open
  */
-export interface FormattedApiError {
+type ApiErrorCategory =
+  | 'network'
+  | 'not-found'
+  | 'quota'
+  | 'auth'
+  | 'server'
+  | 'unknown';
+type ApiErrorRecovery = 'retry' | 'go-back' | 'sign-out' | 'none';
+
+interface ClassifiedApiErrorCore {
   message: string;
-  category: 'network' | 'not-found' | 'quota' | 'auth' | 'server' | 'unknown';
-  recovery: 'retry' | 'go-back' | 'sign-out' | 'none';
+  category: ApiErrorCategory;
+  recovery: ApiErrorRecovery;
+}
+
+export interface FormattedApiError extends ClassifiedApiErrorCore {
+  blocksManualEntry: boolean;
+}
+
+function blocksManualEntryForCategory(category: ApiErrorCategory): boolean {
+  return (
+    category === 'not-found' || category === 'quota' || category === 'auth'
+  );
+}
+
+function formatClassifiedApiError(
+  error: ClassifiedApiErrorCore,
+): FormattedApiError {
+  return {
+    ...error,
+    blocksManualEntry: blocksManualEntryForCategory(error.category),
+  };
 }
 
 interface RecoveryAction {
@@ -342,14 +372,14 @@ export function recoveryActions(
  *  1. Typed NetworkError / TypeError network failures → network / retry
  *  2. Typed error classes from api-client.ts boundary (HMR-safe name guards)
  *  3. Error codes on the error object (apiCode, code)
- *  4. HTTP status from the "API error {status}: …" shape (plain Error fallback)
+ *  4. HTTP status on Error objects or the "API error {status}: …" fallback
  *  5. Message pattern heuristics (network keywords)
  *  6. Anything else → unknown / retry
  *
  * The message is derived AFTER classification so the classifier never
  * string-matches on formatted output.
  */
-export function classifyApiError(error: unknown): FormattedApiError {
+function classifyApiErrorCore(error: unknown): ClassifiedApiErrorCore {
   // 1. Typed NetworkError — thrown by customFetch on fetch rejection
   if (isNetworkError(error)) {
     return {
@@ -526,6 +556,47 @@ export function classifyApiError(error: unknown): FormattedApiError {
       };
     }
 
+    if (typeof apiErrorLike.status === 'number') {
+      const status = apiErrorLike.status;
+      const userMsg =
+        msg.length < 200 ? (friendlyMessage(msg) ?? msg) : undefined;
+
+      if (status === 401 || status === 403) {
+        return {
+          message: userMsg ?? i18next.t('errors.forbidden'),
+          category: 'auth',
+          recovery: 'sign-out',
+        };
+      }
+
+      if (status === 404 || status === 410) {
+        return {
+          message: userMsg ?? i18next.t('errors.notFound'),
+          category: 'not-found',
+          recovery: 'go-back',
+        };
+      }
+
+      if (status === 429) {
+        return {
+          message: userMsg ?? i18next.t('errors.rateLimited'),
+          category: 'quota',
+          recovery: 'retry',
+        };
+      }
+
+      if (status >= 500) {
+        return {
+          message:
+            userMsg && !isGenericServerMessage(userMsg)
+              ? userMsg
+              : SERVER_MESSAGE(),
+          category: 'server',
+          recovery: 'retry',
+        };
+      }
+    }
+
     // 3b. SSE timeout
     if (msgLower.includes('timed out while waiting for a reply')) {
       return {
@@ -635,6 +706,10 @@ export function classifyApiError(error: unknown): FormattedApiError {
 
   // 7. Fallback for null / undefined / non-Error values
   return { message: DEFAULT_MESSAGE(), category: 'unknown', recovery: 'retry' };
+}
+
+export function classifyApiError(error: unknown): FormattedApiError {
+  return formatClassifiedApiError(classifyApiErrorCore(error));
 }
 
 /**

@@ -460,8 +460,28 @@ describe('ShelfScreen', () => {
       getByTestId('shelf-empty');
     });
     getByText('This shelf is still getting ready');
+    getByText('Pick a book to start');
+    getByTestId('shelf-empty-pick-book');
     getByTestId('shelf-empty-retry');
     getByTestId('shelf-empty-back');
+  });
+
+  it('empty state pick button opens the book picker', async () => {
+    mockFetch.setRoute('/subjects/sub-1/books', { books: [] });
+
+    const { getByTestId } = render(<ShelfScreen />, { wrapper: TestWrapper });
+
+    await waitFor(() => {
+      getByTestId('shelf-empty-pick-book');
+    });
+    fireEvent.press(getByTestId('shelf-empty-pick-book'));
+
+    expect(mockPush).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pathname: '/(app)/pick-book/[subjectId]',
+        params: { subjectId: 'sub-1' },
+      }),
+    );
   });
 
   it('empty state retry reloads shelf data', async () => {
