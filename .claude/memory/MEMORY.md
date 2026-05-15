@@ -53,6 +53,7 @@ Two production dead-code branches removed 2026-04-19 in commit `970a82a5`: `AgeB
 - [feedback_partial_staging_stash.md](feedback_partial_staging_stash.md) — Pre-commit tests full working tree; stash in-progress files before partial commits.
 - [feedback_stash_untracked_protection.md](feedback_stash_untracked_protection.md) — Always `--keep-index -u` when stashing; `-u` protects untracked files from lint-staged destruction.
 - [feedback_commit_skip_failing.md](feedback_commit_skip_failing.md) — If pre-commit fails on some files, unstage them, commit+push what passes, fix failures after.
+- [feedback_test_receipts.md](feedback_test_receipts.md) — Stale `.test-receipts/*` push-hook failures: record, verify, then commit receipt-only follow-up.
 - [feedback_testing_tracking_only.md](feedback_testing_tracking_only.md) — When testing flows, track silently — surface flows tested + bugs at the end, not play-by-play.
 
 ## Android SDK & Build
