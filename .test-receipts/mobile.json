@@ -1,18 +1,12 @@
 {
   "scope": "mobile",
-  "verifiedAt": "2026-05-15T13:40:16Z",
+  "verifiedAt": "2026-05-15T14:11:17Z",
   "verifiedBy": "Lord Vetinari @ ramtop",
   "command": "pnpm exec nx run mobile:test",
   "passed": true,
   "testFiles": {
-    "apps/mobile/src/app/(app)/library.test.tsx": "95dc65f5a66bb547a6c996b70071c0c5f4bd90c4",
-    "apps/mobile/src/app/(app)/progress.test.tsx": "205001bf5dbcae8c7889e4ba278d1a0ae78bff91",
-    "apps/mobile/src/app/(app)/quiz/play.test.tsx": "24cdebcf9484e9726006757934a6e0df10100762",
-    "apps/mobile/src/app/session-summary/[sessionId].test.tsx": "ab92c3b7093db769069bf603cd7160cd2c38f61b",
+    "apps/mobile/src/app/(app)/library.test.tsx": "7fa0faf035a0071327a5de41c3a87edca2de8bee",
     "apps/mobile/src/components/common/MagicPenAnimation.test.tsx": "648579af675c9ab7669f9af1a13faf7575a02af7",
-    "apps/mobile/src/components/home/LearnerScreen.test.tsx": "bd04a10145824b4428163a680f53e243e325aa00",
-    "apps/mobile/src/components/home/SubjectTile.test.tsx": "8c424034399124cea0a5c7f7c13234a9b59521c4",
-    "apps/mobile/src/hooks/use-homework-ocr.test.ts": "50a460ee0ad42bac4f073d19e90dc151389e0655",
-    "apps/mobile/src/lib/subject-tints.test.ts": "27cd5e6ecfee942e5d854432f06bf2d99e93098e"
+    "apps/mobile/src/components/home/LearnerScreen.test.tsx": "bd04a10145824b4428163a680f53e243e325aa00"
   }
 }
