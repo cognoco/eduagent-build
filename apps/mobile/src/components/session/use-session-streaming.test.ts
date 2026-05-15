@@ -7,7 +7,7 @@ import { QuotaExceededError } from '../../lib/api-client';
 
 // Mock ChatShell directly so the hook can avoid the session barrel cycle.
 // prettier-ignore
-jest.mock('./ChatShell', () => ({
+jest.mock('./ChatShell', () => ({ // gc1-allow: hook test avoids the session barrel cycle; only the animation helper is needed
   animateResponse: jest.fn(() => jest.fn()),
 }));
 
