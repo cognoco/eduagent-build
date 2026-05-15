@@ -135,7 +135,8 @@ test('J-20 vocabulary quiz: tapped option text matches POSTed answerGiven (BUG-9
     if (await resultsScreen.isVisible().catch(() => false)) break;
     if (await seeResults.isVisible().catch(() => false)) {
       await pressableClick(seeResults);
-      continue;
+      await expect(resultsScreen).toBeVisible({ timeout: 30_000 });
+      break;
     }
 
     await pressableClick(nextQuestion);

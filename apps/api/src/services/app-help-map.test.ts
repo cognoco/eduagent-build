@@ -121,6 +121,14 @@ describe('buildAppHelpPromptBlock', () => {
     expect(block).toContain(en.more.account.profile);
   });
 
+  it('keeps destination labels exact in non-English conversations', () => {
+    expect(block).toContain('Use visible labels only.');
+    expect(block).toContain(
+      'When answering in a non-English conversation, keep destination labels exactly as shown in this map',
+    );
+    expect(block).not.toContain('translate the destination labels');
+  });
+
   it('uses exact i18n labels for Home intent cards', () => {
     expect(en.home.learner.intentActions.homework.title).toBe(
       'Help with an assignment',

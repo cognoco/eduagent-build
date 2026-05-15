@@ -298,6 +298,7 @@ describe('LibraryScreen', () => {
 
     expect(mockUseSubjects).toHaveBeenCalledWith({ includeInactive: true });
     expect(mockUseSubjects).toHaveBeenCalledWith({ enabled: false });
+    expect(mockUseSubjects).not.toHaveBeenCalledWith({ enabled: true });
   });
 
   it('[BUG-634 / M-2] does not crash when subjectsQuery.data is a non-array (stale shape / error payload)', () => {
