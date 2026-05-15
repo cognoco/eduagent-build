@@ -1925,6 +1925,7 @@
       "weeklySnapshot": "Ukentlig øyeblikksbilde",
       "monthlyReport": "Månedsrapport",
       "newBadge": "Ny",
+      "backToLatest": "Tilbake til nyeste rapport",
       "nextReportIn": "Neste rapport om {{timeContext}}",
       "noReportScheduled": "Ingen rapport planlagt",
       "subtitle": "Månedlige og ukentlige læringssammendrag",

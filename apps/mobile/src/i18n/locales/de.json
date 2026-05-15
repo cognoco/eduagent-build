@@ -1925,6 +1925,7 @@
       "weeklySnapshot": "Wöchentliche Momentaufnahme",
       "monthlyReport": "Monatsbericht",
       "newBadge": "Neu",
+      "backToLatest": "Zurück zum neuesten Bericht",
       "nextReportIn": "Nächster Bericht in {{timeContext}}",
       "noReportScheduled": "Kein Bericht geplant",
       "subtitle": "Monatliche und wöchentliche Lernzusammenfassungen",

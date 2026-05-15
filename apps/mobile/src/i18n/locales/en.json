@@ -1995,6 +1995,7 @@
       "weeklySnapshot": "Weekly snapshot",
       "monthlyReport": "Monthly report",
       "newBadge": "New",
+      "backToLatest": "Back to latest report",
       "nextReportIn": "Next report in {{timeContext}}",
       "noReportScheduled": "No report scheduled",
       "subtitle": "Monthly and weekly learning summaries",
