@@ -16,35 +16,45 @@
 
 const mockGetStepDatabase = jest.fn();
 
-jest.mock(
-  '../helpers' /* gc1-allow: isolates handler from Neon DB connection in unit tests */,
-  () => ({
+jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../helpers',
+  ) as typeof import('../helpers');
+  return {
+    ...actual,
     getStepDatabase: () => mockGetStepDatabase(),
-  }),
-);
+  };
+});
 
-jest.mock('../client', () => ({
-  inngest: {
-    createFunction: jest.fn(
-      (
-        _config: unknown,
-        _trigger: unknown,
-        handler: (...args: unknown[]) => unknown,
-      ) => ({ fn: handler, _config, _trigger }),
-    ),
-  },
-}));
+jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual('../client') as typeof import('../client');
+  return {
+    ...actual,
+    inngest: {
+      createFunction: jest.fn(
+        (
+          _config: unknown,
+          _trigger: unknown,
+          handler: (...args: unknown[]) => unknown,
+        ) => ({ fn: handler, _config, _trigger }),
+      ),
+    },
+  };
+});
 
-jest.mock(
-  '../../services/logger' /* gc1-allow: prevents logger side-effects and noisy output in unit tests */,
-  () => ({
+jest.mock('../../services/logger' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../../services/logger',
+  ) as typeof import('../../services/logger');
+  return {
+    ...actual,
     createLogger: () => ({
       info: jest.fn(),
       warn: jest.fn(),
       error: jest.fn(),
     }),
-  }),
-);
+  };
+});
 
 // Import AFTER mocks are set up
 import { filingCompletedObserve } from './filing-completed-observe';

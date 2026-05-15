@@ -9,28 +9,48 @@ const mockDatabaseModule = createDatabaseModuleMock({
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
-jest.mock('./retention', () => ({
-  processRecallResult: jest.fn(),
-  getRetentionStatus: jest.fn().mockReturnValue('weak'),
-  isTopicStable: jest.fn().mockReturnValue(false),
-  canRetestTopic: jest.fn().mockReturnValue(true),
-}));
+jest.mock('./retention' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    './retention',
+  ) as typeof import('./retention');
+  return {
+    ...actual,
+    processRecallResult: jest.fn(),
+    getRetentionStatus: jest.fn().mockReturnValue('weak'),
+    isTopicStable: jest.fn().mockReturnValue(false),
+    canRetestTopic: jest.fn().mockReturnValue(true),
+  };
+});
 
-jest.mock('./adaptive-teaching', () => ({
-  canExitNeedsDeepening: jest.fn(),
-  checkNeedsDeepeningCapacity: jest
-    .fn()
-    .mockReturnValue({ atCapacity: false, shouldPromote: false }),
-}));
+jest.mock('./adaptive-teaching' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    './adaptive-teaching',
+  ) as typeof import('./adaptive-teaching');
+  return {
+    ...actual,
+    canExitNeedsDeepening: jest.fn(),
+    checkNeedsDeepeningCapacity: jest
+      .fn()
+      .mockReturnValue({ atCapacity: false, shouldPromote: false }),
+  };
+});
 
-jest.mock('./xp', () => ({
-  syncXpLedgerStatus: jest.fn().mockResolvedValue(undefined),
-}));
+jest.mock('./xp' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual('./xp') as typeof import('./xp');
+  return {
+    ...actual,
+    syncXpLedgerStatus: jest.fn().mockResolvedValue(undefined),
+  };
+});
 
-jest.mock('./sentry', () => ({
-  captureException: jest.fn(),
-  addBreadcrumb: jest.fn(),
-}));
+jest.mock('./sentry' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual('./sentry') as typeof import('./sentry');
+  return {
+    ...actual,
+    captureException: jest.fn(),
+    addBreadcrumb: jest.fn(),
+  };
+});
 
 import type { Database } from '@eduagent/database';
 import { createScopedRepository } from '@eduagent/database';

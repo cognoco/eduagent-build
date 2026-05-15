@@ -12,31 +12,47 @@
 // ---------------------------------------------------------------------------
 
 const mockCaptureException = jest.fn();
-jest.mock('../../services/sentry', () => ({
-  captureException: (...args: unknown[]) => mockCaptureException(...args),
-}));
+jest.mock('../../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../../services/sentry',
+  ) as typeof import('../../services/sentry');
+  return {
+    ...actual,
+    captureException: (...args: unknown[]) => mockCaptureException(...args),
+  };
+});
 
 const mockLoggerWarn = jest.fn();
 const mockLoggerError = jest.fn();
-jest.mock('../../services/logger', () => ({
-  createLogger: () => ({
-    warn: (...args: unknown[]) => mockLoggerWarn(...args),
-    error: (...args: unknown[]) => mockLoggerError(...args),
-    info: jest.fn(),
-    debug: jest.fn(),
-  }),
-}));
+jest.mock('../../services/logger' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../../services/logger',
+  ) as typeof import('../../services/logger');
+  return {
+    ...actual,
+    createLogger: () => ({
+      warn: (...args: unknown[]) => mockLoggerWarn(...args),
+      error: (...args: unknown[]) => mockLoggerError(...args),
+      info: jest.fn(),
+      debug: jest.fn(),
+    }),
+  };
+});
 
-jest.mock('../client', () => ({
-  inngest: {
-    createFunction: jest.fn((_config, _trigger, handler) => ({
-      fn: handler,
-      opts: _config,
-      _trigger,
-    })),
-    send: jest.fn().mockResolvedValue(undefined),
-  },
-}));
+jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual('../client') as typeof import('../client');
+  return {
+    ...actual,
+    inngest: {
+      createFunction: jest.fn((_config, _trigger, handler) => ({
+        fn: handler,
+        opts: _config,
+        _trigger,
+      })),
+      send: jest.fn().mockResolvedValue(undefined),
+    },
+  };
+});
 
 import { notificationSuppressedObserve } from './notification-suppressed-observe';
 
@@ -72,7 +88,7 @@ describe('notificationSuppressedObserve', () => {
         profileId,
         notificationType: 'daily_reminder',
         reason: 'dedup_check_failed',
-      })
+      }),
     );
     expect(mockCaptureException).not.toHaveBeenCalled();
   });
@@ -82,7 +98,7 @@ describe('notificationSuppressedObserve', () => {
   // the run completed and burying the signal — this asserts we throw + Sentry.
   it('throws and reports to Sentry on a malformed payload (no silent recovery)', async () => {
     await expect(invoke({ totally: 'wrong-shape' })).rejects.toThrow(
-      /invalid event payload/i
+      /invalid event payload/i,
     );
 
     expect(mockCaptureException).toHaveBeenCalledTimes(1);
@@ -92,11 +108,11 @@ describe('notificationSuppressedObserve', () => {
         extra: expect.objectContaining({
           context: 'notification-suppressed-observe:invalid_payload',
         }),
-      })
+      }),
     );
     expect(mockLoggerError).toHaveBeenCalledWith(
       '[notification-suppressed] invalid event payload',
-      expect.objectContaining({ issues: expect.any(Array) })
+      expect.objectContaining({ issues: expect.any(Array) }),
     );
   });
 });

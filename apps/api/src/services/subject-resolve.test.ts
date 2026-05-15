@@ -1,4 +1,10 @@
-jest.mock('./llm', () => ({ routeAndCall: jest.fn() })); // gc1-allow: LLM external boundary — routeAndCall calls real Gemini/OpenAI/Anthropic providers; no test-env substitute exists
+jest.mock('./llm' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual('./llm') as typeof import('./llm');
+  return {
+    ...actual,
+    routeAndCall: jest.fn(),
+  };
+});
 
 import { resolveSubjectName } from './subject-resolve';
 import { routeAndCall } from './llm';

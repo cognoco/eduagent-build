@@ -22,30 +22,41 @@ const mockDatabaseModule = createDatabaseModuleMock({
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
-jest.mock('../services/account', () => ({ // gc1-allow: findOrCreateAccount stubbed to avoid real Clerk/DB round-trip in route unit test; requireActual preserves all other exports
-  ...jest.requireActual('../services/account'),
-  findOrCreateAccount: jest.fn().mockResolvedValue({
-    id: 'test-account-id',
-    clerkUserId: 'user_test',
-    email: 'test@example.com',
-    timezone: null,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  }),
-}));
+jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/account',
+  ) as typeof import('../services/account');
+  return {
+    ...actual,
+    // gc1-allow: stubs findOrCreateAccount — avoids real Clerk/DB round-trip
+    findOrCreateAccount: jest.fn().mockResolvedValue({
+      id: 'test-account-id',
+      clerkUserId: 'user_test',
+      email: 'test@example.com',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }),
+  };
+});
 
 const mockCreateNudge = jest.fn();
 const mockListUnreadNudges = jest.fn();
 const mockMarkNudgeRead = jest.fn();
 const mockMarkAllNudgesRead = jest.fn();
 
-jest.mock('../services/nudge', () => ({ // gc1-allow: all four service functions stubbed — route unit test exercises HTTP layer only; real nudge service requires live DB transactions + push notifications
-  ...jest.requireActual('../services/nudge'),
-  createNudge: (...args: unknown[]) => mockCreateNudge(...args),
-  listUnreadNudges: (...args: unknown[]) => mockListUnreadNudges(...args),
-  markNudgeRead: (...args: unknown[]) => mockMarkNudgeRead(...args),
-  markAllNudgesRead: (...args: unknown[]) => mockMarkAllNudgesRead(...args),
-}));
+jest.mock('../services/nudge' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/nudge',
+  ) as typeof import('../services/nudge');
+  return {
+    ...actual,
+    // gc1-allow: stubs all nudge service functions — tests exercise HTTP layer, not DB
+    createNudge: (...args: unknown[]) => mockCreateNudge(...args),
+    listUnreadNudges: (...args: unknown[]) => mockListUnreadNudges(...args),
+    markNudgeRead: (...args: unknown[]) => mockMarkNudgeRead(...args),
+    markAllNudgesRead: (...args: unknown[]) => mockMarkAllNudgesRead(...args),
+  };
+});
 
 import { app } from '../index';
 import { BASE_AUTH_ENV, makeAuthHeaders } from '../test-utils/test-env';

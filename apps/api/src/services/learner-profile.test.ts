@@ -22,10 +22,15 @@ import {
 
 // [CR-119.2]: Mock LLM router to capture the system prompt passed to it
 const mockRouteAndCall = jest.fn();
-jest.mock('./llm/router', () => ({
-  ...(jest.requireActual('./llm/router') as Record<string, unknown>),
-  routeAndCall: (...args: unknown[]) => mockRouteAndCall(...args),
-}));
+jest.mock('./llm/router' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    './llm/router',
+  ) as typeof import('./llm/router');
+  return {
+    ...actual,
+    routeAndCall: (...args: unknown[]) => mockRouteAndCall(...args),
+  };
+});
 
 // ---------------------------------------------------------------------------
 // selectCurrentlyWorkingOn

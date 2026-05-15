@@ -40,11 +40,10 @@ const mockDatabaseModule = createDatabaseModuleMock({
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
-jest.mock('../services/account', () => { // gc1-allow: requireActual + targeted overrides
-  const actual = jest.requireActual('../services/account') as Record<
-    string,
-    unknown
-  >;
+jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/account',
+  ) as typeof import('../services/account');
   return {
     ...actual,
     findOrCreateAccount: jest.fn().mockResolvedValue({
@@ -84,11 +83,10 @@ const mockBuildUsageDateLabels = jest.fn((input) => ({
   renewsAtLabel: input.renewsAt ? 'February 15, 2025' : null,
 }));
 
-jest.mock('../services/billing', () => { // gc1-allow: requireActual + targeted overrides
-  const actual = jest.requireActual('../services/billing') as Record<
-    string,
-    unknown
-  >;
+jest.mock('../services/billing' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/billing',
+  ) as typeof import('../services/billing');
   return {
     ...actual,
     // Use real ProfileRemovalNotImplementedError so instanceof checks in the
@@ -126,11 +124,10 @@ jest.mock('../services/billing', () => { // gc1-allow: requireActual + targeted 
 
 const mockReadSubscriptionStatus = jest.fn();
 
-jest.mock('../services/kv', () => { // gc1-allow: requireActual + targeted overrides
-  const actual = jest.requireActual('../services/kv') as Record<
-    string,
-    unknown
-  >;
+jest.mock('../services/kv' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/kv',
+  ) as typeof import('../services/kv');
   return {
     ...actual,
     readSubscriptionStatus: (...args: unknown[]) =>
@@ -148,25 +145,33 @@ const mockCustomersCreate = jest.fn();
 const mockPaymentIntentsCreate = jest.fn();
 const mockPortalCreate = jest.fn();
 
-jest.mock('../services/stripe', () => ({ // gc1-allow: thin wrapper — stubs Stripe external boundary (no real HTTP)
-  createStripeClient: jest.fn().mockReturnValue({
-    checkout: {
-      sessions: { create: (...args: unknown[]) => mockCheckoutCreate(...args) },
-    },
-    subscriptions: {
-      update: (...args: unknown[]) => mockSubscriptionsUpdate(...args),
-    },
-    customers: {
-      create: (...args: unknown[]) => mockCustomersCreate(...args),
-    },
-    paymentIntents: {
-      create: (...args: unknown[]) => mockPaymentIntentsCreate(...args),
-    },
-    billingPortal: {
-      sessions: { create: (...args: unknown[]) => mockPortalCreate(...args) },
-    },
-  }),
-}));
+jest.mock('../services/stripe' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/stripe',
+  ) as typeof import('../services/stripe');
+  return {
+    ...actual,
+    createStripeClient: jest.fn().mockReturnValue({
+      checkout: {
+        sessions: {
+          create: (...args: unknown[]) => mockCheckoutCreate(...args),
+        },
+      },
+      subscriptions: {
+        update: (...args: unknown[]) => mockSubscriptionsUpdate(...args),
+      },
+      customers: {
+        create: (...args: unknown[]) => mockCustomersCreate(...args),
+      },
+      paymentIntents: {
+        create: (...args: unknown[]) => mockPaymentIntentsCreate(...args),
+      },
+      billingPortal: {
+        sessions: { create: (...args: unknown[]) => mockPortalCreate(...args) },
+      },
+    }),
+  };
+});
 
 import { app } from '../index';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';

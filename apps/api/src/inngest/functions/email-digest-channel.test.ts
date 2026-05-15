@@ -35,7 +35,10 @@ import { createInngestTransportCapture } from '../../test-utils/inngest-transpor
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 
 const mockInngestTransport = createInngestTransportCapture();
-jest.mock('../client', () => mockInngestTransport.module); // gc1-allow: inngest framework boundary
+jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual('../client') as typeof import('../client');
+  return { ...actual, inngest: mockInngestTransport.module.inngest };
+});
 
 // Internal services used by the generate handlers — we intercept them here
 // using jest.requireActual patterns would be awkward since these are async
@@ -65,56 +68,72 @@ const mockFormatMonthlyProgressEmail = jest.fn().mockReturnValue({
 });
 
 // prettier-ignore
-jest.mock( // gc1-allow: handler control-flow test; services tested in own suites
+jest.mock( // gc1-allow: pattern-a conversion
   '../../services/notifications',
-  () => ({
-    sendPushNotification: (...args: unknown[]) =>
-      mockSendPushNotification(...args),
-    sendEmail: (...args: unknown[]) => mockSendEmail(...args),
-    formatWeeklyProgressEmail: (...args: unknown[]) =>
-      mockFormatWeeklyProgressEmail(...args),
-    formatMonthlyProgressEmail: (...args: unknown[]) =>
-      mockFormatMonthlyProgressEmail(...args),
-  }),
+  () => {
+    const actual = jest.requireActual('../../services/notifications') as typeof import('../../services/notifications');
+    return {
+      ...actual,
+      sendPushNotification: (...args: unknown[]) =>
+        mockSendPushNotification(...args),
+      sendEmail: (...args: unknown[]) => mockSendEmail(...args),
+      formatWeeklyProgressEmail: (...args: unknown[]) =>
+        mockFormatWeeklyProgressEmail(...args),
+      formatMonthlyProgressEmail: (...args: unknown[]) =>
+        mockFormatMonthlyProgressEmail(...args),
+    };
+  },
 );
 
 const mockGetRecentNotificationCount = jest.fn().mockResolvedValue(0);
 const mockLogNotification = jest.fn().mockResolvedValue(undefined);
 // prettier-ignore
-jest.mock( // gc1-allow: handler control-flow test; services tested in own suites
+jest.mock( /* gc1-allow: pattern-a conversion */
   '../../services/settings',
-  () => ({
-    getRecentNotificationCount: (...args: unknown[]) =>
-      mockGetRecentNotificationCount(...args),
-    logNotification: (...args: unknown[]) => mockLogNotification(...args),
-  }),
+  () => {
+    const actual = jest.requireActual('../../services/settings') as typeof import('../../services/settings');
+    return {
+      ...actual,
+      getRecentNotificationCount: (...args: unknown[]) =>
+        mockGetRecentNotificationCount(...args),
+      logNotification: (...args: unknown[]) => mockLogNotification(...args),
+    };
+  },
 );
 
 const mockGetSnapshotsInRange = jest.fn();
 const mockGetLatestSnapshot = jest.fn();
 const mockGetLatestSnapshotOnOrBefore = jest.fn().mockResolvedValue(null);
 // prettier-ignore
-jest.mock( // gc1-allow: handler control-flow test; services tested in own suites
+jest.mock( /* gc1-allow: pattern-a conversion */
   '../../services/snapshot-aggregation',
-  () => ({
-    getSnapshotsInRange: (...args: unknown[]) =>
-      mockGetSnapshotsInRange(...args),
-    getLatestSnapshot: (...args: unknown[]) => mockGetLatestSnapshot(...args),
-    getLatestSnapshotOnOrBefore: (...args: unknown[]) =>
-      mockGetLatestSnapshotOnOrBefore(...args),
-  }),
+  () => {
+    const actual = jest.requireActual('../../services/snapshot-aggregation') as typeof import('../../services/snapshot-aggregation');
+    return {
+      ...actual,
+      getSnapshotsInRange: (...args: unknown[]) =>
+        mockGetSnapshotsInRange(...args),
+      getLatestSnapshot: (...args: unknown[]) => mockGetLatestSnapshot(...args),
+      getLatestSnapshotOnOrBefore: (...args: unknown[]) =>
+        mockGetLatestSnapshotOnOrBefore(...args),
+    };
+  },
 );
 
 const mockGenerateWeeklyReportData = jest
   .fn()
   .mockReturnValue({ reportData: {} });
 // prettier-ignore
-jest.mock( // gc1-allow: handler control-flow test; services tested in own suites
+jest.mock( /* gc1-allow: pattern-a conversion */
   '../../services/weekly-report',
-  () => ({
-    generateWeeklyReportData: (...args: unknown[]) =>
-      mockGenerateWeeklyReportData(...args),
-  }),
+  () => {
+    const actual = jest.requireActual('../../services/weekly-report') as typeof import('../../services/weekly-report');
+    return {
+      ...actual,
+      generateWeeklyReportData: (...args: unknown[]) =>
+        mockGenerateWeeklyReportData(...args),
+    };
+  },
 );
 
 import { emptyPracticeActivitySummary } from '../../test-utils/practice-activity-summary-fixture';
@@ -123,12 +142,16 @@ const mockGetPracticeActivitySummary = jest
   .fn()
   .mockResolvedValue(emptyPracticeActivitySummary);
 // prettier-ignore
-jest.mock( // gc1-allow: handler control-flow test; service tested separately
+jest.mock( /* gc1-allow: pattern-a conversion */
   '../../services/practice-activity-summary',
-  () => ({
-    getPracticeActivitySummary: (...args: unknown[]) =>
-      mockGetPracticeActivitySummary(...args),
-  }),
+  () => {
+    const actual = jest.requireActual('../../services/practice-activity-summary') as typeof import('../../services/practice-activity-summary');
+    return {
+      ...actual,
+      getPracticeActivitySummary: (...args: unknown[]) =>
+        mockGetPracticeActivitySummary(...args),
+    };
+  },
 );
 
 // ---------------------------------------------------------------------------
@@ -230,11 +253,17 @@ function buildMockDb(
 }
 
 const mockGetStepResendApiKey = jest.fn(() => 'test-resend-key');
-jest.mock('../helpers' /* gc1-allow: unit test boundary */, () => ({
-  getStepDatabase: jest.fn(),
-  resetDatabaseUrl: jest.fn(),
-  getStepResendApiKey: () => mockGetStepResendApiKey(),
-}));
+jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../helpers',
+  ) as typeof import('../helpers');
+  return {
+    ...actual,
+    getStepDatabase: jest.fn(),
+    resetDatabaseUrl: jest.fn(),
+    getStepResendApiKey: () => mockGetStepResendApiKey(),
+  };
+});
 
 import { getStepDatabase } from '../helpers';
 import { weeklyProgressPushGenerate } from './weekly-progress-push';
@@ -666,14 +695,18 @@ const mockGenerateReportHighlights = jest.fn().mockResolvedValue({
 });
 
 // prettier-ignore
-jest.mock( // gc1-allow: handler control-flow test; services tested in own suites
+jest.mock( /* gc1-allow: pattern-a conversion */
   '../../services/monthly-report',
-  () => ({
-    generateMonthlyReportData: (...args: unknown[]) =>
-      mockGenerateMonthlyReportData(...args),
-    generateReportHighlights: (...args: unknown[]) =>
-      mockGenerateReportHighlights(...args),
-  }),
+  () => {
+    const actual = jest.requireActual('../../services/monthly-report') as typeof import('../../services/monthly-report');
+    return {
+      ...actual,
+      generateMonthlyReportData: (...args: unknown[]) =>
+        mockGenerateMonthlyReportData(...args),
+      generateReportHighlights: (...args: unknown[]) =>
+        mockGenerateReportHighlights(...args),
+    };
+  },
 );
 
 function buildMonthlyMockDb(

@@ -13,10 +13,12 @@ jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 // jest.requireActual for createFunction so the function-definition shape
 // stays identical to production.
 const mockInngestSend = jest.fn().mockResolvedValue(undefined);
-jest.mock('../client', () => {
+jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual('../client') as typeof import('../client');
   const realInngest = jest.requireActual('inngest').Inngest;
   const realInstance = new realInngest({ id: 'eduagent-test' });
   return {
+    ...actual,
     inngest: {
       // Preserve createFunction so trialExpiry registers correctly.
       createFunction: realInstance.createFunction.bind(realInstance),
@@ -26,9 +28,15 @@ jest.mock('../client', () => {
 });
 
 const mockCaptureException = jest.fn();
-jest.mock('../../services/sentry', () => ({
-  captureException: (...args: unknown[]) => mockCaptureException(...args),
-}));
+jest.mock('../../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../../services/sentry',
+  ) as typeof import('../../services/sentry');
+  return {
+    ...actual,
+    captureException: (...args: unknown[]) => mockCaptureException(...args),
+  };
+});
 
 // subscription: getTierConfig is a pure static config lookup — use real code.
 
@@ -38,38 +46,75 @@ const mockTransitionToExtendedTrial = jest.fn().mockResolvedValue(undefined);
 const mockDowngradeQuotaPool = jest.fn().mockResolvedValue(undefined);
 const mockFindExpiredTrialsByDaysSinceEnd = jest.fn().mockResolvedValue([]);
 
-jest.mock('../../services/billing', () => ({
-  findExpiredTrials: (...args: unknown[]) => mockFindExpiredTrials(...args),
-  findSubscriptionsByTrialDateRange: (...args: unknown[]) =>
-    mockFindSubscriptionsByTrialDateRange(...args),
-  transitionToExtendedTrial: (...args: unknown[]) =>
-    mockTransitionToExtendedTrial(...args),
-  downgradeQuotaPool: (...args: unknown[]) => mockDowngradeQuotaPool(...args),
-  findExpiredTrialsByDaysSinceEnd: (...args: unknown[]) =>
-    mockFindExpiredTrialsByDaysSinceEnd(...args),
-}));
+jest.mock(
+  '../../services/billing' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/billing',
+    ) as typeof import('../../services/billing');
+    return {
+      ...actual,
+      findExpiredTrials: (...args: unknown[]) => mockFindExpiredTrials(...args),
+      findSubscriptionsByTrialDateRange: (...args: unknown[]) =>
+        mockFindSubscriptionsByTrialDateRange(...args),
+      transitionToExtendedTrial: (...args: unknown[]) =>
+        mockTransitionToExtendedTrial(...args),
+      downgradeQuotaPool: (...args: unknown[]) =>
+        mockDowngradeQuotaPool(...args),
+      findExpiredTrialsByDaysSinceEnd: (...args: unknown[]) =>
+        mockFindExpiredTrialsByDaysSinceEnd(...args),
+    };
+  },
+);
 
 // trial: all exports are pure functions / constants — use real code.
 
 const mockSendPushNotification = jest.fn().mockResolvedValue({ sent: true });
-jest.mock('../../services/notifications', () => ({
-  sendPushNotification: (...args: unknown[]) =>
-    mockSendPushNotification(...args),
-}));
+jest.mock(
+  '../../services/notifications' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/notifications',
+    ) as typeof import('../../services/notifications');
+    return {
+      ...actual,
+      sendPushNotification: (...args: unknown[]) =>
+        mockSendPushNotification(...args),
+    };
+  },
+);
 
 // [BUG-699-FOLLOWUP] getRecentNotificationCount gates dedup: default 0 so
 // existing tests continue to send. Individual tests override to simulate a
 // prior successful send (retry path).
 const mockGetRecentNotificationCount = jest.fn().mockResolvedValue(0);
-jest.mock('../../services/settings', () => ({
-  getRecentNotificationCount: (...args: unknown[]) =>
-    mockGetRecentNotificationCount(...args),
-}));
+jest.mock(
+  '../../services/settings' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/settings',
+    ) as typeof import('../../services/settings');
+    return {
+      ...actual,
+      getRecentNotificationCount: (...args: unknown[]) =>
+        mockGetRecentNotificationCount(...args),
+    };
+  },
+);
 
 const mockFindOwnerProfile = jest.fn();
-jest.mock('../../services/profile', () => ({
-  findOwnerProfile: (...args: unknown[]) => mockFindOwnerProfile(...args),
-}));
+jest.mock(
+  '../../services/profile' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/profile',
+    ) as typeof import('../../services/profile');
+    return {
+      ...actual,
+      findOwnerProfile: (...args: unknown[]) => mockFindOwnerProfile(...args),
+    };
+  },
+);
 
 import { trialExpiry } from './trial-expiry';
 import {

@@ -64,58 +64,98 @@ const mockDb = {
 };
 
 jest.mock(
-  '../../services/solo-progress-reports' /* gc1-allow: unit test boundary */,
-  () => ({
-    listEligibleSelfReportProfileIds: (...args: unknown[]) =>
-      mockListEligibleSelfReportProfileIds(...args),
-    listEligibleSelfReportProfileIdsAtLocalHour9: (...args: unknown[]) =>
-      mockListEligibleSelfReportProfileIdsAtLocalHour9(...args),
-  }),
-);
-
-jest.mock(
-  '../../services/snapshot-aggregation' /* gc1-allow: unit test boundary */,
-  () => ({
-    getLatestSnapshotOnOrBefore: (...args: unknown[]) =>
-      mockGetLatestSnapshotOnOrBefore(...args),
-  }),
-);
-
-jest.mock(
-  '../../services/practice-activity-summary' /* gc1-allow: unit test boundary */,
-  () => ({
-    getPracticeActivitySummary: (...args: unknown[]) =>
-      mockGetPracticeActivitySummary(...args),
-  }),
-);
-
-jest.mock(
-  '../../services/weekly-report' /* gc1-allow: unit test boundary */,
-  () => ({
-    generateWeeklyReportData: (...args: unknown[]) =>
-      mockGenerateWeeklyReportData(...args),
-  }),
-);
-
-jest.mock('../../services/sentry' /* gc1-allow: unit test boundary */, () => ({
-  captureException: (...args: unknown[]) => mockCaptureException(...args),
-}));
-
-jest.mock('../helpers' /* gc1-allow: unit test boundary */, () => ({
-  getStepDatabase: jest.fn().mockReturnValue(mockDb),
-}));
-
-jest.mock('../client' /* gc1-allow: unit test boundary */, () => ({
-  inngest: {
-    createFunction: jest.fn(
-      (config: unknown, trigger: unknown, fn: unknown) => ({
-        fn,
-        _config: config,
-        _trigger: trigger,
-      }),
-    ),
+  '../../services/solo-progress-reports' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/solo-progress-reports',
+    ) as typeof import('../../services/solo-progress-reports');
+    return {
+      ...actual,
+      listEligibleSelfReportProfileIds: (...args: unknown[]) =>
+        mockListEligibleSelfReportProfileIds(...args),
+      listEligibleSelfReportProfileIdsAtLocalHour9: (...args: unknown[]) =>
+        mockListEligibleSelfReportProfileIdsAtLocalHour9(...args),
+    };
   },
-}));
+);
+
+jest.mock(
+  '../../services/snapshot-aggregation' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/snapshot-aggregation',
+    ) as typeof import('../../services/snapshot-aggregation');
+    return {
+      ...actual,
+      getLatestSnapshotOnOrBefore: (...args: unknown[]) =>
+        mockGetLatestSnapshotOnOrBefore(...args),
+    };
+  },
+);
+
+jest.mock(
+  '../../services/practice-activity-summary' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/practice-activity-summary',
+    ) as typeof import('../../services/practice-activity-summary');
+    return {
+      ...actual,
+      getPracticeActivitySummary: (...args: unknown[]) =>
+        mockGetPracticeActivitySummary(...args),
+    };
+  },
+);
+
+jest.mock(
+  '../../services/weekly-report' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/weekly-report',
+    ) as typeof import('../../services/weekly-report');
+    return {
+      ...actual,
+      generateWeeklyReportData: (...args: unknown[]) =>
+        mockGenerateWeeklyReportData(...args),
+    };
+  },
+);
+
+jest.mock('../../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../../services/sentry',
+  ) as typeof import('../../services/sentry');
+  return {
+    ...actual,
+    captureException: (...args: unknown[]) => mockCaptureException(...args),
+  };
+});
+
+jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../helpers',
+  ) as typeof import('../helpers');
+  return {
+    ...actual,
+    getStepDatabase: jest.fn().mockReturnValue(mockDb),
+  };
+});
+
+jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual('../client') as typeof import('../client');
+  return {
+    ...actual,
+    inngest: {
+      createFunction: jest.fn(
+        (config: unknown, trigger: unknown, fn: unknown) => ({
+          fn,
+          _config: config,
+          _trigger: trigger,
+        }),
+      ),
+    },
+  };
+});
 
 import {
   selfProgressReportsBackfill,

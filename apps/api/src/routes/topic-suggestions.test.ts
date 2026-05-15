@@ -32,66 +32,51 @@ jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 // Mock account service — resolves Clerk user → local Account
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/account', () => { // gc1-allow: requireActual + targeted overrides
-  const actual = jest.requireActual('../services/account') as Record<
-    string,
-    unknown
-  >;
-  return {
-    ...actual,
-    findOrCreateAccount: jest.fn().mockResolvedValue({
-      id: 'test-account-id',
-      clerkUserId: 'user_test',
-      email: 'test@example.com',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }),
-  };
-});
+jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../services/account'),
+  findOrCreateAccount: jest.fn().mockResolvedValue({
+    id: 'test-account-id',
+    clerkUserId: 'user_test',
+    email: 'test@example.com',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }),
+}));
 
 // ---------------------------------------------------------------------------
 // Mock profile service — profile-scope middleware auto-resolves owner profile
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/profile', () => { // gc1-allow: requireActual + targeted overrides
-  const actual = jest.requireActual('../services/profile') as Record<
-    string,
-    unknown
-  >;
-  return {
-    ...actual,
-    findOwnerProfile: jest.fn().mockResolvedValue({
-      id: 'test-profile-id',
-      accountId: 'test-account-id',
-      displayName: 'Test User',
-      birthYear: null,
-      location: null,
-      consentStatus: null,
-      hasPremiumLlm: false,
-    }),
-    getProfile: jest.fn().mockResolvedValue({
-      id: 'test-profile-id',
-      accountId: 'test-account-id',
-      displayName: 'Test User',
-      birthYear: null,
-      location: null,
-      consentStatus: null,
-      hasPremiumLlm: false,
-    }),
-  };
-});
+jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => ({
+  ...jest.requireActual('../services/profile'),
+  findOwnerProfile: jest.fn().mockResolvedValue({
+    id: 'test-profile-id',
+    accountId: 'test-account-id',
+    displayName: 'Test User',
+    birthYear: null,
+    location: null,
+    consentStatus: null,
+    hasPremiumLlm: false,
+  }),
+  getProfile: jest.fn().mockResolvedValue({
+    id: 'test-profile-id',
+    accountId: 'test-account-id',
+    displayName: 'Test User',
+    birthYear: null,
+    location: null,
+    consentStatus: null,
+    hasPremiumLlm: false,
+  }),
+}));
 
 // ---------------------------------------------------------------------------
 // Mock suggestion services — stub for route handler
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/suggestions', () => { // gc1-allow: requireActual + targeted overrides
-  const actual = jest.requireActual('../services/suggestions') as Record<
-    string,
-    unknown
-  >;
-  return {
-    ...actual,
+jest.mock(
+  '../services/suggestions' /* gc1-allow: pattern-a conversion */,
+  () => ({
+    ...jest.requireActual('../services/suggestions'),
     getUnusedTopicSuggestions: jest.fn().mockResolvedValue([
       {
         id: TEST_TOPIC_ID,
@@ -101,29 +86,39 @@ jest.mock('../services/suggestions', () => { // gc1-allow: requireActual + targe
         usedAt: null,
       },
     ]),
-  };
-});
+  }),
+);
 
 // ---------------------------------------------------------------------------
 // Mock LLM services — registerProvider for llm middleware
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/llm', () => ({ // gc1-allow: routeAndCall is the LLM provider HTTP boundary
-  ...(jest.requireActual('../services/llm') as Record<string, unknown>),
-  routeAndCall: jest.fn(),
-}));
+jest.mock('../services/llm' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/llm',
+  ) as typeof import('../services/llm');
+  return {
+    ...actual,
+    // gc1-allow: LLM routeAndCall external boundary
+    routeAndCall: jest.fn(),
+    registerProvider: jest.fn(),
+    getRegisteredProviders: jest.fn().mockReturnValue([]),
+    _clearProviders: jest.fn(),
+    _resetCircuits: jest.fn(),
+  };
+});
 
 // ---------------------------------------------------------------------------
 // Mock Sentry (used by global error handler)
 // ---------------------------------------------------------------------------
 
-jest.mock('../services/sentry', () => { // gc1-allow: wraps @sentry/cloudflare external boundary
-  const actual = jest.requireActual('../services/sentry') as Record<
-    string,
-    unknown
-  >;
+jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/sentry',
+  ) as typeof import('../services/sentry');
   return {
     ...actual,
+    // gc1-allow: @sentry/cloudflare external boundary
     captureException: jest.fn(),
   };
 });

@@ -23,14 +23,20 @@ const mockGetDailyNotificationCount = jest.fn();
 const mockLogNotification = jest.fn();
 const mockCheckAndLogRateLimitInternal = jest.fn();
 
-jest.mock('./settings', () => ({
-  getPushToken: (...args: unknown[]) => mockGetPushToken(...args),
-  getDailyNotificationCount: (...args: unknown[]) =>
-    mockGetDailyNotificationCount(...args),
-  logNotification: (...args: unknown[]) => mockLogNotification(...args),
-  checkAndLogRateLimitInternal: (...args: unknown[]) =>
-    mockCheckAndLogRateLimitInternal(...args),
-}));
+jest.mock('./settings' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    './settings',
+  ) as typeof import('./settings');
+  return {
+    ...actual,
+    getPushToken: (...args: unknown[]) => mockGetPushToken(...args),
+    getDailyNotificationCount: (...args: unknown[]) =>
+      mockGetDailyNotificationCount(...args),
+    logNotification: (...args: unknown[]) => mockLogNotification(...args),
+    checkAndLogRateLimitInternal: (...args: unknown[]) =>
+      mockCheckAndLogRateLimitInternal(...args),
+  };
+});
 
 // ---------------------------------------------------------------------------
 // Mock global fetch for Expo Push API

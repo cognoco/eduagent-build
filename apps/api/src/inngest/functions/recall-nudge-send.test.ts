@@ -7,51 +7,76 @@ const mockSendPushNotification = jest.fn();
 const mockFormatRecallNudge = jest.fn();
 const mockResolveProfileRole = jest.fn();
 
+jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../helpers',
+  ) as typeof import('../helpers');
+  return { ...actual, getStepDatabase: () => mockGetStepDatabase() };
+});
+
 jest.mock(
-  '../helpers' /* gc1-allow: isolates DB connection from unit test */,
-  () => ({
-    getStepDatabase: () => mockGetStepDatabase(),
-  }),
+  '../../services/notifications' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/notifications',
+    ) as typeof import('../../services/notifications');
+    return {
+      ...actual,
+      sendPushNotification: (...args: unknown[]) =>
+        mockSendPushNotification(...args),
+      formatRecallNudge: (...args: unknown[]) => mockFormatRecallNudge(...args),
+    };
+  },
 );
 
 jest.mock(
-  '../../services/notifications' /* gc1-allow: isolates push notification external boundary */,
-  () => ({
-    sendPushNotification: (...args: unknown[]) =>
-      mockSendPushNotification(...args),
-    formatRecallNudge: (...args: unknown[]) => mockFormatRecallNudge(...args),
-  }),
-);
-
-jest.mock(
-  '../../services/profile' /* gc1-allow: isolates profile service from unit test */,
-  () => ({
-    resolveProfileRole: (...args: unknown[]) => mockResolveProfileRole(...args),
-  }),
+  '../../services/profile' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/profile',
+    ) as typeof import('../../services/profile');
+    return {
+      ...actual,
+      resolveProfileRole: (...args: unknown[]) =>
+        mockResolveProfileRole(...args),
+    };
+  },
 );
 
 const mockGetRecentNotificationCount = jest.fn().mockResolvedValue(0);
 jest.mock(
-  '../../services/settings' /* gc1-allow: isolates notification settings service */,
-  () => ({
-    getRecentNotificationCount: (...args: unknown[]) =>
-      mockGetRecentNotificationCount(...args),
-  }),
+  '../../services/settings' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/settings',
+    ) as typeof import('../../services/settings');
+    return {
+      ...actual,
+      getRecentNotificationCount: (...args: unknown[]) =>
+        mockGetRecentNotificationCount(...args),
+    };
+  },
 );
 
 const mockCaptureException = jest.fn();
-jest.mock(
-  '../../services/sentry' /* gc1-allow: isolates Sentry external boundary */,
-  () => ({
+jest.mock('../../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../../services/sentry',
+  ) as typeof import('../../services/sentry');
+  return {
+    ...actual,
     captureException: (...args: unknown[]) => mockCaptureException(...args),
-  }),
-);
+  };
+});
 
 import { createInngestTransportCapture } from '../../test-utils/inngest-transport-capture';
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 
 const mockInngestTransport = createInngestTransportCapture();
-jest.mock('../client', () => mockInngestTransport.module); // gc1-allow: inngest framework boundary
+jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual('../client') as typeof import('../client');
+  return { ...actual, ...mockInngestTransport.module };
+});
 
 // Mock drizzle-orm + database
 jest.mock(

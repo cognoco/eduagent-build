@@ -3,9 +3,15 @@
 // ---------------------------------------------------------------------------
 
 const mockGenerateEmbedding = jest.fn();
-jest.mock('./embeddings', () => ({ // gc1-allow: generateEmbedding calls Voyage AI REST API — true external boundary, relative import required
-  generateEmbedding: (...args: unknown[]) => mockGenerateEmbedding(...args),
-}));
+jest.mock('./embeddings' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    './embeddings',
+  ) as typeof import('./embeddings');
+  return {
+    ...actual,
+    generateEmbedding: (...args: unknown[]) => mockGenerateEmbedding(...args),
+  };
+});
 
 const mockFindSimilarTopics = jest.fn();
 
@@ -38,7 +44,7 @@ describe('retrieveRelevantMemory', () => {
     const result = await retrieveRelevantMemory(
       mockDb,
       'profile-1',
-      'What is a quadratic equation?'
+      'What is a quadratic equation?',
     );
 
     expect(result).toEqual({ context: '', topicIds: [] });
@@ -51,7 +57,7 @@ describe('retrieveRelevantMemory', () => {
       mockDb,
       'profile-1',
       'What is a quadratic equation?',
-      undefined
+      undefined,
     );
 
     expect(result).toEqual({ context: '', topicIds: [] });
@@ -84,12 +90,12 @@ describe('retrieveRelevantMemory', () => {
       mockDb,
       'profile-1',
       'How do I solve quadratics?',
-      'pa-test-key'
+      'pa-test-key',
     );
 
     expect(result.context).toContain('Relevant prior learning');
     expect(result.context).toContain(
-      'Quadratic equations involve x squared terms'
+      'Quadratic equations involve x squared terms',
     );
     expect(result.context).toContain('quadratic formula');
     expect(result.topicIds).toEqual(['topic-1', 'topic-2']);
@@ -108,12 +114,12 @@ describe('retrieveRelevantMemory', () => {
       mockDb,
       'profile-1',
       'Tell me about photosynthesis',
-      'pa-test-key'
+      'pa-test-key',
     );
 
     expect(mockGenerateEmbedding).toHaveBeenCalledWith(
       'Tell me about photosynthesis',
-      'pa-test-key'
+      'pa-test-key',
     );
   });
 
@@ -131,14 +137,14 @@ describe('retrieveRelevantMemory', () => {
       'profile-1',
       'Tell me about photosynthesis',
       'pa-test-key',
-      5
+      5,
     );
 
     expect(mockFindSimilarTopics).toHaveBeenCalledWith(
       mockDb,
       [0.1, 0.2],
       5,
-      'profile-1'
+      'profile-1',
     );
   });
 
@@ -157,7 +163,7 @@ describe('retrieveRelevantMemory', () => {
       mockDb,
       [0.1],
       3,
-      'profile-1'
+      'profile-1',
     );
   });
 
@@ -174,7 +180,7 @@ describe('retrieveRelevantMemory', () => {
       mockDb,
       'profile-1',
       'Something completely new',
-      'pa-test-key'
+      'pa-test-key',
     );
 
     expect(result).toEqual({ context: '', topicIds: [] });
@@ -201,7 +207,7 @@ describe('retrieveRelevantMemory', () => {
       mockDb,
       'profile-1',
       'Hello',
-      'pa-test-key'
+      'pa-test-key',
     );
 
     expect(result.topicIds).toEqual(['topic-1']);
@@ -209,7 +215,7 @@ describe('retrieveRelevantMemory', () => {
 
   it('returns empty result when embedding generation fails', async () => {
     mockGenerateEmbedding.mockRejectedValue(
-      new Error('Voyage AI rate limit exceeded')
+      new Error('Voyage AI rate limit exceeded'),
     );
 
     const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
@@ -218,12 +224,12 @@ describe('retrieveRelevantMemory', () => {
       mockDb,
       'profile-1',
       'Hello',
-      'pa-test-key'
+      'pa-test-key',
     );
 
     expect(result).toEqual({ context: '', topicIds: [] });
     expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining('rate limit')
+      expect.stringContaining('rate limit'),
     );
 
     consoleSpy.mockRestore();
@@ -237,7 +243,7 @@ describe('retrieveRelevantMemory', () => {
       provider: 'voyage',
     });
     mockFindSimilarTopics.mockRejectedValue(
-      new Error('pgvector extension not available')
+      new Error('pgvector extension not available'),
     );
 
     const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
@@ -246,12 +252,12 @@ describe('retrieveRelevantMemory', () => {
       mockDb,
       'profile-1',
       'Hello',
-      'pa-test-key'
+      'pa-test-key',
     );
 
     expect(result).toEqual({ context: '', topicIds: [] });
     expect(consoleSpy).toHaveBeenCalledWith(
-      expect.stringContaining('pgvector')
+      expect.stringContaining('pgvector'),
     );
 
     consoleSpy.mockRestore();
@@ -273,7 +279,7 @@ describe('retrieveRelevantMemory', () => {
       mockDb,
       'profile-1',
       'Hello',
-      'pa-test-key'
+      'pa-test-key',
     );
 
     // Content should be truncated to 500 chars + '...'
@@ -313,7 +319,7 @@ describe('retrieveRelevantMemory', () => {
       mockDb,
       'profile-1',
       'How do I solve equations?',
-      'pa-test-key'
+      'pa-test-key',
     );
 
     expect(result.context).toContain('Quadratic equations');
@@ -338,7 +344,7 @@ describe('retrieveRelevantMemory', () => {
       mockDb,
       'profile-1',
       'Hello',
-      'pa-test-key'
+      'pa-test-key',
     );
 
     expect(result.context).toBe('');

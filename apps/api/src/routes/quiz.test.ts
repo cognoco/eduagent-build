@@ -26,17 +26,20 @@ jest.mock('inngest/hono', () => ({
   serve: jest.fn().mockReturnValue(jest.fn()),
 }));
 
-jest.mock(
-  '../inngest/client' /* gc1-allow: route-level test isolates Inngest event bus */,
-  () => ({
+jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../inngest/client',
+  ) as typeof import('../inngest/client');
+  return {
+    ...actual,
     inngest: {
       send: jest.fn().mockResolvedValue(undefined),
       createFunction: jest.fn().mockReturnValue(jest.fn()),
     },
-  }),
-);
+  };
+});
 
-jest.mock('../services/account', () => { // gc1-allow: requireActual + targeted overrides
+jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
   const actual = jest.requireActual(
     '../services/account',
   ) as typeof import('../services/account');
@@ -52,7 +55,7 @@ jest.mock('../services/account', () => { // gc1-allow: requireActual + targeted 
   };
 });
 
-jest.mock('../services/profile', () => { // gc1-allow: requireActual + targeted overrides
+jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
   const actual = jest.requireActual(
     '../services/profile',
   ) as typeof import('../services/profile');
@@ -69,7 +72,7 @@ jest.mock('../services/profile', () => { // gc1-allow: requireActual + targeted 
   };
 });
 
-jest.mock('../services/streaks', () => { // gc1-allow: requireActual + targeted overrides
+jest.mock('../services/streaks' /* gc1-allow: pattern-a conversion */, () => {
   const actual = jest.requireActual(
     '../services/streaks',
   ) as typeof import('../services/streaks');

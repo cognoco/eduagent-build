@@ -1,19 +1,24 @@
 import { safeSend } from './safe-non-core';
 
 const mockCaptureException = jest.fn();
-jest.mock('./sentry' /* gc1-allow: external error-tracker boundary */, () => ({
-  captureException: (...args: unknown[]) => mockCaptureException(...args),
-}));
+jest.mock('./sentry' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual('./sentry') as typeof import('./sentry');
+  return {
+    ...actual,
+    captureException: (...args: unknown[]) => mockCaptureException(...args),
+  };
+});
 
 const mockLoggerError = jest.fn();
-jest.mock(
-  './logger' /* gc1-allow: structured-logger boundary, no real I/O in tests */,
-  () => ({
+jest.mock('./logger' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual('./logger') as typeof import('./logger');
+  return {
+    ...actual,
     createLogger: () => ({
       error: (...args: unknown[]) => mockLoggerError(...args),
     }),
-  }),
-);
+  };
+});
 
 describe('safeSend', () => {
   beforeEach(() => {

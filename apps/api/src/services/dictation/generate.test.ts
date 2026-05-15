@@ -2,9 +2,10 @@
 // Mock the LLM router — true external boundary
 // ---------------------------------------------------------------------------
 
-jest.mock('../llm', () => ({ // gc1-allow: external LLM boundary — routeAndCall is the sole entry point to all LLM providers
-  routeAndCall: jest.fn(),
-}));
+jest.mock('../llm' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual('../llm') as typeof import('../llm');
+  return { ...actual, routeAndCall: jest.fn() };
+});
 
 import { routeAndCall } from '../llm';
 import { generateDictation } from './generate';
@@ -67,7 +68,7 @@ describe('generateDictation', () => {
       generateDictation({
         nativeLanguage: 'en',
         ageYears: 8,
-      })
+      }),
     ).rejects.toThrow();
   });
 
@@ -83,7 +84,7 @@ describe('generateDictation', () => {
       generateDictation({
         nativeLanguage: 'en',
         ageYears: 9,
-      })
+      }),
     ).rejects.toThrow();
   });
 
@@ -110,7 +111,7 @@ describe('generateDictation', () => {
       generateDictation({
         nativeLanguage: 'en',
         ageYears: 8,
-      })
+      }),
     ).rejects.toThrow();
   });
 

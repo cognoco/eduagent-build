@@ -13,43 +13,72 @@ const mockFormatConsentReminderEmail = jest.fn(
 
 // Fake DB whose query.consentStates.findFirst returns a valid consent token.
 // All values are defined inline inside the factory to avoid Jest hoisting issues.
-jest.mock('../helpers', () => ({
-  // gc1-allow: isolates step-database helper from real DB config reads
-  getStepDatabase: jest.fn(() => ({
-    query: {
-      consentStates: {
-        findFirst: jest
-          .fn()
-          .mockResolvedValue({ consentToken: 'test-token-abc123' }),
+jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../helpers',
+  ) as typeof import('../helpers');
+  return {
+    ...actual,
+    getStepDatabase: jest.fn(() => ({
+      query: {
+        consentStates: {
+          findFirst: jest
+            .fn()
+            .mockResolvedValue({ consentToken: 'test-token-abc123' }),
+        },
       },
-    },
-  })),
-  getStepResendApiKey: jest.fn(() => 're_test_key'),
-  getStepEmailFrom: jest.fn(() => 'noreply@mentomate.com'),
-  getStepAppUrl: jest.fn(() => 'https://api.mentomate.com'),
-}));
+    })),
+    getStepResendApiKey: jest.fn(() => 're_test_key'),
+    getStepEmailFrom: jest.fn(() => 'noreply@mentomate.com'),
+    getStepAppUrl: jest.fn(() => 'https://api.mentomate.com'),
+  };
+});
 
-jest.mock('../../services/consent', () => ({
-  // gc1-allow: isolates consent-reminder guards from consent service DB access
-  getConsentStatus: (...args: unknown[]) => mockGetConsentStatus(...args),
-  getProfileConsentState: (...args: unknown[]) =>
-    mockGetProfileConsentState(...args),
-}));
+jest.mock(
+  '../../services/consent' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/consent',
+    ) as typeof import('../../services/consent');
+    return {
+      ...actual,
+      getConsentStatus: (...args: unknown[]) => mockGetConsentStatus(...args),
+      getProfileConsentState: (...args: unknown[]) =>
+        mockGetProfileConsentState(...args),
+    };
+  },
+);
 
-jest.mock('../../services/notifications', () => ({
-  // gc1-allow: prevents real email delivery while asserting notification boundary
-  sendEmail: (...args: unknown[]) => mockSendEmail(...args),
-  formatConsentReminderEmail: (...args: unknown[]) =>
-    mockFormatConsentReminderEmail(
-      ...(args as [string, string, number, string]),
-    ),
-}));
+jest.mock(
+  '../../services/notifications' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/notifications',
+    ) as typeof import('../../services/notifications');
+    return {
+      ...actual,
+      sendEmail: (...args: unknown[]) => mockSendEmail(...args),
+      formatConsentReminderEmail: (...args: unknown[]) =>
+        mockFormatConsentReminderEmail(
+          ...(args as [string, string, number, string]),
+        ),
+    };
+  },
+);
 
-jest.mock('../../services/deletion', () => ({
-  // gc1-allow: prevents destructive profile deletion while asserting the handler boundary
-  deleteProfileIfNoConsent: (...args: unknown[]) =>
-    mockDeleteProfileIfNoConsent(...args),
-}));
+jest.mock(
+  '../../services/deletion' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/deletion',
+    ) as typeof import('../../services/deletion');
+    return {
+      ...actual,
+      deleteProfileIfNoConsent: (...args: unknown[]) =>
+        mockDeleteProfileIfNoConsent(...args),
+    };
+  },
+);
 
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 import { consentReminder } from './consent-reminders';

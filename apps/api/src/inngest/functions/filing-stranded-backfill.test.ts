@@ -38,9 +38,23 @@ const mockDatabaseModule = createDatabaseModuleMock({
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
 const mockInngestTransport = createInngestTransportCapture();
-jest.mock('../client', () => mockInngestTransport.module); // gc1-allow: inngest framework boundary
+jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual('../client') as typeof import('../client');
+  return {
+    ...actual,
+    ...mockInngestTransport.module,
+  };
+});
 
-jest.mock('../helpers', () => ({ getStepDatabase: () => mockDb })); // gc1-allow: replaces DB helper at framework boundary — no real DB in unit tests
+jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../helpers',
+  ) as typeof import('../helpers');
+  return {
+    ...actual,
+    getStepDatabase: () => mockDb,
+  };
+});
 
 import { filingStrandedBackfill } from './filing-stranded-backfill';
 

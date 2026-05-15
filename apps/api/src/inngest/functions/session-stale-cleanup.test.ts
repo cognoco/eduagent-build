@@ -13,34 +13,47 @@ const mockCloseStaleSessions = jest.fn();
 const mockAbandonStaleQuizRounds = jest.fn();
 
 jest.mock(
-  '../../services/session' /* gc1-allow: isolates session service from unit test */,
-  () => ({
-    closeStaleSessions: (...args: unknown[]) => mockCloseStaleSessions(...args),
-  }),
+  '../../services/session' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/session',
+    ) as typeof import('../../services/session');
+    return {
+      ...actual,
+      closeStaleSessions: (...args: unknown[]) =>
+        mockCloseStaleSessions(...args),
+    };
+  },
 );
 
-jest.mock(
-  '../../services/quiz' /* gc1-allow: isolates quiz service from unit test */,
-  () => ({
+jest.mock('../../services/quiz' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../../services/quiz',
+  ) as typeof import('../../services/quiz');
+  return {
+    ...actual,
     abandonStaleQuizRounds: (...args: unknown[]) =>
       mockAbandonStaleQuizRounds(...args),
-  }),
-);
+  };
+});
 
 const mockGetStepDatabase = jest.fn();
 
-jest.mock(
-  '../helpers' /* gc1-allow: isolates DB connection from unit test */,
-  () => ({
-    getStepDatabase: () => mockGetStepDatabase(),
-  }),
-);
+jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../helpers',
+  ) as typeof import('../helpers');
+  return { ...actual, getStepDatabase: () => mockGetStepDatabase() };
+});
 
 import { createInngestTransportCapture } from '../../test-utils/inngest-transport-capture';
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 
 const mockInngestTransport = createInngestTransportCapture();
-jest.mock('../client', () => mockInngestTransport.module); // gc1-allow: inngest framework boundary
+jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual('../client') as typeof import('../client');
+  return { ...actual, ...mockInngestTransport.module };
+});
 
 // Import AFTER mocks are set up
 import { sessionStaleCleanup } from './session-stale-cleanup';

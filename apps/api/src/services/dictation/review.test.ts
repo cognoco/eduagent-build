@@ -4,10 +4,13 @@
 // ---------------------------------------------------------------------------
 
 const mockRouteAndCall = jest.fn();
-jest.mock('../llm', () => ({
-  ...(jest.requireActual('../llm') as Record<string, unknown>),
-  routeAndCall: (...args: unknown[]) => mockRouteAndCall(...args),
-}));
+jest.mock('../llm' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual('../llm') as typeof import('../llm');
+  return {
+    ...actual,
+    routeAndCall: (...args: unknown[]) => mockRouteAndCall(...args),
+  };
+});
 
 import { reviewDictation, buildReviewSystemPrompt } from './review';
 import type { DictationSentence } from '@eduagent/schemas';
