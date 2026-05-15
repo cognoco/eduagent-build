@@ -1,4 +1,13 @@
-import { useMutation, type UseMutationResult } from '@tanstack/react-query';
+import {
+  useMutation,
+  useQuery,
+  type UseMutationResult,
+  type UseQueryResult,
+} from '@tanstack/react-query';
+import {
+  accountDeletionStatusResponseSchema,
+  type AccountDeletionStatusResponse,
+} from '@eduagent/schemas';
 import type {
   AccountDeletionResponse,
   CancelDeletionResponse,
@@ -35,6 +44,25 @@ export function useCancelDeletion(): UseMutationResult<
       const res = await client.account['cancel-deletion'].$post({ json: {} });
       await assertOk(res);
       return (await res.json()) as CancelDeletionResponse;
+    },
+  });
+}
+
+export function useDeletionStatus(): UseQueryResult<
+  AccountDeletionStatusResponse,
+  Error
+> {
+  const client = useApiClient();
+
+  return useQuery({
+    queryKey: ['account', 'deletion-status'],
+    staleTime: 30_000,
+    retry: 1,
+    retryDelay: 250,
+    queryFn: async (): Promise<AccountDeletionStatusResponse> => {
+      const res = await client.account['deletion-status'].$get();
+      await assertOk(res);
+      return accountDeletionStatusResponseSchema.parse(await res.json());
     },
   });
 }

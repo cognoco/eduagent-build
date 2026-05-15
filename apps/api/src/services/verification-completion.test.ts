@@ -13,16 +13,28 @@ const mockDatabaseModule = createDatabaseModuleMock({
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module);
 
-jest.mock('./evaluate', () => ({
-  parseEvaluateAssessment: jest.fn(),
-  mapEvaluateQualityToSm2: jest.fn(),
-  handleEvaluateFailure: jest.fn(),
-}));
+jest.mock('./evaluate' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    './evaluate',
+  ) as typeof import('./evaluate');
+  return {
+    ...actual,
+    parseEvaluateAssessment: jest.fn(),
+    mapEvaluateQualityToSm2: jest.fn(),
+    handleEvaluateFailure: jest.fn(),
+  };
+});
 
-jest.mock('./teach-back', () => ({
-  parseTeachBackAssessment: jest.fn(),
-  mapTeachBackRubricToSm2: jest.fn(),
-}));
+jest.mock('./teach-back' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    './teach-back',
+  ) as typeof import('./teach-back');
+  return {
+    ...actual,
+    parseTeachBackAssessment: jest.fn(),
+    mapTeachBackRubricToSm2: jest.fn(),
+  };
+});
 
 import type { Database } from '@eduagent/database';
 import {

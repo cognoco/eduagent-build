@@ -4,7 +4,13 @@ import { apiBaseUrl, appBaseUrl, runId } from './e2e-web/helpers/runtime';
 
 const e2eWebDir = path.join(process.cwd(), 'apps', 'mobile', 'e2e-web');
 const shouldStartLocalApi = process.env.PLAYWRIGHT_SKIP_LOCAL_API !== '1';
-const usesSharedStagingApi = process.env.PLAYWRIGHT_SKIP_LOCAL_API === '1';
+// *.workers.dev URLs are platform-rate-limited → 1 worker.
+// Custom domains (api-test.mentomate.com) are not → full parallelism.
+// Switching CI to a custom domain intentionally enables 4 workers —
+// that is the desired behavior, not a bug. See p5-execution-status.md.
+const usesSharedStagingApi =
+  process.env.PLAYWRIGHT_SKIP_LOCAL_API === '1' &&
+  apiBaseUrl.includes('.workers.dev');
 
 export default defineConfig({
   testDir: e2eWebDir,
@@ -12,8 +18,8 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  // Shared staging can edge-block parallel authenticated bursts; local API runs
-  // keep parallel workers because they do not traverse the staging gateway.
+  // Shared *.workers.dev rate-limits parallel bursts; custom domains and local
+  // API are not rate-limited, so they can use full parallelism.
   workers: process.env.CI ? (usesSharedStagingApi ? 1 : 4) : undefined,
   reporter: [
     ['line'],
@@ -60,6 +66,10 @@ export default defineConfig({
     {
       command: 'node e2e-web/helpers/serve-exported-web.mjs',
       url: appBaseUrl,
+      // CI (false): always export a fresh bundle — prevents stale API URL
+      // from a prior run being silently reused. Safe at 1 worker (CI smoke).
+      // Local (true): allows external server startup for multi-worker runs
+      // where Playwright's pipe management would otherwise kill the server.
       reuseExistingServer: !process.env.CI,
       stdout: 'pipe',
       stderr: 'pipe',
@@ -70,6 +80,7 @@ export default defineConfig({
     {
       name: 'setup',
       testMatch: /helpers[\\/]auth\.setup\.ts/,
+      fullyParallel: false,
     },
     {
       name: 'smoke-auth',

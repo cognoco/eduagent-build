@@ -3,7 +3,12 @@ const { createInngestTransportCapture } =
 
 const mockInngestTransport = createInngestTransportCapture();
 
-jest.mock('../inngest/client', () => mockInngestTransport.module); // gc1-allow: inngest framework boundary
+jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../inngest/client',
+  ) as typeof import('../inngest/client');
+  return { ...actual, ...mockInngestTransport.module };
+});
 
 import { Hono } from 'hono';
 import { maintenanceRoutes } from './maintenance';

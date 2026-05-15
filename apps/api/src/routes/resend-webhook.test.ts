@@ -2,21 +2,33 @@
 // Resend Webhook Route — Tests [BUG-29]
 // ---------------------------------------------------------------------------
 
-jest.mock('../inngest/client', () => ({
-  inngest: {
-    send: jest.fn().mockResolvedValue(undefined),
-  },
-}));
+jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../inngest/client',
+  ) as typeof import('../inngest/client');
+  return {
+    ...actual,
+    inngest: {
+      send: jest.fn().mockResolvedValue(undefined),
+    },
+  };
+});
 
 const mockLoggerWarn = jest.fn();
-jest.mock('../services/logger', () => ({
-  createLogger: () => ({
-    info: jest.fn(),
-    warn: mockLoggerWarn,
-    error: jest.fn(),
-    debug: jest.fn(),
-  }),
-}));
+jest.mock('../services/logger' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/logger',
+  ) as typeof import('../services/logger');
+  return {
+    ...actual,
+    createLogger: () => ({
+      info: jest.fn(),
+      warn: mockLoggerWarn,
+      error: jest.fn(),
+      debug: jest.fn(),
+    }),
+  };
+});
 
 jest.mock(
   '../services/sentry' /* gc1-allow: Sentry is an external observability boundary — SDK calls, not internal service logic. Same pattern as routes/account.test.ts */,

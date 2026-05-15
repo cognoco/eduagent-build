@@ -21,10 +21,12 @@ jest.mock(
 );
 
 const mockInngestSend = jest.fn().mockResolvedValue(undefined);
-jest.mock('../client' /* gc1-allow: external-boundary */, () => {
+jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual('../client') as typeof import('../client');
   const realInngest = jest.requireActual('inngest').Inngest;
   const realInstance = new realInngest({ id: 'eduagent-test' });
   return {
+    ...actual,
     inngest: {
       createFunction: realInstance.createFunction.bind(realInstance),
       send: (...args: unknown[]) => mockInngestSend(...args),
@@ -37,14 +39,15 @@ const mockGetProfileDisplayName = jest.fn();
 const mockGetProfileForConsentRevocation = jest.fn();
 const mockGetFamilyOwnerProfileId = jest.fn();
 jest.mock(
-  '../../services/consent' /* gc1-allow: external-boundary — DB-dependent; calculateAge is real */,
+  '../../services/consent' /* gc1-allow: pattern-a conversion — DB-backed; calculateAge kept real */,
   () => {
-    const actual = jest.requireActual('../../services/consent') as Record<
-      string,
-      unknown
-    >;
+    const actual = jest.requireActual(
+      '../../services/consent',
+    ) as typeof import('../../services/consent');
     return {
-      calculateAge: actual.calculateAge,
+      ...actual,
+      // consentRevocation only reaches calculateAge plus the four DB-backed
+      // functions below; add an override here if the SUT gains another call.
       getFamilyOwnerProfileId: (...args: unknown[]) =>
         mockGetFamilyOwnerProfileId(...args),
       getConsentStatus: (...args: unknown[]) => mockGetConsentStatus(...args),
@@ -58,37 +61,65 @@ jest.mock(
 
 const mockDeleteProfile = jest.fn().mockResolvedValue(undefined);
 jest.mock(
-  '../../services/deletion' /* gc1-allow: external-boundary — DB-dependent */,
-  () => ({
-    deleteProfile: (...args: unknown[]) => mockDeleteProfile(...args),
-  }),
+  '../../services/deletion' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/deletion',
+    ) as typeof import('../../services/deletion');
+    return {
+      ...actual,
+      deleteProfile: (...args: unknown[]) => mockDeleteProfile(...args),
+    };
+  },
 );
 
 const mockSendPushNotification = jest.fn().mockResolvedValue({ sent: true });
 jest.mock(
-  '../../services/notifications' /* gc1-allow: external-boundary — push delivery */,
-  () => ({
-    sendPushNotification: (...args: unknown[]) =>
-      mockSendPushNotification(...args),
-  }),
+  '../../services/notifications' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/notifications',
+    ) as typeof import('../../services/notifications');
+    return {
+      ...actual,
+      sendPushNotification: (...args: unknown[]) =>
+        mockSendPushNotification(...args),
+    };
+  },
 );
 
 const mockGetRecentNotificationCount = jest.fn().mockResolvedValue(0);
 const mockGetWithdrawalArchivePreference = jest.fn().mockResolvedValue('never');
 jest.mock(
-  '../../services/settings' /* gc1-allow: external-boundary — DB-dependent */,
-  () => ({
-    getRecentNotificationCount: (...args: unknown[]) =>
-      mockGetRecentNotificationCount(...args),
-    getWithdrawalArchivePreference: (...args: unknown[]) =>
-      mockGetWithdrawalArchivePreference(...args),
-  }),
+  '../../services/settings' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/settings',
+    ) as typeof import('../../services/settings');
+    return {
+      ...actual,
+      getRecentNotificationCount: (...args: unknown[]) =>
+        mockGetRecentNotificationCount(...args),
+      getWithdrawalArchivePreference: (...args: unknown[]) =>
+        mockGetWithdrawalArchivePreference(...args),
+    };
+  },
 );
 
 const mockRecordPendingNotice = jest.fn().mockResolvedValue(undefined);
-jest.mock('../../services/notices' /* gc1-allow: DB insert boundary */, () => ({
-  recordPendingNotice: (...args: unknown[]) => mockRecordPendingNotice(...args),
-}));
+jest.mock(
+  '../../services/notices' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/notices',
+    ) as typeof import('../../services/notices');
+    return {
+      ...actual,
+      recordPendingNotice: (...args: unknown[]) =>
+        mockRecordPendingNotice(...args),
+    };
+  },
+);
 
 import { consentRevocation } from './consent-revocation';
 

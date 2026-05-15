@@ -16,106 +16,134 @@ const mockDatabaseModule = createDatabaseModuleMock();
 
 jest.mock('@eduagent/database', () => mockDatabaseModule.module); // gc1-allow: unit test — real Neon DB unavailable; db injected via middleware chain
 
-jest.mock('../services/account', () => ({ // gc1-allow: DB-dependent service; mocked to keep test a unit test of metering middleware
-  findOrCreateAccount: jest.fn().mockResolvedValue({
-    id: 'test-account-id',
-    clerkUserId: 'user_test',
-    email: 'test@example.com',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  }),
-}));
+jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/account',
+  ) as typeof import('../services/account');
+  return {
+    ...actual,
+    findOrCreateAccount: jest.fn().mockResolvedValue({
+      id: 'test-account-id',
+      clerkUserId: 'user_test',
+      email: 'test@example.com',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }),
+  };
+});
 
 // Mock session service (to prevent actual session operations)
-jest.mock('../services/session', () => ({ // gc1-allow: processMessage/streamMessage/evaluateSessionDepth call LLM; entire module stubbed to prevent LLM side-effects in metering unit test
-  processMessage: jest
-    .fn()
-    .mockResolvedValue({ reply: 'test', exchangeCount: 1 }),
-  getSession: jest.fn().mockResolvedValue({
-    id: 'session-1',
-    status: 'active',
-    sessionType: 'homework',
-  }),
-  streamMessage: jest.fn(),
-  startSession: jest.fn(),
-  closeSession: jest.fn(),
-  flagContent: jest.fn(),
-  getSessionSummary: jest.fn(),
-  submitSummary: jest.fn(),
-  // [BUG-653] evaluateSessionDepth + getSessionTranscript needed for the
-  // metering coverage on POST /sessions/:id/evaluate-depth.
-
-  getSessionTranscript: jest.fn().mockResolvedValue({
-    session: {
-      sessionId: 'session-1',
-      subjectId: 'subject-1',
-      topicId: null,
-      sessionType: 'learning',
-      inputMode: 'text',
-      verificationType: null,
-      startedAt: new Date().toISOString(),
-      exchangeCount: 0,
-      milestonesReached: [],
-      wallClockSeconds: null,
-    },
-    exchanges: [],
-  }),
-  evaluateSessionDepth: jest.fn().mockResolvedValue({
-    meaningful: false,
-    reason: 'mock',
-    method: 'heuristic_shallow',
-    topics: [],
-  }),
-  // Other session service exports referenced by the route module — return
-  // permissive defaults so the route module loads without TypeError.
-  getSessionCompletionContext: jest.fn(),
-  recordSystemPrompt: jest.fn(),
-  recordSessionEvent: jest.fn(),
-  skipSummary: jest.fn(),
-  syncHomeworkState: jest.fn(),
-  setSessionInputMode: jest.fn(),
-  getResumeNudgeCandidate: jest.fn(),
-  SubjectInactiveError: (
-    jest.requireActual('../services/session') as Record<string, unknown>
-  ).SubjectInactiveError,
-  SessionExchangeLimitError: (
-    jest.requireActual('../services/session') as Record<string, unknown>
-  ).SessionExchangeLimitError,
-}));
+jest.mock('../services/session' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/session',
+  ) as typeof import('../services/session');
+  return {
+    ...actual,
+    // processMessage/streamMessage/evaluateSessionDepth call LLM
+    processMessage: jest
+      .fn()
+      .mockResolvedValue({ reply: 'test', exchangeCount: 1 }),
+    getSession: jest.fn().mockResolvedValue({
+      id: 'session-1',
+      status: 'active',
+      sessionType: 'homework',
+    }),
+    streamMessage: jest.fn(),
+    startSession: jest.fn(),
+    closeSession: jest.fn(),
+    flagContent: jest.fn(),
+    getSessionSummary: jest.fn(),
+    submitSummary: jest.fn(),
+    // [BUG-653] evaluateSessionDepth + getSessionTranscript needed for the
+    // metering coverage on POST /sessions/:id/evaluate-depth.
+    getSessionTranscript: jest.fn().mockResolvedValue({
+      session: {
+        sessionId: 'session-1',
+        subjectId: 'subject-1',
+        topicId: null,
+        sessionType: 'learning',
+        inputMode: 'text',
+        verificationType: null,
+        startedAt: new Date().toISOString(),
+        exchangeCount: 0,
+        milestonesReached: [],
+        wallClockSeconds: null,
+      },
+      exchanges: [],
+    }),
+    evaluateSessionDepth: jest.fn().mockResolvedValue({
+      meaningful: false,
+      reason: 'mock',
+      method: 'heuristic_shallow',
+      topics: [],
+    }),
+    // Other session service exports referenced by the route module — return
+    // permissive defaults so the route module loads without TypeError.
+    getSessionCompletionContext: jest.fn(),
+    recordSystemPrompt: jest.fn(),
+    recordSessionEvent: jest.fn(),
+    skipSummary: jest.fn(),
+    syncHomeworkState: jest.fn(),
+    setSessionInputMode: jest.fn(),
+    getResumeNudgeCandidate: jest.fn(),
+  };
+});
 
 // Mock recall bridge service so we can exercise the route without an LLM call.
-jest.mock('../services/recall-bridge', () => ({ // gc1-allow: generateRecallBridge calls LLM via routeAndCall; stubbed to prevent real LLM call in metering unit test
-  generateRecallBridge: jest
-    .fn()
-    .mockResolvedValue({ questions: ['Q?'], generated: true }),
-}));
+jest.mock(
+  '../services/recall-bridge' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../services/recall-bridge',
+    ) as typeof import('../services/recall-bridge');
+    return {
+      ...actual,
+      // LLM external boundary (routeAndCall)
+      generateRecallBridge: jest
+        .fn()
+        .mockResolvedValue({ questions: ['Q?'], generated: true }),
+    };
+  },
+);
 
 // Mock profile service
-jest.mock('../services/profile', () => ({ // gc1-allow: DB-dependent service; mocked to keep test a unit test of metering middleware
-  findOwnerProfile: jest.fn().mockResolvedValue({
-    id: 'test-profile-id',
-    birthYear: 2010,
-    location: 'EU',
-    consentStatus: 'CONSENTED',
-  }),
-  getProfile: jest.fn().mockResolvedValue(null),
-  getProfileDisplayName: jest.fn().mockResolvedValue('Test User'),
-  // [BUG-653] Used by the evaluate-depth route to age-tag the LLM call.
-  getProfileAgeBracket: jest.fn().mockResolvedValue('teen'),
-}));
+jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/profile',
+  ) as typeof import('../services/profile');
+  return {
+    ...actual,
+    findOwnerProfile: jest.fn().mockResolvedValue({
+      id: 'test-profile-id',
+      birthYear: 2010,
+      location: 'EU',
+      consentStatus: 'CONSENTED',
+    }),
+    getProfile: jest.fn().mockResolvedValue(null),
+    getProfileDisplayName: jest.fn().mockResolvedValue('Test User'),
+    // [BUG-653] Used by the evaluate-depth route to age-tag the LLM call.
+    getProfileAgeBracket: jest.fn().mockResolvedValue('teen'),
+  };
+});
 
 // Mock subject service for route coverage
-jest.mock('../services/subject', () => ({ // gc1-allow: DB-dependent service; mocked to keep test a unit test of metering middleware
-  listSubjects: jest.fn().mockResolvedValue([]),
-  getSubject: jest.fn().mockResolvedValue({
-    id: 'subject-1',
-    profileId: 'test-profile-id',
-    name: 'Mathematics',
-    status: 'active',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  }),
-}));
+jest.mock('../services/subject' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/subject',
+  ) as typeof import('../services/subject');
+  return {
+    ...actual,
+    listSubjects: jest.fn().mockResolvedValue([]),
+    getSubject: jest.fn().mockResolvedValue({
+      id: 'subject-1',
+      profileId: 'test-profile-id',
+      name: 'Mathematics',
+      status: 'active',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }),
+  };
+});
 
 // ---------------------------------------------------------------------------
 // Mock billing service
@@ -126,17 +154,23 @@ const mockGetQuotaPool = jest.fn();
 const mockDecrementQuota = jest.fn();
 const mockGetTopUpCreditsRemaining = jest.fn().mockResolvedValue(0);
 
-jest.mock('../services/billing', () => ({ // gc1-allow: billing service is the system under observation; controlled stubs are required to drive quota states (exhausted/available/top-up) that would need real DB state to reproduce
-  ensureFreeSubscription: (...args: unknown[]) =>
-    mockEnsureFreeSubscription(...args),
-  getQuotaPool: (...args: unknown[]) => mockGetQuotaPool(...args),
-  decrementQuota: (...args: unknown[]) => mockDecrementQuota(...args),
-  getTopUpCreditsRemaining: (...args: unknown[]) =>
-    mockGetTopUpCreditsRemaining(...args),
-  createSubscription: jest.fn(),
-  getSubscriptionByAccountId: jest.fn(),
-  linkStripeCustomer: jest.fn(),
-}));
+jest.mock('../services/billing' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/billing',
+  ) as typeof import('../services/billing');
+  return {
+    ...actual,
+    ensureFreeSubscription: (...args: unknown[]) =>
+      mockEnsureFreeSubscription(...args),
+    getQuotaPool: (...args: unknown[]) => mockGetQuotaPool(...args),
+    decrementQuota: (...args: unknown[]) => mockDecrementQuota(...args),
+    getTopUpCreditsRemaining: (...args: unknown[]) =>
+      mockGetTopUpCreditsRemaining(...args),
+    createSubscription: jest.fn(),
+    getSubscriptionByAccountId: jest.fn(),
+    linkStripeCustomer: jest.fn(),
+  };
+});
 
 // KV: use in-memory fake that exercises real services/kv Zod parsing.
 
@@ -148,15 +182,20 @@ const mockLoggerInfo = jest.fn();
 const mockLoggerError = jest.fn();
 const mockLoggerDebug = jest.fn();
 
-jest.mock('../services/logger', () => ({
-  ...jest.requireActual('../services/logger'),
-  createLogger: () => ({
-    info: mockLoggerInfo,
-    warn: mockLoggerWarn,
-    error: mockLoggerError,
-    debug: mockLoggerDebug,
-  }),
-}));
+jest.mock('../services/logger' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/logger',
+  ) as typeof import('../services/logger');
+  return {
+    ...actual,
+    createLogger: () => ({
+      info: mockLoggerInfo,
+      warn: mockLoggerWarn,
+      error: mockLoggerError,
+      debug: mockLoggerDebug,
+    }),
+  };
+});
 
 import { app } from '../index';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';

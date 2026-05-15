@@ -117,50 +117,104 @@ const mockExtractSessionContent = jest
   .fn()
   .mockResolvedValue('User: What is algebra?\n\nAI: Algebra is...');
 
-jest.mock('../../services/embeddings', () => ({
-  storeSessionEmbedding: (...args: unknown[]) =>
-    mockStoreSessionEmbedding(...args),
-  extractSessionContent: (...args: unknown[]) =>
-    mockExtractSessionContent(...args),
-}));
+jest.mock(
+  '../../services/embeddings' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/embeddings',
+    ) as typeof import('../../services/embeddings');
+    return {
+      ...actual,
+      storeSessionEmbedding: (...args: unknown[]) =>
+        mockStoreSessionEmbedding(...args),
+      extractSessionContent: (...args: unknown[]) =>
+        mockExtractSessionContent(...args),
+    };
+  },
+);
 
 const mockUpdateRetentionFromSession = jest.fn().mockResolvedValue(undefined);
 const mockUpdateNeedsDeepeningProgress = jest.fn().mockResolvedValue(undefined);
 
-jest.mock('../../services/retention-data', () => ({
-  updateRetentionFromSession: (...args: unknown[]) =>
-    mockUpdateRetentionFromSession(...args),
-  updateNeedsDeepeningProgress: (...args: unknown[]) =>
-    mockUpdateNeedsDeepeningProgress(...args),
-}));
+jest.mock(
+  '../../services/retention-data' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/retention-data',
+    ) as typeof import('../../services/retention-data');
+    return {
+      ...actual,
+      updateRetentionFromSession: (...args: unknown[]) =>
+        mockUpdateRetentionFromSession(...args),
+      updateNeedsDeepeningProgress: (...args: unknown[]) =>
+        mockUpdateNeedsDeepeningProgress(...args),
+    };
+  },
+);
 
 const mockGetCurrentLanguageProgress = jest.fn().mockResolvedValue(null);
 
-jest.mock('../../services/language-curriculum', () => ({
-  getCurrentLanguageProgress: (...args: unknown[]) =>
-    mockGetCurrentLanguageProgress(...args),
-}));
+jest.mock(
+  '../../services/language-curriculum' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/language-curriculum',
+    ) as typeof import('../../services/language-curriculum');
+    return {
+      ...actual,
+      getCurrentLanguageProgress: (...args: unknown[]) =>
+        mockGetCurrentLanguageProgress(...args),
+    };
+  },
+);
 
 const mockExtractVocabularyFromTranscript = jest.fn().mockResolvedValue([]);
 
-jest.mock('../../services/vocabulary-extract', () => ({
-  extractVocabularyFromTranscript: (...args: unknown[]) =>
-    mockExtractVocabularyFromTranscript(...args),
-}));
+jest.mock(
+  '../../services/vocabulary-extract' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/vocabulary-extract',
+    ) as typeof import('../../services/vocabulary-extract');
+    return {
+      ...actual,
+      extractVocabularyFromTranscript: (...args: unknown[]) =>
+        mockExtractVocabularyFromTranscript(...args),
+    };
+  },
+);
 
 const mockUpsertExtractedVocabulary = jest.fn().mockResolvedValue([]);
 
-jest.mock('../../services/vocabulary', () => ({
-  upsertExtractedVocabulary: (...args: unknown[]) =>
-    mockUpsertExtractedVocabulary(...args),
-}));
+jest.mock(
+  '../../services/vocabulary' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/vocabulary',
+    ) as typeof import('../../services/vocabulary');
+    return {
+      ...actual,
+      upsertExtractedVocabulary: (...args: unknown[]) =>
+        mockUpsertExtractedVocabulary(...args),
+    };
+  },
+);
 
 const mockCreatePendingSessionSummary = jest.fn().mockResolvedValue(undefined);
 
-jest.mock('../../services/summaries', () => ({
-  createPendingSessionSummary: (...args: unknown[]) =>
-    mockCreatePendingSessionSummary(...args),
-}));
+jest.mock(
+  '../../services/summaries' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/summaries',
+    ) as typeof import('../../services/summaries');
+    return {
+      ...actual,
+      createPendingSessionSummary: (...args: unknown[]) =>
+        mockCreatePendingSessionSummary(...args),
+    };
+  },
+);
 
 const mockPrecomputeCoachingCard = jest.fn().mockResolvedValue({
   id: 'card-1',
@@ -177,70 +231,139 @@ const mockPrecomputeCoachingCard = jest.fn().mockResolvedValue({
 });
 const mockWriteCoachingCardCache = jest.fn().mockResolvedValue(undefined);
 
-jest.mock('../../services/coaching-cards', () => ({
-  precomputeCoachingCard: (...args: unknown[]) =>
-    mockPrecomputeCoachingCard(...args),
-  writeCoachingCardCache: (...args: unknown[]) =>
-    mockWriteCoachingCardCache(...args),
-}));
+jest.mock(
+  '../../services/coaching-cards' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/coaching-cards',
+    ) as typeof import('../../services/coaching-cards');
+    return {
+      ...actual,
+      precomputeCoachingCard: (...args: unknown[]) =>
+        mockPrecomputeCoachingCard(...args),
+      writeCoachingCardCache: (...args: unknown[]) =>
+        mockWriteCoachingCardCache(...args),
+    };
+  },
+);
 
 const mockRecordSessionActivity = jest.fn().mockResolvedValue(undefined);
 
-jest.mock('../../services/streaks', () => ({
-  recordSessionActivity: (...args: unknown[]) =>
-    mockRecordSessionActivity(...args),
-}));
+jest.mock(
+  '../../services/streaks' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/streaks',
+    ) as typeof import('../../services/streaks');
+    return {
+      ...actual,
+      recordSessionActivity: (...args: unknown[]) =>
+        mockRecordSessionActivity(...args),
+    };
+  },
+);
 
 const mockInsertSessionXpEntry = jest.fn().mockResolvedValue(undefined);
 
-jest.mock('../../services/xp', () => ({
-  insertSessionXpEntry: (...args: unknown[]) =>
-    mockInsertSessionXpEntry(...args),
-}));
+jest.mock('../../services/xp' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../../services/xp',
+  ) as typeof import('../../services/xp');
+  return {
+    ...actual,
+    insertSessionXpEntry: (...args: unknown[]) =>
+      mockInsertSessionXpEntry(...args),
+  };
+});
 
 const mockExtractAndStoreHomeworkSummary = jest
   .fn()
   .mockResolvedValue(undefined);
 
-jest.mock('../../services/homework-summary', () => ({
-  extractAndStoreHomeworkSummary: (...args: unknown[]) =>
-    mockExtractAndStoreHomeworkSummary(...args),
-}));
+jest.mock(
+  '../../services/homework-summary' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/homework-summary',
+    ) as typeof import('../../services/homework-summary');
+    return {
+      ...actual,
+      extractAndStoreHomeworkSummary: (...args: unknown[]) =>
+        mockExtractAndStoreHomeworkSummary(...args),
+    };
+  },
+);
 
 const mockIncrementSummarySkips = jest.fn().mockResolvedValue(1);
 const mockResetSummarySkips = jest.fn().mockResolvedValue(undefined);
 const mockUpdateMedianResponseSeconds = jest.fn().mockResolvedValue(undefined);
 
-jest.mock('../../services/settings', () => ({
-  incrementSummarySkips: (...args: unknown[]) =>
-    mockIncrementSummarySkips(...args),
-  resetSummarySkips: (...args: unknown[]) => mockResetSummarySkips(...args),
-  updateMedianResponseSeconds: (...args: unknown[]) =>
-    mockUpdateMedianResponseSeconds(...args),
-}));
+jest.mock(
+  '../../services/settings' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/settings',
+    ) as typeof import('../../services/settings');
+    return {
+      ...actual,
+      incrementSummarySkips: (...args: unknown[]) =>
+        mockIncrementSummarySkips(...args),
+      resetSummarySkips: (...args: unknown[]) => mockResetSummarySkips(...args),
+      updateMedianResponseSeconds: (...args: unknown[]) =>
+        mockUpdateMedianResponseSeconds(...args),
+    };
+  },
+);
 
 const mockQueueCelebration = jest.fn().mockResolvedValue(undefined);
 
-jest.mock('../../services/celebrations', () => ({
-  queueCelebration: (...args: unknown[]) => mockQueueCelebration(...args),
-}));
+jest.mock(
+  '../../services/celebrations' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/celebrations',
+    ) as typeof import('../../services/celebrations');
+    return {
+      ...actual,
+      queueCelebration: (...args: unknown[]) => mockQueueCelebration(...args),
+    };
+  },
+);
 
 const mockProcessEvaluateCompletion = jest.fn().mockResolvedValue(undefined);
 const mockProcessTeachBackCompletion = jest.fn().mockResolvedValue(undefined);
 
-jest.mock('../../services/verification-completion', () => ({
-  processEvaluateCompletion: (...args: unknown[]) =>
-    mockProcessEvaluateCompletion(...args),
-  processTeachBackCompletion: (...args: unknown[]) =>
-    mockProcessTeachBackCompletion(...args),
-}));
+jest.mock(
+  '../../services/verification-completion' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/verification-completion',
+    ) as typeof import('../../services/verification-completion');
+    return {
+      ...actual,
+      processEvaluateCompletion: (...args: unknown[]) =>
+        mockProcessEvaluateCompletion(...args),
+      processTeachBackCompletion: (...args: unknown[]) =>
+        mockProcessTeachBackCompletion(...args),
+    };
+  },
+);
 
 const mockRefreshProgressSnapshot = jest.fn().mockResolvedValue(undefined);
 
-jest.mock('../../services/snapshot-aggregation', () => ({
-  refreshProgressSnapshot: (...args: unknown[]) =>
-    mockRefreshProgressSnapshot(...args),
-}));
+jest.mock(
+  '../../services/snapshot-aggregation' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/snapshot-aggregation',
+    ) as typeof import('../../services/snapshot-aggregation');
+    return {
+      ...actual,
+      refreshProgressSnapshot: (...args: unknown[]) =>
+        mockRefreshProgressSnapshot(...args),
+    };
+  },
+);
 
 const mockGenerateSessionInsights = jest
   .fn()
@@ -257,23 +380,47 @@ const mockGenerateAndStoreLlmSummary = jest.fn().mockResolvedValue({
     'Start with a new one-step equation and ask the learner to explain each inverse operation.',
 });
 
-jest.mock('../../services/session-highlights', () => ({
-  generateSessionInsights: (...args: unknown[]) =>
-    mockGenerateSessionInsights(...args),
-  buildBrowseHighlight: (...args: unknown[]) =>
-    mockBuildBrowseHighlight(...args),
-}));
+jest.mock(
+  '../../services/session-highlights' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/session-highlights',
+    ) as typeof import('../../services/session-highlights');
+    return {
+      ...actual,
+      generateSessionInsights: (...args: unknown[]) =>
+        mockGenerateSessionInsights(...args),
+      buildBrowseHighlight: (...args: unknown[]) =>
+        mockBuildBrowseHighlight(...args),
+    };
+  },
+);
 
-jest.mock('../../services/session-llm-summary', () => ({
-  generateAndStoreLlmSummary: (...args: unknown[]) =>
-    mockGenerateAndStoreLlmSummary(...args),
-}));
+jest.mock(
+  '../../services/session-llm-summary' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/session-llm-summary',
+    ) as typeof import('../../services/session-llm-summary');
+    return {
+      ...actual,
+      generateAndStoreLlmSummary: (...args: unknown[]) =>
+        mockGenerateAndStoreLlmSummary(...args),
+    };
+  },
+);
 
 const mockCaptureException = jest.fn();
 
-jest.mock('../../services/sentry', () => ({
-  captureException: (...args: unknown[]) => mockCaptureException(...args),
-}));
+jest.mock('../../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../../services/sentry',
+  ) as typeof import('../../services/sentry');
+  return {
+    ...actual,
+    captureException: (...args: unknown[]) => mockCaptureException(...args),
+  };
+});
 
 // Learner-profile service — mocked so the analyze-learner-profile step can
 // be driven through its consent gate without hitting the real LLM or DB.
@@ -283,12 +430,22 @@ const mockGetLearningProfile = jest.fn();
 const mockAnalyzeSessionTranscript = jest.fn();
 const mockApplyAnalysis = jest.fn();
 
-jest.mock('../../services/learner-profile', () => ({
-  getLearningProfile: (...args: unknown[]) => mockGetLearningProfile(...args),
-  analyzeSessionTranscript: (...args: unknown[]) =>
-    mockAnalyzeSessionTranscript(...args),
-  applyAnalysis: (...args: unknown[]) => mockApplyAnalysis(...args),
-}));
+jest.mock(
+  '../../services/learner-profile' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/learner-profile',
+    ) as typeof import('../../services/learner-profile');
+    return {
+      ...actual,
+      getLearningProfile: (...args: unknown[]) =>
+        mockGetLearningProfile(...args),
+      analyzeSessionTranscript: (...args: unknown[]) =>
+        mockAnalyzeSessionTranscript(...args),
+      applyAnalysis: (...args: unknown[]) => mockApplyAnalysis(...args),
+    };
+  },
+);
 
 import { sessionCompleted, embedNewFactsForProfile } from './session-completed';
 import { createDatabase } from '@eduagent/database';

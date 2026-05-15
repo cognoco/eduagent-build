@@ -2,30 +2,34 @@
 // Profile Service Tests
 // ---------------------------------------------------------------------------
 
-jest.mock('./consent', () => ({
-  getConsentStatus: jest.fn().mockResolvedValue(null),
-  checkConsentRequired: jest
-    .fn()
-    .mockReturnValue({ required: false, consentType: null, age: 30 }),
-  createPendingConsentState: jest.fn().mockResolvedValue({
-    id: 'consent-1',
-    profileId: 'profile-1',
-    consentType: 'GDPR',
-    status: 'PENDING',
-    parentEmail: null,
-    requestedAt: '2025-01-15T10:00:00.000Z',
-    respondedAt: null,
-  }),
-  createGrantedConsentState: jest.fn().mockResolvedValue({
-    id: 'consent-1',
-    profileId: 'profile-1',
-    consentType: 'GDPR',
-    status: 'CONSENTED',
-    parentEmail: null,
-    requestedAt: '2025-01-15T10:00:00.000Z',
-    respondedAt: '2025-01-15T10:00:00.000Z',
-  }),
-}));
+jest.mock('./consent' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual('./consent') as typeof import('./consent');
+  return {
+    ...actual,
+    getConsentStatus: jest.fn().mockResolvedValue(null),
+    checkConsentRequired: jest
+      .fn()
+      .mockReturnValue({ required: false, consentType: null, age: 30 }),
+    createPendingConsentState: jest.fn().mockResolvedValue({
+      id: 'consent-1',
+      profileId: 'profile-1',
+      consentType: 'GDPR',
+      status: 'PENDING',
+      parentEmail: null,
+      requestedAt: '2025-01-15T10:00:00.000Z',
+      respondedAt: null,
+    }),
+    createGrantedConsentState: jest.fn().mockResolvedValue({
+      id: 'consent-1',
+      profileId: 'profile-1',
+      consentType: 'GDPR',
+      status: 'CONSENTED',
+      parentEmail: null,
+      requestedAt: '2025-01-15T10:00:00.000Z',
+      respondedAt: '2025-01-15T10:00:00.000Z',
+    }),
+  };
+});
 
 import type { Database } from '@eduagent/database';
 import {

@@ -14,22 +14,41 @@
 const mockClassifySubject = jest.fn();
 const mockGetStepDatabase = jest.fn();
 
-jest.mock('../../services/subject-classify', () => ({
-  // gc1-allow: external service boundary — prevents real LLM calls in unit tests
-  classifySubject: (...args: unknown[]) => mockClassifySubject(...args),
-}));
+jest.mock(
+  '../../services/subject-classify' /* gc1-allow: pattern-a conversion */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/subject-classify',
+    ) as typeof import('../../services/subject-classify');
+    return {
+      ...actual,
+      classifySubject: (...args: unknown[]) => mockClassifySubject(...args),
+    };
+  },
+);
 
-jest.mock('../helpers', () => ({
-  // gc1-allow: isolates step-database helper from real DB config reads
-  getStepDatabase: () => mockGetStepDatabase(),
-}));
+jest.mock('../helpers' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../helpers',
+  ) as typeof import('../helpers');
+  return {
+    ...actual,
+    getStepDatabase: () => mockGetStepDatabase(),
+  };
+});
 
 const { createInngestTransportCapture } =
   require('../../test-utils/inngest-transport-capture') as typeof import('../../test-utils/inngest-transport-capture');
 
 const mockInngestTransport = createInngestTransportCapture();
 
-jest.mock('../client', () => mockInngestTransport.module); // gc1-allow: inngest framework boundary
+jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual('../client') as typeof import('../client');
+  return {
+    ...actual,
+    ...mockInngestTransport.module,
+  };
+});
 
 // Import AFTER mocks
 import { TEST_PROFILE_ID, TEST_SESSION_ID } from '@eduagent/test-utils';

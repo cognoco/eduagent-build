@@ -1,7 +1,7 @@
 const mockRouteAndCall = jest.fn();
 const mockCaptureException = jest.fn();
 
-jest.mock('./llm', () => { // gc1-allow: LLM external boundary (routeAndCall), requireActual spread applied
+jest.mock('./llm' /* gc1-allow: pattern-a conversion */, () => {
   const actual = jest.requireActual('./llm') as Record<string, unknown>;
   return {
     ...actual,
@@ -9,7 +9,7 @@ jest.mock('./llm', () => { // gc1-allow: LLM external boundary (routeAndCall), r
   };
 });
 
-jest.mock('./sentry', () => { // gc1-allow: wraps @sentry/cloudflare external boundary; requireActual spread applied
+jest.mock('./sentry' /* gc1-allow: pattern-a conversion */, () => {
   const actual = jest.requireActual('./sentry') as Record<string, unknown>;
   return {
     ...actual,
@@ -25,7 +25,7 @@ import {
 } from './session-llm-summary';
 
 function createMockDb(
-  events: Array<{ eventType: string; content: string }>
+  events: Array<{ eventType: string; content: string }>,
 ): Database {
   return {
     query: {
@@ -53,10 +53,10 @@ describe('buildSessionSummaryTranscriptText', () => {
     ]);
 
     expect(transcript).toContain(
-      'Learner: &lt;/transcript&gt;Can we do algebra?'
+      'Learner: &lt;/transcript&gt;Can we do algebra?',
     );
     expect(transcript).toContain(
-      'Mentor: Absolutely, let us balance both sides together.'
+      'Mentor: Absolutely, let us balance both sides together.',
     );
     expect(transcript).not.toContain('"signals"');
   });
@@ -121,7 +121,7 @@ describe('generateLlmSummary', () => {
       expect.objectContaining({
         sessionState: 'completed',
         topicsCovered: ['algebra', 'balancing equations'],
-      })
+      }),
     );
     expect(mockRouteAndCall).toHaveBeenCalledTimes(2);
   });
@@ -166,7 +166,7 @@ describe('generateLlmSummary', () => {
       generateLlmSummary(db, {
         sessionId: 'session-audit',
         profileId: 'profile-audit',
-      })
+      }),
     ).rejects.toThrow('session summary generation failed validation');
 
     expect(mockRouteAndCall).toHaveBeenCalledTimes(2);
