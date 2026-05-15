@@ -21,6 +21,10 @@ doppler run -- pnpm eval:llm -- --live      # tier 2 (real LLM calls, costs cred
 
 Snapshots land in `apps/api/eval-llm/snapshots/<flow-id>/<profile-id>.md`.
 
+## Snapshot-trigger trap
+
+`apps/api/src/services/app-help-map.ts` contributes APP HELP wording used by the `exchanges` eval flow. Treat user-visible wording changes there like prompt changes: run `pnpm eval:llm` and stage the resulting `apps/api/eval-llm/snapshots/**` updates, even though the file is not named `*-prompts.ts`.
+
 ## Directory layout
 
 ```
