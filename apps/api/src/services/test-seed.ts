@@ -2409,8 +2409,8 @@ async function seedParentWithWeeklyReport(
     ids: {
       ...base.ids,
       childId: childProfileId,
+      // reportId and weeklyReportId intentionally share one progress_reports row.
       reportId,
-      // Weekly report detail reuses the same progress_reports row in this seed.
       weeklyReportId: reportId,
     },
   };

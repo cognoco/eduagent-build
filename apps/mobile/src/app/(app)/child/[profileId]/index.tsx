@@ -6,11 +6,9 @@ import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { RecentSessionsList } from '../../../../components/progress';
-import {
-  useChildDetail,
-  useChildSessions,
-} from '../../../../hooks/use-dashboard';
+import { useChildDetail } from '../../../../hooks/use-dashboard';
 import { useChildLearnerProfile } from '../../../../hooks/use-learner-profile';
+import { useProfileSessions } from '../../../../hooks/use-progress';
 import { ACCOMMODATION_OPTIONS } from '../../../../lib/accommodation-options';
 import { FAMILY_HOME_PATH, goBackOrReplace } from '../../../../lib/navigation';
 import { useProfile } from '../../../../lib/profile';
@@ -142,7 +140,8 @@ function SubjectCard({
     typeof subject.subjectId === 'string' ? subject.subjectId.trim() : '';
   const canOpen = subjectId.length > 0;
   const rawInput =
-    subject.rawInput && subject.rawInput.trim() !== subject.name
+    subject.rawInput &&
+    subject.rawInput.trim().toLowerCase() !== subject.name.trim().toLowerCase()
       ? subject.rawInput.trim()
       : null;
 
@@ -235,9 +234,9 @@ export default function ChildDetailScreen(): React.ReactElement {
     isError,
     refetch,
   } = useChildDetail(profileId);
-  const sessions = useChildSessions(profileId);
+  const sessionsQuery = useProfileSessions(profileId);
   const { data: learnerProfile } = useChildLearnerProfile(profileId);
-  const lastSessionAt = sessions.data?.[0]?.startedAt ?? null;
+  const lastSessionAt = sessionsQuery.data?.[0]?.startedAt ?? null;
   const lastSessionLabel = formatLastSession(lastSessionAt);
   const joinedLabel = formatJoinedDate(ownedProfile?.createdAt);
   const activeAccommodation = ACCOMMODATION_OPTIONS.find(
@@ -409,7 +408,10 @@ export default function ChildDetailScreen(): React.ReactElement {
           </View>
         ) : null}
 
-        <RecentSessionsList profileId={profileId} />
+        <RecentSessionsList
+          profileId={profileId}
+          sessionsQuery={sessionsQuery}
+        />
 
         {profileId && child?.displayName ? (
           <RowLink

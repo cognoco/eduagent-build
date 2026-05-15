@@ -845,7 +845,10 @@ export default function ProgressScreen(): React.ReactElement {
             </View>
 
             {selectedProfileId ? (
-              <RecentSessionsList profileId={selectedProfileId} />
+              <RecentSessionsList
+                profileId={selectedProfileId}
+                sessionsQuery={profileSessionsQuery}
+              />
             ) : null}
 
             {isViewingSelf ? (

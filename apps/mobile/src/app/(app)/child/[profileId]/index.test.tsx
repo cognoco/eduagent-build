@@ -69,13 +69,11 @@ jest.mock(
 // ---------------------------------------------------------------------------
 
 const mockUseChildDetail = jest.fn();
-const mockUseChildSessions = jest.fn();
 
 jest.mock(
   '../../../../hooks/use-dashboard' /* gc1-allow: query hooks require API client and QueryClientProvider; route rendering owns response handling */,
   () => ({
     useChildDetail: (...args: unknown[]) => mockUseChildDetail(...args),
-    useChildSessions: (...args: unknown[]) => mockUseChildSessions(...args),
   }),
 );
 
@@ -131,13 +129,6 @@ function setupDefaultMocks() {
         },
       ],
     },
-    isLoading: false,
-    isError: false,
-    refetch: jest.fn(),
-  });
-
-  mockUseChildSessions.mockReturnValue({
-    data: [],
     isLoading: false,
     isError: false,
     refetch: jest.fn(),
@@ -222,10 +213,17 @@ describe('ChildDetailScreen — profile overview', () => {
   });
 
   it('shows a last-session signal in the header when sessions exist', () => {
-    mockUseChildSessions.mockReturnValue({
+    mockUseProfileSessions.mockReturnValue({
       data: [
         {
+          sessionId: '33333333-3333-7333-8333-333333333333',
           startedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+          sessionType: 'learning',
+          durationSeconds: 600,
+          wallClockSeconds: 900,
+          displaySummary: null,
+          highlight: null,
+          homeworkSummary: null,
         },
       ],
       isLoading: false,
@@ -239,9 +237,18 @@ describe('ChildDetailScreen — profile overview', () => {
   });
 
   it('shows a no-sessions-yet header signal when there is no session history', () => {
+    mockUseProfileSessions.mockReturnValue({
+      data: [],
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+
     render(<ChildDetailScreen />);
 
-    screen.getByText(/No sessions yet|parentView\.index\.noSessionsYet/);
+    expect(
+      screen.getAllByText(/No sessions yet|parentView\.index\.noSessionsYet/),
+    ).not.toHaveLength(0);
   });
 
   it('links to the child mentor memory management screen', () => {
