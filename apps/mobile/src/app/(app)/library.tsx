@@ -20,7 +20,7 @@ import {
 } from '../../components/common';
 import { goBackOrReplace } from '../../lib/navigation';
 import { useAllBooks } from '../../hooks/use-all-books';
-import { useThemeColors } from '../../lib/theme';
+import { useTheme, useThemeColors } from '../../lib/theme';
 import { useSubjects, useUpdateSubject } from '../../hooks/use-subjects';
 import { useOverallProgress } from '../../hooks/use-progress';
 import {
@@ -41,7 +41,7 @@ import {
 } from '../../components/library/LibrarySearchResults';
 import { useLibrarySearch } from '../../hooks/use-library-search';
 import { ShimmerSkeleton } from '../../components/common/ShimmerSkeleton';
-import { getLearningSubjectTint } from '../../lib/learning-subject-tints';
+import { getSubjectTintMap } from '../../lib/subject-tints';
 
 // ---------------------------------------------------------------------------
 // Local types
@@ -75,6 +75,12 @@ const SUBJECT_STATUS_ORDER: Record<Subject['status'], number> = {
   paused: 1,
   archived: 2,
 };
+
+const SUBJECT_STATUS_GROUPS: Subject['status'][] = [
+  'active',
+  'paused',
+  'archived',
+];
 
 function sortSubjectsByStatus<T extends { status: Subject['status'] }>(
   input: readonly T[],
@@ -133,6 +139,7 @@ export default function LibraryScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const themeColors = useThemeColors();
+  const { colorScheme } = useTheme();
   const { activeProfile, profiles } = useProfile();
   const isGuardian = isGuardianProfile(activeProfile, profiles);
 
@@ -172,13 +179,11 @@ export default function LibraryScreen() {
   );
   const subjectTintsById = useMemo(
     () =>
-      new Map(
-        sortedSubjects.map((subject, index) => [
-          subject.id,
-          getLearningSubjectTint(index, themeColors),
-        ]),
+      getSubjectTintMap(
+        sortedSubjects.map((subject) => subject.id),
+        colorScheme,
       ),
-    [sortedSubjects, themeColors],
+    [sortedSubjects, colorScheme],
   );
 
   const progressQuery = useOverallProgress();
@@ -549,6 +554,11 @@ export default function LibraryScreen() {
     const isSearching = debouncedQuery.trim().length > 0;
     const showingStaleCachedData =
       (subjectsQuery.isError || progressQuery.isError) && subjects.length > 0;
+    const shelfGroups = SUBJECT_STATUS_GROUPS.map((status) => ({
+      status,
+      subjects: visibleSubjects.filter((subject) => subject.status === status),
+    })).filter((group) => group.subjects.length > 0);
+    const showShelfGroupLabels = shelfGroups.length > 1;
 
     return (
       <>
@@ -671,33 +681,42 @@ export default function LibraryScreen() {
                 </Text>
               </Pressable>
             ) : null}
-            {visibleSubjects.map((subject) => {
-              const retData = retentionDataBySubjectId.get(subject.id);
-              const books = booksBySubjectId.get(subject.id) ?? [];
-              const bookCount = books.length;
-              const progress = progressBySubjectId.get(subject.id);
-              const topicsTotal = progress?.topicsTotal ?? 0;
-              const topicsCompleted = progress?.topicsCompleted ?? 0;
-              const topicProgress = `${topicsCompleted}/${topicsTotal}`;
-              const isFinished =
-                topicsTotal > 0 &&
-                (progress?.topicsVerified ?? 0) >= topicsTotal;
+            {shelfGroups.map((group) => (
+              <View key={group.status}>
+                {showShelfGroupLabels ? (
+                  <Text className="text-caption font-bold text-text-secondary mt-1 mb-2">
+                    {t(`library.sections.${group.status}`)}
+                  </Text>
+                ) : null}
+                {group.subjects.map((subject) => {
+                  const retData = retentionDataBySubjectId.get(subject.id);
+                  const books = booksBySubjectId.get(subject.id) ?? [];
+                  const bookCount = books.length;
+                  const progress = progressBySubjectId.get(subject.id);
+                  const topicsTotal = progress?.topicsTotal ?? 0;
+                  const topicsCompleted = progress?.topicsCompleted ?? 0;
+                  const topicProgress = `${topicsCompleted}/${topicsTotal}`;
+                  const isFinished =
+                    topicsTotal > 0 &&
+                    (progress?.topicsVerified ?? 0) >= topicsTotal;
 
-              return (
-                <ShelfRow
-                  key={subject.id}
-                  subjectId={subject.id}
-                  name={subject.name}
-                  bookCount={bookCount}
-                  topicProgress={topicProgress}
-                  reviewDueCount={retData?.reviewDueCount ?? 0}
-                  isFinished={isFinished}
-                  status={subject.status}
-                  tint={subjectTintsById.get(subject.id)}
-                  onPress={handleShelfPress}
-                />
-              );
-            })}
+                  return (
+                    <ShelfRow
+                      key={subject.id}
+                      subjectId={subject.id}
+                      name={subject.name}
+                      bookCount={bookCount}
+                      topicProgress={topicProgress}
+                      reviewDueCount={retData?.reviewDueCount ?? 0}
+                      isFinished={isFinished}
+                      status={subject.status}
+                      tint={subjectTintsById.get(subject.id)}
+                      onPress={handleShelfPress}
+                    />
+                  );
+                })}
+              </View>
+            ))}
           </View>
         )}
       </>

@@ -1,4 +1,5 @@
 import { render, fireEvent } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
 import { SubjectTile, type SubjectTileProps } from './SubjectTile';
 
 const baseProps: SubjectTileProps = {
@@ -38,5 +39,14 @@ describe('SubjectTile', () => {
   it('renders the icon tile', () => {
     const { getByTestId } = render(<SubjectTile {...baseProps} />);
     expect(getByTestId('home-subject-card-abc-123-icon')).toBeTruthy();
+  });
+
+  it('uses the subject shelf tint for the card background and border', () => {
+    const { getByTestId } = render(<SubjectTile {...baseProps} />);
+    const tile = getByTestId('home-subject-card-abc-123');
+    const style = StyleSheet.flatten(tile.props.style);
+
+    expect(style.backgroundColor).toBe(baseProps.tintSoft);
+    expect(style.borderColor).toBe(`${baseProps.tintSolid}33`);
   });
 });

@@ -882,6 +882,11 @@
     "subtitleGuardianNoTopics": "Sua biblioteca pessoal · {{subjectCount}} matérias",
     "statusPaused": "Pausado",
     "statusArchived": "Arquivado",
+    "sections": {
+      "active": "Prateleiras ativas",
+      "paused": "Prateleiras pausadas",
+      "archived": "Prateleiras arquivadas"
+    },
     "loadTimeout": {
       "title": "A biblioteca está demorando muito para carregar",
       "message": "Verifique sua conexão e tente novamente."
@@ -1601,7 +1606,8 @@
       "staleSummary": "O resumo pode ainda não refletir a atividade mais recente.",
       "nudgeCta": "Um pequeno incentivo pode ajudar {{name}} a recomeçar",
       "nudgeA11y": "Enviar um incentivo para {{name}}",
-      "viewAllReports": "Ver todos os relatórios"
+      "viewAllReports": "Ver todos os relatórios",
+      "subjectsTitle": "Matérias"
     }
   },
   "onboarding": {

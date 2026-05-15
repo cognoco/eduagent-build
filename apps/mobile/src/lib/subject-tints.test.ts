@@ -1,4 +1,8 @@
-import { getSubjectTint, SUBJECT_TINT_PALETTE } from './subject-tints';
+import {
+  getSubjectTint,
+  getSubjectTintMap,
+  SUBJECT_TINT_PALETTE,
+} from './subject-tints';
 
 describe('getSubjectTint', () => {
   it('keeps the subject palette limited to five colors per scheme', () => {
@@ -37,5 +41,29 @@ describe('getSubjectTint', () => {
     const tints = ids.map((id) => getSubjectTint(id, 'dark'));
     const uniqueSolids = new Set(tints.map((t) => t.solid));
     expect(uniqueSolids.size).toBeGreaterThanOrEqual(4);
+  });
+
+  it('keeps a single subject on its stable hash tint', () => {
+    const id = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
+    expect(getSubjectTintMap([id], 'light').get(id)).toEqual(
+      getSubjectTint(id, 'light'),
+    );
+  });
+
+  it('nudges adjacent subjects away from the same palette color', () => {
+    const idsByTint = new Map<string, string[]>();
+    for (let index = 0; index < 50; index += 1) {
+      const id = `subject-${index}`;
+      const tint = getSubjectTint(id, 'light');
+      idsByTint.set(tint.solid, [...(idsByTint.get(tint.solid) ?? []), id]);
+    }
+    const collision = [...idsByTint.values()].find((ids) => ids.length >= 2);
+    expect(collision).toBeDefined();
+
+    const first = collision![0]!;
+    const second = collision![1]!;
+    const tintMap = getSubjectTintMap([first, second], 'light');
+
+    expect(tintMap.get(first)?.solid).not.toBe(tintMap.get(second)?.solid);
   });
 });

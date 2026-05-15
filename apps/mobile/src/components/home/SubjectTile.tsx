@@ -41,7 +41,14 @@ export function SubjectTile({
       }
       accessibilityRole="button"
       className="w-[142px] rounded-2xl bg-surface border border-border p-3.5 pb-4"
-      style={[{ gap: 10 }, isPreparing && { opacity: 0.7 }]}
+      style={[
+        {
+          backgroundColor: tintSoft,
+          borderColor: `${tintSolid}33`,
+          gap: 10,
+        },
+        isPreparing && { opacity: 0.7 },
+      ]}
     >
       <View testID={`${testID}-icon`} className="items-start">
         <SubjectBookshelfMotif

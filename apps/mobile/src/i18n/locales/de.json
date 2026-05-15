@@ -857,6 +857,11 @@
     "subtitleGuardianNoTopics": "Deine persönliche Bibliothek · {{subjectCount}} Fächer",
     "statusPaused": "Pausiert",
     "statusArchived": "Archiviert",
+    "sections": {
+      "active": "Aktive Regale",
+      "paused": "Pausierte Regale",
+      "archived": "Archivierte Regale"
+    },
     "loadTimeout": {
       "title": "Bibliothek lädt zu lange",
       "message": "Überprüfe deine Verbindung und versuche es erneut."
@@ -1576,7 +1581,8 @@
       "staleSummary": "Die Zusammenfassung ist möglicherweise noch nicht auf dem neuesten Stand.",
       "nudgeCta": "Ein Anstupser könnte {{name}} helfen, neu zu starten.",
       "nudgeA11y": "{{name}} einen Anstupser senden",
-      "viewAllReports": "Alle Berichte ansehen"
+      "viewAllReports": "Alle Berichte ansehen",
+      "subjectsTitle": "Fächer"
     }
   },
   "onboarding": {
