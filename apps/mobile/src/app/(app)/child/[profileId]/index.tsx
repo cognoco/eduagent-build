@@ -419,12 +419,16 @@ export default function ChildDetailScreen(): React.ReactElement {
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
   const { profiles } = useProfile();
-  const { profileId: rawProfileId } = useLocalSearchParams<{
+  const { profileId: rawProfileId, mode: rawMode } = useLocalSearchParams<{
     profileId: string;
+    mode?: string;
   }>();
   const profileId = Array.isArray(rawProfileId)
     ? rawProfileId[0]
     : rawProfileId;
+  const mode = Array.isArray(rawMode) ? rawMode[0] : rawMode;
+  const showSettingsOnly = mode === 'settings';
+  const showProgressOnly = mode === 'progress';
 
   const ownedProfile = useMemo(
     () => profiles.find((profile) => profile.id === profileId),
@@ -589,25 +593,27 @@ export default function ChildDetailScreen(): React.ReactElement {
         contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
         testID="child-detail-scroll"
       >
-        <RowLink
-          icon="document-text-outline"
-          title={t('parentView.reports.title', {
-            defaultValue: 'Reports',
-          })}
-          subtitle={t('parentView.index.reportsSubtitle', {
-            name: childName,
-            defaultValue: `Weekly and monthly updates for ${childName}`,
-          })}
-          onPress={() =>
-            router.push({
-              pathname: '/(app)/child/[profileId]/reports',
-              params: { profileId },
-            } as Href)
-          }
-          testID="child-reports-link"
-        />
+        {!showSettingsOnly && !showProgressOnly ? (
+          <RowLink
+            icon="document-text-outline"
+            title={t('parentView.reports.title', {
+              defaultValue: 'Reports',
+            })}
+            subtitle={t('parentView.index.reportsSubtitle', {
+              name: childName,
+              defaultValue: `Weekly and monthly updates for ${childName}`,
+            })}
+            onPress={() =>
+              router.push({
+                pathname: '/(app)/child/[profileId]/reports',
+                params: { profileId },
+              } as Href)
+            }
+            testID="child-reports-link"
+          />
+        ) : null}
 
-        {child?.subjects && child.subjects.length > 0 ? (
+        {!showSettingsOnly && child?.subjects && child.subjects.length > 0 ? (
           <View className="mt-6" testID="child-subjects-section">
             <Text className="text-h3 font-semibold text-text-primary mb-1">
               {t('parentView.index.subjects', {
@@ -624,82 +630,88 @@ export default function ChildDetailScreen(): React.ReactElement {
           </View>
         ) : null}
 
-        <RecentSessionsList
-          profileId={profileId}
-          sessionsQuery={sessionsQuery}
-        />
-
-        {profileId && child?.displayName ? (
-          <RowLink
-            icon="options-outline"
-            title={t('more.accommodation.childScreenTitle', {
-              name: child.displayName,
-            })}
-            subtitle={
-              activeAccommodation
-                ? `${activeAccommodation.title} - ${activeAccommodation.description}`
-                : t('parentView.index.noLearningPreferenceSet', {
-                    defaultValue: 'No learning preference set',
-                  })
-            }
-            onPress={() =>
-              router.push(
-                `/(app)/more/accommodation?childProfileId=${profileId}` as Href,
-              )
-            }
-            testID={`child-accommodation-row-${profileId}`}
+        {!showSettingsOnly ? (
+          <RecentSessionsList
+            profileId={profileId}
+            sessionsQuery={sessionsQuery}
           />
         ) : null}
 
-        <RowLink
-          icon="sparkles-outline"
-          title={t('parentView.index.mentorMemoryTitleFallback')}
-          subtitle={t('parentView.index.manageMentorMemoryForChild', {
-            name: childName,
-            defaultValue: `Manage what the mentor remembers about ${childName}`,
-          })}
-          onPress={() =>
-            router.push({
-              pathname: '/(app)/child/[profileId]/mentor-memory',
-              params: { profileId },
-            } as Href)
-          }
-          testID="mentor-memory-link"
-        />
+        {!showProgressOnly ? (
+          <>
+            {profileId && child?.displayName ? (
+              <RowLink
+                icon="options-outline"
+                title={t('more.accommodation.childScreenTitle', {
+                  name: child.displayName,
+                })}
+                subtitle={
+                  activeAccommodation
+                    ? `${activeAccommodation.title} - ${activeAccommodation.description}`
+                    : t('parentView.index.noLearningPreferenceSet', {
+                        defaultValue: 'No learning preference set',
+                      })
+                }
+                onPress={() =>
+                  router.push(
+                    `/(app)/more/accommodation?childProfileId=${profileId}` as Href,
+                  )
+                }
+                testID={`child-accommodation-row-${profileId}`}
+              />
+            ) : null}
 
-        {joinedLabel ? (
-          <InfoRow
-            label={t('parentView.index.profileDetails', {
-              defaultValue: 'Profile details',
-            })}
-            value={t('parentView.index.childProfileJoined', {
-              date: joinedLabel,
-              defaultValue: `Added ${joinedLabel}`,
-            })}
-            testID="child-profile-details"
-          />
-        ) : null}
-
-        <ConsentManagementSection
-          childProfileId={profileId}
-          childName={childName}
-        />
-
-        <View className="mt-5 rounded-card bg-primary-soft px-4 py-3">
-          <View className="flex-row items-start">
-            <Ionicons
-              name="information-circle-outline"
-              size={18}
-              color={colors.primary}
-            />
-            <Text className="text-caption text-text-secondary ms-2 flex-1">
-              {t('parentView.index.childProfileScopeHint', {
-                defaultValue:
-                  'Progress and reports live in their own tabs, so this page only keeps child-specific settings.',
+            <RowLink
+              icon="sparkles-outline"
+              title={t('parentView.index.mentorMemoryTitleFallback')}
+              subtitle={t('parentView.index.manageMentorMemoryForChild', {
+                name: childName,
+                defaultValue: `Manage what the mentor remembers about ${childName}`,
               })}
-            </Text>
-          </View>
-        </View>
+              onPress={() =>
+                router.push({
+                  pathname: '/(app)/child/[profileId]/mentor-memory',
+                  params: { profileId },
+                } as Href)
+              }
+              testID="mentor-memory-link"
+            />
+
+            {joinedLabel ? (
+              <InfoRow
+                label={t('parentView.index.profileDetails', {
+                  defaultValue: 'Profile details',
+                })}
+                value={t('parentView.index.childProfileJoined', {
+                  date: joinedLabel,
+                  defaultValue: `Added ${joinedLabel}`,
+                })}
+                testID="child-profile-details"
+              />
+            ) : null}
+
+            <ConsentManagementSection
+              childProfileId={profileId}
+              childName={childName}
+            />
+
+            <View className="mt-5 rounded-card bg-primary-soft px-4 py-3">
+              <View className="flex-row items-start">
+                <Ionicons
+                  name="information-circle-outline"
+                  size={18}
+                  color={colors.primary}
+                />
+                <Text className="text-caption text-text-secondary ms-2 flex-1">
+                  {t('parentView.index.childProfileScopeHint', {
+                    defaultValue:
+                      'Progress and reports live in their own tabs, so this page only keeps child-specific settings.',
+                  })}
+                </Text>
+              </View>
+            </View>
+          </>
+        ) : null}
       </ScrollView>
     </View>
   );

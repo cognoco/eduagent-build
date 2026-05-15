@@ -18,6 +18,9 @@ jest.mock('react-i18next', () => ({
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
 const mockGoBackOrReplace = jest.fn();
+let mockLocalSearchParams: { profileId: string; mode?: string } = {
+  profileId: 'child-001',
+};
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({
@@ -26,7 +29,7 @@ jest.mock('expo-router', () => ({
     replace: mockReplace,
     push: mockPush,
   }),
-  useLocalSearchParams: () => ({ profileId: 'child-001' }),
+  useLocalSearchParams: () => mockLocalSearchParams,
 }));
 
 jest.mock('react-native-safe-area-context', () => ({
@@ -153,6 +156,8 @@ const { default: ChildDetailScreen } = require('./index') as {
 // ---------------------------------------------------------------------------
 
 function setupDefaultMocks() {
+  mockLocalSearchParams = { profileId: 'child-001' };
+
   mockUseDashboard.mockReturnValue({
     data: undefined,
     isLoading: false,
@@ -375,6 +380,38 @@ describe('ChildDetailScreen — profile overview', () => {
     expect(screen.queryByTestId('child-reports-button')).toBeNull();
     expect(screen.queryByTestId('growth-teaser')).toBeNull();
     screen.getByTestId('consent-section');
+  });
+
+  it('shows only child settings when opened from the child avatar card', () => {
+    mockLocalSearchParams = { profileId: 'child-001', mode: 'settings' };
+
+    render(<ChildDetailScreen />);
+
+    expect(screen.queryByTestId('child-reports-link')).toBeNull();
+    expect(screen.queryByTestId('child-subjects-section')).toBeNull();
+    expect(
+      screen.queryByTestId('session-card-22222222-2222-7222-8222-222222222222'),
+    ).toBeNull();
+    screen.getByTestId('child-accommodation-row-child-001');
+    screen.getByTestId('mentor-memory-link');
+    screen.getByTestId('child-profile-details');
+    screen.getByTestId('consent-section');
+  });
+
+  it('shows only child progress when opened from the Progress action', () => {
+    mockLocalSearchParams = { profileId: 'child-001', mode: 'progress' };
+
+    render(<ChildDetailScreen />);
+
+    expect(screen.queryByTestId('child-reports-link')).toBeNull();
+    screen.getByTestId('child-subjects-section');
+    screen.getByTestId('session-card-22222222-2222-7222-8222-222222222222');
+    expect(
+      screen.queryByTestId('child-accommodation-row-child-001'),
+    ).toBeNull();
+    expect(screen.queryByTestId('mentor-memory-link')).toBeNull();
+    expect(screen.queryByTestId('child-profile-details')).toBeNull();
+    expect(screen.queryByTestId('consent-section')).toBeNull();
   });
 
   it('keeps the child progress surface open when the detail query fails but dashboard data has the child', () => {

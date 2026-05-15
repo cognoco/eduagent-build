@@ -879,7 +879,7 @@ export function ParentHomeScreen({
     (childProfileId: string): void => {
       router.push({
         pathname: '/(app)/child/[profileId]',
-        params: { profileId: childProfileId },
+        params: { profileId: childProfileId, mode: 'settings' },
       } as Href);
     },
     [router],
@@ -889,7 +889,7 @@ export function ParentHomeScreen({
     (childProfileId: string): void => {
       router.push({
         pathname: '/(app)/child/[profileId]',
-        params: { profileId: childProfileId },
+        params: { profileId: childProfileId, mode: 'progress' },
       } as Href);
     },
     [router],
