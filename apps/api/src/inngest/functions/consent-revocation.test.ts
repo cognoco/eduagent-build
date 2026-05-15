@@ -46,6 +46,8 @@ jest.mock(
     ) as typeof import('../../services/consent');
     return {
       ...actual,
+      // Keep calculateAge real for production-equivalent date math; override
+      // DB-backed consent lookups below so this remains a unit test.
       getFamilyOwnerProfileId: (...args: unknown[]) =>
         mockGetFamilyOwnerProfileId(...args),
       getConsentStatus: (...args: unknown[]) => mockGetConsentStatus(...args),

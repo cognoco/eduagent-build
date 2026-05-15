@@ -89,6 +89,8 @@ jest.mock('../services/billing' /* gc1-allow: pattern-a conversion */, () => {
   ) as typeof import('../services/billing');
   return {
     ...actual,
+    // Use real ProfileRemovalNotImplementedError so instanceof checks in the
+    // route handler match production behaviour.
     getSubscriptionByAccountId: (...args: unknown[]) =>
       mockGetSubscriptionByAccountId(...args),
     ensureFreeSubscription: (...args: unknown[]) =>

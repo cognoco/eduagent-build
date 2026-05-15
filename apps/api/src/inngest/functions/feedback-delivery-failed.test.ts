@@ -429,17 +429,24 @@ describe('[BUG-767 / A-24] handler is registered with serve()', () => {
     // Mock client/createFunction once for this isolated import so we don't
     // collide with the test module's mocks above.
     jest.isolateModules(() => {
-      jest.doMock('../client', () => ({
-        inngest: {
-          createFunction: jest.fn((cfg, _trigger, handler) => ({
-            fn: handler,
-            opts: cfg,
-            _config: cfg,
-            id: cfg.id,
-          })),
-          send: jest.fn(),
-        },
-      }));
+      jest.doMock('../client' /* gc1-allow: pattern-a conversion */, () => {
+        const actual = jest.requireActual(
+          '../client',
+        ) as typeof import('../client');
+
+        return {
+          ...actual,
+          inngest: {
+            createFunction: jest.fn((cfg, _trigger, handler) => ({
+              fn: handler,
+              opts: cfg,
+              _config: cfg,
+              id: cfg.id,
+            })),
+            send: jest.fn(),
+          },
+        };
+      });
       const { functions } = require('../index');
       const ids = functions.map(
         (f: { opts?: { id?: string }; _config?: { id?: string } }) =>
