@@ -22,7 +22,7 @@ test('J-17 parent opens a session recap and copies the conversation prompt', asy
   await pressableClick(
     page.getByTestId(`parent-home-child-progress-${childProfileId}`),
   );
-  await expect(page.getByTestId('progress-screen')).toBeVisible({
+  await expect(page.getByTestId('child-detail-scroll')).toBeVisible({
     timeout: 30_000,
   });
   await page.goto(`/child/${childProfileId}/session/${sessionId}`, {

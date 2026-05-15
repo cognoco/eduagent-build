@@ -13,7 +13,7 @@ import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { RecentSessionsList } from '../../../../components/progress';
-import { useChildDetail } from '../../../../hooks/use-dashboard';
+import { useChildDetail, useDashboard } from '../../../../hooks/use-dashboard';
 import { useChildLearnerProfile } from '../../../../hooks/use-learner-profile';
 import { useProfileSessions } from '../../../../hooks/use-progress';
 import {
@@ -432,11 +432,20 @@ export default function ChildDetailScreen(): React.ReactElement {
   );
   const isOwnedProfile = ownedProfile != null;
   const {
-    data: child,
+    data: childDetail,
     isLoading,
     isError,
     refetch,
   } = useChildDetail(profileId);
+  const dashboardQuery = useDashboard();
+  const dashboardChild = useMemo(
+    () =>
+      dashboardQuery.data?.children.find(
+        (entry) => entry.profileId === profileId,
+      ) ?? null,
+    [dashboardQuery.data?.children, profileId],
+  );
+  const child = childDetail ?? dashboardChild;
   const sessionsQuery = useProfileSessions(profileId);
   const { data: learnerProfile } = useChildLearnerProfile(profileId);
   const lastSessionAt = sessionsQuery.data?.[0]?.startedAt ?? null;
@@ -476,7 +485,11 @@ export default function ChildDetailScreen(): React.ReactElement {
     );
   }
 
-  if ((!isLoading && child === null) || (isError && !child)) {
+  const detailUnavailable =
+    (!isLoading && childDetail === null && !child) ||
+    (isError && !child && !dashboardQuery.isLoading);
+
+  if (detailUnavailable) {
     return (
       <View
         className="flex-1 bg-background items-center justify-center px-6"

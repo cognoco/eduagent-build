@@ -83,11 +83,13 @@ jest.mock(
 // ---------------------------------------------------------------------------
 
 const mockUseChildDetail = jest.fn();
+const mockUseDashboard = jest.fn();
 
 jest.mock(
   '../../../../hooks/use-dashboard' /* gc1-allow: query hooks require API client and QueryClientProvider; route rendering owns response handling */,
   () => ({
     useChildDetail: (...args: unknown[]) => mockUseChildDetail(...args),
+    useDashboard: (...args: unknown[]) => mockUseDashboard(...args),
   }),
 );
 
@@ -151,6 +153,11 @@ const { default: ChildDetailScreen } = require('./index') as {
 // ---------------------------------------------------------------------------
 
 function setupDefaultMocks() {
+  mockUseDashboard.mockReturnValue({
+    data: undefined,
+    isLoading: false,
+  });
+
   mockUseChildDetail.mockReturnValue({
     data: {
       displayName: 'Emma',
@@ -368,6 +375,63 @@ describe('ChildDetailScreen — profile overview', () => {
     expect(screen.queryByTestId('child-reports-button')).toBeNull();
     expect(screen.queryByTestId('growth-teaser')).toBeNull();
     screen.getByTestId('consent-section');
+  });
+
+  it('keeps the child progress surface open when the detail query fails but dashboard data has the child', () => {
+    mockUseChildDetail.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      refetch: jest.fn(),
+    });
+    mockUseDashboard.mockReturnValue({
+      data: {
+        children: [
+          {
+            profileId: 'child-001',
+            displayName: 'Emma',
+            consentStatus: null,
+            respondedAt: null,
+            summary: 'Emma is building confidence.',
+            sessionsThisWeek: 0,
+            sessionsLastWeek: 0,
+            totalTimeThisWeek: 0,
+            totalTimeLastWeek: 0,
+            exchangesThisWeek: 0,
+            exchangesLastWeek: 0,
+            trend: 'stable',
+            subjects: [
+              {
+                subjectId: '11111111-1111-7111-8111-111111111111',
+                name: 'Programming',
+                retentionStatus: 'strong',
+                rawInput: null,
+              },
+            ],
+            guidedVsImmediateRatio: 0,
+            retentionTrend: 'stable',
+            totalSessions: 0,
+            weeklyHeadline: undefined,
+            currentlyWorkingOn: ['Programming'],
+            progress: null,
+            currentStreak: 0,
+            longestStreak: 0,
+            totalXp: 0,
+          },
+        ],
+        pendingNotices: [],
+        demoMode: false,
+      },
+      isLoading: false,
+    });
+
+    render(<ChildDetailScreen />);
+
+    expect(screen.queryByTestId('child-profile-unavailable')).toBeNull();
+    screen.getByTestId('child-detail-scroll');
+    screen.getByText('Emma');
+    screen.getByTestId('child-subjects-section');
+    screen.getByText('Programming');
   });
 
   it('routes subject and report surfaces from child detail', () => {
