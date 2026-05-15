@@ -54,7 +54,8 @@ function findDashboardChild(
 }
 
 function firstNameOf(name: string): string {
-  return name.split(' ')[0] ?? name;
+  const trimmed = name.trim();
+  return trimmed.split(/\s+/)[0] ?? trimmed;
 }
 
 function formatActivityLabel(
@@ -93,43 +94,64 @@ function formatChildSnapshot(
   return `${focus} · ${activity}`;
 }
 
+function formatFamilyNameList(profiles: Profile[], t: Translate): string {
+  const names = profiles
+    .map((profile) => firstNameOf(profile.displayName))
+    .filter((name) => name.length > 0);
+  const first = names[0];
+  const second = names[1];
+
+  if (!first) return '';
+  if (names.length === 1) return first;
+  if (names.length === 2 && second) {
+    return `${first} ${t('common.and')} ${second}`;
+  }
+
+  return t('home.parent.familySummary.nameListWithMore', {
+    names: names.slice(0, 2).join(', '),
+    count: names.length - 2,
+  });
+}
+
 function formatFamilyActivitySummary(
-  children: Profile[],
+  profiles: Profile[],
   dashboard: DashboardData | undefined,
   hasParentLearning: boolean,
   t: Translate,
 ): string {
   if (hasParentLearning) {
-    if (children.length === 0) {
+    if (profiles.length === 0) {
       return t('home.parent.familySummary.parentOnly');
     }
 
     return t('home.parent.familySummary.withParent', {
-      count: children.length,
+      memberNames: formatFamilyNameList(profiles, t),
     });
   }
 
+  if (profiles.length === 0) {
+    return t('home.parent.familySummary.parentOnly');
+  }
+
   const totals = familyChildActivityTotals(dashboard);
-  const memberCount = t('home.parent.familySummary.children', {
-    count: children.length,
-  });
+  const memberNames = formatFamilyNameList(profiles, t);
 
   if (totals.minutesThisWeek > 0) {
     return t('home.parent.familySummary.withMinutes', {
-      childCount: memberCount,
+      memberNames,
       count: totals.minutesThisWeek,
     });
   }
 
   if (totals.sessionsThisWeek > 0) {
     return t('home.parent.familySummary.withSessions', {
-      childCount: memberCount,
+      memberNames,
       count: totals.sessionsThisWeek,
     });
   }
 
   return t('home.parent.familySummary.noActivity', {
-    childCount: memberCount,
+    memberNames,
   });
 }
 
@@ -151,24 +173,28 @@ function familyChildActivityTotals(dashboard: DashboardData | undefined): {
 }
 
 function formatFamilyChildActivityDetail(
+  profiles: Profile[],
   dashboard: DashboardData | undefined,
   t: Translate,
 ): string {
   const totals = familyChildActivityTotals(dashboard);
+  const memberNames = formatFamilyNameList(profiles, t);
 
   if (totals.minutesThisWeek > 0) {
     return t('home.parent.familySummary.childMinutes', {
+      memberNames,
       count: totals.minutesThisWeek,
     });
   }
 
   if (totals.sessionsThisWeek > 0) {
     return t('home.parent.familySummary.childSessions', {
+      memberNames,
       count: totals.sessionsThisWeek,
     });
   }
 
-  return t('home.parent.familySummary.childNoActivity');
+  return t('home.parent.familySummary.childNoActivity', { memberNames });
 }
 
 function formatParentLearningSummary(
@@ -541,6 +567,125 @@ function ChildCommandCard({
   );
 }
 
+interface FamilySummaryRow {
+  key: string;
+  icon: React.ComponentProps<typeof Ionicons>['name'];
+  text: string;
+  tone?: 'default' | 'attention';
+}
+
+function FamilySummaryPanel({
+  summary,
+  rows,
+  showAddProfile,
+  addProfileLabel,
+  addProfileAccessibilityLabel,
+  onAddProfile,
+}: {
+  summary: string;
+  rows: FamilySummaryRow[];
+  showAddProfile: boolean;
+  addProfileLabel: string;
+  addProfileAccessibilityLabel: string;
+  onAddProfile: () => void;
+}): React.ReactElement {
+  const colors = useThemeColors();
+
+  return (
+    <View
+      className="bg-surface rounded-card"
+      style={{
+        borderColor: colors.primary + '18',
+        borderWidth: 1,
+        shadowColor: colors.primary,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.08,
+        shadowRadius: 12,
+        elevation: 2,
+      }}
+      testID="parent-home-family-summary"
+    >
+      <View className="flex-row items-start px-4 pt-4 pb-3">
+        <View
+          className="w-10 h-10 rounded-full bg-primary-soft items-center justify-center"
+          accessibilityElementsHidden
+        >
+          <Ionicons name="people-outline" size={21} color={colors.primary} />
+        </View>
+        <View className="flex-1 ms-3">
+          <Text
+            className="text-body font-semibold text-text-primary"
+            numberOfLines={2}
+          >
+            {summary}
+          </Text>
+        </View>
+      </View>
+
+      {rows.length > 0 ? (
+        <View className="px-4 pb-2">
+          {rows.map((row, index) => {
+            const isLast = index === rows.length - 1;
+            const iconColor =
+              row.tone === 'attention' ? colors.warning : colors.primary;
+
+            return (
+              <View
+                key={row.key}
+                className="flex-row items-start"
+                testID={`parent-home-family-summary-${row.key}`}
+              >
+                <View className="w-7 items-center">
+                  <View
+                    className="w-6 h-6 rounded-full bg-primary-soft items-center justify-center"
+                    accessibilityElementsHidden
+                  >
+                    <Ionicons name={row.icon} size={14} color={iconColor} />
+                  </View>
+                  {!isLast ? (
+                    <View
+                      className="flex-1 bg-border mt-1"
+                      style={{ width: 1, minHeight: 12 }}
+                    />
+                  ) : null}
+                </View>
+                <Text className="text-body-sm text-text-secondary ms-3 flex-1 mb-3">
+                  {row.text}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+      ) : null}
+
+      {showAddProfile ? (
+        <Pressable
+          onPress={onAddProfile}
+          className="flex-row items-center bg-background border-t border-border px-4 py-3.5 rounded-b-card"
+          style={Platform.OS === 'web' ? { cursor: 'pointer' } : undefined}
+          accessibilityRole="button"
+          accessibilityLabel={addProfileAccessibilityLabel}
+          testID="parent-home-add-child"
+        >
+          <Ionicons
+            name="person-add-outline"
+            size={20}
+            color={colors.textSecondary}
+          />
+          <Text className="text-body font-semibold text-text-primary ms-3 flex-1">
+            {addProfileLabel}
+          </Text>
+          <Ionicons
+            name="chevron-forward"
+            size={18}
+            color={colors.textSecondary}
+          />
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
 export function ParentHomeScreen({
   activeProfile,
   now,
@@ -577,16 +722,12 @@ export function ParentHomeScreen({
     });
   }, [dashboard]);
   const { subtitle } = getGreeting(activeProfile?.displayName ?? '', now);
-  const firstName = activeProfile?.displayName?.split(' ')[0] ?? 'there';
+  const firstName = activeProfile
+    ? firstNameOf(activeProfile.displayName)
+    : 'there';
   const sheetChild = linkedChildren.find((child) => child.id === sheetChildId);
   const childNames = useMemo(() => {
-    const names = linkedChildren.map(
-      (c) => c.displayName?.split(' ')[0] ?? c.displayName,
-    );
-    if (names.length === 0) return '';
-    if (names.length === 1) return names[0] ?? '';
-    if (names.length === 2) return `${names[0]} ${t('common.and')} ${names[1]}`;
-    return `${names.slice(0, -1).join(', ')} ${t('common.and')} ${names[names.length - 1]}`;
+    return formatFamilyNameList(linkedChildren, t);
   }, [linkedChildren, t]);
   const showAddChild = isAdultOwner({
     role,
@@ -605,7 +746,7 @@ export function ParentHomeScreen({
   );
   const childActivityDetail =
     parentLearningSummary && linkedChildren.length > 0
-      ? formatFamilyChildActivityDetail(dashboard, t)
+      ? formatFamilyChildActivityDetail(linkedChildren, dashboard, t)
       : null;
   const parentExampleSummary = formatParentExampleSummary(
     parentLearningSummary !== null,
@@ -617,6 +758,46 @@ export function ParentHomeScreen({
     dashboard,
     t,
   );
+  const familySummaryRows: FamilySummaryRow[] = [];
+  if (childActivityDetail) {
+    familySummaryRows.push({
+      key: 'linked-profiles',
+      icon: 'school-outline',
+      text: childActivityDetail,
+    });
+  }
+  if (parentLearningSummary) {
+    familySummaryRows.push({
+      key: 'own-learning',
+      icon: 'book-outline',
+      text: parentLearningSummary,
+    });
+  }
+  if (parentExampleSummary) {
+    familySummaryRows.push({
+      key: 'next-step',
+      icon: 'sparkles-outline',
+      text: parentExampleSummary,
+    });
+  }
+  if (attentionSummary) {
+    familySummaryRows.push({
+      key: 'attention',
+      icon: 'alert-circle-outline',
+      text: attentionSummary,
+      tone: 'attention',
+    });
+  }
+  if (familyData) {
+    familySummaryRows.push({
+      key: 'profile-limit',
+      icon: 'people-outline',
+      text: t('home.parent.familySummary.profileLimit', {
+        count: familyData.profileCount,
+        max: familyData.maxProfiles,
+      }),
+    });
+  }
 
   const navigateToCreateChildProfile = useCallback(() => {
     if (Platform.OS === 'web') {
@@ -858,67 +1039,16 @@ export function ParentHomeScreen({
         </Text>
 
         <View style={{ gap: 10 }}>
-          <View
-            className="bg-primary-soft rounded-card px-4 py-3.5"
-            testID="parent-home-family-summary"
-          >
-            <Text className="text-body font-semibold text-text-primary">
-              {familyActivitySummary}
-            </Text>
-            {childActivityDetail ? (
-              <Text className="text-body-sm text-text-secondary mt-1">
-                {childActivityDetail}
-              </Text>
-            ) : null}
-            {parentLearningSummary ? (
-              <Text className="text-body-sm text-text-secondary mt-1">
-                {parentLearningSummary}
-              </Text>
-            ) : null}
-            {parentExampleSummary ? (
-              <Text className="text-body-sm text-text-secondary mt-1">
-                {parentExampleSummary}
-              </Text>
-            ) : null}
-            {attentionSummary ? (
-              <Text className="text-body-sm text-text-secondary mt-1">
-                {attentionSummary}
-              </Text>
-            ) : null}
-            {familyData ? (
-              <Text className="text-body-sm text-text-secondary mt-1">
-                {t('home.parent.familySummary.profileLimit', {
-                  count: familyData.profileCount,
-                  max: familyData.maxProfiles,
-                })}
-              </Text>
-            ) : null}
-          </View>
-
-          {showAddChild ? (
-            <Pressable
-              onPress={handleAddChild}
-              className="flex-row items-center bg-surface rounded-card px-4 py-3"
-              style={Platform.OS === 'web' ? { cursor: 'pointer' } : undefined}
-              accessibilityRole="button"
-              accessibilityLabel={t('more.family.addChild')}
-              testID="parent-home-add-child"
-            >
-              <Ionicons
-                name="person-add-outline"
-                size={20}
-                color={colors.textSecondary}
-              />
-              <Text className="text-body font-semibold text-text-primary ms-3 flex-1">
-                {t('more.family.addChild')}
-              </Text>
-              <Ionicons
-                name="chevron-forward"
-                size={18}
-                color={colors.textSecondary}
-              />
-            </Pressable>
-          ) : null}
+          <FamilySummaryPanel
+            summary={familyActivitySummary}
+            rows={familySummaryRows}
+            showAddProfile={showAddChild}
+            addProfileLabel={t('home.parent.familySummary.addProfileAction')}
+            addProfileAccessibilityLabel={t(
+              'home.parent.familySummary.addProfileAccessibilityLabel',
+            )}
+            onAddProfile={handleAddChild}
+          />
         </View>
 
         {sheetChild ? (
