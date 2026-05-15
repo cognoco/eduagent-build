@@ -52,7 +52,7 @@ test('single learner UX screenshot crawl', async ({ page }) => {
   await capture(page, '05-subject-shelf');
 
   await page.goto('/progress', { waitUntil: 'commit' });
-  await expect(page.getByText('My Learning Journey')).toBeVisible({
+  await expect(page.getByText('My progress')).toBeVisible({
     timeout: 30_000,
   });
   await capture(page, '06-progress-overview');

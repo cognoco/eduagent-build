@@ -20,13 +20,13 @@ test('W-05 tab URLs render the correct screen on web', async ({ page }) => {
   });
 
   await page.goto('/progress', { waitUntil: 'commit' });
-  await expect(page.getByText('My Learning Journey')).toBeVisible({
+  await expect(page.getByText('My progress')).toBeVisible({
     timeout: 30_000,
   });
 
   await page.goto('/more', { waitUntil: 'commit' });
   await expect(
-    page.getByRole('button', { name: 'Profile', exact: true })
+    page.getByRole('button', { name: 'Profile', exact: true }),
   ).toBeVisible({
     timeout: 30_000,
   });
