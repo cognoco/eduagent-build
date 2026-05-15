@@ -459,18 +459,28 @@ export function ChatShell({
     }
   }, [isStreaming, isListening, stopListening, startListening, stopSpeaking]);
 
-  const handleEnableVoiceAndRecord = useCallback(async () => {
+  const pendingVoiceStartRef = useRef(false);
+
+  const handleEnableVoiceAndRecord = useCallback(() => {
     if (isStreaming) return;
     if (!isVoiceEnabled) {
+      pendingVoiceStartRef.current = true;
       setVoiceEnabled(true);
+      return;
     }
-    await handleVoicePress();
+    void handleVoicePress();
   }, [handleVoicePress, isStreaming, isVoiceEnabled, setVoiceEnabled]);
 
   // BUG-359: Gate to prevent late STT updates from re-populating the
   // transcript after the user taps Discard. Set on discard, cleared on
   // re-record or new recording.
   const discardedRef = useRef(false);
+
+  useEffect(() => {
+    if (!pendingVoiceStartRef.current || !isVoiceEnabled) return;
+    pendingVoiceStartRef.current = false;
+    void handleVoicePress();
+  }, [handleVoicePress, isVoiceEnabled]);
 
   // Sync transcript from STT hook to pending transcript when recording stops
   useEffect(() => {
@@ -947,16 +957,14 @@ export function ChatShell({
                 />
               </View>
             ) : (
-              // [BUG-965] When voice mode is OFF, this is the *enable-voice*
-              // affordance, not a record button. Long-press flips voice ON
-              // and starts recording. It must NOT share testID="voice-record-
-              // button" with the on-state mic — otherwise E2E `assertNotVisible:
-              // voice-record-button` fails when voice is off, and consumers
-              // can't distinguish the two states. Use a distinct testID.
+              // [BUG-965] When voice mode is OFF, this enables voice mode
+              // before starting the mic. It must NOT share testID="voice-
+              // record-button" with the on-state mic — otherwise E2E
+              // `assertNotVisible: voice-record-button` fails when voice is
+              // off, and consumers can't distinguish the two states.
               <Pressable
                 testID="voice-enable-button"
-                onPress={() => void handleEnableVoiceAndRecord()}
-                onLongPress={() => void handleEnableVoiceAndRecord()}
+                onPress={handleEnableVoiceAndRecord}
                 disabled={
                   isStreaming || speechStatus === 'requesting_permission'
                 }

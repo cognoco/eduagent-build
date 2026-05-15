@@ -1,4 +1,10 @@
-import { render, screen, fireEvent, act } from '@testing-library/react-native';
+import {
+  render,
+  screen,
+  fireEvent,
+  act,
+  waitFor,
+} from '@testing-library/react-native';
 import { AccessibilityInfo, AppState } from 'react-native';
 import { ChatShell, type ChatMessage } from './ChatShell';
 
@@ -388,7 +394,7 @@ describe('ChatShell', () => {
       });
 
       expect(onInputModeChange).toHaveBeenCalledWith('voice');
-      expect(mockStartListening).toHaveBeenCalled();
+      await waitFor(() => expect(mockStartListening).toHaveBeenCalled());
       screen.getByTestId('voice-record-button');
       expect(screen.queryByTestId('voice-enable-button')).toBeNull();
     });

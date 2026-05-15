@@ -1,6 +1,7 @@
 import { View, Text, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { hapticLight } from '../../lib/haptics';
+import { useThemeColors } from '../../lib/theme';
 import type { ChatMessage } from './ChatShell';
 import { QuotaExceededCard } from './QuotaExceededCard';
 import type { QuotaExceededDetails } from '../../lib/api-client';
@@ -53,6 +54,8 @@ export function SessionMessageActions({
   onToggleBookmark,
   handleReconnect,
 }: SessionMessageActionsProps) {
+  const colors = useThemeColors();
+
   if (message.kind === 'reconnect_prompt') {
     return (
       <Pressable
@@ -177,10 +180,10 @@ export function SessionMessageActions({
                     : 'thumbs-up-outline'
                 }
                 size={18}
-                className={
+                color={
                   feedbackState === 'helpful'
-                    ? 'text-primary'
-                    : 'text-text-secondary'
+                    ? colors.primary
+                    : colors.textSecondary
                 }
               />
             </View>
@@ -212,10 +215,10 @@ export function SessionMessageActions({
                     : 'thumbs-down-outline'
                 }
                 size={18}
-                className={
+                color={
                   feedbackState === 'not_helpful'
-                    ? 'text-warning'
-                    : 'text-text-secondary'
+                    ? colors.warning
+                    : colors.textSecondary
                 }
               />
             </View>
@@ -247,10 +250,10 @@ export function SessionMessageActions({
                     : 'alert-circle-outline'
                 }
                 size={18}
-                className={
+                color={
                   feedbackState === 'incorrect'
-                    ? 'text-danger'
-                    : 'text-text-secondary'
+                    ? colors.danger
+                    : colors.textSecondary
                 }
               />
             </View>
@@ -277,10 +280,10 @@ export function SessionMessageActions({
                     : 'bookmark-outline'
                 }
                 size={22}
-                className={
+                color={
                   bookmarkState?.[message.eventId]
-                    ? 'text-primary'
-                    : 'text-text-secondary'
+                    ? colors.primary
+                    : colors.textSecondary
                 }
               />
             </Pressable>
