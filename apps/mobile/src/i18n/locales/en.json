@@ -152,15 +152,15 @@
       "accountLink": "Open account",
       "intentHeader": "What do you need right now?",
       "tonight": {
-        "titleMorning": "This morning",
-        "titleAfternoon": "This afternoon",
-        "titleEvening": "Tonight",
-        "promptWithTopic": "Ask {{childName}}: what made {{topic}} click today?",
-        "promptNoActivity": "Ask {{childName}}: what would make starting feel easy tonight?",
-        "promptFallback": "Ask {{childName}}: what felt easier today than yesterday?",
-        "promptTrickiestWithTopic": "Ask {{childName}}: what's the trickiest part of {{topic}} right now?",
-        "promptTomorrow": "Ask {{childName}}: what should we focus on tomorrow?",
-        "promptCurious": "Ask {{childName}}: what's something they're curious about?"
+        "titleMorning": "Conversation starters",
+        "titleAfternoon": "Conversation starters",
+        "titleEvening": "Conversation starters",
+        "promptWithTopic": "What made {{topic}} click today?",
+        "promptNoActivity": "What would make starting feel easy tonight?",
+        "promptFallback": "What felt easier today than yesterday?",
+        "promptTrickiestWithTopic": "What's the trickiest part of {{topic}} right now?",
+        "promptTomorrow": "What should we focus on tomorrow?",
+        "promptCurious": "What's something you're curious about?"
       },
       "empty": {
         "title": "Your family dashboard starts here",
@@ -168,8 +168,31 @@
         "cta": "Add your first child"
       },
       "childrenHeader": "Children",
-      "familyManagementHeader": "Family management",
+      "familyManagementHeader": "Your family",
       "familyToolsHeader": "Family tools",
+      "familySummary": {
+        "children_one": "{{count}} child",
+        "children_other": "{{count}} children",
+        "withParent_one": "You + {{count}} child",
+        "withParent_other": "You + {{count}} children",
+        "parentOnly": "You",
+        "withMinutes_one": "{{childCount}} · {{count}} min this week",
+        "withMinutes_other": "{{childCount}} · {{count}} min this week",
+        "withSessions_one": "{{childCount}} · {{count}} session this week",
+        "withSessions_other": "{{childCount}} · {{count}} sessions this week",
+        "noActivity": "{{childCount}} · no sessions this week",
+        "childMinutes_one": "Children: {{count}} min this week",
+        "childMinutes_other": "Children: {{count}} min this week",
+        "childSessions_one": "Children: {{count}} session this week",
+        "childSessions_other": "Children: {{count}} sessions this week",
+        "childNoActivity": "Children: no sessions this week",
+        "parentLearningWithTopic": "You: {{topicTitle}} in {{subjectName}}",
+        "parentLearningWithSubject": "You: {{subjectName}}",
+        "parentExampleLead": "You lead by example.",
+        "parentExampleNudge": "Show them how it's done: start a quick session.",
+        "attentionChild": "{{childName}} may need attention",
+        "profileLimit": "{{count}} of {{max}} profiles used"
+      },
       "encouragementNote": "Nudges are gentle one-way encouragements.",
       "transitionNoticeTitle": "You're now mentoring {{childNames}}",
       "transitionNoticeBody": "Tap Home anytime to check in on their progress and your own learning.",
@@ -1339,6 +1362,9 @@
   },
   "progress": {
     "pageTitle": "My Learning Journey",
+    "pageTitleMine": "My progress",
+    "pageTitleProfile": "{{name}}'s progress",
+    "pageTitleFallbackName": "Your child",
     "pageSubtitle": "Reports and signals from your recent learning.",
     "ownProfilePill": "Mine",
     "startLearning": "Start learning",
@@ -1459,6 +1485,28 @@
       "subtitle": "Weekly and monthly snapshots from your learning.",
       "viewAll": "View all reports"
     },
+    "latestReport": {
+      "title": "Latest report",
+      "open": "Open report",
+      "openWithDate": "Open report for {{date}}",
+      "empty": "Your next weekly or monthly report will appear here once there is enough learning to summarize.",
+      "error": "We couldn't load the latest report right now.",
+      "sessions": "Sessions",
+      "time": "Time",
+      "topics": "Topics",
+      "words": "Words",
+      "practiceLessons_one": "{{count}} practice lesson",
+      "practiceLessons_other": "{{count}} practice lessons",
+      "practicePoints_one": "{{count}} practice point",
+      "practicePoints_other": "{{count}} practice points"
+    },
+    "recentFocus": {
+      "title": "Recent focus",
+      "showAll": "Show all sessions",
+      "empty": "Recent sessions will appear here once learning gets going.",
+      "error": "We couldn't load recent sessions right now.",
+      "sessionFallback": "Studied {{date}}"
+    },
     "newLearner": {
       "title": "You've completed {{count}} session. Keep going!",
       "title_other": "You've completed {{count}} sessions. Keep going!",
@@ -1479,6 +1527,8 @@
     },
     "stats": {
       "sessions": "{{count}} sessions",
+      "practiceLessons_one": "{{count}} practice lesson",
+      "practiceLessons_other": "{{count}} practice lessons",
       "streak": "{{count}}-day streak",
       "viewVocabCount": "View {{count}} vocabulary words",
       "viewVocab": "View vocabulary",
@@ -1653,6 +1703,21 @@
         "wordsAdded": "words added",
         "vocabularyGrowth": "vocabulary growth"
       }
+    },
+    "growthSnapshot": {
+      "latestWeek": "Latest week",
+      "recentWeeks": "Recent weeks",
+      "sessions_one": "{{count}} session",
+      "sessions_other": "{{count}} sessions",
+      "topicsExplored_one": "{{count}} topic explored",
+      "topicsExplored_other": "{{count}} topics explored",
+      "topicsLearned_one": "{{count}} topic learned",
+      "topicsLearned_other": "{{count}} topics learned",
+      "topicsMastered_one": "{{count}} topic mastered",
+      "topicsMastered_other": "{{count}} topics mastered",
+      "wordsAdded_one": "{{count}} word added",
+      "wordsAdded_other": "{{count}} words added",
+      "weekDetail": "{{sessions}} sessions · {{time}} · {{topics}} topics · {{words}} words"
     }
   },
   "onboarding": {

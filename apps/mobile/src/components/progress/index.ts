@@ -1,12 +1,9 @@
 export { RetentionSignal, type RetentionStatus } from './RetentionSignal';
 export { RemediationCard } from './RemediationCard';
 export { ProgressBar } from './ProgressBar';
-export { GrowthChart } from './GrowthChart';
-export { CurrentlyWorkingOnCard } from './CurrentlyWorkingOnCard';
 export { MilestoneCard } from './MilestoneCard';
 export { SubjectProgressRow, hasSubjectActivity } from './SubjectProgressRow';
 export { RecentSessionsList } from './RecentSessionsList';
 export { ReportsList, type ReportsListProps } from './ReportsList';
-export { WeeklyDeltaChip, type WeeklyDeltaMetric } from './WeeklyDeltaChip';
 export { MetricCard } from './MetricCard';
 export { PracticeActivitySummaryCard } from './PracticeActivitySummaryCard';

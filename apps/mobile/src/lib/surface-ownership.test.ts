@@ -196,7 +196,7 @@ describe('Surface ownership self-check: guard is not always-green', () => {
     expect(forbidden).toEqual(['useProgressInventory']);
   });
 
-  it('library rule forbids useProgressInventory and useProgressHistory but not useOverallProgress', () => {
+  it('library rule forbids useProgressInventory but not useOverallProgress', () => {
     const libraryRule = SURFACE_RULES.find(
       (r: SurfaceRule) => r.label === 'Library screens',
     )!;
@@ -204,7 +204,6 @@ describe('Surface ownership self-check: guard is not always-green', () => {
 
     // Forbidden
     expect(libraryRule.forbid.symbols).toContain('useProgressInventory');
-    expect(libraryRule.forbid.symbols).toContain('useProgressHistory');
 
     // useOverallProgress is the documented PR 4 exception — NOT in the forbid list.
     expect(libraryRule.forbid.symbols).not.toContain('useOverallProgress');

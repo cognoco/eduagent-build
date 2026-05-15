@@ -72,11 +72,7 @@ export const SURFACE_RULES: SurfaceRule[] = [
       // app/(app)/session/** — route files + _layout
       p.startsWith('apps/mobile/src/app/(app)/session/'),
     forbid: {
-      symbols: [
-        'useProgressInventory',
-        'useOverallProgress',
-        'useProgressHistory',
-      ],
+      symbols: ['useProgressInventory', 'useOverallProgress'],
     },
     // No allowlist needed: session screens must use use-session-context facades.
   },
@@ -96,7 +92,7 @@ export const SURFACE_RULES: SurfaceRule[] = [
       // app/(app)/library.tsx — single file
       p === 'apps/mobile/src/app/(app)/library.tsx',
     forbid: {
-      symbols: ['useProgressInventory', 'useProgressHistory'],
+      symbols: ['useProgressInventory'],
       // NOTE: useOverallProgress is intentionally NOT in the forbidden list here.
       // library.tsx still imports useOverallProgress for topic-completion stats
       // (totalTopicsCompleted display + loading/error state). This is a documented
