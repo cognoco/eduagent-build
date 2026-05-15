@@ -19,7 +19,7 @@ test('J-07 parent → child progress → session recap → back to parent home',
   await pressableClick(
     page.getByTestId(`parent-home-child-progress-${childProfileId}`),
   );
-  await expect(page.getByTestId('progress-screen')).toBeVisible({
+  await expect(page.getByTestId('child-detail-scroll')).toBeVisible({
     timeout: 30_000,
   });
 
