@@ -34,7 +34,7 @@ import {
   type SessionRecoveryMarker,
 } from '../../lib/session-recovery';
 import { FEATURE_FLAGS } from '../../lib/feature-flags';
-import { getSubjectTint } from '../../lib/subject-tints';
+import { getSubjectTint, getSubjectTintMap } from '../../lib/subject-tints';
 import { useTheme } from '../../lib/theme';
 import { useThemeColors } from '../../lib/theme';
 import {
@@ -232,47 +232,51 @@ export function LearnerScreen({
 
   const subjectCards = useMemo(() => {
     if (!subjects?.length) return [];
+    const activeSubjects = subjects.filter((s) => s.status === 'active');
+    const subjectTintsById = getSubjectTintMap(
+      activeSubjects.map((s) => s.id),
+      colorScheme,
+    );
     const progressBySubject = new Map(
       (overallProgress?.subjects ?? []).map((p) => [p.subjectId, p]),
     );
-    return subjects
-      .filter((s) => s.status === 'active')
-      .map((s) => {
-        const progress = progressBySubject.get(s.id);
-        const tint = getSubjectTint(s.id, colorScheme);
-        const total = progress?.topicsTotal ?? 0;
-        const completed = progress?.topicsCompleted ?? 0;
+    return activeSubjects.map((s) => {
+      const progress = progressBySubject.get(s.id);
+      const tint =
+        subjectTintsById.get(s.id) ?? getSubjectTint(s.id, colorScheme);
+      const total = progress?.topicsTotal ?? 0;
+      const completed = progress?.topicsCompleted ?? 0;
 
-        const isPreparing = s.curriculumStatus === 'preparing';
-        let hint = isPreparing ? `Setting up ${s.name}...` : 'Open';
-        if (
-          !isPreparing &&
-          resumeTarget?.subjectId === s.id &&
-          ['active_session', 'paused_session'].includes(resumeTarget.resumeKind)
-        ) {
-          hint = `Continue ${resumeTarget.topicTitle ?? s.name}`;
-        } else if (
-          !isPreparing &&
-          reviewSummary?.nextReviewTopic?.subjectId === s.id
-        ) {
-          hint = `Quiz: ${reviewSummary.nextReviewTopic.topicTitle}`;
-        } else if (!isPreparing && completed > 0) {
-          hint = `Practice: ${s.name}`;
-        }
+      const isPreparing = s.curriculumStatus === 'preparing';
+      let hint = isPreparing ? `Setting up ${s.name}...` : 'Open';
+      if (
+        !isPreparing &&
+        resumeTarget?.subjectId === s.id &&
+        ['active_session', 'paused_session'].includes(resumeTarget.resumeKind)
+      ) {
+        hint = `Continue ${resumeTarget.topicTitle ?? s.name}`;
+      } else if (
+        !isPreparing &&
+        reviewSummary?.nextReviewTopic?.subjectId === s.id
+      ) {
+        hint = `Quiz: ${reviewSummary.nextReviewTopic.topicTitle}`;
+      } else if (!isPreparing && completed > 0) {
+        hint = `Practice: ${s.name}`;
+      }
 
-        return {
-          subjectId: s.id,
-          name: s.name,
-          hint,
-          isPreparing,
-          progress: total > 0 ? completed / total : 0,
-          topicsCompleted: completed,
-          topicsTotal: total,
-          tintSolid: tint.solid,
-          tintSoft: tint.soft,
-          icon: DEFAULT_SUBJECT_ICON,
-        };
-      });
+      return {
+        subjectId: s.id,
+        name: s.name,
+        hint,
+        isPreparing,
+        progress: total > 0 ? completed / total : 0,
+        topicsCompleted: completed,
+        topicsTotal: total,
+        tintSolid: tint.solid,
+        tintSoft: tint.soft,
+        icon: DEFAULT_SUBJECT_ICON,
+      };
+    });
   }, [subjects, overallProgress, resumeTarget, reviewSummary, colorScheme]);
 
   const coachBand = useMemo(() => {
@@ -367,6 +371,8 @@ export function LearnerScreen({
     quizDiscovery,
     recoveryMarker,
     resumeTarget,
+    returnParams,
+    returnToTab,
     reviewSummary,
   ]);
 
@@ -527,7 +533,7 @@ export function LearnerScreen({
             <Text className="text-h3 font-bold text-text-primary px-5 mb-2">
               {t('home.learner.intentHeading')}
             </Text>
-            <View className="px-5" style={{ gap: 10 }}>
+            <View className="px-5" style={{ gap: 8 }}>
               {HOME_INTENT_ACTIONS.map((action) => {
                 const title = t(action.titleKey);
                 const subtitle = t(action.subtitleKey);
@@ -537,19 +543,19 @@ export function LearnerScreen({
                     key={action.testID}
                     testID={action.testID}
                     onPress={() => openIntentAction(action.route)}
-                    className={`rounded-2xl border px-4 py-4 flex-row items-center ${
+                    className={`rounded-2xl border px-4 py-3 flex-row items-center ${
                       action.highlight
                         ? 'bg-primary-soft border-primary/40'
                         : 'bg-surface border-border'
                     }`}
-                    style={{ gap: 12 }}
+                    style={{ gap: 10 }}
                     accessibilityRole="button"
                     accessibilityLabel={`${title}. ${subtitle}`}
                   >
-                    <View className="w-11 h-11 rounded-2xl bg-surface-elevated items-center justify-center">
+                    <View className="w-10 h-10 rounded-2xl bg-surface-elevated items-center justify-center">
                       <Ionicons
                         name={action.icon}
-                        size={22}
+                        size={21}
                         color={colors.primary}
                       />
                     </View>
@@ -557,7 +563,10 @@ export function LearnerScreen({
                       <Text className="text-body font-bold text-text-primary">
                         {title}
                       </Text>
-                      <Text className="text-body-sm text-text-secondary mt-1">
+                      <Text
+                        className="text-body-sm text-text-secondary mt-0.5"
+                        numberOfLines={2}
+                      >
                         {subtitle}
                       </Text>
                     </View>

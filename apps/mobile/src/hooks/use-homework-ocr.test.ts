@@ -6,6 +6,18 @@ const mockFetch = jest.fn();
 const mockTrackHomeworkOcrGateAccepted = jest.fn();
 const mockTrackHomeworkOcrGateRejected = jest.fn();
 const mockTrackHomeworkOcrGateShortcircuit = jest.fn();
+const formDataGlobal = global as typeof globalThis & {
+  FormData: typeof FormData;
+};
+const originalFormData = formDataGlobal.FormData;
+
+class MockFormData {
+  private readonly parts: Array<[string, unknown]> = [];
+
+  append(name: string, value: unknown) {
+    this.parts.push([name, value]);
+  }
+}
 
 jest.mock('@clerk/clerk-expo', () => ({
   useAuth: () => ({
@@ -61,7 +73,12 @@ beforeEach(() => {
   mockRecognize.mockReset();
   mockManipulateAsync.mockReset();
   mockManipulateAsync.mockResolvedValue({ uri: 'file:///cache/resized.jpg' });
+  formDataGlobal.FormData = MockFormData as unknown as typeof FormData;
   global.fetch = mockFetch as typeof fetch;
+});
+
+afterAll(() => {
+  formDataGlobal.FormData = originalFormData;
 });
 
 describe('useHomeworkOcr', () => {

@@ -882,6 +882,11 @@
     "subtitleGuardianNoTopics": "Twoja osobista biblioteka · {{subjectCount}} przedmiotów",
     "statusPaused": "Wstrzymany",
     "statusArchived": "Zarchiwizowany",
+    "sections": {
+      "active": "Aktywne półki",
+      "paused": "Wstrzymane półki",
+      "archived": "Zarchiwizowane półki"
+    },
     "loadTimeout": {
       "title": "Ładowanie biblioteki trwa zbyt długo",
       "message": "Sprawdź połączenie i spróbuj ponownie."
@@ -1601,7 +1606,8 @@
       "staleSummary": "Podsumowanie może nie uwzględniać ostatniej aktywności.",
       "nudgeCta": "Krótka zachęta może pomóc {{name}} wrócić do nauki.",
       "nudgeA11y": "Wyślij {{name}} zachętę",
-      "viewAllReports": "Zobacz wszystkie raporty"
+      "viewAllReports": "Zobacz wszystkie raporty",
+      "subjectsTitle": "Przedmioty"
     }
   },
   "onboarding": {

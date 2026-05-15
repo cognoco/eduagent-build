@@ -1,13 +1,14 @@
 {
   "scope": "mobile",
-  "verifiedAt": "2026-05-15T11:40:26Z",
+  "verifiedAt": "2026-05-15T12:25:09Z",
   "verifiedBy": "Zuzana Kopečná @ ZLY-Orion",
   "command": "pnpm exec nx run mobile:test",
   "passed": true,
   "testFiles": {
-    "apps/mobile/src/components/session/ChatShell.test.tsx": "c49c9037e4d0194fbe912b66a0ce3b879752a50d",
-    "apps/mobile/src/components/session/MessageBubble.test.tsx": "14a8aee4e25c7abd1460a153833d8ef36d294143",
-    "apps/mobile/src/components/session/SessionMessageActions.test.tsx": "04ad75fd78f2ea3584ebd8c4e1b661bc52812be7",
-    "apps/mobile/src/components/session/VoiceRecordButton.test.tsx": "edf356283448ddbc8e4acda0a8d5a1884d0f480c"
+    "apps/mobile/src/app/(app)/library.test.tsx": "3694463dd920dcd11433463370fce84a075a296e",
+    "apps/mobile/src/app/(app)/progress.test.tsx": "205001bf5dbcae8c7889e4ba278d1a0ae78bff91",
+    "apps/mobile/src/components/home/SubjectTile.test.tsx": "8c424034399124cea0a5c7f7c13234a9b59521c4",
+    "apps/mobile/src/hooks/use-homework-ocr.test.ts": "50a460ee0ad42bac4f073d19e90dc151389e0655",
+    "apps/mobile/src/lib/subject-tints.test.ts": "27cd5e6ecfee942e5d854432f06bf2d99e93098e"
   }
 }

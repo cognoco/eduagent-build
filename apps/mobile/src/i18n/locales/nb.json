@@ -857,6 +857,11 @@
     "subtitleGuardianNoTopics": "Ditt personlige bibliotek · {{subjectCount}} emner",
     "statusPaused": "Pauset",
     "statusArchived": "Arkivert",
+    "sections": {
+      "active": "Aktive hyller",
+      "paused": "Pausede hyller",
+      "archived": "Arkiverte hyller"
+    },
     "loadTimeout": {
       "title": "Biblioteket tar for lang tid å laste",
       "message": "Sjekk tilkoblingen din og prøv igjen."
@@ -1576,7 +1581,8 @@
       "staleSummary": "Oppsummeringen gjenspeiler kanskje ikke den siste aktiviteten ennå.",
       "nudgeCta": "Et lite dytt kan hjelpe {{name}} i gang igjen",
       "nudgeA11y": "Send {{name}} et dytt",
-      "viewAllReports": "Se alle rapporter"
+      "viewAllReports": "Se alle rapporter",
+      "subjectsTitle": "Emner"
     }
   },
   "onboarding": {

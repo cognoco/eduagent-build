@@ -857,6 +857,11 @@
     "subtitleGuardianNoTopics": "Tu biblioteca personal · {{subjectCount}} materias",
     "statusPaused": "En pausa",
     "statusArchived": "Archivado",
+    "sections": {
+      "active": "Estantes activos",
+      "paused": "Estantes en pausa",
+      "archived": "Estantes archivados"
+    },
     "loadTimeout": {
       "title": "La biblioteca está tardando demasiado en cargar",
       "message": "Revisa tu conexión e inténtalo de nuevo."
@@ -1576,7 +1581,8 @@
       "staleSummary": "Puede que el resumen aún no refleje la actividad más reciente.",
       "nudgeCta": "Un recordatorio podría ayudar a {{name}} a retomar.",
       "nudgeA11y": "Enviar un recordatorio a {{name}}",
-      "viewAllReports": "Ver todos los informes"
+      "viewAllReports": "Ver todos los informes",
+      "subjectsTitle": "Materias"
     }
   },
   "onboarding": {
