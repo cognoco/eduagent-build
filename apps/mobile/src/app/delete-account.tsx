@@ -111,10 +111,12 @@ export default function DeleteAccountScreen() {
     deleteAccount.isPending ||
     cancelDeletion.isPending ||
     deletionStatus.isLoading;
+  const statusLoadFailed = deletionStatus.isError && stage !== 'scheduled';
   const canConfirm =
     confirmText === DELETE_CONFIRMATION_PHRASE &&
     !deleteAccount.isPending &&
-    !submittingRef.current;
+    !submittingRef.current &&
+    !statusLoadFailed;
 
   const formattedDate = gracePeriodEnds
     ? new Date(gracePeriodEnds).toLocaleDateString(undefined, {
@@ -152,13 +154,13 @@ export default function DeleteAccountScreen() {
           </Pressable>
         </View>
 
-        {(error !== '' || deletionStatus.isError) && (
+        {error !== '' && (
           <View className="bg-danger/10 rounded-card px-4 py-3 mb-4">
             <Text
               className="text-danger text-body-sm"
               testID="delete-account-error"
             >
-              {error || t('errors.networkError')}
+              {error}
             </Text>
           </View>
         )}
@@ -169,6 +171,36 @@ export default function DeleteAccountScreen() {
               color={colors.primary}
               testID="delete-account-status-loading"
             />
+          </View>
+        ) : statusLoadFailed ? (
+          <View testID="delete-account-status-error">
+            <View className="bg-danger/10 rounded-card px-4 py-3 mb-4">
+              <Text className="text-danger text-body-sm">
+                {t('errors.networkError')}
+              </Text>
+            </View>
+            <Pressable
+              onPress={() => void deletionStatus.refetch()}
+              className="bg-primary rounded-button py-3.5 items-center mb-3"
+              testID="delete-account-status-retry"
+              accessibilityRole="button"
+              accessibilityLabel={t('common.retry')}
+            >
+              <Text className="text-body font-semibold text-text-inverse">
+                {t('common.retry')}
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={handleClose}
+              className="bg-surface rounded-button py-3.5 items-center"
+              testID="delete-account-status-back"
+              accessibilityRole="button"
+              accessibilityLabel={t('common.goBack')}
+            >
+              <Text className="text-body font-semibold text-text-primary">
+                {t('common.goBack')}
+              </Text>
+            </Pressable>
           </View>
         ) : stage === 'scheduled' ? (
           <View testID="delete-account-scheduled">

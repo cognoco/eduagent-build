@@ -33,26 +33,31 @@ export const accountRoutes = new Hono<AccountRouteEnv>()
   .post('/account/delete', async (c) => {
     const db = c.get('db');
     const account = c.get('account');
-    const { gracePeriodEnds } = await scheduleDeletion(db, account.id);
-
-    const profileIds = await getProfileIdsForAccount(db, account.id);
-
-    // [CR-SILENT-RECOVERY-2] Account deletion is GDPR-relevant — safeSend
-    // escalates dispatch failures to Sentry so on-call gets paged on aggregate
-    // dispatch-failure spikes. Mirrors the consent.ts [A-23] pattern.
-    await safeSend(
-      () =>
-        inngest.send({
-          name: 'app/account.deletion-scheduled',
-          data: {
-            accountId: account.id,
-            profileIds,
-            timestamp: new Date().toISOString(),
-          },
-        }),
-      'account.deletion',
-      { accountId: account.id },
+    const { gracePeriodEnds, scheduledNow } = await scheduleDeletion(
+      db,
+      account.id,
     );
+
+    if (scheduledNow) {
+      const profileIds = await getProfileIdsForAccount(db, account.id);
+
+      // [CR-SILENT-RECOVERY-2] Account deletion is GDPR-relevant — safeSend
+      // escalates dispatch failures to Sentry so on-call gets paged on aggregate
+      // dispatch-failure spikes. Mirrors the consent.ts [A-23] pattern.
+      await safeSend(
+        () =>
+          inngest.send({
+            name: 'app/account.deletion-scheduled',
+            data: {
+              accountId: account.id,
+              profileIds,
+              timestamp: new Date().toISOString(),
+            },
+          }),
+        'account.deletion',
+        { accountId: account.id },
+      );
+    }
 
     return c.json(
       accountDeletionResponseSchema.parse({

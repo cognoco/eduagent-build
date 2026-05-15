@@ -37,7 +37,9 @@ type MockDeletionStatus = {
   };
   isLoading: boolean;
   isError: boolean;
+  refetch: jest.Mock;
 };
+const mockDeletionStatusRefetch = jest.fn();
 let mockDeletionStatus: MockDeletionStatus = {
   data: {
     scheduled: false,
@@ -46,19 +48,23 @@ let mockDeletionStatus: MockDeletionStatus = {
   },
   isLoading: false,
   isError: false,
+  refetch: mockDeletionStatusRefetch,
 };
 
-jest.mock('../hooks/use-account', () => ({
-  useDeleteAccount: () => ({
-    mutateAsync: mockDeleteMutateAsync,
-    isPending: mockDeleteIsPending,
+jest.mock(
+  '../hooks/use-account',
+  /* gc1-allow: screen tests mock account hooks to avoid full QueryClient/provider setup around the Expo Router page */ () => ({
+    useDeleteAccount: () => ({
+      mutateAsync: mockDeleteMutateAsync,
+      isPending: mockDeleteIsPending,
+    }),
+    useCancelDeletion: () => ({
+      mutateAsync: mockCancelMutateAsync,
+      isPending: false,
+    }),
+    useDeletionStatus: () => mockDeletionStatus,
   }),
-  useCancelDeletion: () => ({
-    mutateAsync: mockCancelMutateAsync,
-    isPending: false,
-  }),
-  useDeletionStatus: () => mockDeletionStatus,
-}));
+);
 
 // prettier-ignore
 jest.mock('../lib/theme', /* gc1-allow: nativewind vars() does not resolve 'react' in jest; stub theme hooks so screen tests don't blow up on import */ () => ({
@@ -105,6 +111,7 @@ describe('DeleteAccountScreen', () => {
       },
       isLoading: false,
       isError: false,
+      refetch: mockDeletionStatusRefetch,
     };
   });
 
@@ -130,6 +137,7 @@ describe('DeleteAccountScreen', () => {
       },
       isLoading: false,
       isError: false,
+      refetch: mockDeletionStatusRefetch,
     };
 
     render(<DeleteAccountScreen />, { wrapper: Wrapper });
@@ -139,6 +147,29 @@ describe('DeleteAccountScreen', () => {
     });
     screen.getByTestId('delete-account-keep');
     expect(screen.queryByTestId('delete-account-confirm')).toBeNull();
+  });
+
+  it('blocks the destructive flow when deletion status fails to load', () => {
+    mockDeletionStatus = {
+      data: {
+        scheduled: false,
+        deletionScheduledAt: null,
+        gracePeriodEnds: null,
+      },
+      isLoading: false,
+      isError: true,
+      refetch: mockDeletionStatusRefetch,
+    };
+
+    render(<DeleteAccountScreen />, { wrapper: Wrapper });
+
+    screen.getByTestId('delete-account-status-error');
+    expect(screen.queryByTestId('delete-account-confirm')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('delete-account-status-retry'));
+
+    expect(mockDeletionStatusRefetch).toHaveBeenCalledTimes(1);
+    expect(mockDeleteMutateAsync).not.toHaveBeenCalled();
   });
 
   it('schedules deletion and shows grace period after typed confirmation', async () => {

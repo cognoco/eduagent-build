@@ -12,7 +12,12 @@ const GRACE_PERIOD_MS = GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000;
 export async function scheduleDeletion(
   db: Database,
   accountId: string,
-): Promise<{ gracePeriodEnds: string }> {
+): Promise<{ gracePeriodEnds: string; scheduledNow: boolean }> {
+  const existing = await getDeletionStatus(db, accountId);
+  if (existing.scheduled && existing.gracePeriodEnds) {
+    return { gracePeriodEnds: existing.gracePeriodEnds, scheduledNow: false };
+  }
+
   const now = new Date();
   await db
     .update(accounts)
@@ -22,7 +27,7 @@ export async function scheduleDeletion(
   const gracePeriodEnds = new Date(
     now.getTime() + GRACE_PERIOD_MS,
   ).toISOString();
-  return { gracePeriodEnds };
+  return { gracePeriodEnds, scheduledNow: true };
 }
 
 export async function cancelDeletion(
@@ -63,12 +68,14 @@ export async function getDeletionStatus(
   const row = await db.query.accounts.findFirst({
     where: eq(accounts.id, accountId),
   });
+  if (!row) {
+    throw new Error(`account not found: ${accountId}`);
+  }
 
-  const scheduledAt = row?.deletionScheduledAt ?? null;
-  const cancelledAt = row?.deletionCancelledAt ?? null;
+  const scheduledAt = row.deletionScheduledAt ?? null;
+  const cancelledAt = row.deletionCancelledAt ?? null;
   const scheduled =
-    scheduledAt !== null &&
-    (cancelledAt === null || cancelledAt <= scheduledAt);
+    scheduledAt !== null && (cancelledAt === null || cancelledAt < scheduledAt);
 
   if (!scheduled || scheduledAt === null) {
     return {

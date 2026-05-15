@@ -9,10 +9,23 @@ import {
   deleteProfileIfNoConsent,
 } from './deletion';
 
-function createMockDb({
-  findFirstResult = undefined as Record<string, unknown> | undefined,
-  profilesResult = [] as Array<{ id: string }>,
-} = {}): Database {
+function createMockDb(
+  options: {
+    findFirstResult?: Record<string, unknown>;
+    profilesResult?: Array<{ id: string }>;
+  } = {},
+): Database {
+  const findFirstResult = Object.prototype.hasOwnProperty.call(
+    options,
+    'findFirstResult',
+  )
+    ? options.findFirstResult
+    : {
+        deletionScheduledAt: null,
+        deletionCancelledAt: null,
+      };
+  const profilesResult = options.profilesResult ?? [];
+
   return {
     query: {
       accounts: {
@@ -60,6 +73,32 @@ describe('scheduleDeletion', () => {
     const db = createMockDb();
     await scheduleDeletion(db, 'account-1');
     expect(db.update).toHaveBeenCalled();
+  });
+
+  it('throws and does not update when the account is missing', async () => {
+    const db = createMockDb({ findFirstResult: undefined });
+
+    await expect(scheduleDeletion(db, 'missing-account')).rejects.toThrow(
+      'account not found: missing-account',
+    );
+    expect(db.update).not.toHaveBeenCalled();
+  });
+
+  it('does not move the deadline when deletion is already scheduled', async () => {
+    const db = createMockDb({
+      findFirstResult: {
+        deletionScheduledAt: new Date('2026-02-17T00:00:00.000Z'),
+        deletionCancelledAt: null,
+      },
+    });
+
+    const result = await scheduleDeletion(db, 'account-1');
+
+    expect(result).toEqual({
+      gracePeriodEnds: '2026-02-24T00:00:00.000Z',
+      scheduledNow: false,
+    });
+    expect(db.update).not.toHaveBeenCalled();
   });
 });
 
@@ -163,6 +202,14 @@ describe('getDeletionStatus', () => {
     const result = await getDeletionStatus(db, 'account-1');
 
     expect(result.scheduled).toBe(false);
+  });
+
+  it('throws when the account is missing', async () => {
+    const db = createMockDb({ findFirstResult: undefined });
+
+    await expect(getDeletionStatus(db, 'missing-account')).rejects.toThrow(
+      'account not found: missing-account',
+    );
   });
 });
 

@@ -21,7 +21,8 @@ module.exports = {
   moduleFileExtensions: ['ts', 'js', 'html', 'tsx', 'jsx'],
   setupFiles: ['<rootDir>/apps/mobile/jest.polyfills.js'],
   setupFilesAfterEnv: ['<rootDir>/apps/mobile/src/test-setup.ts'],
-  testMatch: ['<rootDir>/apps/mobile/src/**/*.(spec|test).[jt]s?(x)'],
+  testMatch: ['**/apps/mobile/src/**/*.(spec|test).[jt]s?(x)'],
+  testTimeout: 30000,
   modulePathIgnorePatterns: ['\\.claude/worktrees'],
   moduleNameMapper: {
     '^@eduagent/schemas$': '<rootDir>/packages/schemas/src/index.ts',

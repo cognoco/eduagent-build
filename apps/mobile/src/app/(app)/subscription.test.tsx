@@ -1267,33 +1267,35 @@ describe('SubscriptionScreen', () => {
   it('shows manage billing info on web for active trial users', async () => {
     const originalPlatform = Platform.OS;
     Object.defineProperty(Platform, 'OS', { get: () => 'web' });
-    mockFetch.setRoute(
-      '/subscription',
-      () =>
-        new Response(
-          JSON.stringify({
-            subscription: {
-              ...DEFAULT_SUBSCRIPTION,
-              tier: 'free',
-              status: 'trial',
-              trialEndsAt: '2026-05-21T00:00:00.000Z',
-            },
-          }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } },
-        ),
-    );
-    mockOfferings = null;
-    mockCustomerInfo = null;
+    try {
+      mockFetch.setRoute(
+        '/subscription',
+        () =>
+          new Response(
+            JSON.stringify({
+              subscription: {
+                ...DEFAULT_SUBSCRIPTION,
+                tier: 'free',
+                status: 'trial',
+                trialEndsAt: '2026-05-21T00:00:00.000Z',
+              },
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+      );
+      mockOfferings = null;
+      mockCustomerInfo = null;
 
-    render(<SubscriptionScreen />, { wrapper: createWrapper() });
+      render(<SubscriptionScreen />, { wrapper: createWrapper() });
 
-    await waitFor(() => {
-      screen.getByTestId('manage-billing-web-info');
-    });
-    screen.getByText('Manage billing');
-    expect(screen.queryByTestId('manage-billing-button')).toBeNull();
-
-    Object.defineProperty(Platform, 'OS', { get: () => originalPlatform });
+      await waitFor(() => {
+        screen.getByTestId('manage-billing-web-info');
+      });
+      screen.getByText('Manage billing');
+      expect(screen.queryByTestId('manage-billing-button')).toBeNull();
+    } finally {
+      Object.defineProperty(Platform, 'OS', { get: () => originalPlatform });
+    }
   });
 
   it('opens iOS App Store subscriptions on manage billing press (iOS)', async () => {
