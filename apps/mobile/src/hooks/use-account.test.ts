@@ -167,14 +167,15 @@ describe('useDeletionStatus', () => {
   });
 
   it('surfaces errors when GET /account/deletion-status returns non-2xx', async () => {
-    mockFetch.mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({
-          code: 'INTERNAL_ERROR',
-          message: 'Unable to load deletion status',
-        }),
-        { status: 500 },
-      ),
+    mockFetch.mockImplementation(
+      () =>
+        new Response(
+          JSON.stringify({
+            code: 'INTERNAL_ERROR',
+            message: 'Unable to load deletion status',
+          }),
+          { status: 500 },
+        ),
     );
 
     const { result } = renderHook(() => useDeletionStatus(), {
@@ -187,6 +188,7 @@ describe('useDeletionStatus', () => {
     expect(result.current.error?.message).toBe(
       'Unable to load deletion status',
     );
+    expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 });
 

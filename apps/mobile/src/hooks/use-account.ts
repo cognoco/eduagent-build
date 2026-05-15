@@ -56,6 +56,8 @@ export function useDeletionStatus(): UseQueryResult<
 
   return useQuery({
     queryKey: ['account', 'deletion-status'],
+    retry: 1,
+    retryDelay: 250,
     queryFn: async (): Promise<AccountDeletionStatusResponse> => {
       const res = await client.account['deletion-status'].$get();
       await assertOk(res);

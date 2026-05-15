@@ -14,6 +14,9 @@ function createMockDb(
     findFirstResult?: Record<string, unknown>;
     profilesResult?: Array<{ id: string }>;
     updateReturning?: Array<{ deletionScheduledAt: Date | null }>;
+    updateReturningSequence?: Array<
+      Array<{ deletionScheduledAt: Date | null }>
+    >;
   } = {},
 ): Database {
   const findFirstResult = Object.prototype.hasOwnProperty.call(
@@ -29,7 +32,13 @@ function createMockDb(
   const updateReturning = options.updateReturning ?? [
     { deletionScheduledAt: new Date() },
   ];
-  const updateReturningMock = jest.fn().mockResolvedValue(updateReturning);
+  const updateReturningMock = jest.fn();
+  for (const returning of options.updateReturningSequence ?? [
+    updateReturning,
+  ]) {
+    updateReturningMock.mockResolvedValueOnce(returning);
+  }
+  updateReturningMock.mockResolvedValue(updateReturning);
   const updateWhereMock = jest.fn().mockReturnValue({
     returning: updateReturningMock,
   });
@@ -114,21 +123,25 @@ describe('scheduleDeletion', () => {
     expect(db.update).toHaveBeenCalled();
   });
 
-  it('does not dispatch as newly scheduled when another request already won', async () => {
+  it('retries once when a concurrent cancel wins the fallback read', async () => {
     const db = createMockDb({
       findFirstResult: {
         deletionScheduledAt: new Date('2026-02-17T00:00:00.000Z'),
-        deletionCancelledAt: null,
+        deletionCancelledAt: new Date('2026-02-18T00:00:00.000Z'),
       },
-      updateReturning: [],
+      updateReturningSequence: [
+        [],
+        [{ deletionScheduledAt: new Date('2026-02-19T00:00:00.000Z') }],
+      ],
     });
 
     const result = await scheduleDeletion(db, 'account-1');
 
     expect(result).toEqual({
-      gracePeriodEnds: '2026-02-24T00:00:00.000Z',
-      scheduledNow: false,
+      gracePeriodEnds: '2026-02-26T00:00:00.000Z',
+      scheduledNow: true,
     });
+    expect(db.update).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -231,7 +244,11 @@ describe('getDeletionStatus', () => {
 
     const result = await getDeletionStatus(db, 'account-1');
 
-    expect(result.scheduled).toBe(false);
+    expect(result).toEqual({
+      scheduled: false,
+      deletionScheduledAt: null,
+      gracePeriodEnds: null,
+    });
   });
 
   it('throws when the account is missing', async () => {

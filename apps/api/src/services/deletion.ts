@@ -14,36 +14,46 @@ export async function scheduleDeletion(
   db: Database,
   accountId: string,
 ): Promise<{ gracePeriodEnds: string; scheduledNow: boolean }> {
-  const now = new Date();
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const scheduledAt = await tryScheduleDeletion(db, accountId);
+    if (scheduledAt) {
+      return {
+        gracePeriodEnds: new Date(
+          scheduledAt.getTime() + GRACE_PERIOD_MS,
+        ).toISOString(),
+        scheduledNow: true,
+      };
+    }
+
+    const existing = await getDeletionStatus(db, accountId);
+    if (existing.scheduled && existing.gracePeriodEnds) {
+      return { gracePeriodEnds: existing.gracePeriodEnds, scheduledNow: false };
+    }
+  }
+
+  throw new Error(`account deletion scheduling failed: ${accountId}`);
+}
+
+async function tryScheduleDeletion(
+  db: Database,
+  accountId: string,
+): Promise<Date | null> {
+  const scheduledAt = new Date();
   const [updated] = await db
     .update(accounts)
-    .set({ deletionScheduledAt: now })
+    .set({ deletionScheduledAt: scheduledAt })
     .where(
       and(
         eq(accounts.id, accountId),
         or(
           isNull(accounts.deletionScheduledAt),
-          sql`${accounts.deletionCancelledAt} > ${accounts.deletionScheduledAt}`,
+          sql`${accounts.deletionCancelledAt} >= ${accounts.deletionScheduledAt}`,
         ),
       ),
     )
     .returning({ deletionScheduledAt: accounts.deletionScheduledAt });
 
-  if (updated?.deletionScheduledAt) {
-    return {
-      gracePeriodEnds: new Date(
-        updated.deletionScheduledAt.getTime() + GRACE_PERIOD_MS,
-      ).toISOString(),
-      scheduledNow: true,
-    };
-  }
-
-  const existing = await getDeletionStatus(db, accountId);
-  if (existing.scheduled && existing.gracePeriodEnds) {
-    return { gracePeriodEnds: existing.gracePeriodEnds, scheduledNow: false };
-  }
-
-  throw new Error(`account deletion scheduling failed: ${accountId}`);
+  return updated?.deletionScheduledAt ?? null;
 }
 
 export async function cancelDeletion(
