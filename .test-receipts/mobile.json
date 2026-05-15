@@ -1,12 +1,10 @@
 {
   "scope": "mobile",
-  "verifiedAt": "2026-05-15T14:43:45Z",
-  "verifiedBy": "Codex @ db75",
+  "verifiedAt": "2026-05-15T16:36:36Z",
+  "verifiedBy": "Zuzana Kopečná @ ZLY-Orion",
   "command": "pnpm exec nx run mobile:test",
   "passed": true,
   "testFiles": {
-    "apps/mobile/src/app/(app)/progress.test.tsx": "e4357d454d653f64629903ba69e2961b369370c0",
-    "apps/mobile/src/components/home/ParentHomeScreen.test.tsx": "3334b5a2dd52315c48c7ba432bfa1a105172fa31",
-    "apps/mobile/src/lib/surface-ownership.test.ts": "f5f20f902bea8e5b1e8e462a933466a52d76fec0"
+    "apps/mobile/src/components/home/ParentHomeScreen.test.tsx": "f0d696a1ab62faa05d4bc56c47cfde9ffb693198"
   }
 }

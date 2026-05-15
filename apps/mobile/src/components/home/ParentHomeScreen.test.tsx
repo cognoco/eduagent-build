@@ -210,6 +210,7 @@ describe('ParentHomeScreen', () => {
     screen.getByText('Children');
     screen.getByText('Your family');
     screen.getByTestId('parent-home-family-summary');
+    screen.getByText('Add profile');
     screen.getByText("Show them how it's done: start a quick session.");
     expect(screen.queryByTestId('child-accommodation-row-child-a')).toBeNull();
     expect(screen.queryByTestId('child-accommodation-row-child-b')).toBeNull();
@@ -324,7 +325,7 @@ describe('ParentHomeScreen', () => {
       screen.queryByText('Emma: What made Fractions click today?'),
     ).toBeNull();
     screen.getByText('Fractions · 18 min this week');
-    screen.getByText('1 child · 18 min this week');
+    screen.getByText('Emma · 18 min this week');
     screen.getByText('2 of 5 profiles used');
 
     fireEvent.press(screen.getByTestId('parent-home-tonight-child-a-primary'));
@@ -373,8 +374,8 @@ describe('ParentHomeScreen', () => {
     render(<ParentHomeScreen activeProfile={makeProfile()} />);
     await waitForParentTransitionNotice();
 
-    screen.getByText('You + 1 child');
-    screen.getByText('Children: 18 min this week');
+    screen.getByText('You + Emma');
+    screen.getByText('Emma: 18 min this week');
     screen.getByText('You: Fractions in Math');
     screen.getByText('You lead by example.');
   });
