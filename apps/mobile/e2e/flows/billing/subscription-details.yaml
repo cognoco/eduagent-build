@@ -26,7 +26,7 @@ tags:
     timeout: 15000
 
 # 3. Navigate to More tab (use accessibility label for reliable targeting)
-- tapOn: "More Tab"
+- tapOn: "More"
 
 # 4. Wait for More tab index — First settings row is always above the fold
 - extendedWaitUntil:

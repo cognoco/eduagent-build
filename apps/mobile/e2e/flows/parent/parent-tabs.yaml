@@ -63,7 +63,7 @@ tags:
 # ---------- More tab ----------
 
 # 8. Tap "More" tab (use accessibility label to avoid matching heading)
-- tapOn: "More Tab"
+- tapOn: "More"
 
 # 9. Wait for More screen heading
 - extendedWaitUntil:

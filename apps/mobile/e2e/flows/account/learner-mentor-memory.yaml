@@ -16,7 +16,7 @@ tags:
       id: "learner-screen"
     timeout: 15000
 
-- tapOn: "More Tab"
+- tapOn: "More"
 
 # Wait for the More tab index to render — the first settings row is always
 # above the fold; sign-out-button lives at the bottom of the scroll,

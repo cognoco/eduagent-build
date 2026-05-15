@@ -26,7 +26,7 @@ tags:
       id: "learner-screen"
     timeout: 15000
 
-- tapOn: "More Tab"
+- tapOn: "More"
 
 # Use the always-above-fold first settings row as the screen-loaded signal —
 # sign-out-button lives at the bottom of the scroll and isn't visible on load.

@@ -59,7 +59,7 @@ tags:
     timeout: 15000
 
 # 4. Navigate to More tab
-- tapOn: "More Tab"
+- tapOn: "More"
 
 # 5. Wait for More tab index — First settings row is always above the fold
 - extendedWaitUntil:
