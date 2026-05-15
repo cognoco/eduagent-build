@@ -382,7 +382,12 @@ export default function SessionSummaryScreen() {
       return;
     }
 
-    goBackOrReplace(router, summaryHomeHref);
+    if (isAlreadyPersisted) {
+      goBackOrReplace(router, summaryHomeHref);
+      return;
+    }
+
+    router.replace(summaryHomeHref as Href);
   };
 
   if (!sessionId) {

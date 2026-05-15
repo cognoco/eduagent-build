@@ -75,7 +75,7 @@ type ResolveState =
   | { phase: 'preparing' };
 
 const FIRST_CURRICULUM_SESSION_RETRY_MS = 2_000;
-const FIRST_CURRICULUM_SESSION_MAX_ATTEMPTS = 30;
+const FIRST_CURRICULUM_SESSION_MAX_ATTEMPTS = 3;
 
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -129,6 +129,8 @@ export default function CreateSubjectScreen() {
       subjectId: string;
       subjectName: string;
       bookId?: string;
+      fallbackTopicName?: string;
+      rawInput?: string;
     }) => {
       setResolveState({ phase: 'preparing' });
 
@@ -163,10 +165,10 @@ export default function CreateSubjectScreen() {
           } as Href);
           return;
         } catch (err) {
-          if (
-            isFirstCurriculumPreparingError(err) &&
-            attempt < FIRST_CURRICULUM_SESSION_MAX_ATTEMPTS - 1
-          ) {
+          if (isFirstCurriculumPreparingError(err)) {
+            if (attempt >= FIRST_CURRICULUM_SESSION_MAX_ATTEMPTS - 1) {
+              break;
+            }
             if (cancelledRef.current) return;
             await wait(FIRST_CURRICULUM_SESSION_RETRY_MS);
             if (cancelledRef.current) return;
@@ -175,6 +177,20 @@ export default function CreateSubjectScreen() {
           throw err;
         }
       }
+
+      if (cancelledRef.current) return;
+      router.replace({
+        pathname: '/(app)/session',
+        params: {
+          mode: 'learning',
+          subjectId: input.subjectId,
+          subjectName: input.subjectName,
+          ...(input.fallbackTopicName
+            ? { topicName: input.fallbackTopicName }
+            : {}),
+          ...(input.rawInput ? { rawInput: input.rawInput } : {}),
+        },
+      } as Href);
     },
     [apiClient, router],
   );
@@ -255,6 +271,8 @@ export default function CreateSubjectScreen() {
             subjectId: result.subject.id,
             subjectName: result.subject.name,
             bookId: result.bookId,
+            fallbackTopicName: result.bookTitle ?? rawInput,
+            ...(rawInput ? { rawInput } : {}),
           });
           return;
         }
@@ -291,6 +309,7 @@ export default function CreateSubjectScreen() {
         await transitionToFirstSession({
           subjectId: result.subject.id,
           subjectName: result.subject.name,
+          ...(rawInput ? { rawInput } : {}),
         });
       } catch (err: unknown) {
         // [BUG-692] Don't show error alert if user already navigated away.

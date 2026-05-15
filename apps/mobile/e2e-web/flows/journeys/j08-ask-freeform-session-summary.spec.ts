@@ -94,13 +94,18 @@ test('J-08 learner → Ask → freeform chat → end session → summary → hom
   );
   await pressableClick(page.getByTestId('send-button'));
 
-  const subjectResolution = page.getByTestId('session-subject-resolution');
   const thinkingBulb = page.getByTestId('thinking-bulb-animation');
-  await expect(thinkingBulb.or(subjectResolution)).toBeVisible({
-    timeout: 30_000,
-  });
+  const subjectResolution = page.getByTestId('session-subject-resolution');
+  const firstFollowUp = await Promise.race([
+    thinkingBulb
+      .waitFor({ state: 'visible', timeout: 30_000 })
+      .then(() => 'thinking' as const),
+    subjectResolution
+      .waitFor({ state: 'visible', timeout: 30_000 })
+      .then(() => 'subject-resolution' as const),
+  ]);
 
-  if (await subjectResolution.isVisible().catch(() => false)) {
+  if (firstFollowUp === 'subject-resolution') {
     await pressableClick(page.getByTestId(`subject-resolution-${subjectId}`));
   }
 

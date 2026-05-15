@@ -1,6 +1,6 @@
-import { useEffect } from 'react';
+import { useCallback } from 'react';
 import { View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, usePathname, useRouter } from 'expo-router';
 
 // [BUG-685 / M-5] Required by `unstable_settings.initialRouteName: 'index'`
 // in `_layout.tsx`. The topic stack is rendered cross-tab when the user
@@ -15,8 +15,19 @@ import { useRouter } from 'expo-router';
 // (the closest shared ancestor that contains every shelf and book).
 export default function TopicIndexRedirect(): React.JSX.Element {
   const router = useRouter();
-  useEffect(() => {
-    router.replace('/(app)/library');
-  }, [router]);
+  const pathname = usePathname();
+  useFocusEffect(
+    useCallback(() => {
+      if (
+        pathname !== '/topic' &&
+        pathname !== '/topic/' &&
+        pathname !== '/(app)/topic' &&
+        pathname !== '/(app)/topic/'
+      ) {
+        return;
+      }
+      router.replace('/(app)/library');
+    }, [pathname, router]),
+  );
   return <View testID="topic-index-redirect" />;
 }

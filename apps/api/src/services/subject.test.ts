@@ -21,6 +21,8 @@ import {
 } from './subject';
 import { inngest } from '../inngest/client';
 import * as sentry from './sentry';
+import * as bookGeneration from './book-generation';
+import * as profileService from './profile';
 
 const NOW = new Date('2025-01-15T10:00:00.000Z');
 const profileId = 'test-profile-id';
@@ -466,6 +468,119 @@ describe('createSubjectWithStructure focused_book prewarm', () => {
         bookId: uuidBookId,
       },
     });
+  });
+});
+
+describe('createSubjectWithStructure deterministic fallback', () => {
+  let detectSubjectTypeSpy: jest.SpiedFunction<
+    typeof bookGeneration.detectSubjectType
+  >;
+  let getProfileAgeSpy: jest.SpiedFunction<typeof profileService.getProfileAge>;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    detectSubjectTypeSpy = jest
+      .spyOn(bookGeneration, 'detectSubjectType')
+      .mockRejectedValue(new Error('LLM unavailable'));
+    getProfileAgeSpy = jest
+      .spyOn(profileService, 'getProfileAge')
+      .mockResolvedValue(11);
+  });
+
+  afterEach(() => {
+    detectSubjectTypeSpy.mockRestore();
+    getProfileAgeSpy.mockRestore();
+  });
+
+  it('keeps broad subjects on the book-picker path when LLM classification fails', async () => {
+    const subjectRow = mockSubjectRow({
+      id: uuidSubjectId,
+      profileId: uuidProfileId,
+      name: 'History',
+    });
+    const insertValues = jest.fn((values: unknown) => ({
+      returning: jest
+        .fn()
+        .mockResolvedValue(Array.isArray(values) ? [] : [subjectRow]),
+    }));
+    const db = {
+      query: {
+        curricula: {
+          findFirst: jest.fn().mockResolvedValue(mockCurriculumRow()),
+        },
+      },
+      insert: jest.fn(() => ({
+        values: insertValues,
+      })),
+    } as unknown as Database;
+
+    const result = await createSubjectWithStructure(db, uuidProfileId, {
+      name: 'History',
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        structureType: 'broad',
+        suggestionCount: expect.any(Number),
+        classificationFailed: true,
+      }),
+    );
+    expect(result.suggestionCount).toBeGreaterThanOrEqual(4);
+    expect(insertValues).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({
+          subjectId: uuidSubjectId,
+          title: 'Ancient Civilizations',
+        }),
+      ]),
+    );
+  });
+
+  it('treats an empty broad classification as fallback-generated suggestions', async () => {
+    detectSubjectTypeSpy.mockResolvedValueOnce({
+      type: 'broad',
+      books: [],
+    });
+    const subjectRow = mockSubjectRow({
+      id: uuidSubjectId,
+      profileId: uuidProfileId,
+      name: 'History',
+    });
+    const insertValues = jest.fn((values: unknown) => ({
+      returning: jest
+        .fn()
+        .mockResolvedValue(Array.isArray(values) ? [] : [subjectRow]),
+    }));
+    const db = {
+      query: {
+        curricula: {
+          findFirst: jest.fn().mockResolvedValue(mockCurriculumRow()),
+        },
+      },
+      insert: jest.fn(() => ({
+        values: insertValues,
+      })),
+    } as unknown as Database;
+
+    const result = await createSubjectWithStructure(db, uuidProfileId, {
+      name: 'History',
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        structureType: 'broad',
+        suggestionCount: expect.any(Number),
+        classificationFailed: true,
+      }),
+    );
+    expect(insertValues).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({
+          subjectId: uuidSubjectId,
+          title: 'Ancient Civilizations',
+        }),
+      ]),
+    );
   });
 });
 

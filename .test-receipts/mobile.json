@@ -1,12 +1,26 @@
 {
   "scope": "mobile",
-  "verifiedAt": "2026-05-15T14:11:17Z",
-  "verifiedBy": "Lord Vetinari @ ramtop",
-  "command": "pnpm exec nx run mobile:test",
+  "verifiedAt": "2026-05-15T13:28:24Z",
+  "verifiedBy": "Zuzana Kopečná @ ZLY-ORION",
+  "command": "pnpm exec tsx scripts/check-gc1-pattern-a.ts; pnpm exec jest --config apps/mobile/jest.config.cjs --runInBand --no-coverage --runTestsByPath apps/mobile/src/components/session/use-session-streaming.test.ts --testTimeout=30000",
   "passed": true,
   "testFiles": {
-    "apps/mobile/src/app/(app)/library.test.tsx": "7fa0faf035a0071327a5de41c3a87edca2de8bee",
+    "apps/mobile/src/app/(app)/library.test.tsx": "bffe5768fbd9f356a20812dbef14762829fb2b5c",
     "apps/mobile/src/components/common/MagicPenAnimation.test.tsx": "648579af675c9ab7669f9af1a13faf7575a02af7",
-    "apps/mobile/src/components/home/LearnerScreen.test.tsx": "bd04a10145824b4428163a680f53e243e325aa00"
+    "apps/mobile/src/components/home/LearnerScreen.test.tsx": "bd04a10145824b4428163a680f53e243e325aa00",
+    "apps/mobile/src/app/(app)/child/[profileId]/index.test.tsx": "8e630e5bb286e72e534f299f9c2629e4fdecc2f9",
+    "apps/mobile/src/app/e2e-testid-integrity.test.ts": "5a27cf8d48011d98b365e850c3ca02e399b58cb7",
+    "apps/mobile/src/app/(app)/pick-book/[subjectId].test.tsx": "a45f82e106e28a0646f7e4afed2b0bd00e3101c8",
+    "apps/mobile/src/app/(app)/homework/camera.test.tsx": "cdb171d1be7cb96e2cd3a25f45d0a869a0121f26",
+    "apps/mobile/src/app/(app)/progress/[subjectId]/index.test.tsx": "a1f108a50d5421988df302e3f3da3f88d2249ada",
+    "apps/mobile/src/app/(app)/quiz/launch.test.tsx": "d1390e98bffb9949e00cfe7699b3c0795a7a5eb3",
+    "apps/mobile/src/app/(app)/quiz/play.test.tsx": "e15e6886ba554a5839a80470e663bbe13cba2a86",
+    "apps/mobile/src/app/(app)/topic/index.test.tsx": "94705157ddc55785eb0e913ff7a9c6cdf996f18f",
+    "apps/mobile/src/app/create-subject.test.tsx": "eea715e649e3f771fcc1257d1a74d10c1f0047e2",
+    "apps/mobile/src/app/session-summary/[sessionId].test.tsx": "8608ff7332ea614e948c8c21ec52a776baffe786",
+    "apps/mobile/src/bundle-safety.test.ts": "77d29b952919ca389705bad8fcfb423c475afb19",
+    "apps/mobile/src/components/session/SessionMessageActions.test.tsx": "eebe7e79a05105b20a62f15323b397af85d94120",
+    "apps/mobile/src/components/session/use-session-streaming.test.ts": "79546be9e8b77834d025118f5fce89890eb70a31",
+    "apps/mobile/src/hooks/use-books.test.ts": "72472eea0887b9e53694667c73aceb2ed6236920"
   }
 }

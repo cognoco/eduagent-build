@@ -70,11 +70,15 @@ function errorCodeFrom(error: unknown): string | undefined {
     errorCode?: unknown;
     code?: unknown;
     apiCode?: unknown;
+    name?: unknown;
   };
 
   if (typeof apiError.errorCode === 'string') return apiError.errorCode;
   if (typeof apiError.code === 'string') return apiError.code;
   if (typeof apiError.apiCode === 'string') return apiError.apiCode;
+  if (apiError.name === 'ForbiddenError') return 'FORBIDDEN';
+  if (apiError.name === 'ConsentRequiredError') return 'CONSENT_REQUIRED';
+  if (apiError.name === 'QuotaExceededError') return 'QUOTA_EXCEEDED';
 
   return undefined;
 }

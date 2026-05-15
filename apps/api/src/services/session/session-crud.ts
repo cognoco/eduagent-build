@@ -40,6 +40,7 @@ import type {
   HomeworkSummary,
   EngagementSignal,
   SessionMetadata,
+  BookTopicGenerationResult,
 } from '@eduagent/schemas';
 import {
   celebrationReasonSchema,
@@ -54,6 +55,7 @@ import { createPendingSessionSummary } from '../summaries';
 import { incrementSummarySkips } from '../settings';
 import { persistBookTopics } from '../curriculum';
 import { generateBookTopics } from '../book-generation';
+import { buildFallbackBookTopics } from '../book-generation-fallbacks';
 import { getProfileAge } from '../profile';
 import { computeActiveSeconds } from './session-context-builders';
 import { mapSessionRow } from './session-events';
@@ -245,6 +247,7 @@ export async function startSession(
 
 const FIRST_CURRICULUM_SESSION_WAIT_MS = 25_000;
 const FIRST_CURRICULUM_SESSION_POLL_MS = 750;
+const FOCUSED_BOOK_TOPIC_GENERATION_TIMEOUT_MS = 5_000;
 export const MATCHER_TIMEOUT_MS = 1500;
 export const MATCH_CONFIDENCE_FLOOR = 0.6;
 
@@ -283,6 +286,22 @@ class MatcherTimeoutError extends Error {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  message: string,
+): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  return Promise.race([
+    promise,
+    new Promise<never>((_resolve, reject) => {
+      timeoutId = setTimeout(() => reject(new Error(message)), timeoutMs);
+    }),
+  ]).finally(() => {
+    if (timeoutId) clearTimeout(timeoutId);
+  });
 }
 
 function parseTopicIntentMatcherResponse(
@@ -435,14 +454,32 @@ async function materializeFocusedBookTopics(
   }
 
   const learnerAge = await getProfileAge(db, profileId);
-  const result = await generateBookTopics(
-    book.title,
-    book.description ?? '',
-    learnerAge,
-  );
+  let result: BookTopicGenerationResult;
+  try {
+    result = await withTimeout(
+      generateBookTopics(book.title, book.description ?? '', learnerAge),
+      FOCUSED_BOOK_TOPIC_GENERATION_TIMEOUT_MS,
+      'Focused book topic generation timed out',
+    );
+  } catch (error) {
+    logger.warn('focused_book_topic_generation_fallback', {
+      metric: 'focused_book_topic_generation_fallback',
+      profileId,
+      subjectId,
+      bookId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    result = buildFallbackBookTopics(book.title, book.description ?? '');
+  }
 
   if (result.topics.length === 0) {
-    throw new CurriculumSessionNotReadyError();
+    logger.warn('focused_book_topic_generation_empty_fallback', {
+      metric: 'focused_book_topic_generation_fallback',
+      profileId,
+      subjectId,
+      bookId,
+    });
+    result = buildFallbackBookTopics(book.title, book.description ?? '');
   }
 
   await persistBookTopics(

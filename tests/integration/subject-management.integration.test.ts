@@ -286,7 +286,7 @@ describe('Integration: POST /v1/subjects', () => {
       id: expect.any(String),
       name: 'Mathematics',
     });
-    expect(body.structureType).toBe('narrow');
+    expect(body.structureType).toBe('broad');
   });
 
   it('returns 400 with invalid body (empty name)', async () => {

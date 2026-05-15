@@ -362,6 +362,78 @@ describe('CreateSubjectScreen', () => {
     }
   });
 
+  it('falls back to the learning session surface when first lesson preparation keeps returning conflicts', async () => {
+    jest.useFakeTimers();
+    try {
+      setResolveResponse({
+        status: 'ambiguous',
+        displayMessage: '**Easter** can be studied from different angles.',
+        suggestions: [
+          {
+            name: 'World History',
+            description: 'History of Easter traditions',
+          },
+        ],
+      });
+      createSubjectResponse = {
+        subject: { id: 'subject-wh', name: 'World History' },
+        structureType: 'focused_book',
+        bookId: 'book-easter',
+        bookTitle: 'Easter',
+        bookCount: 1,
+      };
+
+      mockFetch.setRoute(
+        '/sessions/first-curriculum',
+        () =>
+          new Response(
+            JSON.stringify({
+              code: 'CONFLICT',
+              message: 'Curriculum is still being prepared',
+            }),
+            { status: 409, headers: { 'Content-Type': 'application/json' } },
+          ),
+      );
+
+      render(<CreateSubjectScreen />, { wrapper: Wrapper });
+
+      await enterSubjectName('Easter');
+      fireEvent.press(screen.getByTestId('create-subject-submit'));
+
+      await waitFor(() => {
+        screen.getByTestId('subject-suggestion-option-0');
+      });
+
+      fireEvent.press(screen.getByTestId('subject-suggestion-option-0'));
+
+      await waitFor(() => {
+        screen.getByText('Preparing your first lesson...');
+      });
+
+      await act(async () => {
+        jest.advanceTimersByTime(2_000);
+      });
+      await act(async () => {
+        jest.advanceTimersByTime(2_000);
+      });
+
+      await waitFor(() => {
+        expect(mockReplace).toHaveBeenCalledWith({
+          pathname: '/(app)/session',
+          params: {
+            mode: 'learning',
+            subjectId: 'subject-wh',
+            subjectName: 'World History',
+            topicName: 'Easter',
+            rawInput: 'Easter',
+          },
+        });
+      });
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
   it('reveals the clarify input when Something else is pressed', async () => {
     setResolveResponse({
       status: 'ambiguous',

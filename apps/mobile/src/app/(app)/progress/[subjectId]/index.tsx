@@ -79,6 +79,14 @@ export default function ProgressSubjectScreen(): React.ReactElement {
     (entry) => entry.subjectId === subjectId,
   );
   const legacyProgress = subjectProgressQuery.data;
+  const hasRetentionSignal =
+    !!legacyProgress &&
+    ((subject?.sessionsCount ?? 0) > 0 ||
+      legacyProgress.retentionStatus !== 'strong' ||
+      legacyProgress.urgencyScore > 0 ||
+      legacyProgress.topicsCompleted > 0 ||
+      legacyProgress.topicsVerified > 0 ||
+      legacyProgress.lastSessionAt != null);
   const isLanguageSubject =
     subject?.pedagogyMode === 'four_strands' || !!languageProgress;
   const canResumeSubject = !!resumeTargetQuery.data;
@@ -552,7 +560,7 @@ export default function ProgressSubjectScreen(): React.ReactElement {
                   </Text>
                 </Pressable>
               </View>
-            ) : legacyProgress && subject.sessionsCount > 0 ? (
+            ) : hasRetentionSignal ? (
               <Pressable
                 onPress={handlePrimarySubjectAction}
                 className="bg-surface rounded-card p-4 mt-4"

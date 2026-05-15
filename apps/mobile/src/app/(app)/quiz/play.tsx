@@ -38,7 +38,7 @@ import {
   type GuessWhoResolvedResult,
 } from '../../../components/quiz/GuessWhoQuestion';
 import { RewardBurst } from '../../../components/common/RewardBurst';
-import { rewardVariantForActivity } from './_quiz-utils';
+import { dismissToQuizIndex, rewardVariantForActivity } from './_quiz-utils';
 
 type AnswerState = 'unanswered' | 'checking' | 'correct' | 'wrong';
 
@@ -254,7 +254,7 @@ export default function QuizPlayScreen(): React.ReactElement {
   const handleLeaveRoundForQuizHome = () => {
     clearRoundAfterExitRef.current = true;
     setQuitConfirmVisible(false);
-    router.replace('/(app)/quiz' as Href);
+    dismissToQuizIndex(router);
   };
   const handleConfirmQuit = () => {
     handleLeaveRoundForQuizHome();
@@ -399,7 +399,7 @@ export default function QuizPlayScreen(): React.ReactElement {
         </Text>
         <View className="flex-row gap-3 w-full">
           <Pressable
-            onPress={() => router.replace('/(app)/quiz' as Href)}
+            onPress={() => dismissToQuizIndex(router)}
             className="flex-1 bg-primary rounded-button px-4 py-3 min-h-[48px] items-center justify-center"
             accessibilityRole="button"
             accessibilityLabel={t('common.retry')}

@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { QuestionCounter, LibraryPrompt } from '../session';
+import { LibraryPrompt } from './LibraryPrompt';
+import { QuestionCounter } from './QuestionCounter';
 import { NoteInput } from '../library/NoteInput';
 import type { useFiling } from '../../hooks/use-filing';
 import type { useCreateNote } from '../../hooks/use-notes';

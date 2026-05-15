@@ -8,7 +8,7 @@ import type {
   CelebrationReason,
 } from '@eduagent/schemas';
 import type { Router, Href } from 'expo-router';
-import type { ChatMessage } from '../session';
+import type { ChatMessage } from './ChatShell';
 import type {
   useCloseSession,
   useRecordSystemPrompt,

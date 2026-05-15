@@ -5,9 +5,9 @@ import {
 } from './use-session-streaming';
 import { QuotaExceededError } from '../../lib/api-client';
 
-// Mock session components barrel (animateResponse)
+// Mock ChatShell directly so the hook can avoid the session barrel cycle.
 // prettier-ignore
-jest.mock('../session', () => ({ // gc1-allow: barrel exports RN components (ChatShell, MessageBubble, animations) cannot render in JSDOM
+jest.mock('./ChatShell', () => ({ // gc1-allow: hook test avoids the session barrel cycle; only the animation helper is needed
   animateResponse: jest.fn(() => jest.fn()),
 }));
 
@@ -559,7 +559,7 @@ describe('useSessionStreaming', () => {
       });
 
       // animateResponse should be called with an error message
-      const { animateResponse } = require('../session');
+      const { animateResponse } = require('./ChatShell');
       expect(animateResponse).toHaveBeenCalledWith(
         expect.stringContaining('select a subject'),
         opts.setMessages,

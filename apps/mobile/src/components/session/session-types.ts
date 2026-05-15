@@ -1,5 +1,5 @@
 import type { PendingCelebration } from '@eduagent/schemas';
-import type { ChatMessage } from '../session';
+import type { ChatMessage } from './ChatShell';
 import { sanitizeSecureStoreKey } from '../../lib/secure-storage';
 
 export function computePaceMultiplier(

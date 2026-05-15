@@ -24,6 +24,7 @@ import {
   curriculumTopics,
   retentionCards,
 } from '@eduagent/database';
+import { desc, eq } from 'drizzle-orm';
 
 import {
   buildIntegrationEnv,
@@ -50,7 +51,7 @@ async function createOwnerProfile(): Promise<string> {
         birthYear: 2000,
       }),
     },
-    TEST_ENV
+    TEST_ENV,
   );
 
   expect(res.status).toBe(201);
@@ -65,11 +66,11 @@ async function createSubject(profileId: string, name: string): Promise<string> {
       method: 'POST',
       headers: buildAuthHeaders(
         { sub: AUTH_USER_ID, email: AUTH_EMAIL },
-        profileId
+        profileId,
       ),
       body: JSON.stringify({ name }),
     },
-    TEST_ENV
+    TEST_ENV,
   );
 
   expect(res.status).toBe(201);
@@ -83,13 +84,30 @@ async function createSubject(profileId: string, name: string): Promise<string> {
 
 async function seedCurriculumWithTopics(
   subjectId: string,
-  topicTitles: string[]
+  topicTitles: string[],
 ): Promise<{ curriculumId: string; topicIds: string[] }> {
   const db = createIntegrationDb();
-  const [curriculum] = await db
-    .insert(curricula)
-    .values({ subjectId })
-    .returning({ id: curricula.id });
+  const existingCurriculum = await db.query.curricula.findFirst({
+    where: eq(curricula.subjectId, subjectId),
+    orderBy: desc(curricula.version),
+  });
+  const curriculum =
+    existingCurriculum ??
+    (
+      await db
+        .insert(curricula)
+        .values({ subjectId })
+        .returning({ id: curricula.id })
+    )[0];
+
+  expect(curriculum).toBeDefined();
+
+  await db
+    .delete(curriculumTopics)
+    .where(eq(curriculumTopics.curriculumId, curriculum!.id));
+  await db
+    .delete(curriculumBooks)
+    .where(eq(curriculumBooks.subjectId, subjectId));
 
   const [book] = await db
     .insert(curriculumBooks)
@@ -116,10 +134,28 @@ async function seedCurriculumWithTopics(
   return { curriculumId: curriculum!.id, topicIds };
 }
 
+async function removeCurriculum(subjectId: string): Promise<void> {
+  const db = createIntegrationDb();
+  const subjectCurricula = await db.query.curricula.findMany({
+    where: eq(curricula.subjectId, subjectId),
+  });
+
+  for (const curriculum of subjectCurricula) {
+    await db
+      .delete(curriculumTopics)
+      .where(eq(curriculumTopics.curriculumId, curriculum.id));
+  }
+
+  await db.delete(curricula).where(eq(curricula.subjectId, subjectId));
+  await db
+    .delete(curriculumBooks)
+    .where(eq(curriculumBooks.subjectId, subjectId));
+}
+
 async function seedRetentionCard(
   profileId: string,
   topicId: string,
-  overrides: Partial<typeof retentionCards.$inferInsert> = {}
+  overrides: Partial<typeof retentionCards.$inferInsert> = {},
 ): Promise<string> {
   const db = createIntegrationDb();
   const [card] = await db
@@ -182,17 +218,17 @@ describe('Integration: GET /v1/subjects/:subjectId/retention', () => {
         method: 'GET',
         headers: buildAuthHeaders(
           { sub: AUTH_USER_ID, email: AUTH_EMAIL },
-          profileId
+          profileId,
         ),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.topics).toHaveLength(2);
     expect(
-      body.topics.map((t: { topicTitle: string }) => t.topicTitle)
+      body.topics.map((t: { topicTitle: string }) => t.topicTitle),
     ).toEqual(expect.arrayContaining(['Derivatives', 'Integrals']));
     // One card has nextReviewAt in the past → due
     expect(body.reviewDueCount).toBe(1);
@@ -202,6 +238,7 @@ describe('Integration: GET /v1/subjects/:subjectId/retention', () => {
     const profileId = await createOwnerProfile();
 
     const subjectId = await createSubject(profileId, 'Empty Subject');
+    await removeCurriculum(subjectId);
 
     const res = await app.request(
       `/v1/subjects/${subjectId}/retention`,
@@ -209,10 +246,10 @@ describe('Integration: GET /v1/subjects/:subjectId/retention', () => {
         method: 'GET',
         headers: buildAuthHeaders(
           { sub: AUTH_USER_ID, email: AUTH_EMAIL },
-          profileId
+          profileId,
         ),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -242,10 +279,10 @@ describe('Integration: GET /v1/topics/:topicId/retention', () => {
         method: 'GET',
         headers: buildAuthHeaders(
           { sub: AUTH_USER_ID, email: AUTH_EMAIL },
-          profileId
+          profileId,
         ),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -268,10 +305,10 @@ describe('Integration: GET /v1/topics/:topicId/retention', () => {
         method: 'GET',
         headers: buildAuthHeaders(
           { sub: AUTH_USER_ID, email: AUTH_EMAIL },
-          profileId
+          profileId,
         ),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -301,7 +338,7 @@ describe('Integration: POST /v1/retention/recall-test', () => {
         method: 'POST',
         headers: buildAuthHeaders(
           { sub: AUTH_USER_ID, email: AUTH_EMAIL },
-          profileId
+          profileId,
         ),
         body: JSON.stringify({
           topicId: topicIds[0],
@@ -309,7 +346,7 @@ describe('Integration: POST /v1/retention/recall-test', () => {
             'Calculus is the mathematical study of continuous change, using derivatives and integrals to analyze rates and areas',
         }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -335,14 +372,14 @@ describe('Integration: POST /v1/retention/recall-test', () => {
         method: 'POST',
         headers: buildAuthHeaders(
           { sub: AUTH_USER_ID, email: AUTH_EMAIL },
-          profileId
+          profileId,
         ),
         body: JSON.stringify({
           topicId: topicIds[0],
           answer: 'Something math',
         }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -368,14 +405,14 @@ describe('Integration: POST /v1/retention/recall-test', () => {
         method: 'POST',
         headers: buildAuthHeaders(
           { sub: AUTH_USER_ID, email: AUTH_EMAIL },
-          profileId
+          profileId,
         ),
         body: JSON.stringify({
           topicId: topicIds[0],
           answer: 'No idea',
         }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -399,11 +436,11 @@ describe('Integration: POST /v1/retention/recall-test', () => {
         method: 'POST',
         headers: buildAuthHeaders(
           { sub: AUTH_USER_ID, email: AUTH_EMAIL },
-          profileId
+          profileId,
         ),
         body: JSON.stringify({ answer: 'Something' }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(400);
@@ -420,7 +457,7 @@ describe('Integration: POST /v1/retention/recall-test', () => {
           answer: 'Something',
         }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(401);
@@ -454,14 +491,14 @@ describe('Integration: POST /v1/retention/relearn', () => {
         method: 'POST',
         headers: buildAuthHeaders(
           { sub: AUTH_USER_ID, email: AUTH_EMAIL },
-          profileId
+          profileId,
         ),
         body: JSON.stringify({
           topicId: topicIds[0],
           method: 'same',
         }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -503,10 +540,10 @@ describe('Integration: GET /v1/subjects/:subjectId/needs-deepening', () => {
         method: 'GET',
         headers: buildAuthHeaders(
           { sub: AUTH_USER_ID, email: AUTH_EMAIL },
-          profileId
+          profileId,
         ),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -531,14 +568,14 @@ describe('Integration: GET /v1/subjects/:subjectId/needs-deepening', () => {
         method: 'POST',
         headers: buildAuthHeaders(
           { sub: AUTH_USER_ID, email: AUTH_EMAIL },
-          profileId
+          profileId,
         ),
         body: JSON.stringify({
           topicId: topicIds[0],
           method: 'same',
         }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     const res = await app.request(
@@ -547,10 +584,10 @@ describe('Integration: GET /v1/subjects/:subjectId/needs-deepening', () => {
         method: 'GET',
         headers: buildAuthHeaders(
           { sub: AUTH_USER_ID, email: AUTH_EMAIL },
-          profileId
+          profileId,
         ),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -578,10 +615,10 @@ describe('Integration: Teaching Preference CRUD', () => {
         method: 'GET',
         headers: buildAuthHeaders(
           { sub: AUTH_USER_ID, email: AUTH_EMAIL },
-          profileId
+          profileId,
         ),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -601,14 +638,14 @@ describe('Integration: Teaching Preference CRUD', () => {
         method: 'PUT',
         headers: buildAuthHeaders(
           { sub: AUTH_USER_ID, email: AUTH_EMAIL },
-          profileId
+          profileId,
         ),
         body: JSON.stringify({
           subjectId,
           method: 'step_by_step',
         }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(putRes.status).toBe(200);
@@ -622,10 +659,10 @@ describe('Integration: Teaching Preference CRUD', () => {
         method: 'GET',
         headers: buildAuthHeaders(
           { sub: AUTH_USER_ID, email: AUTH_EMAIL },
-          profileId
+          profileId,
         ),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(getRes.status).toBe(200);
@@ -645,7 +682,7 @@ describe('Integration: Teaching Preference CRUD', () => {
         method: 'PUT',
         headers: buildAuthHeaders(
           { sub: AUTH_USER_ID, email: AUTH_EMAIL },
-          profileId
+          profileId,
         ),
         body: JSON.stringify({
           subjectId,
@@ -653,7 +690,7 @@ describe('Integration: Teaching Preference CRUD', () => {
           analogyDomain: 'sports',
         }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -674,11 +711,11 @@ describe('Integration: Teaching Preference CRUD', () => {
         method: 'PUT',
         headers: buildAuthHeaders(
           { sub: AUTH_USER_ID, email: AUTH_EMAIL },
-          profileId
+          profileId,
         ),
         body: JSON.stringify({ subjectId, method: 'visual_diagrams' }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     // Delete
@@ -688,10 +725,10 @@ describe('Integration: Teaching Preference CRUD', () => {
         method: 'DELETE',
         headers: buildAuthHeaders(
           { sub: AUTH_USER_ID, email: AUTH_EMAIL },
-          profileId
+          profileId,
         ),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(delRes.status).toBe(200);
@@ -705,10 +742,10 @@ describe('Integration: Teaching Preference CRUD', () => {
         method: 'GET',
         headers: buildAuthHeaders(
           { sub: AUTH_USER_ID, email: AUTH_EMAIL },
-          profileId
+          profileId,
         ),
       },
-      TEST_ENV
+      TEST_ENV,
     );
     const getBody = await getRes.json();
     expect(getBody.preference).toBeNull();
@@ -743,10 +780,10 @@ describe('Integration: GET /v1/retention/stability', () => {
         method: 'GET',
         headers: buildAuthHeaders(
           { sub: AUTH_USER_ID, email: AUTH_EMAIL },
-          profileId
+          profileId,
         ),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -754,10 +791,10 @@ describe('Integration: GET /v1/retention/stability', () => {
     expect(body.topics).toHaveLength(2);
 
     const stable = body.topics.find(
-      (t: { topicId: string }) => t.topicId === topicIds[0]
+      (t: { topicId: string }) => t.topicId === topicIds[0],
     );
     const unstable = body.topics.find(
-      (t: { topicId: string }) => t.topicId === topicIds[1]
+      (t: { topicId: string }) => t.topicId === topicIds[1],
     );
 
     expect(stable.isStable).toBe(true);
@@ -781,10 +818,10 @@ describe('Integration: GET /v1/retention/stability', () => {
         method: 'GET',
         headers: buildAuthHeaders(
           { sub: AUTH_USER_ID, email: AUTH_EMAIL },
-          profileId
+          profileId,
         ),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);

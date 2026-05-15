@@ -352,8 +352,6 @@ describe('QuizLaunchScreen', () => {
     it('suppresses Retry for ForbiddenError-shaped launch failures', () => {
       const forbidden = Object.assign(new Error('Insufficient permissions'), {
         name: 'ForbiddenError',
-        errorCode: 'FORBIDDEN',
-        apiCode: 'FORBIDDEN',
       });
       mockGenerateRound = {
         mutate: mockMutate,

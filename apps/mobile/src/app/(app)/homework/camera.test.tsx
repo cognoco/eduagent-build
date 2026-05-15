@@ -215,6 +215,10 @@ function createWrapper() {
         gcTime: 0,
         refetchOnWindowFocus: false,
       },
+      mutations: {
+        retry: false,
+        gcTime: 0,
+      },
     },
   });
   return function Wrapper({ children }: { children: React.ReactNode }) {

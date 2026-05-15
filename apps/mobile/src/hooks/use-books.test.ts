@@ -180,6 +180,32 @@ describe('useBooks', () => {
     expect(result.current.error?.message).toContain('Network request failed');
   });
 
+  it('uses aggregate library books as initial shelf data when available', async () => {
+    const wrapper = createWrapper();
+    queryClient.setQueryData(['library', 'books', 'test-profile-id'], {
+      subjects: [
+        {
+          subjectId: 'subject-1',
+          subjectName: 'History',
+          books: mockBooks,
+        },
+      ],
+    });
+    mockFetch.mockRejectedValueOnce(new Error('Network request failed'));
+
+    const { result } = renderHook(() => useBooks('subject-1'), {
+      wrapper,
+    });
+
+    expect(result.current.data).toEqual(mockBooks);
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalled();
+    });
+
+    expect(result.current.data).toEqual(mockBooks);
+  });
+
   it('unwraps legacy wrapped cache entries from the books query key', async () => {
     const wrapper = createWrapper();
     queryClient.setQueryData(['books', 'subject-1', 'test-profile-id'], {
