@@ -51,7 +51,8 @@ async function startServer() {
   // For a local static file server the event-loop cost is negligible.
   const server = http.createServer((request, response) => {
     const url = new URL(request.url ?? '/', `http://${host}:${port}`);
-    let candidate = path.join(distDir, path.normalize(url.pathname));
+    const safePath = path.normalize(url.pathname).replace(/^(\.\.[/\\])+/, '');
+    let candidate = path.join(distDir, safePath);
 
     // [I-17] Path traversal containment
     const resolvedCandidate = path.resolve(candidate);
@@ -90,8 +91,11 @@ async function startServer() {
   });
 
   server.on('error', (err) => {
-    console.error(`[serve] fatal: ${err.message}`);
-    process.exit(1);
+    console.error(`[serve] server error: ${err.message}`);
+    // EADDRINUSE is non-fatal: Playwright's reuseExistingServer handles it.
+    // All other errors (permissions, unexpected) are fatal — exit immediately
+    // so Playwright gets a clear signal instead of a 240s timeout.
+    if (err.code !== 'EADDRINUSE') process.exit(1);
   });
 
   server.keepAliveTimeout = 0;

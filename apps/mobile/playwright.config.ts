@@ -6,8 +6,8 @@ const e2eWebDir = path.join(process.cwd(), 'apps', 'mobile', 'e2e-web');
 const shouldStartLocalApi = process.env.PLAYWRIGHT_SKIP_LOCAL_API !== '1';
 // *.workers.dev URLs are platform-rate-limited → 1 worker.
 // Custom domains (api-test.mentomate.com) are not → full parallelism.
-// If CI switches from workers.dev to a custom domain, 4 workers is correct
-// (the custom domain's zone has no rate-limiting).
+// Switching CI to a custom domain intentionally enables 4 workers —
+// that is the desired behavior, not a bug. See p5-execution-status.md.
 const usesSharedStagingApi =
   process.env.PLAYWRIGHT_SKIP_LOCAL_API === '1' &&
   apiBaseUrl.includes('.workers.dev');
