@@ -836,12 +836,10 @@ function ConsentPendingGate(): React.ReactElement {
     activeProfile?.consentStatus === 'PARENTAL_CONSENT_REQUESTED';
 
   const refreshConsentGate = React.useCallback(async () => {
-    await queryClient.invalidateQueries({
-      predicate: (query) => {
-        const key = String(query.queryKey[0]);
-        return key === 'profiles' || key === 'consent-status';
-      },
-    });
+    await Promise.all([
+      queryClient.refetchQueries({ queryKey: ['profiles'] }),
+      queryClient.refetchQueries({ queryKey: ['consent-status'] }),
+    ]);
   }, [queryClient]);
 
   const onCheckAgain = async () => {
