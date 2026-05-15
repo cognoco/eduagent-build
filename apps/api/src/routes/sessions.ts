@@ -22,6 +22,7 @@ import {
   streamFallbackFrameSchema,
   UpstreamLlmError,
   getSubjectSessionsResponseSchema,
+  type SubscriptionTier,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import { z } from 'zod';
@@ -111,6 +112,7 @@ type SessionRouteEnv = {
     db: Database;
     profileId: string | undefined;
     subscriptionId: string;
+    subscriptionTier: SubscriptionTier | undefined;
     llmTier: LLMTier;
   };
 };
@@ -277,6 +279,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const clientId = c.req.header('Idempotency-Key')?.trim() || undefined;
 
       const llmTier = c.get('llmTier');
+      const subscriptionTier = c.get('subscriptionTier');
       const memoryFactsReadEnabled = isMemoryFactsReadEnabled(
         c.env.MEMORY_FACTS_READ_ENABLED,
       );
@@ -292,6 +295,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
           c.req.valid('json'),
           {
             llmTier,
+            subscriptionTier,
             voyageApiKey: c.env.VOYAGE_API_KEY,
             clientId,
             memoryFactsReadEnabled,
@@ -419,6 +423,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       if (!session) return notFound(c, 'Session not found');
 
       const llmTier = c.get('llmTier');
+      const subscriptionTier = c.get('subscriptionTier');
       const memoryFactsReadEnabled = isMemoryFactsReadEnabled(
         c.env.MEMORY_FACTS_READ_ENABLED,
       );
@@ -434,6 +439,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
           input,
           {
             llmTier,
+            subscriptionTier,
             voyageApiKey: c.env.VOYAGE_API_KEY,
             clientId,
             memoryFactsReadEnabled,
@@ -496,6 +502,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                   input,
                   {
                     llmTier,
+                    subscriptionTier,
                     voyageApiKey: c.env.VOYAGE_API_KEY,
                     clientId,
                     memoryFactsReadEnabled,
@@ -795,6 +802,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
               input,
               {
                 llmTier,
+                subscriptionTier,
                 voyageApiKey: c.env.VOYAGE_API_KEY,
                 clientId,
                 memoryFactsReadEnabled,

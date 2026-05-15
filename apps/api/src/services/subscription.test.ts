@@ -11,6 +11,8 @@ describe('getTierConfig', () => {
     expect(config.monthlyQuota).toBe(100);
     expect(config.dailyLimit).toBe(10);
     expect(config.maxProfiles).toBe(1);
+    expect(config.premiumModelProfiles).toBe(0);
+    expect(config.llmTier).toBe('flash');
     expect(config.priceMonthly).toBe(0);
     expect(config.priceYearly).toBe(0);
     expect(config.topUpPrice).toBe(0);
@@ -23,6 +25,8 @@ describe('getTierConfig', () => {
     expect(config.monthlyQuota).toBe(700);
     expect(config.dailyLimit).toBeNull();
     expect(config.maxProfiles).toBe(1);
+    expect(config.premiumModelProfiles).toBe(0);
+    expect(config.llmTier).toBe('standard');
     expect(config.priceMonthly).toBe(18.99);
     expect(config.priceYearly).toBe(168);
     expect(config.topUpPrice).toBe(10);
@@ -34,6 +38,8 @@ describe('getTierConfig', () => {
 
     expect(config.monthlyQuota).toBe(1500);
     expect(config.maxProfiles).toBe(4);
+    expect(config.premiumModelProfiles).toBe(0);
+    expect(config.llmTier).toBe('standard');
     expect(config.priceMonthly).toBe(28.99);
     expect(config.priceYearly).toBe(252);
     expect(config.topUpPrice).toBe(5);
@@ -45,6 +51,8 @@ describe('getTierConfig', () => {
 
     expect(config.monthlyQuota).toBe(3000);
     expect(config.maxProfiles).toBe(6);
+    expect(config.premiumModelProfiles).toBe(2);
+    expect(config.llmTier).toBe('standard');
     expect(config.priceMonthly).toBe(48.99);
     expect(config.priceYearly).toBe(432);
     expect(config.topUpPrice).toBe(5);

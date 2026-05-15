@@ -121,6 +121,28 @@ describe('LLM Router', () => {
       expect(r5.model).toBe('gemini-2.5-pro');
     });
 
+    it('prefers GPT for hard turns when OpenAI is requested', async () => {
+      _clearProviders();
+      _resetCircuits();
+      registerProvider(createMockProvider('gemini'));
+      registerProvider(createMockProvider('openai'));
+
+      try {
+        const result = await routeAndCall(
+          [{ role: 'user', content: 'test' }],
+          4,
+          { preferredProvider: 'openai' },
+        );
+
+        expect(result.provider).toBe('openai');
+        expect(result.model).toBe('gpt-4o');
+      } finally {
+        _clearProviders();
+        _resetCircuits();
+        registerProvider(createMockProvider('gemini'));
+      }
+    });
+
     it('throws when no provider is registered for the resolved id', async () => {
       // Register a provider under an unrelated name; 'openai' is never used by
       // getModelConfig so the existing 'gemini' registration is irrelevant here.

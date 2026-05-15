@@ -21,6 +21,7 @@ import type {
   LearningStyle,
   StrengthEntry,
   StruggleEntry,
+  SubscriptionTier,
   VerificationType,
 } from '@eduagent/schemas';
 import {
@@ -65,7 +66,8 @@ import {
 import { shouldTriggerEvaluate } from '../evaluate';
 import { shouldTriggerTeachBack } from '../teach-back';
 import { getRetentionStatus, type RetentionState } from '../retention';
-import type { EscalationRung } from '../llm';
+import type { EscalationRung, PreferredLlmProvider } from '../llm';
+import type { LLMTier } from '../subscription';
 import { inngest } from '../../inngest/client';
 import {
   getSessionStaticContext,
@@ -113,6 +115,41 @@ const BANNED_FILLER_OPENERS = [
  */
 const LANGUAGE_REGEX =
   /\b(how do (you|i) say|translate|in (french|spanish|german|czech|italian|portuguese|japanese|chinese|korean|arabic|russian|hindi|dutch|polish|swedish|norwegian|danish|finnish|greek|turkish|hungarian|romanian|thai|vietnamese|indonesian|malay|tagalog|swahili|hebrew|ukrainian|croatian|serbian|slovak|slovenian|bulgarian|latvian|lithuanian|estonian)|what('s| is) .+ in \w+)\b/i;
+
+const PLUS_HARD_TURN_RUNG = 4;
+const PLUS_HARD_TURN_ROUTING_REASON = 'plus_hard_turn_claude';
+
+export interface ExchangeLlmRouting {
+  llmTier?: LLMTier;
+  preferredProvider?: PreferredLlmProvider;
+  routingReason?: string;
+}
+
+export function resolveExchangeLlmRouting(input: {
+  subscriptionTier?: SubscriptionTier;
+  requestedLlmTier?: LLMTier;
+  effectiveRung: EscalationRung;
+}): ExchangeLlmRouting {
+  if (input.requestedLlmTier === 'premium') {
+    return {
+      llmTier: 'premium',
+      routingReason: 'premium_profile_or_addon',
+    };
+  }
+
+  if (
+    input.subscriptionTier === 'plus' &&
+    input.effectiveRung >= PLUS_HARD_TURN_RUNG
+  ) {
+    return {
+      llmTier: 'standard',
+      preferredProvider: 'anthropic',
+      routingReason: PLUS_HARD_TURN_ROUTING_REASON,
+    };
+  }
+
+  return { llmTier: input.requestedLlmTier };
+}
 
 async function recordSessionPracticeActivityEvent(
   db: Database,
@@ -203,6 +240,18 @@ export interface ExchangeBehavioralMetrics {
   drillCorrect?: number;
   /** Fluency-drill score total count, when the envelope's ui_hints.fluency_drill.score was set. */
   drillTotal?: number;
+  /** LLM routing tier used for this exchange. */
+  llmTier?: LLMTier;
+  /** Preferred provider requested for this exchange, when an experiment overrides default routing. */
+  preferredLlmProvider?: PreferredLlmProvider;
+  /** Reason code for any non-default routing choice. */
+  llmRoutingReason?: string;
+  /** Provider that produced the response, or the initial streaming provider. */
+  llmProvider?: string;
+  /** Model that produced the response, or the initial streaming model. */
+  llmModel?: string;
+  /** True when streaming fell back from the initial provider before first byte. */
+  llmFallbackUsed?: boolean;
 }
 
 function mapRetrievalScoreToDepth(score: number): 'low' | 'mid' | 'high' {
@@ -651,7 +700,8 @@ export async function prepareExchangeContext(
   options?: {
     voyageApiKey?: string;
     homeworkMode?: 'help_me' | 'check_answer';
-    llmTier?: import('../subscription').LLMTier;
+    llmTier?: LLMTier;
+    subscriptionTier?: SubscriptionTier;
     memoryFactsReadEnabled?: boolean;
     memoryFactsRelevanceEnabled?: boolean;
   },
@@ -1162,6 +1212,11 @@ export async function prepareExchangeContext(
   const effectiveRung = escalationDecision.shouldEscalate
     ? escalationDecision.newRung
     : currentRung;
+  const llmRouting = resolveExchangeLlmRouting({
+    subscriptionTier: options?.subscriptionTier,
+    requestedLlmTier: options?.llmTier,
+    effectiveRung,
+  });
 
   // 5. Build prior learning context (FR40 — bridge FR)
   const priorLearning = buildPriorLearningContext(priorTopics);
@@ -1468,7 +1523,9 @@ export async function prepareExchangeContext(
     // FR228: Homework mode — passed from client per exchange
     homeworkMode: options?.homeworkMode,
     // Subscription-derived LLM tier — controls model routing
-    llmTier: options?.llmTier,
+    llmTier: llmRouting.llmTier,
+    preferredLlmProvider: llmRouting.preferredProvider,
+    llmRoutingReason: llmRouting.routingReason,
     // CFLF: Original learner input so the LLM stays anchored to intent
     rawInput: session.rawInput,
     inputMode: session.inputMode,
@@ -1543,6 +1600,24 @@ export async function persistExchangeResult(
       }),
       ...(behavioral.retrievalScore !== undefined && {
         retrievalScore: behavioral.retrievalScore,
+      }),
+      ...(behavioral.llmTier !== undefined && {
+        llmTier: behavioral.llmTier,
+      }),
+      ...(behavioral.preferredLlmProvider !== undefined && {
+        preferredLlmProvider: behavioral.preferredLlmProvider,
+      }),
+      ...(behavioral.llmRoutingReason !== undefined && {
+        llmRoutingReason: behavioral.llmRoutingReason,
+      }),
+      ...(behavioral.llmProvider !== undefined && {
+        llmProvider: behavioral.llmProvider,
+      }),
+      ...(behavioral.llmModel !== undefined && {
+        llmModel: behavioral.llmModel,
+      }),
+      ...(behavioral.llmFallbackUsed !== undefined && {
+        llmFallbackUsed: behavioral.llmFallbackUsed,
       }),
     }),
   };
@@ -1812,7 +1887,8 @@ export async function processMessage(
   input: SessionMessageInput,
   options?: {
     voyageApiKey?: string;
-    llmTier?: import('../subscription').LLMTier;
+    llmTier?: LLMTier;
+    subscriptionTier?: SubscriptionTier;
     clientId?: string;
     memoryFactsReadEnabled?: boolean;
     memoryFactsRelevanceEnabled?: boolean;
@@ -1913,6 +1989,11 @@ export async function processMessage(
       retrievalScore: result.retrievalScore,
       drillCorrect: result.fluencyDrill?.score?.correct,
       drillTotal: result.fluencyDrill?.score?.total,
+      llmTier: context.llmTier,
+      preferredLlmProvider: context.preferredLlmProvider,
+      llmRoutingReason: context.llmRoutingReason,
+      llmProvider: result.provider,
+      llmModel: result.model,
     },
     options?.clientId,
   );
@@ -1961,7 +2042,8 @@ export async function streamMessage(
   input: SessionMessageInput,
   options?: {
     voyageApiKey?: string;
-    llmTier?: import('../subscription').LLMTier;
+    llmTier?: LLMTier;
+    subscriptionTier?: SubscriptionTier;
     clientId?: string;
     memoryFactsReadEnabled?: boolean;
     memoryFactsRelevanceEnabled?: boolean;
@@ -2157,6 +2239,12 @@ export async function streamMessage(
           retrievalScore: parsed.retrievalScore,
           drillCorrect: parsed.fluencyDrill?.score?.correct,
           drillTotal: parsed.fluencyDrill?.score?.total,
+          llmTier: context.llmTier,
+          preferredLlmProvider: context.preferredLlmProvider,
+          llmRoutingReason: context.llmRoutingReason,
+          llmProvider: result.provider,
+          llmModel: result.model,
+          llmFallbackUsed: result.fallbackUsed === true,
         },
         options?.clientId,
       );

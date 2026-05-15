@@ -1426,7 +1426,8 @@ describe('session routes', () => {
         { message: 'ok' },
         expect.objectContaining({
           clientId: undefined,
-          llmTier: 'premium',
+          llmTier: 'standard',
+          subscriptionTier: 'plus',
         }),
       );
       expect(mockSafeRefundQuota).not.toHaveBeenCalled();
@@ -1479,7 +1480,8 @@ describe('session routes', () => {
         { message: 'ok' },
         expect.objectContaining({
           clientId: undefined,
-          llmTier: 'premium',
+          llmTier: 'standard',
+          subscriptionTier: 'plus',
         }),
       );
       expect(mockSafeRefundQuota).not.toHaveBeenCalled();
@@ -1523,7 +1525,8 @@ describe('session routes', () => {
         { message: 'ok' },
         expect.objectContaining({
           clientId: undefined,
-          llmTier: 'premium',
+          llmTier: 'standard',
+          subscriptionTier: 'plus',
         }),
       );
       expect(mockSafeRefundQuota).not.toHaveBeenCalled();

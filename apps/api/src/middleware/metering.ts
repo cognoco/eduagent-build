@@ -58,6 +58,7 @@ export type MeteringEnv = {
     profileId: string | undefined;
     profileMeta: ProfileMeta | undefined;
     subscriptionId: string;
+    subscriptionTier: SubscriptionTier;
     llmTier: LLMTier;
   };
 };
@@ -483,6 +484,7 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
 
     // Store subscriptionId for potential refund on LLM failure
     c.set('subscriptionId', subscriptionId);
+    c.set('subscriptionTier', tier);
 
     // Expose the LLM tier so session route handlers can thread it to the LLM router.
     // Per-profile premium flag overrides the subscription-level default — this is how
