@@ -91,6 +91,7 @@ async function startServer() {
 
   server.on('error', (err) => {
     console.error(`[serve] server error: ${err.message}`);
+    if (err.code !== 'EADDRINUSE') process.exit(1);
   });
 
   server.keepAliveTimeout = 0;

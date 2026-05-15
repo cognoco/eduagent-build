@@ -4,6 +4,9 @@ import { apiBaseUrl, appBaseUrl, runId } from './e2e-web/helpers/runtime';
 
 const e2eWebDir = path.join(process.cwd(), 'apps', 'mobile', 'e2e-web');
 const shouldStartLocalApi = process.env.PLAYWRIGHT_SKIP_LOCAL_API !== '1';
+// CI sets PLAYWRIGHT_API_URL=<workers.dev URL> → true → 1 worker.
+// Custom domain (api-test.mentomate.com) → false → full parallelism.
+// If CI ever drops PLAYWRIGHT_API_URL, update this check.
 const usesSharedStagingApi =
   process.env.PLAYWRIGHT_SKIP_LOCAL_API === '1' &&
   apiBaseUrl.includes('.workers.dev');
@@ -62,10 +65,11 @@ export default defineConfig({
     {
       command: 'node e2e-web/helpers/serve-exported-web.mjs',
       url: appBaseUrl,
-      // Always true: Playwright's stdio pipe management kills the server
-      // under multi-worker load. CI runners are ephemeral so stale-server
-      // risk from a previous job is negligible.
-      reuseExistingServer: true,
+      // CI (false): always export a fresh bundle — prevents stale API URL
+      // from a prior run being silently reused. Safe at 1 worker (CI smoke).
+      // Local (true): allows external server startup for multi-worker runs
+      // where Playwright's pipe management would otherwise kill the server.
+      reuseExistingServer: !process.env.CI,
       stdout: 'pipe',
       stderr: 'pipe',
       timeout: 240_000,
