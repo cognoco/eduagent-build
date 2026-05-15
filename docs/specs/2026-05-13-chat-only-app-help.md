@@ -1,7 +1,7 @@
 # Chat-Only App Help In Mentor Chat
 
 **Date:** 2026-05-13
-**Status:** Spec - not yet implemented
+**Status:** Implemented; map refreshed 2026-05-15
 **Size:** S
 **Source:** Product discussion 2026-05-13
 
@@ -78,7 +78,7 @@ Initial map:
 | Homework | "Home > Help with an assignment." |
 | Practice / reviews | "Home > Test yourself." (An action card on the Home screen, not a separate tab.) |
 | Viewing a child's progress (parent) | "Home > tap the child's card" to see their progress overview. |
-| Changing a child's preferences (parent) | Switch to the child's profile using the profile selector, then use "More > Preferences" as normal. |
+| Changing a child's preferences (parent) | "Home > tap the child's card > the child's learning preferences row." |
 
 The map should be easy to edit as IA changes. If a destination moves, updating this single map should update prompt behavior.
 

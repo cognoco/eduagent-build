@@ -22,7 +22,7 @@ import { goBackOrReplace } from '../lib/navigation';
 import { formatApiError } from '../lib/format-api-error';
 import { platformAlert } from '../lib/platform-alert';
 import { signOutWithCleanup } from '../lib/sign-out';
-import { useProfile } from '../lib/profile';
+import { useHasLinkedChildren, useProfile } from '../lib/profile';
 
 // [BUG-910] The exact phrase a user must type to confirm. Kept as a constant
 // so tests and accessibility labels stay in sync.
@@ -38,6 +38,7 @@ export default function DeleteAccountScreen() {
   const { signOut } = useAuth();
   const queryClient = useQueryClient();
   const { profiles } = useProfile();
+  const hasLinkedChildren = useHasLinkedChildren();
   const deleteAccount = useDeleteAccount();
   const cancelDeletion = useCancelDeletion();
   const deletionStatus = useDeletionStatus();
@@ -288,19 +289,21 @@ export default function DeleteAccountScreen() {
           </View>
         ) : stage === 'confirming' ? (
           <View testID="delete-account-confirming">
-            {/* [BUG-910] Family pool consequences — parents need to know
-                that linked child profiles are deleted along with their account. */}
-            <View
-              className="bg-danger/10 rounded-card px-4 py-3 mb-4"
-              testID="delete-account-family-warning"
-            >
-              <Text className="text-body-sm font-semibold text-danger mb-1">
-                {t('account.familyWarningTitle')}
-              </Text>
-              <Text className="text-body-sm text-text-primary">
-                {t('account.familyWarningBody')}
-              </Text>
-            </View>
+            {hasLinkedChildren ? (
+              /* [BUG-910] Family pool consequences: parents need to know
+                 that linked child profiles are deleted along with their account. */
+              <View
+                className="bg-danger/10 rounded-card px-4 py-3 mb-4"
+                testID="delete-account-family-warning"
+              >
+                <Text className="text-body-sm font-semibold text-danger mb-1">
+                  {t('account.familyWarningTitle')}
+                </Text>
+                <Text className="text-body-sm text-text-primary">
+                  {t('account.familyWarningBody')}
+                </Text>
+              </View>
+            ) : null}
 
             {/* [BUG-910] Active subscription advisory — store-billed plans
                 continue to charge unless the user cancels with the platform. */}

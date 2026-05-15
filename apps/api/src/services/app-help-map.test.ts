@@ -17,7 +17,7 @@ interface EnglishLocale {
     };
   };
   more: {
-    accommodation: { sectionHeader: string };
+    accommodation: { childScreenTitle: string; sectionHeader: string };
     help: { helpAndFeedback: string };
     learningPreferences: { rowLabel: string };
     mentorMemory: { sectionHeader: string };
@@ -87,7 +87,10 @@ describe('buildAppHelpPromptBlock', () => {
 
   it('contains parent-specific destinations', () => {
     expect(block).toMatch(/child/i);
-    expect(block).toMatch(/profile selector/i);
+    expect(block).toMatch(/child's card/i);
+    expect(block).toMatch(/learning preferences/i);
+    expect(block).not.toMatch(/profile selector/i);
+    expect(block).not.toMatch(/Switch to the child's profile/i);
   });
 
   it('does not contain Expo route strings', () => {
@@ -110,6 +113,9 @@ describe('buildAppHelpPromptBlock', () => {
     expect(en.more.accommodation.sectionHeader).toBe(
       'Your learning accommodation',
     );
+    expect(en.more.accommodation.childScreenTitle).toBe(
+      "{{name}}'s learning preferences",
+    );
     expect(en.more.account.profile).toBe('Profile');
 
     expect(block).toContain(en.more.learningPreferences.rowLabel);
@@ -118,6 +124,12 @@ describe('buildAppHelpPromptBlock', () => {
     expect(block).toContain(en.more.privacy.privacyAndData);
     expect(block).toContain(en.more.notifications.sectionHeader);
     expect(block).toContain(en.more.accommodation.sectionHeader);
+    expect(block).toContain(
+      en.more.accommodation.childScreenTitle.replace(
+        '{{name}}',
+        '<child name>',
+      ),
+    );
     expect(block).toContain(en.more.account.profile);
   });
 
