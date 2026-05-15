@@ -3,8 +3,9 @@
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, isNull, or, sql } from 'drizzle-orm';
 import { accounts, profiles, type Database } from '@eduagent/database';
+import type { AccountDeletionStatusResponse } from '@eduagent/schemas';
 
 const GRACE_PERIOD_DAYS = 7;
 const GRACE_PERIOD_MS = GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000;
@@ -13,21 +14,36 @@ export async function scheduleDeletion(
   db: Database,
   accountId: string,
 ): Promise<{ gracePeriodEnds: string; scheduledNow: boolean }> {
+  const now = new Date();
+  const [updated] = await db
+    .update(accounts)
+    .set({ deletionScheduledAt: now })
+    .where(
+      and(
+        eq(accounts.id, accountId),
+        or(
+          isNull(accounts.deletionScheduledAt),
+          sql`${accounts.deletionCancelledAt} > ${accounts.deletionScheduledAt}`,
+        ),
+      ),
+    )
+    .returning({ deletionScheduledAt: accounts.deletionScheduledAt });
+
+  if (updated?.deletionScheduledAt) {
+    return {
+      gracePeriodEnds: new Date(
+        updated.deletionScheduledAt.getTime() + GRACE_PERIOD_MS,
+      ).toISOString(),
+      scheduledNow: true,
+    };
+  }
+
   const existing = await getDeletionStatus(db, accountId);
   if (existing.scheduled && existing.gracePeriodEnds) {
     return { gracePeriodEnds: existing.gracePeriodEnds, scheduledNow: false };
   }
 
-  const now = new Date();
-  await db
-    .update(accounts)
-    .set({ deletionScheduledAt: now })
-    .where(eq(accounts.id, accountId));
-
-  const gracePeriodEnds = new Date(
-    now.getTime() + GRACE_PERIOD_MS,
-  ).toISOString();
-  return { gracePeriodEnds, scheduledNow: true };
+  throw new Error(`account deletion scheduling failed: ${accountId}`);
 }
 
 export async function cancelDeletion(
@@ -55,16 +71,10 @@ export async function isDeletionCancelled(
   );
 }
 
-export interface AccountDeletionStatus {
-  scheduled: boolean;
-  deletionScheduledAt: string | null;
-  gracePeriodEnds: string | null;
-}
-
 export async function getDeletionStatus(
   db: Database,
   accountId: string,
-): Promise<AccountDeletionStatus> {
+): Promise<AccountDeletionStatusResponse> {
   const row = await db.query.accounts.findFirst({
     where: eq(accounts.id, accountId),
   });

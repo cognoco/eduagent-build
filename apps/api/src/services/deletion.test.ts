@@ -13,6 +13,7 @@ function createMockDb(
   options: {
     findFirstResult?: Record<string, unknown>;
     profilesResult?: Array<{ id: string }>;
+    updateReturning?: Array<{ deletionScheduledAt: Date | null }>;
   } = {},
 ): Database {
   const findFirstResult = Object.prototype.hasOwnProperty.call(
@@ -25,6 +26,16 @@ function createMockDb(
         deletionCancelledAt: null,
       };
   const profilesResult = options.profilesResult ?? [];
+  const updateReturning = options.updateReturning ?? [
+    { deletionScheduledAt: new Date() },
+  ];
+  const updateReturningMock = jest.fn().mockResolvedValue(updateReturning);
+  const updateWhereMock = jest.fn().mockReturnValue({
+    returning: updateReturningMock,
+  });
+  const updateSetMock = jest.fn().mockReturnValue({
+    where: updateWhereMock,
+  });
 
   return {
     query: {
@@ -36,9 +47,7 @@ function createMockDb(
       },
     },
     update: jest.fn().mockReturnValue({
-      set: jest.fn().mockReturnValue({
-        where: jest.fn().mockResolvedValue(undefined),
-      }),
+      set: updateSetMock,
     }),
     delete: jest.fn().mockReturnValue({
       where: jest.fn().mockResolvedValue(undefined),
@@ -75,13 +84,16 @@ describe('scheduleDeletion', () => {
     expect(db.update).toHaveBeenCalled();
   });
 
-  it('throws and does not update when the account is missing', async () => {
-    const db = createMockDb({ findFirstResult: undefined });
+  it('throws and does not claim scheduled when the account is missing', async () => {
+    const db = createMockDb({
+      findFirstResult: undefined,
+      updateReturning: [],
+    });
 
     await expect(scheduleDeletion(db, 'missing-account')).rejects.toThrow(
       'account not found: missing-account',
     );
-    expect(db.update).not.toHaveBeenCalled();
+    expect(db.update).toHaveBeenCalled();
   });
 
   it('does not move the deadline when deletion is already scheduled', async () => {
@@ -90,6 +102,7 @@ describe('scheduleDeletion', () => {
         deletionScheduledAt: new Date('2026-02-17T00:00:00.000Z'),
         deletionCancelledAt: null,
       },
+      updateReturning: [],
     });
 
     const result = await scheduleDeletion(db, 'account-1');
@@ -98,7 +111,24 @@ describe('scheduleDeletion', () => {
       gracePeriodEnds: '2026-02-24T00:00:00.000Z',
       scheduledNow: false,
     });
-    expect(db.update).not.toHaveBeenCalled();
+    expect(db.update).toHaveBeenCalled();
+  });
+
+  it('does not dispatch as newly scheduled when another request already won', async () => {
+    const db = createMockDb({
+      findFirstResult: {
+        deletionScheduledAt: new Date('2026-02-17T00:00:00.000Z'),
+        deletionCancelledAt: null,
+      },
+      updateReturning: [],
+    });
+
+    const result = await scheduleDeletion(db, 'account-1');
+
+    expect(result).toEqual({
+      gracePeriodEnds: '2026-02-24T00:00:00.000Z',
+      scheduledNow: false,
+    });
   });
 });
 

@@ -51,12 +51,22 @@ export default function DeleteAccountScreen() {
   // the destructive button could fire two requests. A ref toggled
   // synchronously around the mutation closes that race.
   const submittingRef = useRef(false);
+  const locallyScheduledRef = useRef(false);
 
   useEffect(() => {
-    if (deletionStatus.data?.scheduled !== true) return;
-    setGracePeriodEnds(deletionStatus.data.gracePeriodEnds);
-    setStage('scheduled');
-  }, [deletionStatus.data]);
+    if (deletionStatus.data?.scheduled === true) {
+      locallyScheduledRef.current = false;
+      setGracePeriodEnds(deletionStatus.data.gracePeriodEnds);
+      setStage('scheduled');
+    } else if (
+      deletionStatus.data?.scheduled === false &&
+      stage === 'scheduled' &&
+      !locallyScheduledRef.current
+    ) {
+      setGracePeriodEnds(null);
+      setStage('initial');
+    }
+  }, [deletionStatus.data, stage]);
 
   const handleClose = useCallback(() => {
     goBackOrReplace(router, '/(app)/more');
@@ -79,6 +89,7 @@ export default function DeleteAccountScreen() {
     setError('');
     try {
       const result = await deleteAccount.mutateAsync();
+      locallyScheduledRef.current = true;
       setGracePeriodEnds(result.gracePeriodEnds);
       setStage('scheduled');
     } catch (err: unknown) {

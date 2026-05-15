@@ -12,7 +12,7 @@ async function allowOnlyFlowApi(
 ) {
   await page.context().route('**/v1/**', async (route) => {
     const url = new URL(route.request().url());
-    if (url.hostname !== '127.0.0.1') {
+    if (!url.hostname.startsWith('127.') && url.hostname !== 'localhost') {
       await route.continue();
       return;
     }
