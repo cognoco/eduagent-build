@@ -28,13 +28,25 @@ const defaultProps: SessionMessageActionsProps = {
 
 describe('SessionMessageActions stage gating', () => {
   it('renders chips and feedback when stage is teaching', () => {
-    const { queryByTestId } = render(
+    const { queryByTestId, queryByText } = render(
       <SessionMessageActions {...defaultProps} stage="teaching" />,
     );
     // Quick chips render for a question-like message
     expect(queryByTestId('quick-chip-too_hard')).toBeTruthy();
-    // Feedback buttons render when eventId is present
-    expect(queryByTestId(`message-feedback-helpful-evt-1`)).toBeTruthy();
+    // Feedback buttons render when eventId is present, but feedback actions
+    // are compact icons rather than text chips.
+    const helpful = queryByTestId(`message-feedback-helpful-evt-1`);
+    const notHelpful = queryByTestId(`message-feedback-not-helpful-evt-1`);
+    const incorrect = queryByTestId(`message-feedback-incorrect-evt-1`);
+    expect(helpful).toBeTruthy();
+    expect(notHelpful).toBeTruthy();
+    expect(incorrect).toBeTruthy();
+    expect(helpful?.props.className).toContain('h-9');
+    expect(notHelpful?.props.className).toContain('w-9');
+    expect(incorrect?.props.className).toContain('h-9');
+    expect(queryByText('Helpful')).toBeNull();
+    expect(queryByText('Not helpful')).toBeNull();
+    expect(queryByText("That's incorrect")).toBeNull();
     expect(queryByTestId('bookmark-toggle-evt-1')).toBeNull();
   });
 
@@ -52,6 +64,24 @@ describe('SessionMessageActions stage gating', () => {
     expect(getByTestId('bookmark-toggle-evt-1').props.className).toContain(
       'min-h-[36px]',
     );
+  });
+
+  it('keeps learning chips before the compact feedback control group', () => {
+    const { getByTestId } = render(
+      <SessionMessageActions
+        {...defaultProps}
+        stage="teaching"
+        bookmarkState={{ 'evt-1': null }}
+        onToggleBookmark={jest.fn()}
+      />,
+    );
+
+    expect(getByTestId('quick-chip-too_hard')).toBeTruthy();
+    expect(getByTestId('quick-chip-explain_differently')).toBeTruthy();
+    expect(getByTestId('quick-chip-hint')).toBeTruthy();
+    expect(
+      getByTestId('message-feedback-controls-evt-1').props.className,
+    ).toContain('ms-auto');
   });
 
   it('hides bookmark toggle when the assistant message has no eventId', () => {

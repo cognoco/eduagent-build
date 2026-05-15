@@ -1,10 +1,13 @@
 {
   "scope": "mobile",
-  "verifiedAt": "2026-05-15T11:20:05Z",
+  "verifiedAt": "2026-05-15T11:40:26Z",
   "verifiedBy": "Zuzana Kopečná @ ZLY-Orion",
   "command": "pnpm exec nx run mobile:test",
   "passed": true,
   "testFiles": {
-    "apps/mobile/src/app/delete-account.test.tsx": "78acd7b835fcba4b1cf5a02ca00b608249e9c8b7"
+    "apps/mobile/src/components/session/ChatShell.test.tsx": "c49c9037e4d0194fbe912b66a0ce3b879752a50d",
+    "apps/mobile/src/components/session/MessageBubble.test.tsx": "14a8aee4e25c7abd1460a153833d8ef36d294143",
+    "apps/mobile/src/components/session/SessionMessageActions.test.tsx": "04ad75fd78f2ea3584ebd8c4e1b661bc52812be7",
+    "apps/mobile/src/components/session/VoiceRecordButton.test.tsx": "edf356283448ddbc8e4acda0a8d5a1884d0f480c"
   }
 }
