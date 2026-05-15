@@ -63,6 +63,22 @@ function parseRouteActivityType(
   return result.success ? result.data : null;
 }
 
+function errorCodeFrom(error: unknown): string | undefined {
+  if (!error || typeof error !== 'object') return undefined;
+
+  const apiError = error as {
+    errorCode?: unknown;
+    code?: unknown;
+    apiCode?: unknown;
+  };
+
+  if (typeof apiError.errorCode === 'string') return apiError.errorCode;
+  if (typeof apiError.code === 'string') return apiError.code;
+  if (typeof apiError.apiCode === 'string') return apiError.apiCode;
+
+  return undefined;
+}
+
 export default function QuizLaunchScreen(): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
@@ -299,12 +315,7 @@ export default function QuizLaunchScreen(): React.ReactElement {
     // help (quota exhausted, consent required). Classify on the typed error
     // code from assertOk's ApiResponseError — never string-match on the
     // formatted message, which can drift without test coverage.
-    const errorCode =
-      generateRound.error instanceof Error &&
-      'code' in generateRound.error &&
-      typeof (generateRound.error as { code?: string }).code === 'string'
-        ? (generateRound.error as { code: string }).code
-        : undefined;
+    const errorCode = errorCodeFrom(generateRound.error);
     const isUnretryable =
       errorCode === 'QUOTA_EXCEEDED' ||
       errorCode === 'FORBIDDEN' ||
