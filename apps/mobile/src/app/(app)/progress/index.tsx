@@ -584,6 +584,7 @@ export default function ProgressScreen(): React.ReactElement {
 
   const refetchInventory = inventoryQuery.refetch;
   const refetchMonthlyReports = monthlyReportsQuery.refetch;
+  const refetchProfileSessions = profileSessionsQuery.refetch;
   const refetchWeeklyReports = weeklyReportsQuery.refetch;
   const refetchChildSummary = childSummaryQuery.refetch;
 
@@ -604,6 +605,7 @@ export default function ProgressScreen(): React.ReactElement {
       await Promise.all([
         refetchInventory(),
         refetchMonthlyReports(),
+        refetchProfileSessions(),
         refetchWeeklyReports(),
         ...(!isViewingSelf ? [refetchChildSummary()] : []),
       ]);
@@ -612,6 +614,7 @@ export default function ProgressScreen(): React.ReactElement {
       isViewingSelf,
       refetchInventory,
       refetchMonthlyReports,
+      refetchProfileSessions,
       refetchWeeklyReports,
       refetchChildSummary,
       refreshProgressSnapshot,
@@ -1035,6 +1038,26 @@ export default function ProgressScreen(): React.ReactElement {
               </View>
             ) : null}
 
+            {selectedProfileId && !hasAnyReports ? (
+              <Pressable
+                testID="progress-view-all-reports"
+                onPress={() =>
+                  router.push(
+                    isViewingSelf
+                      ? ('/(app)/progress/reports' as Href)
+                      : (`/(app)/child/${selectedProfileId}/reports` as Href),
+                  )
+                }
+                className="bg-surface rounded-button px-4 py-3 mt-4 items-center min-h-[48px] justify-center"
+                accessibilityRole="button"
+                accessibilityLabel={t('progress.guardian.viewAllReports')}
+              >
+                <Text className="text-body font-semibold text-primary">
+                  {t('progress.guardian.viewAllReports')}
+                </Text>
+              </Pressable>
+            ) : null}
+
             {!isViewingSelf ? (
               <>
                 {childSummaryQuery.data ? (
@@ -1055,23 +1078,6 @@ export default function ProgressScreen(): React.ReactElement {
                       {t('progress.guardian.nudgeCta', {
                         name: selectedChildName,
                       })}
-                    </Text>
-                  </Pressable>
-                ) : null}
-                {selectedProfileId && !hasAnyReports ? (
-                  <Pressable
-                    testID="progress-view-all-reports"
-                    onPress={() =>
-                      router.push(
-                        `/(app)/child/${selectedProfileId}/reports` as Href,
-                      )
-                    }
-                    className="bg-surface rounded-button px-4 py-3 mt-4 items-center min-h-[48px] justify-center"
-                    accessibilityRole="button"
-                    accessibilityLabel={t('progress.guardian.viewAllReports')}
-                  >
-                    <Text className="text-body font-semibold text-primary">
-                      {t('progress.guardian.viewAllReports')}
                     </Text>
                   </Pressable>
                 ) : null}

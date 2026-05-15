@@ -412,6 +412,7 @@ function mockHooks(
   const milestonesRefetch = jest.fn();
   const refreshSnapshot = jest.fn().mockResolvedValue(undefined);
   const monthlyReportsRefetch = jest.fn();
+  const profileSessionsRefetch = jest.fn();
   const weeklyReportsRefetch = jest.fn();
   (useProgressInventory as jest.Mock).mockReturnValue({
     data: inventory,
@@ -470,7 +471,7 @@ function mockHooks(
         : []),
     isLoading: false,
     isError: false,
-    refetch: jest.fn(),
+    refetch: profileSessionsRefetch,
   });
   (useProfileReports as jest.Mock).mockReturnValue({
     data: monthlyReports,
@@ -506,6 +507,7 @@ function mockHooks(
     inventoryRefetch,
     milestonesRefetch,
     monthlyReportsRefetch,
+    profileSessionsRefetch,
     refreshSnapshot,
     weeklyReportsRefetch,
   };
@@ -556,6 +558,7 @@ describe('ProgressScreen — progressive disclosure', () => {
     });
     expect(refs.refreshSnapshot).toHaveBeenCalled();
     expect(refs.monthlyReportsRefetch).toHaveBeenCalled();
+    expect(refs.profileSessionsRefetch).toHaveBeenCalled();
     expect(refs.weeklyReportsRefetch).toHaveBeenCalled();
     expect(refs.milestonesRefetch).not.toHaveBeenCalled();
   });
@@ -816,6 +819,21 @@ describe('ProgressScreen — progressive disclosure', () => {
       screen.queryByTestId('progress-weekly-delta-topicsMastered'),
     ).toBeNull();
     expect(screen.queryByTestId('progress-currently-working-on')).toBeNull();
+  });
+
+  it('keeps the reports dashboard reachable when no reports exist', () => {
+    mockHooks({
+      inventory: {
+        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 2 },
+        subjects: [fullSubject],
+      },
+    });
+    const push = jest.requireMock('expo-router').useRouter().push as jest.Mock;
+
+    render(<ProgressScreen />);
+
+    fireEvent.press(screen.getByTestId('progress-view-all-reports'));
+    expect(push).toHaveBeenCalledWith('/(app)/progress/reports');
   });
 
   it('shows full view when totalSessions is 3', () => {
