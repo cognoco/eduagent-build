@@ -16,7 +16,7 @@ test('J-05 parent opens a linked child progress view from home', async ({
   });
 
   await pressableClick(
-    page.getByTestId(`parent-home-check-child-${childProfileId}`),
+    page.getByTestId(`parent-home-child-progress-${childProfileId}`),
   );
   await expect(page.getByTestId('progress-screen')).toBeVisible({
     timeout: 30_000,

@@ -8,6 +8,8 @@
     "apps/mobile/src/app/create-profile.test.tsx": "7e7ee6973cff0cfb1edc15fc3c6205f56c4eb359",
     "apps/mobile/src/app/(app)/child/[profileId]/index.test.tsx": "c440acbb54462ac6ee2999a7dbad60ebe396ef69",
     "apps/mobile/src/app/e2e-testid-integrity.test.ts": "e86723b8dd545b4824c3f54a2e93f14c26389822",
+    "apps/mobile/src/app/(app)/library.test.tsx": "899f5a274a3a9c1026bf8e22ded3b5666e21fefb",
+    "apps/mobile/src/app/create-subject.test.tsx": "3fbecb0f71a16b0f30813f53f9eb8394fe4b7348",
     "apps/mobile/src/lib/auth-expiry.test.ts": "62525d2f47d41d62a5deb8e073b06592bd69585b",
     "apps/mobile/src/app/(auth)/sign-up.test.tsx": "10c849fbcfe93d5c9f4cc89f0a64f6496fc961e9",
     "apps/mobile/src/app/(auth)/sign-in.test.tsx": "74acba7f891420f18f74d2349ac7307e6fd2f9b4",

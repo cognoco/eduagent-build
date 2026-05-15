@@ -56,6 +56,17 @@ function isStarterChipInput(input: string): boolean {
   );
 }
 
+function isStarterCategoryRefinement(
+  originalInput: string,
+  subjectName: string,
+): boolean {
+  return (
+    originalInput !== '' &&
+    isStarterChipInput(originalInput) &&
+    originalInput.toLowerCase() !== subjectName.toLowerCase()
+  );
+}
+
 type ResolveState =
   | { phase: 'idle' }
   | { phase: 'resolving' }
@@ -382,21 +393,21 @@ export default function CreateSubjectScreen() {
       // resolver's focus is a clarification label ("Biology: Life Sciences"),
       // not enough learner intent to create a focused book. Let the API treat
       // the picked subject as broad so the learner gets the book picker.
-      const isStarterCategoryRefinement =
-        originalInput !== '' &&
-        isStarterChipInput(originalInput) &&
-        originalInput.toLowerCase() !== subjectName.toLowerCase();
+      const starterCategoryRefinement = isStarterCategoryRefinement(
+        originalInput,
+        subjectName,
+      );
       const derivedFocus =
         originalInput &&
         originalInput.toLowerCase() !== subjectName.toLowerCase()
           ? originalInput
           : undefined;
-      const effectiveFocus = isStarterCategoryRefinement
+      const effectiveFocus = starterCategoryRefinement
         ? undefined
         : (suggestionFocus ?? derivedFocus);
       await doCreate(
         subjectName,
-        isStarterCategoryRefinement ? null : originalInput || undefined,
+        starterCategoryRefinement ? null : originalInput || undefined,
         effectiveFocus,
         effectiveFocus ? suggestion.description : undefined,
       );
@@ -407,11 +418,24 @@ export default function CreateSubjectScreen() {
   const onAcceptSuggestion = useCallback(async () => {
     if (resolveState.phase !== 'suggestion') return;
     const resolved = resolveState.result.resolvedName ?? name.trim();
-    const focus = resolveState.result.focus ?? undefined;
-    const focusDescription = resolveState.result.focusDescription ?? undefined;
+    const starterCategoryRefinement = isStarterCategoryRefinement(
+      originalInput,
+      resolved,
+    );
+    const focus = starterCategoryRefinement
+      ? undefined
+      : (resolveState.result.focus ?? undefined);
+    const focusDescription = starterCategoryRefinement
+      ? undefined
+      : (resolveState.result.focusDescription ?? undefined);
     setName(resolved);
-    await doCreate(resolved, undefined, focus, focusDescription);
-  }, [resolveState, name, doCreate]);
+    await doCreate(
+      resolved,
+      starterCategoryRefinement ? null : undefined,
+      focus,
+      focusDescription,
+    );
+  }, [resolveState, name, originalInput, doCreate]);
 
   const onEditSuggestion = useCallback(() => {
     if (resolveState.phase !== 'suggestion') return;

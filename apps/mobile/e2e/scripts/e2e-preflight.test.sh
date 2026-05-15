@@ -25,7 +25,28 @@ _tfail() { FAIL=$((FAIL+1)); FAILURES+=("$*"); echo "  ✗ $*" >&2; }
 # Port picker — each call to _next_port returns a fresh unused high port so
 # consecutive mock-server spawns can't collide on the kernel's TIME_WAIT state.
 _NEXT_PORT=18080
-_next_port() { _NEXT_PORT=$((_NEXT_PORT + 1)); echo "$_NEXT_PORT"; }
+_next_port() {
+  local start=$((_NEXT_PORT + 1))
+  local port
+  port=$(node - "$start" <<'NODE'
+const net = require('net');
+const start = Number(process.argv[2] || 18081);
+
+function probe(port) {
+  const srv = net.createServer();
+  srv.once('error', () => probe(port + 1));
+  srv.listen(port, '127.0.0.1', () => {
+    const chosen = srv.address().port;
+    srv.close(() => process.stdout.write(String(chosen)));
+  });
+}
+
+probe(start);
+NODE
+)
+  _NEXT_PORT="$port"
+  echo "$_NEXT_PORT"
+}
 
 # ── Mock servers (spawned on demand, killed in trap) ───────────────────────
 _MOCK_PIDS=()
@@ -142,6 +163,28 @@ _spawn_api_mock() {
 source "$SCRIPT_DIR/e2e-preflight.sh"
 PREFLIGHT_QUIET=1
 
+echo "─── check_adb_device ─────────────────────────────────────────────────"
+
+# CASE 0: Windows adb.exe invoked from WSL can return "device\r\n". The
+# preflight must treat that as healthy instead of falsely blocking all flows.
+_ADB_MOCK=$(mktemp)
+cat > "$_ADB_MOCK" <<'EOF'
+#!/usr/bin/env bash
+if [ "$1" = "get-state" ]; then
+  printf 'device\r\n'
+fi
+EOF
+chmod +x "$_ADB_MOCK"
+rc=0
+PREFLIGHT_ADB="$_ADB_MOCK" check_adb_device >/dev/null 2>/tmp/pf_err_adb_crlf.txt || rc=$?
+if [ $rc -eq 0 ]; then
+  _tpass "accepts Windows adb get-state output with CRLF"
+else
+  _tfail "check_adb_device rejected CRLF device state (rc=$rc). stderr: $(cat /tmp/pf_err_adb_crlf.txt)"
+fi
+rm -f "$_ADB_MOCK"
+
+echo ""
 echo "─── check_bundle_proxy_fast ───────────────────────────────────────────"
 
 # CASE 1: Degraded proxy (5s delay) should FAIL. This is the exact condition

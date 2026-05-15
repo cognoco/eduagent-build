@@ -670,6 +670,58 @@ describe('CreateSubjectScreen', () => {
     });
   });
 
+  it('[BUG-SUBJECT-STARTER-FOCUS] confident starter-chip refinements stay broad', async () => {
+    setResolveResponse({
+      status: 'resolved',
+      resolvedName: 'Biology',
+      displayMessage: "We'll start with Biology.",
+      suggestions: [
+        {
+          name: 'Biology',
+          description: 'Living things, ecosystems, and the human body',
+        },
+      ],
+      focus: 'Life Sciences',
+      focusDescription: 'Plants, animals, and ecosystems',
+    });
+
+    createSubjectResponse = {
+      subject: { id: 'subject-biology', name: 'Biology' },
+      structureType: 'broad',
+      bookCount: 5,
+    };
+
+    render(<CreateSubjectScreen />, { wrapper: Wrapper });
+
+    fireEvent.press(screen.getByTestId('subject-start-how plants grow'));
+
+    await waitFor(() => {
+      screen.getByTestId('subject-confident-card');
+    });
+
+    fireEvent.press(screen.getByTestId('subject-suggestion-accept'));
+
+    await waitFor(() => {
+      const createCalls = fetchCallsMatching(mockFetch, '/subjects').filter(
+        (c: { url: string; init?: RequestInit }) =>
+          c.init?.method === 'POST' && !c.url.includes('/resolve'),
+      );
+      expect(createCalls.length).toBeGreaterThanOrEqual(1);
+      const body = extractJsonBody<{
+        name: string;
+        rawInput?: string;
+        focus?: string;
+        focusDescription?: string;
+      }>(createCalls[0]?.init);
+      expect(body).toEqual({ name: 'Biology' });
+    });
+
+    expect(mockReplace).toHaveBeenCalledWith({
+      pathname: '/(app)/pick-book/[subjectId]',
+      params: { subjectId: 'subject-biology' },
+    });
+  });
+
   it('splits combined LLM names like "Biology — Botany" and derives focus', async () => {
     // LLM returns combined name despite prompt instructions saying not to
     setResolveResponse({
