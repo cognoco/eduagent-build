@@ -533,13 +533,15 @@ describe('metering middleware', () => {
 
     it('refunds quota when a metered route rejects before producing an answer', async () => {
       mockEnsureFreeSubscription.mockResolvedValue(mockSubscription());
-      mockGetQuotaPool.mockResolvedValue(mockQuota({ usedThisMonth: 100 }));
+      mockGetQuotaPool.mockResolvedValue(
+        mockQuota({ usedThisMonth: 100, dailyLimit: 10, usedToday: 1 }),
+      );
       mockDecrementQuota.mockResolvedValue({
         success: true,
         source: 'monthly',
         remainingMonthly: 399,
         remainingTopUp: 0,
-        remainingDaily: null,
+        remainingDaily: 8,
       });
 
       const res = await app.request(
@@ -566,6 +568,9 @@ describe('metering middleware', () => {
           profileId: 'test-profile-id',
         }),
       );
+      expect(res.headers.get('X-Quota-Remaining')).toBeNull();
+      expect(res.headers.get('X-Quota-Warning-Level')).toBeNull();
+      expect(res.headers.get('X-Daily-Remaining')).toBeNull();
     });
 
     it('[BUG-623 / A-6] decrements quota for POST /sessions/:id/recall-bridge', async () => {
