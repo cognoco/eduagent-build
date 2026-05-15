@@ -26,13 +26,13 @@ function loadWorkflow(name: string): unknown {
 describe('[BUG-979] e2e-web cleanup wiring', () => {
   describe('e2e-web.yml — per-run cleanup step', () => {
     const workflow = loadWorkflow('e2e-web.yml') as {
-      jobs: { smoke: { steps: Array<Record<string, unknown>> } };
+      jobs: { 'run-smoke': { steps: Array<Record<string, unknown>> } };
     };
-    const steps = workflow.jobs.smoke.steps;
+    const steps = workflow.jobs['run-smoke'].steps;
 
     function findStep(prefix: string) {
       return steps.find((s) =>
-        typeof s.name === 'string' ? s.name.startsWith(prefix) : false
+        typeof s.name === 'string' ? s.name.startsWith(prefix) : false,
       );
     }
 
@@ -106,7 +106,7 @@ describe('[BUG-979] e2e-web cleanup wiring', () => {
       >;
       const job = Object.values(jobs)[0]!;
       const stepWithCurl = job.steps.find((s) =>
-        String(s.run ?? '').includes('/v1/__test/reset')
+        String(s.run ?? '').includes('/v1/__test/reset'),
       );
       expect(stepWithCurl).toBeDefined();
       const run = String(stepWithCurl!.run ?? '');
