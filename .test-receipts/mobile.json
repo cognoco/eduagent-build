@@ -1,10 +1,19 @@
 {
   "scope": "mobile",
-  "verifiedAt": "2026-05-15T16:36:36Z",
-  "verifiedBy": "Zuzana Kopečná @ ZLY-Orion",
-  "command": "pnpm exec nx run mobile:test",
+  "verifiedAt": "2026-05-15T19:10:01Z",
+  "maxAgeHours": 24,
+  "verifiedBy": "Zuzana Kopečná @ ZLY-ORION",
+  "command": "pnpm exec jest --config apps/mobile/jest.config.cjs --runTestsByPath <42 related route/component test files> --runInBand --no-coverage --forceExit --silent && pnpm exec jest --config apps/mobile/jest.config.cjs --runTestsByPath apps/mobile/src/app/(app)/pick-book/[subjectId].test.tsx --runInBand --no-coverage --forceExit --silent",
   "passed": true,
-  "testFiles": {
-    "apps/mobile/src/components/home/ParentHomeScreen.test.tsx": "f0d696a1ab62faa05d4bc56c47cfde9ffb693198"
+  "affectedFiles": {
+    "apps/mobile/src/app/(app)/library.tsx": true,
+    "apps/mobile/src/app/(app)/progress/index.tsx": true,
+    "apps/mobile/src/app/(app)/quiz/history.test.tsx": true,
+    "apps/mobile/src/app/(app)/quiz/history.tsx": true,
+    "apps/mobile/src/app/_layout.tsx": true,
+    "apps/mobile/src/components/AnimatedSplash.test.tsx": true,
+    "apps/mobile/src/components/AnimatedSplash.tsx": true,
+    "apps/mobile/src/components/common/TimeoutLoader.test.tsx": true,
+    "apps/mobile/src/components/common/TimeoutLoader.tsx": true
   }
 }
