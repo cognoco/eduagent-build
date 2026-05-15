@@ -914,7 +914,7 @@ async function seedParentMultiChild(
     narrative:
       'Emma compared fractions with growing confidence and explained why the larger denominator did not always mean the larger value.',
     conversationPrompt: 'Which fraction felt easiest to compare today?',
-    engagementSignal: 'engaged',
+    engagementSignal: 'focused',
     status: 'accepted',
   });
 
@@ -972,7 +972,7 @@ async function seedParentMultiChild(
       'Lucas worked through photosynthesis step by step and linked each ingredient to what the plant needs to survive.',
     conversationPrompt:
       'Can you point out where the plant gets its energy from?',
-    engagementSignal: 'steady',
+    engagementSignal: 'focused',
     status: 'accepted',
   });
 
@@ -2094,7 +2094,7 @@ async function seedSessionWithTranscript(
     narrative:
       'The learner worked through Pythagoras step-by-step with growing confidence.',
     conversationPrompt: 'Can you think of a real-world use for this theorem?',
-    engagementSignal: 'engaged',
+    engagementSignal: 'focused',
     status: 'accepted',
   });
 
@@ -2232,7 +2232,7 @@ async function seedParentProxy(
     narrative:
       'The learner understood photosynthesis as a conversion process and made the colour-absorption link independently.',
     conversationPrompt: 'What would happen to a plant kept in the dark?',
-    engagementSignal: 'engaged',
+    engagementSignal: 'curious',
     status: 'accepted',
   });
 
@@ -2410,6 +2410,7 @@ async function seedParentWithWeeklyReport(
       ...base.ids,
       childId: childProfileId,
       reportId,
+      // Weekly report detail reuses the same progress_reports row in this seed.
       weeklyReportId: reportId,
     },
   };

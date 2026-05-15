@@ -138,7 +138,9 @@ function SubjectCard({
   const { t } = useTranslation();
   const router = useRouter();
   const colors = useThemeColors();
-  const canOpen = typeof subject.subjectId === 'string';
+  const subjectId =
+    typeof subject.subjectId === 'string' ? subject.subjectId.trim() : '';
+  const canOpen = subjectId.length > 0;
   const rawInput =
     subject.rawInput && subject.rawInput.trim() !== subject.name
       ? subject.rawInput.trim()
@@ -147,16 +149,13 @@ function SubjectCard({
   const content = (
     <View className="flex-row items-center justify-between">
       <View className="flex-1 pe-3">
-        <Text
-          className="text-body font-semibold text-text-primary"
-          testID={canOpen ? `subject-card-${subject.name}` : undefined}
-        >
+        <Text className="text-body font-semibold text-text-primary">
           {subject.name}
         </Text>
         {rawInput ? (
           <Text
             className="text-caption text-text-secondary mt-1"
-            testID={`subject-raw-input-${subject.name}`}
+            testID={canOpen ? `subject-raw-input-${subjectId}` : undefined}
           >
             {t('parentView.index.subjectRawInputAudit', {
               rawInput,
@@ -194,7 +193,7 @@ function SubjectCard({
           pathname: '/(app)/child/[profileId]/subjects/[subjectId]',
           params: {
             profileId,
-            subjectId: subject.subjectId ?? '',
+            subjectId,
             subjectName: subject.name,
           },
         } as Href)
@@ -205,7 +204,7 @@ function SubjectCard({
         subject: subject.name,
         defaultValue: `Open ${subject.name} progress`,
       })}
-      testID={`subject-card-${subject.subjectId}`}
+      testID={`subject-card-${subjectId}`}
     >
       {content}
     </Pressable>

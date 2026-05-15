@@ -304,7 +304,9 @@ describe('ChildDetailScreen — profile overview', () => {
     screen.getByTestId('child-reports-link');
     screen.getByTestId('child-subjects-section');
     screen.getByTestId('subject-card-11111111-1111-7111-8111-111111111111');
-    screen.getByTestId('subject-raw-input-Mathematics');
+    screen.getByTestId(
+      'subject-raw-input-11111111-1111-7111-8111-111111111111',
+    );
     screen.getByTestId('session-card-22222222-2222-7222-8222-222222222222');
   });
 

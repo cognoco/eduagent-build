@@ -1,8 +1,13 @@
+import * as fs from 'fs';
+import * as path from 'path';
+
+import { ENGAGEMENT_SIGNALS } from '@eduagent/schemas';
+import type { Database } from '@eduagent/database';
+
 // ---------------------------------------------------------------------------
 // Test Seed Service — Unit Tests
 // ---------------------------------------------------------------------------
 
-import type { Database } from '@eduagent/database';
 import {
   seedScenario,
   resetDatabase,
@@ -110,6 +115,25 @@ describe('VALID_SCENARIOS', () => {
   it('has no duplicates', () => {
     const unique = new Set(VALID_SCENARIOS);
     expect(unique.size).toBe(VALID_SCENARIOS.length);
+  });
+});
+
+describe('seed engagement signals', () => {
+  it('uses only schema-supported engagement signals in source seeds', () => {
+    const source = fs.readFileSync(
+      path.join(__dirname, 'test-seed.ts'),
+      'utf8',
+    );
+    const allowedSignals = new Set<string>(ENGAGEMENT_SIGNALS);
+    const matches = [...source.matchAll(/engagementSignal:\s*'([^']+)'/g)];
+
+    expect(matches.length).toBeGreaterThan(0);
+    expect(
+      matches
+        .map((match) => match[1])
+        .filter((signal): signal is string => signal != null)
+        .filter((signal) => !allowedSignals.has(signal)),
+    ).toEqual([]);
   });
 });
 
