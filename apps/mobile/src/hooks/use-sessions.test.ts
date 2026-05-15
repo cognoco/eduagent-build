@@ -1052,6 +1052,94 @@ describe('useStreamMessage', () => {
     });
   });
 
+  it('queues overlapping stream calls instead of completing the second silently', async () => {
+    const { streamSSEViaXHR } = require('../lib/sse') as {
+      streamSSEViaXHR: jest.Mock;
+    };
+
+    let releaseFirst!: () => void;
+    let releaseSecond!: () => void;
+    const firstGate = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    const secondGate = new Promise<void>((resolve) => {
+      releaseSecond = resolve;
+    });
+
+    streamSSEViaXHR
+      .mockReturnValueOnce({
+        events: (async function* () {
+          yield { type: 'chunk', content: 'First' };
+          await firstGate;
+          yield { type: 'done', exchangeCount: 1, escalationRung: 1 };
+        })(),
+        abort: jest.fn(),
+      })
+      .mockReturnValueOnce({
+        events: (async function* () {
+          yield { type: 'chunk', content: 'Second' };
+          await secondGate;
+          yield { type: 'done', exchangeCount: 2, escalationRung: 1 };
+        })(),
+        abort: jest.fn(),
+      });
+
+    const { result } = renderHook(() => useStreamMessage('session-1'), {
+      wrapper: createWrapper(),
+    });
+
+    const firstDone = jest.fn();
+    const secondDone = jest.fn();
+    let firstPromise!: Promise<void>;
+    let secondPromise!: Promise<void>;
+
+    await act(async () => {
+      firstPromise = result.current.stream(
+        'first',
+        jest.fn(),
+        firstDone,
+        'session-1',
+      );
+      secondPromise = result.current.stream(
+        'second',
+        jest.fn(),
+        secondDone,
+        'session-1',
+      );
+    });
+
+    await waitFor(() => {
+      expect(streamSSEViaXHR).toHaveBeenCalledTimes(1);
+    });
+
+    await act(async () => {
+      releaseFirst();
+      await firstPromise;
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(streamSSEViaXHR).toHaveBeenCalledTimes(2);
+    });
+    expect(secondDone).not.toHaveBeenCalled();
+
+    await act(async () => {
+      releaseSecond();
+      await secondPromise;
+    });
+
+    expect(firstDone).toHaveBeenCalledWith({
+      exchangeCount: 1,
+      escalationRung: 1,
+    });
+    expect(secondDone).toHaveBeenCalledWith({
+      exchangeCount: 2,
+      escalationRung: 1,
+    });
+  });
+
   it('classifies server SSE error events as retryable upstream errors', async () => {
     const { streamSSEViaXHR } = require('../lib/sse') as {
       streamSSEViaXHR: jest.Mock;

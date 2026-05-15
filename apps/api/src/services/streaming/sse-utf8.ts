@@ -1,5 +1,21 @@
 import type { Context } from 'hono';
 import { streamSSE, type SSEStreamingApi } from 'hono/streaming';
+import { streamErrorFrameSchema } from '@eduagent/schemas';
+
+const DEFAULT_STREAM_ERROR_MESSAGE =
+  'Something went wrong while generating a reply. Please try again.';
+
+async function emitJsonErrorFrame(stream: SSEStreamingApi): Promise<void> {
+  await stream.writeSSE({
+    data: JSON.stringify(
+      streamErrorFrameSchema.parse({
+        type: 'error',
+        code: 'STREAM_CALLBACK_ERROR',
+        message: DEFAULT_STREAM_ERROR_MESSAGE,
+      }),
+    ),
+  });
+}
 
 /**
  * [BUG-881] Wrapper around Hono's `streamSSE` that ensures the response
@@ -31,9 +47,26 @@ import { streamSSE, type SSEStreamingApi } from 'hono/streaming';
 export function streamSSEUtf8(
   c: Context,
   cb: (stream: SSEStreamingApi) => Promise<void>,
-  onError?: (e: Error, stream: SSEStreamingApi) => Promise<void>
+  onError?: (e: Error, stream: SSEStreamingApi) => Promise<void>,
 ): Response {
-  const res = streamSSE(c, cb, onError);
+  const guardedCallback = async (stream: SSEStreamingApi): Promise<void> => {
+    try {
+      await cb(stream);
+    } catch (caught) {
+      const error =
+        caught instanceof Error ? caught : new Error(String(caught));
+      if (onError) {
+        try {
+          await onError(error, stream);
+        } catch (onErrorCaught) {
+          console.error(onErrorCaught);
+        }
+      }
+      await emitJsonErrorFrame(stream);
+    }
+  };
+
+  const res = streamSSE(c, guardedCallback);
   res.headers.set('Content-Type', 'text/event-stream; charset=utf-8');
   return res;
 }
