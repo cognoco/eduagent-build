@@ -441,6 +441,7 @@ export function MagicPenAnimation({
     (PEN_START.y + (PEN_END.y - PEN_START.y) * DROP_TRIGGER_PROGRESS) *
     drawingScale;
   const dropletFallDistance = size * 0.18;
+  const dropletRadius = Math.max(3, size * 0.055);
   const dropletStyle = useAnimatedStyle(() => {
     const fallY = dropletFall.value * dropletFallDistance;
     return {
@@ -484,8 +485,6 @@ export function MagicPenAnimation({
     (PEN_START.y + (PEN_END.y - PEN_START.y) * 0.5) * drawingScale;
   const sparkleSize = Math.max(6, size * 0.08);
 
-  // Droplet base size
-  const dropletRadius = Math.max(3, size * 0.055);
   const bodyColor = color;
   const capColor = '#1a1a1a';
   const steelColor = '#cfd4dc';

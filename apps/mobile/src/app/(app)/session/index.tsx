@@ -733,10 +733,13 @@ function SessionScreenInner() {
     () => messages.filter((m) => m.role === 'user' && !m.isAutoSent).length,
     [messages],
   );
+  // Resumed sessions can receive exchangeCount before UI message history
+  // hydrates; keep the server turn count so returning learners stay in-loop.
+  const learnerTurnCount = Math.max(userMessageCount, exchangeCount);
 
   const hasSubject = !!(classifiedSubject?.subjectId || subjectId);
   const conversationStage = getConversationStage(
-    userMessageCount,
+    learnerTurnCount,
     hasSubject,
     effectiveMode,
   );
@@ -1049,7 +1052,7 @@ function SessionScreenInner() {
         isStreaming,
         latestAiMessageId,
         consumedQuickChipMessageId,
-        userMessageCount,
+        userMessageCount: learnerTurnCount,
         showWrongSubjectChip,
         messageFeedback,
         bookmarkState,
