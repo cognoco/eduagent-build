@@ -209,6 +209,34 @@ describe('DeleteAccountScreen', () => {
     expect(screen.queryByTestId('delete-account-scheduled')).toBeNull();
   });
 
+  it('keeps typed confirmation when a refetch reports deletion is scheduled', async () => {
+    const { rerender } = render(<DeleteAccountScreen />, { wrapper: Wrapper });
+
+    advanceToConfirmedState();
+    screen.getByTestId('delete-account-confirming');
+
+    mockDeletionStatus = {
+      data: {
+        scheduled: true,
+        deletionScheduledAt: '2026-02-17T00:00:00.000Z',
+        gracePeriodEnds: '2026-02-24T00:00:00.000Z',
+      },
+      isLoading: false,
+      isError: false,
+      refetch: mockDeletionStatusRefetch,
+    };
+
+    rerender(<DeleteAccountScreen />);
+
+    await waitFor(() => {
+      screen.getByTestId('delete-account-confirming');
+    });
+    expect(screen.queryByTestId('delete-account-scheduled')).toBeNull();
+    expect(screen.getByTestId('delete-account-confirm-input').props.value).toBe(
+      'DELETE',
+    );
+  });
+
   it('schedules deletion and shows grace period after typed confirmation', async () => {
     mockDeleteMutateAsync.mockResolvedValue({
       message: 'Deletion scheduled',

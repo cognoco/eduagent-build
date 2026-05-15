@@ -55,6 +55,7 @@ export default function DeleteAccountScreen() {
 
   useEffect(() => {
     if (deletionStatus.data?.scheduled === true) {
+      if (stage === 'confirming') return;
       locallyScheduledRef.current = false;
       setGracePeriodEnds(deletionStatus.data.gracePeriodEnds);
       setStage('scheduled');

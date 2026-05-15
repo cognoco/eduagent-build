@@ -1298,6 +1298,40 @@ describe('SubscriptionScreen', () => {
     }
   });
 
+  it('does not render native manage billing for server-side trial users', async () => {
+    const originalPlatform = Platform.OS;
+    Object.defineProperty(Platform, 'OS', { get: () => 'ios' });
+    try {
+      mockFetch.setRoute(
+        '/subscription',
+        () =>
+          new Response(
+            JSON.stringify({
+              subscription: {
+                ...DEFAULT_SUBSCRIPTION,
+                tier: 'free',
+                status: 'trial',
+                trialEndsAt: '2026-05-21T00:00:00.000Z',
+              },
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+      );
+      mockOfferings = makeMockOfferings([makeMockPackage()]);
+      mockCustomerInfo = null;
+
+      render(<SubscriptionScreen />, { wrapper: createWrapper() });
+
+      await waitFor(() => {
+        screen.getByTestId('offerings-section');
+      });
+      expect(screen.queryByTestId('manage-billing-button')).toBeNull();
+      expect(screen.queryByTestId('manage-billing-web-info')).toBeNull();
+    } finally {
+      Object.defineProperty(Platform, 'OS', { get: () => originalPlatform });
+    }
+  });
+
   it('opens iOS App Store subscriptions on manage billing press (iOS)', async () => {
     const originalPlatform = Platform.OS;
     Object.defineProperty(Platform, 'OS', { get: () => 'ios' });

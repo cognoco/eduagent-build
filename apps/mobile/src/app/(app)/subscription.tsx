@@ -1190,7 +1190,9 @@ function SubscriptionContent(): React.ReactElement {
   const status = subscription?.status ?? 'active';
   const isPaidTier = tier !== 'free';
   const canManageBilling =
-    isPaidTier || hasActiveSubscription || status === 'trial';
+    isPaidTier ||
+    hasActiveSubscription ||
+    (status === 'trial' && Platform.OS === 'web');
   const cancelAtPeriodEnd = subscription?.cancelAtPeriodEnd ?? false;
 
   // Get the current offering's available packages
