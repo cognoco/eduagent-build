@@ -32,7 +32,7 @@ const mockInngestTransport = createInngestTransportCapture();
 jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
   const actual = jest.requireActual('../client') as typeof import('../client');
   return { ...actual, ...mockInngestTransport.module };
-}); // gc1-allow: inngest framework boundary
+});
 
 const mockCaptureException = jest.fn();
 jest.mock('../../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
