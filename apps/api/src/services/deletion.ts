@@ -20,7 +20,7 @@ export async function scheduleDeletion(
     .where(eq(accounts.id, accountId));
 
   const gracePeriodEnds = new Date(
-    now.getTime() + GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000,
+    now.getTime() + GRACE_PERIOD_MS,
   ).toISOString();
   return { gracePeriodEnds };
 }
