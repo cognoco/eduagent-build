@@ -1,0 +1,12 @@
+Starting at 2026-05-14T20:34:01+02:00
+Mode: PLAYWRIGHT_SKIP_LOCAL_API=1, CI=1 (retries=1, forbidOnly), custom domain
+START_EPOCH=1778783641
+ WARN  Unsupported engine: wanted: {"node":"22.x"} (current: {"node":"v24.15.0","pnpm":"10.19.0"})
+
+> @eduagent/source@0.0.0 test:e2e:web /Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5
+> pnpm exec playwright test -c apps/mobile/playwright.config.ts --reporter=list
+
+ WARN  Unsupported engine: wanted: {"node":"22.x"} (current: {"node":"v24.15.0","pnpm":"10.19.0"})
+[WebServer] ../..                                    | [43m[30m WARN [39m[49m Unsupported engine: wanted: {"node":"22.x"} (current: {"node":"v24.15.0","pnpm":"10.19.0"})
+[WebServer] [2mStarting Metro Bundler[22m
+[WebServer] [33mwarning[39m: Bundler cache is empty, rebuilding [2m(this may take a minute)[22m

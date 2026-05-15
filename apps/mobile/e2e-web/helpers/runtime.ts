@@ -1,6 +1,8 @@
 import path from 'node:path';
 import { randomBytes } from 'node:crypto';
 
+import { defaultApiUrl } from './e2e-defaults.js';
+
 function trimTrailingSlash(value: string): string {
   return value.replace(/\/+$/, '');
 }
@@ -18,11 +20,11 @@ export const seedEmailPrefix =
 process.env.PLAYWRIGHT_EMAIL_PREFIX = seedEmailPrefix;
 
 export const apiBaseUrl = trimTrailingSlash(
-  process.env.PLAYWRIGHT_API_URL ?? 'http://127.0.0.1:8787'
+  process.env.PLAYWRIGHT_API_URL ?? defaultApiUrl,
 );
 
 export const appBaseUrl = trimTrailingSlash(
-  process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:19006'
+  process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:19006',
 );
 
 export function buildSeedEmail(alias: string): string {

@@ -1,0 +1,2079 @@
+Starting at 2026-05-14T21:37:53+02:00
+Mode: sync server, reuseExistingServer:true, CI=1, --workers=2, PLAYWRIGHT_SKIP_LOCAL_API=1
+START_EPOCH=1778787473
+ WARN  Unsupported engine: wanted: {"node":"22.x"} (current: {"node":"v24.15.0","pnpm":"10.19.0"})
+
+> @eduagent/source@0.0.0 test:e2e:web /Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5
+> pnpm exec playwright test -c apps/mobile/playwright.config.ts --reporter=list --workers=2
+
+ WARN  Unsupported engine: wanted: {"node":"22.x"} (current: {"node":"v24.15.0","pnpm":"10.19.0"})
+[WebServer] ../..                                    | [43m[30m WARN [39m[49m Unsupported engine: wanted: {"node":"22.x"} (current: {"node":"v24.15.0","pnpm":"10.19.0"})
+[WebServer] [2mStarting Metro Bundler[22m
+[WebServer] [33mwarning[39m: Bundler cache is empty, rebuilding [2m(this may take a minute)[22m
+[WebServer] [1mWeb[22m [0m[2mapps/mobile/[22m[0m[1mindex.js[22m [47m[37m░░░░░░░░░░░░░░░░[39m[49m[1m  0.0% [22m[2m(0/1)[22m
+[WebServer] [33m|[39m [baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+[WebServer] [33m|[39m [baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+[WebServer] [33m|[39m [baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+[WebServer] [33m|[39m [baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+[WebServer] [1mWeb[22m [0m[2mapps/mobile/[22m[0m[1mindex.js[22m [32m[42m▓▓▓▓▓[49m[39m[47m[37m░░░░░░░░░░░[39m[49m[1m 36.0% [22m[2m( 9/16)[22m
+[WebServer] [33m|[39m [baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+[WebServer] [33m|[39m [baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+[WebServer] [33m|[39m [baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+[WebServer] [1mWeb[22m [0m[2mapps/mobile/[22m[0m[1mindex.js[22m [32m[42m▓▓▓▓▓▓[49m[39m[47m[37m░░░░░░░░░░[39m[49m[1m 39.1% [22m[2m( 94/324)[22m
+[WebServer] [1mWeb[22m [0m[2mapps/mobile/[22m[0m[1mindex.js[22m [32m[42m▓▓▓▓▓▓[49m[39m[47m[37m░░░░░░░░░░[39m[49m[1m 39.1% [22m[2m(347/748)[22m
+[WebServer] [1mWeb[22m [0m[2mapps/mobile/[22m[0m[1mindex.js[22m [32m[42m▓▓▓▓▓▓[49m[39m[47m[37m░░░░░░░░░░[39m[49m[1m 39.1% [22m[2m( 661/1363)[22m
+[WebServer] [1mWeb[22m [0m[2mapps/mobile/[22m[0m[1mindex.js[22m [32m[42m▓▓▓▓▓▓[49m[39m[47m[37m░░░░░░░░░░[39m[49m[1m 39.1% [22m[2m( 913/1589)[22m
+[WebServer] [1mWeb[22m [0m[2mapps/mobile/[22m[0m[1mindex.js[22m [32m[42m▓▓▓▓▓▓▓[49m[39m[47m[37m░░░░░░░░░[39m[49m[1m 46.0% [22m[2m(1138/1677)[22m
+[WebServer] [1mWeb[22m [0m[2mapps/mobile/[22m[0m[1mindex.js[22m [32m[42m▓▓▓▓▓▓▓▓▓[49m[39m[47m[37m░░░░░░░[39m[49m[1m 60.6% [22m[2m(1378/1770)[22m
+[WebServer] [1mWeb[22m [0m[2mapps/mobile/[22m[0m[1mindex.js[22m [32m[42m▓▓▓▓▓▓▓▓▓▓▓▓[49m[39m[47m[37m░░░░[39m[49m[1m 80.0% [22m[2m(1960/2191)[22m
+[WebServer] [32m[1mWeb[22m Bundled [39m[2m31111ms[22m[0m[2m apps/mobile/index.js (2690 modules)[22m[0m
+[WebServer] 
+[WebServer] [1m› Assets (41):[22m
+[WebServer] ../../node_modules/.pnpm/@expo-google-fonts+atkinson-hyperlegible@0.4.1/node_modules/@expo-google-fonts/atkinson-hyperlegible/400Regular_Italic/AtkinsonHyperlegible_400Regular_Italic.2badbc897377af4c75f1536a29e24231.ttf [90m(54.2 kB)[39m
+[WebServer] ../../node_modules/.pnpm/@expo-google-fonts+atkinson-hyperlegible@0.4.1/node_modules/@expo-google-fonts/atkinson-hyperlegible/400Regular/AtkinsonHyperlegible_400Regular.59f0f5543754fa6b68a563036eafaaab.ttf [90m(53.5 kB)[39m
+[WebServer] ../../node_modules/.pnpm/@expo-google-fonts+atkinson-hyperlegible@0.4.1/node_modules/@expo-google-fonts/atkinson-hyperlegible/700Bold_Italic/AtkinsonHyperlegible_700Bold_Italic.1d9aff33518db56f83412a331c653888.ttf [90m(54.6 kB)[39m
+[WebServer] ../../node_modules/.pnpm/@expo-google-fonts+atkinson-hyperlegible@0.4.1/node_modules/@expo-google-fonts/atkinson-hyperlegible/700Bold/AtkinsonHyperlegible_700Bold.f2193e9c742b9554852a3000f0ccdc9c.ttf [90m(54.4 kB)[39m
+[WebServer] ../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/AntDesign.3f78af31cca60105799838a1a7a59fbd.ttf [90m(130 kB)[39m
+[WebServer] ../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Entypo.31b5ffea3daddc69dd01a1f3d6cf63c5.ttf [90m(66.2 kB)[39m
+[WebServer] ../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/EvilIcons.140c53a7643ea949007aa9a282153849.ttf [90m(13.5 kB)[39m
+[WebServer] ../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Feather.ca4b48e04dc1ce10bfbddb262c8b835f.ttf [90m(55.6 kB)[39m
+[WebServer] ../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome.b06871f281fee6b241d60582ae9369b9.ttf [90m(166 kB)[39m
+[WebServer] ../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome5_Brands.3b89dd103490708d19a95adcae52210e.ttf [90m(134 kB)[39m
+[WebServer] ../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome5_Regular.1f77739ca9ff2188b539c36f30ffa2be.ttf [90m(33.7 kB)[39m
+[WebServer] ../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome5_Solid.605ed7926cf39a2ad5ec2d1f9d391d3d.ttf [90m(203 kB)[39m
+[WebServer] ../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome6_Brands.56c8d80832e37783f12c05db7c8849e2.ttf [90m(209 kB)[39m
+[WebServer] ../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome6_Regular.370dd5af19f8364907b6e2c41f45dbbf.ttf [90m(68 kB)[39m
+[WebServer] ../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome6_Solid.adec7d6f310bc577f05e8fe06a5daccf.ttf [90m(424 kB)[39m
+[WebServer] ../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Fontisto.b49ae8ab2dbccb02c4d11caaacf09eab.ttf [90m(314 kB)[39m
+[WebServer] ../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Foundation.e20945d7c929279ef7a6f1db184a4470.ttf [90m(57 kB)[39m
+[WebServer] ../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.b4eb097d35f44ed943676fd56f6bdc51.ttf [90m(390 kB)[39m
+[WebServer] ../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/MaterialCommunityIcons.6e435534bd35da5fef04168860a9b8fa.ttf [90m(1.31 MB)[39m
+[WebServer] ../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/MaterialIcons.4e85bc9ebe07e0340c9c4fc2f6c38908.ttf [90m(357 kB)[39m
+[WebServer] ../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Octicons.871378c6eab492a3e689a9385dc45a12.ttf [90m(69.4 kB)[39m
+[WebServer] ../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/SimpleLineIcons.d2285965fe34b05465047401b8595dd0.ttf [90m(54.1 kB)[39m
+[WebServer] ../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Zocial.1681f34aaca71b8dfb70756bca331eb2.ttf [90m(25.8 kB)[39m
+[WebServer] ../../node_modules/.pnpm/@react-navigation+elements@2.9.5_@react-navigation+native@7.1.28_react-native@0.81.5_@b_55bc4e64cea369cde4c1d750354d716f/node_modules/@react-navigation/elements/lib/module/assets/back-icon-mask.0a328cd9c1afd0afe8e3b1ec5165b1b4.png [90m(653 B)[39m
+[WebServer] ../../node_modules/.pnpm/@react-navigation+elements@2.9.5_@react-navigation+native@7.1.28_react-native@0.81.5_@b_55bc4e64cea369cde4c1d750354d716f/node_modules/@react-navigation/elements/lib/module/assets/back-icon.35ba0eaec5a4f5ed12ca16fabeae451d.png [90m(207 B)[39m
+[WebServer] ../../node_modules/.pnpm/@react-navigation+elements@2.9.5_@react-navigation+native@7.1.28_react-native@0.81.5_@b_55bc4e64cea369cde4c1d750354d716f/node_modules/@react-navigation/elements/lib/module/assets/clear-icon.c94f6478e7ae0cdd9f15de1fcb9e5e55.png [90m(4 variations | 425 B)[39m
+[WebServer] ../../node_modules/.pnpm/@react-navigation+elements@2.9.5_@react-navigation+native@7.1.28_react-native@0.81.5_@b_55bc4e64cea369cde4c1d750354d716f/node_modules/@react-navigation/elements/lib/module/assets/close-icon.808e1b1b9b53114ec2838071a7e6daa7.png [90m(4 variations | 235 B)[39m
+[WebServer] ../../node_modules/.pnpm/@react-navigation+elements@2.9.5_@react-navigation+native@7.1.28_react-native@0.81.5_@b_55bc4e64cea369cde4c1d750354d716f/node_modules/@react-navigation/elements/lib/module/assets/search-icon.286d67d3f74808a60a78d3ebf1a5fb57.png [90m(928 B)[39m
+[WebServer] ../../node_modules/.pnpm/expo-router@6.0.23_5a0d0b482ec9810f7dfe3d4e8900091f/node_modules/expo-router/assets/arrow_down.017bc6ba3fc25503e5eb5e53826d48a8.png [90m(9.46 kB)[39m
+[WebServer] ../../node_modules/.pnpm/expo-router@6.0.23_5a0d0b482ec9810f7dfe3d4e8900091f/node_modules/expo-router/assets/error.d1ea1496f9057eb392d5bbf3732a61b7.png [90m(469 B)[39m
+[WebServer] ../../node_modules/.pnpm/expo-router@6.0.23_5a0d0b482ec9810f7dfe3d4e8900091f/node_modules/expo-router/assets/file.19eeb73b9593a38f8e9f418337fc7d10.png [90m(138 B)[39m
+[WebServer] ../../node_modules/.pnpm/expo-router@6.0.23_5a0d0b482ec9810f7dfe3d4e8900091f/node_modules/expo-router/assets/forward.d8b800c443b8972542883e0b9de2bdc6.png [90m(188 B)[39m
+[WebServer] ../../node_modules/.pnpm/expo-router@6.0.23_5a0d0b482ec9810f7dfe3d4e8900091f/node_modules/expo-router/assets/pkg.ab19f4cbc543357183a20571f68380a3.png [90m(364 B)[39m
+[WebServer] ../../node_modules/.pnpm/expo-router@6.0.23_5a0d0b482ec9810f7dfe3d4e8900091f/node_modules/expo-router/assets/sitemap.412dd9275b6b48ad28f5e3d81bb1f626.png [90m(465 B)[39m
+[WebServer] ../../node_modules/.pnpm/expo-router@6.0.23_5a0d0b482ec9810f7dfe3d4e8900091f/node_modules/expo-router/assets/unmatched.20e71bdf79e3a97bf55fd9e164041578.png [90m(4.75 kB)[39m
+[WebServer] 
+[WebServer] [1m› web bundles (3):[22m
+[WebServer] _expo/static/css/web-6852554d7bd6fbab07d8e2434da6f4cf.css [90m(20.2 kB)[39m
+[WebServer] _expo/static/js/web/index-693ad48f038723380ab1084a462b49ee.js [90m(7.77 MB)[39m
+[WebServer] _expo/static/js/web/index-d2c6002d2c101c33b4a852751fead2ff.js [90m(10.6 kB)[39m
+[WebServer] 
+[WebServer] [1m› Files (3):[22m
+[WebServer] favicon.ico [90m(14.5 kB)[39m
+[WebServer] index.html [90m(1.4 kB)[39m
+[WebServer] metadata.json [90m(49 B)[39m
+[WebServer] 
+[WebServer] [92mExported: dist[39m
+[WebServer] Static Expo web preview ready on http://127.0.0.1:19006
+[dotenv@17.2.2] injecting env (0) from .env.local,.env -- tip: 🔐 prevent committing .env to code: https://dotenvx.com/precommit
+
+Running 31 tests using 2 workers
+
+  ✓   1 [smoke-auth] › apps/mobile/e2e-web/flows/auth/auth-navigation.spec.ts:4:5 › J-02 auth screen navigation works on web @smoke (3.2s)
+  ✓   3 [smoke-auth] › apps/mobile/e2e-web/flows/auth/sign-up-flow.spec.ts:25:7 › [BUG-754] sign-up flow top-of-funnel › form renders with email, password, terms, and submit @smoke (1.0s)
+  ✓   4 [smoke-auth] › apps/mobile/e2e-web/flows/auth/sign-up-flow.spec.ts:44:7 › [BUG-754] sign-up flow top-of-funnel › submit button is disabled until email + ≥8-char password are entered (2.1s)
+  ✓   5 [smoke-auth] › apps/mobile/e2e-web/flows/auth/sign-up-flow.spec.ts:66:7 › [BUG-754] sign-up flow top-of-funnel › clicking submit fires a request to Clerk and transitions to loading (3.1s)
+  ✓   2 [setup] › apps/mobile/e2e-web/helpers/auth.setup.ts:24:8 › seed onboarding-complete and capture solo-learner storage state (10.4s)
+  ✓   6 [smoke-auth] › apps/mobile/e2e-web/flows/auth/sign-up-flow.spec.ts:102:7 › [BUG-754] sign-up flow top-of-funnel › terms and privacy links are reachable from the sign-up screen (2.1s)
+  ✓   7 [setup] › apps/mobile/e2e-web/helpers/auth.setup.ts:24:8 › seed parent-multi-child and capture owner-with-children storage state (9.2s)
+  ✓   8 [smoke-learner] › apps/mobile/e2e-web/flows/journeys/j01-learner-home.spec.ts:3:5 › J-01 seeded learner lands on learner home @smoke (1.3s)
+  ✘   9 [smoke-learner] › apps/mobile/e2e-web/flows/journeys/j01-ux-pass.spec.ts:23:5 › single learner UX screenshot crawl (33.6s)
+  ✓  11 [smoke-learner] › apps/mobile/e2e-web/flows/journeys/j01-ux-pass.spec.ts:23:5 › single learner UX screenshot crawl (retry #1) (9.0s)
+  ✘  10 [smoke-parent] › apps/mobile/e2e-web/flows/journeys/j03-parent-gateway.spec.ts:3:5 › J-03 seeded parent lands on parent home @smoke (1.0m)
+  ✘  12 [role-transitions] › apps/mobile/e2e-web/flows/journeys/j04-parent-inline-learn.spec.ts:4:5 › J-04 parent taps child card to open child progress (1.0m)
+  ✘  13 [smoke-parent] › apps/mobile/e2e-web/flows/journeys/j03-parent-gateway.spec.ts:3:5 › J-03 seeded parent lands on parent home @smoke (retry #1) (1.0m)
+  ✘  14 [role-transitions] › apps/mobile/e2e-web/flows/journeys/j04-parent-inline-learn.spec.ts:4:5 › J-04 parent taps child card to open child progress (retry #1) (35.7s)
+  ✘  15 [role-transitions] › apps/mobile/e2e-web/flows/journeys/j05-parent-switch-to-child.spec.ts:5:5 › J-05 parent opens a linked child progress view from home (36.8s)
+  ✘  16 [role-transitions] › apps/mobile/e2e-web/flows/journeys/j06-child-switch-to-parent.spec.ts:5:5 › J-06 parent opens child progress and returns home (43.6s)
+  ✘  17 [role-transitions] › apps/mobile/e2e-web/flows/journeys/j05-parent-switch-to-child.spec.ts:5:5 › J-05 parent opens a linked child progress view from home (retry #1) (34.1s)
+  ✘  18 [role-transitions] › apps/mobile/e2e-web/flows/journeys/j06-child-switch-to-parent.spec.ts:5:5 › J-06 parent opens child progress and returns home (retry #1) (34.3s)
+  ✘  20 [later-phases] › apps/mobile/e2e-web/flows/auth/w03-deep-link-auth-redirect.spec.ts:7:5 › W-03 deep link to authenticated route redirects to sign-in and back (165ms)
+  ✘  21 [later-phases] › apps/mobile/e2e-web/flows/auth/w03-deep-link-auth-redirect.spec.ts:7:5 › W-03 deep link to authenticated route redirects to sign-in and back (retry #1) (155ms)
+  ✘  19 [role-transitions] › apps/mobile/e2e-web/flows/journeys/j07-parent-dashboard-drilldown.spec.ts:5:5 › J-07 parent → child progress → session recap → back to parent home (34.2s)
+  ✘  22 [later-phases] › apps/mobile/e2e-web/flows/journeys/j08-ask-freeform-session-summary.spec.ts:9:5 › J-08 learner → Ask → freeform chat → end session → summary → home (34.4s)
+  ✘  24 [later-phases] › apps/mobile/e2e-web/flows/journeys/j08-ask-freeform-session-summary.spec.ts:9:5 › J-08 learner → Ask → freeform chat → end session → summary → home (retry #1) (182ms)
+  ✘  25 [later-phases] › apps/mobile/e2e-web/flows/journeys/j09-learn-create-subject-onboarding.spec.ts:25:5 › J-09 learner → Add a subject → language setup → session chat (1.5s)
+  ✘  26 [later-phases] › apps/mobile/e2e-web/flows/journeys/j09-learn-create-subject-onboarding.spec.ts:25:5 › J-09 learner → Add a subject → language setup → session chat (retry #1) (1.4s)
+  ✘  27 [later-phases] › apps/mobile/e2e-web/flows/journeys/j10-practice-quiz-cycle.spec.ts:8:5 › J-10 learner → Practice → Quiz → launch → play → results → home (183ms)
+  ✘  28 [later-phases] › apps/mobile/e2e-web/flows/journeys/j10-practice-quiz-cycle.spec.ts:8:5 › J-10 learner → Practice → Quiz → launch → play → results → home (retry #1) (186ms)
+  ✘  29 [later-phases] › apps/mobile/e2e-web/flows/journeys/j11-library-to-book-session.spec.ts:9:5 › J-11 learner → Library → shelf → book → start learning (186ms)
+  ✘  30 [later-phases] › apps/mobile/e2e-web/flows/journeys/j11-library-to-book-session.spec.ts:9:5 › J-11 learner → Library → shelf → book → start learning (retry #1) (185ms)
+  ✘  31 [later-phases] › apps/mobile/e2e-web/flows/journeys/j12-pre-profile-create-profile.spec.ts:5:5 › J-12 new user → create profile → lands on learner home (1.7s)
+  ✘  32 [later-phases] › apps/mobile/e2e-web/flows/journeys/j12-pre-profile-create-profile.spec.ts:5:5 › J-12 new user → create profile → lands on learner home (retry #1) (1.4s)
+  ✘  33 [later-phases] › apps/mobile/e2e-web/flows/journeys/j13-consent-pending-parent-approval.spec.ts:6:5 › J-13 pending consent blocks app until parent approval completes (167ms)
+  ✘  34 [later-phases] › apps/mobile/e2e-web/flows/journeys/j13-consent-pending-parent-approval.spec.ts:6:5 › J-13 pending consent blocks app until parent approval completes (retry #1) (1.5s)
+  ✘  35 [later-phases] › apps/mobile/e2e-web/flows/journeys/j14-loading-timeout-fallback.spec.ts:7:5 › J-14 profile loading resolves without dead-end (183ms)
+  ✘  36 [later-phases] › apps/mobile/e2e-web/flows/journeys/j14-loading-timeout-fallback.spec.ts:7:5 › J-14 profile loading resolves without dead-end (retry #1) (176ms)
+  ✘  37 [later-phases] › apps/mobile/e2e-web/flows/journeys/j15-parent-solo-add-first-child.spec.ts:5:5 › J-15 family-plan parent with no children sees add-first-child CTA (153ms)
+  ✘  38 [later-phases] › apps/mobile/e2e-web/flows/journeys/j15-parent-solo-add-first-child.spec.ts:5:5 › J-15 family-plan parent with no children sees add-first-child CTA (retry #1) (1.4s)
+  ✘  39 [later-phases] › apps/mobile/e2e-web/flows/journeys/j16-parent-drilldown-back-chain.spec.ts:9:5 › J-16 parent drill-down reaches topic detail and unwinds cleanly (184ms)
+  ✘  40 [later-phases] › apps/mobile/e2e-web/flows/journeys/j16-parent-drilldown-back-chain.spec.ts:9:5 › J-16 parent drill-down reaches topic detail and unwinds cleanly (retry #1) (187ms)
+  ✘  41 [later-phases] › apps/mobile/e2e-web/flows/journeys/j17-parent-session-recap-copy.spec.ts:9:5 › J-17 parent opens a session recap and copies the conversation prompt (186ms)
+  ✘  42 [later-phases] › apps/mobile/e2e-web/flows/journeys/j17-parent-session-recap-copy.spec.ts:9:5 › J-17 parent opens a session recap and copies the conversation prompt (retry #1) (190ms)
+  ✘  43 [later-phases] › apps/mobile/e2e-web/flows/journeys/j18-invalid-saved-profile-fallback.spec.ts:8:5 › J-18 invalid saved profile falls back to the owner profile (182ms)
+  ✘  44 [later-phases] › apps/mobile/e2e-web/flows/journeys/j18-invalid-saved-profile-fallback.spec.ts:8:5 › J-18 invalid saved profile falls back to the owner profile (retry #1) (182ms)
+  ✘  23 [role-transitions] › apps/mobile/e2e-web/flows/journeys/j07-parent-dashboard-drilldown.spec.ts:5:5 › J-07 parent → child progress → session recap → back to parent home (retry #1) (44.8s)
+  ✘  45 [later-phases] › apps/mobile/e2e-web/flows/journeys/j19-subscription-paywall-ui.spec.ts:25:5 › J-19 free-tier learner sees subscription paywall with static tier comparison on web (180ms)
+  ✘  46 [later-phases] › apps/mobile/e2e-web/flows/navigation/w01-no-bleed-through-fullscreen.spec.ts:8:5 › W-01 full-screen routes hide the tab bar and prior scene content (181ms)
+  ✘  47 [later-phases] › apps/mobile/e2e-web/flows/journeys/j19-subscription-paywall-ui.spec.ts:25:5 › J-19 free-tier learner sees subscription paywall with static tier comparison on web (retry #1) (182ms)
+  ✘  48 [later-phases] › apps/mobile/e2e-web/flows/navigation/w01-no-bleed-through-fullscreen.spec.ts:8:5 › W-01 full-screen routes hide the tab bar and prior scene content (retry #1) (183ms)
+  ✘  49 [later-phases] › apps/mobile/e2e-web/flows/navigation/w02-go-back-or-replace-empty-history.spec.ts:8:5 › W-02 goBackOrReplace falls back when a direct URL has no browser history (180ms)
+  ✘  50 [later-phases] › apps/mobile/e2e-web/flows/navigation/w04-browser-history-stack.spec.ts:12:5 › W-04 practice to quiz keeps the contextual web stack coherent (182ms)
+  ✘  51 [later-phases] › apps/mobile/e2e-web/flows/navigation/w02-go-back-or-replace-empty-history.spec.ts:8:5 › W-02 goBackOrReplace falls back when a direct URL has no browser history (retry #1) (180ms)
+  ✘  52 [later-phases] › apps/mobile/e2e-web/flows/navigation/w04-browser-history-stack.spec.ts:12:5 › W-04 practice to quiz keeps the contextual web stack coherent (retry #1) (181ms)
+  ✘  53 [later-phases] › apps/mobile/e2e-web/flows/navigation/w05-tab-routes-render-correct-screen.spec.ts:8:5 › W-05 tab URLs render the correct screen on web (172ms)
+  ✘  54 [later-phases] › apps/mobile/e2e-web/flows/navigation/w05-tab-routes-render-correct-screen.spec.ts:8:5 › W-05 tab URLs render the correct screen on web (retry #1) (174ms)
+
+
+  1) [smoke-parent] › apps/mobile/e2e-web/flows/journeys/j03-parent-gateway.spec.ts:3:5 › J-03 seeded parent lands on parent home @smoke 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: getByTestId('parent-home-screen')
+    Expected: visible
+    Timeout: 60000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 60000ms[22m
+    [2m  - waiting for getByTestId('parent-home-screen')[22m
+
+
+       5 |
+       6 |   await expect(page).toHaveURL(/\/home(?:\?.*)?$/);
+    >  7 |   await expect(page.getByTestId('parent-home-screen')).toBeVisible({
+         |                                                        ^
+       8 |     timeout: 60_000,
+       9 |   });
+      10 |   await expect(
+        at /Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/flows/journeys/j03-parent-gateway.spec.ts:7:56
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j03-parent--c1ff6--lands-on-parent-home-smoke-smoke-parent/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j03-parent--c1ff6--lands-on-parent-home-smoke-smoke-parent/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: apps/mobile/e2e-web/test-results/flows-journeys-j03-parent--c1ff6--lands-on-parent-home-smoke-smoke-parent/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j03-parent--c1ff6--lands-on-parent-home-smoke-smoke-parent/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/flows-journeys-j03-parent--c1ff6--lands-on-parent-home-smoke-smoke-parent/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: getByTestId('parent-home-screen')
+    Expected: visible
+    Timeout: 60000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 60000ms[22m
+    [2m  - waiting for getByTestId('parent-home-screen')[22m
+
+
+       5 |
+       6 |   await expect(page).toHaveURL(/\/home(?:\?.*)?$/);
+    >  7 |   await expect(page.getByTestId('parent-home-screen')).toBeVisible({
+         |                                                        ^
+       8 |     timeout: 60_000,
+       9 |   });
+      10 |   await expect(
+        at /Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/flows/journeys/j03-parent-gateway.spec.ts:7:56
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j03-parent--c1ff6--lands-on-parent-home-smoke-smoke-parent-retry1/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j03-parent--c1ff6--lands-on-parent-home-smoke-smoke-parent-retry1/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: apps/mobile/e2e-web/test-results/flows-journeys-j03-parent--c1ff6--lands-on-parent-home-smoke-smoke-parent-retry1/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j03-parent--c1ff6--lands-on-parent-home-smoke-smoke-parent-retry1/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/flows-journeys-j03-parent--c1ff6--lands-on-parent-home-smoke-smoke-parent-retry1/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  2) [role-transitions] › apps/mobile/e2e-web/flows/journeys/j04-parent-inline-learn.spec.ts:4:5 › J-04 parent taps child card to open child progress 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: getByTestId('parent-home-screen')
+    Expected: visible
+    Timeout: 60000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 60000ms[22m
+    [2m  - waiting for getByTestId('parent-home-screen')[22m
+
+
+       5 |   await page.goto('/home', { waitUntil: 'commit' });
+       6 |
+    >  7 |   await expect(page.getByTestId('parent-home-screen')).toBeVisible({
+         |                                                        ^
+       8 |     timeout: 60_000,
+       9 |   });
+      10 |   await expect(
+        at /Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/flows/journeys/j04-parent-inline-learn.spec.ts:7:56
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j04-parent--24a1e-card-to-open-child-progress-role-transitions/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j04-parent--24a1e-card-to-open-child-progress-role-transitions/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: apps/mobile/e2e-web/test-results/flows-journeys-j04-parent--24a1e-card-to-open-child-progress-role-transitions/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j04-parent--24a1e-card-to-open-child-progress-role-transitions/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/flows-journeys-j04-parent--24a1e-card-to-open-child-progress-role-transitions/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: getByTestId('progress-screen')
+    Expected: visible
+    Timeout: 30000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 30000ms[22m
+    [2m  - waiting for getByTestId('progress-screen')[22m
+
+
+      13 |
+      14 |   await pressableClick(page.getByTestId(/^parent-home-check-child-/).first());
+    > 15 |   await expect(page.getByTestId('progress-screen')).toBeVisible({
+         |                                                     ^
+      16 |     timeout: 30_000,
+      17 |   });
+      18 |   await expect(page.getByTestId(/^progress-pill-/).first()).toBeVisible({
+        at /Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/flows/journeys/j04-parent-inline-learn.spec.ts:15:53
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j04-parent--24a1e-card-to-open-child-progress-role-transitions-retry1/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j04-parent--24a1e-card-to-open-child-progress-role-transitions-retry1/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: apps/mobile/e2e-web/test-results/flows-journeys-j04-parent--24a1e-card-to-open-child-progress-role-transitions-retry1/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j04-parent--24a1e-card-to-open-child-progress-role-transitions-retry1/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/flows-journeys-j04-parent--24a1e-card-to-open-child-progress-role-transitions-retry1/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  3) [role-transitions] › apps/mobile/e2e-web/flows/journeys/j05-parent-switch-to-child.spec.ts:5:5 › J-05 parent opens a linked child progress view from home 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: getByTestId('progress-screen')
+    Expected: visible
+    Timeout: 30000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 30000ms[22m
+    [2m  - waiting for getByTestId('progress-screen')[22m
+
+
+      19 |     page.getByTestId(`parent-home-check-child-${childProfileId}`),
+      20 |   );
+    > 21 |   await expect(page.getByTestId('progress-screen')).toBeVisible({
+         |                                                     ^
+      22 |     timeout: 30_000,
+      23 |   });
+      24 |   await expect(page.getByTestId(`progress-pill-${childProfileId}`)).toBeVisible(
+        at /Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/flows/journeys/j05-parent-switch-to-child.spec.ts:21:53
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j05-parent--480ab-ild-progress-view-from-home-role-transitions/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j05-parent--480ab-ild-progress-view-from-home-role-transitions/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: apps/mobile/e2e-web/test-results/flows-journeys-j05-parent--480ab-ild-progress-view-from-home-role-transitions/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j05-parent--480ab-ild-progress-view-from-home-role-transitions/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/flows-journeys-j05-parent--480ab-ild-progress-view-from-home-role-transitions/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: getByTestId('progress-screen')
+    Expected: visible
+    Timeout: 30000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 30000ms[22m
+    [2m  - waiting for getByTestId('progress-screen')[22m
+
+
+      19 |     page.getByTestId(`parent-home-check-child-${childProfileId}`),
+      20 |   );
+    > 21 |   await expect(page.getByTestId('progress-screen')).toBeVisible({
+         |                                                     ^
+      22 |     timeout: 30_000,
+      23 |   });
+      24 |   await expect(page.getByTestId(`progress-pill-${childProfileId}`)).toBeVisible(
+        at /Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/flows/journeys/j05-parent-switch-to-child.spec.ts:21:53
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j05-parent--480ab-ild-progress-view-from-home-role-transitions-retry1/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j05-parent--480ab-ild-progress-view-from-home-role-transitions-retry1/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: apps/mobile/e2e-web/test-results/flows-journeys-j05-parent--480ab-ild-progress-view-from-home-role-transitions-retry1/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j05-parent--480ab-ild-progress-view-from-home-role-transitions-retry1/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/flows-journeys-j05-parent--480ab-ild-progress-view-from-home-role-transitions-retry1/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  4) [role-transitions] › apps/mobile/e2e-web/flows/journeys/j06-child-switch-to-parent.spec.ts:5:5 › J-06 parent opens child progress and returns home 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: getByTestId('progress-screen')
+    Expected: visible
+    Timeout: 30000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 30000ms[22m
+    [2m  - waiting for getByTestId('progress-screen')[22m
+
+
+      16 |     page.getByTestId(`parent-home-check-child-${childProfileId}`),
+      17 |   );
+    > 18 |   await expect(page.getByTestId('progress-screen')).toBeVisible({
+         |                                                     ^
+      19 |     timeout: 30_000,
+      20 |   });
+      21 |
+        at /Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/flows/journeys/j06-child-switch-to-parent.spec.ts:18:53
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j06-child-s-76db7-d-progress-and-returns-home-role-transitions/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j06-child-s-76db7-d-progress-and-returns-home-role-transitions/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: apps/mobile/e2e-web/test-results/flows-journeys-j06-child-s-76db7-d-progress-and-returns-home-role-transitions/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j06-child-s-76db7-d-progress-and-returns-home-role-transitions/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/flows-journeys-j06-child-s-76db7-d-progress-and-returns-home-role-transitions/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: getByTestId('progress-screen')
+    Expected: visible
+    Timeout: 30000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 30000ms[22m
+    [2m  - waiting for getByTestId('progress-screen')[22m
+
+
+      16 |     page.getByTestId(`parent-home-check-child-${childProfileId}`),
+      17 |   );
+    > 18 |   await expect(page.getByTestId('progress-screen')).toBeVisible({
+         |                                                     ^
+      19 |     timeout: 30_000,
+      20 |   });
+      21 |
+        at /Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/flows/journeys/j06-child-switch-to-parent.spec.ts:18:53
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j06-child-s-76db7-d-progress-and-returns-home-role-transitions-retry1/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j06-child-s-76db7-d-progress-and-returns-home-role-transitions-retry1/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: apps/mobile/e2e-web/test-results/flows-journeys-j06-child-s-76db7-d-progress-and-returns-home-role-transitions-retry1/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j06-child-s-76db7-d-progress-and-returns-home-role-transitions-retry1/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/flows-journeys-j06-child-s-76db7-d-progress-and-returns-home-role-transitions-retry1/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  5) [role-transitions] › apps/mobile/e2e-web/flows/journeys/j07-parent-dashboard-drilldown.spec.ts:5:5 › J-07 parent → child progress → session recap → back to parent home 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: getByTestId('progress-screen')
+    Expected: visible
+    Timeout: 30000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 30000ms[22m
+    [2m  - waiting for getByTestId('progress-screen')[22m
+
+
+      19 |     page.getByTestId(`parent-home-check-child-${childProfileId}`),
+      20 |   );
+    > 21 |   await expect(page.getByTestId('progress-screen')).toBeVisible({
+         |                                                     ^
+      22 |     timeout: 30_000,
+      23 |   });
+      24 |
+        at /Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/flows/journeys/j07-parent-dashboard-drilldown.spec.ts:21:53
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j07-parent--3a158-recap-→-back-to-parent-home-role-transitions/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j07-parent--3a158-recap-→-back-to-parent-home-role-transitions/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: apps/mobile/e2e-web/test-results/flows-journeys-j07-parent--3a158-recap-→-back-to-parent-home-role-transitions/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j07-parent--3a158-recap-→-back-to-parent-home-role-transitions/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/flows-journeys-j07-parent--3a158-recap-→-back-to-parent-home-role-transitions/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: getByTestId('progress-screen')
+    Expected: visible
+    Timeout: 30000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 30000ms[22m
+    [2m  - waiting for getByTestId('progress-screen')[22m
+
+
+      19 |     page.getByTestId(`parent-home-check-child-${childProfileId}`),
+      20 |   );
+    > 21 |   await expect(page.getByTestId('progress-screen')).toBeVisible({
+         |                                                     ^
+      22 |     timeout: 30_000,
+      23 |   });
+      24 |
+        at /Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/flows/journeys/j07-parent-dashboard-drilldown.spec.ts:21:53
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j07-parent--3a158-recap-→-back-to-parent-home-role-transitions-retry1/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j07-parent--3a158-recap-→-back-to-parent-home-role-transitions-retry1/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: apps/mobile/e2e-web/test-results/flows-journeys-j07-parent--3a158-recap-→-back-to-parent-home-role-transitions-retry1/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j07-parent--3a158-recap-→-back-to-parent-home-role-transitions-retry1/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/flows-journeys-j07-parent--3a158-recap-→-back-to-parent-home-role-transitions-retry1/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  6) [later-phases] › apps/mobile/e2e-web/flows/auth/w03-deep-link-auth-redirect.spec.ts:7:5 › W-03 deep link to authenticated route redirects to sign-in and back 
+
+    Error: Seeding onboarding-complete failed (500): <!DOCTYPE html>
+    <!--[if lt IE 7]> <html class="no-js ie6 oldie" lang="en-US"> <![endif]-->
+    <!--[if IE 7]>    <html class="no-js ie7 oldie" lang="en-US"> <![endif]-->
+    <!--[if IE 8]>    <html class="no-js ie8 oldie" lang="en-US"> <![endif]-->
+    <!--[if gt IE 8]><!--> <html class="no-js" lang="en-US"> <!--<![endif]-->
+    <head>
+    <title>Worker threw exception | api-test.mentomate.com | Cloudflare</title>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="stylesheet" id="cf_styles-css" href="/cdn-cgi/styles/cf.errors.css" />
+    <!--[if lt IE 9]><link rel="stylesheet" id='cf_styles-ie-css' href="/cdn-cgi/styles/cf.errors.ie.css" /><![endif]-->
+    <style>body{margin:0;padding:0}</style>
+
+
+    <!--[if gte IE 10]><!-->
+    <script>
+      if (!navigator.cookieEnabled) {
+        window.addEventListener('DOMContentLoaded', function () {
+          var cookieEl = document.getElementById('cookie-alert');
+          cookieEl.style.display = 'block';
+        })
+      }
+    </script>
+    <!--<![endif]-->
+
+    </head>
+    <body>
+        <div id="cf-wrapper">
+            <div class="cf-alert cf-alert-error cf-cookie-error" id="cookie-alert" data-translate="enable_cookies">Please enable cookies.</div>
+            <div id="cf-error-details" class="cf-error-details-wrapper">
+                <div class="cf-wrapper cf-header cf-error-overview">
+                    <h1>
+                        <span class="cf-error-type" data-translate="error">Error</span>
+                        <span class="cf-error-code">1101</span>
+                        <small class="heading-ray-id">Ray ID: 9fbc634f7ffa5693 &bull; 2026-05-14 19:42:45 UTC</small>
+                    </h1>
+                    <h2 class="cf-subheadline" data-translate="error_desc">Worker threw exception</h2>
+                </div><!-- /.header -->
+        
+                <section></section><!-- spacer -->
+        
+                <div class="cf-section cf-wrapper">
+                    <div class="cf-columns two">
+                        <div class="cf-column">
+                            <h2 data-translate="what_happened">What happened?</h2>
+                                <p>You've requested a page on a website (api-test.mentomate.com) that is on the <a href="https://www.cloudflare.com/5xx-error-landing?utm_source=error_100x" target="_blank">Cloudflare</a> network. An unknown error occurred while rendering the page.</p>
+                        </div>
+                        
+                        <div class="cf-column">
+                            <h2 data-translate="what_can_i_do">What can I do?</h2>
+                                <p><strong>If you are the owner of this website:</strong><br />refer to <a href="https://developers.cloudflare.com/workers/observability/errors/" target="_blank">Workers - Errors and Exceptions</a> and check Workers Logs for api-test.mentomate.com.</p>
+                        </div>
+                        
+                    </div>
+                </div><!-- /.section -->
+        
+                <div class="cf-error-footer cf-wrapper w-240 lg:w-full py-10 sm:py-4 sm:px-8 mx-auto text-center sm:text-left border-solid border-0 border-t border-gray-300">
+        <p class="text-13">
+          <span class="cf-footer-item sm:block sm:mb-1">Cloudflare Ray ID: <strong class="font-semibold">9fbc634f7ffa5693</strong></span>
+          <span class="cf-footer-separator sm:hidden">&bull;</span>
+          <span id="cf-footer-item-ip" class="cf-footer-item hidden sm:block sm:mb-1">
+            Your IP:
+            <button type="button" id="cf-footer-ip-reveal" class="cf-footer-ip-reveal-btn">Click to reveal</button>
+            <span class="hidden" id="cf-footer-ip">2001:4654:6d0:0:95fa:f7d1:2153:d726</span>
+            <span class="cf-footer-separator sm:hidden">&bull;</span>
+          </span>
+          <span class="cf-footer-item sm:block sm:mb-1"><span>Performance &amp; security by</span> <a rel="noopener noreferrer" href="https://www.cloudflare.com/5xx-error-landing" id="brand_link" target="_blank">Cloudflare</a></span>
+          
+        </p>
+        <script>(function(){function d(){var b=a.getElementById("cf-footer-item-ip"),c=a.getElementById("cf-footer-ip-reveal");b&&"classList"in b&&(b.classList.remove("hidden"),c.addEventListener("click",function(){c.classList.add("hidden");a.getElementById("cf-footer-ip").classList.remove("hidden")}))}var a=document;document.addEventListener&&a.addEventListener("DOMContentLoaded",d)})();</script>
+      </div><!-- /.error-footer -->
+
+            </div><!-- /#cf-error-details -->
+        </div><!-- /#cf-wrapper -->
+
+         <script>
+        window._cf_translation = {};
+        
+        
+      </script> 
+    </body>
+    </html>
+
+       at helpers/test-seed.ts:65
+
+      63 |   if (!response.ok) {
+      64 |     const detail = await response.text();
+    > 65 |     throw new Error(`${action} failed (${response.status}): ${detail}`);
+         |           ^
+      66 |   }
+      67 |
+      68 |   return (await response.json()) as T;
+        at readJsonOrThrow (/Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/helpers/test-seed.ts:65:11)
+        at /Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/flows/auth/w03-deep-link-auth-redirect.spec.ts:11:18
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-auth-w03-deep-link-a-9e035-directs-to-sign-in-and-back-later-phases/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-auth-w03-deep-link-a-9e035-directs-to-sign-in-and-back-later-phases/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-auth-w03-deep-link-a-9e035-directs-to-sign-in-and-back-later-phases/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/flows-auth-w03-deep-link-a-9e035-directs-to-sign-in-and-back-later-phases/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: Seeding onboarding-complete failed (500): <!DOCTYPE html>
+    <!--[if lt IE 7]> <html class="no-js ie6 oldie" lang="en-US"> <![endif]-->
+    <!--[if IE 7]>    <html class="no-js ie7 oldie" lang="en-US"> <![endif]-->
+    <!--[if IE 8]>    <html class="no-js ie8 oldie" lang="en-US"> <![endif]-->
+    <!--[if gt IE 8]><!--> <html class="no-js" lang="en-US"> <!--<![endif]-->
+    <head>
+    <title>Worker threw exception | api-test.mentomate.com | Cloudflare</title>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="stylesheet" id="cf_styles-css" href="/cdn-cgi/styles/cf.errors.css" />
+    <!--[if lt IE 9]><link rel="stylesheet" id='cf_styles-ie-css' href="/cdn-cgi/styles/cf.errors.ie.css" /><![endif]-->
+    <style>body{margin:0;padding:0}</style>
+
+
+    <!--[if gte IE 10]><!-->
+    <script>
+      if (!navigator.cookieEnabled) {
+        window.addEventListener('DOMContentLoaded', function () {
+          var cookieEl = document.getElementById('cookie-alert');
+          cookieEl.style.display = 'block';
+        })
+      }
+    </script>
+    <!--<![endif]-->
+
+    </head>
+    <body>
+        <div id="cf-wrapper">
+            <div class="cf-alert cf-alert-error cf-cookie-error" id="cookie-alert" data-translate="enable_cookies">Please enable cookies.</div>
+            <div id="cf-error-details" class="cf-error-details-wrapper">
+                <div class="cf-wrapper cf-header cf-error-overview">
+                    <h1>
+                        <span class="cf-error-type" data-translate="error">Error</span>
+                        <span class="cf-error-code">1101</span>
+                        <small class="heading-ray-id">Ray ID: 9fbc63531ca35693 &bull; 2026-05-14 19:42:46 UTC</small>
+                    </h1>
+                    <h2 class="cf-subheadline" data-translate="error_desc">Worker threw exception</h2>
+                </div><!-- /.header -->
+        
+                <section></section><!-- spacer -->
+        
+                <div class="cf-section cf-wrapper">
+                    <div class="cf-columns two">
+                        <div class="cf-column">
+                            <h2 data-translate="what_happened">What happened?</h2>
+                                <p>You've requested a page on a website (api-test.mentomate.com) that is on the <a href="https://www.cloudflare.com/5xx-error-landing?utm_source=error_100x" target="_blank">Cloudflare</a> network. An unknown error occurred while rendering the page.</p>
+                        </div>
+                        
+                        <div class="cf-column">
+                            <h2 data-translate="what_can_i_do">What can I do?</h2>
+                                <p><strong>If you are the owner of this website:</strong><br />refer to <a href="https://developers.cloudflare.com/workers/observability/errors/" target="_blank">Workers - Errors and Exceptions</a> and check Workers Logs for api-test.mentomate.com.</p>
+                        </div>
+                        
+                    </div>
+                </div><!-- /.section -->
+        
+                <div class="cf-error-footer cf-wrapper w-240 lg:w-full py-10 sm:py-4 sm:px-8 mx-auto text-center sm:text-left border-solid border-0 border-t border-gray-300">
+        <p class="text-13">
+          <span class="cf-footer-item sm:block sm:mb-1">Cloudflare Ray ID: <strong class="font-semibold">9fbc63531ca35693</strong></span>
+          <span class="cf-footer-separator sm:hidden">&bull;</span>
+          <span id="cf-footer-item-ip" class="cf-footer-item hidden sm:block sm:mb-1">
+            Your IP:
+            <button type="button" id="cf-footer-ip-reveal" class="cf-footer-ip-reveal-btn">Click to reveal</button>
+            <span class="hidden" id="cf-footer-ip">2001:4654:6d0:0:95fa:f7d1:2153:d726</span>
+            <span class="cf-footer-separator sm:hidden">&bull;</span>
+          </span>
+          <span class="cf-footer-item sm:block sm:mb-1"><span>Performance &amp; security by</span> <a rel="noopener noreferrer" href="https://www.cloudflare.com/5xx-error-landing" id="brand_link" target="_blank">Cloudflare</a></span>
+          
+        </p>
+        <script>(function(){function d(){var b=a.getElementById("cf-footer-item-ip"),c=a.getElementById("cf-footer-ip-reveal");b&&"classList"in b&&(b.classList.remove("hidden"),c.addEventListener("click",function(){c.classList.add("hidden");a.getElementById("cf-footer-ip").classList.remove("hidden")}))}var a=document;document.addEventListener&&a.addEventListener("DOMContentLoaded",d)})();</script>
+      </div><!-- /.error-footer -->
+
+            </div><!-- /#cf-error-details -->
+        </div><!-- /#cf-wrapper -->
+
+         <script>
+        window._cf_translation = {};
+        
+        
+      </script> 
+    </body>
+    </html>
+
+       at helpers/test-seed.ts:65
+
+      63 |   if (!response.ok) {
+      64 |     const detail = await response.text();
+    > 65 |     throw new Error(`${action} failed (${response.status}): ${detail}`);
+         |           ^
+      66 |   }
+      67 |
+      68 |   return (await response.json()) as T;
+        at readJsonOrThrow (/Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/helpers/test-seed.ts:65:11)
+        at /Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/flows/auth/w03-deep-link-auth-redirect.spec.ts:11:18
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-auth-w03-deep-link-a-9e035-directs-to-sign-in-and-back-later-phases-retry1/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-auth-w03-deep-link-a-9e035-directs-to-sign-in-and-back-later-phases-retry1/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-auth-w03-deep-link-a-9e035-directs-to-sign-in-and-back-later-phases-retry1/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/flows-auth-w03-deep-link-a-9e035-directs-to-sign-in-and-back-later-phases-retry1/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  7) [later-phases] › apps/mobile/e2e-web/flows/journeys/j08-ask-freeform-session-summary.spec.ts:9:5 › J-08 learner → Ask → freeform chat → end session → summary → home 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: getByTestId('thinking-bulb-animation')
+    Expected: visible
+    Timeout: 30000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 30000ms[22m
+    [2m  - waiting for getByTestId('thinking-bulb-animation')[22m
+
+
+      30 |   // bubble renders. We wait for the bulb to disappear — meaning the stream
+      31 |   // finished and the response is rendered.
+    > 32 |   await expect(page.getByTestId('thinking-bulb-animation')).toBeVisible({
+         |                                                             ^
+      33 |     timeout: 30_000,
+      34 |   });
+      35 |   await expect(page.getByTestId('thinking-bulb-animation')).toBeHidden({
+        at /Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/flows/journeys/j08-ask-freeform-session-summary.spec.ts:32:61
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j08-ask-fre-bcb14-nd-session-→-summary-→-home-later-phases/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j08-ask-fre-bcb14-nd-session-→-summary-→-home-later-phases/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: apps/mobile/e2e-web/test-results/flows-journeys-j08-ask-fre-bcb14-nd-session-→-summary-→-home-later-phases/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j08-ask-fre-bcb14-nd-session-→-summary-→-home-later-phases/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/flows-journeys-j08-ask-fre-bcb14-nd-session-→-summary-→-home-later-phases/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home
+    Call log:
+    [2m  - navigating to "http://127.0.0.1:19006/home", waiting until "commit"[22m
+
+
+      10 |   page,
+      11 | }) => {
+    > 12 |   await page.goto('/home', { waitUntil: 'commit' });
+         |              ^
+      13 |   await expect(page.getByTestId('learner-screen')).toBeVisible({
+      14 |     timeout: 60_000,
+      15 |   });
+        at /Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/flows/journeys/j08-ask-freeform-session-summary.spec.ts:12:14
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j08-ask-fre-bcb14-nd-session-→-summary-→-home-later-phases-retry1/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j08-ask-fre-bcb14-nd-session-→-summary-→-home-later-phases-retry1/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j08-ask-fre-bcb14-nd-session-→-summary-→-home-later-phases-retry1/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/flows-journeys-j08-ask-fre-bcb14-nd-session-→-summary-→-home-later-phases-retry1/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  8) [later-phases] › apps/mobile/e2e-web/flows/journeys/j09-learn-create-subject-onboarding.spec.ts:25:5 › J-09 learner → Add a subject → language setup → session chat 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/sign-in
+    Call log:
+    [2m  - navigating to "http://127.0.0.1:19006/sign-in", waiting until "commit"[22m
+
+
+       at helpers/auth.ts:36
+
+      34 |
+      35 |   await setupClerkTestingToken({ page });
+    > 36 |   await page.goto('/sign-in', { waitUntil: 'commit' });
+         |              ^
+      37 |   await expect(page.getByTestId('sign-in-email')).toBeVisible({
+      38 |     timeout: 60_000,
+      39 |   });
+        at signIn (/Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/helpers/auth.ts:36:14)
+        at seedAndSignIn (/Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/helpers/seed-and-sign-in.ts:23:3)
+        at /Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/flows/journeys/j09-learn-create-subject-onboarding.spec.ts:28:3
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j09-learn-c-2de19-nguage-setup-→-session-chat-later-phases/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j09-learn-c-2de19-nguage-setup-→-session-chat-later-phases/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j09-learn-c-2de19-nguage-setup-→-session-chat-later-phases/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/flows-journeys-j09-learn-c-2de19-nguage-setup-→-session-chat-later-phases/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/sign-in
+    Call log:
+    [2m  - navigating to "http://127.0.0.1:19006/sign-in", waiting until "commit"[22m
+
+
+       at helpers/auth.ts:36
+
+      34 |
+      35 |   await setupClerkTestingToken({ page });
+    > 36 |   await page.goto('/sign-in', { waitUntil: 'commit' });
+         |              ^
+      37 |   await expect(page.getByTestId('sign-in-email')).toBeVisible({
+      38 |     timeout: 60_000,
+      39 |   });
+        at signIn (/Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/helpers/auth.ts:36:14)
+        at seedAndSignIn (/Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/helpers/seed-and-sign-in.ts:23:3)
+        at /Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/flows/journeys/j09-learn-create-subject-onboarding.spec.ts:28:3
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j09-learn-c-2de19-nguage-setup-→-session-chat-later-phases-retry1/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j09-learn-c-2de19-nguage-setup-→-session-chat-later-phases-retry1/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j09-learn-c-2de19-nguage-setup-→-session-chat-later-phases-retry1/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/flows-journeys-j09-learn-c-2de19-nguage-setup-→-session-chat-later-phases-retry1/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  9) [later-phases] › apps/mobile/e2e-web/flows/journeys/j10-practice-quiz-cycle.spec.ts:8:5 › J-10 learner → Practice → Quiz → launch → play → results → home 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home
+    Call log:
+    [2m  - navigating to "http://127.0.0.1:19006/home", waiting until "commit"[22m
+
+
+       9 |   page,
+      10 | }) => {
+    > 11 |   await page.goto('/home', { waitUntil: 'commit' });
+         |              ^
+      12 |   await expect(page.getByTestId('learner-screen')).toBeVisible({
+      13 |     timeout: 60_000,
+      14 |   });
+        at /Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/flows/journeys/j10-practice-quiz-cycle.spec.ts:11:14
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j10-practic-6b51f-nch-→-play-→-results-→-home-later-phases/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j10-practic-6b51f-nch-→-play-→-results-→-home-later-phases/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j10-practic-6b51f-nch-→-play-→-results-→-home-later-phases/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/flows-journeys-j10-practic-6b51f-nch-→-play-→-results-→-home-later-phases/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home
+    Call log:
+    [2m  - navigating to "http://127.0.0.1:19006/home", waiting until "commit"[22m
+
+
+       9 |   page,
+      10 | }) => {
+    > 11 |   await page.goto('/home', { waitUntil: 'commit' });
+         |              ^
+      12 |   await expect(page.getByTestId('learner-screen')).toBeVisible({
+      13 |     timeout: 60_000,
+      14 |   });
+        at /Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/flows/journeys/j10-practice-quiz-cycle.spec.ts:11:14
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j10-practic-6b51f-nch-→-play-→-results-→-home-later-phases-retry1/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j10-practic-6b51f-nch-→-play-→-results-→-home-later-phases-retry1/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j10-practic-6b51f-nch-→-play-→-results-→-home-later-phases-retry1/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/flows-journeys-j10-practic-6b51f-nch-→-play-→-results-→-home-later-phases-retry1/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  10) [later-phases] › apps/mobile/e2e-web/flows/journeys/j11-library-to-book-session.spec.ts:9:5 › J-11 learner → Library → shelf → book → start learning 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home
+    Call log:
+    [2m  - navigating to "http://127.0.0.1:19006/home", waiting until "commit"[22m
+
+
+      13 |   const subjectId = seed.ids.subjectId;
+      14 |
+    > 15 |   await page.goto('/home', { waitUntil: 'commit' });
+         |              ^
+      16 |   await expect(page.getByTestId('learner-screen')).toBeVisible({
+      17 |     timeout: 60_000,
+      18 |   });
+        at /Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/flows/journeys/j11-library-to-book-session.spec.ts:15:14
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j11-library-b89cf-elf-→-book-→-start-learning-later-phases/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j11-library-b89cf-elf-→-book-→-start-learning-later-phases/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j11-library-b89cf-elf-→-book-→-start-learning-later-phases/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/flows-journeys-j11-library-b89cf-elf-→-book-→-start-learning-later-phases/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home
+    Call log:
+    [2m  - navigating to "http://127.0.0.1:19006/home", waiting until "commit"[22m
+
+
+      13 |   const subjectId = seed.ids.subjectId;
+      14 |
+    > 15 |   await page.goto('/home', { waitUntil: 'commit' });
+         |              ^
+      16 |   await expect(page.getByTestId('learner-screen')).toBeVisible({
+      17 |     timeout: 60_000,
+      18 |   });
+        at /Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/flows/journeys/j11-library-to-book-session.spec.ts:15:14
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j11-library-b89cf-elf-→-book-→-start-learning-later-phases-retry1/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j11-library-b89cf-elf-→-book-→-start-learning-later-phases-retry1/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j11-library-b89cf-elf-→-book-→-start-learning-later-phases-retry1/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/flows-journeys-j11-library-b89cf-elf-→-book-→-start-learning-later-phases-retry1/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  11) [later-phases] › apps/mobile/e2e-web/flows/journeys/j12-pre-profile-create-profile.spec.ts:5:5 › J-12 new user → create profile → lands on learner home 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/sign-in
+    Call log:
+    [2m  - navigating to "http://127.0.0.1:19006/sign-in", waiting until "commit"[22m
+
+
+       at helpers/auth.ts:36
+
+      34 |
+      35 |   await setupClerkTestingToken({ page });
+    > 36 |   await page.goto('/sign-in', { waitUntil: 'commit' });
+         |              ^
+      37 |   await expect(page.getByTestId('sign-in-email')).toBeVisible({
+      38 |     timeout: 60_000,
+      39 |   });
+        at signIn (/Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/helpers/auth.ts:36:14)
+        at seedAndSignIn (/Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/helpers/seed-and-sign-in.ts:23:3)
+        at /Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/flows/journeys/j12-pre-profile-create-profile.spec.ts:8:3
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j12-pre-pro-6b0fa-ile-→-lands-on-learner-home-later-phases/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j12-pre-pro-6b0fa-ile-→-lands-on-learner-home-later-phases/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j12-pre-pro-6b0fa-ile-→-lands-on-learner-home-later-phases/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/flows-journeys-j12-pre-pro-6b0fa-ile-→-lands-on-learner-home-later-phases/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/sign-in
+    Call log:
+    [2m  - navigating to "http://127.0.0.1:19006/sign-in", waiting until "commit"[22m
+
+
+       at helpers/auth.ts:36
+
+      34 |
+      35 |   await setupClerkTestingToken({ page });
+    > 36 |   await page.goto('/sign-in', { waitUntil: 'commit' });
+         |              ^
+      37 |   await expect(page.getByTestId('sign-in-email')).toBeVisible({
+      38 |     timeout: 60_000,
+      39 |   });
+        at signIn (/Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/helpers/auth.ts:36:14)
+        at seedAndSignIn (/Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/helpers/seed-and-sign-in.ts:23:3)
+        at /Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/flows/journeys/j12-pre-profile-create-profile.spec.ts:8:3
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j12-pre-pro-6b0fa-ile-→-lands-on-learner-home-later-phases-retry1/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j12-pre-pro-6b0fa-ile-→-lands-on-learner-home-later-phases-retry1/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j12-pre-pro-6b0fa-ile-→-lands-on-learner-home-later-phases-retry1/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/flows-journeys-j12-pre-pro-6b0fa-ile-→-lands-on-learner-home-later-phases-retry1/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  12) [later-phases] › apps/mobile/e2e-web/flows/journeys/j13-consent-pending-parent-approval.spec.ts:6:5 › J-13 pending consent blocks app until parent approval completes 
+
+    Error: Seeding consent-pending failed (500): <!DOCTYPE html>
+    <!--[if lt IE 7]> <html class="no-js ie6 oldie" lang="en-US"> <![endif]-->
+    <!--[if IE 7]>    <html class="no-js ie7 oldie" lang="en-US"> <![endif]-->
+    <!--[if IE 8]>    <html class="no-js ie8 oldie" lang="en-US"> <![endif]-->
+    <!--[if gt IE 8]><!--> <html class="no-js" lang="en-US"> <!--<![endif]-->
+    <head>
+    <title>Worker threw exception | api-test.mentomate.com | Cloudflare</title>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="stylesheet" id="cf_styles-css" href="/cdn-cgi/styles/cf.errors.css" />
+    <!--[if lt IE 9]><link rel="stylesheet" id='cf_styles-ie-css' href="/cdn-cgi/styles/cf.errors.ie.css" /><![endif]-->
+    <style>body{margin:0;padding:0}</style>
+
+
+    <!--[if gte IE 10]><!-->
+    <script>
+      if (!navigator.cookieEnabled) {
+        window.addEventListener('DOMContentLoaded', function () {
+          var cookieEl = document.getElementById('cookie-alert');
+          cookieEl.style.display = 'block';
+        })
+      }
+    </script>
+    <!--<![endif]-->
+
+    </head>
+    <body>
+        <div id="cf-wrapper">
+            <div class="cf-alert cf-alert-error cf-cookie-error" id="cookie-alert" data-translate="enable_cookies">Please enable cookies.</div>
+            <div id="cf-error-details" class="cf-error-details-wrapper">
+                <div class="cf-wrapper cf-header cf-error-overview">
+                    <h1>
+                        <span class="cf-error-type" data-translate="error">Error</span>
+                        <span class="cf-error-code">1101</span>
+                        <small class="heading-ray-id">Ray ID: 9fbc6473991b568e &bull; 2026-05-14 19:43:32 UTC</small>
+                    </h1>
+                    <h2 class="cf-subheadline" data-translate="error_desc">Worker threw exception</h2>
+                </div><!-- /.header -->
+        
+                <section></section><!-- spacer -->
+        
+                <div class="cf-section cf-wrapper">
+                    <div class="cf-columns two">
+                        <div class="cf-column">
+                            <h2 data-translate="what_happened">What happened?</h2>
+                                <p>You've requested a page on a website (api-test.mentomate.com) that is on the <a href="https://www.cloudflare.com/5xx-error-landing?utm_source=error_100x" target="_blank">Cloudflare</a> network. An unknown error occurred while rendering the page.</p>
+                        </div>
+                        
+                        <div class="cf-column">
+                            <h2 data-translate="what_can_i_do">What can I do?</h2>
+                                <p><strong>If you are the owner of this website:</strong><br />refer to <a href="https://developers.cloudflare.com/workers/observability/errors/" target="_blank">Workers - Errors and Exceptions</a> and check Workers Logs for api-test.mentomate.com.</p>
+                        </div>
+                        
+                    </div>
+                </div><!-- /.section -->
+        
+                <div class="cf-error-footer cf-wrapper w-240 lg:w-full py-10 sm:py-4 sm:px-8 mx-auto text-center sm:text-left border-solid border-0 border-t border-gray-300">
+        <p class="text-13">
+          <span class="cf-footer-item sm:block sm:mb-1">Cloudflare Ray ID: <strong class="font-semibold">9fbc6473991b568e</strong></span>
+          <span class="cf-footer-separator sm:hidden">&bull;</span>
+          <span id="cf-footer-item-ip" class="cf-footer-item hidden sm:block sm:mb-1">
+            Your IP:
+            <button type="button" id="cf-footer-ip-reveal" class="cf-footer-ip-reveal-btn">Click to reveal</button>
+            <span class="hidden" id="cf-footer-ip">2001:4654:6d0:0:95fa:f7d1:2153:d726</span>
+            <span class="cf-footer-separator sm:hidden">&bull;</span>
+          </span>
+          <span class="cf-footer-item sm:block sm:mb-1"><span>Performance &amp; security by</span> <a rel="noopener noreferrer" href="https://www.cloudflare.com/5xx-error-landing" id="brand_link" target="_blank">Cloudflare</a></span>
+          
+        </p>
+        <script>(function(){function d(){var b=a.getElementById("cf-footer-item-ip"),c=a.getElementById("cf-footer-ip-reveal");b&&"classList"in b&&(b.classList.remove("hidden"),c.addEventListener("click",function(){c.classList.add("hidden");a.getElementById("cf-footer-ip").classList.remove("hidden")}))}var a=document;document.addEventListener&&a.addEventListener("DOMContentLoaded",d)})();</script>
+      </div><!-- /.error-footer -->
+
+            </div><!-- /#cf-error-details -->
+        </div><!-- /#cf-wrapper -->
+
+         <script>
+        window._cf_translation = {};
+        
+        
+      </script> 
+    </body>
+    </html>
+
+       at helpers/test-seed.ts:65
+
+      63 |   if (!response.ok) {
+      64 |     const detail = await response.text();
+    > 65 |     throw new Error(`${action} failed (${response.status}): ${detail}`);
+         |           ^
+      66 |   }
+      67 |
+      68 |   return (await response.json()) as T;
+        at readJsonOrThrow (/Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/helpers/test-seed.ts:65:11)
+        at seedAndSignIn (/Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/helpers/seed-and-sign-in.ts:18:18)
+        at /Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/flows/journeys/j13-consent-pending-parent-approval.spec.ts:10:18
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j13-consent-3f7a0-l-parent-approval-completes-later-phases/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j13-consent-3f7a0-l-parent-approval-completes-later-phases/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j13-consent-3f7a0-l-parent-approval-completes-later-phases/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/flows-journeys-j13-consent-3f7a0-l-parent-approval-completes-later-phases/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/sign-in
+    Call log:
+    [2m  - navigating to "http://127.0.0.1:19006/sign-in", waiting until "commit"[22m
+
+
+       at helpers/auth.ts:36
+
+      34 |
+      35 |   await setupClerkTestingToken({ page });
+    > 36 |   await page.goto('/sign-in', { waitUntil: 'commit' });
+         |              ^
+      37 |   await expect(page.getByTestId('sign-in-email')).toBeVisible({
+      38 |     timeout: 60_000,
+      39 |   });
+        at signIn (/Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/helpers/auth.ts:36:14)
+        at seedAndSignIn (/Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/helpers/seed-and-sign-in.ts:23:3)
+        at /Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/flows/journeys/j13-consent-pending-parent-approval.spec.ts:10:18
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j13-consent-3f7a0-l-parent-approval-completes-later-phases-retry1/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j13-consent-3f7a0-l-parent-approval-completes-later-phases-retry1/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j13-consent-3f7a0-l-parent-approval-completes-later-phases-retry1/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/flows-journeys-j13-consent-3f7a0-l-parent-approval-completes-later-phases-retry1/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  13) [later-phases] › apps/mobile/e2e-web/flows/journeys/j14-loading-timeout-fallback.spec.ts:7:5 › J-14 profile loading resolves without dead-end 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home
+    Call log:
+    [2m  - navigating to "http://127.0.0.1:19006/home", waiting until "commit"[22m
+
+
+      13 |   // When a TimeoutLoader is added (UX resilience rule: 15-30s timeout),
+      14 |   // extend this test to verify fallback actions (retry, go home) work.
+    > 15 |   await page.goto('/home', { waitUntil: 'commit' });
+         |              ^
+      16 |
+      17 |   // The app should resolve past profile-loading to a real screen.
+      18 |   // Accept learner home, learner screen, or consent gate as valid states.
+        at /Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/flows/journeys/j14-loading-timeout-fallback.spec.ts:15:14
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j14-loading-b55ca-g-resolves-without-dead-end-later-phases/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j14-loading-b55ca-g-resolves-without-dead-end-later-phases/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j14-loading-b55ca-g-resolves-without-dead-end-later-phases/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/flows-journeys-j14-loading-b55ca-g-resolves-without-dead-end-later-phases/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home
+    Call log:
+    [2m  - navigating to "http://127.0.0.1:19006/home", waiting until "commit"[22m
+
+
+      13 |   // When a TimeoutLoader is added (UX resilience rule: 15-30s timeout),
+      14 |   // extend this test to verify fallback actions (retry, go home) work.
+    > 15 |   await page.goto('/home', { waitUntil: 'commit' });
+         |              ^
+      16 |
+      17 |   // The app should resolve past profile-loading to a real screen.
+      18 |   // Accept learner home, learner screen, or consent gate as valid states.
+        at /Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/flows/journeys/j14-loading-timeout-fallback.spec.ts:15:14
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j14-loading-b55ca-g-resolves-without-dead-end-later-phases-retry1/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j14-loading-b55ca-g-resolves-without-dead-end-later-phases-retry1/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j14-loading-b55ca-g-resolves-without-dead-end-later-phases-retry1/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/flows-journeys-j14-loading-b55ca-g-resolves-without-dead-end-later-phases-retry1/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  14) [later-phases] › apps/mobile/e2e-web/flows/journeys/j15-parent-solo-add-first-child.spec.ts:5:5 › J-15 family-plan parent with no children sees add-first-child CTA 
+
+    Error: Seeding parent-solo failed (500): <!DOCTYPE html>
+    <!--[if lt IE 7]> <html class="no-js ie6 oldie" lang="en-US"> <![endif]-->
+    <!--[if IE 7]>    <html class="no-js ie7 oldie" lang="en-US"> <![endif]-->
+    <!--[if IE 8]>    <html class="no-js ie8 oldie" lang="en-US"> <![endif]-->
+    <!--[if gt IE 8]><!--> <html class="no-js" lang="en-US"> <!--<![endif]-->
+    <head>
+    <title>Worker threw exception | api-test.mentomate.com | Cloudflare</title>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="stylesheet" id="cf_styles-css" href="/cdn-cgi/styles/cf.errors.css" />
+    <!--[if lt IE 9]><link rel="stylesheet" id='cf_styles-ie-css' href="/cdn-cgi/styles/cf.errors.ie.css" /><![endif]-->
+    <style>body{margin:0;padding:0}</style>
+
+
+    <!--[if gte IE 10]><!-->
+    <script>
+      if (!navigator.cookieEnabled) {
+        window.addEventListener('DOMContentLoaded', function () {
+          var cookieEl = document.getElementById('cookie-alert');
+          cookieEl.style.display = 'block';
+        })
+      }
+    </script>
+    <!--<![endif]-->
+
+    </head>
+    <body>
+        <div id="cf-wrapper">
+            <div class="cf-alert cf-alert-error cf-cookie-error" id="cookie-alert" data-translate="enable_cookies">Please enable cookies.</div>
+            <div id="cf-error-details" class="cf-error-details-wrapper">
+                <div class="cf-wrapper cf-header cf-error-overview">
+                    <h1>
+                        <span class="cf-error-type" data-translate="error">Error</span>
+                        <span class="cf-error-code">1101</span>
+                        <small class="heading-ray-id">Ray ID: 9fbc648acf975696 &bull; 2026-05-14 19:43:36 UTC</small>
+                    </h1>
+                    <h2 class="cf-subheadline" data-translate="error_desc">Worker threw exception</h2>
+                </div><!-- /.header -->
+        
+                <section></section><!-- spacer -->
+        
+                <div class="cf-section cf-wrapper">
+                    <div class="cf-columns two">
+                        <div class="cf-column">
+                            <h2 data-translate="what_happened">What happened?</h2>
+                                <p>You've requested a page on a website (api-test.mentomate.com) that is on the <a href="https://www.cloudflare.com/5xx-error-landing?utm_source=error_100x" target="_blank">Cloudflare</a> network. An unknown error occurred while rendering the page.</p>
+                        </div>
+                        
+                        <div class="cf-column">
+                            <h2 data-translate="what_can_i_do">What can I do?</h2>
+                                <p><strong>If you are the owner of this website:</strong><br />refer to <a href="https://developers.cloudflare.com/workers/observability/errors/" target="_blank">Workers - Errors and Exceptions</a> and check Workers Logs for api-test.mentomate.com.</p>
+                        </div>
+                        
+                    </div>
+                </div><!-- /.section -->
+        
+                <div class="cf-error-footer cf-wrapper w-240 lg:w-full py-10 sm:py-4 sm:px-8 mx-auto text-center sm:text-left border-solid border-0 border-t border-gray-300">
+        <p class="text-13">
+          <span class="cf-footer-item sm:block sm:mb-1">Cloudflare Ray ID: <strong class="font-semibold">9fbc648acf975696</strong></span>
+          <span class="cf-footer-separator sm:hidden">&bull;</span>
+          <span id="cf-footer-item-ip" class="cf-footer-item hidden sm:block sm:mb-1">
+            Your IP:
+            <button type="button" id="cf-footer-ip-reveal" class="cf-footer-ip-reveal-btn">Click to reveal</button>
+            <span class="hidden" id="cf-footer-ip">2001:4654:6d0:0:95fa:f7d1:2153:d726</span>
+            <span class="cf-footer-separator sm:hidden">&bull;</span>
+          </span>
+          <span class="cf-footer-item sm:block sm:mb-1"><span>Performance &amp; security by</span> <a rel="noopener noreferrer" href="https://www.cloudflare.com/5xx-error-landing" id="brand_link" target="_blank">Cloudflare</a></span>
+          
+        </p>
+        <script>(function(){function d(){var b=a.getElementById("cf-footer-item-ip"),c=a.getElementById("cf-footer-ip-reveal");b&&"classList"in b&&(b.classList.remove("hidden"),c.addEventListener("click",function(){c.classList.add("hidden");a.getElementById("cf-footer-ip").classList.remove("hidden")}))}var a=document;document.addEventListener&&a.addEventListener("DOMContentLoaded",d)})();</script>
+      </div><!-- /.error-footer -->
+
+            </div><!-- /#cf-error-details -->
+        </div><!-- /#cf-wrapper -->
+
+         <script>
+        window._cf_translation = {};
+        
+        
+      </script> 
+    </body>
+    </html>
+
+       at helpers/test-seed.ts:65
+
+      63 |   if (!response.ok) {
+      64 |     const detail = await response.text();
+    > 65 |     throw new Error(`${action} failed (${response.status}): ${detail}`);
+         |           ^
+      66 |   }
+      67 |
+      68 |   return (await response.json()) as T;
+        at readJsonOrThrow (/Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/helpers/test-seed.ts:65:11)
+        at seedAndSignIn (/Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/helpers/seed-and-sign-in.ts:18:18)
+        at /Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/flows/journeys/j15-parent-solo-add-first-child.spec.ts:8:3
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j15-parent--2417c-en-sees-add-first-child-CTA-later-phases/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j15-parent--2417c-en-sees-add-first-child-CTA-later-phases/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j15-parent--2417c-en-sees-add-first-child-CTA-later-phases/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/flows-journeys-j15-parent--2417c-en-sees-add-first-child-CTA-later-phases/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/sign-in
+    Call log:
+    [2m  - navigating to "http://127.0.0.1:19006/sign-in", waiting until "commit"[22m
+
+
+       at helpers/auth.ts:36
+
+      34 |
+      35 |   await setupClerkTestingToken({ page });
+    > 36 |   await page.goto('/sign-in', { waitUntil: 'commit' });
+         |              ^
+      37 |   await expect(page.getByTestId('sign-in-email')).toBeVisible({
+      38 |     timeout: 60_000,
+      39 |   });
+        at signIn (/Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/helpers/auth.ts:36:14)
+        at seedAndSignIn (/Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/helpers/seed-and-sign-in.ts:23:3)
+        at /Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/flows/journeys/j15-parent-solo-add-first-child.spec.ts:8:3
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j15-parent--2417c-en-sees-add-first-child-CTA-later-phases-retry1/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j15-parent--2417c-en-sees-add-first-child-CTA-later-phases-retry1/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j15-parent--2417c-en-sees-add-first-child-CTA-later-phases-retry1/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/flows-journeys-j15-parent--2417c-en-sees-add-first-child-CTA-later-phases-retry1/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  15) [later-phases] › apps/mobile/e2e-web/flows/journeys/j16-parent-drilldown-back-chain.spec.ts:9:5 › J-16 parent drill-down reaches topic detail and unwinds cleanly 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home
+    Call log:
+    [2m  - navigating to "http://127.0.0.1:19006/home", waiting until "commit"[22m
+
+
+      14 |   const sessionId = seed.ids.session1Id;
+      15 |
+    > 16 |   await page.goto('/home', { waitUntil: 'commit' });
+         |              ^
+      17 |   await expect(page.getByTestId('parent-home-screen')).toBeVisible({
+      18 |     timeout: 60_000,
+      19 |   });
+        at /Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/flows/journeys/j16-parent-drilldown-back-chain.spec.ts:16:14
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j16-parent--e4f49--detail-and-unwinds-cleanly-later-phases/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j16-parent--e4f49--detail-and-unwinds-cleanly-later-phases/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j16-parent--e4f49--detail-and-unwinds-cleanly-later-phases/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/flows-journeys-j16-parent--e4f49--detail-and-unwinds-cleanly-later-phases/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home
+    Call log:
+    [2m  - navigating to "http://127.0.0.1:19006/home", waiting until "commit"[22m
+
+
+      14 |   const sessionId = seed.ids.session1Id;
+      15 |
+    > 16 |   await page.goto('/home', { waitUntil: 'commit' });
+         |              ^
+      17 |   await expect(page.getByTestId('parent-home-screen')).toBeVisible({
+      18 |     timeout: 60_000,
+      19 |   });
+        at /Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/flows/journeys/j16-parent-drilldown-back-chain.spec.ts:16:14
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j16-parent--e4f49--detail-and-unwinds-cleanly-later-phases-retry1/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j16-parent--e4f49--detail-and-unwinds-cleanly-later-phases-retry1/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j16-parent--e4f49--detail-and-unwinds-cleanly-later-phases-retry1/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/flows-journeys-j16-parent--e4f49--detail-and-unwinds-cleanly-later-phases-retry1/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  16) [later-phases] › apps/mobile/e2e-web/flows/journeys/j17-parent-session-recap-copy.spec.ts:9:5 › J-17 parent opens a session recap and copies the conversation prompt 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home
+    Call log:
+    [2m  - navigating to "http://127.0.0.1:19006/home", waiting until "commit"[22m
+
+
+      14 |   const sessionId = seed.ids.session1Id;
+      15 |
+    > 16 |   await page.goto('/home', { waitUntil: 'commit' });
+         |              ^
+      17 |   await expect(page.getByTestId('parent-home-screen')).toBeVisible({
+      18 |     timeout: 60_000,
+      19 |   });
+        at /Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/flows/journeys/j17-parent-session-recap-copy.spec.ts:16:14
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j17-parent--9d2d0-ies-the-conversation-prompt-later-phases/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j17-parent--9d2d0-ies-the-conversation-prompt-later-phases/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j17-parent--9d2d0-ies-the-conversation-prompt-later-phases/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/flows-journeys-j17-parent--9d2d0-ies-the-conversation-prompt-later-phases/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home
+    Call log:
+    [2m  - navigating to "http://127.0.0.1:19006/home", waiting until "commit"[22m
+
+
+      14 |   const sessionId = seed.ids.session1Id;
+      15 |
+    > 16 |   await page.goto('/home', { waitUntil: 'commit' });
+         |              ^
+      17 |   await expect(page.getByTestId('parent-home-screen')).toBeVisible({
+      18 |     timeout: 60_000,
+      19 |   });
+        at /Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/flows/journeys/j17-parent-session-recap-copy.spec.ts:16:14
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j17-parent--9d2d0-ies-the-conversation-prompt-later-phases-retry1/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j17-parent--9d2d0-ies-the-conversation-prompt-later-phases-retry1/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j17-parent--9d2d0-ies-the-conversation-prompt-later-phases-retry1/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/flows-journeys-j17-parent--9d2d0-ies-the-conversation-prompt-later-phases-retry1/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  17) [later-phases] › apps/mobile/e2e-web/flows/journeys/j18-invalid-saved-profile-fallback.spec.ts:8:5 › J-18 invalid saved profile falls back to the owner profile 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home
+    Call log:
+    [2m  - navigating to "http://127.0.0.1:19006/home", waiting until "commit"[22m
+
+
+      22 |   });
+      23 |
+    > 24 |   await page.goto('/home', { waitUntil: 'commit' });
+         |              ^
+      25 |   await expect(page.getByTestId('parent-home-screen')).toBeVisible({
+      26 |     timeout: 60_000,
+      27 |   });
+        at /Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/flows/journeys/j18-invalid-saved-profile-fallback.spec.ts:24:14
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j18-invalid-4c47b-s-back-to-the-owner-profile-later-phases/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j18-invalid-4c47b-s-back-to-the-owner-profile-later-phases/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j18-invalid-4c47b-s-back-to-the-owner-profile-later-phases/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/flows-journeys-j18-invalid-4c47b-s-back-to-the-owner-profile-later-phases/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home
+    Call log:
+    [2m  - navigating to "http://127.0.0.1:19006/home", waiting until "commit"[22m
+
+
+      22 |   });
+      23 |
+    > 24 |   await page.goto('/home', { waitUntil: 'commit' });
+         |              ^
+      25 |   await expect(page.getByTestId('parent-home-screen')).toBeVisible({
+      26 |     timeout: 60_000,
+      27 |   });
+        at /Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/flows/journeys/j18-invalid-saved-profile-fallback.spec.ts:24:14
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j18-invalid-4c47b-s-back-to-the-owner-profile-later-phases-retry1/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j18-invalid-4c47b-s-back-to-the-owner-profile-later-phases-retry1/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j18-invalid-4c47b-s-back-to-the-owner-profile-later-phases-retry1/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/flows-journeys-j18-invalid-4c47b-s-back-to-the-owner-profile-later-phases-retry1/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  18) [later-phases] › apps/mobile/e2e-web/flows/journeys/j19-subscription-paywall-ui.spec.ts:25:5 › J-19 free-tier learner sees subscription paywall with static tier comparison on web 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/more
+    Call log:
+    [2m  - navigating to "http://127.0.0.1:19006/more", waiting until "commit"[22m
+
+
+      27 | }) => {
+      28 |   // ── 1. Navigate to More tab and open Subscription via the nav row ──────────
+    > 29 |   await page.goto('/more', { waitUntil: 'commit' });
+         |              ^
+      30 |   await expect(
+      31 |     page.getByRole('button', { name: 'Profile', exact: true }),
+      32 |   ).toBeVisible({ timeout: 60_000 });
+        at /Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/flows/journeys/j19-subscription-paywall-ui.spec.ts:29:14
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j19-subscri-438fb-atic-tier-comparison-on-web-later-phases/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j19-subscri-438fb-atic-tier-comparison-on-web-later-phases/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j19-subscri-438fb-atic-tier-comparison-on-web-later-phases/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/flows-journeys-j19-subscri-438fb-atic-tier-comparison-on-web-later-phases/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/more
+    Call log:
+    [2m  - navigating to "http://127.0.0.1:19006/more", waiting until "commit"[22m
+
+
+      27 | }) => {
+      28 |   // ── 1. Navigate to More tab and open Subscription via the nav row ──────────
+    > 29 |   await page.goto('/more', { waitUntil: 'commit' });
+         |              ^
+      30 |   await expect(
+      31 |     page.getByRole('button', { name: 'Profile', exact: true }),
+      32 |   ).toBeVisible({ timeout: 60_000 });
+        at /Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/flows/journeys/j19-subscription-paywall-ui.spec.ts:29:14
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j19-subscri-438fb-atic-tier-comparison-on-web-later-phases-retry1/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j19-subscri-438fb-atic-tier-comparison-on-web-later-phases-retry1/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j19-subscri-438fb-atic-tier-comparison-on-web-later-phases-retry1/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/flows-journeys-j19-subscri-438fb-atic-tier-comparison-on-web-later-phases-retry1/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  19) [later-phases] › apps/mobile/e2e-web/flows/navigation/w01-no-bleed-through-fullscreen.spec.ts:8:5 › W-01 full-screen routes hide the tab bar and prior scene content 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home
+    Call log:
+    [2m  - navigating to "http://127.0.0.1:19006/home", waiting until "commit"[22m
+
+
+       9 |   page,
+      10 | }) => {
+    > 11 |   await page.goto('/home', { waitUntil: 'commit' });
+         |              ^
+      12 |   await expect(page.getByTestId('learner-screen')).toBeVisible({
+      13 |     timeout: 60_000,
+      14 |   });
+        at /Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/flows/navigation/w01-no-bleed-through-fullscreen.spec.ts:11:14
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-navigation-w01-no-bl-209fd-bar-and-prior-scene-content-later-phases/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-navigation-w01-no-bl-209fd-bar-and-prior-scene-content-later-phases/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-navigation-w01-no-bl-209fd-bar-and-prior-scene-content-later-phases/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/flows-navigation-w01-no-bl-209fd-bar-and-prior-scene-content-later-phases/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home
+    Call log:
+    [2m  - navigating to "http://127.0.0.1:19006/home", waiting until "commit"[22m
+
+
+       9 |   page,
+      10 | }) => {
+    > 11 |   await page.goto('/home', { waitUntil: 'commit' });
+         |              ^
+      12 |   await expect(page.getByTestId('learner-screen')).toBeVisible({
+      13 |     timeout: 60_000,
+      14 |   });
+        at /Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/flows/navigation/w01-no-bleed-through-fullscreen.spec.ts:11:14
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-navigation-w01-no-bl-209fd-bar-and-prior-scene-content-later-phases-retry1/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-navigation-w01-no-bl-209fd-bar-and-prior-scene-content-later-phases-retry1/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-navigation-w01-no-bl-209fd-bar-and-prior-scene-content-later-phases-retry1/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/flows-navigation-w01-no-bl-209fd-bar-and-prior-scene-content-later-phases-retry1/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  20) [later-phases] › apps/mobile/e2e-web/flows/navigation/w02-go-back-or-replace-empty-history.spec.ts:8:5 › W-02 goBackOrReplace falls back when a direct URL has no browser history 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/quiz
+    Call log:
+    [2m  - navigating to "http://127.0.0.1:19006/quiz", waiting until "commit"[22m
+
+
+       9 |   page,
+      10 | }) => {
+    > 11 |   await page.goto('/quiz', { waitUntil: 'commit' });
+         |              ^
+      12 |   await expect(page.getByTestId('quiz-index-screen')).toBeVisible({
+      13 |     timeout: 60_000,
+      14 |   });
+        at /Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/flows/navigation/w02-go-back-or-replace-empty-history.spec.ts:11:14
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-navigation-w02-go-ba-0819f--URL-has-no-browser-history-later-phases/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-navigation-w02-go-ba-0819f--URL-has-no-browser-history-later-phases/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-navigation-w02-go-ba-0819f--URL-has-no-browser-history-later-phases/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/flows-navigation-w02-go-ba-0819f--URL-has-no-browser-history-later-phases/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/quiz
+    Call log:
+    [2m  - navigating to "http://127.0.0.1:19006/quiz", waiting until "commit"[22m
+
+
+       9 |   page,
+      10 | }) => {
+    > 11 |   await page.goto('/quiz', { waitUntil: 'commit' });
+         |              ^
+      12 |   await expect(page.getByTestId('quiz-index-screen')).toBeVisible({
+      13 |     timeout: 60_000,
+      14 |   });
+        at /Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/flows/navigation/w02-go-back-or-replace-empty-history.spec.ts:11:14
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-navigation-w02-go-ba-0819f--URL-has-no-browser-history-later-phases-retry1/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-navigation-w02-go-ba-0819f--URL-has-no-browser-history-later-phases-retry1/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-navigation-w02-go-ba-0819f--URL-has-no-browser-history-later-phases-retry1/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/flows-navigation-w02-go-ba-0819f--URL-has-no-browser-history-later-phases-retry1/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  21) [later-phases] › apps/mobile/e2e-web/flows/navigation/w04-browser-history-stack.spec.ts:12:5 › W-04 practice to quiz keeps the contextual web stack coherent 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home
+    Call log:
+    [2m  - navigating to "http://127.0.0.1:19006/home", waiting until "commit"[22m
+
+
+      13 |   page,
+      14 | }) => {
+    > 15 |   await page.goto('/home', { waitUntil: 'commit' });
+         |              ^
+      16 |   await expect(page.getByTestId('learner-screen')).toBeVisible({
+      17 |     timeout: 60_000,
+      18 |   });
+        at /Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/flows/navigation/w04-browser-history-stack.spec.ts:15:14
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-navigation-w04-brows-d9628-ntextual-web-stack-coherent-later-phases/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-navigation-w04-brows-d9628-ntextual-web-stack-coherent-later-phases/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-navigation-w04-brows-d9628-ntextual-web-stack-coherent-later-phases/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/flows-navigation-w04-brows-d9628-ntextual-web-stack-coherent-later-phases/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home
+    Call log:
+    [2m  - navigating to "http://127.0.0.1:19006/home", waiting until "commit"[22m
+
+
+      13 |   page,
+      14 | }) => {
+    > 15 |   await page.goto('/home', { waitUntil: 'commit' });
+         |              ^
+      16 |   await expect(page.getByTestId('learner-screen')).toBeVisible({
+      17 |     timeout: 60_000,
+      18 |   });
+        at /Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/flows/navigation/w04-browser-history-stack.spec.ts:15:14
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-navigation-w04-brows-d9628-ntextual-web-stack-coherent-later-phases-retry1/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-navigation-w04-brows-d9628-ntextual-web-stack-coherent-later-phases-retry1/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-navigation-w04-brows-d9628-ntextual-web-stack-coherent-later-phases-retry1/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/flows-navigation-w04-brows-d9628-ntextual-web-stack-coherent-later-phases-retry1/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  22) [later-phases] › apps/mobile/e2e-web/flows/navigation/w05-tab-routes-render-correct-screen.spec.ts:8:5 › W-05 tab URLs render the correct screen on web 
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home
+    Call log:
+    [2m  - navigating to "http://127.0.0.1:19006/home", waiting until "commit"[22m
+
+
+      10 |   const subjectId = seed.ids.subjectId;
+      11 |
+    > 12 |   await page.goto('/home', { waitUntil: 'commit' });
+         |              ^
+      13 |   await expect(page.getByTestId('learner-screen')).toBeVisible({
+      14 |     timeout: 60_000,
+      15 |   });
+        at /Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/flows/navigation/w05-tab-routes-render-correct-screen.spec.ts:12:14
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-navigation-w05-tab-r-1df78-r-the-correct-screen-on-web-later-phases/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-navigation-w05-tab-r-1df78-r-the-correct-screen-on-web-later-phases/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-navigation-w05-tab-r-1df78-r-the-correct-screen-on-web-later-phases/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/flows-navigation-w05-tab-r-1df78-r-the-correct-screen-on-web-later-phases/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home
+    Call log:
+    [2m  - navigating to "http://127.0.0.1:19006/home", waiting until "commit"[22m
+
+
+      10 |   const subjectId = seed.ids.subjectId;
+      11 |
+    > 12 |   await page.goto('/home', { waitUntil: 'commit' });
+         |              ^
+      13 |   await expect(page.getByTestId('learner-screen')).toBeVisible({
+      14 |     timeout: 60_000,
+      15 |   });
+        at /Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/flows/navigation/w05-tab-routes-render-correct-screen.spec.ts:12:14
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-navigation-w05-tab-r-1df78-r-the-correct-screen-on-web-later-phases-retry1/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-navigation-w05-tab-r-1df78-r-the-correct-screen-on-web-later-phases-retry1/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-navigation-w05-tab-r-1df78-r-the-correct-screen-on-web-later-phases-retry1/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/flows-navigation-w05-tab-r-1df78-r-the-correct-screen-on-web-later-phases-retry1/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  23) [smoke-learner] › apps/mobile/e2e-web/flows/journeys/j01-ux-pass.spec.ts:23:5 › single learner UX screenshot crawl 
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: getByTestId('shelf-row-header-019e27ff-a3ca-769e-8628-6949b680d1e7')
+    Expected: visible
+    Timeout: 30000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 30000ms[22m
+    [2m  - waiting for getByTestId('shelf-row-header-019e27ff-a3ca-769e-8628-6949b680d1e7')[22m
+
+
+      44 |   // Without this, the shelf-row testID poll can race the first paint on slow CI.
+      45 |   await page.waitForLoadState('networkidle');
+    > 46 |   await expect(page.getByTestId(`shelf-row-header-${subjectId}`)).toBeVisible({
+         |                                                                   ^
+      47 |     timeout: 30_000,
+      48 |   });
+      49 |   await capture(page, '04-library');
+        at /Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/apps/mobile/e2e-web/flows/journeys/j01-ux-pass.spec.ts:46:67
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j01-ux-pass-6525e-learner-UX-screenshot-crawl-smoke-learner/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j01-ux-pass-6525e-learner-UX-screenshot-crawl-smoke-learner/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: apps/mobile/e2e-web/test-results/flows-journeys-j01-ux-pass-6525e-learner-UX-screenshot-crawl-smoke-learner/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/flows-journeys-j01-ux-pass-6525e-learner-UX-screenshot-crawl-smoke-learner/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/flows-journeys-j01-ux-pass-6525e-learner-UX-screenshot-crawl-smoke-learner/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  22 failed
+    [smoke-parent] › apps/mobile/e2e-web/flows/journeys/j03-parent-gateway.spec.ts:3:5 › J-03 seeded parent lands on parent home @smoke 
+    [role-transitions] › apps/mobile/e2e-web/flows/journeys/j04-parent-inline-learn.spec.ts:4:5 › J-04 parent taps child card to open child progress 
+    [role-transitions] › apps/mobile/e2e-web/flows/journeys/j05-parent-switch-to-child.spec.ts:5:5 › J-05 parent opens a linked child progress view from home 
+    [role-transitions] › apps/mobile/e2e-web/flows/journeys/j06-child-switch-to-parent.spec.ts:5:5 › J-06 parent opens child progress and returns home 
+    [role-transitions] › apps/mobile/e2e-web/flows/journeys/j07-parent-dashboard-drilldown.spec.ts:5:5 › J-07 parent → child progress → session recap → back to parent home 
+    [later-phases] › apps/mobile/e2e-web/flows/auth/w03-deep-link-auth-redirect.spec.ts:7:5 › W-03 deep link to authenticated route redirects to sign-in and back 
+    [later-phases] › apps/mobile/e2e-web/flows/journeys/j08-ask-freeform-session-summary.spec.ts:9:5 › J-08 learner → Ask → freeform chat → end session → summary → home 
+    [later-phases] › apps/mobile/e2e-web/flows/journeys/j09-learn-create-subject-onboarding.spec.ts:25:5 › J-09 learner → Add a subject → language setup → session chat 
+    [later-phases] › apps/mobile/e2e-web/flows/journeys/j10-practice-quiz-cycle.spec.ts:8:5 › J-10 learner → Practice → Quiz → launch → play → results → home 
+    [later-phases] › apps/mobile/e2e-web/flows/journeys/j11-library-to-book-session.spec.ts:9:5 › J-11 learner → Library → shelf → book → start learning 
+    [later-phases] › apps/mobile/e2e-web/flows/journeys/j12-pre-profile-create-profile.spec.ts:5:5 › J-12 new user → create profile → lands on learner home 
+    [later-phases] › apps/mobile/e2e-web/flows/journeys/j13-consent-pending-parent-approval.spec.ts:6:5 › J-13 pending consent blocks app until parent approval completes 
+    [later-phases] › apps/mobile/e2e-web/flows/journeys/j14-loading-timeout-fallback.spec.ts:7:5 › J-14 profile loading resolves without dead-end 
+    [later-phases] › apps/mobile/e2e-web/flows/journeys/j15-parent-solo-add-first-child.spec.ts:5:5 › J-15 family-plan parent with no children sees add-first-child CTA 
+    [later-phases] › apps/mobile/e2e-web/flows/journeys/j16-parent-drilldown-back-chain.spec.ts:9:5 › J-16 parent drill-down reaches topic detail and unwinds cleanly 
+    [later-phases] › apps/mobile/e2e-web/flows/journeys/j17-parent-session-recap-copy.spec.ts:9:5 › J-17 parent opens a session recap and copies the conversation prompt 
+    [later-phases] › apps/mobile/e2e-web/flows/journeys/j18-invalid-saved-profile-fallback.spec.ts:8:5 › J-18 invalid saved profile falls back to the owner profile 
+    [later-phases] › apps/mobile/e2e-web/flows/journeys/j19-subscription-paywall-ui.spec.ts:25:5 › J-19 free-tier learner sees subscription paywall with static tier comparison on web 
+    [later-phases] › apps/mobile/e2e-web/flows/navigation/w01-no-bleed-through-fullscreen.spec.ts:8:5 › W-01 full-screen routes hide the tab bar and prior scene content 
+    [later-phases] › apps/mobile/e2e-web/flows/navigation/w02-go-back-or-replace-empty-history.spec.ts:8:5 › W-02 goBackOrReplace falls back when a direct URL has no browser history 
+    [later-phases] › apps/mobile/e2e-web/flows/navigation/w04-browser-history-stack.spec.ts:12:5 › W-04 practice to quiz keeps the contextual web stack coherent 
+    [later-phases] › apps/mobile/e2e-web/flows/navigation/w05-tab-routes-render-correct-screen.spec.ts:8:5 › W-05 tab URLs render the correct screen on web 
+  1 flaky
+    [smoke-learner] › apps/mobile/e2e-web/flows/journeys/j01-ux-pass.spec.ts:23:5 › single learner UX screenshot crawl 
+  8 passed (5.9m)
+ ELIFECYCLE  Command failed with exit code 1.
+END_EPOCH=1778787832
+EXIT=1
+DURATION_SEC=359

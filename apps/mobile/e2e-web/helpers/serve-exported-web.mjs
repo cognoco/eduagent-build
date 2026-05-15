@@ -1,8 +1,10 @@
 import http from 'node:http';
 import path from 'node:path';
+import { createRequire } from 'node:module';
 import { spawn } from 'node:child_process';
 import { createReadStream } from 'node:fs';
-import { access, stat, readFile, writeFile, rename, rm } from 'node:fs/promises';
+import { access, readFile, writeFile, rename, rm } from 'node:fs/promises';
+import { statSync } from 'node:fs';
 import { constants as fsConstants } from 'node:fs';
 
 const projectRoot = process.cwd();
@@ -42,55 +44,63 @@ async function fileExists(filePath) {
   }
 }
 
-async function resolveAssetPath(urlPath) {
-  const safePath = path.normalize(urlPath).replace(/^(\.\.[/\\])+/, '');
-  let candidate = path.join(distDir, safePath);
-
-  // [I-17] Path traversal containment — reject any resolved path that escapes distDir
-  const resolvedCandidate = path.resolve(candidate);
-  const resolvedDist = path.resolve(distDir);
-  if (!resolvedCandidate.startsWith(resolvedDist + path.sep) && resolvedCandidate !== resolvedDist) {
-    return null;
-  }
-
-  if (await fileExists(candidate)) {
-    const candidateStats = await stat(candidate);
-    if (candidateStats.isDirectory()) {
-      candidate = path.join(candidate, 'index.html');
-    }
-    return candidate;
-  }
-
-  if (!path.extname(candidate)) {
-    return path.join(distDir, 'index.html');
-  }
-
-  return null;
-}
-
 async function startServer() {
-  const server = http.createServer(async (request, response) => {
+  // Sync handler: statSync is intentional — the async version caused the
+  // server process to die under concurrent Playwright workers due to
+  // unhandled async rejections in Node's http.createServer callback.
+  // For a local static file server the event-loop cost is negligible.
+  const server = http.createServer((request, response) => {
     const url = new URL(request.url ?? '/', `http://${host}:${port}`);
-    const assetPath = await resolveAssetPath(url.pathname);
+    const safePath = path.normalize(url.pathname).replace(/^(\.\.[/\\])+/, '');
+    let candidate = path.join(distDir, safePath);
 
-    if (!assetPath) {
-      response.statusCode = 404;
-      response.end('Not found');
+    // [I-17] Path traversal containment
+    const resolvedCandidate = path.resolve(candidate);
+    const resolvedDist = path.resolve(distDir);
+    if (!resolvedCandidate.startsWith(resolvedDist + path.sep) && resolvedCandidate !== resolvedDist) {
+      response.statusCode = 403;
+      response.end('Forbidden');
       return;
     }
 
-    const extension = path.extname(assetPath).toLowerCase();
-    response.setHeader(
-      'Content-Type',
-      mimeTypes[extension] ?? 'application/octet-stream'
-    );
-    createReadStream(assetPath).pipe(response);
+    try {
+      const stats = statSync(candidate);
+      if (stats.isDirectory()) candidate = path.join(candidate, 'index.html');
+    } catch {
+      if (!path.extname(candidate)) {
+        candidate = path.join(distDir, 'index.html');
+      } else {
+        response.statusCode = 404;
+        response.end('Not found');
+        return;
+      }
+    }
+
+    const extension = path.extname(candidate).toLowerCase();
+    response.setHeader('Content-Type', mimeTypes[extension] ?? 'application/octet-stream');
+    const stream = createReadStream(candidate);
+    stream.on('error', () => {
+      if (!response.headersSent) {
+        response.statusCode = 500;
+        response.end('Internal Server Error');
+      } else {
+        response.destroy();
+      }
+    });
+    stream.pipe(response);
   });
 
-  const shutdown = () => {
-    server.close(() => process.exit(0));
-  };
+  server.on('error', (err) => {
+    console.error(`[serve] server error: ${err.message}`);
+    // EADDRINUSE is non-fatal: Playwright's reuseExistingServer handles it.
+    // All other errors (permissions, unexpected) are fatal — exit immediately
+    // so Playwright gets a clear signal instead of a 240s timeout.
+    if (err.code !== 'EADDRINUSE') process.exit(1);
+  });
 
+  server.keepAliveTimeout = 0;
+
+  const shutdown = () => server.close(() => process.exit(0));
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);
 
@@ -110,7 +120,9 @@ const envFilesToOverride = ['.env.local', '.env.development.local'].map(
     backupPath: path.join(projectRoot, `${name}.e2e-bak`),
   })
 );
-const apiUrl = process.env.PLAYWRIGHT_API_URL ?? 'http://127.0.0.1:8787';
+const require = createRequire(import.meta.url);
+const { defaultApiUrl } = require('./e2e-defaults.js');
+const apiUrl = process.env.PLAYWRIGHT_API_URL ?? defaultApiUrl;
 process.env.EXPO_PUBLIC_API_URL = apiUrl;
 const generatedEnvFiles = new Set();
 
