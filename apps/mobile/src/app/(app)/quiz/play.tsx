@@ -23,11 +23,7 @@ import type {
   CompleteRoundResponse,
   QuestionResult,
 } from '@eduagent/schemas';
-import {
-  useCheckAnswer,
-  useCompleteRound,
-  usePrefetchRound,
-} from '../../../hooks/use-quiz';
+import { useCheckAnswer, useCompleteRound } from '../../../hooks/use-quiz';
 import { PolarStar } from '../../../components/common';
 import { platformAlert } from '../../../lib/platform-alert';
 // platformAlert maps to window.confirm on web for 2-button prompts, which
@@ -67,7 +63,6 @@ export default function QuizPlayScreen(): React.ReactElement {
     round,
     activityType,
     returnTo,
-    subjectId,
     setPrefetchedRoundId,
     setRound,
     setCompletionResult,
@@ -75,13 +70,6 @@ export default function QuizPlayScreen(): React.ReactElement {
   const exitHref = returnTo === 'practice' ? '/(app)/practice' : '/(app)/quiz';
   const completeRound = useCompleteRound();
   const completeRoundMutate = completeRound.mutate;
-  const prefetchRound = usePrefetchRound();
-  // [BUG-542] Extract .mutate so the useEffect dep array references a stable
-  // variable rather than a member-access expression. ESLint exhaustive-deps
-  // treats `prefetchRound.mutate` in a dep array as an undeclared dep on
-  // `prefetchRound` (the whole object), which is recreated each render. The
-  // extracted local is still the stable TanStack Query .mutate ref.
-  const prefetchRoundMutate = prefetchRound.mutate;
   const checkAnswer = useCheckAnswer();
   // [ASSUMP-F10] When completeRound fails we surface an inline retry UI
   // instead of silently fabricating a 0-XP "nice" result and navigating.
@@ -126,7 +114,6 @@ export default function QuizPlayScreen(): React.ReactElement {
   const questionStartTimeRef = useRef(Date.now());
   const resultsRef = useRef<QuestionResult[]>([]);
   const continueEnabledAtRef = useRef(0);
-  const prefetchTriggeredRef = useRef(false);
   const continueHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
@@ -188,34 +175,6 @@ export default function QuizPlayScreen(): React.ReactElement {
 
     return () => clearInterval(interval);
   }, [currentIndex, currentQuestion]);
-
-  useEffect(() => {
-    if (
-      prefetchTriggeredRef.current ||
-      !activityType ||
-      totalQuestions === 0 ||
-      currentIndex < Math.floor(totalQuestions / 2)
-    ) {
-      return;
-    }
-
-    prefetchTriggeredRef.current = true;
-    prefetchRoundMutate(
-      { activityType, subjectId: subjectId ?? undefined },
-      {
-        onSuccess: (data) => setPrefetchedRoundId(data.id),
-      },
-    );
-    // [BUG-542] Use extracted .mutate local (stable ref) instead of whole
-    // mutation result or member-access expression in the dep array.
-  }, [
-    activityType,
-    currentIndex,
-    prefetchRoundMutate,
-    setPrefetchedRoundId,
-    subjectId,
-    totalQuestions,
-  ]);
 
   useEffect(() => {
     return () => {

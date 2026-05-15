@@ -9,7 +9,10 @@ import {
 import React from 'react';
 import { platformAlert } from '../../lib/platform-alert';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { createRoutedMockFetch } from '../../test-utils/mock-api-routes';
+import {
+  createRoutedMockFetch,
+  fetchCallsMatching,
+} from '../../test-utils/mock-api-routes';
 
 const mockReplace = jest.fn();
 const mockPush = jest.fn();
@@ -122,14 +125,6 @@ jest.mock('../../hooks/use-rating-prompt', () => ({
   useRatingPrompt: () => ({
     onSuccessfulRecall: mockOnSuccessfulRecall,
   }),
-}));
-
-// useDepthEvaluation fires a mutation from a useEffect on mount (fire-and-forget
-// analytics). With TanStack Query's synchronous notifyManager in tests, calling
-// mutate() from within a useEffect causes React 19 to throw an invariant error
-// (sync state update from within effect commit). Keep as a no-op direct mock.
-jest.mock('../../hooks/use-depth-evaluation', () => ({
-  useDepthEvaluation: () => ({ mutate: jest.fn() }),
 }));
 
 const mockReadSummaryDraft = jest.fn();
@@ -417,6 +412,14 @@ describe('SessionSummaryScreen', () => {
     // 5 exchanges, rung 2 → "strong independent thinking"
     screen.getByText(/worked through 5 exchanges/);
     screen.getByText(/strong independent thinking/);
+  });
+
+  it('does not fire hidden depth evaluation on mount', async () => {
+    render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+    await flushAsyncEffects();
+
+    expect(fetchCallsMatching(mockFetch, 'evaluate-depth')).toHaveLength(0);
   });
 
   // [BUG-801] When the URL passes exchangeCount='0' (legitimate value for

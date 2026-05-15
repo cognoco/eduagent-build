@@ -28,7 +28,6 @@ import {
   useRecallBridge,
 } from '../../hooks/use-sessions';
 import { useSessionBookmarks } from '../../hooks/use-bookmarks';
-import { useDepthEvaluation } from '../../hooks/use-depth-evaluation';
 import { useTotalSessionCount } from '../../hooks/use-session-context';
 import { usePostSessionNotificationAsk } from '../../hooks/use-post-session-notification-ask';
 import { goBackOrReplace, homeHrefForReturnTo } from '../../lib/navigation';
@@ -127,7 +126,6 @@ export default function SessionSummaryScreen() {
       ? computeAgeBracket(activeProfile.birthYear)
       : 'adolescent';
   const recallBridge = useRecallBridge(sessionId ?? '');
-  const depthEvaluation = useDepthEvaluation();
   const totalSessionCount = useTotalSessionCount();
   // JIT notification permission ask — fires once after the user has
   // completed at least one session (the post-value moment). Skipped in
@@ -170,20 +168,6 @@ export default function SessionSummaryScreen() {
     persisted?.status === 'submitted' || persisted?.status === 'accepted';
   const isPersistedSkipped = persisted?.status === 'skipped';
   const isAlreadyPersisted = isPersistedSubmitted || isPersistedSkipped;
-
-  // Fire depth evaluation for fresh sessions to trigger server-side telemetry
-  // (session quality gating, topic detection). Fire-and-forget — the result
-  // drives analytics, not UI. Skip for revisited/persisted sessions.
-  // Ref (not state) because the guard must be synchronous: Strict Mode and
-  // rapid rerenders can re-run this effect before a setState would flush,
-  // but the ref assignment lands immediately so the second pass short-circuits.
-  const depthFiredRef = useRef(false);
-  useEffect(() => {
-    if (sessionId && !isAlreadyPersisted && !depthFiredRef.current) {
-      depthFiredRef.current = true;
-      depthEvaluation.mutate({ sessionId });
-    }
-  }, [sessionId, isAlreadyPersisted, depthEvaluation]);
 
   useEffect(() => {
     setRecapTimedOut(false);
