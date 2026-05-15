@@ -50,6 +50,8 @@ export async function pressableClick(target: Locator): Promise<void> {
     };
 
     dispatchPointerEvent('pointerdown', 1);
+    // RNW listens to pointer events when PointerEvent exists; mouse events are
+    // retained for environments that only support the compatibility path.
     element.dispatchEvent(
       new MouseEvent('mousedown', { ...eventDefaults, buttons: 1 }),
     );

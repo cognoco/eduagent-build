@@ -1,15 +1,12 @@
 {
   "scope": "mobile",
-  "verifiedAt": "2026-05-15T10:41:10Z",
+  "verifiedAt": "2026-05-15T12:25:26Z",
   "verifiedBy": "Lord Vetinari @ ramtop",
   "command": "pnpm exec nx run mobile:test",
   "passed": true,
   "testFiles": {
-    "apps/mobile/src/app/(app)/child/[profileId]/index.test.tsx": "8e630e5bb286e72e534f299f9c2629e4fdecc2f9",
-    "apps/mobile/src/app/(app)/library.test.tsx": "7761bc858138eecd04bfec07f1b9992f0bb3c213",
-    "apps/mobile/src/app/(app)/pick-book/[subjectId].test.tsx": "a45f82e106e28a0646f7e4afed2b0bd00e3101c8",
-    "apps/mobile/src/app/e2e-testid-integrity.test.ts": "5a27cf8d48011d98b365e850c3ca02e399b58cb7",
+    "apps/mobile/src/app/(app)/library.test.tsx": "8757fe1a4ef870388d53d20ac9b73cc3f102e7c4",
     "apps/mobile/src/components/common/MagicPenAnimation.test.tsx": "648579af675c9ab7669f9af1a13faf7575a02af7",
-    "apps/mobile/src/components/home/LearnerScreen.test.tsx": "e7f10507c1752949680c5903e69d37f31d39703a"
+    "apps/mobile/src/components/home/LearnerScreen.test.tsx": "bd04a10145824b4428163a680f53e243e325aa00"
   }
 }

@@ -64,8 +64,10 @@ const mockFetch = createRoutedMockFetch({
   },
 });
 
-jest.mock('../../lib/api-client', () =>
-  require('../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch),
+jest.mock(
+  '../../lib/api-client' /* gc1-allow: API client hook wraps auth/network boundary; test drives screen fetch states */,
+  () =>
+    require('../../test-utils/mock-api-routes').mockApiClientFactory(mockFetch),
 );
 
 jest.mock(
@@ -73,25 +75,28 @@ jest.mock(
   () => require('../../test-utils/mock-i18n').i18nMock,
 );
 
-jest.mock('../../lib/profile', () => ({
-  useProfile: () => ({
-    activeProfile: {
-      id: 'test-profile-id',
-      accountId: 'test-account-id',
-      displayName: 'Test Learner',
-      isOwner: true,
-      hasPremiumLlm: false,
-      conversationLanguage: 'en',
-      pronouns: null,
-      consentStatus: null,
+jest.mock(
+  '../../lib/profile' /* gc1-allow: profile context uses native storage and query state */,
+  () => ({
+    useProfile: () => ({
+      activeProfile: {
+        id: 'test-profile-id',
+        accountId: 'test-account-id',
+        displayName: 'Test Learner',
+        isOwner: true,
+        hasPremiumLlm: false,
+        conversationLanguage: 'en',
+        pronouns: null,
+        consentStatus: null,
+      },
+    }),
+    useLinkedChildren: () => mockLinkedChildren,
+    useHasLinkedChildren: () => mockLinkedChildren.length > 0,
+    ProfileContext: {
+      Provider: ({ children }: { children: React.ReactNode }) => children,
     },
   }),
-  useLinkedChildren: () => mockLinkedChildren,
-  useHasLinkedChildren: () => mockLinkedChildren.length > 0,
-  ProfileContext: {
-    Provider: ({ children }: { children: React.ReactNode }) => children,
-  },
-}));
+);
 
 const mockPush = jest.fn();
 const mockReadSessionRecoveryMarker = jest.fn();
@@ -106,9 +111,12 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
-jest.mock('../common', () => ({
-  BookPageFlipAnimation: () => null,
-}));
+jest.mock(
+  '../common' /* gc1-allow: common animation subtree is outside LearnerScreen contract */,
+  () => ({
+    BookPageFlipAnimation: () => null,
+  }),
+);
 
 jest.mock(
   '../feedback/FeedbackProvider' /* gc1-allow: native feedback modal/i18n subtree is outside LearnerScreen's contract */,
@@ -117,13 +125,16 @@ jest.mock(
   }),
 );
 
-jest.mock('../../lib/greeting', () => ({
-  getGreeting: (_name: string) => ({
-    title: 'Good morning!',
-    subtitle: 'Fresh mind, fresh start',
+jest.mock(
+  '../../lib/greeting' /* gc1-allow: deterministic greeting avoids clock-dependent assertions */,
+  () => ({
+    getGreeting: (_name: string) => ({
+      title: 'Good morning!',
+      subtitle: 'Fresh mind, fresh start',
+    }),
+    getTimeOfDay: () => 'evening',
   }),
-  getTimeOfDay: () => 'evening',
-}));
+);
 
 jest.mock(
   '../../hooks/use-active-profile-role' /* gc1-allow: external hook boundary — wraps profile context + family-links query */,
@@ -155,14 +166,17 @@ jest.mock(
   }),
 );
 
-jest.mock('../../lib/session-recovery', () => ({
-  readSessionRecoveryMarker: (...args: unknown[]) =>
-    mockReadSessionRecoveryMarker(...args),
-  clearSessionRecoveryMarker: (...args: unknown[]) =>
-    mockClearSessionRecoveryMarker(...args),
-  isRecoveryMarkerFresh: (...args: unknown[]) =>
-    mockIsRecoveryMarkerFresh(...args),
-}));
+jest.mock(
+  '../../lib/session-recovery' /* gc1-allow: session recovery wrapper uses persistent storage side effects */,
+  () => ({
+    readSessionRecoveryMarker: (...args: unknown[]) =>
+      mockReadSessionRecoveryMarker(...args),
+    clearSessionRecoveryMarker: (...args: unknown[]) =>
+      mockClearSessionRecoveryMarker(...args),
+    isRecoveryMarkerFresh: (...args: unknown[]) =>
+      mockIsRecoveryMarkerFresh(...args),
+  }),
+);
 
 function createWrapper() {
   const queryClient = new QueryClient({
