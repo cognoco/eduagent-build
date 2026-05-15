@@ -18,30 +18,34 @@ type CreateDatabaseModuleMockOptions<TDb extends MockDatabaseRecord> = {
  * inline module factory.
  */
 export function createDatabaseModuleMock<TDb extends MockDatabaseRecord>(
-  options: CreateDatabaseModuleMockOptions<TDb> = {}
+  options: CreateDatabaseModuleMockOptions<TDb> = {},
 ): {
   db: TDb;
   createDatabase: jest.Mock;
+  closeDatabase: jest.Mock;
   module: MockDatabaseRecord;
 } {
   const db = (options.db ?? (createMockDb() as TDb)) as TDb;
   const createDatabase = jest.fn().mockReturnValue(db);
+  const closeDatabase = jest.fn().mockResolvedValue(undefined);
 
   return {
     db,
     createDatabase,
+    closeDatabase,
     module: {
       ...(options.includeActual
         ? jest.requireActual('@eduagent/database')
         : {}),
       createDatabase,
+      closeDatabase,
       ...(options.exports ?? {}),
     },
   };
 }
 
 export function createTransactionalMockDb<TDb extends MockDatabaseRecord>(
-  overrides: Partial<TDb> = {}
+  overrides: Partial<TDb> = {},
 ): TDb & { transaction: jest.Mock } {
   const db = {
     ...(createMockDb() as MockDatabaseRecord),

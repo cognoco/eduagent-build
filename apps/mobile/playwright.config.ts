@@ -5,6 +5,7 @@ import { apiBaseUrl, appBaseUrl, runId } from './e2e-web/helpers/runtime';
 const e2eWebDir = path.join(process.cwd(), 'apps', 'mobile', 'e2e-web');
 const shouldStartLocalApi = process.env.PLAYWRIGHT_SKIP_LOCAL_API !== '1';
 const usesSharedStagingApi = process.env.PLAYWRIGHT_SKIP_LOCAL_API === '1';
+const includeP1BCoverage = process.env.PLAYWRIGHT_INCLUDE_P1B === '1';
 
 export default defineConfig({
   testDir: e2eWebDir,
@@ -105,8 +106,9 @@ export default defineConfig({
     {
       name: 'later-phases',
       dependencies: ['setup'],
-      testMatch:
-        /flows[\\/](journeys[\\/](j0[89]|j1[0-9])-.*|auth[\\/]w03-.*|navigation[\\/]w0[1-5]-.*)\.spec\.ts/,
+      testMatch: includeP1BCoverage
+        ? /flows[\\/](journeys[\\/](j0[89]|j1[0-9]|j20)-.*|auth[\\/]w03-.*|navigation[\\/]w0[1-5]-.*)\.spec\.ts/
+        : /flows[\\/](journeys[\\/](j0[89]|j1[0-9])-.*|auth[\\/]w03-.*|navigation[\\/]w0[1-5]-.*)\.spec\.ts/,
     },
   ],
 });

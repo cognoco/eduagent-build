@@ -2,6 +2,7 @@ import path from 'node:path';
 import { mkdir } from 'node:fs/promises';
 import { expect, type Page } from '@playwright/test';
 import { setupClerkTestingToken } from '@clerk/testing/playwright';
+import { pressableClick } from './pressable';
 
 export interface SignInOptions {
   email: string;
@@ -14,9 +15,104 @@ export interface PersistedSignInOptions extends SignInOptions {
   storageStatePath: string;
 }
 
+async function isAppShellAtPathVisible(
+  page: Page,
+  landingPath: string | undefined,
+): Promise<boolean> {
+  if (landingPath) {
+    const currentUrl = new URL(page.url());
+    if (currentUrl.pathname !== landingPath) {
+      return false;
+    }
+  }
+
+  return page
+    .getByRole('tablist')
+    .isVisible()
+    .catch(() => false);
+}
+
+type SignedInReadyState =
+  | 'post-approval'
+  | 'landing'
+  | 'app-shell'
+  | 'error-boundary';
+
+async function waitForSignedInReady(
+  page: Page,
+  options: SignInOptions,
+  waitOptions: { allowPostApproval: boolean },
+): Promise<SignedInReadyState> {
+  const timeout = 60_000;
+  const maxProfileLoadRetries = 3;
+  const deadline = Date.now() + timeout;
+  const postApproval = page.getByTestId('post-approval-continue');
+  const landing = page.getByTestId(options.landingTestId);
+  const errorBoundary = page.getByTestId('error-boundary-fallback');
+  const profileLoadError = page.getByTestId('profile-load-error');
+  const profileLoadRetry = page.getByTestId('profile-load-error-retry');
+  const signInError = page.getByText(
+    'Sign-in could not be completed. Please try again.',
+  );
+  const signInButton = page.getByTestId('sign-in-button');
+  let profileRetryCount = 0;
+  let signInRetryCount = 0;
+
+  while (Date.now() < deadline) {
+    if (
+      waitOptions.allowPostApproval &&
+      (await postApproval.isVisible().catch(() => false))
+    ) {
+      return 'post-approval';
+    }
+
+    if (await landing.isVisible().catch(() => false)) {
+      return 'landing';
+    }
+
+    if (await isAppShellAtPathVisible(page, options.landingPath)) {
+      return 'app-shell';
+    }
+
+    if (await errorBoundary.isVisible().catch(() => false)) {
+      return 'error-boundary';
+    }
+
+    if (
+      profileRetryCount < maxProfileLoadRetries &&
+      (await profileLoadError.isVisible().catch(() => false)) &&
+      (await profileLoadRetry.isVisible().catch(() => false))
+    ) {
+      profileRetryCount += 1;
+      await pressableClick(profileLoadRetry);
+      await page.waitForTimeout(500);
+      continue;
+    }
+
+    if (
+      signInRetryCount < 3 &&
+      (await signInError.isVisible().catch(() => false)) &&
+      (await signInButton.isVisible().catch(() => false))
+    ) {
+      signInRetryCount += 1;
+      await signInButton.click();
+      await page.waitForTimeout(1_000);
+      continue;
+    }
+
+    await page.waitForTimeout(500);
+  }
+
+  throw new Error(
+    `Timed out waiting for signed-in app readiness after ${timeout}ms` +
+      ` (profile load retries: ${profileRetryCount}/${maxProfileLoadRetries}, ` +
+      `sign-in retries: ${signInRetryCount}/3)`,
+  );
+}
+
 export async function signIn(
   page: Page,
-  options: SignInOptions
+  options: SignInOptions,
 ): Promise<void> {
   const pageErrors: string[] = [];
   const consoleErrors: string[] = [];
@@ -45,46 +141,31 @@ export async function signIn(
   try {
     // Tap through the post-approval landing if it appears (fresh SecureStore)
     const postApproval = page.getByTestId('post-approval-continue');
-    const landing = page.getByTestId(options.landingTestId);
-    const errorBoundary = page.getByTestId('error-boundary-fallback');
-    const first = await Promise.race([
-      postApproval
-        .waitFor({ state: 'visible', timeout: 60_000 })
-        .then(() => 'post-approval' as const),
-      landing
-        .waitFor({ state: 'visible', timeout: 60_000 })
-        .then(() => 'landing' as const),
-      errorBoundary
-        .waitFor({ state: 'visible', timeout: 60_000 })
-        .then(() => 'error-boundary' as const),
-    ]);
+    const first = await waitForSignedInReady(page, options, {
+      allowPostApproval: true,
+    });
 
     if (first === 'error-boundary') {
       const diagnostics = [...pageErrors, ...consoleErrors].join(' | ');
       throw new Error(
         diagnostics
           ? `Sign-in landed on the app error boundary: ${diagnostics}`
-          : 'Sign-in landed on the app error boundary.'
+          : 'Sign-in landed on the app error boundary.',
       );
     }
 
     if (first === 'post-approval') {
       await postApproval.click();
-      const second = await Promise.race([
-        landing
-          .waitFor({ state: 'visible', timeout: 60_000 })
-          .then(() => 'landing' as const),
-        errorBoundary
-          .waitFor({ state: 'visible', timeout: 60_000 })
-          .then(() => 'error-boundary' as const),
-      ]);
+      const second = await waitForSignedInReady(page, options, {
+        allowPostApproval: false,
+      });
 
       if (second === 'error-boundary') {
         const diagnostics = [...pageErrors, ...consoleErrors].join(' | ');
         throw new Error(
           diagnostics
             ? `Post-approval flow landed on the app error boundary: ${diagnostics}`
-            : 'Post-approval flow landed on the app error boundary.'
+            : 'Post-approval flow landed on the app error boundary.',
         );
       }
     }
@@ -102,7 +183,7 @@ export async function signIn(
 
 export async function signInAndPersistStorageState(
   page: Page,
-  options: PersistedSignInOptions
+  options: PersistedSignInOptions,
 ): Promise<void> {
   await signIn(page, options);
 

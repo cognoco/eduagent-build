@@ -20,7 +20,7 @@ export interface ResetResponse {
 // during parallel Playwright workers.
 const RETRY_MAX_ATTEMPTS = 6;
 const RETRY_BASE_DELAY_MS = 1_500;
-const RETRYABLE_STATUSES = new Set([403, 429, 502, 503]);
+const RETRYABLE_STATUSES = new Set([403, 429, 500, 502, 503]);
 
 async function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));

@@ -34,7 +34,7 @@ jest.mock('react-native-safe-area-context', () => ({
 }));
 
 jest.mock('../../hooks/use-subjects', () => ({
-  useSubjects: () => mockUseSubjects(),
+  useSubjects: (...args: unknown[]) => mockUseSubjects(...args),
   useUpdateSubject: () => ({ mutateAsync: mockUpdateSubjectMutateAsync }),
 }));
 
@@ -486,6 +486,68 @@ describe('LibraryScreen', () => {
     // Library renders normally — subjects still visible as shelf rows
     expect(screen.queryByTestId('library-error')).toBeNull();
     screen.getByTestId('shelves-list');
+  });
+
+  it('does not show full-page error when progress fails after subjects load', () => {
+    mockUseSubjects.mockReturnValue({
+      data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+    mockUseOverallProgress.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: new Error('Database temporarily unavailable'),
+      refetch: jest.fn(),
+    });
+    mockUseAllBooks.mockReturnValue({
+      books: [],
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+
+    render(<LibraryScreen />, { wrapper: TestWrapper });
+
+    expect(screen.queryByTestId('library-error')).toBeNull();
+    screen.getByTestId('shelf-row-header-sub-1');
+  });
+
+  it('renders cached active subjects when the include-inactive subject refresh fails', () => {
+    const refetchIncludeInactive = jest.fn();
+    const refetchActive = jest.fn();
+    mockUseSubjects.mockImplementation(
+      (options?: { includeInactive?: boolean }) =>
+        options?.includeInactive
+          ? {
+              data: undefined,
+              isLoading: false,
+              isError: true,
+              error: new Error('Database temporarily unavailable'),
+              refetch: refetchIncludeInactive,
+            }
+          : {
+              data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
+              isLoading: false,
+              isError: false,
+              refetch: refetchActive,
+            },
+    );
+    mockUseOverallProgress.mockReturnValue({
+      data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+
+    render(<LibraryScreen />, { wrapper: TestWrapper });
+
+    expect(screen.queryByTestId('library-error')).toBeNull();
+    screen.getByText('1 subjects');
+    screen.getByTestId('shelf-row-header-sub-1');
+    expect(mockUseSubjects).toHaveBeenCalledWith({ includeInactive: true });
   });
 
   describe('Manage Subjects modal — backdrop close [BUG-510]', () => {

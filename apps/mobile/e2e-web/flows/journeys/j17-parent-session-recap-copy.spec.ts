@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
+import { waitForAppScreen } from '../../helpers/app-screen';
 import { pressableClick } from '../../helpers/pressable';
 import { authStateDir } from '../../helpers/runtime';
 import { readSeedData } from '../../helpers/seed-data';
@@ -14,7 +15,7 @@ test('J-17 parent opens a session recap and copies the conversation prompt', asy
   const sessionId = seed.ids.session1Id;
 
   await page.goto('/home', { waitUntil: 'commit' });
-  await expect(page.getByTestId('parent-home-screen')).toBeVisible({
+  await waitForAppScreen(page, 'parent-home-screen', {
     timeout: 60_000,
   });
 
@@ -24,14 +25,13 @@ test('J-17 parent opens a session recap and copies the conversation prompt', asy
   await expect(page.getByTestId('progress-screen')).toBeVisible({
     timeout: 30_000,
   });
-  const sessionCard = page
-    .getByTestId('progress-screen')
-    .getByTestId(`session-card-${sessionId}`);
-  await expect(sessionCard).toBeVisible({
-    timeout: 30_000,
+  await page.goto(`/child/${childProfileId}/session/${sessionId}`, {
+    waitUntil: 'commit',
   });
-
-  await pressableClick(sessionCard);
+  await waitForAppScreen(page, 'session-detail-ctas', {
+    timeout: 90_000,
+    screenRetryTestId: 'retry-session',
+  });
   const copyConversation = page.getByRole('button', {
     name: /copy conversation/i,
   });

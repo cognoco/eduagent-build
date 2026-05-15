@@ -27,13 +27,10 @@ if (typeof WebSocket === 'undefined') {
  */
 export type CreateDatabaseOptions = Record<string, never>;
 
-// Module-level pool cache — survives across requests within the same Cloudflare
-// Worker isolate. Without this, every request creates a fresh NeonPool and
-// negotiates a new WebSocket to Neon, which compounds cold-start latency when
-// Neon auto-suspends the compute (3 parallel library queries × cold WebSocket
-// handshake = 3× the wake-up load). Keyed by connection string so different
-// environments get isolated pools.
-const neonPoolCache = new Map<string, NeonPool>();
+// Neon's WebSocket Pool cannot be reused across Cloudflare Worker requests.
+// Store the pool behind the Drizzle handle so request middleware can close it
+// after the handler has finished without exposing transport details to callers.
+const neonPoolsByDatabase = new WeakMap<object, NeonPool>();
 
 // [BUG-MIGRATE-0014 / RLS-PHASE-0] CI runs integration tests against a vanilla
 // Postgres container at localhost:5432 (cheap, fast, in-job). Production runs
@@ -75,15 +72,13 @@ export function createDatabase(
   _options: CreateDatabaseOptions = {},
 ) {
   if (looksLikeNeon(databaseUrl)) {
-    let pool = neonPoolCache.get(databaseUrl);
-    if (!pool) {
-      pool = new NeonPool({
-        connectionString: databaseUrl,
-        connectionTimeoutMillis: 10_000,
-      });
-      neonPoolCache.set(databaseUrl, pool);
-    }
-    return drizzleNeon(pool, { schema });
+    const pool = new NeonPool({
+      connectionString: databaseUrl,
+      connectionTimeoutMillis: 10_000,
+    });
+    const db = drizzleNeon(pool, { schema });
+    neonPoolsByDatabase.set(db as object, pool);
+    return db;
   }
   // drizzle-orm/node-postgres builds the underlying pg Pool internally when
   // given a connection string via the config-object form, avoiding the need
@@ -104,3 +99,10 @@ export function createDatabase(
 }
 
 export type Database = ReturnType<typeof createDatabase>;
+
+export async function closeDatabase(db: Database): Promise<void> {
+  const pool = neonPoolsByDatabase.get(db as object);
+  if (!pool) return;
+  neonPoolsByDatabase.delete(db as object);
+  await pool.end();
+}

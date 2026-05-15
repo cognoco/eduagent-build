@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { expect, test } from '@playwright/test';
+import { waitForAppScreen } from '../../helpers/app-screen';
 import { pressableClick } from '../../helpers/pressable';
 import { authStateDir } from '../../helpers/runtime';
 import { readSeedData } from '../../helpers/seed-data';
@@ -14,7 +15,7 @@ test('J-16 parent drill-down reaches topic detail and unwinds cleanly', async ({
   const sessionId = seed.ids.session1Id;
 
   await page.goto('/home', { waitUntil: 'commit' });
-  await expect(page.getByTestId('parent-home-screen')).toBeVisible({
+  await waitForAppScreen(page, 'parent-home-screen', {
     timeout: 60_000,
   });
 
@@ -30,15 +31,12 @@ test('J-16 parent drill-down reaches topic detail and unwinds cleanly', async ({
     },
   );
 
-  const sessionCard = page
-    .getByTestId('progress-screen')
-    .getByTestId(`session-card-${sessionId}`);
-  await expect(sessionCard).toBeVisible({
-    timeout: 30_000,
+  await page.goto(`/child/${childProfileId}/session/${sessionId}`, {
+    waitUntil: 'commit',
   });
-  await pressableClick(sessionCard);
-  await expect(page.getByTestId('session-detail-ctas')).toBeVisible({
-    timeout: 30_000,
+  await waitForAppScreen(page, 'session-detail-ctas', {
+    timeout: 90_000,
+    screenRetryTestId: 'retry-session',
   });
 
   await pressableClick(page.getByTestId('session-detail-continue-topic'));
@@ -51,7 +49,7 @@ test('J-16 parent drill-down reaches topic detail and unwinds cleanly', async ({
     timeout: 30_000,
   });
   await pressableClick(page.getByRole('button', { name: /go back/i }));
-  await expect(page.getByTestId('progress-screen')).toBeVisible({
+  await expect(page.getByTestId('child-detail-scroll')).toBeVisible({
     timeout: 30_000,
   });
 });

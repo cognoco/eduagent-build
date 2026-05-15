@@ -81,6 +81,38 @@ describe('MagicPenAnimation', () => {
     }).not.toThrow();
   });
 
+  it('animated worklets do not read geometry before initialization', () => {
+    const reanimated = require('react-native-reanimated');
+    const originalUseAnimatedStyle = reanimated.useAnimatedStyle;
+    const originalUseAnimatedProps = reanimated.useAnimatedProps;
+    const originalInterpolate = reanimated.interpolate;
+    const originalExtrapolation = reanimated.Extrapolation;
+
+    reanimated.useAnimatedStyle = (
+      factory: () => Record<string, unknown>,
+    ): Record<string, unknown> => factory();
+    reanimated.useAnimatedProps = (
+      factory: () => Record<string, unknown>,
+    ): Record<string, unknown> => factory();
+    reanimated.interpolate = (
+      _value: number,
+      _input: number[],
+      output: number[],
+    ): number => output[0] ?? 0;
+    reanimated.Extrapolation = { CLAMP: 'clamp' };
+
+    try {
+      expect(() => {
+        render(<MagicPenAnimation testID="pen" />);
+      }).not.toThrow();
+    } finally {
+      reanimated.useAnimatedStyle = originalUseAnimatedStyle;
+      reanimated.useAnimatedProps = originalUseAnimatedProps;
+      reanimated.interpolate = originalInterpolate;
+      reanimated.Extrapolation = originalExtrapolation;
+    }
+  });
+
   it('renders in reduced motion mode without crashing (static render path)', () => {
     const reanimated = require('react-native-reanimated');
     const original = reanimated.useReducedMotion;

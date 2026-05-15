@@ -280,6 +280,33 @@ describe('LearnerScreen', () => {
     });
   });
 
+  it('keeps home actions available when the subject list fails to load', async () => {
+    mockFetch.setRoute(
+      '/subjects',
+      new Response(
+        JSON.stringify({
+          code: 'INTERNAL_ERROR',
+          message: 'timeout exceeded when trying to connect',
+        }),
+        {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
+        },
+      ),
+    );
+
+    render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
+
+    await waitFor(() => {
+      screen.getByTestId('learner-screen');
+      screen.getByText('What do you need right now?');
+      screen.getByTestId('home-ask-anything');
+      screen.getByTestId('home-subjects-load-error');
+      expect(screen.queryByTestId('learner-error-state')).toBeNull();
+      expect(screen.queryByTestId('home-empty-subjects')).toBeNull();
+    });
+  });
+
   it('shows the topics-learned momentum line on Home', async () => {
     mockFetch.setRoute('/progress/overview', {
       subjects: [],

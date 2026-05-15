@@ -418,6 +418,38 @@ export function MagicPenAnimation({
   }));
 
   // -------------------------------------------------------------------------
+  // Derived colors and geometry
+  // -------------------------------------------------------------------------
+  // These values must be declared before useAnimatedStyle callbacks. Reanimated
+  // can evaluate worklets during hook setup on web, and later const bindings
+  // are still in the temporal dead zone at that point.
+  const sparkleX =
+    (PEN_START.x + (PEN_END.x - PEN_START.x) * 0.5) * drawingScale;
+  const sparkleY =
+    (PEN_START.y + (PEN_END.y - PEN_START.y) * 0.5) * drawingScale;
+  const sparkleSize = Math.max(6, size * 0.08);
+
+  const dropletRadius = Math.max(3, size * 0.055);
+  const bodyColor = color;
+  const capColor = '#1a1a1a';
+  const steelColor = '#cfd4dc';
+  const steelDeepColor = '#9aa3ad';
+  const slitColor = '#5a6470';
+
+  // The visible pen travel uses React Native core Animated. Reanimated SVG
+  // The pen is drawn horizontally with the writing tip at (88, 50) inside a
+  // 100×100 viewBox, then rotated ~32–45° clockwise. The empirical offsets
+  // below place the rotated tip onto the writing path with minimal drift
+  // across the rotation range.
+  const nibOffsetX = penContainerSize * 0.79;
+  const nibOffsetY = penContainerSize * 0.74;
+  const penStartX = PEN_START.x * drawingScale - nibOffsetX;
+  const penEndX = PEN_END.x * drawingScale - nibOffsetX;
+  const penStartY = PEN_START.y * drawingScale - nibOffsetY;
+  const penEndY = PEN_END.y * drawingScale - nibOffsetY;
+  const penMidY = ((PEN_START.y + PEN_END.y) / 2) * drawingScale - nibOffsetY;
+
+  // -------------------------------------------------------------------------
   // Animated styles
   // -------------------------------------------------------------------------
 
@@ -472,37 +504,6 @@ export function MagicPenAnimation({
       transform: [{ translateX: nibPixelX - 3 }, { translateY: nibPixelY - 3 }],
     };
   });
-
-  // -------------------------------------------------------------------------
-  // Derived colors
-  // -------------------------------------------------------------------------
-  // Grip is slightly darker (use opacity trick — dark overlay)
-  // Sparkle position (fixed crossing point on the writing path, approx 50% t)
-  const sparkleX =
-    (PEN_START.x + (PEN_END.x - PEN_START.x) * 0.5) * drawingScale;
-  const sparkleY =
-    (PEN_START.y + (PEN_END.y - PEN_START.y) * 0.5) * drawingScale;
-  const sparkleSize = Math.max(6, size * 0.08);
-
-  // Droplet base size
-  const dropletRadius = Math.max(3, size * 0.055);
-  const bodyColor = color;
-  const capColor = '#1a1a1a';
-  const steelColor = '#cfd4dc';
-  const steelDeepColor = '#9aa3ad';
-  const slitColor = '#5a6470';
-  // The visible pen travel uses React Native core Animated. Reanimated SVG
-  // The pen is drawn horizontally with the writing tip at (88, 50) inside a
-  // 100×100 viewBox, then rotated ~32–45° clockwise. The empirical offsets
-  // below place the rotated tip onto the writing path with minimal drift
-  // across the rotation range.
-  const nibOffsetX = penContainerSize * 0.79;
-  const nibOffsetY = penContainerSize * 0.74;
-  const penStartX = PEN_START.x * drawingScale - nibOffsetX;
-  const penEndX = PEN_END.x * drawingScale - nibOffsetX;
-  const penStartY = PEN_START.y * drawingScale - nibOffsetY;
-  const penEndY = PEN_END.y * drawingScale - nibOffsetY;
-  const penMidY = ((PEN_START.y + PEN_END.y) / 2) * drawingScale - nibOffsetY;
 
   // Pen body motion driven entirely from Reanimated shared values so it
   // shares the ink stroke's scheduler — no two-clock drift, and the pen

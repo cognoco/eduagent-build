@@ -19,22 +19,22 @@ import { pressableClick } from '../../helpers/pressable';
  * tapped — for indices 0 and 1 specifically (the failure window) plus 2
  * and 3 for completeness.
  *
- * Seed scenario: language-learner — gives the profile a Spanish (es)
- * four_strands subject with 3 vocabulary entries which is enough for the
- * quiz round endpoint to fall back to the starter word list and produce a
+ * Seed scenario: language-subject-active — gives the profile an active
+ * Spanish (es) four_strands subject with enough vocabulary to generate a
  * deterministic 4-option multiple-choice round.
  */
 test('J-20 vocabulary quiz: tapped option text matches POSTed answerGiven (BUG-924)', async ({
   page,
 }) => {
-  await seedAndSignIn(page, {
-    scenario: 'language-learner',
+  const seeded = await seedAndSignIn(page, {
+    scenario: 'language-subject-active',
     alias: 'j20',
     landingTestId: 'learner-screen',
     landingPath: '/home',
   });
+  const subjectId = seeded.ids.subjectId;
+  expect(subjectId).toBeTruthy();
 
-  // Navigate Home → Practice → Quiz index
   await expect(page.getByTestId('learner-screen')).toBeVisible({
     timeout: 60_000,
   });
@@ -42,17 +42,13 @@ test('J-20 vocabulary quiz: tapped option text matches POSTed answerGiven (BUG-9
   await expect(page.getByTestId('practice-screen')).toBeVisible({
     timeout: 30_000,
   });
+
   await pressableClick(page.getByTestId('practice-quiz'));
   await expect(page.getByTestId('quiz-index-screen')).toBeVisible({
     timeout: 30_000,
   });
 
-  // Launch the vocabulary quiz for the seeded language subject. The card's
-  // testID is `quiz-vocabulary-${subjectId}` — match by prefix because the
-  // subjectId is generated at seed time.
-  const vocabCard = page.locator('[data-testid^="quiz-vocabulary-"]').first();
-  await expect(vocabCard).toBeVisible({ timeout: 30_000 });
-  await pressableClick(vocabCard);
+  await pressableClick(page.getByTestId(`quiz-vocabulary-${subjectId}`));
 
   await expect(page.getByTestId('quiz-play-screen')).toBeVisible({
     timeout: 60_000,
@@ -119,14 +115,31 @@ test('J-20 vocabulary quiz: tapped option text matches POSTed answerGiven (BUG-9
     ).toBe(renderedText);
     expect(body.answerMode).toBe('multiple_choice');
 
-    // Wait for feedback then advance.
-    await expect(page.getByTestId('quiz-answer-feedback')).toBeVisible({
+    // Wait until the continue guard has opened, then advance.
+    const answerFeedback = page.getByTestId('quiz-answer-feedback');
+    await expect(answerFeedback).toBeVisible({
       timeout: 30_000,
     });
-    await expect(page.getByText('Tap anywhere to continue')).toBeVisible({
+    await expect(answerFeedback).toHaveText('Ready for the next one', {
+      timeout: 5_000,
+    });
+
+    const nextQuestion = page.getByTestId('quiz-next-question');
+    const seeResults = page.getByTestId('quiz-final-see-results');
+    const resultsScreen = page.getByTestId('quiz-results-screen');
+
+    await expect(nextQuestion.or(seeResults).or(resultsScreen)).toBeVisible({
       timeout: 30_000,
     });
-    await pressableClick(quizScreen);
+
+    if (await resultsScreen.isVisible().catch(() => false)) break;
+    if (await seeResults.isVisible().catch(() => false)) {
+      await pressableClick(seeResults);
+      continue;
+    }
+
+    await pressableClick(nextQuestion);
+    await expect(answerFeedback).toBeHidden({ timeout: 10_000 });
   }
 
   // Round must have completed — confirms the cycle wasn't accidentally a
