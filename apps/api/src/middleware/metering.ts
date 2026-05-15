@@ -75,9 +75,13 @@ export type MeteringEnv = {
 
 // Routes that consume LLM exchanges on BOTH GET and POST. Currently every
 // session-scoped LLM endpoint that may be invoked via SSE/GET counts here.
-const LLM_ROUTE_PATTERNS_ANY_METHOD = [
+const SESSION_MESSAGE_STREAM_PATTERNS = [
   /\/sessions\/[^/]+\/messages\/?$/,
   /\/sessions\/[^/]+\/stream\/?$/,
+];
+
+const LLM_ROUTE_PATTERNS_ANY_METHOD = [
+  ...SESSION_MESSAGE_STREAM_PATTERNS,
   // [BUG-623 / A-6] generateRecallBridge calls the LLM but was missing from
   // this list, so any authenticated user could call recall-bridge in a tight
   // loop and burn unlimited LLM capacity at zero cost. Meter it like any
@@ -110,10 +114,7 @@ const PROFILE_REQUIRED_BEFORE_METERING_PATTERNS = [
   /\/dictation\/review\/?$/,
 ];
 
-const IDEMPOTENT_SESSION_ROUTE_PATTERNS = [
-  /\/sessions\/[^/]+\/messages\/?$/,
-  /\/sessions\/[^/]+\/stream\/?$/,
-];
+const IDEMPOTENT_SESSION_ROUTE_PATTERNS = SESSION_MESSAGE_STREAM_PATTERNS;
 
 function isLlmRoute(path: string, method: string): boolean {
   // GET methods never decrement quota for POST-only endpoints. The any-method
@@ -151,6 +152,18 @@ function profileRequiredResponse(c: Context<MeteringEnv>): Response {
 
 function shouldRefundAfterHandler(status: number): boolean {
   return status >= 400;
+}
+
+function withoutQuotaHeaders(response: Response): Response {
+  const headers = new Headers(response.headers);
+  headers.delete('X-Quota-Remaining');
+  headers.delete('X-Quota-Warning-Level');
+  headers.delete('X-Daily-Remaining');
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
 }
 
 async function maybeReplayIdempotentSessionRequest(
@@ -478,6 +491,7 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
         route: `metering.${c.req.method}.${c.req.path}`,
         profileId,
       });
+      c.res = withoutQuotaHeaders(c.res);
       return;
     }
 
