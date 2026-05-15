@@ -16,10 +16,47 @@ concurrency:
 permissions:
   actions: read
   contents: read
+  pull-requests: read
 
 jobs:
-  smoke:
-    name: Playwright web smoke
+  # Lightweight gate: skip the expensive Playwright suite when the PR only
+  # touches docs, configs, or workflow files unrelated to the app.
+  # Runs in ~5s on a shared runner (no checkout needed).
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      should-run: ${{ steps.check.outputs.should-run }}
+    steps:
+      - name: Check for relevant file changes
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "should-run=true" >> "$GITHUB_OUTPUT"
+            echo "Manual dispatch — running full E2E suite"
+            exit 0
+          fi
+
+          FILES=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" --paginate --jq '.[].filename')
+
+          SHOULD_RUN=false
+          while IFS= read -r f; do
+            [ -z "$f" ] && continue
+            case "$f" in
+              apps/*|packages/*|pnpm-lock.yaml|.github/workflows/e2e-web.yml)
+                SHOULD_RUN=true
+                break
+                ;;
+            esac
+          done <<< "$FILES"
+
+          echo "should-run=$SHOULD_RUN" >> "$GITHUB_OUTPUT"
+          echo "Run E2E: $SHOULD_RUN (changed files: $(echo "$FILES" | wc -l | tr -d ' '))"
+
+  run-smoke:
+    needs: changes
+    if: needs.changes.outputs.should-run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -101,3 +138,28 @@ jobs:
             apps/mobile/e2e-web/playwright-report
             apps/mobile/e2e-web/test-results
           retention-days: 14
+
+  # Gate job — this is the required status check on branch protection.
+  # Always runs so the check is never stuck "pending". Fails only if the
+  # smoke suite ran and failed; reports success when tests pass OR when
+  # they were legitimately skipped (no relevant file changes).
+  smoke:
+    name: Playwright web smoke
+    if: always()
+    needs: [changes, run-smoke]
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          if [[ "${{ needs.changes.result }}" != "success" ]]; then
+            echo "Change detection failed — failing closed"
+            exit 1
+          fi
+          if [[ "${{ needs.run-smoke.result }}" == "failure" || "${{ needs.run-smoke.result }}" == "cancelled" ]]; then
+            echo "E2E smoke tests failed"
+            exit 1
+          fi
+          if [[ "${{ needs.changes.outputs.should-run }}" == "false" ]]; then
+            echo "E2E smoke tests skipped — no relevant file changes"
+          else
+            echo "E2E smoke tests passed"
+          fi

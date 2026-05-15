@@ -1189,6 +1189,10 @@ function SubscriptionContent(): React.ReactElement {
   const tier = subscription?.tier ?? 'free';
   const status = subscription?.status ?? 'active';
   const isPaidTier = tier !== 'free';
+  const canManageBilling =
+    isPaidTier ||
+    hasActiveSubscription ||
+    (status === 'trial' && Platform.OS === 'web');
   const cancelAtPeriodEnd = subscription?.cancelAtPeriodEnd ?? false;
 
   // Get the current offering's available packages
@@ -1810,13 +1814,12 @@ function SubscriptionContent(): React.ReactElement {
             </View>
           )}
 
-          {/* Manage billing — deep links to platform subscription management */}
+          {/* Manage billing — native deep link or web-only plan guidance */}
           {/* BUG-394: Fall back to API-side tier when RevenueCat fails */}
-          {/* BUG-896: Show whenever user is on a paid tier per API, not only when */}
-          {/* RevenueCat reports an active entitlement. The store deep-link works */}
-          {/* regardless of RC sync state, and a paid user must always have a way */}
-          {/* to cancel/manage in-app. */}
-          {(isPaidTier || hasActiveSubscription) && (
+          {/* BUG-896/916: Paid native users need a store management path even */}
+          {/* when RC sync lags; trial users only get the static web guidance */}
+          {/* unless RevenueCat confirms a native entitlement. */}
+          {canManageBilling && (
             <View className="mt-6" testID="manage-section">
               <Text className="text-body-sm font-semibold text-text-primary opacity-70 tracking-wide mb-2">
                 Manage

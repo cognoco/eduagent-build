@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,11 @@ import { useAuth } from '@clerk/clerk-expo';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQueryClient } from '@tanstack/react-query';
-import { useDeleteAccount, useCancelDeletion } from '../hooks/use-account';
+import {
+  useDeleteAccount,
+  useCancelDeletion,
+  useDeletionStatus,
+} from '../hooks/use-account';
 import { useThemeColors } from '../lib/theme';
 import { goBackOrReplace } from '../lib/navigation';
 import { formatApiError } from '../lib/format-api-error';
@@ -36,6 +40,7 @@ export default function DeleteAccountScreen() {
   const { profiles } = useProfile();
   const deleteAccount = useDeleteAccount();
   const cancelDeletion = useCancelDeletion();
+  const deletionStatus = useDeletionStatus();
 
   const [stage, setStage] = useState<Stage>('initial');
   const [confirmText, setConfirmText] = useState('');
@@ -46,6 +51,32 @@ export default function DeleteAccountScreen() {
   // the destructive button could fire two requests. A ref toggled
   // synchronously around the mutation closes that race.
   const submittingRef = useRef(false);
+  const locallyScheduledRef = useRef(false);
+  const stageRef = useRef<Stage>('initial');
+  const setScreenStage = useCallback((nextStage: Stage) => {
+    stageRef.current = nextStage;
+    setStage(nextStage);
+  }, []);
+
+  useEffect(() => {
+    const currentStage = stageRef.current;
+    if (deletionStatus.data?.scheduled === true) {
+      if (currentStage === 'confirming') return;
+      setGracePeriodEnds(deletionStatus.data.gracePeriodEnds);
+      if (currentStage !== 'scheduled') {
+        setScreenStage('scheduled');
+      }
+    } else if (
+      deletionStatus.data?.scheduled === false &&
+      currentStage === 'scheduled'
+    ) {
+      if (locallyScheduledRef.current) {
+        return;
+      }
+      setGracePeriodEnds(null);
+      setScreenStage('initial');
+    }
+  }, [deletionStatus.data, setScreenStage]);
 
   const handleClose = useCallback(() => {
     goBackOrReplace(router, '/(app)/more');
@@ -55,8 +86,8 @@ export default function DeleteAccountScreen() {
   const onBeginConfirm = useCallback(() => {
     setError('');
     setConfirmText('');
-    setStage('confirming');
-  }, []);
+    setScreenStage('confirming');
+  }, [setScreenStage]);
 
   // Step 2: user has typed DELETE and taps the destructive button — fire
   // the mutation. The button is only enabled when the typed phrase
@@ -68,36 +99,46 @@ export default function DeleteAccountScreen() {
     setError('');
     try {
       const result = await deleteAccount.mutateAsync();
+      locallyScheduledRef.current = true;
       setGracePeriodEnds(result.gracePeriodEnds);
-      setStage('scheduled');
+      setScreenStage('scheduled');
     } catch (err: unknown) {
       setError(formatApiError(err));
     } finally {
       submittingRef.current = false;
     }
-  }, [deleteAccount, confirmText]);
+  }, [deleteAccount, confirmText, setScreenStage]);
 
   const onBackToWarning = useCallback(() => {
     setConfirmText('');
     setError('');
-    setStage('initial');
-  }, []);
+    setScreenStage('initial');
+  }, [setScreenStage]);
 
   const onCancelDeletion = useCallback(async () => {
     setError('');
     try {
       await cancelDeletion.mutateAsync();
+      locallyScheduledRef.current = false;
+      await queryClient.invalidateQueries({
+        queryKey: ['account', 'deletion-status'],
+      });
       handleClose();
     } catch (err: unknown) {
       setError(formatApiError(err));
     }
-  }, [cancelDeletion, handleClose]);
+  }, [cancelDeletion, handleClose, queryClient]);
 
-  const isLoading = deleteAccount.isPending || cancelDeletion.isPending;
+  const isLoading =
+    deleteAccount.isPending ||
+    cancelDeletion.isPending ||
+    deletionStatus.isLoading;
+  const statusLoadFailed = deletionStatus.isError && stage !== 'scheduled';
   const canConfirm =
     confirmText === DELETE_CONFIRMATION_PHRASE &&
     !deleteAccount.isPending &&
-    !submittingRef.current;
+    !submittingRef.current &&
+    !statusLoadFailed;
 
   const formattedDate = gracePeriodEnds
     ? new Date(gracePeriodEnds).toLocaleDateString(undefined, {
@@ -146,7 +187,44 @@ export default function DeleteAccountScreen() {
           </View>
         )}
 
-        {stage === 'scheduled' ? (
+        {deletionStatus.isLoading ? (
+          <View className="flex-1 items-center justify-center py-10">
+            <ActivityIndicator
+              color={colors.primary}
+              testID="delete-account-status-loading"
+            />
+          </View>
+        ) : statusLoadFailed ? (
+          <View testID="delete-account-status-error">
+            <View className="bg-danger/10 rounded-card px-4 py-3 mb-4">
+              <Text className="text-danger text-body-sm">
+                {t('errors.networkError')}
+              </Text>
+            </View>
+            <Pressable
+              onPress={() => void deletionStatus.refetch()}
+              className="bg-primary rounded-button py-3.5 items-center mb-3"
+              testID="delete-account-status-retry"
+              accessibilityRole="button"
+              accessibilityLabel={t('common.retry')}
+            >
+              <Text className="text-body font-semibold text-text-inverse">
+                {t('common.retry')}
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={handleClose}
+              className="bg-surface rounded-button py-3.5 items-center"
+              testID="delete-account-status-back"
+              accessibilityRole="button"
+              accessibilityLabel={t('common.goBack')}
+            >
+              <Text className="text-body font-semibold text-text-primary">
+                {t('common.goBack')}
+              </Text>
+            </Pressable>
+          </View>
+        ) : stage === 'scheduled' ? (
           <View testID="delete-account-scheduled">
             <Text className="text-body text-text-primary mb-2">
               {t('account.scheduledTitle')}
