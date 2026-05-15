@@ -286,7 +286,9 @@ beforeAll(async () => {
     if (url.startsWith(ANTHROPIC_URL) || url.startsWith(VOYAGE_URL)) {
       // routeAndCall spy should intercept before fetch; this is belt-and-suspenders.
       return new Response(
-        JSON.stringify({ content: [{ type: 'text', text: LLM_MOCK_RESPONSE }] }),
+        JSON.stringify({
+          content: [{ type: 'text', text: LLM_MOCK_RESPONSE }],
+        }),
         { status: 200, headers: { 'Content-Type': 'application/json' } },
       );
     }
@@ -377,7 +379,11 @@ describe('session-completed integration', () => {
         },
       },
       step,
-    })) as { status: string; sessionId: string; outcomes: Array<{ step: string; status: string }> };
+    })) as {
+      status: string;
+      sessionId: string;
+      outcomes: Array<{ step: string; status: string }>;
+    };
 
     // ── 3. Assert handler result ─────────────────────────────────────────────
     expect(result.status).toMatch(/^completed/); // 'completed' or 'completed-with-errors'
@@ -509,7 +515,11 @@ describe('session-completed integration', () => {
         },
       },
       step,
-    })) as { status: string; sessionId: string; outcomes: Array<{ step: string; status: string }> };
+    })) as {
+      status: string;
+      sessionId: string;
+      outcomes: Array<{ step: string; status: string }>;
+    };
 
     // waitForEvent was called (freeform session)
     expect(step.waitForEvent).toHaveBeenCalledWith(
@@ -518,7 +528,9 @@ describe('session-completed integration', () => {
     );
 
     // re-read-session step ran (topicId was null + exchangeCount was null)
-    const reReadCalls = (step.run as jest.Mock).mock.calls.map((c: [string, ...unknown[]]) => c[0]);
+    const reReadCalls = (step.run as jest.Mock).mock.calls.map(
+      (c: [string, ...unknown[]]) => c[0],
+    );
     expect(reReadCalls).toContain('re-read-session');
 
     // session_summaries row created
@@ -612,7 +624,10 @@ describe('session-completed integration', () => {
         },
       },
       step,
-    })) as { status: string; outcomes: Array<{ step: string; status: string }> };
+    })) as {
+      status: string;
+      outcomes: Array<{ step: string; status: string }>;
+    };
 
     // waitForEvent was called for homework session
     expect(step.waitForEvent).toHaveBeenCalled();
@@ -692,7 +707,10 @@ describe('session-completed integration', () => {
         },
       },
       step,
-    })) as { status: string; outcomes: Array<{ step: string; status: string }> };
+    })) as {
+      status: string;
+      outcomes: Array<{ step: string; status: string }>;
+    };
 
     // relearn-retention-reset outcome is 'ok'
     const resetOutcome = result.outcomes.find(
@@ -766,7 +784,8 @@ describe('session-completed integration', () => {
         subjectId,
         topicId,
         eventType: 'user_message',
-        content: 'I think the formula is wrong because the variables are swapped.',
+        content:
+          'I think the formula is wrong because the variables are swapped.',
       },
       {
         sessionId,
@@ -801,7 +820,10 @@ describe('session-completed integration', () => {
         },
       },
       step,
-    })) as { status: string; outcomes: Array<{ step: string; status: string; qualityRating?: number }> };
+    })) as {
+      status: string;
+      outcomes: Array<{ step: string; status: string; qualityRating?: number }>;
+    };
 
     const verificationOutcome = result.outcomes.find(
       (o) => o.step === 'process-verification-completion',
@@ -851,7 +873,8 @@ describe('session-completed integration', () => {
         subjectId,
         topicId,
         eventType: 'user_message',
-        content: 'Photosynthesis uses light to convert CO2 and water into glucose.',
+        content:
+          'Photosynthesis uses light to convert CO2 and water into glucose.',
       },
       {
         sessionId,
@@ -886,7 +909,10 @@ describe('session-completed integration', () => {
         },
       },
       step,
-    })) as { status: string; outcomes: Array<{ step: string; status: string; qualityRating?: number }> };
+    })) as {
+      status: string;
+      outcomes: Array<{ step: string; status: string; qualityRating?: number }>;
+    };
 
     const verificationOutcome = result.outcomes.find(
       (o) => o.step === 'process-verification-completion',
@@ -936,8 +962,18 @@ describe('session-completed integration', () => {
     const VOCAB_LLM_RESPONSE = JSON.stringify({
       // extractVocabularyFromTranscript expects: {"items": [{term, translation, type}]}
       items: [
-        { term: 'la photosynthèse', translation: 'photosynthesis', type: 'word', cefrLevel: 'B1' },
-        { term: 'la lumière', translation: 'light', type: 'word', cefrLevel: 'A1' },
+        {
+          term: 'la photosynthèse',
+          translation: 'photosynthesis',
+          type: 'word',
+          cefrLevel: 'B1',
+        },
+        {
+          term: 'la lumière',
+          translation: 'light',
+          type: 'word',
+          cefrLevel: 'A1',
+        },
       ],
       // Standard summary fields for other parsers
       closingLine: 'Très bien!',
@@ -984,7 +1020,10 @@ describe('session-completed integration', () => {
         },
       },
       step,
-    })) as { status: string; outcomes: Array<{ step: string; status: string }> };
+    })) as {
+      status: string;
+      outcomes: Array<{ step: string; status: string }>;
+    };
 
     // update-vocabulary-retention ran (not skipped)
     const vocabOutcome = result.outcomes.find(
@@ -1082,7 +1121,13 @@ describe('session-completed integration', () => {
 
     // LLM returns an analysis with a medium-confidence struggle → triggers struggle_noticed
     const STRUGGLE_LLM_RESPONSE = JSON.stringify({
-      struggles: [{ topic: 'photosynthesis light reactions', subject: 'Biology', confidence: 'medium' }],
+      struggles: [
+        {
+          topic: 'photosynthesis light reactions',
+          subject: 'Biology',
+          confidence: 'medium',
+        },
+      ],
       interests: null,
       strengths: null,
       resolvedTopics: null,
@@ -1129,7 +1174,10 @@ describe('session-completed integration', () => {
         },
       },
       step,
-    })) as { status: string; outcomes: Array<{ step: string; status: string }> };
+    })) as {
+      status: string;
+      outcomes: Array<{ step: string; status: string }>;
+    };
 
     // analyze-learner-profile ran (consent granted)
     const analyzeOutcome = result.outcomes.find(
@@ -1138,7 +1186,9 @@ describe('session-completed integration', () => {
     expect(analyzeOutcome?.status).toBe('ok');
 
     // Expo push URL was hit (sendStruggleNotification fired fetch to Expo)
-    const expoPushCalls = fetchCalls.filter((c) => c.url.startsWith(EXPO_PUSH_URL));
+    const expoPushCalls = fetchCalls.filter((c) =>
+      c.url.startsWith(EXPO_PUSH_URL),
+    );
     expect(expoPushCalls.length).toBeGreaterThan(0);
   });
 
@@ -1188,7 +1238,10 @@ describe('session-completed integration', () => {
         },
       },
       step,
-    })) as { status: string; outcomes: Array<{ step: string; status: string }> };
+    })) as {
+      status: string;
+      outcomes: Array<{ step: string; status: string }>;
+    };
 
     // update-retention skipped (no quality signal for silence_timeout)
     const retentionOutcome = result.outcomes.find(
@@ -1266,7 +1319,10 @@ describe('session-completed integration', () => {
         },
       },
       step,
-    })) as { status: string; outcomes: Array<{ step: string; status: string }> };
+    })) as {
+      status: string;
+      outcomes: Array<{ step: string; status: string }>;
+    };
 
     dedupEnabledSpy.mockRestore();
     rolloutSpy.mockRestore();
@@ -1337,7 +1393,9 @@ describe('session-completed integration', () => {
     captureExceptionSpy.mockRestore();
 
     // step.sendEvent called with app/session.filing_timed_out
-    const sendEventCalls = (step.sendEvent as jest.Mock).mock.calls as Array<[string, unknown]>;
+    const sendEventCalls = (step.sendEvent as jest.Mock).mock.calls as Array<
+      [string, unknown]
+    >;
     const timedOutCall = sendEventCalls.find((args) => {
       const payload = args[1] as { name?: string } | undefined;
       return payload?.name === 'app/session.filing_timed_out';
@@ -1346,11 +1404,12 @@ describe('session-completed integration', () => {
 
     // captureException was called with a timeout error
     expect(captureExceptionSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ message: expect.stringContaining('waitForEvent timed out') }),
+      expect.objectContaining({
+        message: expect.stringContaining('waitForEvent timed out'),
+      }),
       expect.objectContaining({ profileId }),
     );
   });
-
 });
 
 // ── Scenario coverage index ────────────────────────────────────────────────────

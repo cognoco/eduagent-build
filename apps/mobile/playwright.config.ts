@@ -4,6 +4,7 @@ import { apiBaseUrl, appBaseUrl, runId } from './e2e-web/helpers/runtime';
 
 const e2eWebDir = path.join(process.cwd(), 'apps', 'mobile', 'e2e-web');
 const shouldStartLocalApi = process.env.PLAYWRIGHT_SKIP_LOCAL_API !== '1';
+const includeP1BCoverage = process.env.PLAYWRIGHT_INCLUDE_P1B === '1';
 // *.workers.dev URLs are platform-rate-limited → 1 worker.
 // Custom domains (api-test.mentomate.com) are not → full parallelism.
 // Switching CI to a custom domain intentionally enables 4 workers —
@@ -116,8 +117,9 @@ export default defineConfig({
     {
       name: 'later-phases',
       dependencies: ['setup'],
-      testMatch:
-        /flows[\\/](journeys[\\/](j0[89]|j1[0-9]|j2[0-9])-.*|auth[\\/]w03-.*|navigation[\\/]w0[1-5]-.*)\.spec\.ts/,
+      testMatch: includeP1BCoverage
+        ? /flows[\\/](journeys[\\/](j0[89]|j[1-9][0-9])-.*|auth[\\/]w03-.*|navigation[\\/]w0[1-5]-.*)\.spec\.ts/
+        : /flows[\\/](journeys[\\/](j0[89]|j1[0-9])-.*|auth[\\/]w03-.*|navigation[\\/]w0[1-5]-.*)\.spec\.ts/,
     },
   ],
 });

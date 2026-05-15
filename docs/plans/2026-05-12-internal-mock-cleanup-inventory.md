@@ -1,7 +1,7 @@
 # Internal Mock Cleanup Inventory
 
-**Date:** 2026-05-12 (last refreshed 2026-05-14)  
-**Status:** Framework complete (Phases 0-4); P0 drained; opportunistic P1/P2 cleanup ongoing via batch + on-touch (GC6).  
+**Date:** 2026-05-12 (last refreshed 2026-05-14)
+**Status:** Framework complete (Phases 0-4); P0 drained; opportunistic P1/P2 cleanup ongoing via batch + on-touch (GC6).
 **Goal:** Reduce internal mocks that hide route/service/background-job contract drift while preserving true external boundary shims.
 
 ## Why

@@ -3,22 +3,114 @@
 // ---------------------------------------------------------------------------
 
 import { createMiddleware } from 'hono/factory';
-import { createDatabase, type Database } from '@eduagent/database';
+import type { Context } from 'hono';
+import {
+  closeDatabase,
+  createDatabase,
+  type Database,
+} from '@eduagent/database';
+import { captureException } from '../services/sentry';
 
 export type DatabaseEnv = {
   Bindings: { DATABASE_URL: string };
   Variables: { db: Database };
 };
 
+async function closeDatabaseWithFallback(
+  c: Context<DatabaseEnv>,
+  db: Database,
+): Promise<void> {
+  const closePromise = closeDatabase(db).catch((err) => {
+    captureException(err, {
+      extra: { phase: 'request-db-close' },
+    });
+  });
+  try {
+    c.executionCtx.waitUntil(closePromise);
+  } catch {
+    await closePromise;
+  }
+}
+
+function wrapStreamingResponseForDatabaseClose(
+  c: Context<DatabaseEnv>,
+  db: Database,
+): boolean {
+  const response = c.res;
+  const contentType = response.headers.get('Content-Type') ?? '';
+  if (!contentType.toLowerCase().includes('text/event-stream')) return false;
+  if (!response.body) return false;
+
+  let reader: ReadableStreamDefaultReader<Uint8Array>;
+  try {
+    reader = response.body.getReader();
+  } catch {
+    return false;
+  }
+  let closePromise: Promise<void> | undefined;
+  const closeOnce = () => {
+    closePromise ??= closeDatabase(db);
+    return closePromise;
+  };
+
+  const wrappedBody = new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      try {
+        const { done, value } = await reader.read();
+        if (done) {
+          await closeOnce().catch((closeErr) => {
+            captureException(closeErr, {
+              extra: { phase: 'sse-stream-done-close' },
+            });
+          });
+          controller.close();
+          return;
+        }
+        controller.enqueue(value);
+      } catch (err) {
+        await closeOnce().catch((closeErr) => {
+          captureException(closeErr, {
+            extra: { phase: 'sse-stream-error-close' },
+          });
+        });
+        controller.error(err);
+      }
+    },
+    async cancel(reason) {
+      try {
+        await reader.cancel(reason);
+      } finally {
+        await closeOnce().catch((closeErr) => {
+          captureException(closeErr, {
+            extra: { phase: 'sse-stream-cancel-close' },
+          });
+        });
+      }
+    },
+  });
+
+  c.res = new Response(wrappedBody, response);
+  return true;
+}
+
 export const databaseMiddleware = createMiddleware<DatabaseEnv>(
   async (c, next) => {
     const url = c.env?.DATABASE_URL;
+    let db: Database | undefined;
     if (url) {
       // Phase 0.0 (RLS plan 2026-04-27): neon-serverless WS driver — real ACID
       // transactions; onTransactionFallback is no longer needed.
-      const db = createDatabase(url, { cacheNeonPool: false });
+      db = createDatabase(url, { cacheNeonPool: false });
       c.set('db', db);
     }
-    await next();
+    try {
+      await next();
+    } finally {
+      if (db) {
+        if (!wrapStreamingResponseForDatabaseClose(c, db)) {
+          await closeDatabaseWithFallback(c, db);
+        }
+      }
+    }
   },
 );

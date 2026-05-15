@@ -96,8 +96,12 @@ test('J-10 learner → Practice → Quiz → launch → play → results → hom
       });
       await pressableClick(firstOption);
     }
-    await expect(page.getByTestId('quiz-answer-feedback')).toBeVisible({
+    const answerFeedback = page.getByTestId('quiz-answer-feedback');
+    await expect(answerFeedback).toBeVisible({
       timeout: 30_000,
+    });
+    await expect(answerFeedback).toHaveText('Ready for the next one', {
+      timeout: 5_000,
     });
 
     const nextQuestion = page.getByTestId('quiz-next-question');
@@ -115,6 +119,9 @@ test('J-10 learner → Practice → Quiz → launch → play → results → hom
     }
     if (await nextQuestion.isVisible().catch(() => false)) {
       await pressableClick(nextQuestion);
+      await expect(answerFeedback).toBeHidden({
+        timeout: 10_000,
+      });
       continue;
     }
 

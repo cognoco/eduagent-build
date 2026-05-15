@@ -20,7 +20,7 @@ Running 31 tests using 5 workers
   -   7 [setup] › apps/mobile/e2e-web/helpers/auth.setup.ts:24:8 › seed parent-multi-child and capture owner-with-children storage state
 
 
-  1) [setup] › apps/mobile/e2e-web/helpers/auth.setup.ts:24:8 › seed onboarding-complete and capture solo-learner storage state 
+  1) [setup] › apps/mobile/e2e-web/helpers/auth.setup.ts:24:8 › seed onboarding-complete and capture solo-learner storage state
 
     TimeoutError: locator.waitFor: Timeout 60000ms exceeded.
     Call log:
@@ -59,7 +59,7 @@ Running 31 tests using 5 workers
     ────────────────────────────────────────────────────────────────────────────────────────────────
 
   1 failed
-    [setup] › apps/mobile/e2e-web/helpers/auth.setup.ts:24:8 › seed onboarding-complete and capture solo-learner storage state 
+    [setup] › apps/mobile/e2e-web/helpers/auth.setup.ts:24:8 › seed onboarding-complete and capture solo-learner storage state
   25 did not run
   5 passed (1.4m)
  ELIFECYCLE  Command failed with exit code 1.

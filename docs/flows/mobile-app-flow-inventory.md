@@ -1,3 +1,5 @@
+> **STATUS: ACTIVE** — canonical mobile flow inventory. Updated 2026-05-14.
+
 # Mobile App Flow Inventory
 
 Current-state flow map for the Expo mobile app as of 2026-05-14.

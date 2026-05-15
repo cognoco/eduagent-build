@@ -29,7 +29,7 @@
     - Establishing cross-consistency and determining obsolesence
 9. General sweep - obsolete & stale (session: Stale Docs)
     - Processed all non-code/config files in the entire repo to identify obsolete documentation and leftover files, temporary stubs, etc. 
-    Reviewed and decide: `docs/audit/2026-04-30-cleanup-triage.md`
+    Reviewed and decide: `docs/_archive/consistency-cleanup/audit/2026-04-30-cleanup-triage.md`
     - 
 10. Executed `/context-audit` - Pass 1 (session:context-audit)
     Added:

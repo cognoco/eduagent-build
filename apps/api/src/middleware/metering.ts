@@ -204,7 +204,9 @@ async function maybeReplayIdempotentSessionRequest(
 
   let existing: string | null = null;
   try {
-    existing = await kv.get(buildIdempotencyCacheKey(profileId, 'session', key));
+    existing = await kv.get(
+      buildIdempotencyCacheKey(profileId, 'session', key),
+    );
   } catch (error) {
     logger.warn('[metering] Idempotency replay lookup failed', {
       event: 'metering.idempotency_replay_lookup_failed',

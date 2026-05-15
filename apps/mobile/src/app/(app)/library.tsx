@@ -169,9 +169,20 @@ export default function LibraryScreen() {
 
   // ---- Data hooks ---------------------------------------------------------
   const subjectsQuery = useSubjects({ includeInactive: true });
+  const activeSubjectsFallbackQuery = useSubjects({
+    enabled: subjectsQuery.isError && !Array.isArray(subjectsQuery.data),
+  });
+  const hasSubjectData =
+    Array.isArray(subjectsQuery.data) ||
+    Array.isArray(activeSubjectsFallbackQuery.data);
   const subjects = useMemo(
-    () => (Array.isArray(subjectsQuery.data) ? subjectsQuery.data : []),
-    [subjectsQuery.data],
+    () =>
+      Array.isArray(subjectsQuery.data)
+        ? subjectsQuery.data
+        : Array.isArray(activeSubjectsFallbackQuery.data)
+          ? activeSubjectsFallbackQuery.data
+          : [],
+    [activeSubjectsFallbackQuery.data, subjectsQuery.data],
   );
   const sortedSubjects = useMemo(
     () => sortSubjectsByStatus(subjects),
@@ -188,9 +199,12 @@ export default function LibraryScreen() {
 
   const progressQuery = useOverallProgress();
 
-  // [M19] Timeout escape for the subject list loading spinner. Progress is
-  // optional for this screen; the shelves can render while progress catches up.
-  const isSubjectsLoading = subjectsQuery.isLoading;
+  // [M19] Timeout escape for the subject loading spinner. Progress is
+  // ancillary on the Library surface; loaded subjects should still render
+  // when the progress aggregate is slow or temporarily unavailable.
+  const isSubjectsLoading =
+    !hasSubjectData &&
+    (subjectsQuery.isLoading || activeSubjectsFallbackQuery.isLoading);
   const [subjectsLoadTimedOut, setSubjectsLoadTimedOut] = useState(false);
   useEffect(() => {
     if (!isSubjectsLoading) {
@@ -361,6 +375,7 @@ export default function LibraryScreen() {
 
   const handleRetry = (): void => {
     void subjectsQuery.refetch();
+    void activeSubjectsFallbackQuery.refetch();
     void progressQuery.refetch();
     allBooksQuery.refetch();
     void libraryRetentionQuery.refetch();
@@ -460,7 +475,7 @@ export default function LibraryScreen() {
   // ---- Main content -------------------------------------------------------
 
   const renderContent = (): React.ReactElement => {
-    if (subjectsQuery.isLoading) {
+    if (isSubjectsLoading) {
       if (subjectsLoadTimedOut) {
         return (
           <ErrorFallback
@@ -471,6 +486,8 @@ export default function LibraryScreen() {
               label: t('common.retry'),
               onPress: () => {
                 void subjectsQuery.refetch();
+                void activeSubjectsFallbackQuery.refetch();
+                void progressQuery.refetch();
               },
               testID: 'library-load-timeout-retry',
             }}
@@ -486,8 +503,12 @@ export default function LibraryScreen() {
       return renderShimmerSkeleton();
     }
 
-    if (subjectsQuery.isError && !subjectsQuery.data) {
-      const libraryLoadError = subjectsQuery.error;
+    if (
+      !hasSubjectData &&
+      (subjectsQuery.isError || activeSubjectsFallbackQuery.isError)
+    ) {
+      const libraryLoadError =
+        subjectsQuery.error ?? activeSubjectsFallbackQuery.error;
       return (
         <View
           className="flex-1 items-center justify-center px-5 py-12"
@@ -553,7 +574,10 @@ export default function LibraryScreen() {
 
     const isSearching = debouncedQuery.trim().length > 0;
     const showingStaleCachedData =
-      (subjectsQuery.isError || progressQuery.isError) && subjects.length > 0;
+      (subjectsQuery.isError ||
+        activeSubjectsFallbackQuery.isError ||
+        progressQuery.isError) &&
+      subjects.length > 0;
     const shelfGroups = SUBJECT_STATUS_GROUPS.map((status) => ({
       status,
       subjects: visibleSubjects.filter((subject) => subject.status === status),
@@ -745,25 +769,25 @@ export default function LibraryScreen() {
               {isGuardian
                 ? totalTopicsAcrossBooks > 0
                   ? t('library.subtitleGuardian', {
-                      subjectCount: subjectsQuery.data?.length ?? 0,
+                      subjectCount: subjects.length,
                       topicCount: totalTopicsAcrossBooks,
                     })
                   : t('library.subtitleGuardianNoTopics', {
-                      subjectCount: subjectsQuery.data?.length ?? 0,
+                      subjectCount: subjects.length,
                     })
                 : totalTopicsAcrossBooks > 0
                   ? t('library.subtitle', {
-                      subjectCount: subjectsQuery.data?.length ?? 0,
+                      subjectCount: subjects.length,
                       topicCount: totalTopicsAcrossBooks,
                     })
                   : t('library.subtitleNoTopics', {
-                      subjectCount: subjectsQuery.data?.length ?? 0,
+                      subjectCount: subjects.length,
                     })}
             </Text>
           </View>
         </View>
 
-        {(subjectsQuery.data?.length ?? 0) > 0 && (
+        {subjects.length > 0 && (
           <Pressable
             onPress={() => setShowManageSubjects(true)}
             className="rounded-full bg-surface-elevated px-4 py-2"

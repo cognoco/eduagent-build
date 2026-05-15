@@ -1,3 +1,5 @@
+> **STATUS: SNAPSHOT** taken 2026-05-04. Superseded by `e2e-flow-coverage-audit-2026-05-13.md` which maps the current More-tab shape.
+
 # E2E Coverage Audit
 
 Audit of `docs/flows/mobile-app-flow-inventory.md` against the actual Maestro flow files in `apps/mobile/e2e/flows/` and current source. Snapshot taken **2026-05-04**.

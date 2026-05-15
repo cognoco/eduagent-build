@@ -33,145 +33,177 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
-jest.mock('../../hooks/use-subjects', () => ({
-  useSubjects: () => mockUseSubjects(),
-  useUpdateSubject: () => ({ mutateAsync: mockUpdateSubjectMutateAsync }),
-}));
+jest.mock(
+  '../../hooks/use-subjects' /* gc1-allow: hook boundary mocked to drive library screen states */,
+  () => ({
+    useSubjects: (...args: unknown[]) => mockUseSubjects(...args),
+    useUpdateSubject: () => ({ mutateAsync: mockUpdateSubjectMutateAsync }),
+  }),
+);
 
-jest.mock('../../hooks/use-progress', () => ({
-  useOverallProgress: () => mockUseOverallProgress(),
-}));
+jest.mock(
+  '../../hooks/use-progress' /* gc1-allow: hook boundary mocked to isolate retention UI */,
+  () => ({
+    useOverallProgress: () => mockUseOverallProgress(),
+  }),
+);
 
-jest.mock('../../hooks/use-all-books', () => ({
-  useAllBooks: () => mockUseAllBooks(),
-}));
+jest.mock(
+  '../../hooks/use-all-books' /* gc1-allow: hook boundary mocked to isolate shelf rendering */,
+  () => ({
+    useAllBooks: () => mockUseAllBooks(),
+  }),
+);
 
-jest.mock('../../components/progress', () => ({
-  RetentionSignal: ({ status }: { status: string }) => {
-    const { Text } = require('react-native');
-    return <Text>{status}</Text>;
-  },
-}));
+jest.mock(
+  '../../components/progress' /* gc1-allow: progress component subtree is outside library screen contract */,
+  () => ({
+    RetentionSignal: ({ status }: { status: string }) => {
+      const { Text } = require('react-native');
+      return <Text>{status}</Text>;
+    },
+  }),
+);
 
-jest.mock('../../components/common', () => ({
-  ...jest.requireActual('../../components/common'),
-  // gc1-allow: Reanimated worklets + react-native-svg cannot run in JSDOM
-  BookPageFlipAnimation: () => null,
-  BrandCelebration: () => null,
-}));
+jest.mock(
+  '../../components/common' /* gc1-allow: Reanimated worklets and SVG animations cannot run in JSDOM */,
+  () => ({
+    ...jest.requireActual('../../components/common'),
+    BookPageFlipAnimation: () => null,
+    BrandCelebration: () => null,
+  }),
+);
 
 // navigation: real module is pure functions wrapping expo-router (already mocked)
 
-jest.mock('../../lib/theme', () => ({
-  // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM
-  useTheme: () => ({ colorScheme: 'light' }),
-  useThemeColors: () => ({
-    accent: '#2563eb',
-    border: '#e5e7eb',
-    primary: '#2563eb',
-    textPrimary: '#111827',
-    textSecondary: '#6b7280',
-    surfaceElevated: '#f9fafb',
-    warning: '#f59e0b',
+jest.mock(
+  '../../lib/theme' /* gc1-allow: theme hooks require native ColorScheme unavailable in JSDOM */,
+  () => ({
+    useTheme: () => ({ colorScheme: 'light' }),
+    useThemeColors: () => ({
+      accent: '#2563eb',
+      border: '#e5e7eb',
+      primary: '#2563eb',
+      textPrimary: '#111827',
+      textSecondary: '#6b7280',
+      surfaceElevated: '#f9fafb',
+      warning: '#f59e0b',
+    }),
+    useSubjectTint: () => ({
+      solid: '#0f766e',
+      soft: 'rgba(15,118,110,0.14)',
+    }),
   }),
-  useSubjectTint: () => ({
-    solid: '#0f766e',
-    soft: 'rgba(15,118,110,0.14)',
-  }),
-}));
+);
 
-jest.mock('../../lib/api-client', () => ({
-  // gc1-allow: Clerk useAuth() external boundary
-  ...jest.requireActual('../../lib/api-client'),
-  useApiClient: () => ({
-    library: {
-      retention: {
-        $get: jest.fn().mockResolvedValue({
-          ok: true,
-          json: jest.fn().mockResolvedValue({ subjects: [] }),
-        }),
+jest.mock(
+  '../../lib/api-client' /* gc1-allow: API client hook wraps Clerk useAuth external boundary */,
+  () => ({
+    ...jest.requireActual('../../lib/api-client'),
+    useApiClient: () => ({
+      library: {
+        retention: {
+          $get: jest.fn().mockResolvedValue({
+            ok: true,
+            json: jest.fn().mockResolvedValue({ subjects: [] }),
+          }),
+        },
       },
+    }),
+  }),
+);
+
+jest.mock(
+  '../../hooks/use-library-search' /* gc1-allow: hook boundary mocked to assert search states */,
+  () => ({
+    useLibrarySearch: (...args: unknown[]) => mockUseLibrarySearch(...args),
+  }),
+);
+
+jest.mock(
+  '../../components/common/ShimmerSkeleton' /* gc1-allow: skeleton implementation is visual-only for these tests */,
+  () => ({
+    ShimmerSkeleton: ({
+      children,
+      testID,
+    }: {
+      children: React.ReactNode;
+      testID?: string;
+    }) => {
+      const { View } = require('react-native');
+      return <View testID={testID}>{children}</View>;
     },
   }),
-}));
+);
 
-jest.mock('../../hooks/use-library-search', () => ({
-  useLibrarySearch: (...args: unknown[]) => mockUseLibrarySearch(...args),
-}));
-
-jest.mock('../../components/common/ShimmerSkeleton', () => ({
-  ShimmerSkeleton: ({
-    children,
-    testID,
-  }: {
-    children: React.ReactNode;
-    testID?: string;
-  }) => {
-    const { View } = require('react-native');
-    return <View testID={testID}>{children}</View>;
-  },
-}));
-
-jest.mock('../../components/library/ShelfRow', () => ({
-  ShelfRow: ({
-    subjectId,
-    name,
-    onPress,
-    testID,
-  }: {
-    subjectId: string;
-    name: string;
-    onPress: (id: string) => void;
-    testID?: string;
-  }) => {
-    const { View, Text, Pressable } = require('react-native');
-    return (
-      <View>
-        <Pressable
-          testID={testID ?? `shelf-row-header-${subjectId}`}
-          onPress={() => onPress(subjectId)}
-          accessibilityRole="button"
-        >
-          <Text>{name}</Text>
-        </Pressable>
-      </View>
-    );
-  },
-}));
-
-jest.mock('../../components/library/LibrarySearchBar', () => ({
-  LibrarySearchBar: ({
-    value,
-    onChangeText,
-    placeholder,
-  }: {
-    value: string;
-    onChangeText: (text: string) => void;
-    placeholder?: string;
-  }) => {
-    const { View, TextInput } = require('react-native');
-    return (
-      <View>
-        <TextInput
-          testID="library-search-input"
-          value={value}
-          onChangeText={onChangeText}
-          placeholder={placeholder}
-        />
-      </View>
-    );
-  },
-}));
-
-jest.mock('../../lib/profile', () => ({
-  // gc1-allow: ProfileProvider uses SecureStore (native)
-  ...jest.requireActual('../../lib/profile'),
-  useProfile: () => ({
-    activeProfile: { id: 'profile-1', isOwner: true },
-    profiles: [{ id: 'profile-1', isOwner: true }],
+jest.mock(
+  '../../components/library/ShelfRow' /* gc1-allow: shelf row visual details are outside library screen contract */,
+  () => ({
+    ShelfRow: ({
+      subjectId,
+      name,
+      onPress,
+      testID,
+    }: {
+      subjectId: string;
+      name: string;
+      onPress: (id: string) => void;
+      testID?: string;
+    }) => {
+      const { View, Text, Pressable } = require('react-native');
+      return (
+        <View>
+          <Pressable
+            testID={testID ?? `shelf-row-header-${subjectId}`}
+            onPress={() => onPress(subjectId)}
+            accessibilityRole="button"
+          >
+            <Text>{name}</Text>
+          </Pressable>
+        </View>
+      );
+    },
   }),
-  isGuardianProfile: () => false,
-}));
+);
+
+jest.mock(
+  '../../components/library/LibrarySearchBar' /* gc1-allow: search bar implementation is covered separately */,
+  () => ({
+    LibrarySearchBar: ({
+      value,
+      onChangeText,
+      placeholder,
+    }: {
+      value: string;
+      onChangeText: (text: string) => void;
+      placeholder?: string;
+    }) => {
+      const { View, TextInput } = require('react-native');
+      return (
+        <View>
+          <TextInput
+            testID="library-search-input"
+            value={value}
+            onChangeText={onChangeText}
+            placeholder={placeholder}
+          />
+        </View>
+      );
+    },
+  }),
+);
+
+jest.mock(
+  '../../lib/profile' /* gc1-allow: ProfileProvider uses SecureStore native storage */,
+  () => ({
+    ...jest.requireActual('../../lib/profile'),
+    useProfile: () => ({
+      activeProfile: { id: 'profile-1', isOwner: true },
+      profiles: [{ id: 'profile-1', isOwner: true }],
+    }),
+    isGuardianProfile: () => false,
+  }),
+);
 
 interface AggregateLibRetention {
   subjects: Array<{
@@ -243,6 +275,30 @@ describe('LibraryScreen', () => {
     render(<LibraryScreen />, { wrapper: TestWrapper });
 
     screen.getByTestId('library-loading');
+  });
+
+  it('does not enable the active-subject fallback query during initial loading', () => {
+    mockUseSubjects.mockImplementation(
+      (options?: { includeInactive?: boolean; enabled?: boolean }) =>
+        options?.includeInactive
+          ? { data: undefined, isLoading: true, isError: false }
+          : {
+              data: undefined,
+              isLoading: false,
+              isError: false,
+              refetch: jest.fn(),
+            },
+    );
+    mockUseOverallProgress.mockReturnValue({
+      data: undefined,
+      isLoading: true,
+    });
+
+    render(<LibraryScreen />, { wrapper: TestWrapper });
+
+    expect(mockUseSubjects).toHaveBeenCalledWith({ includeInactive: true });
+    expect(mockUseSubjects).toHaveBeenCalledWith({ enabled: false });
+    expect(mockUseSubjects).not.toHaveBeenCalledWith({ enabled: true });
   });
 
   it('[BUG-634 / M-2] does not crash when subjectsQuery.data is a non-array (stale shape / error payload)', () => {
@@ -504,6 +560,68 @@ describe('LibraryScreen', () => {
     // Library renders normally — subjects still visible as shelf rows
     expect(screen.queryByTestId('library-error')).toBeNull();
     screen.getByTestId('shelves-list');
+  });
+
+  it('does not show full-page error when progress fails after subjects load', () => {
+    mockUseSubjects.mockReturnValue({
+      data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+    mockUseOverallProgress.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: new Error('Database temporarily unavailable'),
+      refetch: jest.fn(),
+    });
+    mockUseAllBooks.mockReturnValue({
+      books: [],
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+
+    render(<LibraryScreen />, { wrapper: TestWrapper });
+
+    expect(screen.queryByTestId('library-error')).toBeNull();
+    screen.getByTestId('shelf-row-header-sub-1');
+  });
+
+  it('renders cached active subjects when the include-inactive subject refresh fails', () => {
+    const refetchIncludeInactive = jest.fn();
+    const refetchActive = jest.fn();
+    mockUseSubjects.mockImplementation(
+      (options?: { includeInactive?: boolean }) =>
+        options?.includeInactive
+          ? {
+              data: undefined,
+              isLoading: false,
+              isError: true,
+              error: new Error('Database temporarily unavailable'),
+              refetch: refetchIncludeInactive,
+            }
+          : {
+              data: [{ id: 'sub-1', name: 'Math', status: 'active' }],
+              isLoading: false,
+              isError: false,
+              refetch: refetchActive,
+            },
+    );
+    mockUseOverallProgress.mockReturnValue({
+      data: { subjects: [], totalTopicsCompleted: 0, totalTopicsVerified: 0 },
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+
+    render(<LibraryScreen />, { wrapper: TestWrapper });
+
+    expect(screen.queryByTestId('library-error')).toBeNull();
+    screen.getByText('1 subjects');
+    screen.getByTestId('shelf-row-header-sub-1');
+    expect(mockUseSubjects).toHaveBeenCalledWith({ includeInactive: true });
   });
 
   describe('Manage Subjects modal — backdrop close [BUG-510]', () => {

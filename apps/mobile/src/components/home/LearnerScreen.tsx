@@ -171,6 +171,7 @@ export function LearnerScreen({
   }, []);
 
   const [loadingTimedOut, setLoadingTimedOut] = useState(false);
+  const subjectsLoadFailed = isError && !subjects;
   useEffect(() => {
     if (!isLoading) {
       setLoadingTimedOut(false);
@@ -435,37 +436,6 @@ export function LearnerScreen({
     );
   }
 
-  if (isError && !subjects) {
-    return (
-      <ScrollView
-        className="flex-1 bg-background"
-        contentContainerStyle={{
-          paddingTop: insets.top + 16,
-          paddingHorizontal: 20,
-          paddingBottom: insets.bottom + 24,
-          flex: 1,
-          justifyContent: 'center',
-          alignItems: 'center',
-        }}
-        testID="learner-error-state"
-      >
-        <Text className="text-body text-text-secondary text-center mb-4">
-          We couldn't load your library right now
-        </Text>
-        <Pressable
-          onPress={() => void refetch()}
-          className="min-h-[44px] px-6 items-center justify-center bg-surface rounded-card"
-          accessibilityRole="button"
-          accessibilityLabel="Retry loading library"
-        >
-          <Text className="text-body font-semibold text-text-primary">
-            Retry
-          </Text>
-        </Pressable>
-      </ScrollView>
-    );
-  }
-
   const firstName = activeProfile?.displayName?.split(' ')[0] ?? 'there';
   const showCoachBand =
     FEATURE_FLAGS.COACH_BAND_ENABLED && coachBand && !coachBandDismissed;
@@ -638,40 +608,74 @@ export function LearnerScreen({
             </>
           ) : (
             !isParentProxy && (
-              <View
-                testID="home-empty-subjects"
-                className="mx-5 rounded-2xl border border-dashed border-border items-center justify-center py-7"
-                style={{ gap: 10 }}
-              >
-                <Ionicons
-                  name="book-outline"
-                  size={30}
-                  color={colors.textSecondary}
-                  style={{ opacity: 0.6 }}
-                />
-                <Text className="text-body-sm font-semibold text-text-primary text-center px-6">
-                  {t('home.learner.emptySubjectsTitle')}
-                </Text>
-                <Text className="text-body-sm text-text-secondary text-center px-6">
-                  {t('home.learner.emptySubjectsMessage')}
-                </Text>
-                <Pressable
-                  testID="home-add-first-subject"
-                  onPress={() =>
-                    router.push({
-                      pathname: CREATE_SUBJECT_FROM_HOME_HREF,
-                      params: { returnTo: returnToTab },
-                    } as Href)
-                  }
-                  className="bg-primary rounded-xl px-5 py-2.5 mt-1"
-                  accessibilityRole="button"
-                  accessibilityLabel={t('home.learner.addSubject')}
-                >
-                  <Text className="text-body-sm font-bold text-text-inverse">
-                    {t('home.learner.addSubject')}
-                  </Text>
-                </Pressable>
-              </View>
+              <>
+                {subjectsLoadFailed ? (
+                  <View
+                    testID="home-subjects-load-error"
+                    className="mx-5 rounded-2xl border border-border bg-surface items-center justify-center py-7"
+                    style={{ gap: 10 }}
+                  >
+                    <Ionicons
+                      name="cloud-offline-outline"
+                      size={30}
+                      color={colors.textSecondary}
+                      style={{ opacity: 0.65 }}
+                    />
+                    <Text className="text-body-sm font-semibold text-text-primary text-center px-6">
+                      We couldn't load your subjects right now
+                    </Text>
+                    <Text className="text-body-sm text-text-secondary text-center px-6">
+                      You can still start a session or try another action.
+                    </Text>
+                    <Pressable
+                      testID="home-subjects-load-retry"
+                      onPress={() => void refetch()}
+                      className="bg-surface-elevated rounded-xl px-5 py-2.5 mt-1"
+                      accessibilityRole="button"
+                      accessibilityLabel="Retry loading subjects"
+                    >
+                      <Text className="text-body-sm font-bold text-text-primary">
+                        Retry
+                      </Text>
+                    </Pressable>
+                  </View>
+                ) : (
+                  <View
+                    testID="home-empty-subjects"
+                    className="mx-5 rounded-2xl border border-dashed border-border items-center justify-center py-7"
+                    style={{ gap: 10 }}
+                  >
+                    <Ionicons
+                      name="book-outline"
+                      size={30}
+                      color={colors.textSecondary}
+                      style={{ opacity: 0.6 }}
+                    />
+                    <Text className="text-body-sm font-semibold text-text-primary text-center px-6">
+                      {t('home.learner.emptySubjectsTitle')}
+                    </Text>
+                    <Text className="text-body-sm text-text-secondary text-center px-6">
+                      {t('home.learner.emptySubjectsMessage')}
+                    </Text>
+                    <Pressable
+                      testID="home-add-first-subject"
+                      onPress={() =>
+                        router.push({
+                          pathname: CREATE_SUBJECT_FROM_HOME_HREF,
+                          params: { returnTo: returnToTab },
+                        } as Href)
+                      }
+                      className="bg-primary rounded-xl px-5 py-2.5 mt-1"
+                      accessibilityRole="button"
+                      accessibilityLabel={t('home.learner.addSubject')}
+                    >
+                      <Text className="text-body-sm font-bold text-text-inverse">
+                        {t('home.learner.addSubject')}
+                      </Text>
+                    </Pressable>
+                  </View>
+                )}
+              </>
             )
           )}
         </View>

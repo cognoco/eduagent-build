@@ -1,0 +1,590 @@
+Starting at 2026-05-14T14:04:08+02:00
+Mode: Local-API (wrangler dev on :8787 reads apps/api/.dev.vars, no PLAYWRIGHT_API_URL override, Playwright default workers)
+START_EPOCH=1778760248
+ WARN  Unsupported engine: wanted: {"node":"22.x"} (current: {"node":"v24.15.0","pnpm":"10.19.0"})
+
+> @eduagent/source@0.0.0 test:e2e:web /Users/vetinari/_dev/eduagent-build
+> pnpm exec playwright test -c apps/mobile/playwright.config.ts --reporter=list,json
+
+ WARN  Unsupported engine: wanted: {"node":"22.x"} (current: {"node":"v24.15.0","pnpm":"10.19.0"})
+[2m[WebServer] [22m../..                                    | [43m[30m WARN [39m[49m Unsupported engine: wanted: {"node":"22.x"} (current: {"node":"v24.15.0","pnpm":"10.19.0"})
+[2m[WebServer] [22m
+[2m[WebServer] [22m ⛅️ wrangler 4.65.0 (update available [32m4.90.1[39m)
+[2m[WebServer] [22m[38;2;255;136;0m─────────────────────────────────────────────[39m
+[2m[WebServer] [22mUsing vars defined in .dev.vars
+[2m[WebServer] [22mYour Worker has access to the following bindings:
+[2m[WebServer] [22m[2mBinding[22m                                                                       [2mResource[22m                  [2mMode[22m
+[2m[WebServer] [22m[37menv.SUBSCRIPTION_KV[39m ([2m3510a1174e454e66a169a519c9c996f7[22m)                        [38;2;189;91;8mKV Namespace        [39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.COACHING_KV[39m ([2mdb6f91e2639e44ce931f63f858593f3c[22m)                            [38;2;189;91;8mKV Namespace        [39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.ENVIRONMENT[39m ([2m"development"[22m)                                               [38;2;189;91;8mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.ANTHROPIC_API_KEY[39m ([2m"(hidden)"[22m)                                            [38;2;189;91;8mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.API_ORIGIN[39m ([2m"(hidden)"[22m)                                                   [38;2;189;91;8mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.CLERK_AUDIENCE[39m ([2m"(hidden)"[22m)                                               [38;2;189;91;8mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.CLERK_JWKS_URL[39m ([2m"(hidden)"[22m)                                               [38;2;189;91;8mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.CLERK_PUBLISHABLE_KEY[39m ([2m"(hidden)"[22m)                                        [38;2;189;91;8mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.CLERK_SECRET_KEY[39m ([2m"(hidden)"[22m)                                             [38;2;189;91;8mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.CLERK_TESTING_TOKEN[39m ([2m"(hidden)"[22m)                                          [38;2;189;91;8mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.CLOUDFLARE_ACCOUNT_ID[39m ([2m"(hidden)"[22m)                                        [38;2;189;91;8mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.CLOUDFLARE_API_TOKEN[39m ([2m"(hidden)"[22m)                                         [38;2;189;91;8mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.DATABASE_URL[39m ([2m"(hidden)"[22m)                                                 [38;2;189;91;8mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.DOPPLER_CONFIG[39m ([2m"(hidden)"[22m)                                               [38;2;189;91;8mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.DOPPLER_ENVIRONMENT[39m ([2m"(hidden)"[22m)                                          [38;2;189;91;8mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.DOPPLER_PROJECT[39m ([2m"(hidden)"[22m)                                              [38;2;189;91;8mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.EXPO_PUBLIC_API_URL[39m ([2m"(hidden)"[22m)                                          [38;2;189;91;8mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY[39m ([2m"(hidden)"[22m)                            [38;2;189;91;8mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.EXPO_TOKEN[39m ([2m"(hidden)"[22m)                                                   [38;2;189;91;8mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.GEMINI_API_KEY[39m ([2m"(hidden)"[22m)                                               [38;2;189;91;8mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.INNGEST_EVENT_KEY[39m ([2m"(hidden)"[22m)                                            [38;2;189;91;8mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.INNGEST_SIGNING_KEY[39m ([2m"(hidden)"[22m)                                          [38;2;189;91;8mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.RESEND_API_KEY[39m ([2m"(hidden)"[22m)                                               [38;2;189;91;8mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.SENTRY_AUTH_TOKEN[39m ([2m"(hidden)"[22m)                                            [38;2;189;91;8mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.SENTRY_DISABLE_AUTO_UPLOAD[39m ([2m"(hidden)"[22m)                                   [38;2;189;91;8mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.TEST_SEED_SECRET[39m ([2m"(hidden)"[22m)                                             [38;2;189;91;8mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m[37menv.VOYAGE_API_KEY[39m ([2m"(hidden)"[22m)                                               [38;2;189;91;8mEnvironment Variable[39m      [34mlocal[39m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[2m⎔ Starting local server...[22m
+[2m[WebServer] [22m[32m[wrangler:info][39m Ready on [32mhttp://localhost:8787[39m
+[2m[WebServer] [22m{"timestamp":"2026-05-14T12:04:14.786Z","level":"info","message":"Request completed","context":{"method":"GET","path":"/v1/health","status":200,"latencyMs":2}}
+[2m[WebServer] [22m[32m[wrangler:info][39m [0m[1mGET[22m /v1/health [32m[1m200[22m OK [39m[90m(1171ms)[39m[0m
+[2m[WebServer] [22m../..                                    | [43m[30m WARN [39m[49m Unsupported engine: wanted: {"node":"22.x"} (current: {"node":"v24.15.0","pnpm":"10.19.0"})
+[2m[WebServer] [22m[2mStarting Metro Bundler[22m
+[2m[WebServer] [22m[33mwarning[39m: Bundler cache is empty, rebuilding [2m(this may take a minute)[22m
+[2m[WebServer] [22m[1mWeb[22m [0m[2mapps/mobile/[22m[0m[1mindex.js[22m [47m[37m░░░░░░░░░░░░░░░░[39m[49m[1m  0.0% [22m[2m(0/1)[22m
+[2m[WebServer] [22m[33m|[39m [baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+[2m[WebServer] [22m[1mWeb[22m [0m[2mapps/mobile/[22m[0m[1mindex.js[22m [47m[37m░░░░░░░░░░░░░░░░[39m[49m[1m  0.0% [22m[2m(0/1)[22m
+[2m[WebServer] [22m[33m|[39m [baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+[2m[WebServer] [22m[33m|[39m [baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+[2m[WebServer] [22m[33m|[39m [baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+[2m[WebServer] [22m[33m|[39m [baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+[2m[WebServer] [22m[33m|[39m [baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+[2m[WebServer] [22m[33m|[39m [baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
+[2m[WebServer] [22m[1mWeb[22m [0m[2mapps/mobile/[22m[0m[1mindex.js[22m [32m[42m▓▓▓▓▓[49m[39m[47m[37m░░░░░░░░░░░[39m[49m[1m 36.0% [22m[2m(317/692)[22m
+[2m[WebServer] [22m[33m|[39m Browserslist: browsers data (caniuse-lite) is 7 months old. Please run:
+[2m[WebServer] [22m[33m|[39m   npx update-browserslist-db@latest
+[2m[WebServer] [22m[33m|[39m   Why you should do it regularly: https://github.com/browserslist/update-db#readme
+[2m[WebServer] [22m[1mWeb[22m [0m[2mapps/mobile/[22m[0m[1mindex.js[22m [32m[42m▓▓▓▓▓▓[49m[39m[47m[37m░░░░░░░░░░[39m[49m[1m 37.9% [22m[2m( 687/1200)[22m
+[2m[WebServer] [22m[1mWeb[22m [0m[2mapps/mobile/[22m[0m[1mindex.js[22m [32m[42m▓▓▓▓▓▓▓▓[49m[39m[47m[37m░░░░░░░░[39m[49m[1m 55.6% [22m[2m(1306/1752)[22m
+[2m[WebServer] [22m[1mWeb[22m [0m[2mapps/mobile/[22m[0m[1mindex.js[22m [32m[42m▓▓▓▓▓▓▓▓▓▓▓▓[49m[39m[47m[37m░░░░[39m[49m[1m 79.5% [22m[2m(1953/2191)[22m
+[2m[WebServer] [22m[32m[1mWeb[22m Bundled [39m[2m22565ms[22m[0m[2m apps/mobile/index.js (2690 modules)[22m[0m
+[2m[WebServer] [22m[1mWeb[22m [0m[2mapps/mobile/[22m[0m[1mindex.js[22m [32m[42m▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓[49m[39m[47m[37m░[39m[49m[1m 99.9% [22m[2m(2690/2690)[22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[1m› Assets (41):[22m
+[2m[WebServer] [22m../../node_modules/.pnpm/@expo-google-fonts+atkinson-hyperlegible@0.4.1/node_modules/@expo-google-fonts/atkinson-hyperlegible/400Regular_Italic/AtkinsonHyperlegible_400Regular_Italic.2badbc897377af4c75f1536a29e24231.ttf [90m(54.2 kB)[39m
+[2m[WebServer] [22m../../node_modules/.pnpm/@expo-google-fonts+atkinson-hyperlegible@0.4.1/node_modules/@expo-google-fonts/atkinson-hyperlegible/400Regular/AtkinsonHyperlegible_400Regular.59f0f5543754fa6b68a563036eafaaab.ttf [90m(53.5 kB)[39m
+[2m[WebServer] [22m../../node_modules/.pnpm/@expo-google-fonts+atkinson-hyperlegible@0.4.1/node_modules/@expo-google-fonts/atkinson-hyperlegible/700Bold_Italic/AtkinsonHyperlegible_700Bold_Italic.1d9aff33518db56f83412a331c653888.ttf [90m(54.6 kB)[39m
+[2m[WebServer] [22m../../node_modules/.pnpm/@expo-google-fonts+atkinson-hyperlegible@0.4.1/node_modules/@expo-google-fonts/atkinson-hyperlegible/700Bold/AtkinsonHyperlegible_700Bold.f2193e9c742b9554852a3000f0ccdc9c.ttf [90m(54.4 kB)[39m
+[2m[WebServer] [22m../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/AntDesign.3f78af31cca60105799838a1a7a59fbd.ttf [90m(130 kB)[39m
+[2m[WebServer] [22m../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Entypo.31b5ffea3daddc69dd01a1f3d6cf63c5.ttf [90m(66.2 kB)[39m
+[2m[WebServer] [22m../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/EvilIcons.140c53a7643ea949007aa9a282153849.ttf [90m(13.5 kB)[39m
+[2m[WebServer] [22m../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Feather.ca4b48e04dc1ce10bfbddb262c8b835f.ttf [90m(55.6 kB)[39m
+[2m[WebServer] [22m../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome.b06871f281fee6b241d60582ae9369b9.ttf [90m(166 kB)[39m
+[2m[WebServer] [22m../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome5_Brands.3b89dd103490708d19a95adcae52210e.ttf [90m(134 kB)[39m
+[2m[WebServer] [22m../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome5_Regular.1f77739ca9ff2188b539c36f30ffa2be.ttf [90m(33.7 kB)[39m
+[2m[WebServer] [22m../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome5_Solid.605ed7926cf39a2ad5ec2d1f9d391d3d.ttf [90m(203 kB)[39m
+[2m[WebServer] [22m../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome6_Brands.56c8d80832e37783f12c05db7c8849e2.ttf [90m(209 kB)[39m
+[2m[WebServer] [22m../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome6_Regular.370dd5af19f8364907b6e2c41f45dbbf.ttf [90m(68 kB)[39m
+[2m[WebServer] [22m../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/FontAwesome6_Solid.adec7d6f310bc577f05e8fe06a5daccf.ttf [90m(424 kB)[39m
+[2m[WebServer] [22m../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Fontisto.b49ae8ab2dbccb02c4d11caaacf09eab.ttf [90m(314 kB)[39m
+[2m[WebServer] [22m../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Foundation.e20945d7c929279ef7a6f1db184a4470.ttf [90m(57 kB)[39m
+[2m[WebServer] [22m../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Ionicons.b4eb097d35f44ed943676fd56f6bdc51.ttf [90m(390 kB)[39m
+[2m[WebServer] [22m../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/MaterialCommunityIcons.6e435534bd35da5fef04168860a9b8fa.ttf [90m(1.31 MB)[39m
+[2m[WebServer] [22m../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/MaterialIcons.4e85bc9ebe07e0340c9c4fc2f6c38908.ttf [90m(357 kB)[39m
+[2m[WebServer] [22m../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Octicons.871378c6eab492a3e689a9385dc45a12.ttf [90m(69.4 kB)[39m
+[2m[WebServer] [22m../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/SimpleLineIcons.d2285965fe34b05465047401b8595dd0.ttf [90m(54.1 kB)[39m
+[2m[WebServer] [22m../../node_modules/.pnpm/@expo+vector-icons@15.0.3_expo-font@14.0.11_expo@54.0.29_react-native@0.81.5_@babel+cor_13d7138721ec42a24f2b8c1513831902/node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/Fonts/Zocial.1681f34aaca71b8dfb70756bca331eb2.ttf [90m(25.8 kB)[39m
+[2m[WebServer] [22m../../node_modules/.pnpm/@react-navigation+elements@2.9.5_@react-navigation+native@7.1.28_react-native@0.81.5_@b_55bc4e64cea369cde4c1d750354d716f/node_modules/@react-navigation/elements/lib/module/assets/back-icon-mask.0a328cd9c1afd0afe8e3b1ec5165b1b4.png [90m(653 B)[39m
+[2m[WebServer] [22m../../node_modules/.pnpm/@react-navigation+elements@2.9.5_@react-navigation+native@7.1.28_react-native@0.81.5_@b_55bc4e64cea369cde4c1d750354d716f/node_modules/@react-navigation/elements/lib/module/assets/back-icon.35ba0eaec5a4f5ed12ca16fabeae451d.png [90m(207 B)[39m
+[2m[WebServer] [22m../../node_modules/.pnpm/@react-navigation+elements@2.9.5_@react-navigation+native@7.1.28_react-native@0.81.5_@b_55bc4e64cea369cde4c1d750354d716f/node_modules/@react-navigation/elements/lib/module/assets/clear-icon.c94f6478e7ae0cdd9f15de1fcb9e5e55.png [90m(4 variations | 425 B)[39m
+[2m[WebServer] [22m../../node_modules/.pnpm/@react-navigation+elements@2.9.5_@react-navigation+native@7.1.28_react-native@0.81.5_@b_55bc4e64cea369cde4c1d750354d716f/node_modules/@react-navigation/elements/lib/module/assets/close-icon.808e1b1b9b53114ec2838071a7e6daa7.png [90m(4 variations | 235 B)[39m
+[2m[WebServer] [22m../../node_modules/.pnpm/@react-navigation+elements@2.9.5_@react-navigation+native@7.1.28_react-native@0.81.5_@b_55bc4e64cea369cde4c1d750354d716f/node_modules/@react-navigation/elements/lib/module/assets/search-icon.286d67d3f74808a60a78d3ebf1a5fb57.png [90m(928 B)[39m
+[2m[WebServer] [22m../../node_modules/.pnpm/expo-router@6.0.23_5a0d0b482ec9810f7dfe3d4e8900091f/node_modules/expo-router/assets/arrow_down.017bc6ba3fc25503e5eb5e53826d48a8.png [90m(9.46 kB)[39m
+[2m[WebServer] [22m../../node_modules/.pnpm/expo-router@6.0.23_5a0d0b482ec9810f7dfe3d4e8900091f/node_modules/expo-router/assets/error.d1ea1496f9057eb392d5bbf3732a61b7.png [90m(469 B)[39m
+[2m[WebServer] [22m../../node_modules/.pnpm/expo-router@6.0.23_5a0d0b482ec9810f7dfe3d4e8900091f/node_modules/expo-router/assets/file.19eeb73b9593a38f8e9f418337fc7d10.png [90m(138 B)[39m
+[2m[WebServer] [22m../../node_modules/.pnpm/expo-router@6.0.23_5a0d0b482ec9810f7dfe3d4e8900091f/node_modules/expo-router/assets/forward.d8b800c443b8972542883e0b9de2bdc6.png [90m(188 B)[39m
+[2m[WebServer] [22m../../node_modules/.pnpm/expo-router@6.0.23_5a0d0b482ec9810f7dfe3d4e8900091f/node_modules/expo-router/assets/pkg.ab19f4cbc543357183a20571f68380a3.png [90m(364 B)[39m
+[2m[WebServer] [22m../../node_modules/.pnpm/expo-router@6.0.23_5a0d0b482ec9810f7dfe3d4e8900091f/node_modules/expo-router/assets/sitemap.412dd9275b6b48ad28f5e3d81bb1f626.png [90m(465 B)[39m
+[2m[WebServer] [22m../../node_modules/.pnpm/expo-router@6.0.23_5a0d0b482ec9810f7dfe3d4e8900091f/node_modules/expo-router/assets/unmatched.20e71bdf79e3a97bf55fd9e164041578.png [90m(4.75 kB)[39m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[1m› web bundles (3):[22m
+[2m[WebServer] [22m_expo/static/css/web-6852554d7bd6fbab07d8e2434da6f4cf.css [90m(20.2 kB)[39m
+[2m[WebServer] [22m_expo/static/js/web/index-3d5c09758803256d56ec0bbda544d5d1.js [90m(7.77 MB)[39m
+[2m[WebServer] [22m_expo/static/js/web/index-d2c6002d2c101c33b4a852751fead2ff.js [90m(10.6 kB)[39m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[1m› Files (3):[22m
+[2m[WebServer] [22mfavicon.ico [90m(14.5 kB)[39m
+[2m[WebServer] [22mindex.html [90m(1.4 kB)[39m
+[2m[WebServer] [22mmetadata.json [90m(49 B)[39m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[92mExported: dist[39m
+[2m[WebServer] [22mStatic Expo web preview ready on http://127.0.0.1:19006
+[dotenv@17.2.2] injecting env (0) from .env.local,.env -- tip: 🔐 encrypt with Dotenvx: https://dotenvx.com
+
+Running 31 tests using 5 workers
+
+  ✓   1 [smoke-auth] › apps/mobile/e2e-web/flows/auth/sign-up-flow.spec.ts:25:7 › [BUG-754] sign-up flow top-of-funnel › form renders with email, password, terms, and submit @smoke (3.8s)
+  ✓   2 [smoke-auth] › apps/mobile/e2e-web/flows/auth/sign-up-flow.spec.ts:44:7 › [BUG-754] sign-up flow top-of-funnel › submit button is disabled until email + ≥8-char password are entered (3.9s)
+[2m[WebServer] [22m{"timestamp":"2026-05-14T12:05:57.596Z","level":"info","message":"Request completed","context":{"method":"POST","path":"/v1/__test/seed","status":201,"latencyMs":2201}}
+[2m[WebServer] [22m[32m[wrangler:info][39m [0m[1mPOST[22m /v1/__test/seed [32m[1m201[22m Created [39m[90m(3087ms)[39m[0m
+  ✓   4 [smoke-auth] › apps/mobile/e2e-web/flows/auth/sign-up-flow.spec.ts:66:7 › [BUG-754] sign-up flow top-of-funnel › clicking submit fires a request to Clerk and transitions to loading (4.9s)
+  ✓   5 [smoke-auth] › apps/mobile/e2e-web/flows/auth/auth-navigation.spec.ts:4:5 › J-02 auth screen navigation works on web @smoke (5.1s)
+  ✓   6 [smoke-auth] › apps/mobile/e2e-web/flows/auth/sign-up-flow.spec.ts:102:7 › [BUG-754] sign-up flow top-of-funnel › terms and privacy links are reachable from the sign-up screen (2.2s)
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mUncaught Error: Cannot perform I/O on behalf of a different request. I/O objects (such as streams, request/response bodies, and others) created in the context of one request handler cannot be accessed from a different request's handler. This is a limitation of Cloudflare Workers which allows us to improve overall performance. (I/O type: Native) Error[0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m      at null.<anonymous> (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1010:39)
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mUncaught Error: Cannot perform I/O on behalf of a different request. I/O objects (such as streams, request/response bodies, and others) created in the context of one request handler cannot be accessed from a different request's handler. This is a limitation of Cloudflare Workers which allows us to improve overall performance. (I/O type: Native) [0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mUncaught Error: The Workers runtime canceled this request because it detected that your Worker's code had hung and would never generate a response. Refer to: https://developers.cloudflare.com/workers/observability/errors/ [0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[32m[wrangler:info][39m [0m[1mGET[22m /v1/profiles [31m[1m500[22m Internal Server Error [39m[90m(130ms)[39m[0m
+[2m[WebServer] [22m{"timestamp":"2026-05-14T12:06:02.878Z","level":"info","message":"Request completed","context":{"method":"GET","path":"/v1/profiles","status":200,"latencyMs":262}}
+[2m[WebServer] [22m[32m[wrangler:info][39m [0m[1mGET[22m /v1/profiles [32m[1m200[22m OK [39m[90m(280ms)[39m[0m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mUncaught Error: Cannot perform I/O on behalf of a different request. I/O objects (such as streams, request/response bodies, and others) created in the context of one request handler cannot be accessed from a different request's handler. This is a limitation of Cloudflare Workers which allows us to improve overall performance. (I/O type: Native) Error[0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m      at null.<anonymous> (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1010:39)
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mUncaught Error: Cannot perform I/O on behalf of a different request. I/O objects (such as streams, request/response bodies, and others) created in the context of one request handler cannot be accessed from a different request's handler. This is a limitation of Cloudflare Workers which allows us to improve overall performance. (I/O type: Native) [0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mUncaught Error: The Workers runtime canceled this request because it detected that your Worker's code had hung and would never generate a response. Refer to: https://developers.cloudflare.com/workers/observability/errors/ [0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[32m[wrangler:info][39m [0m[1mGET[22m /v1/subjects [31m[1m500[22m Internal Server Error [39m[90m(28ms)[39m[0m
+[2m[WebServer] [22m{"timestamp":"2026-05-14T12:06:03.319Z","level":"info","message":"Request completed","context":{"method":"GET","path":"/v1/coaching-card","status":200,"latencyMs":291}}
+[2m[WebServer] [22m[32m[wrangler:info][39m [0m[1mGET[22m /v1/coaching-card [32m[1m200[22m OK [39m[90m(362ms)[39m[0m
+[2m[WebServer] [22m{"timestamp":"2026-05-14T12:06:03.338Z","level":"info","message":"Request completed","context":{"method":"GET","path":"/v1/progress/review-summary","status":200,"latencyMs":367}}
+[2m[WebServer] [22m[32m[wrangler:info][39m [0m[1mGET[22m /v1/progress/review-summary [32m[1m200[22m OK [39m[90m(395ms)[39m[0m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mUncaught Error: Cannot perform I/O on behalf of a different request. I/O objects (such as streams, request/response bodies, and others) created in the context of one request handler cannot be accessed from a different request's handler. This is a limitation of Cloudflare Workers which allows us to improve overall performance. (I/O type: Native) Error[0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m      at null.<anonymous> (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1010:39)
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mUncaught Error: Cannot perform I/O on behalf of a different request. I/O objects (such as streams, request/response bodies, and others) created in the context of one request handler cannot be accessed from a different request's handler. This is a limitation of Cloudflare Workers which allows us to improve overall performance. (I/O type: Native) [0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mUncaught Error: The Workers runtime canceled this request because it detected that your Worker's code had hung and would never generate a response. Refer to: https://developers.cloudflare.com/workers/observability/errors/ [0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mUncaught Error: Cannot perform I/O on behalf of a different request. I/O objects (such as streams, request/response bodies, and others) created in the context of one request handler cannot be accessed from a different request's handler. This is a limitation of Cloudflare Workers which allows us to improve overall performance. (I/O type: Native) Error[0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m      at null.<anonymous> (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1010:39)
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mUncaught Error: Cannot perform I/O on behalf of a different request. I/O objects (such as streams, request/response bodies, and others) created in the context of one request handler cannot be accessed from a different request's handler. This is a limitation of Cloudflare Workers which allows us to improve overall performance. (I/O type: Native) [0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mUncaught Error: The Workers runtime canceled this request because it detected that your Worker's code had hung and would never generate a response. Refer to: https://developers.cloudflare.com/workers/observability/errors/ [0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[32m[wrangler:info][39m [0m[1mGET[22m /v1/subscription [31m[1m500[22m Internal Server Error [39m[90m(24ms)[39m[0m
+[2m[WebServer] [22m[32m[wrangler:info][39m [0m[1mGET[22m /v1/settings/celebration-level [31m[1m500[22m Internal Server Error [39m[90m(7ms)[39m[0m
+[2m[WebServer] [22m{"timestamp":"2026-05-14T12:06:03.373Z","level":"info","message":"Request completed","context":{"method":"GET","path":"/v1/dashboard","status":200,"latencyMs":356}}
+[2m[WebServer] [22m[32m[wrangler:info][39m [0m[1mGET[22m /v1/dashboard [32m[1m200[22m OK [39m[90m(444ms)[39m[0m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mUncaught Error: Cannot perform I/O on behalf of a different request. I/O objects (such as streams, request/response bodies, and others) created in the context of one request handler cannot be accessed from a different request's handler. This is a limitation of Cloudflare Workers which allows us to improve overall performance. (I/O type: Native) Error[0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m      at null.<anonymous> (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1010:39)
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mUncaught Error: Cannot perform I/O on behalf of a different request. I/O objects (such as streams, request/response bodies, and others) created in the context of one request handler cannot be accessed from a different request's handler. This is a limitation of Cloudflare Workers which allows us to improve overall performance. (I/O type: Native) [0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mUncaught Error: Cannot perform I/O on behalf of a different request. I/O objects (such as streams, request/response bodies, and others) created in the context of one request handler cannot be accessed from a different request's handler. This is a limitation of Cloudflare Workers which allows us to improve overall performance. (I/O type: Native) Error[0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m      at null.<anonymous> (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1010:39)
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mUncaught Error: Cannot perform I/O on behalf of a different request. I/O objects (such as streams, request/response bodies, and others) created in the context of one request handler cannot be accessed from a different request's handler. This is a limitation of Cloudflare Workers which allows us to improve overall performance. (I/O type: Native) [0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mUncaught Error: The Workers runtime canceled this request because it detected that your Worker's code had hung and would never generate a response. Refer to: https://developers.cloudflare.com/workers/observability/errors/ [0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mUncaught Error: The Workers runtime canceled this request because it detected that your Worker's code had hung and would never generate a response. Refer to: https://developers.cloudflare.com/workers/observability/errors/ [0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mUncaught Error: Cannot perform I/O on behalf of a different request. I/O objects (such as streams, request/response bodies, and others) created in the context of one request handler cannot be accessed from a different request's handler. This is a limitation of Cloudflare Workers which allows us to improve overall performance. (I/O type: Native) Error[0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m      at null.<anonymous> (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1010:39)
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mUncaught Error: Cannot perform I/O on behalf of a different request. I/O objects (such as streams, request/response bodies, and others) created in the context of one request handler cannot be accessed from a different request's handler. This is a limitation of Cloudflare Workers which allows us to improve overall performance. (I/O type: Native) [0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mUncaught Error: Cannot perform I/O on behalf of a different request. I/O objects (such as streams, request/response bodies, and others) created in the context of one request handler cannot be accessed from a different request's handler. This is a limitation of Cloudflare Workers which allows us to improve overall performance. (I/O type: Native) Error[0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m      at null.<anonymous> (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1010:39)
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mUncaught Error: Cannot perform I/O on behalf of a different request. I/O objects (such as streams, request/response bodies, and others) created in the context of one request handler cannot be accessed from a different request's handler. This is a limitation of Cloudflare Workers which allows us to improve overall performance. (I/O type: Native) [0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m{"timestamp":"2026-05-14T12:06:03.518Z","level":"info","message":"Request completed","context":{"method":"GET","path":"/v1/progress/resume-target","status":200,"latencyMs":557}}
+[2m[WebServer] [22m{"timestamp":"2026-05-14T12:06:03.616Z","level":"info","message":"Request completed","context":{"method":"GET","path":"/v1/progress/overview","status":200,"latencyMs":642}}
+[2m[WebServer] [22m[32m[wrangler:info][39m [0m[1mGET[22m /v1/progress/resume-target [32m[1m200[22m OK [39m[90m(588ms)[39m[0m
+[2m[WebServer] [22m[32m[wrangler:info][39m [0m[1mGET[22m /v1/progress/overview [32m[1m200[22m OK [39m[90m(673ms)[39m[0m
+[2m[WebServer] [22m[32m[wrangler:info][39m [0m[1mGET[22m /v1/celebrations/pending [31m[1m500[22m Internal Server Error [39m[90m(39ms)[39m[0m
+[2m[WebServer] [22m[32m[wrangler:info][39m [0m[1mGET[22m /v1/learner-profile [31m[1m500[22m Internal Server Error [39m[90m(83ms)[39m[0m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mUncaught Error: Cannot perform I/O on behalf of a different request. I/O objects (such as streams, request/response bodies, and others) created in the context of one request handler cannot be accessed from a different request's handler. This is a limitation of Cloudflare Workers which allows us to improve overall performance. (I/O type: Native) Error[0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m      at null.<anonymous> (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1010:39)
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mUncaught Error: Cannot perform I/O on behalf of a different request. I/O objects (such as streams, request/response bodies, and others) created in the context of one request handler cannot be accessed from a different request's handler. This is a limitation of Cloudflare Workers which allows us to improve overall performance. (I/O type: Native) [0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mUncaught Error: The Workers runtime canceled this request because it detected that your Worker's code had hung and would never generate a response. Refer to: https://developers.cloudflare.com/workers/observability/errors/ [0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[32m[wrangler:info][39m [0m[1mGET[22m /v1/subjects [31m[1m500[22m Internal Server Error [39m[90m(8ms)[39m[0m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mUncaught Error: Cannot perform I/O on behalf of a different request. I/O objects (such as streams, request/response bodies, and others) created in the context of one request handler cannot be accessed from a different request's handler. This is a limitation of Cloudflare Workers which allows us to improve overall performance. (I/O type: Native) Error[0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m      at null.<anonymous> (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1010:39)
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mUncaught Error: Cannot perform I/O on behalf of a different request. I/O objects (such as streams, request/response bodies, and others) created in the context of one request handler cannot be accessed from a different request's handler. This is a limitation of Cloudflare Workers which allows us to improve overall performance. (I/O type: Native) [0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mUncaught Error: The Workers runtime canceled this request because it detected that your Worker's code had hung and would never generate a response. Refer to: https://developers.cloudflare.com/workers/observability/errors/ [0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[32m[wrangler:info][39m [0m[1mGET[22m /v1/subscription [31m[1m500[22m Internal Server Error [39m[90m(15ms)[39m[0m
+[2m[WebServer] [22mWarning: A promise was resolved or rejected from a different request context than the one it was created in. However, the creating request has already been completed or canceled. Continuations for that request are unlikely to run safely and have been canceled. If this behavior breaks your worker, consider setting the `no_handle_cross_request_promise_resolution` compatibility flag for your worker.
+[2m[WebServer] [22m    at [object Object]
+[2m[WebServer] [22m    at cb (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1345:3)
+[2m[WebServer] [22m    at _r.callback (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1410:72)
+[2m[WebServer] [22m    at _r.handleError (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:924:56)
+[2m[WebServer] [22m    at null.<anonymous> (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1239:23)
+[2m[WebServer] [22m    at null.<anonymous> (node-internal:internal_process:17:9)
+[2m[WebServer] [22mWarning: A promise was resolved or rejected from a different request context than the one it was created in. However, the creating request has already been completed or canceled. Continuations for that request are unlikely to run safely and have been canceled. If this behavior breaks your worker, consider setting the `no_handle_cross_request_promise_resolution` compatibility flag for your worker.
+[2m[WebServer] [22m    at [object Object]
+[2m[WebServer] [22m    at cb (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1345:3)
+[2m[WebServer] [22m    at _r.callback (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1410:72)
+[2m[WebServer] [22m    at _r.handleError (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:924:56)
+[2m[WebServer] [22m    at null.<anonymous> (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1239:23)
+[2m[WebServer] [22m    at null.<anonymous> (node-internal:internal_process:17:9)
+[2m[WebServer] [22mWarning: A promise was resolved or rejected from a different request context than the one it was created in. However, the creating request has already been completed or canceled. Continuations for that request are unlikely to run safely and have been canceled. If this behavior breaks your worker, consider setting the `no_handle_cross_request_promise_resolution` compatibility flag for your worker.
+[2m[WebServer] [22m    at [object Object]
+[2m[WebServer] [22m    at cb (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1345:3)
+[2m[WebServer] [22m    at _r.callback (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1410:72)
+[2m[WebServer] [22m    at _r.handleError (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:924:56)
+[2m[WebServer] [22m    at null.<anonymous> (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1239:23)
+[2m[WebServer] [22m    at null.<anonymous> (node-internal:internal_process:17:9)
+[2m[WebServer] [22mWarning: A promise was resolved or rejected from a different request context than the one it was created in. However, the creating request has already been completed or canceled. Continuations for that request are unlikely to run safely and have been canceled. If this behavior breaks your worker, consider setting the `no_handle_cross_request_promise_resolution` compatibility flag for your worker.
+[2m[WebServer] [22m    at [object Object]
+[2m[WebServer] [22m    at cb (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1345:3)
+[2m[WebServer] [22m    at _r.callback (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1410:72)
+[2m[WebServer] [22m    at _r.handleError (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:924:56)
+[2m[WebServer] [22m    at null.<anonymous> (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1239:23)
+[2m[WebServer] [22m    at null.<anonymous> (node-internal:internal_process:17:9)
+[2m[WebServer] [22mWarning: A promise was resolved or rejected from a different request context than the one it was created in. However, the creating request has already been completed or canceled. Continuations for that request are unlikely to run safely and have been canceled. If this behavior breaks your worker, consider setting the `no_handle_cross_request_promise_resolution` compatibility flag for your worker.
+[2m[WebServer] [22m    at [object Object]
+[2m[WebServer] [22m    at cb (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1345:3)
+[2m[WebServer] [22m    at _r.callback (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1410:72)
+[2m[WebServer] [22m    at _r.handleError (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:924:56)
+[2m[WebServer] [22m    at null.<anonymous> (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1239:23)
+[2m[WebServer] [22m    at null.<anonymous> (node-internal:internal_process:17:9)
+[2m[WebServer] [22mWarning: A promise was resolved or rejected from a different request context than the one it was created in. However, the creating request has already been completed or canceled. Continuations for that request are unlikely to run safely and have been canceled. If this behavior breaks your worker, consider setting the `no_handle_cross_request_promise_resolution` compatibility flag for your worker.
+[2m[WebServer] [22m    at [object Object]
+[2m[WebServer] [22m    at cb (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1345:3)
+[2m[WebServer] [22m    at _r.callback (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1410:72)
+[2m[WebServer] [22m    at _r.handleError (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:924:56)
+[2m[WebServer] [22m    at null.<anonymous> (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1239:23)
+[2m[WebServer] [22m    at null.<anonymous> (node-internal:internal_process:17:9)
+[2m[WebServer] [22mWarning: A promise was resolved or rejected from a different request context than the one it was created in. However, the creating request has already been completed or canceled. Continuations for that request are unlikely to run safely and have been canceled. If this behavior breaks your worker, consider setting the `no_handle_cross_request_promise_resolution` compatibility flag for your worker.
+[2m[WebServer] [22m    at [object Object]
+[2m[WebServer] [22m    at cb (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1345:3)
+[2m[WebServer] [22m    at _r.callback (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1410:72)
+[2m[WebServer] [22m    at _r.handleError (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:924:56)
+[2m[WebServer] [22m    at null.<anonymous> (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1239:23)
+[2m[WebServer] [22m    at null.<anonymous> (node-internal:internal_process:17:9)
+[2m[WebServer] [22mWarning: A promise was resolved or rejected from a different request context than the one it was created in. However, the creating request has already been completed or canceled. Continuations for that request are unlikely to run safely and have been canceled. If this behavior breaks your worker, consider setting the `no_handle_cross_request_promise_resolution` compatibility flag for your worker.
+[2m[WebServer] [22m    at [object Object]
+[2m[WebServer] [22m    at cb (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1345:3)
+[2m[WebServer] [22m    at _r.callback (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1410:72)
+[2m[WebServer] [22m    at _r.handleError (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:924:56)
+[2m[WebServer] [22m    at null.<anonymous> (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1239:23)
+[2m[WebServer] [22m    at null.<anonymous> (node-internal:internal_process:17:9)
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mUncaught Error: Cannot perform I/O on behalf of a different request. I/O objects (such as streams, request/response bodies, and others) created in the context of one request handler cannot be accessed from a different request's handler. This is a limitation of Cloudflare Workers which allows us to improve overall performance. (I/O type: Native) Error[0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m      at null.<anonymous> (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1010:39)
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mUncaught Error: Cannot perform I/O on behalf of a different request. I/O objects (such as streams, request/response bodies, and others) created in the context of one request handler cannot be accessed from a different request's handler. This is a limitation of Cloudflare Workers which allows us to improve overall performance. (I/O type: Native) [0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mUncaught Error: Cannot perform I/O on behalf of a different request. I/O objects (such as streams, request/response bodies, and others) created in the context of one request handler cannot be accessed from a different request's handler. This is a limitation of Cloudflare Workers which allows us to improve overall performance. (I/O type: Native) Error[0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m      at null.<anonymous> (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1010:39)
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mUncaught Error: Cannot perform I/O on behalf of a different request. I/O objects (such as streams, request/response bodies, and others) created in the context of one request handler cannot be accessed from a different request's handler. This is a limitation of Cloudflare Workers which allows us to improve overall performance. (I/O type: Native) [0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mUncaught Error: The Workers runtime canceled this request because it detected that your Worker's code had hung and would never generate a response. Refer to: https://developers.cloudflare.com/workers/observability/errors/ [0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mUncaught Error: Cannot perform I/O on behalf of a different request. I/O objects (such as streams, request/response bodies, and others) created in the context of one request handler cannot be accessed from a different request's handler. This is a limitation of Cloudflare Workers which allows us to improve overall performance. (I/O type: Native) Error[0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m      at null.<anonymous> (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1010:39)
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mUncaught Error: Cannot perform I/O on behalf of a different request. I/O objects (such as streams, request/response bodies, and others) created in the context of one request handler cannot be accessed from a different request's handler. This is a limitation of Cloudflare Workers which allows us to improve overall performance. (I/O type: Native) [0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mUncaught Error: Cannot perform I/O on behalf of a different request. I/O objects (such as streams, request/response bodies, and others) created in the context of one request handler cannot be accessed from a different request's handler. This is a limitation of Cloudflare Workers which allows us to improve overall performance. (I/O type: Native) Error[0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m      at null.<anonymous> (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1010:39)
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mUncaught Error: Cannot perform I/O on behalf of a different request. I/O objects (such as streams, request/response bodies, and others) created in the context of one request handler cannot be accessed from a different request's handler. This is a limitation of Cloudflare Workers which allows us to improve overall performance. (I/O type: Native) [0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mUncaught Error: The Workers runtime canceled this request because it detected that your Worker's code had hung and would never generate a response. Refer to: https://developers.cloudflare.com/workers/observability/errors/ [0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mUncaught Error: The Workers runtime canceled this request because it detected that your Worker's code had hung and would never generate a response. Refer to: https://developers.cloudflare.com/workers/observability/errors/ [0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22mWarning: A promise was resolved or rejected from a different request context than the one it was created in. However, the creating request has already been completed or canceled. Continuations for that request are unlikely to run safely and have been canceled. If this behavior breaks your worker, consider setting the `no_handle_cross_request_promise_resolution` compatibility flag for your worker.
+[2m[WebServer] [22m    at [object Object]
+[2m[WebServer] [22m    at cb (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1345:3)
+[2m[WebServer] [22m    at _r.callback (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1410:72)
+[2m[WebServer] [22m    at _r.handleError (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:924:56)
+[2m[WebServer] [22m    at null.<anonymous> (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1239:23)
+[2m[WebServer] [22m    at null.<anonymous> (node-internal:internal_process:17:9)
+[2m[WebServer] [22m{"timestamp":"2026-05-14T12:06:13.690Z","level":"info","message":"Request completed","context":{"method":"GET","path":"/v1/subscription","status":200,"latencyMs":235}}
+[2m[WebServer] [22m[32m[wrangler:info][39m [0m[1mGET[22m /v1/dashboard/demo [31m[1m500[22m Internal Server Error [39m[90m(10027ms)[39m[0m
+[2m[WebServer] [22m[32m[wrangler:info][39m [0m[1mGET[22m /v1/subscription [32m[1m200[22m OK [39m[90m(258ms)[39m[0m
+[2m[WebServer] [22m[32m[wrangler:info][39m [0m[1mGET[22m /v1/settings/celebration-level [31m[1m500[22m Internal Server Error [39m[90m(10083ms)[39m[0m
+[2m[WebServer] [22m[32m[wrangler:info][39m [0m[1mGET[22m /v1/celebrations/pending [31m[1m500[22m Internal Server Error [39m[90m(10020ms)[39m[0m
+[2m[WebServer] [22m[32m[wrangler:info][39m [0m[1mGET[22m /v1/dashboard [31m[1m500[22m Internal Server Error [39m[90m(17ms)[39m[0m
+[2m[WebServer] [22m[32m[wrangler:info][39m [0m[1mGET[22m /v1/learner-profile [31m[1m500[22m Internal Server Error [39m[90m(10034ms)[39m[0m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1m[unhandled] Error: timeout exceeded when trying to connect[0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m      at null.<anonymous> (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1345:74)
+[2m[WebServer] [22m      at async NeonPreparedQuery.execute (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/drizzle-orm@0.39.3_@cloudflare+workers-types@4.20260214.0_@neondatabase+serverless@0.10_4955cb61fa913e14f3948bc406a3f631/node_modules/src/neon-serverless/session.ts:102:18)
+[2m[WebServer] [22m      at async findAccountByClerkId (file:///Users/vetinari/_dev/eduagent-build/apps/api/src/services/account.ts:56:15)
+[2m[WebServer] [22m      at async findOrCreateAccount (file:///Users/vetinari/_dev/eduagent-build/apps/api/src/services/account.ts:81:20)
+[2m[WebServer] [22m      at async withTransientDatabaseRetry (file:///Users/vetinari/_dev/eduagent-build/apps/api/src/services/transient-db-retry.ts:40:14)
+[2m[WebServer] [22m      at null.<anonymous> (async file:///Users/vetinari/_dev/eduagent-build/apps/api/.wrangler/tmp/dev-Nce9rb/index.js:80417:21)
+[2m[WebServer] [22m      at async dispatch (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/hono@4.11.9/node_modules/hono/dist/compose.js:22:17)
+[2m[WebServer] [22m      at null.<anonymous> (async file:///Users/vetinari/_dev/eduagent-build/apps/api/.wrangler/tmp/dev-Nce9rb/index.js:66953:5)
+[2m[WebServer] [22m      at async dispatch (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/hono@4.11.9/node_modules/hono/dist/compose.js:22:17)
+[2m[WebServer] [22m      at async dispatch (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/hono@4.11.9/node_modules/hono/dist/compose.js:22:17)
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1m{"timestamp":"2026-05-14T12:06:14.404Z","level":"error","message":"Request failed","context":{"method":"GET","path":"/v1/settings/celebration-level","status":500,"latencyMs":10032}}[0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1m[unhandled] Error: timeout exceeded when trying to connect[0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m      at null.<anonymous> (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1345:74)
+[2m[WebServer] [22m      at async NeonPreparedQuery.execute (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/drizzle-orm@0.39.3_@cloudflare+workers-types@4.20260214.0_@neondatabase+serverless@0.10_4955cb61fa913e14f3948bc406a3f631/node_modules/src/neon-serverless/session.ts:102:18)
+[2m[WebServer] [22m      at async findAccountByClerkId (file:///Users/vetinari/_dev/eduagent-build/apps/api/src/services/account.ts:56:15)
+[2m[WebServer] [22m      at async findOrCreateAccount (file:///Users/vetinari/_dev/eduagent-build/apps/api/src/services/account.ts:81:20)
+[2m[WebServer] [22m      at async withTransientDatabaseRetry (file:///Users/vetinari/_dev/eduagent-build/apps/api/src/services/transient-db-retry.ts:40:14)
+[2m[WebServer] [22m      at null.<anonymous> (async file:///Users/vetinari/_dev/eduagent-build/apps/api/.wrangler/tmp/dev-Nce9rb/index.js:80417:21)
+[2m[WebServer] [22m      at async dispatch (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/hono@4.11.9/node_modules/hono/dist/compose.js:22:17)
+[2m[WebServer] [22m      at null.<anonymous> (async file:///Users/vetinari/_dev/eduagent-build/apps/api/.wrangler/tmp/dev-Nce9rb/index.js:66953:5)
+[2m[WebServer] [22m      at async dispatch (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/hono@4.11.9/node_modules/hono/dist/compose.js:22:17)
+[2m[WebServer] [22m      at async dispatch (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/hono@4.11.9/node_modules/hono/dist/compose.js:22:17)
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1m{"timestamp":"2026-05-14T12:06:14.448Z","level":"error","message":"Request failed","context":{"method":"GET","path":"/v1/celebrations/pending","status":500,"latencyMs":10012}}[0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mUncaught Error: Cannot perform I/O on behalf of a different request. I/O objects (such as streams, request/response bodies, and others) created in the context of one request handler cannot be accessed from a different request's handler. This is a limitation of Cloudflare Workers which allows us to improve overall performance. (I/O type: Native) Error[0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m      at null.<anonymous> (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1010:39)
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mUncaught Error: Cannot perform I/O on behalf of a different request. I/O objects (such as streams, request/response bodies, and others) created in the context of one request handler cannot be accessed from a different request's handler. This is a limitation of Cloudflare Workers which allows us to improve overall performance. (I/O type: Native) [0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mUncaught Error: The Workers runtime canceled this request because it detected that your Worker's code had hung and would never generate a response. Refer to: https://developers.cloudflare.com/workers/observability/errors/ [0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[32m[wrangler:info][39m [0m[1mGET[22m /v1/progress/inventory [31m[1m500[22m Internal Server Error [39m[90m(5ms)[39m[0m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mUncaught Error: The Workers runtime canceled this request because it detected that your Worker's code had hung and would never generate a response. Refer to: https://developers.cloudflare.com/workers/observability/errors/ [0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[32m[wrangler:info][39m [0m[1mGET[22m /v1/subjects [31m[1m500[22m Internal Server Error [39m[90m(10011ms)[39m[0m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mUncaught Error: Cannot perform I/O on behalf of a different request. I/O objects (such as streams, request/response bodies, and others) created in the context of one request handler cannot be accessed from a different request's handler. This is a limitation of Cloudflare Workers which allows us to improve overall performance. (I/O type: Native) Error[0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m      at null.<anonymous> (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1010:39)
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mUncaught Error: Cannot perform I/O on behalf of a different request. I/O objects (such as streams, request/response bodies, and others) created in the context of one request handler cannot be accessed from a different request's handler. This is a limitation of Cloudflare Workers which allows us to improve overall performance. (I/O type: Native) [0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mUncaught Error: The Workers runtime canceled this request because it detected that your Worker's code had hung and would never generate a response. Refer to: https://developers.cloudflare.com/workers/observability/errors/ [0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mUncaught Error: Cannot perform I/O on behalf of a different request. I/O objects (such as streams, request/response bodies, and others) created in the context of one request handler cannot be accessed from a different request's handler. This is a limitation of Cloudflare Workers which allows us to improve overall performance. (I/O type: Native) Error[0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m      at null.<anonymous> (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1010:39)
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mUncaught Error: Cannot perform I/O on behalf of a different request. I/O objects (such as streams, request/response bodies, and others) created in the context of one request handler cannot be accessed from a different request's handler. This is a limitation of Cloudflare Workers which allows us to improve overall performance. (I/O type: Native) [0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mUncaught Error: The Workers runtime canceled this request because it detected that your Worker's code had hung and would never generate a response. Refer to: https://developers.cloudflare.com/workers/observability/errors/ [0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mUncaught Error: Cannot perform I/O on behalf of a different request. I/O objects (such as streams, request/response bodies, and others) created in the context of one request handler cannot be accessed from a different request's handler. This is a limitation of Cloudflare Workers which allows us to improve overall performance. (I/O type: Native) Error[0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m      at null.<anonymous> (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1010:39)
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mUncaught Error: Cannot perform I/O on behalf of a different request. I/O objects (such as streams, request/response bodies, and others) created in the context of one request handler cannot be accessed from a different request's handler. This is a limitation of Cloudflare Workers which allows us to improve overall performance. (I/O type: Native) [0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1mUncaught Error: The Workers runtime canceled this request because it detected that your Worker's code had hung and would never generate a response. Refer to: https://developers.cloudflare.com/workers/observability/errors/ [0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[32m[wrangler:info][39m [0m[1mGET[22m /v1/settings/celebration-level [31m[1m500[22m Internal Server Error [39m[90m(8ms)[39m[0m
+[2m[WebServer] [22m[32m[wrangler:info][39m [0m[1mGET[22m /v1/dashboard [31m[1m500[22m Internal Server Error [39m[90m(19ms)[39m[0m
+[2m[WebServer] [22m[32m[wrangler:info][39m [0m[1mGET[22m /v1/celebrations/pending [31m[1m500[22m Internal Server Error [39m[90m(26ms)[39m[0m
+[2m[WebServer] [22mWarning: A promise was resolved or rejected from a different request context than the one it was created in. However, the creating request has already been completed or canceled. Continuations for that request are unlikely to run safely and have been canceled. If this behavior breaks your worker, consider setting the `no_handle_cross_request_promise_resolution` compatibility flag for your worker.
+[2m[WebServer] [22m    at [object Object]
+[2m[WebServer] [22m    at cb (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1345:3)
+[2m[WebServer] [22m    at _r.callback (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1410:72)
+[2m[WebServer] [22m    at _r.handleError (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:924:56)
+[2m[WebServer] [22m    at null.<anonymous> (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1239:23)
+[2m[WebServer] [22m    at null.<anonymous> (node-internal:internal_process:17:9)
+[2m[WebServer] [22mWarning: A promise was resolved or rejected from a different request context than the one it was created in. However, the creating request has already been completed or canceled. Continuations for that request are unlikely to run safely and have been canceled. If this behavior breaks your worker, consider setting the `no_handle_cross_request_promise_resolution` compatibility flag for your worker.
+[2m[WebServer] [22m    at [object Object]
+[2m[WebServer] [22m    at cb (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1345:3)
+[2m[WebServer] [22m    at _r.callback (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1410:72)
+[2m[WebServer] [22m    at _r.handleError (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:924:56)
+[2m[WebServer] [22m    at null.<anonymous> (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1239:23)
+[2m[WebServer] [22m    at null.<anonymous> (node-internal:internal_process:17:9)
+[2m[WebServer] [22mWarning: A promise was resolved or rejected from a different request context than the one it was created in. However, the creating request has already been completed or canceled. Continuations for that request are unlikely to run safely and have been canceled. If this behavior breaks your worker, consider setting the `no_handle_cross_request_promise_resolution` compatibility flag for your worker.
+[2m[WebServer] [22m    at [object Object]
+[2m[WebServer] [22m    at cb (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1345:3)
+[2m[WebServer] [22m    at _r.callback (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1410:72)
+[2m[WebServer] [22m    at _r.handleError (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:924:56)
+[2m[WebServer] [22m    at null.<anonymous> (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1239:23)
+[2m[WebServer] [22m    at null.<anonymous> (node-internal:internal_process:17:9)
+[2m[WebServer] [22mWarning: A promise was resolved or rejected from a different request context than the one it was created in. However, the creating request has already been completed or canceled. Continuations for that request are unlikely to run safely and have been canceled. If this behavior breaks your worker, consider setting the `no_handle_cross_request_promise_resolution` compatibility flag for your worker.
+[2m[WebServer] [22m    at [object Object]
+[2m[WebServer] [22m    at cb (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1345:3)
+[2m[WebServer] [22m    at _r.callback (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1410:72)
+[2m[WebServer] [22m    at _r.handleError (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:924:56)
+[2m[WebServer] [22m    at null.<anonymous> (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1239:23)
+[2m[WebServer] [22m    at null.<anonymous> (node-internal:internal_process:17:9)
+[2m[WebServer] [22mWarning: A promise was resolved or rejected from a different request context than the one it was created in. However, the creating request has already been completed or canceled. Continuations for that request are unlikely to run safely and have been canceled. If this behavior breaks your worker, consider setting the `no_handle_cross_request_promise_resolution` compatibility flag for your worker.
+[2m[WebServer] [22m    at [object Object]
+[2m[WebServer] [22m    at cb (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1345:3)
+[2m[WebServer] [22m    at _r.callback (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1410:72)
+[2m[WebServer] [22m    at _r.handleError (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:924:56)
+[2m[WebServer] [22m    at null.<anonymous> (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1239:23)
+[2m[WebServer] [22m    at null.<anonymous> (node-internal:internal_process:17:9)
+[2m[WebServer] [22mWarning: A promise was resolved or rejected from a different request context than the one it was created in. However, the creating request has already been completed or canceled. Continuations for that request are unlikely to run safely and have been canceled. If this behavior breaks your worker, consider setting the `no_handle_cross_request_promise_resolution` compatibility flag for your worker.
+[2m[WebServer] [22m    at [object Object]
+[2m[WebServer] [22m    at cb (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1345:3)
+[2m[WebServer] [22m    at _r.callback (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1410:72)
+[2m[WebServer] [22m    at _r.handleError (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:924:56)
+[2m[WebServer] [22m    at null.<anonymous> (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1239:23)
+[2m[WebServer] [22m    at null.<anonymous> (node-internal:internal_process:17:9)
+[2m[WebServer] [22mWarning: A promise was resolved or rejected from a different request context than the one it was created in. However, the creating request has already been completed or canceled. Continuations for that request are unlikely to run safely and have been canceled. If this behavior breaks your worker, consider setting the `no_handle_cross_request_promise_resolution` compatibility flag for your worker.
+[2m[WebServer] [22m    at [object Object]
+[2m[WebServer] [22m    at cb (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1345:3)
+[2m[WebServer] [22m    at _r.callback (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1410:72)
+[2m[WebServer] [22m    at _r.handleError (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:924:56)
+[2m[WebServer] [22m    at null.<anonymous> (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1239:23)
+[2m[WebServer] [22m    at null.<anonymous> (node-internal:internal_process:17:9)
+[2m[WebServer] [22m{"timestamp":"2026-05-14T12:06:24.841Z","level":"info","message":"Request completed","context":{"method":"GET","path":"/v1/progress/inventory","status":200,"latencyMs":21857}}
+[2m[WebServer] [22m[32m[wrangler:info][39m [0m[1mGET[22m /v1/progress/inventory [32m[1m200[22m OK [39m[90m(21903ms)[39m[0m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1m[unhandled] Error: timeout exceeded when trying to connect[0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m      at null.<anonymous> (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1345:74)
+[2m[WebServer] [22m      at async NeonPreparedQuery.execute (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/drizzle-orm@0.39.3_@cloudflare+workers-types@4.20260214.0_@neondatabase+serverless@0.10_4955cb61fa913e14f3948bc406a3f631/node_modules/src/neon-serverless/session.ts:102:18)
+[2m[WebServer] [22m      at async findAccountByClerkId (file:///Users/vetinari/_dev/eduagent-build/apps/api/src/services/account.ts:56:15)
+[2m[WebServer] [22m      at async findOrCreateAccount (file:///Users/vetinari/_dev/eduagent-build/apps/api/src/services/account.ts:81:20)
+[2m[WebServer] [22m      at async withTransientDatabaseRetry (file:///Users/vetinari/_dev/eduagent-build/apps/api/src/services/transient-db-retry.ts:40:14)
+[2m[WebServer] [22m      at null.<anonymous> (async file:///Users/vetinari/_dev/eduagent-build/apps/api/.wrangler/tmp/dev-Nce9rb/index.js:80417:21)
+[2m[WebServer] [22m      at async dispatch (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/hono@4.11.9/node_modules/hono/dist/compose.js:22:17)
+[2m[WebServer] [22m      at null.<anonymous> (async file:///Users/vetinari/_dev/eduagent-build/apps/api/.wrangler/tmp/dev-Nce9rb/index.js:66953:5)
+[2m[WebServer] [22m      at async dispatch (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/hono@4.11.9/node_modules/hono/dist/compose.js:22:17)
+[2m[WebServer] [22m      at async dispatch (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/hono@4.11.9/node_modules/hono/dist/compose.js:22:17)
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1m{"timestamp":"2026-05-14T12:06:26.500Z","level":"error","message":"Request failed","context":{"method":"GET","path":"/v1/learner-profile","status":500,"latencyMs":10016}}[0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[32m[wrangler:info][39m [0m[1mGET[22m /v1/learner-profile [31m[1m500[22m Internal Server Error [39m[90m(10037ms)[39m[0m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1m[unhandled] Error: timeout exceeded when trying to connect[0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m      at null.<anonymous> (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/@neondatabase+serverless@0.10.4/node_modules/@neondatabase/serverless/index.mjs:1345:74)
+[2m[WebServer] [22m      at async NeonPreparedQuery.execute (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/drizzle-orm@0.39.3_@cloudflare+workers-types@4.20260214.0_@neondatabase+serverless@0.10_4955cb61fa913e14f3948bc406a3f631/node_modules/src/neon-serverless/session.ts:102:18)
+[2m[WebServer] [22m      at async findAccountByClerkId (file:///Users/vetinari/_dev/eduagent-build/apps/api/src/services/account.ts:56:15)
+[2m[WebServer] [22m      at async findOrCreateAccount (file:///Users/vetinari/_dev/eduagent-build/apps/api/src/services/account.ts:81:20)
+[2m[WebServer] [22m      at async withTransientDatabaseRetry (file:///Users/vetinari/_dev/eduagent-build/apps/api/src/services/transient-db-retry.ts:40:14)
+[2m[WebServer] [22m      at null.<anonymous> (async file:///Users/vetinari/_dev/eduagent-build/apps/api/.wrangler/tmp/dev-Nce9rb/index.js:80417:21)
+[2m[WebServer] [22m      at async dispatch (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/hono@4.11.9/node_modules/hono/dist/compose.js:22:17)
+[2m[WebServer] [22m      at null.<anonymous> (async file:///Users/vetinari/_dev/eduagent-build/apps/api/.wrangler/tmp/dev-Nce9rb/index.js:66953:5)
+[2m[WebServer] [22m      at async dispatch (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/hono@4.11.9/node_modules/hono/dist/compose.js:22:17)
+[2m[WebServer] [22m      at async dispatch (file:///Users/vetinari/_dev/eduagent-build/node_modules/.pnpm/hono@4.11.9/node_modules/hono/dist/compose.js:22:17)
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[31m✘ [41;31m[[41;97mERROR[41;31m][0m [1m{"timestamp":"2026-05-14T12:06:27.933Z","level":"error","message":"Request failed","context":{"method":"GET","path":"/v1/progress/inventory","status":500,"latencyMs":10011}}[0m
+[2m[WebServer] [22m
+[2m[WebServer] [22m
+[2m[WebServer] [22m[32m[wrangler:info][39m [0m[1mGET[22m /v1/progress/inventory [31m[1m500[22m Internal Server Error [39m[90m(10014ms)[39m[0m
+  ✘   3 [setup] › apps/mobile/e2e-web/helpers/auth.setup.ts:24:8 › seed onboarding-complete and capture solo-learner storage state (1.1m)
+  -   7 [setup] › apps/mobile/e2e-web/helpers/auth.setup.ts:24:8 › seed parent-multi-child and capture owner-with-children storage state
+[2m[WebServer] [22m{"timestamp":"2026-05-14T12:07:04.332Z","level":"info","message":"Request completed","context":{"method":"POST","path":"/v1/__test/reset","status":200,"latencyMs":962}}
+[2m[WebServer] [22m[32m[wrangler:info][39m [0m[1mPOST[22m /v1/__test/reset [32m[1m200[22m OK [39m[90m(982ms)[39m[0m
+
+
+  1) [setup] › apps/mobile/e2e-web/helpers/auth.setup.ts:24:8 › seed onboarding-complete and capture solo-learner storage state 
+
+    TimeoutError: locator.waitFor: Timeout 60000ms exceeded.
+    Call log:
+    [2m  - waiting for getByTestId('post-approval-continue') to be visible[22m
+
+
+       at helpers/auth.ts:52
+
+      50 |     const first = await Promise.race([
+      51 |       postApproval
+    > 52 |         .waitFor({ state: 'visible', timeout: 60_000 })
+         |          ^
+      53 |         .then(() => 'post-approval' as const),
+      54 |       landing
+      55 |         .waitFor({ state: 'visible', timeout: 60_000 })
+        at signIn (/Users/vetinari/_dev/eduagent-build/apps/mobile/e2e-web/helpers/auth.ts:52:10)
+        at signInAndPersistStorageState (/Users/vetinari/_dev/eduagent-build/apps/mobile/e2e-web/helpers/auth.ts:107:3)
+        at /Users/vetinari/_dev/eduagent-build/apps/mobile/e2e-web/helpers/auth.setup.ts:38:7
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/helpers-auth.setup.ts-seed-5b2b3--solo-learner-storage-state-setup/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/helpers-auth.setup.ts-seed-5b2b3--solo-learner-storage-state-setup/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: apps/mobile/e2e-web/test-results/helpers-auth.setup.ts-seed-5b2b3--solo-learner-storage-state-setup/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    apps/mobile/e2e-web/test-results/helpers-auth.setup.ts-seed-5b2b3--solo-learner-storage-state-setup/trace.zip
+    Usage:
+
+        pnpm exec playwright show-trace apps/mobile/e2e-web/test-results/helpers-auth.setup.ts-seed-5b2b3--solo-learner-storage-state-setup/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  1 failed
+    [setup] › apps/mobile/e2e-web/helpers/auth.setup.ts:24:8 › seed onboarding-complete and capture solo-learner storage state 
+  25 did not run
+  5 passed (2.9m)
+ ELIFECYCLE  Command failed with exit code 1.
+END_EPOCH=1778760426
+EXIT=1
+DURATION_SEC=178

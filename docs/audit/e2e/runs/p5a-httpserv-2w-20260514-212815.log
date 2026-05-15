@@ -25,7 +25,7 @@ START_EPOCH=1778786895
 [WebServer] [1mWeb[22m [0m[2mapps/mobile/[22m[0m[1mindex.js[22m [32m[42m▓▓▓▓▓▓▓▓[49m[39m[47m[37m░░░░░░░░[39m[49m[1m 53.0% [22m[2m(1217/1671)[22m
 [WebServer] [1mWeb[22m [0m[2mapps/mobile/[22m[0m[1mindex.js[22m [32m[42m▓▓▓▓▓▓▓▓▓▓▓▓▓[49m[39m[47m[37m░░░[39m[49m[1m 87.2% [22m[2m(2281/2443)[22m
 [WebServer] [32m[1mWeb[22m Bundled [39m[2m12407ms[22m[0m[2m apps/mobile/index.js (2690 modules)[22m[0m
-[WebServer] 
+[WebServer]
 [WebServer] [1m› Assets (41):[22m
 [WebServer] ../../node_modules/.pnpm/@expo-google-fonts+atkinson-hyperlegible@0.4.1/node_modules/@expo-google-fonts/atkinson-hyperlegible/400Regular_Italic/AtkinsonHyperlegible_400Regular_Italic.2badbc897377af4c75f1536a29e24231.ttf [90m(54.2 kB)[39m
 [WebServer] ../../node_modules/.pnpm/@expo-google-fonts+atkinson-hyperlegible@0.4.1/node_modules/@expo-google-fonts/atkinson-hyperlegible/400Regular/AtkinsonHyperlegible_400Regular.59f0f5543754fa6b68a563036eafaaab.ttf [90m(53.5 kB)[39m
@@ -62,17 +62,17 @@ START_EPOCH=1778786895
 [WebServer] ../../node_modules/.pnpm/expo-router@6.0.23_5a0d0b482ec9810f7dfe3d4e8900091f/node_modules/expo-router/assets/pkg.ab19f4cbc543357183a20571f68380a3.png [90m(364 B)[39m
 [WebServer] ../../node_modules/.pnpm/expo-router@6.0.23_5a0d0b482ec9810f7dfe3d4e8900091f/node_modules/expo-router/assets/sitemap.412dd9275b6b48ad28f5e3d81bb1f626.png [90m(465 B)[39m
 [WebServer] ../../node_modules/.pnpm/expo-router@6.0.23_5a0d0b482ec9810f7dfe3d4e8900091f/node_modules/expo-router/assets/unmatched.20e71bdf79e3a97bf55fd9e164041578.png [90m(4.75 kB)[39m
-[WebServer] 
+[WebServer]
 [WebServer] [1m› web bundles (3):[22m
 [WebServer] _expo/static/css/web-6852554d7bd6fbab07d8e2434da6f4cf.css [90m(20.2 kB)[39m
 [WebServer] _expo/static/js/web/index-693ad48f038723380ab1084a462b49ee.js [90m(7.77 MB)[39m
 [WebServer] _expo/static/js/web/index-d2c6002d2c101c33b4a852751fead2ff.js [90m(10.6 kB)[39m
-[WebServer] 
+[WebServer]
 [WebServer] [1m› Files (3):[22m
 [WebServer] favicon.ico [90m(14.5 kB)[39m
 [WebServer] index.html [90m(1.4 kB)[39m
 [WebServer] metadata.json [90m(49 B)[39m
-[WebServer] 
+[WebServer]
 [WebServer] [92mExported: dist[39m
 [WebServer] Static Expo web preview ready on http://127.0.0.1:19006
 [WebServer] npm warn Unknown env config "shamefully-hoist". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
@@ -95,7 +95,7 @@ Running 31 tests using 2 workers
   -   9 [setup] › apps/mobile/e2e-web/helpers/auth.setup.ts:24:8 › seed parent-multi-child and capture owner-with-children storage state (retry #1)
 
 
-  1) [setup] › apps/mobile/e2e-web/helpers/auth.setup.ts:24:8 › seed parent-multi-child and capture owner-with-children storage state 
+  1) [setup] › apps/mobile/e2e-web/helpers/auth.setup.ts:24:8 › seed parent-multi-child and capture owner-with-children storage state
 
     Error: Seeding parent-multi-child failed (500): <!DOCTYPE html>
     <!--[if lt IE 7]> <html class="no-js ie6 oldie" lang="en-US"> <![endif]-->
@@ -138,24 +138,24 @@ Running 31 tests using 2 workers
                     </h1>
                     <h2 class="cf-subheadline" data-translate="error_desc">Worker threw exception</h2>
                 </div><!-- /.header -->
-        
+
                 <section></section><!-- spacer -->
-        
+
                 <div class="cf-section cf-wrapper">
                     <div class="cf-columns two">
                         <div class="cf-column">
                             <h2 data-translate="what_happened">What happened?</h2>
                                 <p>You've requested a page on a website (api-test.mentomate.com) that is on the <a href="https://www.cloudflare.com/5xx-error-landing?utm_source=error_100x" target="_blank">Cloudflare</a> network. An unknown error occurred while rendering the page.</p>
                         </div>
-                        
+
                         <div class="cf-column">
                             <h2 data-translate="what_can_i_do">What can I do?</h2>
                                 <p><strong>If you are the owner of this website:</strong><br />refer to <a href="https://developers.cloudflare.com/workers/observability/errors/" target="_blank">Workers - Errors and Exceptions</a> and check Workers Logs for api-test.mentomate.com.</p>
                         </div>
-                        
+
                     </div>
                 </div><!-- /.section -->
-        
+
                 <div class="cf-error-footer cf-wrapper w-240 lg:w-full py-10 sm:py-4 sm:px-8 mx-auto text-center sm:text-left border-solid border-0 border-t border-gray-300">
         <p class="text-13">
           <span class="cf-footer-item sm:block sm:mb-1">Cloudflare Ray ID: <strong class="font-semibold">9fbc4f0539f90b3d</strong></span>
@@ -167,7 +167,7 @@ Running 31 tests using 2 workers
             <span class="cf-footer-separator sm:hidden">&bull;</span>
           </span>
           <span class="cf-footer-item sm:block sm:mb-1"><span>Performance &amp; security by</span> <a rel="noopener noreferrer" href="https://www.cloudflare.com/5xx-error-landing" id="brand_link" target="_blank">Cloudflare</a></span>
-          
+
         </p>
         <script>(function(){function d(){var b=a.getElementById("cf-footer-item-ip"),c=a.getElementById("cf-footer-ip-reveal");b&&"classList"in b&&(b.classList.remove("hidden"),c.addEventListener("click",function(){c.classList.add("hidden");a.getElementById("cf-footer-ip").classList.remove("hidden")}))}var a=document;document.addEventListener&&a.addEventListener("DOMContentLoaded",d)})();</script>
       </div><!-- /.error-footer -->
@@ -177,9 +177,9 @@ Running 31 tests using 2 workers
 
          <script>
         window._cf_translation = {};
-        
-        
-      </script> 
+
+
+      </script>
     </body>
     </html>
 
@@ -211,7 +211,7 @@ Running 31 tests using 2 workers
 
     ────────────────────────────────────────────────────────────────────────────────────────────────
 
-  2) [setup] › apps/mobile/e2e-web/helpers/auth.setup.ts:24:8 › seed onboarding-complete and capture solo-learner storage state 
+  2) [setup] › apps/mobile/e2e-web/helpers/auth.setup.ts:24:8 › seed onboarding-complete and capture solo-learner storage state
 
     Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
 
@@ -252,9 +252,9 @@ Running 31 tests using 2 workers
     ────────────────────────────────────────────────────────────────────────────────────────────────
 
   1 failed
-    [setup] › apps/mobile/e2e-web/helpers/auth.setup.ts:24:8 › seed parent-multi-child and capture owner-with-children storage state 
+    [setup] › apps/mobile/e2e-web/helpers/auth.setup.ts:24:8 › seed parent-multi-child and capture owner-with-children storage state
   1 flaky
-    [setup] › apps/mobile/e2e-web/helpers/auth.setup.ts:24:8 › seed onboarding-complete and capture solo-learner storage state 
+    [setup] › apps/mobile/e2e-web/helpers/auth.setup.ts:24:8 › seed onboarding-complete and capture solo-learner storage state
   24 did not run
   5 passed (1.8m)
  ELIFECYCLE  Command failed with exit code 1.

@@ -73,7 +73,7 @@ Internal error: step id not found: fixture@71
     at i.<anonymous> (/Users/vetinari/_dev/eduagent-build/.claude/worktrees/e2e-p5/node_modules/.pnpm/playwright@1.56.1/node_modules/playwright/lib/program.js:71:7)
 
 
-  1) [role-transitions] › apps/mobile/e2e-web/flows/journeys/j04-parent-inline-learn.spec.ts:4:5 › J-04 parent taps child card to open child progress 
+  1) [role-transitions] › apps/mobile/e2e-web/flows/journeys/j04-parent-inline-learn.spec.ts:4:5 › J-04 parent taps child card to open child progress
 
     Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
 
@@ -155,7 +155,7 @@ Internal error: step id not found: fixture@71
 
     ────────────────────────────────────────────────────────────────────────────────────────────────
 
-  2) [role-transitions] › apps/mobile/e2e-web/flows/journeys/j05-parent-switch-to-child.spec.ts:5:5 › J-05 parent opens a linked child progress view from home 
+  2) [role-transitions] › apps/mobile/e2e-web/flows/journeys/j05-parent-switch-to-child.spec.ts:5:5 › J-05 parent opens a linked child progress view from home
 
     Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
 
@@ -237,7 +237,7 @@ Internal error: step id not found: fixture@71
 
     ────────────────────────────────────────────────────────────────────────────────────────────────
 
-  3) [role-transitions] › apps/mobile/e2e-web/flows/journeys/j06-child-switch-to-parent.spec.ts:5:5 › J-06 parent opens child progress and returns home 
+  3) [role-transitions] › apps/mobile/e2e-web/flows/journeys/j06-child-switch-to-parent.spec.ts:5:5 › J-06 parent opens child progress and returns home
 
     Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
 
@@ -319,7 +319,7 @@ Internal error: step id not found: fixture@71
 
     ────────────────────────────────────────────────────────────────────────────────────────────────
 
-  4) [role-transitions] › apps/mobile/e2e-web/flows/journeys/j07-parent-dashboard-drilldown.spec.ts:5:5 › J-07 parent → child progress → session recap → back to parent home 
+  4) [role-transitions] › apps/mobile/e2e-web/flows/journeys/j07-parent-dashboard-drilldown.spec.ts:5:5 › J-07 parent → child progress → session recap → back to parent home
 
     Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
 
@@ -401,7 +401,7 @@ Internal error: step id not found: fixture@71
 
     ────────────────────────────────────────────────────────────────────────────────────────────────
 
-  5) [later-phases] › apps/mobile/e2e-web/flows/journeys/j08-ask-freeform-session-summary.spec.ts:9:5 › J-08 learner → Ask → freeform chat → end session → summary → home 
+  5) [later-phases] › apps/mobile/e2e-web/flows/journeys/j08-ask-freeform-session-summary.spec.ts:9:5 › J-08 learner → Ask → freeform chat → end session → summary → home
 
     Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
 
@@ -483,7 +483,7 @@ Internal error: step id not found: fixture@71
 
     ────────────────────────────────────────────────────────────────────────────────────────────────
 
-  6) [later-phases] › apps/mobile/e2e-web/flows/journeys/j09-learn-create-subject-onboarding.spec.ts:25:5 › J-09 learner → Add a subject → language setup → session chat 
+  6) [later-phases] › apps/mobile/e2e-web/flows/journeys/j09-learn-create-subject-onboarding.spec.ts:25:5 › J-09 learner → Add a subject → language setup → session chat
 
     Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
 
@@ -565,7 +565,7 @@ Internal error: step id not found: fixture@71
 
     ────────────────────────────────────────────────────────────────────────────────────────────────
 
-  7) [later-phases] › apps/mobile/e2e-web/flows/journeys/j10-practice-quiz-cycle.spec.ts:8:5 › J-10 learner → Practice → Quiz → launch → play → results → home 
+  7) [later-phases] › apps/mobile/e2e-web/flows/journeys/j10-practice-quiz-cycle.spec.ts:8:5 › J-10 learner → Practice → Quiz → launch → play → results → home
 
     Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
 
@@ -647,7 +647,7 @@ Internal error: step id not found: fixture@71
 
     ────────────────────────────────────────────────────────────────────────────────────────────────
 
-  8) [later-phases] › apps/mobile/e2e-web/flows/journeys/j13-consent-pending-parent-approval.spec.ts:6:5 › J-13 pending consent blocks app until parent approval completes 
+  8) [later-phases] › apps/mobile/e2e-web/flows/journeys/j13-consent-pending-parent-approval.spec.ts:6:5 › J-13 pending consent blocks app until parent approval completes
 
     Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
 
@@ -737,7 +737,7 @@ Internal error: step id not found: fixture@71
 
     ────────────────────────────────────────────────────────────────────────────────────────────────
 
-  9) [later-phases] › apps/mobile/e2e-web/flows/journeys/j16-parent-drilldown-back-chain.spec.ts:9:5 › J-16 parent drill-down reaches topic detail and unwinds cleanly 
+  9) [later-phases] › apps/mobile/e2e-web/flows/journeys/j16-parent-drilldown-back-chain.spec.ts:9:5 › J-16 parent drill-down reaches topic detail and unwinds cleanly
 
     Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
 
@@ -819,7 +819,7 @@ Internal error: step id not found: fixture@71
 
     ────────────────────────────────────────────────────────────────────────────────────────────────
 
-  10) [later-phases] › apps/mobile/e2e-web/flows/journeys/j17-parent-session-recap-copy.spec.ts:9:5 › J-17 parent opens a session recap and copies the conversation prompt 
+  10) [later-phases] › apps/mobile/e2e-web/flows/journeys/j17-parent-session-recap-copy.spec.ts:9:5 › J-17 parent opens a session recap and copies the conversation prompt
 
     Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
 
@@ -901,7 +901,7 @@ Internal error: step id not found: fixture@71
 
     ────────────────────────────────────────────────────────────────────────────────────────────────
 
-  11) [later-phases] › apps/mobile/e2e-web/flows/auth/w03-deep-link-auth-redirect.spec.ts:7:5 › W-03 deep link to authenticated route redirects to sign-in and back 
+  11) [later-phases] › apps/mobile/e2e-web/flows/auth/w03-deep-link-auth-redirect.spec.ts:7:5 › W-03 deep link to authenticated route redirects to sign-in and back
 
     Error: Seeding onboarding-complete failed (500): {"code":"INTERNAL_ERROR","message":"timeout exceeded when trying to connect"}
 
@@ -933,7 +933,7 @@ Internal error: step id not found: fixture@71
 
     ────────────────────────────────────────────────────────────────────────────────────────────────
 
-  12) [later-phases] › apps/mobile/e2e-web/flows/journeys/j11-library-to-book-session.spec.ts:9:5 › J-11 learner → Library → shelf → book → start learning 
+  12) [later-phases] › apps/mobile/e2e-web/flows/journeys/j11-library-to-book-session.spec.ts:9:5 › J-11 learner → Library → shelf → book → start learning
 
     Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
 
@@ -974,7 +974,7 @@ Internal error: step id not found: fixture@71
 
     ────────────────────────────────────────────────────────────────────────────────────────────────
 
-  13) [later-phases] › apps/mobile/e2e-web/flows/journeys/j12-pre-profile-create-profile.spec.ts:5:5 › J-12 new user → create profile → lands on learner home 
+  13) [later-phases] › apps/mobile/e2e-web/flows/journeys/j12-pre-profile-create-profile.spec.ts:5:5 › J-12 new user → create profile → lands on learner home
 
     Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
 
@@ -1015,7 +1015,7 @@ Internal error: step id not found: fixture@71
 
     ────────────────────────────────────────────────────────────────────────────────────────────────
 
-  14) [later-phases] › apps/mobile/e2e-web/flows/journeys/j19-subscription-paywall-ui.spec.ts:25:5 › J-19 free-tier learner sees subscription paywall with static tier comparison on web 
+  14) [later-phases] › apps/mobile/e2e-web/flows/journeys/j19-subscription-paywall-ui.spec.ts:25:5 › J-19 free-tier learner sees subscription paywall with static tier comparison on web
 
     Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
 
@@ -1056,7 +1056,7 @@ Internal error: step id not found: fixture@71
 
     ────────────────────────────────────────────────────────────────────────────────────────────────
 
-  15) [later-phases] › apps/mobile/e2e-web/flows/navigation/w04-browser-history-stack.spec.ts:12:5 › W-04 practice to quiz keeps the contextual web stack coherent 
+  15) [later-phases] › apps/mobile/e2e-web/flows/navigation/w04-browser-history-stack.spec.ts:12:5 › W-04 practice to quiz keeps the contextual web stack coherent
 
     Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
 
@@ -1098,22 +1098,22 @@ Internal error: step id not found: fixture@71
     ────────────────────────────────────────────────────────────────────────────────────────────────
 
   10 failed
-    [role-transitions] › apps/mobile/e2e-web/flows/journeys/j04-parent-inline-learn.spec.ts:4:5 › J-04 parent taps child card to open child progress 
-    [role-transitions] › apps/mobile/e2e-web/flows/journeys/j05-parent-switch-to-child.spec.ts:5:5 › J-05 parent opens a linked child progress view from home 
-    [role-transitions] › apps/mobile/e2e-web/flows/journeys/j06-child-switch-to-parent.spec.ts:5:5 › J-06 parent opens child progress and returns home 
-    [role-transitions] › apps/mobile/e2e-web/flows/journeys/j07-parent-dashboard-drilldown.spec.ts:5:5 › J-07 parent → child progress → session recap → back to parent home 
-    [later-phases] › apps/mobile/e2e-web/flows/journeys/j08-ask-freeform-session-summary.spec.ts:9:5 › J-08 learner → Ask → freeform chat → end session → summary → home 
-    [later-phases] › apps/mobile/e2e-web/flows/journeys/j09-learn-create-subject-onboarding.spec.ts:25:5 › J-09 learner → Add a subject → language setup → session chat 
-    [later-phases] › apps/mobile/e2e-web/flows/journeys/j10-practice-quiz-cycle.spec.ts:8:5 › J-10 learner → Practice → Quiz → launch → play → results → home 
-    [later-phases] › apps/mobile/e2e-web/flows/journeys/j13-consent-pending-parent-approval.spec.ts:6:5 › J-13 pending consent blocks app until parent approval completes 
-    [later-phases] › apps/mobile/e2e-web/flows/journeys/j16-parent-drilldown-back-chain.spec.ts:9:5 › J-16 parent drill-down reaches topic detail and unwinds cleanly 
-    [later-phases] › apps/mobile/e2e-web/flows/journeys/j17-parent-session-recap-copy.spec.ts:9:5 › J-17 parent opens a session recap and copies the conversation prompt 
+    [role-transitions] › apps/mobile/e2e-web/flows/journeys/j04-parent-inline-learn.spec.ts:4:5 › J-04 parent taps child card to open child progress
+    [role-transitions] › apps/mobile/e2e-web/flows/journeys/j05-parent-switch-to-child.spec.ts:5:5 › J-05 parent opens a linked child progress view from home
+    [role-transitions] › apps/mobile/e2e-web/flows/journeys/j06-child-switch-to-parent.spec.ts:5:5 › J-06 parent opens child progress and returns home
+    [role-transitions] › apps/mobile/e2e-web/flows/journeys/j07-parent-dashboard-drilldown.spec.ts:5:5 › J-07 parent → child progress → session recap → back to parent home
+    [later-phases] › apps/mobile/e2e-web/flows/journeys/j08-ask-freeform-session-summary.spec.ts:9:5 › J-08 learner → Ask → freeform chat → end session → summary → home
+    [later-phases] › apps/mobile/e2e-web/flows/journeys/j09-learn-create-subject-onboarding.spec.ts:25:5 › J-09 learner → Add a subject → language setup → session chat
+    [later-phases] › apps/mobile/e2e-web/flows/journeys/j10-practice-quiz-cycle.spec.ts:8:5 › J-10 learner → Practice → Quiz → launch → play → results → home
+    [later-phases] › apps/mobile/e2e-web/flows/journeys/j13-consent-pending-parent-approval.spec.ts:6:5 › J-13 pending consent blocks app until parent approval completes
+    [later-phases] › apps/mobile/e2e-web/flows/journeys/j16-parent-drilldown-back-chain.spec.ts:9:5 › J-16 parent drill-down reaches topic detail and unwinds cleanly
+    [later-phases] › apps/mobile/e2e-web/flows/journeys/j17-parent-session-recap-copy.spec.ts:9:5 › J-17 parent opens a session recap and copies the conversation prompt
   5 flaky
-    [later-phases] › apps/mobile/e2e-web/flows/auth/w03-deep-link-auth-redirect.spec.ts:7:5 › W-03 deep link to authenticated route redirects to sign-in and back 
-    [later-phases] › apps/mobile/e2e-web/flows/journeys/j11-library-to-book-session.spec.ts:9:5 › J-11 learner → Library → shelf → book → start learning 
-    [later-phases] › apps/mobile/e2e-web/flows/journeys/j12-pre-profile-create-profile.spec.ts:5:5 › J-12 new user → create profile → lands on learner home 
-    [later-phases] › apps/mobile/e2e-web/flows/journeys/j19-subscription-paywall-ui.spec.ts:25:5 › J-19 free-tier learner sees subscription paywall with static tier comparison on web 
-    [later-phases] › apps/mobile/e2e-web/flows/navigation/w04-browser-history-stack.spec.ts:12:5 › W-04 practice to quiz keeps the contextual web stack coherent 
+    [later-phases] › apps/mobile/e2e-web/flows/auth/w03-deep-link-auth-redirect.spec.ts:7:5 › W-03 deep link to authenticated route redirects to sign-in and back
+    [later-phases] › apps/mobile/e2e-web/flows/journeys/j11-library-to-book-session.spec.ts:9:5 › J-11 learner → Library → shelf → book → start learning
+    [later-phases] › apps/mobile/e2e-web/flows/journeys/j12-pre-profile-create-profile.spec.ts:5:5 › J-12 new user → create profile → lands on learner home
+    [later-phases] › apps/mobile/e2e-web/flows/journeys/j19-subscription-paywall-ui.spec.ts:25:5 › J-19 free-tier learner sees subscription paywall with static tier comparison on web
+    [later-phases] › apps/mobile/e2e-web/flows/navigation/w04-browser-history-stack.spec.ts:12:5 › W-04 practice to quiz keeps the contextual web stack coherent
   16 passed (11.2m)
  ELIFECYCLE  Command failed with exit code 1.
 END_EPOCH=1778788588

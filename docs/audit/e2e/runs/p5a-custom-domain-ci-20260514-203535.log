@@ -35,7 +35,7 @@ START_EPOCH=1778783735
 [WebServer] [1mWeb[22m [0m[2mapps/mobile/[22m[0m[1mindex.js[22m [32m[42m▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓[49m[39m[47m[37m░[39m[49m[1m 99.9% [22m[2m(2689/2690)[22m
 [WebServer] [1mWeb[22m [0m[2mapps/mobile/[22m[0m[1mindex.js[22m [32m[42m▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓[49m[39m[47m[37m░[39m[49m[1m 99.9% [22m[2m(2690/2690)[22m
 [WebServer] [32m[1mWeb[22m Bundled [39m[2m45659ms[22m[0m[2m apps/mobile/index.js (2690 modules)[22m[0m
-[WebServer] 
+[WebServer]
 [WebServer] [1m› Assets (41):[22m
 [WebServer] ../../node_modules/.pnpm/@expo-google-fonts+atkinson-hyperlegible@0.4.1/node_modules/@expo-google-fonts/atkinson-hyperlegible/400Regular_Italic/AtkinsonHyperlegible_400Regular_Italic.2badbc897377af4c75f1536a29e24231.ttf [90m(54.2 kB)[39m
 [WebServer] ../../node_modules/.pnpm/@expo-google-fonts+atkinson-hyperlegible@0.4.1/node_modules/@expo-google-fonts/atkinson-hyperlegible/400Regular/AtkinsonHyperlegible_400Regular.59f0f5543754fa6b68a563036eafaaab.ttf [90m(53.5 kB)[39m
@@ -72,17 +72,17 @@ START_EPOCH=1778783735
 [WebServer] ../../node_modules/.pnpm/expo-router@6.0.23_5a0d0b482ec9810f7dfe3d4e8900091f/node_modules/expo-router/assets/pkg.ab19f4cbc543357183a20571f68380a3.png [90m(364 B)[39m
 [WebServer] ../../node_modules/.pnpm/expo-router@6.0.23_5a0d0b482ec9810f7dfe3d4e8900091f/node_modules/expo-router/assets/sitemap.412dd9275b6b48ad28f5e3d81bb1f626.png [90m(465 B)[39m
 [WebServer] ../../node_modules/.pnpm/expo-router@6.0.23_5a0d0b482ec9810f7dfe3d4e8900091f/node_modules/expo-router/assets/unmatched.20e71bdf79e3a97bf55fd9e164041578.png [90m(4.75 kB)[39m
-[WebServer] 
+[WebServer]
 [WebServer] [1m› web bundles (3):[22m
 [WebServer] _expo/static/css/web-6852554d7bd6fbab07d8e2434da6f4cf.css [90m(20.2 kB)[39m
 [WebServer] _expo/static/js/web/index-693ad48f038723380ab1084a462b49ee.js [90m(7.77 MB)[39m
 [WebServer] _expo/static/js/web/index-d2c6002d2c101c33b4a852751fead2ff.js [90m(10.6 kB)[39m
-[WebServer] 
+[WebServer]
 [WebServer] [1m› Files (3):[22m
 [WebServer] favicon.ico [90m(14.5 kB)[39m
 [WebServer] index.html [90m(1.4 kB)[39m
 [WebServer] metadata.json [90m(49 B)[39m
-[WebServer] 
+[WebServer]
 [WebServer] [92mExported: dist[39m
 [WebServer] Static Expo web preview ready on http://127.0.0.1:19006
 [dotenv@17.2.2] injecting env (0) from .env.local,.env -- tip: 📡 observe env with Radar: https://dotenvx.com/radar
@@ -147,7 +147,7 @@ Running 31 tests using 4 workers
   ✘  56 [later-phases] › apps/mobile/e2e-web/flows/navigation/w05-tab-routes-render-correct-screen.spec.ts:8:5 › W-05 tab URLs render the correct screen on web (retry #1) (524ms)
 
 
-  1) [smoke-learner] › apps/mobile/e2e-web/flows/journeys/j01-ux-pass.spec.ts:23:5 › single learner UX screenshot crawl 
+  1) [smoke-learner] › apps/mobile/e2e-web/flows/journeys/j01-ux-pass.spec.ts:23:5 › single learner UX screenshot crawl
 
     Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
 
@@ -220,7 +220,7 @@ Running 31 tests using 4 workers
 
     ────────────────────────────────────────────────────────────────────────────────────────────────
 
-  2) [smoke-parent] › apps/mobile/e2e-web/flows/journeys/j03-parent-gateway.spec.ts:3:5 › J-03 seeded parent lands on parent home @smoke 
+  2) [smoke-parent] › apps/mobile/e2e-web/flows/journeys/j03-parent-gateway.spec.ts:3:5 › J-03 seeded parent lands on parent home @smoke
 
     Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
 
@@ -293,7 +293,7 @@ Running 31 tests using 4 workers
 
     ────────────────────────────────────────────────────────────────────────────────────────────────
 
-  3) [role-transitions] › apps/mobile/e2e-web/flows/journeys/j04-parent-inline-learn.spec.ts:4:5 › J-04 parent taps child card to open child progress 
+  3) [role-transitions] › apps/mobile/e2e-web/flows/journeys/j04-parent-inline-learn.spec.ts:4:5 › J-04 parent taps child card to open child progress
 
     Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
 
@@ -366,7 +366,7 @@ Running 31 tests using 4 workers
 
     ────────────────────────────────────────────────────────────────────────────────────────────────
 
-  4) [role-transitions] › apps/mobile/e2e-web/flows/journeys/j05-parent-switch-to-child.spec.ts:5:5 › J-05 parent opens a linked child progress view from home 
+  4) [role-transitions] › apps/mobile/e2e-web/flows/journeys/j05-parent-switch-to-child.spec.ts:5:5 › J-05 parent opens a linked child progress view from home
 
     Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
 
@@ -439,7 +439,7 @@ Running 31 tests using 4 workers
 
     ────────────────────────────────────────────────────────────────────────────────────────────────
 
-  5) [role-transitions] › apps/mobile/e2e-web/flows/journeys/j06-child-switch-to-parent.spec.ts:5:5 › J-06 parent opens child progress and returns home 
+  5) [role-transitions] › apps/mobile/e2e-web/flows/journeys/j06-child-switch-to-parent.spec.ts:5:5 › J-06 parent opens child progress and returns home
 
     Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home
     Call log:
@@ -503,7 +503,7 @@ Running 31 tests using 4 workers
 
     ────────────────────────────────────────────────────────────────────────────────────────────────
 
-  6) [role-transitions] › apps/mobile/e2e-web/flows/journeys/j07-parent-dashboard-drilldown.spec.ts:5:5 › J-07 parent → child progress → session recap → back to parent home 
+  6) [role-transitions] › apps/mobile/e2e-web/flows/journeys/j07-parent-dashboard-drilldown.spec.ts:5:5 › J-07 parent → child progress → session recap → back to parent home
 
     Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home
     Call log:
@@ -567,7 +567,7 @@ Running 31 tests using 4 workers
 
     ────────────────────────────────────────────────────────────────────────────────────────────────
 
-  7) [later-phases] › apps/mobile/e2e-web/flows/auth/w03-deep-link-auth-redirect.spec.ts:7:5 › W-03 deep link to authenticated route redirects to sign-in and back 
+  7) [later-phases] › apps/mobile/e2e-web/flows/auth/w03-deep-link-auth-redirect.spec.ts:7:5 › W-03 deep link to authenticated route redirects to sign-in and back
 
     Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/quiz
     Call log:
@@ -631,7 +631,7 @@ Running 31 tests using 4 workers
 
     ────────────────────────────────────────────────────────────────────────────────────────────────
 
-  8) [later-phases] › apps/mobile/e2e-web/flows/journeys/j08-ask-freeform-session-summary.spec.ts:9:5 › J-08 learner → Ask → freeform chat → end session → summary → home 
+  8) [later-phases] › apps/mobile/e2e-web/flows/journeys/j08-ask-freeform-session-summary.spec.ts:9:5 › J-08 learner → Ask → freeform chat → end session → summary → home
 
     Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home
     Call log:
@@ -695,7 +695,7 @@ Running 31 tests using 4 workers
 
     ────────────────────────────────────────────────────────────────────────────────────────────────
 
-  9) [later-phases] › apps/mobile/e2e-web/flows/journeys/j09-learn-create-subject-onboarding.spec.ts:25:5 › J-09 learner → Add a subject → language setup → session chat 
+  9) [later-phases] › apps/mobile/e2e-web/flows/journeys/j09-learn-create-subject-onboarding.spec.ts:25:5 › J-09 learner → Add a subject → language setup → session chat
 
     Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/sign-in
     Call log:
@@ -767,7 +767,7 @@ Running 31 tests using 4 workers
 
     ────────────────────────────────────────────────────────────────────────────────────────────────
 
-  10) [later-phases] › apps/mobile/e2e-web/flows/journeys/j10-practice-quiz-cycle.spec.ts:8:5 › J-10 learner → Practice → Quiz → launch → play → results → home 
+  10) [later-phases] › apps/mobile/e2e-web/flows/journeys/j10-practice-quiz-cycle.spec.ts:8:5 › J-10 learner → Practice → Quiz → launch → play → results → home
 
     Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home
     Call log:
@@ -831,7 +831,7 @@ Running 31 tests using 4 workers
 
     ────────────────────────────────────────────────────────────────────────────────────────────────
 
-  11) [later-phases] › apps/mobile/e2e-web/flows/journeys/j11-library-to-book-session.spec.ts:9:5 › J-11 learner → Library → shelf → book → start learning 
+  11) [later-phases] › apps/mobile/e2e-web/flows/journeys/j11-library-to-book-session.spec.ts:9:5 › J-11 learner → Library → shelf → book → start learning
 
     Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home
     Call log:
@@ -895,7 +895,7 @@ Running 31 tests using 4 workers
 
     ────────────────────────────────────────────────────────────────────────────────────────────────
 
-  12) [later-phases] › apps/mobile/e2e-web/flows/journeys/j12-pre-profile-create-profile.spec.ts:5:5 › J-12 new user → create profile → lands on learner home 
+  12) [later-phases] › apps/mobile/e2e-web/flows/journeys/j12-pre-profile-create-profile.spec.ts:5:5 › J-12 new user → create profile → lands on learner home
 
     Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/sign-in
     Call log:
@@ -967,7 +967,7 @@ Running 31 tests using 4 workers
 
     ────────────────────────────────────────────────────────────────────────────────────────────────
 
-  13) [later-phases] › apps/mobile/e2e-web/flows/journeys/j13-consent-pending-parent-approval.spec.ts:6:5 › J-13 pending consent blocks app until parent approval completes 
+  13) [later-phases] › apps/mobile/e2e-web/flows/journeys/j13-consent-pending-parent-approval.spec.ts:6:5 › J-13 pending consent blocks app until parent approval completes
 
     Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/sign-in
     Call log:
@@ -1039,7 +1039,7 @@ Running 31 tests using 4 workers
 
     ────────────────────────────────────────────────────────────────────────────────────────────────
 
-  14) [later-phases] › apps/mobile/e2e-web/flows/journeys/j14-loading-timeout-fallback.spec.ts:7:5 › J-14 profile loading resolves without dead-end 
+  14) [later-phases] › apps/mobile/e2e-web/flows/journeys/j14-loading-timeout-fallback.spec.ts:7:5 › J-14 profile loading resolves without dead-end
 
     Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home
     Call log:
@@ -1103,7 +1103,7 @@ Running 31 tests using 4 workers
 
     ────────────────────────────────────────────────────────────────────────────────────────────────
 
-  15) [later-phases] › apps/mobile/e2e-web/flows/journeys/j15-parent-solo-add-first-child.spec.ts:5:5 › J-15 family-plan parent with no children sees add-first-child CTA 
+  15) [later-phases] › apps/mobile/e2e-web/flows/journeys/j15-parent-solo-add-first-child.spec.ts:5:5 › J-15 family-plan parent with no children sees add-first-child CTA
 
     Error: Seeding parent-solo failed (500): <!DOCTYPE html>
     <!--[if lt IE 7]> <html class="no-js ie6 oldie" lang="en-US"> <![endif]-->
@@ -1146,24 +1146,24 @@ Running 31 tests using 4 workers
                     </h1>
                     <h2 class="cf-subheadline" data-translate="error_desc">Worker threw exception</h2>
                 </div><!-- /.header -->
-        
+
                 <section></section><!-- spacer -->
-        
+
                 <div class="cf-section cf-wrapper">
                     <div class="cf-columns two">
                         <div class="cf-column">
                             <h2 data-translate="what_happened">What happened?</h2>
                                 <p>You've requested a page on a website (api-test.mentomate.com) that is on the <a href="https://www.cloudflare.com/5xx-error-landing?utm_source=error_100x" target="_blank">Cloudflare</a> network. An unknown error occurred while rendering the page.</p>
                         </div>
-                        
+
                         <div class="cf-column">
                             <h2 data-translate="what_can_i_do">What can I do?</h2>
                                 <p><strong>If you are the owner of this website:</strong><br />refer to <a href="https://developers.cloudflare.com/workers/observability/errors/" target="_blank">Workers - Errors and Exceptions</a> and check Workers Logs for api-test.mentomate.com.</p>
                         </div>
-                        
+
                     </div>
                 </div><!-- /.section -->
-        
+
                 <div class="cf-error-footer cf-wrapper w-240 lg:w-full py-10 sm:py-4 sm:px-8 mx-auto text-center sm:text-left border-solid border-0 border-t border-gray-300">
         <p class="text-13">
           <span class="cf-footer-item sm:block sm:mb-1">Cloudflare Ray ID: <strong class="font-semibold">9fbc07c94dc15696</strong></span>
@@ -1175,7 +1175,7 @@ Running 31 tests using 4 workers
             <span class="cf-footer-separator sm:hidden">&bull;</span>
           </span>
           <span class="cf-footer-item sm:block sm:mb-1"><span>Performance &amp; security by</span> <a rel="noopener noreferrer" href="https://www.cloudflare.com/5xx-error-landing" id="brand_link" target="_blank">Cloudflare</a></span>
-          
+
         </p>
         <script>(function(){function d(){var b=a.getElementById("cf-footer-item-ip"),c=a.getElementById("cf-footer-ip-reveal");b&&"classList"in b&&(b.classList.remove("hidden"),c.addEventListener("click",function(){c.classList.add("hidden");a.getElementById("cf-footer-ip").classList.remove("hidden")}))}var a=document;document.addEventListener&&a.addEventListener("DOMContentLoaded",d)})();</script>
       </div><!-- /.error-footer -->
@@ -1185,9 +1185,9 @@ Running 31 tests using 4 workers
 
          <script>
         window._cf_translation = {};
-        
-        
-      </script> 
+
+
+      </script>
     </body>
     </html>
 
@@ -1256,7 +1256,7 @@ Running 31 tests using 4 workers
 
     ────────────────────────────────────────────────────────────────────────────────────────────────
 
-  16) [later-phases] › apps/mobile/e2e-web/flows/journeys/j16-parent-drilldown-back-chain.spec.ts:9:5 › J-16 parent drill-down reaches topic detail and unwinds cleanly 
+  16) [later-phases] › apps/mobile/e2e-web/flows/journeys/j16-parent-drilldown-back-chain.spec.ts:9:5 › J-16 parent drill-down reaches topic detail and unwinds cleanly
 
     Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home
     Call log:
@@ -1320,7 +1320,7 @@ Running 31 tests using 4 workers
 
     ────────────────────────────────────────────────────────────────────────────────────────────────
 
-  17) [later-phases] › apps/mobile/e2e-web/flows/journeys/j17-parent-session-recap-copy.spec.ts:9:5 › J-17 parent opens a session recap and copies the conversation prompt 
+  17) [later-phases] › apps/mobile/e2e-web/flows/journeys/j17-parent-session-recap-copy.spec.ts:9:5 › J-17 parent opens a session recap and copies the conversation prompt
 
     Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home
     Call log:
@@ -1384,7 +1384,7 @@ Running 31 tests using 4 workers
 
     ────────────────────────────────────────────────────────────────────────────────────────────────
 
-  18) [later-phases] › apps/mobile/e2e-web/flows/journeys/j18-invalid-saved-profile-fallback.spec.ts:8:5 › J-18 invalid saved profile falls back to the owner profile 
+  18) [later-phases] › apps/mobile/e2e-web/flows/journeys/j18-invalid-saved-profile-fallback.spec.ts:8:5 › J-18 invalid saved profile falls back to the owner profile
 
     Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home
     Call log:
@@ -1448,7 +1448,7 @@ Running 31 tests using 4 workers
 
     ────────────────────────────────────────────────────────────────────────────────────────────────
 
-  19) [later-phases] › apps/mobile/e2e-web/flows/journeys/j19-subscription-paywall-ui.spec.ts:25:5 › J-19 free-tier learner sees subscription paywall with static tier comparison on web 
+  19) [later-phases] › apps/mobile/e2e-web/flows/journeys/j19-subscription-paywall-ui.spec.ts:25:5 › J-19 free-tier learner sees subscription paywall with static tier comparison on web
 
     Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/more
     Call log:
@@ -1512,7 +1512,7 @@ Running 31 tests using 4 workers
 
     ────────────────────────────────────────────────────────────────────────────────────────────────
 
-  20) [later-phases] › apps/mobile/e2e-web/flows/navigation/w01-no-bleed-through-fullscreen.spec.ts:8:5 › W-01 full-screen routes hide the tab bar and prior scene content 
+  20) [later-phases] › apps/mobile/e2e-web/flows/navigation/w01-no-bleed-through-fullscreen.spec.ts:8:5 › W-01 full-screen routes hide the tab bar and prior scene content
 
     Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home
     Call log:
@@ -1576,7 +1576,7 @@ Running 31 tests using 4 workers
 
     ────────────────────────────────────────────────────────────────────────────────────────────────
 
-  21) [later-phases] › apps/mobile/e2e-web/flows/navigation/w02-go-back-or-replace-empty-history.spec.ts:8:5 › W-02 goBackOrReplace falls back when a direct URL has no browser history 
+  21) [later-phases] › apps/mobile/e2e-web/flows/navigation/w02-go-back-or-replace-empty-history.spec.ts:8:5 › W-02 goBackOrReplace falls back when a direct URL has no browser history
 
     Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/quiz
     Call log:
@@ -1640,7 +1640,7 @@ Running 31 tests using 4 workers
 
     ────────────────────────────────────────────────────────────────────────────────────────────────
 
-  22) [later-phases] › apps/mobile/e2e-web/flows/navigation/w04-browser-history-stack.spec.ts:12:5 › W-04 practice to quiz keeps the contextual web stack coherent 
+  22) [later-phases] › apps/mobile/e2e-web/flows/navigation/w04-browser-history-stack.spec.ts:12:5 › W-04 practice to quiz keeps the contextual web stack coherent
 
     Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home
     Call log:
@@ -1704,7 +1704,7 @@ Running 31 tests using 4 workers
 
     ────────────────────────────────────────────────────────────────────────────────────────────────
 
-  23) [later-phases] › apps/mobile/e2e-web/flows/navigation/w05-tab-routes-render-correct-screen.spec.ts:8:5 › W-05 tab URLs render the correct screen on web 
+  23) [later-phases] › apps/mobile/e2e-web/flows/navigation/w05-tab-routes-render-correct-screen.spec.ts:8:5 › W-05 tab URLs render the correct screen on web
 
     Error: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:19006/home
     Call log:
@@ -1768,7 +1768,7 @@ Running 31 tests using 4 workers
 
     ────────────────────────────────────────────────────────────────────────────────────────────────
 
-  24) [setup] › apps/mobile/e2e-web/helpers/auth.setup.ts:24:8 › seed parent-multi-child and capture owner-with-children storage state 
+  24) [setup] › apps/mobile/e2e-web/helpers/auth.setup.ts:24:8 › seed parent-multi-child and capture owner-with-children storage state
 
     TimeoutError: locator.waitFor: Timeout 60000ms exceeded.
     Call log:
@@ -1807,31 +1807,31 @@ Running 31 tests using 4 workers
     ────────────────────────────────────────────────────────────────────────────────────────────────
 
   23 failed
-    [smoke-learner] › apps/mobile/e2e-web/flows/journeys/j01-ux-pass.spec.ts:23:5 › single learner UX screenshot crawl 
-    [smoke-parent] › apps/mobile/e2e-web/flows/journeys/j03-parent-gateway.spec.ts:3:5 › J-03 seeded parent lands on parent home @smoke 
-    [role-transitions] › apps/mobile/e2e-web/flows/journeys/j04-parent-inline-learn.spec.ts:4:5 › J-04 parent taps child card to open child progress 
-    [role-transitions] › apps/mobile/e2e-web/flows/journeys/j05-parent-switch-to-child.spec.ts:5:5 › J-05 parent opens a linked child progress view from home 
-    [role-transitions] › apps/mobile/e2e-web/flows/journeys/j06-child-switch-to-parent.spec.ts:5:5 › J-06 parent opens child progress and returns home 
-    [role-transitions] › apps/mobile/e2e-web/flows/journeys/j07-parent-dashboard-drilldown.spec.ts:5:5 › J-07 parent → child progress → session recap → back to parent home 
-    [later-phases] › apps/mobile/e2e-web/flows/auth/w03-deep-link-auth-redirect.spec.ts:7:5 › W-03 deep link to authenticated route redirects to sign-in and back 
-    [later-phases] › apps/mobile/e2e-web/flows/journeys/j08-ask-freeform-session-summary.spec.ts:9:5 › J-08 learner → Ask → freeform chat → end session → summary → home 
-    [later-phases] › apps/mobile/e2e-web/flows/journeys/j09-learn-create-subject-onboarding.spec.ts:25:5 › J-09 learner → Add a subject → language setup → session chat 
-    [later-phases] › apps/mobile/e2e-web/flows/journeys/j10-practice-quiz-cycle.spec.ts:8:5 › J-10 learner → Practice → Quiz → launch → play → results → home 
-    [later-phases] › apps/mobile/e2e-web/flows/journeys/j11-library-to-book-session.spec.ts:9:5 › J-11 learner → Library → shelf → book → start learning 
-    [later-phases] › apps/mobile/e2e-web/flows/journeys/j12-pre-profile-create-profile.spec.ts:5:5 › J-12 new user → create profile → lands on learner home 
-    [later-phases] › apps/mobile/e2e-web/flows/journeys/j13-consent-pending-parent-approval.spec.ts:6:5 › J-13 pending consent blocks app until parent approval completes 
-    [later-phases] › apps/mobile/e2e-web/flows/journeys/j14-loading-timeout-fallback.spec.ts:7:5 › J-14 profile loading resolves without dead-end 
-    [later-phases] › apps/mobile/e2e-web/flows/journeys/j15-parent-solo-add-first-child.spec.ts:5:5 › J-15 family-plan parent with no children sees add-first-child CTA 
-    [later-phases] › apps/mobile/e2e-web/flows/journeys/j16-parent-drilldown-back-chain.spec.ts:9:5 › J-16 parent drill-down reaches topic detail and unwinds cleanly 
-    [later-phases] › apps/mobile/e2e-web/flows/journeys/j17-parent-session-recap-copy.spec.ts:9:5 › J-17 parent opens a session recap and copies the conversation prompt 
-    [later-phases] › apps/mobile/e2e-web/flows/journeys/j18-invalid-saved-profile-fallback.spec.ts:8:5 › J-18 invalid saved profile falls back to the owner profile 
-    [later-phases] › apps/mobile/e2e-web/flows/journeys/j19-subscription-paywall-ui.spec.ts:25:5 › J-19 free-tier learner sees subscription paywall with static tier comparison on web 
-    [later-phases] › apps/mobile/e2e-web/flows/navigation/w01-no-bleed-through-fullscreen.spec.ts:8:5 › W-01 full-screen routes hide the tab bar and prior scene content 
-    [later-phases] › apps/mobile/e2e-web/flows/navigation/w02-go-back-or-replace-empty-history.spec.ts:8:5 › W-02 goBackOrReplace falls back when a direct URL has no browser history 
-    [later-phases] › apps/mobile/e2e-web/flows/navigation/w04-browser-history-stack.spec.ts:12:5 › W-04 practice to quiz keeps the contextual web stack coherent 
-    [later-phases] › apps/mobile/e2e-web/flows/navigation/w05-tab-routes-render-correct-screen.spec.ts:8:5 › W-05 tab URLs render the correct screen on web 
+    [smoke-learner] › apps/mobile/e2e-web/flows/journeys/j01-ux-pass.spec.ts:23:5 › single learner UX screenshot crawl
+    [smoke-parent] › apps/mobile/e2e-web/flows/journeys/j03-parent-gateway.spec.ts:3:5 › J-03 seeded parent lands on parent home @smoke
+    [role-transitions] › apps/mobile/e2e-web/flows/journeys/j04-parent-inline-learn.spec.ts:4:5 › J-04 parent taps child card to open child progress
+    [role-transitions] › apps/mobile/e2e-web/flows/journeys/j05-parent-switch-to-child.spec.ts:5:5 › J-05 parent opens a linked child progress view from home
+    [role-transitions] › apps/mobile/e2e-web/flows/journeys/j06-child-switch-to-parent.spec.ts:5:5 › J-06 parent opens child progress and returns home
+    [role-transitions] › apps/mobile/e2e-web/flows/journeys/j07-parent-dashboard-drilldown.spec.ts:5:5 › J-07 parent → child progress → session recap → back to parent home
+    [later-phases] › apps/mobile/e2e-web/flows/auth/w03-deep-link-auth-redirect.spec.ts:7:5 › W-03 deep link to authenticated route redirects to sign-in and back
+    [later-phases] › apps/mobile/e2e-web/flows/journeys/j08-ask-freeform-session-summary.spec.ts:9:5 › J-08 learner → Ask → freeform chat → end session → summary → home
+    [later-phases] › apps/mobile/e2e-web/flows/journeys/j09-learn-create-subject-onboarding.spec.ts:25:5 › J-09 learner → Add a subject → language setup → session chat
+    [later-phases] › apps/mobile/e2e-web/flows/journeys/j10-practice-quiz-cycle.spec.ts:8:5 › J-10 learner → Practice → Quiz → launch → play → results → home
+    [later-phases] › apps/mobile/e2e-web/flows/journeys/j11-library-to-book-session.spec.ts:9:5 › J-11 learner → Library → shelf → book → start learning
+    [later-phases] › apps/mobile/e2e-web/flows/journeys/j12-pre-profile-create-profile.spec.ts:5:5 › J-12 new user → create profile → lands on learner home
+    [later-phases] › apps/mobile/e2e-web/flows/journeys/j13-consent-pending-parent-approval.spec.ts:6:5 › J-13 pending consent blocks app until parent approval completes
+    [later-phases] › apps/mobile/e2e-web/flows/journeys/j14-loading-timeout-fallback.spec.ts:7:5 › J-14 profile loading resolves without dead-end
+    [later-phases] › apps/mobile/e2e-web/flows/journeys/j15-parent-solo-add-first-child.spec.ts:5:5 › J-15 family-plan parent with no children sees add-first-child CTA
+    [later-phases] › apps/mobile/e2e-web/flows/journeys/j16-parent-drilldown-back-chain.spec.ts:9:5 › J-16 parent drill-down reaches topic detail and unwinds cleanly
+    [later-phases] › apps/mobile/e2e-web/flows/journeys/j17-parent-session-recap-copy.spec.ts:9:5 › J-17 parent opens a session recap and copies the conversation prompt
+    [later-phases] › apps/mobile/e2e-web/flows/journeys/j18-invalid-saved-profile-fallback.spec.ts:8:5 › J-18 invalid saved profile falls back to the owner profile
+    [later-phases] › apps/mobile/e2e-web/flows/journeys/j19-subscription-paywall-ui.spec.ts:25:5 › J-19 free-tier learner sees subscription paywall with static tier comparison on web
+    [later-phases] › apps/mobile/e2e-web/flows/navigation/w01-no-bleed-through-fullscreen.spec.ts:8:5 › W-01 full-screen routes hide the tab bar and prior scene content
+    [later-phases] › apps/mobile/e2e-web/flows/navigation/w02-go-back-or-replace-empty-history.spec.ts:8:5 › W-02 goBackOrReplace falls back when a direct URL has no browser history
+    [later-phases] › apps/mobile/e2e-web/flows/navigation/w04-browser-history-stack.spec.ts:12:5 › W-04 practice to quiz keeps the contextual web stack coherent
+    [later-phases] › apps/mobile/e2e-web/flows/navigation/w05-tab-routes-render-correct-screen.spec.ts:8:5 › W-05 tab URLs render the correct screen on web
   1 flaky
-    [setup] › apps/mobile/e2e-web/helpers/auth.setup.ts:24:8 › seed parent-multi-child and capture owner-with-children storage state 
+    [setup] › apps/mobile/e2e-web/helpers/auth.setup.ts:24:8 › seed parent-multi-child and capture owner-with-children storage state
   7 passed (5.1m)
  ELIFECYCLE  Command failed with exit code 1.
 END_EPOCH=1778784043

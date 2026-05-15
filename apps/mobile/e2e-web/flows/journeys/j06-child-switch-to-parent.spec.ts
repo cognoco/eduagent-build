@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { waitForAppScreen } from '../../helpers/app-screen';
 import { pressableClick } from '../../helpers/pressable';
 import { readSeedData } from '../../helpers/seed-data';
 
@@ -8,7 +9,7 @@ test('J-06 parent opens child progress and returns home', async ({ page }) => {
 
   await page.goto('/home', { waitUntil: 'commit' });
 
-  await expect(page.getByTestId('parent-home-screen')).toBeVisible({
+  await waitForAppScreen(page, 'parent-home-screen', {
     timeout: 60_000,
   });
 
@@ -21,7 +22,7 @@ test('J-06 parent opens child progress and returns home', async ({ page }) => {
 
   await pressableClick(page.getByTestId('tab-home'));
 
-  await expect(page.getByTestId('parent-home-screen')).toBeVisible({
+  await waitForAppScreen(page, 'parent-home-screen', {
     timeout: 30_000,
   });
 });

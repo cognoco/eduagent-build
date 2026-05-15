@@ -8,7 +8,8 @@ import {
 } from '../test-utils/jwks-interceptor';
 import { clearJWKSCache } from '../middleware/jwt';
 
-jest.mock('inngest/hono', () => ({ // gc1-allow: Inngest framework boundary
+jest.mock('inngest/hono', () => ({
+  // gc1-allow: Inngest framework boundary
   serve: jest.fn().mockReturnValue(jest.fn()),
 }));
 

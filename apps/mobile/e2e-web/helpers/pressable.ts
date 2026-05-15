@@ -25,9 +25,44 @@ export async function pressableClick(target: Locator): Promise<void> {
 
   await expect(target).toBeVisible({ timeout: 15_000 });
   await target.scrollIntoViewIfNeeded();
-  await target.dispatchEvent('pointerdown');
-  await target.dispatchEvent('pointerup');
-  await target.dispatchEvent('click');
+  await target.evaluate((element) => {
+    const eventDefaults = {
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+      button: 0,
+    };
+
+    const dispatchPointerEvent = (
+      type: 'pointerdown' | 'pointerup',
+      buttons: number,
+    ) => {
+      const PointerEventCtor = window.PointerEvent ?? window.MouseEvent;
+      element.dispatchEvent(
+        new PointerEventCtor(type, {
+          ...eventDefaults,
+          buttons,
+          pointerId: 1,
+          pointerType: 'mouse',
+          isPrimary: true,
+        } as PointerEventInit),
+      );
+    };
+
+    dispatchPointerEvent('pointerdown', 1);
+    // RNW listens to pointer events when PointerEvent exists; mouse events are
+    // retained for environments that only support the compatibility path.
+    element.dispatchEvent(
+      new MouseEvent('mousedown', { ...eventDefaults, buttons: 1 }),
+    );
+    dispatchPointerEvent('pointerup', 0);
+    element.dispatchEvent(
+      new MouseEvent('mouseup', { ...eventDefaults, buttons: 0 }),
+    );
+    element.dispatchEvent(
+      new MouseEvent('click', { ...eventDefaults, buttons: 0 }),
+    );
+  });
 }
 
 export async function pressableClickByTestId(

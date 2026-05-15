@@ -31,12 +31,13 @@ export interface CreateDatabaseOptions {
 }
 
 // Module-level pool cache — survives across requests within the same Cloudflare
-// Worker isolate. Without this, every request creates a fresh NeonPool and
-// negotiates a new WebSocket to Neon, which compounds cold-start latency when
-// Neon auto-suspends the compute (3 parallel library queries × cold WebSocket
-// handshake = 3× the wake-up load). Keyed by connection string so different
-// environments get isolated pools.
+// Worker isolate. Non-Worker callers can opt into this default to avoid repeated
+// Neon WebSocket handshakes.
 const neonPoolCache = new Map<string, NeonPool>();
+
+// Per-request Neon pools must be closed by request middleware. Store those
+// pools behind the Drizzle handle without exposing transport details to callers.
+const neonPoolsByDatabase = new WeakMap<object, NeonPool>();
 
 // [BUG-MIGRATE-0014 / RLS-PHASE-0] CI runs integration tests against a vanilla
 // Postgres container at localhost:5432 (cheap, fast, in-job). Production runs
@@ -78,13 +79,13 @@ export function createDatabase(
 ) {
   if (looksLikeNeon(databaseUrl)) {
     if (options.cacheNeonPool === false) {
-      return drizzleNeon(
-        new NeonPool({
-          connectionString: databaseUrl,
-          connectionTimeoutMillis: 10_000,
-        }),
-        { schema },
-      );
+      const pool = new NeonPool({
+        connectionString: databaseUrl,
+        connectionTimeoutMillis: 10_000,
+      });
+      const db = drizzleNeon(pool, { schema });
+      neonPoolsByDatabase.set(db as object, pool);
+      return db;
     }
 
     let pool = neonPoolCache.get(databaseUrl);
@@ -116,3 +117,10 @@ export function createDatabase(
 }
 
 export type Database = ReturnType<typeof createDatabase>;
+
+export async function closeDatabase(db: Database): Promise<void> {
+  const pool = neonPoolsByDatabase.get(db as object);
+  if (!pool) return;
+  neonPoolsByDatabase.delete(db as object);
+  await pool.end();
+}

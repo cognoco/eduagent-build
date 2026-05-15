@@ -2,9 +2,9 @@
 
 **Date:** 2026-05-02
 **Auditor:** {fork name}
-**Scope:** {one-sentence scope statement, copied from the punch list extended-scope entry}
+**Scope:** {one-sentence scope statement, copied from the current tracker or work item}
 **Status:** RECON COMPLETE (read-only — no fixes applied)
-**Companion punch list:** `docs/audit/2026-05-02-artefact-consistency-punchlist.md`
+**Companion tracker:** `{current tracker, issue, or plan path}`
 
 ---
 
@@ -48,7 +48,7 @@
 
 ## Recommended punch-list entries
 
-> Format ready to paste into the **Track B** or **Track C** section of `2026-05-02-artefact-consistency-punchlist.md`. Use the same prose conventions: bold ID, severity line, effort line, files line, why-it-matters line.
+> Format ready to paste into the current tracker. Use the same prose conventions: bold ID, severity line, effort line, files line, why-it-matters line.
 
 ```markdown
 - **AUDIT-{ID}** {short imperative description}

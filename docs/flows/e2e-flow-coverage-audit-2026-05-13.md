@@ -1,3 +1,5 @@
+> **STATUS: COMPANION** — point-in-time mobile coverage audit from 2026-05-13. Maps inventory against Maestro flows and current More-tab shape. Verify specific claims before acting — app source may have changed.
+
 # E2E Flow Coverage Audit — 2026-05-13
 
 This audit maps `docs/flows/mobile-app-flow-inventory.md` against current Maestro flow files under `apps/mobile/e2e/flows/` and the current More-tab route shape.

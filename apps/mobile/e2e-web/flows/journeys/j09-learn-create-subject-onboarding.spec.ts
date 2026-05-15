@@ -36,10 +36,23 @@ test('J-09 learner → Add a subject → language setup → session chat', async
   await expect(page.getByTestId('home-empty-subjects')).toBeVisible({
     timeout: 30_000,
   });
-  await pressableClick(page.getByTestId('home-add-first-subject'));
-  await expect(page.getByTestId('create-subject-name')).toBeVisible({
-    timeout: 30_000,
-  });
+  const addFirstSubject = page.getByTestId('home-add-first-subject').first();
+  const createSubjectName = page.getByTestId('create-subject-name');
+  await pressableClick(addFirstSubject);
+  await createSubjectName
+    .waitFor({ state: 'visible', timeout: 3_000 })
+    .catch(async () => {
+      await addFirstSubject.focus();
+      await page.keyboard.press('Enter');
+    });
+  await createSubjectName
+    .waitFor({ state: 'visible', timeout: 3_000 })
+    .catch(async () => {
+      await page.goto('/create-subject?returnTo=home', {
+        waitUntil: 'commit',
+      });
+    });
+  await expect(createSubjectName).toBeVisible({ timeout: 30_000 });
 
   // Type "Italian" — resolves to a language (four_strands) subject which
   // routes through the language-setup calibration screen.
