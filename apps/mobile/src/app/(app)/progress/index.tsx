@@ -1058,7 +1058,7 @@ export default function ProgressScreen(): React.ReactElement {
                 ) : null}
                 {inventory?.subjects?.length ? (
                   <View testID="progress-subject-breakdown" className="mt-5">
-                    <Text className="text-caption font-bold uppercase text-text-secondary mb-2">
+                    <Text className="text-caption font-bold text-text-secondary mb-2">
                       {t('progress.guardian.subjectsTitle')}
                     </Text>
                     {inventory.subjects.map((subject) => (
