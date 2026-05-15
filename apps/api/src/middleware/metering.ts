@@ -75,9 +75,13 @@ export type MeteringEnv = {
 
 // Routes that consume LLM exchanges on BOTH GET and POST. Currently every
 // session-scoped LLM endpoint that may be invoked via SSE/GET counts here.
-const LLM_ROUTE_PATTERNS_ANY_METHOD = [
+const SESSION_MESSAGE_STREAM_PATTERNS = [
   /\/sessions\/[^/]+\/messages\/?$/,
   /\/sessions\/[^/]+\/stream\/?$/,
+];
+
+const LLM_ROUTE_PATTERNS_ANY_METHOD = [
+  ...SESSION_MESSAGE_STREAM_PATTERNS,
   // [BUG-623 / A-6] generateRecallBridge calls the LLM but was missing from
   // this list, so any authenticated user could call recall-bridge in a tight
   // loop and burn unlimited LLM capacity at zero cost. Meter it like any
@@ -110,10 +114,7 @@ const PROFILE_REQUIRED_BEFORE_METERING_PATTERNS = [
   /\/dictation\/review\/?$/,
 ];
 
-const IDEMPOTENT_SESSION_ROUTE_PATTERNS = [
-  /\/sessions\/[^/]+\/messages\/?$/,
-  /\/sessions\/[^/]+\/stream\/?$/,
-];
+const IDEMPOTENT_SESSION_ROUTE_PATTERNS = SESSION_MESSAGE_STREAM_PATTERNS;
 
 function isLlmRoute(path: string, method: string): boolean {
   // GET methods never decrement quota for POST-only endpoints. The any-method
@@ -151,6 +152,29 @@ function profileRequiredResponse(c: Context<MeteringEnv>): Response {
 
 function shouldRefundAfterHandler(status: number): boolean {
   return status >= 400;
+}
+
+function withQuotaHeaders(
+  response: Response,
+  headersToSet: {
+    remaining: number;
+    warningLevel: string;
+    remainingDaily: number | null;
+  },
+): Response {
+  const headers = new Headers(response.headers);
+  headers.set('X-Quota-Remaining', String(headersToSet.remaining));
+  headers.set('X-Quota-Warning-Level', headersToSet.warningLevel);
+  if (headersToSet.remainingDaily !== null) {
+    headers.set('X-Daily-Remaining', String(headersToSet.remainingDaily));
+  } else {
+    headers.delete('X-Daily-Remaining');
+  }
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
 }
 
 async function maybeReplayIdempotentSessionRequest(
@@ -464,14 +488,6 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
     const baseLlmTier = getTierConfig(tier).llmTier;
     c.set('llmTier', profileMeta?.hasPremiumLlm ? 'premium' : baseLlmTier);
 
-    // Set quota headers for client-side UI
-    const remaining = decrement.remainingMonthly + decrement.remainingTopUp;
-    c.header('X-Quota-Remaining', String(remaining));
-    c.header('X-Quota-Warning-Level', result.warningLevel);
-    if (decrement.remainingDaily !== null) {
-      c.header('X-Daily-Remaining', String(decrement.remainingDaily));
-    }
-
     await next();
     if (shouldRefundAfterHandler(c.res.status)) {
       await safeRefundQuota(db, subscriptionId, {
@@ -480,6 +496,12 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
       });
       return;
     }
+
+    c.res = withQuotaHeaders(c.res, {
+      remaining: decrement.remainingMonthly + decrement.remainingTopUp,
+      warningLevel: result.warningLevel,
+      remainingDaily: decrement.remainingDaily,
+    });
 
     // I7 fix: Update KV cache after decrement so next request sees fresh count.
     // Derive from the atomic DB result (decrement.remainingMonthly/Daily) to
