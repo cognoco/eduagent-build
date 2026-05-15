@@ -51,20 +51,18 @@ let mockDeletionStatus: MockDeletionStatus = {
   refetch: mockDeletionStatusRefetch,
 };
 
-jest.mock(
-  '../hooks/use-account',
-  /* gc1-allow: screen tests mock account hooks to avoid full QueryClient/provider setup around the Expo Router page */ () => ({
-    useDeleteAccount: () => ({
-      mutateAsync: mockDeleteMutateAsync,
-      isPending: mockDeleteIsPending,
-    }),
-    useCancelDeletion: () => ({
-      mutateAsync: mockCancelMutateAsync,
-      isPending: false,
-    }),
-    useDeletionStatus: () => mockDeletionStatus,
+// prettier-ignore
+jest.mock('../hooks/use-account', /* gc1-allow: screen tests mock account hooks to avoid full QueryClient/provider setup around the Expo Router page */ () => ({
+  useDeleteAccount: () => ({
+    mutateAsync: mockDeleteMutateAsync,
+    isPending: mockDeleteIsPending,
   }),
-);
+  useCancelDeletion: () => ({
+    mutateAsync: mockCancelMutateAsync,
+    isPending: false,
+  }),
+  useDeletionStatus: () => mockDeletionStatus,
+}));
 
 // prettier-ignore
 jest.mock('../lib/theme', /* gc1-allow: nativewind vars() does not resolve 'react' in jest; stub theme hooks so screen tests don't blow up on import */ () => ({

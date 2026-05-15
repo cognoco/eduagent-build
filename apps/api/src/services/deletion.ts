@@ -104,6 +104,8 @@ export async function getDeletionStatus(
 
   const scheduledAt = row.deletionScheduledAt ?? null;
   const cancelledAt = row.deletionCancelledAt ?? null;
+  // Deletion stays active when no later cancellation supersedes the schedule.
+  // Equal timestamps are treated as scheduled, mirroring isDeletionCancelled().
   const scheduled =
     scheduledAt !== null &&
     (cancelledAt === null || cancelledAt <= scheduledAt);

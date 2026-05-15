@@ -52,23 +52,31 @@ export default function DeleteAccountScreen() {
   // synchronously around the mutation closes that race.
   const submittingRef = useRef(false);
   const locallyScheduledRef = useRef(false);
+  const stageRef = useRef<Stage>('initial');
+  const setScreenStage = useCallback((nextStage: Stage) => {
+    stageRef.current = nextStage;
+    setStage(nextStage);
+  }, []);
 
   useEffect(() => {
+    const currentStage = stageRef.current;
     if (deletionStatus.data?.scheduled === true) {
-      if (stage === 'confirming') return;
+      if (currentStage === 'confirming') return;
       setGracePeriodEnds(deletionStatus.data.gracePeriodEnds);
-      setStage('scheduled');
+      if (currentStage !== 'scheduled') {
+        setScreenStage('scheduled');
+      }
     } else if (
       deletionStatus.data?.scheduled === false &&
-      stage === 'scheduled'
+      currentStage === 'scheduled'
     ) {
       if (locallyScheduledRef.current) {
         return;
       }
       setGracePeriodEnds(null);
-      setStage('initial');
+      setScreenStage('initial');
     }
-  }, [deletionStatus.data, stage]);
+  }, [deletionStatus.data, setScreenStage]);
 
   const handleClose = useCallback(() => {
     goBackOrReplace(router, '/(app)/more');
@@ -78,8 +86,8 @@ export default function DeleteAccountScreen() {
   const onBeginConfirm = useCallback(() => {
     setError('');
     setConfirmText('');
-    setStage('confirming');
-  }, []);
+    setScreenStage('confirming');
+  }, [setScreenStage]);
 
   // Step 2: user has typed DELETE and taps the destructive button — fire
   // the mutation. The button is only enabled when the typed phrase
@@ -93,19 +101,19 @@ export default function DeleteAccountScreen() {
       const result = await deleteAccount.mutateAsync();
       locallyScheduledRef.current = true;
       setGracePeriodEnds(result.gracePeriodEnds);
-      setStage('scheduled');
+      setScreenStage('scheduled');
     } catch (err: unknown) {
       setError(formatApiError(err));
     } finally {
       submittingRef.current = false;
     }
-  }, [deleteAccount, confirmText]);
+  }, [deleteAccount, confirmText, setScreenStage]);
 
   const onBackToWarning = useCallback(() => {
     setConfirmText('');
     setError('');
-    setStage('initial');
-  }, []);
+    setScreenStage('initial');
+  }, [setScreenStage]);
 
   const onCancelDeletion = useCallback(async () => {
     setError('');
