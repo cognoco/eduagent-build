@@ -61,7 +61,7 @@ check_adb_device() {
     return 1
   fi
   local state
-  state=$("$PREFLIGHT_ADB" get-state 2>/dev/null || echo "")
+  state=$("$PREFLIGHT_ADB" get-state 2>/dev/null | tr -d '\r' || echo "")
   if [ "$state" != "device" ]; then
     _preflight_fail "No Android emulator/device ready (adb get-state = '${state:-<none>}')."
     _preflight_fail "  Fix: start the emulator, or check 'adb devices'."

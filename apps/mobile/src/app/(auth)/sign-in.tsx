@@ -33,7 +33,10 @@ import {
   getTransitionElapsed,
   SESSION_TRANSITION_MS,
 } from '../../lib/auth-transition';
-import { consumeSessionExpiredNotice } from '../../lib/auth-expiry';
+import {
+  clearSessionExpiredNotice,
+  peekSessionExpiredNotice,
+} from '../../lib/auth-expiry';
 import {
   readWebSearchParam,
   toInternalAppRedirectPath,
@@ -373,8 +376,13 @@ export default function SignInScreen() {
     [setError],
   );
 
+  const clearSessionExpiredMessage = useCallback(() => {
+    clearSessionExpiredNotice();
+    setError('');
+  }, []);
+
   useEffect(() => {
-    if (consumeSessionExpiredNotice()) {
+    if (peekSessionExpiredNotice()) {
       clearVerificationFlow();
       setError('Your session expired. Sign in again to continue learning.');
     }
@@ -626,7 +634,7 @@ export default function SignInScreen() {
     async (strategy: SupportedSSOStrategy) => {
       if (!isLoaded) return;
       clearVerificationFlow();
-      setError('');
+      clearSessionExpiredMessage();
       setOauthLoading(strategy);
 
       try {
@@ -725,6 +733,7 @@ export default function SignInScreen() {
     },
     [
       activateSession,
+      clearSessionExpiredMessage,
       clearVerificationFlow,
       handleIncompleteSignIn,
       isLoaded,
@@ -742,7 +751,7 @@ export default function SignInScreen() {
       return;
     }
 
-    setError('');
+    clearSessionExpiredMessage();
     setLoading(true);
     try {
       await activateSession(
@@ -755,6 +764,7 @@ export default function SignInScreen() {
   }, [
     activateSession,
     activationFailureContext,
+    clearSessionExpiredMessage,
     isLoaded,
     pendingSessionActivationId,
     setActive,
@@ -764,7 +774,7 @@ export default function SignInScreen() {
     if (!isLoaded || !canSubmit || !signIn) return;
 
     clearVerificationFlow();
-    setError('');
+    clearSessionExpiredMessage();
     setLoading(true);
 
     try {
@@ -811,6 +821,7 @@ export default function SignInScreen() {
     canSubmit,
     signIn,
     activateSession,
+    clearSessionExpiredMessage,
     clearVerificationFlow,
     handleIncompleteSignIn,
     emailAddress,
@@ -821,7 +832,7 @@ export default function SignInScreen() {
   const onStartVerificationPress = useCallback(async () => {
     if (!isLoaded || !verificationOffer) return;
 
-    setError('');
+    clearSessionExpiredMessage();
     setLoading(true);
 
     try {
@@ -836,13 +847,18 @@ export default function SignInScreen() {
     } finally {
       setLoading(false);
     }
-  }, [isLoaded, startVerificationFlow, verificationOffer]);
+  }, [
+    clearSessionExpiredMessage,
+    isLoaded,
+    startVerificationFlow,
+    verificationOffer,
+  ]);
 
   const onVerifyPress = useCallback(async () => {
     if (!isLoaded || !signIn || !pendingVerification || code.trim() === '')
       return;
 
-    setError('');
+    clearSessionExpiredMessage();
     setLoading(true);
 
     try {
@@ -893,6 +909,7 @@ export default function SignInScreen() {
     code,
     signIn,
     activateSession,
+    clearSessionExpiredMessage,
     handleIncompleteSignIn,
   ]);
 
@@ -900,7 +917,7 @@ export default function SignInScreen() {
     if (!isLoaded || !signIn || !pendingVerification || resending) return;
     if (pendingVerification.strategy === 'backup_code') return;
 
-    setError('');
+    clearSessionExpiredMessage();
     setResending(true);
 
     try {
@@ -930,7 +947,13 @@ export default function SignInScreen() {
     } finally {
       setResending(false);
     }
-  }, [isLoaded, pendingVerification, resending, signIn]);
+  }, [
+    clearSessionExpiredMessage,
+    isLoaded,
+    pendingVerification,
+    resending,
+    signIn,
+  ]);
 
   const onBackFromVerification = useCallback(() => {
     clearVerificationFlow(true);

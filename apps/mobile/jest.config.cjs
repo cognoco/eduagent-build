@@ -6,15 +6,18 @@ const path = require('path');
 const ciDefaults = process.env.CI
   ? {
       silent: true,
-      reporters: ['default', path.join(__dirname, '../../scripts/jest-ci-reporter.cjs')],
+      reporters: [
+        'default',
+        path.join(__dirname, '../../scripts/jest-ci-reporter.cjs'),
+      ],
     }
   : {};
 
 module.exports = {
+  ...ciDefaults,
   displayName: '@eduagent/mobile',
   rootDir: '../..',
   preset: 'jest-expo',
-  ...ciDefaults,
   moduleFileExtensions: ['ts', 'js', 'html', 'tsx', 'jsx'],
   setupFiles: ['<rootDir>/apps/mobile/jest.polyfills.js'],
   setupFilesAfterEnv: ['<rootDir>/apps/mobile/src/test-setup.ts'],

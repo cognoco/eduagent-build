@@ -1137,14 +1137,39 @@ describe('QuizPlayScreen — error feedback [BUG-799 / BUG-806]', () => {
     expect(mockReplace).toHaveBeenCalledWith('/(app)/quiz');
   });
 
-  it('confirming quit replaces to Practice when launched from Practice', () => {
+  it('confirming quit returns to quiz index when launched from Practice', () => {
     mockReturnTo = 'practice';
     render(<QuizPlayScreen />);
 
     fireEvent.press(screen.getByTestId('quiz-play-quit'));
     fireEvent.press(screen.getByTestId('quiz-quit-confirm'));
 
-    expect(mockReplace).toHaveBeenCalledWith('/(app)/practice');
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/quiz');
+  });
+
+  it('[QUIZ-11] malformed fallback back button returns directly to quiz index', () => {
+    mockRound = {
+      id: 'round-malformed-back',
+      activityType: 'capitals' as const,
+      theme: 'Europe',
+      total: 1,
+      questions: [
+        {
+          type: 'capitals' as const,
+          country: 'Slovakia',
+          options: ['Bratislava', 'Bratislava'],
+          isLibraryItem: true,
+          freeTextEligible: false,
+        },
+      ],
+    };
+
+    render(<QuizPlayScreen />);
+
+    fireEvent.press(screen.getByTestId('quiz-play-malformed-back'));
+
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/quiz');
+    expect(screen.queryByTestId('quiz-quit-confirm')).toBeNull();
   });
 
   it('saves answered progress from the quit modal', async () => {

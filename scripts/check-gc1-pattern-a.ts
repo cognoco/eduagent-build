@@ -16,11 +16,14 @@
 //   apps/api/src/services/billing/family.test.ts:3   (named-local spread)
 //   apps/api/src/routes/quiz.test.ts:66   (gc1-allow external boundary)
 //
-// CLI usage (from .husky/pre-commit):
-//   pnpm exec tsx scripts/check-gc1-pattern-a.ts
+// CLI usage:
+//   Pre-commit (default): scans the staged index.
+//     pnpm exec tsx scripts/check-gc1-pattern-a.ts
+//   CI (PR mode):         scans HEAD vs. origin/<base>. Triggered by setting
+//     GITHUB_BASE_REF. Reads files from HEAD (not the index).
 // Exit codes: 0 clean, 1 violations.
 
-import { execSync, spawnSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 
 export type Violation = {
   file: string;
@@ -136,14 +139,48 @@ export function checkFile(
   return violations;
 }
 
+type DiffSource = {
+  // git-diff range args: e.g. `['--cached']` for the index or
+  // `['origin/main...HEAD']` for a CI base-vs-HEAD comparison.
+  rangeArgs: string[];
+  // `git show <ref>:<file>` ref: `:` reads the index, `HEAD` reads the tip.
+  showRef: string;
+  // Human label for error messages.
+  mode: 'pre-commit' | 'ci';
+};
+
+function resolveDiffSource(): DiffSource {
+  const baseRef = process.env.GITHUB_BASE_REF;
+  if (baseRef && baseRef.trim().length > 0) {
+    return {
+      rangeArgs: [`origin/${baseRef}...HEAD`],
+      showRef: 'HEAD',
+      mode: 'ci',
+    };
+  }
+  return { rangeArgs: ['--cached'], showRef: ':', mode: 'pre-commit' };
+}
+
 function runCli(): void {
-  const stagedFiles = execSync(
-    "git diff --cached --name-only --diff-filter=d -- '*.test.ts' '*.test.tsx'",
+  const src = resolveDiffSource();
+
+  const nameOnly = spawnSync(
+    'git',
+    [
+      'diff',
+      ...src.rangeArgs,
+      '--name-only',
+      '--diff-filter=d',
+      '--',
+      '*.test.ts',
+      '*.test.tsx',
+    ],
     { encoding: 'utf8' },
-  )
-    .trim()
-    .split('\n')
-    .filter(Boolean);
+  );
+  if (nameOnly.status !== 0) {
+    process.exit(0);
+  }
+  const stagedFiles = nameOnly.stdout.trim().split('\n').filter(Boolean);
 
   if (stagedFiles.length === 0) {
     process.exit(0);
@@ -156,12 +193,12 @@ function runCli(): void {
     try {
       const diffResult = spawnSync(
         'git',
-        ['diff', '--cached', '--unified=0', '--', f],
+        ['diff', ...src.rangeArgs, '--unified=0', '--', f],
         {
           encoding: 'utf8',
         },
       );
-      const stagedResult = spawnSync('git', ['show', `:${f}`], {
+      const stagedResult = spawnSync('git', ['show', `${src.showRef}:${f}`], {
         encoding: 'utf8',
       });
       if (diffResult.status !== 0 || stagedResult.status !== 0) {
@@ -181,7 +218,7 @@ function runCli(): void {
 
   console.error('');
   console.error(
-    'pre-commit: GC1 — new internal jest.mock() must be Pattern A or carry gc1-allow.',
+    `${src.mode === 'ci' ? 'CI' : 'pre-commit'}: GC1 — new internal jest.mock() must be Pattern A or carry gc1-allow.`,
   );
   console.error('');
   console.error('Offending added lines:');
