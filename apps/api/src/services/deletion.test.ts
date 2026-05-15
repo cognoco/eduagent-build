@@ -143,6 +143,23 @@ describe('scheduleDeletion', () => {
     });
     expect(db.update).toHaveBeenCalledTimes(2);
   });
+
+  it('does not reschedule when cancellation timestamp equals scheduled timestamp', async () => {
+    const db = createMockDb({
+      findFirstResult: {
+        deletionScheduledAt: new Date('2026-02-17T00:00:00.000Z'),
+        deletionCancelledAt: new Date('2026-02-17T00:00:00.000Z'),
+      },
+      updateReturning: [],
+    });
+
+    const result = await scheduleDeletion(db, 'account-1');
+
+    expect(result).toEqual({
+      gracePeriodEnds: '2026-02-24T00:00:00.000Z',
+      scheduledNow: false,
+    });
+  });
 });
 
 describe('cancelDeletion', () => {
@@ -197,6 +214,17 @@ describe('isDeletionCancelled', () => {
     const result = await isDeletionCancelled(db, 'account-1');
     expect(result).toBe(false);
   });
+
+  it('returns false when cancellation timestamp equals scheduled timestamp', async () => {
+    const db = createMockDb({
+      findFirstResult: {
+        deletionScheduledAt: new Date('2025-01-10T00:00:00Z'),
+        deletionCancelledAt: new Date('2025-01-10T00:00:00Z'),
+      },
+    });
+    const result = await isDeletionCancelled(db, 'account-1');
+    expect(result).toBe(false);
+  });
 });
 
 describe('getDeletionStatus', () => {
@@ -222,6 +250,23 @@ describe('getDeletionStatus', () => {
       findFirstResult: {
         deletionScheduledAt: new Date('2026-02-17T00:00:00.000Z'),
         deletionCancelledAt: null,
+      },
+    });
+
+    const result = await getDeletionStatus(db, 'account-1');
+
+    expect(result).toEqual({
+      scheduled: true,
+      deletionScheduledAt: '2026-02-17T00:00:00.000Z',
+      gracePeriodEnds: '2026-02-24T00:00:00.000Z',
+    });
+  });
+
+  it('returns scheduled when cancellation timestamp equals scheduled timestamp', async () => {
+    const db = createMockDb({
+      findFirstResult: {
+        deletionScheduledAt: new Date('2026-02-17T00:00:00.000Z'),
+        deletionCancelledAt: new Date('2026-02-17T00:00:00.000Z'),
       },
     });
 

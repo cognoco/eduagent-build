@@ -56,6 +56,7 @@ export function useDeletionStatus(): UseQueryResult<
 
   return useQuery({
     queryKey: ['account', 'deletion-status'],
+    staleTime: 10_000,
     retry: 1,
     retryDelay: 250,
     queryFn: async (): Promise<AccountDeletionStatusResponse> => {

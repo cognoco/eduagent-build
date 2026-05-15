@@ -47,7 +47,7 @@ async function tryScheduleDeletion(
         eq(accounts.id, accountId),
         or(
           isNull(accounts.deletionScheduledAt),
-          sql`${accounts.deletionCancelledAt} >= ${accounts.deletionScheduledAt}`,
+          sql`${accounts.deletionCancelledAt} > ${accounts.deletionScheduledAt}`,
         ),
       ),
     )
@@ -95,7 +95,8 @@ export async function getDeletionStatus(
   const scheduledAt = row.deletionScheduledAt ?? null;
   const cancelledAt = row.deletionCancelledAt ?? null;
   const scheduled =
-    scheduledAt !== null && (cancelledAt === null || cancelledAt < scheduledAt);
+    scheduledAt !== null &&
+    (cancelledAt === null || cancelledAt <= scheduledAt);
 
   if (!scheduled || scheduledAt === null) {
     return {

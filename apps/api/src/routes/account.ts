@@ -27,8 +27,12 @@ export const accountRoutes = new Hono<AccountRouteEnv>()
   .get('/account/deletion-status', async (c) => {
     const db = c.get('db');
     const account = c.get('account');
-    const status = await getDeletionStatus(db, account.id);
-    return c.json(accountDeletionStatusResponseSchema.parse(status));
+    try {
+      const status = await getDeletionStatus(db, account.id);
+      return c.json(accountDeletionStatusResponseSchema.parse(status));
+    } catch {
+      return c.json({ code: 'NOT_FOUND', message: 'Account not found' }, 404);
+    }
   })
   .post('/account/delete', async (c) => {
     const db = c.get('db');
