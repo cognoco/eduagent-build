@@ -306,6 +306,13 @@ export function getConversationStage(
   // in freeform flows the progression is greeting → teaching, skipping orienting.
   if (userMessageCount >= 2) return 'teaching';
 
+  // Routed learning sessions already know the subject/topic. Once the learner
+  // sends a real message, the assistant response should expose learning-loop
+  // actions instead of staying in the warmup-only stage.
+  if (effectiveMode === 'learning' && hasSubject && userMessageCount >= 1) {
+    return 'teaching';
+  }
+
   // Subject is known but conversation hasn't warmed up yet.
   // Reachable in two cases:
   // 1. Learning mode with subject pre-set via route params (most common).

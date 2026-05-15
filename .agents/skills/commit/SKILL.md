@@ -5,11 +5,11 @@ description: Use when the user asks to commit, save changes, commit staged files
 
 # Commit
 
-You are handling git for this repo. Commit intentionally, preserve unrelated user work, and do not push unless the user explicitly asked for push.
+You are handling git for this repo. Commit intentionally, preserve unrelated user work, and push after a successful commit unless the user explicitly asks you not to push.
 
 ## Critical Rules
 
-1. Never push unless the user explicitly says "push" or "commit and push".
+1. Push after successful commits unless the user explicitly says not to push. Never force-push unless explicitly requested.
 2. Never use `--no-verify`.
 3. Never stage files beyond the user's requested scope.
 4. Never edit source files as part of this skill. If hooks fail because code needs fixes, report the failure and leave changes staged/unstaged as appropriate.
@@ -94,6 +94,6 @@ EOF
 
 Maximum two commit attempts.
 
-8. Push only if explicitly requested. Do not force-push or rebase.
+8. Push after a successful commit unless explicitly asked not to. Do not force-push or rebase unless explicitly requested.
 
 9. Report commit hash, message, committed files, excluded files, and whether push was performed.

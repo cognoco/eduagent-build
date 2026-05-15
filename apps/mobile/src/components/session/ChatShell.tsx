@@ -195,8 +195,9 @@ export function ChatShell({
   // the offscreen instance and fire its `onSend` (still bound to the prior
   // session's POST URL). useIsFocused returns false on the inactive instance
   // — we use it both to short-circuit handleSend and to remove the dormant
-  // input + buttons from the accessibility tree on web.
+  // input + buttons from the layout/accessibility tree on web.
   const isFocused = useIsFocused();
+  const isWebDormant = Platform.OS === 'web' && !isFocused;
   // [BUG-740 / PERF-10] FlatList ref so virtualization kicks in for long
   // sessions. ScrollView previously rendered every message bubble in the
   // tree, growing unbounded — students hit OOM after a few hundred turns.
@@ -892,17 +893,18 @@ export function ChatShell({
           )}
           <View
             className="flex-row items-end px-4 py-3 bg-surface border-t border-surface-elevated"
-            style={{ paddingBottom: Math.max(insets.bottom, 8) }}
             testID="chat-input-row"
             // [BUG-886] On RN Web, mounted-but-unfocused screens stay in the
             // DOM. Remove the input row from the AT tree, swallow pointer
             // events, and skip tab order so a click on the visible screen
             // cannot land on this dormant ChatShell's Send.
-            pointerEvents={
-              !isFocused && Platform.OS === 'web' ? 'none' : 'auto'
-            }
-            aria-hidden={!isFocused && Platform.OS === 'web' ? true : undefined}
-            tabIndex={!isFocused && Platform.OS === 'web' ? -1 : undefined}
+            pointerEvents={isWebDormant ? 'none' : 'auto'}
+            aria-hidden={isWebDormant ? true : undefined}
+            tabIndex={isWebDormant ? -1 : undefined}
+            style={[
+              { paddingBottom: Math.max(insets.bottom, 8) },
+              isWebDormant ? { display: 'none' } : undefined,
+            ]}
           >
             <TextInput
               className="flex-1 bg-background rounded-input px-4 py-3 text-body text-text-primary me-2"
@@ -922,7 +924,7 @@ export function ChatShell({
               // wrapper above already removes the input from the AT tree on
               // web. Native (iOS/Android) only renders the focused screen so
               // !isFocused effectively never fires there.
-              editable={!isStreaming && isFocused}
+              editable={!isStreaming && !isWebDormant}
               testID="chat-input"
               accessibilityLabel="Message input"
             />
@@ -969,9 +971,9 @@ export function ChatShell({
               // [BUG-886] Pressable disabled state mirrors handleSend's
               // guard — belt-and-braces against any path that bypasses the
               // wrapping View's pointerEvents/aria-hidden treatment.
-              disabled={!input.trim() || isStreaming || !isFocused}
+              disabled={!input.trim() || isStreaming || isWebDormant}
               className={`rounded-button px-5 py-3 min-h-[44px] min-w-[44px] items-center justify-center ${
-                input.trim() && !isStreaming && isFocused
+                input.trim() && !isStreaming && !isWebDormant
                   ? 'bg-primary'
                   : 'bg-surface-elevated'
               }`}

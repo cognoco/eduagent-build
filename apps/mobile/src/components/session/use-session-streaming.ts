@@ -231,6 +231,8 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
     responseHistory,
   } = opts;
 
+  const activeContinueRef = useRef<Promise<void> | null>(null);
+
   const syncHomeworkMetadata = useCallback(
     async (
       targetSessionId: string,
@@ -490,6 +492,16 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
         existingEntry?: OutboxEntry;
       },
     ) => {
+      while (activeContinueRef.current) {
+        await activeContinueRef.current;
+      }
+
+      let resolveCurrentTurn!: () => void;
+      const currentTurn = new Promise<void>((resolve) => {
+        resolveCurrentTurn = resolve;
+      });
+      activeContinueRef.current = currentTurn;
+
       let streamId: string | null = null;
       // [H6] SSE freeze watchdog — hoisted so finally can always clear it.
       let sseWatchdogTimerId: ReturnType<typeof setInterval> | null = null;
@@ -760,7 +772,6 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
                 };
               }),
             );
-            setIsStreaming(false);
             setExchangeCount(result.exchangeCount);
             setEscalationRung(result.escalationRung);
 
@@ -953,6 +964,10 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
             return prev;
           });
         }
+        if (activeContinueRef.current === currentTurn) {
+          activeContinueRef.current = null;
+        }
+        resolveCurrentTurn();
       }
     },
     [
