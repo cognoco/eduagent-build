@@ -248,3 +248,4 @@ apps/api/.notion-*.json
 # fingerprints + package name and Google recommends committing this file.
 # GoogleService-Info.plist will be committed once Apple enrollment completes.
 apps/mobile/GoogleService-Info.plist
+docs/audit/e2e/runs/
