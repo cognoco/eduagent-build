@@ -47,6 +47,7 @@ import {
   llmSummarySchema,
   engagementSignalSchema,
 } from '@eduagent/schemas';
+import { NotFoundError } from '../../errors';
 import { insertSessionEvent } from './session-events';
 import { getSubject } from '../subject';
 import { createPendingSessionSummary } from '../summaries';
@@ -430,7 +431,7 @@ async function materializeFocusedBookTopics(
     .limit(1);
 
   if (!book) {
-    throw new Error('Book not found in this subject');
+    throw new NotFoundError('Book');
   }
 
   const learnerAge = await getProfileAge(db, profileId);
@@ -781,7 +782,7 @@ export async function startFirstCurriculumSession(
   let focusedBookMaterializeAttempted = false;
 
   while (Date.now() <= deadline) {
-    const [topicId, extractedSignals] = await Promise.all([
+    const [initialTopicId, extractedSignals] = await Promise.all([
       sessionCrudDependencies.findFirstAvailableTopicId(
         db,
         profileId,
@@ -794,6 +795,23 @@ export async function startFirstCurriculumSession(
         subjectId,
       ),
     ]);
+    let topicId = initialTopicId;
+
+    if (!topicId && input.bookId && !focusedBookMaterializeAttempted) {
+      focusedBookMaterializeAttempted = true;
+      await sessionCrudDependencies.materializeFocusedBookTopics(
+        db,
+        profileId,
+        subjectId,
+        input.bookId,
+      );
+      topicId = await sessionCrudDependencies.findFirstAvailableTopicId(
+        db,
+        profileId,
+        subjectId,
+        input.bookId,
+      );
+    }
 
     if (topicId) {
       const topicAvailableMs = Date.now() - startedAt;
@@ -845,17 +863,6 @@ export async function startFirstCurriculumSession(
             : {}),
         },
       });
-    }
-
-    if (input.bookId && !focusedBookMaterializeAttempted) {
-      focusedBookMaterializeAttempted = true;
-      await sessionCrudDependencies.materializeFocusedBookTopics(
-        db,
-        profileId,
-        subjectId,
-        input.bookId,
-      );
-      continue;
     }
 
     await sleep(FIRST_CURRICULUM_SESSION_POLL_MS);
