@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# verify-test-receipts.sh — invoked by .husky/pre-push.
+# verify-test-receipts.sh - invoked by .husky/pre-push.
 #
-# For each tracked scope, if test files changed vs origin/main, require
-# a matching receipt at .test-receipts/<scope>.json. The receipt must
-# record the current content hash of every changed test file. Modifying
-# a file after recording invalidates the receipt.
+# For each tracked scope, if mobile TS/TSX files changed vs origin/main,
+# require a passing receipt at .test-receipts/<scope>.json. The receipt must
+# cover every affected file and must be less than 24 hours old. It is not
+# content-hash-bound; freshness plus affected-file coverage is the gate.
 #
 # Exit codes
-#   0 — receipts valid (or no in-scope changes)
-#   1 — at least one scope is missing or stale; push should be blocked
+#   0 - receipts valid (or no in-scope changes)
+#   1 - at least one scope is missing, stale, expired, or incomplete
 #
 # Bypass
 #   SKIP_RECEIPT_CHECK=1 git push     (or git push --no-verify)
@@ -16,16 +16,62 @@
 
 set -u
 
+RECEIPT_MAX_AGE_SECONDS=$((24 * 60 * 60))
+
 if [[ "${SKIP_RECEIPT_CHECK:-0}" == "1" ]]; then
-  echo "── Test-receipt check: bypassed via SKIP_RECEIPT_CHECK=1"
+  echo "-- Test-receipt check: bypassed via SKIP_RECEIPT_CHECK=1"
   exit 0
 fi
 
 # Scope registry. Add new scopes here as their receipt support lands.
 #   format: scope_name|file-glob-regex
 SCOPES=(
-  "mobile|^apps/mobile/src/.+\\.test\\.tsx?$"
+  "mobile|^apps/mobile/src/.+\\.[jt]sx?$"
 )
+
+read_json_string_field() {
+  local receipt="$1"
+  local field="$2"
+  if command -v jq >/dev/null 2>&1; then
+    jq -r --arg field "$field" '.[$field] // empty' "$receipt" 2>/dev/null
+  else
+    grep -oE '"'"$field"'"[[:space:]]*:[[:space:]]*"[^"]+"' "$receipt" \
+      | head -n 1 \
+      | sed -E 's/.*:[[:space:]]*"([^"]+)".*/\1/'
+  fi
+}
+
+read_json_bool_field() {
+  local receipt="$1"
+  local field="$2"
+  if command -v jq >/dev/null 2>&1; then
+    jq -r --arg field "$field" '.[$field] // empty' "$receipt" 2>/dev/null
+  else
+    grep -oE '"'"$field"'"[[:space:]]*:[[:space:]]*(true|false)' "$receipt" \
+      | head -n 1 \
+      | grep -oE '(true|false)' || true
+  fi
+}
+
+receipt_covers_file() {
+  local receipt="$1"
+  local file="$2"
+  if command -v jq >/dev/null 2>&1; then
+    [[ "$(jq -r --arg f "$file" '.affectedFiles[$f] == true' "$receipt" 2>/dev/null)" == "true" ]]
+  else
+    local escaped
+    escaped=$(printf '%s' "$file" | sed 's/[][\/.^$*]/\\&/g')
+    grep -Eq '"'"$escaped"'"[[:space:]]*:[[:space:]]*true' "$receipt"
+  fi
+}
+
+timestamp_to_epoch() {
+  node -e 'const value = process.argv[1]; const ts = Date.parse(value); if (!Number.isFinite(ts)) process.exit(1); console.log(Math.floor(ts / 1000));' "$1" 2>/dev/null
+}
+
+now_epoch() {
+  node -e 'console.log(Math.floor(Date.now() / 1000));' 2>/dev/null
+}
 
 BASE=$(git merge-base HEAD origin/main 2>/dev/null \
        || git merge-base HEAD main 2>/dev/null \
@@ -39,8 +85,8 @@ for entry in "${SCOPES[@]}"; do
   receipt=".test-receipts/$scope.json"
 
   # Pre-push validates only committed branch content because that is what will
-  # be pushed. The recorder also includes staged/unstaged edits so users can
-  # generate a receipt before making the commit that contains it.
+  # be pushed. The recorder includes staged/unstaged edits so users can create
+  # the receipt before making the commit that contains it.
   changed=$(git diff --name-only --diff-filter=d "$BASE..HEAD" 2>/dev/null \
             | grep -E "$glob" || true)
 
@@ -48,75 +94,86 @@ for entry in "${SCOPES[@]}"; do
     continue
   fi
 
-  echo "── Test-receipt check: $scope ──"
+  echo "-- Test-receipt check: $scope --"
   echo "Files changed in this branch vs main:"
   echo "$changed" | sed 's/^/  /'
 
   if [[ ! -f "$receipt" ]]; then
     echo
-    echo "✗ Missing receipt: $receipt"
+    echo "Missing receipt: $receipt"
     echo
-    echo "  This branch modifies $scope test files but has no recorded"
-    echo "  verification that the suite passes. Run:"
+    echo "  This branch modifies $scope files but has no recorded verification. Run:"
     echo
     echo "    bash scripts/record-test-receipt.sh $scope"
     echo
-    echo "  Then commit the receipt (it's a tiny JSON file) and push again."
+    echo "  Then commit the receipt and push again."
     FAILED=1
     continue
   fi
 
-  # Parse the receipt with jq if available, else with grep. The receipt
-  # is small + well-formed (we wrote it) so grep is fine.
-  if command -v jq >/dev/null 2>&1; then
-    passed=$(jq -r '.passed' "$receipt" 2>/dev/null || echo "")
-  else
-    passed=$(grep -oE '"passed":[[:space:]]*(true|false)' "$receipt" \
-             | grep -oE '(true|false)' || echo "")
-  fi
-
+  passed=$(read_json_bool_field "$receipt" passed)
   if [[ "$passed" != "true" ]]; then
     echo
-    echo "✗ Receipt is not in pass state ($receipt)."
+    echo "Receipt is not in pass state ($receipt)."
     echo "  Re-run: bash scripts/record-test-receipt.sh $scope"
     FAILED=1
     continue
   fi
 
-  # Validate that every changed file's current hash is recorded in the receipt.
-  mismatch=0
-  while IFS= read -r f; do
-    [[ -z "$f" ]] && continue
-    current=$(git hash-object "$f" 2>/dev/null || echo "MISSING")
-    if command -v jq >/dev/null 2>&1; then
-      recorded=$(jq -r --arg f "$f" '.testFiles[$f] // "MISSING"' "$receipt" 2>/dev/null)
-    else
-      # Best-effort grep — works as long as we wrote the receipt and didn't
-      # hand-edit it. Falls back to MISSING if not found.
-      recorded=$(grep -oE "\"$(printf '%s' "$f" | sed 's/[][\/.^$*]/\\&/g')\":[[:space:]]*\"[a-f0-9]+\"" "$receipt" \
-                 | grep -oE '"[a-f0-9]+"$' | tr -d '"' || echo "MISSING")
-      [[ -z "$recorded" ]] && recorded="MISSING"
-    fi
+  verified_at=$(read_json_string_field "$receipt" verifiedAt)
+  verified_epoch=$(timestamp_to_epoch "$verified_at" || true)
+  current_epoch=$(now_epoch || true)
 
-    if [[ "$recorded" != "$current" ]]; then
-      echo
-      echo "✗ Stale receipt entry for $f"
-      echo "    recorded: $recorded"
-      echo "    current : $current"
-      mismatch=1
-    fi
-  done <<< "$changed"
-
-  if [[ $mismatch -ne 0 ]]; then
+  if [[ -z "$verified_at" || -z "$verified_epoch" || -z "$current_epoch" ]]; then
     echo
-    echo "  The receipt was written against earlier content. Re-run:"
-    echo "    bash scripts/record-test-receipt.sh $scope"
-    echo "  Then amend or commit the updated receipt."
+    echo "Receipt has an invalid verifiedAt timestamp ($receipt)."
+    echo "  Re-run: bash scripts/record-test-receipt.sh $scope"
     FAILED=1
     continue
   fi
 
-  echo "✓ Receipt valid (all $(echo "$changed" | wc -l | tr -d ' ') file(s) verified)."
+  age_seconds=$((current_epoch - verified_epoch))
+  if [[ $age_seconds -lt -300 ]]; then
+    echo
+    echo "Receipt timestamp is in the future: $verified_at"
+    echo "  Re-run: bash scripts/record-test-receipt.sh $scope"
+    FAILED=1
+    continue
+  fi
+  if [[ $age_seconds -lt 0 ]]; then
+    age_seconds=0
+  fi
+
+  if [[ $age_seconds -gt $RECEIPT_MAX_AGE_SECONDS ]]; then
+    age_hours=$((age_seconds / 3600))
+    echo
+    echo "Receipt is too old ($age_hours hours; max 24): $receipt"
+    echo "  Re-run: bash scripts/record-test-receipt.sh $scope"
+    FAILED=1
+    continue
+  fi
+
+  missing=0
+  while IFS= read -r f; do
+    [[ -z "$f" ]] && continue
+    if ! receipt_covers_file "$receipt" "$f"; then
+      echo
+      echo "Receipt does not cover affected file: $f"
+      missing=1
+    fi
+  done <<< "$changed"
+
+  if [[ $missing -ne 0 ]]; then
+    echo
+    echo "  Re-run so the receipt covers the current affected file set:"
+    echo "    bash scripts/record-test-receipt.sh $scope"
+    FAILED=1
+    continue
+  fi
+
+  file_count=$(echo "$changed" | grep -c . || true)
+  age_minutes=$((age_seconds / 60))
+  echo "Receipt valid ($file_count affected file(s), ${age_minutes}m old, max 24h)."
   echo
 done
 

@@ -2,11 +2,10 @@
 # pre-push hook
 #
 # 1. Test-receipt verification (BLOCKING).
-#    Branches that modify scoped test files (currently: mobile) must carry
-#    a fresh, hash-bound receipt at .test-receipts/<scope>.json proving the
-#    suite passed against the current content. The pre-push gate enforces
-#    this — it was the missing piece in PR #257, where 189 mobile tests
-#    were never run locally and shipped broken.
+#    Branches that modify mobile TS/TSX files must carry a fresh affected-test
+#    receipt at .test-receipts/<scope>.json. The recorder runs Jest only for
+#    tests related to the changed files. The pre-push gate requires a passing
+#    receipt that covers the affected file set and is less than 24 hours old.
 #
 #    Generate the receipt with:
 #      bash scripts/record-test-receipt.sh mobile

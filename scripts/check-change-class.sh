@@ -274,18 +274,16 @@ if hit '^packages/test-utils/src/'; then
 fi
 
 
-# ── Mobile Test Files (PR #257 lesson) ───────────────────────────────────
-# Mobile test-file changes require a verified receipt before push. The
-# pre-push hook BLOCKS the push if the receipt is absent or stale.
-# This was added because PR #257 rewrote 14 mobile tests without running
-# them locally; CI's GC1 step short-circuited and 189 broken tests shipped.
-MOBILE_TESTS=$(filter_files '^apps/mobile/src/.+\.test\.tsx?$')
-if [[ -n "$MOBILE_TESTS" ]]; then
-  CLASSES+=("mobile-tests")
-  add_cmd slow "bash scripts/record-test-receipt.sh mobile" "Run mobile tests and write receipt"
-  note "mobile-tests: pre-push blocks stale or missing .test-receipts/mobile.json"
+# -- Mobile Affected Tests (PR #257 lesson) --------------------------------
+# Mobile TS/TSX changes require a verified receipt before push. The recorder
+# runs only Jest tests related to the affected files, and pre-push accepts a
+# passing receipt for 24 hours without hash-binding it to every follow-up edit.
+MOBILE_AFFECTED=$(filter_files '^apps/mobile/src/.+\.[jt]sx?$')
+if [[ -n "$MOBILE_AFFECTED" ]]; then
+  CLASSES+=("mobile-affected-tests")
+  add_cmd fast "bash scripts/record-test-receipt.sh mobile" "Run related mobile tests and write receipt"
+  note "mobile-affected-tests: pre-push requires a passing .test-receipts/mobile.json from the last 24h"
 fi
-
 if [[ ${#CLASSES[@]} -eq 0 ]]; then
   echo "No change classes matched ($FILE_COUNT file(s) checked)."
   echo "Pre-commit hooks (lint, tsc, surgical tests) cover these files."

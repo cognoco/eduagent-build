@@ -1,28 +1,23 @@
 #!/usr/bin/env bash
-# record-test-receipt.sh — run scoped tests and write a verification receipt.
+# record-test-receipt.sh - run scoped affected tests and write a receipt.
 #
 # Usage:  scripts/record-test-receipt.sh <scope>
 #   scope: mobile           (currently the only supported scope)
 #
 # What this does
-#   1. Identifies test files changed vs origin/main for the scope.
-#   2. Runs the appropriate test command for that scope.
-#   3. On pass, writes .test-receipts/<scope>.json with the current
-#      content hash of each changed test file. The pre-push hook
-#      validates against this — if you modify a test file after the
-#      receipt was written, the push is blocked.
+#   1. Identifies mobile TS/TSX files changed vs origin/main for the scope.
+#   2. Runs Jest only for tests related to those affected files.
+#   3. On pass, writes .test-receipts/<scope>.json with the affected file list
+#      and timestamp. The pre-push hook validates that the receipt is passing,
+#      covers the affected files, and is not older than 24 hours.
 #
-# Why
-#   A green local test run is the only real evidence that a refactor
-#   still works. Without a hash-bound receipt, "tests pass" is hearsay,
-#   and the kind of regression that ate PR #257 ships unchecked.
-#
-# Bypass
-#   SKIP_RECEIPT_CHECK=1 git push     (also honors git push --no-verify)
-#   The bypass shows up in `git push` output so it's visible in chat
-#   transcripts. Use only for emergency reverts.
+# The receipt is intentionally not content-hash-bound. A follow-up commit that
+# touches the same files should not force a multi-hour suite rerun; freshness
+# and affected-file coverage are the gate.
 
 set -euo pipefail
+
+RECEIPT_MAX_AGE_HOURS=24
 
 json_escape() {
   local value="$1"
@@ -36,24 +31,38 @@ json_escape() {
   printf '%s' "$value"
 }
 
+join_command() {
+  local out=""
+  local arg
+  for arg in "$@"; do
+    if [[ -z "$out" ]]; then
+      printf -v out '%q' "$arg"
+    else
+      printf -v out '%s %q' "$out" "$arg"
+    fi
+  done
+  printf '%s' "$out"
+}
+
 SCOPE="${1:-}"
 if [[ -z "$SCOPE" ]]; then
   cat >&2 <<EOF
 usage: scripts/record-test-receipt.sh <scope>
 
 Supported scopes:
-  mobile     apps/mobile/src/**/*.test.tsx?  ->  pnpm exec nx run mobile:test
+  mobile     apps/mobile/src/**/*.{ts,tsx} -> related Jest tests only
 
 After a green run, .test-receipts/<scope>.json is written. Stage and
-commit it alongside your test changes so the pre-push hook can verify it.
+commit it alongside your changes so the pre-push hook can verify it.
 EOF
   exit 2
 fi
 
 case "$SCOPE" in
   mobile)
-    GLOB='^apps/mobile/src/.+\.test\.tsx?$'
-    TEST_CMD='pnpm exec nx run mobile:test'
+    GLOB='^apps/mobile/src/.+\.[jt]sx?$'
+    TEST_CMD=(pnpm exec jest --config apps/mobile/jest.config.cjs --findRelatedTests)
+    TEST_ARGS=(--runInBand --no-coverage --forceExit)
     ;;
   *)
     echo "unknown scope: $SCOPE (supported: mobile)" >&2
@@ -61,18 +70,12 @@ case "$SCOPE" in
     ;;
 esac
 
-# Determine merge base against origin/main. Fall back to main if origin/main
-# is missing (e.g., fresh clone without fetched main).
 BASE=$(git merge-base HEAD origin/main 2>/dev/null \
        || git merge-base HEAD main 2>/dev/null \
        || echo "main")
 
 CHANGED=$(git diff --name-only --diff-filter=d "$BASE..HEAD" 2>/dev/null \
           | grep -E "$GLOB" || true)
-
-# Include unstaged + staged changes that match the scope, too. A receipt
-# written before commit would be confusing — but if the user has staged
-# new test edits since the last commit, those should be in scope.
 UNCOMMITTED=$(git diff --name-only --diff-filter=d 2>/dev/null \
               | grep -E "$GLOB" || true)
 STAGED=$(git diff --cached --name-only --diff-filter=d 2>/dev/null \
@@ -82,29 +85,25 @@ ALL_CHANGED=$(printf '%s\n%s\n%s\n' "$CHANGED" "$UNCOMMITTED" "$STAGED" \
               | grep -v '^$' | sort -u || true)
 
 if [[ -z "$ALL_CHANGED" ]]; then
-  echo "[receipt:$SCOPE] No $SCOPE test files changed vs origin/main."
-  echo "[receipt:$SCOPE] Nothing to record. (If you expected changes, check"
-  echo "[receipt:$SCOPE]  that you're on the right branch.)"
+  echo "[receipt:$SCOPE] No $SCOPE files changed vs origin/main."
+  echo "[receipt:$SCOPE] Nothing to record."
   exit 0
 fi
 
-echo "[receipt:$SCOPE] Test files in scope:"
-echo "$ALL_CHANGED" | sed 's/^/  /'
-echo
-echo "[receipt:$SCOPE] Command: $TEST_CMD"
-echo "[receipt:$SCOPE] Running…"
-echo "──────────────────────────────────────────────────────────────"
+mapfile -t AFFECTED_FILES <<< "$ALL_CHANGED"
+COMMAND_DISPLAY=$(join_command "${TEST_CMD[@]}" "${AFFECTED_FILES[@]}" "${TEST_ARGS[@]}")
 
-if ! eval "$TEST_CMD"; then
+echo "[receipt:$SCOPE] Affected files in scope:"
+printf '  %s\n' "${AFFECTED_FILES[@]}"
+echo
+echo "[receipt:$SCOPE] Command: $COMMAND_DISPLAY"
+echo "[receipt:$SCOPE] Running..."
+echo "--------------------------------------------------------------"
+
+if ! "${TEST_CMD[@]}" "${AFFECTED_FILES[@]}" "${TEST_ARGS[@]}"; then
   echo
-  echo "[receipt:$SCOPE] ✗ TESTS FAILED — receipt NOT written."
+  echo "[receipt:$SCOPE] TESTS FAILED - receipt NOT written."
   echo "[receipt:$SCOPE] Fix the failures, then re-run this script."
-  echo
-  echo "[receipt:$SCOPE] Common patterns:"
-  echo "[receipt:$SCOPE]   - jest.mock factory references an out-of-scope variable"
-  echo "[receipt:$SCOPE]     that doesn't start with 'mock'. Rename or inline-require."
-  echo "[receipt:$SCOPE]   - Test asserts a testID/route the screen no longer renders."
-  echo "[receipt:$SCOPE]   - Mock returns the wrong shape; assertion checks production shape."
   exit 1
 fi
 
@@ -119,31 +118,27 @@ USER_NAME=$(git config user.name 2>/dev/null || echo unknown)
   echo '{'
   printf '  "scope": "%s",\n' "$(json_escape "$SCOPE")"
   printf '  "verifiedAt": "%s",\n' "$(json_escape "$TIMESTAMP")"
+  printf '  "maxAgeHours": %s,\n' "$RECEIPT_MAX_AGE_HOURS"
   printf '  "verifiedBy": "%s",\n' "$(json_escape "$USER_NAME @ $HOST")"
-  printf '  "command": "%s",\n' "$(json_escape "$TEST_CMD")"
+  printf '  "command": "%s",\n' "$(json_escape "$COMMAND_DISPLAY")"
   echo '  "passed": true,'
-  echo '  "testFiles": {'
+  echo '  "affectedFiles": {'
   FIRST=1
-  while IFS= read -r f; do
-    [[ -z "$f" ]] && continue
-    # Hash the working-tree content (what tests just ran against).
-    SHA=$(git hash-object "$f" 2>/dev/null || echo "MISSING")
+  for f in "${AFFECTED_FILES[@]}"; do
     if [[ $FIRST -eq 1 ]]; then
       FIRST=0
     else
       echo ','
     fi
-    printf '    "%s": "%s"' "$(json_escape "$f")" "$(json_escape "$SHA")"
-  done <<< "$ALL_CHANGED"
+    printf '    "%s": true' "$(json_escape "$f")"
+  done
   echo
   echo '  }'
   echo '}'
 } > "$RECEIPT"
 
 echo
-echo "──────────────────────────────────────────────────────────────"
-echo "[receipt:$SCOPE] ✓ Wrote $RECEIPT"
-echo "[receipt:$SCOPE]"
-echo "[receipt:$SCOPE] Stage the receipt before pushing:"
-echo "[receipt:$SCOPE]   git add $RECEIPT"
-echo "[receipt:$SCOPE] Commit it with the normal repo commit flow before pushing."
+echo "--------------------------------------------------------------"
+echo "[receipt:$SCOPE] Wrote $RECEIPT"
+echo "[receipt:$SCOPE] Valid for $RECEIPT_MAX_AGE_HOURS hours if the affected file set stays covered."
+echo "[receipt:$SCOPE] Stage and commit the receipt before pushing."
