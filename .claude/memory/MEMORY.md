@@ -41,6 +41,7 @@ Two production dead-code branches removed 2026-04-19 in commit `970a82a5`: `AgeB
 - [project_archon_spike_merge_rule.md](project_archon_spike_merge_rule.md) — During the Archon spike, `.archon/`-only changes can be direct-merged to main. Verify delta is `.archon/`-only first.
 - [feedback_never_switch_branch.md](feedback_never_switch_branch.md) — NEVER switch branches unless user explicitly asks.
 - [feedback_parallel_agents.md](feedback_parallel_agents.md) — Parallel agents in same tree, no worktrees. Coordinator commits sequentially.
+- [feedback_agent_checkpoint_cadence.md](feedback_agent_checkpoint_cadence.md) — Long-running agents save durable checkpoints every 4 minutes; no git from subagents.
 - [feedback_fast_iteration.md](feedback_fast_iteration.md) — 60-min feedback loops unacceptable. CI gates, but optimize speed.
 - [feedback_fix_verification_rules.md](feedback_fix_verification_rules.md) — Changed ≠ verified. Break tests, finding IDs, no silent recovery.
 - [feedback_sweep_for_same_bug.md](feedback_sweep_for_same_bug.md) — When a bug could be pattern-shaped, sweep the codebase for sibling instances before declaring done. **Direct precursor of CLAUDE.md `Sweep when you fix` rule (added 2026-05-03); strengthened 2026-05-12.**

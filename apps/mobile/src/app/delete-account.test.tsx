@@ -8,6 +8,8 @@ import {
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
+import type { Profile, ProfileContextValue } from '../lib/profile';
+
 const mockBack = jest.fn();
 const mockReplace = jest.fn();
 const mockCanGoBack = jest.fn();
@@ -75,9 +77,60 @@ const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: false, gcTime: 0 } },
 });
 
+const ownerProfile: Profile = {
+  id: '00000000-0000-7000-8000-000000000001',
+  accountId: '00000000-0000-7000-8000-000000000010',
+  displayName: 'Zuzka',
+  avatarUrl: null,
+  birthYear: 1990,
+  location: null,
+  isOwner: true,
+  hasPremiumLlm: false,
+  conversationLanguage: 'en',
+  pronouns: null,
+  consentStatus: null,
+  linkCreatedAt: null,
+  createdAt: '2026-01-01T00:00:00Z',
+  updatedAt: '2026-01-01T00:00:00Z',
+};
+
+const childProfile: Profile = {
+  ...ownerProfile,
+  id: '00000000-0000-7000-8000-000000000002',
+  displayName: 'Mia',
+  birthYear: 2013,
+  isOwner: false,
+  linkCreatedAt: '2026-01-02T00:00:00Z',
+  createdAt: '2026-01-02T00:00:00Z',
+  updatedAt: '2026-01-02T00:00:00Z',
+};
+
+function createProfileContext(
+  profiles: Profile[] = [ownerProfile],
+  activeProfile: Profile | null = profiles[0] ?? null,
+): ProfileContextValue {
+  return {
+    profiles,
+    activeProfile,
+    switchProfile: jest.fn(async () => ({ success: true })),
+    isLoading: false,
+    profileLoadError: null,
+    profileWasRemoved: false,
+    acknowledgeProfileRemoval: jest.fn(),
+  };
+}
+
+let mockProfileContext = createProfileContext();
+const { ProfileContext } =
+  require('../lib/profile') as typeof import('../lib/profile');
+
 function Wrapper({ children }: { children: React.ReactNode }) {
   return (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    <QueryClientProvider client={queryClient}>
+      <ProfileContext.Provider value={mockProfileContext}>
+        {children}
+      </ProfileContext.Provider>
+    </QueryClientProvider>
   );
 }
 
@@ -111,6 +164,7 @@ describe('DeleteAccountScreen', () => {
       isError: false,
       refetch: mockDeletionStatusRefetch,
     };
+    mockProfileContext = createProfileContext();
   });
 
   afterEach(() => {
@@ -417,7 +471,19 @@ describe('DeleteAccountScreen', () => {
       screen.getByTestId('delete-account-confirming');
     });
 
-    it('shows the family-pool warning in the confirming stage', () => {
+    it('hides the family-pool warning for a solo owner', () => {
+      mockProfileContext = createProfileContext([ownerProfile]);
+
+      render(<DeleteAccountScreen />, { wrapper: Wrapper });
+      fireEvent.press(screen.getByTestId('delete-account-confirm'));
+
+      expect(screen.queryByTestId('delete-account-family-warning')).toBeNull();
+      expect(screen.queryByText(/linked child profiles/i)).toBeNull();
+    });
+
+    it('shows the family-pool warning when the owner has a linked child', () => {
+      mockProfileContext = createProfileContext([ownerProfile, childProfile]);
+
       render(<DeleteAccountScreen />, { wrapper: Wrapper });
       fireEvent.press(screen.getByTestId('delete-account-confirm'));
 
