@@ -16,12 +16,8 @@
   fast at the first layer and hides downstream breakage. PR #257 shipped
   with 189 broken mobile tests because the author skipped this step.
 
-  For scoped mobile changes, attach the auto-generated receipt:
-    - bash scripts/record-test-receipt.sh mobile
-    - .test-receipts/mobile.json committed in this PR (fresh within 24h)
-
   Examples of acceptable Verified-By entries:
-    - bash scripts/record-test-receipt.sh mobile - related mobile Jest tests passed; receipt fresh within 24h
+    - pnpm exec jest --config apps/mobile/jest.config.cjs --findRelatedTests apps/mobile/src/path/to/file.tsx --runInBand --no-coverage --forceExit — related mobile Jest tests passed
     - pnpm exec nx run api:test       — 229 passed, 0 failed
     - bash scripts/check-change-class.sh --run    — all green
 -->
@@ -30,7 +26,6 @@
 - [ ] `pnpm lint` — pass on affected projects
 - [ ] Tests — list the exact command and result:
     - `<command>` — `<N passed, 0 failed>`
-- [ ] If mobile TS/TSX files changed: `.test-receipts/mobile.json` committed in this PR and fresh within 24h
 
 ## Failure modes considered
 

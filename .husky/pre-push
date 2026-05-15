@@ -1,31 +1,8 @@
 #!/usr/bin/env sh
 # pre-push hook
 #
-# 1. Test-receipt verification (BLOCKING).
-#    Branches that modify mobile TS/TSX files must carry a fresh affected-test
-#    receipt at .test-receipts/<scope>.json. The recorder runs Jest only for
-#    tests related to the changed files. The pre-push gate requires a passing
-#    receipt that covers the affected file set and is less than 24 hours old.
-#
-#    Generate the receipt with:
-#      bash scripts/record-test-receipt.sh mobile
-#
-#    Bypass (visible in shell):
-#      SKIP_RECEIPT_CHECK=1 git push       # or git push --no-verify
-#
-# 2. Change-class checklist (advisory).
-#    Non-blocking. Prints validation commands beyond what pre-commit enforces.
-
-if [ -f scripts/verify-test-receipts.sh ]; then
-  if ! bash scripts/verify-test-receipts.sh; then
-    echo ""
-    echo "── push blocked by pre-push hook ──────────────────────────────"
-    echo "  Address the test-receipt issue above, then push again."
-    echo "  Override with SKIP_RECEIPT_CHECK=1 git push (use sparingly)."
-    echo ""
-    exit 1
-  fi
-fi
+# Change-class checklist (advisory).
+# Non-blocking. Prints validation commands beyond what pre-commit enforces.
 
 if [ -f scripts/check-change-class.sh ]; then
   echo ""

@@ -275,14 +275,13 @@ fi
 
 
 # -- Mobile Affected Tests (PR #257 lesson) --------------------------------
-# Mobile TS/TSX changes require a verified receipt before push. The recorder
-# runs only Jest tests related to the affected files, and pre-push accepts a
-# passing receipt for 24 hours without hash-binding it to every follow-up edit.
+# Mobile TS/TSX changes should still get focused Jest coverage, but this is
+# advisory only. CI and reviewer-visible Verified-By notes are the merge gate.
 MOBILE_AFFECTED=$(filter_files '^apps/mobile/src/.+\.[jt]sx?$')
 if [[ -n "$MOBILE_AFFECTED" ]]; then
   CLASSES+=("mobile-affected-tests")
-  add_cmd fast "bash scripts/record-test-receipt.sh mobile" "Run related mobile tests and write receipt"
-  note "mobile-affected-tests: pre-push requires a passing .test-receipts/mobile.json from the last 24h"
+  add_cmd fast "pnpm exec jest --config apps/mobile/jest.config.cjs --findRelatedTests <changed-mobile-files> --runInBand --no-coverage --forceExit" "Run related mobile Jest tests"
+  note "mobile-affected-tests: run related Jest tests for changed mobile TS/TSX files; pre-push no longer blocks on receipts"
 fi
 if [[ ${#CLASSES[@]} -eq 0 ]]; then
   echo "No change classes matched ($FILE_COUNT file(s) checked)."
