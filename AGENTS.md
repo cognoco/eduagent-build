@@ -76,7 +76,6 @@ These deviations exist so reviewers do not try to fix them in unrelated PRs.
 Unit tests, lint, typecheck, and formatting are enforced by pre-commit hooks (`lint-staged`, `tsc --build`, `scripts/pre-commit-tests.sh`). Verify locally while iterating, and focus on what hooks do not cover:
 
 - Run integration tests when changing DB behavior, auth/profile scoping, Inngest flows, or cross-package contracts. The pre-commit hook intentionally skips `.integration.test.` files.
-- Mobile TS/TSX changes require a passing affected-test receipt before push: `bash scripts/record-test-receipt.sh mobile`. The receipt runs related Jest tests for affected mobile files, is valid for 24 hours, and is not content-hash-bound.
 - Do not call work complete if related tests, lint, typecheck, required migrations, or required eval snapshots are still failing.
 - No suppression, no shortcuts. Never use `eslint-disable` or suppress warnings to make lint pass. Fix the code or improve the lint rule.
 

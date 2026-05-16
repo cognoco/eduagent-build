@@ -46,7 +46,7 @@ The hook (`scripts/pre-commit-tests.sh` + `.husky/pre-commit`) runs automaticall
 - **i18n staleness guard** — runs when `en.json` staged
 - **GC1 ratchet** — blocks new internal `jest.mock()` without `gc1-allow`
 
-**Not covered by pre-commit** (the script catches these):
+**Not covered by pre-commit** (the change-class script catches these):
 
 - Integration tests (`*.integration.test.*` are intentionally skipped)
 - Cross-package integration tests (`tests/integration/`)
@@ -54,3 +54,22 @@ The hook (`scripts/pre-commit-tests.sh` + `.husky/pre-commit`) runs automaticall
 - `eval:llm --live` (Tier 2 — real LLM calls)
 - DB push/generate/migrate
 - Manual review items (CI config, deploy config, Expo config)
+
+## What the Pre-Push Hook Covers
+
+The hook (`scripts/pre-push-tests.sh` + `.husky/pre-push`) runs automatically on `git push` and **blocks on failure**. It validates the push delta — all files changed since the remote last received this branch (or since `origin/main` for new branches).
+
+- **tsc --build** — incremental typecheck on push delta (catches cross-commit type breakage)
+- **Surgical jest** — `--findRelatedTests` per project on the delta (same pattern as pre-commit, but on the cumulative push range)
+- **eval:llm** — when prompt files or eval harness code are in the delta
+- **check:i18n** — when i18n files are in the delta
+
+Skip with `git push --no-verify` or `SKIP_PRE_PUSH=1`. Skipped automatically on protected branches (`main` by default; configure via `PREPUSH_SKIP_BRANCHES`).
+
+**Not covered by pre-push** (left to CI):
+
+- Integration tests (`*.integration.test.*`)
+- E2E tests (Playwright, Maestro)
+- Full workspace lint
+- DB push/generate/migrate
+- Manual review items
