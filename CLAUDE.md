@@ -75,13 +75,12 @@ These deviations from the rules above exist in the codebase as of 2026-05-01. Th
 
 ## Required Validation
 
-Unit tests, lint, typecheck, and formatting are enforced by pre-commit hooks (lint-staged, `tsc --build`, `scripts/pre-commit-tests.sh`). You don't need to re-run them manually before committing — but verify locally while iterating. Focus on what the hooks do NOT cover:
+Pre-commit and pre-push hooks enforce lint, typecheck, and surgical tests automatically. See `docs/change-classes.md` for what each hook covers. Focus on what hooks do NOT cover:
 
-- Run integration tests when changing DB behavior, auth/profile scoping, Inngest flows, or cross-package contracts. The pre-commit hook intentionally skips `.integration.test.` files.
+- Run integration tests when changing DB behavior, auth/profile scoping, Inngest flows, or cross-package contracts. Both hooks intentionally skip `.integration.test.` files.
 - Do not call work complete if related tests, lint, typecheck, or required migrations are still failing.
 - No suppression, no shortcuts — always address the root of the error. Never use `eslint-disable` or suppress warnings to make lint pass. Fix the actual code or improve the lint rule to handle the pattern correctly.
 
-- **Mobile TS/TSX changes require an affected-test receipt before push.** Pre-push blocks the push if `apps/mobile/src/**/*.{ts,tsx}` changed without a passing `.test-receipts/mobile.json` generated in the last 24 hours. Generate with `bash scripts/record-test-receipt.sh mobile` - it runs `pnpm exec jest --config apps/mobile/jest.config.cjs --findRelatedTests <affected files> --runInBand --no-coverage --forceExit` and records the affected file set plus timestamp. Receipts are freshness-bound, not content-hash-bound, so normal follow-up commits touching the same covered files do not force a full-suite rerun. Bypass with `SKIP_RECEIPT_CHECK=1 git push` (visible in shell history, use only for revert PRs).
 
 ## Repo-Specific Guardrails
 

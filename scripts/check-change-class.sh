@@ -273,16 +273,10 @@ if hit '^packages/test-utils/src/'; then
   add_cmd slow  "pnpm test:api:integration"  "API integration tests"
 fi
 
+# ═════════════════════════════════════════════════════════════════════════
+# OUTPUT
+# ═════════════════════════════════════════════════════════════════════════
 
-# -- Mobile Affected Tests (PR #257 lesson) --------------------------------
-# Mobile TS/TSX changes should still get focused Jest coverage, but this is
-# advisory only. CI and reviewer-visible Verified-By notes are the merge gate.
-MOBILE_AFFECTED=$(filter_files '^apps/mobile/src/.+\.[jt]sx?$')
-if [[ -n "$MOBILE_AFFECTED" ]]; then
-  CLASSES+=("mobile-affected-tests")
-  add_cmd fast "pnpm exec jest --config apps/mobile/jest.config.cjs --findRelatedTests <changed-mobile-files> --runInBand --no-coverage --forceExit" "Run related mobile Jest tests"
-  note "mobile-affected-tests: run related Jest tests for changed mobile TS/TSX files; pre-push no longer blocks on receipts"
-fi
 if [[ ${#CLASSES[@]} -eq 0 ]]; then
   echo "No change classes matched ($FILE_COUNT file(s) checked)."
   echo "Pre-commit hooks (lint, tsc, surgical tests) cover these files."
