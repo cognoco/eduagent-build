@@ -11,6 +11,7 @@ import {
 import type { Database } from '@eduagent/database';
 
 import { captureException } from './services/sentry';
+import { CircuitOpenError } from './services/llm';
 import { isTransientDatabaseError } from './services/transient-db-retry';
 import {
   ForbiddenError,
@@ -318,6 +319,22 @@ app.onError((err, c) => {
     );
   }
 
+  if (err instanceof CircuitOpenError) {
+    captureException(err, {
+      userId: c.get('user')?.userId,
+      profileId: c.get('profileId'),
+      requestPath: c.req.path,
+      extra: { provider: err.provider, circuitKey: err.circuitKey },
+    });
+    return c.json(
+      {
+        code: ERROR_CODES.LLM_UNAVAILABLE,
+        message: err.message,
+      },
+      503,
+    );
+  }
+
   // [BUG-950] LlmStreamError wraps the real cause — unwrap so typed errors
   // (UpstreamLlmError, RateLimitedError, etc.) are classified correctly
   // instead of falling through to the generic 500.
@@ -333,6 +350,22 @@ app.onError((err, c) => {
       return c.json(
         { code: ERROR_CODES.UPSTREAM_ERROR, message: cause.message },
         502,
+      );
+    }
+    if (cause instanceof CircuitOpenError) {
+      captureException(cause, {
+        userId: c.get('user')?.userId,
+        profileId: c.get('profileId'),
+        requestPath: c.req.path,
+        extra: {
+          wrapper: err.message,
+          provider: cause.provider,
+          circuitKey: cause.circuitKey,
+        },
+      });
+      return c.json(
+        { code: ERROR_CODES.LLM_UNAVAILABLE, message: cause.message },
+        503,
       );
     }
     captureException(err, {

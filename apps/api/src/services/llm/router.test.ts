@@ -510,6 +510,52 @@ describe('LLM Router', () => {
         registerProvider(createMockProvider('gemini'));
       }
     });
+
+    it('[LLM-VISION-CIRCUIT] does not let vision stream failures open the text chat circuit', async () => {
+      _clearProviders();
+      _resetCircuits();
+      registerProvider(createFailingStreamProvider('gemini'));
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
+
+      const visionMessages: ChatMessage[] = [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: 'Read this homework image.' },
+            { type: 'inline_data', mimeType: 'image/jpeg', data: 'base64' },
+          ],
+        },
+      ];
+
+      try {
+        for (let attempt = 0; attempt < 3; attempt++) {
+          const result = await routeAndStream(visionMessages, 1);
+          await expect(async () => {
+            for await (const _chunk of result.stream) {
+              // Drain the lazy stream so the vision circuit records failure.
+            }
+          }).rejects.toThrow('Stream connection lost');
+        }
+
+        registerProvider(createMockProvider('gemini'));
+        const textResult = await routeAndStream(
+          [{ role: 'user', content: 'Explain fractions.' }],
+          1,
+        );
+        const textChunks: string[] = [];
+        for await (const chunk of textResult.stream) {
+          textChunks.push(chunk);
+        }
+
+        expect(textResult.provider).toBe('gemini');
+        expect(textChunks.join('')).toContain('Mock streamed');
+      } finally {
+        warnSpy.mockRestore();
+        _clearProviders();
+        _resetCircuits();
+        registerProvider(createMockProvider('gemini'));
+      }
+    });
   });
 
   describe('routeAndCall retry on transient failure', () => {
@@ -865,7 +911,12 @@ describe('LLM Router', () => {
       });
 
       const system = receivedMessages[0]![0]!.content;
-      expect(system).toContain('Respond in Czech unless the learner switches.');
+      expect(system).toContain(
+        'Write only the learner-visible prose inside the JSON "reply" field in Czech unless the learner switches.',
+      );
+      expect(system).toContain(
+        'Keep JSON keys, signal names, and envelope structure exactly as specified in English.',
+      );
     });
 
     it('prepends pronouns line when provided', async () => {
@@ -923,15 +974,18 @@ describe('LLM Router', () => {
 
       const system = getTextContent(receivedMessages[0]![0]!.content);
       expect(system).toContain(
-        'Respond in Spanish unless the learner switches.',
+        'Write only the learner-visible prose inside the JSON "reply" field in Spanish unless the learner switches.',
+      );
+      expect(system).toContain(
+        'Keep JSON keys, signal names, and envelope structure exactly as specified in English.',
       );
       expect(system).toContain(
         'The learner uses the pronouns "she/her" (data only',
       );
       // Personalization lines precede the safety identity statement
-      expect(system.indexOf('Respond in Spanish')).toBeLessThan(
-        system.indexOf('educational AI assistant'),
-      );
+      expect(
+        system.indexOf('Write only the learner-visible prose'),
+      ).toBeLessThan(system.indexOf('educational AI assistant'));
     });
 
     it('omits personalization when neither field provided', async () => {

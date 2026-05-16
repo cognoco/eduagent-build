@@ -127,7 +127,7 @@ export class GeminiOcrProvider implements OcrProvider {
       },
     ];
 
-    const result = await routeAndCall(messages, 1);
+    const result = await routeAndCall(messages, 1, { flow: 'ocr.extract' });
     return parseOcrResponse(result.response);
   }
 }

@@ -71,6 +71,7 @@ import {
 import { generateRecallBridge } from '../services/recall-bridge';
 import { getProfileAgeBracket } from '../services/profile';
 import { markPersisted } from '../services/idempotency-marker';
+import { CircuitOpenError } from '../services/llm';
 import {
   isTopicIntentMatcherEnabled,
   isMemoryFactsReadEnabled,
@@ -78,6 +79,31 @@ import {
 } from '../config';
 
 const logger = createLogger();
+
+function getErrorDebugFields(err: unknown): {
+  error: string;
+  errorName: string;
+  cause?: string;
+  causeName?: string;
+  stack?: string;
+  circuitKey?: string;
+} {
+  const cause = err instanceof Error ? err.cause : undefined;
+  const circuitKey =
+    err instanceof CircuitOpenError
+      ? err.circuitKey
+      : cause instanceof CircuitOpenError
+        ? cause.circuitKey
+        : undefined;
+  return {
+    error: err instanceof Error ? err.message : String(err),
+    errorName: err instanceof Error ? err.name : typeof err,
+    cause: cause instanceof Error ? cause.message : undefined,
+    causeName: cause instanceof Error ? cause.name : undefined,
+    stack: err instanceof Error ? err.stack : undefined,
+    circuitKey,
+  };
+}
 
 function isSafetyFilterError(err: unknown): boolean {
   return (
@@ -458,22 +484,25 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
               });
             }
           } catch (streamErr) {
-            const errMsg =
-              streamErr instanceof Error
-                ? streamErr.message
-                : String(streamErr);
-            const errStack =
-              streamErr instanceof Error ? streamErr.stack : undefined;
+            const debugFields = getErrorDebugFields(streamErr);
             logger.error('[sessions/stream] LLM stream failed', {
+              surface: 'sessions.stream',
+              phase: 'llm_stream_drain',
               sessionId,
-              error: errMsg,
-              errorName:
-                streamErr instanceof Error ? streamErr.name : typeof streamErr,
-              stack: errStack,
+              profileId,
+              chunkCount,
+              ...debugFields,
             });
             captureException(streamErr, {
               profileId,
-              extra: { sessionId, phase: 'llm_stream' },
+              extra: {
+                sessionId,
+                phase: 'llm_stream',
+                chunkCount,
+                circuitKey: debugFields.circuitKey,
+                errorName: debugFields.errorName,
+                causeName: debugFields.causeName,
+              },
             });
 
             if (
@@ -487,11 +516,11 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                 {
                   sessionId,
                   chunkCount,
-                  error: errMsg,
-                  errorName:
-                    streamErr instanceof Error
-                      ? streamErr.name
-                      : typeof streamErr,
+                  profileId,
+                  circuitKey: debugFields.circuitKey,
+                  error: debugFields.error,
+                  errorName: debugFields.errorName,
+                  causeName: debugFields.causeName,
                 },
               );
               try {
@@ -534,18 +563,17 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                 });
                 return;
               } catch (fallbackErr) {
+                const fallbackDebugFields = getErrorDebugFields(fallbackErr);
                 logger.error(
                   '[sessions/stream] Non-streaming fallback failed',
                   {
+                    surface: 'sessions.stream',
+                    phase: 'llm_stream_fallback',
                     sessionId,
-                    error:
-                      fallbackErr instanceof Error
-                        ? fallbackErr.message
-                        : String(fallbackErr),
-                    errorName:
-                      fallbackErr instanceof Error
-                        ? fallbackErr.name
-                        : typeof fallbackErr,
+                    profileId,
+                    parentErrorName: debugFields.errorName,
+                    parentCircuitKey: debugFields.circuitKey,
+                    ...fallbackDebugFields,
                   },
                 );
                 captureException(fallbackErr, {
@@ -553,6 +581,11 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                   extra: {
                     sessionId,
                     phase: 'llm_stream_non_streaming_fallback',
+                    parentErrorName: debugFields.errorName,
+                    parentCircuitKey: debugFields.circuitKey,
+                    circuitKey: fallbackDebugFields.circuitKey,
+                    errorName: fallbackDebugFields.errorName,
+                    causeName: fallbackDebugFields.causeName,
                   },
                 });
               }
@@ -718,12 +751,27 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
               key: clientId,
             });
           } catch (err) {
+            const debugFields = getErrorDebugFields(err);
             // [logging sweep] structured logger so PII fields land as JSON context
             logger.error('[sessions/stream] Post-stream processing failed', {
+              surface: 'sessions.stream',
+              phase: 'on_complete',
               sessionId,
-              error: err instanceof Error ? err.message : String(err),
+              profileId,
+              chunkCount,
+              ...debugFields,
             });
-            captureException(err, { profileId, extra: { sessionId } });
+            captureException(err, {
+              profileId,
+              extra: {
+                sessionId,
+                phase: 'on_complete',
+                chunkCount,
+                circuitKey: debugFields.circuitKey,
+                errorName: debugFields.errorName,
+                causeName: debugFields.causeName,
+              },
+            });
             // Refund quota — user should not be charged for a failed exchange.
             // Wrap in try/catch: if safeRefundQuota throws, the error frame
             // must still be written so the client is never left hanging. [M-3]
@@ -762,11 +810,13 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
           }
         });
       } catch (err) {
+        const debugFields = getErrorDebugFields(err);
         logger.error('[sessions/stream] Pre-stream setup failed', {
+          surface: 'sessions.stream',
+          phase: 'pre_stream_setup',
           sessionId,
-          error: err instanceof Error ? err.message : String(err),
-          errorName: err instanceof Error ? err.name : typeof err,
-          stack: err instanceof Error ? err.stack : undefined,
+          profileId,
+          ...debugFields,
         });
         if (err instanceof SessionExchangeLimitError) {
           return apiError(
@@ -779,8 +829,10 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
 
         const isUpstreamLlmError =
           err instanceof UpstreamLlmError ||
+          err instanceof CircuitOpenError ||
           (err instanceof LlmStreamError &&
-            err.cause instanceof UpstreamLlmError);
+            (err.cause instanceof UpstreamLlmError ||
+              err.cause instanceof CircuitOpenError));
         if (
           !(err instanceof RateLimitedError) &&
           !isSafetyFilterError(err) &&
@@ -790,8 +842,11 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             '[sessions/stream] Pre-stream setup failed; trying non-streaming fallback',
             {
               sessionId,
-              error: err instanceof Error ? err.message : String(err),
-              errorName: err instanceof Error ? err.name : typeof err,
+              profileId,
+              circuitKey: debugFields.circuitKey,
+              error: debugFields.error,
+              errorName: debugFields.errorName,
+              causeName: debugFields.causeName,
             },
           );
           try {
@@ -834,18 +889,17 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
               });
             });
           } catch (fallbackErr) {
+            const fallbackDebugFields = getErrorDebugFields(fallbackErr);
             logger.error(
               '[sessions/stream] Pre-stream non-streaming fallback failed',
               {
+                surface: 'sessions.stream',
+                phase: 'pre_stream_fallback',
                 sessionId,
-                error:
-                  fallbackErr instanceof Error
-                    ? fallbackErr.message
-                    : String(fallbackErr),
-                errorName:
-                  fallbackErr instanceof Error
-                    ? fallbackErr.name
-                    : typeof fallbackErr,
+                profileId,
+                parentErrorName: debugFields.errorName,
+                parentCircuitKey: debugFields.circuitKey,
+                ...fallbackDebugFields,
               },
             );
             captureException(fallbackErr, {
@@ -853,6 +907,11 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
               extra: {
                 sessionId,
                 phase: 'llm_pre_stream_non_streaming_fallback',
+                parentErrorName: debugFields.errorName,
+                parentCircuitKey: debugFields.circuitKey,
+                circuitKey: fallbackDebugFields.circuitKey,
+                errorName: fallbackDebugFields.errorName,
+                causeName: fallbackDebugFields.causeName,
               },
             });
           }

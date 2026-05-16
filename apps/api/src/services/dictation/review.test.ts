@@ -147,7 +147,9 @@ describe('reviewDictation', () => {
 
     await reviewDictation(BASE_INPUT);
 
-    expect(mockRouteAndCall).toHaveBeenCalledWith(expect.any(Array), 2);
+    expect(mockRouteAndCall).toHaveBeenCalledWith(expect.any(Array), 2, {
+      flow: 'dictation.review',
+    });
   });
 
   it('passes age and explanation style through to the system prompt when provided', async () => {
