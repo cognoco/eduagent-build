@@ -77,15 +77,6 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('Crisp, professional');
   });
 
-  // [B.5] Fallback when birthYear is null: resolveAgeBracket returns
-  // 'adolescent' (defence-in-depth — unknown age takes the minor-safe path),
-  // so the bracket-only mapping produces TEEN_VOICE.
-  it('falls back to TEEN voice when birthYear is unavailable (bracket = adolescent)', () => {
-    const prompt = buildSystemPrompt({ ...baseContext, birthYear: null });
-    expect(prompt).toContain('Peer-adjacent and matter-of-fact');
-    expect(prompt).not.toContain('Crisp, professional');
-  });
-
   // [B.5] Age-calibration anchors rephrased for the strict 11+ product.
   describe('age-calibration anchors (B.5)', () => {
     it('uses 12/15/17 anchors, not 9/16/adult', () => {
@@ -607,7 +598,7 @@ describe('buildSystemPrompt', () => {
       sessionType: 'learning',
       escalationRung: 1,
       exchangeHistory: [],
-      birthYear: null,
+      birthYear: currentYear - 16,
     };
 
     const prompt = buildSystemPrompt(minimalContext);

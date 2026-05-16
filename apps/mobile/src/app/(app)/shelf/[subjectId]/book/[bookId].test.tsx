@@ -162,6 +162,7 @@ function makeSession(overrides: Partial<any> = {}) {
     topicId: 'topic-1',
     topicTitle: 'Linear Equations',
     chapter: 'Foundations',
+    exchangeCount: 1,
     createdAt: new Date().toISOString(),
     ...overrides,
   };
@@ -172,7 +173,7 @@ function makeRetentionTopic(overrides: Partial<any> = {}) {
     topicId: 'topic-1',
     repetitions: 1,
     easeFactor: 2.5,
-    xpStatus: 'active',
+    xpStatus: 'verified',
     failureCount: 0,
     nextReviewAt: null,
     daysSinceLastReview: null,
@@ -429,6 +430,65 @@ describe('BookScreen', () => {
     const { getByText } = render(<BookScreen />);
 
     getByText('2 of 3 topics finished');
+  });
+
+  it('ignores verified retention topics from other books', () => {
+    mockUseBookWithTopics.mockReturnValue(
+      makeBookQuery({
+        data: {
+          ...makeBookQuery().data,
+          topics: [
+            makeTopic({ id: 'topic-1', title: 'T1', sortOrder: 1 }),
+            makeTopic({ id: 'topic-2', title: 'T2', sortOrder: 2 }),
+          ],
+        },
+      }),
+    );
+    mockUseRetentionTopics.mockReturnValue(
+      makeRetentionQuery({
+        data: {
+          topics: [
+            makeRetentionTopic({ topicId: 'topic-1' }),
+            makeRetentionTopic({ topicId: 'other-book-topic' }),
+          ],
+          reviewDueCount: 0,
+        },
+      }),
+    );
+
+    const { getByText, queryByTestId } = render(<BookScreen />);
+
+    getByText('1 of 2 topics finished');
+    expect(queryByTestId('book-complete-card')).toBeNull();
+  });
+
+  it('does not count pending retention repetitions as finished topics', () => {
+    mockUseBookWithTopics.mockReturnValue(
+      makeBookQuery({
+        data: {
+          ...makeBookQuery().data,
+          topics: [
+            makeTopic({ id: 'topic-1', title: 'T1', sortOrder: 1 }),
+            makeTopic({ id: 'topic-2', title: 'T2', sortOrder: 2 }),
+          ],
+        },
+      }),
+    );
+    mockUseRetentionTopics.mockReturnValue(
+      makeRetentionQuery({
+        data: {
+          topics: [
+            makeRetentionTopic({ topicId: 'topic-1', xpStatus: 'pending' }),
+          ],
+          reviewDueCount: 0,
+        },
+      }),
+    );
+
+    const { getByText, queryByTestId } = render(<BookScreen />);
+
+    getByText('0 of 2 topics finished');
+    expect(queryByTestId('done-row-topic-1')).toBeNull();
   });
 
   it('shows elapsed retention days in the book header when available', () => {

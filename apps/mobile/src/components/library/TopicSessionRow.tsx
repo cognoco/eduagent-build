@@ -34,12 +34,13 @@ export function TopicSessionRow({
       accessibilityLabel={`${sessionType}, ${date}, ${formatDuration(
         durationSeconds,
       )}`}
-      style={({ pressed }) => ({
+      style={{
         flexDirection: 'row',
         alignItems: 'center',
         alignSelf: 'stretch',
+        width: '100%',
+        maxWidth: '100%',
         minHeight: 72,
-        marginHorizontal: 20,
         marginBottom: 10,
         paddingHorizontal: 14,
         paddingVertical: 14,
@@ -47,14 +48,16 @@ export function TopicSessionRow({
         borderWidth: 1,
         borderColor: colors.border,
         backgroundColor: colors.surface,
-        opacity: pressed ? 0.72 : 1,
-      })}
+        overflow: 'hidden',
+      }}
     >
       <View
+        testID={`session-row-icon-${sessionId}`}
         style={{
           width: 40,
           height: 40,
           borderRadius: 8,
+          flexShrink: 0,
           alignItems: 'center',
           justifyContent: 'center',
           backgroundColor: colors.surfaceElevated,
@@ -89,8 +92,11 @@ export function TopicSessionRow({
       </View>
 
       <View
+        testID={`session-row-duration-${sessionId}`}
         style={{
           minWidth: 64,
+          flexShrink: 0,
+          alignSelf: 'center',
           alignItems: 'center',
           borderRadius: 999,
           paddingHorizontal: 10,
@@ -111,7 +117,7 @@ export function TopicSessionRow({
         name="chevron-forward"
         size={18}
         color={colors.textSecondary}
-        style={{ marginLeft: 8 }}
+        style={{ marginLeft: 8, flexShrink: 0 }}
       />
     </Pressable>
   );

@@ -8,32 +8,41 @@ import {
   subjects,
   learningSessions,
   retentionCards,
+  sessionSummaries,
+  assessments,
   createScopedRepository,
   type Database,
 } from '@eduagent/database';
+import {
+  TopicNotSkippedError,
+  bookTopicGenerationResultSchema,
+  type BookProgressStatus,
+  type BookWithTopics,
+  type CefrLevel,
+  type Curriculum,
+  type CurriculumAdaptRequest,
+  type CurriculumAdaptResponse,
+  type CurriculumBook,
+  type CurriculumInput,
+  type CurriculumTopic,
+  type CurriculumTopicAddInput,
+  type CurriculumTopicAddResponse,
+  type CurriculumTopicPreview,
+  type GeneratedBook,
+  type GeneratedBookTopic,
+  type GeneratedConnection,
+  type GeneratedTopic,
+} from '@eduagent/schemas';
+
+import { NotFoundError } from '../errors';
 import { routeAndCall, type ChatMessage } from './llm';
 import { escapeXml, sanitizeXmlValue } from './llm/sanitize';
-import { NotFoundError } from '../errors';
-import type {
-  CurriculumInput,
-  CefrLevel,
-  GeneratedTopic,
-  Curriculum,
-  CurriculumTopic,
-  CurriculumBook,
-  BookWithTopics,
-  BookProgressStatus,
-  CurriculumTopicAddInput,
-  CurriculumTopicAddResponse,
-  CurriculumTopicPreview,
-  CurriculumAdaptRequest,
-  CurriculumAdaptResponse,
-  GeneratedBook,
-  GeneratedBookTopic,
-  GeneratedConnection,
-} from '@eduagent/schemas';
-import { TopicNotSkippedError } from '@eduagent/schemas';
 import { regenerateLanguageCurriculum } from './language-curriculum';
+import {
+  addTopicCompletion,
+  isAcceptedSummaryStatus,
+  isMeaningfulCompletedSession,
+} from './topic-completion';
 
 // ---------------------------------------------------------------------------
 // Curriculum generation service — pure business logic, no Hono imports
@@ -333,6 +342,7 @@ export async function ensureCurriculum(
 interface BookProgress {
   status: BookProgressStatus;
   completedTopicCount: number;
+  completedTopicIds: string[];
 }
 
 async function computeBookStatus(
@@ -341,65 +351,106 @@ async function computeBookStatus(
   topicIds: string[],
 ): Promise<BookProgress> {
   if (topicIds.length === 0) {
-    return { status: 'NOT_STARTED', completedTopicCount: 0 };
+    return {
+      status: 'NOT_STARTED',
+      completedTopicCount: 0,
+      completedTopicIds: [],
+    };
   }
 
-  const sessionRows = await db
-    .select({
-      topicId: learningSessions.topicId,
-      status: learningSessions.status,
-    })
-    .from(learningSessions)
-    .where(
-      and(
-        eq(learningSessions.profileId, profileId),
-        inArray(learningSessions.topicId, topicIds),
-        gte(learningSessions.exchangeCount, 1),
-      ),
-    );
+  const repo = createScopedRepository(db, profileId);
 
-  const completedTopicIds = new Set(
-    sessionRows
-      .filter(
-        (row) =>
-          row.topicId &&
-          (row.status === 'completed' || row.status === 'auto_closed'),
-      )
-      .map((row) => row.topicId as string),
-  );
+  const [sessionRows, assessmentRows, retentionRows, acceptedSummaryRows] =
+    await Promise.all([
+      db
+        .select({
+          topicId: learningSessions.topicId,
+          status: learningSessions.status,
+          exchangeCount: learningSessions.exchangeCount,
+        })
+        .from(learningSessions)
+        .where(
+          and(
+            eq(learningSessions.profileId, profileId),
+            inArray(learningSessions.topicId, topicIds),
+            gte(learningSessions.exchangeCount, 1),
+          ),
+        ),
+      repo.assessments.findMany(
+        and(
+          inArray(assessments.topicId, topicIds),
+          eq(assessments.status, 'passed'),
+        ),
+      ),
+      repo.retentionCards.findMany(inArray(retentionCards.topicId, topicIds)),
+      db
+        .select({
+          topicId: learningSessions.topicId,
+          summaryStatus: sessionSummaries.status,
+        })
+        .from(sessionSummaries)
+        .innerJoin(
+          learningSessions,
+          eq(sessionSummaries.sessionId, learningSessions.id),
+        )
+        .where(
+          and(
+            eq(sessionSummaries.profileId, profileId),
+            eq(learningSessions.profileId, profileId),
+            inArray(learningSessions.topicId, topicIds),
+            inArray(learningSessions.status, ['completed', 'auto_closed']),
+            eq(sessionSummaries.status, 'accepted'),
+          ),
+        ),
+    ]);
+
+  const completedTopicIds = new Set<string>();
+  const startedTopicIds = new Set<string>();
+  for (const row of sessionRows) {
+    addTopicCompletion(startedTopicIds, row.topicId);
+    if (isMeaningfulCompletedSession(row)) {
+      addTopicCompletion(completedTopicIds, row.topicId);
+    }
+  }
+  for (const assessment of assessmentRows) {
+    addTopicCompletion(completedTopicIds, assessment.topicId);
+  }
+  for (const card of retentionRows) {
+    if (card.xpStatus === 'verified') {
+      addTopicCompletion(completedTopicIds, card.topicId);
+    }
+  }
+  for (const row of acceptedSummaryRows) {
+    if (isAcceptedSummaryStatus(row.summaryStatus)) {
+      addTopicCompletion(completedTopicIds, row.topicId);
+    }
+  }
 
   if (completedTopicIds.size === 0) {
-    return { status: 'NOT_STARTED', completedTopicCount: 0 };
+    return {
+      status: startedTopicIds.size > 0 ? 'IN_PROGRESS' : 'NOT_STARTED',
+      completedTopicCount: 0,
+      completedTopicIds: [],
+    };
   }
 
   if (completedTopicIds.size < topicIds.length) {
     return {
       status: 'IN_PROGRESS',
       completedTopicCount: completedTopicIds.size,
+      completedTopicIds: [...completedTopicIds],
     };
   }
 
   const now = Date.now();
-  const reviewRows = await db
-    .select({
-      topicId: retentionCards.topicId,
-      nextReviewAt: retentionCards.nextReviewAt,
-    })
-    .from(retentionCards)
-    .where(
-      and(
-        eq(retentionCards.profileId, profileId),
-        inArray(retentionCards.topicId, topicIds),
-      ),
-    );
-
-  const hasReviewDue = reviewRows.some(
+  const hasReviewDue = retentionRows.some(
     (row) => row.nextReviewAt && row.nextReviewAt.getTime() <= now,
   );
 
   return {
     status: hasReviewDue ? 'REVIEW_DUE' : 'COMPLETED',
     completedTopicCount: completedTopicIds.size,
+    completedTopicIds: [...completedTopicIds],
   };
 }
 
@@ -419,7 +470,11 @@ async function computeBookStatusesBatch(
   const topicToBook = new Map<string, string>();
   for (const [bookId, topicIds] of topicsByBook) {
     if (topicIds.length === 0) {
-      results.set(bookId, { status: 'NOT_STARTED', completedTopicCount: 0 });
+      results.set(bookId, {
+        status: 'NOT_STARTED',
+        completedTopicCount: 0,
+        completedTopicIds: [],
+      });
       continue;
     }
     for (const tid of topicIds) {
@@ -430,33 +485,90 @@ async function computeBookStatusesBatch(
 
   if (allTopicIds.length === 0) return results;
 
-  // Single query: all learning sessions across every book (real activity only)
-  const sessionRows = await db
-    .select({
-      topicId: learningSessions.topicId,
-      status: learningSessions.status,
-    })
-    .from(learningSessions)
-    .where(
-      and(
-        eq(learningSessions.profileId, profileId),
-        inArray(learningSessions.topicId, allTopicIds),
-        gte(learningSessions.exchangeCount, 1),
-      ),
-    );
+  const repo = createScopedRepository(db, profileId);
 
-  // Group completed topic IDs by book
+  // Batch-compute topic completion from the canonical signals:
+  // meaningful terminal sessions, accepted summaries, passed assessments, or
+  // verified retention cards.
+  const [sessionRows, assessmentRows, retentionRows, acceptedSummaryRows] =
+    await Promise.all([
+      db
+        .select({
+          topicId: learningSessions.topicId,
+          status: learningSessions.status,
+          exchangeCount: learningSessions.exchangeCount,
+        })
+        .from(learningSessions)
+        .where(
+          and(
+            eq(learningSessions.profileId, profileId),
+            inArray(learningSessions.topicId, allTopicIds),
+            gte(learningSessions.exchangeCount, 1),
+          ),
+        ),
+      repo.assessments.findMany(
+        and(
+          inArray(assessments.topicId, allTopicIds),
+          eq(assessments.status, 'passed'),
+        ),
+      ),
+      repo.retentionCards.findMany(
+        inArray(retentionCards.topicId, allTopicIds),
+      ),
+      db
+        .select({
+          topicId: learningSessions.topicId,
+          summaryStatus: sessionSummaries.status,
+        })
+        .from(sessionSummaries)
+        .innerJoin(
+          learningSessions,
+          eq(sessionSummaries.sessionId, learningSessions.id),
+        )
+        .where(
+          and(
+            eq(sessionSummaries.profileId, profileId),
+            eq(learningSessions.profileId, profileId),
+            inArray(learningSessions.topicId, allTopicIds),
+            inArray(learningSessions.status, ['completed', 'auto_closed']),
+            eq(sessionSummaries.status, 'accepted'),
+          ),
+        ),
+    ]);
+
+  // Group started/completed topic IDs by book
+  const startedByBook = new Map<string, Set<string>>();
   const completedByBook = new Map<string, Set<string>>();
+  const addStartedByBook = (topicId: string | null | undefined) => {
+    if (!topicId) return;
+    const bookId = topicToBook.get(topicId);
+    if (!bookId) return;
+    const set = startedByBook.get(bookId) ?? new Set<string>();
+    set.add(topicId);
+    startedByBook.set(bookId, set);
+  };
+  const addCompletedByBook = (topicId: string | null | undefined) => {
+    if (!topicId) return;
+    const bookId = topicToBook.get(topicId);
+    if (!bookId) return;
+    const set = completedByBook.get(bookId) ?? new Set<string>();
+    set.add(topicId);
+    completedByBook.set(bookId, set);
+  };
+
   for (const row of sessionRows) {
-    if (
-      row.topicId &&
-      (row.status === 'completed' || row.status === 'auto_closed')
-    ) {
-      const bookId = topicToBook.get(row.topicId as string);
-      if (!bookId) continue;
-      const set = completedByBook.get(bookId) ?? new Set<string>();
-      set.add(row.topicId as string);
-      completedByBook.set(bookId, set);
+    addStartedByBook(row.topicId);
+    if (isMeaningfulCompletedSession(row)) addCompletedByBook(row.topicId);
+  }
+  for (const assessment of assessmentRows) {
+    addCompletedByBook(assessment.topicId);
+  }
+  for (const card of retentionRows) {
+    if (card.xpStatus === 'verified') addCompletedByBook(card.topicId);
+  }
+  for (const row of acceptedSummaryRows) {
+    if (isAcceptedSummaryStatus(row.summaryStatus)) {
+      addCompletedByBook(row.topicId);
     }
   }
 
@@ -467,11 +579,17 @@ async function computeBookStatusesBatch(
     if (results.has(bookId)) continue; // already set (empty topics)
     const completed = completedByBook.get(bookId);
     if (!completed || completed.size === 0) {
-      results.set(bookId, { status: 'NOT_STARTED', completedTopicCount: 0 });
+      const started = startedByBook.get(bookId);
+      results.set(bookId, {
+        status: started && started.size > 0 ? 'IN_PROGRESS' : 'NOT_STARTED',
+        completedTopicCount: 0,
+        completedTopicIds: [],
+      });
     } else if (completed.size < topicIds.length) {
       results.set(bookId, {
         status: 'IN_PROGRESS',
         completedTopicCount: completed.size,
+        completedTopicIds: [...completed],
       });
     } else {
       fullyCompletedBooks.add(bookId);
@@ -481,23 +599,10 @@ async function computeBookStatusesBatch(
 
   if (fullyCompletedBooks.size === 0) return results;
 
-  // Single query: retention cards for fully-completed books only
   const now = Date.now();
-  const reviewRows = await db
-    .select({
-      topicId: retentionCards.topicId,
-      nextReviewAt: retentionCards.nextReviewAt,
-    })
-    .from(retentionCards)
-    .where(
-      and(
-        eq(retentionCards.profileId, profileId),
-        inArray(retentionCards.topicId, fullyCompletedTopicIds),
-      ),
-    );
-
   const reviewDueByBook = new Set<string>();
-  for (const row of reviewRows) {
+  for (const row of retentionRows) {
+    if (!fullyCompletedTopicIds.includes(row.topicId)) continue;
     if (row.topicId && row.nextReviewAt && row.nextReviewAt.getTime() <= now) {
       const bookId = topicToBook.get(row.topicId as string);
       if (bookId) reviewDueByBook.add(bookId);
@@ -509,6 +614,7 @@ async function computeBookStatusesBatch(
     results.set(bookId, {
       status: reviewDueByBook.has(bookId) ? 'REVIEW_DUE' : 'COMPLETED',
       completedTopicCount: topicIds.length,
+      completedTopicIds: [...(completedByBook.get(bookId) ?? [])],
     });
   }
 
@@ -760,6 +866,7 @@ export async function getBooks(
     const progress = statusMap.get(book.id) ?? {
       status: 'NOT_STARTED' as const,
       completedTopicCount: 0,
+      completedTopicIds: [],
     };
     return {
       ...mapBookRow(book),
@@ -886,6 +993,7 @@ export async function getAllProfileBooks(
     const progress = statusMap.get(book.id) ?? {
       status: 'NOT_STARTED' as const,
       completedTopicCount: 0,
+      completedTopicIds: [],
     };
     list.push({
       ...mapBookRow(book),
@@ -967,6 +1075,7 @@ export async function getBookWithTopics(
     })),
     status: progress.status,
     completedTopicCount: progress.completedTopicCount,
+    completedTopicIds: progress.completedTopicIds,
   };
 }
 
@@ -1025,6 +1134,16 @@ export async function persistBookTopics(
       throw new NotFoundError('Book');
     }
     return existing;
+  }
+
+  const validatedGenerated = bookTopicGenerationResultSchema.safeParse({
+    topics,
+    connections,
+  });
+  if (!validatedGenerated.success) {
+    throw new Error(
+      `Generated book topics failed validation: ${validatedGenerated.error.message}`,
+    );
   }
 
   // Wrap topic + connection inserts + flag update in a transaction

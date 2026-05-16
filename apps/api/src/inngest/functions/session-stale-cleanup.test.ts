@@ -314,10 +314,10 @@ describe('session-stale-cleanup Inngest function', () => {
     await expect(executeHandler()).rejects.toThrow('Connection refused');
   });
 
-  it('[BUG-637 / J-1] dispatches reason:silence_timeout so session-completed skips SM-2 retention/streak credit for unattended closes', async () => {
-    // Without reason:'silence_timeout' the session-completed handler treats
-    // the auto-close as a user-ended session and applies fallback quality=3,
-    // advancing SM-2 cards for sessions where the user wasn't present.
+  it('[BUG-637 / J-1] dispatches reason:silence_timeout so session-completed skips streak credit for unattended closes', async () => {
+    // The session-completed handler no longer infers SM-2 quality from close
+    // reason, but stale cleanup still needs this reason so unattended closes
+    // do not count toward streak activity.
     const session = createClosedSession();
     mockCloseStaleSessions.mockResolvedValue([session]);
 

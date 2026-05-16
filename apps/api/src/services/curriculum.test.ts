@@ -165,14 +165,33 @@ function mockTopicRow(
 function mockLatestSessionSelect(
   rows: Array<{ metadata: unknown; rawInput: string | null }> = [],
 ) {
-  return jest.fn().mockReturnValue({
-    from: jest.fn().mockReturnValue({
-      where: jest.fn().mockReturnValue({
-        orderBy: jest.fn().mockReturnValue({
-          limit: jest.fn().mockResolvedValue(rows),
-        }),
-      }),
-    }),
+  return jest.fn((selection?: Record<string, unknown>) => {
+    const resultRows =
+      selection && 'metadata' in selection && 'rawInput' in selection
+        ? rows
+        : [];
+    const promise = Promise.resolve(resultRows);
+    const chain = {} as {
+      from: jest.Mock;
+      innerJoin: jest.Mock;
+      leftJoin: jest.Mock;
+      where: jest.Mock;
+      orderBy: jest.Mock;
+      limit: jest.Mock;
+      then: typeof promise.then;
+      catch: typeof promise.catch;
+      finally: typeof promise.finally;
+    };
+    chain.from = jest.fn(() => chain);
+    chain.innerJoin = jest.fn(() => chain);
+    chain.leftJoin = jest.fn(() => chain);
+    chain.where = jest.fn(() => chain);
+    chain.orderBy = jest.fn(() => chain);
+    chain.limit = jest.fn().mockResolvedValue(resultRows);
+    chain.then = promise.then.bind(promise);
+    chain.catch = promise.catch.bind(promise);
+    chain.finally = promise.finally.bind(promise);
+    return chain;
   });
 }
 
@@ -205,6 +224,15 @@ function createMockDb({
       },
       curriculumBooks: {
         findFirst: jest.fn().mockResolvedValue(bookFindFirst),
+      },
+      assessments: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      retentionCards: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      sessionSummaries: {
+        findMany: jest.fn().mockResolvedValue([]),
       },
     },
     update: jest.fn().mockReturnValue({
@@ -1021,6 +1049,27 @@ describe('persistBookTopics', () => {
       sortOrder: 2,
       estimatedMinutes: 30,
     },
+    {
+      title: 'Pyramids',
+      description: 'How were they built?',
+      chapter: 'Monuments',
+      sortOrder: 3,
+      estimatedMinutes: 25,
+    },
+    {
+      title: 'Daily Life',
+      description: 'What ordinary people did each day',
+      chapter: 'Society',
+      sortOrder: 4,
+      estimatedMinutes: 25,
+    },
+    {
+      title: 'Legacy',
+      description: 'Why Ancient Egypt still matters',
+      chapter: 'Society',
+      sortOrder: 5,
+      estimatedMinutes: 20,
+    },
   ];
 
   const sampleConnections: GeneratedConnection[] = [
@@ -1124,6 +1173,15 @@ describe('persistBookTopics', () => {
           findMany: topicsFindMany,
           findFirst: jest.fn().mockResolvedValue(null),
         },
+        assessments: {
+          findMany: jest.fn().mockResolvedValue([]),
+        },
+        retentionCards: {
+          findMany: jest.fn().mockResolvedValue([]),
+        },
+        sessionSummaries: {
+          findMany: jest.fn().mockResolvedValue([]),
+        },
       },
       update: jest.fn().mockReturnValue({
         set: jest.fn().mockReturnValue({
@@ -1139,6 +1197,9 @@ describe('persistBookTopics', () => {
       select: jest.fn().mockReturnValue({
         from: jest.fn().mockReturnValue({
           where: jest.fn().mockResolvedValue([]),
+          innerJoin: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue([]),
+          }),
         }),
       }),
       transaction: jest
@@ -1244,18 +1305,18 @@ describe('persistBookTopics', () => {
     it('skips topic insert when topics array is empty', async () => {
       const db = createPersistMockDb({ existingTopicCount: 0 });
 
-      await persistBookTopics(
-        db,
-        PROFILE_ID,
-        SUBJECT_ID,
-        BOOK_ID,
-        [], // empty topics
-        [],
-      );
+      await expect(
+        persistBookTopics(
+          db,
+          PROFILE_ID,
+          SUBJECT_ID,
+          BOOK_ID,
+          [], // empty topics
+          [],
+        ),
+      ).rejects.toThrow('Generated book topics failed validation');
 
-      expect(db.transaction).toHaveBeenCalledTimes(1);
-      // update is called for topicsGenerated flag inside transaction
-      expect(db.update).toHaveBeenCalled();
+      expect(db.transaction).not.toHaveBeenCalled();
     });
   });
 
@@ -1324,8 +1385,31 @@ describe('getBooks (BUG-884)', () => {
     bookRows: Array<{ id: string; subjectId: string; sortOrder: number }>;
     curriculumFindFirst: ReturnType<typeof mockCurriculumRow> | undefined;
     topicRowsForLatestCurriculum: Array<{ id: string; bookId: string }>;
+    sessionRowsForStatus?: Array<{
+      topicId: string;
+      status: string;
+      exchangeCount: number;
+    }>;
+    acceptedSummaryRowsForStatus?: Array<{
+      topicId: string;
+      summaryStatus: string;
+    }>;
   }): { db: Database; capturedWhereCalls: unknown[] } {
     const capturedWhereCalls: unknown[] = [];
+    const selectRowsFor = (selection?: Record<string, unknown>) => {
+      const keys = new Set(Object.keys(selection ?? {}));
+      if (
+        keys.has('topicId') &&
+        keys.has('status') &&
+        keys.has('exchangeCount')
+      ) {
+        return opts.sessionRowsForStatus ?? [];
+      }
+      if (keys.has('summaryStatus')) {
+        return opts.acceptedSummaryRowsForStatus ?? [];
+      }
+      return opts.topicRowsForLatestCurriculum;
+    };
     const db = {
       query: {
         subjects: {
@@ -1337,12 +1421,27 @@ describe('getBooks (BUG-884)', () => {
         curriculumBooks: {
           findMany: jest.fn().mockResolvedValue(opts.bookRows),
         },
+        assessments: {
+          findMany: jest.fn().mockResolvedValue([]),
+        },
+        retentionCards: {
+          findMany: jest.fn().mockResolvedValue([]),
+        },
+        sessionSummaries: {
+          findMany: jest.fn().mockResolvedValue([]),
+        },
       },
-      select: jest.fn().mockReturnValue({
+      select: jest.fn((selection?: Record<string, unknown>) => ({
         from: jest.fn().mockReturnValue({
           where: jest.fn().mockImplementation((arg: unknown) => {
             capturedWhereCalls.push(arg);
-            return Promise.resolve(opts.topicRowsForLatestCurriculum);
+            return Promise.resolve(selectRowsFor(selection));
+          }),
+          innerJoin: jest.fn().mockReturnValue({
+            where: jest.fn().mockImplementation((arg: unknown) => {
+              capturedWhereCalls.push(arg);
+              return Promise.resolve(selectRowsFor(selection));
+            }),
           }),
           // computeBookStatusesBatch also issues db.select chains. Stub a
           // generic resolution so the call doesn't throw.
@@ -1350,7 +1449,7 @@ describe('getBooks (BUG-884)', () => {
             where: jest.fn().mockResolvedValue([]),
           }),
         }),
-      }),
+      })),
     } as unknown as Database;
     return { db, capturedWhereCalls };
   }
@@ -1416,6 +1515,44 @@ describe('getBooks (BUG-884)', () => {
     expect(result).toHaveLength(1);
     expect(result[0]!.id).toBe('book-mesopotamia');
     expect(result[0]!.title).toBe('Mesopotamia');
+  });
+
+  it('marks a book in progress after a short terminal chat without completing the topic', async () => {
+    const latestCurriculum = mockCurriculumRow({
+      id: 'curriculum-latest',
+      version: 2,
+    });
+    const { db } = mockDbForGetBooks({
+      subject: mockSubjectRow(),
+      bookRows: [
+        {
+          id: BOOK_ID,
+          subjectId: SUBJECT_ID,
+          sortOrder: 0,
+          title: 'Test Book',
+          description: '',
+          topicsGenerated: true,
+          createdAt: NOW,
+          updatedAt: NOW,
+        } as unknown as { id: string; subjectId: string; sortOrder: number },
+      ],
+      curriculumFindFirst: latestCurriculum,
+      topicRowsForLatestCurriculum: [{ id: TOPIC_ID, bookId: BOOK_ID }],
+      sessionRowsForStatus: [
+        {
+          topicId: TOPIC_ID,
+          status: 'completed',
+          exchangeCount: 1,
+        },
+      ],
+    });
+
+    const result = await getBooks(db, PROFILE_ID, SUBJECT_ID);
+
+    expect(result).toHaveLength(1);
+    expect(result[0]!.topicCount).toBe(1);
+    expect(result[0]!.status).toBe('IN_PROGRESS');
+    expect(result[0]!.completedTopicCount).toBe(0);
   });
 
   // BUG-884 break test: orphan curriculum_topics rows from prior curriculum

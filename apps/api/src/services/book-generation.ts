@@ -39,7 +39,7 @@ const BOOK_TOPICS_PROMPT = `You are MentoMate's curriculum architect building on
 
 ${AGE_STYLE_GUIDANCE}
 
-Generate 5-15 topics for the book.
+Generate 5-15 topics for the book, grouped into at least 2 chapters.
 
 For each topic provide:
 - title

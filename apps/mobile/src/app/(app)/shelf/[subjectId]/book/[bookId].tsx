@@ -4,7 +4,11 @@ import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { Ionicons } from '@expo/vector-icons';
-import type { CurriculumTopic, RetentionStatus } from '@eduagent/schemas';
+import {
+  MIN_EXCHANGES_FOR_TOPIC_COMPLETION,
+  type CurriculumTopic,
+  type RetentionStatus,
+} from '@eduagent/schemas';
 import * as Sentry from '@sentry/react-native';
 import {
   CelebrationAnimation,
@@ -361,37 +365,6 @@ export default function BookScreen() {
     [notes],
   );
 
-  // --- Book-level retention status (derived from retention topics) ---
-  const bookRetentionStatus = useMemo((): RetentionStatus | null => {
-    const retentionTopics = retentionTopicsQuery.data?.topics ?? [];
-    // Only consider topics that have been studied (have a real retention card)
-    const studiedTopics = retentionTopics.filter((rt) => rt.repetitions > 0);
-    if (studiedTopics.length === 0) return null;
-    return computeBookRetentionStatus(
-      studiedTopics.map((rt) => rt.nextReviewAt),
-    );
-  }, [retentionTopicsQuery.data]);
-
-  const bookDaysSinceLastReview = useMemo((): number | null => {
-    const retentionTopics = retentionTopicsQuery.data?.topics ?? [];
-    const values = retentionTopics
-      .filter((rt) => rt.repetitions > 0)
-      .map((rt) => rt.daysSinceLastReview)
-      .filter((value): value is number => typeof value === 'number');
-    if (values.length === 0) return null;
-    return Math.max(...values);
-  }, [retentionTopicsQuery.data]);
-
-  // Topics that have been studied at least once (repetitions > 0)
-  const topicStudiedIds = useMemo((): Set<string> => {
-    const retentionTopics = retentionTopicsQuery.data?.topics ?? [];
-    const ids = new Set<string>();
-    for (const rt of retentionTopics) {
-      if (rt.repetitions > 0) ids.add(rt.topicId);
-    }
-    return ids;
-  }, [retentionTopicsQuery.data]);
-
   // --- Sessions data ---
   const sessions = useMemo(
     () => sessionsQuery.data ?? [],
@@ -402,6 +375,55 @@ export default function BookScreen() {
   const refetchSessions = sessionsQuery.refetch;
   const refetchRetention = retentionTopicsQuery.refetch;
   const sessionCount = sessions.length;
+
+  // Canonical completed topics come from the book API. Local fallbacks keep
+  // the screen sensible across cached responses and verified retention cards.
+  const topicStudiedIds = useMemo((): Set<string> => {
+    const retentionTopics = retentionTopicsQuery.data?.topics ?? [];
+    const bookTopicIds = new Set(activeTopics.map((topic) => topic.id));
+    const ids = new Set(bookQuery.data?.completedTopicIds ?? []);
+    for (const session of sessions) {
+      if (
+        session.topicId &&
+        session.exchangeCount >= MIN_EXCHANGES_FOR_TOPIC_COMPLETION
+      ) {
+        ids.add(session.topicId);
+      }
+    }
+    for (const rt of retentionTopics) {
+      if (rt.xpStatus === 'verified' && bookTopicIds.has(rt.topicId)) {
+        ids.add(rt.topicId);
+      }
+    }
+    return ids;
+  }, [
+    activeTopics,
+    bookQuery.data?.completedTopicIds,
+    sessions,
+    retentionTopicsQuery.data,
+  ]);
+
+  // --- Book-level retention status (derived from completed topics) ---
+  const bookRetentionStatus = useMemo((): RetentionStatus | null => {
+    const retentionTopics = retentionTopicsQuery.data?.topics ?? [];
+    const studiedTopics = retentionTopics.filter((rt) =>
+      topicStudiedIds.has(rt.topicId),
+    );
+    if (studiedTopics.length === 0) return null;
+    return computeBookRetentionStatus(
+      studiedTopics.map((rt) => rt.nextReviewAt),
+    );
+  }, [retentionTopicsQuery.data, topicStudiedIds]);
+
+  const bookDaysSinceLastReview = useMemo((): number | null => {
+    const retentionTopics = retentionTopicsQuery.data?.topics ?? [];
+    const values = retentionTopics
+      .filter((rt) => topicStudiedIds.has(rt.topicId))
+      .map((rt) => rt.daysSinceLastReview)
+      .filter((value): value is number => typeof value === 'number');
+    if (values.length === 0) return null;
+    return Math.max(...values);
+  }, [retentionTopicsQuery.data, topicStudiedIds]);
 
   const activeTopicIds = useMemo(
     () => new Set(activeTopics.map((topic) => topic.id)),

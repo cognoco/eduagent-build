@@ -15,6 +15,7 @@ export interface BookSession {
   topicId: string | null;
   topicTitle: string;
   chapter: string | null;
+  exchangeCount: number;
   createdAt: string;
 }
 
@@ -28,7 +29,7 @@ export interface BookSession {
 export async function getBookSessions(
   db: Database,
   profileId: string,
-  bookId: string
+  bookId: string,
 ): Promise<BookSession[]> {
   const rows = await db
     .select({
@@ -43,7 +44,7 @@ export async function getBookSessions(
     .from(learningSessions)
     .innerJoin(
       curriculumTopics,
-      eq(learningSessions.topicId, curriculumTopics.id)
+      eq(learningSessions.topicId, curriculumTopics.id),
     )
     .innerJoin(subjects, eq(learningSessions.subjectId, subjects.id))
     .where(
@@ -51,8 +52,8 @@ export async function getBookSessions(
         eq(curriculumTopics.bookId, bookId),
         eq(subjects.profileId, profileId),
         inArray(learningSessions.status, ['completed', 'auto_closed']),
-        gte(learningSessions.exchangeCount, 1)
-      )
+        gte(learningSessions.exchangeCount, 1),
+      ),
     )
     .orderBy(desc(learningSessions.createdAt));
 
@@ -61,6 +62,7 @@ export async function getBookSessions(
     topicId: r.topicId,
     topicTitle: r.topicTitle,
     chapter: r.chapter,
+    exchangeCount: r.exchangeCount,
     createdAt: r.createdAt.toISOString(),
   }));
 }
@@ -74,7 +76,7 @@ export async function backfillSessionTopicId(
   db: Database,
   profileId: string,
   sessionId: string,
-  topicId: string
+  topicId: string,
 ): Promise<void> {
   await db
     .update(learningSessions)
@@ -82,7 +84,7 @@ export async function backfillSessionTopicId(
     .where(
       and(
         eq(learningSessions.id, sessionId),
-        eq(learningSessions.profileId, profileId)
-      )
+        eq(learningSessions.profileId, profileId),
+      ),
     );
 }

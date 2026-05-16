@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -28,10 +28,7 @@ import { useBookmarks } from '../../../hooks/use-bookmarks';
 import { useThemeColors } from '../../../lib/theme';
 import { formatSourceLine } from '../../../lib/format-note-source';
 import { deriveRetentionStatus } from '../../../lib/retention-utils';
-import {
-  goBackOrReplace,
-  pushLearningResumeTarget,
-} from '../../../lib/navigation';
+import { pushLearningResumeTarget } from '../../../lib/navigation';
 import { ErrorFallback } from '../../../components/common';
 import { ShimmerSkeleton } from '../../../components/common/ShimmerSkeleton';
 import { TopicHeader } from '../../../components/library/TopicHeader';
@@ -160,13 +157,19 @@ export default function TopicDetailScreen() {
     needsResolve ? topicId : undefined,
   );
   const subjectId = paramSubjectId || resolved?.subjectId;
-  const topicBackFallback =
-    subjectId && paramBookId
-      ? ({
-          pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
-          params: { subjectId, bookId: paramBookId },
-        } as const)
-      : ('/(app)/library' as const);
+  const topicBackFallback = useMemo(
+    (): Href =>
+      subjectId && paramBookId
+        ? ({
+            pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
+            params: { subjectId, bookId: paramBookId },
+          } as Href)
+        : ('/(app)/library' as Href),
+    [paramBookId, subjectId],
+  );
+  const handleTopicBack = useCallback(() => {
+    router.replace(topicBackFallback);
+  }, [router, topicBackFallback]);
 
   const { data: resumeTarget } = useLearningResumeTarget({
     subjectId: subjectId ?? undefined,
@@ -372,7 +375,7 @@ export default function TopicDetailScreen() {
           }}
           secondaryAction={{
             label: 'Go to Library',
-            onPress: () => goBackOrReplace(router, topicBackFallback),
+            onPress: handleTopicBack,
             testID: 'topic-resolve-timeout-library',
           }}
           testID="topic-resolve-timeout"
@@ -396,7 +399,7 @@ export default function TopicDetailScreen() {
           This topic could not be opened. Please go back and try again.
         </Text>
         <Pressable
-          onPress={() => goBackOrReplace(router, topicBackFallback)}
+          onPress={handleTopicBack}
           className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center"
           accessibilityRole="button"
           accessibilityLabel="Go back"
@@ -437,7 +440,7 @@ export default function TopicDetailScreen() {
           </Text>
         </Pressable>
         <Pressable
-          onPress={() => goBackOrReplace(router, topicBackFallback)}
+          onPress={handleTopicBack}
           className="bg-surface rounded-button px-6 py-3 min-h-[48px] items-center justify-center mb-3"
           accessibilityRole="button"
           accessibilityLabel="Go back"
@@ -469,7 +472,7 @@ export default function TopicDetailScreen() {
       {/* Back nav */}
       <View className="px-5 pt-4 pb-2 flex-row items-center">
         <Pressable
-          onPress={() => goBackOrReplace(router, topicBackFallback)}
+          onPress={handleTopicBack}
           className="me-3 p-2 min-h-[44px] min-w-[44px] items-center justify-center"
           testID="topic-detail-back"
           accessibilityLabel="Go back"
@@ -515,7 +518,7 @@ export default function TopicDetailScreen() {
             This topic may have been removed from your curriculum.
           </Text>
           <Pressable
-            onPress={() => goBackOrReplace(router, topicBackFallback)}
+            onPress={handleTopicBack}
             className="bg-primary rounded-button px-6 py-3 min-h-[48px] items-center justify-center mt-6"
             testID="topic-detail-empty-back"
             accessibilityRole="button"
@@ -690,16 +693,18 @@ export default function TopicDetailScreen() {
                   </View>
                 </ShimmerSkeleton>
               ) : topicSessions && topicSessions.length > 0 ? (
-                topicSessions.map((session) => (
-                  <TopicSessionRow
-                    key={session.id}
-                    sessionId={session.id}
-                    date={formatSessionDate(session.createdAt)}
-                    durationSeconds={session.durationSeconds}
-                    sessionType={session.sessionType}
-                    onPress={handleSessionPress}
-                  />
-                ))
+                <View className="px-5" testID="topic-sessions-list">
+                  {topicSessions.map((session) => (
+                    <TopicSessionRow
+                      key={session.id}
+                      sessionId={session.id}
+                      date={formatSessionDate(session.createdAt)}
+                      durationSeconds={session.durationSeconds}
+                      sessionType={session.sessionType}
+                      onPress={handleSessionPress}
+                    />
+                  ))}
+                </View>
               ) : (
                 <Text
                   className="text-body-sm text-text-secondary px-5 py-2"

@@ -80,7 +80,7 @@ export async function embedNewFactsForProfile(
   db: Database,
   profileId: string,
   embedder: FactEmbedder,
-  options?: { limit?: number }
+  options?: { limit?: number },
 ): Promise<{
   embedded: number;
   failed: number;
@@ -99,8 +99,8 @@ export async function embedNewFactsForProfile(
       and(
         eq(memoryFacts.profileId, profileId),
         isNull(memoryFacts.embedding),
-        sql`${memoryFacts.supersededBy} IS NULL`
-      )
+        sql`${memoryFacts.supersededBy} IS NULL`,
+      ),
     )
     .orderBy(desc(memoryFacts.createdAt), desc(memoryFacts.id))
     .limit(options?.limit ?? 50);
@@ -137,8 +137,8 @@ export async function embedNewFactsForProfile(
         and(
           eq(memoryFacts.id, row.id),
           eq(memoryFacts.profileId, profileId),
-          isNull(memoryFacts.embedding)
-        )
+          isNull(memoryFacts.embedding),
+        ),
       );
     embedded += 1;
     embeddedIds.push(row.id);
@@ -192,7 +192,7 @@ const UNATTENDED_REASONS = ['silence_timeout'] as const;
 async function runIsolated(
   name: string,
   profileId: string,
-  fn: () => Promise<number | undefined | void>
+  fn: () => Promise<number | undefined | void>,
 ): Promise<StepOutcome> {
   try {
     const result = await fn();
@@ -228,7 +228,7 @@ async function runIsolated(
 // The caller must wrap this inside step.run — do NOT add a catch around it.
 async function runCritical(
   name: string,
-  fn: () => Promise<void>
+  fn: () => Promise<void>,
 ): Promise<StepOutcome> {
   await fn(); // throws on error — Inngest retries the whole step.run
   return { step: name, status: 'ok' };
@@ -274,7 +274,7 @@ export const sessionCompleted = inngest.createFunction(
       // silently degrade topic placement for every session otherwise.
       if (filingEvent == null) {
         const timeoutErr = new Error(
-          'session-completed: filing waitForEvent timed out after 60s'
+          'session-completed: filing waitForEvent timed out after 60s',
         );
         captureException(timeoutErr, { profileId });
         // [logging sweep] structured logger so PII fields land as JSON context
@@ -284,7 +284,7 @@ export const sessionCompleted = inngest.createFunction(
             sessionId,
             profileId,
             sessionType: sessionType ?? 'unknown',
-          }
+          },
         );
         await step.sendEvent('filing-timed-out', {
           name: 'app/session.filing_timed_out',
@@ -331,7 +331,7 @@ export const sessionCompleted = inngest.createFunction(
 
     const loadTopicTitle = async (
       db: ReturnType<typeof getStepDatabase>,
-      currentTopicId: string | null | undefined
+      currentTopicId: string | null | undefined,
     ): Promise<string | null> => {
       if (!currentTopicId) return null;
       const [topic] = await db
@@ -347,7 +347,7 @@ export const sessionCompleted = inngest.createFunction(
       const events = await db.query.sessionEvents.findMany({
         where: and(
           eq(sessionEvents.sessionId, sessionId),
-          eq(sessionEvents.profileId, profileId)
+          eq(sessionEvents.profileId, profileId),
         ),
         // [BUG-913 sweep] Tie-break by id when created_at collides — see
         // session-crud.ts getSessionTranscript for the full rationale.
@@ -369,7 +369,7 @@ export const sessionCompleted = inngest.createFunction(
           event.createdAt > lastAiAt
         ) {
           responseSeconds.push(
-            Math.round((event.createdAt.getTime() - lastAiAt.getTime()) / 1000)
+            Math.round((event.createdAt.getTime() - lastAiAt.getTime()) / 1000),
           );
         }
       }
@@ -393,11 +393,11 @@ export const sessionCompleted = inngest.createFunction(
     const rawInterleaved = event.data.interleavedTopicIds;
     const retentionTopicIds: string[] = Array.isArray(rawInterleaved)
       ? (rawInterleaved as unknown[]).filter(
-          (id): id is string => typeof id === 'string'
+          (id): id is string => typeof id === 'string',
         )
       : topicId
-      ? [topicId]
-      : [];
+        ? [topicId]
+        : [];
 
     // Step 1: Process verification-specific completion (EVALUATE / TEACH_BACK)
     // Parses structured assessment from LLM output, maps to SM-2 quality,
@@ -424,8 +424,8 @@ export const sessionCompleted = inngest.createFunction(
             captureException(
               new Error(
                 `session-completed: unknown verificationType ${String(
-                  verificationType
-                )}`
+                  verificationType,
+                )}`,
               ),
               {
                 profileId,
@@ -433,7 +433,7 @@ export const sessionCompleted = inngest.createFunction(
                   sessionId,
                   verificationType: String(verificationType),
                 },
-              }
+              },
             );
           }
           return {
@@ -464,14 +464,14 @@ export const sessionCompleted = inngest.createFunction(
                 db,
                 profileId,
                 sessionId,
-                topicId
+                topicId,
               );
             } else {
               return processTeachBackCompletion(db, profileId, sessionId);
             }
-          }
+          },
         );
-      }
+      },
     );
     outcomes.push(verificationCompletionOutcome);
 
@@ -482,33 +482,10 @@ export const sessionCompleted = inngest.createFunction(
     const completionQualityRating =
       derivedQualityRating ?? (event.data.qualityRating as number | undefined);
 
-    // F-8/F-9: For relearn sessions closed without a summary, SM-2 was
-    // silently skipped, leaving reset cards stuck at intervalDays=1 forever.
-    // Apply a conservative fallback quality=3 ("correct with difficulty") when
-    // no explicit rating is available, UNLESS the session ended without any
-    // user action (e.g. stale-cleanup cron). In that case no learning occurred
-    // and we should not advance the card.
-    //
-    // Verified close reasons via grep (apps/api/src/services/session/session-crud.ts:390,
-    // apps/mobile/src/app/(app)/session/use-session-actions.ts:349):
-    //   'silence_timeout' — stale-cleanup cron (30 min idle, no user action)
-    //   'user_ended'      — user explicitly ended the session
-    let effectiveQuality = completionQualityRating;
-    if (effectiveQuality == null) {
-      const closeReason = event.data.reason as string | undefined;
-      if (
-        closeReason &&
-        (UNATTENDED_REASONS as readonly string[]).includes(closeReason)
-      ) {
-        // No quality signal — session ended without user action, skip SM-2.
-      } else if (retentionTopicIds.length > 0 && (exchangeCount ?? 0) > 0) {
-        // User-closed session with at least one exchange but no summary
-        // (e.g., skipped or crash). Use conservative quality=3 to advance
-        // relearn cards out of reset. Zero-exchange sessions have no learning
-        // signal — skip SM-2 entirely.
-        effectiveQuality = 3;
-      }
-    }
+    // Only explicit quality signals advance SM-2. A user-ended, skipped, or
+    // crash-recovered session with a couple of exchanges is activity, but not
+    // proof that the topic was learned.
+    const effectiveQuality = completionQualityRating;
 
     // Step 1a: Relearn retention reset — must run BEFORE SM-2 update.
     // Pre-redesign, startRelearn reset the card at session start; SM-2 then
@@ -528,6 +505,7 @@ export const sessionCompleted = inngest.createFunction(
         if (
           sessionMode !== 'relearn' ||
           (exchangeCount ?? 0) <= 0 ||
+          effectiveQuality == null ||
           !topicId
         ) {
           return {
@@ -553,19 +531,16 @@ export const sessionCompleted = inngest.createFunction(
             .where(
               and(
                 eq(retentionCards.topicId, topicId),
-                eq(retentionCards.profileId, profileId)
-              )
+                eq(retentionCards.profileId, profileId),
+              ),
             );
         });
-      })
+      }),
     );
 
     // Step 1b: Update retention data via SM-2
     // Conservative: skip retention update when no quality rating was provided,
     // rather than defaulting to 3 (which inflates metrics). Issue #19.
-    // F-8/F-9: effectiveQuality applies a fallback=3 for user-closed sessions
-    // without a summary so relearn cards are not stuck at intervalDays=1
-    // after the relearn-retention-reset above.
     outcomes.push(
       await step.run('update-retention', async () => {
         if (retentionTopicIds.length === 0)
@@ -577,7 +552,7 @@ export const sessionCompleted = inngest.createFunction(
             {
               sessionId,
               profileId,
-            }
+            },
           );
           return { step: 'update-retention', status: 'skipped' as const };
         }
@@ -589,11 +564,11 @@ export const sessionCompleted = inngest.createFunction(
               profileId,
               tid,
               effectiveQuality,
-              timestamp
+              timestamp,
             );
           }
         });
-      })
+      }),
     );
 
     outcomes.push(
@@ -624,13 +599,13 @@ export const sessionCompleted = inngest.createFunction(
             previousLanguageProgress = await getCurrentLanguageProgress(
               db,
               profileId,
-              subjectId
+              subjectId,
             );
 
             const events = await db.query.sessionEvents.findMany({
               where: and(
                 eq(sessionEvents.sessionId, sessionId),
-                eq(sessionEvents.profileId, profileId)
+                eq(sessionEvents.profileId, profileId),
               ),
               // [BUG-913 sweep] Tie-break by id when created_at collides — see
               // session-crud.ts getSessionTranscript for the full rationale.
@@ -641,7 +616,7 @@ export const sessionCompleted = inngest.createFunction(
               .filter(
                 (entry) =>
                   entry.eventType === 'user_message' ||
-                  entry.eventType === 'ai_response'
+                  entry.eventType === 'ai_response',
               )
               .map((entry) => ({
                 role:
@@ -656,7 +631,7 @@ export const sessionCompleted = inngest.createFunction(
             const extractedVocabulary = await extractVocabularyFromTranscript(
               transcript,
               subject.languageCode,
-              cefrLevel
+              cefrLevel,
             );
 
             if (extractedVocabulary.length === 0) {
@@ -666,7 +641,7 @@ export const sessionCompleted = inngest.createFunction(
 
             const quality = Math.max(
               0,
-              Math.min(5, completionQualityRating ?? 3)
+              Math.min(5, completionQualityRating ?? 3),
             );
             await upsertExtractedVocabulary(
               db,
@@ -685,17 +660,17 @@ export const sessionCompleted = inngest.createFunction(
                     undefined,
                   quality,
                 };
-              })
+              }),
             );
 
             nextLanguageProgress = await getCurrentLanguageProgress(
               db,
               profileId,
-              subjectId
+              subjectId,
             );
-          }
+          },
         );
-      })
+      }),
     );
 
     // Step 1c: Update needs-deepening progress (FR63)
@@ -713,11 +688,11 @@ export const sessionCompleted = inngest.createFunction(
               db,
               profileId,
               tid,
-              completionQualityRating
+              completionQualityRating,
             );
           }
         });
-      })
+      }),
     );
 
     outcomes.push(
@@ -743,10 +718,10 @@ export const sessionCompleted = inngest.createFunction(
             'comet',
             'topic_mastered',
             previousLanguageProgress?.currentMilestone?.milestoneTitle ??
-              previousMilestoneId
+              previousMilestoneId,
           );
-        })
-      )
+        }),
+      ),
     );
 
     // Step 2: Write coaching card / session summary
@@ -775,14 +750,14 @@ export const sessionCompleted = inngest.createFunction(
             sessionId,
             profileId,
             topicId ?? null,
-            summaryStatus ?? 'pending'
+            summaryStatus ?? 'pending',
           );
 
           // Precompute coaching card and write to cache (ARCH-11)
           const card = await precomputeCoachingCard(db, profileId);
           await writeCoachingCardCache(db, profileId, card);
-        })
-      )
+        }),
+      ),
     );
 
     // Step 2b: Generate parent-facing session recap fields [PEH-S2]
@@ -798,8 +773,8 @@ export const sessionCompleted = inngest.createFunction(
             .where(
               and(
                 eq(sessionSummaries.sessionId, sessionId),
-                eq(sessionSummaries.profileId, profileId)
-              )
+                eq(sessionSummaries.profileId, profileId),
+              ),
             )
             .limit(1);
 
@@ -810,7 +785,7 @@ export const sessionCompleted = inngest.createFunction(
               {
                 sessionId,
                 profileId,
-              }
+              },
             );
             return;
           }
@@ -828,7 +803,7 @@ export const sessionCompleted = inngest.createFunction(
                 inArray(sessionEvents.eventType, [
                   'user_message',
                   'ai_response',
-                ])
+                ]),
               ),
               // [BUG-913 sweep] Tie-break by id when created_at collides — see
               // session-crud.ts getSessionTranscript for the full rationale.
@@ -841,7 +816,7 @@ export const sessionCompleted = inngest.createFunction(
                 (e) =>
                   `${e.eventType === 'user_message' ? 'Student' : 'Mentor'}: ${
                     e.content
-                  }`
+                  }`,
               )
               .join('\n\n');
 
@@ -860,7 +835,7 @@ export const sessionCompleted = inngest.createFunction(
                   sessionId,
                   profileId,
                   reason: result.reason,
-                }
+                },
               );
               // [SWEEP-SILENT-RECOVERY] LLM drift signal — must be queryable.
               // Without Sentry we can't see how often the insights LLM is
@@ -868,7 +843,7 @@ export const sessionCompleted = inngest.createFunction(
               // template highlights instead of personalised recaps.
               captureException(
                 new Error(
-                  `session-completed: generate-session-insights validation failed: ${result.reason}`
+                  `session-completed: generate-session-insights validation failed: ${result.reason}`,
                 ),
                 {
                   profileId,
@@ -877,7 +852,7 @@ export const sessionCompleted = inngest.createFunction(
                     surface: 'generate-session-insights',
                     reason: result.reason,
                   },
-                }
+                },
               );
             }
           }
@@ -922,7 +897,7 @@ export const sessionCompleted = inngest.createFunction(
               profile?.displayName ?? 'Your child',
               topics,
               duration,
-              subjectRow?.name
+              subjectRow?.name,
             );
           }
 
@@ -939,11 +914,11 @@ export const sessionCompleted = inngest.createFunction(
             .where(
               and(
                 eq(sessionSummaries.id, summaryRow.id),
-                eq(sessionSummaries.profileId, profileId)
-              )
+                eq(sessionSummaries.profileId, profileId),
+              ),
             );
-        })
-      )
+        }),
+      ),
     );
 
     outcomes.push(
@@ -957,8 +932,8 @@ export const sessionCompleted = inngest.createFunction(
             .where(
               and(
                 eq(sessionSummaries.sessionId, sessionId),
-                eq(sessionSummaries.profileId, profileId)
-              )
+                eq(sessionSummaries.profileId, profileId),
+              ),
             )
             .limit(1);
 
@@ -972,13 +947,19 @@ export const sessionCompleted = inngest.createFunction(
             .where(eq(profiles.id, profileId))
             .limit(1);
 
+          if (!profile) {
+            throw new Error(
+              `[session-completed] Profile not found for profileId=${profileId} — aborting`,
+            );
+          }
+
           const recap = await generateLearnerRecap(db, {
             sessionId,
             profileId,
             topicId: topicId ?? null,
             subjectId,
             exchangeCount: exchangeCount ?? 0,
-            birthYear: profile?.birthYear ?? null,
+            birthYear: profile.birthYear,
           });
 
           if (!recap) {
@@ -997,11 +978,11 @@ export const sessionCompleted = inngest.createFunction(
             .where(
               and(
                 eq(sessionSummaries.id, summaryRow.id),
-                eq(sessionSummaries.profileId, profileId)
-              )
+                eq(sessionSummaries.profileId, profileId),
+              ),
             );
-        })
-      )
+        }),
+      ),
     );
 
     // Capture summary outcome from the work step; emit observability events
@@ -1031,7 +1012,7 @@ export const sessionCompleted = inngest.createFunction(
           const summaryRow = await db.query.sessionSummaries.findFirst({
             where: and(
               eq(sessionSummaries.sessionId, sessionId),
-              eq(sessionSummaries.profileId, profileId)
+              eq(sessionSummaries.profileId, profileId),
             ),
             columns: { id: true },
           });
@@ -1096,7 +1077,7 @@ export const sessionCompleted = inngest.createFunction(
             summaryResult: { kind: 'errored', sessionSummaryId: summaryRowId },
           };
         }
-      }
+      },
     );
     outcomes.push(llmSummaryStep.outcome);
 
@@ -1163,7 +1144,7 @@ export const sessionCompleted = inngest.createFunction(
             const transcriptEvents = await db.query.sessionEvents.findMany({
               where: and(
                 eq(sessionEvents.sessionId, sessionId),
-                eq(sessionEvents.profileId, profileId)
+                eq(sessionEvents.profileId, profileId),
               ),
               // [BUG-913 sweep] Tie-break by id when created_at collides — see
               // session-crud.ts getSessionTranscript for the full rationale.
@@ -1188,7 +1169,7 @@ export const sessionCompleted = inngest.createFunction(
             const sessionRow = await db.query.learningSessions.findFirst({
               where: and(
                 eq(learningSessions.id, sessionId),
-                eq(learningSessions.profileId, profileId)
+                eq(learningSessions.profileId, profileId),
               ),
               columns: { rawInput: true },
             });
@@ -1200,11 +1181,11 @@ export const sessionCompleted = inngest.createFunction(
               ? (existingProfile.struggles as Array<unknown>)
                   .filter(
                     (
-                      entry
+                      entry,
                     ): entry is { topic: string; subject: string | null } =>
                       typeof entry === 'object' &&
                       entry !== null &&
-                      typeof (entry as { topic?: unknown }).topic === 'string'
+                      typeof (entry as { topic?: unknown }).topic === 'string',
                   )
                   .map((entry) => ({
                     topic: entry.topic,
@@ -1212,10 +1193,10 @@ export const sessionCompleted = inngest.createFunction(
                   }))
               : [];
             const suppressedTopics = Array.isArray(
-              existingProfile.suppressedInferences
+              existingProfile.suppressedInferences,
             )
               ? (existingProfile.suppressedInferences as unknown[]).filter(
-                  (value): value is string => typeof value === 'string'
+                  (value): value is string => typeof value === 'string',
                 )
               : [];
 
@@ -1225,7 +1206,7 @@ export const sessionCompleted = inngest.createFunction(
               topicTitle,
               sessionRow?.rawInput,
               'session',
-              { knownStruggles, suppressedTopics }
+              { knownStruggles, suppressedTopics },
             );
 
             if (!analysis) {
@@ -1238,14 +1219,14 @@ export const sessionCompleted = inngest.createFunction(
               analysis,
               subjectRow?.name ?? null,
               'inferred',
-              subjectId
+              subjectId,
             );
 
             stepNotifications = analysisResult.notifications;
-          }
+          },
         );
         return { ...outcome, notifications: stepNotifications };
-      }
+      },
     );
     outcomes.push(analyzeOutcome);
 
@@ -1275,9 +1256,9 @@ export const sessionCompleted = inngest.createFunction(
           db,
           profileId,
           makeEmbedderFromEnv(apiKey),
-          { limit: 50 }
+          { limit: 50 },
         );
-      }
+      },
     );
     outcomes.push({ step: 'embed-new-memory-facts', status: 'ok' });
 
@@ -1305,7 +1286,7 @@ export const sessionCompleted = inngest.createFunction(
       if (dedupResult.events.length > 0) {
         await step.sendEvent(
           'dedup-events',
-          dedupResult.events.map((e) => ({ name: e.name, data: e.data }))
+          dedupResult.events.map((e) => ({ name: e.name, data: e.data })),
         );
       }
     }
@@ -1321,8 +1302,8 @@ export const sessionCompleted = inngest.createFunction(
             for (const notification of notifications) {
               await sendStruggleNotification(db, profileId, notification);
             }
-          })
-        )
+          }),
+        ),
       );
     }
 
@@ -1385,10 +1366,10 @@ export const sessionCompleted = inngest.createFunction(
             profileId,
             topicId ?? null,
             content,
-            voyageApiKey
+            voyageApiKey,
           );
-        })
-      )
+        }),
+      ),
     );
 
     // Step 6: Extract parent-facing homework summary (Story 14.12)
@@ -1404,7 +1385,7 @@ export const sessionCompleted = inngest.createFunction(
           const db = getStepDatabase();
           await extractAndStoreHomeworkSummary(db, profileId, sessionId);
         });
-      })
+      }),
     );
 
     // Step 7: Track consecutive summary skips (FR94 — Casual Explorer prompt)
@@ -1423,8 +1404,8 @@ export const sessionCompleted = inngest.createFunction(
           ) {
             await resetSummarySkips(db, profileId);
           }
-        })
-      )
+        }),
+      ),
     );
 
     outcomes.push(
@@ -1437,10 +1418,10 @@ export const sessionCompleted = inngest.createFunction(
           await updateMedianResponseSeconds(
             db,
             profileId,
-            sessionMedianSeconds
+            sessionMedianSeconds,
           );
-        })
-      )
+        }),
+      ),
     );
 
     outcomes.push(
@@ -1460,7 +1441,7 @@ export const sessionCompleted = inngest.createFunction(
               db,
               profileId,
               'twin_stars',
-              'evaluate_success'
+              'evaluate_success',
             );
           }
 
@@ -1469,7 +1450,7 @@ export const sessionCompleted = inngest.createFunction(
               db,
               profileId,
               'twin_stars',
-              'teach_back_success'
+              'teach_back_success',
             );
           }
 
@@ -1480,8 +1461,8 @@ export const sessionCompleted = inngest.createFunction(
               .where(
                 and(
                   eq(retentionCards.profileId, profileId),
-                  eq(retentionCards.topicId, currentTopicId)
-                )
+                  eq(retentionCards.topicId, currentTopicId),
+                ),
               )
               .limit(1);
 
@@ -1492,7 +1473,7 @@ export const sessionCompleted = inngest.createFunction(
                 profileId,
                 'comet',
                 'topic_mastered',
-                topicTitle ?? currentTopicId
+                topicTitle ?? currentTopicId,
               );
             }
           }
@@ -1508,8 +1489,8 @@ export const sessionCompleted = inngest.createFunction(
           if (currentStreak === 30) {
             await queueCelebration(db, profileId, 'orions_belt', 'streak_30');
           }
-        })
-      )
+        }),
+      ),
     );
 
     const failed = outcomes.filter((o) => o.status === 'failed');
@@ -1538,5 +1519,5 @@ export const sessionCompleted = inngest.createFunction(
       sessionId,
       outcomes,
     };
-  }
+  },
 );

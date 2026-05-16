@@ -924,11 +924,12 @@ export async function prepareExchangeContext(
     Boolean(session.topicId) && priorTopicSessionRows.length === 0;
   const isFirstSessionOfSubject = priorSubjectSessionRows.length === 0;
   if (!profile) {
-    logger.warn(
-      '[processExchange] Profile not found — birthYear will be null, LLM defaults to adult tone',
-      {
-        profileId,
-      },
+    // Auth middleware loads the profile before reaching this point, so a missing
+    // row here means a referential-integrity break (deleted profile mid-request,
+    // wrong profileId injected, etc.). Fail loud — silently degrading to a
+    // synthetic birthYear silently routed the LLM to a child-tier voice.
+    throw new Error(
+      `[processExchange] Profile not found for profileId=${profileId} — aborting`,
     );
   }
   const retentionCard = retentionRows[0];
@@ -1482,7 +1483,7 @@ export async function prepareExchangeContext(
     sessionType: session.sessionType,
     escalationRung: effectiveRung,
     exchangeHistory,
-    birthYear: profile?.birthYear ?? null,
+    birthYear: profile.birthYear,
     // BKT-C.1 — source the profile-level tutor language + pronouns here so
     // every downstream call path (processExchange, streamExchange) receives
     // the same personalization. Defaults: 'en' (DB NOT NULL) and null.
