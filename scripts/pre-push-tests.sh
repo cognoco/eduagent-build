@@ -112,7 +112,8 @@ else
   if [[ "$TS_COUNT" -gt 100 ]]; then
     echo ""
     echo "pre-push: >100 TS files in delta, falling back to nx affected --exclude=mobile"
-    if ! NX_DAEMON=false pnpm exec nx affected -t test --base=HEAD --exclude=mobile; then
+    affected_files_csv="$(echo "$TS_FILES" | paste -sd, -)"
+    if ! NX_DAEMON=false pnpm exec nx affected -t test --files="$affected_files_csv" --exclude=mobile; then
       echo ""
       echo "pre-push: FAILED — nx affected tests failed"
       exit 1
