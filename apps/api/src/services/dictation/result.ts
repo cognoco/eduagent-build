@@ -129,11 +129,11 @@ export async function getDictationStreak(
 export async function fetchGenerateContext(
   db: Database,
   profileId: string,
-  birthYear: number | null,
+  birthYear: number,
 ): Promise<GenerateContext> {
   const repo = createScopedRepository(db, profileId);
 
-  const ageYears = birthYear ? new Date().getFullYear() - birthYear : 10; // sensible default
+  const ageYears = new Date().getFullYear() - birthYear;
 
   const prefs = await repo.teachingPreferences.findFirst();
   const nativeLanguage = prefs?.nativeLanguage ?? 'en';

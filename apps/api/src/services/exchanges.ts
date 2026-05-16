@@ -88,7 +88,7 @@ export interface ExchangeContext {
     content: string;
     orphan_reason?: string;
   }>;
-  birthYear?: number | null;
+  birthYear: number;
   priorLearningContext?: string;
   /** Cross-subject learning highlights — recent topics from other subjects (Story 16.0) */
   crossSubjectContext?: string;

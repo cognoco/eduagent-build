@@ -379,7 +379,7 @@ interface GenerateParams {
   profileId: string;
   subjectId?: string | null;
   activityType: QuizActivityType;
-  birthYear?: number | null;
+  birthYear: number;
   themePreference?: string;
   libraryItems: LibraryItem[];
   recentAnswers: string[];
@@ -424,12 +424,8 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
     recentAnswers,
     libraryItems,
   });
-  const ageBracket: AgeBracket =
-    birthYear == null ? 'adolescent' : computeAgeBracket(birthYear);
-
-  // Compute fine-grained ageYears from birthYear when available.
-  const currentYear = new Date().getFullYear();
-  const ageYears = birthYear != null ? currentYear - birthYear : undefined;
+  const ageBracket: AgeBracket = computeAgeBracket(birthYear);
+  const ageYears = new Date().getFullYear() - birthYear;
 
   // Fetch the learner's profile to source personalization signals (P0.1 + P1.2).
   // Use caller-supplied interests when pre-fetched to avoid an extra round-trip.

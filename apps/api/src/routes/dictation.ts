@@ -114,11 +114,16 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
     const profileId = requireProfileId(c.get('profileId'));
     const db = c.get('db');
     const profileMeta = c.get('profileMeta');
+    if (!profileMeta) {
+      throw new Error(
+        `[dictation/generate] profileMeta missing for profileId=${profileId}`,
+      );
+    }
 
     const ctx = await fetchGenerateContext(
       db,
       profileId,
-      profileMeta?.birthYear ?? null,
+      profileMeta.birthYear,
     );
     const result = await generateDictation(ctx);
 
@@ -213,11 +218,12 @@ export const dictationRoutes = new Hono<DictationRouteEnv>()
 
       // Derive ageYears from profileMeta birthYear (same pattern as generate route).
       const profileMeta = c.get('profileMeta');
-      const currentYear = new Date().getFullYear();
-      const ageYears =
-        profileMeta?.birthYear != null
-          ? currentYear - profileMeta.birthYear
-          : undefined;
+      if (!profileMeta) {
+        throw new Error(
+          `[dictation/review] profileMeta missing for profileId=${profileId}`,
+        );
+      }
+      const ageYears = new Date().getFullYear() - profileMeta.birthYear;
 
       // Fetch struggles best-effort — if DB fails, review proceeds without them.
       let recentStruggles: string[] = [];
