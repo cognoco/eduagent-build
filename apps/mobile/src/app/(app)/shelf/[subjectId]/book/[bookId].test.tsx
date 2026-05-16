@@ -432,6 +432,36 @@ describe('BookScreen', () => {
     getByText('2 of 3 topics finished');
   });
 
+  it('ignores verified retention topics from other books', () => {
+    mockUseBookWithTopics.mockReturnValue(
+      makeBookQuery({
+        data: {
+          ...makeBookQuery().data,
+          topics: [
+            makeTopic({ id: 'topic-1', title: 'T1', sortOrder: 1 }),
+            makeTopic({ id: 'topic-2', title: 'T2', sortOrder: 2 }),
+          ],
+        },
+      }),
+    );
+    mockUseRetentionTopics.mockReturnValue(
+      makeRetentionQuery({
+        data: {
+          topics: [
+            makeRetentionTopic({ topicId: 'topic-1' }),
+            makeRetentionTopic({ topicId: 'other-book-topic' }),
+          ],
+          reviewDueCount: 0,
+        },
+      }),
+    );
+
+    const { getByText, queryByTestId } = render(<BookScreen />);
+
+    getByText('1 of 2 topics finished');
+    expect(queryByTestId('book-complete-card')).toBeNull();
+  });
+
   it('does not count pending retention repetitions as finished topics', () => {
     mockUseBookWithTopics.mockReturnValue(
       makeBookQuery({

@@ -1,21 +1,11 @@
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
+import type { BookSession, GetBookSessionsResponse } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
 
-export interface BookSession {
-  id: string;
-  topicId: string | null;
-  topicTitle: string;
-  chapter: string | null;
-  exchangeCount: number;
-  createdAt: string;
-}
-
-interface BookSessionsResponse {
-  sessions: BookSession[];
-}
+export type { BookSession } from '@eduagent/schemas';
 
 export function useBookSessions(
   subjectId: string | undefined,
@@ -35,7 +25,7 @@ export function useBookSessions(
           ':bookId'
         ].sessions.$get({ param: { subjectId, bookId } }, { init: { signal } });
         await assertOk(res);
-        const data = (await res.json()) as BookSessionsResponse;
+        const data = (await res.json()) as GetBookSessionsResponse;
         return data.sessions;
       } finally {
         cleanup();

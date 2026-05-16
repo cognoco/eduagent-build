@@ -380,6 +380,7 @@ export default function BookScreen() {
   // the screen sensible across cached responses and verified retention cards.
   const topicStudiedIds = useMemo((): Set<string> => {
     const retentionTopics = retentionTopicsQuery.data?.topics ?? [];
+    const bookTopicIds = new Set(activeTopics.map((topic) => topic.id));
     const ids = new Set(bookQuery.data?.completedTopicIds ?? []);
     for (const session of sessions) {
       if (
@@ -390,10 +391,17 @@ export default function BookScreen() {
       }
     }
     for (const rt of retentionTopics) {
-      if (rt.xpStatus === 'verified') ids.add(rt.topicId);
+      if (rt.xpStatus === 'verified' && bookTopicIds.has(rt.topicId)) {
+        ids.add(rt.topicId);
+      }
     }
     return ids;
-  }, [bookQuery.data?.completedTopicIds, sessions, retentionTopicsQuery.data]);
+  }, [
+    activeTopics,
+    bookQuery.data?.completedTopicIds,
+    sessions,
+    retentionTopicsQuery.data,
+  ]);
 
   // --- Book-level retention status (derived from completed topics) ---
   const bookRetentionStatus = useMemo((): RetentionStatus | null => {
