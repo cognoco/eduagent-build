@@ -2,11 +2,13 @@ import { Hono } from 'hono';
 import { ERROR_CODES } from '@eduagent/schemas';
 import { inngest } from '../inngest/client';
 import { safeSend } from '../services/safe-non-core';
+import { captureException } from '../services/sentry';
 
 type MaintenanceEnv = {
   Bindings: {
     ENVIRONMENT?: string;
     MAINTENANCE_SECRET?: string;
+    SENTRY_DSN?: string;
   };
 };
 
@@ -39,6 +41,34 @@ async function verifyMaintenanceSecret(c: {
 }
 
 export const maintenanceRoutes = new Hono<MaintenanceEnv>()
+  .post('/maintenance/sentry-smoke', async (c) => {
+    if (!(await verifyMaintenanceSecret(c))) {
+      return c.json(
+        {
+          code: ERROR_CODES.FORBIDDEN,
+          message: 'Maintenance secret required',
+        },
+        403,
+      );
+    }
+
+    const smokeId = crypto.randomUUID();
+    captureException(new Error('Sentry smoke test'), {
+      requestPath: c.req.path,
+      extra: {
+        surface: 'maintenance.sentry-smoke',
+        smokeId,
+        environment: c.env.ENVIRONMENT ?? 'unknown',
+        sentryConfigured: Boolean(c.env.SENTRY_DSN),
+      },
+    });
+
+    return c.json({
+      captured: true,
+      smokeId,
+      sentryConfigured: Boolean(c.env.SENTRY_DSN),
+    });
+  })
   .post('/maintenance/memory-facts-backfill', async (c) => {
     if (!(await verifyMaintenanceSecret(c))) {
       return c.json(

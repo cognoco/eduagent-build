@@ -48,10 +48,11 @@ import { sanitizeSecureStoreKey } from '../lib/secure-storage';
 import { ErrorBoundary, OfflineBanner } from '../components/common';
 import { OutboxDrainProvider } from '../providers/OutboxDrainProvider';
 import { useNetworkStatus } from '../hooks/use-network-status';
-import { Sentry } from '../lib/sentry';
+import { enableSentry, Sentry } from '../lib/sentry';
 import { configureRevenueCat } from '../lib/revenuecat';
 import { AnimatedSplash } from '../components/AnimatedSplash';
 import { asyncStoragePersister } from '../lib/query-persister';
+import { shouldReportQueryErrorToSentry } from '../lib/query-error-reporting';
 
 // BUG-417: Clerk's default tokenCache uses expo-secure-store directly,
 // which crashes on web. Use our secure-storage wrapper instead.
@@ -81,6 +82,9 @@ if (!clerkPublishableKey) {
 const queryClient = new QueryClient({
   queryCache: new QueryCache({
     onError: (error, query) => {
+      if (!shouldReportQueryErrorToSentry(error)) {
+        return;
+      }
       // Global fallback: report query failures to Sentry so silent blank
       // screens become observable even when a screen forgets to handle
       // isError, but ensures no failure goes unnoticed.
@@ -462,6 +466,10 @@ export default function RootLayout() {
   const [clerkReady, setClerkReady] = useState(false);
   const [clerkTimedOut, setClerkTimedOut] = useState(false);
   const showSplash = !animDone;
+
+  useEffect(() => {
+    enableSentry();
+  }, []);
 
   const onAnimComplete = useCallback(() => {
     if (__DEV__) console.log('[Splash] Animation complete');

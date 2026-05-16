@@ -265,6 +265,8 @@ function SessionScreenInner() {
   const [messages, setMessages] = useState<ChatMessage[]>([
     { id: 'opening', role: 'assistant', content: openingContent },
   ]);
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
   // [BUG-919] Hide the "Go to the Library" hint once the conversation
   // starts. See shouldShowBookLink for the full rationale.
   const showBookLink = shouldShowBookLink({
@@ -395,8 +397,16 @@ function SessionScreenInner() {
   // history loads everywhere instead of dropping the learner into a blank chat.
   // Scoped to learning mode only: review/homework/freeform intentionally start
   // fresh.
+  const hasLocalLearnerTurn = messages.some(
+    (message) => message.role === 'user' && !message.eventId,
+  );
   const shouldLookupActiveSession =
-    effectiveMode === 'learning' && !!topicId && !routeSessionId;
+    effectiveMode === 'learning' &&
+    !!topicId &&
+    !routeSessionId &&
+    !activeSessionId &&
+    !isStreaming &&
+    !hasLocalLearnerTurn;
   const activeSessionLookup = useActiveSessionForTopic(
     shouldLookupActiveSession ? topicId : undefined,
   );
@@ -607,6 +617,22 @@ function SessionScreenInner() {
         isSystemPrompt: entry.isSystemPrompt,
         escalationRung: entry.escalationRung,
       }));
+
+    const currentMessages = messagesRef.current;
+    const transcriptUserContents = new Set(
+      transcriptMessages
+        .filter((message) => message.role === 'user')
+        .map((message) => message.content),
+    );
+    const hasInFlightLocalTurn =
+      currentMessages.some((message) => message.streaming) ||
+      currentMessages.some(
+        (message) =>
+          message.role === 'user' &&
+          !message.eventId &&
+          !transcriptUserContents.has(message.content),
+      );
+    if (hasInFlightLocalTurn) return;
 
     setMessages(
       transcriptMessages.length > 0

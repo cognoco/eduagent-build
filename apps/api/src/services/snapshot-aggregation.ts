@@ -693,10 +693,14 @@ export async function buildKnowledgeInventory(
   // — the next session-completed pipeline tick will refresh the snapshot.
   if (latestSnapshot) {
     const cachedSubjectIds = new Set(metrics.subjects.map((s) => s.subjectId));
+    const liveSubjectIds = new Set(state.subjects.map((s) => s.id));
     const hasMissingLiveSubject = state.subjects.some(
       (s) => !cachedSubjectIds.has(s.id),
     );
-    if (hasMissingLiveSubject) {
+    const hasStaleCachedSubject = metrics.subjects.some(
+      (s) => !liveSubjectIds.has(s.subjectId),
+    );
+    if (hasMissingLiveSubject || hasStaleCachedSubject) {
       metrics = await computeProgressMetrics(db, profileId);
     }
   }
