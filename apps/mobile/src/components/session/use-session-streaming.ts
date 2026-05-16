@@ -14,6 +14,7 @@ import type {
 } from '../../hooks/use-sessions';
 import { useApiClient, type QuotaExceededDetails } from '../../lib/api-client';
 import { formatApiError } from '../../lib/format-api-error';
+import { Sentry } from '../../lib/sentry';
 import { writeSessionRecoveryMarker } from '../../lib/session-recovery';
 import {
   buildHomeworkSessionMetadata,
@@ -40,6 +41,20 @@ import {
 
 const FIRST_TOPIC_ACK_PATTERN =
   /^(ok(?:ay)?|yes|yep|yeah|ready|start|go ahead|sure|sounds good|let'?s go)[.!?\s]*$/i;
+
+function getStreamErrorCode(error: unknown): string | undefined {
+  if (error == null || typeof error !== 'object' || !('code' in error)) {
+    return undefined;
+  }
+  const code = (error as { code?: unknown }).code;
+  return typeof code === 'string' ? code : undefined;
+}
+
+function shouldCaptureLlmStreamError(error: unknown): boolean {
+  const code = getStreamErrorCode(error);
+  if (code === 'LLM_UNAVAILABLE' || code === 'UPSTREAM_ERROR') return true;
+  return error instanceof Error && error.name === 'UpstreamError';
+}
 
 export function buildSessionApiMessage(
   text: string,
@@ -502,6 +517,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
       activeContinueRef.current = currentTurn;
 
       let streamId: string | null = null;
+      let resolvedSessionId: string | null = activeSessionId;
       // [H6] SSE freeze watchdog — hoisted so finally can always clear it.
       let sseWatchdogTimerId: ReturnType<typeof setInterval> | null = null;
       let doneCalled = false;
@@ -543,6 +559,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
         };
 
         const sid = await ensureSession(sessionSubjectId, text);
+        resolvedSessionId = sid;
         if (!sid) {
           const hasSubject = !!(
             subjectId ||
@@ -897,6 +914,25 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
         }
 
         const reconnectable = isReconnectableSessionError(err);
+        const streamErrorCode = getStreamErrorCode(err);
+        if (shouldCaptureLlmStreamError(err)) {
+          Sentry.captureException(err, {
+            tags: {
+              surface: 'session_stream',
+              feature: 'llm',
+              mode: effectiveMode,
+              reconnectable: String(reconnectable),
+              code: streamErrorCode ?? 'unknown',
+            },
+            extra: {
+              sessionId: resolvedSessionId,
+              profileId: activeProfileId,
+              subjectId: options?.sessionSubjectId ?? effectiveSubjectId,
+              topicId,
+              inputMode,
+            },
+          });
+        }
         const formattedError = formatApiError(err);
         // [3B.1] Classify: timeout → timeout msg, 5xx → server error, network → reconnect,
         // CORS/config → config error, fatal 4xx → formatted api error (non-reconnectable).
@@ -971,6 +1007,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
     },
     [
       activeHomeworkProblem,
+      activeSessionId,
       activeProfileId,
       animationCleanupRef,
       classifiedSubject,
@@ -984,6 +1021,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
       homeworkProblemsState,
       imageBase64Ref,
       imageMimeTypeRef,
+      inputMode,
       lastAiAtRef,
       lastExpectedMinutesRef,
       lastRetryPayloadRef,

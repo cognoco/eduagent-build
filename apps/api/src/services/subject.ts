@@ -3,7 +3,7 @@
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
 
-import { eq, and, gte, notInArray, sql } from 'drizzle-orm';
+import { eq, and, gte, inArray, notInArray, sql } from 'drizzle-orm';
 import {
   subjects,
   curriculumBooks,
@@ -80,24 +80,40 @@ function mapSubjectRow(
   };
 }
 
-async function getSubjectCurriculumStatus(
+async function getSubjectCurriculumStatuses(
   db: Database,
-  subjectId: string,
-): Promise<SubjectCurriculumStatus> {
-  const readyBook = await db.query.curriculumBooks.findFirst({
-    where: and(
-      eq(curriculumBooks.subjectId, subjectId),
-      eq(curriculumBooks.topicsGenerated, true),
-    ),
-  });
-  if (readyBook) return 'ready';
+  subjectIds: string[],
+): Promise<Map<string, SubjectCurriculumStatus>> {
+  if (subjectIds.length === 0) return new Map();
 
-  const bookSuggestion = await db.query.bookSuggestions.findFirst({
-    where: eq(bookSuggestions.subjectId, subjectId),
-  });
-  if (bookSuggestion) return 'ready';
+  const [readyBooks, suggestions] = await Promise.all([
+    db.query.curriculumBooks.findMany({
+      where: and(
+        inArray(curriculumBooks.subjectId, subjectIds),
+        eq(curriculumBooks.topicsGenerated, true),
+      ),
+      columns: { subjectId: true },
+    }),
+    db.query.bookSuggestions.findMany({
+      where: inArray(bookSuggestions.subjectId, subjectIds),
+      columns: { subjectId: true },
+    }),
+  ]);
 
-  return 'preparing';
+  const readySubjectIds = new Set<string>();
+  for (const book of readyBooks) {
+    readySubjectIds.add(book.subjectId);
+  }
+  for (const suggestion of suggestions) {
+    readySubjectIds.add(suggestion.subjectId);
+  }
+
+  return new Map(
+    subjectIds.map((subjectId) => [
+      subjectId,
+      readySubjectIds.has(subjectId) ? 'ready' : 'preparing',
+    ]),
+  );
 }
 
 async function dispatchCurriculumPrewarm(args: {
@@ -193,14 +209,16 @@ export async function listSubjects(
   // Sort by most recently updated first — prevents arbitrary subject[0] picks
   // in freeform classifier fallback and Learn New "Continue with X" card
   rows.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
-  return Promise.all(
-    rows.map(async (row) =>
-      mapSubjectRow(
-        row,
-        row.status === 'active'
-          ? await getSubjectCurriculumStatus(db, row.id)
-          : undefined,
-      ),
+  const curriculumStatuses = await getSubjectCurriculumStatuses(
+    db,
+    rows.filter((row) => row.status === 'active').map((row) => row.id),
+  );
+  return rows.map((row) =>
+    mapSubjectRow(
+      row,
+      row.status === 'active'
+        ? (curriculumStatuses.get(row.id) ?? 'preparing')
+        : undefined,
     ),
   );
 }

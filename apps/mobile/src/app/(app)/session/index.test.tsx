@@ -1016,6 +1016,29 @@ describe('SessionScreen homework flow', () => {
     });
   });
 
+  it('does not auto-resume over a local turn when the learner sends before lookup settles', async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'learning',
+      subjectId: 'subject-1',
+      subjectName: 'Geography',
+      topicId: 'topic-1',
+      topicName: 'Continents',
+    });
+    mockFetch.setRoute('/progress/topic', { sessionId: 'session-resumed' });
+
+    const wrapper = createWrapper();
+    const testScreen = render(<SessionScreen />, { wrapper });
+
+    fireEvent.press(testScreen.getByTestId('manual-send-button'));
+    await flushAsyncWork();
+
+    await waitFor(() => {
+      expect(mockStartSession).toHaveBeenCalledTimes(1);
+      expect(testScreen.queryByText('Solve 2x + 5 = 17')).toBeTruthy();
+    });
+    expect(mockSetParams).not.toHaveBeenCalled();
+  });
+
   it('does not auto-resume when entering a topic in review mode', async () => {
     (useLocalSearchParams as jest.Mock).mockReturnValue({
       mode: 'review',

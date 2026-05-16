@@ -288,8 +288,8 @@ METRO_PORT=$(echo "$METRO_URL" | sed -n 's#.*:\([0-9][0-9]*\)\(/.*\)\?$#\1#p')
 REVERSED_PORTS=""
 reverse_port() {
   local port="$1"
-  [ -z "$port" ] && return
-  case " $REVERSED_PORTS " in *" $port "*) return ;; esac
+  [ -z "$port" ] && return 0
+  case " $REVERSED_PORTS " in *" $port "*) return 0 ;; esac
   REVERSED_PORTS="$REVERSED_PORTS $port"
   $ADB $DEVICE_FLAG reverse tcp:"$port" tcp:"$port" 2>/dev/null || true
 }

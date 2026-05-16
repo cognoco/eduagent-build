@@ -141,6 +141,9 @@ describe('MessageBubble collapse affordance', () => {
 
     const toggle = getByTestId('message-collapse-toggle');
     expect(toggle.props.className).toContain('min-h-[32px]');
+    expect(getByTestId('message-ai-content').props.style).toEqual(
+      expect.objectContaining({ maxHeight: 150, overflow: 'hidden' }),
+    );
     expect(queryByText('Show less')).toBeNull();
     expect(queryByText('Show more')).toBeNull();
   });

@@ -5,11 +5,11 @@ import {
 
 jest.mock(
   './sentry' /* gc1-allow: transient-retry unit test suppresses Sentry */,
-  () => ({ captureException: jest.fn() }),
+  () => ({ addBreadcrumb: jest.fn() }),
 );
 
-const { captureException } = jest.requireMock('./sentry') as {
-  captureException: jest.Mock;
+const { addBreadcrumb } = jest.requireMock('./sentry') as {
+  addBreadcrumb: jest.Mock;
 };
 
 beforeEach(() => {
@@ -20,6 +20,7 @@ describe('isTransientDatabaseError', () => {
   it.each([
     ['Connection terminated unexpectedly', true],
     ['Connection closed', true],
+    ['timeout exceeded when trying to connect', true],
     ['socket hang up', true],
     [Object.assign(new Error('fail'), { code: 'ECONNRESET' }), true],
     [Object.assign(new Error('fail'), { code: 'ECONNREFUSED' }), true],
@@ -40,7 +41,7 @@ describe('withTransientDatabaseRetry', () => {
       Promise.resolve('ok'),
     );
     expect(result).toBe('ok');
-    expect(captureException).not.toHaveBeenCalled();
+    expect(addBreadcrumb).not.toHaveBeenCalled();
   });
 
   it('retries on transient error and succeeds', async () => {
@@ -56,15 +57,15 @@ describe('withTransientDatabaseRetry', () => {
 
     expect(result).toBe('recovered');
     expect(op).toHaveBeenCalledTimes(2);
-    expect(captureException).toHaveBeenCalledTimes(1);
-    expect(captureException).toHaveBeenCalledWith(
-      expect.any(Error),
+    expect(addBreadcrumb).toHaveBeenCalledTimes(1);
+    expect(addBreadcrumb).toHaveBeenCalledWith(
+      'Transient database error; retrying',
+      'database',
+      'warning',
       expect.objectContaining({
-        extra: expect.objectContaining({
-          retryable: true,
-          operation: 'test_op',
-          attempt: 1,
-        }),
+        retryable: true,
+        operation: 'test_op',
+        attempt: 1,
       }),
     );
   });
@@ -77,7 +78,7 @@ describe('withTransientDatabaseRetry', () => {
       nonTransient,
     );
     expect(op).toHaveBeenCalledTimes(1);
-    expect(captureException).not.toHaveBeenCalled();
+    expect(addBreadcrumb).not.toHaveBeenCalled();
   });
 
   it('throws after exhausting all retries', async () => {
@@ -88,6 +89,6 @@ describe('withTransientDatabaseRetry', () => {
       transient,
     );
     expect(op).toHaveBeenCalledTimes(4); // 1 initial + 3 retries
-    expect(captureException).toHaveBeenCalledTimes(3);
+    expect(addBreadcrumb).toHaveBeenCalledTimes(3);
   });
 });

@@ -90,16 +90,19 @@ function createMockDb({
   insertReturning = [] as ReturnType<typeof mockSubjectRow>[],
   updateReturning = [] as ReturnType<typeof mockSubjectRow>[],
   readyBook = null as ReturnType<typeof mockBookRow> | null,
+  readyBooks = [] as Array<Pick<ReturnType<typeof mockBookRow>, 'subjectId'>>,
   bookSuggestion = null as { id: string } | null,
+  bookSuggestions = [] as Array<{ subjectId: string }>,
 } = {}): Database {
   return {
     query: {
       curriculumBooks: {
         findFirst: jest.fn().mockResolvedValue(readyBook),
-        findMany: jest.fn().mockResolvedValue([]),
+        findMany: jest.fn().mockResolvedValue(readyBooks),
       },
       bookSuggestions: {
         findFirst: jest.fn().mockResolvedValue(bookSuggestion),
+        findMany: jest.fn().mockResolvedValue(bookSuggestions),
       },
     },
     insert: jest.fn().mockReturnValue({
@@ -143,7 +146,9 @@ describe('listSubjects', () => {
       mockSubjectRow({ id: 's2', name: 'Science' }),
     ];
     setupScopedRepo({ findManyResult: rows });
-    const db = createMockDb({ readyBook: mockBookRow() });
+    const db = createMockDb({
+      readyBooks: [{ subjectId: 's1' }, { subjectId: 's2' }],
+    });
     const result = await listSubjects(db, profileId);
 
     expect(result).toHaveLength(2);
@@ -172,7 +177,9 @@ describe('listSubjects', () => {
     setupScopedRepo({
       findManyResult: [mockSubjectRow({ id: 'subject-broad' })],
     });
-    const db = createMockDb({ bookSuggestion: { id: 'suggestion-1' } });
+    const db = createMockDb({
+      bookSuggestions: [{ subjectId: 'subject-broad' }],
+    });
 
     const result = await listSubjects(db, profileId);
 
@@ -222,6 +229,45 @@ describe('listSubjects', () => {
     const db = createMockDb();
     const result = await listSubjects(db, profileId);
     expect(result[0]!.id).toBe('newer');
+  });
+
+  it('batches curriculum status lookups across active subjects', async () => {
+    const rows = [
+      mockSubjectRow({ id: 'ready-book', name: 'Math' }),
+      mockSubjectRow({ id: 'ready-suggestion', name: 'Science' }),
+      mockSubjectRow({ id: 'preparing', name: 'History' }),
+      mockSubjectRow({
+        id: 'archived',
+        name: 'Old class',
+        status: 'archived',
+      }),
+    ];
+    setupScopedRepo({ findManyResult: rows });
+    const db = createMockDb({
+      readyBooks: [{ subjectId: 'ready-book' }],
+      bookSuggestions: [{ subjectId: 'ready-suggestion' }],
+    });
+
+    const result = await listSubjects(db, profileId, { includeInactive: true });
+
+    expect(db.query.curriculumBooks.findMany).toHaveBeenCalledTimes(1);
+    expect(db.query.bookSuggestions.findMany).toHaveBeenCalledTimes(1);
+    expect(result.find((subject) => subject.id === 'ready-book')).toMatchObject(
+      {
+        curriculumStatus: 'ready',
+      },
+    );
+    expect(
+      result.find((subject) => subject.id === 'ready-suggestion'),
+    ).toMatchObject({
+      curriculumStatus: 'ready',
+    });
+    expect(result.find((subject) => subject.id === 'preparing')).toMatchObject({
+      curriculumStatus: 'preparing',
+    });
+    expect(
+      result.find((subject) => subject.id === 'archived'),
+    ).not.toHaveProperty('curriculumStatus');
   });
 });
 

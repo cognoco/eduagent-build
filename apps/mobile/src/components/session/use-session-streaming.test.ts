@@ -4,6 +4,18 @@ import {
   useSessionStreaming,
 } from './use-session-streaming';
 import { QuotaExceededError } from '../../lib/api-client';
+import { UpstreamError } from '../../lib/api-errors';
+
+const mockCaptureException = jest.fn();
+
+jest.mock(
+  '../../lib/sentry' /* gc1-allow: Sentry SDK loads native module config in Jest */,
+  () => ({
+    Sentry: {
+      captureException: (...args: unknown[]) => mockCaptureException(...args),
+    },
+  }),
+);
 
 // Mock ChatShell directly so the hook can avoid the session barrel cycle.
 // prettier-ignore
@@ -247,6 +259,7 @@ describe('useSessionStreaming', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockCaptureException.mockClear();
   });
 
   afterEach(() => {
@@ -593,6 +606,7 @@ describe('useSessionStreaming', () => {
 
       expect(opts.setQuotaError).toHaveBeenCalledWith(quotaDetails);
       expect(opts.setIsStreaming).toHaveBeenCalledWith(false);
+      expect(mockCaptureException).not.toHaveBeenCalled();
     });
 
     it('handles reconnectable errors with reconnect prompt', async () => {
@@ -609,6 +623,44 @@ describe('useSessionStreaming', () => {
       expect(opts.setIsStreaming).toHaveBeenCalledWith(false);
       // setMessages should have been called to show the error
       expect(opts.setMessages).toHaveBeenCalled();
+      expect(mockCaptureException).not.toHaveBeenCalled();
+    });
+
+    it('captures upstream LLM stream errors before showing reconnect prompt', async () => {
+      const llmError = new UpstreamError(
+        'Something went wrong while generating a reply. Please try again.',
+        'LLM_UNAVAILABLE',
+        502,
+      );
+      const opts = makeOpts({
+        activeSessionId: 'session-1',
+        effectiveMode: 'learning',
+        topicId: 'topic-1',
+        inputMode: 'voice',
+        streamMessage: jest.fn().mockRejectedValue(llmError),
+      });
+      const { result } = renderHook(() => useSessionStreaming(opts as any));
+
+      await act(async () => {
+        await result.current.continueWithMessage('test');
+      });
+
+      expect(mockCaptureException).toHaveBeenCalledWith(llmError, {
+        tags: {
+          surface: 'session_stream',
+          feature: 'llm',
+          mode: 'learning',
+          reconnectable: 'true',
+          code: 'LLM_UNAVAILABLE',
+        },
+        extra: {
+          sessionId: 'session-1',
+          profileId: 'profile-1',
+          subjectId: 'subject-1',
+          topicId: 'topic-1',
+          inputMode: 'voice',
+        },
+      });
     });
 
     it('writes session recovery marker after successful stream', async () => {

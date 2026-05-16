@@ -1,4 +1,4 @@
-import { captureException } from './sentry';
+import { addBreadcrumb } from './sentry';
 
 const TRANSIENT_DB_RETRY_ATTEMPTS = 3;
 const TRANSIENT_DB_RETRY_DELAY_MS = 300;
@@ -25,6 +25,7 @@ export function isTransientDatabaseError(error: unknown): boolean {
     code === 'ETIMEDOUT' ||
     /connection terminated/i.test(message) ||
     /connection closed/i.test(message) ||
+    /timeout exceeded when trying to connect/i.test(message) ||
     /socket hang up/i.test(message)
   );
 }
@@ -47,14 +48,18 @@ export async function withTransientDatabaseRetry<T>(
         throw error;
       }
 
-      captureException(error, {
-        extra: {
+      addBreadcrumb(
+        'Transient database error; retrying',
+        'database',
+        'warning',
+        {
+          error: error instanceof Error ? error.message : String(error),
           retryable: true,
           operation: label,
           attempt: attempt + 1,
           maxAttempts: TRANSIENT_DB_RETRY_ATTEMPTS + 1,
         },
-      });
+      );
       await delay(TRANSIENT_DB_RETRY_DELAY_MS * (attempt + 1));
     }
   }

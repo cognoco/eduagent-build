@@ -301,9 +301,12 @@ export function MessageBubble({
       if (!isExpanded) return; // don't re-measure constrained height
       if (event.nativeEvent.layout.height > COLLAPSE_THRESHOLD) {
         setIsCollapsible(true);
+        if (!isCollapsible) {
+          setIsExpanded(false);
+        }
       }
     },
-    [isExpanded],
+    [isCollapsible, isExpanded],
   );
 
   const showCollapseToggle = isAI && isCollapsible && !streaming;

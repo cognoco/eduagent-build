@@ -41,6 +41,7 @@ jest.mock('./sentry' /* gc1-allow: pattern-a conversion */, () => {
   return {
     ...actual,
     captureException: jest.fn(),
+    addBreadcrumb: jest.fn(),
   };
 });
 
@@ -69,7 +70,7 @@ import {
 } from './snapshot-aggregation';
 import { detectMilestones, storeMilestones } from './milestone-detection';
 import { queueCelebration } from './celebrations';
-import { captureException } from './sentry';
+import { addBreadcrumb } from './sentry';
 import type {
   ProgressMetrics,
   SubjectProgressMetrics,
@@ -721,6 +722,26 @@ describe('buildKnowledgeInventory', () => {
     });
   });
 
+  it('recomputes when cached snapshot contains a subject missing from live state', async () => {
+    const staleSubjectId = '550e8400-e29b-41d4-a716-446655440099';
+    const latest = makeSnapshotRow({
+      snapshotDate: TODAY,
+      metrics: makeMetrics({
+        totalSessions: 3,
+        subjects: [makeSubjectMetric(staleSubjectId)],
+      }),
+    });
+    const db = createSnapshotDb({ findFirst: latest, findMany: [latest] });
+
+    await expect(buildKnowledgeInventory(db, profileId)).resolves.toEqual(
+      expect.objectContaining({
+        global: expect.objectContaining({ totalSessions: 0 }),
+        subjects: [],
+      }),
+    );
+    expect(db.query.subjects.findMany).toHaveBeenCalledTimes(2);
+  });
+
   it('includes currently working on entries from the learning profile', async () => {
     const latest = makeSnapshotRow({
       snapshotDate: TODAY,
@@ -939,13 +960,14 @@ describe('refreshProgressSnapshot', () => {
 
     expect(result.snapshotDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(vocabularyCardsFindMany).toHaveBeenCalledTimes(2);
-    expect(captureException).toHaveBeenCalledWith(
-      connectionError,
+    expect(addBreadcrumb).toHaveBeenCalledWith(
+      'Transient database error; retrying',
+      'database',
+      'warning',
       expect.objectContaining({
-        extra: expect.objectContaining({
-          operation: 'load_progress_state',
-          retryable: true,
-        }),
+        error: connectionError.message,
+        operation: 'load_progress_state',
+        retryable: true,
       }),
     );
   });
