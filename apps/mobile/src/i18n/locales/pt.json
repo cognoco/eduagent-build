@@ -1371,6 +1371,13 @@
         "growthSecondaryLegend": "Vocabulary growth",
         "currentlyWorkingOnTitle": "Trabalhando agora",
         "currentlyWorkingOnDetected": "Detectado em sessões recentes"
+      },
+      "teen": {
+        "retentionStrong": "Ainda lembrado.",
+        "retentionFading": "Vale a pena rever rapidamente.",
+        "retentionWeak": "Precisa de uma revisão rápida.",
+        "currentlyWorkingOnTitle": "Trabalhando agora",
+        "currentlyWorkingOnDetected": "Das suas sessões recentes"
       }
     },
     "currentlyWorkingOn": {

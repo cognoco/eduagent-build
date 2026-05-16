@@ -1067,7 +1067,7 @@ describe('ProgressScreen — progressive disclosure', () => {
     expect(screen.queryByTestId('milestones-teaser')).toBeNull();
   });
 
-  it('uses current focus areas as recent focus fallback when sessions are absent', () => {
+  it('surfaces current focus areas inside the hero card regardless of session count', () => {
     mockLinkedChildren = [makeLinkedChild()];
     mockSearchParams = { profileId: 'child-1' };
     mockHooks({
@@ -1085,10 +1085,12 @@ describe('ProgressScreen — progressive disclosure', () => {
     });
     render(<ProgressScreen />);
 
-    screen.getByTestId('progress-recent-focus-card');
-    screen.getByText('Fractions');
-    screen.getByText('Decimals');
-    expect(screen.queryByTestId('progress-currently-working-on')).toBeNull();
+    // Bug-fix coverage: focus areas used to only appear as a RecentFocusCard
+    // fallback when sessions were empty, which made them invisible to
+    // established learners. Now they live in the hero card whenever
+    // currentlyWorkingOn is non-empty.
+    screen.getByTestId('progress-currently-working-on');
+    screen.getByText('Fractions · Decimals');
   });
 
   it('keeps currently working on hidden when inventory has no focus areas', () => {

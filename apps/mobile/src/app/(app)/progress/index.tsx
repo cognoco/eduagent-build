@@ -391,14 +391,12 @@ function sessionFocusTitle(session: ChildSession): string {
 
 function RecentFocusCard({
   sessions,
-  fallbackItems,
   isLoading,
   isError,
   onRetry,
   onShowAll,
 }: {
   sessions: ChildSession[] | undefined;
-  fallbackItems: string[];
   isLoading: boolean;
   isError: boolean;
   onRetry: () => void;
@@ -406,8 +404,6 @@ function RecentFocusCard({
 }): React.ReactElement {
   const { t } = useTranslation();
   const focusSessions = sessions?.slice(0, 2) ?? [];
-  const fallbackFocus =
-    focusSessions.length === 0 ? fallbackItems.slice(0, 2) : [];
 
   return (
     <View className="mt-6" testID="progress-recent-focus-card">
@@ -472,14 +468,6 @@ function RecentFocusCard({
               </Text>
             </View>
           ))
-        ) : fallbackFocus.length > 0 ? (
-          fallbackFocus.map((item, index) => (
-            <View key={item} className={index === 0 ? '' : 'mt-3'}>
-              <Text className="text-body font-semibold text-text-primary">
-                {item}
-              </Text>
-            </View>
-          ))
         ) : (
           <Text className="text-body text-text-secondary">
             {t('progress.recentFocus.empty')}
@@ -493,7 +481,6 @@ function RecentFocusCard({
 export default function ProgressScreen(): React.ReactElement {
   const { t } = useTranslation();
   const role = useActiveProfileRole();
-  const register = copyRegisterFor(role);
   const router = useRouter();
   const { profileId: rawRequestedProfileId } = useLocalSearchParams<{
     profileId?: string;
@@ -539,6 +526,13 @@ export default function ProgressScreen(): React.ReactElement {
     selectedProfileId === activeProfile?.id ||
     (!hasLinked && !selectedProfileId);
 
+  const selectedChildProfile = isViewingSelf
+    ? null
+    : (linkedChildren.find((child) => child.id === selectedProfileId) ?? null);
+  const selectedRegister: CopyRegister = isViewingSelf
+    ? copyRegisterFor(role, activeProfile?.birthYear)
+    : copyRegisterFor('child', selectedChildProfile?.birthYear);
+
   const ownInventoryQuery = useProgressInventory();
   const childInventoryQuery = useChildInventory(
     isViewingSelf ? undefined : selectedProfileId,
@@ -578,7 +572,7 @@ export default function ProgressScreen(): React.ReactElement {
       vocabularyTotal: inventory?.global.vocabularyTotal ?? 0,
       totalSessions: inventory?.global.totalSessions ?? 0,
     },
-    isViewingSelf ? register : 'child',
+    selectedRegister,
     t,
   );
 
@@ -983,6 +977,31 @@ export default function ProgressScreen(): React.ReactElement {
                   ) : null}
                 </View>
               ) : null}
+              {inventory?.currentlyWorkingOn?.length ? (
+                <View
+                  className="mt-5 pt-4 border-t border-border"
+                  testID="progress-currently-working-on"
+                >
+                  <Text className="text-caption font-semibold text-text-secondary mb-1">
+                    {t(
+                      `progress.register.${selectedRegister}.currentlyWorkingOnTitle`,
+                    )}
+                  </Text>
+                  <Text className="text-body text-text-primary">
+                    {inventory.currentlyWorkingOn.slice(0, 3).join(' · ')}
+                    {inventory.currentlyWorkingOn.length > 3
+                      ? ` · ${t('progress.currentlyWorkingOn.andNMore', {
+                          count: inventory.currentlyWorkingOn.length - 3,
+                        })}`
+                      : ''}
+                  </Text>
+                  <Text className="text-caption text-text-tertiary mt-1">
+                    {t(
+                      `progress.register.${selectedRegister}.currentlyWorkingOnDetected`,
+                    )}
+                  </Text>
+                </View>
+              ) : null}
             </View>
 
             <LatestReportCard
@@ -1101,7 +1120,6 @@ export default function ProgressScreen(): React.ReactElement {
 
             <RecentFocusCard
               sessions={profileSessionsQuery.data}
-              fallbackItems={inventory?.currentlyWorkingOn ?? []}
               isLoading={profileSessionsQuery.isLoading}
               isError={profileSessionsQuery.isError}
               onRetry={() => void profileSessionsQuery.refetch()}

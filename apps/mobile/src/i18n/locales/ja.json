@@ -1346,6 +1346,13 @@
         "growthSecondaryLegend": "Vocabulary growth",
         "currentlyWorkingOnTitle": "現在取り組み中",
         "currentlyWorkingOnDetected": "最近のセッションから検出"
+      },
+      "teen": {
+        "retentionStrong": "まだ覚えてる。",
+        "retentionFading": "ちょっと復習しておくと良いかも。",
+        "retentionWeak": "サッと見直しておこう。",
+        "currentlyWorkingOnTitle": "現在取り組み中",
+        "currentlyWorkingOnDetected": "最近のセッションから"
       }
     },
     "currentlyWorkingOn": {

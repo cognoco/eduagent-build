@@ -21,6 +21,7 @@ import {
   useSubjectProgress,
 } from '../../../../hooks/use-progress';
 import { useActiveProfileRole } from '../../../../hooks/use-active-profile-role';
+import { useProfile } from '../../../../lib/profile';
 import { useLanguageProgress } from '../../../../hooks/use-language-progress';
 import { formatMinutes } from '../../../../lib/format-relative-date';
 import { useUpdateSubject } from '../../../../hooks/use-subjects';
@@ -51,7 +52,8 @@ function StatCard({
 export default function ProgressSubjectScreen(): React.ReactElement {
   const { t } = useTranslation();
   const role = useActiveProfileRole();
-  const register = copyRegisterFor(role);
+  const { activeProfile } = useProfile();
+  const register = copyRegisterFor(role, activeProfile?.birthYear);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { subjectId, returnTo } = useLocalSearchParams<{

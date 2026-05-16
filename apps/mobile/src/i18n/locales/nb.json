@@ -1346,6 +1346,13 @@
         "growthSecondaryLegend": "Vokabularvekst",
         "currentlyWorkingOnTitle": "Jobber med nå",
         "currentlyWorkingOnDetected": "Oppdaget i nylige økter"
+      },
+      "teen": {
+        "retentionStrong": "Sitter fortsatt.",
+        "retentionFading": "En rask gjennomgang hjelper.",
+        "retentionWeak": "Trenger en rask oppfriskning.",
+        "currentlyWorkingOnTitle": "Jobber med nå",
+        "currentlyWorkingOnDetected": "Fra dine siste økter"
       }
     },
     "currentlyWorkingOn": {
