@@ -75,9 +75,9 @@ These deviations from the rules above exist in the codebase as of 2026-05-01. Th
 
 ## Required Validation
 
-Unit tests, lint, typecheck, and formatting are enforced by pre-commit hooks (lint-staged, `tsc --build`, `scripts/pre-commit-tests.sh`). You don't need to re-run them manually before committing — but verify locally while iterating. Focus on what the hooks do NOT cover:
+Pre-commit and pre-push hooks enforce lint, typecheck, and surgical tests automatically. See `docs/change-classes.md` for what each hook covers. Focus on what hooks do NOT cover:
 
-- Run integration tests when changing DB behavior, auth/profile scoping, Inngest flows, or cross-package contracts. The pre-commit hook intentionally skips `.integration.test.` files.
+- Run integration tests when changing DB behavior, auth/profile scoping, Inngest flows, or cross-package contracts. Both hooks intentionally skip `.integration.test.` files.
 - Do not call work complete if related tests, lint, typecheck, or required migrations are still failing.
 - No suppression, no shortcuts — always address the root of the error. Never use `eslint-disable` or suppress warnings to make lint pass. Fix the actual code or improve the lint rule to handle the pattern correctly.
 
