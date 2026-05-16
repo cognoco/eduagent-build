@@ -1081,6 +1081,7 @@ function SessionScreenInner() {
         isStreaming={isStreaming}
         inputDisabled={
           isOffline ||
+          pendingClassification ||
           isSubjectFlowBlockingComposer ||
           sessionExpired ||
           !!quotaError ||
