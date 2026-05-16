@@ -34,7 +34,11 @@
 //      silently drop characters the user already saw render correctly.
 // ---------------------------------------------------------------------------
 
-import { parseEnvelope, normalizeReplyText } from './envelope';
+import {
+  parseEnvelope,
+  normalizeReplyText,
+  stripEmbeddedEnvelopeTail,
+} from './envelope';
 import { extractFirstJsonObject } from './extract-json';
 
 /**
@@ -48,19 +52,19 @@ import { extractFirstJsonObject } from './extract-json';
  */
 export function stripMarkdownFence(text: string): string {
   const match = text.match(/^```(?:[a-z]*)?\s*([\s\S]*?)```\s*$/);
-  return match ? match[1]?.trim() ?? text : text;
+  return match ? (match[1]?.trim() ?? text) : text;
 }
 
 export function projectAiResponseContent(
   rawContent: string,
-  options: { silent?: boolean } = {}
+  options: { silent?: boolean } = {},
 ): string {
   // Step 1: strip markdown fence so fence-wrapped envelopes pass the pre-check.
   const trimmed = stripMarkdownFence(rawContent.trim());
 
   // Step 2: cheap pre-check — avoid JSON work on plain prose.
   if (!trimmed.startsWith('{') || !trimmed.includes('"reply"')) {
-    return rawContent;
+    return stripEmbeddedEnvelopeTail(rawContent);
   }
 
   // Step 3: strict envelope parse.
@@ -87,7 +91,9 @@ export function projectAiResponseContent(
     typeof (parsed as { reply?: unknown }).reply === 'string' &&
     (parsed as { reply: string }).reply.length > 0
   ) {
-    return normalizeReplyText((parsed as { reply: string }).reply);
+    return stripEmbeddedEnvelopeTail(
+      normalizeReplyText((parsed as { reply: string }).reply),
+    );
   }
   return rawContent;
 }

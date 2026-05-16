@@ -11,11 +11,14 @@ pnpm exec lint-staged
 #   - apps/api/src/services/**/*-prompts.ts
 #   - apps/api/src/services/llm/**/*.ts (including providers/, excluding tests)
 #   - apps/api/src/services/dictation/generate.ts (inline prompt construction)
+# Parser/projector-only LLM infrastructure files are excluded because they do
+# not contribute to prompt snapshot output; still run pnpm eval:llm manually
+# for those changes per AGENTS.md.
 # Requires at least one staged file under apps/api/eval-llm/snapshots/.
 # Bypass with `git commit --no-verify` if the change is a pure refactor.
 PROMPT_CHANGED=$(git diff --cached --name-only --diff-filter=d \
   | grep -E '(apps/api/src/services/.*-prompts\.ts$|apps/api/src/services/llm/.+\.ts$|apps/api/src/services/dictation/generate\.ts$)' \
-  | grep -vE '\.test\.ts$' || true)
+  | grep -vE '(\.test\.ts$|apps/api/src/services/llm/(envelope|project-response|stream-envelope)\.ts$)' || true)
 if [ -n "$PROMPT_CHANGED" ]; then
   SNAPSHOT_CHANGED=$(git diff --cached --name-only \
     | grep -E '^apps/api/eval-llm/snapshots/' || true)

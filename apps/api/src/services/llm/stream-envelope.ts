@@ -1,3 +1,5 @@
+import { stripEmbeddedEnvelopeTail } from './envelope';
+
 // ---------------------------------------------------------------------------
 // streamEnvelopeReply — incremental extractor that emits only the characters
 // inside the `reply` string of a streaming LLM envelope. The provider stream
@@ -36,6 +38,42 @@ interface LiteralEscapeNormalizer {
   push(input: string): string;
   /** Flush any deferred trailing `\` once the source has drained. */
   flush(): string;
+}
+
+interface EmbeddedEnvelopeTailFilter {
+  push(input: string): string;
+  flush(): string;
+}
+
+function createEmbeddedEnvelopeTailFilter(): EmbeddedEnvelopeTailFilter {
+  let pending = '';
+  let stopped = false;
+  const holdChars = 48;
+
+  return {
+    push(input: string): string {
+      if (stopped || input.length === 0) return '';
+
+      pending += input;
+      const stripped = stripEmbeddedEnvelopeTail(pending);
+      if (stripped !== pending) {
+        stopped = true;
+        pending = '';
+        return stripped;
+      }
+
+      if (pending.length <= holdChars) return '';
+      const emit = pending.slice(0, -holdChars);
+      pending = pending.slice(-holdChars);
+      return emit;
+    },
+    flush(): string {
+      if (stopped) return '';
+      const out = stripEmbeddedEnvelopeTail(pending);
+      pending = '';
+      return out;
+    },
+  };
 }
 
 function createLiteralEscapeNormalizer(): LiteralEscapeNormalizer {
@@ -204,7 +242,7 @@ export function teeEnvelopeStream(source: AsyncIterable<string>): {
 }
 
 export async function* streamEnvelopeReply(
-  source: AsyncIterable<string>
+  source: AsyncIterable<string>,
 ): AsyncGenerator<string> {
   let buffer = '';
   let state: StreamState = 'find_reply_key';
@@ -212,9 +250,10 @@ export async function* streamEnvelopeReply(
   // Defensive normalizer — removes literal `\n`/`\r`/`\t` leaks from
   // double-escaping LLMs before the chunk reaches the SSE consumer.
   const normalizer = createLiteralEscapeNormalizer();
+  const embeddedTailFilter = createEmbeddedEnvelopeTailFilter();
 
   function emit(text: string): string {
-    return normalizer.push(text);
+    return embeddedTailFilter.push(normalizer.push(text));
   }
 
   for await (const chunk of source) {
@@ -326,6 +365,9 @@ export async function* streamEnvelopeReply(
     const normalized = emit(pendingEscape);
     if (normalized) yield normalized;
   }
-  const flushed = normalizer.flush();
+  const normalizedFlush = normalizer.flush();
+  const filteredFlush = embeddedTailFilter.push(normalizedFlush);
+  if (filteredFlush) yield filteredFlush;
+  const flushed = embeddedTailFilter.flush();
   if (flushed) yield flushed;
 }
