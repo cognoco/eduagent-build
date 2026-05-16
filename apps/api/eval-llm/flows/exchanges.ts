@@ -3,6 +3,7 @@ import {
   sanitizeUserContent,
   type ExchangeContext,
 } from '../../src/services/exchanges';
+import { isAppHelpQuery } from '../../src/services/app-help-map';
 import { resolveAgeBracket } from '../../src/services/exchange-prompts';
 import { buildMemoryBlock } from '../../src/services/learner-profile';
 import type { ChatMessage } from '../../src/services/llm/types';
@@ -571,7 +572,6 @@ export const exchangesFlow: FlowDefinition<ExchangeScenarioInput> = {
   },
 
   buildPrompt(input: ExchangeScenarioInput): PromptMessages {
-    const system = buildSystemPrompt(input.context);
     const lastUserTurn = [...input.context.exchangeHistory]
       .reverse()
       .find((t) => t.role === 'user');
@@ -582,10 +582,14 @@ export const exchangesFlow: FlowDefinition<ExchangeScenarioInput> = {
             input.context.topicTitle ?? input.context.subjectName
           }.`)
         : undefined;
+    const user = lastUserTurn?.content ?? firstTurnUser;
+    const system = buildSystemPrompt(input.context, {
+      includeAppHelpMap: user != null && isAppHelpQuery(user),
+    });
 
     return {
       system,
-      user: lastUserTurn?.content ?? firstTurnUser,
+      user,
       notes: [
         `Scenario: ${input.scenarioId} — ${input.scenarioPurpose}`,
         `Rung: ${input.context.escalationRung}, sessionType: ${

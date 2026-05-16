@@ -1880,6 +1880,33 @@ describe('session routes', () => {
       expect(body).toMatchObject({ code: 'LLM_UNAVAILABLE' });
     });
 
+    it('[LLM-CIRCUIT] CircuitOpenError surfaces as 503 LLM_UNAVAILABLE, not a generic 500', async () => {
+      const { CircuitOpenError } = jest.requireActual('../services/llm') as {
+        CircuitOpenError: typeof import('../services/llm').CircuitOpenError;
+      };
+      (streamMessage as jest.Mock).mockRejectedValueOnce(
+        new CircuitOpenError('gemini', 'gemini:text'),
+      );
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/stream`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'Hello' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(503);
+      const body = await res.json();
+      expect(body).toMatchObject({ code: 'LLM_UNAVAILABLE' });
+      expect(mockIncrementQuota).toHaveBeenCalledWith(
+        expect.anything(),
+        'sub-1',
+      );
+    });
+
     // [BUG-666 / S-7] When the SSE stream is abandoned mid-flight — i.e.
     // streamMessage returned but onComplete (which drains rawResponsePromise,
     // parses the envelope, and persists the user_message + ai_response in a

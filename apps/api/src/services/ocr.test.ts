@@ -176,6 +176,7 @@ describe('GeminiOcrProvider', () => {
         }),
       ],
       1,
+      { flow: 'ocr.extract' },
     );
   });
 

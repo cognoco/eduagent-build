@@ -314,7 +314,10 @@ export async function processExchange(
   userMessage: string,
   imageData?: ImageData,
 ): Promise<ExchangeResult> {
-  const systemPrompt = _buildSystemPrompt(context);
+  const appHelpTurn = isAppHelpQuery(userMessage);
+  const systemPrompt = _buildSystemPrompt(context, {
+    includeAppHelpMap: appHelpTurn,
+  });
 
   const messages: ChatMessage[] = [
     { role: 'system', content: systemPrompt },
@@ -340,6 +343,8 @@ export async function processExchange(
       // safety preamble carries it on every provider uniformly.
       conversationLanguage: context.conversationLanguage,
       pronouns: context.pronouns,
+      flow: 'exchange.process',
+      sessionId: context.sessionId,
     },
   );
 
@@ -348,9 +353,7 @@ export async function processExchange(
     profileId: context.profileId,
     flow: 'processExchange',
   });
-  const finalParsed = isAppHelpQuery(userMessage)
-    ? applyAppHelpSignalGuard(parsed)
-    : parsed;
+  const finalParsed = appHelpTurn ? applyAppHelpSignalGuard(parsed) : parsed;
 
   return {
     response: finalParsed.cleanResponse,
@@ -383,7 +386,10 @@ export async function streamExchange(
   userMessage: string,
   imageData?: ImageData,
 ): Promise<ExchangeStreamResult> {
-  const systemPrompt = _buildSystemPrompt(context);
+  const appHelpTurn = isAppHelpQuery(userMessage);
+  const systemPrompt = _buildSystemPrompt(context, {
+    includeAppHelpMap: appHelpTurn,
+  });
 
   const messages: ChatMessage[] = [
     { role: 'system', content: systemPrompt },
@@ -407,6 +413,8 @@ export async function streamExchange(
       ageBracket,
       conversationLanguage: context.conversationLanguage,
       pronouns: context.pronouns,
+      flow: 'exchange.stream',
+      sessionId: context.sessionId,
     },
   );
 

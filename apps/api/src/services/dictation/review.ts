@@ -196,7 +196,7 @@ export async function reviewDictation(
   ];
 
   // Rung 2 — vision-capable model required
-  const result = await routeAndCall(messages, 2);
+  const result = await routeAndCall(messages, 2, { flow: 'dictation.review' });
 
   if (!result.response || result.response.trim() === '') {
     const err = new UpstreamLlmError(

@@ -889,6 +889,46 @@ describe('processExchange', () => {
 
     registerProvider(createMockProvider('gemini'));
   });
+
+  it('injects the app-help map only for app-help messages', async () => {
+    const systemPrompts: string[] = [];
+    const capturingProvider: LLMProvider = {
+      id: 'gemini',
+      async chat(messages: ChatMessage[], _config: ModelConfig) {
+        systemPrompts.push(String(messages[0]?.content ?? ''));
+        return {
+          content: JSON.stringify({
+            reply: 'Got it.',
+            signals: {
+              understanding_check: false,
+              partial_progress: false,
+              needs_deepening: false,
+            },
+          }),
+          stopReason: 'stop' as StopReason,
+        };
+      },
+      chatStream() {
+        const s = (async function* () {
+          yield '';
+        })();
+        return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
+      },
+    };
+    registerProvider(capturingProvider);
+
+    try {
+      await processExchange(baseContext, 'Explain quadratics');
+      await processExchange(baseContext, 'Where do I find my notes?');
+    } finally {
+      registerProvider(createMockProvider('gemini'));
+    }
+
+    expect(systemPrompts).toHaveLength(2);
+    expect(systemPrompts[0]).not.toContain('APP HELP');
+    expect(systemPrompts[1]).toContain('APP HELP');
+    expect(systemPrompts[1]).toContain('Mentor memory');
+  });
 });
 
 // ---------------------------------------------------------------------------

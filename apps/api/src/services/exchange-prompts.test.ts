@@ -100,15 +100,25 @@ describe('buildSystemPrompt — anti-fabrication block [BUG-937]', () => {
 });
 
 describe('buildSystemPrompt — app-help block', () => {
-  it('includes the APP HELP map in the prompt', () => {
+  it('does not include the APP HELP map on ordinary learning prompts', () => {
     const prompt = buildSystemPrompt(makeContext());
+    expect(prompt).not.toContain('APP HELP');
+    expect(prompt).not.toContain('Mentor memory');
+  });
+
+  it('includes the APP HELP map when app-help is requested', () => {
+    const prompt = buildSystemPrompt(makeContext(), {
+      includeAppHelpMap: true,
+    });
     expect(prompt).toContain('APP HELP');
     expect(prompt).toContain('Mentor memory');
     expect(prompt).toContain('Preferences');
   });
 
   it('places APP HELP after ANTI-FABRICATION', () => {
-    const prompt = buildSystemPrompt(makeContext());
+    const prompt = buildSystemPrompt(makeContext(), {
+      includeAppHelpMap: true,
+    });
     const antiFabIdx = prompt.indexOf('ANTI-FABRICATION');
     const appHelpIdx = prompt.indexOf('APP HELP');
     expect(antiFabIdx).toBeGreaterThan(-1);
@@ -117,7 +127,9 @@ describe('buildSystemPrompt — app-help block', () => {
   });
 
   it('places APP HELP before the envelope response contract', () => {
-    const prompt = buildSystemPrompt(makeContext());
+    const prompt = buildSystemPrompt(makeContext(), {
+      includeAppHelpMap: true,
+    });
     const appHelpIdx = prompt.indexOf('APP HELP');
     const envelopeIdx = prompt.indexOf('RESPONSE FORMAT');
     expect(appHelpIdx).toBeGreaterThan(-1);
@@ -126,7 +138,9 @@ describe('buildSystemPrompt — app-help block', () => {
   });
 
   it('does not contain Expo route strings in the prompt', () => {
-    const prompt = buildSystemPrompt(makeContext());
+    const prompt = buildSystemPrompt(makeContext(), {
+      includeAppHelpMap: true,
+    });
     const appHelpStart = prompt.indexOf('APP HELP');
     const appHelpSection = prompt.slice(appHelpStart, appHelpStart + 2000);
     expect(appHelpSection).not.toMatch(/\/\(app\)/);
@@ -135,15 +149,25 @@ describe('buildSystemPrompt — app-help block', () => {
 });
 
 describe('buildSystemPrompt — scope-boundary app-help exception', () => {
-  it('includes app-help exception in standard learning scope boundaries', () => {
-    const prompt = buildSystemPrompt(makeContext({ sessionType: 'learning' }));
+  it('includes app-help exception in standard learning scope boundaries for app-help turns', () => {
+    const prompt = buildSystemPrompt(makeContext({ sessionType: 'learning' }), {
+      includeAppHelpMap: true,
+    });
     expect(prompt).toContain('Scope boundaries');
     expect(prompt).toMatch(/app.*help/i);
     expect(prompt).toMatch(/not off-topic/i);
   });
 
-  it('includes app-help exception in homework scope', () => {
-    const prompt = buildSystemPrompt(makeContext({ sessionType: 'homework' }));
+  it('omits app-help exception from ordinary learning scope boundaries', () => {
+    const prompt = buildSystemPrompt(makeContext({ sessionType: 'learning' }));
+    expect(prompt).toContain('Scope boundaries');
+    expect(prompt).not.toMatch(/not off-topic/i);
+  });
+
+  it('includes app-help exception in homework scope for app-help turns', () => {
+    const prompt = buildSystemPrompt(makeContext({ sessionType: 'homework' }), {
+      includeAppHelpMap: true,
+    });
     expect(prompt).toMatch(/app.*help|APP HELP/);
 
     const homeworkScopeStart = prompt.indexOf('Scope (homework)');
