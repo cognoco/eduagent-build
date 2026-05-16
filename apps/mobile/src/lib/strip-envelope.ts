@@ -44,7 +44,7 @@ const REQUIRED_ENVELOPE_SIBLINGS = new Set(['signals', 'ui_hints']);
 const EMBEDDED_ENVELOPE_TAIL_RE =
   /["\u201c\u201d]\s*,\s*["\u201c\u201d](?:signals|ui_hints|confidence)["\u201c\u201d]\s*:/;
 const EMBEDDED_ENVELOPE_CONFIRM_RE =
-  /["\u201c\u201d](?:partial_progress|needs_deepening|understanding_check|ready_to_finish|retrieval_score|note_prompt|post_session|fluency_drill)["\u201c\u201d]\s*:/;
+  /["\u201c\u201d](?:partial_progress|needs_deepening|understanding_check|ready_to_finish|retrieval_score|note_prompt|post_session|fluency_drill|confidence)["\u201c\u201d]\s*:/;
 
 function stripEmbeddedEnvelopeTail(text: string): string {
   const match = EMBEDDED_ENVELOPE_TAIL_RE.exec(text);

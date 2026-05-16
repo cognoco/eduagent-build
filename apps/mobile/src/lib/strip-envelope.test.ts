@@ -45,6 +45,12 @@ describe('stripEnvelopeJson', () => {
       expect(stripEnvelopeJson(text)).toBe('Who did the actual farming?');
     });
 
+    it('strips a confidence-only side-channel from prose before rendering', () => {
+      expect(stripEnvelopeJson('Nice work!","confidence":"low"}')).toBe(
+        'Nice work!',
+      );
+    });
+
     it('leaves prose that merely teaches about a signals field unchanged', () => {
       const text =
         'In this JSON example, "signals": means clues that point to an answer.';

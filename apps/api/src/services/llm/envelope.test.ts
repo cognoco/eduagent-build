@@ -203,6 +203,11 @@ describe('parseEnvelope', () => {
       expect(stripEmbeddedEnvelopeTail(leaked)).toBe('Who did the farming?');
     });
 
+    it('removes a confidence-only side-channel copied into reply text', () => {
+      const leaked = 'Nice work!","confidence":"low"}';
+      expect(stripEmbeddedEnvelopeTail(leaked)).toBe('Nice work!');
+    });
+
     it('leaves ordinary teaching prose about a signals field alone', () => {
       const text =
         'In this example, "signals": means clues that point to an answer.';

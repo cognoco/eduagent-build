@@ -43,6 +43,21 @@ describe('streamEnvelopeReply', () => {
     expect(await collect(stream)).toBe('Hello world');
   });
 
+  it('does not hold ordinary streamed text until flush', async () => {
+    const iterator = streamEnvelopeReply(
+      fromChunks(['{"reply":"Hello', ' world"}']),
+    )[Symbol.asyncIterator]();
+
+    await expect(iterator.next()).resolves.toEqual({
+      done: false,
+      value: 'Hello',
+    });
+    await expect(iterator.next()).resolves.toEqual({
+      done: false,
+      value: ' world',
+    });
+  });
+
   it('decodes JSON escapes (newline, quote, backslash)', async () => {
     const stream = streamEnvelopeReply(
       fromChunks(['{"reply":"line1\\nline2 \\"quoted\\" \\\\end"}']),
@@ -86,6 +101,21 @@ describe('streamEnvelopeReply', () => {
     const stream = streamEnvelopeReply(chunked(raw, 11));
 
     expect(await collect(stream)).toBe('Who did the actual farming?');
+  });
+
+  it('strips a confidence side-channel that the model copied into the reply string', async () => {
+    const raw = JSON.stringify({
+      reply: 'Nice work!","confidence":"low"}',
+      signals: {
+        partial_progress: false,
+        needs_deepening: false,
+        understanding_check: true,
+      },
+      confidence: 'medium',
+    });
+    const stream = streamEnvelopeReply(chunked(raw, 5));
+
+    expect(await collect(stream)).toBe('Nice work!');
   });
 
   it('tolerates whitespace around the colon', async () => {

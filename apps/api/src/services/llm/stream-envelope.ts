@@ -1,4 +1,7 @@
-import { stripEmbeddedEnvelopeTail } from './envelope';
+import {
+  findEmbeddedEnvelopeTailStart,
+  stripEmbeddedEnvelopeTail,
+} from './envelope';
 
 // ---------------------------------------------------------------------------
 // streamEnvelopeReply — incremental extractor that emits only the characters
@@ -47,33 +50,106 @@ interface EmbeddedEnvelopeTailFilter {
 
 function createEmbeddedEnvelopeTailFilter(): EmbeddedEnvelopeTailFilter {
   let pending = '';
+  let tailPending: string | null = null;
   let stopped = false;
-  const holdChars = 48;
+  const maxTailPendingChars = 512;
 
   return {
     push(input: string): string {
       if (stopped || input.length === 0) return '';
 
-      pending += input;
-      const stripped = stripEmbeddedEnvelopeTail(pending);
-      if (stripped !== pending) {
-        stopped = true;
-        pending = '';
-        return stripped;
+      if (tailPending !== null) {
+        tailPending += input;
+        const stripped = stripEmbeddedEnvelopeTail(tailPending);
+        if (stripped !== tailPending) {
+          stopped = true;
+          tailPending = null;
+          return stripped;
+        }
+        if (tailPending.length > maxTailPendingChars) {
+          const out = tailPending;
+          tailPending = null;
+          return out;
+        }
+        return '';
       }
 
-      if (pending.length <= holdChars) return '';
-      const emit = pending.slice(0, -holdChars);
-      pending = pending.slice(-holdChars);
-      return emit;
+      pending += input;
+      const tailStart = findEmbeddedEnvelopeTailStart(pending);
+      if (tailStart >= 0) {
+        const beforeTail = pending.slice(0, tailStart);
+        tailPending = pending.slice(tailStart);
+        pending = '';
+        const stripped = stripEmbeddedEnvelopeTail(tailPending);
+        if (stripped !== tailPending) {
+          stopped = true;
+          tailPending = null;
+          return beforeTail + stripped;
+        }
+        return beforeTail;
+      }
+
+      const prefixStart = findPotentialTailStarterPrefixStart(pending);
+      if (prefixStart >= 0) {
+        const emit = pending.slice(0, prefixStart);
+        pending = pending.slice(prefixStart);
+        return emit;
+      }
+
+      const out = pending;
+      pending = '';
+      return out;
     },
     flush(): string {
       if (stopped) return '';
-      const out = stripEmbeddedEnvelopeTail(pending);
+      const out =
+        (tailPending === null ? '' : stripEmbeddedEnvelopeTail(tailPending)) +
+        pending;
+      tailPending = null;
       pending = '';
       return out;
     },
   };
+}
+
+function findPotentialTailStarterPrefixStart(text: string): number {
+  const lookbehind = Math.min(text.length, 32);
+  const start = text.length - lookbehind;
+  for (let i = start; i < text.length; i += 1) {
+    if (isTailStarterPrefix(text.slice(i))) return i;
+  }
+  return -1;
+}
+
+function isTailStarterPrefix(value: string): boolean {
+  let index = 0;
+  if (!isQuote(value[index])) return false;
+  index += 1;
+  index = skipSpaces(value, index);
+  if (index >= value.length) return true;
+  if (value[index] !== ',') return false;
+  index += 1;
+  index = skipSpaces(value, index);
+  if (index >= value.length) return true;
+  if (!isQuote(value[index])) return false;
+  index += 1;
+
+  const rest = value.slice(index);
+  const keyPart = rest.match(/^[A-Za-z_]*/)?.[0] ?? '';
+  if (keyPart.length !== rest.length) return false;
+  return ['signals', 'ui_hints', 'confidence'].some((key) =>
+    key.startsWith(keyPart),
+  );
+}
+
+function skipSpaces(value: string, start: number): number {
+  let index = start;
+  while (value[index] === ' ' || value[index] === '\t') index += 1;
+  return index;
+}
+
+function isQuote(value: string | undefined): boolean {
+  return value === '"' || value === '\u201c' || value === '\u201d';
 }
 
 function createLiteralEscapeNormalizer(): LiteralEscapeNormalizer {
