@@ -76,7 +76,28 @@ export function ShelfRow({
   const showFinished = isFinished && !needsReview;
 
   return (
-    <View style={{ opacity: isInactive ? 0.65 : 1 }}>
+    <View
+      style={{
+        opacity: isInactive ? 0.65 : 1,
+        marginBottom: 12,
+        position: 'relative',
+      }}
+    >
+      <View
+        testID={`shelf-row-depth-${subjectId}`}
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          left: 12,
+          right: 12,
+          bottom: -4,
+          height: 14,
+          borderRadius: 14,
+          backgroundColor: tint.solid + '24',
+          borderColor: tint.solid + '1F',
+          borderWidth: 1,
+        }}
+      />
       <Pressable
         testID={testID ?? `shelf-row-header-${subjectId}`}
         onPress={() => onPress(subjectId)}
@@ -95,9 +116,19 @@ export function ShelfRow({
         style={{
           flexDirection: 'row',
           alignItems: 'center',
-          paddingVertical: 12,
+          minHeight: 86,
+          paddingVertical: 14,
           paddingHorizontal: 16,
           gap: 12,
+          borderRadius: 16,
+          borderWidth: 1,
+          borderColor: tint.solid + '33',
+          backgroundColor: tint.soft,
+          shadowColor: tint.solid,
+          shadowOffset: { width: 0, height: 5 },
+          shadowOpacity: 0.14,
+          shadowRadius: 8,
+          elevation: 3,
         }}
       >
         <SubjectBookshelfMotif
@@ -105,7 +136,7 @@ export function ShelfRow({
           tint={tint}
         />
 
-        <View style={{ flex: 1 }}>
+        <View style={{ flex: 1, minWidth: 0 }}>
           <Text
             style={{
               fontSize: 15,
@@ -127,6 +158,17 @@ export function ShelfRow({
           >
             {subtitle}
           </Text>
+          <View
+            testID={`shelf-row-rail-${subjectId}`}
+            style={{
+              height: 4,
+              borderRadius: 999,
+              backgroundColor: tint.solid,
+              opacity: 0.42,
+              marginTop: 8,
+              width: '72%',
+            }}
+          />
         </View>
 
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>

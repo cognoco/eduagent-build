@@ -59,18 +59,26 @@ describe('ShelfRow', () => {
     screen.getByTestId('shelf-row-bookshelf-sub-math');
   });
 
-  it('keeps each shelf as a compact horizontal row', () => {
+  it('renders each shelf as a full-width tinted shelf row', () => {
     render(<ShelfRow {...defaultProps} />);
 
     const header = screen.getByTestId('shelf-row-header-sub-math');
     expect(header.props.style).toEqual(
       expect.objectContaining({
         alignItems: 'center',
+        backgroundColor: '#edf3ff',
+        borderColor: '#2f6fbd33',
+        borderRadius: 16,
+        borderWidth: 1,
+        elevation: 3,
         flexDirection: 'row',
-        paddingVertical: 12,
+        minHeight: 86,
+        paddingVertical: 14,
+        shadowColor: '#2f6fbd',
       }),
     );
-    expect(header.props.style).not.toHaveProperty('minHeight');
+    screen.getByTestId('shelf-row-depth-sub-math');
+    screen.getByTestId('shelf-row-rail-sub-math');
   });
 
   it('opens the subject shelf when header is pressed', () => {

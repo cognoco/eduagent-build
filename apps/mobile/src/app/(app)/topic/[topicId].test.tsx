@@ -46,6 +46,7 @@ jest.mock('../../../lib/profile', () => ({
 // ---------------------------------------------------------------------------
 
 const mockPush = jest.fn();
+const mockReplace = jest.fn();
 const mockGoBackOrReplace = jest.fn();
 const mockPushLearningResumeTarget = jest.fn();
 type TopicRouteParams = {
@@ -66,7 +67,7 @@ jest.mock('expo-router', () => ({
     push: mockPush,
     back: jest.fn(),
     canGoBack: jest.fn().mockReturnValue(true),
-    replace: jest.fn(),
+    replace: mockReplace,
   }),
   useLocalSearchParams: () => mockUseLocalSearchParams(),
 }));
@@ -424,7 +425,8 @@ describe('TopicDetailScreen error / empty / missing-params states', () => {
     screen.getByText('Topic not found');
 
     fireEvent.press(screen.getByTestId('topic-detail-missing-params-back'));
-    expect(mockGoBackOrReplace).toHaveBeenCalled();
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
+    expect(mockGoBackOrReplace).not.toHaveBeenCalled();
   });
 
   it('shows empty state when topic data is null after loading', async () => {
@@ -466,7 +468,8 @@ describe('TopicDetailScreen error / empty / missing-params states', () => {
     screen.getByText("We couldn't load this topic");
 
     fireEvent.press(screen.getByTestId('topic-detail-go-back'));
-    expect(mockGoBackOrReplace).toHaveBeenCalled();
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
+    expect(mockGoBackOrReplace).not.toHaveBeenCalled();
   });
 
   it('[F-009] shows loading spinner while resolving subjectId from a deep-link (no subjectId param)', async () => {
@@ -587,7 +590,7 @@ describe('TopicDetailScreen rendering details', () => {
     });
   });
 
-  it('navigates back on back button press', async () => {
+  it('replaces to the library fallback on back when no parent book is present', async () => {
     setupRoutes({ completionStatus: 'completed' });
 
     render(<TopicDetailScreen />, { wrapper: TestWrapper });
@@ -596,10 +599,11 @@ describe('TopicDetailScreen rendering details', () => {
       screen.getByTestId('topic-detail-back');
     });
     fireEvent.press(screen.getByTestId('topic-detail-back'));
-    expect(mockGoBackOrReplace).toHaveBeenCalled();
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
+    expect(mockGoBackOrReplace).not.toHaveBeenCalled();
   });
 
-  it('falls back to the parent book when opened from a book route', async () => {
+  it('replaces to the parent book when opened from a book route', async () => {
     mockUseLocalSearchParams.mockReturnValue({
       subjectId: 's1',
       bookId: 'book-1',
@@ -613,10 +617,11 @@ describe('TopicDetailScreen rendering details', () => {
       screen.getByTestId('topic-detail-back');
     });
     fireEvent.press(screen.getByTestId('topic-detail-back'));
-    expect(mockGoBackOrReplace).toHaveBeenCalledWith(expect.anything(), {
+    expect(mockReplace).toHaveBeenCalledWith({
       pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
       params: { subjectId: 's1', bookId: 'book-1' },
     });
+    expect(mockGoBackOrReplace).not.toHaveBeenCalled();
   });
 
   it('shows "No sessions yet. Start one below!" when sessions are empty', async () => {
@@ -653,6 +658,7 @@ describe('TopicDetailScreen rendering details', () => {
     await waitFor(() => {
       screen.getByText('2 sessions · 2 min total');
     });
+    screen.getByTestId('topic-sessions-list');
   });
 
   it('shows "+ Add your first note for this topic" when no notes exist', async () => {

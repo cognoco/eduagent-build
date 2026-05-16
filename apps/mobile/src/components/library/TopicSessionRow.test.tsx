@@ -119,6 +119,36 @@ describe('TopicSessionRow', () => {
     expect(row.props.accessibilityRole).toBe('button');
   });
 
+  it('keeps the row full-width and horizontal inside a scroll list', () => {
+    render(
+      <TopicSessionRow
+        sessionId="s1"
+        date="May 1"
+        durationSeconds={60}
+        sessionType="Review"
+        onPress={onPress}
+      />,
+    );
+
+    const row = screen.getByTestId('session-row-s1');
+    expect(row.props.style).toEqual(
+      expect.objectContaining({
+        flexDirection: 'row',
+        alignItems: 'center',
+        alignSelf: 'stretch',
+        width: '100%',
+        maxWidth: '100%',
+        overflow: 'hidden',
+      }),
+    );
+    expect(screen.getByTestId('session-row-icon-s1').props.style).toEqual(
+      expect.objectContaining({ flexShrink: 0 }),
+    );
+    expect(screen.getByTestId('session-row-duration-s1').props.style).toEqual(
+      expect.objectContaining({ alignSelf: 'center', flexShrink: 0 }),
+    );
+  });
+
   it('formats 60 seconds as "1 min"', () => {
     render(
       <TopicSessionRow
