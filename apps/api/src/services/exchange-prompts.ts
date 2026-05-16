@@ -24,26 +24,23 @@ import type { ExchangeContext } from './exchanges';
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-export function resolveAgeBracket(birthYear?: number | null): AgeBracket {
-  // Defence-in-depth: unknown birthYear takes the minor-safe path. This
-  // matches the rest of PR-11's sweep (generate-round.ts, relearn.tsx,
-  // mentor-memory.tsx, session-summary) — null/undefined birthYear should
-  // never silently produce adult-framed content.
-  return birthYear == null ? 'adolescent' : computeAgeBracket(birthYear);
+// birthYear is guaranteed non-null by the DB schema (`profiles.birth_year NOT NULL`,
+// migration 0017) and the create-time Zod schema (`birthYearSchema`). The previous
+// nullable signature here silently routed unknown ages to TEEN_VOICE, which produced
+// the "LLM talks to me like a child" symptom for any caller that fell through the
+// `?? null` defensive chain. Tightening the type makes that trap unrepresentable.
+export function resolveAgeBracket(birthYear: number): AgeBracket {
+  return computeAgeBracket(birthYear);
 }
 
 /**
- * Four-tier age-voice mapping. When birthYear is available the function uses
- * fine-grained age bands; when only the bracket is known it falls back to the
- * bracket-based split. Bracket→voice decisions:
- *   'child'      → EARLY_TEEN_VOICE (under-13 learners use the youngest voice)
- *   'adolescent' → TEEN_VOICE       (defence-in-depth: youngest plausible)
- *   'adult'      → ADULT_VOICE      (honours explicit bracket from family_links etc.)
+ * Four-tier age-voice mapping driven directly by `birthYear`. Tiers:
+ *   age < 14 → EARLY_TEEN_VOICE
+ *   age < 18 → TEEN_VOICE
+ *   age < 30 → YOUNG_ADULT_VOICE
+ *   age ≥ 30 → ADULT_VOICE
  */
-export function getAgeVoice(
-  ageBracket: AgeBracket,
-  birthYear?: number | null,
-): string {
+export function getAgeVoice(birthYear: number): string {
   const EARLY_TEEN_VOICE =
     'Communication style: Friendly, curious, and concrete.\n' +
     'Talk to an early teen — short sentences, vivid everyday examples, and one idea at a time.\n' +
@@ -72,29 +69,11 @@ export function getAgeVoice(
     'Draw on analogies from work, life, and broader experience, not school or classrooms.\n' +
     'Never patronise. No emoji, no cheerleading, no "great question!" — just clear teaching.';
 
-  // Fine-grained mapping when birthYear is available (4 tiers, incl. adult split)
-  if (birthYear != null) {
-    const age = new Date().getFullYear() - birthYear;
-    if (age < 14) return EARLY_TEEN_VOICE;
-    if (age < 18) return TEEN_VOICE;
-    if (age < 30) return YOUNG_ADULT_VOICE;
-    return ADULT_VOICE;
-  }
-
-  // Fallback path — bracket-only callers (birthYear unknown).
-  // Known users with birthYear still reach the fine-grained branch above. [B.5]
-  switch (ageBracket) {
-    case 'child':
-      return EARLY_TEEN_VOICE;
-    case 'adolescent':
-      return TEEN_VOICE;
-    case 'adult':
-      return ADULT_VOICE;
-    default: {
-      const exhaustive: never = ageBracket;
-      throw new Error(`Unexpected ageBracket: ${exhaustive}`);
-    }
-  }
+  const age = new Date().getFullYear() - birthYear;
+  if (age < 14) return EARLY_TEEN_VOICE;
+  if (age < 18) return TEEN_VOICE;
+  if (age < 30) return YOUNG_ADULT_VOICE;
+  return ADULT_VOICE;
 }
 
 export function getSessionTypeGuidance(
@@ -426,9 +405,10 @@ export function buildSystemPrompt(context: ExchangeContext): string {
       '- When a fact would help your teaching but you do not have it, either ask one short question or proceed without that fact. Never confabulate.',
   );
 
-  // Persona voice
+  // Persona voice — driven by birthYear (DB-guaranteed non-null since migration 0017).
+  // `ageBracket` is still consumed by `getSessionTypeGuidance` below.
   const ageBracket = resolveAgeBracket(context.birthYear);
-  sections.push(getAgeVoice(ageBracket, context.birthYear));
+  sections.push(getAgeVoice(context.birthYear));
 
   // Learner name — personalise the mentor's voice
   if (safeLearnerName) {

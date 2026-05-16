@@ -19,9 +19,17 @@ describe('getAgeVoiceTierLabel', () => {
     );
   });
 
-  it('falls back to teen label for null birthYear', () => {
-    expect(getAgeVoiceTierLabel(null)).toBe(
-      'teen (14-17): peer-adjacent, brief, sharp',
+  it('returns young-adult label for ages 18-29', () => {
+    const currentYear = new Date().getFullYear();
+    expect(getAgeVoiceTierLabel(currentYear - 25)).toBe(
+      'young adult (18-29): collegial, efficient, no scaffolding',
+    );
+  });
+
+  it('returns adult label for ages 30+', () => {
+    const currentYear = new Date().getFullYear();
+    expect(getAgeVoiceTierLabel(currentYear - 35)).toBe(
+      'adult (30+): crisp, professional, no motivational framing',
     );
   });
 });

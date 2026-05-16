@@ -6,7 +6,7 @@ import { buildFourStrandsPrompt } from './language-prompts';
 import type { ExchangeContext } from './exchanges';
 
 function makeContext(
-  overrides: Partial<ExchangeContext> = {}
+  overrides: Partial<ExchangeContext> = {},
 ): ExchangeContext {
   return {
     sessionId: 'session-1',
@@ -16,6 +16,7 @@ function makeContext(
     escalationRung: 1,
     exchangeHistory: [],
     ...overrides,
+    birthYear: overrides.birthYear ?? new Date().getFullYear() - 14,
   };
 }
 
@@ -40,7 +41,7 @@ describe('buildFourStrandsPrompt', () => {
 
   it('falls back to subjectName when languageCode is null', () => {
     const result = buildFourStrandsPrompt(
-      makeContext({ languageCode: undefined, subjectName: 'My Language' })
+      makeContext({ languageCode: undefined, subjectName: 'My Language' }),
     );
     const joined = result.join('\n');
 
@@ -49,7 +50,7 @@ describe('buildFourStrandsPrompt', () => {
 
   it('falls back to subjectName for unsupported language code', () => {
     const result = buildFourStrandsPrompt(
-      makeContext({ languageCode: 'xx', subjectName: 'Klingon' })
+      makeContext({ languageCode: 'xx', subjectName: 'Klingon' }),
     );
     const joined = result.join('\n');
 
@@ -58,7 +59,7 @@ describe('buildFourStrandsPrompt', () => {
 
   it('includes native language when provided', () => {
     const result = buildFourStrandsPrompt(
-      makeContext({ languageCode: 'fr', nativeLanguage: 'English' })
+      makeContext({ languageCode: 'fr', nativeLanguage: 'English' }),
     );
     const joined = result.join('\n');
 
@@ -77,7 +78,7 @@ describe('buildFourStrandsPrompt', () => {
       makeContext({
         languageCode: 'es',
         knownVocabulary: ['hola', 'buenos días', 'gracias'],
-      })
+      }),
     );
     const joined = result.join('\n');
 
@@ -88,7 +89,7 @@ describe('buildFourStrandsPrompt', () => {
 
   it('handles empty known vocabulary as a hard zero-knowledge signal [BUG-937]', () => {
     const result = buildFourStrandsPrompt(
-      makeContext({ languageCode: 'es', knownVocabulary: [] })
+      makeContext({ languageCode: 'es', knownVocabulary: [] }),
     );
     const joined = result.join('\n');
 
@@ -101,7 +102,7 @@ describe('buildFourStrandsPrompt', () => {
 
   it('handles undefined known vocabulary as a hard zero-knowledge signal [BUG-937]', () => {
     const result = buildFourStrandsPrompt(
-      makeContext({ languageCode: 'es', knownVocabulary: undefined })
+      makeContext({ languageCode: 'es', knownVocabulary: undefined }),
     );
     const joined = result.join('\n');
 
@@ -113,7 +114,7 @@ describe('buildFourStrandsPrompt', () => {
     // Break test: with vocabulary present, the zero-knowledge wording must NOT
     // appear — otherwise the model gets a contradictory signal.
     const result = buildFourStrandsPrompt(
-      makeContext({ languageCode: 'es', knownVocabulary: ['hola', 'gracias'] })
+      makeContext({ languageCode: 'es', knownVocabulary: ['hola', 'gracias'] }),
     );
     const joined = result.join('\n');
 

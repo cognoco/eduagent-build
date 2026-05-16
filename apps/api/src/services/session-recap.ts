@@ -24,7 +24,7 @@ interface RecapInput {
   topicId: string | null;
   subjectId: string;
   exchangeCount: number;
-  birthYear: number | null;
+  birthYear: number;
 }
 
 export interface LearnerRecapResult {
@@ -39,13 +39,13 @@ interface TopicSuggestion {
   title: string;
 }
 
-export function getAgeVoiceTierLabel(birthYear: number | null): string {
-  if (birthYear == null) return 'teen (14-17): peer-adjacent, brief, sharp';
-
+export function getAgeVoiceTierLabel(birthYear: number): string {
   const age = new Date().getFullYear() - birthYear;
-  return age < 14
-    ? 'early teen (11-13): friendly, concrete, warm'
-    : 'teen (14-17): peer-adjacent, brief, sharp';
+  if (age < 14) return 'early teen (11-13): friendly, concrete, warm';
+  if (age < 18) return 'teen (14-17): peer-adjacent, brief, sharp';
+  if (age < 30)
+    return 'young adult (18-29): collegial, efficient, no scaffolding';
+  return 'adult (30+): crisp, professional, no motivational framing';
 }
 
 // [PROMPT-INJECT-2] Prompt-value sanitization now lives in

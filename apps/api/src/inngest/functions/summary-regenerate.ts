@@ -24,7 +24,7 @@ interface SummaryEventPayload {
 function buildSummaryGeneratedEvent(
   payload: SummaryEventPayload,
   sessionSummaryId: string | null,
-  summary: LlmSummary
+  summary: LlmSummary,
 ) {
   return {
     name: 'app/session.summary.generated' as const,
@@ -42,7 +42,7 @@ function buildSummaryGeneratedEvent(
 
 function buildSummaryFailedEvent(
   payload: SummaryEventPayload,
-  sessionSummaryId?: string
+  sessionSummaryId?: string,
 ) {
   return {
     name: 'app/session.summary.failed' as const,
@@ -56,7 +56,7 @@ function buildSummaryFailedEvent(
 }
 
 async function regenerateLearnerRecapForSession(
-  payload: SummaryEventPayload
+  payload: SummaryEventPayload,
 ): Promise<{ status: string }> {
   const db = getStepDatabase();
   const [summaryRow] = await db
@@ -69,8 +69,8 @@ async function regenerateLearnerRecapForSession(
     .where(
       and(
         eq(sessionSummaries.sessionId, payload.sessionId),
-        eq(sessionSummaries.profileId, payload.profileId)
-      )
+        eq(sessionSummaries.profileId, payload.profileId),
+      ),
     )
     .limit(1);
 
@@ -88,8 +88,8 @@ async function regenerateLearnerRecapForSession(
     .where(
       and(
         eq(learningSessions.id, payload.sessionId),
-        eq(learningSessions.profileId, payload.profileId)
-      )
+        eq(learningSessions.profileId, payload.profileId),
+      ),
     )
     .limit(1);
 
@@ -103,13 +103,19 @@ async function regenerateLearnerRecapForSession(
     .where(eq(profiles.id, payload.profileId))
     .limit(1);
 
+  if (!profile) {
+    throw new Error(
+      `[summary-regenerate] Profile not found for profileId=${payload.profileId} — aborting`,
+    );
+  }
+
   const recap = await generateLearnerRecap(db, {
     sessionId: payload.sessionId,
     profileId: payload.profileId,
     topicId: sessionRow.topicId ?? null,
     subjectId: sessionRow.subjectId,
     exchangeCount: sessionRow.exchangeCount ?? 0,
-    birthYear: profile?.birthYear ?? null,
+    birthYear: profile.birthYear,
   });
 
   if (!recap) {
@@ -128,8 +134,8 @@ async function regenerateLearnerRecapForSession(
     .where(
       and(
         eq(sessionSummaries.id, summaryRow.id),
-        eq(sessionSummaries.profileId, payload.profileId)
-      )
+        eq(sessionSummaries.profileId, payload.profileId),
+      ),
     );
 
   return { status: 'completed' };
@@ -151,7 +157,7 @@ export const sessionSummaryCreate = inngest.createFunction(
         payload.sessionId,
         payload.profileId,
         payload.topicId ?? null,
-        'pending'
+        'pending',
       );
 
       const summary = await generateAndStoreLlmSummary(db, {
@@ -179,12 +185,12 @@ export const sessionSummaryCreate = inngest.createFunction(
     if (result.status === 'skipped_no_summary') {
       await step.sendEvent(
         'notify-session-summary-create-failed',
-        buildSummaryFailedEvent(payload, result.summaryId)
+        buildSummaryFailedEvent(payload, result.summaryId),
       );
     } else {
       await step.sendEvent(
         'notify-session-summary-created',
-        buildSummaryGeneratedEvent(payload, result.summaryId, result.summary)
+        buildSummaryGeneratedEvent(payload, result.summaryId, result.summary),
       );
     }
 
@@ -192,7 +198,7 @@ export const sessionSummaryCreate = inngest.createFunction(
       status: result.status,
       summaryId: result.summaryId,
     };
-  }
+  },
 );
 
 export const sessionSummaryRegenerate = inngest.createFunction(
@@ -224,7 +230,7 @@ export const sessionSummaryRegenerate = inngest.createFunction(
     if (!result.summary) {
       await step.sendEvent(
         'notify-session-summary-regenerate-failed',
-        buildSummaryFailedEvent(payload, payload.sessionSummaryId)
+        buildSummaryFailedEvent(payload, payload.sessionSummaryId),
       );
     } else {
       await step.sendEvent(
@@ -232,8 +238,8 @@ export const sessionSummaryRegenerate = inngest.createFunction(
         buildSummaryGeneratedEvent(
           payload,
           payload.sessionSummaryId ?? null,
-          result.summary
-        )
+          result.summary,
+        ),
       );
     }
 
@@ -241,7 +247,7 @@ export const sessionSummaryRegenerate = inngest.createFunction(
       status: result.status,
       regenerated: result.regenerated,
     };
-  }
+  },
 );
 
 export const learnerRecapRegenerate = inngest.createFunction(
@@ -268,5 +274,5 @@ export const learnerRecapRegenerate = inngest.createFunction(
         throw error;
       }
     });
-  }
+  },
 );

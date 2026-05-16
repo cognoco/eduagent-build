@@ -11,6 +11,7 @@ function makeContext(
     sessionType: 'learning',
     escalationRung: 1,
     exchangeHistory: [],
+    birthYear: new Date().getFullYear() - 14,
     ...overrides,
   };
 }
