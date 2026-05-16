@@ -1,3 +1,8 @@
+import {
+  findEmbeddedEnvelopeTailStart,
+  stripEmbeddedEnvelopeTail,
+} from './envelope';
+
 // ---------------------------------------------------------------------------
 // streamEnvelopeReply — incremental extractor that emits only the characters
 // inside the `reply` string of a streaming LLM envelope. The provider stream
@@ -36,6 +41,115 @@ interface LiteralEscapeNormalizer {
   push(input: string): string;
   /** Flush any deferred trailing `\` once the source has drained. */
   flush(): string;
+}
+
+interface EmbeddedEnvelopeTailFilter {
+  push(input: string): string;
+  flush(): string;
+}
+
+function createEmbeddedEnvelopeTailFilter(): EmbeddedEnvelopeTailFilter {
+  let pending = '';
+  let tailPending: string | null = null;
+  let stopped = false;
+  const maxTailPendingChars = 512;
+
+  return {
+    push(input: string): string {
+      if (stopped || input.length === 0) return '';
+
+      if (tailPending !== null) {
+        tailPending += input;
+        const stripped = stripEmbeddedEnvelopeTail(tailPending);
+        if (stripped !== tailPending) {
+          stopped = true;
+          tailPending = null;
+          return stripped;
+        }
+        if (tailPending.length > maxTailPendingChars) {
+          const out = tailPending;
+          tailPending = null;
+          return out;
+        }
+        return '';
+      }
+
+      pending += input;
+      const tailStart = findEmbeddedEnvelopeTailStart(pending);
+      if (tailStart >= 0) {
+        const beforeTail = pending.slice(0, tailStart);
+        tailPending = pending.slice(tailStart);
+        pending = '';
+        const stripped = stripEmbeddedEnvelopeTail(tailPending);
+        if (stripped !== tailPending) {
+          stopped = true;
+          tailPending = null;
+          return beforeTail + stripped;
+        }
+        return beforeTail;
+      }
+
+      const prefixStart = findPotentialTailStarterPrefixStart(pending);
+      if (prefixStart >= 0) {
+        const emit = pending.slice(0, prefixStart);
+        pending = pending.slice(prefixStart);
+        return emit;
+      }
+
+      const out = pending;
+      pending = '';
+      return out;
+    },
+    flush(): string {
+      if (stopped) return '';
+      const out =
+        (tailPending === null ? '' : stripEmbeddedEnvelopeTail(tailPending)) +
+        pending;
+      tailPending = null;
+      pending = '';
+      return out;
+    },
+  };
+}
+
+function findPotentialTailStarterPrefixStart(text: string): number {
+  const lookbehind = Math.min(text.length, 32);
+  const start = text.length - lookbehind;
+  for (let i = start; i < text.length; i += 1) {
+    if (isTailStarterPrefix(text.slice(i))) return i;
+  }
+  return -1;
+}
+
+function isTailStarterPrefix(value: string): boolean {
+  let index = 0;
+  if (!isQuote(value[index])) return false;
+  index += 1;
+  index = skipSpaces(value, index);
+  if (index >= value.length) return true;
+  if (value[index] !== ',') return false;
+  index += 1;
+  index = skipSpaces(value, index);
+  if (index >= value.length) return true;
+  if (!isQuote(value[index])) return false;
+  index += 1;
+
+  const rest = value.slice(index);
+  const keyPart = rest.match(/^[A-Za-z_]*/)?.[0] ?? '';
+  if (keyPart.length !== rest.length) return false;
+  return ['signals', 'ui_hints', 'confidence'].some((key) =>
+    key.startsWith(keyPart),
+  );
+}
+
+function skipSpaces(value: string, start: number): number {
+  let index = start;
+  while (value[index] === ' ' || value[index] === '\t') index += 1;
+  return index;
+}
+
+function isQuote(value: string | undefined): boolean {
+  return value === '"' || value === '\u201c' || value === '\u201d';
 }
 
 function createLiteralEscapeNormalizer(): LiteralEscapeNormalizer {
@@ -204,7 +318,7 @@ export function teeEnvelopeStream(source: AsyncIterable<string>): {
 }
 
 export async function* streamEnvelopeReply(
-  source: AsyncIterable<string>
+  source: AsyncIterable<string>,
 ): AsyncGenerator<string> {
   let buffer = '';
   let state: StreamState = 'find_reply_key';
@@ -212,9 +326,10 @@ export async function* streamEnvelopeReply(
   // Defensive normalizer — removes literal `\n`/`\r`/`\t` leaks from
   // double-escaping LLMs before the chunk reaches the SSE consumer.
   const normalizer = createLiteralEscapeNormalizer();
+  const embeddedTailFilter = createEmbeddedEnvelopeTailFilter();
 
   function emit(text: string): string {
-    return normalizer.push(text);
+    return embeddedTailFilter.push(normalizer.push(text));
   }
 
   for await (const chunk of source) {
@@ -326,6 +441,9 @@ export async function* streamEnvelopeReply(
     const normalized = emit(pendingEscape);
     if (normalized) yield normalized;
   }
-  const flushed = normalizer.flush();
+  const normalizedFlush = normalizer.flush();
+  const filteredFlush = embeddedTailFilter.push(normalizedFlush);
+  if (filteredFlush) yield filteredFlush;
+  const flushed = embeddedTailFilter.flush();
   if (flushed) yield flushed;
 }

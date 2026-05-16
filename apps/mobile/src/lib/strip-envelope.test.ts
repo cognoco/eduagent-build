@@ -38,6 +38,30 @@ describe('stripEnvelopeJson', () => {
       const text = '{"hello": "world"}';
       expect(stripEnvelopeJson(text)).toBe(text);
     });
+
+    it('strips a copied envelope side-channel from prose before rendering', () => {
+      const text =
+        'Who did the actual farming?","signals":{"partial_progress":false,"needs_deepening":false,"understanding_check":true},"ui_hints":{"note_prompt":{"show":false,"post_session":false}}}';
+      expect(stripEnvelopeJson(text)).toBe('Who did the actual farming?');
+    });
+
+    it('strips a confidence-only side-channel from prose before rendering', () => {
+      expect(stripEnvelopeJson('Nice work!","confidence":"low"}')).toBe(
+        'Nice work!',
+      );
+    });
+
+    it('leaves prose that merely teaches about a signals field unchanged', () => {
+      const text =
+        'In this JSON example, "signals": means clues that point to an answer.';
+      expect(stripEnvelopeJson(text)).toBe(text);
+    });
+
+    it('leaves JSON teaching prose about partial_progress unchanged', () => {
+      const text =
+        'For example, "signals":{"partial_progress":false} means we still need more practice.';
+      expect(stripEnvelopeJson(text)).toBe(text);
+    });
   });
 
   describe('full envelope extraction (BUG-941)', () => {
@@ -78,6 +102,19 @@ describe('stripEnvelopeJson', () => {
     it('preserves leading/trailing whitespace boundaries on extracted reply', () => {
       const envelope = '  {"reply":"Trimmed reply","signals":{}}  ';
       expect(stripEnvelopeJson(envelope)).toBe('Trimmed reply');
+    });
+
+    it('strips a copied envelope side-channel from an extracted reply', () => {
+      const envelope = JSON.stringify({
+        reply:
+          'Who did the actual farming?","signals":{"partial_progress":false,"needs_deepening":false,"understanding_check":true},"ui_hints":{"note_prompt":{"show":false,"post_session":false}}}',
+        signals: {
+          partial_progress: false,
+          needs_deepening: false,
+          understanding_check: true,
+        },
+      });
+      expect(stripEnvelopeJson(envelope)).toBe('Who did the actual farming?');
     });
   });
 

@@ -3,6 +3,7 @@ import {
   normalizeReplyText,
   parseEnvelope,
   replyHasLiteralEscape,
+  stripEmbeddedEnvelopeTail,
 } from './envelope';
 
 // [BUG-847] Telemetry helper — the structured logger writes JSON entries to
@@ -38,7 +39,7 @@ describe('parseEnvelope', () => {
 
   it('parses an envelope with signals', () => {
     const result = parseEnvelope(
-      '{"reply": "done", "signals": {"ready_to_finish": true}}'
+      '{"reply": "done", "signals": {"ready_to_finish": true}}',
     );
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -48,7 +49,7 @@ describe('parseEnvelope', () => {
 
   it('extracts the first balanced JSON object when prose surrounds it', () => {
     const result = parseEnvelope(
-      'Here you go: {"reply": "hi", "signals": {"ready_to_finish": false}} trailing prose'
+      'Here you go: {"reply": "hi", "signals": {"ready_to_finish": false}} trailing prose',
     );
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -58,7 +59,7 @@ describe('parseEnvelope', () => {
 
   it('handles strings containing braces without overshooting', () => {
     const result = parseEnvelope(
-      '{"reply": "say {hello}", "signals": {"ready_to_finish": false}}'
+      '{"reply": "say {hello}", "signals": {"ready_to_finish": false}}',
     );
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -189,9 +190,58 @@ describe('parseEnvelope', () => {
     });
   });
 
+  describe('stripEmbeddedEnvelopeTail', () => {
+    it('removes an envelope side-channel copied into reply text', () => {
+      const leaked =
+        'Who did the farming?","signals":{"partial_progress":false,"needs_deepening":false},"ui_hints":{"note_prompt":{"show":false}}}';
+      expect(stripEmbeddedEnvelopeTail(leaked)).toBe('Who did the farming?');
+    });
+
+    it('removes the same leak when smart quotes appear around envelope keys', () => {
+      const leaked =
+        'Who did the farming?”,”signals”:{"partial_progress":false,"needs_deepening":false}';
+      expect(stripEmbeddedEnvelopeTail(leaked)).toBe('Who did the farming?');
+    });
+
+    it('removes a confidence-only side-channel copied into reply text', () => {
+      const leaked = 'Nice work!","confidence":"low"}';
+      expect(stripEmbeddedEnvelopeTail(leaked)).toBe('Nice work!');
+    });
+
+    it('leaves ordinary teaching prose about a signals field alone', () => {
+      const text =
+        'In this example, "signals": means clues that point to an answer.';
+      expect(stripEmbeddedEnvelopeTail(text)).toBe(text);
+    });
+
+    it('leaves JSON teaching prose about partial_progress alone', () => {
+      const text =
+        'For example, "signals":{"partial_progress":false} means we still need more practice.';
+      expect(stripEmbeddedEnvelopeTail(text)).toBe(text);
+    });
+  });
+
+  it('strips embedded envelope side-channel text from a valid reply field', () => {
+    const result = parseEnvelope(
+      JSON.stringify({
+        reply:
+          'Who did the farming?","signals":{"partial_progress":false,"needs_deepening":false},"ui_hints":{"note_prompt":{"show":false}}}',
+        signals: {
+          partial_progress: false,
+          needs_deepening: false,
+          understanding_check: true,
+        },
+      }),
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.envelope.reply).toBe('Who did the farming?');
+    }
+  });
+
   it('accepts ui_hints for upcoming F2.1 / F2.2 migrations', () => {
     const result = parseEnvelope(
-      '{"reply": "noted", "ui_hints": {"note_prompt": {"show": true, "post_session": true}}}'
+      '{"reply": "noted", "ui_hints": {"note_prompt": {"show": true, "post_session": true}}}',
     );
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -211,7 +261,7 @@ describe('parseEnvelope', () => {
         surface: 'filing',
         reason: 'no_json_found',
         rawSnippet: 'just prose, no JSON',
-      })
+      }),
     );
     spy.mockRestore();
   });
@@ -225,7 +275,7 @@ describe('parseEnvelope', () => {
       expect.objectContaining({
         surface: 'exchange.session',
         reason: 'invalid_json',
-      })
+      }),
     );
     spy.mockRestore();
   });
@@ -234,7 +284,7 @@ describe('parseEnvelope', () => {
     const { spy, entries } = captureLoggerWarns();
     parseEnvelope(
       '{"signals": {"ready_to_finish": true}}',
-      'exchange.silent_classify'
+      'exchange.silent_classify',
     );
     const [entry] = entries();
     expect(entry?.message).toBe('llm.envelope.parse_failed');
@@ -242,7 +292,7 @@ describe('parseEnvelope', () => {
       expect.objectContaining({
         surface: 'exchange.silent_classify',
         reason: 'schema_violation',
-      })
+      }),
     );
     spy.mockRestore();
   });
@@ -259,7 +309,7 @@ describe('parseEnvelope', () => {
     parseEnvelope('not json');
     const [entry] = entries();
     expect(entry?.context).toEqual(
-      expect.objectContaining({ surface: 'unknown' })
+      expect.objectContaining({ surface: 'unknown' }),
     );
     spy.mockRestore();
   });
@@ -270,7 +320,7 @@ describe('parseEnvelope', () => {
     parseEnvelope(long, 'filing');
     const [entry] = entries();
     expect(
-      (entry?.context as { rawSnippet?: string })?.rawSnippet?.length
+      (entry?.context as { rawSnippet?: string })?.rawSnippet?.length,
     ).toBe(200);
     spy.mockRestore();
   });

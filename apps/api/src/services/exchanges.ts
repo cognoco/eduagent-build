@@ -8,7 +8,7 @@ import {
   teeEnvelopeStream,
 } from './llm';
 import { applyAppHelpSignalGuard, isAppHelpQuery } from './app-help-map';
-import { normalizeReplyText } from './llm/envelope';
+import { normalizeReplyText, stripEmbeddedEnvelopeTail } from './llm/envelope';
 import type {
   ChatMessage,
   EscalationRung,
@@ -501,7 +501,9 @@ function clampDrillDuration(seconds: number): number {
 }
 
 function parsedFromVisibleFallbackText(text: string): ParsedExchangeEnvelope {
-  const cleanResponse = stripPhoneticHints(normalizeReplyText(text).trim());
+  const cleanResponse = stripPhoneticHints(
+    stripEmbeddedEnvelopeTail(normalizeReplyText(text)).trim(),
+  );
   return {
     ...EMPTY_PARSED_ENVELOPE,
     cleanResponse,
@@ -544,7 +546,7 @@ export function parseExchangeEnvelope(
     const replyCandidate = extractReplyCandidate(response);
     const fallbackText =
       replyCandidate && replyCandidate.length > 0
-        ? normalizeReplyText(replyCandidate)
+        ? stripEmbeddedEnvelopeTail(normalizeReplyText(replyCandidate))
         : response.trim();
     return {
       // [BUG-865] Strip TTS pronunciation hints from chat-visible text.

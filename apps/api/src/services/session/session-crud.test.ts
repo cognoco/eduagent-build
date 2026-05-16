@@ -119,6 +119,20 @@ describe('projectAiResponseContent', () => {
     expect(projectAiResponseContent(text)).toBe(text);
   });
 
+  it('strips an embedded envelope side-channel from already-persisted prose', () => {
+    const leaked =
+      'Who did the actual farming?","signals":{"partial_progress":false,"needs_deepening":false,"understanding_check":true},"ui_hints":{"note_prompt":{"show":false,"post_session":false}}}';
+    expect(projectAiResponseContent(leaked)).toBe(
+      'Who did the actual farming?',
+    );
+  });
+
+  it('leaves prose that merely teaches about a signals field unchanged', () => {
+    const text =
+      'In this JSON example, "signals": means clues that point to an answer.';
+    expect(projectAiResponseContent(text)).toBe(text);
+  });
+
   // ---- [I-2] Markdown-fence leak protection --------------------------------
 
   it('[I-2] strips full envelope JSON wrapped in markdown ```json fence', () => {

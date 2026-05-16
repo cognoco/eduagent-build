@@ -38,10 +38,17 @@ if (!match) {
 // The shell regex uses POSIX ERE which JS RegExp accepts for these constructs.
 // We unescape the shell-escaped backslashes (\\. -> \.) and rebuild as JS RegExp.
 const promptRegex = new RegExp(match[1]);
-const testFilter = /\.test\.ts$/;
+const excludeMatch = hookSrc.match(/\| grep -vE '([^']+)'/);
+if (!excludeMatch) {
+  throw new Error(
+    'Could not locate PROMPT_CHANGED exclusion regex in .husky/pre-commit. ' +
+      'The test parser must be updated alongside any restructuring of the hook.',
+  );
+}
+const promptExcludeRegex = new RegExp(excludeMatch[1]);
 
 function isPromptFile(path: string): boolean {
-  return promptRegex.test(path) && !testFilter.test(path);
+  return promptRegex.test(path) && !promptExcludeRegex.test(path);
 }
 
 describe('[BUG-45] pre-commit eval-harness guard regex', () => {
@@ -49,7 +56,6 @@ describe('[BUG-45] pre-commit eval-harness guard regex', () => {
     const SHOULD_MATCH = [
       // top-level llm/
       'apps/api/src/services/llm/router.ts',
-      'apps/api/src/services/llm/envelope.ts',
       'apps/api/src/services/llm/sanitize.ts',
       // nested llm/providers/* — this was the gap
       'apps/api/src/services/llm/providers/anthropic.ts',
@@ -76,6 +82,10 @@ describe('[BUG-45] pre-commit eval-harness guard regex', () => {
       'apps/api/src/services/llm/providers/anthropic.test.ts',
       'apps/api/src/services/dictation/generate.test.ts',
       'apps/api/src/services/interview/interview-prompts.test.ts',
+      // parser/projector-only LLM infrastructure does not affect prompt snapshots
+      'apps/api/src/services/llm/envelope.ts',
+      'apps/api/src/services/llm/project-response.ts',
+      'apps/api/src/services/llm/stream-envelope.ts',
       // unrelated service code
       'apps/api/src/services/dictation/result.ts',
       'apps/api/src/services/notes.ts',

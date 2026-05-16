@@ -91,6 +91,34 @@ export function normalizeReplyText(text: string): string {
     .replace(/\\t/g, '\t');
 }
 
+const EMBEDDED_ENVELOPE_TAIL_RE =
+  /["\u201c\u201d]\s*,\s*["\u201c\u201d](?:signals|ui_hints|confidence)["\u201c\u201d]\s*:/;
+const EMBEDDED_ENVELOPE_CONFIRM_RE =
+  /["\u201c\u201d](?:partial_progress|needs_deepening|understanding_check|ready_to_finish|retrieval_score|note_prompt|post_session|fluency_drill|confidence)["\u201c\u201d]\s*:/;
+
+/**
+ * Some live models occasionally copy the envelope side-channel back into the
+ * learner-visible `reply` string, yielding text like:
+ *
+ *   Nice work.","signals":{"partial_progress":false,...}
+ *
+ * The outer envelope can still be valid JSON, so schema parsing alone cannot
+ * catch it. Strip the embedded side-channel tail while preserving plain prose.
+ */
+export function stripEmbeddedEnvelopeTail(text: string): string {
+  const match = EMBEDDED_ENVELOPE_TAIL_RE.exec(text);
+  if (!match) return text;
+
+  const tail = text.slice(match.index);
+  if (!EMBEDDED_ENVELOPE_CONFIRM_RE.test(tail)) return text;
+
+  return text.slice(0, match.index).replace(/[ \t]+$/g, '');
+}
+
+export function findEmbeddedEnvelopeTailStart(text: string): number {
+  return EMBEDDED_ENVELOPE_TAIL_RE.exec(text)?.index ?? -1;
+}
+
 function parseEnvelopeRaw(response: string): ParseEnvelopeResult {
   const jsonStr = extractFirstJsonObject(response);
   if (!jsonStr) {
@@ -118,7 +146,7 @@ function parseEnvelopeRaw(response: string): ParseEnvelopeResult {
   // persists the reply. Idempotent for well-behaved LLM output.
   const envelope: LlmResponseEnvelope = {
     ...result.data,
-    reply: normalizeReplyText(result.data.reply),
+    reply: stripEmbeddedEnvelopeTail(normalizeReplyText(result.data.reply)),
   };
 
   return { ok: true, envelope };
@@ -137,7 +165,7 @@ export interface ParseEnvelopeOptions {
 export function parseEnvelope(
   response: string,
   surface: EnvelopeSurface = 'unknown',
-  options: ParseEnvelopeOptions = {}
+  options: ParseEnvelopeOptions = {},
 ): ParseEnvelopeResult {
   const result = parseEnvelopeRaw(response);
   if (!result.ok && !options.silent) {

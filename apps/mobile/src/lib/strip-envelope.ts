@@ -41,6 +41,21 @@ const KNOWN_ENVELOPE_KEYS = new Set(['reply', 'signals', 'ui_hints']);
  */
 const REQUIRED_ENVELOPE_SIBLINGS = new Set(['signals', 'ui_hints']);
 
+const EMBEDDED_ENVELOPE_TAIL_RE =
+  /["\u201c\u201d]\s*,\s*["\u201c\u201d](?:signals|ui_hints|confidence)["\u201c\u201d]\s*:/;
+const EMBEDDED_ENVELOPE_CONFIRM_RE =
+  /["\u201c\u201d](?:partial_progress|needs_deepening|understanding_check|ready_to_finish|retrieval_score|note_prompt|post_session|fluency_drill|confidence)["\u201c\u201d]\s*:/;
+
+function stripEmbeddedEnvelopeTail(text: string): string {
+  const match = EMBEDDED_ENVELOPE_TAIL_RE.exec(text);
+  if (!match) return text;
+
+  const tail = text.slice(match.index);
+  if (!EMBEDDED_ENVELOPE_CONFIRM_RE.test(tail)) return text;
+
+  return text.slice(0, match.index).replace(/[ \t]+$/g, '');
+}
+
 /**
  * Strip a leading/trailing markdown code fence from `text` if present.
  * Handles: ```json … ```, ```typescript … ```, ``` … ```.
@@ -74,7 +89,7 @@ export function stripEnvelopeJson(rawContent: string): string {
 
   // Cheap pre-check — avoid JSON.parse work on plain prose.
   if (!trimmed.startsWith('{') || !trimmed.includes('"reply"')) {
-    return rawContent;
+    return stripEmbeddedEnvelopeTail(rawContent);
   }
 
   let parsed: unknown;
@@ -102,7 +117,7 @@ export function stripEnvelopeJson(rawContent: string): string {
     Object.keys(parsed as object).every((k) => KNOWN_ENVELOPE_KEYS.has(k)) &&
     Object.keys(parsed as object).some((k) => REQUIRED_ENVELOPE_SIBLINGS.has(k))
   ) {
-    return (parsed as { reply: string }).reply;
+    return stripEmbeddedEnvelopeTail((parsed as { reply: string }).reply);
   }
 
   return rawContent;
