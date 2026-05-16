@@ -10,6 +10,7 @@ import {
   getBookSessionsResponseSchema,
   moveTopicResponseSchema,
   ERROR_CODES,
+  type BookTopicGenerationResult,
 } from '@eduagent/schemas';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
@@ -24,6 +25,7 @@ import {
 } from '../services/curriculum';
 import { getBookSessions } from '../services/session';
 import { generateBookTopics } from '../services/book-generation';
+import { buildFallbackBookTopics } from '../services/book-generation-fallbacks';
 import { getProfileAge } from '../services/profile';
 import { inngest } from '../inngest/client';
 import { captureException } from '../services/sentry';
@@ -73,7 +75,7 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
         }
         throw error;
       }
-    }
+    },
   )
   .get(
     '/subjects/:subjectId/books/:bookId',
@@ -95,7 +97,7 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
         }
         throw error;
       }
-    }
+    },
   )
   .post(
     '/subjects/:subjectId/books/:bookId/generate-topics',
@@ -114,7 +116,7 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
           db,
           profileId,
           subjectId,
-          bookId
+          bookId,
         );
 
         if (!claimed) {
@@ -123,7 +125,7 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
             db,
             profileId,
             subjectId,
-            bookId
+            bookId,
           );
           if (!existing) {
             return notFound(c, 'Book not found');
@@ -133,12 +135,29 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
 
         const learnerAge = await getProfileAge(db, profileId);
 
-        const generated = await generateBookTopics(
-          claimed.title,
-          claimed.description ?? '',
-          learnerAge,
-          priorKnowledge
-        );
+        let generated: BookTopicGenerationResult;
+        try {
+          generated = await generateBookTopics(
+            claimed.title,
+            claimed.description ?? '',
+            learnerAge,
+            priorKnowledge,
+          );
+        } catch (error) {
+          captureException(error, {
+            profileId,
+            extra: {
+              phase: 'book_topic_generation_fallback',
+              subjectId,
+              bookId,
+              bookTitle: claimed.title,
+            },
+          });
+          generated = buildFallbackBookTopics(
+            claimed.title,
+            claimed.description ?? '',
+          );
+        }
 
         const persisted = await persistBookTopics(
           db,
@@ -146,7 +165,7 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
           subjectId,
           bookId,
           generated.topics,
-          generated.connections
+          generated.connections,
         );
 
         // Fire-and-forget: pre-generate next books in background.
@@ -176,7 +195,7 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
         }
         throw error;
       }
-    }
+    },
   )
   .get(
     '/subjects/:subjectId/books/:bookId/sessions',
@@ -188,7 +207,7 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
 
       const sessions = await getBookSessions(db, profileId, bookId);
       return c.json(getBookSessionsResponseSchema.parse({ sessions }));
-    }
+    },
   )
   // Move a topic from its current book to a different book within the same shelf.
   // Used by the long-press "Move to different book" action on the Book screen.
@@ -200,7 +219,7 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
         subjectId: z.string().uuid(),
         bookId: z.string().uuid(),
         topicId: z.string().uuid(),
-      })
+      }),
     ),
     zValidator('json', z.object({ targetBookId: z.string().uuid() })),
     async (c) => {
@@ -216,7 +235,7 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
           c,
           400,
           ERROR_CODES.VALIDATION_ERROR,
-          'Topic is already in this book.'
+          'Topic is already in this book.',
         );
       }
 
@@ -227,10 +246,10 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
           subjectId,
           bookId,
           topicId,
-          targetBookId
+          targetBookId,
         );
         return c.json(
-          moveTopicResponseSchema.parse({ moved: true, topicId, targetBookId })
+          moveTopicResponseSchema.parse({ moved: true, topicId, targetBookId }),
         );
       } catch (error) {
         if (error instanceof NotFoundError) {
@@ -238,5 +257,5 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
         }
         throw error;
       }
-    }
+    },
   );

@@ -221,6 +221,8 @@ export const summaryStatusSchema = z.enum([
 ]);
 export type SummaryStatus = z.infer<typeof summaryStatusSchema>;
 
+export const MIN_EXCHANGES_FOR_TOPIC_COMPLETION = 3;
+
 export const escalationRungSchema = z.number().int().min(1).max(5);
 export type EscalationRung = z.infer<typeof escalationRungSchema>;
 

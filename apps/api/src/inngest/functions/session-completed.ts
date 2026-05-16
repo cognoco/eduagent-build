@@ -482,33 +482,10 @@ export const sessionCompleted = inngest.createFunction(
     const completionQualityRating =
       derivedQualityRating ?? (event.data.qualityRating as number | undefined);
 
-    // F-8/F-9: For relearn sessions closed without a summary, SM-2 was
-    // silently skipped, leaving reset cards stuck at intervalDays=1 forever.
-    // Apply a conservative fallback quality=3 ("correct with difficulty") when
-    // no explicit rating is available, UNLESS the session ended without any
-    // user action (e.g. stale-cleanup cron). In that case no learning occurred
-    // and we should not advance the card.
-    //
-    // Verified close reasons via grep (apps/api/src/services/session/session-crud.ts:390,
-    // apps/mobile/src/app/(app)/session/use-session-actions.ts:349):
-    //   'silence_timeout' — stale-cleanup cron (30 min idle, no user action)
-    //   'user_ended'      — user explicitly ended the session
-    let effectiveQuality = completionQualityRating;
-    if (effectiveQuality == null) {
-      const closeReason = event.data.reason as string | undefined;
-      if (
-        closeReason &&
-        (UNATTENDED_REASONS as readonly string[]).includes(closeReason)
-      ) {
-        // No quality signal — session ended without user action, skip SM-2.
-      } else if (retentionTopicIds.length > 0 && (exchangeCount ?? 0) > 0) {
-        // User-closed session with at least one exchange but no summary
-        // (e.g., skipped or crash). Use conservative quality=3 to advance
-        // relearn cards out of reset. Zero-exchange sessions have no learning
-        // signal — skip SM-2 entirely.
-        effectiveQuality = 3;
-      }
-    }
+    // Only explicit quality signals advance SM-2. A user-ended, skipped, or
+    // crash-recovered session with a couple of exchanges is activity, but not
+    // proof that the topic was learned.
+    const effectiveQuality = completionQualityRating;
 
     // Step 1a: Relearn retention reset — must run BEFORE SM-2 update.
     // Pre-redesign, startRelearn reset the card at session start; SM-2 then
@@ -528,6 +505,7 @@ export const sessionCompleted = inngest.createFunction(
         if (
           sessionMode !== 'relearn' ||
           (exchangeCount ?? 0) <= 0 ||
+          effectiveQuality == null ||
           !topicId
         ) {
           return {
@@ -563,9 +541,6 @@ export const sessionCompleted = inngest.createFunction(
     // Step 1b: Update retention data via SM-2
     // Conservative: skip retention update when no quality rating was provided,
     // rather than defaulting to 3 (which inflates metrics). Issue #19.
-    // F-8/F-9: effectiveQuality applies a fallback=3 for user-closed sessions
-    // without a summary so relearn cards are not stuck at intervalDays=1
-    // after the relearn-retention-reset above.
     outcomes.push(
       await step.run('update-retention', async () => {
         if (retentionTopicIds.length === 0)

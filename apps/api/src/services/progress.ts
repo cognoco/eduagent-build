@@ -26,6 +26,11 @@ import type {
 } from '@eduagent/schemas';
 import { getPracticeActivitySummary } from './practice-activity-summary';
 import { computeDaysSinceLastReview } from './retention-data';
+import {
+  addTopicCompletion,
+  isAcceptedSummaryStatus,
+  isMeaningfulCompletedSession,
+} from './topic-completion';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -66,11 +71,13 @@ function computeAggregateRetentionStatus(
 
 function computeCompletionStatus(
   sessionCount: number,
+  hasCompletedSessionSignal: boolean,
   assessment: { status: string; masteryScore: number | null } | undefined,
   retentionCard: { xpStatus: string; nextReviewAt: Date | null } | undefined,
 ): 'not_started' | 'in_progress' | 'completed' | 'verified' | 'stable' {
   if (retentionCard?.xpStatus === 'verified') return 'verified';
   if (assessment?.status === 'passed') return 'completed';
+  if (hasCompletedSessionSignal) return 'completed';
   if (sessionCount > 0 || assessment) return 'in_progress';
   return 'not_started';
 }
@@ -156,18 +163,27 @@ export async function getSubjectProgress(
     ),
   );
 
-  // [BUG-LIB-TOPICS] A completed session on a curriculum topic also counts as
-  // completion — matches the book-view semantic (services/curriculum.ts
-  // computeBookStatusesBatch). Without this, library showed 0/N while the book
-  // screen showed 1/N for the same topic after a session finished.
+  const sessionIds = sessions.map((session) => session.id);
+  const sessionSummaryRows =
+    sessionIds.length > 0
+      ? await repo.sessionSummaries.findMany(
+          inArray(sessionSummaries.sessionId, sessionIds),
+        )
+      : [];
+  const acceptedSummarySessionIds = new Set(
+    sessionSummaryRows
+      .filter((summary) => isAcceptedSummaryStatus(summary.status))
+      .map((summary) => summary.sessionId),
+  );
+
+  // A topic counts as complete only after a meaningful terminal session, an
+  // accepted summary, a passed assessment, or verified retention.
   const curriculumTopicIds = new Set(topics.map((t) => t.id));
   for (const session of sessions) {
-    if (
-      session.topicId &&
-      curriculumTopicIds.has(session.topicId) &&
-      (session.status === 'completed' || session.status === 'auto_closed')
-    ) {
-      completedTopics.add(session.topicId);
+    if (isMeaningfulCompletedSession(session)) {
+      addTopicCompletion(completedTopics, session.topicId, curriculumTopicIds);
+    } else if (acceptedSummarySessionIds.has(session.id)) {
+      addTopicCompletion(completedTopics, session.topicId, curriculumTopicIds);
     }
   }
 
@@ -258,15 +274,27 @@ export async function getTopicProgress(
     (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
   );
   const lastTopicSession = sortedSessions[0];
+  const topicSessionIds = topicSessions.map((session) => session.id);
+  const topicSummaryRows =
+    topicSessionIds.length > 0
+      ? await repo.sessionSummaries.findMany(
+          inArray(sessionSummaries.sessionId, topicSessionIds),
+        )
+      : [];
+  const summaryBySessionId = new Map(
+    topicSummaryRows.map((summary) => [summary.sessionId, summary]),
+  );
   const summaryRow =
     lastTopicSession != null
-      ? await repo.sessionSummaries.findFirst(
-          eq(sessionSummaries.sessionId, lastTopicSession.id),
-        )
+      ? summaryBySessionId.get(lastTopicSession.id)
       : undefined;
+  const hasCompletedSessionSignal =
+    topicSessions.some(isMeaningfulCompletedSession) ||
+    topicSummaryRows.some((summary) => isAcceptedSummaryStatus(summary.status));
 
   const completionStatus = computeCompletionStatus(
     topicSessions.length,
+    hasCompletedSessionSignal,
     latestAssessment
       ? {
           status: latestAssessment.status,
@@ -432,6 +460,20 @@ export async function getOverallProgress(
           ),
         )
       : [];
+  const allSessionSummaries =
+    allSessions.length > 0
+      ? await repo.sessionSummaries.findMany(
+          inArray(
+            sessionSummaries.sessionId,
+            allSessions.map((session) => session.id),
+          ),
+        )
+      : [];
+  const acceptedSummarySessionIds = new Set(
+    allSessionSummaries
+      .filter((summary) => isAcceptedSummaryStatus(summary.status))
+      .map((summary) => summary.sessionId),
+  );
 
   const sessionsBySubject = new Map<string, typeof allSessions>();
   for (const session of allSessions) {
@@ -485,18 +527,22 @@ export async function getOverallProgress(
     // Last session
     const subjectSessions = sessionsBySubject.get(subject.id) ?? [];
 
-    // [BUG-LIB-TOPICS] A completed session on a curriculum topic also counts
-    // as completion — matches the book-view semantic in
-    // services/curriculum.ts:computeBookStatusesBatch. Keeps the library card
-    // aligned with what the book screen shows.
+    // Session-derived completion uses the same strict meaning as book status:
+    // enough terminal exchange depth or an accepted summary.
     const curriculumTopicIds = new Set(topics.map((t) => t.id));
     for (const session of subjectSessions) {
-      if (
-        session.topicId &&
-        curriculumTopicIds.has(session.topicId) &&
-        (session.status === 'completed' || session.status === 'auto_closed')
-      ) {
-        completedTopics.add(session.topicId);
+      if (isMeaningfulCompletedSession(session)) {
+        addTopicCompletion(
+          completedTopics,
+          session.topicId,
+          curriculumTopicIds,
+        );
+      } else if (acceptedSummarySessionIds.has(session.id)) {
+        addTopicCompletion(
+          completedTopics,
+          session.topicId,
+          curriculumTopicIds,
+        );
       }
     }
 
@@ -618,10 +664,8 @@ export async function getTopicProgressBatch(
     xpByTopic.set(x.topicId, list);
   }
 
-  // Batch-fetch session summaries for the most recent session of each topic.
-  // Sessions from findMany arrive in DB insertion order, so we must sort by
-  // createdAt to pick the genuinely most-recent session per topic.
-  const lastSessionIds: string[] = [];
+  // Batch-fetch summaries for all topic sessions. We use all summaries for
+  // completion signals, and the latest session's summary for the excerpt.
   const lastSessionByTopic = new Map<string, string>();
   for (const topic of topics) {
     const topicSessions = sessionsByTopic.get(topic.id) ?? [];
@@ -630,15 +674,15 @@ export async function getTopicProgressBatch(
     );
     const last = sorted[0];
     if (last) {
-      lastSessionIds.push(last.id);
       lastSessionByTopic.set(topic.id, last.id);
     }
   }
 
+  const allSessionIds = allSessions.map((session) => session.id);
   const allSummaries =
-    lastSessionIds.length > 0
+    allSessionIds.length > 0
       ? await repo.sessionSummaries.findMany(
-          inArray(sessionSummaries.sessionId, lastSessionIds),
+          inArray(sessionSummaries.sessionId, allSessionIds),
         )
       : [];
   const summaryBySessionId = new Map(allSummaries.map((s) => [s.sessionId, s]));
@@ -667,9 +711,15 @@ export async function getTopicProgressBatch(
     const summaryRow = lastSessionId
       ? summaryBySessionId.get(lastSessionId)
       : undefined;
+    const hasCompletedSessionSignal =
+      topicSessions.some(isMeaningfulCompletedSession) ||
+      topicSessions.some((session) =>
+        isAcceptedSummaryStatus(summaryBySessionId.get(session.id)?.status),
+      );
 
     const completionStatus = computeCompletionStatus(
       topicSessions.length,
+      hasCompletedSessionSignal,
       latestAssessment
         ? {
             status: latestAssessment.status,

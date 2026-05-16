@@ -10,6 +10,46 @@ jest.mock('./llm' /* gc1-allow: pattern-a conversion */, () => {
 
 import { detectSubjectType, generateBookTopics } from './book-generation';
 
+function generatedBookTopicsFixture() {
+  return [
+    {
+      title: 'Timeline',
+      description: 'How it all began',
+      chapter: 'The Story',
+      sortOrder: 1,
+      estimatedMinutes: 30,
+    },
+    {
+      title: 'Old Kingdom',
+      description: 'The age of pyramids',
+      chapter: 'The Story',
+      sortOrder: 2,
+      estimatedMinutes: 30,
+    },
+    {
+      title: 'Pyramids',
+      description: 'How were they built?',
+      chapter: 'Monuments',
+      sortOrder: 3,
+      estimatedMinutes: 25,
+    },
+    {
+      title: 'Daily Life',
+      description: 'What ordinary people did each day',
+      chapter: 'Society',
+      sortOrder: 4,
+      estimatedMinutes: 25,
+    },
+    {
+      title: 'Legacy',
+      description: 'Why Ancient Egypt still matters',
+      chapter: 'Society',
+      sortOrder: 5,
+      estimatedMinutes: 20,
+    },
+  ];
+}
+
 describe('book-generation', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -125,29 +165,7 @@ describe('book-generation', () => {
     it('generates topics with chapters and connections', async () => {
       mockRouteAndCall.mockResolvedValueOnce({
         response: JSON.stringify({
-          topics: [
-            {
-              title: 'Timeline',
-              description: 'How it all began',
-              chapter: 'The Story',
-              sortOrder: 1,
-              estimatedMinutes: 30,
-            },
-            {
-              title: 'Old Kingdom',
-              description: 'The age of pyramids',
-              chapter: 'The Story',
-              sortOrder: 2,
-              estimatedMinutes: 30,
-            },
-            {
-              title: 'Pyramids',
-              description: 'How were they built?',
-              chapter: 'Monuments',
-              sortOrder: 3,
-              estimatedMinutes: 25,
-            },
-          ],
+          topics: generatedBookTopicsFixture(),
           connections: [{ topicA: 'Old Kingdom', topicB: 'Pyramids' }],
         }),
         provider: 'mock',
@@ -162,7 +180,7 @@ describe('book-generation', () => {
         11,
       );
 
-      expect(result.topics).toHaveLength(3);
+      expect(result.topics).toHaveLength(5);
       expect(result.topics[0]?.chapter).toBe('The Story');
       expect(result.connections).toHaveLength(1);
       expect(result.connections[0]?.topicA).toBe('Old Kingdom');
@@ -170,7 +188,10 @@ describe('book-generation', () => {
 
     it('passes prior knowledge through to the LLM prompt', async () => {
       mockRouteAndCall.mockResolvedValueOnce({
-        response: JSON.stringify({ topics: [], connections: [] }),
+        response: JSON.stringify({
+          topics: generatedBookTopicsFixture(),
+          connections: [],
+        }),
         provider: 'mock',
         model: 'mock-model',
         latencyMs: 12,
@@ -222,7 +243,10 @@ describe('book-generation', () => {
 
     it('asks for adult-appropriate book topic naming when the learner is adult', async () => {
       mockRouteAndCall.mockResolvedValueOnce({
-        response: JSON.stringify({ topics: [], connections: [] }),
+        response: JSON.stringify({
+          topics: generatedBookTopicsFixture(),
+          connections: [],
+        }),
         provider: 'mock',
         model: 'mock-model',
         latencyMs: 12,
@@ -421,6 +445,43 @@ describe('book-generation', () => {
       ).rejects.toThrow('LLM returned unexpected book topic structure');
     });
 
+    it('throws when the generated book is too thin', async () => {
+      mockRouteAndCall.mockResolvedValueOnce({
+        response: JSON.stringify({
+          topics: generatedBookTopicsFixture().slice(0, 2),
+          connections: [],
+        }),
+        provider: 'mock',
+        model: 'mock-model',
+        latencyMs: 12,
+        stopReason: 'stop',
+      });
+
+      await expect(
+        generateBookTopics('Ancient Egypt', 'Explore pyramids', 11),
+      ).rejects.toThrow('LLM returned unexpected book topic structure');
+    });
+
+    it('throws when generated topics all belong to one chapter', async () => {
+      mockRouteAndCall.mockResolvedValueOnce({
+        response: JSON.stringify({
+          topics: generatedBookTopicsFixture().map((topic) => ({
+            ...topic,
+            chapter: 'Only Chapter',
+          })),
+          connections: [],
+        }),
+        provider: 'mock',
+        model: 'mock-model',
+        latencyMs: 12,
+        stopReason: 'stop',
+      });
+
+      await expect(
+        generateBookTopics('Ancient Egypt', 'Explore pyramids', 11),
+      ).rejects.toThrow('LLM returned unexpected book topic structure');
+    });
+
     it('throws on schema validation failure — missing connections array', async () => {
       mockRouteAndCall.mockResolvedValueOnce({
         response: JSON.stringify({
@@ -451,15 +512,7 @@ describe('book-generation', () => {
         response:
           'Sure! Here is the curriculum:\n' +
           JSON.stringify({
-            topics: [
-              {
-                title: 'Timeline',
-                description: 'How it all began',
-                chapter: 'The Story',
-                sortOrder: 1,
-                estimatedMinutes: 30,
-              },
-            ],
+            topics: generatedBookTopicsFixture(),
             connections: [],
           }) +
           '\nLet me know if you need changes.',
@@ -474,7 +527,7 @@ describe('book-generation', () => {
         'Explore pyramids',
         11,
       );
-      expect(result.topics).toHaveLength(1);
+      expect(result.topics).toHaveLength(5);
       expect(result.topics[0]?.title).toBe('Timeline');
     });
 

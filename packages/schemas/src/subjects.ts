@@ -177,6 +177,7 @@ export const bookWithTopicsSchema = z.object({
   connections: z.array(topicConnectionSchema),
   status: bookProgressStatusSchema,
   completedTopicCount: z.number().int().optional(),
+  completedTopicIds: z.array(z.string().uuid()).optional(),
 });
 export type BookWithTopics = z.infer<typeof bookWithTopicsSchema>;
 
@@ -239,10 +240,31 @@ export const bookGenerationResultSchema = z.discriminatedUnion('type', [
 ]);
 export type BookGenerationResult = z.infer<typeof bookGenerationResultSchema>;
 
-export const bookTopicGenerationResultSchema = z.object({
-  topics: z.array(generatedBookTopicSchema),
-  connections: z.array(generatedConnectionSchema),
-});
+export const MIN_GENERATED_BOOK_TOPICS = 5;
+export const MAX_GENERATED_BOOK_TOPICS = 15;
+export const MIN_GENERATED_BOOK_CHAPTERS = 2;
+
+export const bookTopicGenerationResultSchema = z
+  .object({
+    topics: z
+      .array(generatedBookTopicSchema)
+      .min(MIN_GENERATED_BOOK_TOPICS)
+      .max(MAX_GENERATED_BOOK_TOPICS),
+    connections: z.array(generatedConnectionSchema),
+  })
+  .superRefine((value, ctx) => {
+    const chapterCount = new Set(
+      value.topics.map((topic) => topic.chapter.trim().toLowerCase()),
+    ).size;
+
+    if (chapterCount < MIN_GENERATED_BOOK_CHAPTERS) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['topics'],
+        message: `Generated books need at least ${MIN_GENERATED_BOOK_CHAPTERS} chapters.`,
+      });
+    }
+  });
 export type BookTopicGenerationResult = z.infer<
   typeof bookTopicGenerationResultSchema
 >;
@@ -543,6 +565,7 @@ export const bookSessionSchema = z.object({
   topicId: z.string().uuid().nullable(),
   topicTitle: z.string(),
   chapter: z.string().nullable(),
+  exchangeCount: z.number().int().min(0),
   createdAt: isoDateField,
 });
 export type BookSession = z.infer<typeof bookSessionSchema>;

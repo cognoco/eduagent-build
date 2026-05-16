@@ -9,6 +9,7 @@ export interface BookSession {
   topicId: string | null;
   topicTitle: string;
   chapter: string | null;
+  exchangeCount: number;
   createdAt: string;
 }
 

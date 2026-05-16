@@ -745,28 +745,26 @@ describe('sessionCompleted', () => {
       expect(retentionOutcome.status).toBe('skipped');
     });
 
-    it('uses fallback quality=3 when no qualityRating and session has topicId and reason is user_ended (F-8)', async () => {
-      await executeSteps(createEventData({ reason: 'user_ended' }));
+    it('skips retention update when no qualityRating and reason is user_ended (STATUS-STRICT)', async () => {
+      const { result } = (await executeSteps(
+        createEventData({ reason: 'user_ended' }),
+      )) as any;
 
-      expect(mockUpdateRetentionFromSession).toHaveBeenCalledWith(
-        expect.anything(),
-        PROFILE_ID,
-        TOPIC_ID,
-        3,
-        '2026-02-17T10:00:00.000Z',
+      expect(mockUpdateRetentionFromSession).not.toHaveBeenCalled();
+      const retentionOutcome = result.outcomes.find(
+        (o: any) => o.step === 'update-retention',
       );
+      expect(retentionOutcome.status).toBe('skipped');
     });
 
-    it('uses fallback quality=3 when no qualityRating, no reason, and session has topicId (F-8)', async () => {
-      await executeSteps(createEventData());
+    it('skips retention update when no qualityRating, no reason, and session has topicId (STATUS-STRICT)', async () => {
+      const { result } = (await executeSteps(createEventData())) as any;
 
-      expect(mockUpdateRetentionFromSession).toHaveBeenCalledWith(
-        expect.anything(),
-        PROFILE_ID,
-        TOPIC_ID,
-        3,
-        '2026-02-17T10:00:00.000Z',
+      expect(mockUpdateRetentionFromSession).not.toHaveBeenCalled();
+      const retentionOutcome = result.outcomes.find(
+        (o: any) => o.step === 'update-retention',
       );
+      expect(retentionOutcome.status).toBe('skipped');
     });
 
     it('skips retention update when no qualityRating and no topicId and no reason (F-8)', async () => {
@@ -872,6 +870,21 @@ describe('sessionCompleted', () => {
           mode: 'learning',
           exchangeCount: 3,
           qualityRating: 4,
+        }),
+      )) as any;
+
+      const resetOutcome = result.outcomes.find(
+        (o: any) => o.step === 'relearn-retention-reset',
+      );
+      expect(resetOutcome.status).toBe('skipped');
+    });
+
+    it('skips the reset when relearn has no explicit quality signal', async () => {
+      const { result } = (await executeSteps(
+        createEventData({
+          mode: 'relearn',
+          exchangeCount: 3,
+          qualityRating: undefined,
         }),
       )) as any;
 

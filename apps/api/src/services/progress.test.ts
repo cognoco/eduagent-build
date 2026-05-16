@@ -220,6 +220,11 @@ function setupScopedRepo({
     createdAt: Date;
   }>,
   sessionSummariesFindFirst = undefined as { content: string } | undefined,
+  sessionSummariesFindMany = [] as Array<{
+    sessionId: string;
+    status: string;
+    content?: string;
+  }>,
 } = {}) {
   (createScopedRepository as jest.Mock).mockReturnValue({
     subjects: {
@@ -244,6 +249,7 @@ function setupScopedRepo({
     },
     sessionSummaries: {
       findFirst: jest.fn().mockResolvedValue(sessionSummariesFindFirst),
+      findMany: jest.fn().mockResolvedValue(sessionSummariesFindMany),
     },
   });
 }
@@ -320,12 +326,8 @@ describe('getSubjectProgress', () => {
     expect(result!.lastSessionAt).toBe(NOW.toISOString());
   });
 
-  // [BUG-LIB-TOPICS] Library card showed 0/10 topics while the book view showed
-  // 1/10 after a completed session — because library only counted
-  // assessment.passed / retention.verified, ignoring sessions. Book view counts
-  // session-completed topics. Align the two: sessions should also count here.
-  describe('[BUG-LIB-TOPICS] session-based topic completion', () => {
-    it('counts a topic with a completed session as completed, even without assessment or retention card', async () => {
+  describe('[STATUS-STRICT] session-based topic completion', () => {
+    it('counts a topic with a meaningful completed session as completed, even without assessment or retention card', async () => {
       const topic = mockTopicRow({ id: 'topic-1' });
       setupScopedRepo({
         subjectFindFirst: mockSubjectRow(),
@@ -343,6 +345,55 @@ describe('getSubjectProgress', () => {
       expect(result!.topicsTotal).toBe(1);
       expect(result!.topicsCompleted).toBe(1);
       expect(result!.topicsVerified).toBe(0);
+    });
+
+    it('does not count a short completed session as topic completion', async () => {
+      const topic = mockTopicRow({ id: 'topic-1' });
+      setupScopedRepo({
+        subjectFindFirst: mockSubjectRow(),
+        retentionCardsFindMany: [],
+        assessmentsFindMany: [],
+        sessionsFindMany: [
+          mockSessionRow({ topicId: 'topic-1', exchangeCount: 1 }),
+        ],
+      });
+      const db = createMockDb({
+        curriculumFindFirst: { id: curriculumId, subjectId },
+        topicsFindMany: [topic],
+      });
+
+      const result = await getSubjectProgress(db, profileId, subjectId);
+
+      expect(result!.topicsTotal).toBe(1);
+      expect(result!.topicsCompleted).toBe(0);
+      expect(result!.lastSessionAt).toBe(NOW.toISOString());
+    });
+
+    it('counts an accepted summary as topic completion even for a short session', async () => {
+      const topic = mockTopicRow({ id: 'topic-1' });
+      setupScopedRepo({
+        subjectFindFirst: mockSubjectRow(),
+        retentionCardsFindMany: [],
+        assessmentsFindMany: [],
+        sessionsFindMany: [
+          mockSessionRow({
+            id: 'session-accepted',
+            topicId: 'topic-1',
+            exchangeCount: 1,
+          }),
+        ],
+        sessionSummariesFindMany: [
+          { sessionId: 'session-accepted', status: 'accepted' },
+        ],
+      });
+      const db = createMockDb({
+        curriculumFindFirst: { id: curriculumId, subjectId },
+        topicsFindMany: [topic],
+      });
+
+      const result = await getSubjectProgress(db, profileId, subjectId);
+
+      expect(result!.topicsCompleted).toBe(1);
     });
 
     it('counts auto_closed sessions (but not active/paused) as completed topics', async () => {
@@ -492,6 +543,30 @@ describe('getTopicProgress', () => {
     expect(result!.xpStatus).toBe('pending');
     expect(result!.totalSessions).toBe(1);
     expect(result!.daysSinceLastReview).toEqual(expect.any(Number));
+  });
+
+  it('keeps a short terminal topic session in progress instead of completed', async () => {
+    const topic = mockTopicRow();
+    setupScopedRepo({
+      subjectFindFirst: mockSubjectRow(),
+      retentionCardFindFirst: undefined,
+      assessmentsFindMany: [],
+      sessionsFindMany: [mockSessionRow({ topicId, exchangeCount: 1 })],
+      needsDeepeningFindMany: [],
+      xpLedgerFindMany: [],
+    });
+    const db = {
+      query: {
+        curriculumTopics: {
+          findFirst: jest.fn().mockResolvedValue(topic),
+        },
+      },
+    } as unknown as Database;
+
+    const result = await getTopicProgress(db, profileId, subjectId, topicId);
+
+    expect(result!.completionStatus).toBe('in_progress');
+    expect(result!.totalSessions).toBe(1);
   });
 
   it('marks struggle status as needs_deepening when active', async () => {
@@ -796,10 +871,8 @@ describe('getOverallProgress', () => {
     expect(result.totalTopicsCompleted).toBe(0);
   });
 
-  // [BUG-LIB-TOPICS] Same semantic mismatch at the overall-progress level —
-  // library tab shows 0/N topics per shelf even after a session completed.
-  describe('[BUG-LIB-TOPICS] session-based topic completion', () => {
-    it('counts topics with completed sessions as completed in the overall aggregate', async () => {
+  describe('[STATUS-STRICT] session-based topic completion', () => {
+    it('counts topics with meaningful completed sessions as completed in the overall aggregate', async () => {
       const subject = mockSubjectRow({ id: 'sub-1', name: 'Geography' });
       const curriculumIdLocal = 'curr-1';
       const topic = {
@@ -829,6 +902,38 @@ describe('getOverallProgress', () => {
       expect(result.subjects[0]!.topicsVerified).toBe(0);
       expect(result.totalTopicsCompleted).toBe(1);
       expect(result.totalTopicsVerified).toBe(0);
+    });
+
+    it('does not count short completed sessions as completed in the overall aggregate', async () => {
+      const subject = mockSubjectRow({ id: 'sub-1', name: 'Geography' });
+      const curriculumIdLocal = 'curr-1';
+      const topic = {
+        ...mockTopicRow({ id: 'topic-1' }),
+        curriculumId: curriculumIdLocal,
+      };
+
+      setupScopedRepo({
+        subjectsFindMany: [subject],
+        retentionCardsFindMany: [],
+        assessmentsFindMany: [],
+        sessionsFindMany: [
+          mockSessionRow({
+            subjectId: 'sub-1',
+            topicId: 'topic-1',
+            exchangeCount: 1,
+          }),
+        ],
+      });
+
+      const db = createMockDb({
+        curriculaFindMany: [{ id: curriculumIdLocal, subjectId: 'sub-1' }],
+        topicsFindMany: [topic],
+      });
+
+      const result = await getOverallProgress(db, profileId);
+
+      expect(result.subjects[0]!.topicsCompleted).toBe(0);
+      expect(result.totalTopicsCompleted).toBe(0);
     });
 
     it('does not double-count topics that are both session-completed and SRS-verified', async () => {
