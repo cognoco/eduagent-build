@@ -96,6 +96,14 @@ function sortSubjectsByStatus<T extends { status: Subject['status'] }>(
     .map(({ subject }) => subject);
 }
 
+function chunkIntoRows<T>(items: readonly T[], rowSize: number): T[][] {
+  const rows: T[][] = [];
+  for (let index = 0; index < items.length; index += rowSize) {
+    rows.push(items.slice(index, index + rowSize));
+  }
+  return rows;
+}
+
 // ---------------------------------------------------------------------------
 // SubjectStatusPill
 // ---------------------------------------------------------------------------
@@ -712,33 +720,83 @@ export default function LibraryScreen() {
                     {t(`library.sections.${group.status}`)}
                   </Text>
                 ) : null}
-                {group.subjects.map((subject) => {
-                  const retData = retentionDataBySubjectId.get(subject.id);
-                  const books = booksBySubjectId.get(subject.id) ?? [];
-                  const bookCount = books.length;
-                  const progress = progressBySubjectId.get(subject.id);
-                  const topicsTotal = progress?.topicsTotal ?? 0;
-                  const topicsCompleted = progress?.topicsCompleted ?? 0;
-                  const topicProgress = `${topicsCompleted}/${topicsTotal}`;
-                  const isFinished =
-                    topicsTotal > 0 &&
-                    (progress?.topicsVerified ?? 0) >= topicsTotal;
-
-                  return (
-                    <ShelfRow
-                      key={subject.id}
-                      subjectId={subject.id}
-                      name={subject.name}
-                      bookCount={bookCount}
-                      topicProgress={topicProgress}
-                      reviewDueCount={retData?.reviewDueCount ?? 0}
-                      isFinished={isFinished}
-                      status={subject.status}
-                      tint={subjectTintsById.get(subject.id)}
-                      onPress={handleShelfPress}
+                {chunkIntoRows(group.subjects, 2).map((row, rowIndex) => (
+                  <View
+                    key={`${group.status}-${rowIndex}`}
+                    testID={`shelf-grid-row-${group.status}-${rowIndex}`}
+                    style={{
+                      position: 'relative',
+                      paddingBottom: 12,
+                      marginBottom: 14,
+                    }}
+                  >
+                    <View
+                      pointerEvents="none"
+                      testID={`shelf-grid-plank-${group.status}-${rowIndex}`}
+                      style={{
+                        position: 'absolute',
+                        left: 2,
+                        right: 2,
+                        bottom: 0,
+                        height: 16,
+                        borderRadius: 999,
+                        backgroundColor: themeColors.surface,
+                        borderColor: themeColors.border,
+                        borderWidth: 1,
+                        shadowColor: themeColors.textPrimary,
+                        shadowOffset: { width: 0, height: 2 },
+                        shadowOpacity: 0.04,
+                        shadowRadius: 4,
+                        elevation: 1,
+                      }}
                     />
-                  );
-                })}
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        justifyContent: 'space-between',
+                        alignItems: 'flex-end',
+                      }}
+                    >
+                      {row.map((subject) => {
+                        const retData = retentionDataBySubjectId.get(
+                          subject.id,
+                        );
+                        const books = booksBySubjectId.get(subject.id) ?? [];
+                        const bookCount = books.length;
+                        const progress = progressBySubjectId.get(subject.id);
+                        const topicsTotal = progress?.topicsTotal ?? 0;
+                        const topicsCompleted = progress?.topicsCompleted ?? 0;
+                        const topicProgress = `${topicsCompleted}/${topicsTotal}`;
+                        const isFinished =
+                          topicsTotal > 0 &&
+                          (progress?.topicsVerified ?? 0) >= topicsTotal;
+
+                        return (
+                          <View
+                            key={subject.id}
+                            style={{ width: '48%', zIndex: 1 }}
+                          >
+                            <ShelfRow
+                              subjectId={subject.id}
+                              name={subject.name}
+                              bookCount={bookCount}
+                              topicProgress={topicProgress}
+                              reviewDueCount={retData?.reviewDueCount ?? 0}
+                              isFinished={isFinished}
+                              status={subject.status}
+                              tint={subjectTintsById.get(subject.id)}
+                              onPress={handleShelfPress}
+                              variant="card"
+                            />
+                          </View>
+                        );
+                      })}
+                      {row.length === 1 ? (
+                        <View style={{ width: '48%' }} />
+                      ) : null}
+                    </View>
+                  </View>
+                ))}
               </View>
             ))}
           </View>
