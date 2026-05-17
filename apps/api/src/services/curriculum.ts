@@ -16,7 +16,10 @@ import {
 import {
   TopicNotSkippedError,
   bookTopicGenerationResultSchema,
+  MAX_GENERATED_BOOK_TOPICS,
+  MIN_GENERATED_BOOK_TOPICS,
   type BookProgressStatus,
+  type BookTopicGenerationResult,
   type BookWithTopics,
   type CefrLevel,
   type Curriculum,
@@ -37,6 +40,7 @@ import {
 import { NotFoundError } from '../errors';
 import { routeAndCall, type ChatMessage } from './llm';
 import { escapeXml, sanitizeXmlValue } from './llm/sanitize';
+import { buildFallbackBookTopics } from './book-generation-fallbacks';
 import { regenerateLanguageCurriculum } from './language-curriculum';
 import {
   addTopicCompletion,
@@ -1079,6 +1083,71 @@ export async function getBookWithTopics(
   };
 }
 
+export function normalizeTopicTitle(title: string): string {
+  return title.trim().toLowerCase();
+}
+
+export function prepareTopicExpansion(
+  generated: BookTopicGenerationResult,
+  existingTopics: Array<{ title: string; skipped?: boolean }>,
+  bookTitle: string,
+  bookDescription: string | null,
+): BookTopicGenerationResult {
+  const existingTitleKeys = new Set(
+    existingTopics
+      .filter((topic) => !topic.skipped)
+      .map((topic) => normalizeTopicTitle(topic.title)),
+  );
+  const seenTitleKeys = new Set(existingTitleKeys);
+  const expansionTopics: GeneratedBookTopic[] = [];
+
+  const addTopic = (topic: GeneratedBookTopic) => {
+    if (expansionTopics.length >= MAX_GENERATED_BOOK_TOPICS) return;
+    const key = normalizeTopicTitle(topic.title);
+    if (seenTitleKeys.has(key)) return;
+    seenTitleKeys.add(key);
+    expansionTopics.push({
+      ...topic,
+      sortOrder: expansionTopics.length + 1,
+    });
+  };
+
+  for (const topic of generated.topics) addTopic(topic);
+
+  const fallback = buildFallbackBookTopics(bookTitle, bookDescription ?? '');
+  if (expansionTopics.length < MIN_GENERATED_BOOK_TOPICS) {
+    for (const topic of fallback.topics) addTopic(topic);
+  }
+
+  if (expansionTopics.length < MIN_GENERATED_BOOK_TOPICS) {
+    throw new Error(
+      `Book topic expansion produced only ${expansionTopics.length} unique topics`,
+    );
+  }
+
+  const expansionTitleKeys = new Set(
+    expansionTopics.map((topic) => normalizeTopicTitle(topic.title)),
+  );
+  const seenConnectionKeys = new Set<string>();
+  const connections = [...generated.connections, ...fallback.connections]
+    .filter((connection) => {
+      const topicA = normalizeTopicTitle(connection.topicA);
+      const topicB = normalizeTopicTitle(connection.topicB);
+      return expansionTitleKeys.has(topicA) && expansionTitleKeys.has(topicB);
+    })
+    .filter((connection) => {
+      const topicA = normalizeTopicTitle(connection.topicA);
+      const topicB = normalizeTopicTitle(connection.topicB);
+      const key =
+        topicA < topicB ? `${topicA}:${topicB}` : `${topicB}:${topicA}`;
+      if (seenConnectionKeys.has(key)) return false;
+      seenConnectionKeys.add(key);
+      return true;
+    });
+
+  return { topics: expansionTopics, connections };
+}
+
 export async function persistBookTopics(
   db: Database,
   profileId: string,
@@ -1128,9 +1197,10 @@ export async function persistBookTopics(
         );
       }
 
-      const normalizeTopicTitle = (title: string) => title.trim().toLowerCase();
       const existingTitleKeys = new Set(
-        existingTopics.map((topic) => normalizeTopicTitle(topic.title)),
+        existingTopics
+          .filter((topic) => !topic.skipped)
+          .map((topic) => normalizeTopicTitle(topic.title)),
       );
       const topicsToInsert = topics.filter((topic) => {
         const key = normalizeTopicTitle(topic.title);

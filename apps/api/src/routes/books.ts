@@ -10,10 +10,8 @@ import {
   getBookSessionsResponseSchema,
   moveTopicResponseSchema,
   ERROR_CODES,
-  MAX_GENERATED_BOOK_TOPICS,
   MIN_GENERATED_BOOK_TOPICS,
   type BookTopicGenerationResult,
-  type GeneratedBookTopic,
 } from '@eduagent/schemas';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
@@ -25,6 +23,7 @@ import {
   persistBookTopics,
   claimBookForGeneration,
   moveTopicToBook,
+  prepareTopicExpansion,
 } from '../services/curriculum';
 import { getBookSessions } from '../services/session';
 import { generateBookTopics } from '../services/book-generation';
@@ -50,71 +49,6 @@ const bookParamSchema = z.object({
   subjectId: z.string().uuid(),
   bookId: z.string().uuid(),
 });
-
-function normalizeTopicTitle(title: string): string {
-  return title.trim().toLowerCase();
-}
-
-function prepareTopicExpansion(
-  generated: BookTopicGenerationResult,
-  existingTopics: Array<{ title: string; skipped?: boolean }>,
-  bookTitle: string,
-  bookDescription: string | null,
-): BookTopicGenerationResult {
-  const existingTitleKeys = new Set(
-    existingTopics
-      .filter((topic) => !topic.skipped)
-      .map((topic) => normalizeTopicTitle(topic.title)),
-  );
-  const seenTitleKeys = new Set(existingTitleKeys);
-  const expansionTopics: GeneratedBookTopic[] = [];
-
-  const addTopic = (topic: GeneratedBookTopic) => {
-    if (expansionTopics.length >= MAX_GENERATED_BOOK_TOPICS) return;
-    const key = normalizeTopicTitle(topic.title);
-    if (seenTitleKeys.has(key)) return;
-    seenTitleKeys.add(key);
-    expansionTopics.push({
-      ...topic,
-      sortOrder: expansionTopics.length + 1,
-    });
-  };
-
-  for (const topic of generated.topics) addTopic(topic);
-
-  const fallback = buildFallbackBookTopics(bookTitle, bookDescription ?? '');
-  if (expansionTopics.length < MIN_GENERATED_BOOK_TOPICS) {
-    for (const topic of fallback.topics) addTopic(topic);
-  }
-
-  if (expansionTopics.length < MIN_GENERATED_BOOK_TOPICS) {
-    throw new Error(
-      `Book topic expansion produced only ${expansionTopics.length} unique topics`,
-    );
-  }
-
-  const expansionTitleKeys = new Set(
-    expansionTopics.map((topic) => normalizeTopicTitle(topic.title)),
-  );
-  const seenConnectionKeys = new Set<string>();
-  const connections = [...generated.connections, ...fallback.connections]
-    .filter((connection) => {
-      const topicA = normalizeTopicTitle(connection.topicA);
-      const topicB = normalizeTopicTitle(connection.topicB);
-      return expansionTitleKeys.has(topicA) && expansionTitleKeys.has(topicB);
-    })
-    .filter((connection) => {
-      const topicA = normalizeTopicTitle(connection.topicA);
-      const topicB = normalizeTopicTitle(connection.topicB);
-      const key =
-        topicA < topicB ? `${topicA}:${topicB}` : `${topicB}:${topicA}`;
-      if (seenConnectionKeys.has(key)) return false;
-      seenConnectionKeys.add(key);
-      return true;
-    });
-
-  return { topics: expansionTopics, connections };
-}
 
 export const bookRoutes = new Hono<BooksRouteEnv>()
   // [BUG-733 / PERF-3] Aggregate all-subjects books in a single round-trip.
