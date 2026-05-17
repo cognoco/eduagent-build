@@ -458,6 +458,51 @@ describe('ChildDetailScreen — profile overview', () => {
         profileId: 'child-001',
         subjectId: '11111111-1111-7111-8111-111111111111',
         subjectName: 'Mathematics',
+        childName: 'Emma',
+      },
+    });
+  });
+
+  it('opens the latest topic from the progress action card when the session has one', () => {
+    mockLocalSearchParams = { profileId: 'child-001', mode: 'progress' };
+    mockUseProfileSessions.mockReturnValue({
+      data: [
+        {
+          sessionId: '33333333-3333-7333-8333-333333333333',
+          subjectId: '11111111-1111-7111-8111-111111111111',
+          subjectName: 'Mathematics',
+          topicId: '44444444-4444-7444-8444-444444444444',
+          topicTitle: 'Fractions',
+          startedAt: '2026-05-13T12:00:00.000Z',
+          sessionType: 'learning',
+          durationSeconds: 600,
+          wallClockSeconds: 900,
+          displaySummary: null,
+          highlight: null,
+          homeworkSummary: null,
+        },
+      ],
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+
+    render(<ChildDetailScreen />);
+
+    fireEvent.press(screen.getByTestId('child-progress-nudge-card'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/child/[profileId]/topic/[topicId]',
+      params: {
+        profileId: 'child-001',
+        topicId: '44444444-4444-7444-8444-444444444444',
+        title: 'Fractions',
+        completionStatus: 'in_progress',
+        masteryScore: '',
+        retentionStatus: '',
+        totalSessions: '1',
+        subjectId: '11111111-1111-7111-8111-111111111111',
+        subjectName: 'Mathematics',
       },
     });
   });
@@ -537,6 +582,7 @@ describe('ChildDetailScreen — profile overview', () => {
         profileId: 'child-001',
         subjectId: '11111111-1111-7111-8111-111111111111',
         subjectName: 'Mathematics',
+        childName: 'Emma',
       },
     });
   });

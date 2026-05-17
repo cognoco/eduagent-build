@@ -81,6 +81,8 @@ type ProgressNudgeAction = {
   subjectId: string;
   subjectName: string;
   focusName: string;
+  topicId: string | null;
+  topicTitle: string | null;
   lastSessionLabel: string | null;
   lastSessionAt: string | null;
   hasSessionHistory: boolean;
@@ -134,10 +136,40 @@ function buildProgressNudgeAction({
     subjectId,
     subjectName: subject.name,
     focusName,
+    topicId: latestSession?.topicId?.trim() || null,
+    topicTitle: latestSession?.topicTitle ?? null,
     lastSessionLabel,
     lastSessionAt: latestSession?.startedAt ?? null,
     hasSessionHistory: latestSession != null,
   };
+}
+
+function sortSubjectsByRecentSession(
+  subjects: DashboardSubject[],
+  sessions: ChildSession[] | undefined,
+): DashboardSubject[] {
+  if (!sessions || sessions.length === 0) return subjects;
+
+  const lastSessionBySubject = new Map<string, number>();
+  for (const session of sessions) {
+    const subjectId = session.subjectId?.trim();
+    if (!subjectId) continue;
+    const startedAt = Date.parse(session.startedAt);
+    if (Number.isNaN(startedAt)) continue;
+    const current = lastSessionBySubject.get(subjectId) ?? 0;
+    if (startedAt > current) {
+      lastSessionBySubject.set(subjectId, startedAt);
+    }
+  }
+
+  return [...subjects].sort((a, b) => {
+    const aId = a.subjectId?.trim() ?? '';
+    const bId = b.subjectId?.trim() ?? '';
+    const aLast = lastSessionBySubject.get(aId) ?? 0;
+    const bLast = lastSessionBySubject.get(bId) ?? 0;
+    if (aLast !== bLast) return bLast - aLast;
+    return a.name.localeCompare(b.name);
+  });
 }
 
 function RowLink({
@@ -288,9 +320,11 @@ function ProgressNudgeCard({
 
 function SubjectCard({
   profileId,
+  childName,
   subject,
 }: {
   profileId: string;
+  childName: string;
   subject: DashboardSubject;
 }): React.ReactElement {
   const { t } = useTranslation();
@@ -354,6 +388,7 @@ function SubjectCard({
             profileId,
             subjectId,
             subjectName: subject.name,
+            childName,
           },
         } as Href)
       }
@@ -618,14 +653,45 @@ export default function ChildDetailScreen(): React.ReactElement {
       }),
     [child, lastSessionLabel, sessionsQuery.data],
   );
+  const sortedSubjects = useMemo(
+    () =>
+      sortSubjectsByRecentSession(child?.subjects ?? [], sessionsQuery.data),
+    [child?.subjects, sessionsQuery.data],
+  );
   const openProgressNudgeAction = (): void => {
     if (!progressNudgeAction) return;
+
+    if (progressNudgeAction.topicId) {
+      const totalTopicSessions =
+        sessionsQuery.data?.filter(
+          (session) => session.topicId === progressNudgeAction.topicId,
+        ).length ?? 1;
+
+      router.push({
+        pathname: '/(app)/child/[profileId]/topic/[topicId]',
+        params: {
+          profileId,
+          topicId: progressNudgeAction.topicId,
+          title:
+            progressNudgeAction.topicTitle ?? progressNudgeAction.focusName,
+          completionStatus: 'in_progress',
+          masteryScore: '',
+          retentionStatus: '',
+          totalSessions: String(Math.max(totalTopicSessions, 1)),
+          subjectId: progressNudgeAction.subjectId,
+          subjectName: progressNudgeAction.subjectName,
+        },
+      } as Href);
+      return;
+    }
+
     router.push({
       pathname: '/(app)/child/[profileId]/subjects/[subjectId]',
       params: {
         profileId,
         subjectId: progressNudgeAction.subjectId,
         subjectName: progressNudgeAction.subjectName,
+        childName,
       },
     } as Href);
   };
@@ -790,17 +856,24 @@ export default function ChildDetailScreen(): React.ReactElement {
           />
         ) : null}
 
-        {!showSettingsOnly && child?.subjects && child.subjects.length > 0 ? (
+        {!showSettingsOnly && sortedSubjects.length > 0 ? (
           <View className="mt-6" testID="child-subjects-section">
             <Text className="text-h3 font-semibold text-text-primary mb-1">
               {t('parentView.index.subjects', {
                 defaultValue: 'Subjects',
               })}
             </Text>
-            {child.subjects.map((subject, index) => (
+            <Text className="text-body-sm text-text-secondary mb-1">
+              {t('parentView.index.subjectsDescription', {
+                name: childName,
+                defaultValue: `${childName}'s active subjects, with the most recent activity first.`,
+              })}
+            </Text>
+            {sortedSubjects.map((subject, index) => (
               <SubjectCard
                 key={subject.subjectId ?? index}
                 profileId={profileId}
+                childName={childName}
                 subject={subject}
               />
             ))}

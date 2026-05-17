@@ -87,6 +87,19 @@ export default function TopicDetailScreen() {
   const subjectName = Array.isArray(rawSubjectName)
     ? rawSubjectName[0]
     : rawSubjectName;
+  const backHref: Href =
+    profileId && subjectId
+      ? ({
+          pathname: '/(app)/child/[profileId]/subjects/[subjectId]',
+          params: {
+            profileId,
+            subjectId,
+            ...(subjectName ? { subjectName } : {}),
+          },
+        } as Href)
+      : profileId
+        ? (`/(app)/child/${profileId}` as Href)
+        : ('/(app)/more' as Href);
   // [BUG-813] Guard against NaN from malformed query params (e.g.
   // `?totalSessions=abc`). Without the isNaN check the UI renders
   // "NaN sessions" and downstream Number formatting breaks.
@@ -122,7 +135,7 @@ export default function TopicDetailScreen() {
     >
       <View className="px-5 pt-4 pb-2 flex-row items-center">
         <Pressable
-          onPress={() => goBackOrReplace(router, '/(app)/more' as const)}
+          onPress={() => goBackOrReplace(router, backHref)}
           className="me-3 py-2 pe-2"
           accessibilityLabel={t('common.goBack')}
           accessibilityRole="button"
