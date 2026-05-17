@@ -1,9 +1,12 @@
 import {
+  useInfiniteQuery,
   useMutation,
   useQuery,
   useQueryClient,
+  type InfiniteData,
   type QueryClient,
   type UseMutationResult,
+  type UseInfiniteQueryResult,
   type UseQueryResult,
 } from '@tanstack/react-query';
 import type {
@@ -18,6 +21,7 @@ import type {
   OverdueTopicsResponse,
   ProgressSummary,
   ReportPracticeSummary,
+  ChildSessionsPageResponse,
   ChildSession,
   SubjectProgress,
   TopicProgress,
@@ -27,6 +31,7 @@ import type {
 import {
   childReportDetailResponseSchema,
   childReportsResponseSchema,
+  childSessionsPageResponseSchema,
   childSessionsResponseSchema,
   progressSummarySchema,
   weeklyReportDetailResponseSchema,
@@ -426,7 +431,10 @@ export function useProfileSessions(
       try {
         const isActiveProfile = profileId === activeProfile?.id;
         const res = isActiveProfile
-          ? await client.progress.sessions.$get({}, { init: { signal } })
+          ? await client.progress.sessions.$get(
+              { query: {} },
+              { init: { signal } },
+            )
           : await client.dashboard.children[':profileId'].sessions.$get(
               { param: { profileId: profileId ?? '' } },
               { init: { signal } },
@@ -442,6 +450,42 @@ export function useProfileSessions(
       !!activeProfile &&
       !!profileId &&
       (profileId === activeProfile.id || activeProfile.isOwner === true),
+  });
+}
+
+export function useProfileSessionsArchive(
+  profileId: string | undefined,
+  options?: { limit?: number },
+): UseInfiniteQueryResult<InfiniteData<ChildSessionsPageResponse>, Error> {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+
+  return useInfiniteQuery({
+    queryKey: [
+      ...queryKeys.progress.profileSessions(profileId, activeProfile?.id),
+      'archive',
+    ],
+    initialPageParam: undefined as string | undefined,
+    queryFn: async ({ pageParam, signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await client.progress.sessions.$get(
+          {
+            query: {
+              ...(pageParam ? { cursor: pageParam } : {}),
+              ...(options?.limit ? { limit: String(options.limit) } : {}),
+            },
+          },
+          { init: { signal } },
+        );
+        await assertOk(res);
+        return childSessionsPageResponseSchema.parse(await res.json());
+      } finally {
+        cleanup();
+      }
+    },
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    enabled: !!activeProfile && !!profileId && profileId === activeProfile.id,
   });
 }
 

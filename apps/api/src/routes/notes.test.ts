@@ -7,6 +7,9 @@ const PROFILE_ID = 'a0000000-0000-4000-a000-000000000001';
 const SUBJECT_ID = 'a0000000-0000-4000-a000-000000000010';
 const TOPIC_ID = 'a0000000-0000-4000-a000-000000000020';
 const NOTE_ID = 'a0000000-0000-4000-a000-000000000030';
+const NOTE_ID_2 = 'a0000000-0000-4000-a000-000000000031';
+const BOOK_ID = 'a0000000-0000-4000-a000-000000000040';
+const SESSION_ID = 'a0000000-0000-4000-a000-000000000050';
 
 type FakeDb = Database & {
   selectRows: unknown[][];
@@ -86,6 +89,106 @@ function makeApp(db: FakeDb) {
 }
 
 describe('note routes', () => {
+  describe('GET /v1/notes', () => {
+    it('returns global notes for the active profile', async () => {
+      const db = makeFakeDb({ noteExists: false });
+      db.selectRows = [
+        [
+          {
+            id: NOTE_ID,
+            topicId: TOPIC_ID,
+            topicTitle: 'Atomic Structure',
+            bookId: BOOK_ID,
+            bookTitle: 'Chemistry Basics',
+            subjectId: SUBJECT_ID,
+            subjectName: 'Chemistry',
+            sessionId: SESSION_ID,
+            content: 'Remember that atoms are mostly empty space.',
+            createdAt: new Date('2026-05-15T10:00:00.000Z'),
+            updatedAt: new Date('2026-05-15T10:05:00.000Z'),
+          },
+        ],
+      ];
+      const app = makeApp(db);
+
+      const res = await app.request('/v1/notes?limit=1');
+
+      expect(res.status).toBe(200);
+      await expect(res.json()).resolves.toEqual({
+        notes: [
+          {
+            id: NOTE_ID,
+            topicId: TOPIC_ID,
+            topicTitle: 'Atomic Structure',
+            bookId: BOOK_ID,
+            bookTitle: 'Chemistry Basics',
+            subjectId: SUBJECT_ID,
+            subjectName: 'Chemistry',
+            sessionId: SESSION_ID,
+            content: 'Remember that atoms are mostly empty space.',
+            createdAt: '2026-05-15T10:00:00.000Z',
+            updatedAt: '2026-05-15T10:05:00.000Z',
+          },
+        ],
+        nextCursor: null,
+      });
+      expect(db.selectRows).toHaveLength(0);
+    });
+
+    it('returns a next cursor when more notes are available', async () => {
+      const db = makeFakeDb({ noteExists: false });
+      db.selectRows = [
+        [
+          {
+            id: NOTE_ID,
+            topicId: TOPIC_ID,
+            topicTitle: 'Atomic Structure',
+            bookId: BOOK_ID,
+            bookTitle: 'Chemistry Basics',
+            subjectId: SUBJECT_ID,
+            subjectName: 'Chemistry',
+            sessionId: null,
+            content: 'First visible note.',
+            createdAt: new Date('2026-05-15T10:00:00.000Z'),
+            updatedAt: new Date('2026-05-15T10:05:00.000Z'),
+          },
+          {
+            id: NOTE_ID_2,
+            topicId: TOPIC_ID,
+            topicTitle: 'Atomic Structure',
+            bookId: BOOK_ID,
+            bookTitle: 'Chemistry Basics',
+            subjectId: SUBJECT_ID,
+            subjectName: 'Chemistry',
+            sessionId: null,
+            content: 'Second row is the lookahead row.',
+            createdAt: new Date('2026-05-15T09:00:00.000Z'),
+            updatedAt: new Date('2026-05-15T09:05:00.000Z'),
+          },
+        ],
+      ];
+      const app = makeApp(db);
+
+      const res = await app.request('/v1/notes?limit=1');
+
+      expect(res.status).toBe(200);
+      await expect(res.json()).resolves.toMatchObject({
+        notes: [{ id: NOTE_ID, content: 'First visible note.' }],
+        nextCursor: NOTE_ID,
+      });
+    });
+
+    it('rejects invalid query params', async () => {
+      const db = makeFakeDb({ noteExists: false });
+      const app = makeApp(db);
+
+      const res = await app.request('/v1/notes?limit=0');
+
+      expect(res.status).toBe(400);
+      expect(db.selectRows).toHaveLength(2);
+    });
+  });
+
   describe('DELETE /v1/subjects/:subjectId/topics/:topicId/note', () => {
     it('deletes the latest topic note through the legacy mobile URL', async () => {
       const db = makeFakeDb({ noteExists: true });

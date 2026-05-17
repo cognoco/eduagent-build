@@ -1576,6 +1576,8 @@ export interface ChildSession {
   drills: ChildSessionDrillScore[];
 }
 
+type LearningSessionRow = typeof learningSessions.$inferSelect;
+
 export function getSessionMetadata(metadata: unknown): SessionMetadata {
   if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
     return {};
@@ -1611,7 +1613,7 @@ export function parseEngagementSignal(
 
 /**
  * Lists recent sessions for a profile, scoped to that profile.
- * Returns up to 50 most recent sessions ordered by startedAt descending.
+ * Returns up to 50 most recent sessions.
  *
  * No parent-proxy guard here — this function operates on a single profileId
  * directly. Parent-facing callers (getChildSessions in dashboard.ts) add
@@ -1621,13 +1623,46 @@ export async function getProfileSessions(
   db: Database,
   profileId: string,
 ): Promise<ChildSession[]> {
-  const scoped = createScopedRepository(db, profileId);
-  const sessions = await scoped.sessions.findMany(
-    gte(learningSessions.exchangeCount, 1),
-    50,
-    desc(learningSessions.startedAt),
-  );
+  const result = await listProfileSessions(db, profileId, { limit: 50 });
+  return result.sessions;
+}
 
+export async function listProfileSessions(
+  db: Database,
+  profileId: string,
+  options: {
+    cursor?: string;
+    limit?: number;
+  } = {},
+): Promise<{ sessions: ChildSession[]; nextCursor: string | null }> {
+  const limit = Math.min(Math.max(options.limit ?? 20, 1), 50);
+  const conditions = [gte(learningSessions.exchangeCount, 1)];
+
+  if (options.cursor) {
+    // learning_sessions.id is UUIDv7, so desc(id) is newest-first keyset
+    // pagination without relying on offset scans.
+    conditions.push(lt(learningSessions.id, options.cursor));
+  }
+
+  const scoped = createScopedRepository(db, profileId);
+  const rows = await scoped.sessions.findMany(
+    and(...conditions),
+    limit + 1,
+    desc(learningSessions.id),
+  );
+  const hasMore = rows.length > limit;
+  const page = hasMore ? rows.slice(0, limit) : rows;
+
+  return {
+    sessions: await hydrateChildSessions(db, page),
+    nextCursor: hasMore ? (page[page.length - 1]?.id ?? null) : null,
+  };
+}
+
+async function hydrateChildSessions(
+  db: Database,
+  sessions: LearningSessionRow[],
+): Promise<ChildSession[]> {
   if (sessions.length === 0) return [];
 
   // Batch-fetch highlights from session_summaries for all sessions

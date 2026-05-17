@@ -11,6 +11,8 @@ import {
   topicNotesResponseSchema,
   noteMutationResponseSchema,
   topicSessionsResponseSchema,
+  allNotesQuerySchema,
+  allNotesResponseSchema,
 } from '@eduagent/schemas';
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
@@ -24,6 +26,7 @@ import {
   updateNote,
   deleteNoteById,
   getTopicIdsWithNotes,
+  listAllNotes,
 } from '../services/notes';
 import { getTopicSessions } from '../services/session';
 
@@ -91,6 +94,19 @@ export const noteRoutes = new Hono<NotesRouteEnv>()
       }
     },
   )
+  // GET /notes - all notes for this profile
+  .get('/notes', zValidator('query', allNotesQuerySchema), async (c) => {
+    const db = c.get('db');
+    const profileId = requireProfileId(c.get('profileId'));
+    const { cursor, limit, subjectId } = c.req.valid('query');
+
+    const result = await listAllNotes(db, profileId, {
+      cursor,
+      limit,
+      subjectId,
+    });
+    return c.json(allNotesResponseSchema.parse(result));
+  })
   // GET /notes/topic-ids — all topic IDs with notes for this profile
   .get('/notes/topic-ids', async (c) => {
     const db = c.get('db');

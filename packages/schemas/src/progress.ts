@@ -813,6 +813,20 @@ export const childSessionsResponseSchema = z.object({
 });
 export type ChildSessionsResponse = z.infer<typeof childSessionsResponseSchema>;
 
+export const childSessionsQuerySchema = z.object({
+  cursor: z.string().uuid().optional(),
+  limit: z.coerce.number().int().min(1).max(50).optional(),
+});
+export type ChildSessionsQuery = z.infer<typeof childSessionsQuerySchema>;
+
+export const childSessionsPageResponseSchema =
+  childSessionsResponseSchema.extend({
+    nextCursor: z.string().uuid().nullable(),
+  });
+export type ChildSessionsPageResponse = z.infer<
+  typeof childSessionsPageResponseSchema
+>;
+
 // GET /dashboard/children/:profileId/sessions/:sessionId
 export const childSessionDetailResponseSchema = z.object({
   session: childSessionSchema,

@@ -278,6 +278,7 @@ describe('LearnerScreen', () => {
 
     await waitFor(() => {
       screen.getByText('What do you need right now?');
+      screen.getByTestId('home-my-notes');
       screen.getByText('Help with an assignment');
       screen.getByText('Take a photo or type the problem');
       screen.getByText('Test yourself');
@@ -292,6 +293,14 @@ describe('LearnerScreen', () => {
       screen.getByText('Your subjects will show up here');
       expect(screen.queryByTestId('home-subject-carousel')).toBeNull();
     });
+  });
+
+  it('opens My Notes from learner Home', async () => {
+    render(<LearnerScreen {...defaultProps} />, { wrapper: Wrapper });
+
+    await waitFor(() => screen.getByTestId('home-my-notes'));
+    fireEvent.press(screen.getByTestId('home-my-notes'));
+    expect(mockPush).toHaveBeenCalledWith('/(app)/my-notes');
   });
 
   it('keeps home actions available when the subject list fails to load', async () => {
@@ -506,6 +515,7 @@ describe('LearnerScreen', () => {
       expect(screen.queryByTestId('home-ask-anything')).toBeNull();
       expect(screen.queryByTestId('home-action-study-new')).toBeNull();
       expect(screen.queryByTestId('home-add-subject-tile')).toBeNull();
+      expect(screen.queryByTestId('home-my-notes')).toBeNull();
       screen.getByTestId('intent-proxy-placeholder');
       screen.getByText(/Sessions are private to Alex/);
     });

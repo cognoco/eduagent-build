@@ -4,12 +4,16 @@
 
 import {
   useQuery,
+  useInfiniteQuery,
   useMutation,
   useQueryClient,
+  type InfiniteData,
+  type UseInfiniteQueryResult,
   type UseQueryResult,
   type UseMutationResult,
 } from '@tanstack/react-query';
 import type {
+  AllNotesResponse,
   BookNotesResponse,
   TopicNotesResponse,
   CreateNoteInput,
@@ -23,6 +27,40 @@ import { assertOk } from '../lib/assert-ok';
 // ---------------------------------------------------------------------------
 // useBookNotes — fetch all notes for a given book
 // ---------------------------------------------------------------------------
+
+export function useAllNotes(options?: {
+  subjectId?: string;
+  limit?: number;
+}): UseInfiniteQueryResult<InfiniteData<AllNotesResponse>, Error> {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+
+  return useInfiniteQuery({
+    queryKey: ['all-notes', activeProfile?.id, options?.subjectId],
+    initialPageParam: undefined as string | undefined,
+    queryFn: async ({ pageParam, signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await client.notes.$get(
+          {
+            query: {
+              ...(pageParam ? { cursor: pageParam } : {}),
+              ...(options?.subjectId ? { subjectId: options.subjectId } : {}),
+              ...(options?.limit ? { limit: String(options.limit) } : {}),
+            },
+          },
+          { init: { signal } },
+        );
+        await assertOk(res);
+        return (await res.json()) as AllNotesResponse;
+      } finally {
+        cleanup();
+      }
+    },
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    enabled: !!activeProfile,
+  });
+}
 
 export function useBookNotes(
   subjectId: string | undefined,
@@ -195,6 +233,9 @@ export function useCreateNote(
       void queryClient.invalidateQueries({
         queryKey: ['note-topic-ids', activeProfile?.id],
       });
+      void queryClient.invalidateQueries({
+        queryKey: ['all-notes', activeProfile?.id],
+      });
     },
   });
 }
@@ -219,6 +260,7 @@ export function useUpdateNote(): UseMutationResult<
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['book-notes'] });
       void queryClient.invalidateQueries({ queryKey: ['topic-notes'] });
+      void queryClient.invalidateQueries({ queryKey: ['all-notes'] });
     },
   });
 }
@@ -238,6 +280,7 @@ export function useDeleteNoteById(): UseMutationResult<void, Error, string> {
       void queryClient.invalidateQueries({ queryKey: ['book-notes'] });
       void queryClient.invalidateQueries({ queryKey: ['topic-notes'] });
       void queryClient.invalidateQueries({ queryKey: ['note-topic-ids'] });
+      void queryClient.invalidateQueries({ queryKey: ['all-notes'] });
     },
   });
 }

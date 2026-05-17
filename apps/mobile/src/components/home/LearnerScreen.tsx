@@ -467,6 +467,27 @@ export function LearnerScreen({
               <ChildQuotaLine totalTopicsCompleted={totalTopicsCompleted} />
             ) : null}
           </View>
+          {!isParentProxy ? (
+            <Pressable
+              onPress={() => router.push('/(app)/my-notes' as Href)}
+              className="min-h-[56px] min-w-[64px] rounded-card border border-border bg-surface items-center justify-center px-2"
+              accessibilityRole="button"
+              accessibilityLabel="Open My Notes"
+              testID="home-my-notes"
+            >
+              <Ionicons
+                name="document-text-outline"
+                size={21}
+                color={colors.primary}
+              />
+              <Text
+                className="text-caption font-semibold text-text-primary mt-0.5"
+                numberOfLines={1}
+              >
+                My Notes
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
       </View>
 
