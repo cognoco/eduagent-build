@@ -86,6 +86,35 @@ export const topicIdsResponseSchema = z.object({
 });
 export type TopicIdsResponse = z.infer<typeof topicIdsResponseSchema>;
 
+/** GET /notes - all notes for the active profile. */
+export const allNotesQuerySchema = z.object({
+  cursor: z.string().uuid().optional(),
+  limit: z.coerce.number().int().min(1).max(50).optional(),
+  subjectId: z.string().uuid().optional(),
+});
+export type AllNotesQuery = z.infer<typeof allNotesQuerySchema>;
+
+export const allNoteSchema = z.object({
+  id: z.string().uuid(),
+  topicId: z.string().uuid(),
+  topicTitle: z.string(),
+  bookId: z.string().uuid(),
+  bookTitle: z.string(),
+  subjectId: z.string().uuid(),
+  subjectName: z.string(),
+  sessionId: z.string().uuid().nullable(),
+  content: z.string(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+export type AllNote = z.infer<typeof allNoteSchema>;
+
+export const allNotesResponseSchema = z.object({
+  notes: z.array(allNoteSchema),
+  nextCursor: z.string().uuid().nullable(),
+});
+export type AllNotesResponse = z.infer<typeof allNotesResponseSchema>;
+
 /** GET /topics/:topicId/sessions — sessions associated with a topic. */
 const _topicSessionSchema = z.object({
   id: z.string().uuid(),

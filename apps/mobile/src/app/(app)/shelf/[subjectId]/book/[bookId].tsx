@@ -226,6 +226,8 @@ export default function BookScreen() {
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
   const [showNoteInput, setShowNoteInput] = useState(false);
   const [showBookCompletionBurst, setShowBookCompletionBurst] = useState(false);
+  const [isExpandingThinTopicList, setIsExpandingThinTopicList] =
+    useState(false);
   const wasBookComplete = useRef<boolean | null>(null);
   const [editingNote, setEditingNote] = useState<{
     noteId: string;
@@ -248,7 +250,8 @@ export default function BookScreen() {
   // Keep the MagicPenAnimation visible long enough to register, even when
   // generation completes faster than perception.
   const showGenerating = useStickyLoading(
-    needsGeneration || generateMutation.isPending,
+    needsGeneration ||
+      (generateMutation.isPending && !isExpandingThinTopicList),
     800,
   );
 
@@ -335,6 +338,33 @@ export default function BookScreen() {
       },
     });
   };
+
+  const handleExpandThinTopicList = useCallback(() => {
+    if (isExpandingThinTopicList || generateMutation.isPending) return;
+
+    setIsExpandingThinTopicList(true);
+    generateMutation.mutate(
+      {
+        expandExisting: true,
+        priorKnowledge:
+          activeTopics.length > 0
+            ? `The book already has these starter topics: ${activeTopics
+                .map((topic) => topic.title)
+                .join(', ')}`
+            : undefined,
+      },
+      {
+        onSuccess: () => {
+          setIsExpandingThinTopicList(false);
+          void bookQuery.refetch();
+        },
+        onError: (error) => {
+          setIsExpandingThinTopicList(false);
+          platformAlert('Could not set up topic list', formatApiError(error));
+        },
+      },
+    );
+  }, [activeTopics, bookQuery, generateMutation, isExpandingThinTopicList]);
 
   // Cleanup retry timers on unmount
   useEffect(() => {
@@ -1499,15 +1529,17 @@ export default function BookScreen() {
                 before you study it.
               </Text>
               <Pressable
-                onPress={handleBuildLearningPath}
-                disabled={startFirstCurriculumSession.isPending}
+                onPress={handleExpandThinTopicList}
+                disabled={isExpandingThinTopicList}
                 className="min-h-[44px] items-center justify-center rounded-button bg-primary px-5 py-3"
                 testID="book-thin-path-build"
                 accessibilityRole="button"
                 accessibilityLabel="Set up topic list"
               >
                 <Text className="text-body-sm font-semibold text-text-inverse">
-                  Set up topic list
+                  {isExpandingThinTopicList
+                    ? 'Setting up...'
+                    : 'Set up topic list'}
                 </Text>
               </Pressable>
             </View>

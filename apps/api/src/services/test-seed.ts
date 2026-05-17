@@ -35,6 +35,7 @@ import {
   needsDeepeningTopics,
   vocabulary,
   bookmarks,
+  topicNotes,
   quizRounds,
   generateUUIDv7,
   type Database,
@@ -2328,6 +2329,13 @@ async function seedWithBookmarks(
         'Julius Caesar crossed the Rubicon river in 49 BC, triggering the civil war.',
     },
   ]);
+
+  await db.insert(topicNotes).values({
+    profileId,
+    topicId,
+    sessionId,
+    content: 'Rome moved from monarchy to republic before becoming an empire.',
+  });
 
   return {
     scenario: 'with-bookmarks',

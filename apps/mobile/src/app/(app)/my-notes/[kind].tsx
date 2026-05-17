@@ -1,0 +1,528 @@
+import { useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import type { AllNote, Bookmark, ChildSession } from '@eduagent/schemas';
+import { useBookmarks } from '../../../hooks/use-bookmarks';
+import { useAllNotes } from '../../../hooks/use-notes';
+import { useProfileSessionsArchive } from '../../../hooks/use-progress';
+import { useProfile } from '../../../lib/profile';
+import { goBackOrReplace } from '../../../lib/navigation';
+import { useThemeColors } from '../../../lib/theme';
+
+type MyNotesKind = 'sessions' | 'notes' | 'bookmarks';
+type GroupMode = 'date' | 'subject';
+
+type ArchiveItem = {
+  id: string;
+  kind: MyNotesKind;
+  subjectId: string | null;
+  subjectName: string;
+  topicId: string | null;
+  topicTitle: string | null;
+  date: string;
+  typeLabel: string;
+  preview: string | null;
+  durationSeconds: number | null;
+  sessionId: string | null;
+};
+
+type ListRow =
+  | { type: 'header'; id: string; title: string }
+  | { type: 'item'; id: string; item: ArchiveItem };
+
+const VALID_KINDS = new Set(['sessions', 'notes', 'bookmarks']);
+
+function asKind(value: string | string[] | undefined): MyNotesKind {
+  const raw = Array.isArray(value) ? value[0] : value;
+  return VALID_KINDS.has(raw ?? '') ? (raw as MyNotesKind) : 'sessions';
+}
+
+function titleForKind(kind: MyNotesKind): string {
+  switch (kind) {
+    case 'notes':
+      return 'Notes';
+    case 'bookmarks':
+      return 'Bookmarks';
+    case 'sessions':
+      return 'Sessions';
+  }
+}
+
+function subtitleForKind(kind: MyNotesKind, count: number): string {
+  const label =
+    count === 1
+      ? kind === 'bookmarks'
+        ? 'saved reply'
+        : kind.slice(0, -1)
+      : kind === 'bookmarks'
+        ? 'saved replies'
+        : kind;
+  return `${count} ${label}`;
+}
+
+function formatDate(iso: string): string {
+  const date = new Date(iso);
+  const today = new Date();
+  const startToday = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate(),
+  );
+  const startDate = new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+  );
+  const diffDays = Math.round(
+    (startToday.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
+  );
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+function formatInlineDate(iso: string): string {
+  return new Date(iso).toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
+function formatMinutes(seconds: number | null): string | null {
+  if (seconds == null) return null;
+  if (seconds > 0 && seconds < 60) return '<1 min';
+  return `${Math.max(1, Math.round(seconds / 60))} min`;
+}
+
+function normalizeSessionType(type: string): string {
+  switch (type) {
+    case 'homework':
+      return 'Homework';
+    case 'interleaved':
+      return 'Review';
+    default:
+      return 'Learning';
+  }
+}
+
+function truncate(text: string, max = 120): string {
+  const compact = text.replace(/\s+/g, ' ').trim();
+  return compact.length > max ? `${compact.slice(0, max - 3)}...` : compact;
+}
+
+function sessionToItem(session: ChildSession): ArchiveItem {
+  return {
+    id: session.sessionId,
+    kind: 'sessions',
+    subjectId: session.subjectId,
+    subjectName: session.subjectName ?? 'Unknown subject',
+    topicId: session.topicId,
+    topicTitle: session.topicTitle,
+    date: session.startedAt,
+    typeLabel: normalizeSessionType(session.sessionType),
+    preview: session.highlight ?? session.displaySummary ?? null,
+    durationSeconds: session.wallClockSeconds ?? session.durationSeconds,
+    sessionId: session.sessionId,
+  };
+}
+
+function noteToItem(note: AllNote): ArchiveItem {
+  return {
+    id: note.id,
+    kind: 'notes',
+    subjectId: note.subjectId,
+    subjectName: note.subjectName,
+    topicId: note.topicId,
+    topicTitle: note.topicTitle,
+    date: note.updatedAt,
+    typeLabel: 'Note',
+    preview: truncate(note.content),
+    durationSeconds: null,
+    sessionId: note.sessionId,
+  };
+}
+
+function bookmarkToItem(bookmark: Bookmark): ArchiveItem {
+  return {
+    id: bookmark.id,
+    kind: 'bookmarks',
+    subjectId: bookmark.subjectId,
+    subjectName: bookmark.subjectName,
+    topicId: bookmark.topicId,
+    topicTitle: bookmark.topicTitle,
+    date: bookmark.createdAt,
+    typeLabel: 'Bookmark',
+    preview: truncate(bookmark.content),
+    durationSeconds: null,
+    sessionId: bookmark.sessionId,
+  };
+}
+
+function groupItems(items: ArchiveItem[], mode: GroupMode): ListRow[] {
+  const rows: ListRow[] = [];
+  const seen = new Set<string>();
+
+  for (const item of items) {
+    const group = mode === 'date' ? formatDate(item.date) : item.subjectName;
+    if (!seen.has(group)) {
+      seen.add(group);
+      rows.push({ type: 'header', id: `header-${group}`, title: group });
+    }
+    rows.push({ type: 'item', id: `${item.kind}-${item.id}`, item });
+  }
+
+  return rows;
+}
+
+function matchesQuery(item: ArchiveItem, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  return [
+    item.subjectName,
+    item.topicTitle,
+    item.typeLabel,
+    item.preview,
+    formatInlineDate(item.date),
+  ]
+    .filter((value): value is string => !!value)
+    .some((value) => value.toLowerCase().includes(q));
+}
+
+function GroupToggle({
+  mode,
+  onChange,
+}: {
+  mode: GroupMode;
+  onChange: (mode: GroupMode) => void;
+}) {
+  return (
+    <View className="flex-row rounded-card bg-surface-elevated p-1 mt-4">
+      {(['date', 'subject'] as const).map((value) => {
+        const selected = mode === value;
+        return (
+          <Pressable
+            key={value}
+            onPress={() => onChange(value)}
+            className={`flex-1 rounded-card py-2 items-center ${
+              selected ? 'bg-surface' : ''
+            }`}
+            accessibilityRole="button"
+            accessibilityLabel={`Group by ${value}`}
+            testID={`my-notes-group-${value}`}
+          >
+            <Text
+              className={`text-body-sm font-semibold ${
+                selected ? 'text-text-primary' : 'text-text-secondary'
+              }`}
+            >
+              {value === 'date' ? 'Date' : 'Subject'}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+function ArchiveCard({
+  item,
+  onPress,
+}: {
+  item: ArchiveItem;
+  onPress: (item: ArchiveItem) => void;
+}) {
+  const colors = useThemeColors();
+  const duration = formatMinutes(item.durationSeconds);
+  const meta = [item.topicTitle, item.typeLabel, formatInlineDate(item.date)]
+    .filter(Boolean)
+    .join(' · ');
+
+  return (
+    <Pressable
+      onPress={() => onPress(item)}
+      className="rounded-card border border-border bg-surface p-4 mb-3 flex-row items-center"
+      accessibilityRole="button"
+      accessibilityLabel={`${item.subjectName}. ${meta}`}
+      testID={`my-notes-row-${item.kind}-${item.id}`}
+    >
+      <View className="h-12 w-12 rounded-2xl bg-surface-elevated items-center justify-center me-3">
+        <Ionicons
+          name={
+            item.kind === 'sessions'
+              ? 'time-outline'
+              : item.kind === 'bookmarks'
+                ? 'bookmark-outline'
+                : 'document-text-outline'
+          }
+          size={24}
+          color={colors.primary}
+        />
+      </View>
+      <View className="flex-1 pe-2">
+        <Text
+          className="text-body font-bold text-text-primary"
+          numberOfLines={1}
+        >
+          {item.subjectName}
+        </Text>
+        <Text
+          className="text-body-sm text-text-secondary mt-0.5"
+          numberOfLines={1}
+        >
+          {meta}
+        </Text>
+        {item.preview ? (
+          <Text
+            className="text-caption text-text-tertiary mt-1"
+            numberOfLines={1}
+          >
+            {item.preview}
+          </Text>
+        ) : null}
+      </View>
+      {duration ? (
+        <View className="rounded-full bg-surface-elevated px-3 py-1 me-2">
+          <Text className="text-body-sm font-semibold text-text-primary">
+            {duration}
+          </Text>
+        </View>
+      ) : null}
+      <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+    </Pressable>
+  );
+}
+
+export default function MyNotesListScreen(): React.ReactElement {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const colors = useThemeColors();
+  const { activeProfile } = useProfile();
+  const params = useLocalSearchParams<{ kind?: string }>();
+  const kind = asKind(params.kind);
+  const [groupMode, setGroupMode] = useState<GroupMode>('date');
+  const [query, setQuery] = useState('');
+
+  const sessionsQuery = useProfileSessionsArchive(activeProfile?.id, {
+    limit: 20,
+  });
+  const notesQuery = useAllNotes({ limit: 20 });
+  const bookmarksQuery = useBookmarks({ limit: 20 });
+
+  const rawItems = useMemo((): ArchiveItem[] => {
+    if (kind === 'sessions') {
+      return (
+        sessionsQuery.data?.pages.flatMap((page) =>
+          page.sessions.map(sessionToItem),
+        ) ?? []
+      );
+    }
+    if (kind === 'notes') {
+      return (
+        notesQuery.data?.pages.flatMap((page) => page.notes.map(noteToItem)) ??
+        []
+      );
+    }
+    return (
+      bookmarksQuery.data?.pages.flatMap((page) =>
+        page.bookmarks.map(bookmarkToItem),
+      ) ?? []
+    );
+  }, [bookmarksQuery.data, kind, notesQuery.data, sessionsQuery.data]);
+
+  const items = useMemo(
+    () => rawItems.filter((item) => matchesQuery(item, query)),
+    [query, rawItems],
+  );
+  const rows = useMemo(() => groupItems(items, groupMode), [groupMode, items]);
+
+  const activeQuery =
+    kind === 'sessions'
+      ? sessionsQuery
+      : kind === 'notes'
+        ? notesQuery
+        : bookmarksQuery;
+
+  const handleEndReached = (): void => {
+    if (kind === 'sessions' && sessionsQuery.hasNextPage) {
+      void sessionsQuery.fetchNextPage();
+    }
+    if (kind === 'notes' && notesQuery.hasNextPage) {
+      void notesQuery.fetchNextPage();
+    }
+    if (kind === 'bookmarks' && bookmarksQuery.hasNextPage) {
+      void bookmarksQuery.fetchNextPage();
+    }
+  };
+
+  const hasNextPage =
+    (kind === 'sessions' && sessionsQuery.hasNextPage) ||
+    (kind === 'notes' && notesQuery.hasNextPage) ||
+    (kind === 'bookmarks' && bookmarksQuery.hasNextPage);
+  const isFetchingNextPage =
+    (kind === 'sessions' && sessionsQuery.isFetchingNextPage) ||
+    (kind === 'notes' && notesQuery.isFetchingNextPage) ||
+    (kind === 'bookmarks' && bookmarksQuery.isFetchingNextPage);
+
+  const handleItemPress = (item: ArchiveItem): void => {
+    if (item.kind === 'sessions' && item.sessionId) {
+      router.push({
+        pathname: '/session-summary/[sessionId]',
+        params: { sessionId: item.sessionId },
+      } as Href);
+      return;
+    }
+
+    if (item.subjectId && item.topicId) {
+      router.push({
+        pathname: '/(app)/topic/[topicId]',
+        params: { subjectId: item.subjectId, topicId: item.topicId },
+      } as Href);
+      return;
+    }
+
+    if (item.sessionId) {
+      router.push({
+        pathname: '/session-summary/[sessionId]',
+        params: { sessionId: item.sessionId },
+      } as Href);
+    }
+  };
+
+  return (
+    <View
+      className="flex-1 bg-background"
+      style={{ paddingTop: insets.top }}
+      testID={`my-notes-list-${kind}`}
+    >
+      <FlatList
+        testID="my-notes-flat-list"
+        data={rows}
+        keyExtractor={(row) => row.id}
+        contentContainerStyle={{
+          paddingHorizontal: 20,
+          paddingBottom: insets.bottom + 24,
+        }}
+        onEndReached={handleEndReached}
+        onEndReachedThreshold={0.45}
+        ListHeaderComponent={
+          <View>
+            <View className="flex-row items-center mt-4">
+              <Pressable
+                onPress={() =>
+                  goBackOrReplace(router, '/(app)/my-notes' as const)
+                }
+                className="me-3 min-h-[44px] min-w-[44px] items-center justify-center"
+                accessibilityRole="button"
+                accessibilityLabel="Back"
+                testID="my-notes-list-back"
+              >
+                <Ionicons
+                  name="arrow-back"
+                  size={24}
+                  color={colors.textPrimary}
+                />
+              </Pressable>
+              <View className="flex-1">
+                <Text className="text-h2 font-bold text-text-primary">
+                  {titleForKind(kind)}
+                </Text>
+                <Text className="text-body-sm text-text-secondary mt-0.5">
+                  {subtitleForKind(kind, rawItems.length)}
+                </Text>
+              </View>
+            </View>
+
+            <View className="mt-5 rounded-card border border-border bg-surface px-3 py-2 flex-row items-center">
+              <Ionicons
+                name="search"
+                size={18}
+                color={colors.textSecondary}
+                style={{ marginRight: 8 }}
+              />
+              <TextInput
+                value={query}
+                onChangeText={setQuery}
+                placeholder={`Search ${titleForKind(kind).toLowerCase()}`}
+                placeholderTextColor={colors.textSecondary}
+                className="flex-1 text-body text-text-primary"
+                testID="my-notes-search"
+              />
+            </View>
+
+            <GroupToggle mode={groupMode} onChange={setGroupMode} />
+          </View>
+        }
+        renderItem={({ item }) =>
+          item.type === 'header' ? (
+            <Text className="text-caption font-bold text-text-secondary mt-5 mb-2">
+              {item.title}
+            </Text>
+          ) : (
+            <ArchiveCard item={item.item} onPress={handleItemPress} />
+          )
+        }
+        ListEmptyComponent={
+          activeQuery.isLoading ? (
+            <View className="items-center py-14" testID="my-notes-loading">
+              <ActivityIndicator />
+            </View>
+          ) : activeQuery.isError ? (
+            <View className="items-center py-14" testID="my-notes-error">
+              <Text className="text-body font-semibold text-text-primary">
+                Couldn't load {titleForKind(kind).toLowerCase()}
+              </Text>
+              <Pressable
+                onPress={() => void activeQuery.refetch()}
+                className="mt-4 rounded-button bg-primary px-5 py-3"
+                accessibilityRole="button"
+                accessibilityLabel="Try again"
+                testID="my-notes-retry"
+              >
+                <Text className="text-body font-semibold text-text-inverse">
+                  Try again
+                </Text>
+              </Pressable>
+            </View>
+          ) : (
+            <View className="items-center py-14" testID="my-notes-empty">
+              <Text className="text-body font-semibold text-text-primary">
+                No {titleForKind(kind).toLowerCase()} yet
+              </Text>
+              <Text className="text-body-sm text-text-secondary mt-1 text-center">
+                They'll show up here as you learn.
+              </Text>
+            </View>
+          )
+        }
+        ListFooterComponent={
+          isFetchingNextPage ? (
+            <View className="py-4 items-center">
+              <ActivityIndicator />
+            </View>
+          ) : hasNextPage ? (
+            <Pressable
+              onPress={handleEndReached}
+              className="my-3 rounded-button border border-border bg-surface px-5 py-3 items-center"
+              accessibilityRole="button"
+              accessibilityLabel="Load more"
+              testID="my-notes-load-more"
+            >
+              <Text className="text-body font-semibold text-text-primary">
+                Load more
+              </Text>
+            </Pressable>
+          ) : null
+        }
+      />
+    </View>
+  );
+}

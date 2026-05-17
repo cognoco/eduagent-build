@@ -7,7 +7,10 @@ import {
   type RetentionStatus,
 } from '../../../../../components/progress';
 import { useChildSubjectTopics } from '../../../../../hooks/use-dashboard';
-import { useChildInventory } from '../../../../../hooks/use-progress';
+import {
+  useChildInventory,
+  useProfileSessions,
+} from '../../../../../hooks/use-progress';
 import { Button } from '../../../../../components/common/Button';
 import { goBackOrReplace } from '../../../../../lib/navigation';
 import { isNewLearner } from '../../../../../lib/progressive-disclosure';
@@ -30,6 +33,24 @@ function TopicSkeleton(): React.ReactNode {
   );
 }
 
+function formatSessionDate(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return date.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function formatDuration(seconds: number | null): string | null {
+  if (seconds === null || seconds <= 0) return null;
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 1) return '<1 min';
+  return `${minutes} min`;
+}
+
 export default function SubjectTopicsScreen() {
   const { t } = useTranslation();
   const router = useRouter();
@@ -38,10 +59,12 @@ export default function SubjectTopicsScreen() {
     profileId: rawProfileId,
     subjectId: rawSubjectId,
     subjectName: routeSubjectName,
+    childName: routeChildName,
   } = useLocalSearchParams<{
     profileId: string;
     subjectId: string;
     subjectName?: string;
+    childName?: string;
   }>();
   const profileId = Array.isArray(rawProfileId)
     ? rawProfileId[0]
@@ -59,12 +82,18 @@ export default function SubjectTopicsScreen() {
     refetch,
   } = useChildSubjectTopics(profileId, subjectId);
   const { data: inventory } = useChildInventory(profileId);
+  const { data: sessions } = useProfileSessions(profileId);
   const childIsNew = isNewLearner(inventory?.global.totalSessions);
   const subjectName =
     routeSubjectName ??
     inventory?.subjects.find((subject) => subject.subjectId === subjectId)
       ?.subjectName ??
     'Subject';
+  const childName = Array.isArray(routeChildName)
+    ? routeChildName[0]
+    : routeChildName;
+  const subjectSessions =
+    sessions?.filter((session) => session.subjectId === subjectId) ?? [];
 
   if (!profileId || !subjectId) {
     return (
@@ -142,9 +171,19 @@ export default function SubjectTopicsScreen() {
             {'\u2190'}
           </Text>
         </Pressable>
-        <Text className="text-h2 font-bold text-text-primary">
-          {subjectName}
-        </Text>
+        <View className="flex-1">
+          <Text className="text-h2 font-bold text-text-primary">
+            {subjectName}
+          </Text>
+          <Text className="text-body-sm text-text-secondary mt-1">
+            {t('parentView.subjects.description', {
+              subject: subjectName,
+              name: childName,
+              defaultValue:
+                "This is your child's progress in this subject. Topics appear once sessions connect to a lesson step.",
+            })}
+          </Text>
+        </View>
       </View>
 
       <ScrollView
@@ -243,17 +282,92 @@ export default function SubjectTopicsScreen() {
           </View>
         ) : childIsNew ? (
           <View className="py-8 items-center" testID="topics-new-learner">
-            <Text className="text-body text-text-secondary text-center">
-              {t('parentView.subjects.topicsNewLearner')}
+            <Text className="text-body text-text-secondary text-center mb-1">
+              {t('parentView.subjects.topicsNewLearnerTitle', {
+                defaultValue: 'No lesson topics yet',
+              })}
+            </Text>
+            <Text className="text-body-sm text-text-secondary text-center">
+              {t('parentView.subjects.topicsNewLearnerBody', {
+                defaultValue:
+                  'This can happen after early sessions or free browsing. Recent sessions below still show what happened.',
+              })}
             </Text>
           </View>
         ) : (
           <View className="py-8 items-center" testID="topics-empty">
-            <Text className="text-body text-text-secondary">
-              {t('parentView.subjects.noTopicsYet')}
+            <Text className="text-body text-text-secondary text-center mb-1">
+              {t('parentView.subjects.noTopicsYetTitle', {
+                defaultValue: 'No lesson topics yet',
+              })}
+            </Text>
+            <Text className="text-body-sm text-text-secondary text-center">
+              {t('parentView.subjects.noTopicsYetBody', {
+                defaultValue:
+                  'Sessions may still exist here before the mentor has enough lesson-level progress to show.',
+              })}
             </Text>
           </View>
         )}
+
+        {!isLoading && topics?.length === 0 && subjectSessions.length > 0 ? (
+          <View className="mt-2" testID="subject-recent-sessions">
+            <Text className="text-h3 font-semibold text-text-primary mb-1">
+              {t('parentView.subjects.recentSubjectSessions', {
+                subject: subjectName,
+                defaultValue: `Recent ${subjectName} sessions`,
+              })}
+            </Text>
+            {subjectSessions.slice(0, 5).map((session) => {
+              const duration = formatDuration(
+                session.wallClockSeconds ?? session.durationSeconds,
+              );
+              return (
+                <Pressable
+                  key={session.sessionId}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/(app)/child/[profileId]/session/[sessionId]',
+                      params: {
+                        profileId: profileId ?? '',
+                        sessionId: session.sessionId,
+                      },
+                    } as Href)
+                  }
+                  className="bg-surface rounded-card p-4 mt-3"
+                  accessibilityRole="button"
+                  accessibilityLabel={t('parentView.subjects.viewSessionFrom', {
+                    date: formatSessionDate(session.startedAt),
+                    defaultValue: `View session from ${formatSessionDate(session.startedAt)}`,
+                  })}
+                  testID={`subject-session-card-${session.sessionId}`}
+                >
+                  <View className="flex-row items-start justify-between">
+                    <View className="flex-1 pe-3">
+                      <Text className="text-body font-semibold text-text-primary">
+                        {session.topicTitle ??
+                          session.displayTitle ??
+                          formatSessionDate(session.startedAt)}
+                      </Text>
+                      <Text className="text-caption text-text-secondary mt-1">
+                        {formatSessionDate(session.startedAt)}
+                        {duration ? ` - ${duration}` : ''}
+                      </Text>
+                      {session.highlight ? (
+                        <Text className="text-body-sm text-text-secondary mt-2">
+                          {session.highlight}
+                        </Text>
+                      ) : null}
+                    </View>
+                    <Text className="text-caption text-text-secondary">
+                      {session.sessionType}
+                    </Text>
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+        ) : null}
       </ScrollView>
     </View>
   );

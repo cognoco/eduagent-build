@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { zValidator } from '@hono/zod-validator';
 import type { Database } from '@eduagent/database';
 import {
   subjectProgressEndpointResponseSchema,
@@ -10,7 +11,8 @@ import {
   topicResolveResponseSchema,
   resumeTargetResponseSchema,
   continueSuggestionResponseSchema,
-  childSessionsResponseSchema,
+  childSessionsQuerySchema,
+  childSessionsPageResponseSchema,
   childReportsResponseSchema,
   weeklyReportsResponseSchema,
   childReportDetailResponseSchema,
@@ -19,7 +21,7 @@ import {
 import type { AuthUser } from '../middleware/auth';
 import { requireProfileId } from '../middleware/profile-scope';
 import { notFound } from '../errors';
-import { getProfileSessions } from '../services/session/session-crud';
+import { listProfileSessions } from '../services/session/session-crud';
 import {
   getMonthlyReportForProfile,
   listMonthlyReportsForProfile,
@@ -107,13 +109,21 @@ export const progressRoutes = new Hono<ProgressRouteEnv>()
   })
 
   // List sessions for the active profile. Used by /progress self-reporting.
-  .get('/progress/sessions', async (c) => {
-    const db = c.get('db');
-    const profileId = requireProfileId(c.get('profileId'));
+  .get(
+    '/progress/sessions',
+    zValidator('query', childSessionsQuerySchema),
+    async (c) => {
+      const db = c.get('db');
+      const profileId = requireProfileId(c.get('profileId'));
+      const { cursor, limit } = c.req.valid('query');
 
-    const sessions = await getProfileSessions(db, profileId);
-    return c.json(childSessionsResponseSchema.parse({ sessions }));
-  })
+      const result = await listProfileSessions(db, profileId, {
+        cursor,
+        limit,
+      });
+      return c.json(childSessionsPageResponseSchema.parse(result));
+    },
+  )
 
   // List monthly reports for the active profile. Parent-facing dashboard
   // routes still enforce parent-child access separately.

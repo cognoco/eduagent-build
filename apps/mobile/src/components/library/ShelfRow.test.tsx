@@ -82,6 +82,30 @@ describe('ShelfRow', () => {
     screen.getByTestId('shelf-row-rail-sub-math');
   });
 
+  it('renders the compact shelf card variant for the library grid', () => {
+    render(<ShelfRow {...defaultProps} variant="card" />);
+
+    const header = screen.getByTestId('shelf-row-header-sub-math');
+    expect(header.props.style).toEqual(
+      expect.objectContaining({
+        backgroundColor: '#edf3ff',
+        borderRadius: 14,
+        borderWidth: 1,
+        elevation: 1,
+        justifyContent: 'space-between',
+        minHeight: 148,
+        paddingHorizontal: 12,
+      }),
+    );
+    screen.getByText('Open');
+    screen.getByText('18/32 topics');
+    expect(screen.getByTestId('shelf-row-rail-sub-math').props.style).toEqual(
+      expect.objectContaining({
+        width: '100%',
+      }),
+    );
+  });
+
   it('opens the subject shelf when header is pressed', () => {
     const onPress = jest.fn();
     render(<ShelfRow {...defaultProps} onPress={onPress} />);

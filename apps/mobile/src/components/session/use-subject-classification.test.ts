@@ -478,6 +478,70 @@ describe('useSubjectClassification — typed subject override', () => {
   });
 });
 
+describe('useSubjectClassification — homework image subject resolution', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('preserves the image send request while waiting for a subject pick', async () => {
+    const opts = createMockOpts({
+      effectiveMode: 'homework',
+      classifySubject: {
+        mutateAsync: jest.fn().mockRejectedValue(new Error('network error')),
+      },
+      availableSubjects: [{ id: 's1', name: 'Math' }],
+    });
+    const { result } = renderHook(() => useSubjectClassification(opts as any));
+
+    await act(async () => {
+      await result.current.handleSend('Solve this homework problem', {
+        attachImage: true,
+      });
+    });
+
+    expect(opts.setPendingSubjectResolution).toHaveBeenCalledWith(
+      expect.objectContaining({
+        originalText: 'Solve this homework problem',
+        attachImage: true,
+      }),
+    );
+    expect(opts.continueWithMessage).not.toHaveBeenCalled();
+  });
+
+  it('sends the preserved image after the learner chooses a subject', async () => {
+    const imageAttachment = {
+      base64: 'base64-image',
+      mimeType: 'image/jpeg' as const,
+    };
+    const pendingSubjectResolution = {
+      originalText: 'Solve this homework problem',
+      prompt: 'Pick the subject that fits best:',
+      candidates: [{ subjectId: 's1', subjectName: 'Math' }],
+      imageAttachment,
+    };
+    const opts = createMockOpts({
+      pendingSubjectResolution,
+    });
+    const { result } = renderHook(() => useSubjectClassification(opts as any));
+
+    await act(async () => {
+      await result.current.handleResolveSubject({
+        subjectId: 's1',
+        subjectName: 'Math',
+      });
+    });
+
+    expect(opts.continueWithMessage).toHaveBeenCalledWith(
+      'Solve this homework problem',
+      {
+        sessionSubjectId: 's1',
+        sessionSubjectName: 'Math',
+        imageAttachment,
+      },
+    );
+  });
+});
+
 describe('C7 subject classification ack is tentative (copy sweep 2026-04-19)', () => {
   beforeEach(() => {
     jest.clearAllMocks();

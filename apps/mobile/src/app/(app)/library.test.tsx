@@ -507,6 +507,8 @@ describe('LibraryScreen', () => {
     expect(screen.queryByTestId('library-tab-topics')).toBeNull();
     // Instead, the subject shelf list is the root navigation.
     screen.getByTestId('shelves-list');
+    screen.getByTestId('shelf-grid-row-active-0');
+    screen.getByTestId('shelf-grid-plank-active-0');
   });
 
   it('opens the subject shelf when a subject row is pressed', () => {

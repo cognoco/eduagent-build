@@ -20,6 +20,7 @@ interface ShelfRowProps {
   tint?: LearningSubjectTint;
   onPress: (subjectId: string) => void;
   testID?: string;
+  variant?: 'row' | 'card';
 }
 
 export function ShelfRow({
@@ -34,6 +35,7 @@ export function ShelfRow({
   tint: providedTint,
   onPress,
   testID,
+  variant = 'row',
 }: ShelfRowProps): React.ReactElement {
   const { t } = useTranslation();
   const colors = useThemeColors();
@@ -74,6 +76,152 @@ export function ShelfRow({
 
   const needsReview = reviewDueCount > 0;
   const showFinished = isFinished && !needsReview;
+  const openLabel = t('library.row.shelfActionOpen');
+  const openDisplayLabel =
+    openLabel.length > 0
+      ? openLabel.charAt(0).toUpperCase() + openLabel.slice(1)
+      : 'Open';
+  const cardStatusLabel = isUnstarted
+    ? t('library.row.shelfSubtitleUnstarted')
+    : rowStatus === 'paused'
+      ? t('library.row.paused')
+      : rowStatus === 'archived'
+        ? t('library.row.archived')
+        : needsReview
+          ? t('library.row.review')
+          : showFinished
+            ? t('library.row.finished')
+            : openDisplayLabel;
+  const cardStatusColor =
+    rowStatus === 'paused'
+      ? colors.warning
+      : rowStatus === 'archived'
+        ? colors.textSecondary
+        : needsReview
+          ? colors.retentionWeak
+          : showFinished
+            ? colors.success
+            : isUnstarted
+              ? tint.solid
+              : colors.textSecondary;
+  const topicCountLabel = t('library.row.bookTopics', {
+    progress: topicProgress,
+  });
+
+  if (variant === 'card') {
+    return (
+      <View
+        style={{
+          opacity: isInactive ? 0.65 : 1,
+          minHeight: 154,
+          position: 'relative',
+        }}
+      >
+        <Pressable
+          testID={testID ?? `shelf-row-header-${subjectId}`}
+          onPress={() => onPress(subjectId)}
+          accessibilityRole="button"
+          accessibilityLabel={t('library.row.shelfAccessibilityLabel', {
+            name,
+            subtitle,
+            pausedSuffix: statusSuffix,
+            reviewSuffix: needsReview
+              ? t('library.row.shelfReviewSuffix')
+              : showFinished
+                ? t('library.row.shelfFinishedSuffix')
+                : '',
+            action: t('library.row.shelfActionOpen'),
+          })}
+          style={{
+            minHeight: 148,
+            borderRadius: 14,
+            borderWidth: 1,
+            borderColor: tint.solid + '1F',
+            backgroundColor: tint.soft,
+            paddingHorizontal: 12,
+            paddingTop: 12,
+            paddingBottom: 11,
+            justifyContent: 'space-between',
+            shadowColor: tint.solid,
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.06,
+            shadowRadius: 4,
+            elevation: 1,
+          }}
+        >
+          <View>
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'flex-start',
+                gap: 8,
+              }}
+            >
+              <SubjectBookshelfMotif
+                testID={`shelf-row-bookshelf-${subjectId}`}
+                tint={tint}
+              />
+              <Ionicons
+                name="chevron-forward"
+                size={15}
+                color={colors.textSecondary}
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants"
+                style={{ marginTop: 4 }}
+              />
+            </View>
+            <Text
+              style={{
+                fontSize: 16,
+                fontWeight: 'bold',
+                color: colors.textPrimary,
+                marginTop: 12,
+              }}
+              numberOfLines={1}
+            >
+              {name}
+            </Text>
+            <Text
+              style={{
+                fontSize: 12,
+                color: cardStatusColor,
+                fontWeight: isUnstarted || needsReview ? '600' : '400',
+                marginTop: 4,
+              }}
+              numberOfLines={1}
+            >
+              {cardStatusLabel}
+            </Text>
+          </View>
+
+          <View>
+            <Text
+              style={{
+                fontSize: 12,
+                fontWeight: '600',
+                color: colors.textPrimary,
+              }}
+              numberOfLines={1}
+            >
+              {topicCountLabel}
+            </Text>
+            <View
+              testID={`shelf-row-rail-${subjectId}`}
+              style={{
+                height: 4,
+                borderRadius: 999,
+                backgroundColor: tint.solid,
+                opacity: 0.25,
+                marginTop: 7,
+                width: '100%',
+              }}
+            />
+          </View>
+        </Pressable>
+      </View>
+    );
+  }
 
   return (
     <View

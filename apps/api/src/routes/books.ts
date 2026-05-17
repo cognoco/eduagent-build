@@ -10,6 +10,7 @@ import {
   getBookSessionsResponseSchema,
   moveTopicResponseSchema,
   ERROR_CODES,
+  MIN_GENERATED_BOOK_TOPICS,
   type BookTopicGenerationResult,
 } from '@eduagent/schemas';
 import type { AuthUser } from '../middleware/auth';
@@ -22,6 +23,7 @@ import {
   persistBookTopics,
   claimBookForGeneration,
   moveTopicToBook,
+  prepareTopicExpansion,
 } from '../services/curriculum';
 import { getBookSessions } from '../services/session';
 import { generateBookTopics } from '../services/book-generation';
@@ -107,7 +109,7 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const { subjectId, bookId } = c.req.valid('param');
-      const { priorKnowledge } = c.req.valid('json');
+      const { priorKnowledge, expandExisting } = c.req.valid('json');
 
       try {
         // Atomic CAS: only one concurrent request wins the right to generate.
@@ -129,6 +131,66 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
           );
           if (!existing) {
             return notFound(c, 'Book not found');
+          }
+          if (
+            expandExisting &&
+            existing.topics.filter((topic) => !topic.skipped).length <
+              MIN_GENERATED_BOOK_TOPICS
+          ) {
+            const learnerAge = await getProfileAge(db, profileId);
+            const existingTopicTitles = existing.topics
+              .filter((topic) => !topic.skipped)
+              .map((topic) => topic.title)
+              .join(', ');
+            const expansionContext = [
+              priorKnowledge,
+              existingTopicTitles
+                ? `Existing starter topics in this book: ${existingTopicTitles}`
+                : null,
+            ]
+              .filter((value): value is string => !!value?.trim())
+              .join('\n');
+            let generated: BookTopicGenerationResult;
+            try {
+              generated = await generateBookTopics(
+                existing.book.title,
+                existing.book.description ?? '',
+                learnerAge,
+                expansionContext || undefined,
+              );
+            } catch (error) {
+              captureException(error, {
+                profileId,
+                extra: {
+                  phase: 'book_topic_expansion_fallback',
+                  subjectId,
+                  bookId,
+                  bookTitle: existing.book.title,
+                },
+              });
+              generated = buildFallbackBookTopics(
+                existing.book.title,
+                existing.book.description ?? '',
+              );
+            }
+
+            const expansion = prepareTopicExpansion(
+              generated,
+              existing.topics,
+              existing.book.title,
+              existing.book.description,
+            );
+
+            const expanded = await persistBookTopics(
+              db,
+              profileId,
+              subjectId,
+              bookId,
+              expansion.topics,
+              expansion.connections,
+              { appendToExisting: true },
+            );
+            return c.json(bookWithTopicsSchema.parse(expanded));
           }
           return c.json(bookWithTopicsSchema.parse(existing));
         }

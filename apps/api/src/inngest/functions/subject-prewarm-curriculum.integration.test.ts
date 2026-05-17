@@ -39,9 +39,32 @@ const BOOK_TOPIC_RESPONSE = JSON.stringify({
       sortOrder: 1,
       estimatedMinutes: 30,
     },
+    {
+      title: 'Tea Types',
+      description: 'How black, green, white, and oolong teas differ',
+      chapter: 'Production',
+      sortOrder: 2,
+      estimatedMinutes: 25,
+    },
+    {
+      title: 'Brewing Choices',
+      description: 'How water temperature and steeping time affect flavor',
+      chapter: 'Preparation',
+      sortOrder: 3,
+      estimatedMinutes: 20,
+    },
+    {
+      title: 'Tea Around the World',
+      description: 'How tea is used in different places and traditions',
+      chapter: 'Culture',
+      sortOrder: 4,
+      estimatedMinutes: 25,
+    },
   ],
   connections: [
     { topicA: 'Tea Plant Basics', topicB: 'Leaves and Processing' },
+    { topicA: 'Leaves and Processing', topicB: 'Tea Types' },
+    { topicA: 'Tea Types', topicB: 'Brewing Choices' },
   ],
 });
 
@@ -204,7 +227,13 @@ describe('subject-prewarm-curriculum integration', () => {
       topics
         .map((topic: typeof curriculumTopics.$inferSelect) => topic.title)
         .sort(),
-    ).toEqual(['Leaves and Processing', 'Tea Plant Basics']);
+    ).toEqual([
+      'Brewing Choices',
+      'Leaves and Processing',
+      'Tea Around the World',
+      'Tea Plant Basics',
+      'Tea Types',
+    ]);
     expect(step.sendEvent).toHaveBeenCalledWith('emit-topics-generated', {
       name: 'app/book.topics-generated',
       data: { subjectId, bookId, profileId },

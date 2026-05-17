@@ -555,8 +555,7 @@
       "typeSubjectPlaceholder": "Wpisz przedmiot",
       "typeSubjectLabel": "Wpisz przedmiot",
       "useTypedSubject": "Użyj",
-      "useTypedSubjectLabel": "Użyj wpisanego przedmiotu",
-      "addNote": "Dodaj notatkę"
+      "useTypedSubjectLabel": "Użyj wpisanego przedmiotu"
     },
     "quota": {
       "dailyLimitReached": "Osiągnięto limit dzienny",
@@ -1268,6 +1267,7 @@
     "flashOff": "wył.",
     "flashOn": "wł.",
     "centerHomework": "Wyśrodkuj swoją pracę domową",
+    "typeOrRecordInstead": "Bez zdjecia? Wpisz lub nagraj",
     "photoPreviewLabel": "Podgląd zdjęcia pracy domowej",
     "photoCaptured": "Zdjęcie zrobione",
     "retake": "Zrób ponownie",
@@ -1280,6 +1280,7 @@
     "ocrTimeout": "Czytanie zdjęcia trwa zbyt długo. Sprawdź połączenie i spróbuj ponownie lub wpisz problem ręcznie.",
     "ocrDefaultError": "Nie mogliśmy tego wyraźnie odczytać. Spróbuj zrobić zdjęcie ponownie przy lepszym oświetleniu.",
     "problemsFound": "Oto problemy, które znalazłem:",
+    "manualEntryPrompt": "Wpisz lub powiedz zadanie domowe:",
     "addSkippedFragmentsLabel": "Dodaj pominięte fragmenty z powrotem",
     "skippedFragments_one": "Pominęliśmy {{count}} niejasny fragment. Stuknij, aby go dodać z powrotem.",
     "skippedFragments_other": "Pominęliśmy {{count}} niejasnych fragmentów. Stuknij, aby je dodać z powrotem.",
@@ -1818,13 +1819,14 @@
       "progressNudgeRecentTitle": "Podtrzymaj {{focus}}",
       "progressNudgeRecentSubtitle": "{{name}} ostatnio ruszył/a {{focus}} {{time}}. Otwórz {{subject}}, zerknij szybko samodzielnie i wybierz jedno pytanie nawiązujące.",
       "progressNudgeStaleTitle": "Pomóż {{name}} wrócić do {{focus}}",
-      "progressNudgeStaleSubtitle": "Ostatnia sesja była {{time}}. Otwórz {{subject}}, podejrzyj samodzielnie mały krok i zaproś {{name}} z powrotem.",
+      "progressNudgeStaleSubtitle": "Ostatnia sesja była {{time}}. Otwórz {{subject}}, aby znaleźć szybką powtórkę albo następny krok, który możecie zrobić razem.",
       "progressNudgeStartTitle": "Ucz się razem z {{name}}",
       "progressNudgeStartSubtitle": "Otwórz {{subject}}, zobacz co jest gotowe, a potem spróbuj krótkiej lekcji samodzielnie.",
       "openProgressNudgeAction": "Otwórz {{subject}}",
       "recentGrowth": "Ostatni rozwój",
       "recentGrowthSubtitle": "Tematy opanowane w ciągu ostatnich 8 tygodni",
       "subjects": "Przedmioty",
+      "subjectsDescription": "{{name}}'s active subjects, with the most recent activity first.",
       "subjectRawInputAudit": "Twoje dziecko szukało „{{rawInput}}”",
       "openSubjectProgress": "Otwórz postępy w {{subject}}",
       "viewSubjectDetails": "Zobacz szczegóły {{name}}",
@@ -2044,7 +2046,14 @@
       "topicsCouldNotLoad": "Nie można załadować tematów",
       "retryLoadingTopics": "Spróbuj ponownie załadować tematy",
       "topicsNewLearner": "Tematy pojawią się tutaj po kilku sesjach.",
-      "noTopicsYet": "Brak jeszcze tematów"
+      "topicsNewLearnerTitle": "No lesson topics yet",
+      "topicsNewLearnerBody": "This can happen after early sessions or free browsing. Recent sessions below still show what happened.",
+      "noTopicsYet": "Brak jeszcze tematów",
+      "noTopicsYetTitle": "No lesson topics yet",
+      "noTopicsYetBody": "Sessions may still exist here before the mentor has enough lesson-level progress to show.",
+      "description": "This is your child's progress in {{subject}}. Topics appear once sessions connect to a lesson step.",
+      "recentSubjectSessions": "Recent {{subject}} sessions",
+      "viewSessionFrom": "View session from {{date}}"
     },
     "topic": {
       "topic": "Temat",

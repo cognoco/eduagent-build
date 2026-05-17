@@ -1,4 +1,4 @@
-import { eq, and, inArray, sql, desc } from 'drizzle-orm';
+import { eq, and, inArray, sql, desc, lt, type SQL } from 'drizzle-orm';
 import {
   topicNotes,
   curriculumTopics,
@@ -21,6 +21,20 @@ type NoteRow = {
   updatedAt: Date;
 };
 
+export type AllNoteRow = {
+  id: string;
+  topicId: string;
+  topicTitle: string;
+  bookId: string;
+  bookTitle: string;
+  subjectId: string;
+  subjectName: string;
+  sessionId: string | null;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 /**
  * Atomic count-and-insert for topic notes. Wraps the cap check + insert in
  * a transaction with a per-(profile, topic) advisory lock so two concurrent
@@ -38,12 +52,12 @@ async function insertNoteWithCap(
     profileId: string;
     sessionId: string | null;
     content: string;
-  }
+  },
 ): Promise<NoteRow> {
   return db.transaction(async (tx) => {
     const lockKey = `notes:${values.profileId}:${values.topicId}`;
     await tx.execute(
-      sql`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`
+      sql`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`,
     );
 
     // Idempotency for retries: if a note for this sessionId already exists,
@@ -68,8 +82,8 @@ async function insertNoteWithCap(
           and(
             eq(topicNotes.profileId, values.profileId),
             eq(topicNotes.sessionId, values.sessionId),
-            eq(topicNotes.topicId, values.topicId)
-          )
+            eq(topicNotes.topicId, values.topicId),
+          ),
         )
         .limit(1);
       if (existingForSession) return existingForSession;
@@ -81,12 +95,12 @@ async function insertNoteWithCap(
       .where(
         and(
           eq(topicNotes.topicId, values.topicId),
-          eq(topicNotes.profileId, values.profileId)
-        )
+          eq(topicNotes.profileId, values.profileId),
+        ),
       );
     if (countRow && Number(countRow.count) >= MAX_NOTES_PER_TOPIC) {
       throw new ConflictError(
-        `Note limit reached: maximum ${MAX_NOTES_PER_TOPIC} notes per topic`
+        `Note limit reached: maximum ${MAX_NOTES_PER_TOPIC} notes per topic`,
       );
     }
 
@@ -120,7 +134,7 @@ export async function createNoteForSession(
     topicId: string;
     sessionId: string;
     content: string;
-  }
+  },
 ): Promise<NoteRow> {
   return insertNoteWithCap(db, {
     topicId: params.topicId,
@@ -143,7 +157,7 @@ async function verifyTopicOwnership(
   db: Database,
   profileId: string,
   subjectId: string,
-  topicId: string
+  topicId: string,
 ): Promise<void> {
   // Use scoped repo's db handle to satisfy createScopedRepository guardrail.
   // Single query: topics ⋈ books ⋈ subjects(scoped) — verifies entire chain
@@ -155,15 +169,15 @@ async function verifyTopicOwnership(
       curriculumBooks,
       and(
         eq(curriculumTopics.bookId, curriculumBooks.id),
-        eq(curriculumBooks.subjectId, subjectId)
-      )
+        eq(curriculumBooks.subjectId, subjectId),
+      ),
     )
     .innerJoin(
       subjects,
       and(
         eq(subjects.id, curriculumBooks.subjectId),
-        eq(subjects.profileId, profileId)
-      )
+        eq(subjects.profileId, profileId),
+      ),
     )
     .where(eq(curriculumTopics.id, topicId))
     .limit(1);
@@ -184,7 +198,7 @@ export async function getNote(
   db: Database,
   profileId: string,
   subjectId: string,
-  topicId: string
+  topicId: string,
 ): Promise<{
   id: string;
   topicId: string;
@@ -202,7 +216,7 @@ export async function getNote(
     })
     .from(topicNotes)
     .where(
-      and(eq(topicNotes.topicId, topicId), eq(topicNotes.profileId, profileId))
+      and(eq(topicNotes.topicId, topicId), eq(topicNotes.profileId, profileId)),
     )
     .orderBy(desc(topicNotes.updatedAt))
     .limit(1);
@@ -218,7 +232,7 @@ export async function getNotesForBook(
   db: Database,
   profileId: string,
   subjectId: string,
-  bookId: string
+  bookId: string,
 ): Promise<
   {
     id: string;
@@ -240,7 +254,7 @@ export async function getNotesForBook(
   const book = await db.query.curriculumBooks.findFirst({
     where: and(
       eq(curriculumBooks.id, bookId),
-      eq(curriculumBooks.subjectId, subjectId)
+      eq(curriculumBooks.subjectId, subjectId),
     ),
   });
   if (!book) {
@@ -272,8 +286,8 @@ export async function getNotesForBook(
     .where(
       and(
         inArray(topicNotes.topicId, topicIds),
-        eq(topicNotes.profileId, profileId)
-      )
+        eq(topicNotes.profileId, profileId),
+      ),
     )
     .orderBy(desc(topicNotes.createdAt));
 }
@@ -284,7 +298,7 @@ export async function getNotesForBook(
  */
 export async function getTopicIdsWithNotes(
   db: Database,
-  profileId: string
+  profileId: string,
 ): Promise<string[]> {
   // Migration 0048 dropped the (topic_id, profile_id) unique constraint to
   // allow multi-note per topic, so the same topicId can now appear multiple
@@ -297,6 +311,66 @@ export async function getTopicIdsWithNotes(
   return rows.map((r) => r.topicId);
 }
 
+export async function listAllNotes(
+  db: Database,
+  profileId: string,
+  options: {
+    cursor?: string;
+    limit?: number;
+    subjectId?: string;
+  } = {},
+): Promise<{ notes: AllNoteRow[]; nextCursor: string | null }> {
+  const limit = Math.min(Math.max(options.limit ?? 20, 1), 50);
+  const conditions: SQL[] = [
+    eq(topicNotes.profileId, profileId),
+    eq(subjects.profileId, profileId),
+  ];
+
+  if (options.subjectId) {
+    conditions.push(eq(subjects.id, options.subjectId));
+  }
+
+  if (options.cursor) {
+    // topic_notes.id is UUIDv7, so desc(id) gives newest-first keyset
+    // pagination just like bookmarks.
+    conditions.push(lt(topicNotes.id, options.cursor));
+  }
+
+  const rows = await db
+    .select({
+      id: topicNotes.id,
+      topicId: topicNotes.topicId,
+      topicTitle: curriculumTopics.title,
+      bookId: curriculumBooks.id,
+      bookTitle: curriculumBooks.title,
+      subjectId: subjects.id,
+      subjectName: subjects.name,
+      sessionId: topicNotes.sessionId,
+      content: topicNotes.content,
+      createdAt: topicNotes.createdAt,
+      updatedAt: topicNotes.updatedAt,
+    })
+    .from(topicNotes)
+    .innerJoin(curriculumTopics, eq(topicNotes.topicId, curriculumTopics.id))
+    .innerJoin(curriculumBooks, eq(curriculumTopics.bookId, curriculumBooks.id))
+    .innerJoin(subjects, eq(curriculumBooks.subjectId, subjects.id))
+    .where(and(...conditions))
+    .orderBy(desc(topicNotes.id))
+    .limit(limit + 1);
+
+  const hasMore = rows.length > limit;
+  const page = hasMore ? rows.slice(0, limit) : rows;
+
+  return {
+    notes: page.map((row) => ({
+      ...row,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    })),
+    nextCursor: hasMore ? (page[page.length - 1]?.id ?? null) : null,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Multi-note CRUD (Library v3)
 // ---------------------------------------------------------------------------
@@ -307,7 +381,7 @@ export async function createNote(
   subjectId: string,
   topicId: string,
   content: string,
-  sessionId?: string
+  sessionId?: string,
 ): Promise<NoteRow> {
   await verifyTopicOwnership(db, profileId, subjectId, topicId);
 
@@ -318,8 +392,8 @@ export async function createNote(
       .where(
         and(
           eq(learningSessions.id, sessionId),
-          eq(learningSessions.profileId, profileId)
-        )
+          eq(learningSessions.profileId, profileId),
+        ),
       )
       .limit(1);
     if (!session || session.topicId !== topicId) {
@@ -339,7 +413,7 @@ export async function updateNote(
   db: Database,
   profileId: string,
   noteId: string,
-  content: string
+  content: string,
 ): Promise<{
   id: string;
   topicId: string;
@@ -368,7 +442,7 @@ export async function updateNote(
 export async function deleteNoteById(
   db: Database,
   profileId: string,
-  noteId: string
+  noteId: string,
 ): Promise<boolean> {
   const result = await db
     .delete(topicNotes)
@@ -382,7 +456,7 @@ export async function getNotesForTopic(
   db: Database,
   profileId: string,
   subjectId: string,
-  topicId: string
+  topicId: string,
 ): Promise<
   {
     id: string;
@@ -406,7 +480,7 @@ export async function getNotesForTopic(
     })
     .from(topicNotes)
     .where(
-      and(eq(topicNotes.topicId, topicId), eq(topicNotes.profileId, profileId))
+      and(eq(topicNotes.topicId, topicId), eq(topicNotes.profileId, profileId)),
     )
     .orderBy(desc(topicNotes.createdAt));
 }

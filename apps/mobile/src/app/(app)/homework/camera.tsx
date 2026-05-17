@@ -398,6 +398,27 @@ export default function CameraScreen(): React.ReactNode {
     dispatch({ type: 'RETAKE' });
   }, [speech]);
 
+  const handleStartManualEntry = useCallback(() => {
+    if (speech.isListening) {
+      void speech.stopListening();
+    }
+    setImageMimeType(null);
+    setVoiceProblemId(null);
+    lastAppliedTranscriptRef.current = '';
+    setOcrText('');
+    setDroppedProblems([]);
+    setManualText('');
+    setManualSubjectName('');
+    setAutoDetectedSubject(null);
+    setShowSubjectPicker(false);
+    setShowCelebration(false);
+    classifyTriggeredRef.current = false;
+    setDraftProblems([
+      createHomeworkProblem('', { source: 'manual', originalText: null }),
+    ]);
+    dispatch({ type: 'START_MANUAL_ENTRY' });
+  }, [speech]);
+
   const handleRetryOcr = useCallback(async () => {
     dispatch({ type: 'RETRY_OCR' });
     await ocr.retry();
@@ -841,13 +862,27 @@ export default function CameraScreen(): React.ReactNode {
             style={{ paddingBottom: insets.bottom + 16 }}
           >
             <Pressable
+              testID="manual-entry-button"
+              onPress={handleStartManualEntry}
+              className="absolute left-6 right-6 flex-row items-center justify-center gap-2 rounded-full bg-black/60 border border-white/20 py-3 px-4"
+              style={{ bottom: insets.bottom + 96 }}
+              accessibilityLabel={t('homework.typeOrRecordInstead')}
+              accessibilityRole="button"
+            >
+              <Ionicons name="mic-outline" size={18} color="white" />
+              <Text className="text-body-sm font-semibold text-white text-center">
+                {t('homework.typeOrRecordInstead')}
+              </Text>
+            </Pressable>
+
+            <Pressable
               testID="gallery-button"
               onPress={() => void handlePickFromGallery()}
-              className="absolute left-8 w-12 h-12 items-center justify-center rounded-full bg-black/40"
+              className="absolute left-8 w-16 h-16 items-center justify-center rounded-full bg-accent border border-white/20"
               accessibilityLabel={t('homework.galleryLabel')}
               accessibilityRole="button"
             >
-              <Ionicons name="images-outline" size={22} color="white" />
+              <Ionicons name="images-outline" size={26} color="white" />
             </Pressable>
 
             <Pressable
@@ -863,7 +898,7 @@ export default function CameraScreen(): React.ReactNode {
             <Pressable
               testID="flash-toggle"
               onPress={toggleFlash}
-              className="absolute right-8 w-12 h-12 items-center justify-center rounded-full bg-black/40"
+              className="absolute right-8 w-16 h-16 items-center justify-center rounded-full bg-accent border border-white/20"
               accessibilityLabel={t('homework.flashLabel', {
                 state:
                   flash === 'off'
@@ -874,7 +909,7 @@ export default function CameraScreen(): React.ReactNode {
             >
               <Ionicons
                 name={flash === 'off' ? 'flash-off-outline' : 'flash-outline'}
-                size={22}
+                size={26}
                 color="white"
               />
             </Pressable>
@@ -986,6 +1021,10 @@ export default function CameraScreen(): React.ReactNode {
   // ---- Result phase ----
   if (state.phase === 'result') {
     const needsSubjectPick = !subjectId;
+    const resultPrompt =
+      state.imageUri || ocrText.trim().length > 0
+        ? t('homework.problemsFound')
+        : t('homework.manualEntryPrompt');
 
     return (
       <ScrollView
@@ -1020,7 +1059,7 @@ export default function CameraScreen(): React.ReactNode {
         )}
 
         <Text className="text-body text-text-secondary mt-4 mb-3">
-          {t('homework.problemsFound')}
+          {resultPrompt}
         </Text>
 
         {droppedProblems.length > 0 && (

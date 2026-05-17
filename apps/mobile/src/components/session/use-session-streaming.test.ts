@@ -412,6 +412,63 @@ describe('useSessionStreaming', () => {
       expect(opts.setIsStreaming).toHaveBeenCalledWith(false);
     });
 
+    it('attaches a homework image only when the send explicitly requests it', async () => {
+      const imageBase64Ref = { current: 'homework-image-base64' };
+      const imageMimeTypeRef = {
+        current: 'image/jpeg' as const,
+      };
+      const opts = makeOpts({
+        effectiveMode: 'homework',
+        imageBase64Ref,
+        imageMimeTypeRef,
+      });
+      const { result } = renderHook(() => useSessionStreaming(opts as any));
+
+      await act(async () => {
+        await result.current.continueWithMessage('Solve 2x + 5 = 17');
+      });
+
+      const streamOptions = (opts.streamMessage as jest.Mock).mock
+        .calls[0]?.[4];
+      expect(streamOptions).not.toHaveProperty('imageBase64');
+      expect(streamOptions).not.toHaveProperty('imageMimeType');
+      expect(imageBase64Ref.current).toBe('homework-image-base64');
+      expect(imageMimeTypeRef.current).toBe('image/jpeg');
+    });
+
+    it('sends the homework image with the requested first turn and then clears it', async () => {
+      const imageBase64Ref = { current: 'homework-image-base64' };
+      const imageMimeTypeRef = {
+        current: 'image/jpeg' as const,
+      };
+      const opts = makeOpts({
+        effectiveMode: 'homework',
+        imageBase64Ref,
+        imageMimeTypeRef,
+      });
+      const { result } = renderHook(() => useSessionStreaming(opts as any));
+
+      await act(async () => {
+        await result.current.continueWithMessage('Solve 2x + 5 = 17', {
+          attachImage: true,
+        });
+      });
+
+      expect(opts.streamMessage).toHaveBeenCalledWith(
+        'Solve 2x + 5 = 17',
+        expect.any(Function),
+        expect.any(Function),
+        'new-session-1',
+        expect.objectContaining({
+          idempotencyKey: expect.any(String),
+          imageBase64: 'homework-image-base64',
+          imageMimeType: 'image/jpeg',
+        }),
+      );
+      expect(imageBase64Ref.current).toBeNull();
+      expect(imageMimeTypeRef.current).toBeNull();
+    });
+
     it('keeps the session input locked until the low-level stream settles', async () => {
       let releaseStream!: () => void;
       let markDoneHandlerComplete!: () => void;

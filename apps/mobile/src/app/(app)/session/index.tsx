@@ -76,7 +76,10 @@ import {
   type MessageFeedbackState,
   type PendingSubjectResolution,
 } from '../../../components/session/session-types';
-import { useSessionStreaming } from '../../../components/session/use-session-streaming';
+import {
+  useSessionStreaming,
+  type ContinueMessageOptions,
+} from '../../../components/session/use-session-streaming';
 import { useSubjectClassification } from '../../../components/session/use-subject-classification';
 import { useSessionActions } from '../../../components/session/use-session-actions';
 import { BookmarkNudgeTooltip } from '../../../components/session/BookmarkNudgeTooltip';
@@ -374,10 +377,8 @@ function SessionScreenInner() {
   const localMessageIdRef = useRef(0);
   const lastRetryPayloadRef = useRef<{
     text: string;
-    options?: {
-      sessionSubjectId?: string;
-      sessionSubjectName?: string;
-    };
+    options?: ContinueMessageOptions;
+    outboxEntryId?: string;
   } | null>(null);
 
   const transcript = useSessionTranscript(routeSessionId ?? '');
@@ -442,10 +443,8 @@ function SessionScreenInner() {
   // current value, not a stale closure capture from when setTimeout was created.
   const trackerStateRef = useRef(trackerState);
   trackerStateRef.current = trackerState;
-  const { imageBase64Ref, imageMimeTypeRef } = useImageBase64(
-    imageUri,
-    imageMimeType,
-  );
+  const { imageBase64Ref, imageMimeTypeRef, imageAttachmentStatus } =
+    useImageBase64(imageUri, imageMimeType);
   const { CelebrationOverlay, trigger } = useCelebration({
     celebrationLevel,
     accommodationMode: learnerProfile?.accommodationMode,
@@ -824,19 +823,31 @@ function SessionScreenInner() {
   }, [currentProblemIndex, handleSend]);
 
   useEffect(() => {
-    if (problemText && !routeSessionId && !hasAutoSentRef.current) {
-      hasAutoSentRef.current = true;
+    if (initialProblemText && !routeSessionId && !hasAutoSentRef.current) {
+      if (imageUri && imageAttachmentStatus === 'loading') {
+        return undefined;
+      }
+
       const timer = setTimeout(() => {
+        if (hasAutoSentRef.current) return;
+        hasAutoSentRef.current = true;
         // BUG-373: Mark homework auto-send as auto-sent
-        void handleSend(problemText, {
+        void handleSend(initialProblemText, {
           isAutoSent: true,
           imageUri: imageUri ?? undefined,
+          attachImage: imageAttachmentStatus === 'ready',
         });
       }, 500);
       return () => clearTimeout(timer);
     }
     return undefined;
-  }, [problemText, handleSend, routeSessionId, imageUri]);
+  }, [
+    initialProblemText,
+    handleSend,
+    routeSessionId,
+    imageUri,
+    imageAttachmentStatus,
+  ]);
 
   const {
     handleInputModeChange,
