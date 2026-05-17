@@ -160,6 +160,7 @@ import {
   getBooks,
   getAllProfileBooks,
   getBookWithTopics,
+  persistBookTopics,
   claimBookForGeneration,
 } from '../services/curriculum';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
@@ -170,6 +171,9 @@ const mockGetAllProfileBooks = getAllProfileBooks as jest.MockedFunction<
 >;
 const mockGetBookWithTopics = getBookWithTopics as jest.MockedFunction<
   typeof getBookWithTopics
+>;
+const mockPersistBookTopics = persistBookTopics as jest.MockedFunction<
+  typeof persistBookTopics
 >;
 const mockClaimBookForGeneration =
   claimBookForGeneration as jest.MockedFunction<typeof claimBookForGeneration>;
@@ -393,6 +397,50 @@ describe('book routes', () => {
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.book.topicsGenerated).toBe(true);
+    });
+
+    it('expands an already-generated thin book when requested', async () => {
+      mockClaimBookForGeneration.mockResolvedValueOnce(null);
+      mockGetBookWithTopics.mockResolvedValueOnce(mockBookWithTopics as never);
+
+      const { generateBookTopics } = jest.requireMock(
+        '../services/book-generation',
+      );
+
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/books/${BOOK_ID}/generate-topics`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ expandExisting: true }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      expect(generateBookTopics).toHaveBeenCalledWith(
+        'Ancient Egypt',
+        'Explore pyramids and pharaohs',
+        12,
+        expect.stringContaining('Existing starter topics in this book'),
+      );
+      const expansionTopics = mockPersistBookTopics.mock.calls[0]?.[4] ?? [];
+      expect(expansionTopics).toHaveLength(6);
+      expect(expansionTopics.map((topic) => topic.title)).not.toContain(
+        'Timeline of Egypt',
+      );
+      expect(expansionTopics.map((topic) => topic.title)).toContain(
+        'Start with Ancient Egypt',
+      );
+      expect(mockPersistBookTopics).toHaveBeenCalledWith(
+        undefined,
+        'test-profile-id',
+        SUBJECT_ID,
+        BOOK_ID,
+        expect.any(Array),
+        expect.any(Array),
+        { appendToExisting: true },
+      );
     });
 
     it('passes prior knowledge to generation', async () => {

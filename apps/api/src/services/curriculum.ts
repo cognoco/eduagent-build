@@ -1086,6 +1086,7 @@ export async function persistBookTopics(
   bookId: string,
   topics: GeneratedBookTopic[],
   connections: GeneratedConnection[],
+  options: { appendToExisting?: boolean } = {},
 ): Promise<BookWithTopics> {
   // Verify subject ownership
   const repo = createScopedRepository(db, profileId);
@@ -1116,6 +1117,121 @@ export async function persistBookTopics(
 
   // Idempotent: if topics already exist, just ensure the flag is set
   if (existingTopics.length > 0) {
+    if (options.appendToExisting) {
+      const validatedGenerated = bookTopicGenerationResultSchema.safeParse({
+        topics,
+        connections,
+      });
+      if (!validatedGenerated.success) {
+        throw new Error(
+          `Generated book topics failed validation: ${validatedGenerated.error.message}`,
+        );
+      }
+
+      const normalizeTopicTitle = (title: string) => title.trim().toLowerCase();
+      const existingTitleKeys = new Set(
+        existingTopics.map((topic) => normalizeTopicTitle(topic.title)),
+      );
+      const topicsToInsert = topics.filter((topic) => {
+        const key = normalizeTopicTitle(topic.title);
+        if (existingTitleKeys.has(key)) return false;
+        existingTitleKeys.add(key);
+        return true;
+      });
+
+      if (topicsToInsert.length > 0) {
+        const maxSortOrder = existingTopics.reduce(
+          (max, topic) => Math.max(max, topic.sortOrder),
+          -1,
+        );
+        const newTitleKeys = new Set(
+          topicsToInsert.map((topic) => normalizeTopicTitle(topic.title)),
+        );
+
+        await db.transaction(async (tx) => {
+          await tx
+            .insert(curriculumTopics)
+            .values(
+              topicsToInsert.map((topic, index) => ({
+                curriculumId: curriculum.id,
+                title: topic.title,
+                description: topic.description,
+                sortOrder: maxSortOrder + index + 1,
+                relevance: 'core' as const,
+                estimatedMinutes: topic.estimatedMinutes,
+                bookId,
+                chapter: topic.chapter,
+              })),
+            )
+            .onConflictDoNothing();
+
+          const topicRows = await tx.query.curriculumTopics.findMany({
+            where: and(
+              eq(curriculumTopics.curriculumId, curriculum.id),
+              eq(curriculumTopics.bookId, bookId),
+            ),
+            orderBy: asc(curriculumTopics.sortOrder),
+          });
+          const topicIdByTitle = new Map(
+            topicRows.map((topic) => [
+              normalizeTopicTitle(topic.title),
+              topic.id,
+            ]),
+          );
+          const seenConnectionKeys = new Set<string>();
+          const connectionValues: Array<typeof topicConnections.$inferInsert> =
+            [];
+
+          for (const connection of connections) {
+            const keyA = normalizeTopicTitle(connection.topicA);
+            const keyB = normalizeTopicTitle(connection.topicB);
+            if (!newTitleKeys.has(keyA) && !newTitleKeys.has(keyB)) continue;
+            const topicAId = topicIdByTitle.get(keyA);
+            const topicBId = topicIdByTitle.get(keyB);
+            if (!topicAId || !topicBId || topicAId === topicBId) continue;
+            const connectionKey =
+              topicAId < topicBId
+                ? `${topicAId}:${topicBId}`
+                : `${topicBId}:${topicAId}`;
+            if (seenConnectionKeys.has(connectionKey)) continue;
+            seenConnectionKeys.add(connectionKey);
+            connectionValues.push({ topicAId, topicBId });
+          }
+
+          if (connectionValues.length > 0) {
+            await tx
+              .insert(topicConnections)
+              .values(connectionValues)
+              .onConflictDoNothing();
+          }
+
+          await tx
+            .update(curriculumBooks)
+            .set({
+              topicsGenerated: true,
+              updatedAt: new Date(),
+            })
+            .where(
+              and(
+                eq(curriculumBooks.id, bookId),
+                eq(curriculumBooks.subjectId, subjectId),
+              ),
+            );
+        });
+
+        const appended = await getBookWithTopics(
+          db,
+          profileId,
+          subjectId,
+          bookId,
+        );
+        if (!appended) {
+          throw new NotFoundError('Book');
+        }
+        return appended;
+      }
+    }
+
     await db
       .update(curriculumBooks)
       .set({

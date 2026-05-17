@@ -512,7 +512,7 @@ describe('BookScreen', () => {
     getByText('Remembered after 9 days');
   });
 
-  it('offers to set up a fuller topic list when a book only has one starter topic', async () => {
+  it('expands the topic list when a book only has one starter topic', () => {
     mockUseBookWithTopics.mockReturnValue(
       makeBookQuery({
         data: {
@@ -539,24 +539,41 @@ describe('BookScreen', () => {
 
     fireEvent.press(getByTestId('book-thin-path-build'));
 
-    await waitFor(() => {
-      expect(mockStartFirstCurriculumMutateAsync).toHaveBeenCalledWith({
-        bookId: 'book-1',
-        sessionType: 'learning',
-        inputMode: 'text',
-      });
-      expect(mockPush).toHaveBeenCalledWith({
-        pathname: '/(app)/session',
-        params: expect.objectContaining({
-          mode: 'learning',
-          subjectId: 'sub-1',
-          bookId: 'book-1',
-          sessionId: 'session-1',
-          topicId: 'topic-1',
-          subjectName: 'Introduction to Programming',
-        }),
-      });
-    });
+    expect(mockGenerateMutate).toHaveBeenCalledWith(
+      {
+        expandExisting: true,
+        priorKnowledge:
+          'The book already has these starter topics: Introduction to Programming',
+      },
+      expect.objectContaining({
+        onSuccess: expect.any(Function),
+        onError: expect.any(Function),
+      }),
+    );
+    expect(mockStartFirstCurriculumMutateAsync).not.toHaveBeenCalled();
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('shows setup progress while expanding a thin topic list', () => {
+    mockUseBookWithTopics.mockReturnValue(
+      makeBookQuery({
+        data: {
+          ...makeBookQuery().data,
+          topics: [
+            makeTopic({
+              id: 'topic-1',
+              title: 'Introduction to Programming',
+              sortOrder: 1,
+            }),
+          ],
+        },
+      }),
+    );
+
+    const { getByTestId, getByText } = render(<BookScreen />);
+
+    fireEvent.press(getByTestId('book-thin-path-build'));
+    getByText('Setting up...');
   });
 
   it('renders continue now and started from in-progress sessions', () => {
