@@ -1818,7 +1818,7 @@
       "progressNudgeRecentTitle": "Mantém {{focus}} ativo",
       "progressNudgeRecentSubtitle": "{{name}} tocou em {{focus}} pela última vez {{time}}. Abre {{subject}}, dá tu uma vista rápida e escolhe uma pergunta de seguimento.",
       "progressNudgeStaleTitle": "Ajuda {{name}} a voltar a {{focus}}",
-      "progressNudgeStaleSubtitle": "A última sessão foi {{time}}. Abre {{subject}}, vê tu um pequeno passo e convida {{name}} a voltar.",
+      "progressNudgeStaleSubtitle": "A última sessão foi {{time}}. Abre {{subject}} para encontrar uma revisão rápida ou um próximo passo que possam fazer juntos.",
       "progressNudgeStartTitle": "Aprende junto com {{name}}",
       "progressNudgeStartSubtitle": "Abre {{subject}} para ver o que está pronto e experimenta uma lição curta para poderes ajudar.",
       "openProgressNudgeAction": "Abrir {{subject}}",

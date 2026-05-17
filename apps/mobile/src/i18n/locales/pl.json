@@ -1818,7 +1818,7 @@
       "progressNudgeRecentTitle": "Podtrzymaj {{focus}}",
       "progressNudgeRecentSubtitle": "{{name}} ostatnio ruszył/a {{focus}} {{time}}. Otwórz {{subject}}, zerknij szybko samodzielnie i wybierz jedno pytanie nawiązujące.",
       "progressNudgeStaleTitle": "Pomóż {{name}} wrócić do {{focus}}",
-      "progressNudgeStaleSubtitle": "Ostatnia sesja była {{time}}. Otwórz {{subject}}, podejrzyj samodzielnie mały krok i zaproś {{name}} z powrotem.",
+      "progressNudgeStaleSubtitle": "Ostatnia sesja była {{time}}. Otwórz {{subject}}, aby znaleźć szybką powtórkę albo następny krok, który możecie zrobić razem.",
       "progressNudgeStartTitle": "Ucz się razem z {{name}}",
       "progressNudgeStartSubtitle": "Otwórz {{subject}}, zobacz co jest gotowe, a potem spróbuj krótkiej lekcji samodzielnie.",
       "openProgressNudgeAction": "Otwórz {{subject}}",

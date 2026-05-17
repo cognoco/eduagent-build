@@ -251,7 +251,7 @@ function ProgressNudgeCard({
         : recency === 'recent'
           ? `${childName} last touched ${action.focusName} ${action.lastSessionLabel}. Open ${action.subjectName}, take a quick look yourself, then pick one follow-up question.`
           : recency === 'stale'
-            ? `Last session was ${action.lastSessionLabel}. Open ${action.subjectName}, preview a small step yourself, then invite ${childName} back in.`
+            ? `Last session was ${action.lastSessionLabel}. Open ${action.subjectName} to find one quick review or next step you can do together.`
             : `Open ${action.subjectName} to see what is ready, then try a small lesson yourself so you can help.`,
   });
 

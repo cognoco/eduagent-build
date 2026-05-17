@@ -1793,7 +1793,7 @@
       "progressNudgeRecentTitle": "{{focus}}を忘れないうちに",
       "progressNudgeRecentSubtitle": "{{name}}が最後に{{focus}}に触れたのは{{time}}です。{{subject}}を開き、まず自分で少し見てから次の質問を1つ選びましょう。",
       "progressNudgeStaleTitle": "{{name}}が{{focus}}に戻れるようにする",
-      "progressNudgeStaleSubtitle": "最後のセッションは{{time}}でした。{{subject}}を開き、自分で小さな一歩を確認してから{{name}}を誘い戻しましょう。",
+      "progressNudgeStaleSubtitle": "最後のセッションは{{time}}でした。{{subject}}を開いて、一緒にできる短い復習や次の一歩を見つけましょう。",
       "progressNudgeStartTitle": "{{name}}と一緒に学ぶ",
       "progressNudgeStartSubtitle": "{{subject}}を開いて次にできることを見て、あなたも短いレッスンを試してみましょう。",
       "openProgressNudgeAction": "{{subject}}を開く",
