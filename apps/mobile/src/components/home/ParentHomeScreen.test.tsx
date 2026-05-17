@@ -344,8 +344,11 @@ describe('ParentHomeScreen', () => {
       expect(style).toEqual(
         expect.objectContaining({
           borderWidth: 1,
-          elevation: 1,
-          shadowOpacity: 0.08,
+          borderLeftWidth: 5,
+          backgroundColor: '#ffffff',
+          elevation: 2,
+          minHeight: 78,
+          shadowOpacity: 0.12,
         }),
       );
     });

@@ -996,16 +996,21 @@ export function ParentHomeScreen({
                   <Pressable
                     key={`tonight-${prompt.key}`}
                     onPress={() => pushChildProgress(prompt.childId)}
-                    className="rounded-card px-4 py-3.5 flex-row items-start"
+                    className="flex-row items-center"
                     style={({ pressed }) => ({
                       backgroundColor: colors.surface,
-                      borderColor: tint ? tint.solid + '33' : colors.border,
+                      borderColor: tint ? tint.solid + '66' : colors.border,
                       borderWidth: 1,
+                      borderLeftWidth: 5,
+                      borderRadius: 16,
+                      minHeight: 78,
+                      paddingHorizontal: 14,
+                      paddingVertical: 14,
                       shadowColor: tint?.solid ?? colors.textSecondary,
                       shadowOffset: { width: 0, height: 2 },
-                      shadowOpacity: 0.08,
-                      shadowRadius: 5,
-                      elevation: 1,
+                      shadowOpacity: 0.12,
+                      shadowRadius: 8,
+                      elevation: 2,
                       opacity: pressed ? 0.76 : 1,
                     })}
                     accessibilityRole="button"
@@ -1022,7 +1027,7 @@ export function ParentHomeScreen({
                         color={tint?.solid ?? colors.textSecondary}
                       />
                     </View>
-                    <Text className="text-body-sm text-text-primary ms-3 flex-1">
+                    <Text className="text-body-sm text-text-primary ms-3 flex-1 leading-6">
                       {prompt.text}
                     </Text>
                   </Pressable>
