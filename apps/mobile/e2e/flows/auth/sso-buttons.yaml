@@ -49,6 +49,6 @@ tags:
 
 - assertVisible:
     id: "openai-sso-button"
-    optional: true
+    optional: true  # justified: openai-sso-button only renders when EXPO_PUBLIC_CLERK_OPENAI_SSO_KEY is set in the build; feature/config dependent
 
 - takeScreenshot: sso-02-buttons-visible

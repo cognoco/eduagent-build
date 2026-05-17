@@ -133,7 +133,7 @@ tags:
 # NOTE: Full text wraps on screen — Maestro Pattern B limitation (Issue 21).
 - assertVisible:
     text: "GDPR"
-    optional: true
+    optional: true  # justified: long wrapping text on Android is split across Text nodes; Maestro Pattern B substring matching fails (Issue 21)
     # Justification: long wrapping text unreliable on Android (Issue 21 Pattern B)
 
 - takeScreenshot: gdpr-under16-04-parent-form
@@ -183,6 +183,6 @@ tags:
       text: "Hang tight!"
     timeout: 15000
     # Optional: navigation after consent done varies by app state
-    optional: true
+    optional: true  # justified: navigation after consent-done varies — may go to consent-pending gate or learner-screen depending on device state
 
 - takeScreenshot: gdpr-under16-06-complete

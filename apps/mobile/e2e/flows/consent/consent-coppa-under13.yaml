@@ -134,7 +134,7 @@ tags:
 # Use partial match. The parent-view testID already confirms correct phase.
 - assertVisible:
     text: "COPPA"
-    optional: true
+    optional: true  # justified: long wrapping text on Android is split across Text nodes; Maestro Pattern B substring matching fails (Issue 21)
     # Justification: long wrapping text unreliable on Android (Issue 21 Pattern B)
 
 - takeScreenshot: coppa-under13-04-parent-form
@@ -186,6 +186,6 @@ tags:
       text: "Hang tight!"
     timeout: 15000
     # Optional: navigation after consent done varies by app state
-    optional: true
+    optional: true  # justified: navigation after consent-done varies — may go to consent-pending gate or learner-screen depending on device state
 
 - takeScreenshot: coppa-under13-06-complete

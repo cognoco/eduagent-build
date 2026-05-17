@@ -1,0 +1,15 @@
+# Navigate to More tab → Notifications sub-screen.
+# Precondition: bottom tab bar visible.
+# Postcondition: Notifications scroll container visible.
+appId: com.mentomate.app
+---
+- runFlow:
+    file: nav-to-more.yaml
+
+- tapOn:
+    id: "more-row-notifications"
+
+- extendedWaitUntil:
+    visible:
+      id: "more-notifications-scroll"
+    timeout: 10000

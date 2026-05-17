@@ -135,13 +135,13 @@ tags:
     visible:
       text: "dictation-test-image"
     timeout: 10000
-    optional: true
+    optional: true  # justified: Android image picker UI varies by OS version; filename may not appear as selectable text
 
 # Tap the first image tile in the picker (the pre-planted test JPEG).
 - tapOn:
     index: 0
     text: "Photos"
-    optional: true
+    optional: true  # justified: system image picker layout varies by Android version and gallery app
 
 # Wait for the LLM review to complete. The review screen is either
 # review-remediation-screen (mistakes found) or review-celebration (no mistakes).
@@ -151,13 +151,13 @@ tags:
     visible:
       id: "review-remediation-screen"
     timeout: 30000
-    optional: true
+    optional: true  # justified: LLM response determines which branch renders; mistakes found → remediation, none → celebration
 
 - extendedWaitUntil:
     visible:
       id: "review-celebration"
     timeout: 5000
-    optional: true
+    optional: true  # justified: alternate LLM outcome path — celebration renders when LLM finds no mistakes
 
 - takeScreenshot: dict-review-05-review-screen
 

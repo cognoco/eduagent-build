@@ -86,7 +86,7 @@ tags:
 # 12. Inline copy confirmation is transient — assert with optional
 - assertVisible:
     id: "session-recap-copy-prompt-toast"
-    optional: true   # transient — permitted use of optional
+    optional: true  # justified: session-recap-copy-prompt-toast auto-dismisses within ~1.5s after copy; timing-dependent transient element
 
 - takeScreenshot: 03-after-copy
 

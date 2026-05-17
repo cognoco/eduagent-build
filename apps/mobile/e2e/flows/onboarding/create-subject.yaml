@@ -78,14 +78,14 @@ tags:
 # Verify the interview title contains "Interview"
 - assertVisible:
     text: "Interview"
-    optional: true
+    optional: true  # justified: ChatShell title shows "Interview:" prefix but may show subject name before "Interview" text is visible; timing-dependent
 
 # The opening AI message should be visible in the chat (SSE streaming)
 - extendedWaitUntil:
     visible:
       text: "learning coach"
     timeout: 30000
-    optional: true
+    optional: true  # justified: LLM streaming response "learning coach" text inside FlatList chat bubble; Maestro text matching inside chat bubbles unreliable on Android
 
 # Verify the chat input is available (testID: chat-input)
 - assertVisible:

@@ -85,6 +85,6 @@ tags:
     visible:
       id: "practice-screen"
     timeout: 10000
-    optional: true
+    optional: true  # justified: end-session-button may show a confirmation dialog before navigating; practice-screen appears only after confirmation
 
 - takeScreenshot: recitation-04-exited

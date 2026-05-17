@@ -1,0 +1,15 @@
+# Navigate to More tab → Privacy sub-screen.
+# Precondition: bottom tab bar visible.
+# Postcondition: Privacy scroll container visible.
+appId: com.mentomate.app
+---
+- runFlow:
+    file: nav-to-more.yaml
+
+- tapOn:
+    id: "more-row-privacy"
+
+- extendedWaitUntil:
+    visible:
+      id: "more-privacy-scroll"
+    timeout: 10000

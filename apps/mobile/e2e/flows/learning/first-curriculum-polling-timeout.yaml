@@ -56,13 +56,13 @@ tags:
     visible:
       id: "home-screen"
     timeout: 25000
-    optional: true
+    optional: true  # justified: DRAFT flow — may land on home-screen or home-loading-timeout depending on seed; Maestro has no OR construct
 
 - extendedWaitUntil:
     visible:
       id: "home-loading-timeout"
     timeout: 5000
-    optional: true
+    optional: true  # justified: home-loading-timeout is an alternative landing state on slow networks; completes the OR pattern
 
 - takeScreenshot: curriculum-polling-02-on-home
 

@@ -77,7 +77,7 @@ tags:
       id: "book-notes-section"
     direction: DOWN
     timeout: 5000
-    optional: true
+    optional: true  # justified: book-notes-section only renders when the book has notes content; may be absent for books with no notes yet
 
 - takeScreenshot: book-04-scrolled
 
@@ -90,7 +90,7 @@ tags:
     visible:
       id: "shelf-screen"
     timeout: 10000
-    optional: true
+    optional: true  # justified: two-push navigation means book-back may land on shelf-screen first; runFlow when: block handles the conditional tap
 
 - runFlow:
     when:

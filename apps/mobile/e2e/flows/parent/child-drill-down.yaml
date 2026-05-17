@@ -38,7 +38,7 @@ tags:
     visible:
       id: 'parent-home-check-child-${CHILD_PROFILE_ID}'
     timeout: 10000
-    optional: true
+    optional: true  # justified: dynamic testID constructed from CHILD_PROFILE_ID env var; if env var is not populated by seed helper the ID cannot be matched
 
 # 4. Screenshot: parent home with child cards
 - takeScreenshot: parent-drill-down-01-dashboard
@@ -61,12 +61,10 @@ tags:
     visible:
       text: 'Subjects'
     timeout: 5000
-    optional: true
 
 # 8. Verify "Recent Sessions" heading is present
 - assertVisible:
     text: 'Recent Sessions'
-    optional: true
 
 # 9. Screenshot: child detail with subjects and sessions
 - takeScreenshot: parent-drill-down-02-child-detail
@@ -103,7 +101,7 @@ tags:
 # 15a. Verify topic retention card when data is present
 - assertVisible:
     id: 'topic-retention-card'
-    optional: true # only rendered when retention data exists — permitted use of optional
+    optional: true  # justified: only rendered when retention data exists — permitted use of optional
 
 # 16. Verify session history heading
 - assertVisible:
@@ -119,7 +117,7 @@ tags:
 # 19. Navigate back to child detail (from subject topics)
 - tapOn:
     id: 'back-button'
-    optional: true
+    optional: true  # justified: back-button may already be handled by hardware back or navigation state changes between topic → subject-topics
 
 # 20. Wait for child detail to reappear
 - extendedWaitUntil:
@@ -133,13 +131,13 @@ tags:
 #     If SESSION_ID is not set by the seed, fall back to tapping by index via point.
 - tapOn:
     id: 'session-card-${SESSION_ID}'
-    optional: true
+    optional: true  # justified: dynamic testID from SESSION_ID env var; if not set by seed, this ID won't resolve and fallback (step 21b) takes over
 
 # 21b. Fallback: tap the first session card by coordinate if SESSION_ID is not set
 - tapOn:
     id: 'child-detail-scroll'
     point: '50%,78%'
-    optional: true
+    optional: true  # justified: coordinate fallback for when SESSION_ID env var is absent; one of step 21 or 21b will succeed
 
 # 22. Wait for session detail screen (child/[profileId]/session/[sessionId].tsx)
 - extendedWaitUntil:
@@ -153,15 +151,15 @@ tags:
 # 24. Navigate back to child detail
 - tapOn:
     id: 'session-detail-back-to-child'
-    optional: true
+    optional: true  # justified: session-detail-back-to-child is a specific back button that may not exist on all nav configurations; hardware back is the real fallback
 - tapOn:
     id: 'back-button'
-    optional: true
+    optional: true  # justified: generic back-button fallback if session-detail-back-to-child was not present
 
 # 25. Navigate back to dashboard
 - tapOn:
     id: 'back-button'
-    optional: true
+    optional: true  # justified: cleanup back navigation; navigation state may already be at dashboard if earlier back steps handled it
 
 # 26. Final screenshot: back on dashboard
 - takeScreenshot: parent-drill-down-06-back-to-dashboard
@@ -194,7 +192,7 @@ tags:
     visible:
       id: 'learner-screen'
     timeout: 15000
-    optional: true
+    optional: true  # justified: persona routing after profile switch — landing screen depends on child profile state
 
 # 29. Navigate to the child's completed session summary via the Library tab.
 #     The parent-proxy seed creates a completed session (SESSION_ID) for the child.
@@ -213,28 +211,23 @@ tags:
       text: 'History'
     direction: DOWN
     timeout: 10000
-    optional: true
+    optional: true  # justified: History item presence and scroll position vary by device size and menu configuration
 
 - tapOn:
     text: 'History'
-    optional: true
+    optional: true  # justified: History tap only applicable when History was found by scroll above
 
 # 31. If History is not available, fall back to tapping the session card on learner home
 - tapOn:
-    id: 'learner-screen'
-    optional: true
-
-# 32. Attempt to tap the seeded session card directly from learner home
-- tapOn:
     id: 'session-card-${SESSION_ID}'
-    optional: true
+    optional: true  # justified: fallback path when History nav is unavailable; session card may be directly accessible on home
 
 # 33. Wait for session summary to load (summary-title is the stable landing anchor)
 - extendedWaitUntil:
     visible:
       id: 'summary-title'
     timeout: 15000
-    optional: true
+    optional: true  # justified: session summary may not load if earlier navigation steps (History or direct session card) were all skipped
 
 # 34. Core assertion: transcript CTA must NOT be visible in proxy mode.
 #     [CR-PR129-M5] view-transcript-cta is conditionally rendered only when

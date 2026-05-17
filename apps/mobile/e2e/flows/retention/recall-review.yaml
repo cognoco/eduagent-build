@@ -65,19 +65,19 @@ tags:
 # 9. Tap first book by text (seed names the book "World History")
 - tapOn:
     text: "World History"
-    optional: true
+    optional: true  # justified: text tap on nested list items can be unreliable on Android; flow recovers via topic-detail-scroll wait below
 
 # 10. Wait for book detail screen
 - extendedWaitUntil:
     visible:
       id: "book-screen"
     timeout: 10000
-    optional: true
+    optional: true  # justified: book-screen only appears if step 9 tap succeeded; conditional on optional tap above
 
 # 11. Navigate to a topic — tap first topic in the list
 - tapOn:
     text: "Topic"
-    optional: true
+    optional: true  # justified: topic tap only possible if book-screen appeared; conditional on optional chain above
 
 # 12. Wait for topic detail screen
 - extendedWaitUntil:
@@ -110,7 +110,7 @@ tags:
 # 18. Submit answer — use send-button or Enter key
 - tapOn:
     id: "send-button"
-    optional: true
+    optional: true  # justified: send-button covered by keyboard on Android (BUG-35); pressKey Enter is the reliable fallback
 - pressKey: Enter
 
 # 19. Wait for response (chat-input re-enables after LLM streams back)

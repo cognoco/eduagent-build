@@ -61,10 +61,9 @@ tags:
     id: 'parent-home-check-child-${CHILD_PROFILE_ID}'
 
 # 6. Fallback: tap on child name text
-# optional: only fires if testID-based tap in step 5 did not navigate (e.g. testID not rendered)
 - tapOn:
     text: 'Test Teen'
-    optional: true
+    optional: true  # justified: text fallback fires only when testID-based tap in step 5 did not trigger navigation; Maestro has no if-else
 
 # 7. Wait for child detail view
 - extendedWaitUntil:
@@ -77,10 +76,9 @@ tags:
     text: 'sessions'
 
 # 9. Navigate back to parent Home
-# optional: back button only present if we navigated into child detail (step 7)
 - tapOn:
     id: 'back-button'
-    optional: true
+    optional: true  # justified: back-button only present when navigation into child detail succeeded; if fallback tap also missed, no back needed
 
 # 10. Screenshot
 - takeScreenshot: parent-dashboard-complete

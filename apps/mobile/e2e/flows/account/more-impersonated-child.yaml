@@ -53,10 +53,10 @@ tags:
 - tapOn:
     text: "More"
 
-# 5. Wait for More screen to load
+# 5. Wait for More tab index to load
 - extendedWaitUntil:
     visible:
-      id: "learning-accommodation-section-header"
+      id: "more-row-learning-preferences"
     timeout: 15000
 
 - takeScreenshot: 01-more-as-impersonated-child
@@ -71,19 +71,8 @@ tags:
 - assertNotVisible:
     id: "more-row-subscription"
 
-# Export and Delete rows appear in the "Other" section — scroll down to check
-- scrollUntilVisible:
-    element:
-      id: "learning-accommodation-section-header"
-    direction: DOWN
-    timeout: 10000
-
-- scrollUntilVisible:
-    element:
-      id: "notifications-section-header"
-    direction: DOWN
-    timeout: 10000
-
+# Export and Delete rows live in the Privacy sub-screen — scroll to bottom of
+# More index to confirm they aren't exposed at the top level either.
 - scrollUntilVisible:
     element:
       id: "more-row-help"

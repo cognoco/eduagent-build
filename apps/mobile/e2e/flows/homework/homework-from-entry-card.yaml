@@ -43,29 +43,29 @@ tags:
 # 4. Camera permission screen may appear — grant it (optional, may not appear)
 - tapOn:
     id: "grant-permission-button"
-    optional: true
+    optional: true  # justified: system camera permission dialog — only appears on first use or after permission reset
 
 # 5. If camera viewfinder appears, close it to fall back to manual input
 #    On emulator, camera hardware is unreliable — test the text-input path instead.
 - tapOn:
     id: "close-button"
-    optional: true
+    optional: true  # justified: emulator camera hardware is unreliable; viewfinder may not open
 
 # 6. Fallback: if we ended up back on home, tap the HW button directly
 #    The "HW" text label is on every homework button in the subject list.
 - tapOn:
     text: "HW"
-    optional: true
+    optional: true  # justified: alternate routing path — only needed if primary homework entry returned to home
 
 # 7. Handle camera permission screen again (from HW button path)
 - tapOn:
     id: "grant-permission-button"
-    optional: true
+    optional: true  # justified: system camera permission dialog on second path — same OS-level variance
 
 # 8. Close camera viewfinder again if it appeared
 - tapOn:
     id: "close-button"
-    optional: true
+    optional: true  # justified: emulator camera hardware unreliable on second entry path
 
 # 9. Wait for chat input — we may have arrived at the session screen
 #    via auto-navigation when problemText is provided, or manual input route

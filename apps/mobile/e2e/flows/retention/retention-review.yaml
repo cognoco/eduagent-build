@@ -81,7 +81,7 @@ tags:
 # the LLM handles the extra message gracefully.
 - tapOn:
     id: "chat-input"
-    optional: true
+    optional: true  # justified: second recall card may not exist if only one card is due; optional avoids false failure on single-card sessions
 - inputText: "The second concept relates to how these principles are applied in practice"
 
 # BUG-35: keyboard covers send button on Android. Use keyboard Enter key.
@@ -92,7 +92,7 @@ tags:
     visible:
       id: "chat-input"
     timeout: 60000
-    optional: true
+    optional: true  # justified: second feedback wait only meaningful when a second card existed; optional prevents blocking when no second card
 
 # 14. Screenshot
 - takeScreenshot: retention-review-complete

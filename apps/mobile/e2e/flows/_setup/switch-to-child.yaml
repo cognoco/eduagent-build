@@ -16,21 +16,23 @@ appId: com.mentomate.app
 - tapOn:
     text: "More"
 
-# 2. Wait for More screen to load — Learning Mode is always above the fold
+# 2. Wait for More tab index — first settings row is always above the fold
 - extendedWaitUntil:
     visible:
-      id: "learning-accommodation-section-header"
-    timeout: 10000
+      id: "more-row-learning-preferences"
+    timeout: 15000
 
-# 3. Scroll to find Profile row and tap it
-- scrollUntilVisible:
-    element:
-      text: "Profile"
-    direction: DOWN
+# 3. Profile is now inside the Account sub-screen
+- tapOn:
+    id: "more-row-account"
+
+- extendedWaitUntil:
+    visible:
+      id: "more-account-scroll"
     timeout: 10000
 
 - tapOn:
-    text: "Profile"
+    id: "more-row-profile"
 
 # 4. Wait for profiles screen
 - extendedWaitUntil:

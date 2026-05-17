@@ -29,14 +29,23 @@ tags:
 - tapOn:
     text: "More"
 
-# 4. Wait for More screen content to load.
+# 4. Wait for More tab index to load.
 # Using text: "More" matched the tab label itself, resolving before ScrollView rendered.
 - extendedWaitUntil:
     visible:
-      id: "learning-accommodation-section-header"
+      id: "more-row-learning-preferences"
+    timeout: 15000
+
+# 5. Navigate to Account sub-screen — more-row-profile has moved there
+- tapOn:
+    id: "more-row-account"
+
+- extendedWaitUntil:
+    visible:
+      id: "more-account-scroll"
     timeout: 10000
 
-# 5. Scroll to Profile row
+# 6. Scroll to Profile row inside Account sub-screen
 - scrollUntilVisible:
     element:
       id: "more-row-profile"
@@ -90,12 +99,12 @@ tags:
 # Default date is Jan 1, 2010 — gives age ~16, LEARNER persona
 - tapOn:
     text: "OK"
-    optional: true
+    optional: true  # justified: Android date picker OK button only appears on Android; no-op on iOS
 
 # 13. On iOS, tap Done to dismiss the spinner picker
 - tapOn:
     id: "date-picker-done"
-    optional: true
+    optional: true  # justified: date-picker-done only appears on iOS spinner-style picker; no-op on Android
 
 - takeScreenshot: create-profile-date-selected
 
@@ -120,13 +129,13 @@ tags:
     visible:
       id: "profiles-screen"
     timeout: 15000
-    optional: true
+    optional: true  # justified: after profile creation, app may navigate to profiles-screen or directly to learner-screen depending on consent flow
 
 - extendedWaitUntil:
     visible:
       id: "learner-screen"
     timeout: 15000
-    optional: true
+    optional: true  # justified: alternative destination — one of profiles-screen or learner-screen must appear; Maestro has no OR construct
 
 # 20. Final screenshot — profile created
 - takeScreenshot: create-profile-complete

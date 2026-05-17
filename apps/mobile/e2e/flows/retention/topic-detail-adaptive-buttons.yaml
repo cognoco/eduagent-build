@@ -50,7 +50,7 @@ tags:
     notVisible:
       id: "library-loading"
     timeout: 10000
-    optional: true
+    optional: true  # justified: library-loading spinner may already be dismissed before this step runs
 
 # 6. Tap the first topic. learning-active seeds "World History" with 3 topics.
 #    Topic 1 has the session, so it will be in_progress.
@@ -63,7 +63,7 @@ tags:
       id: "topic-retention-card"
     timeout: 15000
     # learning-active may not seed retention cards; wait for Progress section instead
-    optional: true
+    optional: true  # justified: topic-retention-card only renders when retention data exists; learning-active seed may not seed retention cards
 
 - extendedWaitUntil:
     visible:

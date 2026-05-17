@@ -24,7 +24,7 @@ tags:
     visible:
       id: "learner-screen"
     timeout: 10000
-    optional: true
+    optional: true  # justified: post-auth landing varies by persona routing (parent-with-children may land elsewhere)
 
 # 3. Navigate to More tab
 - tapOn:
@@ -63,7 +63,7 @@ tags:
     visible:
       id: "profile-active-check"
     timeout: 10000
-    optional: true
+    optional: true  # justified: active-check indicator only renders when a profile has focus; may not appear on first load
 
 # 9. Verify the "Done" close button is present
 - assertVisible:
@@ -81,12 +81,12 @@ tags:
     visible:
       text: "Test Teen"
     timeout: 10000
-    optional: true
+    optional: true  # justified: child profile presence depends on seed state; "Test Teen" may not exist in all runs
 
 # 13. Tap on the child profile to switch (if visible)
 - tapOn:
     text: "Test Teen"
-    optional: true
+    optional: true  # justified: conditional tap — only fires if step 12 found the child profile
 
 # 14. After switching, we should be navigated back (router.back())
 # Wait for the home/More screen to reappear
@@ -94,19 +94,19 @@ tags:
     visible:
       id: "learner-screen"
     timeout: 15000
-    optional: true
+    optional: true  # justified: post-switch navigation destination varies (learner-screen vs staying in modal)
 
 # 15. Fallback: if no child profile was available, close the modal manually
 - tapOn:
     id: "profiles-close"
-    optional: true
+    optional: true  # justified: fallback close path when no child profile was present to switch to
 
 # 16. Verify we're back on a main screen
 - extendedWaitUntil:
     visible:
       text: "More"
     timeout: 10000
-    optional: true
+    optional: true  # justified: navigation outcome varies — learner-screen (step 14) or More tab (step 15) may be active
 
 # 17. Final screenshot — profile switch completed
 - takeScreenshot: profile-switching-complete

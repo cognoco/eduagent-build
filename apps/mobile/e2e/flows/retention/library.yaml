@@ -39,7 +39,7 @@ tags:
 # 3. Verify subject carousel is visible on home screen
 - assertVisible:
     id: "home-subject-carousel"
-    optional: true
+    optional: true  # justified: home-subject-carousel only renders when subjects are loaded; React Query revalidation may delay mount on fresh sign-in
 
 # 4. Screenshot of home screen
 - takeScreenshot: home-intent-stack
@@ -58,7 +58,7 @@ tags:
     notVisible:
       id: "library-loading"
     timeout: 10000
-    optional: true
+    optional: true  # justified: library-loading spinner is transient and may already be dismissed by the time this step runs
 
 # 8. Wait for shelves list to render (subject cards)
 - extendedWaitUntil:

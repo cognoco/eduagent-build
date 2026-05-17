@@ -11,14 +11,15 @@ tags:
   - consent
   - critical
 ---
-- runFlow: ../_setup/launch-devclient.yaml
+# Sign in (seed-and-run.sh has already launched the app and navigated
+# to the sign-in screen before Maestro starts).
+- runFlow: ../_setup/seed-and-sign-in.yaml
 
 # Navigate to a state where consent can be requested.
 # This flow verifies the consent request initiation does not error out,
 # confirming the API endpoint is reachable and returns success.
 - assertVisible:
     id: "home-screen"
-    optional: true
 
 # Note: Full consent URL verification is done server-side.
 # The API test suite asserts:

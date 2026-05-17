@@ -76,11 +76,11 @@ tags:
     visible:
       id: "quiz-challenge-start"
     timeout: 5000
-    optional: true
+    optional: true  # justified: challenge-start interstitial screen only appears for certain quiz configurations
 
 - tapOn:
     id: "quiz-challenge-start"
-    optional: true
+    optional: true  # justified: conditional tap — only fires if interstitial screen appeared (step above)
 
 - extendedWaitUntil:
     visible:
@@ -96,18 +96,18 @@ tags:
           visible:
             id: "quiz-option-0"
           timeout: 5000
-          optional: true
+          optional: true  # justified: quiz option may not be visible during round transition/animation
       - tapOn:
           id: "quiz-option-0"
-          optional: true
+          optional: true  # justified: conditional tap — only fires if quiz-option-0 appeared in this iteration
       - extendedWaitUntil:
           visible:
             id: "quiz-dispute-button"
           timeout: 5000
-          optional: true
+          optional: true  # justified: dispute button timing varies — may not appear between rapid answer transitions
       - tapOn:
           id: "quiz-play-screen"
-          optional: true
+          optional: true  # justified: advance tap needed only when quiz-play-screen requires explicit continuation
 
 - extendedWaitUntil:
     visible:

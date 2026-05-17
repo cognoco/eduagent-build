@@ -41,12 +41,12 @@ tags:
 # 4. Tap intent-continue to start recall (handles review-due topics)
 - tapOn:
     id: "home-coach-band-continue"
-    optional: true
+    optional: true  # justified: home-coach-band-continue only renders when recall-due topics exist in seed data
 
 # 5. If coaching card didn't navigate, try direct recall prompt
 - tapOn:
     text: "Review"
-    optional: true
+    optional: true  # justified: fallback path when coach band is absent or didn't navigate to recall
 
 # 6. Wait for session screen (ChatShell)
 # BUG-40 fix: The app uses ChatShell for retention/recall reviews, not a dedicated
@@ -107,13 +107,13 @@ tags:
     visible:
       id: "relearn-method-phase"
     timeout: 10000
-    optional: true
+    optional: true  # justified: routing bifurcation — directEntry=true skips topics phase; either screen may appear
 
 - extendedWaitUntil:
     visible:
       id: "relearn-topics-phase"
     timeout: 5000
-    optional: true
+    optional: true  # justified: alternative phase — appears when relearn entered without directEntry params
 
 # 17. Screenshot of relearn screen reached from remediation card
 - takeScreenshot: failed-recall-to-relearn

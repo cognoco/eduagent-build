@@ -45,10 +45,10 @@ tags:
     visible:
       text: "Nudge sent"
     timeout: 5000
-    optional: true
+    optional: true  # justified: native alert dialog timing varies; "Nudge sent" may auto-dismiss before Maestro polls
 - tapOn:
     text: "OK"
-    optional: true
+    optional: true  # justified: dismiss alert only if it appeared (paired with optional alert wait above)
 - extendedWaitUntil:
     visible:
       id: "parent-home-screen"
@@ -67,10 +67,10 @@ tags:
     visible:
       text: "Nudge sent"
     timeout: 5000
-    optional: true
+    optional: true  # justified: native alert dialog timing varies; "Nudge sent" may auto-dismiss before Maestro polls
 - tapOn:
     text: "OK"
-    optional: true
+    optional: true  # justified: dismiss alert only if it appeared (paired with optional alert wait above)
 - extendedWaitUntil:
     visible:
       id: "parent-home-screen"
@@ -89,10 +89,10 @@ tags:
     visible:
       text: "Nudge sent"
     timeout: 5000
-    optional: true
+    optional: true  # justified: native alert dialog timing varies; "Nudge sent" may auto-dismiss before Maestro polls
 - tapOn:
     text: "OK"
-    optional: true
+    optional: true  # justified: dismiss alert only if it appeared (paired with optional alert wait above)
 - extendedWaitUntil:
     visible:
       id: "parent-home-screen"

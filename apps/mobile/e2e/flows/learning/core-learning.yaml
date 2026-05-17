@@ -42,15 +42,14 @@ tags:
       id: "shelves-list"
     timeout: 5000
     # shelves-list is the Library v3 single-pane shelf list (library-tab-shelves removed in PR #144)
-    optional: true
 
 # Tap More tab → verify it navigates
 - tapOn:
     id: "tab-more"
 - extendedWaitUntil:
     visible:
-      id: "learning-accommodation-section-header"
-    timeout: 5000
+      id: "more-row-learning-preferences"
+    timeout: 15000
 
 # Return to Home tab
 - tapOn:
@@ -189,14 +188,21 @@ tags:
 
 # ── M05 post-session regression: tabs still tappable after session ────
 # After returning from a full session, the tab bar must remain functional.
-# BUG M05 found tabs hidden behind system buttons — this catches it.
-# optional: regression guard; depends on step 14 (learner-screen) succeeding first.
+# BUG M05 found tabs hidden behind system buttons. The guard must actually
+# fail if the tabs are unreachable — optional taps would silently pass even
+# when M05 regressed.
 - tapOn:
     id: "tab-library"
-    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "shelves-list"
+    timeout: 10000
 - tapOn:
     id: "tab-home"
-    optional: true
+- extendedWaitUntil:
+    visible:
+      id: "learner-screen"
+    timeout: 10000
 
 # 15. Screenshot
 - takeScreenshot: core-learning-complete

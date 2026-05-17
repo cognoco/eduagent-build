@@ -50,7 +50,7 @@ tags:
       text: "Recent Sessions"
     direction: DOWN
     timeout: 10000
-    optional: true
+    optional: true  # justified: "Recent Sessions" section only present when seed includes sessions with escalationRung >= 3
 
 # 6. Tap on a session card to navigate to session detail screen.
 #     The session detail screen (child/[profileId]/session/[sessionId].tsx) replaced
@@ -58,14 +58,14 @@ tags:
 #     the "Guided" badge was specific to the old transcript rendering.
 - tapOn:
     id: "session-card-${SESSION_ID}"
-    optional: true
+    optional: true  # justified: SESSION_ID env var may be unset in some seed runs; card may not exist
 
 # 7. Wait for session detail screen (testID: session-metadata)
 - extendedWaitUntil:
     visible:
       id: "session-metadata"
     timeout: 10000
-    optional: true
+    optional: true  # justified: only reached if step 6 (optional session card tap) succeeded
 
 # 8. Screenshot: session detail screen
 - takeScreenshot: guided-tooltip-01-session-detail
@@ -73,15 +73,15 @@ tags:
 # 9. Navigate back to child detail
 - tapOn:
     id: "session-detail-back-to-child"
-    optional: true
+    optional: true  # justified: session-detail-back-to-child only present if session screen was reached (step 7 optional)
 - tapOn:
     id: "back-button"
-    optional: true
+    optional: true  # justified: alternate back path depending on which back button is rendered
 
 # 10. Navigate back to dashboard
 - tapOn:
     id: "back-button"
-    optional: true
+    optional: true  # justified: conditional navigation — only needed if we drilled into session detail
 
 # 11. Final screenshot
 - takeScreenshot: guided-tooltip-04-complete

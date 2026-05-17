@@ -43,7 +43,7 @@ tags:
     visible:
       id: "subject-confident-card"
     timeout: 15000
-    optional: true
+    optional: true  # justified: subject-confident-card only appears when resolver returns a confidence confirmation; direct matches skip it
 
 - runFlow:
     when:

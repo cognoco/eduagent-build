@@ -1,0 +1,15 @@
+# Navigate to More tab → Account sub-screen.
+# Precondition: bottom tab bar visible.
+# Postcondition: Account scroll container visible.
+appId: com.mentomate.app
+---
+- runFlow:
+    file: nav-to-more.yaml
+
+- tapOn:
+    id: "more-row-account"
+
+- extendedWaitUntil:
+    visible:
+      id: "more-account-scroll"
+    timeout: 10000

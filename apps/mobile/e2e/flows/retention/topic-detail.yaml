@@ -57,13 +57,12 @@ tags:
     notVisible:
       id: "library-loading"
     timeout: 10000
-    optional: true
+    optional: true  # justified: library-loading spinner may already be dismissed before this step runs
 
 # 6. Verify shelves are loaded (not empty state).
 #    library-empty is removed from Library; check shelves-list is visible.
 - assertVisible:
     id: "shelves-list"
-    optional: true
 
 # 7. Tap the first visible topic row. Topic rows in book.tsx show:
 #    - topic.name (e.g., "Biology Topic 1")
@@ -88,12 +87,12 @@ tags:
 # 10. Verify retention card shows interval info
 - assertVisible:
     text: "Interval"
-    optional: true
+    optional: true  # justified: Interval field only renders when retention card has interval data; retention-due seed may not populate this field
 
 # 11. Verify retention card shows review count
 - assertVisible:
     text: "Reviews"
-    optional: true
+    optional: true  # justified: Reviews field only renders when session history exists; retention-due seed may not include reviews
 
 # 12. Verify progress section shows mastery or status
 - assertVisible:

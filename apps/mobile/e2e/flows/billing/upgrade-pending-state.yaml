@@ -40,13 +40,22 @@ tags:
 - tapOn:
     text: "More"
 
-# 4. Wait for More screen
+# 4. Wait for More tab index
 - extendedWaitUntil:
     visible:
-      id: "learning-accommodation-section-header"
+      id: "more-row-learning-preferences"
+    timeout: 15000
+
+# 4a. Navigate into Account sub-screen (Subscription has moved from More index to Account)
+- tapOn:
+    id: "more-row-account"
+
+- extendedWaitUntil:
+    visible:
+      id: "more-account-scroll"
     timeout: 10000
 
-# 5. Scroll to and tap Subscription row
+# 5. Scroll to and tap Subscription row on Account screen
 - scrollUntilVisible:
     element:
       id: "more-row-subscription"

@@ -69,12 +69,10 @@ tags:
 # 7. Verify withdrawal explanation (child-friendly copy for LEARNER persona)
 - assertVisible:
     text: "Your parent or guardian has decided to close your account."
-    optional: true
 
 # 8. Verify deletion timeline message (child-friendly copy for LEARNER persona)
 - assertVisible:
     text: "Your learning data will be removed in 7 days."
-    optional: true
 
 # 9. Screenshot of consent-withdrawn gate
 - takeScreenshot: consent-withdrawn-gate
@@ -82,7 +80,7 @@ tags:
 # 10. Verify switch-profile button (optional — only shows with 2+ profiles)
 - assertVisible:
     id: "withdrawn-switch-profile"
-    optional: true
+    optional: true  # justified: withdrawn-switch-profile only renders when account has 2+ profiles; single-profile seeds won't show it
 
 # 11. Verify sign-out button
 - assertVisible:

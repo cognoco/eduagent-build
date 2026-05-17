@@ -43,7 +43,7 @@ tags:
     visible:
       id: "progress-keep-learning"
     timeout: 15000
-    optional: true
+    optional: true  # justified: progress-keep-learning only renders in "new learner" teaser state; learning-active seed may have exited that gate
 
 # 5. Screenshot: Progress tab
 - takeScreenshot: streak-display-01-progress-tab

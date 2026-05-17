@@ -105,18 +105,18 @@ tags:
     visible:
       id: "quiz-launch-loading"
     timeout: 10000
-    optional: true
+    optional: true  # justified: loading screen is transient; fast devices/network may skip it before Maestro polls
 
 # 7. Dismiss challenge banner if present
 - extendedWaitUntil:
     visible:
       id: "quiz-challenge-start"
     timeout: 5000
-    optional: true
+    optional: true  # justified: challenge banner only appears on difficulty-bump runs, not every session
 
 - tapOn:
     id: "quiz-challenge-start"
-    optional: true
+    optional: true  # justified: only tappable when challenge banner appeared (line above)
 
 # 8. Wait for play screen
 - extendedWaitUntil:
@@ -152,24 +152,24 @@ tags:
     visible:
       id: "quiz-dispute-button"
     timeout: 3000
-    optional: true
+    optional: true  # justified: AI/LLM response — option-1 correctness is non-deterministic on LLM-generated rounds; dispute button only appears on wrong answers
 
 - takeScreenshot: quiz-dispute-04-dispute-button-visible
 
 # 11b. Tap dispute button — should show quiz-dispute-noted and hide quiz-dispute-button
 - tapOn:
     id: "quiz-dispute-button"
-    optional: true
+    optional: true  # justified: only tappable when wrong-answer path was taken (line above)
 
 - extendedWaitUntil:
     visible:
       id: "quiz-dispute-noted"
     timeout: 5000
-    optional: true
+    optional: true  # justified: quiz-dispute-noted only appears after tapping dispute button, which requires wrong-answer path
 
 - assertNotVisible:
     id: "quiz-dispute-button"
-    optional: true
+    optional: true  # justified: assertNotVisible for button after dispute tap — only meaningful in wrong-answer path
 
 - takeScreenshot: quiz-dispute-05-dispute-noted
 
@@ -178,12 +178,12 @@ tags:
 #     [BUG-927] Dispute button is suppressed on correct answers — assert it.
 - assertNotVisible:
     id: "quiz-dispute-button"
-    optional: true
+    optional: true  # justified: AI/LLM response — option-1 may be correct or wrong; assertNotVisible is only valid assertion in correct-answer branch; in wrong-answer branch the button IS visible, so optional is required to avoid false failure
 
 # 13. Continue to next question or results
 - tapOn:
     id: "quiz-play-body"
-    optional: true
+    optional: true  # justified: quiz-play-body tap advances the round; may not apply if round auto-advanced or ended
 
 - takeScreenshot: quiz-dispute-06-after-dispute
 
@@ -197,45 +197,45 @@ tags:
     visible:
       id: "quiz-option-0"
     timeout: 10000
-    optional: true
+    optional: true  # justified: question 2 may not exist if quiz ended after question 1 or round had only 1 question
 
 - tapOn:
     id: "quiz-option-0"
-    optional: true
+    optional: true  # justified: only tappable when question 2 is rendered (line above)
 
 - extendedWaitUntil:
     visible:
       id: "quiz-answer-feedback"
     timeout: 10000
-    optional: true
+    optional: true  # justified: answer feedback only appears after question 2 answer submission; question 2 may not have been reached
 
 # After a correct answer, quiz-dispute-button must not be present
 # [BUG-927] Core assertion: dispute button only shows on wrong answers
 - assertNotVisible:
     id: "quiz-dispute-button"
-    optional: true
+    optional: true  # justified: AI/LLM response — option-0 correctness is non-deterministic; assertNotVisible is valid for both correct and wrong paths (wrong path also has no button after dispute was already tapped)
 
 - takeScreenshot: quiz-dispute-07-correct-no-dispute-button
 
 # 14. Quit back to quiz index (cleanup)
 - tapOn:
     id: "quiz-play-quit"
-    optional: true
+    optional: true  # justified: cleanup tap — quiz may have auto-advanced to results before this point, making quit button absent
 
 - extendedWaitUntil:
     visible:
       id: "quiz-quit-modal-backdrop"
     timeout: 5000
-    optional: true
+    optional: true  # justified: quit modal only appears after quit tap; quit tap itself was optional
 
 - tapOn:
     id: "quiz-quit-confirm"
-    optional: true
+    optional: true  # justified: confirm tap only applicable when quit modal appeared
 
 - extendedWaitUntil:
     visible:
       id: "quiz-index-screen"
     timeout: 10000
-    optional: true
+    optional: true  # justified: return to index depends on modal confirmation; earlier cleanup steps were optional
 
 - takeScreenshot: quiz-dispute-08-done

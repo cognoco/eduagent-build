@@ -36,18 +36,20 @@ tags:
 - tapOn:
     text: "More"
 
-# 4. Wait for More screen — Learning Mode section is always above the fold
+# 4. Wait for More tab index — first settings row is always above the fold
 - extendedWaitUntil:
     visible:
-      id: "learning-accommodation-section-header"
-    timeout: 10000
-
-# 5. Scroll down to Account section (language picker row is below the fold)
-- scrollUntilVisible:
-    element:
-      id: "settings-app-language"
-    direction: DOWN
+      id: "more-row-learning-preferences"
     timeout: 15000
+
+# 5. Navigate to Account sub-screen (language picker lives there now)
+- tapOn:
+    id: "more-row-account"
+
+- extendedWaitUntil:
+    visible:
+      id: "more-account-scroll"
+    timeout: 10000
 
 # 6. Tap the App Language settings row to open the bottom sheet
 - tapOn:

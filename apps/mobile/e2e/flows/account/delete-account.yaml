@@ -57,12 +57,10 @@ tags:
 # 8. Verify informational text about permanent deletion
 - assertVisible:
     text: "permanently delete your account"
-    optional: true
 
 # 9. Verify 7-day grace period notice
 - assertVisible:
     text: "7-day grace period"
-    optional: true
 
 # 10. Verify the confirm button is present (red danger button)
 - assertVisible:

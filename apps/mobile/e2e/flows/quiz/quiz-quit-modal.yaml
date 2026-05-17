@@ -70,11 +70,11 @@ tags:
     visible:
       id: "quiz-challenge-start"
     timeout: 5000
-    optional: true
+    optional: true  # justified: quiz-challenge-start banner only renders for accounts with an active challenge; not shown for all seeds
 
 - tapOn:
     id: "quiz-challenge-start"
-    optional: true
+    optional: true  # justified: challenge-start tap only needed when the banner appeared above; no-op otherwise
 
 - extendedWaitUntil:
     visible:

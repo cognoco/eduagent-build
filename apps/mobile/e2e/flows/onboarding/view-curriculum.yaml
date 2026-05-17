@@ -36,7 +36,7 @@ tags:
     visible:
       id: "home-subject-carousel"
     timeout: 10000
-    optional: true
+    optional: true  # justified: BUG-989 — home-subject-carousel may not mount before this step on cold-start cache; timing-dependent
 
 # REMOVED (Rule 3): "Your coach has a plan" assertion dropped — this heading
 # text no longer exists in the home screen implementation. Home screen shows

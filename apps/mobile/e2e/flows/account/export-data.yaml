@@ -68,17 +68,19 @@ tags:
 
 - extendedWaitUntil:
     visible:
-      id: "learning-accommodation-section-header"
-    timeout: 30000
+      id: "more-row-learning-preferences"
+    timeout: 15000
 
 - takeScreenshot: export-02-more-loaded
 
-# ── Step 4: Scroll to "Export my data" row and tap it ──
-- scrollUntilVisible:
-    element:
-      id: "more-row-export"
-    direction: DOWN
-    timeout: 15000
+# ── Step 4: Navigate to Privacy sub-screen (Export lives there now) ──
+- tapOn:
+    id: "more-row-privacy"
+
+- extendedWaitUntil:
+    visible:
+      id: "more-privacy-scroll"
+    timeout: 10000
 
 - assertVisible:
     id: "more-row-export"
@@ -100,7 +102,7 @@ tags:
     visible:
       text: "MentoMate account data export"
     timeout: 15000
-    optional: true
+    optional: true  # justified: Android native Share sheet title rendering varies by Android version; not all versions surface the share title as accessible text
 
 - takeScreenshot: export-04-share-sheet
 
@@ -113,14 +115,14 @@ tags:
 - assertNotVisible:
     text: "Export failed"
 
-# ── Step 7: Dismiss Share sheet and confirm we are still on More screen ──
+# ── Step 7: Dismiss Share sheet and confirm we are still on Privacy screen ──
 # Press Back to dismiss the share sheet (works on all Android versions).
-# The app should remain on the More screen with more-row-export visible.
+# The app should remain on the Privacy sub-screen with more-row-export visible.
 - pressKey: back
 
 - extendedWaitUntil:
     visible:
-      id: "more-row-export"
+      id: "more-privacy-scroll"
     timeout: 10000
 
-- takeScreenshot: export-05-back-on-more
+- takeScreenshot: export-05-back-on-privacy

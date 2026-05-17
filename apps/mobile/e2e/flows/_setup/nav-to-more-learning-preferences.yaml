@@ -1,0 +1,15 @@
+# Navigate to More tab → Learning Preferences sub-screen.
+# Precondition: bottom tab bar visible.
+# Postcondition: Learning Preferences scroll container visible.
+appId: com.mentomate.app
+---
+- runFlow:
+    file: nav-to-more.yaml
+
+- tapOn:
+    id: "more-row-learning-preferences"
+
+- extendedWaitUntil:
+    visible:
+      id: "learning-preferences-scroll"
+    timeout: 10000
