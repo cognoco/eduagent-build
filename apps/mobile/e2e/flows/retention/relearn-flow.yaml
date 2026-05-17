@@ -66,7 +66,7 @@ tags:
     notVisible:
       id: "library-loading"
     timeout: 10000
-    optional: true
+    optional: true  # justified: loading spinner is ephemeral — may already be gone by the time Maestro polls
 
 # 6. Tap the Chemistry subject shelf row header.
 #    The failed-recall-3x seed creates a "Chemistry" subject.
@@ -74,11 +74,11 @@ tags:
 #    ShelfRow uses testID="shelf-row-header-${subjectId}".
 - tapOn:
     id: "shelf-row-header-${SUBJECT_ID}"
-    optional: true
+    optional: true  # justified: SUBJECT_ID env var may be absent if seed injection failed; text fallback covers it
 
 - tapOn:
     text: "Chemistry"
-    optional: true
+    optional: true  # justified: text fallback when SUBJECT_ID env var is absent (paired with step above)
 
 # 7. Wait for shelf screen (books for Chemistry)
 - extendedWaitUntil:
@@ -111,10 +111,12 @@ tags:
       id: "topic-detail-scroll"
     timeout: 10000
 
-# 13. Look for "Needs attention" indicator (3+ failures marker)
+# 13. Verify "Needs attention" indicator (3+ failures marker).
+# The failed-recall-3x seed explicitly sets failureCount=3 for "Chemistry
+# Topic 1", which is above the threshold — this assertion is a contract gate
+# on the failed-recall scenario, not a probabilistic check.
 - assertVisible:
     text: "Needs attention"
-    optional: true
 
 # 14. Verify the study CTA is present
 - assertVisible:
@@ -138,18 +140,18 @@ tags:
     visible:
       id: "relearn-method-phase"
     timeout: 10000
-    optional: true
+    optional: true  # justified: routing bifurcation — directEntry=true skips topics phase; either may appear first
 
 - extendedWaitUntil:
     visible:
       id: "relearn-topics-phase"
     timeout: 5000
-    optional: true
+    optional: true  # justified: alternative phase — appears when directEntry=false or topicId absent
 
 # 18. If in topics phase, select the first topic to advance to method phase
 - tapOn:
     text: "Chemistry Topic 1"
-    optional: true
+    optional: true  # justified: conditional tap — only needed when relearn-topics-phase loaded (not method phase)
 
 # 19. Wait for method phase
 - extendedWaitUntil:
@@ -184,7 +186,7 @@ tags:
     visible:
       id: "relearn-loading"
     timeout: 5000
-    optional: true
+    optional: true  # justified: loading state is ephemeral — API may respond faster than Maestro's poll interval
 
 # 25. Screenshot after method selection (loading or session)
 - takeScreenshot: relearn-session-starting

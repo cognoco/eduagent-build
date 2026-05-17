@@ -54,19 +54,18 @@ tags:
 # 7. Check if shelves list is visible (Library v3: library-tab-shelves removed in PR #144)
 - assertVisible:
     id: "shelves-list"
-    optional: true
+    optional: true  # justified: early check — shelves-list may already be visible before loading completes; non-blocking pre-check
 
 # 8. Check for loading state (may have already resolved)
 - assertVisible:
     id: "library-loading"
-    optional: true
+    optional: true  # justified: library-loading is transient; it may have already dismissed by the time this step runs
 
-# 9. Wait for shelves list or loading to resolve
+# 9. Wait for shelves list to render — mandatory: this is the core assertion for the Library tab
 - extendedWaitUntil:
     visible:
       id: "shelves-list"
     timeout: 10000
-    optional: true
 
 # 10. Screenshot: Library content (Shelves tab — subject cards)
 - takeScreenshot: parent-library-02-content

@@ -85,18 +85,20 @@ tags:
 
 - takeScreenshot: home-layout-04-action-chips
 
-# ── Part 4: Coach band (data-gated — present when a resumable session exists) ──
-# learning-active has a seeded incomplete session so coach-band-continue should
-# render. Permitted optional use: UI gated by data presence.
+# ── Part 4: Coach band (seed contract: learning-active has a resumable session) ──
+# The flow's documented prerequisite is "at least one active subject and a due
+# session" (scenario: learning-active). The coach band MUST render for this
+# seed; making it optional masked seed-contract regressions. Keep the scroll
+# optional (it's a best-effort discovery step), but require the final
+# assertion so a missing resumable-session UI fails the test.
 - scrollUntilVisible:
     element:
       id: "home-coach-band"
     direction: DOWN
-    timeout: 5000
-    optional: true
+    timeout: 10000
+    optional: true  # justified: scroll is discovery only — assertVisible below is the contract gate
 
 - assertVisible:
     id: "home-coach-band-continue"
-    optional: true
 
 - takeScreenshot: home-layout-05-coach-band

@@ -26,15 +26,24 @@ tags:
     timeout: 15000
 
 # 3. Navigate to More tab (use accessibility label for reliable targeting)
-- tapOn: "More Tab"
+- tapOn: "More"
 
-# 4. Wait for More screen — Learning Mode section is always above the fold
+# 4. Wait for More tab index — First settings row is always above the fold
 - extendedWaitUntil:
     visible:
-      id: "learning-accommodation-section-header"
-    timeout: 30000
+      id: "more-row-learning-preferences"
+    timeout: 15000
 
-# 5. Scroll to & tap Subscription menu item (below the fold on More screen)
+# 4a. Navigate into Account sub-screen (Subscription has moved from More index to Account)
+- tapOn:
+    id: "more-row-account"
+
+- extendedWaitUntil:
+    visible:
+      id: "more-account-scroll"
+    timeout: 10000
+
+# 5. Scroll to & tap Subscription menu item on Account screen
 - scrollUntilVisible:
     element:
       text: "Subscription"
@@ -57,7 +66,7 @@ tags:
 # 7a. Verify trial end-date text when present (only when trialEndsAt is set)
 - assertVisible:
     id: "trial-banner-ends-at"
-    optional: true   # only rendered when subscription.trialEndsAt is set — permitted use of optional
+    optional: true  # justified: trial-banner-ends-at only renders when subscription.trialEndsAt is set in seed data
 
 # 8. Screenshot of trial banner
 - takeScreenshot: subscription-details-trial-banner
@@ -95,12 +104,12 @@ tags:
     timeout: 15000
     speed: 30
     # BYOK UI commented out in subscription.tsx (Epic 10) — element not rendered
-    optional: true
+    optional: true  # justified: BYOK UI is commented out in subscription.tsx (Epic 10) — element not rendered yet
 
 # BYOK UI commented out in subscription.tsx (Epic 10) — element not rendered
 - assertVisible:
     text: "Bring your own key \\(coming soon\\)"
-    optional: true
+    optional: true  # justified: BYOK UI is commented out in subscription.tsx (Epic 10) — element not rendered yet
 
 # 15. Screenshot of restore + BYOK section
 - takeScreenshot: subscription-details-restore-byok
@@ -108,12 +117,12 @@ tags:
 # 16. Verify RevenueCat offerings section (optional — emulator has no store)
 - assertVisible:
     id: "offerings-section"
-    optional: true
+    optional: true  # justified: RevenueCat offerings unavailable in emulator environment (no Google Play store)
 
 # 17. If no offerings, verify fallback message
 - assertVisible:
     id: "no-offerings"
-    optional: true
+    optional: true  # justified: no-offerings fallback is the alternate of offerings-section; one or the other renders
 
 # 18. Final screenshot
 - takeScreenshot: subscription-details-complete

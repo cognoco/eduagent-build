@@ -296,6 +296,13 @@ reverse_port() {
 reverse_port 8081
 reverse_port 8082
 reverse_port "${METRO_PORT:-}"
+API_PORT=$(echo "$API_URL" | sed -n 's#.*:\([0-9][0-9]*\)\(/.*\)\?$#\1#p')
+reverse_port "${API_PORT:-8787}"
+
+# BUG-7 workaround: the dev-client auto-discovers Metro on port 8081, but OkHttp's
+# chunked transfer encoding fails on direct Metro connections on WHPX emulators.
+# Reroute emulator's 8081 through the bundle proxy (8082) which re-encodes responses.
+$ADB $DEVICE_FLAG reverse tcp:8081 tcp:8082 2>/dev/null || true
 
 echo "[seed-and-run] Emulator OK. Ports forwarded:${REVERSED_PORTS}. METRO_URL=${METRO_URL}. Timeouts: launcher=${LAUNCHER_TIMEOUT}s, bundle=${BUNDLE_TIMEOUT}s"
 

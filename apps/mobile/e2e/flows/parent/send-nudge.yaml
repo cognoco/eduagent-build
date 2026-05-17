@@ -70,7 +70,7 @@ tags:
     visible:
       text: "Nudge sent"
     timeout: 5000
-    optional: true
+    optional: true  # justified: native Alert.alert text matching is unreliable on Android (BUG-49 pattern); screenshot provides visual evidence
 
 # 11. Screenshot: success alert
 - takeScreenshot: send-nudge-03-sent-alert
@@ -78,7 +78,7 @@ tags:
 # 12. Dismiss the native alert (tap OK)
 - tapOn:
     text: "OK"
-    optional: true
+    optional: true  # justified: OK button only present when native alert appeared in step 10; no-op if alert text was not matched
 
 # 13. The action sheet should auto-close after success.
 #     Verify we're back on the parent Home screen.

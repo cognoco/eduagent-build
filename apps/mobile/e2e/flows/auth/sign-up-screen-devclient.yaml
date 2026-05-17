@@ -37,7 +37,7 @@ tags:
 # SSO buttons (sign-up screen uses sign-up-google-sso, not google-sso-button)
 - assertVisible:
     id: "sign-up-google-sso"
-    optional: true
+    optional: true  # justified: sign-up-google-sso testID may not be found by Maestro on Android Pressable (BUG-4 pattern); text assertion below is the reliable fallback
 - assertVisible: "Continue with Google"
 - assertVisible: "Continue with Apple"
 

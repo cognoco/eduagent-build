@@ -31,8 +31,8 @@ tags:
 
 - extendedWaitUntil:
     visible:
-      id: "learning-accommodation-section-header"
-    timeout: 10000
+      id: "more-row-learning-preferences"
+    timeout: 15000
 
 - takeScreenshot: bug239-02-more-tab
 
@@ -67,7 +67,7 @@ tags:
 # Android date picker: confirm default date
 - tapOn:
     text: "OK"
-    optional: true
+    optional: true  # justified: Android date picker confirmation dialog varies by OS version and device manufacturer
 
 - takeScreenshot: bug239-04-form-filled
 
@@ -89,21 +89,18 @@ tags:
 # 10. Dismiss the alert
 - tapOn:
     text: "OK"
-    optional: true
+    optional: true  # justified: "Profile created" alert depends on API response completing before Maestro polls
 
 # 11. CRITICAL ASSERTION: Parent is NOT locked out. They should still be on
 # the More tab or have navigated back. The consent-pending gate must NOT appear.
 - assertNotVisible:
     id: "consent-pending-gate"
-    optional: true
 
 - assertNotVisible:
     text: "Hang tight!"
-    optional: true
 
 - assertNotVisible:
     text: "Waiting for approval"
-    optional: true
 
 # 12. Verify parent still has access — can navigate to Home tab
 - tapOn:

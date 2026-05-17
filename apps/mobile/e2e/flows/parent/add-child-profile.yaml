@@ -51,7 +51,7 @@ tags:
 # Verify existing child is shown
 - assertVisible:
     text: "Test Teen"
-    optional: true
+    optional: true  # justified: seed may render child by testID rather than name text; text match is supplemental
 
 - takeScreenshot: add-child-01-profiles-list
 
@@ -78,10 +78,9 @@ tags:
     id: "create-profile-birthdate"
 
 # Android date picker: tap OK to confirm default date
-# optional: date picker may render differently on different Android versions
 - tapOn:
     text: "OK"
-    optional: true
+    optional: true  # justified: Android date picker OK button is platform-specific; iOS uses a spinner with Done button
 
 - takeScreenshot: add-child-03-date-selected
 
@@ -102,11 +101,11 @@ tags:
     visible:
       id: "profiles-screen"
     timeout: 15000
-    optional: true
+    optional: true  # justified: age-gated consent flow may redirect away from profiles-screen; destination is conditional on birthdate → consent trigger
 
 # Verify the new child appears in the list
 - assertVisible:
     text: "New Child"
-    optional: true
+    optional: true  # justified: if consent flow was triggered, user stays on consent screen and profiles-screen never shows; "New Child" card not visible
 
 - takeScreenshot: add-child-05-complete

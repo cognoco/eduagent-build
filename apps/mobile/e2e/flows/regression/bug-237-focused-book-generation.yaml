@@ -8,8 +8,9 @@ tags:
   - library
   - subject-creation
 ---
-# 1. Launch dev client and sign in
-- runFlow: ../_setup/launch-devclient.yaml
+# 1. Sign in (seed-and-run.sh has already launched the app and navigated
+#    to the sign-in screen before Maestro starts).
+- runFlow: ../_setup/seed-and-sign-in.yaml
 
 # 2. Navigate to create subject via Library tab → empty state add button.
 #    library-tab → tab-library (tabBarButtonTestID in _layout.tsx).
@@ -25,14 +26,14 @@ tags:
 # Tap "Add subject" from Library empty state (fresh session has no subjects)
 - tapOn:
     id: "library-add-subject-empty"
-    optional: true
+    optional: true  # justified: library-add-subject-empty only renders in empty-state; if subjects exist this button is absent
 # Fallback: if user already has subjects, return home and use intent-learn
 - tapOn:
     id: "tab-home"
-    optional: true
+    optional: true  # justified: tab-home tap only needed when library had subjects (empty-state button absent); Maestro has no if-else
 - tapOn:
     id: "home-action-study-new"
-    optional: true
+    optional: true  # justified: home-action-study-new only tapped when subjects-present fallback path is taken
 
 # 3. Type a specific topic
 - extendedWaitUntil:
@@ -70,4 +71,3 @@ tags:
 #    (the first session for the focused book should be active, not a shelf).
 - assertNotVisible:
     id: "shelf-screen"
-    optional: true

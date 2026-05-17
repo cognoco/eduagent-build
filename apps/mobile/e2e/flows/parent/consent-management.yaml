@@ -72,12 +72,11 @@ tags:
 # 9. Wait for the native alert confirmation dialog
 #    Alert title is "Withdraw consent for {childName}?" — Maestro cannot
 #    substring-match "Withdraw consent" from the full title (BUG-49 pattern).
-#    optional: true — the dialog renders but text matching is unreliable.
 - extendedWaitUntil:
     visible:
       text: "Withdraw consent"
     timeout: 5000
-    optional: true
+    optional: true  # justified: native Alert.alert title text matching is unreliable on Android; full title includes child name which varies
 
 # 10. Screenshot: confirmation dialog
 - takeScreenshot: consent-mgmt-02-confirm-dialog
@@ -86,12 +85,11 @@ tags:
 #     React Native passes the title-cased label through to the native alert.
 - tapOn:
     text: "Withdraw"
-    optional: true
+    optional: true  # justified: title-case "Withdraw" vs. all-caps "WITHDRAW" varies by Android OEM skin; exactly one fires
 
-# Android OEM skins may still expose the destructive button in all caps.
 - tapOn:
     text: "WITHDRAW"
-    optional: true
+    optional: true  # justified: Android OEM skins expose destructive button in all caps; alternative to "Withdraw" above
 
 # 12. Wait for grace period banner to appear (consent is now WITHDRAWN)
 - extendedWaitUntil:

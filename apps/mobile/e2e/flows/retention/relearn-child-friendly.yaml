@@ -58,7 +58,7 @@ tags:
       id: "library-loading"
     timeout: 10000
     # Spinner may already be gone by the time we check
-    optional: true
+    optional: true  # justified: library-loading spinner may already be dismissed by the time this step runs
 
 # 6. Tap the first topic row (seeded with 3 failed recalls)
 - tapOn:
@@ -91,18 +91,18 @@ tags:
     visible:
       id: "relearn-method-phase"
     timeout: 10000
-    optional: true
+    optional: true  # justified: relearn may start at method-phase (directEntry=true) or topics-phase; exactly one renders; Maestro has no OR construct
 
 - extendedWaitUntil:
     visible:
       id: "relearn-topics-phase"
     timeout: 5000
-    optional: true
+    optional: true  # justified: alternative phase — topics-phase renders when directEntry=false; complementary to relearn-method-phase above
 
 # 12. If in topics phase, tap first topic to advance to method phase
 - tapOn:
     text: "Chemistry Topic 1"
-    optional: true
+    optional: true  # justified: topic tap only needed when relearn-topics-phase appeared above; no-op when already at method phase
 
 # 13. Wait for method phase
 - extendedWaitUntil:

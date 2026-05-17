@@ -106,18 +106,18 @@ tags:
     visible:
       id: "quiz-launch-loading"
     timeout: 10000
-    optional: true
+    optional: true  # justified: loading screen is transient; fast devices/network may skip it before Maestro polls
 
 # 7. Dismiss challenge banner if present (difficulty bump)
 - extendedWaitUntil:
     visible:
       id: "quiz-challenge-start"
     timeout: 5000
-    optional: true
+    optional: true  # justified: challenge banner only appears on difficulty-bump runs, not every session
 
 - tapOn:
     id: "quiz-challenge-start"
-    optional: true
+    optional: true  # justified: only tappable when challenge banner appeared (line above)
 
 # 8. Wait for play screen — either malformed guard or normal play
 # NOTE: quiz-play-malformed fires when options.dedupe < 2; the seeded malformed
@@ -127,14 +127,14 @@ tags:
     visible:
       id: "quiz-play-malformed"
     timeout: 30000
-    optional: true
+    optional: true  # justified: LLM/architecture — fresh LLM-generated round is unlikely to be malformed; malformed guard fires only on the seeded round which requires URL-param wiring not yet implemented (see ARCHITECTURE NOTE)
 
 - takeScreenshot: quiz-malformed-03-play-state
 
 # 9a. MALFORMED PATH: assert fallback and tap back
 - tapOn:
     id: "quiz-play-malformed-back"
-    optional: true
+    optional: true  # justified: only tappable when malformed guard was triggered (step 8 above found quiz-play-malformed)
 
 # 9b. NORMAL PATH (LLM-generated non-malformed round): verify play screen renders
 #     and quit back to index. This branch runs when the seeded mechanism isn't
@@ -143,22 +143,22 @@ tags:
     visible:
       id: "quiz-play-screen"
     timeout: 5000
-    optional: true
+    optional: true  # justified: mutually exclusive with malformed path — normal play screen only renders when LLM round is well-formed
 
 - tapOn:
     id: "quiz-play-quit"
-    optional: true
+    optional: true  # justified: only tappable when normal play screen was reached (malformed path was not triggered)
 
 # 10. Wait for quit modal and confirm quit (returns to quiz index)
 - extendedWaitUntil:
     visible:
       id: "quiz-quit-modal-backdrop"
     timeout: 5000
-    optional: true
+    optional: true  # justified: quit modal only appears after quit tap; quit tap itself was optional
 
 - tapOn:
     id: "quiz-quit-confirm"
-    optional: true
+    optional: true  # justified: confirm only applicable when quit modal appeared
 
 # 11. Confirm return to quiz index screen
 - extendedWaitUntil:

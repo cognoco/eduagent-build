@@ -8,8 +8,6 @@ tags:
   - chat
   - navigation
 ---
-- runFlow: ../_setup/launch-devclient.yaml
-
 # Sign in
 - runFlow: ../_setup/seed-and-sign-in.yaml
 
@@ -83,4 +81,3 @@ tags:
 # Assert the Library heading text is not visible — more robust than testID.
 - assertNotVisible:
     text: "Library"
-    optional: true

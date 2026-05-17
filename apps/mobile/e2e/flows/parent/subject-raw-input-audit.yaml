@@ -54,7 +54,7 @@ tags:
     visible:
       text: 'Subjects'
     timeout: 5000
-    optional: true
+    optional: true  # justified: Subjects section only renders when seed has subjects; heading may not appear if child has no subjects yet
 
 # 7. Screenshot: child detail with subjects
 - takeScreenshot: raw-input-audit-02-child-detail
@@ -62,7 +62,7 @@ tags:
 # 8. Verify subject name is visible (seed-dependent)
 - assertVisible:
     text: 'Mathematics'
-    optional: true
+    optional: true  # justified: seed may not include Mathematics subject with this exact name; seed data is variable
 
 # 9. Check for rawInput subtitle — "Your child searched for" text
 #    This only appears when the subject has rawInput != name in the DB.
@@ -70,12 +70,12 @@ tags:
 #    this assertion will pass. Otherwise it's optional until seed is updated.
 - assertVisible:
     text: 'Your child searched for'
-    optional: true
+    optional: true  # justified: rawInput subtitle only renders when seed inserts a subject with rawInput != name; seed does not currently do this
 
 # 10. Check for the specific rawInput testID pattern
 - assertVisible:
     id: 'subject-raw-input-${SUBJECT_ID}'
-    optional: true
+    optional: true  # justified: subject-raw-input testID only renders when rawInput != name; seed currently lacks this data
 
 # 11. Screenshot: subject cards (captures rawInput subtitle if present)
 - takeScreenshot: raw-input-audit-03-subject-cards

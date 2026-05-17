@@ -61,19 +61,19 @@ tags:
     visible:
       id: "session-chat-shell"
     timeout: 25000
-    optional: true
+    optional: true  # justified: DRAFT flow — seed may land on session-chat-shell or home depending on scenario; Maestro has no OR construct
 
 - extendedWaitUntil:
     visible:
       id: "home-screen"
     timeout: 5000
-    optional: true
+    optional: true  # justified: alternative landing screen when session-chat-shell does not appear; one of three must match
 
 - extendedWaitUntil:
     visible:
       id: "home-loading-timeout"
     timeout: 5000
-    optional: true
+    optional: true  # justified: third fallback — home-loading-timeout state shown on slow networks; completes the OR pattern
 
 - takeScreenshot: sse-reconnect-02-on-app
 

@@ -56,7 +56,7 @@ tags:
     visible:
       id: "session-subject-resolution"
     timeout: 30000
-    optional: true
+    optional: true  # justified: session-subject-resolution only appears when LLM classifier fails to auto-match; auto-classification routes directly to chat without this UI
 
 # 7. If subject resolution chips appeared, verify the "New subject" escape hatch
 - runFlow:

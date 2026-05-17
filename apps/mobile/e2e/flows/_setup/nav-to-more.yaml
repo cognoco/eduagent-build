@@ -1,0 +1,12 @@
+# Navigate to the More tab and wait for it to load.
+# Precondition: bottom tab bar visible (learner-screen, parent-home-screen, or dashboard-scroll).
+# Postcondition: More index screen loaded, more-row-learning-preferences visible.
+appId: com.mentomate.app
+---
+- tapOn:
+    text: "More"
+
+- extendedWaitUntil:
+    visible:
+      id: "more-row-learning-preferences"
+    timeout: 15000

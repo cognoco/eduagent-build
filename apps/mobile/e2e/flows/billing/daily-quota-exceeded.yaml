@@ -39,12 +39,12 @@ tags:
 - tapOn:
     id: "home-coach-band-continue"
     # Intent card may not render if no active subject
-    optional: true
+    optional: true  # justified: coach-band-continue only renders when an active session exists; falls back to subject tap below
 
 # 3b. Fallback: if no coaching card, try to navigate via subject
 - tapOn:
     text: "Mathematics"
-    optional: true
+    optional: true  # justified: Mathematics tap is only needed when coach-band-continue did not render; Maestro has no if-else
 
 # 4. Wait for the session/chat screen
 - extendedWaitUntil:
@@ -70,10 +70,9 @@ tags:
     timeout: 15000
 
 # 7b. Alternative: check for the shorter variant
-# optional: only fires if the full text above was rendered differently (partial render)
 - assertVisible:
     text: "Come back tomorrow"
-    optional: true
+    optional: true  # justified: "Come back tomorrow" is a substring fallback in case the full error text renders differently on some devices
 
 # 8. Screenshot of quota exceeded state
 - takeScreenshot: daily-quota-exceeded-chat

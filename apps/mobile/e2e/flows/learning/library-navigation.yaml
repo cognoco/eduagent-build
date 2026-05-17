@@ -67,10 +67,9 @@ tags:
     id: "book-row-${BOOK_ID}"
 
 # Review pill is data-gated: only renders when retention status is weak/forgotten.
-# Permitted optional use: UI gated by data presence.
 - assertVisible:
     id: "shelf-row-review-${SUBJECT_ID}"
-    optional: true
+    optional: true  # justified: shelf-row-review only renders when retention status is weak/forgotten; data-dependent on seed content
 
 - takeScreenshot: library-nav-03-shelf-expanded
 
@@ -164,6 +163,6 @@ tags:
     visible:
       id: "shelves-list"
     timeout: 10000
-    optional: true
+    optional: true  # justified: handleGoToLibrary may navigate to topic detail (not library index) when topicId+subjectId present; shelves-list absent in that case
 
 - takeScreenshot: library-nav-07-library-arrived

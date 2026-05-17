@@ -89,7 +89,7 @@ tags:
     visible:
       id: "quiz-launch-loading"
     timeout: 10000
-    optional: true
+    optional: true  # justified: quiz-launch-loading is a transient spinner; may already have transitioned to error state before this step runs
 
 # 7. Wait for error panel — FORBIDDEN causes isUnretryable = true
 - extendedWaitUntil:

@@ -9,8 +9,12 @@ appId: com.mentomate.app
 tags:
   - smoke
 ---
-# Launch dev-client, connect to Metro, dismiss dev menu.
-- runFlow: _setup/launch-devclient.yaml
+# seed-and-run.sh has already launched the app and landed it on the
+# sign-in screen before Maestro starts. Just wait for it to settle.
+- extendedWaitUntil:
+    visible:
+      id: "sign-in-button"
+    timeout: 30000
 
 # Verify key sign-in elements are present
 - assertVisible: "Sign in to start learning"

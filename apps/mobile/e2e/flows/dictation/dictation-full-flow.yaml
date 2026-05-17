@@ -89,7 +89,7 @@ tags:
     visible:
       id: "dictation-complete-screen"
     timeout: 60000
-    optional: true
+    optional: true  # justified: dictation may auto-complete (dictation-complete-screen) OR timeout and allow exit via playback-exit; both paths handled below via runFlow when:
 
 - runFlow:
     when:
