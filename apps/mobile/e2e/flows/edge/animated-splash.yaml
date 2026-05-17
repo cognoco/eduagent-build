@@ -45,15 +45,23 @@ tags:
     timeout: 30000
 
 # Tap the Metro server entry (port 8082 = bundle proxy).
-# Both 8081 and 8082 are shown; tap 8082 first (bundle proxy), fallback to 8081.
-- tapOn:
-    text: "http://10.0.2.2:8082"
-    optional: true  # justified: port 8082 (bundle proxy) shown in dev-client; may not be present if only port 8081 is listed
-
-# Fallback: tap port 8081 if 8082 not found
-- tapOn:
-    text: "http://10.0.2.2:8081"
-    optional: true  # justified: port 8081 is the Metro fallback; exactly one of 8082 or 8081 will be listed in dev-client launcher
+# Strict precedence: tap 8082 if present; only fall back to 8081 when 8082 is
+# absent. Both `optional: true` would let *both* taps fire on dev-client
+# launchers that list both ports, defeating the bundle-proxy preference and
+# adding launcher-path variability to the test.
+- runFlow:
+    when:
+      visible: "http://10.0.2.2:8082"
+    commands:
+      - tapOn:
+          text: "http://10.0.2.2:8082"
+- runFlow:
+    when:
+      visible: "http://10.0.2.2:8081"
+      notVisible: "http://10.0.2.2:8082"
+    commands:
+      - tapOn:
+          text: "http://10.0.2.2:8081"
 
 # Wait for JS bundle to load and "Continue" overlay to appear.
 # Bundle is cached by Metro, so this should be fast (5-15s).

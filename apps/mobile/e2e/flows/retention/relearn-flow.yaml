@@ -111,10 +111,12 @@ tags:
       id: "topic-detail-scroll"
     timeout: 10000
 
-# 13. Look for "Needs attention" indicator (3+ failures marker)
+# 13. Verify "Needs attention" indicator (3+ failures marker).
+# The failed-recall-3x seed explicitly sets failureCount=3 for "Chemistry
+# Topic 1", which is above the threshold — this assertion is a contract gate
+# on the failed-recall scenario, not a probabilistic check.
 - assertVisible:
     text: "Needs attention"
-    optional: true  # justified: "Needs attention" only renders when failureCount >= threshold; seed data may vary
 
 # 14. Verify the study CTA is present
 - assertVisible:

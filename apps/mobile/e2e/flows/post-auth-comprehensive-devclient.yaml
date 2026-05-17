@@ -92,14 +92,16 @@ tags:
 - assertVisible:
     text: "Your subjects"
 
-# The coaching card should be visible (AdaptiveEntryCard for teen persona)
+# The coaching card should be visible (AdaptiveEntryCard for teen persona).
+# Both prompts render for the teen persona today, but copy is sourced from
+# the AdaptiveEntryCard rotation and may vary by persona/state — keep optional
+# until the prompt set is locked.
 - assertVisible:
     text: "Help with an assignment"
-    optional: true  # justified: deferred flow
-
+    optional: true  # justified: AdaptiveEntryCard prompt rotation — copy may change per persona/state
 - assertVisible:
     text: "Just ask something"
-    optional: true  # justified: deferred flow
+    optional: true  # justified: AdaptiveEntryCard prompt rotation — copy may change per persona/state
 
 # Verify the intent card stack exists (replaced add-subject-button + coaching card)
 - assertVisible:
@@ -125,16 +127,11 @@ tags:
 
 - takeScreenshot: 04-more-screen-top
 
-# ── Legacy theme section (optional on current builds) ──
-- assertVisible:
-    text: "Teen (Dark)"
-    optional: true  # justified: deferred flow
-- assertVisible:
-    text: "Eager Learner (Calm)"
-    optional: true  # justified: deferred flow
-- assertVisible:
-    text: "Parent (Light)"
-    optional: true  # justified: deferred flow
+# ── Legacy theme section: REMOVED (DEFERRED:M1-COMPREHENSIVE) ──
+# Theme variants ("Teen (Dark)", "Eager Learner (Calm)", "Parent (Light)") are
+# fully removed from the app (zero matches in source). Assertions removed so
+# this section can be rebuilt against current settings copy when the flow is
+# rewritten.
 
 # ── Notifications section ──
 - assertVisible:
@@ -222,70 +219,14 @@ tags:
     timeout: 10000
 
 # ═══════════════════════════════════════════════════════════════════
-# PHASE 5: Theme Switching
+# PHASE 5: Theme Switching — REMOVED (DEFERRED:M1-COMPREHENSIVE)
 # ═══════════════════════════════════════════════════════════════════
-
-# Scroll to top to see the settings top
-- swipe:
-    start: "50%,30%"
-    end: "50%,70%"
-- swipe:
-    start: "50%,30%"
-    end: "50%,70%"
-
-- extendedWaitUntil:
-    visible:
-      id: "more-row-learning-preferences"
-    timeout: 15000
-
-# Switch to Eager Learner theme (stays in learner route group — safe)
-- tapOn: "Eager Learner (Calm)"
-- takeScreenshot: 10-theme-eager-learner
-
-# Switch back to Teen (Dark)
-# BUG-11: After theme switch, the screen re-renders with new CSS variables.
-# Maestro's text recognition can fail during the transition. Wait for the
-# Settings top to be visible before tapping.
-- extendedWaitUntil:
-    visible:
-      id: "more-row-learning-preferences"
-    timeout: 15000
-
-- tapOn: "Teen (Dark)"
-- takeScreenshot: 11-theme-teen-restored
-
-# ── Parent theme → redirects to (parent)/dashboard ──
-# BUG-12: Selecting "Parent (Light)" on the More screen triggers a persona
-# routing guard in (learner)/_layout.tsx (line 575):
-#   if (persona === 'parent') return <Redirect href="/(parent)/dashboard" />;
-# This navigates away from the More screen to the Parent dashboard.
-# Verify the redirect works, then switch back via the "Switch to Teen view"
-# link on the parent dashboard.
-- tapOn: "More"
-- extendedWaitUntil:
-    visible:
-      id: "more-row-learning-preferences"
-    timeout: 15000
-
-- tapOn: "Parent (Light)"
-
-- extendedWaitUntil:
-    visible:
-      text: "How your children are doing"
-    timeout: 15000
-
-- takeScreenshot: 12-parent-dashboard-redirect
-
-# The parent dashboard has a "Switch to Teen view (demo)" link
-- tapOn:
-    id: "switch-to-teen"
-
-- extendedWaitUntil:
-    visible:
-      id: "learner-screen"
-    timeout: 15000
-
-- takeScreenshot: 13-back-to-teen-home
+# Theme variants ("Eager Learner (Calm)", "Teen (Dark)", "Parent (Light)")
+# are completely removed from the app. The `(parent)` route group no longer
+# exists; the `switch-to-teen` testID is on the e2e-testid-integrity
+# known-removed list. The previous hard tapOn calls to these labels would
+# crash Maestro. This phase will be rewritten against the current settings
+# surface when the comprehensive flow is rebuilt.
 
 # ═══════════════════════════════════════════════════════════════════
 # PHASE 6: Done — all post-auth screens verified
