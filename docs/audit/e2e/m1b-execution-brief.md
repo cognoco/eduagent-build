@@ -1,4 +1,6 @@
 > **STATUS: ACTIVE** — execution brief for M1-B (validator, tag set, inventory close-out). Human-supervised, light agent assist.
+>
+> **Handoff:** if you are picking up M1-B mid-flight from branch `m1-b`, start with `docs/audit/e2e/m1b-handoff-2026-05-17.md`. It points at the two operational docs (`m1b-pr-blocking-candidates.md`, the close-out section of `docs/flows/e2e-flow-coverage-audit-2026-05-13.md`), the sanity-check commands, and the known pre-existing failures carried over from the M1-A re-run.
 
 # M1-B Execution Brief — Validator + Tag Set + Inventory
 
