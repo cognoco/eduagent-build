@@ -59,6 +59,12 @@ export interface PendingSubjectResolution {
     subjectId: string;
     subjectName: string;
   }>;
+  /** Preserve a homework image while the learner picks/creates the subject. */
+  attachImage?: boolean;
+  imageAttachment?: {
+    base64: string;
+    mimeType: 'image/jpeg' | 'image/png' | 'image/webp';
+  };
   /** When the classifier cannot match an enrolled subject, it suggests a new one */
   suggestedSubjectName?: string | null;
   /** Rich suggestions from subjects.resolve — shown as tappable cards */

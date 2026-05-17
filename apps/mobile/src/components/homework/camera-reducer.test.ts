@@ -52,6 +52,18 @@ describe('cameraReducer', () => {
     expect(state.source).toBe('gallery');
   });
 
+  it('opens manual entry from the viewfinder without carrying an image', () => {
+    const viewfinder: CameraState = {
+      ...initialCameraState,
+      phase: 'viewfinder',
+    };
+    const state = cameraReducer(viewfinder, { type: 'START_MANUAL_ENTRY' });
+    expect(state.phase).toBe('result');
+    expect(state.imageUri).toBeNull();
+    expect(state.ocrText).toBeNull();
+    expect(state.source).toBe('camera');
+  });
+
   it('transitions preview → processing on CONFIRM_PHOTO', () => {
     const preview: CameraState = {
       ...initialCameraState,

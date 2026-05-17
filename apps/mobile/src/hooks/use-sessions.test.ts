@@ -860,6 +860,40 @@ describe('useStreamMessage', () => {
     );
   });
 
+  it('sends image payloads in the SSE request body when provided', async () => {
+    const { streamSSEViaXHR } = require('../lib/sse') as {
+      streamSSEViaXHR: jest.Mock;
+    };
+
+    streamSSEViaXHR.mockReturnValueOnce({
+      events: (async function* () {
+        yield { type: 'done', exchangeCount: 1, escalationRung: 1 };
+      })(),
+      abort: jest.fn(),
+    });
+
+    const { result } = renderHook(() => useStreamMessage('session-1'), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await result.current.stream('Hello', jest.fn(), jest.fn(), 'session-1', {
+        imageBase64: 'base64-homework-image',
+        imageMimeType: 'image/jpeg',
+      });
+    });
+
+    const [, init] = streamSSEViaXHR.mock.calls[0] as [
+      string,
+      { body: string },
+    ];
+    expect(JSON.parse(init.body)).toEqual({
+      message: 'Hello',
+      imageBase64: 'base64-homework-image',
+      imageMimeType: 'image/jpeg',
+    });
+  });
+
   it('waits for async done handling before resolving the stream', async () => {
     const { streamSSEViaXHR } = require('../lib/sse') as {
       streamSSEViaXHR: jest.Mock;

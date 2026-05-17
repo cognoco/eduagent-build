@@ -3,6 +3,10 @@ import type { ChatMessage } from './ChatShell';
 import type { useClassifySubject } from '../../hooks/use-classify-subject';
 import type { useResolveSubject } from '../../hooks/use-resolve-subject';
 import type { useCreateSubject } from '../../hooks/use-subjects';
+import type {
+  ContinueMessageOptions,
+  SessionImageAttachment,
+} from './use-session-streaming';
 import { type PendingSubjectResolution, isGreeting } from './session-types';
 
 export interface UseSubjectClassificationOptions {
@@ -43,7 +47,7 @@ export interface UseSubjectClassificationOptions {
   // Functions from other hooks
   continueWithMessage: (
     text: string,
-    options?: { sessionSubjectId?: string; sessionSubjectName?: string },
+    options?: ContinueMessageOptions,
   ) => Promise<void>;
   createLocalMessageId: (prefix: 'user' | 'ai') => string;
   showConfirmation: (message: string) => void;
@@ -59,6 +63,17 @@ export interface UseSubjectClassificationOptions {
   sessionExperience: number;
   animationCleanupRef: React.MutableRefObject<(() => void) | null>;
   setIsStreaming: React.Dispatch<React.SetStateAction<boolean>>;
+}
+
+function getPendingImageOptions(
+  pendingSubjectResolution: PendingSubjectResolution,
+): Pick<ContinueMessageOptions, 'attachImage' | 'imageAttachment'> {
+  return {
+    ...(pendingSubjectResolution.attachImage ? { attachImage: true } : {}),
+    ...(pendingSubjectResolution.imageAttachment
+      ? { imageAttachment: pendingSubjectResolution.imageAttachment }
+      : {}),
+  };
 }
 
 export function useSubjectClassification(
@@ -105,6 +120,10 @@ export function useSubjectClassification(
         description: string;
         focus?: string;
       }>,
+      imageOptions?: Pick<
+        PendingSubjectResolution,
+        'attachImage' | 'imageAttachment'
+      >,
     ) => {
       const dedupedCandidates = candidates.filter(
         (candidate, index, all) =>
@@ -119,6 +138,10 @@ export function useSubjectClassification(
         originalText: text,
         prompt,
         candidates: dedupedCandidates,
+        ...(imageOptions?.attachImage ? { attachImage: true } : {}),
+        ...(imageOptions?.imageAttachment
+          ? { imageAttachment: imageOptions.imageAttachment }
+          : {}),
         suggestedSubjectName,
         resolveSuggestions,
       });
@@ -147,6 +170,7 @@ export function useSubjectClassification(
       await continueWithMessage(pendingSubjectResolution.originalText, {
         sessionSubjectId: candidate.subjectId,
         sessionSubjectName: candidate.subjectName,
+        ...getPendingImageOptions(pendingSubjectResolution),
       });
     },
     [
@@ -197,6 +221,7 @@ export function useSubjectClassification(
         await continueWithMessage(originalText, {
           sessionSubjectId: result.subject.id,
           sessionSubjectName: result.subject.name,
+          ...getPendingImageOptions(pendingSubjectResolution),
         });
       } catch {
         showConfirmation(
@@ -256,6 +281,7 @@ export function useSubjectClassification(
       await continueWithMessage(originalText, {
         sessionSubjectId: result.subject.id,
         sessionSubjectName: result.subject.name,
+        ...getPendingImageOptions(pendingSubjectResolution),
       });
     } catch {
       showConfirmation(
@@ -335,6 +361,7 @@ export function useSubjectClassification(
           await continueWithMessage(originalText, {
             sessionSubjectId: result.subject.id,
             sessionSubjectName: result.subject.name,
+            ...getPendingImageOptions(pendingSubjectResolution),
           });
           return;
         }
@@ -383,7 +410,12 @@ export function useSubjectClassification(
   const handleSend = useCallback(
     async (
       text: string,
-      opts?: { isAutoSent?: boolean; imageUri?: string },
+      opts?: {
+        isAutoSent?: boolean;
+        imageUri?: string;
+        attachImage?: boolean;
+        imageAttachment?: SessionImageAttachment;
+      },
     ) => {
       // CR-1: Guard on quotaError so programmatic callers (quick chips, homework
       // auto-send, queued problems) can't bypass the UI-disabled input guard.
@@ -404,6 +436,36 @@ export function useSubjectClassification(
         },
       ]);
       setResumedBanner(false);
+
+      const imageResolutionOptions: Pick<
+        PendingSubjectResolution,
+        'attachImage' | 'imageAttachment'
+      > = {
+        ...(opts?.attachImage ? { attachImage: true } : {}),
+        ...(opts?.imageAttachment
+          ? { imageAttachment: opts.imageAttachment }
+          : {}),
+      };
+      const openSubjectResolutionForTurn = (
+        originalText: string,
+        prompt: string,
+        candidates: Array<{ subjectId: string; subjectName: string }>,
+        suggestedSubjectName?: string | null,
+        resolveSuggestions?: Array<{
+          name: string;
+          description: string;
+          focus?: string;
+        }>,
+      ) => {
+        openSubjectResolution(
+          originalText,
+          prompt,
+          candidates,
+          suggestedSubjectName,
+          resolveSuggestions,
+          imageResolutionOptions,
+        );
+      };
 
       // Greeting guard: intercept pure greetings in freeform mode before
       // any classification or session creation. Saves quota, prevents
@@ -488,7 +550,7 @@ export function useSubjectClassification(
                 .slice(0, 3)
                 .map((c) => c.subjectName)
                 .join(' or ')}. Which one are we working on?`;
-              openSubjectResolution(
+              openSubjectResolutionForTurn(
                 text,
                 promptMessage,
                 freeformCandidates,
@@ -509,7 +571,7 @@ export function useSubjectClassification(
             }
             const suggested = result.suggestedSubjectName ?? null;
             if (!best && suggested) {
-              openSubjectResolution(
+              openSubjectResolutionForTurn(
                 text,
                 `This sounds like ${suggested}. Pick a subject below, or tap "+ ${suggested}" to add it.`,
                 availableSubjects.map((candidate) => ({
@@ -529,7 +591,7 @@ export function useSubjectClassification(
                   resolveResult.resolvedName ||
                   resolveResult.suggestions.length > 0
                 ) {
-                  openSubjectResolution(
+                  openSubjectResolutionForTurn(
                     text,
                     resolveResult.displayMessage ||
                       'Pick a subject that fits, or create your own.',
@@ -591,7 +653,7 @@ export function useSubjectClassification(
                 const resolvePrompt =
                   resolveResult.displayMessage ||
                   'Pick a subject that fits, or create your own.';
-                openSubjectResolution(
+                openSubjectResolutionForTurn(
                   text,
                   resolvePrompt,
                   subjectCandidates,
@@ -599,7 +661,7 @@ export function useSubjectClassification(
                   suggestions,
                 );
               } catch {
-                openSubjectResolution(
+                openSubjectResolutionForTurn(
                   text,
                   "I couldn't figure out the subject. You can create a new one below.",
                   subjectCandidates,
@@ -613,7 +675,7 @@ export function useSubjectClassification(
                   : "I couldn't place that yet. Pick the closest subject and we'll get moving.";
             }
 
-            openSubjectResolution(
+            openSubjectResolutionForTurn(
               text,
               promptMessage,
               subjectCandidates,
@@ -628,7 +690,7 @@ export function useSubjectClassification(
               subjectName: candidate.name,
             }));
             if (fallbackCandidates.length > 0) {
-              openSubjectResolution(
+              openSubjectResolutionForTurn(
                 text,
                 "I couldn't figure out the subject. Which one fits?",
                 fallbackCandidates,
@@ -646,7 +708,7 @@ export function useSubjectClassification(
               setClassifyError(
                 "Could not identify the subject automatically. Pick one below and we'll keep going.",
               );
-              openSubjectResolution(
+              openSubjectResolutionForTurn(
                 text,
                 'Pick the subject that fits best:',
                 fallbackCandidates,
@@ -657,7 +719,7 @@ export function useSubjectClassification(
                 const resolveResult = await resolveSubject.mutateAsync({
                   rawInput: text,
                 });
-                openSubjectResolution(
+                openSubjectResolutionForTurn(
                   text,
                   resolveResult.displayMessage ||
                     'Pick a subject that fits, or create your own.',
@@ -669,7 +731,7 @@ export function useSubjectClassification(
                 setClassifyError(
                   'Could not identify the subject. Create a new subject to get started.',
                 );
-                openSubjectResolution(
+                openSubjectResolutionForTurn(
                   text,
                   "I couldn't figure out the subject. You can create a new one below.",
                   [],
@@ -686,6 +748,10 @@ export function useSubjectClassification(
       await continueWithMessage(text, {
         sessionSubjectId,
         sessionSubjectName,
+        ...(opts?.attachImage ? { attachImage: true } : {}),
+        ...(opts?.imageAttachment
+          ? { imageAttachment: opts.imageAttachment }
+          : {}),
       });
     },
     [

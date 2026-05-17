@@ -42,6 +42,19 @@ import {
 const FIRST_TOPIC_ACK_PATTERN =
   /^(ok(?:ay)?|yes|yep|yeah|ready|start|go ahead|sure|sounds good|let'?s go)[.!?\s]*$/i;
 
+type ImageMimeType = 'image/jpeg' | 'image/png' | 'image/webp';
+export type SessionImageAttachment = {
+  base64: string;
+  mimeType: ImageMimeType;
+};
+export type ContinueMessageOptions = {
+  sessionSubjectId?: string;
+  sessionSubjectName?: string;
+  existingEntry?: OutboxEntry;
+  attachImage?: boolean;
+  imageAttachment?: SessionImageAttachment;
+};
+
 function getStreamErrorCode(error: unknown): string | undefined {
   if (error == null || typeof error !== 'object' || !('code' in error)) {
     return undefined;
@@ -149,7 +162,7 @@ export interface UseSessionStreamingOptions {
   lastExpectedMinutesRef: React.MutableRefObject<number>;
   lastRetryPayloadRef: React.MutableRefObject<{
     text: string;
-    options?: { sessionSubjectId?: string; sessionSubjectName?: string };
+    options?: ContinueMessageOptions;
     outboxEntryId?: string;
   } | null>;
   trackerStateRef: React.MutableRefObject<
@@ -157,9 +170,7 @@ export interface UseSessionStreamingOptions {
   >;
   /** Base64-encoded homework image to send with the first message (set once, cleared after send) */
   imageBase64Ref: React.MutableRefObject<string | null>;
-  imageMimeTypeRef: React.MutableRefObject<
-    'image/jpeg' | 'image/png' | 'image/webp' | null
-  >;
+  imageMimeTypeRef: React.MutableRefObject<ImageMimeType | null>;
 
   // Profile
   activeProfileId: string | undefined;
@@ -498,14 +509,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
   );
 
   const continueWithMessage = useCallback(
-    async (
-      text: string,
-      options?: {
-        sessionSubjectId?: string;
-        sessionSubjectName?: string;
-        existingEntry?: OutboxEntry;
-      },
-    ) => {
+    async (text: string, options?: ContinueMessageOptions) => {
       while (activeContinueRef.current) {
         await activeContinueRef.current;
       }
@@ -544,18 +548,37 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
           topicName,
           messages,
         });
+        const imageAttachment: SessionImageAttachment | undefined =
+          options?.imageAttachment ??
+          (options?.attachImage &&
+          effectiveMode === 'homework' &&
+          imageBase64Ref.current &&
+          imageMimeTypeRef.current
+            ? {
+                base64: imageBase64Ref.current,
+                mimeType: imageMimeTypeRef.current,
+              }
+            : undefined);
+        const retryOptions: ContinueMessageOptions | undefined =
+          options || imageAttachment
+            ? {
+                ...(options?.sessionSubjectId
+                  ? { sessionSubjectId: options.sessionSubjectId }
+                  : {}),
+                ...(options?.sessionSubjectName
+                  ? { sessionSubjectName: options.sessionSubjectName }
+                  : {}),
+                ...(options?.attachImage ? { attachImage: true } : {}),
+                ...(imageAttachment ? { imageAttachment } : {}),
+              }
+            : undefined;
 
         // BUG-331: Update retry payload BEFORE ensureSession so that if
         // ensureSession fails and the user reconnects, we replay the correct
         // (current) message — not the payload from the previous send.
         lastRetryPayloadRef.current = {
           text: apiMessage,
-          options: options
-            ? {
-                sessionSubjectId: options.sessionSubjectId,
-                sessionSubjectName: options.sessionSubjectName,
-              }
-            : undefined,
+          options: retryOptions,
         };
 
         const sid = await ensureSession(sessionSubjectId, text);
@@ -671,12 +694,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
           await beginAttempt(activeProfileId, 'session', outboxEntry.id);
           lastRetryPayloadRef.current = {
             text: apiMessage,
-            options: options
-              ? {
-                  sessionSubjectId: options.sessionSubjectId,
-                  sessionSubjectName: options.sessionSubjectName,
-                }
-              : undefined,
+            options: retryOptions,
             outboxEntryId: outboxEntry.id,
           };
         }
@@ -684,7 +702,7 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
         const streamOptions: {
           homeworkMode?: 'help_me' | 'check_answer';
           imageBase64?: string;
-          imageMimeType?: 'image/jpeg' | 'image/png' | 'image/webp';
+          imageMimeType?: ImageMimeType;
           idempotencyKey?: string;
           onReplay?: (result: {
             replayed: true;
@@ -697,10 +715,9 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
         if (effectiveMode === 'homework' && homeworkMode) {
           streamOptions.homeworkMode = homeworkMode;
         }
-        if (imageBase64Ref.current && imageMimeTypeRef.current) {
-          streamOptions.imageBase64 = imageBase64Ref.current;
-          streamOptions.imageMimeType = imageMimeTypeRef.current;
-          // Clear after first send — subsequent messages are text-only
+        if (imageAttachment) {
+          streamOptions.imageBase64 = imageAttachment.base64;
+          streamOptions.imageMimeType = imageAttachment.mimeType;
           imageBase64Ref.current = null;
           imageMimeTypeRef.current = null;
         }

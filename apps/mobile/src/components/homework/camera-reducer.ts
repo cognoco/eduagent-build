@@ -20,6 +20,7 @@ export type CameraState = {
 export type CameraAction =
   | { type: 'PERMISSION_GRANTED' }
   | { type: 'PHOTO_TAKEN'; uri: string; source: HomeworkCaptureSource }
+  | { type: 'START_MANUAL_ENTRY' }
   | { type: 'CONFIRM_PHOTO' }
   | { type: 'RETAKE' }
   | { type: 'OCR_SUCCESS'; text: string }
@@ -50,6 +51,12 @@ export function cameraReducer(
         phase: 'preview',
         imageUri: action.uri,
         source: action.source,
+      };
+
+    case 'START_MANUAL_ENTRY':
+      return {
+        ...initialCameraState,
+        phase: 'result',
       };
 
     case 'CONFIRM_PHOTO':

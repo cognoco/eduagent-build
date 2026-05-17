@@ -401,10 +401,48 @@ describe('CameraScreen', () => {
       wrapper: createWrapper(),
     });
     getByTestId('camera-view');
-    getByTestId('capture-button');
-    getByTestId('gallery-button');
-    getByTestId('flash-toggle');
+    const captureButton = getByTestId('capture-button');
+    const galleryButton = getByTestId('gallery-button');
+    const flashButton = getByTestId('flash-toggle');
+    getByTestId('manual-entry-button');
+    expect(captureButton.props.className).toContain('w-16 h-16');
+    expect(galleryButton.props.className).toContain('w-16 h-16');
+    expect(galleryButton.props.className).toContain('bg-accent');
+    expect(flashButton.props.className).toContain('w-16 h-16');
+    expect(flashButton.props.className).toContain('bg-accent');
     getByText(/center your homework/i);
+  });
+
+  it('opens a type-or-record editor from the viewfinder without taking a picture', async () => {
+    const { getByTestId, getByText } = render(<CameraScreen />, {
+      wrapper: createWrapper(),
+    });
+
+    fireEvent.press(getByTestId('manual-entry-button'));
+
+    getByText(/type or say the homework problem/i);
+    fireEvent.press(getByTestId('problem-mic-0'));
+    expect(mockClearTranscript).toHaveBeenCalled();
+    expect(mockStartListening).toHaveBeenCalled();
+
+    fireEvent.changeText(getByTestId('result-text-input'), 'x^2 + 3x - 10 = 0');
+    fireEvent.press(getByTestId('confirm-button'));
+
+    await waitFor(() => {
+      expect(mockRouter.replace).toHaveBeenCalledWith(
+        expect.objectContaining({
+          pathname: '/(app)/session',
+          params: expect.objectContaining({
+            mode: 'homework',
+            subjectId: 'sub-123',
+            subjectName: 'Mathematics',
+            problemText: 'x^2 + 3x - 10 = 0',
+          }),
+        }),
+      );
+    });
+    const callArgs = mockRouter.replace.mock.calls[0][0];
+    expect(callArgs.params.imageUri).toBeUndefined();
   });
 
   it('opens the preview when a gallery image is selected', async () => {

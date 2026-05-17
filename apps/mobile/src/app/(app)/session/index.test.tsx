@@ -271,6 +271,18 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
+jest.mock('expo-file-system', () => {
+  const readAsStringAsync = jest.fn();
+  (
+    global as { __sessionTestReadAsStringAsync?: typeof readAsStringAsync }
+  ).__sessionTestReadAsStringAsync = readAsStringAsync;
+  return { readAsStringAsync };
+});
+
+const mockReadAsStringAsync = (
+  global as { __sessionTestReadAsStringAsync?: jest.Mock }
+).__sessionTestReadAsStringAsync!;
+
 jest.mock('expo-router', () => ({
   useRouter: jest.fn(),
   useLocalSearchParams: jest.fn(),
@@ -486,6 +498,7 @@ describe('SessionScreen homework flow', () => {
     mockLearningMode = 'casual';
     mockLearningModeLoading = false;
     mockLearningModePending = false;
+    mockReadAsStringAsync.mockResolvedValue('base64-homework-image');
     // Default: no active session (null response body)
     mockFetch.setRoute('/progress/topic', null);
     // Clear SecureStore mock data
@@ -781,6 +794,49 @@ describe('SessionScreen homework flow', () => {
         hwCalls[0]?.init,
       );
       expect(body?.metadata).toMatchObject({ source: 'gallery' });
+    });
+  });
+
+  it('auto-sends a camera homework image through the session stream', async () => {
+    jest.useRealTimers();
+    (useLocalSearchParams as jest.Mock).mockReturnValue({
+      mode: 'homework',
+      subjectId: 'subject-1',
+      subjectName: 'Math',
+      imageUri: 'file:///cache/homework-photo.jpg',
+      imageMimeType: 'image/jpeg',
+      problemText: 'Solve 2x + 5 = 17',
+      homeworkProblems: JSON.stringify([
+        {
+          id: 'problem-1',
+          text: 'Solve 2x + 5 = 17',
+          source: 'ocr',
+        },
+      ]),
+    });
+
+    const wrapper = createWrapper();
+    render(<SessionScreen />, { wrapper });
+
+    await waitFor(() => {
+      expect(mockReadAsStringAsync).toHaveBeenCalledWith(
+        'file:///cache/homework-photo.jpg',
+        { encoding: 'base64' },
+      );
+    });
+
+    await waitFor(() => {
+      expect(mockStream).toHaveBeenCalledWith(
+        'Solve 2x + 5 = 17',
+        expect.any(Function),
+        expect.any(Function),
+        'session-1',
+        expect.objectContaining({
+          imageBase64: 'base64-homework-image',
+          imageMimeType: 'image/jpeg',
+          idempotencyKey: expect.any(String),
+        }),
+      );
     });
   });
 
