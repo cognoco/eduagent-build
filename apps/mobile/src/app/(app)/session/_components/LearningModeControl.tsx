@@ -73,6 +73,7 @@ export function useLearningModeControl(): {
       className={`ms-1 px-2 py-2 rounded-button bg-surface-elevated min-h-[44px] min-w-[44px] items-center justify-center flex-row ${
         buttonDisabled ? 'opacity-50' : ''
       }`}
+      style={{ maxWidth: 144 }}
       accessibilityRole="button"
       accessibilityLabel={
         selected ? `Learning mode: ${selected.title}` : 'Learning mode loading'
@@ -86,7 +87,10 @@ export function useLearningModeControl(): {
         color={colors.textSecondary}
       />
       {selected ? (
-        <Text className="ms-1 text-caption font-semibold text-text-secondary">
+        <Text
+          className="ms-1 text-caption font-semibold text-text-secondary"
+          numberOfLines={1}
+        >
           {selected.title}
         </Text>
       ) : null}

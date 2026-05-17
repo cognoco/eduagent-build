@@ -327,6 +327,21 @@ describe('ChatShell', () => {
       screen.getByTestId('voice-playback-bar');
     });
 
+    it('shares one compact toolbar for playback and composer accessories', () => {
+      const { Text } = require('react-native');
+      renderChatShell({
+        verificationType: 'teach_back',
+        composerAccessory: <Text testID="composer-tools">Tools</Text>,
+      });
+
+      screen.getByTestId('chat-composer-toolbar');
+      screen.getByTestId('voice-playback-bar');
+      screen.getByTestId('composer-tools');
+      expect(screen.getByTestId('chat-input-row').props.className).toContain(
+        'pt-1',
+      );
+    });
+
     it('hides playback bar when voice is OFF', () => {
       renderChatShell({ verificationType: undefined });
 

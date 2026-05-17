@@ -300,6 +300,7 @@ jest.mock(
       headerBelow,
       messages,
       inputAccessory,
+      composerAccessory,
       belowInput,
       inputMode,
       onInputModeChange,
@@ -315,6 +316,7 @@ jest.mock(
       headerBelow?: React.ReactNode;
       messages?: Array<{ id: string; content: string }>;
       inputAccessory?: React.ReactNode;
+      composerAccessory?: React.ReactNode;
       belowInput?: React.ReactNode;
       inputMode?: InputMode;
       onInputModeChange?: (mode: InputMode) => void;
@@ -352,6 +354,9 @@ jest.mock(
           ))}
           {inputAccessory ? (
             <View testID="mock-input-accessory">{inputAccessory}</View>
+          ) : null}
+          {composerAccessory ? (
+            <View testID="mock-composer-accessory">{composerAccessory}</View>
           ) : null}
           {belowInput ? (
             <View testID="mock-below-input">{belowInput}</View>
@@ -850,11 +855,13 @@ describe('SessionScreen homework flow', () => {
     expect(testScreen.queryByText('Too easy')).toBeNull();
     expect(testScreen.queryByText('Example')).toBeNull();
 
-    // Session tool chips live above the composer so the area below the input
-    // does not turn into a tall empty footer.
+    // Session tool chips live in the compact composer toolbar so they can
+    // share a row with voice playback controls instead of adding another band.
+    const composerAccessory = testScreen.getByTestId('mock-composer-accessory');
+    within(composerAccessory).getByText('Switch topic');
+    expect(within(composerAccessory).queryByText('Park it')).toBeNull();
     const inputAccessory = testScreen.getByTestId('mock-input-accessory');
-    within(inputAccessory).getByText('Switch topic');
-    within(inputAccessory).getByText('Park it');
+    expect(within(inputAccessory).queryByText('Switch topic')).toBeNull();
     expect(testScreen.queryByTestId('mock-below-input')).toBeNull();
   });
 

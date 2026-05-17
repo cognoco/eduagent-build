@@ -90,21 +90,26 @@ function buildGateMetrics(
   };
 }
 
-function hasHomeworkCue(text: string): boolean {
-  if (/\d/.test(text) || /[+\-−×*·÷/=<>≤≥±²³]/.test(text)) {
+function stripListMarkers(text: string): string {
+  return text
+    .split('\n')
+    .map((line) => line.replace(/^\s*(?:\d+|[A-Z])[.)]?\s+/, ''))
+    .join('\n');
+}
+
+function hasStrongHomeworkCue(text: string): boolean {
+  const contentText = stripListMarkers(text);
+
+  if (/\d/.test(contentText) || /[+\-−×*·÷/=<>≤≥±²³]/.test(contentText)) {
     return true;
   }
 
-  if (/^\s*(?:\d+|[A-Z])[.)]\s+/m.test(text)) {
-    return true;
-  }
-
-  if (/[?!:]/.test(text)) {
+  if (/[?!:]/.test(contentText)) {
     return true;
   }
 
   return /\b(?:answer|calculate|choose|circle|compare|complete|conjugate|contrast|correct|define|describe|draw|evaluate|explain|factor|fill|find|graph|how|identify|label|prove|read|select|show|simplify|solve|translate|underline|what|when|where|which|who|why|write)\b/iu.test(
-    text,
+    contentText,
   );
 }
 
@@ -113,7 +118,7 @@ function shouldEscalateLocalOcr(text: string, confidence?: number): boolean {
     return true;
   }
 
-  if (hasHomeworkCue(text)) {
+  if (hasStrongHomeworkCue(text)) {
     return false;
   }
 

@@ -19,6 +19,7 @@ export interface VoicePlaybackBarProps {
   onResume: () => void;
   onReplay: () => void;
   onRateChange: (rate: number) => void;
+  variant?: 'bar' | 'inline';
 }
 
 function nextRate(current: number): number {
@@ -36,15 +37,19 @@ export function VoicePlaybackBar({
   onResume,
   onReplay,
   onRateChange,
+  variant = 'bar',
 }: VoicePlaybackBarProps) {
   const colors = useThemeColors();
+  const isInline = variant === 'inline';
 
   return (
     <View
-      className="px-4 py-2 bg-surface border-t border-surface-elevated"
+      className={
+        isInline ? '' : 'px-4 py-2 bg-surface border-t border-surface-elevated'
+      }
       testID="voice-playback-bar"
     >
-      <View className="flex-row items-center gap-2">
+      <View className="flex-row items-center" style={{ gap: isInline ? 4 : 8 }}>
         {/* Replay */}
         <Pressable
           onPress={onReplay}

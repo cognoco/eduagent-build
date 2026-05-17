@@ -18,6 +18,7 @@ export interface SessionToolAccessoryProps {
   handleQuickChip: (chip: QuickChipId) => Promise<void>;
   stage: ConversationStage;
   onAddNote?: () => void;
+  embedded?: boolean;
 }
 
 export function SessionToolAccessory({
@@ -25,12 +26,13 @@ export function SessionToolAccessory({
   handleQuickChip,
   stage,
   onAddNote,
+  embedded = false,
 }: SessionToolAccessoryProps) {
   const { t } = useTranslation();
   if (stage !== 'teaching') return null;
 
   return (
-    <View className="bg-surface px-4 py-1.5">
+    <View className={embedded ? 'flex-1 min-w-0' : 'bg-surface px-4 py-1.5'}>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -62,7 +64,6 @@ export function SessionToolAccessory({
         {(
           [
             { id: 'switch_topic', label: t('session.accessories.switchTopic') },
-            { id: 'park', label: t('session.accessories.parkIt') },
           ] as Array<{ id: QuickChipId; label: string }>
         ).map((chip) => (
           <Pressable
