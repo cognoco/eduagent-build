@@ -58,7 +58,7 @@ function installAssessmentLlmMock(): void {
       shouldEscalateDepth: false,
       rawScore: 0.45,
       qualityRating: 4,
-    })
+    }),
   );
 }
 
@@ -105,11 +105,11 @@ describe('Integration: assessment routes', () => {
         method: 'POST',
         headers: buildAuthHeaders(
           { sub: ASSESSMENTS_USER.userId, email: ASSESSMENTS_USER.email },
-          profile.id
+          profile.id,
         ),
         body: JSON.stringify({}),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(201);
@@ -122,7 +122,7 @@ describe('Integration: assessment routes', () => {
     const assessment = await db.query.assessments.findFirst({
       where: and(
         eq(assessments.profileId, profile.id),
-        eq(assessments.topicId, topicId)
+        eq(assessments.topicId, topicId),
       ),
     });
 
@@ -144,7 +144,7 @@ describe('Integration: assessment routes', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(401);
@@ -184,13 +184,13 @@ describe('Integration: assessment routes', () => {
         method: 'POST',
         headers: buildAuthHeaders(
           { sub: ASSESSMENTS_USER.userId, email: ASSESSMENTS_USER.email },
-          childProfile.id
+          childProfile.id,
         ),
         body: JSON.stringify({
           answer: 'Plants use light to make sugars from carbon dioxide.',
         }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(ownerProfile.isOwner).toBe(true);
@@ -226,7 +226,7 @@ describe('Integration: assessment routes', () => {
         shouldEscalateDepth: false,
         rawScore: 0.9,
         qualityRating: 4,
-      })
+      }),
     );
 
     const getRes = await app.request(
@@ -235,10 +235,10 @@ describe('Integration: assessment routes', () => {
         method: 'GET',
         headers: buildAuthHeaders(
           { sub: ASSESSMENTS_USER.userId, email: ASSESSMENTS_USER.email },
-          profile.id
+          profile.id,
         ),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(getRes.status).toBe(200);
@@ -252,14 +252,14 @@ describe('Integration: assessment routes', () => {
         method: 'POST',
         headers: buildAuthHeaders(
           { sub: ASSESSMENTS_USER.userId, email: ASSESSMENTS_USER.email },
-          profile.id
+          profile.id,
         ),
         body: JSON.stringify({
           answer:
             'Photosynthesis is the process by which plants convert light energy into chemical energy.',
         }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(answerRes.status).toBe(200);
@@ -314,7 +314,7 @@ describe('Integration: assessment routes', () => {
         shouldEscalateDepth: false,
         rawScore: 0.9,
         qualityRating: 4,
-      })
+      }),
     );
 
     const res = await app.request(
@@ -323,13 +323,13 @@ describe('Integration: assessment routes', () => {
         method: 'POST',
         headers: buildAuthHeaders(
           { sub: ASSESSMENTS_USER.userId, email: ASSESSMENTS_USER.email },
-          profile.id
+          profile.id,
         ),
         body: JSON.stringify({
           answer: 'Plants use light to make energy-rich sugars.',
         }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -338,13 +338,13 @@ describe('Integration: assessment routes', () => {
     const card = await db.query.retentionCards.findFirst({
       where: and(
         eq(retentionCards.profileId, profile.id),
-        eq(retentionCards.topicId, topicId)
+        eq(retentionCards.topicId, topicId),
       ),
     });
     const xp = await db.query.xpLedger.findFirst({
       where: and(
         eq(xpLedger.profileId, profile.id),
-        eq(xpLedger.topicId, topicId)
+        eq(xpLedger.topicId, topicId),
       ),
     });
 
@@ -377,7 +377,7 @@ describe('Integration: assessment routes', () => {
         shouldEscalateDepth: true,
         rawScore: 0.3,
         qualityRating: 3,
-      })
+      }),
     );
 
     const res = await app.request(
@@ -386,13 +386,13 @@ describe('Integration: assessment routes', () => {
         method: 'POST',
         headers: buildAuthHeaders(
           { sub: ASSESSMENTS_USER.userId, email: ASSESSMENTS_USER.email },
-          profile.id
+          profile.id,
         ),
         body: JSON.stringify({
           answer: 'A partial answer.',
         }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -404,13 +404,13 @@ describe('Integration: assessment routes', () => {
     const card = await db.query.retentionCards.findFirst({
       where: and(
         eq(retentionCards.profileId, profile.id),
-        eq(retentionCards.topicId, topicId)
+        eq(retentionCards.topicId, topicId),
       ),
     });
     const xp = await db.query.xpLedger.findFirst({
       where: and(
         eq(xpLedger.profileId, profile.id),
-        eq(xpLedger.topicId, topicId)
+        eq(xpLedger.topicId, topicId),
       ),
     });
 
@@ -445,7 +445,7 @@ describe('Integration: assessment routes', () => {
         shouldEscalateDepth: false,
         rawScore: 0.65,
         qualityRating: 3,
-      })
+      }),
     );
 
     const res = await app.request(
@@ -454,13 +454,13 @@ describe('Integration: assessment routes', () => {
         method: 'POST',
         headers: buildAuthHeaders(
           { sub: ASSESSMENTS_USER.userId, email: ASSESSMENTS_USER.email },
-          profile.id
+          profile.id,
         ),
         body: JSON.stringify({
           answer: 'Plants convert sunlight into food, mostly using water.',
         }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -481,10 +481,10 @@ describe('Integration: assessment routes', () => {
         method: 'PATCH',
         headers: buildAuthHeaders(
           { sub: ASSESSMENTS_USER.userId, email: ASSESSMENTS_USER.email },
-          profile.id
+          profile.id,
         ),
       },
-      TEST_ENV
+      TEST_ENV,
     );
     expect(declineRes.status).toBe(200);
   });
@@ -526,7 +526,7 @@ describe('Integration: assessment routes', () => {
         shouldEscalateDepth: false,
         rawScore: 0.2,
         qualityRating: 1,
-      })
+      }),
     );
 
     const res = await app.request(
@@ -535,11 +535,13 @@ describe('Integration: assessment routes', () => {
         method: 'POST',
         headers: buildAuthHeaders(
           { sub: ASSESSMENTS_USER.userId, email: ASSESSMENTS_USER.email },
-          profile.id
+          profile.id,
         ),
-        body: JSON.stringify({ answer: 'I do not know.' }),
+        body: JSON.stringify({
+          answer: 'Plants use light somehow, but I cannot explain the process.',
+        }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -559,12 +561,47 @@ describe('Integration: assessment routes', () => {
         method: 'PATCH',
         headers: buildAuthHeaders(
           { sub: ASSESSMENTS_USER.userId, email: ASSESSMENTS_USER.email },
-          profile.id
+          profile.id,
         ),
       },
-      TEST_ENV
+      TEST_ENV,
     );
     expect(declineRes.status).toBe(200);
+  });
+
+  it('hands off clear no-recall answers to review without another LLM evaluation', async () => {
+    const profile = await createOwnerProfile();
+    const subject = await seedSubject(profile.id, 'Biology');
+    const curriculum = await seedCurriculum({
+      subjectId: subject.id,
+      topics: [{ title: 'Photosynthesis', sortOrder: 0 }],
+    });
+    const topicId = curriculum.topicIds[0]!;
+    const assessmentId = await seedAssessmentRecord({
+      profileId: profile.id,
+      subjectId: subject.id,
+      topicId,
+    });
+    mockChat.mockClear();
+
+    const res = await app.request(
+      `/v1/assessments/${assessmentId}/answer`,
+      {
+        method: 'POST',
+        headers: buildAuthHeaders(
+          { sub: ASSESSMENTS_USER.userId, email: ASSESSMENTS_USER.email },
+          profile.id,
+        ),
+        body: JSON.stringify({ answer: "I don't remember" }),
+      },
+      TEST_ENV,
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.status).toBe('failed_exhausted');
+    expect(body.evaluation.feedback).toContain('needs a quick review');
+    expect(mockChat).not.toHaveBeenCalled();
   });
 
   it('returns 400 for an empty assessment answer', async () => {
@@ -586,11 +623,11 @@ describe('Integration: assessment routes', () => {
         method: 'POST',
         headers: buildAuthHeaders(
           { sub: ASSESSMENTS_USER.userId, email: ASSESSMENTS_USER.email },
-          profile.id
+          profile.id,
         ),
         body: JSON.stringify({ answer: '' }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(400);
@@ -605,11 +642,11 @@ describe('Integration: assessment routes', () => {
         method: 'POST',
         headers: buildAuthHeaders(
           { sub: ASSESSMENTS_USER.userId, email: ASSESSMENTS_USER.email },
-          profile.id
+          profile.id,
         ),
         body: JSON.stringify({ answer: 'Some answer' }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(404);
@@ -636,10 +673,10 @@ describe('Integration: assessment routes', () => {
         method: 'PATCH',
         headers: buildAuthHeaders(
           { sub: ASSESSMENTS_USER.userId, email: ASSESSMENTS_USER.email },
-          profile.id
+          profile.id,
         ),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(400);
@@ -667,13 +704,13 @@ describe('Integration: assessment routes', () => {
         method: 'POST',
         headers: buildAuthHeaders(
           { sub: ASSESSMENTS_USER.userId, email: ASSESSMENTS_USER.email },
-          profile.id
+          profile.id,
         ),
         body: JSON.stringify({
           answer: 'Plants use light energy to make food.',
         }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(200);
@@ -693,11 +730,11 @@ describe('Integration: assessment routes', () => {
         method: 'POST',
         headers: buildAuthHeaders(
           { sub: ASSESSMENTS_USER.userId, email: ASSESSMENTS_USER.email },
-          profile.id
+          profile.id,
         ),
         body: JSON.stringify({ answer: 'Some answer' }),
       },
-      TEST_ENV
+      TEST_ENV,
     );
 
     expect(res.status).toBe(404);

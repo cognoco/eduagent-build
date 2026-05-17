@@ -79,25 +79,51 @@ export function ShelfRow({
     <View
       style={{
         opacity: isInactive ? 0.65 : 1,
-        marginBottom: 12,
+        marginBottom: 16,
+        minHeight: 98,
         position: 'relative',
       }}
     >
+      <View
+        testID={`shelf-row-backboard-${subjectId}`}
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          left: 38,
+          right: 10,
+          top: 8,
+          bottom: 18,
+          borderRadius: 8,
+          backgroundColor: tint.soft,
+          borderColor: tint.solid + '18',
+          borderWidth: 1,
+        }}
+      />
       <View
         testID={`shelf-row-depth-${subjectId}`}
         pointerEvents="none"
         style={{
           position: 'absolute',
-          left: 12,
-          right: 12,
-          bottom: -4,
-          height: 14,
-          borderRadius: 14,
-          backgroundColor: tint.solid + '24',
-          borderColor: tint.solid + '1F',
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: 18,
+          borderRadius: 9,
+          backgroundColor: tint.solid + '2A',
+          borderColor: tint.solid + '24',
           borderWidth: 1,
         }}
-      />
+      >
+        <View
+          style={{
+            height: 3,
+            borderTopLeftRadius: 9,
+            borderTopRightRadius: 9,
+            backgroundColor: tint.solid,
+            opacity: 0.24,
+          }}
+        />
+      </View>
       <Pressable
         testID={testID ?? `shelf-row-header-${subjectId}`}
         onPress={() => onPress(subjectId)}
@@ -116,19 +142,20 @@ export function ShelfRow({
         style={{
           flexDirection: 'row',
           alignItems: 'center',
-          minHeight: 86,
-          paddingVertical: 14,
+          minHeight: 90,
+          paddingTop: 12,
+          paddingBottom: 20,
           paddingHorizontal: 16,
           gap: 12,
-          borderRadius: 16,
-          borderWidth: 1,
-          borderColor: tint.solid + '33',
-          backgroundColor: tint.soft,
+          borderRadius: 10,
+          borderWidth: 0,
+          backgroundColor: 'transparent',
           shadowColor: tint.solid,
-          shadowOffset: { width: 0, height: 5 },
-          shadowOpacity: 0.14,
-          shadowRadius: 8,
-          elevation: 3,
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.05,
+          shadowRadius: 3,
+          elevation: 0,
+          zIndex: 1,
         }}
       >
         <SubjectBookshelfMotif

@@ -333,6 +333,11 @@
     "celebrations": {
       "sectionHeader": "Your celebrations",
       "inlinePrompt": "Celebrations",
+      "lessAnimationTitle": "Prefer less animation? Click here",
+      "lessAnimationDescription": "Adjust how often milestone animations appear",
+      "screenTitle": "Celebration settings",
+      "childScreenTitle": "{{name}}'s celebration settings",
+      "screenDescription": "Choose how much motion to show when milestones happen.",
       "allTitle": "All celebrations",
       "allDescription": "Show every milestone, including quick wins",
       "bigOnlyTitle": "Big milestones only",
@@ -797,7 +802,7 @@
       "couldNotLoad": "Could not load review status"
     },
     "assessment": {
-      "title": "Prove I know this",
+      "title": "Knowledge check",
       "topicsReady_one": "{{count}} topic ready to test",
       "topicsReady_other": "{{count}} topics ready to test",
       "studySubjectFirst": "Study {{subject}} first to unlock this",
@@ -1257,7 +1262,10 @@
   "assessment": {
     "title": "Knowledge Check",
     "openingMessage": "Let's see what you've picked up so far. Just do your best, and I'll help fill in any gaps.\n\nFirst question: what are the main things you remember about this topic? Share one or two examples if you can.",
+    "openingMessageWithTopic": "Let's check what is solid and what still needs explaining.\n\nTopic: {{title}}\nWhat it covers: {{description}}\n\nFirst question: what are the main ideas you remember from this topic? Share one or two examples if you can.",
     "firstQuestion": "First question: what are the main things you remember about this topic? Share one or two examples if you can.",
+    "firstQuestionWithTopic": "First question: what are the main ideas you remember from {{title}}? Share one or two examples if you can.",
+    "topicDescriptionFallback": "the ideas from your recent lesson",
     "resultSummary": "You got {{mastery}}%! {{band}}.",
     "bands": {
       "excellent": "Excellent",
@@ -1274,8 +1282,8 @@
     "notNowAction": "Not now",
     "passedMessage": "You've got a solid grasp of most of this — {{mastery}}% mastery! The areas to revisit will show up in your Library.",
     "missingParams": "This assessment can't be started — missing required information.",
-    "pickerTitle": "Pick a topic to check",
-    "pickerSubtitle": "You've studied these recently - pick one to prove what stuck.",
+    "pickerTitle": "Pick a topic to review",
+    "pickerSubtitle": "Choose a recent topic. We'll check what's solid and what still needs explaining.",
     "pickerLoadError": "Could not load topics ready for assessment.",
     "pickerLoading": "Loading topics...",
     "pickerLoadingBody": "We're checking which topics are ready for a fair test.",
@@ -1850,6 +1858,15 @@
       "monthlyReportsSummary": "Detailed summaries of your child's learning each month",
       "firstReportSoon": "The first report will arrive at the end of the month",
       "progressUnlockMessage": "Progress details unlock after the first few sessions",
+      "progressNudgeFreshTitle": "Ask about {{focus}} while it is fresh",
+      "progressNudgeFreshSubtitle": "{{name}} studied {{focus}} {{time}}. Try a quick pass yourself, then ask what clicked.",
+      "progressNudgeRecentTitle": "Keep {{focus}} warm",
+      "progressNudgeRecentSubtitle": "{{name}} last touched {{focus}} {{time}}. Open {{subject}}, take a quick look yourself, then pick one follow-up question.",
+      "progressNudgeStaleTitle": "Help {{name}} ease back into {{focus}}",
+      "progressNudgeStaleSubtitle": "Last session was {{time}}. Open {{subject}}, preview a small step yourself, then invite {{name}} back in.",
+      "progressNudgeStartTitle": "Learn alongside {{name}}",
+      "progressNudgeStartSubtitle": "Open {{subject}} to see what is ready, then try a small lesson yourself so you can help.",
+      "openProgressNudgeAction": "Open {{subject}}",
       "recentGrowth": "Recent growth",
       "recentGrowthSubtitle": "Topics mastered over the last 8 weeks",
       "subjects": "Subjects",
@@ -2130,7 +2147,7 @@
       "activityTypes": {
         "quiz": "Quiz",
         "review": "Review",
-        "assessment": "Prove I know this",
+        "assessment": "Knowledge check",
         "dictation": "Dictation",
         "recitation": "Recite",
         "fluency_drill": "Fluency drill"
@@ -2139,7 +2156,7 @@
         "capitals": "Capitals",
         "guess_who": "Guess who",
         "vocabulary": "Vocabulary",
-        "assessment": "Prove I know this",
+        "assessment": "Knowledge check",
         "dictation": "Dictation",
         "recitation": "Recite",
         "fluency_drill": "Fluency drill"

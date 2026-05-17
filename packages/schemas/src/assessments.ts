@@ -430,6 +430,7 @@ export type StabilityResponse = z.infer<typeof stabilityResponseSchema>;
 export const assessmentEligibleTopicSchema = z.object({
   topicId: z.string().uuid(),
   topicTitle: z.string(),
+  topicDescription: z.string(),
   subjectId: z.string().uuid(),
   subjectName: z.string(),
   lastStudiedAt: z.string().datetime(),

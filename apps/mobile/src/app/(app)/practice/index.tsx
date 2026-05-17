@@ -25,7 +25,11 @@ import type { QuizActivityType, QuizStats } from '@eduagent/schemas';
 
 import { useQuizStats } from '../../../hooks/use-quiz';
 import { useSubjects } from '../../../hooks/use-subjects';
-import { goBackOrReplace, homeHrefForReturnTo } from '../../../lib/navigation';
+import {
+  goBackOrReplace,
+  homeHrefForReturnTo,
+  PRACTICE_RETURN_TO,
+} from '../../../lib/navigation';
 import { useReviewSummary } from '../../../hooks/use-progress';
 import { useParentProxy } from '../../../hooks/use-parent-proxy';
 import { useAssessmentEligibleTopics } from '../../../hooks/use-assessments';
@@ -382,7 +386,7 @@ export default function PracticeScreen(): React.ReactElement {
     totalRoundsPlayed > 0
       ? t('practiceHub.history.roundsPlayed', { count: totalRoundsPlayed })
       : t('practiceHub.history.noRoundsYet');
-  const practiceReturnParams = { returnTo: 'practice' } as const;
+  const practiceReturnParams = { returnTo: PRACTICE_RETURN_TO } as const;
 
   const handleBack = () => {
     goBackOrReplace(router, homeHrefForReturnTo(returnTo));
@@ -499,9 +503,7 @@ export default function PracticeScreen(): React.ReactElement {
               onPress={() =>
                 router.push({
                   pathname: '/(app)/topic/relearn',
-                  params: {
-                    ...(returnTo ? { returnTo } : {}),
-                  },
+                  params: practiceReturnParams,
                 } as Href)
               }
               accessibilityRole="button"

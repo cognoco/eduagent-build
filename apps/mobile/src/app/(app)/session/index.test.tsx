@@ -338,8 +338,12 @@ jest.mock(
               {renderMessageActions?.(message as never)}
             </View>
           ))}
-          {inputAccessory}
-          {belowInput}
+          {inputAccessory ? (
+            <View testID="mock-input-accessory">{inputAccessory}</View>
+          ) : null}
+          {belowInput ? (
+            <View testID="mock-below-input">{belowInput}</View>
+          ) : null}
           {rightAction}
           {footer}
           <Pressable
@@ -780,7 +784,7 @@ describe('SessionScreen homework flow', () => {
     });
   });
 
-  it('hides contextual chips on greeting but shows session tools', () => {
+  it('hides contextual chips on greeting but shows session tools above the composer', () => {
     const wrapper = createWrapper();
     const testScreen = render(<SessionScreen />, { wrapper });
 
@@ -790,9 +794,12 @@ describe('SessionScreen homework flow', () => {
     expect(testScreen.queryByText('Too easy')).toBeNull();
     expect(testScreen.queryByText('Example')).toBeNull();
 
-    // Session tool chips should always be present
-    testScreen.getByText('Switch topic');
-    testScreen.getByText('Park it');
+    // Session tool chips live above the composer so the area below the input
+    // does not turn into a tall empty footer.
+    const inputAccessory = testScreen.getByTestId('mock-input-accessory');
+    within(inputAccessory).getByText('Switch topic');
+    within(inputAccessory).getByText('Park it');
+    expect(testScreen.queryByTestId('mock-below-input')).toBeNull();
   });
 
   it('records quick chips and learner feedback with follow-up prompts', async () => {

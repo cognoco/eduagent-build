@@ -7,10 +7,12 @@ import {
   learningSessions,
   subjects,
 } from '@eduagent/database';
+import { bookSuggestionGenerationResultSchema } from '@eduagent/schemas';
+
+import { getLanguageByCode } from '../data/languages';
 import { routeAndCall, type ChatMessage } from './llm';
 import { sanitizeXmlValue } from './llm/sanitize';
 import { areEquivalentBookTitles } from './curriculum';
-import { bookSuggestionGenerationResultSchema } from '@eduagent/schemas';
 import { createLogger } from './logger';
 import { AGE_STYLE_GUIDANCE } from './book-generation';
 
@@ -25,7 +27,6 @@ type FailureReason =
   | 'timeout'
   | 'lock_loser'
   | 'cooldown'
-  | 'language_subject'
   | 'no_subject'
   | 'all_filtered'
   | 'unknown';
@@ -56,10 +57,6 @@ export async function generateCategorizedBookSuggestions(
   if (!subject) {
     emitFailureMetric(profileId, subjectId, 'no_subject');
     return 'no_subject';
-  }
-  if (subject.pedagogyMode === 'four_strands') {
-    emitFailureMetric(profileId, subjectId, 'language_subject');
-    return 'language_subject';
   }
   const last = subject.bookSuggestionsLastGenerationAttemptedAt;
   if (last && Date.now() - last.getTime() < COOLDOWN_MS) {
@@ -157,6 +154,10 @@ export async function generateCategorizedBookSuggestions(
     try {
       const messages = buildPrompt({
         subjectName: subject.name,
+        languageName:
+          subject.pedagogyMode === 'four_strands' && subject.languageCode
+            ? (getLanguageDisplayName(subject.languageCode) ?? subject.name)
+            : null,
         existingBookTitles,
         existingSuggestionTitles,
         studiedTopics,
@@ -210,11 +211,15 @@ export async function generateCategorizedBookSuggestions(
 
 export function buildPrompt(args: {
   subjectName: string;
+  languageName?: string | null;
   existingBookTitles: string[];
   existingSuggestionTitles: string[];
   studiedTopics: string[];
 }): ChatMessage[] {
   const safeName = sanitizeXmlValue(args.subjectName, 200);
+  const safeLanguageName = args.languageName
+    ? sanitizeXmlValue(args.languageName, 100)
+    : null;
   const studied =
     args.studiedTopics.length === 0
       ? '(none — learner has not studied any topics on this subject yet)'
@@ -229,28 +234,41 @@ export function buildPrompt(args: {
     existing.length === 0
       ? '(none)'
       : existing.map((t) => `- ${sanitizeXmlValue(t, 200)}`).join('\n');
+  const languageLine = safeLanguageName
+    ? `Target language: <target_language>${safeLanguageName}</target_language>\n`
+    : '';
 
   const noStudiedTopics = args.studiedTopics.length === 0;
   const splitInstruction = noStudiedTopics
     ? 'Return exactly 4 suggestions, all with category "explore".'
     : 'Return exactly 4 suggestions: 2 with category "related" (built on the studied topics) and 2 with category "explore" (adjacent areas the learner has not seen yet).';
 
-  const system = `You are MentoMate's curriculum architect proposing fresh book-level suggestions inside an existing subject.
+  const domainInstruction = safeLanguageName
+    ? `The subject is a language-learning subject. The learner is studying ${safeLanguageName}.
 
-${AGE_STYLE_GUIDANCE}
+Language-specific rules:
+- Suggestions should be practice lanes inside ${safeLanguageName}, not generic school subjects or the language name by itself.
+- Prefer useful communication themes, vocabulary domains, grammar-in-context, pronunciation/listening practice, culture, media, and real-life situations.
+- Titles should be concrete and pickable, like "Travel Conversations", "Music and Lyrics", or "Everyday Speaking".`
+    : '';
 
-${splitInstruction}
-
-Rules:
+  const rules = `Rules:
 - Each suggestion has: title (1-200 chars), description (1+ chars), emoji (1+ chars), category ("related" or "explore").
 - Titles MUST NOT be (case-insensitive) equivalent to any title in the EXISTING list.
 - Titles MUST NOT duplicate each other.
 
 Return ONLY valid JSON in this exact shape:
 {"suggestions":[{"title":"...","description":"...","emoji":"...","category":"related"}]}`;
+  const system = [
+    "You are MentoMate's curriculum architect proposing fresh book-level suggestions inside an existing subject.",
+    AGE_STYLE_GUIDANCE,
+    splitInstruction,
+    ...(domainInstruction ? [domainInstruction] : []),
+    rules,
+  ].join('\n\n');
 
   const user = `<subject_name>${safeName}</subject_name>
-Studied topics so far:
+${languageLine}Studied topics so far:
 ${studied}
 
 EXISTING titles to avoid:
@@ -279,6 +297,13 @@ function classifyError(error: unknown): FailureReason {
   if (lower.includes('json') || lower.includes('parse')) return 'parse';
   if (lower.includes('network') || lower.includes('fetch')) return 'network';
   return 'unknown';
+}
+
+function getLanguageDisplayName(languageCode: string): string | null {
+  const language = getLanguageByCode(languageCode);
+  const firstName = language?.names[0];
+  if (!firstName) return null;
+  return firstName.replace(/^./, (char) => char.toUpperCase());
 }
 
 function isUniqueViolation(error: unknown): boolean {

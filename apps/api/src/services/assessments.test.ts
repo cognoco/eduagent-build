@@ -14,7 +14,9 @@ import {
   calculateMasteryScore,
   createAssessment,
   getAssessment,
+  resolveAssessmentStatus,
   recordAssessmentCompletionActivity,
+  shouldEndAssessmentForReview,
   updateAssessment,
 } from './assessments';
 import type {
@@ -499,6 +501,50 @@ describe('calculateMasteryScore', () => {
     expect(calculateMasteryScore('recall', 0.3)).toBeCloseTo(0.3);
     expect(calculateMasteryScore('explain', 0.6)).toBeCloseTo(0.6);
     expect(calculateMasteryScore('transfer', 0.7)).toBeCloseTo(0.7);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Assessment flow recovery
+// ---------------------------------------------------------------------------
+
+describe('assessment review handoff', () => {
+  it('ends the assessment when the learner says they do not remember', () => {
+    expect(shouldEndAssessmentForReview("I don't remember", [])).toBe(true);
+    expect(shouldEndAssessmentForReview('No idea', [])).toBe(true);
+  });
+
+  it('treats acknowledgement-only replies as review handoff after a prior answer', () => {
+    expect(
+      shouldEndAssessmentForReview('Ok', [
+        { role: 'user', content: 'Not much. We talked about feudalism.' },
+        {
+          role: 'assistant',
+          content: "Let's review the ideas together.",
+        },
+      ]),
+    ).toBe(true);
+  });
+
+  it('does not end on an initial readiness acknowledgement', () => {
+    expect(shouldEndAssessmentForReview('Ok', [])).toBe(false);
+  });
+
+  it('forces a review status instead of keeping the check in progress', () => {
+    const status = resolveAssessmentStatus({
+      evaluation: {
+        feedback:
+          "No problem. This topic needs a quick review before another check. Let's go through it together.",
+        passed: false,
+        shouldEscalateDepth: false,
+        masteryScore: 0,
+        qualityRating: 0,
+      },
+      answerCount: 2,
+      forceReview: true,
+    });
+
+    expect(status).toBe('failed_exhausted');
   });
 });
 

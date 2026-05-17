@@ -45,12 +45,12 @@ export function perGapCap(event: TimedEvent): number {
  *  (from the later event's metadata) × pace buffer. Falls back to 10 min. */
 export function computeActiveSeconds(
   sessionStartedAt: Date,
-  events: TimedEvent[]
+  events: TimedEvent[],
 ): number {
   if (events.length === 0) return 0;
 
   const sorted = [...events].sort(
-    (a, b) => a.createdAt.getTime() - b.createdAt.getTime()
+    (a, b) => a.createdAt.getTime() - b.createdAt.getTime(),
   );
 
   const first = sorted[0];
@@ -61,7 +61,7 @@ export function computeActiveSeconds(
   // Gap from session start to first event
   const firstGap = Math.max(
     0,
-    (first.createdAt.getTime() - sessionStartedAt.getTime()) / 1000
+    (first.createdAt.getTime() - sessionStartedAt.getTime()) / 1000,
   );
   total += Math.min(firstGap, perGapCap(first));
 
@@ -72,7 +72,7 @@ export function computeActiveSeconds(
     if (!curr || !next) continue;
     const gap = Math.max(
       0,
-      (next.createdAt.getTime() - curr.createdAt.getTime()) / 1000
+      (next.createdAt.getTime() - curr.createdAt.getTime()) / 1000,
     );
     total += Math.min(gap, perGapCap(next));
   }
@@ -82,7 +82,7 @@ export function computeActiveSeconds(
 
 export function formatLearningRecency(endedAt: Date): string {
   const diffDays = Math.floor(
-    (Date.now() - endedAt.getTime()) / (1000 * 60 * 60 * 24)
+    (Date.now() - endedAt.getTime()) / (1000 * 60 * 60 * 24),
   );
   if (diffDays <= 0) return 'covered today';
   if (diffDays === 1) return 'covered yesterday';
@@ -90,11 +90,101 @@ export function formatLearningRecency(endedAt: Date): string {
   return `covered on ${endedAt.toISOString().slice(0, 10)}`;
 }
 
+type CurriculumTopicRow = typeof curriculumTopics.$inferSelect;
+
+const TOPIC_MAP_NEIGHBOR_LIMIT = 3;
+
+function formatTopicMapNeighbor(
+  topic: CurriculumTopicRow,
+  latestByTopic: Map<string, Date>,
+): string {
+  const latest = latestByTopic.get(topic.id);
+  const recency = latest ? ` (${formatLearningRecency(latest)})` : '';
+  return `${sanitizeXmlValue(topic.title, 160)}${recency}`;
+}
+
+export function buildCurrentTopicMapContext(input: {
+  subjectName: string;
+  bookTitle: string;
+  bookDescription?: string | null;
+  topics: CurriculumTopicRow[];
+  currentTopicId: string;
+  latestByTopic?: Map<string, Date>;
+}): string | undefined {
+  const currentIndex = input.topics.findIndex(
+    (topic) => topic.id === input.currentTopicId,
+  );
+  if (currentIndex < 0) return undefined;
+
+  const currentTopic = input.topics[currentIndex];
+  if (!currentTopic) return undefined;
+
+  const latestByTopic = input.latestByTopic ?? new Map<string, Date>();
+  const previousTopics = input.topics.slice(
+    Math.max(0, currentIndex - TOPIC_MAP_NEIGHBOR_LIMIT),
+    currentIndex,
+  );
+  const nextTopics = input.topics.slice(
+    currentIndex + 1,
+    currentIndex + 1 + TOPIC_MAP_NEIGHBOR_LIMIT,
+  );
+
+  const lines = [
+    'Topic map for the mentor (data only; do not announce this section):',
+    `- Subject: ${sanitizeXmlValue(input.subjectName, 200)}`,
+    `- Book: ${sanitizeXmlValue(input.bookTitle, 200)}${
+      input.bookDescription
+        ? ` - ${sanitizeXmlValue(input.bookDescription, 300)}`
+        : ''
+    }`,
+    `- Current topic (${currentIndex + 1} of ${
+      input.topics.length
+    }): ${sanitizeXmlValue(currentTopic.title, 200)}`,
+  ];
+
+  if (currentTopic.description) {
+    lines.push(
+      `- Topic scope: ${sanitizeXmlValue(currentTopic.description, 500)}`,
+    );
+  }
+
+  if (currentTopic.chapter) {
+    lines.push(
+      `- Chapter/group: ${sanitizeXmlValue(currentTopic.chapter, 160)}`,
+    );
+  }
+
+  if (previousTopics.length > 0) {
+    lines.push(
+      `- Earlier in the book: ${previousTopics
+        .map((topic) => formatTopicMapNeighbor(topic, latestByTopic))
+        .join('; ')}`,
+    );
+  }
+
+  if (nextTopics.length > 0) {
+    lines.push(
+      `- Coming next in the book: ${nextTopics
+        .map((topic) => formatTopicMapNeighbor(topic, latestByTopic))
+        .join('; ')}`,
+    );
+  }
+
+  lines.push(
+    '- Use this map to keep lessons focused. Teach the current topic in small steps; use adjacent topics only as short bridges.',
+  );
+  lines.push(
+    '- Do not treat the topic as learned just because it has been discussed briefly. Look for evidence in the exchange history, retention status, learner notes, and prior summaries.',
+  );
+
+  return `<topic_map>\n${lines.join('\n')}\n</topic_map>`;
+}
+
 export async function buildBookLearningHistoryContext(
   db: Database,
   profileId: string,
   currentTopicId: string,
-  bookId: string
+  bookId: string,
 ): Promise<string | undefined> {
   const book = await db.query.curriculumBooks.findFirst({
     where: eq(curriculumBooks.id, bookId),
@@ -106,7 +196,7 @@ export async function buildBookLearningHistoryContext(
   // verified through the subjects table.
   const repo = createScopedRepository(db, profileId);
   const subject = await repo.subjects.findFirst(
-    eq(subjects.id, book.subjectId)
+    eq(subjects.id, book.subjectId),
   );
   // If the subject doesn't belong to this profile, bail out silently.
   if (!subject) return undefined;
@@ -120,7 +210,7 @@ export async function buildBookLearningHistoryContext(
   const topics = await db.query.curriculumTopics.findMany({
     where: and(
       eq(curriculumTopics.curriculumId, curriculum.id),
-      eq(curriculumTopics.bookId, bookId)
+      eq(curriculumTopics.bookId, bookId),
     ),
     orderBy: asc(curriculumTopics.sortOrder),
   });
@@ -144,8 +234,8 @@ export async function buildBookLearningHistoryContext(
           inArray(learningSessions.topicId, topicIds),
           inArray(learningSessions.status, ['completed', 'auto_closed']),
           isNotNull(learningSessions.endedAt),
-          gte(learningSessions.exchangeCount, 1)
-        )
+          gte(learningSessions.exchangeCount, 1),
+        ),
       ),
     // Fetch recent topic notes for this book (last 3, full text)
     db
@@ -158,8 +248,8 @@ export async function buildBookLearningHistoryContext(
       .where(
         and(
           inArray(topicNotes.topicId, topicIds),
-          eq(topicNotes.profileId, profileId)
-        )
+          eq(topicNotes.profileId, profileId),
+        ),
       )
       .orderBy(desc(topicNotes.updatedAt))
       .limit(3),
@@ -175,6 +265,15 @@ export async function buildBookLearningHistoryContext(
     }
   }
 
+  const topicMapContext = buildCurrentTopicMapContext({
+    subjectName: subject.name,
+    bookTitle: book.title,
+    bookDescription: book.description,
+    topics,
+    currentTopicId,
+    latestByTopic,
+  });
+
   // Build chapter groupings with topic summaries
   const chapterMap = new Map<string, typeof topics>();
   for (const topic of topics) {
@@ -187,16 +286,20 @@ export async function buildBookLearningHistoryContext(
 
   const sections: string[] = [];
 
-  // Header with shelf and book info
-  const shelfName = subject?.name ?? 'Unknown';
-  sections.push(`Shelf: ${shelfName}`);
-  sections.push(
-    `Book: ${book.title}${book.description ? ` — "${book.description}"` : ''}`
-  );
+  if (topicMapContext) {
+    sections.push(topicMapContext);
+  } else {
+    // Fallback for defensive completeness if the current topic is missing
+    // from the ordered topic list.
+    sections.push(`Shelf: ${subject.name}`);
+    sections.push(
+      `Book: ${book.title}${book.description ? ` - "${book.description}"` : ''}`,
+    );
+  }
 
   // Chapter groupings
   if (chapterMap.size > 0) {
-    sections.push('Chapters:');
+    const chapterSections: string[] = [];
     for (const [chapterName, chapterTopics] of chapterMap.entries()) {
       const coveredTopics = chapterTopics
         .filter((t) => latestByTopic.has(t.id))
@@ -209,8 +312,12 @@ export async function buildBookLearningHistoryContext(
           const recency = formatLearningRecency(latest);
           return `${t.title} (${recency})`;
         });
-        sections.push(`- ${chapterName}: ${topicNames.join(', ')}`);
+        chapterSections.push(`- ${chapterName}: ${topicNames.join(', ')}`);
       }
+    }
+    if (chapterSections.length > 0) {
+      sections.push('Learner history in this book:');
+      sections.push(...chapterSections);
     }
   }
 
@@ -230,19 +337,22 @@ export async function buildBookLearningHistoryContext(
   }
 
   // Only return if there is meaningful content beyond headers
+  const hasTopicMap = Boolean(topicMapContext);
   const hasTopicHistory = latestByTopic.size > 0;
   const hasNotes = notes.length > 0;
-  if (!hasTopicHistory && !hasNotes) return undefined;
+  if (!hasTopicMap && !hasTopicHistory && !hasNotes) return undefined;
 
-  sections.push(
-    'Build on these naturally when they help the learner connect ideas.'
-  );
+  if (hasTopicHistory || hasNotes) {
+    sections.push(
+      'Build on these naturally when they help the learner connect ideas.',
+    );
+  }
   return sections.join('\n');
 }
 
 export async function buildHomeworkLibraryContext(
   db: Database,
-  subjectId: string
+  subjectId: string,
 ): Promise<string | undefined> {
   const curriculum = await db.query.curricula.findFirst({
     where: eq(curricula.subjectId, subjectId),
@@ -266,12 +376,12 @@ export async function buildHomeworkLibraryContext(
 export async function buildResumeContext(
   db: Database,
   profileId: string,
-  resumeFromSessionId: string
+  resumeFromSessionId: string,
 ): Promise<string | undefined> {
   const session = await loadPriorSessionMeta(
     db,
     profileId,
-    resumeFromSessionId
+    resumeFromSessionId,
   );
   if (!session) return undefined;
 
@@ -286,14 +396,14 @@ export async function buildResumeContext(
     db.query.sessionSummaries.findFirst({
       where: and(
         eq(sessionSummaries.sessionId, resumeFromSessionId),
-        eq(sessionSummaries.profileId, profileId)
+        eq(sessionSummaries.profileId, profileId),
       ),
     }),
     db.query.sessionEvents.findMany({
       where: and(
         eq(sessionEvents.sessionId, resumeFromSessionId),
         eq(sessionEvents.profileId, profileId),
-        inArray(sessionEvents.eventType, ['user_message', 'ai_response'])
+        inArray(sessionEvents.eventType, ['user_message', 'ai_response']),
       ),
       // [BUG-913 sweep] Tie-break by id when created_at collides — see
       // session-crud.ts getSessionTranscript for the full rationale. With
@@ -323,7 +433,7 @@ export async function buildResumeContext(
   }
   if (summary?.nextTopicReason) {
     sections.push(
-      `Suggested next step: ${escapeXml(summary.nextTopicReason.slice(0, 300))}`
+      `Suggested next step: ${escapeXml(summary.nextTopicReason.slice(0, 300))}`,
     );
   }
 
@@ -347,7 +457,7 @@ export async function buildResumeContext(
       'MANDATORY OPENER FORMAT: your first turn MUST reference at least one specific detail from the "Previous summary" or "Recent exchange" above (a concept, term, or question the learner mentioned). Do NOT produce a generic "ready when you are" opener.',
       'Shape: "Last time we were working on <specific detail from above> - want to keep going there, or pivot to something else?"',
       'If they clearly choose another direction, adapt within the current subject/topic.',
-    ].join(' ')
+    ].join(' '),
   );
 
   return `<resume_context>\n${sections.join('\n')}\n</resume_context>`;
@@ -356,7 +466,7 @@ export async function buildResumeContext(
 export async function loadPriorSessionMeta(
   db: Database,
   profileId: string,
-  resumeFromSessionId: string
+  resumeFromSessionId: string,
 ): Promise<{
   subjectId: string;
   topicId: string | null;
@@ -367,7 +477,7 @@ export async function loadPriorSessionMeta(
     where: and(
       eq(learningSessions.id, resumeFromSessionId),
       eq(learningSessions.profileId, profileId),
-      gte(learningSessions.exchangeCount, 1)
+      gte(learningSessions.exchangeCount, 1),
     ),
   });
   return session

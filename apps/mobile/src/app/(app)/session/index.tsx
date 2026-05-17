@@ -1023,17 +1023,25 @@ function SessionScreenInner() {
       </View>
     ) : null;
 
-  const sessionToolAccessory = (
+  const isSubjectFlowBlockingComposer =
+    pendingClassification || !!pendingSubjectResolution;
+
+  const showSessionToolAccessory =
+    conversationStage === 'teaching' &&
+    !isSubjectFlowBlockingComposer &&
+    !isOffline &&
+    !sessionExpired &&
+    !quotaError &&
+    !isClosing;
+
+  const sessionToolAccessory = showSessionToolAccessory ? (
     <SessionToolAccessory
       isStreaming={isStreaming}
       handleQuickChip={handleQuickChip}
       stage={conversationStage}
       onAddNote={() => setShowNoteInput(true)}
     />
-  );
-
-  const isSubjectFlowBlockingComposer =
-    pendingClassification || !!pendingSubjectResolution;
+  ) : null;
 
   const drillStrip = fluencyDrill ? (
     <FluencyDrillStrip
@@ -1133,24 +1141,13 @@ function SessionScreenInner() {
         onInputModeChange={handleInputModeChange}
         rightAction={headerRight}
         inputAccessory={
-          drillStrip ? (
-            <View>
-              {drillStrip}
-              {sessionAccessory}
-            </View>
-          ) : (
-            sessionAccessory
-          )
+          <>
+            {drillStrip}
+            {sessionAccessory}
+            {sessionToolAccessory}
+          </>
         }
-        belowInput={
-          isSubjectFlowBlockingComposer ||
-          isOffline ||
-          sessionExpired ||
-          !!quotaError ||
-          isClosing
-            ? null
-            : sessionToolAccessory
-        }
+        belowInput={null}
         onDraftChange={setDraftText}
         renderMessageActions={renderMessageActions}
         speechRecognitionLanguage={languageVoiceLocale}

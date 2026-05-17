@@ -7,7 +7,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import type { DashboardChild } from '@eduagent/schemas';
+import type { ChildSession, DashboardChild } from '@eduagent/schemas';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -77,6 +77,69 @@ function formatJoinedDate(isoDate: string | null | undefined): string | null {
 
 type DashboardSubject = DashboardChild['subjects'][number];
 
+type ProgressNudgeAction = {
+  subjectId: string;
+  subjectName: string;
+  focusName: string;
+  lastSessionLabel: string | null;
+  lastSessionAt: string | null;
+  hasSessionHistory: boolean;
+};
+
+type SessionRecency = 'fresh' | 'recent' | 'stale' | 'none';
+
+function getSessionRecency(isoDate: string | null): SessionRecency {
+  if (!isoDate) return 'none';
+  const then = new Date(isoDate);
+  if (Number.isNaN(then.getTime())) return 'none';
+  const diffMs = Date.now() - then.getTime();
+  if (diffMs < 24 * 60 * 60 * 1000) return 'fresh';
+  if (diffMs < 7 * 24 * 60 * 60 * 1000) return 'recent';
+  return 'stale';
+}
+
+function buildProgressNudgeAction({
+  child,
+  latestSession,
+  lastSessionLabel,
+}: {
+  child: DashboardChild | null | undefined;
+  latestSession: ChildSession | undefined;
+  lastSessionLabel: string | null;
+}): ProgressNudgeAction | null {
+  const subjects = child?.subjects ?? [];
+  const sessionSubjectId = latestSession?.subjectId?.trim();
+  const sessionSubject = sessionSubjectId
+    ? subjects.find((subject) => subject.subjectId === sessionSubjectId)
+    : undefined;
+  const focusName =
+    latestSession?.topicTitle ??
+    child?.currentlyWorkingOn?.[0] ??
+    sessionSubject?.name ??
+    subjects[0]?.name;
+  const subject =
+    sessionSubject ??
+    (focusName
+      ? subjects.find((entry) => entry.name === focusName)
+      : undefined) ??
+    subjects[0];
+  const subjectId =
+    typeof subject?.subjectId === 'string' ? subject.subjectId.trim() : '';
+
+  if (!subject || subjectId.length === 0 || !focusName) {
+    return null;
+  }
+
+  return {
+    subjectId,
+    subjectName: subject.name,
+    focusName,
+    lastSessionLabel,
+    lastSessionAt: latestSession?.startedAt ?? null,
+    hasSessionHistory: latestSession != null,
+  };
+}
+
 function RowLink({
   icon,
   title,
@@ -134,6 +197,92 @@ function InfoRow({
         {value}
       </Text>
     </View>
+  );
+}
+
+function ProgressNudgeCard({
+  childName,
+  action,
+  onPress,
+}: {
+  childName: string;
+  action: ProgressNudgeAction;
+  onPress: () => void;
+}): React.ReactElement {
+  const { t } = useTranslation();
+  const colors = useThemeColors();
+  const recency = getSessionRecency(action.lastSessionAt);
+  const titleKey =
+    recency === 'fresh'
+      ? 'parentView.index.progressNudgeFreshTitle'
+      : recency === 'recent'
+        ? 'parentView.index.progressNudgeRecentTitle'
+        : recency === 'stale'
+          ? 'parentView.index.progressNudgeStaleTitle'
+          : 'parentView.index.progressNudgeStartTitle';
+  const subtitleKey =
+    recency === 'fresh'
+      ? 'parentView.index.progressNudgeFreshSubtitle'
+      : recency === 'recent'
+        ? 'parentView.index.progressNudgeRecentSubtitle'
+        : recency === 'stale'
+          ? 'parentView.index.progressNudgeStaleSubtitle'
+          : 'parentView.index.progressNudgeStartSubtitle';
+  const title = t(titleKey, {
+    name: childName,
+    focus: action.focusName,
+    defaultValue:
+      recency === 'fresh'
+        ? `Ask about ${action.focusName} while it is fresh`
+        : recency === 'recent'
+          ? `Keep ${action.focusName} warm`
+          : recency === 'stale'
+            ? `Help ${childName} ease back into ${action.focusName}`
+            : `Learn alongside ${childName}`,
+  });
+  const subtitle = t(subtitleKey, {
+    name: childName,
+    focus: action.focusName,
+    subject: action.subjectName,
+    time: action.lastSessionLabel,
+    defaultValue:
+      recency === 'fresh'
+        ? `${childName} studied ${action.focusName} ${action.lastSessionLabel}. Try a quick pass yourself, then ask what clicked.`
+        : recency === 'recent'
+          ? `${childName} last touched ${action.focusName} ${action.lastSessionLabel}. Open ${action.subjectName}, take a quick look yourself, then pick one follow-up question.`
+          : recency === 'stale'
+            ? `Last session was ${action.lastSessionLabel}. Open ${action.subjectName}, preview a small step yourself, then invite ${childName} back in.`
+            : `Open ${action.subjectName} to see what is ready, then try a small lesson yourself so you can help.`,
+  });
+
+  return (
+    <Pressable
+      onPress={onPress}
+      className="mt-4 rounded-card bg-primary-soft px-4 py-4"
+      accessibilityRole="button"
+      accessibilityLabel={title}
+      testID="child-progress-nudge-card"
+    >
+      <View className="flex-row items-start">
+        <View className="w-10 h-10 rounded-full bg-surface items-center justify-center me-3">
+          <Ionicons name="sparkles-outline" size={20} color={colors.primary} />
+        </View>
+        <View className="flex-1">
+          <Text className="text-body font-semibold text-text-primary">
+            {title}
+          </Text>
+          <Text className="text-body-sm text-text-secondary mt-1">
+            {subtitle}
+          </Text>
+          <Text className="text-body-sm font-semibold text-primary mt-3">
+            {t('parentView.index.openProgressNudgeAction', {
+              subject: action.subjectName,
+              defaultValue: `Open ${action.subjectName}`,
+            })}
+          </Text>
+        </View>
+      </View>
+    </Pressable>
   );
 }
 
@@ -460,6 +609,26 @@ export default function ChildDetailScreen(): React.ReactElement {
   );
   const childName =
     child?.displayName ?? ownedProfile?.displayName ?? t('common.loading');
+  const progressNudgeAction = useMemo(
+    () =>
+      buildProgressNudgeAction({
+        child,
+        latestSession: sessionsQuery.data?.[0],
+        lastSessionLabel,
+      }),
+    [child, lastSessionLabel, sessionsQuery.data],
+  );
+  const openProgressNudgeAction = (): void => {
+    if (!progressNudgeAction) return;
+    router.push({
+      pathname: '/(app)/child/[profileId]/subjects/[subjectId]',
+      params: {
+        profileId,
+        subjectId: progressNudgeAction.subjectId,
+        subjectName: progressNudgeAction.subjectName,
+      },
+    } as Href);
+  };
 
   if (!profileId) {
     return (
@@ -593,6 +762,14 @@ export default function ChildDetailScreen(): React.ReactElement {
         contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
         testID="child-detail-scroll"
       >
+        {showProgressOnly && progressNudgeAction ? (
+          <ProgressNudgeCard
+            childName={childName}
+            action={progressNudgeAction}
+            onPress={openProgressNudgeAction}
+          />
+        ) : null}
+
         {!showSettingsOnly && !showProgressOnly ? (
           <RowLink
             icon="document-text-outline"

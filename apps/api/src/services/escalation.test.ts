@@ -127,6 +127,13 @@ describe('evaluateEscalation', () => {
       expect(decision.newRung).toBe(2);
     });
 
+    it('handles "I don\'t remember" as a stuck indicator', () => {
+      const decision = evaluateEscalation(baseState, "I don't remember");
+
+      expect(decision.shouldEscalate).toBe(true);
+      expect(decision.newRung).toBe(2);
+    });
+
     it('handles "I\'m stuck" as a stuck indicator', () => {
       const decision = evaluateEscalation(baseState, "I'm stuck on this");
 
@@ -255,7 +262,7 @@ describe('partial progress detection', () => {
   it('holds rung when response is long enough at early exchanges (engaged heuristic)', () => {
     const decision = evaluateEscalation(
       baseState, // questionsAtCurrentRung: 2 (below threshold 3)
-      'I think the answer involves the mitochondria because it produces energy for the cell'
+      'I think the answer involves the mitochondria because it produces energy for the cell',
     );
 
     expect(decision.shouldEscalate).toBe(false);
@@ -271,7 +278,7 @@ describe('partial progress detection', () => {
 
     const decision = evaluateEscalation(
       state,
-      'I think I know but I am not really sure about this to be honest with you'
+      'I think I know but I am not really sure about this to be honest with you',
     );
 
     expect(decision.shouldEscalate).toBe(true);
@@ -294,7 +301,7 @@ describe('partial progress detection', () => {
   it('still escalates on stuck indicator even with long response', () => {
     const decision = evaluateEscalation(
       baseState,
-      "I don't know what the answer is, I'm completely lost and confused"
+      "I don't know what the answer is, I'm completely lost and confused",
     );
 
     expect(decision.shouldEscalate).toBe(true);
@@ -316,7 +323,7 @@ describe('partial progress detection', () => {
 
     const decision = evaluateEscalation(
       state,
-      'I think the answer involves the mitochondria because it produces energy for the cell'
+      'I think the answer involves the mitochondria because it produces energy for the cell',
     );
 
     // Despite engaged response, hold budget is exhausted — escalate normally
@@ -332,7 +339,7 @@ describe('partial progress detection', () => {
 
     const decision = evaluateEscalation(
       state,
-      'I think the answer involves the mitochondria because it produces energy for the cell'
+      'I think the answer involves the mitochondria because it produces energy for the cell',
     );
 
     expect(decision.shouldEscalate).toBe(false);

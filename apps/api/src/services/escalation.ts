@@ -51,6 +51,11 @@ const MAX_PARTIAL_PROGRESS_HOLDS = 2;
 const STUCK_INDICATORS = [
   "i don't know",
   'i dont know',
+  "i don't remember",
+  'i dont remember',
+  "i can't remember",
+  'i cant remember',
+  'cannot remember',
   'idk',
   "i'm not sure",
   'im not sure',
@@ -92,7 +97,7 @@ export function createInitialEscalationState(): EscalationState {
  * new       → rung 1
  */
 export function getRetentionAwareStartingRung(
-  retentionStatus?: 'new' | 'strong' | 'fading' | 'weak' | 'forgotten'
+  retentionStatus?: 'new' | 'strong' | 'fading' | 'weak' | 'forgotten',
 ): EscalationRung {
   switch (retentionStatus) {
     case 'forgotten':
@@ -132,11 +137,11 @@ export function getRetentionAwareStartingRung(
  */
 export function evaluateEscalation(
   state: EscalationState,
-  userResponse: string
+  userResponse: string,
 ): EscalationDecision {
   const normalised = userResponse.toLowerCase().trim();
   const isStuck = STUCK_INDICATORS.some((phrase) =>
-    normalised.includes(phrase)
+    normalised.includes(phrase),
   );
 
   // Never escalate beyond rung 5
@@ -216,7 +221,7 @@ export function evaluateEscalation(
  */
 export function getEscalationPromptGuidance(
   rung: EscalationRung,
-  _sessionType: SessionType
+  _sessionType: SessionType,
 ): string {
   switch (rung) {
     case 1:

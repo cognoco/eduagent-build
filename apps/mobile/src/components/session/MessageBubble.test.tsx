@@ -10,7 +10,7 @@
 // transcript hydration).
 // ---------------------------------------------------------------------------
 
-import { fireEvent, render } from '@testing-library/react-native';
+import { render } from '@testing-library/react-native';
 import { MessageBubble } from './MessageBubble';
 
 // react-native-markdown-display renders <Text> children verbatim in our
@@ -126,25 +126,16 @@ describe('verification badge styling', () => {
   });
 });
 
-describe('MessageBubble collapse affordance', () => {
-  it('uses an icon-only collapse control for long assistant messages', () => {
-    const { getByTestId, queryByText } = render(
+describe('MessageBubble long messages', () => {
+  it('renders long assistant messages fully without a collapse chevron', () => {
+    const { getByTestId, queryByTestId } = render(
       <MessageBubble
         sender="assistant"
         content="Long answer with enough layout height to become collapsible."
       />,
     );
 
-    fireEvent(getByTestId('message-ai-content'), 'layout', {
-      nativeEvent: { layout: { height: 220 } },
-    });
-
-    const toggle = getByTestId('message-collapse-toggle');
-    expect(toggle.props.className).toContain('min-h-[32px]');
-    expect(getByTestId('message-ai-content').props.style).toEqual(
-      expect.objectContaining({ maxHeight: 150, overflow: 'hidden' }),
-    );
-    expect(queryByText('Show less')).toBeNull();
-    expect(queryByText('Show more')).toBeNull();
+    expect(queryByTestId('message-collapse-toggle')).toBeNull();
+    expect(getByTestId('message-ai-content').props.style).toBeUndefined();
   });
 });

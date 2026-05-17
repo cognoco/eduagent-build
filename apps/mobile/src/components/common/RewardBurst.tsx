@@ -48,7 +48,7 @@ const VARIANT_CONFIG: Record<
   assessment: {
     colors: ['#22c55e', '#f59e0b', '#38bdf8', '#a855f7', '#f43f5e'],
     icon: '✓',
-    label: 'You proved it',
+    label: 'Solid work',
   },
   capitals: {
     colors: ['#2563eb', '#14b8a6', '#facc15'],

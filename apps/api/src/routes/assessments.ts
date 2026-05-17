@@ -19,9 +19,11 @@ import {
   getAssessment,
   updateAssessment,
   loadTopicTitle,
-  MAX_ASSESSMENT_EXCHANGES,
   evaluateQuickCheckAnswer,
   recordAssessmentCompletionActivity,
+  buildNeedsReviewEvaluation,
+  resolveAssessmentStatus,
+  shouldEndAssessmentForReview,
 } from '../services/assessments';
 import { mapEvaluateQualityToSm2 } from '../services/evaluate';
 import { updateRetentionFromSession } from '../services/retention-data';
@@ -88,15 +90,21 @@ export const assessmentRoutes = new Hono<RouteEnv>()
         profileId,
       );
 
-      const evaluation = await evaluateAssessmentAnswer(
-        {
-          topicTitle,
-          topicDescription: '',
-          currentDepth: assessment.verificationDepth,
-          exchangeHistory: assessment.exchangeHistory,
-        },
+      const forceReview = shouldEndAssessmentForReview(
         answer,
+        assessment.exchangeHistory,
       );
+      const evaluation = forceReview
+        ? buildNeedsReviewEvaluation()
+        : await evaluateAssessmentAnswer(
+            {
+              topicTitle,
+              topicDescription: '',
+              currentDepth: assessment.verificationDepth,
+              exchangeHistory: assessment.exchangeHistory,
+            },
+            answer,
+          );
 
       const updatedHistory = [
         ...assessment.exchangeHistory,
@@ -105,24 +113,11 @@ export const assessmentRoutes = new Hono<RouteEnv>()
       ];
 
       const answerCount = countLearnerAnswers(updatedHistory);
-      const capReached = answerCount >= MAX_ASSESSMENT_EXCHANGES;
-      const shouldContinueDepth =
-        evaluation.passed &&
-        evaluation.shouldEscalateDepth &&
-        evaluation.nextDepth &&
-        !capReached;
-      const newStatus = shouldContinueDepth
-        ? 'in_progress'
-        : evaluation.passed
-          ? 'passed'
-          : evaluation.masteryScore >= 0.6 &&
-              (capReached ||
-                !evaluation.shouldEscalateDepth ||
-                !evaluation.nextDepth)
-            ? 'borderline'
-            : capReached
-              ? 'failed_exhausted'
-              : 'in_progress';
+      const newStatus = resolveAssessmentStatus({
+        evaluation,
+        answerCount,
+        forceReview,
+      });
 
       const updatedAssessment = await updateAssessment(
         db,
