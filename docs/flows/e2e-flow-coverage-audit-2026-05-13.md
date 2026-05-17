@@ -150,3 +150,115 @@ These flow IDs need dedicated coverage or an explicit "not suitable for Maestro"
 ## Not Counted As Runtime Failures Yet
 
 This audit is static. A flow is listed as stale when it references old route/testID assumptions, not because it was executed and failed. Before closing a flow as fixed, run it on the Android dev-client using the E2E runbook.
+
+---
+
+## M1-B Close-out (2026-05-17)
+
+Per `docs/audit/e2e/m1b-execution-brief.md` Step 6. Classifications below are **static** — based on what's on `main` and the M1-B validator results, not on emulator runs. Rows tagged `DEFERRED:VERIFY` need a green run on the test machine before they can be promoted to "✅ passing." Rows tagged with another `DEFERRED:<class>` need additional infrastructure / configuration / coverage before they can run at all.
+
+### Existing E2E Flows Likely Stale (25 rows above)
+
+The Primary Finding's root cause — the More-tab refactor — was addressed by PR #305 (M1-A drift repair, merged 2026-05-17). Anchor sweeps replaced `learning-accommodation-section-header` with `more-row-learning-preferences` and rerouted billing/account flows through the new More → Account / Privacy sub-screens. The validator (`scripts/validate-maestro-flows.sh`) reports zero stale testID, missing-helper, or untagged-flow violations as of this close-out.
+
+| Flow | Static state | Classification |
+|---|---|---|
+| `_setup/switch-to-child.yaml` | Rewritten in PR #305 to route via Account / Profile IDs | `DEFERRED:VERIFY` |
+| `account/account-lifecycle.yaml` | More anchor updated | `DEFERRED:VERIFY` |
+| `account/app-language-edit.yaml` | Routes through `nav-to-more-account.yaml` | `DEFERRED:VERIFY` |
+| `account/change-password.yaml` | Routes through Account | `DEFERRED:VERIFY` |
+| `account/delete-account.yaml` | Routes through Privacy | `DEFERRED:VERIFY` |
+| `account/delete-account-scheduled.yaml` | Routes through Privacy | `DEFERRED:VERIFY` |
+| `account/export-data.yaml` | Routes through Privacy | `DEFERRED:VERIFY` |
+| `account/learner-mentor-memory.yaml` | More anchor updated | `DEFERRED:VERIFY` |
+| `account/learner-mentor-memory-populated.yaml` | More anchor updated | `DEFERRED:VERIFY` |
+| `account/more-impersonated-child.yaml` | Anchor + role gating updated | `DEFERRED:VERIFY` |
+| `account/more-tab-navigation.yaml` | Updated; tagged `pr-blocking` | `DEFERRED:VERIFY` |
+| `account/settings-toggles.yaml` | Routes via Notifications sub-screen | `DEFERRED:VERIFY` |
+| `billing/child-paywall.yaml` | Optional-true tightened in PR #305 | `DEFERRED:VERIFY` |
+| `billing/family-pool.yaml` | Routes through Account | `DEFERRED:VERIFY` |
+| `billing/static-comparison-family.yaml` | Routes through Account | `DEFERRED:VERIFY` |
+| `billing/static-comparison-pro.yaml` | Routes through Account | `DEFERRED:VERIFY` |
+| `billing/subscription.yaml` | Routes through Account | `DEFERRED:VERIFY` |
+| `billing/subscription-details.yaml` | Routes through Account | `DEFERRED:VERIFY` |
+| `billing/upgrade-confirmed-state.yaml` | Routes through Account | `DEFERRED:VERIFY` |
+| `billing/upgrade-pending-state.yaml` | Routes through Account | `DEFERRED:VERIFY` |
+| `learning/core-learning.yaml` | M1-A tightened post-session tab regression guard | `DEFERRED:VERIFY` (3 known pre-existing blockers — see m1a re-run notes) |
+| `onboarding/create-profile-standalone.yaml` | More anchor updated | `DEFERRED:VERIFY` |
+| `parent/parent-tabs.yaml` | More anchor updated | `DEFERRED:VERIFY` |
+| `post-auth-comprehensive-devclient.yaml` | M1-A removed crash-inducing taps to deleted theme features (Phase 5) + stale Phase-3 assertions | `DEFERRED:M1-COMPREHENSIVE` — full rewrite still required; per-file DEFERRED notice retained in YAML |
+| `regression/bug-239-parent-add-child.yaml` | More anchor updated | `DEFERRED:VERIFY` |
+
+### Broken Inventory References (3 rows above)
+
+| Old path | Action |
+|---|---|
+| `apps/mobile/e2e/flows/onboarding/onboarding-extras-flow.yaml` | `DEFERRED:INVENTORY-1` — update inventory to point at `onboarding-fast-path.yaml` |
+| `apps/mobile/e2e/flows/account/tutor-language-edit.yaml` | `DEFERRED:INVENTORY-2` — update inventory to point at `account/app-language-edit.yaml` |
+| `apps/mobile/e2e/flows/onboarding/settings-language-edit.yaml` | `DEFERRED:INVENTORY-3` — update inventory to point at `onboarding/onboarding-fast-path-language.yaml` |
+
+The fixes are mechanical edits in `docs/flows/mobile-app-flow-inventory.md`. Not done here to avoid an unrelated inventory rewrite — to be carried by the test-machine agent or the inventory owner in a follow-up.
+
+### Missing Or Incomplete Coverage (32 rows above)
+
+Each row is classified by its blocker:
+
+| Row | Blocker class | Notes |
+|---|---|---|
+| AUTH-03 — Sign-up email verification code | `DEFERRED:CLERK-1` | Needs Clerk test-email automation |
+| AUTH-08 — OAuth happy path | `DEFERRED:CLERK-2` | Needs OAuth provider test config (Google / Apple) |
+| AUTH-11 — Session-expired forced sign-out | `DEFERRED:INFRA-1` | Needs ADB-driven JWT expiry injection |
+| AUTH-13 — Deep-link auth redirect | `DEFERRED:INFRA-2` | Needs ADB deep-link injection |
+| AUTH-14 — Sign-in transition stuck-state | `DEFERRED:VERIFY` | Implementable as a flow today; needs author |
+| ACCOUNT-02 — Generic additional-profile journey | `DEFERRED:VERIFY` | Implementable as a flow today; needs author |
+| ACCOUNT-05 — Max-profile gating | `DEFERRED:VERIFY` | Implementable; needs seed for at-cap state |
+| ACCOUNT-12 — Cancel scheduled deletion | `DEFERRED:VERIFY` | Implementable; needs author |
+| ACCOUNT-13 — Privacy policy as dedicated flow | `DEFERRED:VERIFY` | Trivial flow, low priority |
+| ACCOUNT-14 — Terms of service as dedicated flow | `DEFERRED:VERIFY` | Trivial flow, low priority |
+| ACCOUNT-19 — Underage profile consent (end-to-end) | `DEFERRED:VERIFY` | Implementable; needs author |
+| HOME-06 — Resume interrupted session | `DEFERRED:VERIFY` | Implementable; needs seeded mid-session state |
+| HOME-08 — Home loading-timeout fallback | `DEFERRED:INFRA-3` | Needs network throttling / artificial slow-network seed |
+| SUBJECT-02 — Create subject from Library empty state | `DEFERRED:VERIFY` | Implementable; needs author |
+| SUBJECT-04 — Create subject from Homework branch | `DEFERRED:VERIFY` | Implementable; needs author |
+| LEARN-18 — Subject progress detail | `DEFERRED:VERIFY` | Implementable; needs author |
+| LEARN-20 — Milestones list error/fallback | `DEFERRED:VERIFY` | Implementable; needs seed for error state |
+| LEARN-26 — First-curriculum polling | `DEFERRED:TESTID-1` + `DEFERRED:SEED-1` | Stub `learning/first-curriculum-polling-timeout.yaml` exists; blocked on `curriculum-polling-banner` testID and `first-curriculum-seeded` seed scenario (DRAFT notice in file) |
+| PRACTICE-02 — Review topics shortcut | `DEFERRED:VERIFY` | Implementable; needs author |
+| QUIZ-06 — Round-complete error retry | `DEFERRED:VERIFY` | Implementable; needs seed for error state |
+| QUIZ-09 — Quiz history | `DEFERRED:VERIFY` | Implementable; needs author |
+| QUIZ-10 — Quiz round detail | `DEFERRED:VERIFY` | Implementable; needs author |
+| DICT-02 — OCR text preview / edit | `DEFERRED:DEVICE-1` | Camera + OCR — needs real device |
+| DICT-05 — Mid-dictation hardware-back exit | `DEFERRED:VERIFY` | Implementable; uses Maestro `pressKey: back` |
+| DICT-07 — Camera capture in dictation review | `DEFERRED:DEVICE-2` | Camera — needs real device |
+| DICT-10 — Dictation result-recording retry | `DEFERRED:VERIFY` | Implementable; needs seed for retry state |
+| HOMEWORK-05 — Gallery import | `DEFERRED:DEVICE-3` | File picker — needs real device or ADB push fixture |
+| HOMEWORK-06 — Vision / image pass-through | `DEFERRED:DEVICE-4` | Same as above |
+| PARENT-10 — Parent child-topic Understanding + Retention cards | `DEFERRED:VERIFY` | Implementable; needs seed for parent-with-retention |
+| BILLING-02 — RevenueCat IAP happy path | `DEFERRED:INFRA-4` | RevenueCat sandbox automation not currently available; stub at `billing/top-up.yaml` |
+| BILLING-05 — Manage billing deep link | `DEFERRED:INFRA-2` | Needs deep-link injection |
+| BILLING-10 — BYOK waitlist | `DEFERRED:UI` | UI is commented out in source; revisit when feature ships |
+| SESSION-SSE — SSE reconnect banner | `DEFERRED:TESTID-2` + `DEFERRED:SEED-2` | Stub `session/sse-reconnect-banner.yaml` exists; blocked on banner testID and `session-active` seed (DRAFT notice in file) |
+
+### DEFERRED tag legend
+
+| Prefix | Means |
+|---|---|
+| `DEFERRED:VERIFY` | The static work is complete on this branch; needs an emulator run to confirm green |
+| `DEFERRED:M1-COMPREHENSIVE` | Per-file DEFERRED notice; flow needs a full rewrite |
+| `DEFERRED:INFRA-<n>` | Blocked on test infrastructure (network throttling, ADB injection, RevenueCat sandbox) |
+| `DEFERRED:CLERK-<n>` | Blocked on Clerk dashboard configuration (MFA / SSO / test emails) |
+| `DEFERRED:DEVICE-<n>` | Needs a real device — camera, OCR, file picker |
+| `DEFERRED:INVENTORY-<n>` | Inventory row points at a stale path; mechanical update needed |
+| `DEFERRED:TESTID-<n>` | Blocked on a testID being added to app source |
+| `DEFERRED:SEED-<n>` | Blocked on a new `SeedScenario` variant being added to the API |
+| `DEFERRED:UI` | Blocked on a UI feature that isn't shipped yet |
+
+### Exit criteria status
+
+Per `docs/audit/e2e/m1b-execution-brief.md` "Exit criteria":
+
+1. ✅ `bash scripts/validate-maestro-flows.sh` exits 0 (verified on this branch, 0.35 s).
+2. ✅ Validator wired into `.github/workflows/docs-checks.yml` (advisory).
+3. ⏸️ `pr-blocking` tag set is **7 today** (target 15-25). Expansion plan in `docs/audit/e2e/m1b-pr-blocking-candidates.md`; test-machine agent owns the green-twice verification.
+4. ✅ Every non-setup flow has a `tags:` block (C7: 149 / 149 passing).
+5. 🟡 Every inventory row classified (this section). "Verified passing" stamps still depend on emulator runs (`DEFERRED:VERIFY`).

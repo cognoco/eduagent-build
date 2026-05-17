@@ -14,12 +14,24 @@ on:
       - 'apps/api/drizzle/**'
       - 'scripts/check-migration-rollback.sh'
       - '.github/workflows/docs-checks.yml'
+      - 'apps/mobile/e2e/flows/**/*.yaml'
+      - 'apps/mobile/e2e/flows/**/*.yml'
+      - 'apps/mobile/e2e/*.txt'
+      - 'apps/mobile/e2e/CONVENTIONS.md'
+      - 'scripts/validate-maestro-flows.sh'
+      - 'scripts/validate-maestro-flows/**'
   pull_request:
     paths:
       - 'docs/plans/**.md'
       - 'apps/api/drizzle/**'
       - 'scripts/check-migration-rollback.sh'
       - '.github/workflows/docs-checks.yml'
+      - 'apps/mobile/e2e/flows/**/*.yaml'
+      - 'apps/mobile/e2e/flows/**/*.yml'
+      - 'apps/mobile/e2e/*.txt'
+      - 'apps/mobile/e2e/CONVENTIONS.md'
+      - 'scripts/validate-maestro-flows.sh'
+      - 'scripts/validate-maestro-flows/**'
 
 permissions:
   contents: read
@@ -43,3 +55,34 @@ jobs:
       # SQL-only changes.
       - name: Migration rollback-section check
         run: bash scripts/check-migration-rollback.sh
+
+  maestro-validator:
+    # Static integrity checker for Maestro flow YAML. See
+    # docs/audit/e2e/validator-spec.md and docs/audit/e2e/m1b-execution-brief.md.
+    # Advisory while the suite settles — promote to required after M1-B
+    # stabilises and the inventory close-out is complete.
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install dependencies (root only)
+        # The validator only needs tsx + ts-jest from the root workspace —
+        # we don't need to build every app. `--ignore-scripts` skips heavy
+        # postinstall hooks (Prisma, Sentry CLI download, etc.).
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Validator unit tests
+        run: pnpm exec jest --config scripts/jest.config.cjs scripts/validate-maestro-flows/
+
+      - name: Validate Maestro flow integrity
+        run: bash scripts/validate-maestro-flows.sh

@@ -18,7 +18,7 @@ tags:
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
     env:
-      SEED_SCENARIO: "basic"
+      SEED_SCENARIO: "learning-active"
       API_URL: ${API_URL}
 
 # Wait for home screen to fully load
