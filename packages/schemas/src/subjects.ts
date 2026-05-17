@@ -293,6 +293,7 @@ export type BookSuggestionGenerationResult = z.infer<
 
 export const bookTopicGenerateInputSchema = z.object({
   priorKnowledge: z.string().max(2000).optional(),
+  expandExisting: z.boolean().optional(),
 });
 export type BookTopicGenerateInput = z.infer<
   typeof bookTopicGenerateInputSchema
