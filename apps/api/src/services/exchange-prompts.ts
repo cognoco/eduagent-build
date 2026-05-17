@@ -131,7 +131,8 @@ export function getSessionTypeGuidance(
       'This is a mixed-topic retrieval session. Topics are interleaved to strengthen discrimination and long-term retention.\n' +
       'Ask retrieval questions that test understanding at the depth established in previous assessments.\n' +
       'Context-switching between topics is intentional — it creates desirable difficulty that produces stronger memory traces.\n' +
-      'Keep each question focused on one topic. After the learner responds, move to a different topic.'
+      'Keep each question focused on one topic. After the learner responds, move to a different topic.\n' +
+      'If the learner cannot recall an answer, do not keep testing the same empty memory. Give one compact cue or re-teach the key idea, then ask a smaller check or move to another topic.'
     );
   }
   return (
@@ -413,6 +414,16 @@ export function buildSystemPrompt(
       '- When a fact would help your teaching but you do not have it, either ask one short question or proceed without that fact. Never confabulate.',
   );
 
+  if (!isRecitation) {
+    sections.push(
+      'NO-RECALL RECOVERY — NON-NEGOTIABLE RULES:\n' +
+        '- If the learner says they do not know, do not remember, cannot recall, have no idea, or are not sure, treat that as useful learning signal, not failure.\n' +
+        '- Do NOT ask the same recall question again or pressure them to remember from nothing.\n' +
+        '- Switch immediately to support: give one concrete cue, re-teach the smallest missing idea, or show a short example. Then ask one easier check if needed.\n' +
+        '- If the learner replies only "ok", "yes", "sure", or similar after you offered to review, treat it as consent to continue the review; do not demand another unsupported recall answer.',
+    );
+  }
+
   // Persona voice — driven by birthYear (DB-guaranteed non-null since migration 0017).
   // `ageBracket` is still consumed by `getSessionTypeGuidance` below.
   const ageBracket = resolveAgeBracket(context.birthYear);
@@ -597,6 +608,7 @@ export function buildSystemPrompt(
         '   - Comment briefly on delivery: pace, confidence, expression.\n' +
         '4. Offer to let them try again or move on.\n\n' +
         'Keep feedback encouraging. Use "not yet" framing for missed parts.\n' +
+        'If the learner says they cannot remember or replies with only an acknowledgement after you offer help, give a small starting cue or offer to review the first part together. Do not keep demanding the full recitation.\n' +
         'If you do not recognise the text, say so honestly and base feedback only on clarity and delivery.',
     );
   }
@@ -611,6 +623,7 @@ export function buildSystemPrompt(
       'Session type: REVIEW (calibrated relearning)\n' +
         'TRANSITION PHRASE: Begin with a brief one-line handoff that tells the learner this is a review check, not a fresh lesson.\n' +
         `CALIBRATION QUESTION: The UI may already have presented an opening question about <topic_title>${safeTopicTitle}</topic_title>. If the learner's latest message answers that question, do NOT ask it again — respond to what they remembered and use any gaps to guide the next teaching step.\n` +
+        'If the learner says they do not remember, have no idea, or are not sure, do NOT keep asking them to recall. Start a compact review of the core idea and ask one smaller supported check.\n' +
         'If the learner has not answered a calibration question yet, ask exactly one open question inviting them to say what they remember in their own words. Do NOT introduce new content before that answer.',
     );
   }
@@ -684,7 +697,7 @@ export function buildSystemPrompt(
     );
   } else if (context.continuationOpenerPhase === 'score') {
     sections.push(
-      'CONTINUATION OPENER (scoring turn): The learner just answered your retrieval question(s). Set signals.retrieval_score from 0.0 (no recall) to 1.0 (perfect recall). Do not mention the score to the learner.',
+      'CONTINUATION OPENER (scoring turn): The learner just answered your retrieval question(s). Set signals.retrieval_score from 0.0 (no recall) to 1.0 (perfect recall). Do not mention the score to the learner. If the answer shows little or no recall, briefly re-teach the essentials now instead of asking another unsupported retrieval question.',
     );
   } else if (context.continuationDepth) {
     const depthGuidance =

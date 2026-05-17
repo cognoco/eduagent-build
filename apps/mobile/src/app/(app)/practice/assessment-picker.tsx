@@ -156,6 +156,8 @@ export default function AssessmentPickerScreen(): React.ReactElement {
                   params: {
                     subjectId: topic.subjectId,
                     topicId: topic.topicId,
+                    topicTitle: topic.topicTitle,
+                    topicDescription: topic.topicDescription,
                   },
                 } as Href)
               }
@@ -163,6 +165,12 @@ export default function AssessmentPickerScreen(): React.ReactElement {
               <View className="flex-1">
                 <Text className="text-body font-semibold text-text-primary">
                   {topic.topicTitle}
+                </Text>
+                <Text
+                  className="text-body-sm text-text-secondary mt-1"
+                  numberOfLines={2}
+                >
+                  {topic.topicDescription}
                 </Text>
                 <Text className="text-body-sm text-text-secondary mt-1">
                   {topic.subjectName} -{' '}

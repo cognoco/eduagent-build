@@ -25,10 +25,27 @@ import { isAssessmentReadinessReply } from './assessment-readiness';
 export default function AssessmentScreen() {
   const router = useRouter();
   const { t } = useTranslation();
-  const { subjectId, topicId } = useLocalSearchParams<{
-    subjectId?: string;
-    topicId?: string;
-  }>();
+  const { subjectId, topicId, topicTitle, topicDescription } =
+    useLocalSearchParams<{
+      subjectId?: string;
+      topicId?: string;
+      topicTitle?: string;
+      topicDescription?: string;
+    }>();
+  const scopedTopicTitle =
+    typeof topicTitle === 'string' && topicTitle.trim().length > 0
+      ? topicTitle.trim()
+      : null;
+  const scopedTopicDescription =
+    typeof topicDescription === 'string' && topicDescription.trim().length > 0
+      ? topicDescription.trim()
+      : t('assessment.topicDescriptionFallback');
+  const openingMessage = scopedTopicTitle
+    ? t('assessment.openingMessageWithTopic', {
+        title: scopedTopicTitle,
+        description: scopedTopicDescription,
+      })
+    : t('assessment.openingMessage');
 
   const createAssessment = useCreateAssessment(subjectId ?? '', topicId ?? '');
   const [assessmentId, setAssessmentId] = useState<string | null>(null);
@@ -43,7 +60,7 @@ export default function AssessmentScreen() {
     {
       id: 'opening',
       role: 'assistant',
-      content: t('assessment.openingMessage'),
+      content: openingMessage,
     },
   ]);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -65,7 +82,11 @@ export default function AssessmentScreen() {
 
       if (isFirstLearnerTurn && isAssessmentReadinessReply(text)) {
         animateResponse(
-          t('assessment.firstQuestion'),
+          scopedTopicTitle
+            ? t('assessment.firstQuestionWithTopic', {
+                title: scopedTopicTitle,
+              })
+            : t('assessment.firstQuestion'),
           setMessages,
           setIsStreaming,
         );
@@ -122,6 +143,7 @@ export default function AssessmentScreen() {
       createAssessment,
       submitAnswer,
       t,
+      scopedTopicTitle,
     ],
   );
 

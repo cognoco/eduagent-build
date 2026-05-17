@@ -8,8 +8,6 @@ const mockReplace = jest.fn();
 const mockBack = jest.fn();
 const mockCanGoBack = jest.fn();
 const mockAccommodationMutate = jest.fn();
-const mockCelebrationLevelMutate = jest.fn();
-const mockChildCelebrationLevelMutate = jest.fn();
 const mockPlatformAlert = jest.fn();
 
 let mockActiveProfile = {
@@ -30,9 +28,6 @@ let mockLearnerProfile: { accommodationMode?: string } | null = {
 let mockChildLearnerProfile: { accommodationMode?: string } | null = null;
 let mockLearnerProfileError = false;
 let mockChildLearnerProfileError = false;
-let mockCelebrationLevel: 'all' | 'big_only' | 'off' | undefined = 'big_only';
-let mockChildCelebrationLevel: 'all' | 'big_only' | 'off' | undefined =
-  'big_only';
 const mockLearnerProfileRefetch = jest.fn();
 const mockChildLearnerProfileRefetch = jest.fn();
 let mockSearchParams: Record<string, string | undefined> = {};
@@ -91,28 +86,6 @@ jest.mock(
 );
 
 jest.mock(
-  '../../../hooks/use-settings' /* gc1-allow: unit test boundary */,
-  () => ({
-    useCelebrationLevel: () => ({
-      data: mockCelebrationLevel,
-      isLoading: false,
-    }),
-    useUpdateCelebrationLevel: () => ({
-      mutate: mockCelebrationLevelMutate,
-      isPending: false,
-    }),
-    useChildCelebrationLevel: () => ({
-      data: mockChildCelebrationLevel,
-      isLoading: false,
-    }),
-    useUpdateChildCelebrationLevel: () => ({
-      mutate: mockChildCelebrationLevelMutate,
-      isPending: false,
-    }),
-  }),
-);
-
-jest.mock(
   '../../../lib/platform-alert' /* gc1-allow: unit test boundary */,
   () => ({
     platformAlert: (...args: unknown[]) => mockPlatformAlert(...args),
@@ -148,8 +121,6 @@ describe('AccommodationScreen', () => {
     mockChildLearnerProfile = null;
     mockLearnerProfileError = false;
     mockChildLearnerProfileError = false;
-    mockCelebrationLevel = 'big_only';
-    mockChildCelebrationLevel = 'big_only';
     mockSearchParams = {};
   });
 
@@ -173,14 +144,14 @@ describe('AccommodationScreen', () => {
     );
   });
 
-  it('shows the inline celebration follow-up only for short-burst and predictable', () => {
+  it('shows the celebration settings link only for short-burst and predictable', () => {
     mockLearnerProfile = { accommodationMode: 'short-burst' };
     const { rerender } = render(<AccommodationScreen />, {
       wrapper: createWrapper(),
     });
 
     screen.getByTestId('celebration-followup-short-burst');
-    screen.getByTestId('celebration-level-big-only');
+    screen.getByTestId('celebration-settings-link');
 
     mockLearnerProfile = { accommodationMode: 'predictable' };
     rerender(<AccommodationScreen />);
@@ -188,19 +159,16 @@ describe('AccommodationScreen', () => {
 
     mockLearnerProfile = { accommodationMode: 'audio-first' };
     rerender(<AccommodationScreen />);
-    expect(screen.queryByTestId('celebration-level-big-only')).toBeNull();
+    expect(screen.queryByTestId('celebration-settings-link')).toBeNull();
   });
 
-  it('updates celebration level from the inline follow-up', () => {
+  it('opens the central celebrations screen from the follow-up link', () => {
     mockLearnerProfile = { accommodationMode: 'predictable' };
     render(<AccommodationScreen />, { wrapper: createWrapper() });
 
-    fireEvent.press(screen.getByTestId('celebration-level-off'));
+    fireEvent.press(screen.getByTestId('celebration-settings-link'));
 
-    expect(mockCelebrationLevelMutate).toHaveBeenCalledWith(
-      'off',
-      expect.objectContaining({ onError: expect.any(Function) }),
-    );
+    expect(mockPush).toHaveBeenCalledWith('/(app)/more/celebrations');
   });
 
   it('renders an error block with retry when the learner profile fails to load', () => {
@@ -281,17 +249,15 @@ describe('AccommodationScreen', () => {
       );
     });
 
-    it('uses child celebration level hooks in child mode', () => {
+    it('preserves childProfileId when opening the central celebrations screen', () => {
       mockChildLearnerProfile = { accommodationMode: 'predictable' };
       render(<AccommodationScreen />, { wrapper: createWrapper() });
 
-      fireEvent.press(screen.getByTestId('celebration-level-off'));
+      fireEvent.press(screen.getByTestId('celebration-settings-link'));
 
-      expect(mockChildCelebrationLevelMutate).toHaveBeenCalledWith(
-        { childProfileId: 'child-1', celebrationLevel: 'off' },
-        expect.objectContaining({ onError: expect.any(Function) }),
+      expect(mockPush).toHaveBeenCalledWith(
+        '/(app)/more/celebrations?childProfileId=child-1',
       );
-      expect(mockCelebrationLevelMutate).not.toHaveBeenCalled();
     });
 
     it('returns to the learner More root when a cached child-editing route opens outside parent mode', () => {

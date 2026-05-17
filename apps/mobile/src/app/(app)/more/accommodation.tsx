@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import type { AccommodationMode, CelebrationLevel } from '@eduagent/schemas';
+import type { AccommodationMode } from '@eduagent/schemas';
 
 import { useProfile } from '../../../lib/profile';
 import {
@@ -13,19 +13,16 @@ import {
   useUpdateAccommodationMode,
 } from '../../../hooks/use-learner-profile';
 import {
-  useCelebrationLevel,
-  useChildCelebrationLevel,
-  useUpdateCelebrationLevel,
-  useUpdateChildCelebrationLevel,
-} from '../../../hooks/use-settings';
-import {
   ACCOMMODATION_GUIDE,
   ACCOMMODATION_OPTIONS,
 } from '../../../lib/accommodation-options';
 import { goBackOrReplace } from '../../../lib/navigation';
 import { platformAlert } from '../../../lib/platform-alert';
 import { useThemeColors } from '../../../lib/theme';
-import { LearningModeOption } from '../../../components/more/settings-rows';
+import {
+  LearningModeOption,
+  SettingsRow,
+} from '../../../components/more/settings-rows';
 
 export default function AccommodationScreen(): React.ReactElement {
   const insets = useSafeAreaInsets();
@@ -61,19 +58,6 @@ export default function AccommodationScreen(): React.ReactElement {
   } = learnerQuery;
 
   const updateAccommodation = useUpdateAccommodationMode();
-
-  const selfCelebration = useCelebrationLevel();
-  const childCelebration = useChildCelebrationLevel(
-    canEditChildPreferences ? childProfileId : undefined,
-  );
-  const celebrationQuery = canEditChildPreferences
-    ? childCelebration
-    : selfCelebration;
-  const { data: celebrationLevel = 'big_only', isLoading: celebrationLoading } =
-    celebrationQuery;
-
-  const updateSelfCelebration = useUpdateCelebrationLevel();
-  const updateChildCelebration = useUpdateChildCelebrationLevel();
 
   const currentMode = learnerProfile?.accommodationMode ?? 'none';
 
@@ -115,35 +99,13 @@ export default function AccommodationScreen(): React.ReactElement {
     ],
   );
 
-  const handleSelectCelebrationLevel = (next: CelebrationLevel): void => {
-    if (celebrationLevel === next) return;
-    if (canEditChildPreferences) {
-      updateChildCelebration.mutate(
-        { childProfileId, celebrationLevel: next },
-        {
-          onError: () => {
-            platformAlert(
-              t('more.errors.couldNotSaveSetting'),
-              t('more.errors.tryAgain'),
-            );
-          },
-        },
-      );
-    } else {
-      updateSelfCelebration.mutate(next, {
-        onError: () => {
-          platformAlert(
-            t('more.errors.couldNotSaveSetting'),
-            t('more.errors.tryAgain'),
-          );
-        },
-      });
-    }
-  };
-
-  const celebrationPending = canEditChildPreferences
-    ? updateChildCelebration.isPending
-    : updateSelfCelebration.isPending;
+  const openCelebrations = useCallback(() => {
+    router.push(
+      canEditChildPreferences && childProfileId
+        ? (`/(app)/more/celebrations?childProfileId=${childProfileId}` as Href)
+        : ('/(app)/more/celebrations' as Href),
+    );
+  }, [canEditChildPreferences, childProfileId, router]);
 
   const title = canEditChildPreferences
     ? t('more.accommodation.childScreenTitle', { name: childName })
@@ -234,32 +196,14 @@ export default function AccommodationScreen(): React.ReactElement {
                       className="ml-4 mb-2 border-l-2 border-primary/30 pl-3"
                       testID={`celebration-followup-${opt.mode}`}
                     >
-                      <Text className="text-caption font-semibold text-text-primary mb-2">
-                        {t('more.celebrations.inlinePrompt')}
-                      </Text>
-                      <LearningModeOption
-                        title={t('more.celebrations.allTitle')}
-                        description={t('more.celebrations.allDescription')}
-                        selected={celebrationLevel === 'all'}
-                        disabled={celebrationLoading || celebrationPending}
-                        onPress={() => handleSelectCelebrationLevel('all')}
-                        testID="celebration-level-all"
-                      />
-                      <LearningModeOption
-                        title={t('more.celebrations.bigOnlyTitle')}
-                        description={t('more.celebrations.bigOnlyDescription')}
-                        selected={celebrationLevel === 'big_only'}
-                        disabled={celebrationLoading || celebrationPending}
-                        onPress={() => handleSelectCelebrationLevel('big_only')}
-                        testID="celebration-level-big-only"
-                      />
-                      <LearningModeOption
-                        title={t('more.celebrations.offTitle')}
-                        description={t('more.celebrations.offDescription')}
-                        selected={celebrationLevel === 'off'}
-                        disabled={celebrationLoading || celebrationPending}
-                        onPress={() => handleSelectCelebrationLevel('off')}
-                        testID="celebration-level-off"
+                      <SettingsRow
+                        label={t('more.celebrations.lessAnimationTitle')}
+                        description={t(
+                          'more.celebrations.lessAnimationDescription',
+                        )}
+                        onPress={openCelebrations}
+                        testID="celebration-settings-link"
+                        labelClassName="text-body-sm font-semibold text-text-primary"
                       />
                     </View>
                   ) : null}

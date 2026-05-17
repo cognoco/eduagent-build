@@ -6,6 +6,8 @@ export const LEARNER_HOME_RETURN_TO = 'learner-home';
 export const LEARNER_HOME_HREF = '/(app)/home';
 export const OWN_LEARNING_RETURN_TO = 'own-learning';
 export const OWN_LEARNING_HREF = '/(app)/own-learning';
+export const PRACTICE_RETURN_TO = 'practice';
+export const PRACTICE_HREF = '/(app)/practice';
 
 function firstParam(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
@@ -17,6 +19,7 @@ export function homeHrefForReturnTo(
   const token = firstParam(returnTo);
   if (token === OWN_LEARNING_RETURN_TO) return OWN_LEARNING_HREF as Href;
   if (token === LEARNER_HOME_RETURN_TO) return LEARNER_HOME_HREF as Href;
+  if (token === PRACTICE_RETURN_TO) return PRACTICE_HREF as Href;
   return '/(app)/home' as Href;
 }
 

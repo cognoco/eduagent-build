@@ -138,7 +138,7 @@ export default function MoreScreen() {
         <View className="gap-2">
           <SettingsRow
             label={t('more.learningPreferences.rowLabel')}
-            onPress={() => router.push('/(app)/more/learning-preferences')}
+            onPress={() => router.push('/(app)/more/accommodation')}
             testID="more-row-learning-preferences"
           />
           <SettingsRow

@@ -179,6 +179,58 @@ describe('buildSystemPrompt — scope-boundary app-help exception', () => {
   });
 });
 
+describe('buildSystemPrompt — no-recall recovery', () => {
+  it('adds global no-recall recovery guidance to ordinary learning prompts', () => {
+    const prompt = buildSystemPrompt(makeContext());
+
+    expect(prompt).toContain('NO-RECALL RECOVERY');
+    expect(prompt).toContain('Do NOT ask the same recall question again');
+    expect(prompt).toContain('treat it as consent to continue the review');
+  });
+
+  it('makes review mode pivot into supported review when recall is empty', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        effectiveMode: 'review',
+        topicTitle: 'Feudalism',
+        exchangeCount: 0,
+      }),
+    );
+
+    expect(prompt).toContain('Session type: REVIEW');
+    expect(prompt).toContain('do NOT keep asking them to recall');
+    expect(prompt).toContain('ask one smaller supported check');
+  });
+
+  it('protects interleaved retrieval from repeated empty-memory testing', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({ sessionType: 'interleaved' }),
+    );
+
+    expect(prompt).toContain('Session type: INTERLEAVED RETRIEVAL');
+    expect(prompt).toContain('do not keep testing the same empty memory');
+  });
+
+  it('protects recitation from demanding a full recitation after no-recall', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({ effectiveMode: 'recitation' }),
+    );
+
+    expect(prompt).toContain('Session type: RECITATION PRACTICE');
+    expect(prompt).toContain('give a small starting cue');
+    expect(prompt).not.toContain('NO-RECALL RECOVERY');
+  });
+
+  it('makes continuation scoring re-teach after low recall', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({ continuationOpenerPhase: 'score' }),
+    );
+
+    expect(prompt).toContain('CONTINUATION OPENER (scoring turn)');
+    expect(prompt).toContain('briefly re-teach the essentials now');
+  });
+});
+
 describe('buildSystemPrompt — first-encounter topic probe', () => {
   it('uses the subject opener on the first turn of a never-seen subject', () => {
     const prompt = buildSystemPrompt(

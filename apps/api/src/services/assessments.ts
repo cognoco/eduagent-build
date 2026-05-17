@@ -52,6 +52,12 @@ const DEPTH_ORDER: VerificationDepth[] = ['recall', 'explain', 'transfer'];
 
 export const MAX_ASSESSMENT_EXCHANGES = 4;
 
+const NO_RECALL_REPLY_PATTERN =
+  /\b(i\s*(do\s*not|don't|dont|can'?t|cannot)?\s*remember|i\s*(do\s*not|don't|dont)\s*know|no\s+idea|not\s+sure|nothing\s+comes?\s+to\s+mind|can'?t\s+recall|cannot\s+recall)\b/i;
+
+const ACKNOWLEDGEMENT_ONLY_PATTERN =
+  /^(ok(?:ay)?|yes|yep|yeah|sure|alright|all right|got it|sounds good|fine)[.!?\s]*$/i;
+
 // ---------------------------------------------------------------------------
 // System prompts
 // ---------------------------------------------------------------------------
@@ -99,6 +105,60 @@ Respond in this exact JSON format:
   "qualityRating": 0-5,
   "weakAreas": ["gap label 1", "gap label 2"]
 }`;
+
+export function shouldEndAssessmentForReview(
+  answer: string,
+  exchangeHistory: ChatExchange[],
+): boolean {
+  const trimmed = answer.trim();
+  if (trimmed.length === 0) return false;
+  if (NO_RECALL_REPLY_PATTERN.test(trimmed)) return true;
+
+  const hasPriorLearnerAnswer = exchangeHistory.some(
+    (exchange) => exchange.role === 'user',
+  );
+  return hasPriorLearnerAnswer && ACKNOWLEDGEMENT_ONLY_PATTERN.test(trimmed);
+}
+
+export function buildNeedsReviewEvaluation(): AssessmentEvaluation {
+  return {
+    feedback:
+      "No problem. This topic needs a quick review before another check. Let's go through it together.",
+    passed: false,
+    shouldEscalateDepth: false,
+    masteryScore: 0,
+    qualityRating: 0,
+    weakAreas: ['Core topic recall'],
+  };
+}
+
+export function resolveAssessmentStatus(input: {
+  evaluation: AssessmentEvaluation;
+  answerCount: number;
+  forceReview: boolean;
+}): AssessmentStatus {
+  if (input.forceReview) return 'failed_exhausted';
+
+  const capReached = input.answerCount >= MAX_ASSESSMENT_EXCHANGES;
+  const shouldContinueDepth =
+    input.evaluation.passed &&
+    input.evaluation.shouldEscalateDepth &&
+    input.evaluation.nextDepth &&
+    !capReached;
+
+  if (shouldContinueDepth) return 'in_progress';
+  if (input.evaluation.passed) return 'passed';
+  if (
+    input.evaluation.masteryScore >= 0.6 &&
+    (capReached ||
+      !input.evaluation.shouldEscalateDepth ||
+      !input.evaluation.nextDepth)
+  ) {
+    return 'borderline';
+  }
+  if (capReached) return 'failed_exhausted';
+  return 'in_progress';
+}
 
 // ---------------------------------------------------------------------------
 // Core functions

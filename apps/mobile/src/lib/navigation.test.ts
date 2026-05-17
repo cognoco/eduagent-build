@@ -5,6 +5,8 @@ import {
   pushLearningResumeTarget,
   LEARNER_HOME_HREF,
   LEARNER_HOME_RETURN_TO,
+  PRACTICE_HREF,
+  PRACTICE_RETURN_TO,
 } from './navigation';
 import type { LearningResumeTarget } from '@eduagent/schemas';
 import type { Router } from 'expo-router';
@@ -24,6 +26,10 @@ describe('homeHrefForReturnTo', () => {
     expect(homeHrefForReturnTo([LEARNER_HOME_RETURN_TO, 'other'])).toBe(
       LEARNER_HOME_HREF,
     );
+  });
+
+  it('returns the practice href when returnTo === PRACTICE_RETURN_TO', () => {
+    expect(homeHrefForReturnTo(PRACTICE_RETURN_TO)).toBe(PRACTICE_HREF);
   });
 
   it('falls back to the family home for any other value', () => {

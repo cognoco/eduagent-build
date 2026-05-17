@@ -56,7 +56,8 @@ jest.mock(
   () => ({
     goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
     homeHrefForReturnTo: (returnTo: unknown) =>
-      returnTo === 'learner-home' ? '/(app)/home' : '/(app)/home',
+      returnTo === 'practice' ? '/(app)/practice' : '/(app)/home',
+    PRACTICE_RETURN_TO: 'practice',
   }),
 );
 
@@ -122,6 +123,7 @@ describe('PracticeScreen', () => {
           subjectId: 'subject-1',
           subjectName: 'Math',
           topicTitle: 'Algebra',
+          topicDescription: 'Variables, expressions, and equations',
         },
       ],
       isError: false,
@@ -138,7 +140,7 @@ describe('PracticeScreen', () => {
     screen.getByText('Test yourself');
     screen.getByText('Pick a quick win. Every round helps your memory stick.');
     screen.getByText("Today's review");
-    screen.getByText('Prove I know this');
+    screen.getByText('Knowledge check');
     screen.getByText('Quick quiz');
     screen.getByText('Capitals');
     screen.getByText("Who's who");
@@ -177,11 +179,11 @@ describe('PracticeScreen', () => {
     fireEvent.press(screen.getByTestId('practice-review'));
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/topic/relearn',
-      params: {},
+      params: { returnTo: 'practice' },
     });
   });
 
-  it('keeps the learner home return target when opening relearn from practice', () => {
+  it('marks practice as the return target when opening relearn from practice', () => {
     mockSearchParams = { returnTo: 'learner-home' };
 
     render(<PracticeScreen />);
@@ -190,7 +192,7 @@ describe('PracticeScreen', () => {
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/topic/relearn',
       params: {
-        returnTo: 'learner-home',
+        returnTo: 'practice',
       },
     });
   });

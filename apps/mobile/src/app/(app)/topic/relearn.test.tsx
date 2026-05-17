@@ -61,7 +61,7 @@ jest.mock('../../../lib/navigation', () => ({
   // gc1-allow: imports expo-router Router type; goBackOrReplace calls router.back which requires native navigation context
   goBackOrReplace: (...args: unknown[]) => mockBack(...args),
   homeHrefForReturnTo: (returnTo: string | undefined) =>
-    returnTo === 'learner-home' ? '/(app)/home' : '/(app)/home',
+    returnTo === 'practice' ? '/(app)/practice' : '/(app)/home',
 }));
 
 const RelearnScreen = require('./relearn').default;
@@ -289,6 +289,21 @@ describe('RelearnScreen', () => {
     await waitFor(() => {
       screen.getByTestId('relearn-subjects-phase');
     });
+  });
+
+  it('returns to practice when launched from the practice hub', async () => {
+    mockSearchParams = { returnTo: 'practice' };
+
+    render(<RelearnScreen />);
+
+    await waitFor(() => {
+      screen.getByTestId('relearn-topics-phase');
+    });
+
+    fireEvent.press(screen.getByTestId('relearn-back'));
+
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/practice');
+    expect(mockBack).not.toHaveBeenCalled();
   });
 
   it('renders a fetch error state and retries', async () => {

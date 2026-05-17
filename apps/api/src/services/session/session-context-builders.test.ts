@@ -1,4 +1,5 @@
 import {
+  buildCurrentTopicMapContext,
   buildResumeContext,
   computeActiveSeconds,
 } from './session-context-builders';
@@ -122,12 +123,71 @@ describe('buildResumeContext', () => {
   });
 });
 
+describe('buildCurrentTopicMapContext', () => {
+  const topics = [
+    {
+      id: 'topic-1',
+      title: 'What Plants Need: The Ingredients',
+      description: 'Light, water, and carbon dioxide as inputs.',
+      chapter: 'The Grand Overview',
+    },
+    {
+      id: 'topic-2',
+      title: "The Plant's Powerhouse: Chloroplasts",
+      description: 'How chloroplasts turn light into usable energy.',
+      chapter: 'The Green Factories',
+    },
+    {
+      id: 'topic-3',
+      title: "The Green Pigment: Chlorophyll's Magic",
+      description: 'Why chlorophyll captures light.',
+      chapter: 'The Green Factories',
+    },
+  ] as Parameters<typeof buildCurrentTopicMapContext>[0]['topics'];
+
+  it('summarizes the current topic scope and nearby path for the mentor', () => {
+    const result = buildCurrentTopicMapContext({
+      subjectName: 'Biology',
+      bookTitle: 'Photosynthesis',
+      bookDescription: 'How plants use sunlight to create food and energy',
+      currentTopicId: 'topic-2',
+      topics,
+      latestByTopic: new Map([
+        ['topic-1', new Date(Date.now() - 2 * 24 * 60 * 60 * 1000)],
+      ]),
+    });
+
+    expect(result).toContain('Topic map for the mentor');
+    expect(result).toContain('Current topic (2 of 3)');
+    expect(result).toContain("The Plant's Powerhouse: Chloroplasts");
+    expect(result).toContain(
+      'Topic scope: How chloroplasts turn light into usable energy.',
+    );
+    expect(result).toContain('Earlier in the book');
+    expect(result).toContain('What Plants Need: The Ingredients');
+    expect(result).toContain('Coming next in the book');
+    expect(result).toContain("The Green Pigment: Chlorophyll's Magic");
+    expect(result).toContain('Do not treat the topic as learned');
+  });
+
+  it('returns undefined when the current topic is not in the ordered map', () => {
+    expect(
+      buildCurrentTopicMapContext({
+        subjectName: 'Biology',
+        bookTitle: 'Photosynthesis',
+        currentTopicId: 'missing-topic',
+        topics,
+      }),
+    ).toBeUndefined();
+  });
+});
+
 describe('computeActiveSeconds', () => {
   const baseTime = new Date('2025-01-15T10:00:00.000Z');
 
   function eventAt(
     offsetSeconds: number,
-    metadata?: Record<string, unknown>
+    metadata?: Record<string, unknown>,
   ): { createdAt: Date; metadata?: unknown } {
     return {
       createdAt: new Date(baseTime.getTime() + offsetSeconds * 1000),
@@ -155,7 +215,7 @@ describe('computeActiveSeconds', () => {
     expect(
       computeActiveSeconds(baseTime, [
         eventAt(300, { expectedResponseMinutes: 2 }),
-      ])
+      ]),
     ).toBe(180);
   });
 
@@ -167,7 +227,7 @@ describe('computeActiveSeconds', () => {
     expect(
       computeActiveSeconds(baseTime, [
         { createdAt: new Date(baseTime.getTime() - 5_000) },
-      ])
+      ]),
     ).toBe(0);
   });
 });

@@ -3,6 +3,7 @@ import {
   evaluateEligibilitySchema,
   evaluateDifficultyRungSchema,
   evaluateFailureActionSchema,
+  assessmentEligibleTopicSchema,
   retentionCardSchema,
   verificationTypeSchema,
 } from './assessments.js';
@@ -206,6 +207,31 @@ describe('evaluateFailureActionSchema', () => {
       evaluateFailureActionSchema.parse({
         action: 'unknown',
         message: 'test',
+      }),
+    ).toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// assessmentEligibleTopicSchema
+// ---------------------------------------------------------------------------
+
+describe('assessmentEligibleTopicSchema', () => {
+  it('requires the topic description so the check has visible scope', () => {
+    const data = {
+      topicId: TEST_UUID,
+      topicTitle: 'Photosynthesis',
+      topicDescription: 'How plants use light, water, and carbon dioxide.',
+      subjectId: '660e8400-e29b-41d4-a716-446655440000',
+      subjectName: 'Biology',
+      lastStudiedAt: '2026-05-17T08:00:00.000Z',
+    };
+
+    expect(assessmentEligibleTopicSchema.parse(data)).toEqual(data);
+    expect(() =>
+      assessmentEligibleTopicSchema.parse({
+        ...data,
+        topicDescription: undefined,
       }),
     ).toThrow();
   });

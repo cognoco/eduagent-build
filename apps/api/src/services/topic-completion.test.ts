@@ -6,6 +6,7 @@ import {
 
 describe('topic-completion', () => {
   it('requires a terminal session with at least the meaningful exchange threshold', () => {
+    expect(MIN_EXCHANGES_FOR_TOPIC_COMPLETION).toBeGreaterThan(3);
     expect(
       isMeaningfulCompletedSession({
         status: 'completed',

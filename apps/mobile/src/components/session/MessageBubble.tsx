@@ -1,11 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  View,
-  Text,
-  Pressable,
-  type LayoutChangeEvent,
-  type TextStyle,
-} from 'react-native';
+import { useEffect, useMemo } from 'react';
+import { View, Text, type TextStyle } from 'react-native';
 import Animated, {
   FadeIn,
   FadeInUp,
@@ -130,9 +124,6 @@ function BlinkingCursor(): React.ReactElement {
     </Animated.Text>
   );
 }
-
-/** Collapse AI messages taller than ~7 lines (at 22px line-height). */
-const COLLAPSE_THRESHOLD = 150;
 
 const ESCALATION_STYLES: Partial<
   Record<
@@ -292,25 +283,6 @@ export function MessageBubble({
     isAI && escalationRung ? ESCALATION_STYLES[escalationRung] : undefined;
   const isThinking = streaming && !content;
 
-  // Collapse / expand for long AI messages
-  const [isExpanded, setIsExpanded] = useState(true);
-  const [isCollapsible, setIsCollapsible] = useState(false);
-
-  const handleContentLayout = useCallback(
-    (event: LayoutChangeEvent) => {
-      if (!isExpanded) return; // don't re-measure constrained height
-      if (event.nativeEvent.layout.height > COLLAPSE_THRESHOLD) {
-        setIsCollapsible(true);
-        if (!isCollapsible) {
-          setIsExpanded(false);
-        }
-      }
-    },
-    [isCollapsible, isExpanded],
-  );
-
-  const showCollapseToggle = isAI && isCollapsible && !streaming;
-
   const mdStyles = useMemo(
     () => buildMarkdownStyles(colors.textPrimary),
     [colors.textPrimary],
@@ -350,15 +322,7 @@ export function MessageBubble({
         {isThinking ? (
           <ThinkingIndicator />
         ) : isAI ? (
-          <View
-            onLayout={handleContentLayout}
-            testID="message-ai-content"
-            style={
-              isCollapsible && !isExpanded
-                ? { maxHeight: COLLAPSE_THRESHOLD, overflow: 'hidden' }
-                : undefined
-            }
-          >
+          <View testID="message-ai-content">
             <Markdown
               mergeStyle={false}
               style={mdStyles}
@@ -396,23 +360,6 @@ export function MessageBubble({
           <Text className="text-body leading-relaxed text-text-inverse">
             {displayContent}
           </Text>
-        )}
-        {showCollapseToggle && (
-          <Pressable
-            onPress={() => setIsExpanded((prev) => !prev)}
-            className="self-end mt-1 min-h-[32px] min-w-[32px] items-center justify-center rounded-full"
-            accessibilityLabel={
-              isExpanded ? 'Collapse message' : 'Expand message'
-            }
-            accessibilityRole="button"
-            testID="message-collapse-toggle"
-          >
-            <Ionicons
-              name={isExpanded ? 'chevron-up' : 'chevron-down'}
-              size={14}
-              color={colors.accent}
-            />
-          </Pressable>
         )}
         {actions ? <View className="mt-3">{actions}</View> : null}
       </View>

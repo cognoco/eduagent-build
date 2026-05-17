@@ -30,13 +30,14 @@ import {
   createScopedRepository,
   type Database,
 } from '@eduagent/database';
+import { MIN_EXCHANGES_FOR_TOPIC_COMPLETION } from '@eduagent/schemas';
 import type {
+  AssessmentEligibleTopic,
   RetentionCardResponse,
   RecallTestSubmitInput,
   RelearnTopicInput,
   NeedsDeepeningStatus,
   TopicStability,
-  AssessmentEligibleTopic,
 } from '@eduagent/schemas';
 import { sm2 } from '@eduagent/retention';
 import {
@@ -542,6 +543,7 @@ export async function getAssessmentEligibleTopics(
     .select({
       topicId: learningSessions.topicId,
       topicTitle: curriculumTopics.title,
+      topicDescription: curriculumTopics.description,
       subjectId: subjects.id,
       subjectName: subjects.name,
       endedAt: learningSessions.endedAt,
@@ -560,7 +562,7 @@ export async function getAssessmentEligibleTopics(
         isNotNull(learningSessions.topicId),
         isNotNull(learningSessions.endedAt),
         inArray(learningSessions.status, ['completed', 'auto_closed']),
-        gte(learningSessions.exchangeCount, 3),
+        gte(learningSessions.exchangeCount, MIN_EXCHANGES_FOR_TOPIC_COMPLETION),
         gte(learningSessions.endedAt, cutoff),
       ),
     )
@@ -574,6 +576,7 @@ export async function getAssessmentEligibleTopics(
     topics.push({
       topicId: row.topicId,
       topicTitle: row.topicTitle,
+      topicDescription: row.topicDescription,
       subjectId: row.subjectId,
       subjectName: row.subjectName,
       lastStudiedAt: (row.endedAt ?? row.lastActivityAt).toISOString(),

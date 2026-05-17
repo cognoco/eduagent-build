@@ -26,6 +26,7 @@ export default function MoreLayout(): React.JSX.Element {
         options={{ headerShown: false }}
       />
       <Stack.Screen name="accommodation" options={{ headerShown: false }} />
+      <Stack.Screen name="celebrations" options={{ headerShown: false }} />
       <Stack.Screen
         name="notifications"
         options={{ title: t('more.subscreens.notifications') }}

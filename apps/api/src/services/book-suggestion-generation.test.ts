@@ -261,28 +261,71 @@ describe('generateCategorizedBookSuggestions', () => {
   });
 
   // -------------------------------------------------------------------------
-  // Task 3 — Language subject (four_strands) early return
+  // Language subjects
   // -------------------------------------------------------------------------
   describe('four_strands pedagogy mode', () => {
-    it('returns early without LLM call when pedagogyMode is four_strands', async () => {
-      const subject = makeSubject({ pedagogyMode: 'four_strands' });
-      const { db, transactionMock } = makeDb(subject);
+    it('generates language-aware suggestions instead of skipping the picker', async () => {
+      const subject = makeSubject({
+        name: 'French',
+        pedagogyMode: 'four_strands',
+        languageCode: 'fr',
+      });
+      routeAndCallMock.mockResolvedValue(
+        makeLlmResult([makeSuggestion('Travel Conversations')]),
+      );
+
+      const { tx, mocks } = makeTx({});
+      const { db, transactionMock } = makeDb(subject, async (cb) => cb(tx));
 
       await generateCategorizedBookSuggestions(db, PROFILE_ID, SUBJECT_ID);
 
-      expect(routeAndCallMock).not.toHaveBeenCalled();
-      expect(transactionMock).not.toHaveBeenCalled();
+      expect(transactionMock).toHaveBeenCalled();
+      expect(routeAndCallMock).toHaveBeenCalled();
+      const [messages] = routeAndCallMock.mock.calls[0]!;
+      expect(messages).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            role: 'system',
+            content: expect.stringContaining(
+              'The subject is a language-learning subject',
+            ),
+          }),
+          expect.objectContaining({
+            role: 'user',
+            content: expect.stringContaining(
+              '<target_language>French</target_language>',
+            ),
+          }),
+        ]),
+      );
+      expect(mocks.insertValues).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({ title: 'Travel Conversations' }),
+        ]),
+      );
     });
 
-    it('emits language_subject failure metric', async () => {
-      const subject = makeSubject({ pedagogyMode: 'four_strands' });
-      const { db } = makeDb(subject);
+    it('uses the subject name as target language when the code is outside the local catalog', async () => {
+      const subject = makeSubject({
+        name: 'English',
+        pedagogyMode: 'four_strands',
+        languageCode: 'en',
+      });
+      routeAndCallMock.mockResolvedValue(
+        makeLlmResult([makeSuggestion('Everyday Speaking')]),
+      );
+
+      const { tx } = makeTx({});
+      const { db } = makeDb(subject, async (cb) => cb(tx));
 
       await generateCategorizedBookSuggestions(db, PROFILE_ID, SUBJECT_ID);
 
-      expect(loggerWarnMock).toHaveBeenCalledWith(
-        'book_suggestion_generation_failed',
-        expect.objectContaining({ reason: 'language_subject' }),
+      const messages = routeAndCallMock.mock.calls[0]![0] as Array<{
+        content: string;
+      }>;
+      expect(messages[0]?.content).toContain('The learner is studying English');
+      expect(messages[1]?.content).toContain(
+        '<target_language>English</target_language>',
       );
     });
   });

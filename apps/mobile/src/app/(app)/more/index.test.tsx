@@ -169,12 +169,12 @@ describe('MoreScreen landing', () => {
     );
   });
 
-  it('navigates to the learning-preferences screen', () => {
+  it('navigates directly to the accommodation picker from Preferences', () => {
     render(<MoreScreen />, { wrapper: createWrapper() });
 
     fireEvent.press(screen.getByTestId('more-row-learning-preferences'));
 
-    expect(mockPush).toHaveBeenCalledWith('/(app)/more/learning-preferences');
+    expect(mockPush).toHaveBeenCalledWith('/(app)/more/accommodation');
   });
 
   it('navigates to the four More sub-screens', () => {

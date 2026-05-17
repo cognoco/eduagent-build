@@ -996,23 +996,32 @@ export function ParentHomeScreen({
                   <Pressable
                     key={`tonight-${prompt.key}`}
                     onPress={() => pushChildProgress(prompt.childId)}
-                    className="rounded-card px-4 py-3 flex-row items-start"
+                    className="rounded-card px-4 py-3.5 flex-row items-start"
                     style={({ pressed }) => ({
-                      backgroundColor: tint?.soft ?? colors.coachingCard,
+                      backgroundColor: colors.surface,
                       borderColor: tint ? tint.solid + '33' : colors.border,
                       borderWidth: 1,
+                      shadowColor: tint?.solid ?? colors.textSecondary,
+                      shadowOffset: { width: 0, height: 2 },
+                      shadowOpacity: 0.08,
+                      shadowRadius: 5,
+                      elevation: 1,
                       opacity: pressed ? 0.76 : 1,
                     })}
                     accessibilityRole="button"
                     accessibilityLabel={prompt.text}
                     testID={`parent-home-tonight-${prompt.key}`}
                   >
-                    <Ionicons
-                      name="chatbubble-outline"
-                      size={18}
-                      color={tint?.solid ?? colors.textSecondary}
-                      style={{ marginTop: 2 }}
-                    />
+                    <View
+                      className="h-9 w-9 rounded-full items-center justify-center"
+                      style={{ backgroundColor: tint?.soft ?? colors.surface }}
+                    >
+                      <Ionicons
+                        name="chatbubble-outline"
+                        size={18}
+                        color={tint?.solid ?? colors.textSecondary}
+                      />
+                    </View>
                     <Text className="text-body-sm text-text-primary ms-3 flex-1">
                       {prompt.text}
                     </Text>

@@ -404,6 +404,7 @@ describe('ChildDetailScreen — profile overview', () => {
     render(<ChildDetailScreen />);
 
     expect(screen.queryByTestId('child-reports-link')).toBeNull();
+    screen.getByTestId('child-progress-nudge-card');
     screen.getByTestId('child-subjects-section');
     screen.getByTestId('session-card-22222222-2222-7222-8222-222222222222');
     expect(
@@ -412,6 +413,53 @@ describe('ChildDetailScreen — profile overview', () => {
     expect(screen.queryByTestId('mentor-memory-link')).toBeNull();
     expect(screen.queryByTestId('child-profile-details')).toBeNull();
     expect(screen.queryByTestId('consent-section')).toBeNull();
+  });
+
+  it('uses a fresh progress nudge when the child studied recently', () => {
+    mockLocalSearchParams = { profileId: 'child-001', mode: 'progress' };
+    mockUseProfileSessions.mockReturnValue({
+      data: [
+        {
+          sessionId: '33333333-3333-7333-8333-333333333333',
+          subjectId: '11111111-1111-7111-8111-111111111111',
+          subjectName: 'Mathematics',
+          topicId: '44444444-4444-7444-8444-444444444444',
+          topicTitle: 'Fractions',
+          startedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+          sessionType: 'learning',
+          durationSeconds: 600,
+          wallClockSeconds: 900,
+          displaySummary: null,
+          highlight: null,
+          homeworkSummary: null,
+        },
+      ],
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+
+    render(<ChildDetailScreen />);
+
+    screen.getByText(/parentView\.index\.progressNudgeFreshTitle/);
+    expect(screen.queryByText(/ease back/)).toBeNull();
+  });
+
+  it('opens the nudge subject from the progress action card', () => {
+    mockLocalSearchParams = { profileId: 'child-001', mode: 'progress' };
+
+    render(<ChildDetailScreen />);
+
+    fireEvent.press(screen.getByTestId('child-progress-nudge-card'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/child/[profileId]/subjects/[subjectId]',
+      params: {
+        profileId: 'child-001',
+        subjectId: '11111111-1111-7111-8111-111111111111',
+        subjectName: 'Mathematics',
+      },
+    });
   });
 
   it('keeps the child progress surface open when the detail query fails but dashboard data has the child', () => {
