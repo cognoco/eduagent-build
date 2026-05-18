@@ -1250,7 +1250,21 @@
     "topicPassedNote": "Dobra robota - ten temat jest oznaczony jako zaliczony, a słabsze miejsca wrócą w powtórce, gdy będą wymagały uwagi.",
     "pickerLoadingBody": "Sprawdzamy, które tematy są gotowe do sprawiedliwego testu.",
     "pickerLoadTimeoutTitle": "Ładowanie tematów do oceny trwa zbyt długo",
-    "pickerLoadTimeoutMessage": "Sprawdź połączenie, a następnie spróbuj ponownie lub wróć."
+    "pickerLoadTimeoutMessage": "Sprawdź połączenie, a następnie spróbuj ponownie lub wróć.",
+    "languageOpeningMessage": "Sprawdźmy, jak posługujesz się językiem.\n\nPierwsze zadanie: napisz jedno lub dwa słowa albo krótkie zwroty w języku {{language}}. Dodaj angielskie tłumaczenie, jeśli pamiętasz.",
+    "languageOpeningMessageWithTopic": "Sprawdźmy, jak posługujesz się językiem.\n\n{{title}}\n\nPierwsze zadanie: napisz jedno lub dwa słowa albo krótkie zwroty w języku {{language}}. Dodaj angielskie tłumaczenie, jeśli pamiętasz.",
+    "languageGreetingOpeningMessage": "Zacznijmy od samego języka.\n\nPierwsze zadanie: czy umiesz przywitać się w języku {{language}}? Napisz jedno lub dwa powitania. Dodaj angielskie tłumaczenie, jeśli pamiętasz.",
+    "languageGreetingOpeningMessageWithTopic": "Zacznijmy od samego języka.\n\n{{title}}\n\nPierwsze zadanie: czy umiesz przywitać się w języku {{language}}? Napisz jedno lub dwa powitania. Dodaj angielskie tłumaczenie, jeśli pamiętasz.",
+    "languageFirstQuestion": "Pierwsze zadanie: napisz jedno lub dwa słowa albo krótkie zwroty w języku {{language}}. Dodaj angielskie tłumaczenie, jeśli pamiętasz.",
+    "languageFirstQuestionWithTopic": "Pierwsze zadanie: napisz jedno lub dwa słowa albo krótkie zwroty w języku {{language}} na temat {{title}}. Dodaj angielskie tłumaczenie, jeśli pamiętasz.",
+    "languageGreetingFirstQuestion": "Pierwsze zadanie: czy umiesz przywitać się w języku {{language}}? Napisz jedno lub dwa powitania. Dodaj angielskie tłumaczenie, jeśli pamiętasz.",
+    "languageGreetingFirstQuestionWithTopic": "Pierwsze zadanie: czy umiesz przywitać się w języku {{language}}? Napisz jedno lub dwa powitania. Dodaj angielskie tłumaczenie, jeśli pamiętasz.",
+    "continuePrompt": "Czy potrafisz wyjaśnić jeden z tych pomysłów własnymi słowami?",
+    "languageContinuePrompt": "Teraz dodaj jeszcze jeden zwrot w języku {{language}} lub przetłumacz jeden z napisanych zwrotów na angielski.",
+    "languageGreetingContinuePrompt": "Teraz dodaj jeszcze jedno powitanie w języku {{language}} lub przetłumacz jedno z napisanych powitań na angielski.",
+    "loadingReview": "Ładowanie zapisanego sprawdzenia...",
+    "pickerContinueForTopic": "Kontynuuj sprawdzanie dla {{title}}",
+    "pickerInProgress": "W toku"
   },
   "homework": {
     "permissionTitle": "Wymagany dostęp do aparatu",

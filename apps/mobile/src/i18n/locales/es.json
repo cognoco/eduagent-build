@@ -530,8 +530,7 @@
       "typeSubjectPlaceholder": "Escribe una materia",
       "typeSubjectLabel": "Escribe una materia",
       "useTypedSubject": "Usar",
-      "useTypedSubjectLabel": "Usar materia escrita",
-      "addNote": "Añadir nota"
+      "useTypedSubjectLabel": "Usar materia escrita"
     },
     "quota": {
       "dailyLimitReached": "Límite diario alcanzado",
@@ -1226,7 +1225,21 @@
     "topicPassedNote": "Buen trabajo: este tema queda marcado como aprobado, y los puntos débiles volverán en el repaso cuando necesiten atención.",
     "pickerLoadingBody": "Estamos comprobando qué temas están listos para una prueba justa.",
     "pickerLoadTimeoutTitle": "Los temas de la evaluación tardan mucho en cargarse",
-    "pickerLoadTimeoutMessage": "Comprueba tu conexión y vuelve a intentarlo o regresa."
+    "pickerLoadTimeoutMessage": "Comprueba tu conexión y vuelve a intentarlo o regresa.",
+    "languageOpeningMessage": "Vamos a comprobar el idioma que realmente puedes producir.\n\nPrimera tarea: escribe una o dos palabras o frases cortas en {{language}}. Añade la traducción al inglés si la recuerdas.",
+    "languageOpeningMessageWithTopic": "Vamos a comprobar el idioma que realmente puedes producir.\n\n{{title}}\n\nPrimera tarea: escribe una o dos palabras o frases cortas en {{language}}. Añade la traducción al inglés si la recuerdas.",
+    "languageGreetingOpeningMessage": "Empecemos con el idioma en sí.\n\nPrimera tarea: ¿sabes decir hola en {{language}}? Escribe uno o dos saludos. Añade la traducción al inglés si la recuerdas.",
+    "languageGreetingOpeningMessageWithTopic": "Empecemos con el idioma en sí.\n\n{{title}}\n\nPrimera tarea: ¿sabes decir hola en {{language}}? Escribe uno o dos saludos. Añade la traducción al inglés si la recuerdas.",
+    "languageFirstQuestion": "Primera tarea: escribe una o dos palabras o frases cortas en {{language}}. Añade la traducción al inglés si la recuerdas.",
+    "languageFirstQuestionWithTopic": "Primera tarea: escribe una o dos palabras o frases cortas en {{language}} para {{title}}. Añade la traducción al inglés si la recuerdas.",
+    "languageGreetingFirstQuestion": "Primera tarea: ¿sabes decir hola en {{language}}? Escribe uno o dos saludos. Añade la traducción al inglés si la recuerdas.",
+    "languageGreetingFirstQuestionWithTopic": "Primera tarea: ¿sabes decir hola en {{language}}? Escribe uno o dos saludos. Añade la traducción al inglés si la recuerdas.",
+    "continuePrompt": "¿Puedes explicar una de esas ideas con tus propias palabras?",
+    "languageContinuePrompt": "Ahora añade una frase más en {{language}} o traduce al inglés una de las que escribiste.",
+    "languageGreetingContinuePrompt": "Ahora añade un saludo más en {{language}} o traduce al inglés uno de los que escribiste.",
+    "loadingReview": "Cargando tu comprobación guardada...",
+    "pickerContinueForTopic": "Continuar evaluación para {{title}}",
+    "pickerInProgress": "En curso"
   },
   "homework": {
     "permissionTitle": "Se necesita acceso a la cámara",

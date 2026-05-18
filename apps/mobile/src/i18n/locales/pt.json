@@ -555,8 +555,7 @@
       "typeSubjectPlaceholder": "Digite uma matéria",
       "typeSubjectLabel": "Digite uma matéria",
       "useTypedSubject": "Usar",
-      "useTypedSubjectLabel": "Usar matéria digitada",
-      "addNote": "Adicionar nota"
+      "useTypedSubjectLabel": "Usar matéria digitada"
     },
     "quota": {
       "dailyLimitReached": "Limite diário atingido",
@@ -1251,7 +1250,21 @@
     "topicPassedNote": "Bom trabalho: este tópico foi marcado como aprovado, e os pontos fracos voltarão na revisão quando precisarem de atenção.",
     "pickerLoadingBody": "Estamos a verificar que tópicos estão prontos para um teste justo.",
     "pickerLoadTimeoutTitle": "Os tópicos da avaliação estão a demorar muito a carregar",
-    "pickerLoadTimeoutMessage": "Verifique a sua ligação, tente novamente ou volte."
+    "pickerLoadTimeoutMessage": "Verifique a sua ligação, tente novamente ou volte.",
+    "languageOpeningMessage": "Vamos verificar o idioma que você consegue produzir.\n\nPrimeira tarefa: escreva uma ou duas palavras ou frases curtas em {{language}}. Adicione a tradução em inglês, se você se lembrar.",
+    "languageOpeningMessageWithTopic": "Vamos verificar o idioma que você consegue produzir.\n\n{{title}}\n\nPrimeira tarefa: escreva uma ou duas palavras ou frases curtas em {{language}}. Adicione a tradução em inglês, se você se lembrar.",
+    "languageGreetingOpeningMessage": "Vamos começar com o próprio idioma.\n\nPrimeira tarefa: você sabe dizer olá em {{language}}? Escreva um ou dois cumprimentos. Adicione a tradução em inglês, se você se lembrar.",
+    "languageGreetingOpeningMessageWithTopic": "Vamos começar com o próprio idioma.\n\n{{title}}\n\nPrimeira tarefa: você sabe dizer olá em {{language}}? Escreva um ou dois cumprimentos. Adicione a tradução em inglês, se você se lembrar.",
+    "languageFirstQuestion": "Primeira tarefa: escreva uma ou duas palavras ou frases curtas em {{language}}. Adicione a tradução em inglês, se você se lembrar.",
+    "languageFirstQuestionWithTopic": "Primeira tarefa: escreva uma ou duas palavras ou frases curtas em {{language}} para {{title}}. Adicione a tradução em inglês, se você se lembrar.",
+    "languageGreetingFirstQuestion": "Primeira tarefa: você sabe dizer olá em {{language}}? Escreva um ou dois cumprimentos. Adicione a tradução em inglês, se você se lembrar.",
+    "languageGreetingFirstQuestionWithTopic": "Primeira tarefa: você sabe dizer olá em {{language}}? Escreva um ou dois cumprimentos. Adicione a tradução em inglês, se você se lembrar.",
+    "continuePrompt": "Você pode explicar uma dessas ideias com suas próprias palavras?",
+    "languageContinuePrompt": "Agora adicione mais uma frase em {{language}} ou traduza para o inglês uma das frases que você escreveu.",
+    "languageGreetingContinuePrompt": "Agora adicione mais um cumprimento em {{language}} ou traduza para o inglês um dos cumprimentos que você escreveu.",
+    "loadingReview": "Carregando sua verificação salva...",
+    "pickerContinueForTopic": "Continuar avaliação para {{title}}",
+    "pickerInProgress": "Em andamento"
   },
   "homework": {
     "permissionTitle": "É necessário acesso à câmera",

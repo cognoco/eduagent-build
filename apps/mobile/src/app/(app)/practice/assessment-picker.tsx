@@ -147,9 +147,14 @@ export default function AssessmentPickerScreen(): React.ReactElement {
               testID={`assessment-topic-${topic.topicId}`}
               className="bg-surface-elevated rounded-card px-4 py-4 flex-row items-center active:opacity-80"
               accessibilityRole="button"
-              accessibilityLabel={t('assessment.pickerStartForTopic', {
-                title: topic.topicTitle,
-              })}
+              accessibilityLabel={t(
+                topic.activeAssessmentId
+                  ? 'assessment.pickerContinueForTopic'
+                  : 'assessment.pickerStartForTopic',
+                {
+                  title: topic.topicTitle,
+                },
+              )}
               onPress={() =>
                 router.push({
                   pathname: '/(app)/practice/assessment',
@@ -158,14 +163,23 @@ export default function AssessmentPickerScreen(): React.ReactElement {
                     topicId: topic.topicId,
                     topicTitle: topic.topicTitle,
                     topicDescription: topic.topicDescription,
+                    pedagogyMode: topic.pedagogyMode,
+                    languageCode: topic.languageCode,
                   },
                 } as Href)
               }
             >
               <View className="flex-1">
-                <Text className="text-body font-semibold text-text-primary">
-                  {topic.topicTitle}
-                </Text>
+                <View className="flex-row items-center gap-2">
+                  <Text className="text-body font-semibold text-text-primary flex-1">
+                    {topic.topicTitle}
+                  </Text>
+                  {topic.activeAssessmentId ? (
+                    <Text className="text-caption font-semibold text-primary">
+                      {t('assessment.pickerInProgress')}
+                    </Text>
+                  ) : null}
+                </View>
                 <Text
                   className="text-body-sm text-text-secondary mt-1"
                   numberOfLines={2}

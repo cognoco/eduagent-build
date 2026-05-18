@@ -27,6 +27,7 @@ import {
   teachingPreferences,
   learningSessions,
   sessionSummaries,
+  assessments,
   createScopedRepository,
   type Database,
 } from '@eduagent/database';
@@ -546,6 +547,8 @@ export async function getAssessmentEligibleTopics(
       topicDescription: curriculumTopics.description,
       subjectId: subjects.id,
       subjectName: subjects.name,
+      pedagogyMode: subjects.pedagogyMode,
+      languageCode: subjects.languageCode,
       endedAt: learningSessions.endedAt,
       lastActivityAt: learningSessions.lastActivityAt,
     })
@@ -568,6 +571,31 @@ export async function getAssessmentEligibleTopics(
     )
     .orderBy(desc(learningSessions.lastActivityAt));
 
+  const topicIds = Array.from(
+    new Set(
+      rows
+        .map((row) => row.topicId)
+        .filter((topicId): topicId is string => typeof topicId === 'string'),
+    ),
+  );
+  const activeAssessmentByTopicId = new Map<string, string>();
+  if (topicIds.length > 0) {
+    const repo = createScopedRepository(db, profileId);
+    const activeAssessments = await repo.assessments.findMany(
+      and(
+        inArray(assessments.topicId, topicIds),
+        eq(assessments.status, 'in_progress'),
+      ),
+    );
+    for (const assessment of activeAssessments
+      .slice()
+      .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())) {
+      if (!activeAssessmentByTopicId.has(assessment.topicId)) {
+        activeAssessmentByTopicId.set(assessment.topicId, assessment.id);
+      }
+    }
+  }
+
   const seen = new Set<string>();
   const topics: AssessmentEligibleTopic[] = [];
   for (const row of rows) {
@@ -579,6 +607,9 @@ export async function getAssessmentEligibleTopics(
       topicDescription: row.topicDescription,
       subjectId: row.subjectId,
       subjectName: row.subjectName,
+      pedagogyMode: row.pedagogyMode,
+      languageCode: row.languageCode ?? null,
+      activeAssessmentId: activeAssessmentByTopicId.get(row.topicId) ?? null,
       lastStudiedAt: (row.endedAt ?? row.lastActivityAt).toISOString(),
     });
   }

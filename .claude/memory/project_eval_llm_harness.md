@@ -1,6 +1,6 @@
 ---
 name: Eval-LLM harness — apps/api/eval-llm
-description: All 9 flows wired. Fixture-driven snapshot harness for every LLM prompt builder.
+description: All 10 flows wired. Fixture-driven snapshot harness for every LLM prompt builder.
 type: project
 ---
 
@@ -35,7 +35,7 @@ apps/api/eval-llm/
 ├── flows/
 │   ├── quiz-capitals.ts, quiz-vocabulary.ts, quiz-guess-who.ts
 │   ├── dictation-generate.ts, dictation-review.ts, dictation-prepare-homework.ts
-│   ├── session-analysis.ts
+│   ├── session-analysis.ts, assessment-evaluation.ts
 │   └── filing-pre-session.ts
 └── snapshots/                             # committed markdown
 ```
@@ -62,9 +62,9 @@ apps/api/eval-llm/
 3. Register in `apps/api/eval-llm/index.ts` `FLOWS` array.
 4. Run `pnpm eval:llm -- --flow <id>`. Commit the generated snapshot files.
 
-## What's wired (2026-04-19)
+## What's wired (2026-05-18)
 
-**All 9 LLM flows wired:** quiz-capitals, quiz-vocabulary, quiz-guess-who, dictation-generate, dictation-review, dictation-prepare-homework, session-analysis, filing-pre-session, exchanges (added 002f5bad).
+**All 10 LLM flows wired:** quiz-capitals, quiz-vocabulary, quiz-guess-who, dictation-generate, dictation-review, dictation-prepare-homework, session-analysis, filing-pre-session, exchanges, assessment-evaluation.
 
 **Also available:** `filing-post-session` (trivial copy of filing-pre-session, wired as needed).
 

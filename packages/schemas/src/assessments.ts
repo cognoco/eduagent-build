@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { chatExchangeSchema } from './common.ts';
+import { languageCodeSchema, pedagogyModeSchema } from './language.ts';
 
 // Verification depth
 
@@ -75,6 +76,9 @@ export const assessmentContextSchema = z.object({
   topicDescription: z.string(),
   currentDepth: verificationDepthSchema,
   exchangeHistory: z.array(chatExchangeSchema),
+  subjectName: z.string().optional(),
+  pedagogyMode: pedagogyModeSchema.optional(),
+  languageCode: languageCodeSchema.nullable().optional(),
 });
 export type AssessmentContext = z.infer<typeof assessmentContextSchema>;
 
@@ -433,6 +437,9 @@ export const assessmentEligibleTopicSchema = z.object({
   topicDescription: z.string(),
   subjectId: z.string().uuid(),
   subjectName: z.string(),
+  pedagogyMode: pedagogyModeSchema,
+  languageCode: languageCodeSchema.nullable().optional(),
+  activeAssessmentId: z.string().uuid().nullable().optional(),
   lastStudiedAt: z.string().datetime(),
 });
 export type AssessmentEligibleTopic = z.infer<
@@ -445,4 +452,12 @@ export const assessmentEligibleTopicsResponseSchema = z.object({
 });
 export type AssessmentEligibleTopicsResponse = z.infer<
   typeof assessmentEligibleTopicsResponseSchema
+>;
+
+/** GET /subjects/:subjectId/topics/:topicId/assessments/active */
+export const getActiveAssessmentResponseSchema = z.object({
+  assessment: assessmentRecordSchema.nullable(),
+});
+export type GetActiveAssessmentResponse = z.infer<
+  typeof getActiveAssessmentResponseSchema
 >;
