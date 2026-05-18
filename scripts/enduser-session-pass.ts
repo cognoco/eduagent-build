@@ -767,10 +767,7 @@ async function runMode(
   const startedAt = new Date().toISOString();
   const email = `codex-enduser-${definition.mode}-${runId}@example.com`;
   console.log(`[${definition.mode}] seeding ${definition.scenario}`);
-  const seed = await seedScenario(db, definition.scenario, email, {
-    CLERK_SECRET_KEY: process.env['CLERK_SECRET_KEY'],
-    SEED_PASSWORD: process.env['SEED_PASSWORD'],
-  });
+  const seed = await seedScenario(db, definition.scenario, email, seedEnv());
 
   const subjectId = seed.ids['subjectId'];
   if (!subjectId) {
