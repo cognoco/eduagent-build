@@ -164,17 +164,17 @@ The Primary Finding's root cause — the More-tab refactor — was addressed by 
 | Flow | Static state | Classification |
 |---|---|---|
 | `_setup/switch-to-child.yaml` | Rewritten in PR #305 to route via Account / Profile IDs | `DEFERRED:VERIFY` |
-| `account/account-lifecycle.yaml` | More anchor updated | `DEFERRED:VERIFY` |
-| `account/app-language-edit.yaml` | Routes through `nav-to-more-account.yaml` | `DEFERRED:VERIFY` |
-| `account/change-password.yaml` | Routes through Account | `DEFERRED:VERIFY` |
-| `account/delete-account.yaml` | Routes through Privacy | `DEFERRED:VERIFY` |
-| `account/delete-account-scheduled.yaml` | Routes through Privacy | `DEFERRED:VERIFY` |
+| `account/account-lifecycle.yaml` | More anchor updated | `DEFERRED:VERIFY` — 2026-05-18 verification run: fails at `assertVisible "Display name" is visible`. Account screen copy or layout has drifted post-M1-A; needs flow-author update. |
+| `account/app-language-edit.yaml` | Routes through `nav-to-more-account.yaml` | `DEFERRED:VERIFY` — 2026-05-18 verification run: Norwegian switch succeeds, then `scrollUntilVisible id: sign-out-button` fails (timeout 10s). The post-translation More screen pushes sign-out further down; flow needs longer scroll or different anchor. |
+| `account/change-password.yaml` | Routes through Account | ✅ passing (verified 2026-05-18, WHPX Pixel API 34, single run end-to-end) |
+| `account/delete-account.yaml` | Routes through Privacy | `DEFERRED:VERIFY` (not re-run in 2026-05-18 session; tagged `pr-blocking` so any breakage will surface in CI immediately) |
+| `account/delete-account-scheduled.yaml` | Routes through Privacy | `DEFERRED:VERIFY` (not re-run in 2026-05-18 session; tagged `pr-blocking` so any breakage will surface in CI immediately) |
 | `account/export-data.yaml` | Routes through Privacy | `DEFERRED:VERIFY` |
 | `account/learner-mentor-memory.yaml` | More anchor updated | `DEFERRED:VERIFY` |
 | `account/learner-mentor-memory-populated.yaml` | More anchor updated | `DEFERRED:VERIFY` |
 | `account/more-impersonated-child.yaml` | Anchor + role gating updated | `DEFERRED:VERIFY` |
-| `account/more-tab-navigation.yaml` | Updated; tagged `pr-blocking` | `DEFERRED:VERIFY` |
-| `account/settings-toggles.yaml` | Routes via Notifications sub-screen | `DEFERRED:VERIFY` |
+| `account/more-tab-navigation.yaml` | Updated; tagged `pr-blocking` | ✅ passing (verified 2026-05-18, WHPX Pixel API 34, single run end-to-end through More → Help → Sign-out) |
+| `account/settings-toggles.yaml` | Routes via Notifications sub-screen | `DEFERRED:VERIFY` — 2026-05-18 verification run: Maestro Kotlin TestRunner crashed before any flow step ran. Re-run needed on a fresh Maestro session (driver fatigue suspected). |
 | `billing/child-paywall.yaml` | Optional-true tightened in PR #305 | `DEFERRED:VERIFY` |
 | `billing/family-pool.yaml` | Routes through Account | `DEFERRED:VERIFY` |
 | `billing/static-comparison-family.yaml` | Routes through Account | `DEFERRED:VERIFY` |
@@ -183,9 +183,9 @@ The Primary Finding's root cause — the More-tab refactor — was addressed by 
 | `billing/subscription-details.yaml` | Routes through Account | `DEFERRED:VERIFY` |
 | `billing/upgrade-confirmed-state.yaml` | Routes through Account | `DEFERRED:VERIFY` |
 | `billing/upgrade-pending-state.yaml` | Routes through Account | `DEFERRED:VERIFY` |
-| `learning/core-learning.yaml` | M1-A tightened post-session tab regression guard | `DEFERRED:VERIFY` (3 known pre-existing blockers — see m1a re-run notes) |
+| `learning/core-learning.yaml` | M1-A tightened post-session tab regression guard | `DEFERRED:VERIFY` — 2026-05-18 verification run: carousel scroll fix from M1-B commit `552d0b7f0` advances the flow through ~18 assertions, then fails at `assertVisible id: learning-mode-sheet` after tapping `learning-mode-header-button`. Either the sheet's testID changed or the open animation needs longer settle — separate from the carryover-list M1-A blockers (APK + carousel) which are resolved. |
 | `onboarding/create-profile-standalone.yaml` | More anchor updated | `DEFERRED:VERIFY` |
-| `parent/parent-tabs.yaml` | More anchor updated | `DEFERRED:VERIFY` |
+| `parent/parent-tabs.yaml` | More anchor updated | `DEFERRED:VERIFY` — 2026-05-18 verification run: tab sweep from M1-B commit `089ef9c75` lets all four tab taps succeed, then fails at `scrollUntilVisible id: sign-out-button` on the More tab (timeout 10s). Same drift class as `app-language-edit.yaml`. |
 | `post-auth-comprehensive-devclient.yaml` | M1-A removed crash-inducing taps to deleted theme features (Phase 5) + stale Phase-3 assertions | `DEFERRED:M1-COMPREHENSIVE` — full rewrite still required; per-file DEFERRED notice retained in YAML |
 | `regression/bug-239-parent-add-child.yaml` | More anchor updated | `DEFERRED:VERIFY` |
 
