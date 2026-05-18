@@ -1006,6 +1006,25 @@ describe('classifyExchangeOutcome', () => {
     expect(result.parsed.cleanResponse).toBe('Yes, that is correct.');
   });
 
+  it('normalizes inflated style words in learner-visible replies', () => {
+    const raw = JSON.stringify({
+      reply:
+        'Roman roads were very important. They definitely helped armies move between places.',
+      signals: {
+        partial_progress: false,
+        needs_deepening: false,
+        understanding_check: false,
+      },
+    });
+
+    const result = classifyExchangeOutcome(raw, ctx);
+
+    expect(result.fallback).toBeUndefined();
+    expect(result.parsed.cleanResponse).toBe(
+      'Roman roads were important. They helped armies move between places.',
+    );
+  });
+
   it.each(['', '   \n\t  '])(
     'returns empty_reply fallback for empty reply %p',
     (reply) => {

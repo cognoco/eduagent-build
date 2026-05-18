@@ -377,6 +377,7 @@ describe('buildSystemPrompt — no-recall recovery', () => {
     );
     expect(prompt).toContain('prefer one clean sentence');
     expect(prompt).toContain('Do not add new adjectives');
+    expect(prompt).toContain('On setup/readiness turns');
   });
 
   it('allows delivery feedback only for voice recitation', () => {

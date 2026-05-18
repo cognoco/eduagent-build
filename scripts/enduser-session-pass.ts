@@ -414,7 +414,7 @@ const LEARNING_UNSUPPORTED_CONQUEST_CONFIRM_RE =
 const LEARNING_UNSUPPORTED_SPEED_OR_TERRAIN_RE =
   /\b(?:move(?: around)? quickly|quickly helped|faster|muddy?|paved path|forests?)\b/i;
 const REVIEW_OFF_ANCHOR_RE =
-  /\b(lego|brick|building blocks?|wall|organs?|eat|breathe|reproduc|grow|respond(?:ing)? to its environment|outer boundary|cell membrane|outer layer|stomach|lung|molecules?|atoms?|proteins?|processes of life|function on its own|main jobs?)\b/i;
+  /\b(lego|brick|building blocks?|wall|organs?|virus(?:es)?|eat|breathe|reproduc\w*|grow\w*|respond(?:ing)? to its environment|outer boundary|cell membrane|outer layer|stomach|lung|molecules?|atoms?|proteins?|processes of life|function on its own|main jobs?)\b/i;
 const CONCRETE_NEXT_PRACTICE_RE =
   /\b(try|practice|explain in one sentence|one-sentence|compare|write|say|answer this|task)\b/i;
 const SELF_CHECK_RE = /\b(check|substitut|plug|back into|reverse|undo)\b/i;

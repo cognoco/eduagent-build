@@ -394,7 +394,7 @@ function buildFinalGroundingCheckBlock(): string {
     '- If the learner asks whether their own outside-world claim is the main idea and that claim is not fully supported, do NOT answer "yes". Use: "The source supports X; it does not say Y is the main idea. For this topic, focus on X."\n' +
     '- A source phrase such as "helped armies move between places" does not support extra claims like conquering land, defending land, forests, mud, speed, causes, or military strategy unless those words or ideas are actually in the source.\n' +
     '- If the reliable source is only a short title/description, do not invent examples or analogies. Teach by restating the supported relationship and asking one small check from those same words.\n' +
-    '- Delete unsupported details, nearby examples, and analogies from the final reply. Delete risky words unless the reliable source itself supports them: conquer, conquest, defend, quick, fast, faster, mud, muddy, paved, forest, organ, molecule, atom, protein, membrane, grow, reproduce, respond, processes of life, function on its own, main job.\n' +
+    '- Delete unsupported details, nearby examples, and analogies from the final reply. Delete risky words unless the reliable source itself supports them: conquer, conquest, defend, quick, fast, faster, mud, muddy, paved, forest, organ, molecule, atom, protein, virus, membrane, grow, reproduce, respond, processes of life, function on its own, main job.\n' +
     '- Delete inflated wording such as "super important", "definitely", "absolutely", "crucial", "very important", or "incredibly".\n' +
     "- If the reliable source is too thin for the learner's factual question, say what the source supports and what it does not support instead of filling the gap from memory."
   );
@@ -718,6 +718,7 @@ export function buildSystemPrompt(
         recitationFeedbackScope +
         '   - If the learner asks what sounded weak, always name one concrete strength and one concrete improvement to try next. Do not say there was nothing weak unless the recitation is already a polished multi-part answer.\n' +
         '   - When giving a polished version, improve structure using only the learner\'s wording and source-supported facts; prefer one clean sentence over repeating every earlier sentence verbatim. Do not add new adjectives, adverbs, causes, examples, or facts. If the learner said "armies travel", keep that wording; do not change it to "armies travel quickly" unless the learner said that.\n' +
+        '   - On setup/readiness turns for a loaded topic, include "current_topic" in private_sources.relied_on when that source exists, even if the visible reply is mostly procedural.\n' +
         '4. Offer to let them try again or move on.\n\n' +
         'Keep feedback encouraging. Use "not yet" framing for missed parts.\n' +
         'If the learner says they cannot remember or replies with only an acknowledgement after you offer help, give a small starting cue or offer to review the first part together. Do not keep demanding the full recitation.\n' +
@@ -736,7 +737,7 @@ export function buildSystemPrompt(
         'TRANSITION PHRASE: Begin with a brief one-line handoff that tells the learner this is a review check, not a fresh lesson.\n' +
         `CALIBRATION QUESTION: The UI may already have presented an opening question about <topic_title>${safeTopicTitle}</topic_title>. If the learner's latest message answers that question, do NOT ask it again — respond to what they remembered and use any gaps to guide the next teaching step.\n` +
         "Use the learner's partial answer as the anchor. Explicitly say what they got and what is still missing. Do not pivot into a different subtopic just because it is nearby; stay inside the learner's answer and the current topic description.\n" +
-        'REVIEW SOURCE DISCIPLINE: In review mode, do not use analogies, nearby examples, or extra biology/history facts unless they appear in the source pack. For a hint, use a cloze-style prompt from the source wording, such as "A cell is the basic unit of life; it uses inputs to ____." Do not use brick/building-block, wall, organ, membrane, grow, reproduce, respond, molecule, atom, protein, "processes of life", "function on its own", or "main job" examples unless those words are present in the source pack.\n' +
+        'REVIEW SOURCE DISCIPLINE: In review mode, do not use analogies, nearby examples, or extra biology/history facts unless they appear in the source pack. For a hint, use a cloze-style prompt from the source wording, such as "A cell is the basic unit of life; it uses inputs to ____." Do not use brick/building-block, wall, organ, membrane, grow, reproduce, respond, molecule, atom, protein, virus, "processes of life", "function on its own", or "main job" examples unless those words are present in the source pack.\n' +
         'If the learner says they do not remember, have no idea, or are not sure, do NOT keep asking them to recall. Start a compact review of the core idea and ask one smaller supported check.\n' +
         'If the learner has not answered a calibration question yet, ask exactly one open question inviting them to say what they remember in their own words. Do NOT introduce new content before that answer.\n' +
         'When the learner asks whether they got the important part, answer directly: "Yes, you got X; the missing piece is Y." Then give one small next check.',
@@ -1101,7 +1102,7 @@ export function buildSystemPrompt(
       'REVIEW FINAL CHECK BEFORE REPLY:\n' +
         '- If the latest learner answer is about energy/inputs, keep the next reply anchored there first.\n' +
         '- Use the pattern: "You got X; the missing piece is Y." Then ask one small source-supported check.\n' +
-        '- Do not introduce brick, building-block, wall, organ, membrane, grow, reproduce, respond, molecule, atom, protein, "processes of life", "function on its own", or "main job" examples unless those exact words are in the source pack.',
+        '- Do not introduce brick, building-block, wall, organ, membrane, grow, reproduce, respond, molecule, atom, protein, virus, "processes of life", "function on its own", or "main job" examples unless those exact words are in the source pack.',
     );
   }
 
