@@ -168,7 +168,10 @@ describe('buildSystemPrompt', () => {
       sessionType: 'learning',
     });
     expect(prompt).toContain(
-      'Teach the concept clearly using a concrete example',
+      'Teach the concept clearly using a source-supported relationship',
+    );
+    expect(prompt).toContain(
+      'Use a concrete example only when it is present in a reliable source',
     );
     expect(prompt).toContain('explain → verify → next concept');
     // Old guidance should be gone

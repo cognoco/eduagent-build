@@ -26,6 +26,7 @@ import {
   registerProvider,
 } from '../apps/api/src/services/llm/index';
 import {
+  resetDatabase,
   seedScenario,
   type SeedScenario,
 } from '../apps/api/src/services/test-seed';
@@ -401,7 +402,7 @@ const SEED_PLACEHOLDER_NAME_RE =
 const RECITATION_TEXT_DELIVERY_RE =
   /\b(delivery|pace|confidence|confident|expression|pronunciation)\b/i;
 const GENERIC_LEARNER_PRAISE_RE =
-  /\b(great job|nice work|great question|(?:really )?good question|nice,\s+[A-Z][a-z]+|you did a great job|you'?re (?:doing )?(?:amazing|awesome|fantastic|excellent)|(?:amazing|awesome|fantastic|excellent|great|nice) (?:work|job|answer|effort|reasoning|connection)|(?:your|that'?s|this is) (?:amazing|awesome|fantastic|excellent|great|nice))\b/i;
+  /\b(great job|nice work|great question|(?:really )?good question|great topic|nice,\s+[A-Z][a-z]+|you did a great job|you'?re (?:doing )?(?:amazing|awesome|fantastic|excellent)|(?:amazing|awesome|fantastic|excellent|great|nice) (?:work|job|answer|effort|reasoning|connection)|(?:your|that'?s|this is) (?:amazing|awesome|fantastic|excellent|great|nice))\b/i;
 const OVERHEATED_STYLE_RE =
   /\b(super important|incredibly|definitely|absolutely|crucial|very important)\b/i;
 const RECITATION_NO_WEAKNESS_RE =
@@ -409,9 +410,11 @@ const RECITATION_NO_WEAKNESS_RE =
 const RECITATION_UNSUPPORTED_POLISH_RE =
   /\b(?:armies|army)\s+(?:could\s+)?travel(?:ed|ing)?\s+quickly\b/i;
 const LEARNING_UNSUPPORTED_CONQUEST_CONFIRM_RE =
-  /\b(?:you'?re right[^.?!]*conquering|conquering land was (?:definitely|a big part|the main))\b/i;
+  /\b(?:you'?re right[^.?!]*conquer|conquering (?:new )?land can be part|empires? grow[^.?!]*conquer|conquer(?:ing|ed)? new (?:areas|land)|defend(?:ing)? (?:land|the land)|conquering land was (?:definitely|a big part|the main))\b/i;
+const LEARNING_UNSUPPORTED_SPEED_OR_TERRAIN_RE =
+  /\b(?:move(?: around)? quickly|quickly helped|faster|muddy?|paved path|forests?)\b/i;
 const REVIEW_OFF_ANCHOR_RE =
-  /\b(lego|brick|building blocks?|wall|organs?|eat|breathe|reproduc|grow|respond(?:ing)? to its environment|outer boundary|cell membrane|outer layer|stomach|lung)\b/i;
+  /\b(lego|brick|building blocks?|wall|organs?|eat|breathe|reproduc|grow|respond(?:ing)? to its environment|outer boundary|cell membrane|outer layer|stomach|lung|molecules?|atoms?|proteins?|processes of life|function on its own|main jobs?)\b/i;
 const CONCRETE_NEXT_PRACTICE_RE =
   /\b(try|practice|explain in one sentence|one-sentence|compare|write|say|answer this|task)\b/i;
 const SELF_CHECK_RE = /\b(check|substitut|plug|back into|reverse|undo)\b/i;
@@ -541,7 +544,7 @@ function analyzeTurn(input: {
 
   if (definition.mode !== 'freeform' && OVERHEATED_STYLE_RE.test(response)) {
     issues.push({
-      severity: 'warn',
+      severity: 'fail',
       code: 'overheated_style',
       message:
         'The reply used inflated wording; stronger mentor turns usually explain why the idea matters in concrete terms.',
@@ -577,6 +580,22 @@ function analyzeTurn(input: {
       code: 'learning_confirmed_unsupported_claim',
       message:
         'The learner made an outside-world claim that was not in the source pack, and the reply confirmed it instead of redirecting to supported topic content.',
+      mode: definition.mode,
+      turnIndex,
+      snippet: snippet(response),
+    });
+  }
+
+  if (
+    definition.mode === 'learning' &&
+    turnIndex <= 2 &&
+    LEARNING_UNSUPPORTED_SPEED_OR_TERRAIN_RE.test(response)
+  ) {
+    issues.push({
+      severity: 'fail',
+      code: 'learning_unsupported_source_expansion',
+      message:
+        'The reply added speed, terrain, or historical-detail wording that was not present in the trusted topic source.',
       mode: definition.mode,
       turnIndex,
       snippet: snippet(response),
@@ -941,6 +960,20 @@ async function main(): Promise<void> {
 
   const results: ModeResult[] = [];
   try {
+    if (!process.argv.includes('--skip-seed-cleanup')) {
+      const cleanup = await resetDatabase(
+        db,
+        {
+          CLERK_SECRET_KEY: process.env['CLERK_SECRET_KEY'],
+          SEED_PASSWORD: process.env['SEED_PASSWORD'],
+        },
+        { prefix: 'codex-enduser-' },
+      );
+      console.log(
+        `[cleanup] removed ${cleanup.deletedCount} end-user seed account(s) and ${cleanup.clerkUsersDeleted} Clerk user(s)`,
+      );
+    }
+
     for (const definition of definitions) {
       const result = await runMode(db, definition, runId);
       results.push(result);

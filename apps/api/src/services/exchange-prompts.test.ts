@@ -216,8 +216,11 @@ describe('buildSystemPrompt — response envelope contract', () => {
     expect(prompt).toContain(
       'does not support extra claims like conquering land',
     );
+    expect(prompt).toContain('do not invent examples or analogies');
+    expect(prompt).toContain('Delete risky words');
     expect(prompt).toContain('FINAL OUTPUT FILTER');
     expect(prompt).toContain('Do not start with "Yes"');
+    expect(prompt).toContain('do not add analogies');
     expect(prompt).toContain('include that exact reliable source ID');
     expect(prompt).toContain(
       'For current-topic teaching, review, quizzes, or next-practice tasks, include "current_topic"',
@@ -337,6 +340,7 @@ describe('buildSystemPrompt — no-recall recovery', () => {
     expect(prompt).toContain('what they got and what is still missing');
     expect(prompt).toContain('REVIEW SOURCE DISCIPLINE');
     expect(prompt).toContain('cloze-style prompt from the source wording');
+    expect(prompt).toContain('molecule, atom, protein');
     expect(prompt).toContain('REVIEW OVERRIDE');
     expect(prompt).toContain('REVIEW FINAL CHECK BEFORE REPLY');
   });
