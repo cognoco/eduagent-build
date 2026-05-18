@@ -184,7 +184,6 @@ function TopicSectionStrip({
               fontSize: 11,
               lineHeight: 14,
               fontWeight: '700',
-              textTransform: 'uppercase',
               color: withOpacity(accentColor, 0.92),
             }}
           >
