@@ -1,4 +1,4 @@
-import { and, count, eq, gte, lt } from 'drizzle-orm';
+import { and, count, eq, gte, inArray, lt } from 'drizzle-orm';
 import {
   celebrationEvents,
   practiceActivityEvents,
@@ -286,4 +286,91 @@ export async function getPracticeActivitySummary(
       delta: toDelta(current.totals, previous.totals),
     },
   };
+}
+
+// ---------------------------------------------------------------------------
+// Batch variant — fetches practice activity summaries for N profiles in 2
+// queries (practice rows + celebration counts) instead of 2N.
+// Used by getOverallProgressBatch in the parent dashboard path.
+// ---------------------------------------------------------------------------
+
+export async function getPracticeActivitySummaryBatch(
+  db: Database,
+  profileIds: string[],
+  period: PracticeActivityPeriod,
+): Promise<Map<string, ReportPracticeSummary>> {
+  if (profileIds.length === 0) return new Map();
+
+  // 1. Load all practice rows for all profiles in one query
+  const allRows = await db
+    .select({
+      profileId: practiceActivityEvents.profileId,
+      subjectId: practiceActivityEvents.subjectId,
+      subjectName: subjects.name,
+      activityType: practiceActivityEvents.activityType,
+      activitySubtype: practiceActivityEvents.activitySubtype,
+      pointsEarned: practiceActivityEvents.pointsEarned,
+      score: practiceActivityEvents.score,
+      total: practiceActivityEvents.total,
+    })
+    .from(practiceActivityEvents)
+    .leftJoin(
+      subjects,
+      and(
+        eq(subjects.id, practiceActivityEvents.subjectId),
+        eq(subjects.profileId, practiceActivityEvents.profileId),
+      ),
+    )
+    .where(
+      and(
+        inArray(practiceActivityEvents.profileId, profileIds),
+        gte(practiceActivityEvents.completedAt, period.start),
+        lt(practiceActivityEvents.completedAt, period.endExclusive),
+      ),
+    );
+
+  // 2. Load celebration counts for all profiles in one grouped query
+  const celebrationRows = await db
+    .select({
+      profileId: celebrationEvents.profileId,
+      count: count(),
+    })
+    .from(celebrationEvents)
+    .where(
+      and(
+        inArray(celebrationEvents.profileId, profileIds),
+        gte(celebrationEvents.celebratedAt, period.start),
+        lt(celebrationEvents.celebratedAt, period.endExclusive),
+      ),
+    )
+    .groupBy(celebrationEvents.profileId);
+
+  const celebrationCountByProfile = new Map(
+    celebrationRows.map((r) => [r.profileId, r.count]),
+  );
+
+  // 3. Group practice rows by profileId
+  const rowsByProfile = new Map<string, PracticeEventRow[]>();
+  for (const row of allRows) {
+    const arr = rowsByProfile.get(row.profileId) ?? [];
+    arr.push({
+      subjectId: row.subjectId,
+      subjectName: row.subjectName,
+      activityType: row.activityType,
+      activitySubtype: row.activitySubtype,
+      pointsEarned: row.pointsEarned,
+      score: row.score,
+      total: row.total,
+    });
+    rowsByProfile.set(row.profileId, arr);
+  }
+
+  // 4. Build per-profile summaries in-memory
+  const result = new Map<string, ReportPracticeSummary>();
+  for (const profileId of profileIds) {
+    const rows = rowsByProfile.get(profileId) ?? [];
+    const celebrationCount = celebrationCountByProfile.get(profileId) ?? 0;
+    result.set(profileId, buildSummaryFromRows(rows, celebrationCount));
+  }
+  return result;
 }

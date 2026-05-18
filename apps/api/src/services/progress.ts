@@ -24,7 +24,10 @@ import type {
   SubjectProgress,
   TopicProgress,
 } from '@eduagent/schemas';
-import { getPracticeActivitySummary } from './practice-activity-summary';
+import {
+  getPracticeActivitySummary,
+  getPracticeActivitySummaryBatch,
+} from './practice-activity-summary';
 import { computeDaysSinceLastReview } from './retention-data';
 import {
   addTopicCompletion,
@@ -587,6 +590,402 @@ export async function getOverallProgress(
     practiceActivityCount: practiceSummary.totals.activitiesCompleted,
     practiceSummary,
   };
+}
+
+/** Return type of getOverallProgress, for reuse in the batch variant. */
+export type OverallProgressResult = Awaited<
+  ReturnType<typeof getOverallProgress>
+>;
+
+// ---------------------------------------------------------------------------
+// Batch variant — fetches overall progress for N profiles using ~8 queries
+// (constant count regardless of N) instead of ~8 × N. Used by the parent
+// dashboard endpoint (getChildrenForParent) to collapse the per-child fan-out.
+// ---------------------------------------------------------------------------
+
+export async function getOverallProgressBatch(
+  db: Database,
+  profileIds: string[],
+): Promise<Map<string, OverallProgressResult>> {
+  if (profileIds.length === 0) return new Map();
+
+  const practiceSummaryEnd = new Date();
+  const practiceWindowStart = subtractDays(
+    practiceSummaryEnd,
+    PROGRESS_OVERVIEW_PRACTICE_WINDOW_DAYS,
+  );
+
+  // 1. Batch independent queries upfront — 2 queries total (subjects + practice).
+  const [allSubjects, practiceSummaries] = await Promise.all([
+    db.query.subjects.findMany({
+      where: inArray(subjects.profileId, profileIds),
+    }),
+    getPracticeActivitySummaryBatch(db, profileIds, {
+      start: practiceWindowStart,
+      endExclusive: practiceSummaryEnd,
+    }),
+  ]);
+
+  if (allSubjects.length === 0) {
+    // Every profile has zero subjects — return empty results for each.
+    const emptyResult: OverallProgressResult = {
+      subjects: [],
+      totalTopicsCompleted: 0,
+      totalTopicsVerified: 0,
+      practiceActivityCount: 0,
+      practiceSummary: practiceSummaries.values().next().value ?? {
+        quizzesCompleted: 0,
+        reviewsCompleted: 0,
+        totals: {
+          activitiesCompleted: 0,
+          reviewsCompleted: 0,
+          pointsEarned: 0,
+          celebrations: 0,
+          distinctActivityTypes: 0,
+        },
+        scores: {
+          scoredActivities: 0,
+          score: 0,
+          total: 0,
+          accuracy: null,
+        },
+        byType: [],
+        bySubject: [],
+      },
+    };
+    const result = new Map<string, OverallProgressResult>();
+    for (const pid of profileIds) {
+      const ps = practiceSummaries.get(pid);
+      result.set(
+        pid,
+        ps
+          ? {
+              ...emptyResult,
+              practiceSummary: ps,
+              practiceActivityCount: ps.totals.activitiesCompleted,
+            }
+          : emptyResult,
+      );
+    }
+    return result;
+  }
+
+  // Index subjects by profileId
+  const subjectsByProfile = new Map<string, typeof allSubjects>();
+  for (const s of allSubjects) {
+    const list = subjectsByProfile.get(s.profileId) ?? [];
+    list.push(s);
+    subjectsByProfile.set(s.profileId, list);
+  }
+
+  const allSubjectIds = allSubjects.map((s) => s.id);
+
+  // 2. Fetch all curricula for all subjects — 1 query
+  const allCurricula = await db.query.curricula.findMany({
+    where: inArray(curricula.subjectId, allSubjectIds),
+  });
+
+  const curriculumIds = allCurricula.map((c) => c.id);
+  const curriculumBySubject = new Map(
+    allCurricula.map((c) => [c.subjectId, c]),
+  );
+
+  // 3. Fetch all topics for all curricula — 1 query
+  const allTopics =
+    curriculumIds.length > 0
+      ? await db.query.curriculumTopics.findMany({
+          where: and(
+            inArray(curriculumTopics.curriculumId, curriculumIds),
+            eq(curriculumTopics.skipped, false),
+          ),
+        })
+      : [];
+
+  const topicIds = allTopics.map((t) => t.id);
+  const topicsByCurriculum = new Map<string, typeof allTopics>();
+  for (const topic of allTopics) {
+    const list = topicsByCurriculum.get(topic.curriculumId) ?? [];
+    list.push(topic);
+    topicsByCurriculum.set(topic.curriculumId, list);
+  }
+
+  // 4. Batch fetch retention cards, assessments, sessions, session summaries
+  // using inArray on profileId — 4 queries total (parallel).
+  const [allCards, allAssessments, allSessions] = await Promise.all([
+    topicIds.length > 0
+      ? db.query.retentionCards.findMany({
+          where: and(
+            inArray(retentionCards.profileId, profileIds),
+            inArray(retentionCards.topicId, topicIds),
+          ),
+        })
+      : Promise.resolve([]),
+    topicIds.length > 0
+      ? db.query.assessments.findMany({
+          where: and(
+            inArray(assessments.profileId, profileIds),
+            inArray(assessments.topicId, topicIds),
+          ),
+        })
+      : Promise.resolve([]),
+    allSubjectIds.length > 0
+      ? db.query.learningSessions.findMany({
+          where: and(
+            inArray(learningSessions.profileId, profileIds),
+            inArray(learningSessions.subjectId, allSubjectIds),
+            gte(learningSessions.exchangeCount, 1),
+          ),
+        })
+      : Promise.resolve([]),
+  ]);
+
+  // 5. Fetch all session summaries for the sessions we loaded — 1 query
+  const allSessionSummaries =
+    allSessions.length > 0
+      ? await db.query.sessionSummaries.findMany({
+          where: inArray(
+            sessionSummaries.sessionId,
+            allSessions.map((session) => session.id),
+          ),
+        })
+      : [];
+  const acceptedSummarySessionIds = new Set(
+    allSessionSummaries
+      .filter((summary) => isAcceptedSummaryStatus(summary.status))
+      .map((summary) => summary.sessionId),
+  );
+
+  // 6. Index everything by profileId for in-memory assembly.
+  // Cards: index by profileId → topicId
+  const cardsByProfileAndTopic = new Map<
+    string,
+    Map<string, typeof allCards>
+  >();
+  for (const card of allCards) {
+    let profileMap = cardsByProfileAndTopic.get(card.profileId);
+    if (!profileMap) {
+      profileMap = new Map();
+      cardsByProfileAndTopic.set(card.profileId, profileMap);
+    }
+    const list = profileMap.get(card.topicId) ?? [];
+    list.push(card);
+    profileMap.set(card.topicId, list);
+  }
+
+  // Assessments: index by profileId → topicId
+  const assessmentsByProfileAndTopic = new Map<
+    string,
+    Map<string, typeof allAssessments>
+  >();
+  for (const assessment of allAssessments) {
+    let profileMap = assessmentsByProfileAndTopic.get(assessment.profileId);
+    if (!profileMap) {
+      profileMap = new Map();
+      assessmentsByProfileAndTopic.set(assessment.profileId, profileMap);
+    }
+    const list = profileMap.get(assessment.topicId) ?? [];
+    list.push(assessment);
+    profileMap.set(assessment.topicId, list);
+  }
+
+  // Sessions: index by profileId → subjectId
+  const sessionsByProfileAndSubject = new Map<
+    string,
+    Map<string, typeof allSessions>
+  >();
+  for (const session of allSessions) {
+    let profileMap = sessionsByProfileAndSubject.get(session.profileId);
+    if (!profileMap) {
+      profileMap = new Map();
+      sessionsByProfileAndSubject.set(session.profileId, profileMap);
+    }
+    const list = profileMap.get(session.subjectId) ?? [];
+    list.push(session);
+    profileMap.set(session.subjectId, list);
+  }
+
+  // All cards flat by profileId (for retention computation)
+  const allCardsByProfile = new Map<string, typeof allCards>();
+  for (const card of allCards) {
+    const list = allCardsByProfile.get(card.profileId) ?? [];
+    list.push(card);
+    allCardsByProfile.set(card.profileId, list);
+  }
+
+  // 7. Compute per-profile progress in-memory — same logic as getOverallProgress
+  const result = new Map<string, OverallProgressResult>();
+
+  for (const profileId of profileIds) {
+    const profileSubjects = subjectsByProfile.get(profileId) ?? [];
+    const practiceSummary = practiceSummaries.get(profileId);
+
+    if (profileSubjects.length === 0) {
+      const emptyPractice: ReportPracticeSummary = practiceSummary ?? {
+        quizzesCompleted: 0,
+        reviewsCompleted: 0,
+        totals: {
+          activitiesCompleted: 0,
+          reviewsCompleted: 0,
+          pointsEarned: 0,
+          celebrations: 0,
+          distinctActivityTypes: 0,
+        },
+        scores: {
+          scoredActivities: 0,
+          score: 0,
+          total: 0,
+          accuracy: null,
+        },
+        byType: [],
+        bySubject: [],
+      };
+      result.set(profileId, {
+        subjects: [],
+        totalTopicsCompleted: 0,
+        totalTopicsVerified: 0,
+        practiceActivityCount: emptyPractice.totals.activitiesCompleted,
+        practiceSummary: emptyPractice,
+      });
+      continue;
+    }
+
+    const profileCardsByTopic =
+      cardsByProfileAndTopic.get(profileId) ?? new Map();
+    const profileAssessmentsByTopic =
+      assessmentsByProfileAndTopic.get(profileId) ?? new Map();
+    const profileSessionsBySubject =
+      sessionsByProfileAndSubject.get(profileId) ??
+      new Map<string, typeof allSessions>();
+    const profileCards = allCardsByProfile.get(profileId) ?? [];
+
+    const subjectProgressList: SubjectProgress[] = [];
+    let totalCompleted = 0;
+    let totalVerified = 0;
+
+    for (const subject of profileSubjects) {
+      const curriculum = curriculumBySubject.get(subject.id);
+
+      if (!curriculum) {
+        subjectProgressList.push({
+          subjectId: subject.id,
+          name: subject.name,
+          topicsTotal: 0,
+          topicsCompleted: 0,
+          topicsVerified: 0,
+          urgencyScore: 0,
+          retentionStatus: 'strong',
+          lastSessionAt: null,
+        });
+        continue;
+      }
+
+      const topics = topicsByCurriculum.get(curriculum.id) ?? [];
+
+      const completedTopics = new Set<string>();
+      const verifiedTopics = new Set<string>();
+
+      for (const topic of topics) {
+        const topicAssessments = profileAssessmentsByTopic.get(topic.id) ?? [];
+        const topicCards = profileCardsByTopic.get(topic.id) ?? [];
+
+        for (const a of topicAssessments) {
+          if (a.status === 'passed') completedTopics.add(a.topicId);
+        }
+        for (const c of topicCards) {
+          if (c.xpStatus === 'verified') {
+            verifiedTopics.add(c.topicId);
+            completedTopics.add(c.topicId);
+          }
+        }
+      }
+
+      // Last session
+      const subjectSessions = profileSessionsBySubject.get(subject.id) ?? [];
+
+      const curriculumTopicIds = new Set(topics.map((t) => t.id));
+      for (const session of subjectSessions) {
+        if (isMeaningfulCompletedSession(session)) {
+          addTopicCompletion(
+            completedTopics,
+            session.topicId,
+            curriculumTopicIds,
+          );
+        } else if (acceptedSummarySessionIds.has(session.id)) {
+          addTopicCompletion(
+            completedTopics,
+            session.topicId,
+            curriculumTopicIds,
+          );
+        }
+      }
+
+      const lastSession = subjectSessions.sort(
+        (a, b) => b.lastActivityAt.getTime() - a.lastActivityAt.getTime(),
+      )[0];
+
+      // Retention status from all cards for this subject's topics
+      const subjectTopicIds = new Set(topics.map((t) => t.id));
+      const subjectCards = profileCards.filter((c) =>
+        subjectTopicIds.has(c.topicId),
+      );
+      const retentionStatuses = subjectCards.map((c) =>
+        computeRetentionStatus(c.nextReviewAt),
+      );
+      const retentionStatus =
+        computeAggregateRetentionStatus(retentionStatuses);
+
+      // Urgency: count of overdue reviews
+      const now = new Date();
+      const overdueCount = subjectCards.filter(
+        (c) => c.nextReviewAt && c.nextReviewAt.getTime() < now.getTime(),
+      ).length;
+
+      const progress: SubjectProgress = {
+        subjectId: subject.id,
+        name: subject.name,
+        topicsTotal: topics.length,
+        topicsCompleted: completedTopics.size,
+        topicsVerified: verifiedTopics.size,
+        urgencyScore: overdueCount,
+        retentionStatus,
+        lastSessionAt: lastSession?.lastActivityAt.toISOString() ?? null,
+      };
+
+      subjectProgressList.push(progress);
+      totalCompleted += completedTopics.size;
+      totalVerified += verifiedTopics.size;
+    }
+
+    const ps = practiceSummary ?? {
+      quizzesCompleted: 0,
+      reviewsCompleted: 0,
+      totals: {
+        activitiesCompleted: 0,
+        reviewsCompleted: 0,
+        pointsEarned: 0,
+        celebrations: 0,
+        distinctActivityTypes: 0,
+      },
+      scores: {
+        scoredActivities: 0,
+        score: 0,
+        total: 0,
+        accuracy: null,
+      },
+      byType: [],
+      bySubject: [],
+    };
+
+    result.set(profileId, {
+      subjects: subjectProgressList,
+      totalTopicsCompleted: totalCompleted,
+      totalTopicsVerified: totalVerified,
+      practiceActivityCount: ps.totals.activitiesCompleted,
+      practiceSummary: ps,
+    });
+  }
+
+  return result;
 }
 
 /**
