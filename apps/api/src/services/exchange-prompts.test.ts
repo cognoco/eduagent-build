@@ -209,6 +209,8 @@ describe('buildSystemPrompt — response envelope contract', () => {
       'do not confirm it as true. Acknowledge it as their idea',
     );
     expect(prompt).toContain('Unsupported learner claims need neutral');
+    expect(prompt).toContain('a good observation');
+    expect(prompt).toContain('interesting idea');
     expect(prompt).toContain('good point');
     expect(prompt).toContain('definitely');
     expect(prompt).toContain('The part our source supports is X');
@@ -216,8 +218,10 @@ describe('buildSystemPrompt — response envelope contract', () => {
     expect(prompt).toContain(
       'does not support extra claims like conquering land',
     );
+    expect(prompt).toContain('empire growth');
     expect(prompt).toContain('do not invent examples or analogies');
     expect(prompt).toContain('Delete risky words');
+    expect(prompt).toContain('yummy');
     expect(prompt).toContain('FINAL OUTPUT FILTER');
     expect(prompt).toContain('Do not start with "Yes"');
     expect(prompt).toContain('do not add analogies');
@@ -336,7 +340,7 @@ describe('buildSystemPrompt — no-recall recovery', () => {
       }),
     );
 
-    expect(prompt).toContain('Session type: REVIEW');
+    expect(prompt).toContain('REVIEW OVERRIDE');
     expect(prompt).toContain('do NOT keep asking them to recall');
     expect(prompt).toContain('ask one smaller supported check');
     expect(prompt).toContain("Use the learner's partial answer as the anchor");
@@ -344,8 +348,28 @@ describe('buildSystemPrompt — no-recall recovery', () => {
     expect(prompt).toContain('REVIEW SOURCE DISCIPLINE');
     expect(prompt).toContain('cloze-style prompt from the source wording');
     expect(prompt).toContain('molecule, atom, protein');
+    expect(prompt).toContain('"can do on its own"');
     expect(prompt).toContain('REVIEW OVERRIDE');
     expect(prompt).toContain('REVIEW FINAL CHECK BEFORE REPLY');
+    expect(prompt).toContain('source-wording cloze check');
+    expect(prompt).toContain('Cells use inputs to make ____');
+    expect(prompt).toContain('never ask what a cell can do on its own');
+  });
+
+  it('keeps challenge verification sections out of review mode', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        effectiveMode: 'review',
+        verificationType: 'evaluate',
+        topicTitle: 'Cells as the basic unit of life',
+        exchangeCount: 2,
+      }),
+    );
+
+    expect(prompt).toContain('REVIEW OVERRIDE');
+    expect(prompt).not.toContain("Devil's Advocate");
+    expect(prompt).not.toContain('Quick check');
+    expect(prompt).not.toContain('Some scientists claim');
   });
 
   it('protects interleaved retrieval from repeated empty-memory testing', () => {

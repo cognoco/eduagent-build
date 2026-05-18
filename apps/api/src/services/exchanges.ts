@@ -700,6 +700,101 @@ function sourceFallbackReason(existingReason: string | undefined): string {
   return `${reason} Model reason: ${existingReason}`.slice(0, 1000);
 }
 
+const SOURCE_BOUND_SENTENCE_TERMS: Array<{
+  label: string;
+  response: RegExp;
+  source: RegExp;
+}> = [
+  {
+    label: 'pottery/clay',
+    response: /\bclay\b|\bpots?\b|\bpottery\b/i,
+    source: /\bclay\b|\bpots?\b|\bpottery\b/i,
+  },
+  {
+    label: 'metal/tools',
+    response: /\bmetal\b|\btools?\b/i,
+    source: /\bmetal\b|\btools?\b/i,
+  },
+  {
+    label: 'wheat/grain',
+    response: /\bwheat\b|\bgrain\b/i,
+    source: /\bwheat\b|\bgrain\b/i,
+  },
+  { label: 'salt', response: /\bsalt\b/i, source: /\bsalt\b/i },
+  { label: 'spices', response: /\bspices?\b/i, source: /\bspices?\b/i },
+  { label: 'silk', response: /\bsilk\b/i, source: /\bsilk\b/i },
+  {
+    label: 'oil',
+    response: /\bolive oil\b|\boil\b/i,
+    source: /\bolive oil\b|\boil\b/i,
+  },
+  { label: 'wine', response: /\bwine\b/i, source: /\bwine\b/i },
+  {
+    label: 'cell autonomy phrase',
+    response: /\bcan do on its own\b|\bwhat a cell can do\b/i,
+    source: /\bcan do on its own\b|\bwhat a cell can do\b/i,
+  },
+  {
+    label: 'speed/efficiency',
+    response:
+      /\bquick(?:ly)?\b|\bfaster\b|\bfast\b|\beasier\b|\befficient(?:ly)?\b|\beffective(?:ly)?\b/i,
+    source:
+      /\bquick(?:ly)?\b|\bfaster\b|\bfast\b|\beasier\b|\befficient(?:ly)?\b|\beffective(?:ly)?\b/i,
+  },
+  {
+    label: 'conquest/empire growth',
+    response:
+      /\bconquer(?:ing|ed)?\b|\bconquest\b|\bempires?\s+(?:grow|grew|expand|expanded|stay strong)\b|\bempire\s+(?:grow|grew|expand|expanded|stay strong)\b/i,
+    source:
+      /\bconquer(?:ing|ed)?\b|\bconquest\b|\bempires?\s+(?:grow|grew|expand|expanded|stay strong)\b|\bempire\s+(?:grow|grew|expand|expanded|stay strong)\b/i,
+  },
+];
+
+function appendAuditReason(
+  existingReason: string | undefined,
+  addition: string,
+): string {
+  if (!existingReason) return addition.slice(0, 1000);
+  return `${existingReason} ${addition}`.slice(0, 1000);
+}
+
+function stripUnsupportedSourceBoundSentences(
+  response: string,
+  sourceAudit: ExchangeSourceAudit,
+): { response: string; removedTerms: string[] } {
+  const reliableSourceText = sourceAudit.evidence
+    .filter((item) => item.reliableForFacts)
+    .map((item) => item.excerpt)
+    .filter(Boolean)
+    .join(' ');
+  if (!reliableSourceText) return { response, removedTerms: [] };
+
+  const unsupportedTerms = SOURCE_BOUND_SENTENCE_TERMS.filter(
+    (term) =>
+      term.response.test(response) && !term.source.test(reliableSourceText),
+  );
+  if (unsupportedTerms.length === 0) return { response, removedTerms: [] };
+
+  const unsupportedPatterns = unsupportedTerms.map((term) => term.response);
+  const sentences = response.match(/[^.?!]+[.?!]?/g) ?? [response];
+  const kept = sentences
+    .map((sentence) => sentence.trim())
+    .filter(
+      (sentence) =>
+        sentence.length > 0 &&
+        !unsupportedPatterns.some((pattern) => pattern.test(sentence)),
+    );
+  const scrubbed = kept
+    .join(' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+
+  return {
+    response: scrubbed.length > 0 ? scrubbed : response,
+    removedTerms: unsupportedTerms.map((term) => term.label),
+  };
+}
+
 export function applySourceAuditSafetyFallback(
   response: string,
   sourceAudit: ExchangeSourceAudit,
@@ -711,7 +806,24 @@ export function applySourceAuditSafetyFallback(
       sourceAudit.status === 'unsupported_sources');
 
   if (!needsNoSourceFallback) {
-    return { response, sourceAudit };
+    const scrubbed = stripUnsupportedSourceBoundSentences(
+      response,
+      sourceAudit,
+    );
+    if (scrubbed.removedTerms.length === 0) {
+      return { response, sourceAudit };
+    }
+
+    return {
+      response: scrubbed.response,
+      sourceAudit: {
+        ...sourceAudit,
+        reason: appendAuditReason(
+          sourceAudit.reason,
+          `Server removed unsupported source-bound phrase(s): ${scrubbed.removedTerms.join(', ')}.`,
+        ),
+      },
+    };
   }
 
   return {
@@ -962,14 +1074,22 @@ export const HANDLED_MARKER_KEYS: ReadonlySet<string> =
 
 const DEFAULT_FALLBACK_TEXT = "I didn't have a reply — tap to try again.";
 const GENERIC_PRAISE_SENTENCE_RE =
-  /(?:^|[\s\n]+)(?:(?:you did a )?great job|great work|nice work|excellent|amazing|awesome|fantastic)(?:[^.?!]*)(?:[.?!]|$)/gi;
-const OVERHEATED_PHRASE_RE = /\b(super important|very important|crucial)\b/gi;
-const OVERHEATED_ADVERB_RE = /\b(definitely|absolutely|incredibly)\s+/gi;
+  /(?:^|[\s\n]+)(?:(?:you did a )?great job|great work|nice work|nice,\s+\w+|that was a good start|good question|great question|excellent|amazing|awesome|fantastic)(?:[^.?!]*)(?:[.?!]|$)/gi;
+const UNSUPPORTED_SOFT_VALIDATION_SENTENCE_RE =
+  /(?:^|[\s\n]+)(?:that(?:'s| is) an? )?(?:interesting idea|interesting thought|good observation|fair point)(?:[^.?!]*)(?:[.?!]|$)/gi;
+const OVERHEATED_PHRASE_RE =
+  /\b(super important|very important|really important|crucial|super useful)\b/gi;
+const OVERHEATED_ADVERB_RE = /\b(definitely|absolutely|incredibly)\b[,\s]*/gi;
+const CHILDISH_TONE_RE = /\byummy\s+/gi;
 
 function normalizeInflatedStyle(text: string): string {
   return text
-    .replace(OVERHEATED_PHRASE_RE, 'important')
+    .replace(OVERHEATED_PHRASE_RE, (match) =>
+      /useful/i.test(match) ? 'useful' : 'important',
+    )
     .replace(OVERHEATED_ADVERB_RE, '')
+    .replace(CHILDISH_TONE_RE, '')
+    .replace(/\ba important\b/gi, 'an important')
     .replace(/[^\S\r\n]{2,}/g, ' ');
 }
 
@@ -982,6 +1102,7 @@ function clampDrillDuration(seconds: number): number {
 function cleanLearnerVisibleReply(text: string): string {
   return normalizeInflatedStyle(stripPhoneticHints(text))
     .replace(GENERIC_PRAISE_SENTENCE_RE, '')
+    .replace(UNSUPPORTED_SOFT_VALIDATION_SENTENCE_RE, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }

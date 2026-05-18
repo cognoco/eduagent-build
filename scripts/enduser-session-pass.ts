@@ -323,6 +323,10 @@ function usesMemoryEmbeddings(): boolean {
   return process.argv.includes('--with-memory-embeddings');
 }
 
+function seedEmailPrefix(runId: string): string {
+  return `codex-llm-pass-${runId}-`;
+}
+
 async function getSubjectName(
   db: ReturnType<typeof createDatabase>,
   subjectId: string,
@@ -422,17 +426,22 @@ const RECITATION_TEXT_DELIVERY_RE =
 const GENERIC_LEARNER_PRAISE_RE =
   /\b(great job|nice work|great question|(?:really )?good question|great topic|nice,\s+[A-Z][a-z]+|you did a great job|you'?re (?:doing )?(?:amazing|awesome|fantastic|excellent)|(?:amazing|awesome|fantastic|excellent|great|nice) (?:work|job|answer|effort|reasoning|connection)|(?:your|that'?s|this is) (?:amazing|awesome|fantastic|excellent|great|nice))\b/i;
 const OVERHEATED_STYLE_RE =
-  /\b(super important|incredibly|definitely|absolutely|crucial|very important)\b/i;
+  /\b(super important|super useful|incredibly|definitely|absolutely|crucial|very important|really important)\b/i;
+const CHILDISH_TONE_RE = /\b(yummy|kiddo)\b/i;
 const RECITATION_NO_WEAKNESS_RE =
   /\b(nothing (?:that )?sounded weak|wasn'?t anything (?:that )?sounded weak|there (?:was|is)n'?t anything weak|very clear and complete|all the way through)\b/i;
 const RECITATION_UNSUPPORTED_POLISH_RE =
   /\b(?:armies|army)\s+(?:could\s+)?travel(?:ed|ing)?\s+quickly\b/i;
 const LEARNING_UNSUPPORTED_CONQUEST_CONFIRM_RE =
-  /\b(?:you'?re right[^.?!]*conquer|conquering (?:new )?land (?:can|might|may|could) be part|the idea of empires growing by conquering land is a part|empires? grow[^.?!]*conquer|conquer(?:ing|ed)? new (?:areas|land)|defend(?:ing)? (?:land|the land)|conquering land was (?:definitely|a big part|the main))\b/i;
+  /\b(?:it'?s true[^.?!]*(?:empires?|conquer|conquering|expand)|you'?re right[^.?!]*conquer|(?:good observation|interesting (?:idea|thought))[^.?!]*empires? (?:can )?(?:grow|expand)|conquering (?:new )?land (?:can|might|may|could) be part|the idea of empires growing by conquering land is a part|empires? (?:grow|expand)[^.?!]*conquer|empires? often expand by conquering|conquer(?:ing|ed)? new (?:areas|land)|defend(?:ing)? (?:land|the land)|conquering land was (?:definitely|a big part|the main))\b/i;
 const LEARNING_UNSUPPORTED_SPEED_OR_TERRAIN_RE =
   /\b(?:move(?: around)? quickly|quickly helped|faster|efficiently|more effectively|effectively|muddy?|paved path|forests?)\b/i;
+const LEARNING_UNSUPPORTED_EMPIRE_GROWTH_RE =
+  /\b(?:empires? expand[^.?!]*(?:often|armies?|army|conquer)|often involves armies?|help(?:ed|s|ing)? the empire (?:grow|stay strong)|empire (?:grow|stay strong)|stay strong)\b/i;
 const REVIEW_OFF_ANCHOR_RE =
-  /\b(lego|brick|building blocks?|wall|organs?|virus(?:es)?|eat|breathe|reproduc\w*|grow\w*|respond(?:ing)? to its environment|outer boundary|cell membrane|outer layer|stomach|lung|molecules?|atoms?|proteins?|processes of life|function on its own|all by itself|what a cell can do|main jobs?)\b/i;
+  /\b(lego|brick|building blocks?|wall|organs?|virus(?:es)?|eat|breathe|reproduc\w*|grow\w*|respond(?:ing)? to its environment|outer boundary|cell membrane|outer layer|stomach|lung|molecules?|atoms?|proteins?|processes of life|function on its own|can do on its own|all by itself|what a cell can do|main jobs?)\b/i;
+const REVIEW_CHALLENGE_MODE_RE =
+  /\b(?:quick check[^.?!]*try to trip you up|some scientists claim|devil'?s advocate)\b/i;
 const CONCRETE_NEXT_PRACTICE_RE =
   /\b(try|practice|explain in one sentence|one-sentence|compare|write|say|answer this|task)\b/i;
 const FUTURE_TOPIC_TITLE_RE =
@@ -593,10 +602,7 @@ function analyzeTurn(input: {
     });
   }
 
-  if (
-    definition.mode !== 'freeform' &&
-    GENERIC_LEARNER_PRAISE_RE.test(response)
-  ) {
+  if (GENERIC_LEARNER_PRAISE_RE.test(response)) {
     issues.push({
       severity: 'fail',
       code: 'generic_praise',
@@ -608,12 +614,24 @@ function analyzeTurn(input: {
     });
   }
 
-  if (definition.mode !== 'freeform' && OVERHEATED_STYLE_RE.test(response)) {
+  if (OVERHEATED_STYLE_RE.test(response)) {
     issues.push({
       severity: 'fail',
       code: 'overheated_style',
       message:
         'The reply used inflated wording; stronger mentor turns usually explain why the idea matters in concrete terms.',
+      mode: definition.mode,
+      turnIndex,
+      snippet: snippet(response),
+    });
+  }
+
+  if (CHILDISH_TONE_RE.test(response)) {
+    issues.push({
+      severity: 'fail',
+      code: 'childish_tone',
+      message:
+        'The reply used cute/childish wording; the mentor should stay warm without sounding babyish.',
       mode: definition.mode,
       turnIndex,
       snippet: snippet(response),
@@ -684,6 +702,21 @@ function analyzeTurn(input: {
     });
   }
 
+  if (
+    definition.mode === 'learning' &&
+    LEARNING_UNSUPPORTED_EMPIRE_GROWTH_RE.test(response)
+  ) {
+    issues.push({
+      severity: 'fail',
+      code: 'learning_unsupported_empire_growth',
+      message:
+        'The reply added empire-growth, strength, or army-expansion wording that was not present in the trusted topic source.',
+      mode: definition.mode,
+      turnIndex,
+      snippet: snippet(response),
+    });
+  }
+
   if (definition.mode === 'freeform') {
     const unsupportedExample = unsupportedFreeformExample(definition, response);
     if (unsupportedExample) {
@@ -724,6 +757,18 @@ function analyzeTurn(input: {
       code: 'review_off_anchor',
       message:
         "The review reply drifted away from the learner's energy answer into a nearby but different cell subtopic.",
+      mode: definition.mode,
+      turnIndex,
+      snippet: snippet(response),
+    });
+  }
+
+  if (definition.mode === 'review' && REVIEW_CHALLENGE_MODE_RE.test(response)) {
+    issues.push({
+      severity: 'fail',
+      code: 'review_challenge_mode_leak',
+      message:
+        "The review flow leaked Devil's Advocate/challenge-mode behavior instead of staying in calibrated recall and relearning.",
       mode: definition.mode,
       turnIndex,
       snippet: snippet(response),
@@ -783,7 +828,7 @@ async function runMode(
   runId: string,
 ): Promise<ModeResult> {
   const startedAt = new Date().toISOString();
-  const email = `codex-enduser-${definition.mode}-${runId}@example.com`;
+  const email = `${seedEmailPrefix(runId)}${definition.mode}@example.com`;
   console.log(`[${definition.mode}] seeding ${definition.scenario}`);
   const seed = await seedScenario(db, definition.scenario, email, seedEnv());
 
@@ -1055,7 +1100,7 @@ async function main(): Promise<void> {
   try {
     if (!process.argv.includes('--skip-seed-cleanup')) {
       const cleanup = await resetDatabase(db, seedEnv(), {
-        prefix: 'codex-enduser-',
+        prefix: seedEmailPrefix(runId),
       });
       console.log(
         `[cleanup] removed ${cleanup.deletedCount} end-user seed account(s) and ${cleanup.clerkUsersDeleted} Clerk user(s)`,

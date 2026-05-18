@@ -992,7 +992,7 @@ describe('classifyExchangeOutcome', () => {
   it('strips generic praise sentences from learner-visible replies', () => {
     const raw = JSON.stringify({
       reply:
-        'Yes, that is correct. You did a great job using inverse operations to isolate `x`.',
+        'Good question. Nice, Maya! That is an interesting idea about empires grow. Yes, that is correct. You did a great job using inverse operations to isolate `x`.',
       signals: {
         partial_progress: false,
         needs_deepening: false,
@@ -1009,7 +1009,7 @@ describe('classifyExchangeOutcome', () => {
   it('normalizes inflated style words in learner-visible replies', () => {
     const raw = JSON.stringify({
       reply:
-        'Roman roads were very important. They definitely helped armies move between places.',
+        'Roman roads were a really important link. They absolutely, helped armies move between places. Metal was super useful.',
       signals: {
         partial_progress: false,
         needs_deepening: false,
@@ -1021,7 +1021,26 @@ describe('classifyExchangeOutcome', () => {
 
     expect(result.fallback).toBeUndefined();
     expect(result.parsed.cleanResponse).toBe(
-      'Roman roads were important. They helped armies move between places.',
+      'Roman roads were an important link. They helped armies move between places. Metal was useful.',
+    );
+  });
+
+  it('removes childish style words from learner-visible replies', () => {
+    const raw = JSON.stringify({
+      reply:
+        'Imagine you have a lot of one thing, like yummy grain, but no metal tools.',
+      signals: {
+        partial_progress: false,
+        needs_deepening: false,
+        understanding_check: false,
+      },
+    });
+
+    const result = classifyExchangeOutcome(raw, ctx);
+
+    expect(result.fallback).toBeUndefined();
+    expect(result.parsed.cleanResponse).toBe(
+      'Imagine you have a lot of one thing, like grain, but no metal tools.',
     );
   });
 
@@ -1377,6 +1396,110 @@ describe('source provenance audit', () => {
     expect(safe.response).toMatch(/source-check question/i);
     expect(safe.response).toMatch(/should not answer it from memory/i);
     expect(safe.sourceAudit.reason).toMatch(/no-source safety fallback/i);
+  });
+
+  it('removes source-bound example terms that are not present in reliable source excerpts', () => {
+    const sourceEvidence = buildExchangeSourceEvidence(
+      {
+        ...baseContext,
+        topicTitle: 'Ancient trade and Rome',
+        topicDescription:
+          'Ancient civilizations traded surplus grain or pottery for metal tools.',
+      },
+      'Was trade mostly about things they lacked?',
+    );
+    const audit = auditExchangeSources(
+      { relied_on: ['current_topic'], insufficient: false },
+      sourceEvidence,
+    );
+
+    const safe = applySourceAuditSafetyFallback(
+      'Yes, getting goods they lacked was important. For example, they might trade for metal or spice. They also traded surplus grain.',
+      audit,
+    );
+
+    expect(safe.response).not.toMatch(/\bspice\b/i);
+    expect(safe.response).toContain('They also traded surplus grain.');
+    expect(safe.sourceAudit.reason).toMatch(/unsupported source-bound phrase/i);
+  });
+
+  it('removes review follow-up phrases that are not present in reliable source excerpts', () => {
+    const sourceEvidence = buildExchangeSourceEvidence(
+      {
+        ...baseContext,
+        topicTitle: 'Cells as the basic unit of life',
+        topicDescription:
+          'A cell is the basic unit of life. It uses inputs to make energy.',
+      },
+      'So cells use inputs to make energy?',
+    );
+    const audit = auditExchangeSources(
+      { relied_on: ['current_topic'], insufficient: false },
+      sourceEvidence,
+    );
+
+    const safe = applySourceAuditSafetyFallback(
+      'You got the energy part. What does that tell us about what a cell can do on its own?',
+      audit,
+    );
+
+    expect(safe.response).toContain('You got the energy part.');
+    expect(safe.response).not.toMatch(/can do on its own|what a cell can do/i);
+    expect(safe.sourceAudit.reason).toMatch(/cell autonomy phrase/i);
+  });
+
+  it('removes unsupported speed claims from current-topic replies', () => {
+    const sourceEvidence = buildExchangeSourceEvidence(
+      {
+        ...baseContext,
+        topicTitle: 'Roman roads and empire trade',
+        topicDescription:
+          'Roman roads helped armies and trade move between places.',
+      },
+      'Please start teaching me from the beginning.',
+    );
+    const audit = auditExchangeSources(
+      { relied_on: ['current_topic'], insufficient: false },
+      sourceEvidence,
+    );
+
+    const safe = applySourceAuditSafetyFallback(
+      'Roman roads helped armies move between places. This made it easier for armies to move quickly across the empire.',
+      audit,
+    );
+
+    expect(safe.response).toContain(
+      'Roman roads helped armies move between places.',
+    );
+    expect(safe.response).not.toMatch(/easier|quickly/i);
+    expect(safe.sourceAudit.reason).toMatch(/speed\/efficiency/i);
+  });
+
+  it('removes unsupported conquest confirmations from current-topic replies', () => {
+    const sourceEvidence = buildExchangeSourceEvidence(
+      {
+        ...baseContext,
+        topicTitle: 'Roman roads and empire trade',
+        topicDescription:
+          'Roman roads helped armies and trade move between places.',
+      },
+      'I think empires grow mostly by conquering land. Is that the main idea?',
+    );
+    const audit = auditExchangeSources(
+      { relied_on: ['current_topic'], insufficient: false },
+      sourceEvidence,
+    );
+
+    const safe = applySourceAuditSafetyFallback(
+      'It is true that empires can grow by conquering land. The source says Roman roads helped armies and trade move between places.',
+      audit,
+    );
+
+    expect(safe.response).toContain(
+      'The source says Roman roads helped armies and trade move between places.',
+    );
+    expect(safe.response).not.toMatch(/conquer|empires can grow/i);
+    expect(safe.sourceAudit.reason).toMatch(/conquest\/empire growth/i);
   });
 
   it('adds recitation_text as a reliable source for wording feedback', () => {
