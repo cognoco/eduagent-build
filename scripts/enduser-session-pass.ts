@@ -117,7 +117,7 @@ const runDefinitions: RunDefinition[] = [
     topicOverride: {
       title: 'Ancient trade and Rome',
       description:
-        'Ancient civilizations traded to get goods they lacked, exchange surplus goods, and build connections with other places. Rome is an example of an ancient civilization connected to trade across the Mediterranean.',
+        'Ancient civilizations traded to get goods they lacked, exchange surplus goods, and build connections with other places. For example, surplus grain or pottery could be traded for metal tools. Rome is an example of an ancient civilization connected to trade across the Mediterranean.',
     },
     rawInput: 'I want help understanding why ancient civilizations traded.',
     turns: () => [
@@ -306,6 +306,19 @@ function allowsQualityFailures(): boolean {
   return process.argv.includes('--allow-quality-failures');
 }
 
+function usesClerkUsers(): boolean {
+  return process.argv.includes('--with-clerk-users');
+}
+
+function seedEnv(): { CLERK_SECRET_KEY?: string; SEED_PASSWORD?: string } {
+  return {
+    CLERK_SECRET_KEY: usesClerkUsers()
+      ? process.env['CLERK_SECRET_KEY']
+      : undefined,
+    SEED_PASSWORD: process.env['SEED_PASSWORD'],
+  };
+}
+
 function usesMemoryEmbeddings(): boolean {
   return process.argv.includes('--with-memory-embeddings');
 }
@@ -415,11 +428,11 @@ const RECITATION_NO_WEAKNESS_RE =
 const RECITATION_UNSUPPORTED_POLISH_RE =
   /\b(?:armies|army)\s+(?:could\s+)?travel(?:ed|ing)?\s+quickly\b/i;
 const LEARNING_UNSUPPORTED_CONQUEST_CONFIRM_RE =
-  /\b(?:you'?re right[^.?!]*conquer|conquering (?:new )?land can be part|empires? grow[^.?!]*conquer|conquer(?:ing|ed)? new (?:areas|land)|defend(?:ing)? (?:land|the land)|conquering land was (?:definitely|a big part|the main))\b/i;
+  /\b(?:you'?re right[^.?!]*conquer|conquering (?:new )?land (?:can|might|may|could) be part|the idea of empires growing by conquering land is a part|empires? grow[^.?!]*conquer|conquer(?:ing|ed)? new (?:areas|land)|defend(?:ing)? (?:land|the land)|conquering land was (?:definitely|a big part|the main))\b/i;
 const LEARNING_UNSUPPORTED_SPEED_OR_TERRAIN_RE =
-  /\b(?:move(?: around)? quickly|quickly helped|faster|muddy?|paved path|forests?)\b/i;
+  /\b(?:move(?: around)? quickly|quickly helped|faster|efficiently|more effectively|effectively|muddy?|paved path|forests?)\b/i;
 const REVIEW_OFF_ANCHOR_RE =
-  /\b(lego|brick|building blocks?|wall|organs?|virus(?:es)?|eat|breathe|reproduc\w*|grow\w*|respond(?:ing)? to its environment|outer boundary|cell membrane|outer layer|stomach|lung|molecules?|atoms?|proteins?|processes of life|function on its own|main jobs?)\b/i;
+  /\b(lego|brick|building blocks?|wall|organs?|virus(?:es)?|eat|breathe|reproduc\w*|grow\w*|respond(?:ing)? to its environment|outer boundary|cell membrane|outer layer|stomach|lung|molecules?|atoms?|proteins?|processes of life|function on its own|all by itself|what a cell can do|main jobs?)\b/i;
 const CONCRETE_NEXT_PRACTICE_RE =
   /\b(try|practice|explain in one sentence|one-sentence|compare|write|say|answer this|task)\b/i;
 const SELF_CHECK_RE = /\b(check|substitut|plug|back into|reverse|undo)\b/i;
@@ -429,9 +442,55 @@ const SOURCE_AUDIT_FAIL_STATUSES = new Set([
   'unsupported_sources',
   'missing_reliable_source',
 ]);
+const FREEFORM_EXAMPLE_TERMS: Array<{
+  response: RegExp;
+  source: RegExp;
+  label: string;
+}> = [
+  {
+    response: /\bclay\b|\bpots?\b|\bpottery\b/i,
+    source: /\bclay\b|\bpots?\b|\bpottery\b/i,
+    label: 'pottery/clay',
+  },
+  {
+    response: /\bmetal\b|\btools?\b/i,
+    source: /\bmetal\b|\btools?\b/i,
+    label: 'metal/tools',
+  },
+  {
+    response: /\bwheat\b|\bgrain\b/i,
+    source: /\bwheat\b|\bgrain\b/i,
+    label: 'wheat/grain',
+  },
+  { response: /\bsalt\b/i, source: /\bsalt\b/i, label: 'salt' },
+  { response: /\bspices?\b/i, source: /\bspices?\b/i, label: 'spices' },
+  { response: /\bsilk\b/i, source: /\bsilk\b/i, label: 'silk' },
+  {
+    response: /\bolive oil\b|\boil\b/i,
+    source: /\bolive oil\b|\boil\b/i,
+    label: 'oil',
+  },
+  { response: /\bwine\b/i, source: /\bwine\b/i, label: 'wine' },
+];
 
 function snippet(text: string): string {
   return text.replace(/\s+/g, ' ').trim().slice(0, 240);
+}
+
+function unsupportedFreeformExample(
+  definition: RunDefinition,
+  response: string,
+): string | undefined {
+  const sourceText = [
+    definition.topicOverride?.title,
+    definition.topicOverride?.description,
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  return FREEFORM_EXAMPLE_TERMS.find(
+    (term) => term.response.test(response) && !term.source.test(sourceText),
+  )?.label;
 }
 
 function analyzeTurn(input: {
@@ -605,6 +664,20 @@ function analyzeTurn(input: {
       turnIndex,
       snippet: snippet(response),
     });
+  }
+
+  if (definition.mode === 'freeform') {
+    const unsupportedExample = unsupportedFreeformExample(definition, response);
+    if (unsupportedExample) {
+      issues.push({
+        severity: 'fail',
+        code: 'freeform_unsupported_example',
+        message: `The freeform reply introduced a concrete example (${unsupportedExample}) that was not present in the trusted topic source.`,
+        mode: definition.mode,
+        turnIndex,
+        snippet: snippet(response),
+      });
+    }
   }
 
   if (
@@ -966,14 +1039,9 @@ async function main(): Promise<void> {
   const results: ModeResult[] = [];
   try {
     if (!process.argv.includes('--skip-seed-cleanup')) {
-      const cleanup = await resetDatabase(
-        db,
-        {
-          CLERK_SECRET_KEY: process.env['CLERK_SECRET_KEY'],
-          SEED_PASSWORD: process.env['SEED_PASSWORD'],
-        },
-        { prefix: 'codex-enduser-' },
-      );
+      const cleanup = await resetDatabase(db, seedEnv(), {
+        prefix: 'codex-enduser-',
+      });
       console.log(
         `[cleanup] removed ${cleanup.deletedCount} end-user seed account(s) and ${cleanup.clerkUsersDeleted} Clerk user(s)`,
       );
