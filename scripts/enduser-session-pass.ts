@@ -584,7 +584,7 @@ const RECITATION_UNSUPPORTED_POLISH_RE =
 const LEARNING_UNSUPPORTED_CONQUEST_CONFIRM_RE =
   /\b(?:it'?s true[^.?!]*(?:empires?|conquer|conquering|expand)|you'?re right[^.?!]*conquer|(?:good observation|interesting (?:idea|thought))[^.?!]*empires? (?:can )?(?:grow|expand)|conquering (?:new )?land (?:can|might|may|could) be part|the idea of empires growing by conquering land is a part|empires? (?:grow|expand)[^.?!]*conquer|empires? often expand by conquering|conquer(?:ing|ed)? new (?:areas|land)|defend(?:ing)? (?:land|the land)|conquering land was (?:definitely|a big part|the main))\b/i;
 const LEARNING_UNSUPPORTED_SPEED_OR_TERRAIN_RE =
-  /\b(?:move(?: around)? quickly|quickly helped|faster|efficiently|more effectively|effectively|muddy?|paved path|forests?)\b/i;
+  /\b(?:(?:arm(?:y|ies)|soldiers?)[^.?!]*(?:easier|more easily|quickly|faster|efficiently|more effectively|effectively)|(?:easier|more easily|quickly|faster|efficiently|more effectively|effectively)[^.?!]*(?:arm(?:y|ies)|soldiers?)|move(?: around)? quickly|quickly helped|faster|efficiently|more effectively|effectively|muddy?|paved path|forests?)\b/i;
 const LEARNING_UNSUPPORTED_EMPIRE_GROWTH_RE =
   /\b(?:empires? expand[^.?!]*(?:often|armies?|army|conquer)|often involves armies?|help(?:ed|s|ing)? the empire (?:grow|stay strong)|empire (?:grow|stay strong)|stay strong)\b/i;
 const REVIEW_OFF_ANCHOR_RE =

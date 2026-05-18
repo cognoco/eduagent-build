@@ -737,9 +737,9 @@ const SOURCE_BOUND_SENTENCE_TERMS: Array<{
   {
     label: 'army speed/ease/effectiveness',
     response:
-      /\barm(?:y|ies)\b[^.?!]*(?:more easily|easier|effective(?:ly)?|efficient(?:ly)?|faster|quickly)|(?:more easily|easier|effective(?:ly)?|efficient(?:ly)?|faster|quickly)[^.?!]*\barm(?:y|ies)\b/i,
+      /\b(?:arm(?:y|ies)|soldiers?)\b[^.?!]*(?:more easily|easier|effective(?:ly)?|efficient(?:ly)?|faster|quickly)|(?:more easily|easier|effective(?:ly)?|efficient(?:ly)?|faster|quickly)[^.?!]*\b(?:arm(?:y|ies)|soldiers?)\b/i,
     source:
-      /\barm(?:y|ies)\b[^.?!]*(?:more easily|easier|effective(?:ly)?|efficient(?:ly)?|faster|quickly)|(?:more easily|easier|effective(?:ly)?|efficient(?:ly)?|faster|quickly)[^.?!]*\barm(?:y|ies)\b/i,
+      /\b(?:arm(?:y|ies)|soldiers?)\b[^.?!]*(?:more easily|easier|effective(?:ly)?|efficient(?:ly)?|faster|quickly)|(?:more easily|easier|effective(?:ly)?|efficient(?:ly)?|faster|quickly)[^.?!]*\b(?:arm(?:y|ies)|soldiers?)\b/i,
   },
   {
     label: 'conquest/empire growth',
