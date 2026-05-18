@@ -42,6 +42,7 @@ interface OpenAIRequest {
   messages: OpenAIMessage[];
   max_completion_tokens: number;
   stream?: boolean;
+  response_format?: { type: 'json_object' };
 }
 
 interface OpenAIChoice {
@@ -56,7 +57,7 @@ interface OpenAIResponse {
 }
 
 export function toOpenAIContent(
-  content: string | MessagePart[]
+  content: string | MessagePart[],
 ): string | OpenAIContentBlock[] {
   if (typeof content === 'string') return content;
   const hasImages = content.some((p) => p.type === 'inline_data');
@@ -109,12 +110,15 @@ export function createOpenAIProvider(apiKey: string): LLMProvider {
 
     async chat(
       messages: ChatMessage[],
-      config: ModelConfig
+      config: ModelConfig,
     ): Promise<ChatResult> {
       const body: OpenAIRequest = {
         model: mapModel(config),
         messages: toOpenAIMessages(messages),
         max_completion_tokens: config.maxTokens,
+        ...(config.responseFormat === 'json'
+          ? { response_format: { type: 'json_object' as const } }
+          : {}),
       };
 
       const res = await fetch(OPENAI_BASE_URL, {
@@ -130,7 +134,7 @@ export function createOpenAIProvider(apiKey: string): LLMProvider {
       if (!res.ok) {
         const errorBody = await res.text();
         throw new Error(
-          `OpenAI API request failed (${res.status}): ${errorBody}`
+          `OpenAI API request failed (${res.status}): ${errorBody}`,
         );
       }
 
@@ -148,7 +152,7 @@ export function createOpenAIProvider(apiKey: string): LLMProvider {
         content: text,
         stopReason: normalizeStopReason(
           'openai',
-          data.choices?.[0]?.finish_reason
+          data.choices?.[0]?.finish_reason,
         ),
       };
     },
@@ -165,6 +169,9 @@ export function createOpenAIProvider(apiKey: string): LLMProvider {
           model: mapModel(config),
           messages: toOpenAIMessages(messages),
           max_completion_tokens: config.maxTokens,
+          ...(config.responseFormat === 'json'
+            ? { response_format: { type: 'json_object' as const } }
+            : {}),
           stream: true,
         };
 
@@ -182,7 +189,7 @@ export function createOpenAIProvider(apiKey: string): LLMProvider {
           if (!res.ok) {
             const errorBody = await res.text();
             throw new Error(
-              `OpenAI API stream failed (${res.status}): ${errorBody}`
+              `OpenAI API stream failed (${res.status}): ${errorBody}`,
             );
           }
 

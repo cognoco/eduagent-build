@@ -14,6 +14,9 @@ import {
   calculateMasteryScore,
   createAssessment,
   getAssessment,
+  getActiveAssessmentForTopic,
+  buildAssessmentAppHelpEvaluation,
+  buildAssessmentEvaluationMessages,
   resolveAssessmentStatus,
   recordAssessmentCompletionActivity,
   shouldEndAssessmentForReview,
@@ -197,7 +200,9 @@ describe('evaluateAssessmentAnswer', () => {
     );
 
     expect(result.masteryScore).toBeLessThanOrEqual(0.5);
-    expect(result.passed).toBe(false);
+    expect(result.passed).toBe(true);
+    expect(result.shouldEscalateDepth).toBe(true);
+    expect(result.nextDepth).toBe('explain');
   });
 
   it('caps mastery at 0.8 for explain depth', async () => {
@@ -266,7 +271,7 @@ describe('evaluateAssessmentAnswer', () => {
         feedback: 'Ready for the next level.',
         passed: true,
         shouldEscalateDepth: true,
-        rawScore: 0.45,
+        rawScore: 0.8,
         qualityRating: 4,
       }),
     );
@@ -277,6 +282,73 @@ describe('evaluateAssessmentAnswer', () => {
     );
 
     expect(result.shouldEscalateDepth).toBe(true);
+    expect(result.nextDepth).toBe('explain');
+  });
+
+  it('adds language-specific grading guidance and concrete topic scope', () => {
+    const messages = buildAssessmentEvaluationMessages(
+      {
+        topicTitle: 'Greetings & Introductions',
+        topicDescription:
+          'Meet people, say hello, and share simple personal details.',
+        currentDepth: 'recall',
+        exchangeHistory: [
+          {
+            role: 'assistant',
+            content:
+              'Try 2-3 greetings or intro phrases. Add meanings if you know them.',
+          },
+        ],
+        subjectName: 'Italian',
+        pedagogyMode: 'four_strands',
+        languageCode: 'it',
+      },
+      'ciao, buongiorno, va bene',
+    );
+
+    expect(messages[0]?.content).toContain('LANGUAGE ASSESSMENT MODE');
+    expect(messages[0]?.content).toContain(
+      'Do NOT ask for "main ideas" or broad summaries',
+    );
+    expect(messages[0]?.content).toContain(
+      'ask direct production tasks: say hello',
+    );
+    expect(messages[0]?.content).toContain('tiny realistic exchange');
+    expect(messages[1]?.content).toContain(
+      'Description: <topic_description>Meet people, say hello, and share simple personal details.</topic_description>',
+    );
+    expect(messages[1]?.content).toContain('Target language: it');
+  });
+
+  it('appends a concrete language follow-up when feedback omits the next question', async () => {
+    registerProvider(
+      createAssessmentEvalMockProvider({
+        feedback:
+          'Nice work. You provided two strong examples of Italian greetings.',
+        passed: true,
+        shouldEscalateDepth: true,
+        rawScore: 0.9,
+        qualityRating: 4,
+      }),
+    );
+
+    const result = await evaluateAssessmentAnswer(
+      {
+        topicTitle: 'Greetings & Introductions',
+        topicDescription:
+          'Meet people, say hello, and share simple personal details.',
+        currentDepth: 'recall',
+        exchangeHistory: [],
+        subjectName: 'Italian',
+        pedagogyMode: 'four_strands',
+        languageCode: 'it',
+      },
+      'ciao, buongiorno',
+    );
+
+    expect(result.feedback).toContain(
+      'Add one more greeting in the target language, or translate one greeting you wrote into English.',
+    );
     expect(result.nextDepth).toBe('explain');
   });
 
@@ -413,7 +485,7 @@ describe('evaluateAssessmentAnswer', () => {
       'Some answer',
     );
 
-    expect(result.feedback).toBe('Excellent explanation.');
+    expect(result.feedback).toContain('Excellent explanation.');
     expect(result.passed).toBe(true);
   });
 
@@ -451,6 +523,72 @@ describe('evaluateAssessmentAnswer', () => {
       "We couldn't evaluate your answer right now — please try again.",
     );
     expect(result.passed).toBe(false);
+  });
+
+  it('uses parsed reply as feedback when the LLM returns a session-envelope shape', async () => {
+    const envelopeProvider: LLMProvider = {
+      id: 'gemini',
+      async chat() {
+        return {
+          content: JSON.stringify({
+            reply:
+              'Not yet. You named a useful phrase; now add what it means and when you would use it.',
+            signals: {
+              understanding_check: true,
+              partial_progress: true,
+              needs_deepening: false,
+            },
+            ui_hints: {
+              note_prompt: {
+                show: false,
+                post_session: false,
+              },
+            },
+          }),
+          stopReason: 'stop' as StopReason,
+        };
+      },
+      chatStream() {
+        const s = (async function* () {
+          yield 'unused';
+        })();
+        return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
+      },
+    };
+    registerProvider(envelopeProvider);
+
+    const result = await evaluateAssessmentAnswer(
+      assessmentContext,
+      'Some answer',
+    );
+
+    expect(result.feedback).toBe(
+      'Not yet. You named a useful phrase; now add what it means and when you would use it.',
+    );
+    expect(result.feedback).not.toContain("couldn't evaluate");
+    expect(result.passed).toBe(false);
+  });
+});
+
+describe('buildAssessmentAppHelpEvaluation', () => {
+  it('turns app questions into app-help feedback instead of assessment grading', () => {
+    const result = buildAssessmentAppHelpEvaluation(
+      'Where do I find my notes about this topic or subject?',
+      0.4,
+    );
+
+    expect(result).not.toBeNull();
+    expect(result?.feedback).toContain('Home > My Notes > Notes');
+    expect(result?.feedback).toContain('Library > choose the subject');
+    expect(result?.passed).toBe(false);
+    expect(result?.shouldEscalateDepth).toBe(false);
+    expect(result?.masteryScore).toBe(0.4);
+  });
+
+  it('does not intercept ordinary assessment answers', () => {
+    expect(
+      buildAssessmentAppHelpEvaluation('Ciao means hello in Italian.'),
+    ).toBeNull();
   });
 });
 
@@ -590,6 +728,7 @@ function createAssessmentMockDb({
   findFirstResult = undefined as
     | ReturnType<typeof mockAssessmentRow>
     | undefined,
+  findManyResult = [] as ReturnType<typeof mockAssessmentRow>[],
   insertReturning = [] as ReturnType<typeof mockAssessmentRow>[],
   updateReturning = [mockAssessmentRow()] as ReturnType<
     typeof mockAssessmentRow
@@ -605,6 +744,7 @@ function createAssessmentMockDb({
     query: {
       assessments: {
         findFirst: jest.fn().mockResolvedValue(findFirstResult),
+        findMany: jest.fn().mockResolvedValue(findManyResult),
       },
     },
     insert: jest.fn().mockReturnValue({
@@ -720,6 +860,50 @@ describe('getAssessment', () => {
     const result = await getAssessment(db, testProfileId, testAssessmentId);
 
     expect(result!.masteryScore).toBeNull();
+  });
+});
+
+describe('getActiveAssessmentForTopic', () => {
+  it('returns the newest in-progress assessment for a topic', async () => {
+    const older = mockAssessmentRow({
+      id: 'assessment-older',
+      exchangeHistory: [{ role: 'user', content: 'ciao' }],
+    });
+    const newer = {
+      ...mockAssessmentRow({
+        id: 'assessment-newer',
+        exchangeHistory: [{ role: 'user', content: 'buongiorno' }],
+      }),
+      updatedAt: new Date('2025-01-15T11:00:00.000Z'),
+    };
+    const db = createAssessmentMockDb({
+      findManyResult: [older, newer],
+    });
+
+    const result = await getActiveAssessmentForTopic(
+      db,
+      testProfileId,
+      testSubjectId,
+      testTopicId,
+    );
+
+    expect(result?.id).toBe('assessment-newer');
+    expect(result?.exchangeHistory).toEqual([
+      { role: 'user', content: 'buongiorno' },
+    ]);
+  });
+
+  it('returns null when no in-progress topic assessment exists', async () => {
+    const db = createAssessmentMockDb({ findManyResult: [] });
+
+    const result = await getActiveAssessmentForTopic(
+      db,
+      testProfileId,
+      testSubjectId,
+      testTopicId,
+    );
+
+    expect(result).toBeNull();
   });
 });
 

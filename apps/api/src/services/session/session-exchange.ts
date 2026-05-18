@@ -35,8 +35,12 @@ import {
   streamExchange,
   estimateExpectedResponseMinutes,
   classifyExchangeOutcome,
+  auditExchangeSources,
+  applySourceAuditSafetyFallback,
+  inferObviousReliableSourceForAudit,
   type ExchangeContext,
   type ExchangeFallback,
+  type ExchangeSourceAudit,
   type FluencyDrillAnnotation,
   type ImageData,
 } from '../exchanges';
@@ -116,8 +120,7 @@ const BANNED_FILLER_OPENERS = [
 const LANGUAGE_REGEX =
   /\b(how do (you|i) say|translate|in (french|spanish|german|czech|italian|portuguese|japanese|chinese|korean|arabic|russian|hindi|dutch|polish|swedish|norwegian|danish|finnish|greek|turkish|hungarian|romanian|thai|vietnamese|indonesian|malay|tagalog|swahili|hebrew|ukrainian|croatian|serbian|slovak|slovenian|bulgarian|latvian|lithuanian|estonian)|what('s| is) .+ in \w+)\b/i;
 
-const PLUS_HARD_TURN_RUNG = 4;
-const PLUS_HARD_TURN_ROUTING_REASON = 'plus_hard_turn_claude';
+const PLUS_PREMIUM_ROUTING_REASON = 'plus_included_premium_profile';
 
 export interface ExchangeLlmRouting {
   llmTier?: LLMTier;
@@ -130,21 +133,17 @@ export function resolveExchangeLlmRouting(input: {
   requestedLlmTier?: LLMTier;
   effectiveRung: EscalationRung;
 }): ExchangeLlmRouting {
+  if (input.subscriptionTier === 'plus') {
+    return {
+      llmTier: 'premium',
+      routingReason: PLUS_PREMIUM_ROUTING_REASON,
+    };
+  }
+
   if (input.requestedLlmTier === 'premium') {
     return {
       llmTier: 'premium',
       routingReason: 'premium_profile_or_addon',
-    };
-  }
-
-  if (
-    input.subscriptionTier === 'plus' &&
-    input.effectiveRung >= PLUS_HARD_TURN_RUNG
-  ) {
-    return {
-      llmTier: 'standard',
-      preferredProvider: 'anthropic',
-      routingReason: PLUS_HARD_TURN_ROUTING_REASON,
     };
   }
 
@@ -234,6 +233,12 @@ export interface ExchangeBehavioralMetrics {
   confidence?: 'low' | 'medium' | 'high';
   /** Continuation opener score from the LLM envelope. */
   retrievalScore?: number;
+  /** True when the LLM did not return a valid response envelope. */
+  envelopeParseFailed?: boolean;
+  /** Parser failure reason when envelopeParseFailed is true. */
+  envelopeParseFailureReason?: string;
+  /** Private source provenance audit; not rendered to the learner. */
+  sourceAudit?: ExchangeSourceAudit;
   /** B.3 monitoring: consecutive correct-answer streak at the current escalation rung */
   correctStreak?: number;
   /** Fluency-drill score correct count, when the envelope's ui_hints.fluency_drill.score was set. */
@@ -686,6 +691,12 @@ export function buildExchangeHistory(events: ExchangeHistoryEvent[]): Array<{
                 ui_hints: {
                   note_prompt: { show: false, post_session: false },
                 },
+                private_sources: {
+                  relied_on: ['conversation_history'],
+                  insufficient: false,
+                  reason:
+                    'Rewrapped prior assistant turn for conversation continuity.',
+                },
               });
             })()
           : e.content,
@@ -704,6 +715,7 @@ export async function prepareExchangeContext(
     subscriptionTier?: SubscriptionTier;
     memoryFactsReadEnabled?: boolean;
     memoryFactsRelevanceEnabled?: boolean;
+    semanticMemoryRetrievalEnabled?: boolean;
   },
 ): Promise<ExchangePrep> {
   // 1. Load session
@@ -731,8 +743,10 @@ export async function prepareExchangeContext(
   // CFLF-23: For freeform sessions with rawInput, also scan prior sessions
   // by the learner's original intent so the very first exchange has rich context.
   const isFreeformWithRawInput = isFreeform && !!session.rawInput;
+  const semanticMemoryRetrievalEnabled =
+    options?.semanticMemoryRetrievalEnabled !== false;
   const userMessageVectorPromise: Promise<number[] | undefined> =
-    options?.voyageApiKey
+    semanticMemoryRetrievalEnabled && options?.voyageApiKey
       ? generateEmbedding(userMessage, options.voyageApiKey)
           .then((embedding) => embedding.vector)
           .catch((err) => {
@@ -835,16 +849,18 @@ export async function prepareExchangeContext(
       // session-crud.ts getSessionTranscript for the full rationale.
       orderBy: [asc(sessionEvents.createdAt), asc(sessionEvents.id)],
     }),
-    userMessageVectorPromise.then((userMessageVector) =>
-      retrieveRelevantMemory(
-        db,
-        profileId,
-        userMessage,
-        options?.voyageApiKey,
-        undefined,
-        userMessageVector,
-      ),
-    ),
+    semanticMemoryRetrievalEnabled
+      ? userMessageVectorPromise.then((userMessageVector) =>
+          retrieveRelevantMemory(
+            db,
+            profileId,
+            userMessage,
+            options?.voyageApiKey,
+            undefined,
+            userMessageVector,
+          ),
+        )
+      : Promise.resolve({ context: '', topicIds: [] }),
     // FR92: Load session metadata for interleaved topic list
     isInterleaved
       ? db
@@ -860,7 +876,7 @@ export async function prepareExchangeContext(
       : Promise.resolve([]),
     // CFLF-23: Pre-session similarity scan — uses rawInput for freeform sessions
     // Graceful degradation: if Voyage API is down, returns empty (never breaks session)
-    isFreeformWithRawInput && session.rawInput
+    semanticMemoryRetrievalEnabled && isFreeformWithRawInput && session.rawInput
       ? retrieveRelevantMemory(
           db,
           profileId,
@@ -1602,6 +1618,15 @@ export async function persistExchangeResult(
       ...(behavioral.retrievalScore !== undefined && {
         retrievalScore: behavioral.retrievalScore,
       }),
+      ...(behavioral.envelopeParseFailed !== undefined && {
+        envelopeParseFailed: behavioral.envelopeParseFailed,
+      }),
+      ...(behavioral.envelopeParseFailureReason !== undefined && {
+        envelopeParseFailureReason: behavioral.envelopeParseFailureReason,
+      }),
+      ...(behavioral.sourceAudit !== undefined && {
+        sourceAudit: behavioral.sourceAudit,
+      }),
       ...(behavioral.llmTier !== undefined && {
         llmTier: behavioral.llmTier,
       }),
@@ -1893,6 +1918,7 @@ export async function processMessage(
     clientId?: string;
     memoryFactsReadEnabled?: boolean;
     memoryFactsRelevanceEnabled?: boolean;
+    semanticMemoryRetrievalEnabled?: boolean;
   },
 ): Promise<{
   response: string;
@@ -1901,6 +1927,9 @@ export async function processMessage(
   exchangeCount: number;
   expectedResponseMinutes: number;
   aiEventId?: string;
+  envelopeParseFailed?: boolean;
+  envelopeParseFailureReason?: string;
+  sourceAudit?: ExchangeSourceAudit;
 }> {
   // Early exchange limit check — runs before expensive prepareExchangeContext
   // which performs 9+ parallel DB queries and a quota check (issue #15, review item #4)
@@ -1988,6 +2017,9 @@ export async function processMessage(
       needsDeepening: result.needsDeepening,
       confidence: result.confidence,
       retrievalScore: result.retrievalScore,
+      envelopeParseFailed: result.envelopeParseFailed,
+      envelopeParseFailureReason: result.envelopeParseFailureReason,
+      sourceAudit: result.sourceAudit,
       drillCorrect: result.fluencyDrill?.score?.correct,
       drillTotal: result.fluencyDrill?.score?.total,
       llmTier: context.llmTier,
@@ -2029,6 +2061,9 @@ export async function processMessage(
     exchangeCount: persisted.exchangeCount,
     expectedResponseMinutes: result.expectedResponseMinutes,
     aiEventId: persisted.aiEventId,
+    envelopeParseFailed: result.envelopeParseFailed,
+    envelopeParseFailureReason: result.envelopeParseFailureReason,
+    sourceAudit: result.sourceAudit,
   };
 }
 
@@ -2048,6 +2083,7 @@ export async function streamMessage(
     clientId?: string;
     memoryFactsReadEnabled?: boolean;
     memoryFactsRelevanceEnabled?: boolean;
+    semanticMemoryRetrievalEnabled?: boolean;
   },
 ): Promise<{
   stream: AsyncIterable<string>;
@@ -2064,6 +2100,11 @@ export async function streamMessage(
     notePromptPostSession?: boolean;
     fluencyDrill?: FluencyDrillAnnotation;
     confidence?: 'low' | 'medium' | 'high';
+    sourceAudit?: ExchangeSourceAudit;
+    /** Set when the source audit replaced already-streamed text; caller should
+     *  emit a replace frame before done so the visible bubble matches what was
+     *  persisted. */
+    sourceReplacement?: string;
     /** [BUG-941] Set when the LLM response was empty or unparseable — caller
      *  MUST emit a `fallback` SSE frame and skip persisting the exchange so
      *  the raw envelope never reaches ai_response.content. */
@@ -2216,8 +2257,26 @@ export async function streamMessage(
       const parsed = isAppHelpQuery(input.message)
         ? applyAppHelpSignalGuard(outcome.parsed)
         : outcome.parsed;
-      const expectedResponseMinutes = estimateExpectedResponseMinutes(
+      const privateSourcesForAudit = inferObviousReliableSourceForAudit(
+        parsed.privateSources,
+        result.sourceEvidence,
         parsed.cleanResponse,
+      );
+      const sourceAudit = auditExchangeSources(
+        privateSourcesForAudit,
+        result.sourceEvidence,
+        { envelopeParseFailed: parsed.envelopeParseFailed },
+      );
+      const sourceSafe = applySourceAuditSafetyFallback(
+        parsed.cleanResponse,
+        sourceAudit,
+      );
+      const sourceReplacement =
+        sourceSafe.response !== parsed.cleanResponse
+          ? sourceSafe.response
+          : undefined;
+      const expectedResponseMinutes = estimateExpectedResponseMinutes(
+        sourceSafe.response,
         context,
       );
       const persisted = await persistExchangeResult(
@@ -2226,7 +2285,7 @@ export async function streamMessage(
         sessionId,
         session,
         input.message,
-        parsed.cleanResponse,
+        sourceSafe.response,
         effectiveRung,
         {
           isUnderstandingCheck: parsed.understandingCheck,
@@ -2238,6 +2297,7 @@ export async function streamMessage(
           needsDeepening: parsed.needsDeepening,
           confidence: parsed.confidence,
           retrievalScore: parsed.retrievalScore,
+          sourceAudit: sourceSafe.sourceAudit,
           drillCorrect: parsed.fluencyDrill?.score?.correct,
           drillTotal: parsed.fluencyDrill?.score?.total,
           llmTier: context.llmTier,
@@ -2277,7 +2337,7 @@ export async function streamMessage(
         );
       }
       return {
-        response: parsed.cleanResponse,
+        response: sourceSafe.response,
         exchangeCount: persisted.exchangeCount,
         escalationRung: effectiveRung,
         expectedResponseMinutes,
@@ -2286,6 +2346,8 @@ export async function streamMessage(
         notePromptPostSession: parsed.notePromptPostSession || undefined,
         fluencyDrill: parsed.fluencyDrill ?? undefined,
         confidence: parsed.confidence,
+        sourceAudit: sourceSafe.sourceAudit,
+        sourceReplacement,
       };
     },
   };

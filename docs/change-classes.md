@@ -16,7 +16,7 @@ scripts/check-change-class.sh --branch     # check all changes vs main
 |---|---|---|---|---|
 | **db-schema** | `packages/database/src/schema/**` | `db:push:dev`, `db:generate:dev` | `test:api:integration` | Never push to staging/prod |
 | **db-migrations** | `packages/database/drizzle/**` | `db:migrate:dev` | `test:api:integration` | Migrate before deploy; rollback section if dropping |
-| **llm-prompts** | `services/**/*-prompts.ts`, `services/llm/*.ts` | `eval:llm` | `eval:llm --live` | Pre-commit enforces snapshot staging |
+| **llm-prompts** | `services/**/*-prompts.ts`, `services/llm/*.ts` | `eval:llm` | `eval:llm --live`, `test:llm:enduser` | Pre-commit enforces snapshot staging |
 | **inngest** | `apps/api/src/inngest/**` | — | `test:api:integration` | Verify dashboard sync after deploy |
 | **api-routes** | `apps/api/src/routes/**` | `test:api:unit` | `test:api:integration` | |
 | **api-middleware** | `apps/api/src/middleware/**` | `test:api:unit` | `test:api:integration` | Auth/billing changes need break tests |
@@ -52,6 +52,7 @@ The hook (`scripts/pre-commit-tests.sh` + `.husky/pre-commit`) runs automaticall
 - Cross-package integration tests (`tests/integration/`)
 - E2E tests (Playwright, Maestro)
 - `eval:llm --live` (Tier 2 — real LLM calls)
+- `test:llm:enduser` (live five-session learner quality gate)
 - DB push/generate/migrate
 - Manual review items (CI config, deploy config, Expo config)
 

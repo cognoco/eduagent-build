@@ -13,6 +13,7 @@ import type {
   ChatMessage,
   EscalationRung,
   MessagePart,
+  ParseEnvelopeFailureReason,
   PreferredLlmProvider,
   RouteResult,
   StreamResult,
@@ -73,6 +74,63 @@ export function buildUserContent(
 // Core Exchange Processing Pipeline — Story 2.1
 // Pure business logic, no Hono imports
 // ---------------------------------------------------------------------------
+
+export type ExchangeSourceReliability =
+  | 'trusted_app_content'
+  | 'learner_provided'
+  | 'conversation_only'
+  | 'memory_only'
+  | 'reasoning';
+
+export type ExchangeSourceEvidenceKind =
+  | 'current_topic'
+  | 'interleaved_topics'
+  | 'app_help_map'
+  | 'homework_problem'
+  | 'recitation_text'
+  | 'deterministic_reasoning'
+  | 'learner_message'
+  | 'learner_intent'
+  | 'conversation_history'
+  | 'prior_learning'
+  | 'mentor_memory'
+  | 'accommodation';
+
+export interface ExchangeSourceEvidence {
+  /** Stable ID the model must use in private_sources.relied_on. */
+  id: string;
+  kind: ExchangeSourceEvidenceKind;
+  reliability: ExchangeSourceReliability;
+  label: string;
+  excerpt?: string;
+  /** True when this evidence may support factual teaching/app claims. */
+  reliableForFacts: boolean;
+}
+
+export interface ExchangePrivateSources {
+  relied_on?: string[];
+  insufficient?: boolean;
+  reason?: string;
+}
+
+export type ExchangeSourceAuditStatus =
+  | 'ok'
+  | 'parse_failed'
+  | 'missing_private_sources'
+  | 'unsupported_sources'
+  | 'missing_reliable_source'
+  | 'insufficient_reliable_sources';
+
+export interface ExchangeSourceAudit {
+  status: ExchangeSourceAuditStatus;
+  reliedOnSourceIds: string[];
+  reliableReliedOnSourceIds: string[];
+  unsupportedSourceIds: string[];
+  availableReliableSourceIds: string[];
+  insufficient: boolean;
+  reason?: string;
+  evidence: ExchangeSourceEvidence[];
+}
 
 /** Everything needed to process a learner message */
 export interface ExchangeContext {
@@ -180,6 +238,8 @@ export interface ExchangeContext {
     currentKnowledge?: string;
     interests?: string[];
   } | null;
+  /** Private source pack for the LLM. Built server-side per exchange. */
+  sourceEvidence?: ExchangeSourceEvidence[];
 }
 
 /** Result of processing a single exchange */
@@ -207,6 +267,12 @@ export interface ExchangeResult {
   confidence?: 'low' | 'medium' | 'high';
   /** Continuation opener score from the envelope, 0-1. */
   retrievalScore?: number;
+  /** True when the LLM did not return a valid response envelope. */
+  envelopeParseFailed?: boolean;
+  /** Parser failure reason when envelopeParseFailed is true. */
+  envelopeParseFailureReason?: ParseEnvelopeFailureReason;
+  /** Private provenance audit for this turn; never shown to the learner. */
+  sourceAudit?: ExchangeSourceAudit;
 }
 
 /** Streaming variant result */
@@ -223,6 +289,8 @@ export interface ExchangeStreamResult {
   provider: string;
   model: string;
   fallbackUsed?: boolean;
+  /** Private source pack used to build the streaming prompt. */
+  sourceEvidence: ExchangeSourceEvidence[];
 }
 
 // ---------------------------------------------------------------------------
@@ -297,6 +365,566 @@ export function estimateExpectedResponseMinutes(
 
 export { buildSystemPrompt } from './exchange-prompts';
 
+const SOURCE_EXCERPT_MAX_CHARS = 360;
+
+function compactSourceExcerpt(value: string | undefined): string | undefined {
+  const compact = value?.replace(/\s+/g, ' ').trim();
+  if (!compact) return undefined;
+  return compact.length > SOURCE_EXCERPT_MAX_CHARS
+    ? `${compact.slice(0, SOURCE_EXCERPT_MAX_CHARS - 1)}...`
+    : compact;
+}
+
+function addSourceEvidence(
+  evidence: ExchangeSourceEvidence[],
+  item: ExchangeSourceEvidence,
+): void {
+  if (evidence.some((existing) => existing.id === item.id)) return;
+  evidence.push({
+    ...item,
+    excerpt: compactSourceExcerpt(item.excerpt),
+  });
+}
+
+function looksLikeDeterministicProblem(text: string): boolean {
+  return (
+    /(?:^|\s)[-+]?\d+(?:\.\d+)?\s*(?:[+\-*/=]|x\s*[+\-=]|\bpercent\b)/i.test(
+      text,
+    ) ||
+    /\b(solve|equation|calculate|factor|simplify|percent|ratio|fraction|derivative|integral)\b/i.test(
+      text,
+    )
+  );
+}
+
+export function buildExchangeSourceEvidence(
+  context: ExchangeContext,
+  userMessage: string,
+  options: { appHelpTurn?: boolean } = {},
+): ExchangeSourceEvidence[] {
+  const evidence: ExchangeSourceEvidence[] = [];
+
+  addSourceEvidence(evidence, {
+    id: 'learner_message',
+    kind: 'learner_message',
+    reliability: 'learner_provided',
+    label: 'Current learner message',
+    excerpt: sanitizeUserContent(userMessage),
+    reliableForFacts: false,
+  });
+
+  if (context.rawInput) {
+    addSourceEvidence(evidence, {
+      id: 'learner_intent',
+      kind: 'learner_intent',
+      reliability: 'learner_provided',
+      label: 'Original learner intent',
+      excerpt: context.rawInput,
+      reliableForFacts: false,
+    });
+  }
+
+  if (context.topicTitle || context.topicDescription) {
+    addSourceEvidence(evidence, {
+      id: 'current_topic',
+      kind: 'current_topic',
+      reliability: 'trusted_app_content',
+      label: 'Loaded curriculum topic',
+      excerpt: [context.topicTitle, context.topicDescription]
+        .filter(Boolean)
+        .join(': '),
+      reliableForFacts: true,
+    });
+  }
+
+  if (context.interleavedTopics?.length) {
+    addSourceEvidence(evidence, {
+      id: 'interleaved_topics',
+      kind: 'interleaved_topics',
+      reliability: 'trusted_app_content',
+      label: 'Loaded interleaved curriculum topics',
+      excerpt: context.interleavedTopics
+        .map((topic) =>
+          [topic.title, topic.description].filter(Boolean).join(': '),
+        )
+        .join(' | '),
+      reliableForFacts: true,
+    });
+  }
+
+  if (options.appHelpTurn === true) {
+    addSourceEvidence(evidence, {
+      id: 'app_help_map',
+      kind: 'app_help_map',
+      reliability: 'trusted_app_content',
+      label: 'Server-owned MentoMate app help map',
+      excerpt: 'App navigation and feature map injected by the server.',
+      reliableForFacts: true,
+    });
+  }
+
+  if (context.sessionType === 'homework') {
+    addSourceEvidence(evidence, {
+      id: 'homework_problem',
+      kind: 'homework_problem',
+      reliability: 'learner_provided',
+      label: 'Learner-provided homework problem',
+      excerpt: [context.rawInput, userMessage].filter(Boolean).join(' | '),
+      reliableForFacts: true,
+    });
+  }
+
+  const recentHistory = context.exchangeHistory
+    .filter((entry) => entry.role === 'user' || entry.role === 'assistant')
+    .slice(-6)
+    .map((entry) => `${entry.role}: ${entry.content}`)
+    .join('\n');
+
+  if (context.effectiveMode === 'recitation') {
+    const recentLearnerRecitations = context.exchangeHistory
+      .filter((entry) => entry.role === 'user')
+      .slice(-4)
+      .map((entry) => entry.content);
+    addSourceEvidence(evidence, {
+      id: 'recitation_text',
+      kind: 'recitation_text',
+      reliability: 'learner_provided',
+      label: 'Learner-provided recitation text',
+      excerpt: [...recentLearnerRecitations, sanitizeUserContent(userMessage)]
+        .filter(Boolean)
+        .join('\n'),
+      reliableForFacts: true,
+    });
+  }
+
+  if (
+    context.sessionType === 'homework' ||
+    looksLikeDeterministicProblem(`${context.rawInput ?? ''}\n${userMessage}`)
+  ) {
+    addSourceEvidence(evidence, {
+      id: 'deterministic_reasoning',
+      kind: 'deterministic_reasoning',
+      reliability: 'reasoning',
+      label: 'Deterministic reasoning over provided problem data',
+      excerpt:
+        'Use only transparent transformations that can be checked from the provided problem.',
+      reliableForFacts: true,
+    });
+  }
+
+  if (recentHistory) {
+    addSourceEvidence(evidence, {
+      id: 'conversation_history',
+      kind: 'conversation_history',
+      reliability: 'conversation_only',
+      label: 'Recent conversation history',
+      excerpt: recentHistory,
+      reliableForFacts: false,
+    });
+  }
+
+  if (context.priorLearningContext || context.learningHistoryContext) {
+    addSourceEvidence(evidence, {
+      id: 'prior_learning',
+      kind: 'prior_learning',
+      reliability: 'memory_only',
+      label: 'Prior learning summary',
+      excerpt: [context.priorLearningContext, context.learningHistoryContext]
+        .filter(Boolean)
+        .join('\n'),
+      reliableForFacts: false,
+    });
+  }
+
+  if (
+    context.embeddingMemoryContext ||
+    context.learnerMemoryContext ||
+    context.crossSubjectContext ||
+    context.resumeContext
+  ) {
+    addSourceEvidence(evidence, {
+      id: 'mentor_memory',
+      kind: 'mentor_memory',
+      reliability: 'memory_only',
+      label: 'Mentor memory and summaries',
+      excerpt: [
+        context.embeddingMemoryContext,
+        context.learnerMemoryContext,
+        context.crossSubjectContext,
+        context.resumeContext,
+      ]
+        .filter(Boolean)
+        .join('\n'),
+      reliableForFacts: false,
+    });
+  }
+
+  if (context.accommodationContext || context.teachingPreference) {
+    addSourceEvidence(evidence, {
+      id: 'accommodation',
+      kind: 'accommodation',
+      reliability: 'memory_only',
+      label: 'Learner accommodation and teaching preference',
+      excerpt: [context.accommodationContext, context.teachingPreference]
+        .filter(Boolean)
+        .join('\n'),
+      reliableForFacts: false,
+    });
+  }
+
+  return evidence;
+}
+
+function uniqueSourceIds(ids: string[] | undefined): string[] {
+  const seen = new Set<string>();
+  const unique: string[] = [];
+  for (const rawId of ids ?? []) {
+    const id = rawId.trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    unique.push(id);
+  }
+  return unique;
+}
+
+export function auditExchangeSources(
+  privateSources: ExchangePrivateSources | undefined,
+  evidence: ExchangeSourceEvidence[],
+  options: { envelopeParseFailed?: boolean } = {},
+): ExchangeSourceAudit {
+  const evidenceById = new Map(evidence.map((item) => [item.id, item]));
+  const availableReliableSourceIds = evidence
+    .filter((item) => item.reliableForFacts)
+    .map((item) => item.id);
+  const reliedOnSourceIds = uniqueSourceIds(privateSources?.relied_on);
+  const unsupportedSourceIds = reliedOnSourceIds.filter(
+    (id) => !evidenceById.has(id),
+  );
+  const reliableReliedOnSourceIds = reliedOnSourceIds.filter(
+    (id) => evidenceById.get(id)?.reliableForFacts === true,
+  );
+  const insufficient = privateSources?.insufficient === true;
+
+  let status: ExchangeSourceAuditStatus = 'ok';
+  if (options.envelopeParseFailed === true) {
+    status = 'parse_failed';
+  } else if (!privateSources) {
+    status = 'missing_private_sources';
+  } else if (unsupportedSourceIds.length > 0) {
+    status = 'unsupported_sources';
+  } else if (insufficient) {
+    status = 'insufficient_reliable_sources';
+  } else if (
+    availableReliableSourceIds.length === 0 ||
+    reliableReliedOnSourceIds.length === 0
+  ) {
+    status = 'missing_reliable_source';
+  }
+
+  return {
+    status,
+    reliedOnSourceIds,
+    reliableReliedOnSourceIds,
+    unsupportedSourceIds,
+    availableReliableSourceIds,
+    insufficient,
+    reason: privateSources?.reason,
+    evidence,
+  };
+}
+
+function getSourceEvidenceExcerpt(
+  sourceAudit: ExchangeSourceAudit,
+  sourceId: string,
+): string | undefined {
+  return sourceAudit.evidence.find((item) => item.id === sourceId)?.excerpt;
+}
+
+function truncateForReply(value: string | undefined, maxChars = 160): string {
+  const compact = value?.replace(/\s+/g, ' ').trim();
+  if (!compact) return '';
+  return compact.length > maxChars
+    ? `${compact.slice(0, maxChars - 1)}...`
+    : compact;
+}
+
+function buildUnsupportedFactualReply(
+  sourceAudit: ExchangeSourceAudit,
+): string {
+  const learnerQuestion = truncateForReply(
+    getSourceEvidenceExcerpt(sourceAudit, 'learner_message'),
+  );
+  const lower = learnerQuestion.toLowerCase();
+
+  if (/\b(remember|takeaway|summary|recap)\b/.test(lower)) {
+    return (
+      'The safe takeaway is that we still need reliable source material before making factual claims about this. ' +
+      'Once you share the textbook passage, worksheet, photo, or trusted source, I can help pull out the main claim, one example, and the evidence that supports it.'
+    );
+  }
+
+  if (/\b(example|for instance|rome|specific)\b/.test(lower)) {
+    return (
+      "A specific example needs reliable source material, so I won't invent one. " +
+      'Share the textbook passage, worksheet, photo, or trusted source, and I can turn it into a clear example with what it proves.'
+    );
+  }
+
+  if (/\b(explain|from scratch|beginning|start)\b/.test(lower)) {
+    return (
+      'I can help set up the explanation, but I need reliable source material before filling in the facts. ' +
+      "Send the textbook passage, worksheet, photo, or trusted source, and we'll build it as: main idea, cause, example, evidence."
+    );
+  }
+
+  if (/\b(is|was|were|mostly|because|why|how)\b/.test(lower)) {
+    return (
+      "That's a source-check question, so I should not answer it from memory. " +
+      "Share the textbook passage, worksheet, photo, or trusted source, and we'll check what claim it supports and what evidence it gives."
+    );
+  }
+
+  return (
+    "I don't have reliable source material for that yet, so I won't invent the facts. " +
+    (learnerQuestion
+      ? `What I can safely do now is frame your question: "${learnerQuestion}" `
+      : 'What I can safely do now is help frame the question. ') +
+    "Share the textbook passage, worksheet, photo, or trusted source, and I'll help turn it into a clear answer with evidence."
+  );
+}
+
+function sourceFallbackReason(existingReason: string | undefined): string {
+  const reason =
+    'Server used the no-source safety fallback because no reliable factual source was available.';
+  if (!existingReason) return reason;
+  return `${reason} Model reason: ${existingReason}`.slice(0, 1000);
+}
+
+const SOURCE_BOUND_SENTENCE_TERMS: Array<{
+  label: string;
+  response: RegExp;
+  source: RegExp;
+}> = [
+  {
+    label: 'pottery/clay',
+    response: /\bclay\b|\bpots?\b|\bpottery\b/i,
+    source: /\bclay\b|\bpots?\b|\bpottery\b/i,
+  },
+  {
+    label: 'metal/tools',
+    response: /\bmetal\b|\btools?\b/i,
+    source: /\bmetal\b|\btools?\b/i,
+  },
+  {
+    label: 'wheat/grain',
+    response: /\bwheat\b|\bgrain\b/i,
+    source: /\bwheat\b|\bgrain\b/i,
+  },
+  { label: 'salt', response: /\bsalt\b/i, source: /\bsalt\b/i },
+  { label: 'spices', response: /\bspices?\b/i, source: /\bspices?\b/i },
+  { label: 'silk', response: /\bsilk\b/i, source: /\bsilk\b/i },
+  {
+    label: 'oil',
+    response: /\bolive oil\b|\boil\b/i,
+    source: /\bolive oil\b|\boil\b/i,
+  },
+  { label: 'wine', response: /\bwine\b/i, source: /\bwine\b/i },
+  {
+    label: 'cell autonomy phrase',
+    response:
+      /\b(?:cells?|cell)\b[^.?!]{0,120}\b(?:can do on its own|what a cell can do|all by itself)\b|\b(?:can do on its own|what a cell can do|all by itself)\b[^.?!]{0,120}\b(?:cells?|cell)\b/i,
+    source:
+      /\b(?:cells?|cell)\b[^.?!]{0,120}\b(?:can do on its own|what a cell can do|all by itself)\b|\b(?:can do on its own|what a cell can do|all by itself)\b[^.?!]{0,120}\b(?:cells?|cell)\b/i,
+  },
+  {
+    label: 'building-block analogy',
+    response: /\bbuilding blocks?\b|\bfundamental piece\b/i,
+    source: /\bbuilding blocks?\b|\bfundamental piece\b/i,
+  },
+  {
+    label: 'army speed/ease/effectiveness',
+    response:
+      /\b(?:arm(?:y|ies)|soldiers?|military)\b[^,.;?!]*(?:easy|easily|more easily|easier|effective(?:ly)?|efficient(?:ly)?|faster|quickly)|(?:easy|easily|more easily|easier|effective(?:ly)?|efficient(?:ly)?|faster|quickly)[^,.;?!]*\b(?:arm(?:y|ies)|soldiers?|military)\b/i,
+    source:
+      /\b(?:arm(?:y|ies)|soldiers?|military)\b[^,.;?!]*(?:easy|easily|more easily|easier|effective(?:ly)?|efficient(?:ly)?|faster|quickly)|(?:easy|easily|more easily|easier|effective(?:ly)?|efficient(?:ly)?|faster|quickly)[^,.;?!]*\b(?:arm(?:y|ies)|soldiers?|military)\b/i,
+  },
+  {
+    label: 'conquest/empire growth',
+    response:
+      /\bconquer(?:ing|ed)?\b|\bconquest\b|\bempires?\s+(?:(?:can|could|might|may|often)\s+)?(?:grow|grew|expand|expanded|stay strong)\b|\bempire\s+(?:(?:can|could|might|may|often)\s+)?(?:grow|grew|expand|expanded|stay strong)\b/i,
+    source:
+      /\bconquer(?:ing|ed)?\b|\bconquest\b|\bempires?\s+(?:(?:can|could|might|may|often)\s+)?(?:grow|grew|expand|expanded|stay strong)\b|\bempire\s+(?:(?:can|could|might|may|often)\s+)?(?:grow|grew|expand|expanded|stay strong)\b/i,
+  },
+  {
+    label: 'brick/house analogy',
+    response: /\bbricks?\b|\bhouse\b/i,
+    source: /\bbricks?\b|\bhouse\b/i,
+  },
+  {
+    label: 'unsupported trade container',
+    response: /\bbaskets?\b/i,
+    source: /\bbaskets?\b/i,
+  },
+  {
+    label: 'unsupported historical framing',
+    response:
+      /\bspecial pathways?\b|\bbuilt long ago\b|\b(?:was|were) built\b|\bbuilt to\b|\bancient times\b|\bvillages?\b/i,
+    source:
+      /\bspecial pathways?\b|\bbuilt long ago\b|\b(?:was|were) built\b|\bbuilt to\b|\bancient times\b|\bvillages?\b/i,
+  },
+  {
+    label: 'unsupported land/soil detail',
+    response: /\brich soil\b|\bsoil\b/i,
+    source: /\brich soil\b|\bsoil\b/i,
+  },
+];
+
+function appendAuditReason(
+  existingReason: string | undefined,
+  addition: string,
+): string {
+  if (!existingReason) return addition.slice(0, 1000);
+  return `${existingReason} ${addition}`.slice(0, 1000);
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function responseMentionsSourceTitle(
+  response: string,
+  source: ExchangeSourceEvidence,
+): boolean {
+  const excerpt = source.excerpt?.trim();
+  if (!excerpt) return false;
+  const title = excerpt.split(':')[0]?.trim();
+  if (!title || title.length < 8) return false;
+
+  return new RegExp(`\\b${escapeRegExp(title)}\\b`, 'i').test(response);
+}
+
+export function inferObviousReliableSourceForAudit(
+  privateSources: ExchangePrivateSources | undefined,
+  sourceEvidence: ExchangeSourceEvidence[],
+  response: string,
+): ExchangePrivateSources | undefined {
+  if (!privateSources || privateSources.insufficient === true) {
+    return privateSources;
+  }
+
+  const evidenceById = new Map(sourceEvidence.map((item) => [item.id, item]));
+  const reliedOn = uniqueSourceIds(privateSources.relied_on);
+  if (reliedOn.some((id) => evidenceById.get(id)?.reliableForFacts === true)) {
+    return privateSources;
+  }
+
+  const currentTopic = sourceEvidence.find(
+    (item) => item.id === 'current_topic' && item.reliableForFacts,
+  );
+  if (!currentTopic || !responseMentionsSourceTitle(response, currentTopic)) {
+    return privateSources;
+  }
+
+  return {
+    ...privateSources,
+    relied_on: [...reliedOn, currentTopic.id],
+    reason: appendAuditReason(
+      privateSources.reason,
+      'Server inferred current_topic because the reply explicitly used the loaded topic title.',
+    ),
+  };
+}
+
+function stripUnsupportedSourceBoundSentences(
+  response: string,
+  sourceAudit: ExchangeSourceAudit,
+): { response: string; removedTerms: string[] } {
+  const reliableSourceText = sourceAudit.evidence
+    .filter((item) => item.reliableForFacts)
+    .map((item) => item.excerpt)
+    .filter(Boolean)
+    .join(' ');
+  if (!reliableSourceText) return { response, removedTerms: [] };
+
+  const unsupportedTerms = SOURCE_BOUND_SENTENCE_TERMS.filter(
+    (term) =>
+      term.response.test(response) && !term.source.test(reliableSourceText),
+  );
+  if (unsupportedTerms.length === 0) return { response, removedTerms: [] };
+
+  const unsupportedPatterns = unsupportedTerms.map((term) => term.response);
+  const sentences = response.match(/[^.?!]+[.?!]?/g) ?? [response];
+  const kept = sentences
+    .map((sentence) => sentence.trim())
+    .filter(
+      (sentence) =>
+        sentence.length > 0 &&
+        !unsupportedPatterns.some((pattern) => pattern.test(sentence)),
+    );
+  const scrubbed = kept
+    .join(' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+
+  const fallback = reliableSourceText
+    .split(/(?<=[.?!])\s+/)[0]
+    ?.trim()
+    .replace(/^[^:]{1,140}:\s+/, '');
+  const scrubbedWordCount = scrubbed.split(/\s+/).filter(Boolean).length;
+
+  return {
+    response:
+      scrubbed.length > 0 && scrubbedWordCount >= 6
+        ? scrubbed
+        : fallback
+          ? fallback
+          : response,
+    removedTerms: unsupportedTerms.map((term) => term.label),
+  };
+}
+
+export function applySourceAuditSafetyFallback(
+  response: string,
+  sourceAudit: ExchangeSourceAudit,
+): { response: string; sourceAudit: ExchangeSourceAudit } {
+  const needsNoSourceFallback =
+    sourceAudit.availableReliableSourceIds.length === 0 &&
+    (sourceAudit.status === 'missing_reliable_source' ||
+      sourceAudit.status === 'insufficient_reliable_sources' ||
+      sourceAudit.status === 'unsupported_sources');
+
+  if (!needsNoSourceFallback) {
+    const scrubbed = stripUnsupportedSourceBoundSentences(
+      response,
+      sourceAudit,
+    );
+    if (scrubbed.removedTerms.length === 0) {
+      return { response, sourceAudit };
+    }
+
+    return {
+      response: scrubbed.response,
+      sourceAudit: {
+        ...sourceAudit,
+        reason: appendAuditReason(
+          sourceAudit.reason,
+          `Server removed unsupported source-bound phrase(s): ${scrubbed.removedTerms.join(', ')}.`,
+        ),
+      },
+    };
+  }
+
+  return {
+    response: buildUnsupportedFactualReply(sourceAudit),
+    sourceAudit: {
+      ...sourceAudit,
+      status: 'insufficient_reliable_sources',
+      insufficient: true,
+      reason: sourceFallbackReason(sourceAudit.reason),
+    },
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Exchange processing
 // ---------------------------------------------------------------------------
@@ -315,7 +943,11 @@ export async function processExchange(
   imageData?: ImageData,
 ): Promise<ExchangeResult> {
   const appHelpTurn = isAppHelpQuery(userMessage);
-  const systemPrompt = _buildSystemPrompt(context, {
+  const sourceEvidence = buildExchangeSourceEvidence(context, userMessage, {
+    appHelpTurn,
+  });
+  const promptContext: ExchangeContext = { ...context, sourceEvidence };
+  const systemPrompt = _buildSystemPrompt(promptContext, {
     includeAppHelpMap: appHelpTurn,
   });
 
@@ -345,6 +977,7 @@ export async function processExchange(
       pronouns: context.pronouns,
       flow: 'exchange.process',
       sessionId: context.sessionId,
+      responseFormat: 'json',
     },
   );
 
@@ -354,13 +987,29 @@ export async function processExchange(
     flow: 'processExchange',
   });
   const finalParsed = appHelpTurn ? applyAppHelpSignalGuard(parsed) : parsed;
+  const privateSourcesForAudit = inferObviousReliableSourceForAudit(
+    finalParsed.privateSources,
+    sourceEvidence,
+    finalParsed.cleanResponse,
+  );
+  const sourceAudit = auditExchangeSources(
+    privateSourcesForAudit,
+    sourceEvidence,
+    {
+      envelopeParseFailed: finalParsed.envelopeParseFailed,
+    },
+  );
+  const sourceSafe = applySourceAuditSafetyFallback(
+    finalParsed.cleanResponse,
+    sourceAudit,
+  );
 
   return {
-    response: finalParsed.cleanResponse,
+    response: sourceSafe.response,
     newEscalationRung: context.escalationRung,
     isUnderstandingCheck: finalParsed.understandingCheck,
     expectedResponseMinutes: estimateExpectedResponseMinutes(
-      finalParsed.cleanResponse,
+      sourceSafe.response,
       context,
     ),
     needsDeepening: finalParsed.needsDeepening,
@@ -373,6 +1022,9 @@ export async function processExchange(
     fluencyDrill: finalParsed.fluencyDrill ?? undefined,
     confidence: finalParsed.confidence,
     retrievalScore: finalParsed.retrievalScore,
+    envelopeParseFailed: finalParsed.envelopeParseFailed,
+    envelopeParseFailureReason: finalParsed.envelopeParseFailureReason,
+    sourceAudit: sourceSafe.sourceAudit,
   };
 }
 
@@ -387,7 +1039,11 @@ export async function streamExchange(
   imageData?: ImageData,
 ): Promise<ExchangeStreamResult> {
   const appHelpTurn = isAppHelpQuery(userMessage);
-  const systemPrompt = _buildSystemPrompt(context, {
+  const sourceEvidence = buildExchangeSourceEvidence(context, userMessage, {
+    appHelpTurn,
+  });
+  const promptContext: ExchangeContext = { ...context, sourceEvidence };
+  const systemPrompt = _buildSystemPrompt(promptContext, {
     includeAppHelpMap: appHelpTurn,
   });
 
@@ -415,6 +1071,7 @@ export async function streamExchange(
       pronouns: context.pronouns,
       flow: 'exchange.stream',
       sessionId: context.sessionId,
+      responseFormat: 'json',
     },
   );
 
@@ -428,6 +1085,7 @@ export async function streamExchange(
     newEscalationRung: context.escalationRung,
     provider: result.provider,
     model: result.model,
+    sourceEvidence,
     get fallbackUsed() {
       return result.fallbackUsed;
     },
@@ -453,6 +1111,12 @@ export interface ParsedExchangeEnvelope {
   confidence?: 'low' | 'medium' | 'high';
   /** Continuation opener score from the envelope, 0-1. */
   retrievalScore?: number;
+  /** True when the LLM did not return a valid response envelope. */
+  envelopeParseFailed?: boolean;
+  /** Parser failure reason when envelopeParseFailed is true. */
+  envelopeParseFailureReason?: ParseEnvelopeFailureReason;
+  /** Private source IDs emitted by the model for provenance auditing. */
+  privateSources?: ExchangePrivateSources;
   /**
    * Interview-specific: LLM signalled readiness to close the interview.
    * False for non-interview flows and for every fallback-shaped parse result.
@@ -472,6 +1136,7 @@ const EMPTY_PARSED_ENVELOPE: ParsedExchangeEnvelope = {
   fluencyDrill: null,
   confidence: undefined,
   retrievalScore: undefined,
+  privateSources: undefined,
   readyToFinish: false,
 };
 
@@ -501,6 +1166,26 @@ export const HANDLED_MARKER_KEYS: ReadonlySet<string> =
   new Set<HandledMarkerKey>(['notePrompt', 'fluencyDrill']);
 
 const DEFAULT_FALLBACK_TEXT = "I didn't have a reply — tap to try again.";
+const GENERIC_PRAISE_SENTENCE_RE =
+  /(?:^|[\s\n]+)(?:(?:you did a )?great job|great work|nice work|nice job|nice one|nice,\s+\w+|that(?:'s| is| was) a (?:good|great) (?:start|idea|observation|summary|point)|great (?:idea|observation|summary|point)|good question|great question|you've got a good grasp|excellent|amazing|awesome|fantastic)(?:[^.?!]*)(?:[.?!]|$)/gi;
+const UNSUPPORTED_SOFT_VALIDATION_SENTENCE_RE =
+  /(?:^|[\s\n]+)(?:(?:that(?:'s| is) an? idea about)|(?:that(?:'s| is) an? )?(?:interesting idea|interesting thought|good observation|fair point))(?:[^.?!]*)(?:[.?!]|$)/gi;
+const OVERHEATED_PHRASE_RE =
+  /\b(super important|very important|really important|crucial|super useful)\b/gi;
+const OVERHEATED_ADVERB_RE = /\b(definitely|absolutely|incredibly)\b[,\s]*/gi;
+const CHILDISH_TONE_RE = /\byummy\s+/gi;
+
+function normalizeInflatedStyle(text: string): string {
+  return text
+    .replace(OVERHEATED_PHRASE_RE, (match) =>
+      /useful/i.test(match) ? 'useful' : 'important',
+    )
+    .replace(OVERHEATED_ADVERB_RE, '')
+    .replace(CHILDISH_TONE_RE, '')
+    .replace(/\bThat(?:'s| is) a\s+The\b/g, 'The')
+    .replace(/\ba important\b/gi, 'an important')
+    .replace(/[^\S\r\n]{2,}/g, ' ');
+}
 
 // Shared bounds for fluency-drill duration, used by both the full-envelope
 // and bare-marker code paths so the clamp definition can't drift.
@@ -508,8 +1193,17 @@ function clampDrillDuration(seconds: number): number {
   return Math.min(90, Math.max(15, seconds));
 }
 
+function cleanLearnerVisibleReply(text: string): string {
+  return normalizeInflatedStyle(stripPhoneticHints(text))
+    .replace(GENERIC_PRAISE_SENTENCE_RE, '')
+    .replace(UNSUPPORTED_SOFT_VALIDATION_SENTENCE_RE, '')
+    .replace(/\bThat(?:'s| is) a\s+The\b/g, 'The')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 function parsedFromVisibleFallbackText(text: string): ParsedExchangeEnvelope {
-  const cleanResponse = stripPhoneticHints(
+  const cleanResponse = cleanLearnerVisibleReply(
     stripEmbeddedEnvelopeTail(normalizeReplyText(text)).trim(),
   );
   return {
@@ -555,10 +1249,10 @@ export function parseExchangeEnvelope(
     const fallbackText =
       replyCandidate && replyCandidate.length > 0
         ? stripEmbeddedEnvelopeTail(normalizeReplyText(replyCandidate))
-        : response.trim();
+        : stripEmbeddedEnvelopeTail(normalizeReplyText(response.trim()));
     return {
       // [BUG-865] Strip TTS pronunciation hints from chat-visible text.
-      cleanResponse: stripPhoneticHints(fallbackText),
+      cleanResponse: cleanLearnerVisibleReply(fallbackText),
       understandingCheck: detectUnderstandingCheckFromProse(fallbackText),
       partialProgress: false,
       needsDeepening: false,
@@ -566,6 +1260,8 @@ export function parseExchangeEnvelope(
       notePromptPostSession: false,
       fluencyDrill: null,
       readyToFinish: false,
+      envelopeParseFailed: true,
+      envelopeParseFailureReason: parsed.reason,
     };
   }
 
@@ -586,7 +1282,7 @@ function envelopeToParsedExchange(
   // pipeline today — the LLM hint is dropped on the floor for TTS too. If
   // pronunciation regresses on long words, restore via SSML at the audio
   // boundary, not by passing the dashed form through.
-  const cleanReply = stripPhoneticHints(envelope.reply.trim());
+  const cleanReply = cleanLearnerVisibleReply(envelope.reply);
 
   const notePrompt = uiHints.note_prompt;
   const drill = uiHints.fluency_drill;
@@ -620,6 +1316,7 @@ function envelopeToParsedExchange(
     notePromptPostSession: notePrompt?.post_session === true,
     fluencyDrill,
     confidence: envelope.confidence,
+    privateSources: envelope.private_sources,
     retrievalScore:
       typeof signals.retrieval_score === 'number'
         ? signals.retrieval_score

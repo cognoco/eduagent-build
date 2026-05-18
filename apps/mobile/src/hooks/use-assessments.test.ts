@@ -2,6 +2,7 @@ import { renderHook, waitFor, act } from '@testing-library/react-native';
 import { QueryClient } from '@tanstack/react-query';
 import { createQueryWrapper } from '../test-utils/app-hook-test-utils';
 import {
+  useActiveAssessment,
   useAssessment,
   useCreateAssessment,
   useSubmitAnswer,
@@ -123,6 +124,61 @@ describe('useCreateAssessment', () => {
     });
 
     expect(mockFetch).toHaveBeenCalled();
+  });
+});
+
+describe('useActiveAssessment', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    queryClient.clear();
+  });
+
+  it('fetches an active assessment for a topic', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          assessment: {
+            id: 'active-assess',
+            profileId: 'test-profile-id',
+            subjectId: 'sub-1',
+            topicId: 'topic-1',
+            sessionId: null,
+            verificationDepth: 'explain',
+            status: 'in_progress',
+            masteryScore: 0.5,
+            qualityRating: 4,
+            exchangeHistory: [
+              { role: 'user', content: 'ciao, buongiorno' },
+              {
+                role: 'assistant',
+                content:
+                  'Good start. Pick one phrase and say when you would use it.',
+              },
+            ],
+            createdAt: '2026-02-15T10:00:00.000Z',
+            updatedAt: '2026-02-15T10:01:00.000Z',
+          },
+        }),
+        { status: 200 },
+      ),
+    );
+
+    const { result } = renderHook(
+      () => useActiveAssessment('sub-1', 'topic-1'),
+      { wrapper: createWrapper() },
+    );
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    expect(mockFetch).toHaveBeenCalled();
+    expect(result.current.data?.id).toBe('active-assess');
+    expect(result.current.data?.exchangeHistory).toHaveLength(2);
   });
 });
 

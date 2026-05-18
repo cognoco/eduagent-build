@@ -334,7 +334,9 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
           flow: 'session',
           key: clientId,
         });
-        return c.json(result);
+        const { sourceAudit: privateSourceAudit, ...clientResult } = result;
+        void privateSourceAudit;
+        return c.json(clientResult);
       } catch (err) {
         if (err instanceof SessionExchangeLimitError) {
           return apiError(
@@ -726,6 +728,15 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
                 data: JSON.stringify({
                   type: 'chunk',
                   content: result.response,
+                }),
+              });
+            }
+
+            if (chunkCount > 0 && result.sourceReplacement?.trim()) {
+              await sseStream.writeSSE({
+                data: JSON.stringify({
+                  type: 'replace',
+                  content: result.sourceReplacement,
                 }),
               });
             }

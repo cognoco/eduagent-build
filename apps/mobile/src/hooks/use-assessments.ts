@@ -8,6 +8,7 @@ import type {
   Assessment,
   AssessmentEligibleTopic,
   AssessmentEvaluation,
+  AssessmentRecord,
   AssessmentStatus,
 } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
@@ -43,6 +44,37 @@ export function useAssessment(
   });
 }
 
+export function useActiveAssessment(
+  subjectId: string,
+  topicId: string,
+): UseQueryResult<AssessmentRecord | null> {
+  const client = useApiClient();
+  const { activeProfile } = useProfile();
+
+  return useQuery({
+    queryKey: ['assessment', 'active', subjectId, topicId, activeProfile?.id],
+    queryFn: async ({ signal: querySignal }) => {
+      const { signal, cleanup } = combinedSignal(querySignal);
+      try {
+        const res = await client.subjects[':subjectId'].topics[
+          ':topicId'
+        ].assessments.active.$get(
+          { param: { subjectId, topicId } },
+          { init: { signal } },
+        );
+        await assertOk(res);
+        const data = (await res.json()) as {
+          assessment: AssessmentRecord | null;
+        };
+        return data.assessment;
+      } finally {
+        cleanup();
+      }
+    },
+    enabled: !!activeProfile && !!subjectId && !!topicId,
+  });
+}
+
 export function useCreateAssessment(subjectId: string, topicId: string) {
   const client = useApiClient();
   const queryClient = useQueryClient();
@@ -59,6 +91,9 @@ export function useCreateAssessment(subjectId: string, topicId: string) {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['assessment'] });
+      void queryClient.invalidateQueries({
+        queryKey: ['assessment', 'active'],
+      });
       void queryClient.invalidateQueries({
         queryKey: ['progress', 'subject', subjectId],
       });
@@ -128,6 +163,9 @@ export function useSubmitAnswer(assessmentId: string) {
       const targetAssessmentId = variables.assessmentId ?? assessmentId;
       void queryClient.invalidateQueries({
         queryKey: ['assessment', targetAssessmentId],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ['assessment', 'active'],
       });
       // PR-10 deferred: broad ['progress'] — assessment answer updates topic
       // progress and subject progress, but subjectId, topicId, and activeProfileId

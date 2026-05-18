@@ -2,13 +2,18 @@ import { useState, useCallback, useEffect } from 'react';
 import { View, Text } from 'react-native';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import type { AssessmentEvaluation, AssessmentStatus } from '@eduagent/schemas';
+import type {
+  AssessmentEvaluation,
+  AssessmentRecord,
+  AssessmentStatus,
+} from '@eduagent/schemas';
 import {
   ChatShell,
   animateResponse,
   type ChatMessage,
 } from '../../../../components/session';
 import {
+  useActiveAssessment,
   useCreateAssessment,
   useDeclineAssessmentRefresh,
   useSubmitAnswer,
@@ -16,22 +21,84 @@ import {
 import { formatApiError } from '../../../../lib/format-api-error';
 import { goBackOrReplace } from '../../../../lib/navigation';
 import { platformAlert } from '../../../../lib/platform-alert';
+import type { Translate } from '../../../../i18n';
 import { Button } from '../../../../components/common/Button';
 import { ErrorFallback } from '../../../../components/common/ErrorFallback';
 import { RewardBurst } from '../../../../components/common/RewardBurst';
 import { hapticSuccess } from '../../../../lib/haptics';
 import { isAssessmentReadinessReply } from './assessment-readiness';
+import {
+  assessmentFeedbackNeedsPrompt,
+  buildAssessmentFirstQuestion,
+  buildAssessmentNextActionPrompt,
+  buildAssessmentOpeningMessage,
+} from './assessment-copy';
+
+function buildAssessmentChatMessages(input: {
+  openingMessage: string;
+  exchangeHistory?: AssessmentRecord['exchangeHistory'];
+  status?: AssessmentStatus;
+  t: Translate;
+  topicTitle: string | null;
+  topicDescription: string | null;
+  pedagogyMode: string | null;
+  languageCode: string | null;
+}): ChatMessage[] {
+  const exchangeHistory = input.exchangeHistory ?? [];
+  const messages: ChatMessage[] = [
+    {
+      id: 'opening',
+      role: 'assistant',
+      content: input.openingMessage,
+    },
+    ...exchangeHistory.map((exchange, index) => ({
+      id: `persisted-${index}`,
+      role: exchange.role,
+      content: exchange.content,
+    })),
+  ];
+  const lastMessage = messages[messages.length - 1];
+  if (
+    exchangeHistory.length > 0 &&
+    lastMessage?.role === 'assistant' &&
+    assessmentFeedbackNeedsPrompt({
+      feedback: lastMessage.content,
+      status: input.status ?? 'in_progress',
+    })
+  ) {
+    messages.push({
+      id: 'persisted-next-action',
+      role: 'assistant',
+      content: buildAssessmentNextActionPrompt({
+        t: input.t,
+        topicTitle: input.topicTitle,
+        topicDescription: input.topicDescription,
+        pedagogyMode: input.pedagogyMode,
+        languageCode: input.languageCode,
+      }),
+    });
+  }
+  return messages;
+}
 
 export default function AssessmentScreen() {
   const router = useRouter();
   const { t } = useTranslation();
-  const { subjectId, topicId, topicTitle, topicDescription } =
-    useLocalSearchParams<{
-      subjectId?: string;
-      topicId?: string;
-      topicTitle?: string;
-      topicDescription?: string;
-    }>();
+  const {
+    subjectId,
+    topicId,
+    topicTitle,
+    topicDescription,
+    pedagogyMode,
+    languageCode,
+  } = useLocalSearchParams<{
+    subjectId?: string;
+    topicId?: string;
+    topicTitle?: string;
+    topicDescription?: string;
+    pedagogyMode?: string;
+    languageCode?: string;
+  }>();
   const scopedTopicTitle =
     typeof topicTitle === 'string' && topicTitle.trim().length > 0
       ? topicTitle.trim()
@@ -39,15 +106,25 @@ export default function AssessmentScreen() {
   const scopedTopicDescription =
     typeof topicDescription === 'string' && topicDescription.trim().length > 0
       ? topicDescription.trim()
-      : t('assessment.topicDescriptionFallback');
-  const openingMessage = scopedTopicTitle
-    ? t('assessment.openingMessageWithTopic', {
-        title: scopedTopicTitle,
-        description: scopedTopicDescription,
-      })
-    : t('assessment.openingMessage');
+      : null;
+  const scopedPedagogyMode =
+    typeof pedagogyMode === 'string' && pedagogyMode.trim().length > 0
+      ? pedagogyMode.trim()
+      : null;
+  const scopedLanguageCode =
+    typeof languageCode === 'string' && languageCode.trim().length > 0
+      ? languageCode.trim()
+      : null;
+  const openingMessage = buildAssessmentOpeningMessage({
+    t,
+    topicTitle: scopedTopicTitle,
+    topicDescription: scopedTopicDescription,
+    pedagogyMode: scopedPedagogyMode,
+    languageCode: scopedLanguageCode,
+  });
 
   const createAssessment = useCreateAssessment(subjectId ?? '', topicId ?? '');
+  const activeAssessment = useActiveAssessment(subjectId ?? '', topicId ?? '');
   const [assessmentId, setAssessmentId] = useState<string | null>(null);
   const submitAnswer = useSubmitAnswer(assessmentId ?? '');
   const declineRefresh = useDeclineAssessmentRefresh(assessmentId ?? '');
@@ -56,16 +133,51 @@ export default function AssessmentScreen() {
     status: AssessmentStatus;
   } | null>(null);
 
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: 'opening',
-      role: 'assistant',
-      content: openingMessage,
-    },
-  ]);
+  const [messages, setMessages] = useState<ChatMessage[]>(() =>
+    buildAssessmentChatMessages({
+      openingMessage,
+      t,
+      topicTitle: scopedTopicTitle,
+      topicDescription: scopedTopicDescription,
+      pedagogyMode: scopedPedagogyMode,
+      languageCode: scopedLanguageCode,
+    }),
+  );
   const [isStreaming, setIsStreaming] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
   const [lastUserText, setLastUserText] = useState<string | null>(null);
+
+  useEffect(() => {
+    const assessment = activeAssessment.data;
+    if (!assessment || assessmentId || terminalResult || isStreaming) return;
+    if (messages.some((message) => message.role === 'user')) return;
+
+    setAssessmentId(assessment.id);
+    setMessages(
+      buildAssessmentChatMessages({
+        openingMessage,
+        exchangeHistory: assessment.exchangeHistory,
+        status: assessment.status,
+        t,
+        topicTitle: scopedTopicTitle,
+        topicDescription: scopedTopicDescription,
+        pedagogyMode: scopedPedagogyMode,
+        languageCode: scopedLanguageCode,
+      }),
+    );
+  }, [
+    activeAssessment.data,
+    assessmentId,
+    isStreaming,
+    messages,
+    openingMessage,
+    scopedPedagogyMode,
+    scopedLanguageCode,
+    scopedTopicDescription,
+    scopedTopicTitle,
+    t,
+    terminalResult,
+  ]);
 
   const handleSend = useCallback(
     async (text: string) => {
@@ -82,11 +194,13 @@ export default function AssessmentScreen() {
 
       if (isFirstLearnerTurn && isAssessmentReadinessReply(text)) {
         animateResponse(
-          scopedTopicTitle
-            ? t('assessment.firstQuestionWithTopic', {
-                title: scopedTopicTitle,
-              })
-            : t('assessment.firstQuestion'),
+          buildAssessmentFirstQuestion({
+            t,
+            topicTitle: scopedTopicTitle,
+            topicDescription: scopedTopicDescription,
+            pedagogyMode: scopedPedagogyMode,
+            languageCode: scopedLanguageCode,
+          }),
           setMessages,
           setIsStreaming,
         );
@@ -96,7 +210,7 @@ export default function AssessmentScreen() {
       setLastUserText(text);
 
       try {
-        let currentAssessmentId = assessmentId;
+        let currentAssessmentId = assessmentId ?? activeAssessment.data?.id;
         if (!currentAssessmentId) {
           const created = await createAssessment.mutateAsync();
           currentAssessmentId = created.assessment.id;
@@ -109,9 +223,25 @@ export default function AssessmentScreen() {
         });
         const evaluation = result.evaluation;
         const feedback = evaluation.feedback;
+        const nextActionPrompt = assessmentFeedbackNeedsPrompt({
+          feedback,
+          status: result.status,
+        })
+          ? buildAssessmentNextActionPrompt({
+              t,
+              topicTitle: scopedTopicTitle,
+              topicDescription: scopedTopicDescription,
+              pedagogyMode: scopedPedagogyMode,
+              languageCode: scopedLanguageCode,
+            })
+          : null;
         const terminalStatus = result.status !== 'in_progress';
 
         animateResponse(feedback, setMessages, setIsStreaming, () => {
+          if (nextActionPrompt) {
+            animateResponse(nextActionPrompt, setMessages, setIsStreaming);
+            return;
+          }
           if (terminalStatus) {
             setTerminalResult(result);
           }
@@ -140,14 +270,19 @@ export default function AssessmentScreen() {
       topicId,
       messages,
       assessmentId,
+      activeAssessment.data,
       createAssessment,
       submitAnswer,
       t,
       scopedTopicTitle,
+      scopedTopicDescription,
+      scopedPedagogyMode,
+      scopedLanguageCode,
     ],
   );
 
   const passedAssessment = terminalResult?.status === 'passed';
+  const isReviewLoading = activeAssessment.isLoading && !assessmentId;
 
   useEffect(() => {
     if (passedAssessment) {
@@ -293,7 +428,10 @@ export default function AssessmentScreen() {
         messages={messages}
         onSend={handleSend}
         isStreaming={isStreaming}
-        inputDisabled={!!terminalResult}
+        inputDisabled={isReviewLoading || !!terminalResult}
+        disabledReason={
+          isReviewLoading ? t('assessment.loadingReview') : undefined
+        }
         footer={
           resultCard ??
           (lastError ? (

@@ -530,8 +530,7 @@
       "typeSubjectPlaceholder": "Skriv inn et emne",
       "typeSubjectLabel": "Skriv inn et emne",
       "useTypedSubject": "Bruk",
-      "useTypedSubjectLabel": "Bruk skrevet emne",
-      "addNote": "Legg til notat"
+      "useTypedSubjectLabel": "Bruk skrevet emne"
     },
     "quota": {
       "dailyLimitReached": "Daglig grense nådd",
@@ -1226,7 +1225,21 @@
     "topicPassedNote": "Bra jobbet - dette emnet er markert som bestått, og svake punkter kommer tilbake i repetisjon når de trenger oppmerksomhet.",
     "pickerLoadingBody": "Vi sjekker hvilke emner som er klare for en rettferdig test.",
     "pickerLoadTimeoutTitle": "Vurderingsemner tar for lang tid å laste",
-    "pickerLoadTimeoutMessage": "Sjekk tilkoblingen din, prøv igjen eller gå tilbake."
+    "pickerLoadTimeoutMessage": "Sjekk tilkoblingen din, prøv igjen eller gå tilbake.",
+    "languageOpeningMessage": "La oss sjekke hva du kan si på språket.\n\nFørste oppgave: skriv ett eller to ord eller korte uttrykk på {{language}}. Legg til den engelske oversettelsen hvis du husker den.",
+    "languageOpeningMessageWithTopic": "La oss sjekke hva du kan si på språket.\n\n{{title}}\n\nFørste oppgave: skriv ett eller to ord eller korte uttrykk på {{language}}. Legg til den engelske oversettelsen hvis du husker den.",
+    "languageGreetingOpeningMessage": "La oss starte med selve språket.\n\nFørste oppgave: kan du si hei på {{language}}? Skriv én eller to hilsener. Legg til den engelske oversettelsen hvis du husker den.",
+    "languageGreetingOpeningMessageWithTopic": "La oss starte med selve språket.\n\n{{title}}\n\nFørste oppgave: kan du si hei på {{language}}? Skriv én eller to hilsener. Legg til den engelske oversettelsen hvis du husker den.",
+    "languageFirstQuestion": "Første oppgave: skriv ett eller to ord eller korte uttrykk på {{language}}. Legg til den engelske oversettelsen hvis du husker den.",
+    "languageFirstQuestionWithTopic": "Første oppgave: skriv ett eller to ord eller korte uttrykk på {{language}} for {{title}}. Legg til den engelske oversettelsen hvis du husker den.",
+    "languageGreetingFirstQuestion": "Første oppgave: kan du si hei på {{language}}? Skriv én eller to hilsener. Legg til den engelske oversettelsen hvis du husker den.",
+    "languageGreetingFirstQuestionWithTopic": "Første oppgave: kan du si hei på {{language}}? Skriv én eller to hilsener. Legg til den engelske oversettelsen hvis du husker den.",
+    "continuePrompt": "Kan du forklare en av disse ideene med dine egne ord?",
+    "languageContinuePrompt": "Legg nå til ett uttrykk til på {{language}}, eller oversett ett av uttrykkene du skrev til engelsk.",
+    "languageGreetingContinuePrompt": "Legg nå til én hilsen til på {{language}}, eller oversett en av hilsenene du skrev til engelsk.",
+    "loadingReview": "Laster din lagrede sjekk ...",
+    "pickerContinueForTopic": "Fortsett vurdering for {{title}}",
+    "pickerInProgress": "Pågår"
   },
   "homework": {
     "permissionTitle": "Kameratilgang nødvendig",

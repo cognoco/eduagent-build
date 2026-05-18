@@ -8,6 +8,41 @@ import { z } from 'zod';
 // inside free-text prose. See docs/specs/2026-04-18-llm-response-envelope.md.
 // ---------------------------------------------------------------------------
 
+const privateReliedOnSchema = z.preprocess(
+  (value) => {
+    if (typeof value === 'string') return [value];
+    return value;
+  },
+  z.array(z.string().min(1).max(160)).max(12).catch([]),
+);
+
+const privateInsufficientSchema = z.preprocess((value) => {
+  if (typeof value === 'boolean') return value;
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  return undefined;
+}, z.boolean().optional());
+
+const privateReasonSchema = z.preprocess((value) => {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}, z.string().min(1).max(1000).optional());
+
+const privateSourcesSchema = z.preprocess(
+  (value) =>
+    value && typeof value === 'object' && !Array.isArray(value)
+      ? value
+      : undefined,
+  z
+    .object({
+      relied_on: privateReliedOnSchema.optional(),
+      insufficient: privateInsufficientSchema.optional(),
+      reason: privateReasonSchema.optional(),
+    })
+    .optional(),
+);
+
 export const llmResponseEnvelopeSchema = z.object({
   /**
    * The text the learner actually sees. All prose lives here.
@@ -62,6 +97,14 @@ export const llmResponseEnvelopeSchema = z.object({
         .optional(),
     })
     .optional(),
+
+  /**
+   * Private provenance for complaint review and hallucination audits. This is
+   * never rendered to the learner. Values must reference server-provided source
+   * IDs from the prompt's source pack; the server cross-checks them before
+   * persisting the turn.
+   */
+  private_sources: privateSourcesSchema.optional(),
 
   /**
    * Model's self-reported confidence in its decisions. If present, the UI

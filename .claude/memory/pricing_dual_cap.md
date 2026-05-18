@@ -1,12 +1,12 @@
 ---
-name: Pricing — Dual-Cap Free Tier + Plus tier quota (2026-04-09)
-description: Free tier: 10/day + 100/month. Plus tier: 700/month, no daily limit. Confirmed via integration test fix 2026-04-09.
+name: Pricing — Dual-Cap Free Tier + Plus tier entitlement
+description: Free tier: 10/day + 100/month. Plus tier: 700/month, no daily limit, one premium study profile.
 type: project
 ---
 
 Free tier uses a **dual-cap model: 10 questions/day AND 100 questions/month** (changed from 50/month on 2026-03-25).
 
-**Plus tier: 700 questions/month, no daily limit** — confirmed 2026-04-09 when integration test expected 500 but account had 700. User explicitly stated "699 for plus program" (meaning X-Quota-Remaining shows 699 after 1 message consumed from 700).
+**Plus tier: 700 questions/month, no daily limit, one premium study profile** — quota confirmed 2026-04-09 when integration test expected 500 but account had 700. User explicitly stated "699 for plus program" (meaning X-Quota-Remaining shows 699 after 1 message consumed from 700). Premium profile clarified 2026-05-18: Plus is for one person who wants serious studying.
 
 **Why free tier dual-cap:**
 - 50 monthly was too stingy for users to experience the "aha" moment (needs ~7-10 exchanges)
@@ -17,7 +17,7 @@ Free tier uses a **dual-cap model: 10 questions/day AND 100 questions/month** (c
 
 **Tier config:**
 - Free tier: `monthlyQuota: 100, dailyLimit: 10`
-- Plus: `monthlyQuota: 700, dailyLimit: null`
+- Plus: `monthlyQuota: 700, dailyLimit: null, premiumModelProfiles: 1, llmTier: 'premium'`
 - Family/Pro: `dailyLimit: null` (specific monthly quotas TBD)
 - Daily reset via Inngest cron at 01:00 UTC
 

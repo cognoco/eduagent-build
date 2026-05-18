@@ -224,6 +224,9 @@ describe('assessmentEligibleTopicSchema', () => {
       topicDescription: 'How plants use light, water, and carbon dioxide.',
       subjectId: '660e8400-e29b-41d4-a716-446655440000',
       subjectName: 'Biology',
+      pedagogyMode: 'socratic',
+      languageCode: null,
+      activeAssessmentId: null,
       lastStudiedAt: '2026-05-17T08:00:00.000Z',
     };
 

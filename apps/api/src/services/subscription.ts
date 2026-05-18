@@ -40,15 +40,15 @@ const TIER_CONFIGS: Record<SubscriptionState['tier'], TierConfig> = {
     topUpPrice: 0,
     topUpAmount: 0,
   },
-  // Pre-launch pricing decision (2026-05-15): no active Plus subscribers to
-  // grandfather. Plus stays on standard routing by default; hard turns can be
-  // upgraded per exchange by session routing.
+  // Plus is the one-person serious-study plan: one profile, premium routing.
+  // Family/Pro are multi-profile plans; Pro still has two selectable premium
+  // profiles out of its six seats.
   plus: {
     monthlyQuota: 700,
     dailyLimit: null,
     maxProfiles: 1,
-    premiumModelProfiles: 0,
-    llmTier: 'standard',
+    premiumModelProfiles: 1,
+    llmTier: 'premium',
     priceMonthly: 18.99,
     priceYearly: 168,
     topUpPrice: 10,

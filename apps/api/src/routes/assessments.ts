@@ -9,16 +9,19 @@ import {
   quickCheckFeedbackResponseSchema,
   chatExchangeSchema,
   declineAssessmentRefreshResponseSchema,
+  getActiveAssessmentResponseSchema,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
 import { withProfile, type RouteEnv } from '../route-utils/route-context';
 import {
   evaluateAssessmentAnswer,
+  buildAssessmentAppHelpEvaluation,
   createAssessment,
   getAssessment,
+  getActiveAssessmentForTopic,
   updateAssessment,
-  loadTopicTitle,
+  loadAssessmentTopicContext,
   evaluateQuickCheckAnswer,
   recordAssessmentCompletionActivity,
   buildNeedsReviewEvaluation,
@@ -49,12 +52,9 @@ export const assessmentRoutes = new Hono<RouteEnv>()
     const subjectId = c.req.param('subjectId');
     const topicId = c.req.param('topicId');
 
-    const assessment = await createAssessment(
-      db,
-      profileId,
-      subjectId,
-      topicId,
-    );
+    const assessment =
+      (await getActiveAssessmentForTopic(db, profileId, subjectId, topicId)) ??
+      (await createAssessment(db, profileId, subjectId, topicId));
 
     return c.json(
       createAssessmentResponseSchema.parse({
@@ -71,6 +71,21 @@ export const assessmentRoutes = new Hono<RouteEnv>()
     );
   })
 
+  .get('/subjects/:subjectId/topics/:topicId/assessments/active', async (c) => {
+    const { db, profileId } = withProfile(c);
+    const subjectId = c.req.param('subjectId');
+    const topicId = c.req.param('topicId');
+
+    const assessment = await getActiveAssessmentForTopic(
+      db,
+      profileId,
+      subjectId,
+      topicId,
+    );
+
+    return c.json(getActiveAssessmentResponseSchema.parse({ assessment }));
+  })
+
   // Submit an assessment answer
   .post(
     '/assessments/:assessmentId/answer',
@@ -84,7 +99,20 @@ export const assessmentRoutes = new Hono<RouteEnv>()
       const assessment = await getAssessment(db, profileId, assessmentId);
       if (!assessment) return notFound(c, 'Assessment not found');
 
-      const topicTitle = await loadTopicTitle(
+      const appHelpEvaluation = buildAssessmentAppHelpEvaluation(
+        answer,
+        assessment.masteryScore ?? 0,
+      );
+      if (appHelpEvaluation) {
+        return c.json(
+          submitAssessmentAnswerResponseSchema.parse({
+            evaluation: appHelpEvaluation,
+            status: assessment.status,
+          }),
+        );
+      }
+
+      const topicContext = await loadAssessmentTopicContext(
         db,
         assessment.topicId,
         profileId,
@@ -98,8 +126,7 @@ export const assessmentRoutes = new Hono<RouteEnv>()
         ? buildNeedsReviewEvaluation()
         : await evaluateAssessmentAnswer(
             {
-              topicTitle,
-              topicDescription: '',
+              ...topicContext,
               currentDepth: assessment.verificationDepth,
               exchangeHistory: assessment.exchangeHistory,
             },
@@ -135,8 +162,12 @@ export const assessmentRoutes = new Hono<RouteEnv>()
 
       // Wire terminal standalone assessments into the retention lifecycle.
       // Retention uses the same aggregate mastery signal as the pass gate.
+      // A learner acknowledgement like "OK" after a prior answer is a review
+      // handoff, not a scored recall attempt; do not let that light-touch turn
+      // mutate SM-2 or block the chat with retention-side validation.
       if (
         newStatus !== 'in_progress' &&
+        !forceReview &&
         assessment.topicId &&
         assessment.subjectId
       ) {
@@ -278,15 +309,20 @@ export const assessmentRoutes = new Hono<RouteEnv>()
       const session = await getSession(db, profileId, sessionId);
       if (!session) return notFound(c, 'Session not found');
 
-      // Load topic title for LLM context
-      const topicTitle = session.topicId
-        ? await loadTopicTitle(db, session.topicId, profileId)
-        : 'General';
+      // Load topic scope for LLM context.
+      const topicContext = session.topicId
+        ? await loadAssessmentTopicContext(db, session.topicId, profileId)
+        : {
+            topicTitle: 'General',
+            topicDescription: '',
+            subjectName: undefined,
+            pedagogyMode: undefined,
+            languageCode: null,
+          };
 
       const evaluation = await evaluateQuickCheckAnswer(
         {
-          topicTitle,
-          topicDescription: '',
+          ...topicContext,
           currentDepth: 'recall',
           exchangeHistory: [],
         },

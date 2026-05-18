@@ -137,7 +137,7 @@ function isTailStarterPrefix(value: string): boolean {
   const rest = value.slice(index);
   const keyPart = rest.match(/^[A-Za-z_]*/)?.[0] ?? '';
   if (keyPart.length !== rest.length) return false;
-  return ['signals', 'ui_hints', 'confidence'].some((key) =>
+  return ['signals', 'ui_hints', 'private_sources', 'confidence'].some((key) =>
     key.startsWith(keyPart),
   );
 }

@@ -118,6 +118,26 @@ describe('streamEnvelopeReply', () => {
     expect(await collect(stream)).toBe('Nice work!');
   });
 
+  it('strips private source side-channel copied into the reply string', async () => {
+    const raw = JSON.stringify({
+      reply:
+        'Use the roads example.","private_sources":{"relied_on":["current_topic"],"insufficient":false},"confidence":"high"}',
+      signals: {
+        partial_progress: false,
+        needs_deepening: false,
+        understanding_check: true,
+      },
+      private_sources: {
+        relied_on: ['current_topic'],
+        insufficient: false,
+      },
+      confidence: 'high',
+    });
+    const stream = streamEnvelopeReply(chunked(raw, 7));
+
+    expect(await collect(stream)).toBe('Use the roads example.');
+  });
+
   it('tolerates whitespace around the colon', async () => {
     const stream = streamEnvelopeReply(
       fromChunks(['{"reply"  :  "spaced value"}']),

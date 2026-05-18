@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 
 import {
   applyAppHelpSignalGuard,
+  buildAppHelpDirectReply,
   buildAppHelpPromptBlock,
   isAppHelpQuery,
 } from './app-help-map';
@@ -10,9 +11,11 @@ import {
 interface EnglishLocale {
   home: {
     learner: {
+      askAnythingLabel: string;
       intentActions: {
         homework: { title: string };
         practice: { title: string };
+        studyNew: { title: string };
       };
     };
   };
@@ -44,12 +47,24 @@ describe('buildAppHelpPromptBlock', () => {
     expect(block.length).toBeGreaterThan(0);
   });
 
-  it('contains Notes destination pointing to Library', () => {
+  it('explicitly tells the model it can answer internal app questions', () => {
+    expect(block).toContain(
+      'You DO have access to the app map below, and you are allowed and expected to answer internal app-navigation questions from it.',
+    );
+    expect(block).toContain('Do not treat app questions as off-topic');
+    expect(block).toContain('Do not treat app questions as assessment answers');
+  });
+
+  it('contains Notes destinations pointing to My Notes and Library', () => {
+    expect(block).toContain('My Notes');
+    expect(block).toContain('Home > My Notes > Notes');
     expect(block).toContain('Library');
     expect(block).toMatch(/notes/i);
   });
 
-  it('contains Saved destination pointing to Progress', () => {
+  it('contains past conversations and saved destinations pointing to My Notes', () => {
+    expect(block).toContain('Home > My Notes > Sessions');
+    expect(block).toContain('Home > My Notes > Bookmarks');
     expect(block).toContain('Progress');
     expect(block).toMatch(/saved/i);
   });
@@ -142,13 +157,19 @@ describe('buildAppHelpPromptBlock', () => {
   });
 
   it('uses exact i18n labels for Home intent cards', () => {
+    expect(en.home.learner.askAnythingLabel).toBe('Ask anything');
     expect(en.home.learner.intentActions.homework.title).toBe(
       'Help with an assignment',
     );
     expect(en.home.learner.intentActions.practice.title).toBe('Test yourself');
+    expect(en.home.learner.intentActions.studyNew.title).toBe(
+      'Learn something new',
+    );
 
+    expect(block).toContain(en.home.learner.askAnythingLabel);
     expect(block).toContain(en.home.learner.intentActions.homework.title);
     expect(block).toContain(en.home.learner.intentActions.practice.title);
+    expect(block).toContain(en.home.learner.intentActions.studyNew.title);
   });
 
   it('contains a full version date stamp matching the header comment', () => {
@@ -159,13 +180,25 @@ describe('buildAppHelpPromptBlock', () => {
 describe('isAppHelpQuery', () => {
   it.each([
     'Where do I find my notes?',
+    'Where do I find my notes about this topic or subject?',
+    'Where are the notes about this topic?',
+    'Where are the notes for this subject?',
     'How do I change learning preferences?',
     'where are settings',
     'how to change mode',
     'where is the help section',
     'how do I find saved explanations',
+    'Where are my saved replies?',
+    'Where are my old conversations?',
+    'Where can I find previous sessions?',
     'what is explorer mode',
     'what is challenge mode',
+    'How do I use this app?',
+    'How does MentoMate work?',
+    'What can I do in this app?',
+    'Where do I start in MentoMate?',
+    'Can you answer internal app questions?',
+    'What app questions can I ask?',
     'where can I see what you remember',
     'how do I delete my account',
     'Where can I find the progress tab?',
@@ -209,11 +242,34 @@ describe('isAppHelpQuery', () => {
     'Can you help me find the answer?',
     'How to use the formula',
     'What is the Explorer age of discovery?',
+    'Where are the notes on a musical staff?',
     'Where can I see progress on this topic?',
     'Where can I see my progress in the textbook?',
     'Where can I find help with this calculus problem?',
   ])('does NOT classify "%s" as app-help', (msg) => {
     expect(isAppHelpQuery(msg)).toBe(false);
+  });
+});
+
+describe('buildAppHelpDirectReply', () => {
+  it('answers topic-notes questions with the notes destinations', () => {
+    expect(
+      buildAppHelpDirectReply(
+        'Where do I find my notes about this topic or subject?',
+      ),
+    ).toBe(
+      'You can find all notes at Home > My Notes > Notes. For notes tied to a specific subject, book, or topic, go to Library > choose the subject, choose the book or topic > Your Notes.',
+    );
+  });
+
+  it('answers capability questions without saying the app is off-topic', () => {
+    const reply = buildAppHelpDirectReply(
+      'Can you answer internal app questions?',
+    );
+
+    expect(reply).toContain('Yes - I can answer questions');
+    expect(reply).toContain('MentoMate');
+    expect(reply).not.toMatch(/off-topic|cannot help/i);
   });
 });
 

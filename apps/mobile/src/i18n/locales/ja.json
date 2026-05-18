@@ -507,7 +507,7 @@
       }
     },
     "accessories": {
-      "addNote": "ノートを追加",
+      "addNote": "メモを追加",
       "switchTopic": "トピックを切り替える",
       "parkIt": "保留する",
       "pickSubject": "科目を選ぶ",
@@ -530,8 +530,7 @@
       "typeSubjectPlaceholder": "科目を入力",
       "typeSubjectLabel": "科目を入力",
       "useTypedSubject": "使う",
-      "useTypedSubjectLabel": "入力した科目を使う",
-      "addNote": "メモを追加"
+      "useTypedSubjectLabel": "入力した科目を使う"
     },
     "quota": {
       "dailyLimitReached": "1日の上限に達しました",
@@ -1226,7 +1225,21 @@
     "topicPassedNote": "よくできました。このトピックは合格として記録され、弱いところは必要なタイミングで復習に戻ってきます。",
     "pickerLoadingBody": "適切なテストを実施できるトピックを確認しています。",
     "pickerLoadTimeoutTitle": "アセスメントのトピックの読み込みに時間がかかりすぎています",
-    "pickerLoadTimeoutMessage": "接続を確認して再試行するか、前に戻ってください。"
+    "pickerLoadTimeoutMessage": "接続を確認して再試行するか、前に戻ってください。",
+    "languageOpeningMessage": "実際に使える言語力をチェックしましょう。\n\n最初のタスク：{{language}}で単語や短いフレーズを1つか2つ書いてみましょう。覚えていたら、英語の訳も追加してください。",
+    "languageOpeningMessageWithTopic": "実際に使える言語力をチェックしましょう。\n\n{{title}}\n\n最初のタスク：{{language}}で単語や短いフレーズを1つか2つ書いてみましょう。覚えていたら、英語の訳も追加してください。",
+    "languageGreetingOpeningMessage": "まずは言語そのものから始めましょう。\n\n最初のタスク：{{language}}で挨拶を1つか2つ書いてみましょう。覚えていたら、英語の訳も追加してください。",
+    "languageGreetingOpeningMessageWithTopic": "まずは言語そのものから始めましょう。\n\n{{title}}\n\n最初のタスク：{{language}}で挨拶を1つか2つ書いてみましょう。覚えていたら、英語の訳も追加してください。",
+    "languageFirstQuestion": "最初のタスク：{{language}}で単語や短いフレーズを1つか2つ書いてみましょう。覚えていたら、英語の訳も追加してください。",
+    "languageFirstQuestionWithTopic": "最初のタスク：{{title}}について、{{language}}で単語や短いフレーズを1つか2つ書いてみましょう。覚えていたら、英語の訳も追加してください。",
+    "languageGreetingFirstQuestion": "最初のタスク：{{language}}で挨拶を1つか2つ書いてみましょう。覚えていたら、英語の訳も追加してください。",
+    "languageGreetingFirstQuestionWithTopic": "最初のタスク：{{language}}で挨拶を1つか2つ書いてみましょう。覚えていたら、英語の訳も追加してください。",
+    "continuePrompt": "その中のアイデアを1つ、自分の言葉で説明できますか？",
+    "languageContinuePrompt": "{{language}}でもう1つフレーズを追加するか、書いたフレーズの1つを英語に訳してください。",
+    "languageGreetingContinuePrompt": "{{language}}でもう1つ挨拶を追加するか、書いた挨拶の1つを英語に訳してください。",
+    "loadingReview": "保存したチェックを読み込み中...",
+    "pickerContinueForTopic": "{{title}}の評価を続ける",
+    "pickerInProgress": "進行中"
   },
   "homework": {
     "permissionTitle": "カメラへのアクセスが必要です",

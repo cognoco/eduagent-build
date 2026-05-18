@@ -10,7 +10,11 @@ import {
 import { makeChatStreamResult } from './llm/types';
 import {
   buildSystemPrompt,
+  auditExchangeSources,
+  applySourceAuditSafetyFallback,
+  buildExchangeSourceEvidence,
   classifyExchangeOutcome,
+  inferObviousReliableSourceForAudit,
   parseExchangeEnvelope,
   processExchange,
   streamExchange,
@@ -165,7 +169,10 @@ describe('buildSystemPrompt', () => {
       sessionType: 'learning',
     });
     expect(prompt).toContain(
-      'Teach the concept clearly using a concrete example',
+      'Teach the concept clearly using a source-supported relationship',
+    );
+    expect(prompt).toContain(
+      'Use a concrete example only when it is present in a reliable source',
     );
     expect(prompt).toContain('explain → verify → next concept');
     // Old guidance should be gone
@@ -212,7 +219,7 @@ describe('buildSystemPrompt', () => {
       homeworkMode: 'check_answer',
     });
     expect(prompt).toContain('CHECK MY ANSWER');
-    expect(prompt).toContain('similar worked example');
+    expect(prompt).toContain('keep it tiny');
     expect(prompt).toContain('not a conversation');
   });
 
@@ -223,7 +230,7 @@ describe('buildSystemPrompt', () => {
       homeworkMode: 'help_me',
     });
     expect(prompt).toContain('HELP ME SOLVE IT');
-    expect(prompt).toContain('similar worked example');
+    expect(prompt).toContain('next move or a tiny similar example');
     expect(prompt).toContain('Explain the approach briefly');
   });
 
@@ -983,6 +990,80 @@ describe('classifyExchangeOutcome', () => {
     expect(result.parsed.cleanResponse).toBe('hello');
   });
 
+  it('strips generic praise sentences from learner-visible replies', () => {
+    const raw = JSON.stringify({
+      reply:
+        "Good question. Nice, Maya! That's a great idea, Maya! That is an interesting idea about empires grow. Yes, that is correct. You did a great job using inverse operations to isolate `x`. Nice job!",
+      signals: {
+        partial_progress: false,
+        needs_deepening: false,
+        understanding_check: false,
+      },
+    });
+
+    const result = classifyExchangeOutcome(raw, ctx);
+
+    expect(result.fallback).toBeUndefined();
+    expect(result.parsed.cleanResponse).toBe('Yes, that is correct.');
+  });
+
+  it('strips unsupported soft-validation sentences before source audit runs', () => {
+    const raw = JSON.stringify({
+      reply:
+        "That's an idea about how empires might grow. The source supports roads connecting towns.",
+      signals: {
+        partial_progress: false,
+        needs_deepening: false,
+        understanding_check: false,
+      },
+    });
+
+    const result = classifyExchangeOutcome(raw, ctx);
+
+    expect(result.fallback).toBeUndefined();
+    expect(result.parsed.cleanResponse).toBe(
+      'The source supports roads connecting towns.',
+    );
+  });
+
+  it('normalizes inflated style words in learner-visible replies', () => {
+    const raw = JSON.stringify({
+      reply:
+        'Roman roads were a really important link. They absolutely, helped armies move between places. Metal was super useful.',
+      signals: {
+        partial_progress: false,
+        needs_deepening: false,
+        understanding_check: false,
+      },
+    });
+
+    const result = classifyExchangeOutcome(raw, ctx);
+
+    expect(result.fallback).toBeUndefined();
+    expect(result.parsed.cleanResponse).toBe(
+      'Roman roads were an important link. They helped armies move between places. Metal was useful.',
+    );
+  });
+
+  it('removes childish style words from learner-visible replies', () => {
+    const raw = JSON.stringify({
+      reply:
+        'Imagine you have a lot of one thing, like yummy grain, but no metal tools.',
+      signals: {
+        partial_progress: false,
+        needs_deepening: false,
+        understanding_check: false,
+      },
+    });
+
+    const result = classifyExchangeOutcome(raw, ctx);
+
+    expect(result.fallback).toBeUndefined();
+    expect(result.parsed.cleanResponse).toBe(
+      'Imagine you have a lot of one thing, like grain, but no metal tools.',
+    );
+  });
+
   it.each(['', '   \n\t  '])(
     'returns empty_reply fallback for empty reply %p',
     (reply) => {
@@ -1171,6 +1252,488 @@ describe('parseExchangeEnvelope schema-failure fallback [BUG-934][BUG-935]', () 
     const result = parseExchangeEnvelope(raw, ctx);
 
     expect(result.cleanResponse).toBe('plain text, no json at all');
+  });
+
+  it('strips embedded envelope tails from raw prose fallback text', () => {
+    const raw =
+      'What do you get after subtracting 5 from both sides?","signals":{"partial_progress":true,"needs_deepening":false,"understanding_check":false},"ui_hints":{"note_prompt":{"show":false,"post_session":false}}}';
+
+    const result = parseExchangeEnvelope(raw, ctx);
+
+    expect(result.envelopeParseFailed).toBe(true);
+    expect(result.cleanResponse).toBe(
+      'What do you get after subtracting 5 from both sides?',
+    );
+    expect(result.cleanResponse).not.toContain('signals');
+    expect(result.cleanResponse).not.toContain('ui_hints');
+  });
+
+  it('extracts private source provenance from a valid envelope', () => {
+    const raw = JSON.stringify({
+      reply: 'Roads made moving people and goods easier.',
+      signals: {
+        partial_progress: false,
+        needs_deepening: false,
+        understanding_check: false,
+      },
+      ui_hints: { note_prompt: { show: false, post_session: false } },
+      private_sources: {
+        relied_on: ['current_topic'],
+        insufficient: false,
+        reason: 'The current topic describes Roman roads and trade.',
+      },
+    });
+
+    const result = parseExchangeEnvelope(raw, ctx);
+
+    expect(result.privateSources).toEqual({
+      relied_on: ['current_topic'],
+      insufficient: false,
+      reason: 'The current topic describes Roman roads and trade.',
+    });
+  });
+});
+
+describe('source provenance audit', () => {
+  const evidence = buildExchangeSourceEvidence(
+    {
+      ...baseContext,
+      topicTitle: 'Roman roads and empire trade',
+      topicDescription:
+        'How Roman roads helped armies, towns, and trade stay connected.',
+    },
+    'Give me a quick example with Rome.',
+  );
+
+  it('passes when the model relies on an available reliable source', () => {
+    const audit = auditExchangeSources(
+      { relied_on: ['current_topic'], insufficient: false },
+      evidence,
+    );
+
+    expect(audit.status).toBe('ok');
+    expect(audit.reliableReliedOnSourceIds).toEqual(['current_topic']);
+  });
+
+  it('fails when the model invents a source id', () => {
+    const audit = auditExchangeSources(
+      { relied_on: ['forum_post_123'], insufficient: false },
+      evidence,
+    );
+
+    expect(audit.status).toBe('unsupported_sources');
+    expect(audit.unsupportedSourceIds).toEqual(['forum_post_123']);
+  });
+
+  it('fails when the model relies only on memory for factual support', () => {
+    const audit = auditExchangeSources(
+      { relied_on: ['mentor_memory'], insufficient: false },
+      [
+        {
+          id: 'mentor_memory',
+          kind: 'mentor_memory',
+          reliability: 'memory_only',
+          label: 'Mentor memory',
+          reliableForFacts: false,
+        },
+      ],
+    );
+
+    expect(audit.status).toBe('missing_reliable_source');
+    expect(audit.reliableReliedOnSourceIds).toEqual([]);
+  });
+
+  it('infers current_topic for audit when a setup reply explicitly names the loaded topic', () => {
+    const sourceEvidence = buildExchangeSourceEvidence(
+      {
+        ...baseContext,
+        topicTitle: 'Cells as the basic unit of life',
+        topicDescription:
+          'Cells are the smallest living unit and use inputs to make energy.',
+      },
+      'I am ready to review Cells as the basic unit of life.',
+    );
+
+    const inferred = inferObviousReliableSourceForAudit(
+      {
+        relied_on: ['learner_message'],
+        insufficient: false,
+        reason: 'The reply used learner intent.',
+      },
+      sourceEvidence,
+      'Today we are going to review Cells as the basic unit of life. What do you remember?',
+    );
+    const audit = auditExchangeSources(inferred, sourceEvidence);
+
+    expect(inferred?.relied_on).toContain('current_topic');
+    expect(inferred?.reason).toMatch(/Server inferred current_topic/i);
+    expect(audit.status).toBe('ok');
+    expect(audit.reliableReliedOnSourceIds).toEqual(['current_topic']);
+  });
+
+  it('records an intentional insufficient-source outcome', () => {
+    const audit = auditExchangeSources(
+      {
+        relied_on: ['learner_message'],
+        insufficient: true,
+        reason: 'Learner asked for a factual answer without source material.',
+      },
+      buildExchangeSourceEvidence(baseContext, 'Tell me why Atlantis sank.'),
+    );
+
+    expect(audit.status).toBe('insufficient_reliable_sources');
+    expect(audit.insufficient).toBe(true);
+  });
+
+  it('replaces unsupported factual replies when no reliable source exists', () => {
+    const audit = auditExchangeSources(
+      { relied_on: ['learner_message'], insufficient: false },
+      buildExchangeSourceEvidence(
+        { ...baseContext, topicTitle: undefined, topicDescription: undefined },
+        'Tell me a historical fact without source material.',
+      ),
+    );
+
+    const safe = applySourceAuditSafetyFallback(
+      'Here is an unsupported historical claim.',
+      audit,
+    );
+
+    expect(safe.response).toMatch(/reliable source material/i);
+    expect(safe.sourceAudit.status).toBe('insufficient_reliable_sources');
+  });
+
+  it('replaces invented source citations when no reliable source exists', () => {
+    const audit = auditExchangeSources(
+      { relied_on: ['current_topic'], insufficient: false },
+      buildExchangeSourceEvidence(
+        { ...baseContext, topicTitle: undefined, topicDescription: undefined },
+        'Why did ancient civilizations trade?',
+      ),
+    );
+
+    const safe = applySourceAuditSafetyFallback(
+      'Ancient civilizations traded because of resources.',
+      audit,
+    );
+
+    expect(audit.status).toBe('unsupported_sources');
+    expect(safe.response).toMatch(/source-check question/i);
+    expect(safe.sourceAudit.status).toBe('insufficient_reliable_sources');
+    expect(safe.sourceAudit.unsupportedSourceIds).toEqual(['current_topic']);
+  });
+
+  it('standardizes intentional no-source replies into useful non-factual guidance', () => {
+    const audit = auditExchangeSources(
+      {
+        relied_on: ['learner_message'],
+        insufficient: true,
+        reason: 'No trusted history source was provided.',
+      },
+      buildExchangeSourceEvidence(
+        { ...baseContext, topicTitle: undefined, topicDescription: undefined },
+        'Was trade mostly about things civilizations lacked?',
+      ),
+    );
+
+    const safe = applySourceAuditSafetyFallback(
+      'Please share your source material.',
+      audit,
+    );
+
+    expect(safe.response).toMatch(/source-check question/i);
+    expect(safe.response).toMatch(/should not answer it from memory/i);
+    expect(safe.sourceAudit.reason).toMatch(/no-source safety fallback/i);
+  });
+
+  it('removes source-bound example terms that are not present in reliable source excerpts', () => {
+    const sourceEvidence = buildExchangeSourceEvidence(
+      {
+        ...baseContext,
+        topicTitle: 'Ancient trade and Rome',
+        topicDescription:
+          'Ancient civilizations traded surplus grain or pottery for metal tools.',
+      },
+      'Was trade mostly about things they lacked?',
+    );
+    const audit = auditExchangeSources(
+      { relied_on: ['current_topic'], insufficient: false },
+      sourceEvidence,
+    );
+
+    const safe = applySourceAuditSafetyFallback(
+      'Yes, getting goods they lacked was important. For example, they might trade for metal, spice, or baskets. They also traded surplus grain.',
+      audit,
+    );
+
+    expect(safe.response).not.toMatch(/\bspice\b/i);
+    expect(safe.response).not.toMatch(/\bbaskets?\b/i);
+    expect(safe.response).toContain('They also traded surplus grain.');
+    expect(safe.sourceAudit.reason).toMatch(/unsupported source-bound phrase/i);
+  });
+
+  it('removes unsupported land details from source-thin explanations', () => {
+    const sourceEvidence = buildExchangeSourceEvidence(
+      {
+        ...baseContext,
+        topicTitle: 'Ancient trade and Rome',
+        topicDescription:
+          'Ancient civilizations traded surplus grain or pottery for metal tools.',
+      },
+      'Can you explain it from scratch?',
+    );
+    const audit = auditExchangeSources(
+      { relied_on: ['current_topic'], insufficient: false },
+      sourceEvidence,
+    );
+
+    const safe = applySourceAuditSafetyFallback(
+      'A place might have rich soil for growing grain. Ancient civilizations traded surplus grain for metal tools.',
+      audit,
+    );
+
+    expect(safe.response).not.toMatch(/rich soil|soil/i);
+    expect(safe.response).toContain('surplus grain for metal tools');
+    expect(safe.sourceAudit.reason).toMatch(/unsupported land\/soil detail/i);
+  });
+
+  it('removes unsupported brick and house analogies from short source replies', () => {
+    const sourceEvidence = buildExchangeSourceEvidence(
+      {
+        ...baseContext,
+        topicTitle: 'Ancient trade and Rome',
+        topicDescription:
+          'Ancient civilizations traded surplus grain or pottery for metal tools.',
+      },
+      'Can you explain it from scratch?',
+    );
+    const audit = auditExchangeSources(
+      { relied_on: ['current_topic'], insufficient: false },
+      sourceEvidence,
+    );
+
+    const safe = applySourceAuditSafetyFallback(
+      'Imagine building a house from bricks. Ancient civilizations traded surplus grain for metal tools.',
+      audit,
+    );
+
+    expect(safe.response).not.toMatch(/\bhouse\b|\bbricks?\b/i);
+    expect(safe.response).toContain('surplus grain for metal tools');
+    expect(safe.sourceAudit.reason).toMatch(/brick\/house analogy/i);
+  });
+
+  it('removes unsupported building-block analogies from review replies', () => {
+    const sourceEvidence = buildExchangeSourceEvidence(
+      {
+        ...baseContext,
+        topicTitle: 'Cells as the basic unit of life',
+        topicDescription:
+          'Cells are the smallest living unit and use inputs to make energy.',
+      },
+      'So cells use inputs to make energy?',
+    );
+    const audit = auditExchangeSources(
+      { relied_on: ['current_topic'], insufficient: false },
+      sourceEvidence,
+    );
+
+    const safe = applySourceAuditSafetyFallback(
+      'Cells use inputs to make energy. This means they are the fundamental building blocks for life.',
+      audit,
+    );
+
+    expect(safe.response).toContain('Cells use inputs to make energy.');
+    expect(safe.response).not.toMatch(/building blocks?|fundamental piece/i);
+    expect(safe.sourceAudit.reason).toMatch(/building-block analogy/i);
+  });
+
+  it('removes review follow-up phrases that are not present in reliable source excerpts', () => {
+    const sourceEvidence = buildExchangeSourceEvidence(
+      {
+        ...baseContext,
+        topicTitle: 'Cells as the basic unit of life',
+        topicDescription:
+          'A cell is the basic unit of life. It uses inputs to make energy.',
+      },
+      'So cells use inputs to make energy?',
+    );
+    const audit = auditExchangeSources(
+      { relied_on: ['current_topic'], insufficient: false },
+      sourceEvidence,
+    );
+
+    const safe = applySourceAuditSafetyFallback(
+      'You got the energy part. What does that tell us about what a cell can do on its own?',
+      audit,
+    );
+
+    expect(safe.response).toBe('A cell is the basic unit of life.');
+    expect(safe.response).not.toMatch(/can do on its own|what a cell can do/i);
+    expect(safe.sourceAudit.reason).toMatch(/cell autonomy phrase/i);
+  });
+
+  it('does not treat ordinary algebra wording as a biology source drift', () => {
+    const sourceEvidence = buildExchangeSourceEvidence(
+      {
+        ...baseContext,
+        sessionType: 'homework',
+        topicTitle: undefined,
+        topicDescription: undefined,
+        rawInput: 'Solve 3x + 5 = 20.',
+      },
+      'How do I start?',
+    );
+    const audit = auditExchangeSources(
+      {
+        relied_on: ['homework_problem', 'deterministic_reasoning'],
+        insufficient: false,
+      },
+      sourceEvidence,
+    );
+
+    const safe = applySourceAuditSafetyFallback(
+      'The goal is to get x all by itself. Start by subtracting 5 from both sides.',
+      audit,
+    );
+
+    expect(safe.response).toContain('get x all by itself');
+    expect(safe.sourceAudit.reason ?? '').not.toMatch(/cell autonomy phrase/i);
+  });
+
+  it('removes unsupported speed claims from current-topic replies', () => {
+    const sourceEvidence = buildExchangeSourceEvidence(
+      {
+        ...baseContext,
+        topicTitle: 'Roman roads and empire trade',
+        topicDescription:
+          'Roman roads helped armies move between places, connected towns, and made trade easier across the empire.',
+      },
+      'Please start teaching me from the beginning.',
+    );
+    const audit = auditExchangeSources(
+      { relied_on: ['current_topic'], insufficient: false },
+      sourceEvidence,
+    );
+
+    const safe = applySourceAuditSafetyFallback(
+      'Roman roads were special pathways built long ago. Roman roads helped armies move between places. This made it easier for the Roman military to travel.',
+      audit,
+    );
+
+    expect(safe.response).toContain(
+      'Roman roads helped armies move between places.',
+    );
+    expect(safe.response).not.toMatch(/special pathways|built long ago/i);
+    expect(safe.response).not.toMatch(/easier|military/i);
+    expect(safe.sourceAudit.reason).toMatch(/army speed\/ease\/effectiveness/i);
+    expect(safe.sourceAudit.reason).toMatch(/unsupported historical framing/i);
+  });
+
+  it('falls back to reliable source text when scrubbing leaves a too-thin reply', () => {
+    const sourceEvidence = buildExchangeSourceEvidence(
+      {
+        ...baseContext,
+        topicTitle: 'Roman roads and empire trade',
+        topicDescription:
+          'Roman roads helped armies move between places, connected towns, and made trade easier across the empire.',
+      },
+      'Please start teaching me from the beginning.',
+    );
+    const audit = auditExchangeSources(
+      { relied_on: ['current_topic'], insufficient: false },
+      sourceEvidence,
+    );
+
+    const safe = applySourceAuditSafetyFallback(
+      'Roman roads were important. This made it easier for the Roman military to travel.',
+      audit,
+    );
+
+    expect(safe.response).toBe(
+      'Roman roads helped armies move between places, connected towns, and made trade easier across the empire.',
+    );
+  });
+
+  it('removes unsupported conquest confirmations from current-topic replies', () => {
+    const sourceEvidence = buildExchangeSourceEvidence(
+      {
+        ...baseContext,
+        topicTitle: 'Roman roads and empire trade',
+        topicDescription:
+          'Roman roads helped armies move between places, connected towns, and made trade easier across the empire.',
+      },
+      'I think empires grow mostly by conquering land. Is that the main idea?',
+    );
+    const audit = auditExchangeSources(
+      { relied_on: ['current_topic'], insufficient: false },
+      sourceEvidence,
+    );
+
+    const safe = applySourceAuditSafetyFallback(
+      'That is an idea about how empires might grow. It is true that empires can grow by conquering land. The source says Roman roads helped armies and trade move between places.',
+      audit,
+    );
+
+    expect(safe.response).toContain(
+      'The source says Roman roads helped armies and trade move between places.',
+    );
+    expect(safe.response).not.toMatch(/conquer|empires (?:can|might) grow/i);
+    expect(safe.sourceAudit.reason).toMatch(/conquest\/empire growth/i);
+  });
+
+  it('adds recitation_text as a reliable source for wording feedback', () => {
+    const sourceEvidence = buildExchangeSourceEvidence(
+      { ...baseContext, topicTitle: undefined, effectiveMode: 'recitation' },
+      'Roman roads connected towns.',
+    );
+
+    expect(sourceEvidence).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'recitation_text',
+          reliableForFacts: true,
+          reliability: 'learner_provided',
+        }),
+      ]),
+    );
+  });
+
+  it('allows recitation turns to cite conversation continuity without treating it as factual support', () => {
+    const sourceEvidence = buildExchangeSourceEvidence(
+      {
+        ...baseContext,
+        topicTitle: undefined,
+        effectiveMode: 'recitation',
+        exchangeHistory: [
+          {
+            role: 'user',
+            content: 'Roman roads helped armies travel.',
+          },
+        ],
+      },
+      'Give me a polished version.',
+    );
+
+    expect(sourceEvidence).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'conversation_history',
+          reliableForFacts: false,
+          reliability: 'conversation_only',
+        }),
+      ]),
+    );
+
+    const audit = auditExchangeSources(
+      {
+        relied_on: ['recitation_text', 'conversation_history'],
+        insufficient: false,
+      },
+      sourceEvidence,
+    );
+
+    expect(audit.status).toBe('ok');
+    expect(audit.reliableReliedOnSourceIds).toEqual(['recitation_text']);
   });
 });
 

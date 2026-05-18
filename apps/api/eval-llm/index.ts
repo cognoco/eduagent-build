@@ -36,6 +36,7 @@ import { topicIntentMatcherFlow } from './flows/topic-intent-matcher';
 import { probesFlow } from './flows/probes';
 import { bookSuggestionRegenerationFlow } from './flows/book-suggestion-regeneration';
 import { progressSummaryFlow } from './flows/progress-summary';
+import { assessmentEvaluationFlow } from './flows/assessment-evaluation';
 import {
   listFlows,
   parseCliArgs,
@@ -86,6 +87,7 @@ const FLOWS: FlowDefinition[] = [
   probesFlow as FlowDefinition,
   bookSuggestionRegenerationFlow as FlowDefinition,
   progressSummaryFlow as FlowDefinition,
+  assessmentEvaluationFlow as FlowDefinition,
 ];
 
 async function main(): Promise<void> {

@@ -14,6 +14,7 @@
     "test:api:integration": "C:/Tools/doppler/doppler.exe run -- jest --config apps/api/jest.config.cjs --no-coverage --runInBand",
     "test:mobile:unit": "jest --config apps/mobile/jest.config.cjs --runInBand --forceExit",
     "test:coverage": "nx run-many -t test --coverage",
+    "test:llm:enduser": "C:/Tools/doppler/doppler.exe run -c stg -- pnpm exec tsx scripts/enduser-session-pass.ts",
     "lint": "nx run-many -t lint",
     "format:check": "nx run-many -t format:check",
     "format:write": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,scss,html}\"",

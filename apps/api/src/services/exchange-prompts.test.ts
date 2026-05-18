@@ -179,7 +179,168 @@ describe('buildSystemPrompt — scope-boundary app-help exception', () => {
   });
 });
 
+describe('buildSystemPrompt — response envelope contract', () => {
+  it('makes the JSON-only shape explicit to reduce provider drift', () => {
+    const prompt = buildSystemPrompt(makeContext());
+
+    expect(prompt).toContain('Reply with ONLY valid JSON');
+    expect(prompt).toContain('must begin with `{` and end with `}`');
+    expect(prompt).toContain('Do not wrap it in markdown fences');
+    expect(prompt).toContain('avoid raw double quote characters');
+    expect(prompt).toContain('write `+5` or plus 5, not "+5"');
+  });
+
+  it('requires private source provenance in the envelope', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        topicTitle: 'Photosynthesis',
+        topicDescription: 'How plants turn sunlight into usable energy.',
+      }),
+    );
+
+    expect(prompt).toContain('PRIVATE SOURCE CONTRACT');
+    expect(prompt).toContain('private_sources');
+    expect(prompt).toContain('relied_on');
+    expect(prompt).toContain('current_topic');
+    expect(prompt).toContain('applies to every subject, session mode');
+    expect(prompt).toContain('reliable_for_facts="true"');
+    expect(prompt).toContain('never show it, source IDs');
+    expect(prompt).toContain('Treat each source excerpt as a boundary');
+    expect(prompt).toContain(
+      'do not confirm it as true. Acknowledge it as their idea',
+    );
+    expect(prompt).toContain('Unsupported learner claims need neutral');
+    expect(prompt).toContain('a good observation');
+    expect(prompt).toContain('interesting idea');
+    expect(prompt).toContain('good point');
+    expect(prompt).toContain('definitely');
+    expect(prompt).toContain('The part our source supports is X');
+    expect(prompt).toContain('FINAL GROUNDING CHECK');
+    expect(prompt).toContain(
+      'does not support extra claims like conquering land',
+    );
+    expect(prompt).toContain('It does not license unstated causes');
+    expect(prompt).toContain('empire growth');
+    expect(prompt).toContain('do not invent examples or analogies');
+    expect(prompt).toContain('Delete risky words');
+    expect(prompt).toContain('yummy');
+    expect(prompt).toContain('FINAL OUTPUT FILTER');
+    expect(prompt).toContain('Do not start with "Yes"');
+    expect(prompt).toContain('do not add analogies');
+    expect(prompt).toContain('include that exact reliable source ID');
+    expect(prompt).toContain(
+      'For current-topic teaching, review, quizzes, or next-practice tasks, include "current_topic"',
+    );
+    expect(prompt).toContain(
+      'Never cite source IDs that are not present in the <source_pack>',
+    );
+  });
+
+  it('requires first learning turns to teach source content before checking', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        topicTitle: 'Roman roads and empire trade',
+        topicDescription:
+          'Roman roads helped armies move between places, connected towns, and made trade easier across the empire.',
+      }),
+    );
+
+    expect(prompt).toContain('first teaching turn');
+    expect(prompt).toContain(
+      'at least two source-supported facts or relationships',
+    );
+    expect(prompt).toContain('Do not reduce the opener to "X is important"');
+  });
+
+  it('does not allow memory or conversation history as factual evidence', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        sourceEvidence: [
+          {
+            id: 'mentor_memory',
+            kind: 'mentor_memory',
+            reliability: 'memory_only',
+            label: 'Mentor memory',
+            excerpt: 'Learner once mentioned liking space.',
+            reliableForFacts: false,
+          },
+        ],
+      }),
+    );
+
+    expect(prompt).toContain('mentor_memory');
+    expect(prompt).toContain('reliable_for_facts="false"');
+    expect(prompt).toMatch(/Conversation history, mentor memory/i);
+    expect(prompt).toMatch(/NOT evidence for factual teaching claims/i);
+  });
+});
+
+describe('buildSystemPrompt — homework brevity', () => {
+  it('caps youth help-me turns so first homework help stays chat-sized', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        sessionType: 'homework',
+        homeworkMode: 'help_me',
+      }),
+    );
+
+    expect(prompt).toContain('Hard cap: stay under about 120 words');
+    expect(prompt).toContain(
+      'show only the next move or a tiny similar example',
+    );
+    expect(prompt).toContain('Do not give a full step-by-step worked example');
+  });
+
+  it('keeps check-answer examples tiny instead of launching a full lesson', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        sessionType: 'homework',
+        homeworkMode: 'check_answer',
+      }),
+    );
+
+    expect(prompt).toContain('keep it tiny');
+    expect(prompt).toContain('one setup line and the key correction step only');
+  });
+});
+
 describe('buildSystemPrompt — no-recall recovery', () => {
+  it('sets a higher bar for concrete next practice and specific feedback', () => {
+    const prompt = buildSystemPrompt(makeContext());
+
+    expect(prompt).toContain('what to practice next');
+    expect(prompt).toContain('stay on the current topic');
+    expect(prompt).toContain('cite current_topic privately');
+    expect(prompt).toContain('concrete task they can do in one sentence');
+    expect(prompt).toContain('Practice by');
+    expect(prompt).toContain('source-supported part');
+    expect(prompt).toContain('do not affirm the whole answer');
+    expect(prompt).toContain('do not send them to a future topic title');
+    expect(prompt).toContain(
+      'Do not end with a vague "what are your thoughts?"',
+    );
+    expect(prompt).toContain('Avoid generic praise words');
+    expect(prompt).toContain('Name the specific reasoning instead');
+    expect(prompt).toContain('Avoid overheated intensifiers');
+    expect(prompt).toContain('"Good question!"');
+  });
+
+  it('asks homework mistake-watch replies to include a self-check', () => {
+    const prompt = buildSystemPrompt(makeContext({ sessionType: 'homework' }));
+
+    expect(prompt).toContain('what mistake to watch for');
+    expect(prompt).toContain(
+      'one concrete mistake and one concrete self-check',
+    );
+    expect(prompt).toContain('substitute x back in');
+
+    const helpPrompt = buildSystemPrompt(
+      makeContext({ sessionType: 'homework', homeworkMode: 'help_me' }),
+    );
+    expect(helpPrompt).toContain('Self-check:');
+    expect(helpPrompt).toContain('Do not ask a conceptual follow-up');
+  });
+
   it('adds global no-recall recovery guidance to ordinary learning prompts', () => {
     const prompt = buildSystemPrompt(makeContext());
 
@@ -197,9 +358,36 @@ describe('buildSystemPrompt — no-recall recovery', () => {
       }),
     );
 
-    expect(prompt).toContain('Session type: REVIEW');
+    expect(prompt).toContain('REVIEW OVERRIDE');
     expect(prompt).toContain('do NOT keep asking them to recall');
     expect(prompt).toContain('ask one smaller supported check');
+    expect(prompt).toContain("Use the learner's partial answer as the anchor");
+    expect(prompt).toContain('what they got and what is still missing');
+    expect(prompt).toContain('REVIEW SOURCE DISCIPLINE');
+    expect(prompt).toContain('cloze-style prompt from the source wording');
+    expect(prompt).toContain('molecule, atom, protein');
+    expect(prompt).toContain('"can do on its own"');
+    expect(prompt).toContain('REVIEW OVERRIDE');
+    expect(prompt).toContain('REVIEW FINAL CHECK BEFORE REPLY');
+    expect(prompt).toContain('source-wording cloze check');
+    expect(prompt).toContain('Cells use inputs to make ____');
+    expect(prompt).toContain('never ask what a cell can do on its own');
+  });
+
+  it('keeps challenge verification sections out of review mode', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        effectiveMode: 'review',
+        verificationType: 'evaluate',
+        topicTitle: 'Cells as the basic unit of life',
+        exchangeCount: 2,
+      }),
+    );
+
+    expect(prompt).toContain('REVIEW OVERRIDE');
+    expect(prompt).not.toContain("Devil's Advocate");
+    expect(prompt).not.toContain('Quick check');
+    expect(prompt).not.toContain('Some scientists claim');
   });
 
   it('protects interleaved retrieval from repeated empty-memory testing', () => {
@@ -219,6 +407,32 @@ describe('buildSystemPrompt — no-recall recovery', () => {
     expect(prompt).toContain('Session type: RECITATION PRACTICE');
     expect(prompt).toContain('give a small starting cue');
     expect(prompt).not.toContain('NO-RECALL RECOVERY');
+  });
+
+  it('keeps text recitation feedback scoped to wording, not heard delivery', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({ effectiveMode: 'recitation', inputMode: 'text' }),
+    );
+
+    expect(prompt).toContain('Because this is text input');
+    expect(prompt).toContain('Comment only on wording');
+    expect(prompt).toContain('do NOT claim to hear pace');
+    expect(prompt).toContain(
+      'one concrete strength and one concrete improvement',
+    );
+    expect(prompt).toContain('prefer one clean sentence');
+    expect(prompt).toContain('Do not add new adjectives');
+    expect(prompt).toContain('On setup/readiness turns');
+  });
+
+  it('allows delivery feedback only for voice recitation', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({ effectiveMode: 'recitation', inputMode: 'voice' }),
+    );
+
+    expect(prompt).toContain('Because this is voice input');
+    expect(prompt).toContain('pace, confidence, expression');
+    expect(prompt).not.toContain('do NOT claim to hear pace');
   });
 
   it('makes continuation scoring re-teach after low recall', () => {
@@ -262,6 +476,7 @@ describe('buildSystemPrompt — first-encounter topic probe', () => {
     expect(prompt).toContain(
       'one teaching nugget AND one focused follow-up question',
     );
+    expect(prompt).toContain('confirm only source-supported facts');
     expect(prompt).toContain('end with exactly one focused follow-up question');
     expect(prompt).not.toContain('end with exactly one learner action');
     expect(prompt).toContain(

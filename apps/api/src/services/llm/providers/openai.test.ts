@@ -68,6 +68,19 @@ describe('OpenAI Provider', () => {
       expect(body.max_completion_tokens).toBe(4096);
     });
 
+    it('requests JSON object mode when responseFormat is json', async () => {
+      mockFetch.mockResolvedValueOnce(createOkResponse('{"reply":"Hello"}'));
+
+      await provider.chat(TEST_MESSAGES, {
+        ...TEST_CONFIG,
+        responseFormat: 'json',
+      });
+
+      const [, opts] = mockFetch.mock.calls[0];
+      const body = JSON.parse(opts.body);
+      expect(body.response_format).toEqual({ type: 'json_object' });
+    });
+
     it('throws on non-2xx response', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
@@ -76,7 +89,7 @@ describe('OpenAI Provider', () => {
       });
 
       await expect(provider.chat(TEST_MESSAGES, TEST_CONFIG)).rejects.toThrow(
-        'OpenAI API request failed (429): Rate limited'
+        'OpenAI API request failed (429): Rate limited',
       );
     });
 
@@ -90,7 +103,7 @@ describe('OpenAI Provider', () => {
       });
 
       await expect(provider.chat(TEST_MESSAGES, TEST_CONFIG)).rejects.toThrow(
-        'OpenAI API error: Invalid model'
+        'OpenAI API error: Invalid model',
       );
     });
 
@@ -102,7 +115,7 @@ describe('OpenAI Provider', () => {
       });
 
       await expect(provider.chat(TEST_MESSAGES, TEST_CONFIG)).rejects.toThrow(
-        'OpenAI returned empty response'
+        'OpenAI returned empty response',
       );
     });
 
@@ -122,7 +135,7 @@ describe('OpenAI Provider', () => {
       });
 
       await expect(provider.chat(TEST_MESSAGES, TEST_CONFIG)).rejects.toThrow(
-        'OpenAI returned empty response'
+        'OpenAI returned empty response',
       );
     });
   });
@@ -132,14 +145,14 @@ describe('OpenAI Provider', () => {
       const body = createSseStream(
         'data: {"choices":[{"delta":{"content":"Hello"}}]}',
         'data: {"choices":[{"delta":{"content":" world"}}]}',
-        'data: [DONE]'
+        'data: [DONE]',
       );
       mockFetch.mockResolvedValueOnce({ ok: true, status: 200, body });
 
       const chunks: string[] = [];
       for await (const chunk of provider.chatStream(
         TEST_MESSAGES,
-        TEST_CONFIG
+        TEST_CONFIG,
       )) {
         chunks.push(chunk);
       }
@@ -158,7 +171,7 @@ describe('OpenAI Provider', () => {
       await expect(async () => {
         for await (const chunk of provider.chatStream(
           TEST_MESSAGES,
-          TEST_CONFIG
+          TEST_CONFIG,
         )) {
           chunks.push(chunk);
         }
@@ -176,7 +189,7 @@ describe('OpenAI Provider', () => {
       await expect(async () => {
         for await (const chunk of provider.chatStream(
           TEST_MESSAGES,
-          TEST_CONFIG
+          TEST_CONFIG,
         )) {
           chunks.push(chunk);
         }
@@ -188,14 +201,14 @@ describe('OpenAI Provider', () => {
         'data: {"choices":[{"delta":{"content":"ok"}}]}',
         'data: {not valid json}',
         'data: {"choices":[{"delta":{"content":"!"}}]}',
-        'data: [DONE]'
+        'data: [DONE]',
       );
       mockFetch.mockResolvedValueOnce({ ok: true, status: 200, body });
 
       const chunks: string[] = [];
       for await (const chunk of provider.chatStream(
         TEST_MESSAGES,
-        TEST_CONFIG
+        TEST_CONFIG,
       )) {
         chunks.push(chunk);
       }
@@ -207,14 +220,14 @@ describe('OpenAI Provider', () => {
       const body = createSseStream(
         'data: {"choices":[{"delta":{}}]}',
         'data: {"choices":[{"delta":{"content":"hi"}}]}',
-        'data: [DONE]'
+        'data: [DONE]',
       );
       mockFetch.mockResolvedValueOnce({ ok: true, status: 200, body });
 
       const chunks: string[] = [];
       for await (const chunk of provider.chatStream(
         TEST_MESSAGES,
-        TEST_CONFIG
+        TEST_CONFIG,
       )) {
         chunks.push(chunk);
       }
@@ -229,7 +242,7 @@ describe('OpenAI Provider', () => {
       const chunks: string[] = [];
       for await (const chunk of provider.chatStream(
         TEST_MESSAGES,
-        TEST_CONFIG
+        TEST_CONFIG,
       )) {
         chunks.push(chunk);
       }
@@ -275,7 +288,7 @@ describe('OpenAI Provider', () => {
       const body = JSON.parse(mockFetch.mock.calls[0][1].body);
       expect(body.model).toBe('gpt-4o-mini');
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('gemini-3.0-flash')
+        expect.stringContaining('gemini-3.0-flash'),
       );
       warnSpy.mockRestore();
     });

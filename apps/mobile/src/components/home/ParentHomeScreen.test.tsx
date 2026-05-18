@@ -335,35 +335,33 @@ describe('ParentHomeScreen', () => {
     expect(
       screen.queryByText('Emma: What made Fractions click today?'),
     ).toBeNull();
-    const promptStyles = [
+    const promptCardStyles = [
       resolvedStyle('parent-home-tonight-child-a-primary'),
       resolvedStyle('parent-home-tonight-child-a-trickiest'),
       resolvedStyle('parent-home-tonight-child-a-tomorrow'),
     ];
-    promptStyles.forEach((style) => {
+    promptCardStyles.forEach((style) => {
       expect(style).toEqual(
         expect.objectContaining({
           borderWidth: 1,
-          borderLeftWidth: 5,
-          backgroundColor: '#ffffff',
+          borderRadius: 18,
           elevation: 2,
-          minHeight: 78,
-          shadowOpacity: 0.12,
+          minHeight: 82,
+          shadowOpacity: 0.1,
         }),
       );
+      expect(style.backgroundColor).toEqual(expect.stringContaining('rgba('));
     });
-    expect(new Set(promptStyles.map((style) => style.borderColor)).size).toBe(
-      3,
-    );
+    expect(
+      new Set(promptCardStyles.map((style) => style.borderColor)).size,
+    ).toBe(3);
+    expect(
+      screen.getByTestId('parent-home-tonight-child-a-primary').props
+        .accessibilityRole,
+    ).toBeUndefined();
     screen.getByText('Fractions · 18 min this week');
     screen.getByText('Emma · 18 min this week');
     screen.getByText('2 of 5 profiles used');
-
-    fireEvent.press(screen.getByTestId('parent-home-tonight-child-a-primary'));
-    expect(mockPush).toHaveBeenLastCalledWith({
-      pathname: '/(app)/child/[profileId]',
-      params: { profileId: 'child-a', mode: 'progress' },
-    });
   });
 
   it('includes the parent in the family summary when they have been learning', async () => {
