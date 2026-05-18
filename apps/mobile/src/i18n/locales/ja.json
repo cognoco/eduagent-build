@@ -999,6 +999,13 @@
     },
     "bookmarkCard": {
       "accessibilityLabel": "保存したブックマークを開く: {{title}}"
+    },
+    "topic": {
+      "bookmarks": {
+        "savedFromChat": "チャットから保存",
+        "emptyShort": "このトピックで保存されたチャットはまだありません",
+        "emptyLong": "このトピックで保存された説明はまだありません。"
+      }
     }
   },
   "topic": {

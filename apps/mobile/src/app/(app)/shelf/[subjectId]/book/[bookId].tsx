@@ -228,6 +228,7 @@ export default function BookScreen() {
   const [showBookCompletionBurst, setShowBookCompletionBurst] = useState(false);
   const [isExpandingThinTopicList, setIsExpandingThinTopicList] =
     useState(false);
+  const thinTopicExpansionAttemptedBookIds = useRef<Set<string>>(new Set());
   const wasBookComplete = useRef<boolean | null>(null);
   const [editingNote, setEditingNote] = useState<{
     noteId: string;
@@ -615,7 +616,24 @@ export default function BookScreen() {
     wasBookComplete.current = isBookComplete;
   }, [isBookComplete]);
 
-  const showThinBookSetup = activeTopics.length === 1 && !isBookComplete;
+  const shouldAutoExpandThinTopicList =
+    activeTopics.length === 1 && !isBookComplete;
+
+  useEffect(() => {
+    if (!shouldAutoExpandThinTopicList || isReadOnly || !bookId) return;
+    if (thinTopicExpansionAttemptedBookIds.current.has(bookId)) return;
+    if (isExpandingThinTopicList || generateMutation.isPending) return;
+
+    thinTopicExpansionAttemptedBookIds.current.add(bookId);
+    handleExpandThinTopicList();
+  }, [
+    bookId,
+    generateMutation.isPending,
+    handleExpandThinTopicList,
+    isExpandingThinTopicList,
+    isReadOnly,
+    shouldAutoExpandThinTopicList,
+  ]);
 
   const continueNowTopic = useMemo(() => {
     if (!continueNowTopicId) {
@@ -1515,34 +1533,6 @@ export default function BookScreen() {
                 Set up this book
               </Text>
             </Pressable>
-          </View>
-        ) : null}
-
-        {showThinBookSetup && !isReadOnly ? (
-          <View className="px-5 mb-4" testID="book-thin-path-card">
-            <View className="rounded-card border border-border bg-surface-elevated p-4">
-              <Text className="mb-1 text-body font-semibold text-text-primary">
-                Create a fuller topic list
-              </Text>
-              <Text className="mb-3 text-body-sm text-text-secondary">
-                This book only has one starting topic. Set up a clear sequence
-                before you study it.
-              </Text>
-              <Pressable
-                onPress={handleExpandThinTopicList}
-                disabled={isExpandingThinTopicList}
-                className="min-h-[44px] items-center justify-center rounded-button bg-primary px-5 py-3"
-                testID="book-thin-path-build"
-                accessibilityRole="button"
-                accessibilityLabel="Set up topic list"
-              >
-                <Text className="text-body-sm font-semibold text-text-inverse">
-                  {isExpandingThinTopicList
-                    ? 'Setting up...'
-                    : 'Set up topic list'}
-                </Text>
-              </Pressable>
-            </View>
           </View>
         ) : null}
 

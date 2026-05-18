@@ -19,7 +19,10 @@ import {
   processMessage,
   startSession,
 } from '../apps/api/src/services/session/index';
-import type { ExchangeSourceAudit } from '../apps/api/src/services/exchanges';
+import type {
+  ExchangeSourceAudit,
+  FluencyDrillAnnotation,
+} from '../apps/api/src/services/exchanges';
 import {
   _clearProviders,
   createAnthropicProvider,
@@ -33,7 +36,13 @@ import {
   type SeedScenario,
 } from '../apps/api/src/services/test-seed';
 
-type Mode = 'freeform' | 'learning' | 'homework' | 'review' | 'recitation';
+type Mode =
+  | 'freeform'
+  | 'learning'
+  | 'homework'
+  | 'review'
+  | 'recitation'
+  | 'four-strands';
 type IssueMode = Mode | 'run';
 type AccommodationMode = 'none' | 'short-burst' | 'audio-first' | 'predictable';
 type TeachingMethod =
@@ -65,6 +74,7 @@ interface LearnerProfileVariant {
   supportProfile: string;
   accommodationMode: AccommodationMode;
   teachingPreference?: TeachingMethod;
+  nativeLanguage?: string;
   analogyDomain?:
     | 'cooking'
     | 'sports'
@@ -106,6 +116,7 @@ interface TurnResult {
   envelopeParseFailed?: boolean;
   envelopeParseFailureReason?: string;
   sourceAudit?: ExchangeSourceAudit;
+  fluencyDrill?: FluencyDrillAnnotation;
   qualityIssues: QualityIssue[];
   durationMs: number;
 }
@@ -192,6 +203,18 @@ const learnerProfiles = {
     teachingPreference: 'practice_problems',
     communicationNotes: [
       'Prefers concise feedback and a model answer to practice',
+    ],
+  },
+  languageFourStrands: {
+    id: 'language-four-strands',
+    label: 'older teen / four-strands language learner',
+    age: 17,
+    supportProfile: 'language-four-strands',
+    accommodationMode: 'none',
+    teachingPreference: 'practice_problems',
+    nativeLanguage: 'English',
+    communicationNotes: [
+      'Wants direct correction, useful input, target-language output, and brisk fluency practice',
     ],
   },
 } satisfies Record<string, LearnerProfileVariant>;
@@ -337,6 +360,42 @@ const runDefinitions: RunDefinition[] = [
         message: 'Roman roads also helped trade move faster across the empire.',
       },
       { message: 'Give me one final polished version to try reciting.' },
+    ],
+  },
+  {
+    mode: 'four-strands',
+    scenario: 'language-subject-active',
+    learnerName: 'Maya',
+    learnerProfile: learnerProfiles.languageFourStrands,
+    sessionType: 'learning',
+    useTopic: true,
+    topicOverride: {
+      title: 'Spanish connectors for opinions',
+      description:
+        'Practice Spanish connectors for opinions: "en mi opinión" means "in my opinion", "porque" means "because", "pero" means "but", "y" means "and", and "entonces" means "then/so". Use them to build short connected sentences about studying.',
+    },
+    rawInput:
+      'Spanish practice using Four Strands: I need useful input, output practice, direct grammar correction, and a short fluency drill with connectors.',
+    turns: () => [
+      {
+        message:
+          'I want to practice Spanish connectors for giving opinions. Start with a tiny example I can understand.',
+      },
+      {
+        message: 'Mi opinión, estudiar es útil porque ayuda, pero es difícil.',
+      },
+      {
+        message:
+          'Can you explain the mistake quickly in English, then give me one retry sentence?',
+      },
+      {
+        message:
+          'En mi opinión, estudiar es útil porque ayuda, pero es difícil.',
+      },
+      {
+        message:
+          'Can we do a 30 second fluency drill with porque, pero, and entonces?',
+      },
     ],
   },
 ];
@@ -499,7 +558,7 @@ async function updateSeedProfile(
         subjectId,
         method: learnerProfile.teachingPreference,
         analogyDomain: learnerProfile.analogyDomain ?? null,
-        nativeLanguage: null,
+        nativeLanguage: learnerProfile.nativeLanguage ?? null,
         updatedAt: new Date(),
       })
       .onConflictDoUpdate({
@@ -507,7 +566,7 @@ async function updateSeedProfile(
         set: {
           method: learnerProfile.teachingPreference,
           analogyDomain: learnerProfile.analogyDomain ?? null,
-          nativeLanguage: null,
+          nativeLanguage: learnerProfile.nativeLanguage ?? null,
           updatedAt: new Date(),
         },
       });
@@ -573,8 +632,9 @@ const SEED_PLACEHOLDER_NAME_RE =
 const RECITATION_TEXT_DELIVERY_RE =
   /\b(delivery|pace|confidence|confident|expression|pronunciation)\b/i;
 const GENERIC_LEARNER_PRAISE_RE =
-  /\b(great job|nice work|nice one|great question|(?:really )?good question|great topic|great idea|great observation|great summary|good start|good grasp|nice,\s+[A-Z][a-z]+|you did a great job|you'?re (?:doing )?(?:amazing|awesome|fantastic|excellent)|(?:amazing|awesome|fantastic|excellent|great|nice) (?:work|job|answer|effort|reasoning|connection|observation|summary)|(?:your|that'?s|this is) (?:amazing|awesome|fantastic|excellent|great|nice))\b/i;
-const MALFORMED_CLEANUP_RE = /\bthat'?s a the\b/i;
+  /(?:\b(great job|nice work|nice one|great question|(?:really )?good question|great topic|great idea|great observation|great summary|good start|good grasp|nice,\s+[A-Z][a-z]+|bien hecho,\s+[A-Z][a-z]+|you did a great job|you'?re (?:doing )?(?:amazing|awesome|fantastic|excellent)|(?:amazing|awesome|fantastic|excellent|great|nice) (?:work|job|answer|effort|reasoning|connection|observation|summary)|(?:your|that'?s|this is) (?:amazing|awesome|fantastic|excellent|great|nice))\b|\b(?:nice|perfecto|perfect|bien hecho)[!,])/i;
+const MALFORMED_CLEANUP_RE =
+  /\bthat'?s a the\b|\bthat'?s\s+(?:there'?s|here'?s|so\b)|(?:^|\n)\s*that'?s\s*(?=\n|$)/i;
 const RECITATION_SETUP_PREMATURE_MODEL_RE =
   /\b(?:you could say|to actually recite|polished version|final version|model answer)\b/i;
 const OVERHEATED_STYLE_RE =
@@ -583,11 +643,13 @@ const CHILDISH_TONE_RE = /\b(yummy|kiddo)\b/i;
 const RECITATION_NO_WEAKNESS_RE =
   /\b(nothing (?:that )?sounded weak|wasn'?t anything (?:that )?sounded weak|there (?:was|is)n'?t anything weak|very clear and complete|all the way through)\b/i;
 const RECITATION_UNSUPPORTED_POLISH_RE =
-  /\b(?:armies|army)\s+(?:could\s+)?travel(?:ed|ing)?\s+quickly\b/i;
+  /\b(?:armies|army)\s+(?:could\s+)?travel(?:ed|ing)?\s+quickly\b|\btrade\b[^.?!]*\bfaster\b|\bfaster\b[^.?!]*\btrade\b/i;
 const LEARNING_UNSUPPORTED_CONQUEST_CONFIRM_RE =
   /\b(?:it'?s true[^.?!]*(?:empires?|conquer|conquering|expand)|you'?re right[^.?!]*conquer|(?:good observation|interesting (?:idea|thought))[^.?!]*empires? (?:can )?(?:grow|expand)|that'?s an idea about how empires? might grow|conquering (?:new )?land (?:can|might|may|could) be part|the idea of empires growing by conquering land is a part|empires? (?:can |could |might |may |often )?(?:grow|expand)[^.?!]*conquer|empires? often expand by conquering|conquer(?:ing|ed)? new (?:areas|land)|defend(?:ing)? (?:land|the land)|conquering land was (?:definitely|a big part|the main))\b/i;
 const LEARNING_UNSUPPORTED_SPEED_OR_TERRAIN_RE =
-  /\b(?:(?:arm(?:y|ies)|soldiers?|military)[^.?!]*(?:easy|easily|easier|more easily|quickly|faster|efficiently|more effectively|effectively)|(?:easy|easily|easier|more easily|quickly|faster|efficiently|more effectively|effectively)[^.?!]*(?:arm(?:y|ies)|soldiers?|military)|move(?: around)? quickly|quickly helped|faster|efficiently|more effectively|effectively|muddy?|paved path|forests?)\b/i;
+  /\b(?:(?:arm(?:y|ies)|soldiers?|military)[^.?!]*(?:quickly|faster|efficiently|more effectively|effectively)|(?:quickly|faster|efficiently|more effectively|effectively)[^.?!]*(?:arm(?:y|ies)|soldiers?|military)|move(?: around)? quickly|quickly helped|faster|efficiently|more effectively|effectively|muddy?|paved path|forests?)\b/i;
+const LEARNING_UNSUPPORTED_BROAD_EASE_RE =
+  /\b(?:made|make|makes|making)\s+(?:things|everything|life|it)\s+easier\s+for\s+(?:the\s+)?empire\b|\b(?:things|everything|life|it)\s+(?:easier)\s+for\s+(?:the\s+)?empire\b/i;
 const LEARNING_UNSUPPORTED_EMPIRE_GROWTH_RE =
   /\b(?:empires? (?:can |could |might |may |often )?(?:grow|expand)|empires? expand[^.?!]*(?:often|armies?|army|conquer)|often involves armies?|help(?:ed|s|ing)? the empire (?:grow|stay strong)|empire (?:can |could |might |may |often )?(?:grow|stay strong)|stay strong)\b/i;
 const CELL_AUTONOMY_SOURCE_BOUND_RE =
@@ -601,6 +663,17 @@ const CONCRETE_NEXT_PRACTICE_RE =
 const FUTURE_TOPIC_TITLE_RE =
   /\b(?:World History|Biology|Algebra) Topic \d+\b/i;
 const SELF_CHECK_RE = /\b(check|substitut|plug|back into|reverse|undo)\b/i;
+const FOUR_STRANDS_TARGET_LANGUAGE_RE =
+  /\b(?:en mi opini[oó]n|porque|pero|entonces|estudiar|[uú]til|dif[ií]cil)\b/i;
+const FOUR_STRANDS_SPANISH_EXAMPLE_RE =
+  /\b(?:en mi opini[oó]n|estudiar)\b[^.?!]*(?:porque|pero|entonces)|(?:porque|pero|entonces)[^.?!]*\b(?:en mi opini[oó]n|estudiar)\b/i;
+const FOUR_STRANDS_OUTPUT_PROMPT_RE =
+  /\b(?:try|retry|write|say|make|give me|your turn|repeat|answer)\b[^.?!]*(?:Spanish|sentence|frase|oraci[oó]n|porque|pero|entonces|en mi opini[oó]n)/i;
+const FOUR_STRANDS_CORRECTION_RE = /\ben mi opini[oó]n\b/i;
+const FOUR_STRANDS_EXPLAINS_EN_RE =
+  /\b(?:missing|need|needs|use|uses|add|adds)\b[^.?!]*\ben\b|\ben\b[^.?!]*(?:before|in front of|with)\s+(?:mi opini[oó]n|opini[oó]n)/i;
+const FOUR_STRANDS_FLUENCY_RE =
+  /\b(?:fluency|30\s*(?:second|s|sec)|timer|timed|as many|quick)\b/i;
 const LEARNING_SOURCE_POINT_RE = [
   /\barm(?:y|ies)\b[^.?!]*\bmove\b|\bmove\b[^.?!]*\barm(?:y|ies)\b/i,
   /\bconnect(?:ed|s|ing)?\b[^.?!]*\btowns?\b|\btowns?\b[^.?!]*\bconnect(?:ed|s|ing)?\b/i,
@@ -701,6 +774,10 @@ function snippet(text: string): string {
   return text.replace(/\s+/g, ' ').trim().slice(0, 240);
 }
 
+function qualityPatternText(text: string): string {
+  return text.replace(/[*_`]/g, '');
+}
+
 function trustedSourceTextForDefinition(definition: RunDefinition): string {
   return [
     definition.topicOverride?.title,
@@ -746,9 +823,11 @@ function analyzeTurn(input: {
   envelopeParseFailed?: boolean;
   envelopeParseFailureReason?: string;
   sourceAudit?: ExchangeSourceAudit;
+  fluencyDrill?: FluencyDrillAnnotation;
 }): QualityIssue[] {
   const issues: QualityIssue[] = [];
   const { definition, turnIndex, response } = input;
+  const patternResponse = qualityPatternText(response);
 
   if (input.envelopeParseFailed === true) {
     issues.push({
@@ -968,7 +1047,8 @@ function analyzeTurn(input: {
   if (
     definition.mode === 'learning' &&
     turnIndex <= 2 &&
-    LEARNING_UNSUPPORTED_SPEED_OR_TERRAIN_RE.test(response)
+    (LEARNING_UNSUPPORTED_SPEED_OR_TERRAIN_RE.test(response) ||
+      LEARNING_UNSUPPORTED_BROAD_EASE_RE.test(response))
   ) {
     issues.push({
       severity: 'fail',
@@ -1072,14 +1152,14 @@ function analyzeTurn(input: {
 
   if (
     definition.mode === 'recitation' &&
-    turnIndex === 5 &&
+    turnIndex >= 4 &&
     RECITATION_UNSUPPORTED_POLISH_RE.test(response)
   ) {
     issues.push({
       severity: 'fail',
       code: 'recitation_polish_added_fact',
       message:
-        'The polished recitation added a speed claim to the army point that the learner did not say.',
+        'The recitation feedback or polished version carried an unsupported speed claim instead of staying within source-supported wording.',
       mode: definition.mode,
       turnIndex,
       snippet: snippet(response),
@@ -1096,6 +1176,55 @@ function analyzeTurn(input: {
       code: 'recitation_no_concrete_improvement',
       message:
         'The learner asked what sounded weak, but the feedback did not give a concrete improvement to try next.',
+      mode: definition.mode,
+      turnIndex,
+      snippet: snippet(response),
+    });
+  }
+
+  if (
+    definition.mode === 'four-strands' &&
+    turnIndex === 2 &&
+    (!FOUR_STRANDS_CORRECTION_RE.test(patternResponse) ||
+      !FOUR_STRANDS_EXPLAINS_EN_RE.test(patternResponse))
+  ) {
+    issues.push({
+      severity: 'fail',
+      code: 'four_strands_missing_direct_correction',
+      message:
+        'The learner made a connector error, but the reply did not clearly correct it to "en mi opinión" and explain the missing "en".',
+      mode: definition.mode,
+      turnIndex,
+      snippet: snippet(response),
+    });
+  }
+
+  if (
+    definition.mode === 'four-strands' &&
+    turnIndex === 5 &&
+    input.fluencyDrill?.active !== true
+  ) {
+    issues.push({
+      severity: 'fail',
+      code: 'four_strands_missing_fluency_drill_signal',
+      message:
+        'The learner asked for a timed fluency drill, but the response envelope did not activate ui_hints.fluency_drill.',
+      mode: definition.mode,
+      turnIndex,
+      snippet: snippet(response),
+    });
+  }
+
+  if (
+    definition.mode === 'four-strands' &&
+    turnIndex === 5 &&
+    !FOUR_STRANDS_FLUENCY_RE.test(patternResponse)
+  ) {
+    issues.push({
+      severity: 'fail',
+      code: 'four_strands_fluency_reply_not_timed',
+      message:
+        'The fluency turn should be visibly framed as a short timed fluency activity.',
       mode: definition.mode,
       turnIndex,
       snippet: snippet(response),
@@ -1193,8 +1322,7 @@ async function runMode(
   const turns: TurnResult[] = [];
   const plannedTurns = definition.turns({ subjectName, topicTitle });
 
-  for (let index = 0; index < plannedTurns.length; index += 1) {
-    const planned = plannedTurns[index]!;
+  for (const [index, planned] of plannedTurns.entries()) {
     console.log(`[${definition.mode}] turn ${index + 1}: ${planned.message}`);
     const turnStarted = Date.now();
     const result = await processMessage(
@@ -1226,6 +1354,7 @@ async function runMode(
       envelopeParseFailed: result.envelopeParseFailed,
       envelopeParseFailureReason: result.envelopeParseFailureReason,
       sourceAudit: result.sourceAudit,
+      fluencyDrill: result.fluencyDrill,
     });
 
     turns.push({
@@ -1241,6 +1370,7 @@ async function runMode(
       envelopeParseFailed: result.envelopeParseFailed,
       envelopeParseFailureReason: result.envelopeParseFailureReason,
       sourceAudit: result.sourceAudit,
+      fluencyDrill: result.fluencyDrill,
       qualityIssues,
       durationMs: Date.now() - turnStarted,
     });
@@ -1311,6 +1441,9 @@ function renderMarkdown(results: ModeResult[]): string {
         `Assistant: ${turn.assistant}`,
         '',
         `Source audit: ${turn.sourceAudit?.status ?? '(missing)'}`,
+        `Fluency drill: ${
+          turn.fluencyDrill ? JSON.stringify(turn.fluencyDrill) : '(not active)'
+        }`,
         '',
       );
 
@@ -1345,7 +1478,7 @@ function analyzeRunProfileCoverage(results: ModeResult[]): QualityIssue[] {
       severity: 'fail',
       code: 'learner_age_rotation_missing',
       message:
-        'The full five-session pass should rotate learner ages instead of exercising one age voice only.',
+        'The full end-user pass should rotate learner ages instead of exercising one age voice only.',
       mode: 'run',
       snippet: [...ages].join(', '),
     });
@@ -1356,7 +1489,7 @@ function analyzeRunProfileCoverage(results: ModeResult[]): QualityIssue[] {
       issues.push({
         severity: 'fail',
         code: 'learner_accommodation_rotation_missing',
-        message: `The full five-session pass should include the ${required} support profile.`,
+        message: `The full end-user pass should include the ${required} support profile.`,
         mode: 'run',
         snippet: [...accommodations].join(', '),
       });
@@ -1368,9 +1501,90 @@ function analyzeRunProfileCoverage(results: ModeResult[]): QualityIssue[] {
       severity: 'fail',
       code: 'learner_support_rotation_missing',
       message:
-        'The full five-session pass should cover typical, short-burst, and predictable learner-support profiles.',
+        'The full end-user pass should cover typical, short-burst, and predictable learner-support profiles.',
       mode: 'run',
       snippet: [...supportProfiles].join(', '),
+    });
+  }
+
+  return issues;
+}
+
+function analyzeFourStrandsCoverage(results: ModeResult[]): QualityIssue[] {
+  const result = results.find((item) => item.mode === 'four-strands');
+  if (!result) return [];
+
+  const issues: QualityIssue[] = [];
+  const replies = result.turns.map((turn) =>
+    qualityPatternText(turn.assistant),
+  );
+  const targetLanguageTurns = replies.filter((reply) =>
+    FOUR_STRANDS_TARGET_LANGUAGE_RE.test(reply),
+  ).length;
+  const hasMeaningFocusedInput = replies.some((reply) =>
+    FOUR_STRANDS_SPANISH_EXAMPLE_RE.test(reply),
+  );
+  const hasMeaningFocusedOutput = replies.some((reply) =>
+    FOUR_STRANDS_OUTPUT_PROMPT_RE.test(reply),
+  );
+  const hasLanguageFocusedLearning = result.turns.some(
+    (turn) =>
+      turn.index >= 2 &&
+      FOUR_STRANDS_CORRECTION_RE.test(qualityPatternText(turn.assistant)) &&
+      FOUR_STRANDS_EXPLAINS_EN_RE.test(qualityPatternText(turn.assistant)),
+  );
+  const hasFluencyDevelopment = result.turns.some(
+    (turn) => turn.fluencyDrill?.active === true,
+  );
+
+  if (targetLanguageTurns < 3) {
+    issues.push({
+      severity: 'fail',
+      code: 'four_strands_target_language_too_sparse',
+      message:
+        'The Four Strands session should keep Spanish visible across the conversation, not turn into English-only coaching.',
+      mode: 'four-strands',
+      snippet: `Spanish-visible turns: ${targetLanguageTurns}`,
+    });
+  }
+
+  if (!hasMeaningFocusedInput) {
+    issues.push({
+      severity: 'fail',
+      code: 'four_strands_missing_meaning_input',
+      message:
+        'The Four Strands session did not include a comprehensible target-language example for meaning-focused input.',
+      mode: 'four-strands',
+    });
+  }
+
+  if (!hasMeaningFocusedOutput) {
+    issues.push({
+      severity: 'fail',
+      code: 'four_strands_missing_meaning_output',
+      message:
+        'The Four Strands session did not prompt the learner to produce a target-language sentence or retry.',
+      mode: 'four-strands',
+    });
+  }
+
+  if (!hasLanguageFocusedLearning) {
+    issues.push({
+      severity: 'fail',
+      code: 'four_strands_missing_language_focus',
+      message:
+        'The Four Strands session did not clearly explain the connector form after the learner error.',
+      mode: 'four-strands',
+    });
+  }
+
+  if (!hasFluencyDevelopment) {
+    issues.push({
+      severity: 'fail',
+      code: 'four_strands_missing_fluency_development',
+      message:
+        'The Four Strands session did not activate a fluency drill during the timed-practice turn.',
+      mode: 'four-strands',
     });
   }
 
@@ -1491,7 +1705,10 @@ async function main(): Promise<void> {
     const allMdPath = path.join(resultsDir, `${runId}-transcripts.md`);
     const qualityJsonPath = path.join(resultsDir, `${runId}-quality.json`);
     const qualityMdPath = path.join(resultsDir, `${runId}-quality.md`);
-    const runQualityIssues = analyzeRunProfileCoverage(results);
+    const runQualityIssues = [
+      ...analyzeRunProfileCoverage(results),
+      ...analyzeFourStrandsCoverage(results),
+    ];
     const qualityIssues = [
       ...results.flatMap((result) => result.qualityIssues),
       ...runQualityIssues,

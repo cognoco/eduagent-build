@@ -18,6 +18,7 @@ import { createLogger } from '../logger';
 const logger = createLogger();
 
 export type PreferredLlmProvider = 'gemini' | 'openai' | 'anthropic';
+export type LlmProviderPolicy = 'default' | 'gemini_only';
 type LlmCapability = 'text' | 'vision';
 
 function getMessageCapability(messages: ChatMessage[]): LlmCapability {
@@ -255,15 +256,45 @@ function withSafetyPreamble(
 // constant (drift between code and test would be silent).
 export const MIN_REPLY_MAX_TOKENS = 8192;
 
-// Anthropic requires snapshot model IDs in production. The shorter
-// "claude-sonnet-4-6" string is not a valid Messages API model id.
-export const ANTHROPIC_SONNET_MODEL = 'claude-sonnet-4-20250514';
+// Premium candidates used only when an entitled profile reaches the advanced
+// rungs, or when a comparison runner explicitly requests a provider.
+export const OPENAI_ADVANCED_MODEL = 'gpt-5.4';
+export const OPENAI_ADVANCED_MODEL_CANDIDATES = [
+  OPENAI_ADVANCED_MODEL,
+  'gpt-5.5',
+] as const;
+export type OpenAIAdvancedModel =
+  (typeof OPENAI_ADVANCED_MODEL_CANDIDATES)[number];
+export const OPENAI_ADVANCED_MODEL_MIN_RUNG = 5;
+export const ANTHROPIC_SONNET_MODEL = 'claude-sonnet-4-6';
+
+let openAIAdvancedModelOverride: OpenAIAdvancedModel | null = null;
+
+export function getOpenAIAdvancedModel(): OpenAIAdvancedModel {
+  return openAIAdvancedModelOverride ?? OPENAI_ADVANCED_MODEL;
+}
+
+export function _setOpenAIAdvancedModelForTesting(
+  model: OpenAIAdvancedModel | null,
+): void {
+  openAIAdvancedModelOverride = model;
+}
 
 function getModelConfig(
   rung: EscalationRung,
   llmTier: LLMTier = 'standard',
   preferredProvider?: PreferredLlmProvider,
+  providerPolicy: LlmProviderPolicy = 'default',
 ): ModelConfig {
+  if (providerPolicy === 'gemini_only') {
+    const isLight = llmTier === 'flash' || rung <= 2;
+    return {
+      provider: 'gemini',
+      model: isLight ? 'gemini-2.5-flash' : 'gemini-2.5-pro',
+      maxTokens: MIN_REPLY_MAX_TOKENS,
+    };
+  }
+
   const preferredConfig = preferredProvider
     ? getPreferredProviderConfig(rung, llmTier, preferredProvider)
     : null;
@@ -331,9 +362,17 @@ function getPreferredProviderConfig(
         maxTokens: MIN_REPLY_MAX_TOKENS,
       };
     case 'openai':
+      if (llmTier === 'premium' && rung < OPENAI_ADVANCED_MODEL_MIN_RUNG) {
+        return null;
+      }
+
       return {
         provider: 'openai',
-        model: isLight ? 'gpt-4o-mini' : 'gpt-4o',
+        model: isLight
+          ? 'gpt-4o-mini'
+          : llmTier === 'premium'
+            ? getOpenAIAdvancedModel()
+            : 'gpt-4o',
         maxTokens: MIN_REPLY_MAX_TOKENS,
       };
     case 'anthropic':
@@ -356,7 +395,12 @@ function getPreferredProviderConfig(
 function getFallbackConfig(
   primary: ModelConfig,
   rung: EscalationRung,
+  providerPolicy: LlmProviderPolicy = 'default',
 ): ModelConfig | null {
+  if (providerPolicy === 'gemini_only') {
+    return null;
+  }
+
   const shared = {
     responseFormat: primary.responseFormat,
   } satisfies Pick<ModelConfig, 'responseFormat'>;
@@ -594,6 +638,7 @@ export async function routeAndCall(
     correlationId?: string;
     llmTier?: LLMTier;
     preferredProvider?: PreferredLlmProvider;
+    providerPolicy?: LlmProviderPolicy;
     ageBracket?: AgeBracket;
     // BKT-C.1 — profile-level personalization. Optional so existing callers
     // compile unchanged; wired through session-exchange.ts from the active
@@ -615,7 +660,12 @@ export async function routeAndCall(
     pronouns: _options?.pronouns,
   });
   const config = {
-    ...getModelConfig(rung, _options?.llmTier, _options?.preferredProvider),
+    ...getModelConfig(
+      rung,
+      _options?.llmTier,
+      _options?.preferredProvider,
+      _options?.providerPolicy,
+    ),
     ...(_options?.responseFormat ? { responseFormat: 'json' as const } : {}),
   };
   const provider = providers.get(config.provider);
@@ -670,7 +720,11 @@ export async function routeAndCall(
         ...getErrorDiagnostics(err),
       });
       // Fall through to fallback
-      const fallbackConfig = getFallbackConfig(config, rung);
+      const fallbackConfig = getFallbackConfig(
+        config,
+        rung,
+        _options?.providerPolicy,
+      );
       if (!fallbackConfig) throw err;
 
       logger.warn(
@@ -696,7 +750,11 @@ export async function routeAndCall(
   }
 
   // Primary circuit is open — try fallback directly
-  const fallbackConfig = getFallbackConfig(config, rung);
+  const fallbackConfig = getFallbackConfig(
+    config,
+    rung,
+    _options?.providerPolicy,
+  );
   if (fallbackConfig) {
     logger.warn('[llm] Primary provider circuit open, using fallback', {
       provider: config.provider,
@@ -978,6 +1036,7 @@ export async function routeAndStream(
   options?: {
     llmTier?: LLMTier;
     preferredProvider?: PreferredLlmProvider;
+    providerPolicy?: LlmProviderPolicy;
     ageBracket?: AgeBracket;
     // BKT-C.1 — same personalization as routeAndCall.
     conversationLanguage?: ConversationLanguage;
@@ -994,7 +1053,12 @@ export async function routeAndStream(
     pronouns: options?.pronouns,
   });
   const config = {
-    ...getModelConfig(rung, options?.llmTier, options?.preferredProvider),
+    ...getModelConfig(
+      rung,
+      options?.llmTier,
+      options?.preferredProvider,
+      options?.providerPolicy,
+    ),
     ...(options?.responseFormat ? { responseFormat: 'json' as const } : {}),
   };
   const provider = providers.get(config.provider);
@@ -1005,7 +1069,11 @@ export async function routeAndStream(
 
   // --- Try primary provider ---
   if (canAttempt(circuitKey)) {
-    const fallbackConfig = getFallbackConfig(config, rung);
+    const fallbackConfig = getFallbackConfig(
+      config,
+      rung,
+      options?.providerPolicy,
+    );
     // NOTE: recordSuccess/recordFailure fire during iteration, not here,
     // because chatStream() returns a lazy AsyncIterable — the actual HTTP
     // request and data flow happen in the caller's for-await loop.
@@ -1069,7 +1137,11 @@ export async function routeAndStream(
   }
 
   // Primary circuit is open — try fallback directly
-  const fallbackConfig = getFallbackConfig(config, rung);
+  const fallbackConfig = getFallbackConfig(
+    config,
+    rung,
+    options?.providerPolicy,
+  );
   if (fallbackConfig) {
     logger.warn('[llm] Primary stream circuit open, using fallback', {
       provider: config.provider,

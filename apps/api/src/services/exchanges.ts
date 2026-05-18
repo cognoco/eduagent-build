@@ -12,6 +12,7 @@ import { normalizeReplyText, stripEmbeddedEnvelopeTail } from './llm/envelope';
 import type {
   ChatMessage,
   EscalationRung,
+  LlmProviderPolicy,
   MessagePart,
   ParseEnvelopeFailureReason,
   PreferredLlmProvider,
@@ -194,6 +195,8 @@ export interface ExchangeContext {
   llmTier?: LLMTier;
   /** Optional provider preference for experiment-style routing; router still falls back safely. */
   preferredLlmProvider?: PreferredLlmProvider;
+  /** Provider boundary for commercial plan rules, e.g. Family standard stays Gemini-only. */
+  llmProviderPolicy?: LlmProviderPolicy;
   /** Human-readable routing reason stored in session metadata for observability. */
   llmRoutingReason?: string;
   // BKT-C.1 — profile-level personalization surfaced to the router. Separate
@@ -749,6 +752,13 @@ const SOURCE_BOUND_SENTENCE_TERMS: Array<{
       /\b(?:arm(?:y|ies)|soldiers?|military)\b[^,.;?!]*(?:easy|easily|more easily|easier|effective(?:ly)?|efficient(?:ly)?|faster|quickly)|(?:easy|easily|more easily|easier|effective(?:ly)?|efficient(?:ly)?|faster|quickly)[^,.;?!]*\b(?:arm(?:y|ies)|soldiers?|military)\b/i,
   },
   {
+    label: 'trade speed',
+    response:
+      /\btrade\b[^.?!]{0,120}\b(?:fast|faster|quickly|speed)\b|\b(?:fast|faster|quickly|speed)\b[^.?!]{0,120}\btrade\b/i,
+    source:
+      /\btrade\b[^.?!]{0,120}\b(?:fast|faster|quickly|speed)\b|\b(?:fast|faster|quickly|speed)\b[^.?!]{0,120}\btrade\b/i,
+  },
+  {
     label: 'conquest/empire growth',
     response:
       /\bconquer(?:ing|ed)?\b|\bconquest\b|\bempires?\s+(?:(?:can|could|might|may|often)\s+)?(?:grow|grew|expand|expanded|stay strong)\b|\bempire\s+(?:(?:can|could|might|may|often)\s+)?(?:grow|grew|expand|expanded|stay strong)\b/i,
@@ -803,6 +813,30 @@ function responseMentionsSourceTitle(
   return new RegExp(`\\b${escapeRegExp(title)}\\b`, 'i').test(response);
 }
 
+function normalizeForSourcePhraseMatch(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
+function responseMentionsQuotedSourcePhrase(
+  response: string,
+  source: ExchangeSourceEvidence,
+): boolean {
+  const excerpt = source.excerpt?.trim();
+  if (!excerpt) return false;
+
+  const normalizedResponse = normalizeForSourcePhraseMatch(response);
+  const phrases = Array.from(excerpt.matchAll(/["“”]([^"“”]{5,80})["“”]/g))
+    .map((match) => match[1]?.trim())
+    .filter((phrase): phrase is string => Boolean(phrase));
+
+  return phrases.some((phrase) =>
+    normalizedResponse.includes(normalizeForSourcePhraseMatch(phrase)),
+  );
+}
+
 export function inferObviousReliableSourceForAudit(
   privateSources: ExchangePrivateSources | undefined,
   sourceEvidence: ExchangeSourceEvidence[],
@@ -821,7 +855,17 @@ export function inferObviousReliableSourceForAudit(
   const currentTopic = sourceEvidence.find(
     (item) => item.id === 'current_topic' && item.reliableForFacts,
   );
-  if (!currentTopic || !responseMentionsSourceTitle(response, currentTopic)) {
+  if (!currentTopic) {
+    return privateSources;
+  }
+
+  const inferredByTitle = responseMentionsSourceTitle(response, currentTopic);
+  const inferredByQuotedPhrase = responseMentionsQuotedSourcePhrase(
+    response,
+    currentTopic,
+  );
+
+  if (!inferredByTitle && !inferredByQuotedPhrase) {
     return privateSources;
   }
 
@@ -830,7 +874,9 @@ export function inferObviousReliableSourceForAudit(
     relied_on: [...reliedOn, currentTopic.id],
     reason: appendAuditReason(
       privateSources.reason,
-      'Server inferred current_topic because the reply explicitly used the loaded topic title.',
+      inferredByTitle
+        ? 'Server inferred current_topic because the reply explicitly used the loaded topic title.'
+        : 'Server inferred current_topic because the reply explicitly used a quoted phrase from the loaded topic.',
     ),
   };
 }
@@ -970,6 +1016,7 @@ export async function processExchange(
     {
       llmTier: context.llmTier,
       preferredProvider: context.preferredLlmProvider,
+      providerPolicy: context.llmProviderPolicy,
       ageBracket,
       // BKT-C.1 — forward profile-level personalization to the router so the
       // safety preamble carries it on every provider uniformly.
@@ -1066,6 +1113,7 @@ export async function streamExchange(
     {
       llmTier: context.llmTier,
       preferredProvider: context.preferredLlmProvider,
+      providerPolicy: context.llmProviderPolicy,
       ageBracket,
       conversationLanguage: context.conversationLanguage,
       pronouns: context.pronouns,
@@ -1167,7 +1215,7 @@ export const HANDLED_MARKER_KEYS: ReadonlySet<string> =
 
 const DEFAULT_FALLBACK_TEXT = "I didn't have a reply — tap to try again.";
 const GENERIC_PRAISE_SENTENCE_RE =
-  /(?:^|[\s\n]+)(?:(?:you did a )?great job|great work|nice work|nice job|nice one|nice,\s+\w+|that(?:'s| is| was) a (?:good|great) (?:start|idea|observation|summary|point)|great (?:idea|observation|summary|point)|good question|great question|you've got a good grasp|excellent|amazing|awesome|fantastic)(?:[^.?!]*)(?:[.?!]|$)/gi;
+  /(?:^|[\s\n]+)(?:[¡!]*\s*)?(?:(?:nice|perfecto|perfect|bien hecho)(?:,\s+\w+)?\s*[.?!]|(?:(?:you did a )?great job|great work|nice work|nice job|nice one|that(?:'s| is| was) (?:great|nice|excellent|perfect)|that(?:'s| is| was) a (?:good|great) (?:start|idea|observation|summary|point)|great (?:idea|observation|summary|point)|good question|great question|you've got a good grasp|excellent|amazing|awesome|fantastic)(?:[^.?!]*)(?:[.?!]|$))/gi;
 const UNSUPPORTED_SOFT_VALIDATION_SENTENCE_RE =
   /(?:^|[\s\n]+)(?:(?:that(?:'s| is) an? idea about)|(?:that(?:'s| is) an? )?(?:interesting idea|interesting thought|good observation|fair point))(?:[^.?!]*)(?:[.?!]|$)/gi;
 const OVERHEATED_PHRASE_RE =
@@ -1198,6 +1246,8 @@ function cleanLearnerVisibleReply(text: string): string {
     .replace(GENERIC_PRAISE_SENTENCE_RE, '')
     .replace(UNSUPPORTED_SOFT_VALIDATION_SENTENCE_RE, '')
     .replace(/\bThat(?:'s| is) a\s+The\b/g, 'The')
+    .replace(/^[A-Z][A-Za-z'-]{1,40}!\s+(?=(?:Let|We|I|Start|Ready)\b)/, '')
+    .replace(/(?:^|\n)\s*That(?:'s| is)\s*(?=\n|$)/gi, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }

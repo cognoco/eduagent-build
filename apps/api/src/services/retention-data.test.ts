@@ -171,7 +171,9 @@ function createMockDb(options?: {
     insert: jest.fn().mockReturnValue({
       values: jest.fn().mockReturnValue({
         returning: jest.fn().mockResolvedValue([]),
-        onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
+        onConflictDoNothing: jest.fn().mockReturnValue({
+          returning: jest.fn().mockResolvedValue([]),
+        }),
         onConflictDoUpdate: jest.fn().mockReturnValue({
           returning: jest.fn().mockResolvedValue([{}]),
         }),

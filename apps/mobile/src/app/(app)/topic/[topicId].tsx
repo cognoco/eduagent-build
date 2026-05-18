@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ComponentProps,
+} from 'react';
 import {
   View,
   Text,
@@ -8,6 +14,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, type Href } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Bookmark, RetentionStatus } from '@eduagent/schemas';
 import {
@@ -25,6 +32,7 @@ import {
 } from '../../../hooks/use-notes';
 import { useTopicSessions } from '../../../hooks/use-topic-sessions';
 import { useBookmarks } from '../../../hooks/use-bookmarks';
+import { withOpacity } from '../../../lib/color-opacity';
 import { useThemeColors } from '../../../lib/theme';
 import { formatSourceLine } from '../../../lib/format-note-source';
 import { deriveRetentionStatus } from '../../../lib/retention-utils';
@@ -108,6 +116,122 @@ function formatBookmarkSourceLine(bookmark: Bookmark): string {
   return `From chat · ${formatSessionDate(bookmark.createdAt)}`;
 }
 
+interface TopicSectionStripProps {
+  testID: string;
+  icon: ComponentProps<typeof Ionicons>['name'];
+  label: string;
+  summary: string;
+  meta: string;
+  expanded: boolean;
+  accentColor: string;
+  onPress: () => void;
+}
+
+function TopicSectionStrip({
+  testID,
+  icon,
+  label,
+  summary,
+  meta,
+  expanded,
+  accentColor,
+  onPress,
+}: TopicSectionStripProps): React.ReactElement {
+  const colors = useThemeColors();
+
+  return (
+    <Pressable
+      testID={testID}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${label}. ${summary}. ${
+        expanded ? 'Collapse section' : 'Expand section'
+      }.`}
+      style={{
+        marginHorizontal: 20,
+        marginTop: 14,
+        borderRadius: 18,
+        borderWidth: 1,
+        borderColor: withOpacity(accentColor, 0.18),
+        backgroundColor: withOpacity(accentColor, 0.08),
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+      }}
+    >
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 12,
+        }}
+      >
+        <View
+          style={{
+            width: 34,
+            height: 34,
+            borderRadius: 999,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: colors.surface,
+          }}
+        >
+          <Ionicons name={icon} size={18} color={accentColor} />
+        </View>
+
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text
+            style={{
+              fontSize: 11,
+              lineHeight: 14,
+              fontWeight: '700',
+              textTransform: 'uppercase',
+              color: withOpacity(accentColor, 0.92),
+            }}
+          >
+            {label}
+          </Text>
+          <Text
+            style={{
+              marginTop: 3,
+              fontSize: 15,
+              lineHeight: 20,
+              fontWeight: '600',
+              color: colors.textPrimary,
+            }}
+            numberOfLines={expanded ? 2 : 1}
+          >
+            {summary}
+          </Text>
+        </View>
+
+        <View
+          style={{
+            alignItems: 'flex-end',
+            justifyContent: 'center',
+            gap: 4,
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 13,
+              lineHeight: 16,
+              fontWeight: '700',
+              color: colors.textPrimary,
+            }}
+          >
+            {meta}
+          </Text>
+          <Ionicons
+            name={expanded ? 'chevron-up' : 'chevron-down'}
+            size={16}
+            color={colors.textSecondary}
+          />
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // StudyCTA derivation
 // ---------------------------------------------------------------------------
@@ -139,6 +263,7 @@ export default function TopicDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const {
     subjectId: paramSubjectId,
     bookId: paramBookId,
@@ -219,6 +344,9 @@ export default function TopicDetailScreen() {
     null,
   );
   const [editingNoteContent, setEditingNoteContent] = useState('');
+  const [notesExpanded, setNotesExpanded] = useState(false);
+  const [bookmarksExpanded, setBookmarksExpanded] = useState(false);
+  const [sessionsExpanded, setSessionsExpanded] = useState(false);
 
   // [H9] Timeout escape for the deep-link resolve spinner
   const [resolveTimedOut, setResolveTimedOut] = useState(false);
@@ -247,11 +375,37 @@ export default function TopicDetailScreen() {
       bookmarksQuery.data?.pages.flatMap((page) => page.bookmarks ?? []) ?? [],
     [bookmarksQuery.data],
   );
+  const noteCount = notesData?.notes.length ?? 0;
+  const bookmarkCount = topicBookmarks.length;
+  const sessionCount = topicSessions?.length ?? 0;
+  const noteSummary = notesLoading
+    ? 'Loading notes...'
+    : noteCount === 0
+      ? 'Add your first note for this topic'
+      : noteCount === 1
+        ? '1 note saved for this topic'
+        : `${noteCount} notes saved for this topic`;
+  const bookmarkSummary = bookmarksQuery.isLoading
+    ? 'Loading saved explanations...'
+    : bookmarkCount === 0
+      ? t('library.topic.bookmarks.emptyShort')
+      : bookmarkCount === 1
+        ? (topicBookmarks[0]?.content ?? '1 saved explanation')
+        : `${bookmarkCount} saved explanations`;
+  const sessionSummaryText = sessionsLoading
+    ? 'Loading sessions...'
+    : (sessionsSummary ?? 'No sessions yet');
 
   const studyCTA = useMemo(
     () => deriveStudyCTA(topicProgress?.completionStatus, retentionStatus),
     [topicProgress?.completionStatus, retentionStatus],
   );
+
+  useEffect(() => {
+    if (noteInputMode !== null) {
+      setNotesExpanded(true);
+    }
+  }, [noteInputMode]);
 
   const handleStudyPress = useMemo(() => {
     if (!topicProgress) return noop;
@@ -540,99 +694,120 @@ export default function TopicDetailScreen() {
             <TopicHeader
               name={topicProgress.title}
               chapter={paramChapter ?? null}
+              description={topicProgress.description}
               retentionStatus={topicProgress.retentionStatus ?? null}
               daysSinceLastReview={topicProgress.daysSinceLastReview}
               lastStudiedText={lastStudiedText}
             />
 
-            {/* YOUR NOTES section */}
-            <View className="mt-4 mb-2">
-              <Text className="text-body-sm font-semibold text-text-secondary tracking-wide px-5 mb-2">
-                Your Notes
-              </Text>
+            <TopicSectionStrip
+              testID="topic-notes-strip"
+              icon="create-outline"
+              label="Notes for this topic"
+              summary={noteSummary}
+              meta={notesLoading ? '...' : String(noteCount)}
+              expanded={notesExpanded}
+              accentColor={colors.accent}
+              onPress={() => setNotesExpanded((current) => !current)}
+            />
 
-              {notesLoading ? (
-                <ShimmerSkeleton testID="notes-loading">
-                  <View className="px-5">
-                    {[0, 1].map((i) => (
-                      <View
-                        key={i}
-                        style={{
-                          height: 52,
-                          borderRadius: 8,
-                          marginBottom: 8,
-                          backgroundColor: colors.border,
-                        }}
+            {notesExpanded ? (
+              <View className="mt-3 mb-1">
+                {notesLoading ? (
+                  <ShimmerSkeleton testID="notes-loading">
+                    <View className="px-5">
+                      {[0, 1].map((i) => (
+                        <View
+                          key={i}
+                          style={{
+                            height: 52,
+                            borderRadius: 8,
+                            marginBottom: 8,
+                            backgroundColor: colors.border,
+                          }}
+                        />
+                      ))}
+                    </View>
+                  </ShimmerSkeleton>
+                ) : notesData && notesData.notes.length > 0 ? (
+                  notesData.notes.map((note) => {
+                    const sourceSessionId = note.sessionId;
+                    return (
+                      <InlineNoteCard
+                        key={note.id}
+                        noteId={note.id}
+                        topicTitle={topicProgress.title}
+                        content={note.content}
+                        sourceLine={formatSourceLine(note)}
+                        updatedAt={note.updatedAt}
+                        onLongPress={handleNoteLongPress}
+                        onSourcePress={
+                          sourceSessionId
+                            ? () => handleSessionPress(sourceSessionId)
+                            : undefined
+                        }
                       />
-                    ))}
-                  </View>
-                </ShimmerSkeleton>
-              ) : notesData && notesData.notes.length > 0 ? (
-                notesData.notes.map((note) => {
-                  const sourceSessionId = note.sessionId;
-                  return (
-                    <InlineNoteCard
-                      key={note.id}
-                      noteId={note.id}
-                      topicTitle={topicProgress.title}
-                      content={note.content}
-                      sourceLine={formatSourceLine(note)}
-                      updatedAt={note.updatedAt}
-                      onLongPress={handleNoteLongPress}
-                      onSourcePress={
-                        sourceSessionId
-                          ? () => handleSessionPress(sourceSessionId)
-                          : undefined
-                      }
-                    />
-                  );
-                })
-              ) : null}
-
-              {/* Note input (new or edit) */}
-              {noteInputMode !== null ? (
-                <View className="mx-5 mt-2" testID="note-input-container">
-                  <NoteInput
-                    onSave={
-                      noteInputMode === 'new'
-                        ? handleNoteCreate
-                        : handleNoteUpdate
-                    }
-                    onCancel={() => setNoteInputMode(null)}
-                    initialValue={
-                      noteInputMode !== 'new' ? editingNoteContent : ''
-                    }
-                    saving={creatingNote || updatingNote}
-                  />
-                </View>
-              ) : (
-                <Pressable
-                  onPress={() => setNoteInputMode('new')}
-                  className="mx-5 mt-1 py-3 flex-row items-center"
-                  testID="add-note-button"
-                  accessibilityRole="button"
-                  accessibilityLabel={
-                    notesData && notesData.notes.length > 0
-                      ? 'Add a note'
-                      : 'Add your first note for this topic'
-                  }
-                >
-                  <Text className="text-primary text-body-sm font-medium">
-                    {notesData && notesData.notes.length > 0
-                      ? '+ Add a note'
-                      : '+ Add your first note for this topic'}
+                    );
+                  })
+                ) : (
+                  <Text
+                    className="text-body-sm text-text-secondary px-5 py-2"
+                    testID="topic-notes-empty"
+                  >
+                    No notes yet. Add one when something clicks.
                   </Text>
-                </Pressable>
-              )}
-            </View>
+                )}
 
-            {/* SAVED FROM CHAT section */}
-            {bookmarksQuery.isLoading || topicBookmarks.length > 0 ? (
-              <View className="mt-4 mb-2">
-                <Text className="text-body-sm font-semibold text-text-secondary tracking-wide px-5 mb-2">
-                  Saved from chat
-                </Text>
+                {noteInputMode !== null ? (
+                  <View className="mx-5 mt-2" testID="note-input-container">
+                    <NoteInput
+                      onSave={
+                        noteInputMode === 'new'
+                          ? handleNoteCreate
+                          : handleNoteUpdate
+                      }
+                      onCancel={() => setNoteInputMode(null)}
+                      initialValue={
+                        noteInputMode !== 'new' ? editingNoteContent : ''
+                      }
+                      saving={creatingNote || updatingNote}
+                    />
+                  </View>
+                ) : (
+                  <Pressable
+                    onPress={() => setNoteInputMode('new')}
+                    className="mx-5 mt-1 py-3 flex-row items-center"
+                    testID="add-note-button"
+                    accessibilityRole="button"
+                    accessibilityLabel={
+                      noteCount > 0
+                        ? 'Add a note'
+                        : 'Add your first note for this topic'
+                    }
+                  >
+                    <Text className="text-primary text-body-sm font-medium">
+                      {noteCount > 0
+                        ? '+ Add a note'
+                        : '+ Add your first note for this topic'}
+                    </Text>
+                  </Pressable>
+                )}
+              </View>
+            ) : null}
 
+            <TopicSectionStrip
+              testID="topic-bookmarks-strip"
+              icon="bookmark-outline"
+              label={t('library.topic.bookmarks.savedFromChat')}
+              summary={bookmarkSummary}
+              meta={bookmarksQuery.isLoading ? '...' : String(bookmarkCount)}
+              expanded={bookmarksExpanded}
+              accentColor={colors.primary}
+              onPress={() => setBookmarksExpanded((current) => !current)}
+            />
+
+            {bookmarksExpanded ? (
+              <View className="mt-3 mb-1">
                 {bookmarksQuery.isLoading ? (
                   <ShimmerSkeleton testID="bookmarks-loading">
                     <View className="px-5">
@@ -649,7 +824,7 @@ export default function TopicDetailScreen() {
                       ))}
                     </View>
                   </ShimmerSkeleton>
-                ) : (
+                ) : topicBookmarks.length > 0 ? (
                   topicBookmarks.map((bookmark) => (
                     <BookmarkCard
                       key={bookmark.id}
@@ -659,61 +834,69 @@ export default function TopicDetailScreen() {
                       onPress={() => handleSessionPress(bookmark.sessionId)}
                     />
                   ))
+                ) : (
+                  <Text
+                    className="text-body-sm text-text-secondary px-5 py-2"
+                    testID="topic-bookmarks-empty"
+                  >
+                    {t('library.topic.bookmarks.emptyLong')}
+                  </Text>
                 )}
               </View>
             ) : null}
 
-            {/* SESSIONS section */}
-            <View className="mt-4 mb-2">
-              <View className="px-5 mb-2">
-                <Text className="text-body-sm font-semibold text-text-secondary tracking-wide">
-                  Sessions
-                </Text>
-                {sessionsSummary ? (
-                  <Text className="text-caption text-text-tertiary mt-1">
-                    {sessionsSummary}
-                  </Text>
-                ) : null}
-              </View>
+            <TopicSectionStrip
+              testID="topic-sessions-strip"
+              icon="time-outline"
+              label="Sessions"
+              summary={sessionSummaryText}
+              meta={sessionsLoading ? '...' : String(sessionCount)}
+              expanded={sessionsExpanded}
+              accentColor={colors.textSecondary}
+              onPress={() => setSessionsExpanded((current) => !current)}
+            />
 
-              {sessionsLoading ? (
-                <ShimmerSkeleton testID="sessions-loading">
-                  <View className="px-5">
-                    {[0, 1, 2].map((i) => (
-                      <View
-                        key={i}
-                        style={{
-                          height: 44,
-                          borderRadius: 8,
-                          marginBottom: 8,
-                          backgroundColor: colors.border,
-                        }}
+            {sessionsExpanded ? (
+              <View className="mt-3 mb-2">
+                {sessionsLoading ? (
+                  <ShimmerSkeleton testID="sessions-loading">
+                    <View className="px-5">
+                      {[0, 1, 2].map((i) => (
+                        <View
+                          key={i}
+                          style={{
+                            height: 44,
+                            borderRadius: 8,
+                            marginBottom: 8,
+                            backgroundColor: colors.border,
+                          }}
+                        />
+                      ))}
+                    </View>
+                  </ShimmerSkeleton>
+                ) : topicSessions && topicSessions.length > 0 ? (
+                  <View className="px-5" testID="topic-sessions-list">
+                    {topicSessions.map((session) => (
+                      <TopicSessionRow
+                        key={session.id}
+                        sessionId={session.id}
+                        date={formatSessionDate(session.createdAt)}
+                        durationSeconds={session.durationSeconds}
+                        sessionType={session.sessionType}
+                        onPress={handleSessionPress}
                       />
                     ))}
                   </View>
-                </ShimmerSkeleton>
-              ) : topicSessions && topicSessions.length > 0 ? (
-                <View className="px-5" testID="topic-sessions-list">
-                  {topicSessions.map((session) => (
-                    <TopicSessionRow
-                      key={session.id}
-                      sessionId={session.id}
-                      date={formatSessionDate(session.createdAt)}
-                      durationSeconds={session.durationSeconds}
-                      sessionType={session.sessionType}
-                      onPress={handleSessionPress}
-                    />
-                  ))}
-                </View>
-              ) : (
-                <Text
-                  className="text-body-sm text-text-secondary px-5 py-2"
-                  testID="topic-sessions-empty"
-                >
-                  No sessions yet. Start one below!
-                </Text>
-              )}
-            </View>
+                ) : (
+                  <Text
+                    className="text-body-sm text-text-secondary px-5 py-2"
+                    testID="topic-sessions-empty"
+                  >
+                    No sessions yet. Start one below!
+                  </Text>
+                )}
+              </View>
+            ) : null}
           </ScrollView>
 
           {/* Study CTA — sticky bottom */}

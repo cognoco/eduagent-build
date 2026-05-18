@@ -27,7 +27,8 @@ module.exports = {
   // Keep focused waits narrow in individual tests; this cap prevents the
   // receipt/pre-push full-suite run from failing unrelated long mobile suites.
   testTimeout: 30000,
-  modulePathIgnorePatterns: ['\\.claude/worktrees'],
+  modulePathIgnorePatterns: ['\\.claude/worktrees', '<rootDir>/.worktrees/'],
+  testPathIgnorePatterns: ['<rootDir>/.worktrees/'],
   moduleNameMapper: {
     '^@eduagent/schemas$': '<rootDir>/packages/schemas/src/index.ts',
     '^(\\.{1,2}/.*)\\.[jt]s$': '$1',

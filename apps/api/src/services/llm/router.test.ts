@@ -7,6 +7,9 @@ import {
   _resetCircuits,
   MIN_REPLY_MAX_TOKENS,
   ANTHROPIC_SONNET_MODEL,
+  OPENAI_ADVANCED_MODEL,
+  OPENAI_ADVANCED_MODEL_MIN_RUNG,
+  _setOpenAIAdvancedModelForTesting,
 } from './router';
 import { createMockProvider } from './providers/mock';
 import { getTextContent, makeChatStreamResult } from './types';
@@ -136,6 +139,96 @@ describe('LLM Router', () => {
 
         expect(result.provider).toBe('openai');
         expect(result.model).toBe('gpt-4o');
+      } finally {
+        _clearProviders();
+        _resetCircuits();
+        registerProvider(createMockProvider('gemini'));
+      }
+    });
+
+    it('does not use GPT premium candidate before the GPT rung threshold', async () => {
+      _clearProviders();
+      _resetCircuits();
+      registerProvider(createMockProvider('gemini'));
+      registerProvider(createMockProvider('anthropic'));
+      registerProvider(createMockProvider('openai'));
+
+      try {
+        const result = await routeAndCall(
+          [{ role: 'user', content: 'test' }],
+          (OPENAI_ADVANCED_MODEL_MIN_RUNG - 1) as 4,
+          { llmTier: 'premium', preferredProvider: 'openai' },
+        );
+
+        expect(result.provider).toBe('anthropic');
+        expect(result.model).toBe(ANTHROPIC_SONNET_MODEL);
+      } finally {
+        _clearProviders();
+        _resetCircuits();
+        registerProvider(createMockProvider('gemini'));
+      }
+    });
+
+    it('uses the current GPT premium candidate when OpenAI is requested at the GPT rung threshold', async () => {
+      _clearProviders();
+      _resetCircuits();
+      registerProvider(createMockProvider('gemini'));
+      registerProvider(createMockProvider('anthropic'));
+      registerProvider(createMockProvider('openai'));
+
+      try {
+        const result = await routeAndCall(
+          [{ role: 'user', content: 'test' }],
+          OPENAI_ADVANCED_MODEL_MIN_RUNG,
+          { llmTier: 'premium', preferredProvider: 'openai' },
+        );
+
+        expect(result.provider).toBe('openai');
+        expect(result.model).toBe(OPENAI_ADVANCED_MODEL);
+      } finally {
+        _clearProviders();
+        _resetCircuits();
+        registerProvider(createMockProvider('gemini'));
+      }
+    });
+
+    it('can override the GPT premium candidate for comparison runs', async () => {
+      _clearProviders();
+      _resetCircuits();
+      registerProvider(createMockProvider('gemini'));
+      registerProvider(createMockProvider('anthropic'));
+      registerProvider(createMockProvider('openai'));
+      _setOpenAIAdvancedModelForTesting('gpt-5.5');
+
+      try {
+        const result = await routeAndCall(
+          [{ role: 'user', content: 'test' }],
+          OPENAI_ADVANCED_MODEL_MIN_RUNG,
+          { llmTier: 'premium', preferredProvider: 'openai' },
+        );
+
+        expect(result.provider).toBe('openai');
+        expect(result.model).toBe('gpt-5.5');
+      } finally {
+        _setOpenAIAdvancedModelForTesting(null);
+        _clearProviders();
+        _resetCircuits();
+        registerProvider(createMockProvider('gemini'));
+      }
+    });
+
+    it('does not cross-provider fallback when Gemini-only policy is set', async () => {
+      _clearProviders();
+      _resetCircuits();
+      registerProvider(createTransientFailProvider('gemini', 10));
+      registerProvider(createMockProvider('openai'));
+
+      try {
+        await expect(
+          routeAndCall([{ role: 'user', content: 'test' }], 4, {
+            providerPolicy: 'gemini_only',
+          }),
+        ).rejects.toThrow('Transient failure');
       } finally {
         _clearProviders();
         _resetCircuits();
@@ -290,7 +383,7 @@ describe('LLM Router', () => {
       registerProvider(createMockProvider('gemini'));
     });
 
-    it('[BUG-ANTHROPIC-MODEL-ID] uses a valid snapshot model ID for premium Anthropic calls', async () => {
+    it('[BUG-ANTHROPIC-MODEL-ID] uses the current Sonnet model ID for premium Anthropic calls', async () => {
       _clearProviders();
       _resetCircuits();
       const spy = createCapturingProvider('anthropic');
@@ -301,8 +394,8 @@ describe('LLM Router', () => {
       });
 
       expect(spy.lastConfig?.model).toBe(ANTHROPIC_SONNET_MODEL);
-      expect(spy.lastConfig?.model).toBe('claude-sonnet-4-20250514');
-      expect(spy.lastConfig?.model).not.toBe('claude-sonnet-4-6');
+      expect(spy.lastConfig?.model).toBe('claude-sonnet-4-6');
+      expect(spy.lastConfig?.model).not.toBe('claude-sonnet-4-20250514');
     });
   });
 

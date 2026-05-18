@@ -999,6 +999,13 @@
     },
     "bookmarkCard": {
       "accessibilityLabel": "Åpne lagret bokmerke: {{title}}"
+    },
+    "topic": {
+      "bookmarks": {
+        "savedFromChat": "Lagret fra chat",
+        "emptyShort": "Ingen lagret chat for dette emnet ennå",
+        "emptyLong": "Ingen lagrede forklaringer for dette emnet ennå."
+      }
     }
   },
   "topic": {

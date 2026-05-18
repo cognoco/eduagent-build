@@ -1302,6 +1302,21 @@ describe('persistBookTopics', () => {
       expect(db.insert).toHaveBeenCalled();
     });
 
+    it('persists generated connections when titles differ only by case or whitespace', async () => {
+      const db = createPersistMockDb({ existingTopicCount: 0 });
+
+      await persistBookTopics(
+        db,
+        PROFILE_ID,
+        SUBJECT_ID,
+        BOOK_ID,
+        sampleTopics,
+        [{ topicA: ' timeline ', topicB: 'OLD KINGDOM' }],
+      );
+
+      expect(db.insert).toHaveBeenCalledTimes(2);
+    });
+
     it('skips topic insert when topics array is empty', async () => {
       const db = createPersistMockDb({ existingTopicCount: 0 });
 

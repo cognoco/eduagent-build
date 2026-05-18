@@ -10,6 +10,69 @@ jest.mock('./llm' /* gc1-allow: pattern-a conversion */, () => {
 
 import { detectSubjectType, generateBookTopics } from './book-generation';
 
+function llmRouteResult(response: string) {
+  return {
+    response,
+    provider: 'mock',
+    model: 'mock-model',
+    latencyMs: 12,
+    stopReason: 'stop',
+  };
+}
+
+function generatedBooksFixture() {
+  return [
+    {
+      title: 'Ancient Egypt',
+      description: 'Explore pyramids and pharaohs',
+      emoji: '🏛️',
+      sortOrder: 1,
+    },
+    {
+      title: 'Ancient Greece',
+      description: 'Gods, heroes, and democracy',
+      emoji: '⚔️',
+      sortOrder: 2,
+    },
+    {
+      title: 'Ancient Rome',
+      description: 'Republics, empires, roads, and law',
+      emoji: '🏺',
+      sortOrder: 3,
+    },
+    {
+      title: 'Medieval Worlds',
+      description: 'Kingdoms, trade, religion, and daily life',
+      emoji: '🏰',
+      sortOrder: 4,
+    },
+    {
+      title: 'Modern Revolutions',
+      description: 'New ideas, industry, and political change',
+      emoji: '⚙️',
+      sortOrder: 5,
+    },
+  ];
+}
+
+function generatedSubjectTopicsFixture() {
+  return [
+    'What is a Fraction?',
+    'Numerator and Denominator',
+    'Visual Fractions',
+    'Equivalent Fractions',
+    'Simplifying Fractions',
+    'Comparing Fractions',
+    'Adding Fractions',
+    'Subtracting Fractions',
+  ].map((title) => ({
+    title,
+    description: `${title} for fraction practice`,
+    relevance: 'core' as const,
+    estimatedMinutes: 30,
+  }));
+}
+
 function generatedBookTopicsFixture() {
   return [
     {
@@ -52,90 +115,58 @@ function generatedBookTopicsFixture() {
 
 describe('book-generation', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    mockRouteAndCall.mockReset();
+    mockRouteAndCall.mockResolvedValue(llmRouteResult('not json at all'));
   });
 
   describe('detectSubjectType', () => {
     it('returns broad with books for broad subjects', async () => {
-      mockRouteAndCall.mockResolvedValueOnce({
-        response: JSON.stringify({
-          type: 'broad',
-          books: [
-            {
-              title: 'Ancient Egypt',
-              description: 'Explore pyramids and pharaohs',
-              emoji: '🏛️',
-              sortOrder: 1,
-            },
-            {
-              title: 'Ancient Greece',
-              description: 'Gods, heroes, and democracy',
-              emoji: '⚔️',
-              sortOrder: 2,
-            },
-          ],
-        }),
-        provider: 'mock',
-        model: 'mock-model',
-        latencyMs: 12,
-        stopReason: 'stop',
-      });
+      mockRouteAndCall.mockResolvedValueOnce(
+        llmRouteResult(
+          JSON.stringify({
+            type: 'broad',
+            books: generatedBooksFixture(),
+          }),
+        ),
+      );
 
       const result = await detectSubjectType('History', 11);
 
       expect(result.type).toBe('broad');
       if (result.type === 'broad') {
-        expect(result.books).toHaveLength(2);
+        expect(result.books).toHaveLength(5);
         expect(result.books[0]?.title).toBe('Ancient Egypt');
       }
     });
 
     it('returns narrow with topics for narrow subjects', async () => {
-      mockRouteAndCall.mockResolvedValueOnce({
-        response: JSON.stringify({
-          type: 'narrow',
-          topics: [
-            {
-              title: 'What is a Fraction?',
-              description: 'Introduction to fractions',
-              relevance: 'core',
-              estimatedMinutes: 30,
-            },
-          ],
-        }),
-        provider: 'mock',
-        model: 'mock-model',
-        latencyMs: 12,
-        stopReason: 'stop',
-      });
+      mockRouteAndCall.mockResolvedValueOnce(
+        llmRouteResult(
+          JSON.stringify({
+            type: 'narrow',
+            topics: generatedSubjectTopicsFixture(),
+          }),
+        ),
+      );
 
       const result = await detectSubjectType('Fractions', 11);
 
       expect(result.type).toBe('narrow');
       if (result.type === 'narrow') {
-        expect(result.topics).toHaveLength(1);
+        expect(result.topics).toHaveLength(8);
         expect(result.topics[0]?.title).toBe('What is a Fraction?');
       }
     });
 
     it('includes age-register guidance in the subject structure prompt', async () => {
-      mockRouteAndCall.mockResolvedValueOnce({
-        response: JSON.stringify({
-          type: 'broad',
-          books: [
-            {
-              title: 'Human Biology',
-              description: 'Study body systems and health',
-              emoji: '🧬',
-              sortOrder: 1,
-            },
-          ],
-        }),
-        provider: 'mock',
-        model: 'mock-model',
-        latencyMs: 12,
-        stopReason: 'stop',
-      });
+      mockRouteAndCall.mockResolvedValueOnce(
+        llmRouteResult(
+          JSON.stringify({
+            type: 'broad',
+            books: generatedBooksFixture(),
+          }),
+        ),
+      );
 
       await detectSubjectType('Biology', 20);
 
@@ -156,23 +187,22 @@ describe('book-generation', () => {
             content: expect.stringContaining('Learner age: 20'),
           }),
         ]),
-        2,
+        3,
+        { providerPolicy: 'gemini_only', responseFormat: 'json' },
       );
     });
   });
 
   describe('generateBookTopics', () => {
     it('generates topics with chapters and connections', async () => {
-      mockRouteAndCall.mockResolvedValueOnce({
-        response: JSON.stringify({
-          topics: generatedBookTopicsFixture(),
-          connections: [{ topicA: 'Old Kingdom', topicB: 'Pyramids' }],
-        }),
-        provider: 'mock',
-        model: 'mock-model',
-        latencyMs: 12,
-        stopReason: 'stop',
-      });
+      mockRouteAndCall.mockResolvedValueOnce(
+        llmRouteResult(
+          JSON.stringify({
+            topics: generatedBookTopicsFixture(),
+            connections: [{ topicA: 'Old Kingdom', topicB: 'Pyramids' }],
+          }),
+        ),
+      );
 
       const result = await generateBookTopics(
         'Ancient Egypt',
@@ -187,16 +217,14 @@ describe('book-generation', () => {
     });
 
     it('passes prior knowledge through to the LLM prompt', async () => {
-      mockRouteAndCall.mockResolvedValueOnce({
-        response: JSON.stringify({
-          topics: generatedBookTopicsFixture(),
-          connections: [],
-        }),
-        provider: 'mock',
-        model: 'mock-model',
-        latencyMs: 12,
-        stopReason: 'stop',
-      });
+      mockRouteAndCall.mockResolvedValueOnce(
+        llmRouteResult(
+          JSON.stringify({
+            topics: generatedBookTopicsFixture(),
+            connections: [],
+          }),
+        ),
+      );
 
       await generateBookTopics(
         'Ancient Egypt',
@@ -212,8 +240,158 @@ describe('book-generation', () => {
             content: expect.stringContaining('I already know about pyramids'),
           }),
         ]),
-        2,
+        3,
+        { providerPolicy: 'gemini_only', responseFormat: 'json' },
       );
+    });
+
+    it('retries once when structured JSON is malformed', async () => {
+      mockRouteAndCall
+        .mockResolvedValueOnce(
+          llmRouteResult('{"topics":[{"title":"Bad",}],"connections":[]}'),
+        )
+        .mockResolvedValueOnce(
+          llmRouteResult(
+            JSON.stringify({
+              topics: generatedBookTopicsFixture(),
+              connections: [],
+            }),
+          ),
+        );
+
+      const result = await generateBookTopics(
+        'Ancient Egypt',
+        'Explore pyramids and pharaohs',
+        11,
+      );
+
+      expect(result.topics).toHaveLength(5);
+      expect(mockRouteAndCall).toHaveBeenCalledTimes(2);
+      expect(mockRouteAndCall).toHaveBeenLastCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({
+            role: 'user',
+            content: expect.stringContaining(
+              'The previous response failed validation.',
+            ),
+          }),
+        ]),
+        3,
+        { providerPolicy: 'gemini_only', responseFormat: 'json' },
+      );
+    });
+
+    it('retries once when connections reference omitted topics', async () => {
+      mockRouteAndCall
+        .mockResolvedValueOnce(
+          llmRouteResult(
+            JSON.stringify({
+              topics: generatedBookTopicsFixture(),
+              connections: [
+                {
+                  topicA: 'Missing Introduction',
+                  topicB: 'Timeline',
+                },
+              ],
+            }),
+          ),
+        )
+        .mockResolvedValueOnce(
+          llmRouteResult(
+            JSON.stringify({
+              topics: generatedBookTopicsFixture(),
+              connections: [{ topicA: 'Timeline', topicB: 'Old Kingdom' }],
+            }),
+          ),
+        );
+
+      const result = await generateBookTopics(
+        'Ancient Egypt',
+        'Explore pyramids and pharaohs',
+        11,
+      );
+
+      expect(result.connections).toEqual([
+        { topicA: 'Timeline', topicB: 'Old Kingdom' },
+      ]);
+      expect(mockRouteAndCall).toHaveBeenCalledTimes(2);
+    });
+
+    it('retries once when generated descriptions contain precise unsourced dates', async () => {
+      const datedTopics = generatedBookTopicsFixture().map((topic, index) =>
+        index === 1
+          ? {
+              ...topic,
+              description:
+                'Trace the chain of events that followed in the summer of 1914.',
+            }
+          : topic,
+      );
+      mockRouteAndCall
+        .mockResolvedValueOnce(
+          llmRouteResult(
+            JSON.stringify({
+              topics: datedTopics,
+              connections: [],
+            }),
+          ),
+        )
+        .mockResolvedValueOnce(
+          llmRouteResult(
+            JSON.stringify({
+              topics: generatedBookTopicsFixture(),
+              connections: [],
+            }),
+          ),
+        );
+
+      const result = await generateBookTopics(
+        'Causes of World War I',
+        'A careful study path for understanding causes.',
+        15,
+      );
+
+      expect(result.topics[1]?.description).toBe('The age of pyramids');
+      expect(mockRouteAndCall).toHaveBeenCalledTimes(2);
+    });
+
+    it('retries once when generated chapter groups are non-contiguous', async () => {
+      const nonContiguousTopics = generatedBookTopicsFixture().map(
+        (topic, index) =>
+          index === 0 ? { ...topic, chapter: 'Society' } : topic,
+      );
+      mockRouteAndCall
+        .mockResolvedValueOnce(
+          llmRouteResult(
+            JSON.stringify({
+              topics: nonContiguousTopics,
+              connections: [],
+            }),
+          ),
+        )
+        .mockResolvedValueOnce(
+          llmRouteResult(
+            JSON.stringify({
+              topics: generatedBookTopicsFixture(),
+              connections: [],
+            }),
+          ),
+        );
+
+      const result = await generateBookTopics(
+        'Human Biology',
+        'Body systems and evidence-based reasoning.',
+        18,
+      );
+
+      expect(result.topics.map((topic) => topic.chapter)).toEqual([
+        'The Story',
+        'The Story',
+        'Monuments',
+        'Society',
+        'Society',
+      ]);
+      expect(mockRouteAndCall).toHaveBeenCalledTimes(2);
     });
 
     it('rejects blank generated topic titles', async () => {
@@ -284,7 +462,8 @@ describe('book-generation', () => {
             content: expect.stringContaining('Learner age: 20'),
           }),
         ]),
-        2,
+        3,
+        { providerPolicy: 'gemini_only', responseFormat: 'json' },
       );
     });
   });
@@ -340,6 +519,36 @@ describe('book-generation', () => {
       );
     });
 
+    it('throws when a broad subject returns too few books', async () => {
+      mockRouteAndCall.mockResolvedValueOnce(
+        llmRouteResult(
+          JSON.stringify({
+            type: 'broad',
+            books: generatedBooksFixture().slice(0, 2),
+          }),
+        ),
+      );
+
+      await expect(detectSubjectType('History', 11)).rejects.toThrow(
+        'LLM returned unexpected subject detection structure',
+      );
+    });
+
+    it('throws when a narrow subject returns too few topics', async () => {
+      mockRouteAndCall.mockResolvedValueOnce(
+        llmRouteResult(
+          JSON.stringify({
+            type: 'narrow',
+            topics: generatedSubjectTopicsFixture().slice(0, 3),
+          }),
+        ),
+      );
+
+      await expect(detectSubjectType('Fractions', 11)).rejects.toThrow(
+        'LLM returned unexpected subject detection structure',
+      );
+    });
+
     it('throws on schema validation failure — invalid discriminator', async () => {
       mockRouteAndCall.mockResolvedValueOnce({
         response: JSON.stringify({
@@ -363,14 +572,7 @@ describe('book-generation', () => {
           'Here is the result:\n```json\n' +
           JSON.stringify({
             type: 'narrow',
-            topics: [
-              {
-                title: 'Basics',
-                description: 'The basics',
-                relevance: 'core',
-                estimatedMinutes: 30,
-              },
-            ],
+            topics: generatedSubjectTopicsFixture(),
           }) +
           '\n```',
         provider: 'mock',

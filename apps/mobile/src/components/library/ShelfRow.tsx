@@ -42,41 +42,37 @@ function ShelfBooksMotif({
 }): React.ReactElement {
   const colors = useThemeColors();
   const spineStyles = [
-    { height: 38, width: 9, left: 0, opacity: 0.72 },
-    { height: 52, width: 11, left: 10, opacity: 1 },
-    { height: 43, width: 10, left: 23, opacity: 0.84, rotate: '-6deg' },
-    { height: 48, width: 10, left: 35, opacity: 0.92 },
-    { height: 35, width: 8, left: 48, opacity: 0.66, rotate: '3deg' },
+    { height: 24, width: 7, left: 0, opacity: 0.72 },
+    { height: 32, width: 8, left: 9, opacity: 1 },
+    { height: 28, width: 8, left: 19, opacity: 0.84, rotate: '-6deg' },
+    { height: 30, width: 8, left: 29, opacity: 0.92 },
   ];
 
   return (
     <View
       testID={`shelf-row-bookshelf-${subjectId}`}
       style={{
-        width: 88,
-        minHeight: 108,
+        width: 48,
+        height: 46,
         flexShrink: 0,
         position: 'relative',
       }}
     >
       <View
         style={{
-          position: 'absolute',
-          left: 8,
-          bottom: 28,
-          width: 64,
-          height: 66,
-          borderRadius: 16,
+          width: 48,
+          height: 46,
+          borderRadius: 14,
           backgroundColor: colors.surface,
           borderColor: 'rgba(255,255,255,0.84)',
           borderWidth: 1,
-          paddingHorizontal: 7,
-          paddingTop: 7,
-          paddingBottom: 8,
+          paddingHorizontal: 6,
+          paddingTop: 6,
+          paddingBottom: 7,
           shadowColor: colors.textPrimary,
-          shadowOffset: { width: 0, height: 8 },
+          shadowOffset: { width: 0, height: 5 },
           shadowOpacity: 0.08,
-          shadowRadius: 13,
+          shadowRadius: 9,
           elevation: 2,
         }}
       >
@@ -86,13 +82,13 @@ function ShelfBooksMotif({
             left: 7,
             right: 7,
             bottom: 7,
-            height: 8,
+            height: 5,
             borderRadius: 999,
             backgroundColor: colors.textPrimary,
             opacity: 0.08,
           }}
         />
-        <View style={{ height: 52, position: 'relative' }}>
+        <View style={{ height: 30, position: 'relative' }}>
           {spineStyles.map((spine, index) => (
             <View
               key={index}
@@ -126,59 +122,13 @@ function ShelfBooksMotif({
         <View
           style={{
             position: 'absolute',
-            left: 8,
-            right: 8,
+            left: 7,
+            right: 7,
             bottom: 7,
             height: 4,
             borderRadius: 999,
             backgroundColor: tint.solid,
             opacity: 0.68,
-          }}
-        />
-      </View>
-
-      <View
-        testID={`shelf-row-plank-${subjectId}`}
-        style={{
-          position: 'absolute',
-          left: 0,
-          right: 0,
-          bottom: 20,
-          height: 13,
-          borderRadius: 8,
-          borderColor: tint.solid + '33',
-          borderWidth: 1,
-          backgroundColor: tint.solid + '22',
-          shadowColor: tint.solid,
-          shadowOffset: { width: 0, height: 8 },
-          shadowOpacity: 0.11,
-          shadowRadius: 10,
-          elevation: 1,
-        }}
-      >
-        <View
-          style={{
-            position: 'absolute',
-            left: 9,
-            right: 9,
-            top: 2,
-            height: 2,
-            borderRadius: 999,
-            backgroundColor: colors.surface,
-            opacity: 0.48,
-          }}
-        />
-        <View
-          style={{
-            position: 'absolute',
-            left: 5,
-            right: 5,
-            bottom: -5,
-            height: 6,
-            borderBottomLeftRadius: 8,
-            borderBottomRightRadius: 8,
-            backgroundColor: colors.textSecondary,
-            opacity: 0.11,
           }}
         />
       </View>
@@ -243,7 +193,7 @@ export function ShelfRow({
     <View
       style={{
         opacity: isInactive ? 0.72 : 1,
-        marginBottom: 10,
+        marginBottom: 8,
       }}
     >
       <Pressable
@@ -266,12 +216,12 @@ export function ShelfRow({
           overflow: 'hidden',
           backgroundColor: tint.soft,
           borderColor: tint.solid + '33',
-          borderRadius: 20,
+          borderRadius: 18,
           borderWidth: 1,
-          minHeight: 136,
+          minHeight: 92,
           paddingTop: 12,
-          paddingBottom: 14,
-          paddingHorizontal: 14,
+          paddingBottom: 13,
+          paddingHorizontal: 16,
           shadowColor: colors.textPrimary,
           shadowOffset: { width: 0, height: 2 },
           shadowOpacity: 0.04,
@@ -283,20 +233,39 @@ export function ShelfRow({
           testID={`shelf-row-shelf-band-${subjectId}`}
           style={{
             position: 'absolute',
-            left: 0,
-            right: 0,
-            bottom: 24,
-            height: 18,
-            backgroundColor: tint.solid,
-            opacity: 0.08,
+            left: 10,
+            right: 10,
+            bottom: 8,
+            height: 17,
+            borderRadius: 12,
+            backgroundColor: colors.surface,
+            opacity: 0.28,
+          }}
+        />
+
+        <View
+          testID={`shelf-row-plank-${subjectId}`}
+          style={{
+            position: 'absolute',
+            left: 84,
+            right: 29,
+            bottom: 17,
+            height: 4,
+            borderRadius: 999,
+            backgroundColor: colors.surface,
+            shadowColor: colors.textPrimary,
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.08,
+            shadowRadius: 4,
+            elevation: 1,
           }}
         />
 
         <View
           style={{
             flexDirection: 'row',
-            alignItems: 'stretch',
-            gap: 14,
+            alignItems: 'flex-start',
+            gap: 12,
           }}
         >
           <ShelfBooksMotif subjectId={subjectId} tint={tint} />
@@ -305,45 +274,59 @@ export function ShelfRow({
             style={{
               flex: 1,
               minWidth: 0,
-              gap: 8,
-              paddingTop: 9,
+              paddingTop: 0,
             }}
           >
-            <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'flex-start',
+                gap: 12,
+              }}
+            >
               <Text
                 style={{
                   flex: 1,
-                  fontSize: 20,
-                  lineHeight: 23,
+                  fontSize: 16,
+                  lineHeight: 18,
                   fontWeight: 'bold',
                   color: colors.textPrimary,
-                  paddingRight: 8,
                 }}
                 numberOfLines={1}
               >
                 {name}
               </Text>
-              <Ionicons
-                name="chevron-forward"
-                size={18}
-                color={colors.textSecondary}
-                accessibilityElementsHidden
-                importantForAccessibility="no-hide-descendants"
-              />
+              <Text
+                style={{
+                  flexShrink: 0,
+                  fontSize: 11,
+                  lineHeight: 16,
+                  fontWeight: 'bold',
+                  color: colors.textPrimary,
+                }}
+              >
+                {topicProgress}
+              </Text>
             </View>
             <Text
               style={{
-                fontSize: 13,
+                marginTop: 7,
+                fontSize: 12,
                 color: isUnstarted ? tint.solid : colors.textSecondary,
                 fontWeight: isUnstarted ? '500' : 'normal',
-                lineHeight: 18,
+                lineHeight: 15,
               }}
               numberOfLines={2}
             >
               {subtitle}
             </Text>
 
-            <View style={{ minHeight: 20 }}>
+            <View
+              style={{
+                marginTop: 6,
+                minHeight: needsReview || showFinished || statusChip ? 18 : 0,
+              }}
+            >
               <View
                 testID={`shelf-row-chip-row-${subjectId}`}
                 style={{
@@ -440,12 +423,12 @@ export function ShelfRow({
             <View
               testID={`shelf-row-rail-${subjectId}`}
               style={{
-                height: 5,
+                height: 3,
                 borderRadius: 999,
-                backgroundColor: 'rgba(255,255,255,0.58)',
+                backgroundColor: 'rgba(255,255,255,0.86)',
                 overflow: 'hidden',
                 width: '100%',
-                marginTop: 2,
+                marginTop: needsReview || showFinished || statusChip ? 4 : 14,
               }}
             >
               <View

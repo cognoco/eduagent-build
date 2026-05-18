@@ -70,7 +70,11 @@ import {
 import { shouldTriggerEvaluate } from '../evaluate';
 import { shouldTriggerTeachBack } from '../teach-back';
 import { getRetentionStatus, type RetentionState } from '../retention';
-import type { EscalationRung, PreferredLlmProvider } from '../llm';
+import type {
+  EscalationRung,
+  LlmProviderPolicy,
+  PreferredLlmProvider,
+} from '../llm';
 import type { LLMTier } from '../subscription';
 import { inngest } from '../../inngest/client';
 import {
@@ -120,11 +124,19 @@ const BANNED_FILLER_OPENERS = [
 const LANGUAGE_REGEX =
   /\b(how do (you|i) say|translate|in (french|spanish|german|czech|italian|portuguese|japanese|chinese|korean|arabic|russian|hindi|dutch|polish|swedish|norwegian|danish|finnish|greek|turkish|hungarian|romanian|thai|vietnamese|indonesian|malay|tagalog|swahili|hebrew|ukrainian|croatian|serbian|slovak|slovenian|bulgarian|latvian|lithuanian|estonian)|what('s| is) .+ in \w+)\b/i;
 
-const PLUS_PREMIUM_ROUTING_REASON = 'plus_included_premium_profile';
+const ADVANCED_MODEL_MIN_RUNG = 4;
+const OPENAI_ADVANCED_MODEL_MIN_RUNG = 5;
+const PLUS_ADVANCED_RUNG_ROUTING_REASON = 'plus_included_advanced_rung';
+const PLUS_STANDARD_RUNG_ROUTING_REASON = 'plus_standard_below_advanced_rung';
+const PREMIUM_ADDON_ADVANCED_RUNG_ROUTING_REASON =
+  'premium_profile_or_addon_advanced_rung';
+const PREMIUM_ADDON_STANDARD_RUNG_ROUTING_REASON =
+  'premium_profile_or_addon_standard_below_advanced_rung';
 
 export interface ExchangeLlmRouting {
   llmTier?: LLMTier;
   preferredProvider?: PreferredLlmProvider;
+  providerPolicy?: LlmProviderPolicy;
   routingReason?: string;
 }
 
@@ -132,18 +144,48 @@ export function resolveExchangeLlmRouting(input: {
   subscriptionTier?: SubscriptionTier;
   requestedLlmTier?: LLMTier;
   effectiveRung: EscalationRung;
+  advancedLlmProvider?: PreferredLlmProvider;
 }): ExchangeLlmRouting {
+  const isAdvancedRung = input.effectiveRung >= ADVANCED_MODEL_MIN_RUNG;
+  const preferredProvider =
+    input.advancedLlmProvider === 'openai' &&
+    input.effectiveRung < OPENAI_ADVANCED_MODEL_MIN_RUNG
+      ? undefined
+      : input.advancedLlmProvider;
+
   if (input.subscriptionTier === 'plus') {
-    return {
-      llmTier: 'premium',
-      routingReason: PLUS_PREMIUM_ROUTING_REASON,
-    };
+    return isAdvancedRung
+      ? {
+          llmTier: 'premium',
+          ...(preferredProvider ? { preferredProvider } : {}),
+          routingReason: PLUS_ADVANCED_RUNG_ROUTING_REASON,
+        }
+      : {
+          llmTier: 'standard',
+          providerPolicy: 'gemini_only',
+          routingReason: PLUS_STANDARD_RUNG_ROUTING_REASON,
+        };
   }
 
   if (input.requestedLlmTier === 'premium') {
+    return isAdvancedRung
+      ? {
+          llmTier: 'premium',
+          ...(preferredProvider ? { preferredProvider } : {}),
+          routingReason: PREMIUM_ADDON_ADVANCED_RUNG_ROUTING_REASON,
+        }
+      : {
+          llmTier: 'standard',
+          providerPolicy: 'gemini_only',
+          routingReason: PREMIUM_ADDON_STANDARD_RUNG_ROUTING_REASON,
+        };
+  }
+
+  if (input.subscriptionTier === 'family') {
     return {
-      llmTier: 'premium',
-      routingReason: 'premium_profile_or_addon',
+      llmTier: input.requestedLlmTier,
+      providerPolicy: 'gemini_only',
+      routingReason: 'family_standard_gemini_only',
     };
   }
 
@@ -249,6 +291,8 @@ export interface ExchangeBehavioralMetrics {
   llmTier?: LLMTier;
   /** Preferred provider requested for this exchange, when an experiment overrides default routing. */
   preferredLlmProvider?: PreferredLlmProvider;
+  /** Provider policy used to enforce plan boundaries, e.g. Gemini-only Family turns. */
+  llmProviderPolicy?: LlmProviderPolicy;
   /** Reason code for any non-default routing choice. */
   llmRoutingReason?: string;
   /** Provider that produced the response, or the initial streaming provider. */
@@ -713,6 +757,7 @@ export async function prepareExchangeContext(
     homeworkMode?: 'help_me' | 'check_answer';
     llmTier?: LLMTier;
     subscriptionTier?: SubscriptionTier;
+    advancedLlmProvider?: PreferredLlmProvider;
     memoryFactsReadEnabled?: boolean;
     memoryFactsRelevanceEnabled?: boolean;
     semanticMemoryRetrievalEnabled?: boolean;
@@ -1233,6 +1278,7 @@ export async function prepareExchangeContext(
     subscriptionTier: options?.subscriptionTier,
     requestedLlmTier: options?.llmTier,
     effectiveRung,
+    advancedLlmProvider: options?.advancedLlmProvider,
   });
 
   // 5. Build prior learning context (FR40 — bridge FR)
@@ -1542,6 +1588,7 @@ export async function prepareExchangeContext(
     // Subscription-derived LLM tier — controls model routing
     llmTier: llmRouting.llmTier,
     preferredLlmProvider: llmRouting.preferredProvider,
+    llmProviderPolicy: llmRouting.providerPolicy,
     llmRoutingReason: llmRouting.routingReason,
     // CFLF: Original learner input so the LLM stays anchored to intent
     rawInput: session.rawInput,
@@ -1632,6 +1679,9 @@ export async function persistExchangeResult(
       }),
       ...(behavioral.preferredLlmProvider !== undefined && {
         preferredLlmProvider: behavioral.preferredLlmProvider,
+      }),
+      ...(behavioral.llmProviderPolicy !== undefined && {
+        llmProviderPolicy: behavioral.llmProviderPolicy,
       }),
       ...(behavioral.llmRoutingReason !== undefined && {
         llmRoutingReason: behavioral.llmRoutingReason,
@@ -1915,6 +1965,7 @@ export async function processMessage(
     voyageApiKey?: string;
     llmTier?: LLMTier;
     subscriptionTier?: SubscriptionTier;
+    advancedLlmProvider?: PreferredLlmProvider;
     clientId?: string;
     memoryFactsReadEnabled?: boolean;
     memoryFactsRelevanceEnabled?: boolean;
@@ -1929,6 +1980,7 @@ export async function processMessage(
   aiEventId?: string;
   envelopeParseFailed?: boolean;
   envelopeParseFailureReason?: string;
+  fluencyDrill?: FluencyDrillAnnotation;
   sourceAudit?: ExchangeSourceAudit;
 }> {
   // Early exchange limit check — runs before expensive prepareExchangeContext
@@ -2024,6 +2076,7 @@ export async function processMessage(
       drillTotal: result.fluencyDrill?.score?.total,
       llmTier: context.llmTier,
       preferredLlmProvider: context.preferredLlmProvider,
+      llmProviderPolicy: context.llmProviderPolicy,
       llmRoutingReason: context.llmRoutingReason,
       llmProvider: result.provider,
       llmModel: result.model,
@@ -2063,6 +2116,7 @@ export async function processMessage(
     aiEventId: persisted.aiEventId,
     envelopeParseFailed: result.envelopeParseFailed,
     envelopeParseFailureReason: result.envelopeParseFailureReason,
+    fluencyDrill: result.fluencyDrill ?? undefined,
     sourceAudit: result.sourceAudit,
   };
 }
@@ -2080,6 +2134,7 @@ export async function streamMessage(
     voyageApiKey?: string;
     llmTier?: LLMTier;
     subscriptionTier?: SubscriptionTier;
+    advancedLlmProvider?: PreferredLlmProvider;
     clientId?: string;
     memoryFactsReadEnabled?: boolean;
     memoryFactsRelevanceEnabled?: boolean;
@@ -2302,6 +2357,7 @@ export async function streamMessage(
           drillTotal: parsed.fluencyDrill?.score?.total,
           llmTier: context.llmTier,
           preferredLlmProvider: context.preferredLlmProvider,
+          llmProviderPolicy: context.llmProviderPolicy,
           llmRoutingReason: context.llmRoutingReason,
           llmProvider: result.provider,
           llmModel: result.model,

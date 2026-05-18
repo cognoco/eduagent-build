@@ -8,6 +8,12 @@ export {
   _resetCircuits,
   _clearProviders,
   MIN_REPLY_MAX_TOKENS,
+  OPENAI_ADVANCED_MODEL,
+  OPENAI_ADVANCED_MODEL_CANDIDATES,
+  OPENAI_ADVANCED_MODEL_MIN_RUNG,
+  ANTHROPIC_SONNET_MODEL,
+  getOpenAIAdvancedModel,
+  _setOpenAIAdvancedModelForTesting,
 } from './router';
 export { mockProvider, createMockProvider } from './providers/mock';
 export { createGeminiProvider } from './providers/gemini';
@@ -17,7 +23,11 @@ export { getTextContent } from './types';
 export { extractFirstJsonObject } from './extract-json';
 export { normalizeStopReason } from './stop-reason';
 export type { StopReason, StopReasonProvider } from './stop-reason';
-export type { PreferredLlmProvider } from './router';
+export type {
+  LlmProviderPolicy,
+  OpenAIAdvancedModel,
+  PreferredLlmProvider,
+} from './router';
 export {
   parseEnvelope,
   isRecognizedMarker,

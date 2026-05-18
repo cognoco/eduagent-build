@@ -32,6 +32,8 @@ import {
   type Database,
 } from '@eduagent/database';
 import { MIN_EXCHANGES_FOR_TOPIC_COMPLETION } from '@eduagent/schemas';
+import { recordPracticeActivityEvent } from './practice-activity-events';
+import { safeWrite } from './safe-non-core';
 import type {
   AssessmentEligibleTopic,
   RetentionCardResponse,
@@ -758,6 +760,40 @@ export async function processRecallTest(
     };
   }
 
+  // Emit practice activity event for ledger aggregation (weekly/monthly report
+  // practiceSummary, library/progress counts). Matches dictation/vocabulary
+  // pattern: post-atomic-write safeWrite so a ledger failure is captured in
+  // Sentry but never aborts the recall test response.
+  const recallCompletedAt = new Date();
+  const topicCurriculum = topic
+    ? await db.query.curricula.findFirst({
+        where: eq(curricula.id, topic.curriculumId),
+      })
+    : null;
+  await safeWrite(
+    () =>
+      recordPracticeActivityEvent(db, {
+        profileId,
+        subjectId: topicCurriculum?.subjectId ?? null,
+        activityType: 'review',
+        activitySubtype: 'topic_recall',
+        completedAt: recallCompletedAt,
+        score: quality,
+        total: 5,
+        sourceType: 'retention_card',
+        sourceId: effectiveCard.id,
+        occurrenceKey: `retention_card:${effectiveCard.id}:reviewed:${recallCompletedAt.toISOString()}`,
+        metadata: {
+          topicId: input.topicId,
+          attemptMode,
+          passed: result.passed,
+          failureCount: result.newState.failureCount,
+        },
+      }),
+    'retention.recall',
+    { profileId, topicId: input.topicId },
+  );
+
   // Sync xp_ledger to match the retention card's new xpStatus (best-effort —
   // XP bookkeeping should not abort the recall test response)
   if (result.xpChange === 'verified' || result.xpChange === 'decayed') {
@@ -1310,6 +1346,9 @@ export async function updateRetentionFromSession(
     },
   });
 
+  const updatedAtLockWindowStart = new Date(card.updatedAt.getTime() - 1);
+  const updatedAtLockWindowEnd = new Date(card.updatedAt.getTime() + 1);
+
   const updateResult = await db
     .update(retentionCards)
     .set({
@@ -1327,11 +1366,13 @@ export async function updateRetentionFromSession(
         // Optimistic lock: only update if the card hasn't been modified
         // since we read it. Prevents silent overwrites from concurrent sessions.
         // Skip the lock for newly-created cards — no concurrent write is possible,
-        // and PostgreSQL microsecond timestamps truncate to JS milliseconds causing
-        // false conflicts on the WHERE updatedAt = ? clause.
+        // and use a 1ms equality window for existing cards because PostgreSQL
+        // microsecond timestamps truncate to JS milliseconds on read.
         ...(ensured.isNew
           ? []
-          : [eq(retentionCards.updatedAt, card.updatedAt)]),
+          : [
+              sql`${retentionCards.updatedAt} >= ${updatedAtLockWindowStart} AND ${retentionCards.updatedAt} < ${updatedAtLockWindowEnd}`,
+            ]),
       ),
     )
     .returning();

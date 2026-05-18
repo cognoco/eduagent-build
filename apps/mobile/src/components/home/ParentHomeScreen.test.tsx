@@ -346,7 +346,7 @@ describe('ParentHomeScreen', () => {
           borderWidth: 1,
           borderRadius: 18,
           elevation: 2,
-          minHeight: 82,
+          minHeight: 108,
           shadowOpacity: 0.1,
         }),
       );
@@ -359,6 +359,16 @@ describe('ParentHomeScreen', () => {
       screen.getByTestId('parent-home-tonight-child-a-primary').props
         .accessibilityRole,
     ).toBeUndefined();
+    expect(resolvedStyle('parent-home-tonight-icon-child-a-primary')).toEqual(
+      expect.objectContaining({ height: 58, width: 58 }),
+    );
+    expect(resolvedStyle('parent-home-tonight-text-child-a-primary')).toEqual(
+      expect.objectContaining({
+        backgroundColor: 'transparent',
+        fontSize: 21,
+        lineHeight: 30,
+      }),
+    );
     screen.getByText('Fractions · 18 min this week');
     screen.getByText('Emma · 18 min this week');
     screen.getByText('2 of 5 profiles used');

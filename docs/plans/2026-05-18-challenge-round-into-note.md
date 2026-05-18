@@ -10,6 +10,7 @@ Phase 1 — replace what "Challenge mode" did emotionally with a contextual, lea
 - Sunset by deletion, not deprecation (pre-launch, no users — see `feedback_pre_launch_no_users.md`). The `learningModes` table loses its `mode` and `consecutiveSummarySkips` columns; the enum value `'serious'` is removed from schemas + DB; XP + prompt + mastery + summary branches collapse to a single path.
 - New feature is server-driven: trigger eligibility on the server, LLM proposes via envelope signals, server gates and decides mastery, Inngest fans out non-core side effects via `safeSend()`.
 - Per-answer structured evaluation reuses the existing `parseEnvelope()` pipeline.
+- Challenge Round LLM calls do not bypass the commercial routing layer. They still flow through `prepareExchangeContext()` -> `resolveExchangeLlmRouting()` -> `routeAndCall()` / `routeAndStream()`. Family standard remains Gemini-only including fallback; Plus and advanced add-on profiles get advanced help only from rung 4 upward; GPT-5.4 is the default OpenAI rung 5+ candidate. Active/drafting Challenge Round turns may apply a routing-only rung floor of 4, but must not force OpenAI before rung 5.
 - Note drafting reuses the existing `topic_notes` table and `POST /subjects/:subjectId/topics/:topicId/notes` route — the only addition is a `source: 'user' | 'challenge_round'` column for provenance.
 - Mobile UI follows the `fluency_drill` ui_hint pattern that's already proven (server emits ui_hint → mobile detects in `use-session-streaming.ts` → mobile renders widget).
 
@@ -51,6 +52,11 @@ This plan was adversarially reviewed before execution. The following findings sh
 - **CRIT-9** — Empty evaluation arrays must never mark mastery. The initial decision sketch treated `solid.length === evals.length` as verified, which is true for `0 === 0`. Resolved in Task 5 with an explicit empty-evaluation test and `outcome: 'invalid'`.
 - **HIGH-9** — Tests were scattered through tasks but there was no acceptance-level coverage contract. Resolved by adding "Test Coverage Contract" below; implementation is not complete unless every row has a passing test or an explicit follow-up ID.
 - **MED-10** — The lexical-overlap guard used ASCII tokenization, which rejects accented Latin and non-spaced scripts unfairly. Resolved in Task 6: use Unicode-aware tokenization with a character n-gram fallback and add accented Latin + Japanese regression tests.
+- **ROUTING-1** — 2026-05-18 LLM routing changed after this plan was drafted: Plus is no longer globally premium, Family standard is Gemini-only including fallback, advanced help starts at rung 4 for entitled profiles, and the OpenAI advanced candidate is rung 5+ only. Resolved by Task 0.0a + Task 8 routing amendments and final `pnpm test:llm:premium-routing` validation.
+- **ROUTING-2** — Challenge Round active/drafting turns are harder than ordinary teach/check turns, but they must not create a private model-routing side channel. Resolved by Task 8: if a routing floor is applied, apply it before `resolveExchangeLlmRouting()` and persist metadata proving the policy used (`llmRoutingReason`, `llmProviderPolicy`, provider/model).
+- **ROUTING-3** — The original quota gate used "5% remaining", which blocks Plus/Family disproportionately early and does not express the real need. Resolved by Task 3: replace percentage-only readiness with an absolute remaining-turn budget sized for the round.
+- **ROUTING-4** — The current exchange parser flattens recognized envelope fields; `processExchange()` does not receive a generic mutable `envelope.signals` object. Resolved by Task 8: extend `ParsedExchangeEnvelope`, `classifyExchangeOutcome()`, `streamMessage.onComplete()`, SSE `done`, and mobile streaming types for challenge fields explicitly.
+- **ROUTING-5** — LLM routing/subscription changes now have a dedicated live gate. Resolved by Final Validation: run `pnpm test:llm:premium-routing` alongside `pnpm eval:llm --live`.
 
 ---
 
@@ -62,6 +68,7 @@ This plan was adversarially reviewed before execution. The following findings sh
 - **Active session chat** (`apps/mobile/src/app/(app)/session/index.tsx`) — render new Challenge Round components; remove `LearningModeControl` from header.
 - **"Too easy" quick chip** (`apps/mobile/src/components/session/session-types.ts:121-126`, `getContextualQuickChips:271-282`) — extended: on tap, if readiness gates pass server-side, trigger Challenge Round offer; otherwise current behavior (LLM-nudged harder follow-up).
 - **LLM exchange loop** (`apps/api/src/services/exchanges.ts → processExchange`) — dispatch challenge-round trigger evaluation + envelope handling.
+- **Session LLM routing** (`apps/api/src/services/session/session-exchange.ts → resolveExchangeLlmRouting`, `apps/api/src/services/llm/router.ts`) — preserve current commercial policy. Challenge Round may raise the routing rung floor to 4 only for `accepted|active|drafting` states and only by feeding the adjusted rung through the existing resolver; never set provider/model directly.
 - **Prompt builder** (`apps/api/src/services/exchange-prompts.ts:175-192`) — collapse `getLearningModeGuidance()` to single tone; inject challenge-round prompt block when active.
 - **XP service** (`apps/api/src/services/xp.ts:108-113`) — collapse to single path (immediate `verified` for all, with an additional "verified by challenge round" axis available for analytics, not for XP delay).
 - **Settings service** (`apps/api/src/services/settings.ts:459-486`) — delete `getLearningModeRules()`, `consecutiveSummarySkips` tracking, summary-skip warnings.
@@ -158,7 +165,8 @@ This plan was adversarially reviewed before execution. The following findings sh
 | LLM emits malformed envelope mid-round | Parser fails | Mobile renders `reply` only; no challenge ui_hint advances | Server marks `outcome: 'parse_error'`, no note save, no mastery change. Sentry breadcrumb `challenge.envelope_parse`. |
 | LLM emits `note_draft` with content not derivable from learner messages | Hallucination guard fires | Draft NOT shown | Lexical-overlap check (<40% with learner answers) rejects; falls back to `outcome: 'draft_rejected'` with reason persisted for eval review. |
 | Learner taps Save, network drops | POST notes fails | `DraftedNoteReview` shows retry, draft preserved in component state | Reuses in-component state; offline queue not added in v1 (see Out of Scope). |
-| Quota exhausted just before challenge-round LLM call | Monthly cap hit | Offer card never shown | Trigger evaluator suppresses when quota < 5% remaining; no degradation, falls back to normal session. |
+| Quota exhausted just before challenge-round LLM call | Monthly cap hit | Offer card never shown | Trigger evaluator suppresses when fewer than `MIN_CHALLENGE_REMAINING_TURNS` remain; no degradation, falls back to normal session. |
+| Low remaining quota but high monthly allowance | Plus/Family user has many total turns, so 5% threshold would suppress too early | Offer may never appear near normal usage | Use absolute remaining-turn budget for readiness: require enough metered turns for offer + up to 3 challenge answers + draft/retry buffer. The percentage threshold may remain only as a secondary free-tier guard. |
 | Evaluation false-positive (LLM marks `misconception` on correct answer) | Eval flake | Concept incorrectly filed to review targets | Learner can dismiss review targets from the existing review-targets affordance; eval-harness scenario tracks evaluation flakiness for prompt iteration. |
 | Session timer expires mid-round | Auto-end | Drafted note offered on next app open via `note_prompt.post_session` | Same as "session ends mid-round." One explicit integration-test case. |
 | Same topic offered Challenge Round immediately after a decline | Trigger forgets decline | None — guarded server-side | Decline state persists in `sessionMetadata` for this session + cooldown row (`challenge_round_cooldowns`) for 24h on the topic. |
@@ -166,12 +174,13 @@ This plan was adversarially reviewed before execution. The following findings sh
 | "Too easy" chip tapped while already in offered/active state | Re-tap | Chip does nothing (or surfaces a tiny "already in challenge round" toast) | Mobile guard: chip disabled when `challengeRound.state ∈ {offered, accepted, active, drafting}`. |
 | Mastery race: snapshot-aggregation reads mid-round | Reader sees in-flight state | Parent dashboard could show partial state | Snapshot reader filters out rows where `challengeRound.state ∈ {accepted, active, drafting}`. |
 | Concurrent offer race (HIGH-2): LLM emits `challenge_round_offer` while learner taps "Too easy" in the same window | Both paths call `transitionChallengeState({type:'offer'})`; the second throws "illegal: cannot offer from state=offered" | Mobile chip sees a 500; console error | `/maybe-offer` route checks current state BEFORE transitioning; if already `offered|accepted|active|drafting`, returns `{offered: true, alreadyOffered: true}` and mobile no-ops. Unit test in Task 9. |
-| Stream race (HIGH-3): server strips `challenge_round_offer` after `parseEnvelope`; mobile streaming may have already surfaced it | Brief offer card flash, then disappears | Confusing flicker | Task 10 Step 5.0 verifies envelope is delivered as a single end-of-stream message (current pipeline). If streaming is incremental, suppression moves to system prompt: when not eligible, the offer prompt block is NOT injected, so the LLM cannot emit the signal in the first place. |
+| Stream race (HIGH-3): server suppresses `challenge_round_offer` after parsing, but mobile streaming might surface a raw signal too early | Brief offer card flash, then disappears | Confusing flicker | Task 10 Step 5.0 verifies challenge fields reach mobile only on the typed SSE `done` frame after server gating. If a future protocol streams challenge fields incrementally, suppression moves to system prompt: when not eligible, the offer prompt block is NOT injected, so the LLM cannot emit the signal in the first place. |
 | Chip not filtered during round (HIGH-4): `getContextualQuickChips` ignores `sessionMetadata.challengeRound.state` | "Too easy" chip stays visible during an active round | Tap during round causes confused behavior | Task 10 Step 8.5 wires `challengeRound.state` into the chip filter; unit test asserts `too_easy` is filtered when state ∈ `{offered, active, drafting}`. |
 | Drafted-note hallucination via value substitution (HIGH-1) | LLM swaps a correct word for an incorrect one within the learner's vocabulary (e.g. "mitochondria" instead of "chloroplast") | Misleading note saved | Primary defense: drafting prompt is fed ONLY the `solid` evaluations from `decideMasteryAndReview` — misconception text never reaches the drafter. Secondary lexical guard catches topic drift only, not substitution; this is documented in `note-draft.ts` jsdoc, not asserted as the substitution guard. |
 | XP migration race: in-flight `'pending'` XP from old serious-mode session at deploy time | Existing pending XP records | n/a — pre-launch | Phase 0 migration step 4 promotes any `xp.status='pending'` rows to `'verified'` once and clears the column option. |
 | LearningModeControl import remains in session/index.tsx after component delete | TypeScript compile error | n/a — pre-deploy | Caught by `pnpm exec nx run mobile:typecheck` in Task 0.4. |
 | i18n key `more.learningMode.*` referenced elsewhere | Translation lookup misses | Missing string at runtime | Task 0.5 greps all `t('more.learningMode')` references and removes; CI lints would also catch via `i18next` linter if configured. |
+| Challenge Round bypasses paid routing policy | Implementation calls provider directly or mutates provider/model outside `resolveExchangeLlmRouting()` | Wrong plan/model cost, Family standard may cross-provider fallback | Route all Challenge Round turns through the existing session exchange pipeline. Tests assert Family standard keeps `llmProviderPolicy='gemini_only'`, Plus active/drafting turns route as advanced only from rung 4, and OpenAI/GPT is absent before rung 5. |
 
 ### Recommended scope (v1)
 - **Sunset Phase 0 is destructive but safe pre-launch.** Migration drops two columns + an enum. No backcompat shims. (`feedback_pre_launch_no_users.md`.)
@@ -180,6 +189,8 @@ This plan was adversarially reviewed before execution. The following findings sh
 - **"Too easy" chip becomes the learner-initiated Challenge Round entry.** When server-side gates allow, tapping it triggers an offer card. When they don't, falls back to today's behavior. No new chip; no new icon.
 - **Learning + interleaved sessions only.** Homework explicitly excluded. Freeform/ask-anything deferred.
 - **3 challenge questions max per round, 1 round per session, 1 challenge offer per topic per 24h.**
+- **Routing policy:** Offer turns use normal routing. Accepted/active/drafting Challenge Round turns apply a routing-only minimum rung of 4 because they require deeper evaluation and note synthesis. This floor is fed into `resolveExchangeLlmRouting()`; it is not a direct provider override. Plus/add-on profiles can therefore use advanced help at rung 4, Family standard remains Gemini-only, and OpenAI remains blocked until rung 5+.
+- **Quota policy:** Readiness requires an absolute remaining-turn budget, not only a percent threshold. Use `MIN_CHALLENGE_REMAINING_TURNS = 5` for v1 (acceptance/round/draft buffer) and keep any percentage rule only as an additional free-tier cost guard if needed.
 - **Note save = explicit user action.** Never auto-save. Edit always available. Skip is non-destructive.
 - **Mastery-verified is a NEW boolean axis** (`masteryChallengeVerifiedAt`), not a re-purposing of `masteryScore`. Keeps current consumers untouched.
 
@@ -195,11 +206,13 @@ This feature is not complete until every row below is covered by a passing test 
 | Envelope schema | `challenge_round_offer`, per-concept evaluation with `answerEventId`/`learnerQuote`, `challenge_round`, and `note_draft` with source answer event ids parse and reject malformed shapes. | `packages/schemas/src/llm-envelope.test.ts` |
 | Session metadata schema | `challengeRound` accepts valid states, defaults optional fields safely, accumulates evaluations, accepts pending draft recovery state, rejects invalid states/evaluation shapes. | `packages/schemas/src/sessions.test.ts` |
 | Trigger evaluator | Hard-gates homework/freeform/practice/quiz, struggling states, low quota, cooldown, duplicate/in-flight states; allows strong retention path and current-session-new-topic path. | `apps/api/src/services/challenge-round/trigger.test.ts` |
+| Commercial LLM routing | Offer uses normal routing; accepted/active/drafting applies only a resolver-fed rung-4 floor; Family standard remains Gemini-only including fallback; Plus/add-on advanced routes only from rung 4; OpenAI/GPT only appears at rung 5+. | `apps/api/src/services/session/session-exchange.test.ts`, `apps/api/src/services/llm/router.test.ts`, `scripts/premium-routing-pass.ts` |
 | State machine | Valid transitions, illegal transitions, one-round cap, question cap, evaluation accumulation, abort from any active state, no duplicate offer race. | `apps/api/src/services/challenge-round/state.test.ts` |
 | Mastery decision | all solid → verified; mixed → no mastery + review targets + solid quotes only; all missing → reteach; empty eval → invalid/no mastery; any misconception blocks mastery. | `apps/api/src/services/challenge-round/evaluation.test.ts` |
 | Note draft guard | Accepts solid learner quotes, rejects hallucinated/low-overlap drafts, rejects drafts that overlap only with non-solid quotes, handles accented Latin and non-spaced scripts, preserves short drafts, never validates empty. | `apps/api/src/services/challenge-round/note-draft.test.ts` |
 | Prompt/eval harness | Offer only when eligible/confident; no offer when confused/homework; active round emits structured eval; known misconception must not be solid; draft uses learner words; no draft on all missing. | `apps/api/eval-llm/scenarios/challenge-round.ts`, `pnpm eval:llm`, `pnpm eval:llm --live` |
-| `processExchange` integration | Strips ineligible offer signals, transitions offered/active/drafting, persists accumulated evaluations, sends completed event once, handles malformed envelopes without UI advancement. | `apps/api/src/services/exchanges.integration.test.ts` |
+| Session exchange integration | `processExchange`/`streamExchange` strip ineligible offer signals; `session-exchange` transitions offered/active/drafting, persists accumulated evaluations, sends completed event once, and malformed envelope fallback does not mutate challenge state. | `apps/api/src/services/exchanges.test.ts`, `apps/api/src/services/session/session-exchange.test.ts`, `apps/api/src/services/session/session-exchange.integration.test.ts` |
+| Streaming/SSE contract | `ParsedExchangeEnvelope` exposes challenge fields explicitly; `streamMessage.onComplete()` returns them; `apps/api/src/routes/sessions.ts` forwards them on the `done` frame; mobile consumes only the typed `done` fields. | `apps/api/src/services/exchanges.test.ts`, `apps/api/src/services/session/session-exchange.test.ts`, `apps/api/src/routes/sessions.test.ts`, `use-session-streaming.test.tsx` |
 | Routes | `maybe-offer`, `accept`, `decline`, `abort` are profile-scoped, reject cross-profile/cross-topic mismatch, persist cooldown, handle already-offered race as 200 no-op, reject invalid state transitions cleanly. | `apps/api/src/routes/challenge-round.test.ts` |
 | Inngest fan-out | Verified sets mastery flag only on complete all-solid evidence; partial writes review targets and no mastery; reteach/no-solid writes no note and no mastery; empty eval invalid path is observable. | `apps/api/src/inngest/functions/challenge-round-completed.test.ts` + integration |
 | Notes provenance | `source: 'challenge_round'` is accepted, stored, returned, defaults existing/user-created notes to `user`, and coexists with exact-session dedupe. | `packages/schemas/src/notes.test.ts`, `apps/api/src/services/notes.test.ts`, route tests |
@@ -287,7 +300,7 @@ This feature is not complete until every row below is covered by a passing test 
 - `apps/api/src/services/topic-completion.ts` + `.test.ts` — read `masteryChallengeVerifiedAt`.
 - `apps/api/src/services/snapshot-aggregation.ts` + `.test.ts` — filter in-flight challenge-round rows.
 - `apps/api/src/services/retention-data.ts` + `.test.ts` — accept `source` on review-target writes.
-- `apps/mobile/src/components/session/use-session-streaming.ts` + `.test.tsx` — detect `ui_hints.challenge_round` + `ui_hints.note_draft` + `signals.challenge_round_offer`.
+- `apps/mobile/src/components/session/use-session-streaming.ts` + `.test.tsx` — consume typed SSE `done` fields for `challengeRoundOffer`, `challengeRound`, and `noteDraft`.
 - `apps/mobile/src/app/(app)/session/index.tsx` — render new components based on streaming hook output.
 - `apps/mobile/src/lib/strip-envelope.ts` + `.test.ts` — strip new ui_hint keys.
 - `apps/mobile/src/components/session/SessionAccessories.tsx` (the chip strip) + `.test.tsx` — wire `too_easy` tap through `useChallengeRound.maybeOffer()` first; fall through to existing `too_easy` system-prompt dispatch on `{offered: false}`.
@@ -366,6 +379,43 @@ Pick (a) — consistency with `retentionStatusSchema`. Add the extraction as Tas
 ```
 
 > **Gate:** Tasks 8, 9, 11 do not begin until the decision doc is committed and the relevant inline task references are updated to match the chosen targets.
+
+---
+
+### Task 0.0a — Reconcile with 2026-05-18 LLM routing policy (gates ROUTING-1..5)
+
+This task produces NO code unless the decision doc from Task 0.0 is being updated in the same pass. It amends that decision doc with a fifth section: "Challenge Round LLM routing policy".
+
+- [ ] **Step 1: Read the current routing code**
+
+```
+Read apps/api/src/services/session/session-exchange.ts
+Read apps/api/src/services/llm/router.ts
+Read scripts/premium-routing-pass.ts
+```
+
+Confirm these current facts before implementation:
+- `resolveExchangeLlmRouting()` is the commercial policy boundary.
+- Family standard profiles use `providerPolicy: 'gemini_only'` and must not cross-provider fallback.
+- Plus and advanced add-on profiles become premium only from rung 4 upward.
+- OpenAI/GPT premium candidate is suppressed before rung 5.
+- `llmRoutingReason`, `llmProviderPolicy`, provider, and model are persisted in AI event metadata.
+
+- [ ] **Step 2: Record the routing decision**
+
+Add this decision to `docs/plans/2026-05-18-challenge-round-targets.md`:
+
+> Challenge Round offer turns use normal routing. Accepted/active/drafting Challenge Round turns apply a routing-only minimum rung of 4 because they require deeper evaluation and note synthesis. The floor is applied by passing a separate `llmRoutingRung` through the existing resolver, not by directly choosing a provider/model. `escalationRung` remains the pedagogy/analytics rung unless a normal escalation decision changes it. OpenAI remains unavailable before rung 5.
+
+- [ ] **Step 3: Define the implementation shape for Task 8**
+
+Task 8 must add `llmRoutingRung?: EscalationRung` to `ExchangeContext`. `processExchange()` and `streamExchange()` pass `context.llmRoutingRung ?? context.escalationRung` to `routeAndCall()` / `routeAndStream()`. `prepareExchangeContext()` computes that routing rung after the normal escalation decision and before `resolveExchangeLlmRouting()`.
+
+- [ ] **Step 4: Commit the amended decision doc**
+
+```bash
+/commit
+```
 
 ---
 
@@ -1031,7 +1081,7 @@ export type StruggleStatus = z.infer<typeof struggleStatusSchema>;
 
 Re-import inside `progress.ts` and replace the inline enum at line 258 (verify line first; HIGH-5). Add to the schemas barrel export. Without this, the `trigger.ts` import at Step 3 below fails typecheck.
 
-- [ ] **Step 1: Write failing test** *(11 cases — full table of hard gates)*
+- [ ] **Step 1: Write failing test** *(full table of hard gates, including absolute quota budget)*
 
 ```typescript
 // apps/api/src/services/challenge-round/trigger.test.ts
@@ -1044,6 +1094,7 @@ const baseInput = {
   struggleStatus: 'normal' as const,
   recentCorrectStreak: 2,
   currentSessionSolidAnswerCount: 2,
+  quotaRemainingTurns: 6,
   quotaFractionRemaining: 0.5,
   challengeRoundState: undefined,
   cooldownLastOfferedAt: null,
@@ -1138,8 +1189,27 @@ describe('evaluateChallengeReadiness', () => {
     ).toBe(true);
   });
 
-  it('hard-gates when quota fraction below 5%', () => {
-    expect(evaluateChallengeReadiness({ ...baseInput, quotaFractionRemaining: 0.03 }).eligible).toBe(false);
+  it('hard-gates when fewer than 5 turns remain', () => {
+    expect(evaluateChallengeReadiness({ ...baseInput, quotaRemainingTurns: 4 }).eligible).toBe(false);
+  });
+
+  it('uses quota percent only as a secondary free-tier guard', () => {
+    expect(
+      evaluateChallengeReadiness({
+        ...baseInput,
+        subscriptionTier: 'free',
+        quotaRemainingTurns: 6,
+        quotaFractionRemaining: 0.03,
+      }).eligible,
+    ).toBe(false);
+    expect(
+      evaluateChallengeReadiness({
+        ...baseInput,
+        subscriptionTier: 'plus',
+        quotaRemainingTurns: 6,
+        quotaFractionRemaining: 0.03,
+      }).eligible,
+    ).toBe(true);
   });
 
   it("hard-gates 'don't ask again' for this session", () => {
@@ -1177,6 +1247,7 @@ const MIN_CORRECT_STREAK = 2;
 const MIN_NEW_TOPIC_EXCHANGES = 7;
 const MIN_NEW_TOPIC_SOLID_ANSWERS = 4;
 const MIN_NEW_TOPIC_CORRECT_STREAK = 4;
+const MIN_CHALLENGE_REMAINING_TURNS = 5;
 const MIN_QUOTA_FRACTION = 0.05;
 
 export interface ChallengeReadinessInput {
@@ -1186,6 +1257,8 @@ export interface ChallengeReadinessInput {
   struggleStatus: z.infer<typeof struggleStatusSchema>;
   recentCorrectStreak: number;
   currentSessionSolidAnswerCount: number;
+  subscriptionTier?: 'free' | 'plus' | 'family' | 'pro' | 'trial';
+  quotaRemainingTurns: number;
   quotaFractionRemaining: number;
   challengeRoundState: z.infer<typeof challengeRoundSessionStateSchema> | undefined;
   cooldownLastOfferedAt: Date | null;
@@ -1212,7 +1285,12 @@ export function evaluateChallengeReadiness(input: ChallengeReadinessInput): Chal
       input.recentCorrectStreak >= MIN_NEW_TOPIC_CORRECT_STREAK &&
       input.currentSessionSolidAnswerCount >= MIN_NEW_TOPIC_SOLID_ANSWERS);
   if (!retentionEligible) return { eligible: false, reason: 'retention' };
-  if (input.quotaFractionRemaining < MIN_QUOTA_FRACTION) return { eligible: false, reason: 'quota' };
+  if (input.quotaRemainingTurns < MIN_CHALLENGE_REMAINING_TURNS) {
+    return { eligible: false, reason: 'quota_remaining_turns' };
+  }
+  if (input.subscriptionTier === 'free' && input.quotaFractionRemaining < MIN_QUOTA_FRACTION) {
+    return { eligible: false, reason: 'quota_fraction_free_tier' };
+  }
   if (input.challengeRoundState && input.challengeRoundState.state !== 'complete' && input.challengeRoundState.state !== 'aborted') {
     if (input.challengeRoundState.declinedDontAskAgain) return { eligible: false, reason: 'session_decline' };
     if (['offered', 'accepted', 'active', 'drafting'].includes(input.challengeRoundState.state)) {
@@ -1805,17 +1883,17 @@ import {
 } from './challenge-round/prompts';
 
 // at the appropriate spot in buildSystemPrompt:
-const cr = sessionMetadata?.challengeRound;
+const cr = context.challengeRound;
 if (cr?.state === 'offered' || (!cr && challengeEligible)) {
   prompt += '\n\n' + challengeOfferPrompt;
-} else if (cr?.state === 'active') {
+} else if (cr?.state === 'accepted' || cr?.state === 'active') {
   prompt += '\n\n' + challengeRoundActivePrompt;
 } else if (cr?.state === 'drafting') {
   prompt += '\n\n' + challengeRoundDraftingPrompt;
 }
 ```
 
-`challengeEligible` is a new param passed in from `processExchange` based on `evaluateChallengeReadiness` (wired in Task 8). Add it to the `BuildSystemPromptArgs` type with a default `false`.
+`challengeEligible` and `challengeRound` are new typed `ExchangeContext` fields passed from `prepareExchangeContext()` / `processExchange()` based on `evaluateChallengeReadiness` (wired in Task 8). Do not pass raw `session.metadata` into the prompt builder; parse `metadata.challengeRound` with the schema and pass only that typed sub-object. Add defaults of `false` / `undefined` so eval-harness callers compile.
 
 **LOW-2 — state → prompt mapping (canonical):**
 
@@ -1951,22 +2029,71 @@ Expected: new snapshots written under `apps/api/eval-llm/__snapshots__/`. Review
 /commit
 ```
 
-> Tier 2 (`pnpm eval:llm --live`) runs after Task 8 wires `challengeEligible` through `processExchange`.
+> Tier 2 (`pnpm eval:llm --live`) runs after Task 8 wires `challengeEligible` through session exchange.
 
 ---
 
-### Task 8 — Wire trigger evaluator + envelope handling + `notes.source` migration into `processExchange`
+### Task 8 — Wire trigger evaluator + envelope handling + `notes.source` migration into session exchange
 
 **Files:**
 - Modify: `packages/schemas/src/notes.ts` — add `source` field
 - Modify: `packages/database/src/schema/notes.ts` — add column (generated migration)
 - Modify: `apps/api/src/services/notes.ts` + `.test.ts` — accept/persist `source`
 - Modify: `apps/api/src/services/exchanges.ts`
-- Create/modify: `apps/api/src/services/exchanges.integration.test.ts` — end-to-end with mocked `routeAndCall` (external boundary only)
+- Modify: `apps/api/src/services/session/session-exchange.ts`
+- Modify: `apps/api/src/routes/sessions.ts`
+- Create/modify: `apps/api/src/services/session/session-exchange.integration.test.ts` — end-to-end with mocked `routeAndCall` (external boundary only)
 
 - [ ] **Step 0: Confirm Task 0.0 spike is committed (CRIT-3)**
 
 Task 8 references `getSessionById` / `persistSessionMetadata`. Substitute the real names from the Task 0.0 spike decision doc before writing code. If the spike concluded a new `getSessionByIdScoped` helper needs extracting, do that as Step 0.5 here.
+
+- [ ] **Step 0.5: Apply the routing-policy amendment before envelope work (ROUTING-1, ROUTING-2)**
+
+Do this in `apps/api/src/services/session/session-exchange.ts`, because `prepareExchangeContext()` already has the session, profile, subscription tier, effective rung, and metadata needed for commercial routing.
+
+Implementation shape:
+
+```typescript
+// apps/api/src/services/exchanges.ts
+export interface ExchangeContext {
+  // ...existing fields...
+  topicId?: string;
+  challengeEligible?: boolean;
+  challengeRound?: ChallengeRoundSessionState;
+  llmRoutingRung?: EscalationRung;
+}
+
+// apps/api/src/services/exchanges.ts, processExchange + streamExchange
+const routingRung = context.llmRoutingRung ?? context.escalationRung;
+const result = await routeAndCall(messages, routingRung, {
+  llmTier: context.llmTier,
+  preferredProvider: context.preferredLlmProvider,
+  providerPolicy: context.llmProviderPolicy,
+  // ...existing options...
+});
+```
+
+```typescript
+// apps/api/src/services/session/session-exchange.ts, inside prepareExchangeContext()
+const challengeRound = parseChallengeRoundSessionState(session.metadata?.challengeRound);
+const challengeRoutingActive =
+  challengeRound?.state === 'accepted' ||
+  challengeRound?.state === 'active' ||
+  challengeRound?.state === 'drafting';
+const llmRoutingRung = challengeRoutingActive
+  ? (Math.max(effectiveRung, 4) as EscalationRung)
+  : effectiveRung;
+
+const llmRouting = resolveExchangeLlmRouting({
+  subscriptionTier: options?.subscriptionTier,
+  requestedLlmTier: options?.llmTier,
+  effectiveRung: llmRoutingRung,
+  advancedLlmProvider: options?.advancedLlmProvider,
+});
+```
+
+Keep `context.escalationRung = effectiveRung` unless the normal escalation decision changed it. The Challenge Round floor is for routing/model choice, not a fake learner-escalation metric. Persist `llmRoutingReason`, `llmProviderPolicy`, provider, and model as today; add `llmRoutingRung` to AI event metadata only if useful for auditing.
 
 - [ ] **Step 1: Add `source` to notes schema (MED-1 — sweep all 6 sites, not just `createNoteInputSchema`)**
 
@@ -2016,15 +2143,27 @@ const inserted = await tx.insert(topicNotes).values({
 
 Add test case: `it('persists source = challenge_round', ...)`.
 
-- [ ] **Step 4: Wire trigger into processExchange**
+- [ ] **Step 3.5: Extend parser and SSE contract before mutating state (ROUTING-4)**
+
+The current API does not hand `processExchange()` a generic mutable `envelope.signals` object. `parseExchangeEnvelope()` maps recognized fields into `ParsedExchangeEnvelope`, and streaming calls go through `classifyExchangeOutcome()` plus `streamMessage.onComplete()`.
+
+Required backend wire contract:
+- `packages/schemas/src/llm-envelope.ts` already gained the challenge fields in Task 1.
+- `apps/api/src/services/exchanges.ts` adds explicit fields to `ParsedExchangeEnvelope`: `challengeRoundOffer`, `challengeRoundEvaluation`, `challengeRoundUiHint`, and `noteDraft`.
+- `EMPTY_PARSED_ENVELOPE`, `envelopeToParsedExchange()`, `parseHandledMarker()` if needed, and `classifyExchangeOutcome()` all preserve those typed fields.
+- `ExchangeResult` and `ExchangeStreamResult.onComplete()` return those fields; no caller reads raw `envelope.signals`.
+- `processMessage()` returns `challengeRoundOffer` / `challengeRoundEvaluation` in test builds or via an internal result object if the public route response should stay unchanged; route handlers only expose the UI-safe fields on SSE/JSON responses that mobile consumes.
+- `apps/api/src/routes/sessions.ts` forwards challenge fields on the typed `done` frame. The API-internal `challengeRoundOffer` can stay boolean; the client-facing `done` payload should be `challengeRoundOffer: { pitch: result.response }` so mobile never has to infer the pitch from raw envelope content.
+- Mobile reads only the typed `done` fields in Task 10; it does not parse raw envelope JSON from streamed text.
+
+Add tests that a valid envelope containing `signals.challenge_round_offer` becomes `parsed.challengeRoundOffer === true`, and an ineligible server gate returns the field as `false`/`undefined` on both non-streaming and streaming completion paths.
+
+- [ ] **Step 4: Wire trigger into prepareExchangeContext + challenge handling into session-exchange**
 
 ```typescript
-// apps/api/src/services/exchanges.ts (inside processExchange)
-import { evaluateChallengeReadiness } from './challenge-round/trigger';
-import { transitionChallengeState } from './challenge-round/state';
-import { safeSend } from './safe-non-core';
+// apps/api/src/services/session/session-exchange.ts (inside prepareExchangeContext)
+import { evaluateChallengeReadiness } from '../challenge-round/trigger';
 
-// after loading session/profile/topic state, before calling routeAndCall:
 const readiness = evaluateChallengeReadiness({
   sessionType: session.sessionType,
   exchangeCount: session.exchangeCount,
@@ -2032,6 +2171,8 @@ const readiness = evaluateChallengeReadiness({
   struggleStatus: topicProgress?.struggleStatus ?? 'normal',
   recentCorrectStreak: computeRecentCorrectStreak(session),
   currentSessionSolidAnswerCount: computeCurrentSessionSolidAnswerCount(session),
+  subscriptionTier: options?.subscriptionTier,
+  quotaRemainingTurns: quota.remainingTurns,
   quotaFractionRemaining: quota.fractionRemaining,
   challengeRoundState: session.metadata?.challengeRound,
   cooldownLastOfferedAt: cooldown?.lastOfferedAt ?? null,
@@ -2039,76 +2180,92 @@ const readiness = evaluateChallengeReadiness({
   now: new Date(),
 });
 
-const systemPrompt = buildSystemPrompt({
-  ...existingArgs,
-  challengeEligible: readiness.eligible,
-  sessionMetadata: session.metadata,
-});
+// put these on ExchangeContext:
+topicId: session.topicId ?? undefined;
+challengeEligible: readiness.eligible;
+challengeRound;
+llmRoutingRung;
+```
 
-// after parseEnvelope succeeds:
-const envelope = parseResult.envelope;
+If the current quota helper does not expose `remainingTurns`, extend the metering/subscription read helper to return the active remaining-turn budget before calling the evaluator. Do not approximate Plus/Family readiness from percentage alone.
 
-// server-side gate: strip challenge_round_offer if not eligible or already in round
-if (envelope.signals?.challenge_round_offer) {
-  const crState = session.metadata?.challengeRound?.state;
-  const blocked = !readiness.eligible || (crState && !['complete', 'aborted'].includes(crState));
-  if (blocked) delete envelope.signals.challenge_round_offer;
-}
-
-// state transition on offer
-if (envelope.signals?.challenge_round_offer && topicProgress?.topicId) {
-  session.metadata = {
-    ...session.metadata,
-    challengeRound: transitionChallengeState(session.metadata?.challengeRound, {
-      type: 'offer',
-      topicId: topicProgress.topicId,
-    }),
-  };
-  await persistSessionMetadata(session.id, session.metadata);
-}
-
-// state transition on each evaluation in active state
-if (envelope.signals?.challenge_round_evaluation && session.metadata?.challengeRound?.state === 'active') {
-  const previousChallengeRound = session.metadata.challengeRound;
-  session.metadata = {
-    ...session.metadata,
-    challengeRound: transitionChallengeState(previousChallengeRound, {
-      type: 'answer_complete',
-      evaluation: envelope.signals.challenge_round_evaluation,
-    }),
-  };
-  await persistSessionMetadata(session.id, session.metadata);
-}
-
-// dispatch Inngest fan-out on completion (full accumulated evaluation array)
-if (
-  envelope.signals?.challenge_round_evaluation &&
-  session.metadata?.challengeRound?.state === 'drafting'
-) {
-  await safeSend('challenge.round.completed', {
-    sessionId: session.id,
-    profileId: session.profileId,
-    topicId: session.metadata.challengeRound.topicId!,
-    evaluation: session.metadata.challengeRound.evaluations ?? [],
-  });
+```typescript
+// apps/api/src/services/exchanges.ts (after parseExchangeEnvelope / classifyExchangeOutcome)
+// server-side gate: suppress challenge_round_offer if not eligible or already in round.
+// processExchange()/streamExchange() return typed fields only; they do not mutate DB.
+if (parsed.challengeRoundOffer) {
+  const crState = context.challengeRound?.state;
+  const blocked = !context.challengeEligible || (crState && !['complete', 'aborted'].includes(crState));
+  if (blocked) parsed.challengeRoundOffer = false;
 }
 ```
+
+Then add a small persistence helper in `apps/api/src/services/session/session-exchange.ts` (or `apps/api/src/services/challenge-round/session-result.ts` if it is cleaner):
+
+```typescript
+import { transitionChallengeState } from '../challenge-round/state';
+import { safeSend } from '../safe-non-core';
+
+async function applyChallengeRoundResult(
+  db: Database,
+  profileId: string,
+  session: LearningSession,
+  context: ExchangeContext,
+  result: {
+    challengeRoundOffer?: boolean;
+    challengeRoundEvaluation?: ChallengeRoundEvaluationItem;
+  },
+): Promise<void> {
+  let nextChallengeRound = context.challengeRound;
+
+  if (result.challengeRoundOffer && context.topicId) {
+    nextChallengeRound = transitionChallengeState(nextChallengeRound, {
+      type: 'offer',
+      topicId: context.topicId,
+    });
+  }
+
+  if (result.challengeRoundEvaluation && nextChallengeRound?.state === 'active') {
+    nextChallengeRound = transitionChallengeState(nextChallengeRound, {
+      type: 'answer_complete',
+      evaluation: result.challengeRoundEvaluation,
+    });
+  }
+
+  if (nextChallengeRound !== context.challengeRound) {
+    await updateSessionMetadata(db, profileId, session.id, {
+      ...(session.metadata as Record<string, unknown> | null),
+      challengeRound: nextChallengeRound,
+    });
+  }
+
+  if (result.challengeRoundEvaluation && nextChallengeRound?.state === 'drafting') {
+    await safeSend('challenge.round.completed', {
+      sessionId: session.id,
+      profileId,
+      topicId: nextChallengeRound.topicId!,
+      evaluation: nextChallengeRound.evaluations ?? [],
+    });
+  }
+}
+```
+
+Call this helper from both `processMessage()` after `processExchange()` returns, and `streamMessage().onComplete()` after `classifyExchangeOutcome()` succeeds and before/around `persistExchangeResult()`. Keep the order explicit in tests: malformed envelope fallback must not mutate challenge state.
 
 - [ ] **Step 5: Integration test**
 
 ```typescript
-// apps/api/src/services/exchanges.integration.test.ts (append; uses real DB, external-boundary mock only)
-import { processExchange } from './exchanges';
+// apps/api/src/services/session/session-exchange.test.ts or an integration test near session-exchange
 import { setupTestDb, seedEligibleSession } from '@/test-utils';
 
-describe('processExchange — challenge round dispatch', () => {
+describe('session exchange — challenge round dispatch', () => {
   it('strips challenge_round_offer when not eligible (homework)', async () => {
     const { session, profile } = await seedEligibleSession({ sessionType: 'homework' });
     const spy = jest.spyOn(require('./llm/routeAndCall'), 'routeAndCall').mockResolvedValue({
       content: JSON.stringify({ reply: '...', signals: { challenge_round_offer: true }, confidence: 'medium' }),
     });
-    const result = await processExchange({ sessionId: session.id, profileId: profile.id, userMessage: 'is this right?' });
-    expect(result.envelope.signals?.challenge_round_offer).toBeUndefined();
+    const result = await processMessage(db, profile.id, session.id, { message: 'is this right?' });
+    expect(result.challengeRoundOffer).toBeUndefined();
     spy.mockRestore();
   });
 
@@ -2117,8 +2274,8 @@ describe('processExchange — challenge round dispatch', () => {
     jest.spyOn(require('./llm/routeAndCall'), 'routeAndCall').mockResolvedValue({
       content: JSON.stringify({ reply: 'try a challenge?', signals: { challenge_round_offer: true }, confidence: 'medium' }),
     });
-    await processExchange({ sessionId: session.id, profileId: profile.id, userMessage: 'got it' });
-    const refetched = await getSessionById(session.id, profile.id);
+    await processMessage(db, profile.id, session.id, { message: 'got it' });
+    const refetched = await getSessionByIdScoped(session.id, profile.id);
     expect(refetched.metadata.challengeRound.state).toBe('offered');
   });
 });
@@ -2131,6 +2288,17 @@ pnpm eval:llm --live
 ```
 
 Expected: all 7 challenge-round scenarios pass schema validation.
+
+- [ ] **Step 6.5: Run commercial routing gate (ROUTING-5)**
+
+```bash
+pnpm test:llm:premium-routing
+```
+
+Expected:
+- Plus active/drafting Challenge Round turns at routing rung 4 do not select OpenAI.
+- Plus/add-on routing rung 5 may select OpenAI only when configured/requested.
+- Family standard hard Challenge Round turns keep `llmProviderPolicy='gemini_only'` and do not cross-provider fallback.
 
 - [ ] **Step 7: Commit**
 
@@ -2546,31 +2714,32 @@ export function DraftedNoteReview({
 }
 ```
 
-- [ ] **Step 5.0: Verify the envelope is delivered as a single end-of-stream message (HIGH-3)**
+- [ ] **Step 5.0: Verify challenge fields are delivered only on the typed `done` frame (HIGH-3, ROUTING-4)**
 
 ```
 Read apps/mobile/src/components/session/use-session-streaming.ts
 ```
 
-Confirm whether `parseEnvelope` runs on the FULL response (single end-of-stream message) or on STREAMING tokens. The current API pipeline (`apps/api/src/services/llm/envelope.ts:165-182`) parses post-stream — meaning the mobile gets a fully-formed envelope, after the server-side gate has had a chance to strip ineligible signals. Document this assumption inline in `use-session-streaming.ts`:
+Confirm whether challenge fields arrive via the SSE `done` payload after `streamMessage().onComplete()` parses and gates the full raw response. The intended contract after Task 8 is: mobile never parses raw envelope JSON for Challenge Round state; it consumes typed `done` fields after the server has suppressed ineligible offers. Document this assumption inline in `use-session-streaming.ts`:
 
 ```typescript
-// HIGH-3: relies on parseEnvelope running post-stream. If the streaming protocol ever
-// switches to per-token incremental envelopes, the server-side suppression of
-// challenge_round_offer (in processExchange) must move into the system prompt so the LLM
-// never emits the signal in the first place.
+// HIGH-3/ROUTING-4: Challenge Round state is consumed only from the typed SSE
+// `done` payload after the server parses and gates the full envelope. If the
+// streaming protocol ever sends challenge fields incrementally, suppress offers
+// at the prompt source instead: do not inject challengeOfferPrompt unless
+// evaluateChallengeReadiness() returned eligible.
 ```
 
-If the verification reveals that streaming IS incremental (or might become so), bail out of this approach and replace it with prompt-level suppression: when `evaluateChallengeReadiness` returns `{eligible: false}`, do NOT inject `challengeOfferPrompt`. The LLM never knows to emit the signal. This is the safer architecture regardless; consider switching now.
+If verification reveals that challenge fields are streamed incrementally (or might become so), bail out of client-side gating and replace it with prompt-level suppression: when `evaluateChallengeReadiness` returns `{eligible: false}`, do NOT inject `challengeOfferPrompt`. The LLM never knows to emit the signal.
 
 - [ ] **Step 5: use-session-streaming.ts extension**
 
-Locate the existing `ui_hints.fluency_drill` / `note_prompt` detection in `apps/mobile/src/components/session/use-session-streaming.ts`. Add:
+Locate the existing SSE `done` handling for `fluencyDrill` / `notePrompt` in `apps/mobile/src/components/session/use-session-streaming.ts`. Add:
 
 ```typescript
-if (envelope.signals?.challenge_round_offer) setChallengeOfferPitch(envelope.reply);
-if (envelope.ui_hints?.challenge_round) setChallengeRoundActive(envelope.ui_hints.challenge_round);
-if (envelope.ui_hints?.note_draft) setNoteDraft(envelope.ui_hints.note_draft);
+if (result.challengeRoundOffer) setChallengeOfferPitch(result.challengeRoundOffer.pitch);
+if (result.challengeRound) setChallengeRoundActive(result.challengeRound);
+if (result.noteDraft) setNoteDraft(result.noteDraft);
 ```
 
 Expose `challengeOfferPitch`, `challengeRoundActive`, `noteDraft` from the hook return.
@@ -2787,7 +2956,7 @@ describe('challenge round end-to-end', () => {
     mockRouteAndCall({ reply: 'yes', signals: { challenge_round_offer: true }, confidence: 'high' });
     const r = await app.request(`/sessions/${session.id}/exchanges`, { method: 'POST', body: JSON.stringify({ message: 'is this right?' }) });
     const body = await r.json();
-    expect(body.envelope.signals?.challenge_round_offer).toBeUndefined();
+    expect(body.challengeRoundOffer).toBeUndefined();
   });
 });
 ```
@@ -2815,12 +2984,12 @@ pnpm exec jest tests/integration/challenge-round.integration.test.ts
 - [ ] **Step 1: Append to CLAUDE.md "Non-Negotiable Engineering Rules"**
 
 ```markdown
-- Challenge Round mastery policy is server-owned and conservative over structured LLM evidence. The LLM proposes per-concept evaluations via `signals.challenge_round_evaluation`; each item must include `answerEventId` and `learnerQuote`. The server runs `decideMasteryAndReview()` and sets `masteryChallengeVerifiedAt` only when EVERY concept evaluates `solid`. Any `partial`, `missing`, or `misconception` blocks mastery and routes the weak concepts to durable review targets with `source: 'challenge_round'`. Notes drafted from Challenge Rounds must use only `solidAnswerQuotes` and pass the lexical-overlap hallucination guard in `services/challenge-round/note-draft.ts` before being shown to the learner. The Challenge mode toggle (`learningMode: 'serious' | 'casual'`) was removed; today's `casual` is the single default tone and rigor is now expressed per-Challenge-Round rather than globally.
+- Challenge Round mastery policy is server-owned and conservative over structured LLM evidence. The LLM proposes per-concept evaluations via `signals.challenge_round_evaluation`; each item must include `answerEventId` and `learnerQuote`. The server runs `decideMasteryAndReview()` and sets `masteryChallengeVerifiedAt` only when EVERY concept evaluates `solid`. Any `partial`, `missing`, or `misconception` blocks mastery and routes the weak concepts to durable review targets with `source: 'challenge_round'`. Notes drafted from Challenge Rounds must use only `solidAnswerQuotes` and pass the lexical-overlap hallucination guard in `services/challenge-round/note-draft.ts` before being shown to the learner. Challenge Round LLM calls must still route through `resolveExchangeLlmRouting()`; accepted/active/drafting turns may apply a routing-only rung-4 floor, Family standard remains Gemini-only, and the OpenAI advanced candidate stays rung 5+ only. The Challenge mode toggle (`learningMode: 'serious' | 'casual'`) was removed; today's `casual` is the single default tone and rigor is now expressed per-Challenge-Round rather than globally.
 ```
 
 - [ ] **Step 2: Add a short section to `docs/project_context.md`**
 
-Document: trigger evaluator location, prompt module, envelope signal names, mobile component names, the "Too easy chip → maybe-offer route" path, the conservative-mastery rule.
+Document: trigger evaluator location, prompt module, envelope signal names, mobile component names, the "Too easy chip → maybe-offer route" path, the conservative-mastery rule, and the routing rule (`llmRoutingRung` floor only through the existing resolver; no direct provider/model selection).
 
 - [ ] **Step 3: Commit**
 
@@ -2838,6 +3007,7 @@ After Task 12, run the full validation matrix before declaring the feature compl
 - [ ] `pnpm exec nx run-many -t typecheck` — green
 - [ ] `pnpm exec nx run-many -t test` — green
 - [ ] `pnpm eval:llm --live` — all 7 challenge-round scenarios pass schema validation
+- [ ] `pnpm test:llm:premium-routing` — Plus/Family/add-on routing still obeys rung 4+/GPT rung 5+/Family Gemini-only policy
 - [ ] `pnpm exec jest tests/integration/challenge-round.integration.test.ts` — green
 - [ ] **Manual smoke 1 — sunset:** Launch the app on emulator. Open a session. Confirm: no Explorer/Challenge mode header button; no Learning Mode section in More; tone is consistent.
 - [ ] **Manual smoke 2 — system-initiated CR:** Complete a learning session with 6+ exchanges, strong answers, in `strong` retention. Accept the offer. Answer 3 challenge questions correctly. Save the drafted note. Verify it appears under the topic in Library with `source: 'challenge_round'`. Verify mastery shows challenge-verified.

@@ -30,7 +30,7 @@ module.exports = {
     '^@eduagent/test-utils$': '<rootDir>/packages/test-utils/src/index.ts',
     '^(\\.{1,2}/.*)\\.[jt]s$': '$1',
   },
-  modulePathIgnorePatterns: ['\\.claude/worktrees'],
+  modulePathIgnorePatterns: ['\\.claude/worktrees', '<rootDir>/.worktrees/'],
   moduleFileExtensions: ['ts', 'js'],
   testMatch: [
     '<rootDir>/apps/api/src/**/*.test.ts',
@@ -40,6 +40,7 @@ module.exports = {
   // They live in jest.integration.config.cjs → `api:test-integration` target.
   testPathIgnorePatterns: [
     '/node_modules/',
+    '<rootDir>/.worktrees/',
     '\\.integration\\.test\\.ts$',
   ],
   coverageDirectory: '<rootDir>/coverage/apps/api',

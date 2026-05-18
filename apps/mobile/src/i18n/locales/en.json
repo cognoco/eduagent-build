@@ -1070,6 +1070,13 @@
     },
     "bookmarkCard": {
       "accessibilityLabel": "Open saved bookmark: {{title}}"
+    },
+    "topic": {
+      "bookmarks": {
+        "savedFromChat": "Saved from chat",
+        "emptyShort": "No saved chat for this topic yet",
+        "emptyLong": "No saved explanations for this topic yet."
+      }
     }
   },
   "topic": {

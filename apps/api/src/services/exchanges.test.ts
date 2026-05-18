@@ -1292,6 +1292,60 @@ describe('parseExchangeEnvelope schema-failure fallback [BUG-934][BUG-935]', () 
       reason: 'The current topic describes Roman roads and trade.',
     });
   });
+
+  it('removes stranded generic-praise cleanup fragments from visible replies', () => {
+    const raw = JSON.stringify({
+      reply:
+        "That's great.\n\nNice! There's just one small change: use En mi opinión.",
+      signals: {
+        partial_progress: false,
+        needs_deepening: false,
+        understanding_check: false,
+      },
+    });
+
+    const result = parseExchangeEnvelope(raw, ctx);
+
+    expect(result.cleanResponse).toBe(
+      "There's just one small change: use En mi opinión.",
+    );
+  });
+
+  it('removes standalone language-praise openers from visible replies', () => {
+    const raw = JSON.stringify({
+      reply:
+        '¡Bien hecho, Maya! You correctly used en mi opinión, porque, and pero.',
+      signals: {
+        partial_progress: false,
+        needs_deepening: false,
+        understanding_check: false,
+      },
+    });
+
+    const result = parseExchangeEnvelope(raw, ctx);
+
+    expect(result.cleanResponse).toBe(
+      'You correctly used en mi opinión, porque, and pero.',
+    );
+  });
+
+  it('removes stranded learner-name opener fragments from visible replies', () => {
+    const raw = JSON.stringify({
+      reply:
+        "Maya! Let's do a 30-second fluency drill with porque, pero, and entonces.",
+      signals: {
+        partial_progress: false,
+        needs_deepening: false,
+        understanding_check: false,
+      },
+    });
+
+    const result = parseExchangeEnvelope(raw, ctx);
+
+    expect(result.cleanResponse).toBe(
+      "Let's do a 30-second fluency drill with porque, pero, and entonces.",
+    );
+  });
 });
 
 describe('source provenance audit', () => {
@@ -1367,6 +1421,36 @@ describe('source provenance audit', () => {
 
     expect(inferred?.relied_on).toContain('current_topic');
     expect(inferred?.reason).toMatch(/Server inferred current_topic/i);
+    expect(audit.status).toBe('ok');
+    expect(audit.reliableReliedOnSourceIds).toEqual(['current_topic']);
+  });
+
+  it('infers current_topic for language audit when the reply uses a quoted topic phrase', () => {
+    const sourceEvidence = buildExchangeSourceEvidence(
+      {
+        ...baseContext,
+        subjectName: 'Spanish',
+        topicTitle: 'Spanish connectors for opinions',
+        topicDescription:
+          'Practice Spanish connectors for opinions: "en mi opinión" means "in my opinion", "porque" means "because", and "pero" means "but".',
+        pedagogyMode: 'four_strands',
+      },
+      'En mi opinión, estudiar es útil porque ayuda, pero es difícil.',
+    );
+
+    const inferred = inferObviousReliableSourceForAudit(
+      {
+        relied_on: [],
+        insufficient: false,
+        reason: 'The learner used the connector correctly.',
+      },
+      sourceEvidence,
+      'You used **En mi opinión** correctly, and **porque** and **pero** connect the sentence.',
+    );
+    const audit = auditExchangeSources(inferred, sourceEvidence);
+
+    expect(inferred?.relied_on).toContain('current_topic');
+    expect(inferred?.reason).toMatch(/quoted phrase/i);
     expect(audit.status).toBe('ok');
     expect(audit.reliableReliedOnSourceIds).toEqual(['current_topic']);
   });
@@ -1627,6 +1711,31 @@ describe('source provenance audit', () => {
     expect(safe.response).not.toMatch(/easier|military/i);
     expect(safe.sourceAudit.reason).toMatch(/army speed\/ease\/effectiveness/i);
     expect(safe.sourceAudit.reason).toMatch(/unsupported historical framing/i);
+  });
+
+  it('removes unsupported trade-speed claims when the source only supports easier trade', () => {
+    const sourceEvidence = buildExchangeSourceEvidence(
+      {
+        ...baseContext,
+        topicTitle: 'Roman roads and empire trade',
+        topicDescription:
+          'Roman roads helped armies move between places, connected towns, and made trade easier across the empire.',
+      },
+      'Roman roads also helped trade move faster across the empire.',
+    );
+    const audit = auditExchangeSources(
+      { relied_on: ['current_topic'], insufficient: false },
+      sourceEvidence,
+    );
+
+    const safe = applySourceAuditSafetyFallback(
+      'The source says Roman roads allowed trade to move faster across the empire. A better polished version is: Roman roads helped armies travel, connected towns, and made trade easier across the empire.',
+      audit,
+    );
+
+    expect(safe.response).not.toMatch(/trade[^.?!]*faster|faster[^.?!]*trade/i);
+    expect(safe.response).toContain('made trade easier across the empire');
+    expect(safe.sourceAudit.reason).toMatch(/trade speed/i);
   });
 
   it('falls back to reliable source text when scrubbing leaves a too-thin reply', () => {

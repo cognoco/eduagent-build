@@ -1024,6 +1024,13 @@
     },
     "bookmarkCard": {
       "accessibilityLabel": "Otwórz zapisany zakładkę: {{title}}"
+    },
+    "topic": {
+      "bookmarks": {
+        "savedFromChat": "Zapisano z czatu",
+        "emptyShort": "Brak zapisanych czatów w tym temacie",
+        "emptyLong": "Brak zapisanych wyjaśnień w tym temacie."
+      }
     }
   },
   "topic": {

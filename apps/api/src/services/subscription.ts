@@ -40,15 +40,16 @@ const TIER_CONFIGS: Record<SubscriptionState['tier'], TierConfig> = {
     topUpPrice: 0,
     topUpAmount: 0,
   },
-  // Plus is the one-person serious-study plan: one profile, premium routing.
-  // Family/Pro are multi-profile plans; Pro still has two selectable premium
-  // profiles out of its six seats.
+  // Plus is the one-person serious-study plan: one profile with advanced-model
+  // access on the hard rungs. Its base tier stays standard so easier turns
+  // remain on Gemini. Family/Pro are multi-profile plans; Pro still has two
+  // selectable advanced-model profiles out of its six seats.
   plus: {
     monthlyQuota: 700,
     dailyLimit: null,
     maxProfiles: 1,
     premiumModelProfiles: 1,
-    llmTier: 'premium',
+    llmTier: 'standard',
     priceMonthly: 18.99,
     priceYearly: 168,
     topUpPrice: 10,
@@ -89,6 +90,8 @@ export interface AIUpgradeConfig {
 
 export const AI_UPGRADE_ADDON: AIUpgradeConfig = {
   priceMonthly: 15,
+  // Entitlement only: session exchange routing uses the advanced model from
+  // rung 4 upward, while easier turns stay on Gemini.
   llmTier: 'premium',
 };
 

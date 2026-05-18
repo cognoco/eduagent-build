@@ -1,6 +1,6 @@
 # Notion Bug Fix — Pick, Verify, Resolve
 
-Pick 3 bugs from Notion. Source page: https://www.notion.so/cognix/Mentomate-35a8bce91f7c80c98220ff9968184945?source=copy_link — if that database has no open bugs, walk the parent page for sibling databases with open rows. The Bug Tracker is the canonical one; the parent has a `-temp` sibling that also carries rows.
+Pick 3 bugs from the **Issue Tracker - Open** database (`3598bce9-1f7c-8070-86eb-e012bd99f184`). That is the single source of active work — `Issue Tracker - Resolved` (`b8ce802f-1126-4a2f-a123-be5f888cbb23`) is a frozen archive of Done bugs; never read or write from it for active fixes. When a bug is verified Done, you MUST move it from Open → Resolved (see "Archive Done bugs" below). The Open DB stays small only if every Done bug gets archived; leaving them in Open recreates the bloat that drove the split.
 
 **Parallel agents:** when the batch is 3+ bugs that touch disjoint files, fan out via `/my:dispatch` — it owns the planning (one bug per track, file-conflict check), the agent contract, and the post-fan-out validation. Don't hand-roll parallel logic here.
 
@@ -32,13 +32,56 @@ For each bug:
 
 - **In progress** when you start. Even if you finish in 5 minutes — the claim prevents collisions.
 - **Done** when verified, with `Fixed In` (branch / commit ref) and `Resolution` (one-paragraph cite of what changed and what test proves it). If the bug was obsolete, say so explicitly and cite the commit that resolved it upstream.
+- **Move it to the Resolved archive** immediately after marking Done (see "Archive Done bugs" below).
 - **Never reopen Done items** unless the user asks.
+
+## Archive Done bugs (Open → Resolved)
+
+The `Issue Tracker - Open` DB exists to be small. Every Done row gets moved to `Issue Tracker - Resolved` as part of the same task that marked it Done — not "later", not "in a batch".
+
+### Recipe (REST, three calls per row)
+
+Notion has no native "move row" — you copy, then archive the original. The schemas are identical except Open has an extra `Implementation Status` field which is dropped on copy.
+
+```powershell
+# Get NOTION_API_KEY: doppler.exe secrets get NOTION_API_KEY --plain -p mentomate -c dev
+# Headers: Authorization=Bearer $key, Notion-Version=2022-06-28
+
+# 1. Read full source page properties
+GET https://api.notion.com/v1/pages/{sourcePageId}
+
+# 2. Read source page body blocks (for the description)
+GET https://api.notion.com/v1/blocks/{sourcePageId}/children?page_size=100
+
+# 3. Create new page in Resolved with cleaned properties + body
+POST https://api.notion.com/v1/pages
+{
+  "parent": { "database_id": "b8ce802f-1126-4a2f-a123-be5f888cbb23" },
+  "properties": { ...copied from source, dropping Bug ID + Implementation Status... },
+  "children": [ ...stripped blocks (remove null icon/href; sanitize bad URLs)... ]
+}
+
+# 4. Archive the source row in Open
+PATCH https://api.notion.com/v1/pages/{sourcePageId}
+{ "archived": true }
+```
+
+### Gotchas (learned from the 2026-05-18 bulk migration)
+
+- **Don't send `null` for optional block fields** (e.g. `paragraph.icon`) — Notion returns them on read but rejects them on create. Strip null keys from each block payload before posting.
+- **Properties pass through verbatim** — don't recursively null-strip them. PowerShell single-element array unwrap will damage `rich_text` arrays; use `[ordered]@{ rich_text = @($prop.rich_text) }` to force array shape.
+- **Bug IDs do NOT survive the move** (auto-increment is per-DB). If the user references a bug by its Open ID elsewhere, capture the original in the title or Resolution before moving.
+- **`Bug ID` and `Implementation Status` must NOT be in the create payload** — `Bug ID` is auto, `Implementation Status` doesn't exist in Resolved.
+- **Sanitize bad URLs in rich_text.** Real bug seen: a link with `url: "/"` (not absolute) → 400 "Invalid URL for link". Strip `link` and `href` where they don't match `^https?://`.
+- **Files (Screenshots) hosted on Notion can't be re-attached** — signed URLs expire and can't be re-uploaded. If Screenshots is non-empty, warn the user before moving (the 2026-05-18 batch had zero, but future bugs may have UI screenshots).
+
+For a worked example, see `~/.claude/projects/C--Dev-Projects-Products-Apps-eduagent-build/2c71d446-10ea-4dd9-be77-c9968f9963c7/` (the session that built the migration script). The full PowerShell recipe is in that transcript.
 
 ## Update documentation after every bug
 
 For each bug you touched:
 
-- **Notion row** (mandatory) — `Status` → Done (or back to Not started if you couldn't repro and didn't change anything), `Fixed In` (branch / commit / "verified obsolete"), `Resolution` (one paragraph citing the file:line and the test that proves it), `Resolved` (today's ISO date).
+- **Notion row** (mandatory) — `Status` → Done (or back to Not started if you couldn't repro and didn't change anything), `Fixed In` (branch / commit / "verified obsolete"), `Resolution` (one paragraph citing the file:line and the test that proves it), `Resolved` (today's ISO date). **If Status went to Done, move the row from Open → Resolved per "Archive Done bugs" above.** If Status reverted to Not started, leave it in Open.
 - **You touched a test file with internal mocks** → see the documentation block in `/my:run-tests` (regenerate inventory CSV + bump the inventory markdown).
 - **You learned a new repo rule or systemic pattern from the bug** → update `CLAUDE.md` (under the appropriate section: "Tests Must Reflect Reality", "Code Quality Guards", "Fix Development Rules", or "UX Resilience Rules"). Don't bury a new rule in a single bug's Resolution field.
 - **You learned a new E2E infra workaround** → add a row to the troubleshooting matrix in `docs/E2Edocs/e2e-runbook.md`.
