@@ -8,7 +8,7 @@ export const HISTORY_APP_HELP_NOTES: HistoryTurn[] = [
   },
   {
     role: 'user',
-    content: 'Where do I find my notes?',
+    content: 'Where do I find my notes about this topic or subject?',
   },
 ];
 

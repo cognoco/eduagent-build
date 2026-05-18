@@ -257,6 +257,27 @@ describe('buildSystemPrompt — homework brevity', () => {
 });
 
 describe('buildSystemPrompt — no-recall recovery', () => {
+  it('sets a higher bar for concrete next practice and specific feedback', () => {
+    const prompt = buildSystemPrompt(makeContext());
+
+    expect(prompt).toContain('what to practice next');
+    expect(prompt).toContain('concrete task they can do in one sentence');
+    expect(prompt).toContain(
+      'Do not end with a vague "what are your thoughts?"',
+    );
+    expect(prompt).toContain('Avoid generic praise words');
+    expect(prompt).toContain('Name the specific reasoning instead');
+  });
+
+  it('asks homework mistake-watch replies to include a self-check', () => {
+    const prompt = buildSystemPrompt(makeContext({ sessionType: 'homework' }));
+
+    expect(prompt).toContain('what mistake to watch for');
+    expect(prompt).toContain(
+      'one concrete mistake and one concrete self-check',
+    );
+  });
+
   it('adds global no-recall recovery guidance to ordinary learning prompts', () => {
     const prompt = buildSystemPrompt(makeContext());
 
@@ -277,6 +298,8 @@ describe('buildSystemPrompt — no-recall recovery', () => {
     expect(prompt).toContain('Session type: REVIEW');
     expect(prompt).toContain('do NOT keep asking them to recall');
     expect(prompt).toContain('ask one smaller supported check');
+    expect(prompt).toContain("Use the learner's partial answer as the anchor");
+    expect(prompt).toContain('what they got and what is still missing');
   });
 
   it('protects interleaved retrieval from repeated empty-memory testing', () => {
@@ -306,6 +329,10 @@ describe('buildSystemPrompt — no-recall recovery', () => {
     expect(prompt).toContain('Because this is text input');
     expect(prompt).toContain('Comment only on wording');
     expect(prompt).toContain('do NOT claim to hear pace');
+    expect(prompt).toContain(
+      'one concrete strength and one concrete improvement',
+    );
+    expect(prompt).toContain('prefer one clean sentence');
   });
 
   it('allows delivery feedback only for voice recitation', () => {

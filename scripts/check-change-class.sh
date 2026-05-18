@@ -142,6 +142,7 @@ if [[ -n "$PROMPT_HITS" ]]; then
   CLASSES+=("llm-prompts")
   add_cmd fast  "pnpm eval:llm"              "Snapshot prompts (Tier 1 — no LLM call)"
   add_cmd slow  "pnpm eval:llm --live"       "Real LLM validation (Tier 2)"
+  add_cmd slow  "pnpm test:llm:enduser"      "Live five-session end-user quality gate"
   note "llm-prompts: Pre-commit requires eval snapshot files staged with prompt changes"
 fi
 
