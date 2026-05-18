@@ -1489,14 +1489,14 @@ describe('source provenance audit', () => {
     );
 
     const safe = applySourceAuditSafetyFallback(
-      'Roman roads helped armies move between places. This made it easier for armies to move quickly across the empire.',
+      'Roman roads helped armies move between places. This made it easier for soldiers to travel across the empire.',
       audit,
     );
 
     expect(safe.response).toContain(
       'Roman roads helped armies move between places.',
     );
-    expect(safe.response).not.toMatch(/easier|quickly/i);
+    expect(safe.response).not.toMatch(/easier|soldiers/i);
     expect(safe.sourceAudit.reason).toMatch(/army speed\/ease\/effectiveness/i);
   });
 
