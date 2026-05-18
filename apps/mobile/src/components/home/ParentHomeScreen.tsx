@@ -445,6 +445,58 @@ function tonightTitleKey(now?: Date): TranslateKey {
   return 'home.parent.tonight.titleEvening';
 }
 
+function ConversationStarterCard({
+  prompt,
+  tint,
+}: {
+  prompt: TonightPrompt;
+  tint: SubjectTint | undefined;
+}): React.ReactElement {
+  const colors = useThemeColors();
+  const accent = tint?.solid ?? colors.primary;
+
+  return (
+    <View
+      testID={`parent-home-tonight-${prompt.key}`}
+      style={{
+        backgroundColor: tint?.soft ?? colors.primarySoft,
+        borderColor: tint ? tint.solid + '33' : colors.primary + '33',
+        borderRadius: 18,
+        borderWidth: 1,
+        minHeight: 82,
+        shadowColor: accent,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 2,
+      }}
+    >
+      <View
+        className="flex-row items-center"
+        style={{
+          borderRadius: 18,
+          paddingHorizontal: 14,
+          paddingVertical: 14,
+        }}
+      >
+        <View
+          className="h-11 w-11 rounded-full items-center justify-center"
+          style={{
+            backgroundColor: colors.surface + 'cc',
+            borderColor: accent + '22',
+            borderWidth: 1,
+          }}
+        >
+          <Ionicons name="chatbubble-outline" size={20} color={accent} />
+        </View>
+        <Text className="text-body text-text-primary ms-3 flex-1 leading-6">
+          {prompt.text}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
 function ChildActionButton({
   icon,
   label,
@@ -698,7 +750,6 @@ export function ParentHomeScreen({
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const colors = useThemeColors();
   const { colorScheme } = useTheme();
   const role = useActiveProfileRole();
   const linkedChildren = useLinkedChildren();
@@ -993,44 +1044,11 @@ export function ParentHomeScreen({
               {tonightPrompts.map((prompt) => {
                 const tint = promptTintsByKey.get(prompt.key);
                 return (
-                  <Pressable
+                  <ConversationStarterCard
                     key={`tonight-${prompt.key}`}
-                    onPress={() => pushChildProgress(prompt.childId)}
-                    className="flex-row items-center"
-                    style={({ pressed }) => ({
-                      backgroundColor: colors.surface,
-                      borderColor: tint ? tint.solid + '66' : colors.border,
-                      borderWidth: 1,
-                      borderLeftWidth: 5,
-                      borderRadius: 16,
-                      minHeight: 78,
-                      paddingHorizontal: 14,
-                      paddingVertical: 14,
-                      shadowColor: tint?.solid ?? colors.textSecondary,
-                      shadowOffset: { width: 0, height: 2 },
-                      shadowOpacity: 0.12,
-                      shadowRadius: 8,
-                      elevation: 2,
-                      opacity: pressed ? 0.76 : 1,
-                    })}
-                    accessibilityRole="button"
-                    accessibilityLabel={prompt.text}
-                    testID={`parent-home-tonight-${prompt.key}`}
-                  >
-                    <View
-                      className="h-9 w-9 rounded-full items-center justify-center"
-                      style={{ backgroundColor: tint?.soft ?? colors.surface }}
-                    >
-                      <Ionicons
-                        name="chatbubble-outline"
-                        size={18}
-                        color={tint?.solid ?? colors.textSecondary}
-                      />
-                    </View>
-                    <Text className="text-body-sm text-text-primary ms-3 flex-1 leading-6">
-                      {prompt.text}
-                    </Text>
-                  </Pressable>
+                    prompt={prompt}
+                    tint={tint}
+                  />
                 );
               })}
             </View>

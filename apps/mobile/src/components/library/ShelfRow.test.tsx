@@ -12,6 +12,7 @@ jest.mock(
       border: '#e5e7eb',
       retentionWeak: '#b45309',
       success: '#16a34a',
+      surface: '#ffffff',
       textPrimary: '#111827',
       textSecondary: '#6b7280',
       warning: '#d97706',
@@ -55,29 +56,58 @@ describe('ShelfRow', () => {
     screen.getByText('3 books · 18/32 topics');
   });
 
-  it('does not render the old bookshelf motif', () => {
+  it('renders books standing on a shelf plank', () => {
     render(<ShelfRow {...defaultProps} />);
-    expect(screen.queryByTestId('shelf-row-bookshelf-sub-math')).toBeNull();
+    screen.getByTestId('shelf-row-bookshelf-sub-math');
+    screen.getByTestId('shelf-row-plank-sub-math');
+    screen.getByTestId('shelf-row-shelf-band-sub-math');
   });
 
-  it('renders as a flat row on the screen background', () => {
+  it('renders as a tinted subject shelf card with a progress rail', () => {
     render(<ShelfRow {...defaultProps} />);
 
     const header = screen.getByTestId('shelf-row-header-sub-math');
     expect(header.props.style).toEqual(
       expect.objectContaining({
-        alignItems: 'center',
-        backgroundColor: 'transparent',
-        borderBottomWidth: 1,
-        borderColor: '#e5e7eb',
+        backgroundColor: '#edf3ff',
+        borderColor: '#2f6fbd33',
+        borderRadius: 20,
+        borderWidth: 1,
         elevation: 0,
-        flexDirection: 'row',
-        minHeight: 76,
-        paddingHorizontal: 0,
-        paddingVertical: 12,
+        minHeight: 136,
+        overflow: 'hidden',
+        paddingHorizontal: 14,
+        paddingBottom: 14,
+        paddingTop: 12,
+        position: 'relative',
+      }),
+    );
+    expect(
+      screen.getByTestId('shelf-row-shelf-band-sub-math').props.style,
+    ).toEqual(
+      expect.objectContaining({
+        backgroundColor: '#2f6fbd',
+        bottom: 24,
+        height: 18,
+        opacity: 0.08,
+      }),
+    );
+    expect(screen.getByTestId('shelf-row-plank-sub-math').props.style).toEqual(
+      expect.objectContaining({
+        backgroundColor: '#2f6fbd22',
+        borderColor: '#2f6fbd33',
+        height: 13,
       }),
     );
     screen.getByTestId('shelf-row-rail-sub-math');
+    expect(
+      screen.getByTestId('shelf-row-progress-sub-math').props.style,
+    ).toEqual(
+      expect.objectContaining({
+        backgroundColor: '#2f6fbd',
+        width: '56%',
+      }),
+    );
   });
 
   it('opens the subject shelf when header is pressed', () => {
