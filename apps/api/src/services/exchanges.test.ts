@@ -992,7 +992,7 @@ describe('classifyExchangeOutcome', () => {
   it('strips generic praise sentences from learner-visible replies', () => {
     const raw = JSON.stringify({
       reply:
-        'Good question. Nice, Maya! That is an interesting idea about empires grow. Yes, that is correct. You did a great job using inverse operations to isolate `x`.',
+        "Good question. Nice, Maya! That's a great idea, Maya! That is an interesting idea about empires grow. Yes, that is correct. You did a great job using inverse operations to isolate `x`. Nice job!",
       signals: {
         partial_progress: false,
         needs_deepening: false,
@@ -1423,6 +1423,31 @@ describe('source provenance audit', () => {
     expect(safe.sourceAudit.reason).toMatch(/unsupported source-bound phrase/i);
   });
 
+  it('removes unsupported brick and house analogies from short source replies', () => {
+    const sourceEvidence = buildExchangeSourceEvidence(
+      {
+        ...baseContext,
+        topicTitle: 'Ancient trade and Rome',
+        topicDescription:
+          'Ancient civilizations traded surplus grain or pottery for metal tools.',
+      },
+      'Can you explain it from scratch?',
+    );
+    const audit = auditExchangeSources(
+      { relied_on: ['current_topic'], insufficient: false },
+      sourceEvidence,
+    );
+
+    const safe = applySourceAuditSafetyFallback(
+      'Imagine building a house from bricks. Ancient civilizations traded surplus grain for metal tools.',
+      audit,
+    );
+
+    expect(safe.response).not.toMatch(/\bhouse\b|\bbricks?\b/i);
+    expect(safe.response).toContain('surplus grain for metal tools');
+    expect(safe.sourceAudit.reason).toMatch(/brick\/house analogy/i);
+  });
+
   it('removes review follow-up phrases that are not present in reliable source excerpts', () => {
     const sourceEvidence = buildExchangeSourceEvidence(
       {
@@ -1472,7 +1497,7 @@ describe('source provenance audit', () => {
       'Roman roads helped armies move between places.',
     );
     expect(safe.response).not.toMatch(/easier|quickly/i);
-    expect(safe.sourceAudit.reason).toMatch(/speed\/efficiency/i);
+    expect(safe.sourceAudit.reason).toMatch(/army speed\/ease\/effectiveness/i);
   });
 
   it('removes unsupported conquest confirmations from current-topic replies', () => {

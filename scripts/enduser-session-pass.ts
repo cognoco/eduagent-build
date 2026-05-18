@@ -6,10 +6,12 @@ import {
   closeDatabase,
   createDatabase,
   curriculumTopics,
+  learningProfiles,
   profiles,
   retentionCards,
   sessionEvents,
   subjects,
+  teachingPreferences,
 } from '@eduagent/database';
 import { eq } from 'drizzle-orm';
 
@@ -32,6 +34,13 @@ import {
 } from '../apps/api/src/services/test-seed';
 
 type Mode = 'freeform' | 'learning' | 'homework' | 'review' | 'recitation';
+type IssueMode = Mode | 'run';
+type AccommodationMode = 'none' | 'short-burst' | 'audio-first' | 'predictable';
+type TeachingMethod =
+  | 'visual_diagrams'
+  | 'step_by_step'
+  | 'real_world_examples'
+  | 'practice_problems';
 
 interface TopicOverride {
   title: string;
@@ -44,9 +53,27 @@ interface QualityIssue {
   severity: QualitySeverity;
   code: string;
   message: string;
-  mode: Mode;
+  mode: IssueMode;
   turnIndex?: number;
   snippet?: string;
+}
+
+interface LearnerProfileVariant {
+  id: string;
+  label: string;
+  age: number;
+  supportProfile: string;
+  accommodationMode: AccommodationMode;
+  teachingPreference?: TeachingMethod;
+  analogyDomain?:
+    | 'cooking'
+    | 'sports'
+    | 'building'
+    | 'music'
+    | 'nature'
+    | 'gaming';
+  communicationNotes: string[];
+  learningStyle?: Record<string, unknown>;
 }
 
 interface TurnPlan {
@@ -58,6 +85,7 @@ interface RunDefinition {
   mode: Mode;
   scenario: SeedScenario;
   learnerName: string;
+  learnerProfile: LearnerProfileVariant;
   sessionType: 'learning' | 'homework';
   useTopic: boolean;
   topicOverride?: TopicOverride;
@@ -86,6 +114,7 @@ interface ModeResult {
   mode: Mode;
   scenario: SeedScenario;
   learnerName: string;
+  learnerProfile: LearnerProfileVariant;
   email: string;
   profileId: string;
   subjectId: string;
@@ -107,11 +136,72 @@ interface ModeResult {
   }>;
 }
 
+function birthYearForAge(age: number): number {
+  return new Date().getFullYear() - age;
+}
+
+const learnerProfiles = {
+  youngerTypical: {
+    id: 'younger-typical',
+    label: 'younger learner / typical support',
+    age: 11,
+    supportProfile: 'typical',
+    accommodationMode: 'none',
+    teachingPreference: 'step_by_step',
+    communicationNotes: [
+      'Use plain language and keep each turn focused on one idea',
+    ],
+  },
+  shortBurst: {
+    id: 'short-burst-support',
+    label: 'short-burst support / attention-friendly',
+    age: 13,
+    supportProfile: 'short-burst',
+    accommodationMode: 'short-burst',
+    teachingPreference: 'step_by_step',
+    communicationNotes: ['Prefers concise steps and one question at a time'],
+  },
+  olderTypical: {
+    id: 'older-typical',
+    label: 'older teen / typical support',
+    age: 15,
+    supportProfile: 'typical',
+    accommodationMode: 'none',
+    teachingPreference: 'practice_problems',
+    communicationNotes: [
+      'Likes direct correction and a clear next practice step',
+    ],
+  },
+  predictable: {
+    id: 'predictable-support',
+    label: 'predictable support / structure-first',
+    age: 12,
+    supportProfile: 'predictable',
+    accommodationMode: 'predictable',
+    teachingPreference: 'step_by_step',
+    communicationNotes: [
+      'Benefits from literal wording and predictable structure',
+    ],
+  },
+  olderConcise: {
+    id: 'older-concise',
+    label: 'older teen / concise spoken practice',
+    age: 17,
+    supportProfile: 'concise',
+    accommodationMode: 'none',
+    teachingPreference: 'practice_problems',
+    communicationNotes: [
+      'Prefers concise feedback and a model answer to practice',
+    ],
+  },
+} satisfies Record<string, LearnerProfileVariant>;
+
 const runDefinitions: RunDefinition[] = [
   {
     mode: 'freeform',
     scenario: 'learning-active',
     learnerName: 'Maya',
+    learnerProfile: learnerProfiles.youngerTypical,
     sessionType: 'learning',
     useTopic: true,
     topicOverride: {
@@ -134,6 +224,7 @@ const runDefinitions: RunDefinition[] = [
     mode: 'learning',
     scenario: 'learning-active',
     learnerName: 'Maya',
+    learnerProfile: learnerProfiles.shortBurst,
     sessionType: 'learning',
     useTopic: true,
     topicOverride: {
@@ -161,6 +252,7 @@ const runDefinitions: RunDefinition[] = [
     mode: 'homework',
     scenario: 'homework-ready',
     learnerName: 'Maya',
+    learnerProfile: learnerProfiles.olderTypical,
     sessionType: 'homework',
     useTopic: true,
     topicOverride: {
@@ -196,6 +288,7 @@ const runDefinitions: RunDefinition[] = [
     mode: 'review',
     scenario: 'retention-due',
     learnerName: 'Maya',
+    learnerProfile: learnerProfiles.predictable,
     sessionType: 'learning',
     useTopic: true,
     topicOverride: {
@@ -221,6 +314,7 @@ const runDefinitions: RunDefinition[] = [
     mode: 'recitation',
     scenario: 'learning-active',
     learnerName: 'Maya',
+    learnerProfile: learnerProfiles.olderConcise,
     sessionType: 'learning',
     useTopic: true,
     topicOverride: {
@@ -357,12 +451,67 @@ async function resolveTopicId(
 async function updateSeedProfile(
   db: ReturnType<typeof createDatabase>,
   profileId: string,
+  subjectId: string,
   learnerName: string,
+  learnerProfile: LearnerProfileVariant,
 ): Promise<void> {
   await db
     .update(profiles)
-    .set({ displayName: learnerName, updatedAt: new Date() })
+    .set({
+      displayName: learnerName,
+      birthYear: birthYearForAge(learnerProfile.age),
+      updatedAt: new Date(),
+    })
     .where(eq(profiles.id, profileId));
+
+  await db
+    .insert(learningProfiles)
+    .values({
+      profileId,
+      learningStyle: learnerProfile.learningStyle ?? null,
+      communicationNotes: learnerProfile.communicationNotes,
+      accommodationMode: learnerProfile.accommodationMode,
+      memoryConsentStatus: 'granted',
+      memoryEnabled: true,
+      memoryInjectionEnabled: true,
+      memoryCollectionEnabled: false,
+      updatedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: learningProfiles.profileId,
+      set: {
+        learningStyle: learnerProfile.learningStyle ?? null,
+        communicationNotes: learnerProfile.communicationNotes,
+        accommodationMode: learnerProfile.accommodationMode,
+        memoryConsentStatus: 'granted',
+        memoryEnabled: true,
+        memoryInjectionEnabled: true,
+        memoryCollectionEnabled: false,
+        updatedAt: new Date(),
+      },
+    });
+
+  if (learnerProfile.teachingPreference) {
+    await db
+      .insert(teachingPreferences)
+      .values({
+        profileId,
+        subjectId,
+        method: learnerProfile.teachingPreference,
+        analogyDomain: learnerProfile.analogyDomain ?? null,
+        nativeLanguage: null,
+        updatedAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: [teachingPreferences.profileId, teachingPreferences.subjectId],
+        set: {
+          method: learnerProfile.teachingPreference,
+          analogyDomain: learnerProfile.analogyDomain ?? null,
+          nativeLanguage: null,
+          updatedAt: new Date(),
+        },
+      });
+  }
 }
 
 async function applyTopicOverride(
@@ -424,7 +573,7 @@ const SEED_PLACEHOLDER_NAME_RE =
 const RECITATION_TEXT_DELIVERY_RE =
   /\b(delivery|pace|confidence|confident|expression|pronunciation)\b/i;
 const GENERIC_LEARNER_PRAISE_RE =
-  /\b(great job|nice work|great question|(?:really )?good question|great topic|nice,\s+[A-Z][a-z]+|you did a great job|you'?re (?:doing )?(?:amazing|awesome|fantastic|excellent)|(?:amazing|awesome|fantastic|excellent|great|nice) (?:work|job|answer|effort|reasoning|connection)|(?:your|that'?s|this is) (?:amazing|awesome|fantastic|excellent|great|nice))\b/i;
+  /\b(great job|nice work|great question|(?:really )?good question|great topic|great idea|good start|good grasp|nice,\s+[A-Z][a-z]+|you did a great job|you'?re (?:doing )?(?:amazing|awesome|fantastic|excellent)|(?:amazing|awesome|fantastic|excellent|great|nice) (?:work|job|answer|effort|reasoning|connection)|(?:your|that'?s|this is) (?:amazing|awesome|fantastic|excellent|great|nice))\b/i;
 const OVERHEATED_STYLE_RE =
   /\b(super important|super useful|incredibly|definitely|absolutely|crucial|very important|really important)\b/i;
 const CHILDISH_TONE_RE = /\b(yummy|kiddo)\b/i;
@@ -482,6 +631,11 @@ const FREEFORM_EXAMPLE_TERMS: Array<{
     label: 'oil',
   },
   { response: /\bwine\b/i, source: /\bwine\b/i, label: 'wine' },
+  {
+    response: /\bbricks?\b|\bhouse\b/i,
+    source: /\bbricks?\b|\bhouse\b/i,
+    label: 'brick/house analogy',
+  },
 ];
 
 function snippet(text: string): string {
@@ -844,13 +998,19 @@ async function runMode(
     throw new Error(`${definition.scenario} did not resolve a topicId`);
   }
 
-  await updateSeedProfile(db, seed.profileId, definition.learnerName);
+  await updateSeedProfile(
+    db,
+    seed.profileId,
+    subjectId,
+    definition.learnerName,
+    definition.learnerProfile,
+  );
   await applyTopicOverride(db, resolvedTopicId, definition.topicOverride);
 
   const subjectName = await getSubjectName(db, subjectId);
   const topicTitle = await getTopicTitle(db, resolvedTopicId);
   console.log(
-    `[${definition.mode}] starting ${definition.sessionType} session for ${subjectName}${topicTitle ? ` / ${topicTitle}` : ''}`,
+    `[${definition.mode}] starting ${definition.sessionType} session for ${subjectName}${topicTitle ? ` / ${topicTitle}` : ''} (${definition.learnerProfile.label}, age ${definition.learnerProfile.age})`,
   );
 
   const session = await startSession(db, seed.profileId, subjectId, {
@@ -960,6 +1120,7 @@ async function runMode(
     mode: definition.mode,
     scenario: definition.scenario,
     learnerName: definition.learnerName,
+    learnerProfile: definition.learnerProfile,
     email,
     profileId: seed.profileId,
     subjectId,
@@ -993,6 +1154,7 @@ function renderMarkdown(results: ModeResult[]): string {
       '',
       `- Seed: ${result.scenario}`,
       `- Learner: ${result.learnerName}`,
+      `- Learner profile: ${result.learnerProfile.label} (age ${result.learnerProfile.age}, support ${result.learnerProfile.supportProfile}, accommodation ${result.learnerProfile.accommodationMode})`,
       `- Subject: ${result.subjectName}`,
       `- Topic: ${result.topicTitle ?? '(none)'}`,
       `- Session: ${result.sessionId}`,
@@ -1025,8 +1187,63 @@ function renderMarkdown(results: ModeResult[]): string {
   return `${lines.join('\n')}\n`;
 }
 
-function renderQualityMarkdown(results: ModeResult[]): string {
-  const issues = results.flatMap((result) => result.qualityIssues);
+function analyzeRunProfileCoverage(results: ModeResult[]): QualityIssue[] {
+  if (results.length < runDefinitions.length) return [];
+
+  const ages = new Set(results.map((result) => result.learnerProfile.age));
+  const accommodations = new Set(
+    results.map((result) => result.learnerProfile.accommodationMode),
+  );
+  const supportProfiles = new Set(
+    results.map((result) => result.learnerProfile.supportProfile),
+  );
+  const issues: QualityIssue[] = [];
+
+  if (ages.size < 3) {
+    issues.push({
+      severity: 'fail',
+      code: 'learner_age_rotation_missing',
+      message:
+        'The full five-session pass should rotate learner ages instead of exercising one age voice only.',
+      mode: 'run',
+      snippet: [...ages].join(', '),
+    });
+  }
+
+  for (const required of ['none', 'short-burst', 'predictable'] as const) {
+    if (!accommodations.has(required)) {
+      issues.push({
+        severity: 'fail',
+        code: 'learner_accommodation_rotation_missing',
+        message: `The full five-session pass should include the ${required} support profile.`,
+        mode: 'run',
+        snippet: [...accommodations].join(', '),
+      });
+    }
+  }
+
+  if (supportProfiles.size < 3) {
+    issues.push({
+      severity: 'fail',
+      code: 'learner_support_rotation_missing',
+      message:
+        'The full five-session pass should cover typical, short-burst, and predictable learner-support profiles.',
+      mode: 'run',
+      snippet: [...supportProfiles].join(', '),
+    });
+  }
+
+  return issues;
+}
+
+function renderQualityMarkdown(
+  results: ModeResult[],
+  extraIssues: QualityIssue[] = [],
+): string {
+  const issues = [
+    ...results.flatMap((result) => result.qualityIssues),
+    ...extraIssues,
+  ];
   const failures = issues.filter((issue) => issue.severity === 'fail');
   const warnings = issues.filter((issue) => issue.severity === 'warn');
   const lines: string[] = [
@@ -1069,6 +1286,17 @@ async function main(): Promise<void> {
     process.argv.includes('--help')
   ) {
     console.log(runDefinitions.map((definition) => definition.mode).join('\n'));
+    return;
+  }
+  if (process.argv.includes('--list-learner-profiles')) {
+    console.log(
+      Object.values(learnerProfiles)
+        .map(
+          (profile) =>
+            `${profile.id}: age ${profile.age}, support ${profile.supportProfile}, accommodation ${profile.accommodationMode}`,
+        )
+        .join('\n'),
+    );
     return;
   }
 
@@ -1122,12 +1350,19 @@ async function main(): Promise<void> {
     const allMdPath = path.join(resultsDir, `${runId}-transcripts.md`);
     const qualityJsonPath = path.join(resultsDir, `${runId}-quality.json`);
     const qualityMdPath = path.join(resultsDir, `${runId}-quality.md`);
-    const qualityIssues = results.flatMap((result) => result.qualityIssues);
+    const runQualityIssues = analyzeRunProfileCoverage(results);
+    const qualityIssues = [
+      ...results.flatMap((result) => result.qualityIssues),
+      ...runQualityIssues,
+    ];
     const failures = qualityIssues.filter((issue) => issue.severity === 'fail');
     await writeFile(allJsonPath, JSON.stringify(results, null, 2));
     await writeFile(allMdPath, renderMarkdown(results));
     await writeFile(qualityJsonPath, JSON.stringify(qualityIssues, null, 2));
-    await writeFile(qualityMdPath, renderQualityMarkdown(results));
+    await writeFile(
+      qualityMdPath,
+      renderQualityMarkdown(results, runQualityIssues),
+    );
     console.log(`[done] wrote ${allJsonPath}`);
     console.log(`[done] wrote ${allMdPath}`);
     console.log(`[done] wrote ${qualityJsonPath}`);

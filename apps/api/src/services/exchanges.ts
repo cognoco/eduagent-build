@@ -735,11 +735,11 @@ const SOURCE_BOUND_SENTENCE_TERMS: Array<{
     source: /\bcan do on its own\b|\bwhat a cell can do\b/i,
   },
   {
-    label: 'speed/efficiency',
+    label: 'army speed/ease/effectiveness',
     response:
-      /\bquick(?:ly)?\b|\bfaster\b|\bfast\b|\beasier\b|\befficient(?:ly)?\b|\beffective(?:ly)?\b/i,
+      /\barm(?:y|ies)\b[^.?!]*(?:more easily|easier|effective(?:ly)?|efficient(?:ly)?|faster|quickly)|(?:more easily|easier|effective(?:ly)?|efficient(?:ly)?|faster|quickly)[^.?!]*\barm(?:y|ies)\b/i,
     source:
-      /\bquick(?:ly)?\b|\bfaster\b|\bfast\b|\beasier\b|\befficient(?:ly)?\b|\beffective(?:ly)?\b/i,
+      /\barm(?:y|ies)\b[^.?!]*(?:more easily|easier|effective(?:ly)?|efficient(?:ly)?|faster|quickly)|(?:more easily|easier|effective(?:ly)?|efficient(?:ly)?|faster|quickly)[^.?!]*\barm(?:y|ies)\b/i,
   },
   {
     label: 'conquest/empire growth',
@@ -747,6 +747,11 @@ const SOURCE_BOUND_SENTENCE_TERMS: Array<{
       /\bconquer(?:ing|ed)?\b|\bconquest\b|\bempires?\s+(?:grow|grew|expand|expanded|stay strong)\b|\bempire\s+(?:grow|grew|expand|expanded|stay strong)\b/i,
     source:
       /\bconquer(?:ing|ed)?\b|\bconquest\b|\bempires?\s+(?:grow|grew|expand|expanded|stay strong)\b|\bempire\s+(?:grow|grew|expand|expanded|stay strong)\b/i,
+  },
+  {
+    label: 'brick/house analogy',
+    response: /\bbricks?\b|\bhouse\b/i,
+    source: /\bbricks?\b|\bhouse\b/i,
   },
 ];
 
@@ -789,8 +794,15 @@ function stripUnsupportedSourceBoundSentences(
     .replace(/\s{2,}/g, ' ')
     .trim();
 
+  const fallback = reliableSourceText.split(/(?<=[.?!])\s+/)[0]?.trim();
+
   return {
-    response: scrubbed.length > 0 ? scrubbed : response,
+    response:
+      scrubbed.length > 0
+        ? scrubbed
+        : fallback
+          ? `Let's keep this anchored to the source: ${fallback}`
+          : response,
     removedTerms: unsupportedTerms.map((term) => term.label),
   };
 }
@@ -1074,7 +1086,7 @@ export const HANDLED_MARKER_KEYS: ReadonlySet<string> =
 
 const DEFAULT_FALLBACK_TEXT = "I didn't have a reply — tap to try again.";
 const GENERIC_PRAISE_SENTENCE_RE =
-  /(?:^|[\s\n]+)(?:(?:you did a )?great job|great work|nice work|nice,\s+\w+|that was a good start|good question|great question|excellent|amazing|awesome|fantastic)(?:[^.?!]*)(?:[.?!]|$)/gi;
+  /(?:^|[\s\n]+)(?:(?:you did a )?great job|great work|nice work|nice job|nice,\s+\w+|that(?:'s| is| was) a good start|that's a great idea|great idea|good question|great question|you've got a good grasp|excellent|amazing|awesome|fantastic)(?:[^.?!]*)(?:[.?!]|$)/gi;
 const UNSUPPORTED_SOFT_VALIDATION_SENTENCE_RE =
   /(?:^|[\s\n]+)(?:that(?:'s| is) an? )?(?:interesting idea|interesting thought|good observation|fair point)(?:[^.?!]*)(?:[.?!]|$)/gi;
 const OVERHEATED_PHRASE_RE =
