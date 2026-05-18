@@ -27,8 +27,9 @@ Two production dead-code branches removed 2026-04-19 in commit `970a82a5`: `AgeB
 
 ## Critical Architecture Decisions
 
-- [project_eval_llm_harness.md](project_eval_llm_harness.md) — `apps/api/eval-llm/` + `pnpm eval:llm`. All 9 LLM flows wired. Fixture-driven snapshot harness for prompt builders.
+- [project_eval_llm_harness.md](project_eval_llm_harness.md) — `apps/api/eval-llm/` + `pnpm eval:llm`. All 10 LLM flows wired. Fixture-driven snapshot harness for prompt builders.
 - [project_eval_llm_signal_metrics.md](project_eval_llm_signal_metrics.md) — Layer 1 signal-distribution regression guard. `emitsEnvelope` flag + `--check-baseline`/`--update-baseline`.
+- [project_llm_source_provenance.md](project_llm_source_provenance.md) — Private source provenance, sourceAudit metadata, and no-memory/no-forum factual grounding rule for tutoring exchanges.
 - [billing-payments.md](billing-payments.md) — Mobile IAP (RevenueCat), Stripe dormant for future web. Epic 9 COMPLETE.
 - [pricing_dual_cap.md](pricing_dual_cap.md) — Free: 10/day + 100/month. Plus: 700/month, no daily limit.
 - [market_language_pivot.md](market_language_pivot.md) — English UI only. Language TEACHING active (four_strands). GDPR-everywhere.
@@ -68,6 +69,7 @@ Two production dead-code branches removed 2026-04-19 in commit `970a82a5`: `AgeB
 ## Testing Infrastructure
 
 - [project_playwright_e2e_setup.md](project_playwright_e2e_setup.md) — Playwright E2E: `doppler run -c stg`, seed secret, baseline 23m/48% pass (2026-05-14)
+- [project_enduser_session_pass.md](project_enduser_session_pass.md) — Live API-level five-session LLM quality gate: freeform, learning, homework, review, recitation; includes private source-audit checks.
 
 ## Deployment & Secrets
 
@@ -95,6 +97,7 @@ Two production dead-code branches removed 2026-04-19 in commit `970a82a5`: `AgeB
 ## Core Learning Philosophy
 
 - [project_language_pedagogy.md](project_language_pedagogy.md) — four_strands pedagogy mode (alongside socratic). Vocabulary CRUD, CEFR levels, language-progress routes.
+- [project_language_assessments_production_first.md](project_language_assessments_production_first.md) — Language reviews must test production/translation/tiny exchanges, not abstract topic summaries or culture-ish "idea of a greeting" prompts.
 - [feedback_never_lock_topics.md](feedback_never_lock_topics.md) — NEVER lock/block topics. Prerequisites advisory.
 - [feedback_never_force_add_child.md](feedback_never_force_add_child.md) — Never force add-child. Solo/skip path always available for parent accounts.
 - [feedback_human_override_everywhere.md](feedback_human_override_everywhere.md) — Every AI-driven screen must allow human override.
