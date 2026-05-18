@@ -375,7 +375,7 @@ describe('Integration: assessment routes', () => {
         feedback: 'Keep going!',
         passed: true,
         shouldEscalateDepth: true,
-        rawScore: 0.3,
+        rawScore: 0.7,
         qualityRating: 3,
       }),
     );
@@ -389,7 +389,8 @@ describe('Integration: assessment routes', () => {
           profile.id,
         ),
         body: JSON.stringify({
-          answer: 'A partial answer.',
+          answer:
+            'Plants use sunlight, water, and carbon dioxide to make food.',
         }),
       },
       TEST_ENV,
