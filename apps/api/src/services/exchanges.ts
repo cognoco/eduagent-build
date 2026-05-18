@@ -963,6 +963,15 @@ export const HANDLED_MARKER_KEYS: ReadonlySet<string> =
 const DEFAULT_FALLBACK_TEXT = "I didn't have a reply — tap to try again.";
 const GENERIC_PRAISE_SENTENCE_RE =
   /(?:^|[\s\n]+)(?:(?:you did a )?great job|great work|nice work|excellent|amazing|awesome|fantastic)(?:[^.?!]*)(?:[.?!]|$)/gi;
+const OVERHEATED_PHRASE_RE = /\b(super important|very important|crucial)\b/gi;
+const OVERHEATED_ADVERB_RE = /\b(definitely|absolutely|incredibly)\s+/gi;
+
+function normalizeInflatedStyle(text: string): string {
+  return text
+    .replace(OVERHEATED_PHRASE_RE, 'important')
+    .replace(OVERHEATED_ADVERB_RE, '')
+    .replace(/[^\S\r\n]{2,}/g, ' ');
+}
 
 // Shared bounds for fluency-drill duration, used by both the full-envelope
 // and bare-marker code paths so the clamp definition can't drift.
@@ -971,7 +980,7 @@ function clampDrillDuration(seconds: number): number {
 }
 
 function cleanLearnerVisibleReply(text: string): string {
-  return stripPhoneticHints(text)
+  return normalizeInflatedStyle(stripPhoneticHints(text))
     .replace(GENERIC_PRAISE_SENTENCE_RE, '')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
