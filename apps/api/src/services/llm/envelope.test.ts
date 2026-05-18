@@ -93,6 +93,22 @@ describe('parseEnvelope', () => {
     }
   });
 
+  it('repairs bare double quotes inside a reply string', () => {
+    const result = parseEnvelope(
+      '{"reply": "Get rid of the "+5" on the left side.", "signals": {"understanding_check": true}, "private_sources": {"relied_on": ["homework_problem"], "insufficient": false, "reason": "Grounded in the homework problem."}, "confidence": "high"}',
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.envelope.reply).toBe(
+        'Get rid of the "+5" on the left side.',
+      );
+      expect(result.envelope.signals?.understanding_check).toBe(true);
+      expect(result.envelope.private_sources?.relied_on).toEqual([
+        'homework_problem',
+      ]);
+    }
+  });
+
   it('fails with schema_violation when required fields are missing', () => {
     const result = parseEnvelope('{"signals": {"ready_to_finish": true}}');
     expect(result.ok).toBe(false);

@@ -707,7 +707,8 @@ export function applySourceAuditSafetyFallback(
   const needsNoSourceFallback =
     sourceAudit.availableReliableSourceIds.length === 0 &&
     (sourceAudit.status === 'missing_reliable_source' ||
-      sourceAudit.status === 'insufficient_reliable_sources');
+      sourceAudit.status === 'insufficient_reliable_sources' ||
+      sourceAudit.status === 'unsupported_sources');
 
   if (!needsNoSourceFallback) {
     return { response, sourceAudit };
@@ -960,6 +961,8 @@ export const HANDLED_MARKER_KEYS: ReadonlySet<string> =
   new Set<HandledMarkerKey>(['notePrompt', 'fluencyDrill']);
 
 const DEFAULT_FALLBACK_TEXT = "I didn't have a reply — tap to try again.";
+const GENERIC_PRAISE_SENTENCE_RE =
+  /(?:^|[\s\n]+)(?:(?:you did a )?great job|great work|nice work|excellent|amazing|awesome|fantastic)(?:[^.?!]*)(?:[.?!]|$)/gi;
 
 // Shared bounds for fluency-drill duration, used by both the full-envelope
 // and bare-marker code paths so the clamp definition can't drift.
@@ -967,8 +970,15 @@ function clampDrillDuration(seconds: number): number {
   return Math.min(90, Math.max(15, seconds));
 }
 
+function cleanLearnerVisibleReply(text: string): string {
+  return stripPhoneticHints(text)
+    .replace(GENERIC_PRAISE_SENTENCE_RE, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 function parsedFromVisibleFallbackText(text: string): ParsedExchangeEnvelope {
-  const cleanResponse = stripPhoneticHints(
+  const cleanResponse = cleanLearnerVisibleReply(
     stripEmbeddedEnvelopeTail(normalizeReplyText(text)).trim(),
   );
   return {
@@ -1017,7 +1027,7 @@ export function parseExchangeEnvelope(
         : stripEmbeddedEnvelopeTail(normalizeReplyText(response.trim()));
     return {
       // [BUG-865] Strip TTS pronunciation hints from chat-visible text.
-      cleanResponse: stripPhoneticHints(fallbackText),
+      cleanResponse: cleanLearnerVisibleReply(fallbackText),
       understandingCheck: detectUnderstandingCheckFromProse(fallbackText),
       partialProgress: false,
       needsDeepening: false,
@@ -1047,7 +1057,7 @@ function envelopeToParsedExchange(
   // pipeline today — the LLM hint is dropped on the floor for TTS too. If
   // pronunciation regresses on long words, restore via SSML at the audio
   // boundary, not by passing the dashed form through.
-  const cleanReply = stripPhoneticHints(envelope.reply.trim());
+  const cleanReply = cleanLearnerVisibleReply(envelope.reply);
 
   const notePrompt = uiHints.note_prompt;
   const drill = uiHints.fluency_drill;

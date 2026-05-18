@@ -186,6 +186,8 @@ describe('buildSystemPrompt — response envelope contract', () => {
     expect(prompt).toContain('Reply with ONLY valid JSON');
     expect(prompt).toContain('must begin with `{` and end with `}`');
     expect(prompt).toContain('Do not wrap it in markdown fences');
+    expect(prompt).toContain('avoid raw double quote characters');
+    expect(prompt).toContain('write `+5` or plus 5, not "+5"');
   });
 
   it('requires private source provenance in the envelope', () => {
@@ -206,6 +208,16 @@ describe('buildSystemPrompt — response envelope contract', () => {
     expect(prompt).toContain(
       'do not confirm it as true. Acknowledge it as their idea',
     );
+    expect(prompt).toContain('Unsupported learner claims need neutral');
+    expect(prompt).toContain('good point');
+    expect(prompt).toContain('definitely');
+    expect(prompt).toContain('The part our source supports is X');
+    expect(prompt).toContain('FINAL GROUNDING CHECK');
+    expect(prompt).toContain(
+      'does not support extra claims like conquering land',
+    );
+    expect(prompt).toContain('FINAL OUTPUT FILTER');
+    expect(prompt).toContain('Do not start with "Yes"');
     expect(prompt).toContain('include that exact reliable source ID');
     expect(prompt).toContain(
       'For current-topic teaching, review, quizzes, or next-practice tasks, include "current_topic"',
@@ -274,6 +286,8 @@ describe('buildSystemPrompt — no-recall recovery', () => {
     expect(prompt).toContain('what to practice next');
     expect(prompt).toContain('concrete task they can do in one sentence');
     expect(prompt).toContain('Practice by');
+    expect(prompt).toContain('source-supported part');
+    expect(prompt).toContain('do not affirm the whole answer');
     expect(prompt).toContain(
       'Do not end with a vague "what are your thoughts?"',
     );
@@ -321,6 +335,10 @@ describe('buildSystemPrompt — no-recall recovery', () => {
     expect(prompt).toContain('ask one smaller supported check');
     expect(prompt).toContain("Use the learner's partial answer as the anchor");
     expect(prompt).toContain('what they got and what is still missing');
+    expect(prompt).toContain('REVIEW SOURCE DISCIPLINE');
+    expect(prompt).toContain('cloze-style prompt from the source wording');
+    expect(prompt).toContain('REVIEW OVERRIDE');
+    expect(prompt).toContain('REVIEW FINAL CHECK BEFORE REPLY');
   });
 
   it('protects interleaved retrieval from repeated empty-memory testing', () => {
@@ -408,6 +426,7 @@ describe('buildSystemPrompt — first-encounter topic probe', () => {
     expect(prompt).toContain(
       'one teaching nugget AND one focused follow-up question',
     );
+    expect(prompt).toContain('confirm only source-supported facts');
     expect(prompt).toContain('end with exactly one focused follow-up question');
     expect(prompt).not.toContain('end with exactly one learner action');
     expect(prompt).toContain(

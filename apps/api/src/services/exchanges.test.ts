@@ -986,6 +986,23 @@ describe('classifyExchangeOutcome', () => {
     expect(result.parsed.cleanResponse).toBe('hello');
   });
 
+  it('strips generic praise sentences from learner-visible replies', () => {
+    const raw = JSON.stringify({
+      reply:
+        'Yes, that is correct. You did a great job using inverse operations to isolate `x`.',
+      signals: {
+        partial_progress: false,
+        needs_deepening: false,
+        understanding_check: false,
+      },
+    });
+
+    const result = classifyExchangeOutcome(raw, ctx);
+
+    expect(result.fallback).toBeUndefined();
+    expect(result.parsed.cleanResponse).toBe('Yes, that is correct.');
+  });
+
   it.each(['', '   \n\t  '])(
     'returns empty_reply fallback for empty reply %p',
     (reply) => {
@@ -1295,6 +1312,26 @@ describe('source provenance audit', () => {
 
     expect(safe.response).toMatch(/reliable source material/i);
     expect(safe.sourceAudit.status).toBe('insufficient_reliable_sources');
+  });
+
+  it('replaces invented source citations when no reliable source exists', () => {
+    const audit = auditExchangeSources(
+      { relied_on: ['current_topic'], insufficient: false },
+      buildExchangeSourceEvidence(
+        { ...baseContext, topicTitle: undefined, topicDescription: undefined },
+        'Why did ancient civilizations trade?',
+      ),
+    );
+
+    const safe = applySourceAuditSafetyFallback(
+      'Ancient civilizations traded because of resources.',
+      audit,
+    );
+
+    expect(audit.status).toBe('unsupported_sources');
+    expect(safe.response).toMatch(/source-check question/i);
+    expect(safe.sourceAudit.status).toBe('insufficient_reliable_sources');
+    expect(safe.sourceAudit.unsupportedSourceIds).toEqual(['current_topic']);
   });
 
   it('standardizes intentional no-source replies into useful non-factual guidance', () => {

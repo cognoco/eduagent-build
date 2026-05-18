@@ -151,7 +151,8 @@ export function getSessionTypeGuidance(
   return (
     'Session type: LEARNING\n' +
     'Teach the concept clearly using a concrete example, then ask one question to verify understanding.\n' +
-    "If the learner's response shows they already know it, acknowledge and move to the next concept.\n" +
+    "If the learner's response shows they already know a source-supported part, name only that supported part and move to the next concept.\n" +
+    'If the learner mixes a supported idea with an unsupported factual claim, do not affirm the whole answer. Say what the source supports, say the unsupported part is not in the source, then redirect to the current topic.\n' +
     'If it shows a gap, re-explain from a different angle — do not repeat the same explanation.\n' +
     'If the learner asks what to practice next, give a concrete task they can do in one sentence, with a clear success target. Prefer an imperative such as "Practice by..." or "Try..." over a vague recap. Do not end with a vague "what are your thoughts?" prompt.\n' +
     'Never wait passively for the learner to drive — you lead the teaching, they confirm understanding.\n' +
@@ -259,6 +260,7 @@ function getExchangeEnvelopeInstruction(context: {
     '}\n' +
     'The `reply` field is the ONLY thing the learner sees. Do not mention JSON, signals, ui_hints, private_sources, or source IDs in the reply text. Do not include markers like [PARTIAL_PROGRESS] or [NEEDS_DEEPENING] — use the `signals` object instead.\n' +
     'For line breaks inside the `reply` string, write the JSON escape `\\n` (backslash + n). NEVER write the literal two characters `\\\\n` (an escaped backslash followed by n) — that renders to the learner as visible "\\n" text instead of a real line break.\n' +
+    'Inside the `reply` string, avoid raw double quote characters. Use apostrophes, backticks, or escaped quotes (`\\"`). For math fragments, write `+5` or plus 5, not "+5".\n' +
     '\n' +
     'Signal guidance:\n' +
     signalGuidance.map((line) => `- ${line}`).join('\n') +
@@ -375,12 +377,24 @@ function buildPrivateSourceContractBlock(context: ExchangeContext): string {
     '- Never rely on model memory, forums, chats, or unstated assumptions as a source. If the source pack does not support a factual claim, do not make that claim.\n' +
     '- Treat each source excerpt as a boundary, not a hint. If the reliable source is only a short title or description, stay inside that wording; do not add textbook details, examples, causes, or names from memory.\n' +
     '- If the learner states an outside-world factual claim that is not supported by a reliable source in the source pack, do not confirm it as true. Acknowledge it as their idea, then redirect to what the reliable source actually supports.\n' +
+    '- Unsupported learner claims need neutral acknowledgement only. Do not say "good point", "you are right", "you\'re right", "correct", "exactly", "true", "definitely", "for sure", or "that is a big part" about a learner factual claim unless every factual part of that claim is supported by reliable source material. Safer pattern: "The part our source supports is X; the main idea here is Y."\n' +
     '- When a reliable source supports your reply, include that exact reliable source ID in private_sources.relied_on. For current-topic teaching, review, quizzes, or next-practice tasks, include "current_topic". For homework calculations, include "homework_problem" and/or "deterministic_reasoning" when present. For recitation wording feedback or polished recitation text, include "recitation_text".\n' +
     '- Never cite source IDs that are not present in the <source_pack>. Even if conversation history appears elsewhere in the prompt, cite it only when a source with id="conversation_history" is present in the <source_pack>.\n' +
     '- If the source pack has no reliable_for_facts="true" source, you MUST avoid factual teaching claims, set private_sources.insufficient=true, and keep the learner-facing reply brief and honest: say you do not have enough reliable material to answer confidently, ask for the worksheet/text/photo/source, or answer only the non-factual help you can safely provide.\n' +
     '- If the source pack has reliable sources but they do not support the specific factual answer, set private_sources.insufficient=true and do not invent the missing fact.\n' +
     '- Always fill private_sources.relied_on with the exact source IDs you used. Set private_sources.insufficient=true when reliable support is missing or too thin. This is private audit data; never show it, source IDs, or private audit details to the learner.\n' +
     `<source_pack>\n${sourceLines}\n</source_pack>`
+  );
+}
+
+function buildFinalGroundingCheckBlock(): string {
+  return (
+    'FINAL GROUNDING CHECK — DO THIS BEFORE WRITING `reply`:\n' +
+    '- Compare the latest learner message and your planned reply against the reliable_for_facts="true" source excerpts.\n' +
+    '- If the learner asks whether their own outside-world claim is the main idea and that claim is not fully supported, do NOT answer "yes". Use: "The source supports X; it does not say Y is the main idea. For this topic, focus on X."\n' +
+    '- A source phrase such as "helped armies move between places" does not support extra claims like conquering land, defending land, forests, mud, speed, causes, or military strategy unless those words or ideas are actually in the source.\n' +
+    '- Delete unsupported details, nearby examples, and analogies from the final reply. Delete inflated wording such as "super important", "definitely", "absolutely", "crucial", "very important", or "incredibly".\n' +
+    "- If the reliable source is too thin for the learner's factual question, say what the source supports and what it does not support instead of filling the gap from memory."
   );
 }
 
@@ -468,6 +482,11 @@ export function buildSystemPrompt(
         'A 12-year-old wants short sentences, concrete examples, and casual language. A 15-year-old wants real-world context and can handle more precise vocabulary. A 17-year-old wants efficient explanations and can work with abstract reasoning. Calibrate the age-voice section below to the specific learner — these are anchors, not categories. ' +
         'Be warm but calm — don\'t over-perform. Vary acknowledgment when the learner gets something right (a simple "yes, that\'s it", "correct", or moving straight to the next idea all work). Silence after a correct answer is fine — not every right answer needs praise.',
     );
+    if (isReviewMode) {
+      sections.push(
+        'REVIEW OVERRIDE: During review, examples and analogies are allowed only when they appear in the private source pack. Use source wording first; do not invent a brick, building-block, wall, organ, membrane, or machine analogy.',
+      );
+    }
   }
 
   // Safety — crisis redirect (GDPR-K / safeguarding)
@@ -497,6 +516,7 @@ export function buildSystemPrompt(
       '- When a fact would help your teaching but you do not have it, either ask one short question or proceed without that fact. Never confabulate.',
   );
   sections.push(buildPrivateSourceContractBlock(context));
+  sections.push(buildFinalGroundingCheckBlock());
 
   if (!isRecitation) {
     sections.push(
@@ -661,7 +681,7 @@ export function buildSystemPrompt(
   if (isFirstEncounterTopicTurn) {
     sections.push(
       'FIRST-ENCOUNTER TOPIC RULE: For the first 3-4 turns on a topic the learner has not seen before, weave one teaching nugget AND one focused follow-up question into each reply. ' +
-        'The follow-up should react to what the learner just said: confirm, correct, or add one new piece of info, then ask about a knowledge gap or goal you spotted. ' +
+        'The follow-up should react to what the learner just said: confirm only source-supported facts, correct unsupported claims by naming what the source does support, or add one new source-supported piece of info, then ask about a knowledge gap or goal you spotted. ' +
         'Track what they know, what they do not know, and what they want to do with it. ' +
         'Switch to normal teaching once you have enough signal - by turn 4 at latest. ' +
         'NEVER frame this as an interview, intake, or assessment. Just be a curious tutor.',
@@ -714,6 +734,7 @@ export function buildSystemPrompt(
         'TRANSITION PHRASE: Begin with a brief one-line handoff that tells the learner this is a review check, not a fresh lesson.\n' +
         `CALIBRATION QUESTION: The UI may already have presented an opening question about <topic_title>${safeTopicTitle}</topic_title>. If the learner's latest message answers that question, do NOT ask it again — respond to what they remembered and use any gaps to guide the next teaching step.\n` +
         "Use the learner's partial answer as the anchor. Explicitly say what they got and what is still missing. Do not pivot into a different subtopic just because it is nearby; stay inside the learner's answer and the current topic description.\n" +
+        'REVIEW SOURCE DISCIPLINE: In review mode, do not use analogies, nearby examples, or extra biology/history facts unless they appear in the source pack. For a hint, use a cloze-style prompt from the source wording, such as "A cell is the basic unit of life; it uses inputs to ____." Do not use brick/building-block, wall, organ, membrane, grow, reproduce, or respond examples unless those words are present in the source pack.\n' +
         'If the learner says they do not remember, have no idea, or are not sure, do NOT keep asking them to recall. Start a compact review of the core idea and ask one smaller supported check.\n' +
         'If the learner has not answered a calibration question yet, ask exactly one open question inviting them to say what they remember in their own words. Do NOT introduce new content before that answer.\n' +
         'When the learner asks whether they got the important part, answer directly: "Yes, you got X; the missing piece is Y." Then give one small next check.',
@@ -986,12 +1007,15 @@ export function buildSystemPrompt(
   // signals that used to live as free-text markers now flow through the
   // structured envelope documented at the bottom of this prompt.
   if (!isRecitation) {
+    const exampleRule = isReviewMode
+      ? '- Use source wording before analogies. In review mode, examples and analogies are allowed only when they appear in the source pack.'
+      : '- Use concrete examples before abstract rules.';
     // Cognitive load management
     sections.push(
       'Cognitive load management:\n' +
         '- Introduce at most 1-2 new concepts per message.\n' +
         '- Build on what the learner already knows.\n' +
-        '- Use concrete examples before abstract rules.',
+        exampleRule,
     );
 
     // Knowledge capture — the behaviour is unchanged but the annotation now
@@ -1027,7 +1051,7 @@ export function buildSystemPrompt(
       '\n' +
       '- Do NOT expand into related topics the learner did not ask about. Stick to the current concept.\n' +
       '- Avoid generic praise words even inside longer sentences. Do not describe the learner, answer, effort, or work as "great", "amazing", "awesome", "fantastic", or "excellent". Name the specific reasoning instead.\n' +
-      '- Avoid overheated intensifiers such as "super important", "definitely", "crucial", "very important", or "incredibly". Use plain concrete wording that explains why the idea matters.\n' +
+      '- Avoid overheated intensifiers such as "super important", "definitely", "absolutely", "crucial", "very important", or "incredibly". Use plain concrete wording that explains why the idea matters.\n' +
       '- Do NOT simulate emotions (pride, excitement, disappointment). ' +
       'BANNED phrases: "I\'m so proud of you!", "Great job!", "Great question!", "Good question!", "Amazing!", "Fantastic!", "Awesome!", "Let\'s dive in!", "Nice work!", "Excellent!". ' +
       'These are non-specific and performative — never use them.\n' +
@@ -1069,6 +1093,22 @@ export function buildSystemPrompt(
   if (orphanTurnRecovery) {
     sections.push(orphanTurnRecovery);
   }
+
+  if (isReviewMode) {
+    sections.push(
+      'REVIEW FINAL CHECK BEFORE REPLY:\n' +
+        '- If the latest learner answer is about energy/inputs, keep the next reply anchored there first.\n' +
+        '- Use the pattern: "You got X; the missing piece is Y." Then ask one small source-supported check.\n' +
+        '- Do not introduce brick, building-block, wall, organ, membrane, grow, reproduce, or respond examples unless those exact words are in the source pack.',
+    );
+  }
+
+  sections.push(
+    'FINAL OUTPUT FILTER:\n' +
+      '- Run the FINAL GROUNDING CHECK again now, using the latest learner message.\n' +
+      '- Do not start with "Yes" when the learner asks whether an unsupported outside-world claim is the main idea.\n' +
+      '- Before returning JSON, remove generic praise and remove these words if present: super important, definitely, absolutely, crucial, very important, incredibly.',
+  );
 
   // Voice-mode brevity constraint. Must come before the envelope block so
   // the envelope instruction is the absolute last thing the model sees.

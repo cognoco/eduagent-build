@@ -133,7 +133,7 @@ const runDefinitions: RunDefinition[] = [
     topicOverride: {
       title: 'Roman roads and empire trade',
       description:
-        'How Roman roads helped armies, towns, and trade stay connected across the empire.',
+        'Roman roads helped armies move between places, connected towns, and made trade easier across the empire.',
     },
     turns: ({ topicTitle }) => [
       {
@@ -195,7 +195,7 @@ const runDefinitions: RunDefinition[] = [
     topicOverride: {
       title: 'Cells as the basic unit of life',
       description:
-        'What cells are and how they use inputs to support living systems.',
+        'Cells are the basic unit of life: they are the smallest living unit in this review and use inputs to make usable energy for living systems.',
     },
     rawInput: 'Review the due Biology topic with recall first.',
     turns: ({ topicTitle }) => [
@@ -216,7 +216,12 @@ const runDefinitions: RunDefinition[] = [
     scenario: 'learning-active',
     learnerName: 'Maya',
     sessionType: 'learning',
-    useTopic: false,
+    useTopic: true,
+    topicOverride: {
+      title: 'Roman roads and empire trade',
+      description:
+        'Roman roads helped armies travel, connected towns, and allowed trade to move faster across the empire.',
+    },
     rawInput: 'I want to practice reciting a short history explanation aloud.',
     turns: () => [
       {
@@ -396,9 +401,9 @@ const SEED_PLACEHOLDER_NAME_RE =
 const RECITATION_TEXT_DELIVERY_RE =
   /\b(delivery|pace|confidence|confident|expression|pronunciation)\b/i;
 const GENERIC_LEARNER_PRAISE_RE =
-  /\b(great job|nice work|great question|(?:really )?good question|you did a great job|you'?re (?:doing )?(?:amazing|awesome|fantastic|excellent)|(?:amazing|awesome|fantastic|excellent|great|nice) (?:work|job|answer|effort|reasoning|connection)|(?:your|that'?s|this is) (?:amazing|awesome|fantastic|excellent|great|nice))\b/i;
+  /\b(great job|nice work|great question|(?:really )?good question|nice,\s+[A-Z][a-z]+|you did a great job|you'?re (?:doing )?(?:amazing|awesome|fantastic|excellent)|(?:amazing|awesome|fantastic|excellent|great|nice) (?:work|job|answer|effort|reasoning|connection)|(?:your|that'?s|this is) (?:amazing|awesome|fantastic|excellent|great|nice))\b/i;
 const OVERHEATED_STYLE_RE =
-  /\b(super important|incredibly|definitely|crucial|very important)\b/i;
+  /\b(super important|incredibly|definitely|absolutely|crucial|very important)\b/i;
 const RECITATION_NO_WEAKNESS_RE =
   /\b(nothing (?:that )?sounded weak|wasn'?t anything (?:that )?sounded weak|there (?:was|is)n'?t anything weak|very clear and complete|all the way through)\b/i;
 const RECITATION_UNSUPPORTED_POLISH_RE =
@@ -406,7 +411,7 @@ const RECITATION_UNSUPPORTED_POLISH_RE =
 const LEARNING_UNSUPPORTED_CONQUEST_CONFIRM_RE =
   /\b(?:you'?re right[^.?!]*conquering|conquering land was (?:definitely|a big part|the main))\b/i;
 const REVIEW_OFF_ANCHOR_RE =
-  /\b(lego|brick|eat|breathe|reproduc|grow|respond(?:ing)? to its environment|outer boundary|cell membrane|outer layer|stomach|lung)\b/i;
+  /\b(lego|brick|building blocks?|wall|organs?|eat|breathe|reproduc|grow|respond(?:ing)? to its environment|outer boundary|cell membrane|outer layer|stomach|lung)\b/i;
 const CONCRETE_NEXT_PRACTICE_RE =
   /\b(try|practice|explain in one sentence|one-sentence|compare|write|say|answer this|task)\b/i;
 const SELF_CHECK_RE = /\b(check|substitut|plug|back into|reverse|undo)\b/i;

@@ -119,6 +119,68 @@ export function findEmbeddedEnvelopeTailStart(text: string): number {
   return EMBEDDED_ENVELOPE_TAIL_RE.exec(text)?.index ?? -1;
 }
 
+function nextNonWhitespaceChar(
+  value: string,
+  startIndex: number,
+): string | null {
+  for (let index = startIndex; index < value.length; index += 1) {
+    const char = value[index];
+    if (char && !/\s/.test(char)) return char;
+  }
+  return null;
+}
+
+function repairBareQuotesInsideJsonStrings(jsonStr: string): string | null {
+  let repaired = '';
+  let inString = false;
+  let escaped = false;
+  let changed = false;
+
+  for (let index = 0; index < jsonStr.length; index += 1) {
+    const char = jsonStr[index]!;
+
+    if (!inString) {
+      repaired += char;
+      if (char === '"') inString = true;
+      continue;
+    }
+
+    if (escaped) {
+      repaired += char;
+      escaped = false;
+      continue;
+    }
+
+    if (char === '\\') {
+      repaired += char;
+      escaped = true;
+      continue;
+    }
+
+    if (char === '"') {
+      const next = nextNonWhitespaceChar(jsonStr, index + 1);
+      if (
+        next === null ||
+        next === ':' ||
+        next === ',' ||
+        next === '}' ||
+        next === ']'
+      ) {
+        repaired += char;
+        inString = false;
+      } else {
+        repaired += '\\"';
+        changed = true;
+      }
+      continue;
+    }
+
+    repaired += char;
+  }
+
+  return changed && !inString ? repaired : null;
+}
+
 function parseEnvelopeRaw(response: string): ParseEnvelopeResult {
   const jsonStr = extractFirstJsonObject(response);
   if (!jsonStr) {
@@ -129,7 +191,15 @@ function parseEnvelopeRaw(response: string): ParseEnvelopeResult {
   try {
     parsed = JSON.parse(jsonStr);
   } catch (error) {
-    return { ok: false, reason: 'invalid_json', raw: response, error };
+    const repairedJsonStr = repairBareQuotesInsideJsonStrings(jsonStr);
+    if (!repairedJsonStr) {
+      return { ok: false, reason: 'invalid_json', raw: response, error };
+    }
+    try {
+      parsed = JSON.parse(repairedJsonStr);
+    } catch {
+      return { ok: false, reason: 'invalid_json', raw: response, error };
+    }
   }
 
   const result = llmResponseEnvelopeSchema.safeParse(parsed);
