@@ -202,6 +202,7 @@ describe('buildSystemPrompt — response envelope contract', () => {
     expect(prompt).toContain('private_sources');
     expect(prompt).toContain('relied_on');
     expect(prompt).toContain('current_topic');
+    expect(prompt).toContain('applies to every subject, session mode');
     expect(prompt).toContain('reliable_for_facts="true"');
     expect(prompt).toContain('never show it, source IDs');
     expect(prompt).toContain('Treat each source excerpt as a boundary');
@@ -218,6 +219,7 @@ describe('buildSystemPrompt — response envelope contract', () => {
     expect(prompt).toContain(
       'does not support extra claims like conquering land',
     );
+    expect(prompt).toContain('It does not license unstated causes');
     expect(prompt).toContain('empire growth');
     expect(prompt).toContain('do not invent examples or analogies');
     expect(prompt).toContain('Delete risky words');

@@ -742,9 +742,9 @@ const SOURCE_BOUND_SENTENCE_TERMS: Array<{
   {
     label: 'army speed/ease/effectiveness',
     response:
-      /\b(?:arm(?:y|ies)|soldiers?)\b[^.?!]*(?:easy|easily|more easily|easier|effective(?:ly)?|efficient(?:ly)?|faster|quickly)|(?:easy|easily|more easily|easier|effective(?:ly)?|efficient(?:ly)?|faster|quickly)[^.?!]*\b(?:arm(?:y|ies)|soldiers?)\b/i,
+      /\b(?:arm(?:y|ies)|soldiers?)\b[^,.;?!]*(?:easy|easily|more easily|easier|effective(?:ly)?|efficient(?:ly)?|faster|quickly)|(?:easy|easily|more easily|easier|effective(?:ly)?|efficient(?:ly)?|faster|quickly)[^,.;?!]*\b(?:arm(?:y|ies)|soldiers?)\b/i,
     source:
-      /\b(?:arm(?:y|ies)|soldiers?)\b[^.?!]*(?:easy|easily|more easily|easier|effective(?:ly)?|efficient(?:ly)?|faster|quickly)|(?:easy|easily|more easily|easier|effective(?:ly)?|efficient(?:ly)?|faster|quickly)[^.?!]*\b(?:arm(?:y|ies)|soldiers?)\b/i,
+      /\b(?:arm(?:y|ies)|soldiers?)\b[^,.;?!]*(?:easy|easily|more easily|easier|effective(?:ly)?|efficient(?:ly)?|faster|quickly)|(?:easy|easily|more easily|easier|effective(?:ly)?|efficient(?:ly)?|faster|quickly)[^,.;?!]*\b(?:arm(?:y|ies)|soldiers?)\b/i,
   },
   {
     label: 'conquest/empire growth',
@@ -763,6 +763,13 @@ const SOURCE_BOUND_SENTENCE_TERMS: Array<{
     response: /\bbaskets?\b/i,
     source: /\bbaskets?\b/i,
   },
+  {
+    label: 'unsupported historical framing',
+    response:
+      /\bspecial pathways?\b|\bbuilt long ago\b|\b(?:was|were) built\b|\bbuilt to\b|\bancient times\b/i,
+    source:
+      /\bspecial pathways?\b|\bbuilt long ago\b|\b(?:was|were) built\b|\bbuilt to\b|\bancient times\b/i,
+  },
 ];
 
 function appendAuditReason(
@@ -771,6 +778,54 @@ function appendAuditReason(
 ): string {
   if (!existingReason) return addition.slice(0, 1000);
   return `${existingReason} ${addition}`.slice(0, 1000);
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function responseMentionsSourceTitle(
+  response: string,
+  source: ExchangeSourceEvidence,
+): boolean {
+  const excerpt = source.excerpt?.trim();
+  if (!excerpt) return false;
+  const title = excerpt.split(':')[0]?.trim();
+  if (!title || title.length < 8) return false;
+
+  return new RegExp(`\\b${escapeRegExp(title)}\\b`, 'i').test(response);
+}
+
+export function inferObviousReliableSourceForAudit(
+  privateSources: ExchangePrivateSources | undefined,
+  sourceEvidence: ExchangeSourceEvidence[],
+  response: string,
+): ExchangePrivateSources | undefined {
+  if (!privateSources || privateSources.insufficient === true) {
+    return privateSources;
+  }
+
+  const evidenceById = new Map(sourceEvidence.map((item) => [item.id, item]));
+  const reliedOn = uniqueSourceIds(privateSources.relied_on);
+  if (reliedOn.some((id) => evidenceById.get(id)?.reliableForFacts === true)) {
+    return privateSources;
+  }
+
+  const currentTopic = sourceEvidence.find(
+    (item) => item.id === 'current_topic' && item.reliableForFacts,
+  );
+  if (!currentTopic || !responseMentionsSourceTitle(response, currentTopic)) {
+    return privateSources;
+  }
+
+  return {
+    ...privateSources,
+    relied_on: [...reliedOn, currentTopic.id],
+    reason: appendAuditReason(
+      privateSources.reason,
+      'Server inferred current_topic because the reply explicitly used the loaded topic title.',
+    ),
+  };
 }
 
 function stripUnsupportedSourceBoundSentences(
@@ -921,8 +976,13 @@ export async function processExchange(
     flow: 'processExchange',
   });
   const finalParsed = appHelpTurn ? applyAppHelpSignalGuard(parsed) : parsed;
-  const sourceAudit = auditExchangeSources(
+  const privateSourcesForAudit = inferObviousReliableSourceForAudit(
     finalParsed.privateSources,
+    sourceEvidence,
+    finalParsed.cleanResponse,
+  );
+  const sourceAudit = auditExchangeSources(
+    privateSourcesForAudit,
     sourceEvidence,
     {
       envelopeParseFailed: finalParsed.envelopeParseFailed,
@@ -1096,9 +1156,9 @@ export const HANDLED_MARKER_KEYS: ReadonlySet<string> =
 
 const DEFAULT_FALLBACK_TEXT = "I didn't have a reply — tap to try again.";
 const GENERIC_PRAISE_SENTENCE_RE =
-  /(?:^|[\s\n]+)(?:(?:you did a )?great job|great work|nice work|nice job|nice,\s+\w+|that(?:'s| is| was) a good start|that's a great idea|great idea|good question|great question|you've got a good grasp|excellent|amazing|awesome|fantastic)(?:[^.?!]*)(?:[.?!]|$)/gi;
+  /(?:^|[\s\n]+)(?:(?:you did a )?great job|great work|nice work|nice job|nice,\s+\w+|that(?:'s| is| was) a (?:good|great) (?:start|idea|observation|summary|point)|great (?:idea|observation|summary|point)|good question|great question|you've got a good grasp|excellent|amazing|awesome|fantastic)(?:[^.?!]*)(?:[.?!]|$)/gi;
 const UNSUPPORTED_SOFT_VALIDATION_SENTENCE_RE =
-  /(?:^|[\s\n]+)(?:that(?:'s| is) an? )?(?:interesting idea|interesting thought|good observation|fair point)(?:[^.?!]*)(?:[.?!]|$)/gi;
+  /(?:^|[\s\n]+)(?:(?:that(?:'s| is) an? idea about)|(?:that(?:'s| is) an? )?(?:interesting idea|interesting thought|good observation|fair point))(?:[^.?!]*)(?:[.?!]|$)/gi;
 const OVERHEATED_PHRASE_RE =
   /\b(super important|very important|really important|crucial|super useful)\b/gi;
 const OVERHEATED_ADVERB_RE = /\b(definitely|absolutely|incredibly)\b[,\s]*/gi;
@@ -1111,6 +1171,7 @@ function normalizeInflatedStyle(text: string): string {
     )
     .replace(OVERHEATED_ADVERB_RE, '')
     .replace(CHILDISH_TONE_RE, '')
+    .replace(/\bThat(?:'s| is) a\s+The\b/g, 'The')
     .replace(/\ba important\b/gi, 'an important')
     .replace(/[^\S\r\n]{2,}/g, ' ');
 }
@@ -1125,6 +1186,7 @@ function cleanLearnerVisibleReply(text: string): string {
   return normalizeInflatedStyle(stripPhoneticHints(text))
     .replace(GENERIC_PRAISE_SENTENCE_RE, '')
     .replace(UNSUPPORTED_SOFT_VALIDATION_SENTENCE_RE, '')
+    .replace(/\bThat(?:'s| is) a\s+The\b/g, 'The')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }

@@ -37,6 +37,7 @@ import {
   classifyExchangeOutcome,
   auditExchangeSources,
   applySourceAuditSafetyFallback,
+  inferObviousReliableSourceForAudit,
   type ExchangeContext,
   type ExchangeFallback,
   type ExchangeSourceAudit,
@@ -2261,8 +2262,13 @@ export async function streamMessage(
       const parsed = isAppHelpQuery(input.message)
         ? applyAppHelpSignalGuard(outcome.parsed)
         : outcome.parsed;
-      const sourceAudit = auditExchangeSources(
+      const privateSourcesForAudit = inferObviousReliableSourceForAudit(
         parsed.privateSources,
+        result.sourceEvidence,
+        parsed.cleanResponse,
+      );
+      const sourceAudit = auditExchangeSources(
+        privateSourcesForAudit,
         result.sourceEvidence,
         { envelopeParseFailed: parsed.envelopeParseFailed },
       );

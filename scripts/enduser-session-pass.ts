@@ -573,7 +573,8 @@ const SEED_PLACEHOLDER_NAME_RE =
 const RECITATION_TEXT_DELIVERY_RE =
   /\b(delivery|pace|confidence|confident|expression|pronunciation)\b/i;
 const GENERIC_LEARNER_PRAISE_RE =
-  /\b(great job|nice work|great question|(?:really )?good question|great topic|great idea|good start|good grasp|nice,\s+[A-Z][a-z]+|you did a great job|you'?re (?:doing )?(?:amazing|awesome|fantastic|excellent)|(?:amazing|awesome|fantastic|excellent|great|nice) (?:work|job|answer|effort|reasoning|connection)|(?:your|that'?s|this is) (?:amazing|awesome|fantastic|excellent|great|nice))\b/i;
+  /\b(great job|nice work|great question|(?:really )?good question|great topic|great idea|great observation|great summary|good start|good grasp|nice,\s+[A-Z][a-z]+|you did a great job|you'?re (?:doing )?(?:amazing|awesome|fantastic|excellent)|(?:amazing|awesome|fantastic|excellent|great|nice) (?:work|job|answer|effort|reasoning|connection|observation|summary)|(?:your|that'?s|this is) (?:amazing|awesome|fantastic|excellent|great|nice))\b/i;
+const MALFORMED_CLEANUP_RE = /\bthat'?s a the\b/i;
 const OVERHEATED_STYLE_RE =
   /\b(super important|super useful|incredibly|definitely|absolutely|crucial|very important|really important)\b/i;
 const CHILDISH_TONE_RE = /\b(yummy|kiddo)\b/i;
@@ -582,13 +583,13 @@ const RECITATION_NO_WEAKNESS_RE =
 const RECITATION_UNSUPPORTED_POLISH_RE =
   /\b(?:armies|army)\s+(?:could\s+)?travel(?:ed|ing)?\s+quickly\b/i;
 const LEARNING_UNSUPPORTED_CONQUEST_CONFIRM_RE =
-  /\b(?:it'?s true[^.?!]*(?:empires?|conquer|conquering|expand)|you'?re right[^.?!]*conquer|(?:good observation|interesting (?:idea|thought))[^.?!]*empires? (?:can )?(?:grow|expand)|conquering (?:new )?land (?:can|might|may|could) be part|the idea of empires growing by conquering land is a part|empires? (?:grow|expand)[^.?!]*conquer|empires? often expand by conquering|conquer(?:ing|ed)? new (?:areas|land)|defend(?:ing)? (?:land|the land)|conquering land was (?:definitely|a big part|the main))\b/i;
+  /\b(?:it'?s true[^.?!]*(?:empires?|conquer|conquering|expand)|you'?re right[^.?!]*conquer|(?:good observation|interesting (?:idea|thought))[^.?!]*empires? (?:can )?(?:grow|expand)|that'?s an idea about how empires? might grow|conquering (?:new )?land (?:can|might|may|could) be part|the idea of empires growing by conquering land is a part|empires? (?:can |could |might |may |often )?(?:grow|expand)[^.?!]*conquer|empires? often expand by conquering|conquer(?:ing|ed)? new (?:areas|land)|defend(?:ing)? (?:land|the land)|conquering land was (?:definitely|a big part|the main))\b/i;
 const LEARNING_UNSUPPORTED_SPEED_OR_TERRAIN_RE =
-  /\b(?:(?:arm(?:y|ies)|soldiers?)[^.?!]*(?:easier|more easily|quickly|faster|efficiently|more effectively|effectively)|(?:easier|more easily|quickly|faster|efficiently|more effectively|effectively)[^.?!]*(?:arm(?:y|ies)|soldiers?)|move(?: around)? quickly|quickly helped|faster|efficiently|more effectively|effectively|muddy?|paved path|forests?)\b/i;
+  /\b(?:(?:arm(?:y|ies)|soldiers?)[^.?!]*(?:easy|easily|easier|more easily|quickly|faster|efficiently|more effectively|effectively)|(?:easy|easily|easier|more easily|quickly|faster|efficiently|more effectively|effectively)[^.?!]*(?:arm(?:y|ies)|soldiers?)|move(?: around)? quickly|quickly helped|faster|efficiently|more effectively|effectively|muddy?|paved path|forests?)\b/i;
 const LEARNING_UNSUPPORTED_EMPIRE_GROWTH_RE =
-  /\b(?:empires? expand[^.?!]*(?:often|armies?|army|conquer)|often involves armies?|help(?:ed|s|ing)? the empire (?:grow|stay strong)|empire (?:grow|stay strong)|stay strong)\b/i;
+  /\b(?:empires? (?:can |could |might |may |often )?(?:grow|expand)|empires? expand[^.?!]*(?:often|armies?|army|conquer)|often involves armies?|help(?:ed|s|ing)? the empire (?:grow|stay strong)|empire (?:can |could |might |may |often )?(?:grow|stay strong)|stay strong)\b/i;
 const REVIEW_OFF_ANCHOR_RE =
-  /\b(lego|brick|building blocks?|wall|organs?|virus(?:es)?|eat|breathe|reproduc\w*|grow\w*|respond(?:ing)? to its environment|outer boundary|cell membrane|outer layer|stomach|lung|molecules?|atoms?|proteins?|processes of life|function on its own|can do on its own|all by itself|what a cell can do|main jobs?)\b/i;
+  /\b(lego|brick|building blocks?|fundamental piece|wall|organs?|virus(?:es)?|eat|breathe|reproduc\w*|grow\w*|respond(?:ing)? to its environment|outer boundary|cell membrane|outer layer|stomach|lung|molecules?|atoms?|proteins?|processes of life|function on its own|can do on its own|all by itself|what a cell can do|main jobs?)\b/i;
 const REVIEW_CHALLENGE_MODE_RE =
   /\b(?:quick check[^.?!]*try to trip you up|some scientists claim|devil'?s advocate)\b/i;
 const CONCRETE_NEXT_PRACTICE_RE =
@@ -602,6 +603,49 @@ const SOURCE_AUDIT_FAIL_STATUSES = new Set([
   'unsupported_sources',
   'missing_reliable_source',
 ]);
+const SOURCE_BOUND_TRIPWIRE_TERMS: Array<{
+  response: RegExp;
+  source: RegExp;
+  label: string;
+}> = [
+  {
+    response:
+      /\b(?:arm(?:y|ies)|soldiers?)\b[^,.;?!]*(?:easy|easily|more easily|easier|effective(?:ly)?|efficient(?:ly)?|faster|quickly)|(?:easy|easily|more easily|easier|effective(?:ly)?|efficient(?:ly)?|faster|quickly)[^,.;?!]*\b(?:arm(?:y|ies)|soldiers?)\b/i,
+    source:
+      /\b(?:arm(?:y|ies)|soldiers?)\b[^,.;?!]*(?:easy|easily|more easily|easier|effective(?:ly)?|efficient(?:ly)?|faster|quickly)|(?:easy|easily|more easily|easier|effective(?:ly)?|efficient(?:ly)?|faster|quickly)[^,.;?!]*\b(?:arm(?:y|ies)|soldiers?)\b/i,
+    label: 'army speed/ease/effectiveness',
+  },
+  {
+    response:
+      /\bconquer(?:ing|ed)?\b|\bconquest\b|\bempires?\s+(?:(?:can|could|might|may|often)\s+)?(?:grow|grew|expand|expanded|stay strong)\b|\bempire\s+(?:(?:can|could|might|may|often)\s+)?(?:grow|grew|expand|expanded|stay strong)\b/i,
+    source:
+      /\bconquer(?:ing|ed)?\b|\bconquest\b|\bempires?\s+(?:(?:can|could|might|may|often)\s+)?(?:grow|grew|expand|expanded|stay strong)\b|\bempire\s+(?:(?:can|could|might|may|often)\s+)?(?:grow|grew|expand|expanded|stay strong)\b/i,
+    label: 'conquest/empire growth',
+  },
+  {
+    response:
+      /\bbricks?\b|\bhouse\b|\bbuilding blocks?\b|\bfundamental piece\b/i,
+    source: /\bbricks?\b|\bhouse\b|\bbuilding blocks?\b|\bfundamental piece\b/i,
+    label: 'unsupported analogy',
+  },
+  {
+    response: /\bcan do on its own\b|\bwhat a cell can do\b|\ball by itself\b/i,
+    source: /\bcan do on its own\b|\bwhat a cell can do\b|\ball by itself\b/i,
+    label: 'cell autonomy phrase',
+  },
+  {
+    response: /\bbaskets?\b/i,
+    source: /\bbaskets?\b/i,
+    label: 'unsupported concrete example',
+  },
+  {
+    response:
+      /\bspecial pathways?\b|\bbuilt long ago\b|\b(?:was|were) built\b|\bbuilt to\b|\bancient times\b/i,
+    source:
+      /\bspecial pathways?\b|\bbuilt long ago\b|\b(?:was|were) built\b|\bbuilt to\b|\bancient times\b/i,
+    label: 'unsupported historical framing',
+  },
+];
 const FREEFORM_EXAMPLE_TERMS: Array<{
   response: RegExp;
   source: RegExp;
@@ -636,10 +680,33 @@ const FREEFORM_EXAMPLE_TERMS: Array<{
     source: /\bbricks?\b|\bhouse\b/i,
     label: 'brick/house analogy',
   },
+  { response: /\bbaskets?\b/i, source: /\bbaskets?\b/i, label: 'baskets' },
 ];
 
 function snippet(text: string): string {
   return text.replace(/\s+/g, ' ').trim().slice(0, 240);
+}
+
+function trustedSourceTextForDefinition(definition: RunDefinition): string {
+  return [
+    definition.topicOverride?.title,
+    definition.topicOverride?.description,
+    definition.rawInput,
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
+
+function unsupportedSourceBoundFact(
+  definition: RunDefinition,
+  response: string,
+): string | undefined {
+  const sourceText = trustedSourceTextForDefinition(definition);
+  if (!sourceText) return undefined;
+
+  return SOURCE_BOUND_TRIPWIRE_TERMS.find(
+    (term) => term.response.test(response) && !term.source.test(sourceText),
+  )?.label;
 }
 
 function unsupportedFreeformExample(
@@ -717,6 +784,21 @@ function analyzeTurn(input: {
     });
   }
 
+  const unsupportedSourceBound = unsupportedSourceBoundFact(
+    definition,
+    response,
+  );
+  if (unsupportedSourceBound) {
+    issues.push({
+      severity: 'fail',
+      code: 'unsupported_source_bound_fact',
+      message: `The reply introduced source-bound factual detail (${unsupportedSourceBound}) that is not present in the trusted source text for this scenario.`,
+      mode: definition.mode,
+      turnIndex,
+      snippet: snippet(response),
+    });
+  }
+
   if (VISIBLE_ENVELOPE_RE.test(response)) {
     issues.push({
       severity: 'fail',
@@ -762,6 +844,18 @@ function analyzeTurn(input: {
       code: 'generic_praise',
       message:
         "The reply used generic praise instead of naming the learner's specific reasoning or next move.",
+      mode: definition.mode,
+      turnIndex,
+      snippet: snippet(response),
+    });
+  }
+
+  if (MALFORMED_CLEANUP_RE.test(response)) {
+    issues.push({
+      severity: 'fail',
+      code: 'malformed_cleanup_text',
+      message:
+        'The learner-visible reply contains malformed cleanup text that reads like a broken sentence.',
       mode: definition.mode,
       turnIndex,
       snippet: snippet(response),
