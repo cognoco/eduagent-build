@@ -113,7 +113,12 @@ const runDefinitions: RunDefinition[] = [
     scenario: 'learning-active',
     learnerName: 'Maya',
     sessionType: 'learning',
-    useTopic: false,
+    useTopic: true,
+    topicOverride: {
+      title: 'Ancient trade and Rome',
+      description:
+        'Ancient civilizations traded to get goods they lacked, exchange surplus goods, and build connections with other places. Rome is an example of an ancient civilization connected to trade across the Mediterranean.',
+    },
     rawInput: 'I want help understanding why ancient civilizations traded.',
     turns: () => [
       { message: 'I am curious why ancient civilizations traded so much.' },
