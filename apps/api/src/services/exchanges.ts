@@ -512,7 +512,7 @@ export function buildExchangeSourceEvidence(
     });
   }
 
-  if (recentHistory && context.effectiveMode !== 'recitation') {
+  if (recentHistory) {
     addSourceEvidence(evidence, {
       id: 'conversation_history',
       kind: 'conversation_history',

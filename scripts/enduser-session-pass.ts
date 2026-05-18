@@ -395,12 +395,18 @@ const SEED_PLACEHOLDER_NAME_RE =
   /\b(?:Active|Homework|Review|Struggling|Test|Transcript) Learner\b/i;
 const RECITATION_TEXT_DELIVERY_RE =
   /\b(delivery|pace|confidence|confident|expression|pronunciation)\b/i;
-const GENERIC_PRAISE_RE =
-  /\b(great job|nice work|amazing|awesome|fantastic|excellent|super important|you did a great job)\b/i;
+const GENERIC_LEARNER_PRAISE_RE =
+  /\b(great job|nice work|great question|(?:really )?good question|you did a great job|you'?re (?:doing )?(?:amazing|awesome|fantastic|excellent)|(?:amazing|awesome|fantastic|excellent|great|nice) (?:work|job|answer|effort|reasoning|connection)|(?:your|that'?s|this is) (?:amazing|awesome|fantastic|excellent|great|nice))\b/i;
+const OVERHEATED_STYLE_RE =
+  /\b(super important|incredibly|definitely|crucial|very important)\b/i;
 const RECITATION_NO_WEAKNESS_RE =
   /\b(nothing (?:that )?sounded weak|wasn'?t anything (?:that )?sounded weak|there (?:was|is)n'?t anything weak|very clear and complete|all the way through)\b/i;
+const RECITATION_UNSUPPORTED_POLISH_RE =
+  /\b(?:armies|army)\s+(?:could\s+)?travel(?:ed|ing)?\s+quickly\b/i;
+const LEARNING_UNSUPPORTED_CONQUEST_CONFIRM_RE =
+  /\b(?:you'?re right[^.?!]*conquering|conquering land was (?:definitely|a big part|the main))\b/i;
 const REVIEW_OFF_ANCHOR_RE =
-  /\b(brick|outer boundary|cell membrane|outer layer)\b/i;
+  /\b(lego|brick|eat|breathe|reproduc|grow|respond(?:ing)? to its environment|outer boundary|cell membrane|outer layer|stomach|lung)\b/i;
 const CONCRETE_NEXT_PRACTICE_RE =
   /\b(try|practice|explain in one sentence|one-sentence|compare|write|say|answer this|task)\b/i;
 const SELF_CHECK_RE = /\b(check|substitut|plug|back into|reverse|undo)\b/i;
@@ -513,12 +519,27 @@ function analyzeTurn(input: {
     });
   }
 
-  if (definition.mode !== 'freeform' && GENERIC_PRAISE_RE.test(response)) {
+  if (
+    definition.mode !== 'freeform' &&
+    GENERIC_LEARNER_PRAISE_RE.test(response)
+  ) {
     issues.push({
       severity: 'fail',
       code: 'generic_praise',
       message:
         "The reply used generic praise instead of naming the learner's specific reasoning or next move.",
+      mode: definition.mode,
+      turnIndex,
+      snippet: snippet(response),
+    });
+  }
+
+  if (definition.mode !== 'freeform' && OVERHEATED_STYLE_RE.test(response)) {
+    issues.push({
+      severity: 'warn',
+      code: 'overheated_style',
+      message:
+        'The reply used inflated wording; stronger mentor turns usually explain why the idea matters in concrete terms.',
       mode: definition.mode,
       turnIndex,
       snippet: snippet(response),
@@ -535,6 +556,22 @@ function analyzeTurn(input: {
       code: 'learning_next_practice_vague',
       message:
         'The learner asked what to practice next, but the reply did not give a concrete practice task.',
+      mode: definition.mode,
+      turnIndex,
+      snippet: snippet(response),
+    });
+  }
+
+  if (
+    definition.mode === 'learning' &&
+    turnIndex === 2 &&
+    LEARNING_UNSUPPORTED_CONQUEST_CONFIRM_RE.test(response)
+  ) {
+    issues.push({
+      severity: 'fail',
+      code: 'learning_confirmed_unsupported_claim',
+      message:
+        'The learner made an outside-world claim that was not in the source pack, and the reply confirmed it instead of redirecting to supported topic content.',
       mode: definition.mode,
       turnIndex,
       snippet: snippet(response),
@@ -559,7 +596,7 @@ function analyzeTurn(input: {
 
   if (
     definition.mode === 'review' &&
-    turnIndex >= 4 &&
+    turnIndex >= 2 &&
     REVIEW_OFF_ANCHOR_RE.test(response)
   ) {
     issues.push({
@@ -567,6 +604,22 @@ function analyzeTurn(input: {
       code: 'review_off_anchor',
       message:
         "The review reply drifted away from the learner's energy answer into a nearby but different cell subtopic.",
+      mode: definition.mode,
+      turnIndex,
+      snippet: snippet(response),
+    });
+  }
+
+  if (
+    definition.mode === 'recitation' &&
+    turnIndex === 5 &&
+    RECITATION_UNSUPPORTED_POLISH_RE.test(response)
+  ) {
+    issues.push({
+      severity: 'fail',
+      code: 'recitation_polish_added_fact',
+      message:
+        'The polished recitation added a speed claim to the army point that the learner did not say.',
       mode: definition.mode,
       turnIndex,
       snippet: snippet(response),

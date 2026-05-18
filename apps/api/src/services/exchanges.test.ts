@@ -1336,6 +1336,44 @@ describe('source provenance audit', () => {
       ]),
     );
   });
+
+  it('allows recitation turns to cite conversation continuity without treating it as factual support', () => {
+    const sourceEvidence = buildExchangeSourceEvidence(
+      {
+        ...baseContext,
+        topicTitle: undefined,
+        effectiveMode: 'recitation',
+        exchangeHistory: [
+          {
+            role: 'user',
+            content: 'Roman roads helped armies travel.',
+          },
+        ],
+      },
+      'Give me a polished version.',
+    );
+
+    expect(sourceEvidence).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'conversation_history',
+          reliableForFacts: false,
+          reliability: 'conversation_only',
+        }),
+      ]),
+    );
+
+    const audit = auditExchangeSources(
+      {
+        relied_on: ['recitation_text', 'conversation_history'],
+        insufficient: false,
+      },
+      sourceEvidence,
+    );
+
+    expect(audit.status).toBe('ok');
+    expect(audit.reliableReliedOnSourceIds).toEqual(['recitation_text']);
+  });
 });
 
 // ---------------------------------------------------------------------------

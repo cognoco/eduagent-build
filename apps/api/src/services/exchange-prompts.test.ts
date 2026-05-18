@@ -202,6 +202,17 @@ describe('buildSystemPrompt — response envelope contract', () => {
     expect(prompt).toContain('current_topic');
     expect(prompt).toContain('reliable_for_facts="true"');
     expect(prompt).toContain('never show it, source IDs');
+    expect(prompt).toContain('Treat each source excerpt as a boundary');
+    expect(prompt).toContain(
+      'do not confirm it as true. Acknowledge it as their idea',
+    );
+    expect(prompt).toContain('include that exact reliable source ID');
+    expect(prompt).toContain(
+      'For current-topic teaching, review, quizzes, or next-practice tasks, include "current_topic"',
+    );
+    expect(prompt).toContain(
+      'Never cite source IDs that are not present in the <source_pack>',
+    );
   });
 
   it('does not allow memory or conversation history as factual evidence', () => {
@@ -262,11 +273,14 @@ describe('buildSystemPrompt — no-recall recovery', () => {
 
     expect(prompt).toContain('what to practice next');
     expect(prompt).toContain('concrete task they can do in one sentence');
+    expect(prompt).toContain('Practice by');
     expect(prompt).toContain(
       'Do not end with a vague "what are your thoughts?"',
     );
     expect(prompt).toContain('Avoid generic praise words');
     expect(prompt).toContain('Name the specific reasoning instead');
+    expect(prompt).toContain('Avoid overheated intensifiers');
+    expect(prompt).toContain('"Good question!"');
   });
 
   it('asks homework mistake-watch replies to include a self-check', () => {
@@ -276,6 +290,13 @@ describe('buildSystemPrompt — no-recall recovery', () => {
     expect(prompt).toContain(
       'one concrete mistake and one concrete self-check',
     );
+    expect(prompt).toContain('substitute x back in');
+
+    const helpPrompt = buildSystemPrompt(
+      makeContext({ sessionType: 'homework', homeworkMode: 'help_me' }),
+    );
+    expect(helpPrompt).toContain('Self-check:');
+    expect(helpPrompt).toContain('Do not ask a conceptual follow-up');
   });
 
   it('adds global no-recall recovery guidance to ordinary learning prompts', () => {
@@ -333,6 +354,7 @@ describe('buildSystemPrompt — no-recall recovery', () => {
       'one concrete strength and one concrete improvement',
     );
     expect(prompt).toContain('prefer one clean sentence');
+    expect(prompt).toContain('Do not add new adjectives');
   });
 
   it('allows delivery feedback only for voice recitation', () => {
