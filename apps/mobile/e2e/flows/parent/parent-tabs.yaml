@@ -36,8 +36,9 @@ tags:
 
 # ---------- Library tab ----------
 
-# 5. Tap "Library" tab (BUG-10: use accessibility label, not truncated text)
-- tapOn: "Library Tab"
+# 5. Tap "Library" tab (use testID — survives i18n + copy edits)
+- tapOn:
+    id: "tab-library"
 
 # 6. Wait for Library to render — Library v3 single-pane; library-tab-shelves removed in PR #144.
 - extendedWaitUntil:
@@ -51,7 +52,8 @@ tags:
 
 # ---------- Progress tab ----------
 
-- tapOn: "Progress Tab"
+- tapOn:
+    id: "tab-progress"
 
 - extendedWaitUntil:
     visible:
@@ -95,9 +97,9 @@ tags:
 
 # ---------- Back to Home tab ----------
 
-# 15. Tap "Home" tab to return to parent Home
-#     Use accessibility label (not text) to avoid matching "Home" heading
-- tapOn: "Home Tab"
+# 15. Tap "Home" tab to return to parent Home (use testID — avoids matching heading)
+- tapOn:
+    id: "tab-home"
 
 # 16. Verify parent Home is visible again
 - extendedWaitUntil:

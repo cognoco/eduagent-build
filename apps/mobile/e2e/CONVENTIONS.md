@@ -124,4 +124,4 @@ Tag tokens below are wrapped in backticks so the validator's parser can extract 
 
 These tags appear in current flows. They are recognised by the validator to keep C7 green, but a future PR should rationalise each one — promote into a domain/special tag with a clear definition, or remove from the flows that carry it.
 
-`camera`, `classifier`, `comprehensive`, `epic-10`, `home`, `nudge`, `placeholder`, `post-auth`, `quick`, `quota`, `stress`, `subject-creation`, `ux-dead-end`, `voice`
+`archive`, `camera`, `classifier`, `comprehensive`, `epic-10`, `home`, `nudge`, `placeholder`, `post-auth`, `quick`, `quota`, `stress`, `subject-creation`, `ux-dead-end`, `voice`

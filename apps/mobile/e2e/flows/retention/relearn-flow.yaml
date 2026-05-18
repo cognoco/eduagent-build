@@ -52,8 +52,9 @@ tags:
       id: "learner-screen"
     timeout: 15000
 
-# 3. Navigate to Library tab (BUG-10: use accessibility label, not truncated text)
-- tapOn: "Library Tab"
+# 3. Navigate to Library tab (use testID — survives i18n + copy edits)
+- tapOn:
+    id: "tab-library"
 
 # 4. Wait for Library to load (Shelves tab is the default)
 - extendedWaitUntil:
