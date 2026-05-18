@@ -1466,7 +1466,7 @@ describe('session routes', () => {
         { message: 'ok' },
         expect.objectContaining({
           clientId: undefined,
-          llmTier: 'standard',
+          llmTier: 'premium',
           subscriptionTier: 'plus',
         }),
       );
@@ -1520,7 +1520,7 @@ describe('session routes', () => {
         { message: 'ok' },
         expect.objectContaining({
           clientId: undefined,
-          llmTier: 'standard',
+          llmTier: 'premium',
           subscriptionTier: 'plus',
         }),
       );
@@ -1565,7 +1565,7 @@ describe('session routes', () => {
         { message: 'ok' },
         expect.objectContaining({
           clientId: undefined,
-          llmTier: 'standard',
+          llmTier: 'premium',
           subscriptionTier: 'plus',
         }),
       );

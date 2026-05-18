@@ -120,8 +120,7 @@ const BANNED_FILLER_OPENERS = [
 const LANGUAGE_REGEX =
   /\b(how do (you|i) say|translate|in (french|spanish|german|czech|italian|portuguese|japanese|chinese|korean|arabic|russian|hindi|dutch|polish|swedish|norwegian|danish|finnish|greek|turkish|hungarian|romanian|thai|vietnamese|indonesian|malay|tagalog|swahili|hebrew|ukrainian|croatian|serbian|slovak|slovenian|bulgarian|latvian|lithuanian|estonian)|what('s| is) .+ in \w+)\b/i;
 
-const PLUS_HARD_TURN_RUNG = 4;
-const PLUS_HARD_TURN_ROUTING_REASON = 'plus_hard_turn_claude';
+const PLUS_PREMIUM_ROUTING_REASON = 'plus_included_premium_profile';
 
 export interface ExchangeLlmRouting {
   llmTier?: LLMTier;
@@ -134,21 +133,17 @@ export function resolveExchangeLlmRouting(input: {
   requestedLlmTier?: LLMTier;
   effectiveRung: EscalationRung;
 }): ExchangeLlmRouting {
+  if (input.subscriptionTier === 'plus') {
+    return {
+      llmTier: 'premium',
+      routingReason: PLUS_PREMIUM_ROUTING_REASON,
+    };
+  }
+
   if (input.requestedLlmTier === 'premium') {
     return {
       llmTier: 'premium',
       routingReason: 'premium_profile_or_addon',
-    };
-  }
-
-  if (
-    input.subscriptionTier === 'plus' &&
-    input.effectiveRung >= PLUS_HARD_TURN_RUNG
-  ) {
-    return {
-      llmTier: 'standard',
-      preferredProvider: 'anthropic',
-      routingReason: PLUS_HARD_TURN_ROUTING_REASON,
     };
   }
 

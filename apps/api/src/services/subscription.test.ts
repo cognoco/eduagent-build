@@ -25,8 +25,8 @@ describe('getTierConfig', () => {
     expect(config.monthlyQuota).toBe(700);
     expect(config.dailyLimit).toBeNull();
     expect(config.maxProfiles).toBe(1);
-    expect(config.premiumModelProfiles).toBe(0);
-    expect(config.llmTier).toBe('standard');
+    expect(config.premiumModelProfiles).toBe(1);
+    expect(config.llmTier).toBe('premium');
     expect(config.priceMonthly).toBe(18.99);
     expect(config.priceYearly).toBe(168);
     expect(config.topUpPrice).toBe(10);

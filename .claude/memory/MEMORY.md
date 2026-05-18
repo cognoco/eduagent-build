@@ -31,7 +31,7 @@ Two production dead-code branches removed 2026-04-19 in commit `970a82a5`: `AgeB
 - [project_eval_llm_signal_metrics.md](project_eval_llm_signal_metrics.md) — Layer 1 signal-distribution regression guard. `emitsEnvelope` flag + `--check-baseline`/`--update-baseline`.
 - [project_llm_source_provenance.md](project_llm_source_provenance.md) — Private source provenance, sourceAudit metadata, and no-memory/no-forum factual grounding rule for tutoring exchanges.
 - [billing-payments.md](billing-payments.md) — Mobile IAP (RevenueCat), Stripe dormant for future web. Epic 9 COMPLETE.
-- [pricing_dual_cap.md](pricing_dual_cap.md) — Free: 10/day + 100/month. Plus: 700/month, no daily limit.
+- [pricing_dual_cap.md](pricing_dual_cap.md) — Free: 10/day + 100/month. Plus: 700/month, no daily limit, one premium study profile.
 - [market_language_pivot.md](market_language_pivot.md) — English UI only. Language TEACHING active (four_strands). GDPR-everywhere.
 - [project_themekey_removed.md](project_themekey_removed.md) — NEVER use key={themeKey} OR Animated.View opacity on root layout.
 - [feedback_drizzle_transaction_cast.md](feedback_drizzle_transaction_cast.md) — PgTransaction → Database cast pattern for transactions.

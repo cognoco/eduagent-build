@@ -319,17 +319,20 @@ describe('computeCorrectStreak', () => {
 });
 
 describe('resolveExchangeLlmRouting', () => {
-  it('keeps plus on standard routing below the hard-turn rung', () => {
+  it('routes Plus as the included premium study profile', () => {
     expect(
       resolveExchangeLlmRouting({
         subscriptionTier: 'plus',
         requestedLlmTier: 'standard',
-        effectiveRung: 3,
+        effectiveRung: 1,
       }),
-    ).toEqual({ llmTier: 'standard' });
+    ).toEqual({
+      llmTier: 'premium',
+      routingReason: 'plus_included_premium_profile',
+    });
   });
 
-  it('prefers Claude for plus hard turns at rung 4+', () => {
+  it('keeps Plus premium routing on hard turns too', () => {
     expect(
       resolveExchangeLlmRouting({
         subscriptionTier: 'plus',
@@ -337,16 +340,15 @@ describe('resolveExchangeLlmRouting', () => {
         effectiveRung: 4,
       }),
     ).toEqual({
-      llmTier: 'standard',
-      preferredProvider: 'anthropic',
-      routingReason: 'plus_hard_turn_claude',
+      llmTier: 'premium',
+      routingReason: 'plus_included_premium_profile',
     });
   });
 
   it('does not override explicit premium profiles or add-ons', () => {
     expect(
       resolveExchangeLlmRouting({
-        subscriptionTier: 'plus',
+        subscriptionTier: 'pro',
         requestedLlmTier: 'premium',
         effectiveRung: 4,
       }),

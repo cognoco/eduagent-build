@@ -1493,6 +1493,7 @@ The EVALUATE prompt template needs access to: (a) the topic's key concepts, (b) 
 
 **Plus Tier:**
 - 700 questions/month for individual learner (no daily limit)
+- 1 premium study profile for the serious individual learner
 - Full feature access
 - Top-up credits: €10/500 questions
 - Target: Individual serious learners
@@ -1591,7 +1592,7 @@ The EVALUATE prompt template needs access to: (a) the topic's key concepts, (b) 
 - FR108: Users can start 14-day free trial with full access
 - FR109: Users can have progress saved during and after trial
 - FR110: Users can receive trial expiry warnings (3 days before)
-- FR111: Users can upgrade to premium subscription (tiered: Standard/Plus/Pro)
+- FR111: Users can upgrade to premium subscription (tiered: Plus/Family/Pro)
 - FR112: Users can cancel subscription at any time
 - FR113: Users can view subscription status and renewal date
 - FR114: Users can access BYOK waitlist (email capture for future feature)
