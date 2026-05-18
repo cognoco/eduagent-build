@@ -66,7 +66,10 @@ interface ChatShellProps {
   showDisabledBanner?: boolean;
   rightAction?: React.ReactNode;
   footer?: React.ReactNode;
+  footerScrollSignal?: unknown;
   inputAccessory?: React.ReactNode;
+  /** Compact controls rendered in the composer toolbar beside voice playback. */
+  composerAccessory?: React.ReactNode;
   onDraftChange?: (text: string) => void;
   placeholder?: string;
   renderMessageActions?: (message: ChatMessage) => React.ReactNode;
@@ -78,7 +81,7 @@ interface ChatShellProps {
   onInputModeChange?: (mode: InputMode) => void;
   speechRecognitionLanguage?: string;
   textToSpeechLanguage?: string;
-  /** Compact controls rendered below the text input (e.g. Switch topic / Park it). */
+  /** Compact controls rendered below the text input. */
   belowInput?: React.ReactNode;
   /** Optional testID for the message scroll area (used by E2E flows). */
   messagesTestID?: string;
@@ -163,7 +166,9 @@ export function ChatShell({
   showDisabledBanner = true,
   rightAction,
   footer,
+  footerScrollSignal,
   inputAccessory,
+  composerAccessory,
   onDraftChange,
   placeholder,
   renderMessageActions,
@@ -355,7 +360,7 @@ export function ChatShell({
   // events from async bubble layout. Snap is what chat UIs typically do anyway.
   useEffect(() => {
     scrollRef.current?.scrollToEnd({ animated: false });
-  }, [messages]);
+  }, [messages, footerScrollSignal]);
 
   useEffect(() => {
     // [BUG-928] On web, AccessibilityInfo.isScreenReaderEnabled() returns
@@ -598,7 +603,11 @@ export function ChatShell({
   }, [lastMessageIsAi, isStreaming, input]);
 
   const headerRightContent = (
-    <View className="flex-row items-center">
+    <View
+      className="flex-row flex-wrap items-center justify-end"
+      style={{ flexShrink: 1, maxWidth: '70%' }}
+      testID="chat-shell-header-actions"
+    >
       <VoiceToggle
         isVoiceEnabled={isVoiceEnabled}
         onToggle={() =>
@@ -608,6 +617,9 @@ export function ChatShell({
       {rightAction}
     </View>
   );
+  const showVoicePlaybackControls =
+    isVoiceEnabled && !inputDisabled && !screenReaderEnabled;
+  const showComposerToolbar = showVoicePlaybackControls || !!composerAccessory;
 
   return (
     <KeyboardAvoidingView
@@ -759,22 +771,6 @@ export function ChatShell({
         }
       />
 
-      {/* BUG-348: Hide VoicePlaybackBar entirely when screen reader is active.
-          TTS controls compete with VoiceOver/TalkBack for the audio channel,
-          and the Replay button bypasses the auto-TTS suppression. */}
-      {isVoiceEnabled && !inputDisabled && !screenReaderEnabled && (
-        <VoicePlaybackBar
-          isSpeaking={ttsPlaying}
-          isPaused={ttsPaused}
-          rate={rate}
-          onStop={stopSpeaking}
-          onPause={pauseSpeaking}
-          onResume={resumeSpeaking}
-          onReplay={replay}
-          onRateChange={setRate}
-        />
-      )}
-
       {/* Live transcript while recording — gives immediate visual feedback */}
       {isVoiceEnabled && isListening && (
         <View
@@ -834,6 +830,37 @@ export function ChatShell({
       {/* Input accessory — always visible so subject-resolution chips remain
           actionable even when the text input itself is disabled (BUG-234). */}
       {inputAccessory}
+
+      {/* Composer toolbar — keeps everyday session tools and voice playback in
+          one compact shelf instead of stacking multiple white control bands. */}
+      {showComposerToolbar ? (
+        <View
+          className="bg-surface border-t border-surface-elevated px-4 pt-2 pb-1"
+          testID="chat-composer-toolbar"
+        >
+          <View className="flex-row items-center" style={{ gap: 8 }}>
+            {/* BUG-348: Hide VoicePlaybackBar entirely when screen reader is
+                active. TTS controls compete with VoiceOver/TalkBack for the
+                audio channel, and Replay bypasses auto-TTS suppression. */}
+            {showVoicePlaybackControls ? (
+              <VoicePlaybackBar
+                isSpeaking={ttsPlaying}
+                isPaused={ttsPaused}
+                rate={rate}
+                onStop={stopSpeaking}
+                onPause={pauseSpeaking}
+                onResume={resumeSpeaking}
+                onReplay={replay}
+                onRateChange={setRate}
+                variant="inline"
+              />
+            ) : null}
+            {composerAccessory ? (
+              <View className="flex-1 min-w-0">{composerAccessory}</View>
+            ) : null}
+          </View>
+        </View>
+      ) : null}
 
       {/* Input — when disabled, show inline reason instead of hiding entirely.
           H4: Falls back to a generic message when no disabledReason is provided
@@ -910,7 +937,11 @@ export function ChatShell({
             </View>
           )}
           <View
-            className="flex-row items-end px-4 py-3 bg-surface border-t border-surface-elevated"
+            className={`flex-row items-end px-4 bg-surface ${
+              showComposerToolbar
+                ? 'pt-1'
+                : 'py-3 border-t border-surface-elevated'
+            }`}
             testID="chat-input-row"
             // [BUG-886] On RN Web, mounted-but-unfocused screens stay in the
             // DOM. Remove the input row from the AT tree, swallow pointer

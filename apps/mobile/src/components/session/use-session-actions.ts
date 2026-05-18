@@ -343,13 +343,14 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
         {
           text: 'End Session',
           onPress: async () => {
+            let timeoutId: ReturnType<typeof setTimeout> | undefined;
             try {
-              const timeoutPromise = new Promise<never>((_, reject) =>
-                setTimeout(
+              const timeoutPromise = new Promise<never>((_, reject) => {
+                timeoutId = setTimeout(
                   () => reject(new Error('Session close timed out')),
                   CLOSE_TIMEOUT_MS,
-                ),
-              );
+                );
+              });
               const result = await Promise.race([
                 closeSession.mutateAsync({
                   reason: 'user_ended',
@@ -358,6 +359,9 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
                 }),
                 timeoutPromise,
               ]);
+              if (timeoutId) {
+                clearTimeout(timeoutId);
+              }
               const fastCelebrations = await fetchFastCelebrations();
               await clearSessionRecoveryMarker(activeProfileId);
 
@@ -372,6 +376,7 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
                 effectiveMode === 'homework'
               ) {
                 setShowFilingPrompt(true);
+                setIsClosing(false);
               } else {
                 navigateToSummary(
                   activeSessionId,
@@ -380,6 +385,10 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
                 );
               }
             } catch (err: unknown) {
+              if (timeoutId) {
+                clearTimeout(timeoutId);
+              }
+              setIsClosing(false);
               const classified = classifyApiError(err);
               const actions = recoveryActions(classified, {
                 retry: () => setIsClosing(false),
@@ -429,6 +438,7 @@ export function useSessionActions(opts: UseSessionActionsOptions) {
     milestonesReached,
     effectiveMode,
     navigateToSummary,
+    returnTo,
     router,
     setIsClosing,
     setShowFilingPrompt,

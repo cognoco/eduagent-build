@@ -8,12 +8,13 @@ import {
   curriculumBooks,
   curriculumTopics,
   generateUUIDv7,
+  learningSessions,
   profiles,
   subjects,
   topicNotes,
   type Database,
 } from '@eduagent/database';
-import { listAllNotes } from './notes';
+import { createNote, createNoteForSession, listAllNotes } from './notes';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 
@@ -78,6 +79,19 @@ async function seedTopic(
     .returning({ id: curriculumTopics.id });
 
   return { subjectId: subject!.id, topicId: topic!.id };
+}
+
+async function seedSession(
+  profileId: string,
+  subjectId: string,
+  topicId: string,
+): Promise<string> {
+  const [session] = await db
+    .insert(learningSessions)
+    .values({ profileId, subjectId, topicId })
+    .returning({ id: learningSessions.id });
+
+  return session!.id;
 }
 
 describeIfDb('listAllNotes (integration)', () => {
@@ -167,5 +181,82 @@ describeIfDb('listAllNotes (integration)', () => {
     expect(page2.notes[0]!.subjectName).toBe('Chemistry');
     expect(page2.notes[0]!.id).not.toBe(page1.notes[0]!.id);
     expect(page2.nextCursor).toBeNull();
+  });
+
+  it('lists multiple manually written chat notes from the same session', async () => {
+    const { profileId } = await seedProfile();
+    const { subjectId, topicId } = await seedTopic(
+      profileId,
+      'Chemistry',
+      'Reaction Rates',
+    );
+    const sessionId = await seedSession(profileId, subjectId, topicId);
+
+    await createNote(
+      db,
+      profileId,
+      subjectId,
+      topicId,
+      'First chat note from today.',
+      sessionId,
+    );
+    await createNote(
+      db,
+      profileId,
+      subjectId,
+      topicId,
+      'Second chat note from today.',
+      sessionId,
+    );
+
+    const result = await listAllNotes(db, profileId);
+
+    expect(result.notes.map((note) => note.content)).toEqual(
+      expect.arrayContaining([
+        'First chat note from today.',
+        'Second chat note from today.',
+      ]),
+    );
+    expect(result.notes).toHaveLength(2);
+  });
+
+  it('dedupes exact auto-summary retries without hiding different session notes', async () => {
+    const { profileId } = await seedProfile();
+    const { subjectId, topicId } = await seedTopic(
+      profileId,
+      'History',
+      'The Silk Road',
+    );
+    const sessionId = await seedSession(profileId, subjectId, topicId);
+
+    const first = await createNoteForSession(db, {
+      profileId,
+      topicId,
+      sessionId,
+      content: 'Auto summary reflection.',
+    });
+    const retry = await createNoteForSession(db, {
+      profileId,
+      topicId,
+      sessionId,
+      content: 'Auto summary reflection.',
+    });
+    await createNoteForSession(db, {
+      profileId,
+      topicId,
+      sessionId,
+      content: 'A different note from the same session.',
+    });
+
+    const result = await listAllNotes(db, profileId);
+
+    expect(retry.id).toBe(first.id);
+    expect(result.notes.map((note) => note.content)).toEqual(
+      expect.arrayContaining([
+        'Auto summary reflection.',
+        'A different note from the same session.',
+      ]),
+    );
+    expect(result.notes).toHaveLength(2);
   });
 });

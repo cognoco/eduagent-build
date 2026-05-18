@@ -488,7 +488,7 @@ describe('LibraryScreen', () => {
     ]);
   });
 
-  it('has no top-level tabs — library opens subject shelves as the next level', () => {
+  it('has no top-level tabs — library opens subject detail as the next level', () => {
     // Library v3 redesign replaced Shelves/Books/Topics tabs with a subject
     // shelf list. There are no tab controls at the library level.
     mockUseSubjects.mockReturnValue({
@@ -505,10 +505,11 @@ describe('LibraryScreen', () => {
     expect(screen.queryByTestId('library-tab-shelves')).toBeNull();
     expect(screen.queryByTestId('library-tab-books')).toBeNull();
     expect(screen.queryByTestId('library-tab-topics')).toBeNull();
-    // Instead, the subject shelf list is the root navigation.
+    // Instead, the subject list is the root navigation.
     screen.getByTestId('shelves-list');
-    screen.getByTestId('shelf-grid-row-active-0');
-    screen.getByTestId('shelf-grid-plank-active-0');
+    screen.getByTestId('shelf-row-header-sub-1');
+    expect(screen.queryByTestId('shelf-grid-row-active-0')).toBeNull();
+    expect(screen.queryByTestId('shelf-grid-plank-active-0')).toBeNull();
   });
 
   it('opens the subject shelf when a subject row is pressed', () => {

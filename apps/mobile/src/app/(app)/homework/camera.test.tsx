@@ -357,6 +357,67 @@ describe('CameraScreen', () => {
     expect(queryByText(/photograph homework problems so your/i)).toBeNull();
   });
 
+  it('allows type-or-record entry without granting camera permission', async () => {
+    const requestPermission = jest.fn();
+    useCameraPermissions.mockReturnValue([
+      { granted: false, canAskAgain: true },
+      requestPermission,
+      jest.fn().mockResolvedValue({ granted: false, canAskAgain: true }),
+    ]);
+
+    const { getByTestId, getByText, queryByTestId } = render(<CameraScreen />, {
+      wrapper: createWrapper(),
+    });
+
+    fireEvent.press(getByTestId('manual-entry-button'));
+
+    expect(requestPermission).not.toHaveBeenCalled();
+    expect(queryByTestId('camera-view')).toBeNull();
+    getByText(/type or say the homework problem/i);
+    fireEvent.press(getByTestId('problem-mic-0'));
+    expect(mockClearTranscript).toHaveBeenCalled();
+    expect(mockStartListening).toHaveBeenCalled();
+
+    fireEvent.changeText(getByTestId('result-text-input'), 'Explain gravity');
+    fireEvent.press(getByTestId('confirm-button'));
+
+    await waitFor(() => {
+      expect(mockRouter.replace).toHaveBeenCalledWith(
+        expect.objectContaining({
+          pathname: '/(app)/session',
+          params: expect.objectContaining({
+            mode: 'homework',
+            subjectId: 'sub-123',
+            subjectName: 'Mathematics',
+            problemText: 'Explain gravity',
+          }),
+        }),
+      );
+    });
+    const callArgs = mockRouter.replace.mock.calls[0][0];
+    expect(callArgs.params.imageUri).toBeUndefined();
+  });
+
+  it('returns to the permission choice after manual entry when camera is still denied', async () => {
+    useCameraPermissions.mockReturnValue([
+      { granted: false, canAskAgain: true },
+      jest.fn(),
+      jest.fn().mockResolvedValue({ granted: false, canAskAgain: true }),
+    ]);
+
+    const { getByTestId, getByText, queryByTestId } = render(<CameraScreen />, {
+      wrapper: createWrapper(),
+    });
+
+    fireEvent.press(getByTestId('manual-entry-button'));
+    getByText(/type or say the homework problem/i);
+
+    fireEvent.press(getByTestId('camera-back-button'));
+
+    getByText(/camera access/i);
+    expect(queryByTestId('camera-view')).toBeNull();
+  });
+
   it('shows Settings link when permission denied and cannot ask again', () => {
     useCameraPermissions.mockReturnValue([
       { granted: false, canAskAgain: false },
@@ -369,6 +430,23 @@ describe('CameraScreen', () => {
     });
     getByTestId('open-settings-button');
     getByText(/device settings/i);
+  });
+
+  it('allows type-or-record entry when camera permission is permanently denied', () => {
+    useCameraPermissions.mockReturnValue([
+      { granted: false, canAskAgain: false },
+      jest.fn(),
+      jest.fn().mockResolvedValue({ granted: false, canAskAgain: false }),
+    ]);
+
+    const { getByTestId, getByText } = render(<CameraScreen />, {
+      wrapper: createWrapper(),
+    });
+
+    fireEvent.press(getByTestId('manual-entry-button'));
+
+    getByText(/type or say the homework problem/i);
+    getByTestId('problem-mic-0');
   });
 
   it('re-checks permission when app returns from background (e.g. after Settings)', async () => {

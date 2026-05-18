@@ -17,7 +17,7 @@ jest.mock('../../lib/theme', /* gc1-allow: nativewind vars() does not resolve 'r
 describe('SessionToolAccessory stage gating', () => {
   const handleQuickChip = jest.fn();
 
-  it('renders Switch topic and Park it when stage is teaching', () => {
+  it('renders the switch topic tool when stage is teaching', () => {
     const { queryByTestId } = render(
       <SessionToolAccessory
         isStreaming={false}
@@ -26,7 +26,7 @@ describe('SessionToolAccessory stage gating', () => {
       />,
     );
     expect(queryByTestId('quick-chip-switch_topic')).toBeTruthy();
-    expect(queryByTestId('quick-chip-park')).toBeTruthy();
+    expect(queryByTestId('quick-chip-park')).toBeNull();
   });
 
   it('renders Add note as a primary teaching action when provided', () => {
@@ -99,7 +99,7 @@ describe('SessionToolAccessory Add note chip', () => {
     expect(queryByTestId('quick-chip-add-note')).toBeNull();
   });
 
-  it('renders Add note as the first chip when onAddNote is provided and stage is teaching', () => {
+  it('renders Add note and Switch topic when provided and stage is teaching', () => {
     const onAddNote = jest.fn();
     const { queryByTestId } = render(
       <SessionToolAccessory
@@ -111,7 +111,7 @@ describe('SessionToolAccessory Add note chip', () => {
     );
     expect(queryByTestId('quick-chip-add-note')).toBeTruthy();
     expect(queryByTestId('quick-chip-switch_topic')).toBeTruthy();
-    expect(queryByTestId('quick-chip-park')).toBeTruthy();
+    expect(queryByTestId('quick-chip-park')).toBeNull();
   });
 
   it('calls onAddNote when pressed', () => {

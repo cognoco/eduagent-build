@@ -98,6 +98,7 @@ describe('useSessionActions', () => {
       milestonesReached: [],
     });
     expect(opts.setShowFilingPrompt).toHaveBeenCalledWith(true);
+    expect(opts.setIsClosing).toHaveBeenCalledWith(false);
   });
 
   it('shows filing prompt for homework sessions after close', async () => {
@@ -129,5 +130,49 @@ describe('useSessionActions', () => {
 
     expect(opts.setShowFilingPrompt).not.toHaveBeenCalled();
     expect(opts.router.replace).toHaveBeenCalled();
+  });
+
+  it('clears wrapping state when close times out', async () => {
+    jest.useFakeTimers();
+    const opts = createMockOpts({
+      closeSession: {
+        mutateAsync: jest.fn(
+          () =>
+            new Promise(() => {
+              /* never resolves */
+            }),
+        ),
+      },
+    });
+    const { result } = renderHook(() => useSessionActions(opts as any));
+
+    try {
+      await act(async () => {
+        await result.current.handleEndSession();
+      });
+
+      const buttons = (platformAlert as jest.Mock).mock.calls[0]?.[2] as Array<{
+        onPress?: () => void | Promise<void>;
+      }>;
+
+      let closePromise: Promise<void> = Promise.resolve();
+      await act(async () => {
+        closePromise = Promise.resolve(buttons[1]?.onPress?.());
+      });
+
+      await act(async () => {
+        jest.advanceTimersByTime(15_000);
+        await closePromise;
+      });
+
+      expect(opts.setIsClosing).toHaveBeenCalledWith(false);
+      expect(platformAlert).toHaveBeenLastCalledWith(
+        'Could not end this session cleanly',
+        expect.any(String),
+        expect.any(Array),
+      );
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

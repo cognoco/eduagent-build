@@ -395,8 +395,8 @@ export default function CameraScreen(): React.ReactNode {
     setShowSubjectPicker(false);
     setShowCelebration(true);
     classifyTriggeredRef.current = false;
-    dispatch({ type: 'RETAKE' });
-  }, [speech]);
+    dispatch({ type: 'RESET', hasPermission: permission?.granted ?? false });
+  }, [permission?.granted, speech]);
 
   const handleStartManualEntry = useCallback(() => {
     if (speech.isListening) {
@@ -806,6 +806,17 @@ export default function CameraScreen(): React.ReactNode {
             </Text>
           </Pressable>
         )}
+        <Pressable
+          testID="manual-entry-button"
+          onPress={handleStartManualEntry}
+          className="mt-4 py-3 px-6 min-h-[48px] items-center justify-center"
+          accessibilityLabel={t('homework.typeOrRecordInstead')}
+          accessibilityRole="button"
+        >
+          <Text className="text-body font-semibold text-primary text-center">
+            {t('homework.typeOrRecordInstead')}
+          </Text>
+        </Pressable>
         <Pressable
           testID="close-button"
           onPress={handleClose}

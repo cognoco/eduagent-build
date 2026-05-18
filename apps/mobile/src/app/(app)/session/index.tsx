@@ -933,14 +933,20 @@ function SessionScreenInner() {
   const endSessionButton = (
     <Pressable
       onPress={activeSessionId ? handleEndSession : handleHomeBack}
-      disabled={isClosing || isStreaming}
+      disabled={isClosing || isStreaming || showFilingPrompt}
       className="ms-2 px-3 py-2 rounded-button bg-surface-elevated min-h-[44px] items-center justify-center"
+      style={{ maxWidth: 104 }}
       testID="end-session-button"
-      accessibilityLabel={activeSessionId ? "I'm done" : 'Exit'}
+      accessibilityLabel={
+        isClosing ? 'Wrapping up' : activeSessionId ? "I'm done" : 'Exit'
+      }
       accessibilityRole="button"
     >
-      <Text className="text-body-sm font-semibold text-text-secondary">
-        {isClosing ? 'Wrapping up...' : activeSessionId ? "I'm Done" : 'Exit'}
+      <Text
+        className="text-body-sm font-semibold text-text-secondary"
+        numberOfLines={1}
+      >
+        {isClosing ? 'Wrapping...' : activeSessionId ? 'Done' : 'Exit'}
       </Text>
     </Pressable>
   );
@@ -949,7 +955,7 @@ function SessionScreenInner() {
     useLearningModeControl();
 
   const headerRight = (
-    <View className="flex-row items-center">
+    <View className="flex-row flex-wrap items-center justify-end">
       {modeConfig.showTimer && <SessionTimer />}
       {learningModeButton}
       <MilestoneDots count={milestonesReached.length} />
@@ -1051,6 +1057,7 @@ function SessionScreenInner() {
       handleQuickChip={handleQuickChip}
       stage={conversationStage}
       onAddNote={() => setShowNoteInput(true)}
+      embedded
     />
   ) : null;
 
@@ -1130,6 +1137,7 @@ function SessionScreenInner() {
           isSubjectFlowBlockingComposer ||
           sessionExpired ||
           !!quotaError ||
+          (showFilingPrompt && !filingDismissed) ||
           // CR-6: Disable input while session close is in flight.
           isClosing
         }
@@ -1143,21 +1151,24 @@ function SessionScreenInner() {
               ? 'This session has ended'
               : quotaError
                 ? 'Your session limit has been reached'
-                : pendingClassification
-                  ? t('session.chatShell.classifyingSubject')
-                  : undefined
+                : showFilingPrompt && !filingDismissed
+                  ? 'Choose where to save this session'
+                  : pendingClassification
+                    ? t('session.chatShell.classifyingSubject')
+                    : undefined
         }
         verificationType={liveTranscript?.session.verificationType ?? undefined}
         inputMode={inputMode}
         onInputModeChange={handleInputModeChange}
         rightAction={headerRight}
+        footerScrollSignal={`${showFilingPrompt}-${filingDismissed}`}
         inputAccessory={
           <>
             {drillStrip}
             {sessionAccessory}
-            {sessionToolAccessory}
           </>
         }
+        composerAccessory={sessionToolAccessory}
         belowInput={null}
         onDraftChange={setDraftText}
         renderMessageActions={renderMessageActions}

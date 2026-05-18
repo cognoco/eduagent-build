@@ -53,6 +53,7 @@ async function insertNoteWithCap(
     sessionId: string | null;
     content: string;
   },
+  options: { dedupeExactSessionContent?: boolean } = {},
 ): Promise<NoteRow> {
   return db.transaction(async (tx) => {
     const lockKey = `notes:${values.profileId}:${values.topicId}`;
@@ -60,14 +61,10 @@ async function insertNoteWithCap(
       sql`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`,
     );
 
-    // Idempotency for retries: if a note for this sessionId already exists,
-    // return it instead of inserting a duplicate. submitSummary can be
-    // retried (mobile network timeout, double-tap) and without this check the
-    // 50-note cap would be the only backstop — poor UX.
-    // Filter by topicId as well: callers today validate session.topicId === topicId
-    // upstream, but the function signature accepts arbitrary topicId so a future
-    // caller mismatching the pair must not get a note bound to the wrong topic.
-    if (values.sessionId) {
+    // Idempotency for retries: submitSummary can be retried with the same
+    // payload. Only dedupe the exact same session+topic+content; users can
+    // write multiple different notes during the same chat.
+    if (options.dedupeExactSessionContent && values.sessionId) {
       const [existingForSession] = await tx
         .select({
           id: topicNotes.id,
@@ -83,6 +80,7 @@ async function insertNoteWithCap(
             eq(topicNotes.profileId, values.profileId),
             eq(topicNotes.sessionId, values.sessionId),
             eq(topicNotes.topicId, values.topicId),
+            eq(topicNotes.content, values.content),
           ),
         )
         .limit(1);
@@ -136,12 +134,18 @@ export async function createNoteForSession(
     content: string;
   },
 ): Promise<NoteRow> {
-  return insertNoteWithCap(db, {
-    topicId: params.topicId,
-    profileId: params.profileId,
-    sessionId: params.sessionId,
-    content: params.content,
-  });
+  return insertNoteWithCap(
+    db,
+    {
+      topicId: params.topicId,
+      profileId: params.profileId,
+      sessionId: params.sessionId,
+      content: params.content,
+    },
+    {
+      dedupeExactSessionContent: true,
+    },
+  );
 }
 
 // ---------------------------------------------------------------------------

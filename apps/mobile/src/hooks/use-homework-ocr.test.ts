@@ -221,6 +221,46 @@ describe('useHomeworkOcr', () => {
     );
   });
 
+  it('escalates numbered local OCR fragments when numbering is the only cue', async () => {
+    mockRecognize.mockResolvedValue({
+      text: '1. Radissen\n2. Cryiy\nan\nWhal',
+      confidence: 0.9,
+    });
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          text: [
+            '1. What is chasing you',
+            '2. What are you avoiding',
+            '3. What do you want',
+            '4. What feels dead',
+            '5. What hurts',
+            '6. What wants to live',
+          ].join('\n'),
+          confidence: 0.86,
+        }),
+        { status: 200 },
+      ),
+    );
+
+    const { result } = renderHook(() => useHomeworkOcr());
+
+    await act(async () => {
+      await result.current.process('file:///tmp/photo.jpg');
+    });
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(result.current.status).toBe('done');
+    expect(result.current.text).toContain('1. What is chasing you');
+    expect(result.current.text).not.toContain('Radissen');
+    expect(mockTrackHomeworkOcrGateAccepted).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: 'server',
+        confidence: 0.86,
+      }),
+    );
+  });
+
   it('does not treat abbreviation periods as homework cues', async () => {
     mockRecognize.mockResolvedValue({
       text: 'Dr. Smith',
