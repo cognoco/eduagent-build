@@ -599,6 +599,11 @@ const CONCRETE_NEXT_PRACTICE_RE =
 const FUTURE_TOPIC_TITLE_RE =
   /\b(?:World History|Biology|Algebra) Topic \d+\b/i;
 const SELF_CHECK_RE = /\b(check|substitut|plug|back into|reverse|undo)\b/i;
+const LEARNING_SOURCE_POINT_RE = [
+  /\barm(?:y|ies)\b[^.?!]*\bmove\b|\bmove\b[^.?!]*\barm(?:y|ies)\b/i,
+  /\bconnect(?:ed|s|ing)?\b[^.?!]*\btowns?\b|\btowns?\b[^.?!]*\bconnect(?:ed|s|ing)?\b/i,
+  /\btrade\b[^.?!]*\beasier\b|\beasier\b[^.?!]*\btrade\b/i,
+] as const;
 const SOURCE_AUDIT_FAIL_STATUSES = new Set([
   'parse_failed',
   'missing_private_sources',
@@ -642,9 +647,9 @@ const SOURCE_BOUND_TRIPWIRE_TERMS: Array<{
   },
   {
     response:
-      /\bspecial pathways?\b|\bbuilt long ago\b|\b(?:was|were) built\b|\bbuilt to\b|\bancient times\b/i,
+      /\bspecial pathways?\b|\bbuilt long ago\b|\b(?:was|were) built\b|\bbuilt to\b|\bancient times\b|\bvillages?\b/i,
     source:
-      /\bspecial pathways?\b|\bbuilt long ago\b|\b(?:was|were) built\b|\bbuilt to\b|\bancient times\b/i,
+      /\bspecial pathways?\b|\bbuilt long ago\b|\b(?:was|were) built\b|\bbuilt to\b|\bancient times\b|\bvillages?\b/i,
     label: 'unsupported historical framing',
   },
   {
@@ -887,6 +892,23 @@ function analyzeTurn(input: {
       code: 'childish_tone',
       message:
         'The reply used cute/childish wording; the mentor should stay warm without sounding babyish.',
+      mode: definition.mode,
+      turnIndex,
+      snippet: snippet(response),
+    });
+  }
+
+  if (
+    definition.mode === 'learning' &&
+    turnIndex === 1 &&
+    LEARNING_SOURCE_POINT_RE.filter((pattern) => pattern.test(response))
+      .length < 2
+  ) {
+    issues.push({
+      severity: 'fail',
+      code: 'learning_opening_too_thin',
+      message:
+        'The first learning turn should teach at least two source-supported points before checking understanding.',
       mode: definition.mode,
       turnIndex,
       snippet: snippet(response),

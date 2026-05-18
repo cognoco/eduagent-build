@@ -1567,7 +1567,7 @@ describe('source provenance audit', () => {
       audit,
     );
 
-    expect(safe.response).toContain('You got the energy part.');
+    expect(safe.response).toBe('A cell is the basic unit of life.');
     expect(safe.response).not.toMatch(/can do on its own|what a cell can do/i);
     expect(safe.sourceAudit.reason).toMatch(/cell autonomy phrase/i);
   });
@@ -1599,6 +1599,31 @@ describe('source provenance audit', () => {
     expect(safe.response).not.toMatch(/easier|military/i);
     expect(safe.sourceAudit.reason).toMatch(/army speed\/ease\/effectiveness/i);
     expect(safe.sourceAudit.reason).toMatch(/unsupported historical framing/i);
+  });
+
+  it('falls back to reliable source text when scrubbing leaves a too-thin reply', () => {
+    const sourceEvidence = buildExchangeSourceEvidence(
+      {
+        ...baseContext,
+        topicTitle: 'Roman roads and empire trade',
+        topicDescription:
+          'Roman roads helped armies move between places, connected towns, and made trade easier across the empire.',
+      },
+      'Please start teaching me from the beginning.',
+    );
+    const audit = auditExchangeSources(
+      { relied_on: ['current_topic'], insufficient: false },
+      sourceEvidence,
+    );
+
+    const safe = applySourceAuditSafetyFallback(
+      'Roman roads were important. This made it easier for the Roman military to travel.',
+      audit,
+    );
+
+    expect(safe.response).toBe(
+      'Roman roads helped armies move between places, connected towns, and made trade easier across the empire.',
+    );
   });
 
   it('removes unsupported conquest confirmations from current-topic replies', () => {

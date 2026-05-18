@@ -766,9 +766,9 @@ const SOURCE_BOUND_SENTENCE_TERMS: Array<{
   {
     label: 'unsupported historical framing',
     response:
-      /\bspecial pathways?\b|\bbuilt long ago\b|\b(?:was|were) built\b|\bbuilt to\b|\bancient times\b/i,
+      /\bspecial pathways?\b|\bbuilt long ago\b|\b(?:was|were) built\b|\bbuilt to\b|\bancient times\b|\bvillages?\b/i,
     source:
-      /\bspecial pathways?\b|\bbuilt long ago\b|\b(?:was|were) built\b|\bbuilt to\b|\bancient times\b/i,
+      /\bspecial pathways?\b|\bbuilt long ago\b|\b(?:was|were) built\b|\bbuilt to\b|\bancient times\b|\bvillages?\b/i,
   },
   {
     label: 'unsupported land/soil detail',
@@ -864,14 +864,18 @@ function stripUnsupportedSourceBoundSentences(
     .replace(/\s{2,}/g, ' ')
     .trim();
 
-  const fallback = reliableSourceText.split(/(?<=[.?!])\s+/)[0]?.trim();
+  const fallback = reliableSourceText
+    .split(/(?<=[.?!])\s+/)[0]
+    ?.trim()
+    .replace(/^[^:]{1,140}:\s+/, '');
+  const scrubbedWordCount = scrubbed.split(/\s+/).filter(Boolean).length;
 
   return {
     response:
-      scrubbed.length > 0
+      scrubbed.length > 0 && scrubbedWordCount >= 6
         ? scrubbed
         : fallback
-          ? `Let's keep this anchored to the source: ${fallback}`
+          ? fallback
           : response,
     removedTerms: unsupportedTerms.map((term) => term.label),
   };
