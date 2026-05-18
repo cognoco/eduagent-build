@@ -9,6 +9,7 @@ jest.mock(
   '../../lib/theme' /* gc1-allow: ThemeProvider requires native env; unit test cannot render it */,
   () => ({
     useThemeColors: () => ({
+      border: '#e5e7eb',
       retentionWeak: '#b45309',
       success: '#16a34a',
       textPrimary: '#111827',
@@ -54,12 +55,12 @@ describe('ShelfRow', () => {
     screen.getByText('3 books · 18/32 topics');
   });
 
-  it('renders the subject bookshelf motif', () => {
+  it('does not render the old bookshelf motif', () => {
     render(<ShelfRow {...defaultProps} />);
-    screen.getByTestId('shelf-row-bookshelf-sub-math');
+    expect(screen.queryByTestId('shelf-row-bookshelf-sub-math')).toBeNull();
   });
 
-  it('renders each shelf as an open shelf row instead of a boxed card', () => {
+  it('renders as a flat row on the screen background', () => {
     render(<ShelfRow {...defaultProps} />);
 
     const header = screen.getByTestId('shelf-row-header-sub-math');
@@ -67,43 +68,16 @@ describe('ShelfRow', () => {
       expect.objectContaining({
         alignItems: 'center',
         backgroundColor: 'transparent',
-        borderRadius: 10,
-        borderWidth: 0,
+        borderBottomWidth: 1,
+        borderColor: '#e5e7eb',
         elevation: 0,
         flexDirection: 'row',
-        minHeight: 90,
-        paddingBottom: 20,
-        paddingTop: 12,
-        shadowColor: '#2f6fbd',
+        minHeight: 76,
+        paddingHorizontal: 0,
+        paddingVertical: 12,
       }),
     );
-    screen.getByTestId('shelf-row-backboard-sub-math');
-    screen.getByTestId('shelf-row-depth-sub-math');
     screen.getByTestId('shelf-row-rail-sub-math');
-  });
-
-  it('renders the compact shelf card variant for the library grid', () => {
-    render(<ShelfRow {...defaultProps} variant="card" />);
-
-    const header = screen.getByTestId('shelf-row-header-sub-math');
-    expect(header.props.style).toEqual(
-      expect.objectContaining({
-        backgroundColor: '#edf3ff',
-        borderRadius: 14,
-        borderWidth: 1,
-        elevation: 1,
-        justifyContent: 'space-between',
-        minHeight: 148,
-        paddingHorizontal: 12,
-      }),
-    );
-    screen.getByText('Open');
-    screen.getByText('18/32 topics');
-    expect(screen.getByTestId('shelf-row-rail-sub-math').props.style).toEqual(
-      expect.objectContaining({
-        width: '100%',
-      }),
-    );
   });
 
   it('opens the subject shelf when header is pressed', () => {
