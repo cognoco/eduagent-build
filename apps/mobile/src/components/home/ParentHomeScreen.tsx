@@ -463,7 +463,7 @@ function ConversationStarterCard({
         borderColor: tint ? tint.solid + '33' : colors.primary + '33',
         borderRadius: 18,
         borderWidth: 1,
-        minHeight: 82,
+        minHeight: 108,
         shadowColor: accent,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
@@ -472,24 +472,41 @@ function ConversationStarterCard({
       }}
     >
       <View
-        className="flex-row items-center"
         style={{
+          alignItems: 'center',
+          backgroundColor: 'transparent',
           borderRadius: 18,
-          paddingHorizontal: 14,
-          paddingVertical: 14,
+          flexDirection: 'row',
+          paddingHorizontal: 16,
+          paddingVertical: 18,
         }}
       >
         <View
-          className="h-11 w-11 rounded-full items-center justify-center"
+          testID={`parent-home-tonight-icon-${prompt.key}`}
           style={{
-            backgroundColor: colors.surface + 'cc',
-            borderColor: accent + '22',
-            borderWidth: 1,
+            alignItems: 'center',
+            backgroundColor: colors.surface,
+            borderRadius: 999,
+            height: 58,
+            justifyContent: 'center',
+            width: 58,
           }}
         >
-          <Ionicons name="chatbubble-outline" size={20} color={accent} />
+          <Ionicons name="chatbubble-outline" size={28} color={accent} />
         </View>
-        <Text className="text-body text-text-primary ms-3 flex-1 leading-6">
+        <Text
+          testID={`parent-home-tonight-text-${prompt.key}`}
+          style={{
+            backgroundColor: 'transparent',
+            color: colors.textPrimary,
+            flex: 1,
+            fontSize: 21,
+            fontWeight: '500',
+            includeFontPadding: false,
+            lineHeight: 30,
+            marginLeft: 16,
+          }}
+        >
           {prompt.text}
         </Text>
       </View>

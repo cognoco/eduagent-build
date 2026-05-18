@@ -17,6 +17,7 @@ scripts/check-change-class.sh --branch     # check all changes vs main
 | **db-schema** | `packages/database/src/schema/**` | `db:push:dev`, `db:generate:dev` | `test:api:integration` | Never push to staging/prod |
 | **db-migrations** | `packages/database/drizzle/**` | `db:migrate:dev` | `test:api:integration` | Migrate before deploy; rollback section if dropping |
 | **llm-prompts** | `services/**/*-prompts.ts`, `services/llm/*.ts` | `eval:llm` | `eval:llm --live`, `test:llm:enduser` | Pre-commit enforces snapshot staging |
+| **llm-book-generation** | `packages/schemas/src/subjects.ts`, `services/book-generation.ts`, `services/book-suggestion-generation.ts`, `services/curriculum.ts`, `services/session/session-context-builders.ts`, `scripts/book-generation-pass.ts` | — | `test:llm:book-generation` | Live book/topic-map generation quality gate |
 | **inngest** | `apps/api/src/inngest/**` | — | `test:api:integration` | Verify dashboard sync after deploy |
 | **api-routes** | `apps/api/src/routes/**` | `test:api:unit` | `test:api:integration` | |
 | **api-middleware** | `apps/api/src/middleware/**` | `test:api:unit` | `test:api:integration` | Auth/billing changes need break tests |
@@ -52,7 +53,8 @@ The hook (`scripts/pre-commit-tests.sh` + `.husky/pre-commit`) runs automaticall
 - Cross-package integration tests (`tests/integration/`)
 - E2E tests (Playwright, Maestro)
 - `eval:llm --live` (Tier 2 — real LLM calls)
-- `test:llm:enduser` (live five-session learner quality gate)
+- `test:llm:enduser` (live end-user learner quality gate)
+- `test:llm:book-generation` (live generated book/topic-map quality gate)
 - DB push/generate/migrate
 - Manual review items (CI config, deploy config, Expo config)
 

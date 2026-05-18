@@ -193,9 +193,22 @@ export type CurriculumInput = z.infer<typeof curriculumInputSchema>;
 
 // Generated topic — LLM-generated topic before persistence
 
+const UNSOURCED_PRECISE_FACT_PATTERN =
+  /\b(?:1[0-9]{3}|20[0-9]{2})s?\b|\b\d+(?:\.\d+)?\s?%/;
+
+const generatedSourceNeutralDescriptionSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(500)
+  .refine((value) => !UNSOURCED_PRECISE_FACT_PATTERN.test(value), {
+    message:
+      'Generated curriculum descriptions must not contain precise unsourced dates, years, or statistics.',
+  });
+
 export const generatedTopicSchema = z.object({
   title: z.string().trim().min(1).max(200),
-  description: z.string().trim().min(1),
+  description: generatedSourceNeutralDescriptionSchema,
   relevance: topicRelevanceSchema,
   estimatedMinutes: z.number().int().min(5).max(240),
   cefrLevel: cefrLevelSchema.optional(),
@@ -207,7 +220,7 @@ export type GeneratedTopic = z.infer<typeof generatedTopicSchema>;
 
 export const generatedBookSchema = z.object({
   title: z.string().trim().min(1).max(200),
-  description: z.string().trim().min(1),
+  description: generatedSourceNeutralDescriptionSchema,
   emoji: z.string().trim().min(1),
   sortOrder: z.number().int(),
 });
@@ -215,7 +228,7 @@ export type GeneratedBook = z.infer<typeof generatedBookSchema>;
 
 export const generatedBookTopicSchema = z.object({
   title: z.string().trim().min(1).max(200),
-  description: z.string().trim().min(1),
+  description: generatedSourceNeutralDescriptionSchema,
   chapter: z.string().trim().min(1).max(200),
   sortOrder: z.number().int(),
   estimatedMinutes: z.number().int().min(5).max(240),
@@ -223,19 +236,30 @@ export const generatedBookTopicSchema = z.object({
 export type GeneratedBookTopic = z.infer<typeof generatedBookTopicSchema>;
 
 export const generatedConnectionSchema = z.object({
-  topicA: z.string(),
-  topicB: z.string(),
+  topicA: z.string().trim().min(1).max(200),
+  topicB: z.string().trim().min(1).max(200),
 });
 export type GeneratedConnection = z.infer<typeof generatedConnectionSchema>;
+
+export const MIN_GENERATED_SUBJECT_BOOKS = 5;
+export const MAX_GENERATED_SUBJECT_BOOKS = 20;
+export const MIN_GENERATED_SUBJECT_TOPICS = 8;
+export const MAX_GENERATED_SUBJECT_TOPICS = 15;
 
 export const bookGenerationResultSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('broad'),
-    books: z.array(generatedBookSchema),
+    books: z
+      .array(generatedBookSchema)
+      .min(MIN_GENERATED_SUBJECT_BOOKS)
+      .max(MAX_GENERATED_SUBJECT_BOOKS),
   }),
   z.object({
     type: z.literal('narrow'),
-    topics: z.array(generatedTopicSchema),
+    topics: z
+      .array(generatedTopicSchema)
+      .min(MIN_GENERATED_SUBJECT_TOPICS)
+      .max(MAX_GENERATED_SUBJECT_TOPICS),
   }),
 ]);
 export type BookGenerationResult = z.infer<typeof bookGenerationResultSchema>;
@@ -243,6 +267,9 @@ export type BookGenerationResult = z.infer<typeof bookGenerationResultSchema>;
 export const MIN_GENERATED_BOOK_TOPICS = 5;
 export const MAX_GENERATED_BOOK_TOPICS = 15;
 export const MIN_GENERATED_BOOK_CHAPTERS = 2;
+
+const normalizeGeneratedTopicTitle = (title: string): string =>
+  title.trim().toLowerCase().replace(/\s+/g, ' ');
 
 export const bookTopicGenerationResultSchema = z
   .object({
@@ -256,6 +283,30 @@ export const bookTopicGenerationResultSchema = z
     const chapterCount = new Set(
       value.topics.map((topic) => topic.chapter.trim().toLowerCase()),
     ).size;
+    const topicTitles = new Set<string>();
+    const sortOrders = new Set<number>();
+    const connectionKeys = new Set<string>();
+
+    value.topics.forEach((topic, index) => {
+      const title = normalizeGeneratedTopicTitle(topic.title);
+      if (topicTitles.has(title)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['topics', index, 'title'],
+          message: 'Generated book topics need distinct titles.',
+        });
+      }
+      topicTitles.add(title);
+
+      if (sortOrders.has(topic.sortOrder)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['topics', index, 'sortOrder'],
+          message: 'Generated book topics need distinct sortOrder values.',
+        });
+      }
+      sortOrders.add(topic.sortOrder);
+    });
 
     if (chapterCount < MIN_GENERATED_BOOK_CHAPTERS) {
       ctx.addIssue({
@@ -264,6 +315,78 @@ export const bookTopicGenerationResultSchema = z
         message: `Generated books need at least ${MIN_GENERATED_BOOK_CHAPTERS} chapters.`,
       });
     }
+
+    const topicsBySortOrder = [...value.topics].sort(
+      (a, b) => a.sortOrder - b.sortOrder,
+    );
+    for (let index = 1; index < value.topics.length; index += 1) {
+      const previous = value.topics[index - 1];
+      const current = value.topics[index];
+      if (previous && current && current.sortOrder <= previous.sortOrder) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['topics', index, 'sortOrder'],
+          message:
+            'Generated book topics need strictly increasing sortOrder values in array order.',
+        });
+      }
+    }
+
+    const chapterPositions = new Map<string, number[]>();
+    topicsBySortOrder.forEach((topic, index) => {
+      const chapter = normalizeGeneratedTopicTitle(topic.chapter);
+      const positions = chapterPositions.get(chapter) ?? [];
+      positions.push(index);
+      chapterPositions.set(chapter, positions);
+    });
+    for (const [chapter, positions] of chapterPositions) {
+      const min = Math.min(...positions);
+      const max = Math.max(...positions);
+      if (positions.length !== max - min + 1) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['topics'],
+          message: `Generated chapter "${chapter}" must be contiguous in sortOrder.`,
+        });
+      }
+    }
+
+    value.connections.forEach((connection, index) => {
+      const topicA = normalizeGeneratedTopicTitle(connection.topicA);
+      const topicB = normalizeGeneratedTopicTitle(connection.topicB);
+
+      if (!topicTitles.has(topicA)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['connections', index, 'topicA'],
+          message: 'Connection topicA must match a generated topic title.',
+        });
+      }
+      if (!topicTitles.has(topicB)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['connections', index, 'topicB'],
+          message: 'Connection topicB must match a generated topic title.',
+        });
+      }
+      if (topicA === topicB) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['connections', index],
+          message: 'Connection cannot point a topic at itself.',
+        });
+      }
+
+      const key = [topicA, topicB].sort().join('::');
+      if (connectionKeys.has(key)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['connections', index],
+          message: 'Duplicate generated topic connection.',
+        });
+      }
+      connectionKeys.add(key);
+    });
   });
 export type BookTopicGenerationResult = z.infer<
   typeof bookTopicGenerationResultSchema

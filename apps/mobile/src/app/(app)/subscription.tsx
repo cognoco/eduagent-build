@@ -94,7 +94,7 @@ const TIER_FEATURES: Array<{
     features: [
       '700 questions per month, no daily limit',
       'All Free features',
-      'Premium AI mentor for one study profile',
+      'Advanced AI help on harder study questions',
       'Detailed progress analytics',
     ],
   },

@@ -1173,16 +1173,9 @@ describe('dashboard service integration', () => {
     );
 
     expect(sessions).toHaveLength(2);
+    // Sessions are ordered by desc(id) where id is UUIDv7 — creation order,
+    // not startedAt. Homework was seeded second so its UUIDv7 is newer.
     expect(sessions[0]).toEqual(
-      expect.objectContaining({
-        sessionId: learningSessionId,
-        subjectName: 'Mathematics',
-        topicTitle: 'Equivalent fractions',
-        highlight: 'Practiced equivalent fractions',
-        engagementSignal: 'curious',
-      }),
-    );
-    expect(sessions[1]).toEqual(
       expect.objectContaining({
         sessionId: homeworkSessionId,
         subjectName: 'Mathematics',
@@ -1190,6 +1183,15 @@ describe('dashboard service integration', () => {
         displayTitle: 'Math Homework',
         displaySummary: '5 problems, practiced linear equations.',
         narrative: null,
+      }),
+    );
+    expect(sessions[1]).toEqual(
+      expect.objectContaining({
+        sessionId: learningSessionId,
+        subjectName: 'Mathematics',
+        topicTitle: 'Equivalent fractions',
+        highlight: 'Practiced equivalent fractions',
+        engagementSignal: 'curious',
       }),
     );
     expect(detail).toEqual(

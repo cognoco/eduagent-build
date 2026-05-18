@@ -68,7 +68,7 @@ _This document builds collaboratively through step-by-step discovery. Sections a
 **UX Specification Implications:**
 
 - **Coaching model** (Recall → Build → Apply → Close): Requires session state machine with rung tracking and LLM context injection
-- **Socratic Escalation Ladder**: 5 rungs driving model routing — fastest model at rung 1-2, reasoning models at rung 3+
+- **Socratic Escalation Ladder**: 5 rungs driving model routing — fastest model at rung 1-2, standard Gemini Pro at rung 3+, advanced help from rung 4 for entitled profiles, and GPT-5.4 reserved as the default OpenAI candidate for rung 5+ only. Family standard profiles are Gemini-only, including fallback.
 - **Coaching card two-path loading**: Cached path (<1s, context-hash freshness) vs fresh path (1-2s skeleton) — requires background precomputation pipeline
 - **Age-based theming**: Teal primary + lavender secondary, dark-first default — theme follows system preference, components stay persona-unaware. `personaType` DB column removed in Epic 12.
 - **Confidence scoring**: Per-problem behavioral metrics feeding parent dashboard — time-to-answer, hints needed, escalation rung, difficulty

@@ -319,7 +319,7 @@ describe('computeCorrectStreak', () => {
 });
 
 describe('resolveExchangeLlmRouting', () => {
-  it('routes Plus as the included premium study profile', () => {
+  it('keeps Plus easy turns on standard Gemini routing', () => {
     expect(
       resolveExchangeLlmRouting({
         subscriptionTier: 'plus',
@@ -327,34 +327,124 @@ describe('resolveExchangeLlmRouting', () => {
         effectiveRung: 1,
       }),
     ).toEqual({
-      llmTier: 'premium',
-      routingReason: 'plus_included_premium_profile',
+      llmTier: 'standard',
+      providerPolicy: 'gemini_only',
+      routingReason: 'plus_standard_below_advanced_rung',
     });
   });
 
-  it('keeps Plus premium routing on hard turns too', () => {
+  it('routes Plus rung 3 through the standard Gemini path', () => {
+    expect(
+      resolveExchangeLlmRouting({
+        subscriptionTier: 'plus',
+        requestedLlmTier: 'standard',
+        effectiveRung: 3,
+      }),
+    ).toEqual({
+      llmTier: 'standard',
+      providerPolicy: 'gemini_only',
+      routingReason: 'plus_standard_below_advanced_rung',
+    });
+  });
+
+  it('routes Plus rung 4 to advanced help without selecting OpenAI', () => {
     expect(
       resolveExchangeLlmRouting({
         subscriptionTier: 'plus',
         requestedLlmTier: 'standard',
         effectiveRung: 4,
+        advancedLlmProvider: 'openai',
       }),
     ).toEqual({
       llmTier: 'premium',
-      routingReason: 'plus_included_premium_profile',
+      routingReason: 'plus_included_advanced_rung',
     });
   });
 
-  it('does not override explicit premium profiles or add-ons', () => {
+  it('routes Plus rung 5+ to GPT when OpenAI is requested', () => {
     expect(
       resolveExchangeLlmRouting({
-        subscriptionTier: 'pro',
-        requestedLlmTier: 'premium',
-        effectiveRung: 4,
+        subscriptionTier: 'plus',
+        requestedLlmTier: 'standard',
+        effectiveRung: 5,
+        advancedLlmProvider: 'openai',
       }),
     ).toEqual({
       llmTier: 'premium',
-      routingReason: 'premium_profile_or_addon',
+      preferredProvider: 'openai',
+      routingReason: 'plus_included_advanced_rung',
+    });
+  });
+
+  it('keeps upgraded Family profiles on standard routing below rung 4', () => {
+    expect(
+      resolveExchangeLlmRouting({
+        subscriptionTier: 'family',
+        requestedLlmTier: 'premium',
+        effectiveRung: 3,
+      }),
+    ).toEqual({
+      llmTier: 'standard',
+      providerPolicy: 'gemini_only',
+      routingReason: 'premium_profile_or_addon_standard_below_advanced_rung',
+    });
+  });
+
+  it('routes upgraded Family profiles to Claude from rung 4+', () => {
+    expect(
+      resolveExchangeLlmRouting({
+        subscriptionTier: 'family',
+        requestedLlmTier: 'premium',
+        effectiveRung: 4,
+        advancedLlmProvider: 'anthropic',
+      }),
+    ).toEqual({
+      llmTier: 'premium',
+      preferredProvider: 'anthropic',
+      routingReason: 'premium_profile_or_addon_advanced_rung',
+    });
+  });
+
+  it('defers upgraded Family GPT routing until rung 5+', () => {
+    expect(
+      resolveExchangeLlmRouting({
+        subscriptionTier: 'family',
+        requestedLlmTier: 'premium',
+        effectiveRung: 4,
+        advancedLlmProvider: 'openai',
+      }),
+    ).toEqual({
+      llmTier: 'premium',
+      routingReason: 'premium_profile_or_addon_advanced_rung',
+    });
+  });
+
+  it('routes upgraded Family profiles to GPT from rung 5+', () => {
+    expect(
+      resolveExchangeLlmRouting({
+        subscriptionTier: 'family',
+        requestedLlmTier: 'premium',
+        effectiveRung: 5,
+        advancedLlmProvider: 'openai',
+      }),
+    ).toEqual({
+      llmTier: 'premium',
+      preferredProvider: 'openai',
+      routingReason: 'premium_profile_or_addon_advanced_rung',
+    });
+  });
+
+  it('keeps Family standard profiles Gemini-only without the add-on', () => {
+    expect(
+      resolveExchangeLlmRouting({
+        subscriptionTier: 'family',
+        requestedLlmTier: 'standard',
+        effectiveRung: 4,
+      }),
+    ).toEqual({
+      llmTier: 'standard',
+      providerPolicy: 'gemini_only',
+      routingReason: 'family_standard_gemini_only',
     });
   });
 });

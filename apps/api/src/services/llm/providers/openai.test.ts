@@ -277,6 +277,20 @@ describe('OpenAI Provider', () => {
       expect(body.model).toBe('gpt-4o');
     });
 
+    it.each(['gpt-5.5', 'gpt-5.4'])(
+      'passes the GPT premium candidate %s through unchanged',
+      async (model) => {
+        mockFetch.mockResolvedValueOnce(createOkResponse('test'));
+        await provider.chat(TEST_MESSAGES, {
+          ...TEST_CONFIG,
+          model,
+        });
+
+        const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+        expect(body.model).toBe(model);
+      },
+    );
+
     it('warns and defaults to gpt-4o-mini for unmapped models', async () => {
       const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
       mockFetch.mockResolvedValueOnce(createOkResponse('test'));

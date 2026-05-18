@@ -512,7 +512,7 @@ describe('BookScreen', () => {
     getByText('Remembered after 9 days');
   });
 
-  it('expands the topic list when a book only has one starter topic', () => {
+  it('automatically expands the topic list when a book only has one starter topic', async () => {
     mockUseBookWithTopics.mockReturnValue(
       makeBookQuery({
         data: {
@@ -532,29 +532,33 @@ describe('BookScreen', () => {
       }),
     );
 
-    const { getByTestId, getByText } = render(<BookScreen />);
+    const { queryByTestId } = render(<BookScreen />);
 
-    getByTestId('book-thin-path-card');
-    getByText('Create a fuller topic list');
+    expect(queryByTestId('book-thin-path-card')).toBeNull();
 
-    fireEvent.press(getByTestId('book-thin-path-build'));
-
-    expect(mockGenerateMutate).toHaveBeenCalledWith(
-      {
-        expandExisting: true,
-        priorKnowledge:
-          'The book already has these starter topics: Introduction to Programming',
-      },
-      expect.objectContaining({
-        onSuccess: expect.any(Function),
-        onError: expect.any(Function),
-      }),
-    );
+    await waitFor(() => {
+      expect(mockGenerateMutate).toHaveBeenCalledWith(
+        {
+          expandExisting: true,
+          priorKnowledge:
+            'The book already has these starter topics: Introduction to Programming',
+        },
+        expect.objectContaining({
+          onSuccess: expect.any(Function),
+          onError: expect.any(Function),
+        }),
+      );
+    });
     expect(mockStartFirstCurriculumMutateAsync).not.toHaveBeenCalled();
     expect(mockPush).not.toHaveBeenCalled();
   });
 
-  it('shows setup progress while expanding a thin topic list', () => {
+  it('does not automatically expand a read-only thin topic list', () => {
+    mockSearchParams = () => ({
+      subjectId: 'sub-1',
+      bookId: 'book-1',
+      readOnly: 'true',
+    });
     mockUseBookWithTopics.mockReturnValue(
       makeBookQuery({
         data: {
@@ -570,10 +574,10 @@ describe('BookScreen', () => {
       }),
     );
 
-    const { getByTestId, getByText } = render(<BookScreen />);
+    const { queryByTestId } = render(<BookScreen />);
 
-    fireEvent.press(getByTestId('book-thin-path-build'));
-    getByText('Setting up...');
+    expect(queryByTestId('book-thin-path-card')).toBeNull();
+    expect(mockGenerateMutate).not.toHaveBeenCalled();
   });
 
   it('renders continue now and started from in-progress sessions', () => {

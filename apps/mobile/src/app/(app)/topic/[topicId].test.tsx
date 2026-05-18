@@ -547,6 +547,25 @@ describe('TopicDetailScreen rendering details', () => {
     });
   });
 
+  it('renders the topic coverage description from progress data', async () => {
+    setupRoutes({
+      progressOverride: {
+        ...DEFAULT_TOPIC_PROGRESS,
+        description:
+          'This topic covers planning, organizing, leading, and controlling.',
+      },
+    });
+
+    render(<TopicDetailScreen />, { wrapper: TestWrapper });
+
+    await waitFor(() => {
+      screen.getByText('This topic covers');
+    });
+    screen.getByText(
+      'This topic covers planning, organizing, leading, and controlling.',
+    );
+  });
+
   it('shows "Never studied" italic when topic has never been reviewed', async () => {
     setupRoutes({ lastReviewedAt: null });
 
@@ -630,8 +649,10 @@ describe('TopicDetailScreen rendering details', () => {
     render(<TopicDetailScreen />, { wrapper: TestWrapper });
 
     await waitFor(() => {
-      screen.getByTestId('topic-sessions-empty');
+      screen.getByText('No sessions yet');
     });
+    fireEvent.press(screen.getByTestId('topic-sessions-strip'));
+    screen.getByTestId('topic-sessions-empty');
     screen.getByText('No sessions yet. Start one below!');
   });
 
@@ -658,20 +679,24 @@ describe('TopicDetailScreen rendering details', () => {
     await waitFor(() => {
       screen.getByText('2 sessions · 2 min total');
     });
+    fireEvent.press(screen.getByTestId('topic-sessions-strip'));
     screen.getByTestId('topic-sessions-list');
   });
 
-  it('shows "+ Add your first note for this topic" when no notes exist', async () => {
+  it('keeps note actions inside the notes strip when no notes exist', async () => {
     setupRoutes({ notes: [] });
 
     render(<TopicDetailScreen />, { wrapper: TestWrapper });
 
     await waitFor(() => {
-      screen.getByText('+ Add your first note for this topic');
+      screen.getByText('Add your first note for this topic');
     });
+    expect(screen.queryByTestId('add-note-button')).toBeNull();
+    fireEvent.press(screen.getByTestId('topic-notes-strip'));
+    screen.getByText('+ Add your first note for this topic');
   });
 
-  it('shows "+ Add a note" when notes already exist', async () => {
+  it('reveals existing topic notes when the notes strip is opened', async () => {
     setupRoutes({
       notes: [
         {
@@ -688,11 +713,14 @@ describe('TopicDetailScreen rendering details', () => {
     render(<TopicDetailScreen />, { wrapper: TestWrapper });
 
     await waitFor(() => {
-      screen.getByText('+ Add a note');
+      screen.getByText('1 note saved for this topic');
     });
+    fireEvent.press(screen.getByTestId('topic-notes-strip'));
+    screen.getByText('My first note');
+    screen.getByText('+ Add a note');
   });
 
-  it('shows saved chat bookmarks for this topic', async () => {
+  it('reveals saved chat bookmarks for this topic when the strip is opened', async () => {
     setupRoutes({
       bookmarks: [
         {
@@ -714,18 +742,20 @@ describe('TopicDetailScreen rendering details', () => {
     await waitFor(() => {
       screen.getByText('Saved from chat');
     });
-    screen.getByText('This is a saved explanation from chat.');
+    fireEvent.press(screen.getByTestId('topic-bookmarks-strip'));
+    screen.getByTestId('bookmark-card-bookmark-1');
   });
 
-  it('hides saved chat section when there are no bookmarks', async () => {
+  it('shows an empty bookmarks message inside the strip when no bookmarks exist', async () => {
     setupRoutes({ bookmarks: [] });
 
     render(<TopicDetailScreen />, { wrapper: TestWrapper });
 
     await waitFor(() => {
-      screen.getByText('+ Add your first note for this topic');
+      screen.getByText('No saved chat for this topic yet');
     });
-    expect(screen.queryByText('Saved from chat')).toBeNull();
+    fireEvent.press(screen.getByTestId('topic-bookmarks-strip'));
+    screen.getByTestId('topic-bookmarks-empty');
   });
 
   it('opens source session when a topic bookmark is pressed', async () => {
@@ -748,8 +778,10 @@ describe('TopicDetailScreen rendering details', () => {
     render(<TopicDetailScreen />, { wrapper: TestWrapper });
 
     await waitFor(() => {
-      screen.getByTestId('bookmark-card-bookmark-1');
+      screen.getByText('Saved chat item.');
     });
+    fireEvent.press(screen.getByTestId('topic-bookmarks-strip'));
+    screen.getByTestId('bookmark-card-bookmark-1');
     fireEvent.press(screen.getByTestId('bookmark-card-bookmark-1'));
 
     expect(mockPush).toHaveBeenCalledWith({

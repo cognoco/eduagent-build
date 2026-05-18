@@ -2,7 +2,17 @@
 
 **Date:** 2026-05-09
 **Branch:** `ux-cleanup`
-**Status:** Spec — ready to implement
+**Status:** SUPERSEDED — archived 2026-05-18
+**Superseded by:** `docs/_archive/plans/done/2026-05-10-parent-home-as-primary-surface.md`
+
+> Archive note (2026-05-18): the `family.tsx` landing screen this plan calls
+> for was never built. The parent surface ended up as `ParentHomeScreen`
+> delegated from `LearnerScreen.tsx`, with the Family tab itself removed.
+> Backend pieces this plan introduced (`getCurrentlyWorkingOn()`,
+> `weeklyHeadline` on `dashboardChildSchema`) shipped and are consumed by the
+> superseding plan. Child-detail enhancements (latest weekly/monthly cards,
+> per-child celebration-level UI) were not built — descoped with the original
+> Family tab.
 **Siblings:** `2026-05-09-more-tab-restructure.md`, `2026-05-09-parent-home-restructure.md`, `2026-05-09-progress-tab-currently-working-on.md`, `2026-05-09-positive-framing-copy-sweep.md`
 
 ## Why

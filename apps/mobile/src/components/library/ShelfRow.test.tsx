@@ -71,13 +71,13 @@ describe('ShelfRow', () => {
       expect.objectContaining({
         backgroundColor: '#edf3ff',
         borderColor: '#2f6fbd33',
-        borderRadius: 20,
+        borderRadius: 18,
         borderWidth: 1,
         elevation: 0,
-        minHeight: 136,
+        minHeight: 92,
         overflow: 'hidden',
-        paddingHorizontal: 14,
-        paddingBottom: 14,
+        paddingHorizontal: 16,
+        paddingBottom: 13,
         paddingTop: 12,
         position: 'relative',
       }),
@@ -86,17 +86,18 @@ describe('ShelfRow', () => {
       screen.getByTestId('shelf-row-shelf-band-sub-math').props.style,
     ).toEqual(
       expect.objectContaining({
-        backgroundColor: '#2f6fbd',
-        bottom: 24,
-        height: 18,
-        opacity: 0.08,
+        backgroundColor: '#ffffff',
+        bottom: 8,
+        height: 17,
+        opacity: 0.28,
       }),
     );
     expect(screen.getByTestId('shelf-row-plank-sub-math').props.style).toEqual(
       expect.objectContaining({
-        backgroundColor: '#2f6fbd22',
-        borderColor: '#2f6fbd33',
-        height: 13,
+        backgroundColor: '#ffffff',
+        bottom: 17,
+        height: 4,
+        left: 84,
       }),
     );
     screen.getByTestId('shelf-row-rail-sub-math');

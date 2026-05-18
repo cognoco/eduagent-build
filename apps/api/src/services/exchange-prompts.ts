@@ -396,6 +396,7 @@ function buildFinalGroundingCheckBlock(): string {
     '- If the learner asks whether their own outside-world claim is the main idea and that claim is not fully supported, do NOT answer "yes". Use: "The source supports X; it does not say Y is the main idea. For this topic, focus on X."\n' +
     '- In every topic, a source phrase supports only what it says. It does not license unstated causes, effects, examples, mechanisms, analogies, names, dates, places, speed, difficulty, or importance claims.\n' +
     '- A source phrase such as "helped armies move between places" does not support extra claims like conquering land, defending land, empire growth, empire strength, forests, mud, speed, travel ease, causes, or military strategy unless those words or ideas are actually in the source.\n' +
+    '- Keep supported claims attached to their exact source noun. If the source says "made trade easier", you may say trade was easier, but do not broaden it to "made things easier for the empire", "made army movement easier", or "made trade faster".\n' +
     '- If the reliable source is only a short title/description, do not invent examples or analogies. Teach by restating the supported relationship and asking one small check from those same words.\n' +
     '- Delete unsupported details, nearby examples, and analogies from the final reply. Delete risky words unless the reliable source itself supports them: conquer, conquest, defend, quick, fast, faster, easy, easier, easily, efficient, effective, military, built, built long ago, special pathway, village, soil, rich soil, mud, muddy, paved, forest, organ, molecule, atom, protein, virus, membrane, grow, reproduce, respond, empire growth, stay strong, building block, fundamental piece, processes of life, function on its own, can do on its own, all by itself, main job.\n' +
     '- Delete inflated wording such as "super important", "super useful", "definitely", "absolutely", "crucial", "very important", "really important", or "incredibly".\n' +
@@ -724,6 +725,7 @@ export function buildSystemPrompt(
         recitationFeedbackScope +
         '   - If the learner asks what sounded weak, always name one concrete strength and one concrete improvement to try next. Do not say there was nothing weak unless the recitation is already a polished multi-part answer.\n' +
         '   - When giving a polished version, improve structure using only the learner\'s wording and source-supported facts; prefer one clean sentence over repeating every earlier sentence verbatim. Do not add new adjectives, adverbs, causes, examples, or facts. If the learner said "armies travel", keep that wording; do not change it to "armies travel quickly" unless the learner said that.\n' +
+        '   - If the learner adds an unsupported factual modifier, do not preserve it in the polished version. Example: if the source says "made trade easier" and the learner says "trade moved faster", polish it back to "made trade easier" or briefly say the source supports easier trade, not faster trade.\n' +
         '   - On setup/readiness turns for a loaded topic, include "current_topic" in private_sources.relied_on when that source exists, even if the visible reply is mostly procedural.\n' +
         '4. Offer to let them try again or move on.\n\n' +
         'Keep feedback encouraging. Use "not yet" framing for missed parts.\n' +
@@ -1033,6 +1035,13 @@ export function buildSystemPrompt(
         '- Introduce at most 1-2 new concepts per message.\n' +
         '- Build on what the learner already knows.\n' +
         exampleRule,
+    );
+
+    sections.push(
+      'Numeric walkthroughs:\n' +
+        '- If the learner asks for a calculation, percentage, probability, ratio, equation, or counted example, include the final computed result in plain language, not only the setup or intermediate counts.\n' +
+        '- Show the key intermediate quantities, then state the answer in the same units the learner needs. Example pattern: "99 out of 594, which is about 16-17%."\n' +
+        '- Do not stop at "only 99 of 594"; complete the conversion when the source or problem gives enough information.',
     );
 
     // Knowledge capture — the behaviour is unchanged but the annotation now

@@ -18,4 +18,6 @@ const ciDefaults = process.env.CI
 module.exports = {
   ...nxPreset,
   ...ciDefaults,
+  modulePathIgnorePatterns: ['<rootDir>/.worktrees/'],
+  testPathIgnorePatterns: ['<rootDir>/.worktrees/'],
 };

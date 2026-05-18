@@ -91,6 +91,33 @@ describe('TopicHeader', () => {
     screen.getByText('Last studied 3 days ago');
   });
 
+  it('renders the topic coverage description when provided', () => {
+    render(
+      <TopicHeader
+        name="Photosynthesis"
+        chapter={null}
+        description="Chlorophyll, sunlight, carbon dioxide, and glucose."
+        retentionStatus={null}
+        lastStudiedText="Last studied 3 days ago"
+      />,
+    );
+    screen.getByText('This topic covers');
+    screen.getByText('Chlorophyll, sunlight, carbon dioxide, and glucose.');
+  });
+
+  it('does not render the topic coverage card when description is empty', () => {
+    render(
+      <TopicHeader
+        name="Photosynthesis"
+        chapter={null}
+        description="   "
+        retentionStatus={null}
+        lastStudiedText="Last studied 3 days ago"
+      />,
+    );
+    expect(screen.queryByTestId('topic-covers-card')).toBeNull();
+  });
+
   it('renders all elements together', () => {
     render(
       <TopicHeader

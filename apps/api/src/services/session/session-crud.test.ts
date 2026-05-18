@@ -49,11 +49,10 @@ describe('projectAiResponseContent', () => {
     );
   });
 
-  it('strips the exact leaked-envelope shape from BUG-934 (schema-invalid fluency_drill)', () => {
-    // This is the literal payload pasted in the bug report. It fails Zod
-    // validation because `duration_s: 0` is below min(15) and `score: null`
-    // is not a score object — but the JSON is structurally valid and
-    // `.reply` is intact, so the backstop must still project it.
+  it('strips schema-invalid leaked envelopes down to the reply field', () => {
+    // duration_s: 0 is only tolerated for inactive drills; active drills still
+    // fail validation, but the JSON is structurally valid and `.reply` is
+    // intact, so the backstop must still project it.
     const leaked = JSON.stringify({
       reply: 'Ciao, Zuzana! Welcome to your Italian session.',
       signals: {
@@ -63,7 +62,7 @@ describe('projectAiResponseContent', () => {
       },
       ui_hints: {
         note_prompt: { show: false, post_session: false },
-        fluency_drill: { active: false, duration_s: 0, score: null },
+        fluency_drill: { active: true, duration_s: 0, score: null },
       },
     });
     expect(projectAiResponseContent(leaked)).toBe(
@@ -77,7 +76,7 @@ describe('projectAiResponseContent', () => {
     const leaked = JSON.stringify({
       reply: 'Line one.\\nLine two.',
       ui_hints: {
-        fluency_drill: { active: false, duration_s: 0 },
+        fluency_drill: { active: true, duration_s: 0 },
       },
     });
     expect(projectAiResponseContent(leaked)).toBe('Line one.\nLine two.');
@@ -449,11 +448,11 @@ describe('stripMarkdownFence', () => {
 
 describe('[I-1] projectAiResponseContent aggregate logging', () => {
   function makeLeakedEnvelope(reply: string): string {
-    // Schema-invalid: fluency_drill.duration_s violates min(15) constraint.
+    // Schema-invalid: active fluency_drill.duration_s violates min(15).
     return JSON.stringify({
       reply,
       ui_hints: {
-        fluency_drill: { active: false, duration_s: 0, score: null },
+        fluency_drill: { active: true, duration_s: 0, score: null },
       },
     });
   }

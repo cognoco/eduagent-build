@@ -1024,6 +1024,13 @@
     },
     "bookmarkCard": {
       "accessibilityLabel": "Abrir marcador salvo: {{title}}"
+    },
+    "topic": {
+      "bookmarks": {
+        "savedFromChat": "Salvo do chat",
+        "emptyShort": "Nenhum chat salvo para este tópico",
+        "emptyLong": "Ainda não há explicações salvas para este tópico."
+      }
     }
   },
   "topic": {

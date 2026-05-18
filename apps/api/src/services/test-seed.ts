@@ -1598,6 +1598,10 @@ async function seedLanguageLearner(
   }));
   await db.insert(curriculumTopics).values(topicValues);
   const topicIds = topicValues.map((topic) => topic.id);
+  const firstTopicId = topicIds[0];
+  if (!firstTopicId) {
+    throw new Error('language-learner seed did not create a topic');
+  }
 
   await db.insert(vocabulary).values([
     {
@@ -1671,7 +1675,7 @@ async function seedLanguageLearner(
     profileId,
     email,
     password,
-    ids: { subjectId },
+    ids: { subjectId, topicId: firstTopicId },
   };
 }
 

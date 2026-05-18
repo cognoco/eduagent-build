@@ -313,7 +313,7 @@ _Note: FR146 (Language SPEAK/LISTEN voice integration) is mapped to Epic 6 (Lang
 
 - ARCH-7: Scoped repository pattern (`createScopedRepository(profileId)`) for all data access. Never raw `WHERE profile_id =` clauses.
 - ARCH-8: LLM orchestration module (`routeAndCall()`) — all LLM calls must go through this. No direct provider API calls.
-- ARCH-9: Model routing by conversation state (escalation rung): Gemini Flash for rung 1-2, reasoning models for rung 3+.
+- ARCH-9: Model routing by conversation state (escalation rung): Gemini Flash for rung 1-2, Gemini Pro for standard rung 3+, and advanced providers only from rung 4 upward for entitled profiles.
 - ARCH-10: SM-2 as pure math library in `packages/retention/` (~50 lines, zero deps)
 - ARCH-11: ~~Workers KV~~ DB-backed cache (`home_surface_cache` table) for coaching cards (write on Inngest precompute, read on app open) and subscription status (write on Stripe/RevenueCat webhook, read on metering). _Original spec said Workers KV; implementation uses DB table as conscious adaptation — acceptable at current scale._
 - ARCH-12: SSE streaming for LLM responses via Hono `streamSSE()`. Design handler behind interface for potential Durable Objects migration.
@@ -1694,7 +1694,7 @@ So that I actually learn how to solve similar problems.
 **When** AI processes the request
 **Then** AI acknowledges the frustration empathetically and redirects to the current escalation rung ("I get that this is frustrating. Let's try it from a different angle..."). AI never provides the direct answer regardless of persistence. If learner persists after rung 5 (Teaching Mode Pivot), AI teaches the full method and asks learner to apply the final step themselves — the learner always does the last mile.
 
-**And** model routing escalates: Gemini Flash for rung 1-2, reasoning models for rung 3+ (ARCH-9)
+**And** model routing escalates: Gemini Flash for rung 1-2, Gemini Pro for standard rung 3+, and advanced providers only from rung 4 upward for entitled profiles (ARCH-9)
 **And** Homework Fast Lane UI throughout — no gamification elements visible (UX-2)
 
 **FRs:** FR31 | **UX:** UX-2, UX-3, UX-4, UX-16

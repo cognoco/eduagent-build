@@ -20,6 +20,8 @@ import {
   familyLinks,
   profiles,
   learningSessions,
+  learningProfiles,
+  progressSnapshots,
   sessionEvents,
   subjects,
   consentStates,
@@ -35,6 +37,7 @@ import {
 import {
   ForbiddenError,
   NEW_LEARNER_SESSION_THRESHOLD,
+  progressMetricsSchema,
 } from '@eduagent/schemas';
 import type {
   DashboardChild,
@@ -47,7 +50,12 @@ import type {
   ProgressMetrics,
   TopicProgress,
 } from '@eduagent/schemas';
-import { getOverallProgress, getTopicProgressBatch } from './progress';
+import {
+  getOverallProgress,
+  getOverallProgressBatch,
+  getTopicProgressBatch,
+} from './progress';
+import type { OverallProgressResult } from './progress';
 import {
   buildKnowledgeInventory,
   buildProgressHistory,
@@ -55,12 +63,16 @@ import {
   getLatestSnapshotOnOrBefore,
   MAX_SESSION_WALL_CLOCK_SECONDS,
 } from './snapshot-aggregation';
+import type { LatestSnapshot } from './snapshot-aggregation';
 import {
   getMonthlyReportForParentChild,
   listMonthlyReportsForParentChild,
   markMonthlyReportViewed,
 } from './monthly-report';
-import { getCurrentlyWorkingOn } from './learner-profile';
+import {
+  getCurrentlyWorkingOn,
+  selectCurrentlyWorkingOn,
+} from './learner-profile';
 import { assertParentAccess } from './family-access';
 import { generateWeeklyReportData } from './weekly-report';
 import {
@@ -467,6 +479,224 @@ async function buildChildProgressSummary(
 }
 
 // ---------------------------------------------------------------------------
+// Batch progress summaries — replaces N × buildChildProgressSummary calls
+// with ~4 queries (constant count regardless of N children).
+// ---------------------------------------------------------------------------
+
+interface ChildProgressInput {
+  childProfileId: string;
+  childName: string;
+  sessionsThisWeek: number;
+  sessionsLastWeek: number;
+  totalTimeThisWeekMinutes: number;
+  subjectNames: string[];
+  currentStreak: number;
+}
+
+type ChildProgressOutput = {
+  progress: DashboardChild['progress'];
+  totalSessions: number;
+  weeklyHeadline: DashboardChild['weeklyHeadline'];
+  currentlyWorkingOn: DashboardChild['currentlyWorkingOn'];
+};
+
+async function buildChildProgressSummariesBatch(
+  db: Database,
+  children: ChildProgressInput[],
+): Promise<Map<string, ChildProgressOutput>> {
+  if (children.length === 0) return new Map();
+
+  const profileIds = children.map((c) => c.childProfileId);
+
+  // 1. Fetch latest snapshots, live session counts, and currentlyWorkingOn
+  //    for ALL children in 3 queries (constant count).
+  const [allSnapshots, liveCountRows, allLearningProfiles] = await Promise.all([
+    db.query.progressSnapshots.findMany({
+      where: inArray(progressSnapshots.profileId, profileIds),
+      orderBy: desc(progressSnapshots.snapshotDate),
+    }),
+    db
+      .select({
+        profileId: learningSessions.profileId,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(learningSessions)
+      .where(
+        and(
+          inArray(learningSessions.profileId, profileIds),
+          gte(learningSessions.exchangeCount, 1),
+          ne(learningSessions.status, 'active'),
+        ),
+      )
+      .groupBy(learningSessions.profileId),
+    db.query.learningProfiles.findMany({
+      where: inArray(learningProfiles.profileId, profileIds),
+    }),
+  ]);
+
+  // Index live session counts by profileId
+  const liveCountByProfile = new Map(
+    liveCountRows.map((r) => [r.profileId, r.count]),
+  );
+
+  // Index learning profiles by profileId for currentlyWorkingOn
+  const learningProfileByProfileId = new Map(
+    allLearningProfiles.map((lp) => [lp.profileId, lp]),
+  );
+
+  // Deduplicate snapshots to latest-per-profile (they're ordered by date DESC)
+  const latestSnapshotByProfile = new Map<string, LatestSnapshot>();
+  const allSnapshotsByProfile = new Map<
+    string,
+    Array<typeof progressSnapshots.$inferSelect>
+  >();
+  for (const row of allSnapshots) {
+    // Track all snapshots for previous-week lookup
+    const arr = allSnapshotsByProfile.get(row.profileId) ?? [];
+    arr.push(row);
+    allSnapshotsByProfile.set(row.profileId, arr);
+
+    // First one per profile is the latest (ordered DESC)
+    if (!latestSnapshotByProfile.has(row.profileId)) {
+      latestSnapshotByProfile.set(row.profileId, {
+        snapshotDate: row.snapshotDate,
+        metrics: parseSnapshotMetrics(row.metrics),
+        updatedAt: row.updatedAt,
+      });
+    }
+  }
+
+  // For children that have a latest snapshot, find previous-week snapshots
+  // from the already-fetched rows (no additional queries needed).
+  const previousSnapshotByProfile = new Map<string, LatestSnapshot>();
+  for (const [profileId, latest] of latestSnapshotByProfile) {
+    const targetDate = isoDate(
+      subtractDays(new Date(`${latest.snapshotDate}T00:00:00Z`), 7),
+    );
+    const allForProfile = allSnapshotsByProfile.get(profileId) ?? [];
+    // allForProfile is sorted by snapshotDate DESC; find first <= targetDate
+    const match = allForProfile.find((row) => row.snapshotDate <= targetDate);
+    if (match) {
+      previousSnapshotByProfile.set(profileId, {
+        snapshotDate: match.snapshotDate,
+        metrics: parseSnapshotMetrics(match.metrics),
+        updatedAt: match.updatedAt,
+      });
+    }
+  }
+
+  const weekStart = isoDate(getStartOfWeek(new Date()));
+
+  // 2. Assemble per-child results in-memory
+  const result = new Map<string, ChildProgressOutput>();
+
+  for (const child of children) {
+    const { childProfileId } = child;
+    const liveSessionCount = liveCountByProfile.get(childProfileId) ?? 0;
+    const learningProfile = learningProfileByProfileId.get(childProfileId);
+    const currentlyWorkingOn = selectCurrentlyWorkingOn(
+      learningProfile?.struggles,
+    );
+    const latestSnapshot = latestSnapshotByProfile.get(childProfileId) ?? null;
+
+    if (!latestSnapshot) {
+      result.set(childProfileId, {
+        progress: null,
+        totalSessions: liveSessionCount,
+        weeklyHeadline: generateWeeklyReportData(
+          child.childName,
+          weekStart,
+          emptyProgressMetrics(),
+          null,
+        ).headlineStat,
+        currentlyWorkingOn,
+      });
+      continue;
+    }
+
+    const previousSnapshot =
+      previousSnapshotByProfile.get(childProfileId) ?? null;
+    const previousMetrics = previousSnapshot?.metrics ?? null;
+    const currentMetrics = latestSnapshot.metrics;
+    const weeklyDeltas = computeWeeklyDeltas(previousMetrics, currentMetrics);
+    const weeklyHeadline = generateWeeklyReportData(
+      child.childName,
+      weekStart,
+      currentMetrics,
+      previousMetrics,
+    ).headlineStat;
+
+    result.set(childProfileId, {
+      progress: {
+        snapshotDate: latestSnapshot.snapshotDate,
+        topicsMastered: currentMetrics.topicsMastered,
+        vocabularyTotal: currentMetrics.vocabularyTotal,
+        minutesThisWeek: child.totalTimeThisWeekMinutes,
+        weeklyDeltaTopicsMastered: weeklyDeltas.topicsMastered,
+        weeklyDeltaVocabularyTotal: weeklyDeltas.vocabularyTotal,
+        weeklyDeltaTopicsExplored: weeklyDeltas.topicsExplored,
+        engagementTrend:
+          liveSessionCount < MIN_TREND_SESSIONS
+            ? 'stable'
+            : child.sessionsThisWeek === 0
+              ? 'declining'
+              : child.sessionsThisWeek > child.sessionsLastWeek
+                ? 'increasing'
+                : 'stable',
+        guidance: buildProgressGuidance(
+          child.childName,
+          child.subjectNames,
+          child.sessionsThisWeek,
+          child.sessionsLastWeek,
+          child.currentStreak,
+        ),
+      },
+      totalSessions: liveSessionCount,
+      weeklyHeadline,
+      currentlyWorkingOn,
+    });
+  }
+
+  return result;
+}
+
+/**
+ * Parse snapshot metrics JSON — mirrors the private parseMetrics in
+ * snapshot-aggregation.ts but uses the public progressMetricsSchema.
+ */
+function parseSnapshotMetrics(input: unknown): ProgressMetrics {
+  const parsed = progressMetricsSchema.safeParse(input);
+  if (parsed.success) return parsed.data;
+
+  const value = (input ?? {}) as Record<string, unknown>;
+  const defaults: Record<string, unknown> = {
+    totalSessions: 0,
+    totalActiveMinutes: 0,
+    totalWallClockMinutes: 0,
+    totalExchanges: 0,
+    topicsAttempted: 0,
+    topicsMastered: 0,
+    topicsInProgress: 0,
+    booksCompleted: 0,
+    vocabularyTotal: 0,
+    vocabularyMastered: 0,
+    vocabularyLearning: 0,
+    vocabularyNew: 0,
+    retentionCardsDue: 0,
+    retentionCardsStrong: 0,
+    retentionCardsFading: 0,
+    currentStreak: 0,
+    longestStreak: 0,
+    subjects: [],
+  };
+  return progressMetricsSchema.parse({
+    ...defaults,
+    ...value,
+    subjects: Array.isArray(value['subjects']) ? value['subjects'] : [],
+  });
+}
+
+// ---------------------------------------------------------------------------
 // DB-aware query functions (Sprint 8 — route wiring)
 // ---------------------------------------------------------------------------
 
@@ -531,42 +761,16 @@ export async function getChildrenForParent(
     arr.push(s);
   }
 
-  // Batch guided metrics and progress in parallel per child (still parallelized)
+  // Batch guided metrics and progress in parallel per child.
+  // [PERF-BATCH] getOverallProgressBatch replaces N × getOverallProgress
+  // calls with ~8 queries (constant count regardless of N children).
+  // countGuidedMetricsBatch is already a single GROUP BY aggregate.
   const validLinks = links.filter((l) => profilesById.has(l.childProfileId));
-  // [EP15-I9] `buildChildProgressSummary` makes two sequential snapshot
-  // reads per child. Previously it was called inside the per-child for-loop
-  // below, which serialized N × 2 = 2N DB roundtrips (a parent with 4
-  // children did 8 sequential round trips for progress summaries alone,
-  // ignoring the parallel work above). Hoisted here into Promise.all so
-  // all children's progress summaries fan out in parallel, matching the
-  // batching pattern used for `getOverallProgress` and `countGuidedMetrics`.
-  //
-  // Note: the per-child summary needs `sessionsThisWeek`/`sessionsLastWeek`/
-  // `totalTimeThisWeekMinutes`/`subjectNames`, which are computed inside
-  // the for-loop below. We therefore do the parallel fan-out AFTER we've
-  // precomputed those inputs per child in a first pass.
-  // [BUG-734 / PERF-4] countGuidedMetrics was previously called once per
-  // child via Promise.all — N parallel round-trips with identical SQL
-  // shape. Replaced with a single GROUP BY aggregate that returns a Map
-  // keyed by profileId, dropping the dashboard-build cost from O(N) to
-  // O(1) on this segment.
-  const [progressResults, guidedMetricsByProfile] = await Promise.all([
-    Promise.all(
-      validLinks.map((l) => getOverallProgress(db, l.childProfileId)),
-    ),
-    countGuidedMetricsBatch(
-      db,
-      validLinks.map((l) => l.childProfileId),
-      startOfLastWeek,
-    ),
+  const validChildProfileIds = validLinks.map((l) => l.childProfileId);
+  const [progressByProfile, guidedMetricsByProfile] = await Promise.all([
+    getOverallProgressBatch(db, validChildProfileIds),
+    countGuidedMetricsBatch(db, validChildProfileIds, startOfLastWeek),
   ]);
-  const guidedMetricsResults = validLinks.map(
-    (l) =>
-      guidedMetricsByProfile.get(l.childProfileId) ?? {
-        guidedCount: 0,
-        totalProblemCount: 0,
-      },
-  );
 
   // Batch streaks + XP for all children (reuse childProfileIds from links)
   const [streakResults, xpResults] = await Promise.all([
@@ -623,8 +827,7 @@ export async function getChildrenForParent(
   }
 
   // Pre-compute per-child display inputs (first pass) so that the
-  // progress-summary fan-out can run in parallel without needing the
-  // `children.push` loop to complete sequentially.
+  // batch progress-summary can run with all children's data at once.
   interface PreparedChild {
     childProfileId: string;
     displayName: string;
@@ -633,27 +836,28 @@ export async function getChildrenForParent(
     totalTimeThisWeekMinutes: number;
     subjectNames: string[];
     dashboardInput: DashboardInput;
-    progress: (typeof progressResults)[number];
-    guidedMetrics: (typeof guidedMetricsResults)[number];
+    progress: OverallProgressResult;
+    guidedMetrics: { guidedCount: number; totalProblemCount: number };
     rawInputMap: Map<string, string | null>;
     consentStatus: ConsentStatus | null;
     respondedAt: string | null;
   }
 
   const prepared: PreparedChild[] = [];
-  for (let i = 0; i < validLinks.length; i++) {
-    const link = validLinks[i];
-    if (!link) throw new Error(`validLinks[${i}] is unexpectedly undefined`);
+  for (const link of validLinks) {
     const childProfileId = link.childProfileId;
     const profile = profilesById.get(childProfileId);
     if (!profile)
       throw new Error(`Profile not found for childProfileId=${childProfileId}`);
-    const progress = progressResults[i];
+    const progress = progressByProfile.get(childProfileId);
     if (!progress)
-      throw new Error(`progressResults[${i}] is unexpectedly undefined`);
-    const guidedMetrics = guidedMetricsResults[i];
-    if (!guidedMetrics)
-      throw new Error(`guidedMetricsResults[${i}] is unexpectedly undefined`);
+      throw new Error(
+        `progressByProfile missing for childProfileId=${childProfileId}`,
+      );
+    const guidedMetrics = guidedMetricsByProfile.get(childProfileId) ?? {
+      guidedCount: 0,
+      totalProblemCount: 0,
+    };
     const recentSessions = sessionsByProfile.get(childProfileId) ?? [];
 
     const sessionsThisWeek = recentSessions.filter(
@@ -740,29 +944,27 @@ export async function getChildrenForParent(
     });
   }
 
-  // [EP15-I9] Parallel fan-out of progress summaries. Each call is a pair
-  // of snapshot reads; fanning out turns N × 2 sequential roundtrips into
-  // ~2 roundtrips (bounded by the slowest child). Bounded by `validLinks`
-  // (typically ≤ 4 children per parent), so no explicit batching needed.
-  const progressSummaries = await Promise.all(
-    prepared.map((p) =>
-      buildChildProgressSummary(
-        db,
-        p.childProfileId,
-        p.displayName,
-        p.sessionsThisWeek,
-        p.sessionsLastWeek,
-        p.totalTimeThisWeekMinutes,
-        p.subjectNames,
-        streaksByProfile.get(p.childProfileId)?.currentStreak ?? 0,
-      ),
-    ),
+  // [PERF-BATCH] Batch progress summaries — replaces N × buildChildProgressSummary
+  // (each doing 3 + conditional queries) with ~3 queries (constant count).
+  const progressSummariesByProfile = await buildChildProgressSummariesBatch(
+    db,
+    prepared.map((p) => ({
+      childProfileId: p.childProfileId,
+      childName: p.displayName,
+      sessionsThisWeek: p.sessionsThisWeek,
+      sessionsLastWeek: p.sessionsLastWeek,
+      totalTimeThisWeekMinutes: p.totalTimeThisWeekMinutes,
+      subjectNames: p.subjectNames,
+      currentStreak: streaksByProfile.get(p.childProfileId)?.currentStreak ?? 0,
+    })),
   );
 
-  const children: DashboardChild[] = prepared.map((p, i) => {
-    const progressSummary = progressSummaries[i];
+  const children: DashboardChild[] = prepared.map((p) => {
+    const progressSummary = progressSummariesByProfile.get(p.childProfileId);
     if (!progressSummary)
-      throw new Error(`progressSummaries[${i}] is unexpectedly undefined`);
+      throw new Error(
+        `progressSummariesByProfile missing for childProfileId=${p.childProfileId}`,
+      );
     const { progress, totalSessions, weeklyHeadline, currentlyWorkingOn } =
       progressSummary;
     // [BUG-906] Inject lifetime count so generateChildSummary can pick the

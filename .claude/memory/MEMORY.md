@@ -31,7 +31,7 @@ Two production dead-code branches removed 2026-04-19 in commit `970a82a5`: `AgeB
 - [project_eval_llm_signal_metrics.md](project_eval_llm_signal_metrics.md) — Layer 1 signal-distribution regression guard. `emitsEnvelope` flag + `--check-baseline`/`--update-baseline`.
 - [project_llm_source_provenance.md](project_llm_source_provenance.md) — Private source provenance, sourceAudit metadata, and no-memory/no-forum factual grounding rule for tutoring exchanges.
 - [billing-payments.md](billing-payments.md) — Mobile IAP (RevenueCat), Stripe dormant for future web. Epic 9 COMPLETE.
-- [pricing_dual_cap.md](pricing_dual_cap.md) — Free: 10/day + 100/month. Plus: 700/month, no daily limit, one premium study profile.
+- [pricing_dual_cap.md](pricing_dual_cap.md) — Free: 10/day + 100/month. Plus: 700/month, no daily limit, advanced help from rung 4+, GPT-5.4 default OpenAI candidate only rung 5+.
 - [market_language_pivot.md](market_language_pivot.md) — English UI only. Language TEACHING active (four_strands). GDPR-everywhere.
 - [project_themekey_removed.md](project_themekey_removed.md) — NEVER use key={themeKey} OR Animated.View opacity on root layout.
 - [feedback_drizzle_transaction_cast.md](feedback_drizzle_transaction_cast.md) — PgTransaction → Database cast pattern for transactions.
@@ -69,7 +69,8 @@ Two production dead-code branches removed 2026-04-19 in commit `970a82a5`: `AgeB
 ## Testing Infrastructure
 
 - [project_playwright_e2e_setup.md](project_playwright_e2e_setup.md) — Playwright E2E: `doppler run -c stg`, seed secret, baseline 23m/48% pass (2026-05-14)
-- [project_enduser_session_pass.md](project_enduser_session_pass.md) — Live API-level five-session LLM quality gate: freeform, learning, homework, review, recitation; includes private source-audit checks.
+- [project_enduser_session_pass.md](project_enduser_session_pass.md) — Live API-level LLM quality gates: end-user pass plus Plus/Family premium-routing pass; includes private source-audit checks.
+- [project_book_generation_pass.md](project_book_generation_pass.md) — Live book/topic-map generation quality gate upstream of tutoring sessions.
 
 ## Deployment & Secrets
 
@@ -142,7 +143,7 @@ Two production dead-code branches removed 2026-04-19 in commit `970a82a5`: `AgeB
 
 ## Reference & Tooling
 
-- [reference_notion_workspace.md](reference_notion_workspace.md) — Notion MCP often unavailable; use REST API via `doppler.exe`. Bug Tracker DB: `b8ce802f...`.
+- [reference_notion_workspace.md](reference_notion_workspace.md) — Issue Tracker split 2026-05-18: NEW bugs → Open `3598bce9...`; Resolved archive `b8ce802f...`. REST via Doppler.
 - [project_expo_web_preview.md](project_expo_web_preview.md) — `.claude/launch.json` `mobile` target. Cold bundle ~18s. Auth-walled past sign-in.
 - [nativewind-windows.md](nativewind-windows.md) — pnpm patchedDependencies + metro forceWriteFileSystem.
 - Template repo extraction plan — tracked in Notion (archived from memory 2026-05-04).

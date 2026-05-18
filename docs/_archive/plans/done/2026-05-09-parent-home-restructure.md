@@ -2,7 +2,14 @@
 
 **Date:** 2026-05-09
 **Branch:** `ux-cleanup`
-**Status:** Spec — ready to implement
+**Status:** SUPERSEDED — archived 2026-05-18
+**Superseded by:** `docs/_archive/plans/done/2026-05-10-parent-home-as-primary-surface.md`
+
+> Archive note (2026-05-18): `ParentGateway` deletion and direct landing on
+> `LearnerScreen` shipped. The proposed `ChildCard.tsx` component was never
+> built — parents with linked children now delegate to a full
+> `ParentHomeScreen` (a different and larger architecture) introduced by the
+> superseding plan. Treat this doc as historical context only.
 **Sibling:** `2026-05-09-more-tab-restructure.md`
 
 ## Why

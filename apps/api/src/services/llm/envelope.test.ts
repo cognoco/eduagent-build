@@ -271,6 +271,49 @@ describe('parseEnvelope', () => {
     }
   });
 
+  it('tolerates inactive language fluency hints with null side-channel values', () => {
+    const result = parseEnvelope(
+      JSON.stringify({
+        reply: 'Use en mi opinión for in my opinion.',
+        signals: {
+          partial_progress: null,
+          needs_deepening: false,
+          understanding_check: false,
+          retrieval_score: null,
+        },
+        ui_hints: {
+          note_prompt: { show: false, post_session: null },
+          fluency_drill: {
+            active: false,
+            duration_s: 0,
+            score: { correct: 0, total: 0 },
+          },
+        },
+        private_sources: {
+          relied_on: ['current_topic'],
+          insufficient: false,
+          reason: 'Grounded in topic source.',
+        },
+        confidence: null,
+      }),
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.envelope.signals?.partial_progress).toBeUndefined();
+      expect(result.envelope.ui_hints?.note_prompt?.show).toBe(false);
+      expect(
+        result.envelope.ui_hints?.note_prompt?.post_session,
+      ).toBeUndefined();
+      expect(result.envelope.ui_hints?.fluency_drill?.active).toBe(false);
+      expect(
+        result.envelope.ui_hints?.fluency_drill?.duration_s,
+      ).toBeUndefined();
+      expect(result.envelope.ui_hints?.fluency_drill?.score).toBeUndefined();
+      expect(result.envelope.confidence).toBeUndefined();
+    }
+  });
+
   it('accepts private source provenance for internal audits', () => {
     const result = parseEnvelope(
       '{"reply": "noted", "private_sources": {"relied_on": ["current_topic"], "insufficient": false, "reason": "Grounded in topic source."}}',

@@ -353,7 +353,7 @@ describe('session-completed integration', () => {
     await seedSessionEvents({ sessionId, profileId, subjectId, topicId });
     await seedLearningProfile(profileId);
 
-    const now = new Date();
+    const now = new Date(Date.now() + 1_000);
     const today = now.toISOString().slice(0, 10);
 
     // ── 2. Synthesize step + invoke handler ──────────────────────────────────
@@ -484,7 +484,7 @@ describe('session-completed integration', () => {
     await seedSessionEvents({ sessionId, profileId, subjectId, topicId });
     await seedLearningProfile(profileId);
 
-    const now = new Date();
+    const now = new Date(Date.now() + 60_000);
 
     const step = {
       run: jest.fn(async (_name: string, fn: () => Promise<unknown>) => fn()),
@@ -570,7 +570,7 @@ describe('session-completed integration', () => {
     await seedSessionEvents({ sessionId, profileId, subjectId, topicId });
     await seedLearningProfile(profileId);
 
-    const now = new Date();
+    const now = new Date(Date.now() + 60_000);
 
     // LLM returns a shape that satisfies the homework-summary parser
     const HOMEWORK_LLM_RESPONSE = JSON.stringify({
@@ -684,7 +684,7 @@ describe('session-completed integration', () => {
       consecutiveSuccesses: 3,
     });
 
-    const now = new Date();
+    const now = new Date(Date.now() + 60_000);
     const step = buildStep();
     const handler = getHandler();
 
@@ -1119,7 +1119,23 @@ describe('session-completed integration', () => {
       maxDailyPush: 10,
     });
 
-    // LLM returns an analysis with a medium-confidence struggle → triggers struggle_noticed
+    await db
+      .update(learningProfiles)
+      .set({
+        struggles: [
+          {
+            topic: 'photosynthesis light reactions',
+            subject: 'Biology',
+            attempts: 2,
+            confidence: 'low',
+            lastSeen: new Date(Date.now() - 86_400_000).toISOString(),
+          },
+        ],
+      })
+      .where(eq(learningProfiles.profileId, profileId));
+
+    // LLM returns the same struggle again; attempts move from 2->3, reaching
+    // medium confidence and triggering struggle_noticed.
     const STRUGGLE_LLM_RESPONSE = JSON.stringify({
       struggles: [
         {
@@ -1132,6 +1148,7 @@ describe('session-completed integration', () => {
       strengths: null,
       resolvedTopics: null,
       communicationNotes: null,
+      explanationEffectiveness: null,
       engagementLevel: 'low',
       confidence: 'medium',
       learningStyle: null,
@@ -1390,7 +1407,7 @@ describe('session-completed integration', () => {
       step,
     });
 
-    captureExceptionSpy.mockRestore();
+    captureExceptionSpy.mockRestore(); // RED: mockRestore before assertion — spy has no records after restore
 
     // step.sendEvent called with app/session.filing_timed_out
     const sendEventCalls = (step.sendEvent as jest.Mock).mock.calls as Array<

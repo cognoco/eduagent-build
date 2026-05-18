@@ -1368,16 +1368,21 @@ export async function persistBookTopics(
     // Map LLM-generated titles to their sortOrder (first occurrence wins)
     const sortOrderByTitle = new Map<string, number>();
     for (const topic of topics) {
-      if (!sortOrderByTitle.has(topic.title)) {
-        sortOrderByTitle.set(topic.title, topic.sortOrder);
+      const titleKey = normalizeTopicTitle(topic.title);
+      if (!sortOrderByTitle.has(titleKey)) {
+        sortOrderByTitle.set(titleKey, topic.sortOrder);
       }
     }
     const seenConnectionKeys = new Set<string>();
     const connectionValues: Array<typeof topicConnections.$inferInsert> = [];
 
     for (const connection of connections) {
-      const sortOrderA = sortOrderByTitle.get(connection.topicA);
-      const sortOrderB = sortOrderByTitle.get(connection.topicB);
+      const sortOrderA = sortOrderByTitle.get(
+        normalizeTopicTitle(connection.topicA),
+      );
+      const sortOrderB = sortOrderByTitle.get(
+        normalizeTopicTitle(connection.topicB),
+      );
       if (sortOrderA == null || sortOrderB == null) continue;
       const topicAId = topicIdBySortOrder.get(sortOrderA);
       const topicBId = topicIdBySortOrder.get(sortOrderB);

@@ -1048,7 +1048,7 @@ _Collected for the Architecture phase. These are hard technical requirements sur
 | Temporal comparison engine | Journey 3 | Week-over-week aggregation for parent dashboard trends |
 | Production vs recognition tracking | Journey 5 | Two separate data points per vocabulary item |
 | Context prediction model | Journey 2 | Time-of-day, usage patterns, calendar signals for adaptive entry |
-| Model routing by conversation state | Journey 4, Party Mode | Default to fastest model (Gemini Flash) for initial Socratic questions. Escalate to reasoning models (Claude/GPT-4) only at Parallel Example or Teaching Mode rungs. Routing follows Socratic Escalation Ladder, not initial photo classification. |
+| Model routing by conversation state | Journey 4, Party Mode | Default to fastest model (Gemini Flash) for initial Socratic questions. Standard routing can move to Gemini Pro as work gets harder; entitled profiles escalate to advanced providers (Claude/GPT) only from rung 4 upward. Routing follows Socratic Escalation Ladder, not initial photo classification. |
 | Cost ceiling per session | Journey 4, Party Mode | Soft ceiling €0.05/session. Most sessions (70%) resolve in 2-3 fast-model calls (€0.005-0.01). Expensive sessions (10%) are highest-value (teaching mode). Monitor, don't pre-optimize. |
 | Parallel Example template cache | Journey 4, Party Mode | Pre-generated examples by problem type. Evaluate retrieval vs. fresh generation tradeoff. Cached examples indistinguishable from fresh for the child. |
 | Coaching card two-path loading | Journey 2, Party Mode | Cached path (<1s): context-hash freshness check (time_bucket + dayType + retentionSnapshot + lastSessionType). Fresh path (1-2s skeleton): first launch, gap >48h, context hash mismatch, new device. |
@@ -1072,7 +1072,7 @@ _Collected for the Architecture phase. These are hard technical requirements sur
 | # | Change | PRD Impact |
 |---|--------|------------|
 | 25 | Confidence scoring per problem — process visibility for parents | New FR: per-problem confidence derived from time-to-answer, hints needed, escalation rung. Parent dashboard shows "guided vs immediate" ratio. AI uses low-confidence signals to adapt coaching (more recall checks). Preserves child dignity while giving parents real signal. |
-| 26 | Model routing by conversation state | New architectural FR: default to fastest model for initial Socratic questions, escalate to reasoning models only at Parallel Example / Teaching Mode rungs |
+| 26 | Model routing by conversation state | New architectural FR: default to fastest model for initial Socratic questions; reserve advanced providers for rung 4+ on entitled profiles |
 | 27 | Coaching card two-path loading (cached vs fresh) | New architectural FR: cached (<1s, context-hash freshness) vs fresh (1-2s skeleton). Context hash = time_bucket + dayType + retentionSnapshot + lastSessionType |
 | 28 | Phase 1 rescoped — homework-only proving flow | Profile Switcher removed from Phase 1 (parent uses separate login). SessionCloseSummary added. Practice path and eager learner flow deferred. Two entry points for children (Homework, Practice), not three. |
 

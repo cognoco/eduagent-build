@@ -1493,7 +1493,7 @@ The EVALUATE prompt template needs access to: (a) the topic's key concepts, (b) 
 
 **Plus Tier:**
 - 700 questions/month for individual learner (no daily limit)
-- 1 premium study profile for the serious individual learner
+- 1 serious-study profile with advanced model help from rung 4 upward; easier turns stay on Gemini
 - Full feature access
 - Top-up credits: €10/500 questions
 - Target: Individual serious learners
@@ -1501,6 +1501,7 @@ The EVALUATE prompt template needs access to: (a) the topic's key concepts, (b) 
 **Family Tier:**
 - 1,500 questions/month SHARED across all users
 - Up to 4 learner profiles
+- Gemini-only by default, including provider fallback; optional advanced-model profile add-on follows the same rung 4+ rule as Plus
 - Top-up credits: €5/500 questions (50% cheaper than Plus)
 - Anyone can be invited (no household verification)
 - Target: Parents with children, households learning together

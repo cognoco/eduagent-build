@@ -33,7 +33,7 @@ import {
   processEvaluateCompletion,
   processTeachBackCompletion,
 } from '../../services/verification-completion';
-import { captureException } from '../../services/sentry';
+import { captureException } from '../../services/sentry'; // RED: named import breaks jest.spyOn
 import { createLogger } from '../../services/logger';
 import { queueCelebration } from '../../services/celebrations';
 import {

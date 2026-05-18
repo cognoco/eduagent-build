@@ -142,8 +142,22 @@ if [[ -n "$PROMPT_HITS" ]]; then
   CLASSES+=("llm-prompts")
   add_cmd fast  "pnpm eval:llm"              "Snapshot prompts (Tier 1 — no LLM call)"
   add_cmd slow  "pnpm eval:llm --live"       "Real LLM validation (Tier 2)"
-  add_cmd slow  "pnpm test:llm:enduser"      "Live five-session end-user quality gate"
+  add_cmd slow  "pnpm test:llm:enduser"      "Live end-user LLM quality gate"
   note "llm-prompts: Pre-commit requires eval snapshot files staged with prompt changes"
+fi
+
+# ── LLM Commercial Routing ───────────────────────────────────────────────
+ROUTING_HITS=$(filter_files '(services/llm/router\.ts$|services/session/session-exchange\.ts$|services/subscription\.ts$|scripts/premium-routing-pass\.ts$)' | grep -vE '\.test\.ts$' || true)
+if [[ -n "$ROUTING_HITS" ]]; then
+  CLASSES+=("llm-routing")
+  add_cmd slow  "pnpm test:llm:premium-routing" "Live Plus/Family advanced-model routing gate"
+fi
+
+# ── LLM Book / Topic-Map Generation ─────────────────────────────────────
+BOOK_GENERATION_HITS=$(filter_files '(packages/schemas/src/subjects\.ts$|services/book-generation\.ts$|services/book-suggestion-generation\.ts$|services/curriculum\.ts$|services/session/session-context-builders\.ts$|scripts/book-generation-pass\.ts$)' | grep -vE '\.test\.ts$' || true)
+if [[ -n "$BOOK_GENERATION_HITS" ]]; then
+  CLASSES+=("llm-book-generation")
+  add_cmd slow  "pnpm test:llm:book-generation" "Live book/topic-map generation quality gate"
 fi
 
 # ── Inngest Functions ────────────────────────────────────────────────────

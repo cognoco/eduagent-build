@@ -219,6 +219,10 @@ describe('buildSystemPrompt — response envelope contract', () => {
     expect(prompt).toContain(
       'does not support extra claims like conquering land',
     );
+    expect(prompt).toContain(
+      'If the source says "made trade easier", you may say trade was easier',
+    );
+    expect(prompt).toContain('do not broaden it to "made things easier');
     expect(prompt).toContain('It does not license unstated causes');
     expect(prompt).toContain('empire growth');
     expect(prompt).toContain('do not invent examples or analogies');
@@ -422,6 +426,8 @@ describe('buildSystemPrompt — no-recall recovery', () => {
     );
     expect(prompt).toContain('prefer one clean sentence');
     expect(prompt).toContain('Do not add new adjectives');
+    expect(prompt).toContain('unsupported factual modifier');
+    expect(prompt).toContain('polish it back to "made trade easier"');
     expect(prompt).toContain('On setup/readiness turns');
   });
 
@@ -442,6 +448,25 @@ describe('buildSystemPrompt — no-recall recovery', () => {
 
     expect(prompt).toContain('CONTINUATION OPENER (scoring turn)');
     expect(prompt).toContain('briefly re-teach the essentials now');
+  });
+});
+
+describe('buildSystemPrompt — numeric walkthroughs', () => {
+  it('requires final computed results, not only intermediate counts', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        topicTitle: 'Bayes theorem',
+        topicDescription:
+          'Use 10,000 people: 99 true positives and 495 false positives means 99 out of 594 positives have the condition.',
+        escalationRung: 5,
+      }),
+    );
+
+    expect(prompt).toContain('Numeric walkthroughs');
+    expect(prompt).toContain('include the final computed result');
+    expect(prompt).toContain('not only the setup or intermediate counts');
+    expect(prompt).toContain('99 out of 594, which is about 16-17%');
+    expect(prompt).toContain('complete the conversion');
   });
 });
 

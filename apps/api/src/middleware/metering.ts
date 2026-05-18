@@ -487,8 +487,10 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
     c.set('subscriptionTier', tier);
 
     // Expose the LLM tier so session route handlers can thread it to the LLM router.
-    // Plus defaults its single serious-study profile to premium; per-profile
-    // premium flags still upgrade Pro seats and future AI upgrade add-ons.
+    // Plus keeps the base tier standard; session exchange routing promotes its
+    // included advanced entitlement only from rung 4 upward. Per-profile
+    // premium flags unlock the same rung-gated behavior for Pro seats and AI
+    // upgrade add-ons.
     const baseLlmTier = getTierConfig(tier).llmTier;
     c.set('llmTier', profileMeta?.hasPremiumLlm ? 'premium' : baseLlmTier);
 

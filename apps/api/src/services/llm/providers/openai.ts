@@ -88,6 +88,8 @@ const MODEL_MAP: Record<string, string> = {
   // Identity mappings — no warn when config already names an OpenAI model
   'gpt-4o-mini': 'gpt-4o-mini',
   'gpt-4o': 'gpt-4o',
+  'gpt-5.5': 'gpt-5.5',
+  'gpt-5.4': 'gpt-5.4',
 };
 
 function mapModel(config: ModelConfig): string {

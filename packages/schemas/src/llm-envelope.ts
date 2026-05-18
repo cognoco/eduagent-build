@@ -29,6 +29,29 @@ const privateReasonSchema = z.preprocess((value) => {
   return trimmed.length > 0 ? trimmed : undefined;
 }, z.string().min(1).max(1000).optional());
 
+const nullToUndefined = (value: unknown): unknown =>
+  value === null ? undefined : value;
+
+const optionalBooleanSchema = z.preprocess(
+  nullToUndefined,
+  z.boolean().optional(),
+);
+
+const optionalConfidenceSchema = z.preprocess(
+  nullToUndefined,
+  z.enum(['low', 'medium', 'high']).optional(),
+);
+
+const falseWhenMissingBooleanSchema = z.preprocess((value) => {
+  if (value === null || value === undefined) return false;
+  return value;
+}, z.boolean());
+
+const optionalObjectInput = (value: unknown): unknown =>
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? value
+    : undefined;
+
 const privateSourcesSchema = z.preprocess(
   (value) =>
     value && typeof value === 'object' && !Array.isArray(value)
@@ -39,6 +62,106 @@ const privateSourcesSchema = z.preprocess(
       relied_on: privateReliedOnSchema.optional(),
       insufficient: privateInsufficientSchema.optional(),
       reason: privateReasonSchema.optional(),
+    })
+    .optional(),
+);
+
+const signalsSchema = z.preprocess(
+  optionalObjectInput,
+  z
+    .object({
+      /** Interview flow: model believes it has enough to conclude. Ignored by server if exchange < cap. */
+      ready_to_finish: optionalBooleanSchema,
+      /** Main loop: learner response showed partial understanding — hold escalation. */
+      partial_progress: optionalBooleanSchema,
+      /** Main loop: rung-5 exit protocol fired — queue topic for remediation. */
+      needs_deepening: optionalBooleanSchema,
+      /** Main loop: the AI message contains an understanding check. Observational. */
+      understanding_check: optionalBooleanSchema,
+      /** Continuation opener: delayed score for the learner's retrieval answer. */
+      retrieval_score: z.preprocess(
+        nullToUndefined,
+        z.number().min(0).max(1).optional(),
+      ),
+    })
+    .optional(),
+);
+
+const notePromptSchema = z.preprocess(
+  optionalObjectInput,
+  z
+    .object({
+      show: falseWhenMissingBooleanSchema,
+      post_session: optionalBooleanSchema,
+    })
+    .optional(),
+);
+
+const fluencyDrillScoreSchema = z.preprocess(
+  optionalObjectInput,
+  z
+    .object({
+      correct: z.number().int().min(0),
+      total: z.number().int().min(1),
+    })
+    .optional(),
+);
+
+const fluencyDrillSchema = z.preprocess(
+  (value) => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return undefined;
+    }
+
+    const input = value as Record<string, unknown>;
+    const active = input['active'];
+    const normalized: Record<string, unknown> = {
+      ...input,
+      active: active === null || active === undefined ? false : active,
+    };
+
+    if (normalized['score'] === null) {
+      delete normalized['score'];
+    }
+
+    if (
+      normalized['active'] === false &&
+      normalized['score'] &&
+      typeof normalized['score'] === 'object' &&
+      !Array.isArray(normalized['score']) &&
+      (normalized['score'] as Record<string, unknown>)['correct'] === 0 &&
+      (normalized['score'] as Record<string, unknown>)['total'] === 0
+    ) {
+      delete normalized['score'];
+    }
+
+    if (
+      normalized['duration_s'] === null ||
+      (normalized['active'] === false && normalized['duration_s'] === 0)
+    ) {
+      delete normalized['duration_s'];
+    }
+
+    return normalized;
+  },
+  z
+    .object({
+      active: falseWhenMissingBooleanSchema,
+      duration_s: z.preprocess(
+        nullToUndefined,
+        z.number().int().min(15).max(90).optional(),
+      ),
+      score: fluencyDrillScoreSchema,
+    })
+    .optional(),
+);
+
+const uiHintsSchema = z.preprocess(
+  optionalObjectInput,
+  z
+    .object({
+      note_prompt: notePromptSchema,
+      fluency_drill: fluencyDrillSchema,
     })
     .optional(),
 );
@@ -55,48 +178,14 @@ export const llmResponseEnvelopeSchema = z.object({
    * interpretation. New signals are added as a new optional field rather than
    * embedded in reply text.
    */
-  signals: z
-    .object({
-      /** Interview flow: model believes it has enough to conclude. Ignored by server if exchange < cap. */
-      ready_to_finish: z.boolean().optional(),
-      /** Main loop: learner response showed partial understanding — hold escalation. */
-      partial_progress: z.boolean().optional(),
-      /** Main loop: rung-5 exit protocol fired — queue topic for remediation. */
-      needs_deepening: z.boolean().optional(),
-      /** Main loop: the AI message contains an understanding check. Observational. */
-      understanding_check: z.boolean().optional(),
-      /** Continuation opener: delayed score for the learner's retrieval answer. */
-      retrieval_score: z.number().min(0).max(1).optional(),
-    })
-    .optional(),
+  signals: signalsSchema,
 
   /**
    * Presentation hints — the UI may render a widget based on these, but the
    * learner experience degrades gracefully to "just the reply" if missing.
    * None of these drive control flow on the API side.
    */
-  ui_hints: z
-    .object({
-      note_prompt: z
-        .object({
-          show: z.boolean(),
-          post_session: z.boolean().optional(),
-        })
-        .optional(),
-      fluency_drill: z
-        .object({
-          active: z.boolean(),
-          duration_s: z.number().int().min(15).max(90).optional(),
-          score: z
-            .object({
-              correct: z.number().int().min(0),
-              total: z.number().int().min(1),
-            })
-            .optional(),
-        })
-        .optional(),
-    })
-    .optional(),
+  ui_hints: uiHintsSchema,
 
   /**
    * Private provenance for complaint review and hallucination audits. This is
@@ -111,7 +200,7 @@ export const llmResponseEnvelopeSchema = z.object({
    * MAY surface an "Is this right?" tap target when confidence < 'high'.
    * Absent = treat as 'medium'.
    */
-  confidence: z.enum(['low', 'medium', 'high']).optional(),
+  confidence: optionalConfidenceSchema,
 });
 
 export type LlmResponseEnvelope = z.infer<typeof llmResponseEnvelopeSchema>;
