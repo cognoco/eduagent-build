@@ -735,23 +735,33 @@ const SOURCE_BOUND_SENTENCE_TERMS: Array<{
     source: /\bcan do on its own\b|\bwhat a cell can do\b/i,
   },
   {
+    label: 'building-block analogy',
+    response: /\bbuilding blocks?\b|\bfundamental piece\b/i,
+    source: /\bbuilding blocks?\b|\bfundamental piece\b/i,
+  },
+  {
     label: 'army speed/ease/effectiveness',
     response:
-      /\b(?:arm(?:y|ies)|soldiers?)\b[^.?!]*(?:more easily|easier|effective(?:ly)?|efficient(?:ly)?|faster|quickly)|(?:more easily|easier|effective(?:ly)?|efficient(?:ly)?|faster|quickly)[^.?!]*\b(?:arm(?:y|ies)|soldiers?)\b/i,
+      /\b(?:arm(?:y|ies)|soldiers?)\b[^.?!]*(?:easy|easily|more easily|easier|effective(?:ly)?|efficient(?:ly)?|faster|quickly)|(?:easy|easily|more easily|easier|effective(?:ly)?|efficient(?:ly)?|faster|quickly)[^.?!]*\b(?:arm(?:y|ies)|soldiers?)\b/i,
     source:
-      /\b(?:arm(?:y|ies)|soldiers?)\b[^.?!]*(?:more easily|easier|effective(?:ly)?|efficient(?:ly)?|faster|quickly)|(?:more easily|easier|effective(?:ly)?|efficient(?:ly)?|faster|quickly)[^.?!]*\b(?:arm(?:y|ies)|soldiers?)\b/i,
+      /\b(?:arm(?:y|ies)|soldiers?)\b[^.?!]*(?:easy|easily|more easily|easier|effective(?:ly)?|efficient(?:ly)?|faster|quickly)|(?:easy|easily|more easily|easier|effective(?:ly)?|efficient(?:ly)?|faster|quickly)[^.?!]*\b(?:arm(?:y|ies)|soldiers?)\b/i,
   },
   {
     label: 'conquest/empire growth',
     response:
-      /\bconquer(?:ing|ed)?\b|\bconquest\b|\bempires?\s+(?:grow|grew|expand|expanded|stay strong)\b|\bempire\s+(?:grow|grew|expand|expanded|stay strong)\b/i,
+      /\bconquer(?:ing|ed)?\b|\bconquest\b|\bempires?\s+(?:(?:can|could|might|may|often)\s+)?(?:grow|grew|expand|expanded|stay strong)\b|\bempire\s+(?:(?:can|could|might|may|often)\s+)?(?:grow|grew|expand|expanded|stay strong)\b/i,
     source:
-      /\bconquer(?:ing|ed)?\b|\bconquest\b|\bempires?\s+(?:grow|grew|expand|expanded|stay strong)\b|\bempire\s+(?:grow|grew|expand|expanded|stay strong)\b/i,
+      /\bconquer(?:ing|ed)?\b|\bconquest\b|\bempires?\s+(?:(?:can|could|might|may|often)\s+)?(?:grow|grew|expand|expanded|stay strong)\b|\bempire\s+(?:(?:can|could|might|may|often)\s+)?(?:grow|grew|expand|expanded|stay strong)\b/i,
   },
   {
     label: 'brick/house analogy',
     response: /\bbricks?\b|\bhouse\b/i,
     source: /\bbricks?\b|\bhouse\b/i,
+  },
+  {
+    label: 'unsupported trade container',
+    response: /\bbaskets?\b/i,
+    source: /\bbaskets?\b/i,
   },
 ];
 
