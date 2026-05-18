@@ -742,9 +742,9 @@ const SOURCE_BOUND_SENTENCE_TERMS: Array<{
   {
     label: 'army speed/ease/effectiveness',
     response:
-      /\b(?:arm(?:y|ies)|soldiers?)\b[^,.;?!]*(?:easy|easily|more easily|easier|effective(?:ly)?|efficient(?:ly)?|faster|quickly)|(?:easy|easily|more easily|easier|effective(?:ly)?|efficient(?:ly)?|faster|quickly)[^,.;?!]*\b(?:arm(?:y|ies)|soldiers?)\b/i,
+      /\b(?:arm(?:y|ies)|soldiers?|military)\b[^,.;?!]*(?:easy|easily|more easily|easier|effective(?:ly)?|efficient(?:ly)?|faster|quickly)|(?:easy|easily|more easily|easier|effective(?:ly)?|efficient(?:ly)?|faster|quickly)[^,.;?!]*\b(?:arm(?:y|ies)|soldiers?|military)\b/i,
     source:
-      /\b(?:arm(?:y|ies)|soldiers?)\b[^,.;?!]*(?:easy|easily|more easily|easier|effective(?:ly)?|efficient(?:ly)?|faster|quickly)|(?:easy|easily|more easily|easier|effective(?:ly)?|efficient(?:ly)?|faster|quickly)[^,.;?!]*\b(?:arm(?:y|ies)|soldiers?)\b/i,
+      /\b(?:arm(?:y|ies)|soldiers?|military)\b[^,.;?!]*(?:easy|easily|more easily|easier|effective(?:ly)?|efficient(?:ly)?|faster|quickly)|(?:easy|easily|more easily|easier|effective(?:ly)?|efficient(?:ly)?|faster|quickly)[^,.;?!]*\b(?:arm(?:y|ies)|soldiers?|military)\b/i,
   },
   {
     label: 'conquest/empire growth',
@@ -769,6 +769,11 @@ const SOURCE_BOUND_SENTENCE_TERMS: Array<{
       /\bspecial pathways?\b|\bbuilt long ago\b|\b(?:was|were) built\b|\bbuilt to\b|\bancient times\b/i,
     source:
       /\bspecial pathways?\b|\bbuilt long ago\b|\b(?:was|were) built\b|\bbuilt to\b|\bancient times\b/i,
+  },
+  {
+    label: 'unsupported land/soil detail',
+    response: /\brich soil\b|\bsoil\b/i,
+    source: /\brich soil\b|\bsoil\b/i,
   },
 ];
 
@@ -1156,7 +1161,7 @@ export const HANDLED_MARKER_KEYS: ReadonlySet<string> =
 
 const DEFAULT_FALLBACK_TEXT = "I didn't have a reply — tap to try again.";
 const GENERIC_PRAISE_SENTENCE_RE =
-  /(?:^|[\s\n]+)(?:(?:you did a )?great job|great work|nice work|nice job|nice,\s+\w+|that(?:'s| is| was) a (?:good|great) (?:start|idea|observation|summary|point)|great (?:idea|observation|summary|point)|good question|great question|you've got a good grasp|excellent|amazing|awesome|fantastic)(?:[^.?!]*)(?:[.?!]|$)/gi;
+  /(?:^|[\s\n]+)(?:(?:you did a )?great job|great work|nice work|nice job|nice one|nice,\s+\w+|that(?:'s| is| was) a (?:good|great) (?:start|idea|observation|summary|point)|great (?:idea|observation|summary|point)|good question|great question|you've got a good grasp|excellent|amazing|awesome|fantastic)(?:[^.?!]*)(?:[.?!]|$)/gi;
 const UNSUPPORTED_SOFT_VALIDATION_SENTENCE_RE =
   /(?:^|[\s\n]+)(?:(?:that(?:'s| is) an? idea about)|(?:that(?:'s| is) an? )?(?:interesting idea|interesting thought|good observation|fair point))(?:[^.?!]*)(?:[.?!]|$)/gi;
 const OVERHEATED_PHRASE_RE =

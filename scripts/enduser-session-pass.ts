@@ -573,8 +573,10 @@ const SEED_PLACEHOLDER_NAME_RE =
 const RECITATION_TEXT_DELIVERY_RE =
   /\b(delivery|pace|confidence|confident|expression|pronunciation)\b/i;
 const GENERIC_LEARNER_PRAISE_RE =
-  /\b(great job|nice work|great question|(?:really )?good question|great topic|great idea|great observation|great summary|good start|good grasp|nice,\s+[A-Z][a-z]+|you did a great job|you'?re (?:doing )?(?:amazing|awesome|fantastic|excellent)|(?:amazing|awesome|fantastic|excellent|great|nice) (?:work|job|answer|effort|reasoning|connection|observation|summary)|(?:your|that'?s|this is) (?:amazing|awesome|fantastic|excellent|great|nice))\b/i;
+  /\b(great job|nice work|nice one|great question|(?:really )?good question|great topic|great idea|great observation|great summary|good start|good grasp|nice,\s+[A-Z][a-z]+|you did a great job|you'?re (?:doing )?(?:amazing|awesome|fantastic|excellent)|(?:amazing|awesome|fantastic|excellent|great|nice) (?:work|job|answer|effort|reasoning|connection|observation|summary)|(?:your|that'?s|this is) (?:amazing|awesome|fantastic|excellent|great|nice))\b/i;
 const MALFORMED_CLEANUP_RE = /\bthat'?s a the\b/i;
+const RECITATION_SETUP_PREMATURE_MODEL_RE =
+  /\b(?:you could say|to actually recite|polished version|final version|model answer)\b/i;
 const OVERHEATED_STYLE_RE =
   /\b(super important|super useful|incredibly|definitely|absolutely|crucial|very important|really important)\b/i;
 const CHILDISH_TONE_RE = /\b(yummy|kiddo)\b/i;
@@ -585,11 +587,11 @@ const RECITATION_UNSUPPORTED_POLISH_RE =
 const LEARNING_UNSUPPORTED_CONQUEST_CONFIRM_RE =
   /\b(?:it'?s true[^.?!]*(?:empires?|conquer|conquering|expand)|you'?re right[^.?!]*conquer|(?:good observation|interesting (?:idea|thought))[^.?!]*empires? (?:can )?(?:grow|expand)|that'?s an idea about how empires? might grow|conquering (?:new )?land (?:can|might|may|could) be part|the idea of empires growing by conquering land is a part|empires? (?:can |could |might |may |often )?(?:grow|expand)[^.?!]*conquer|empires? often expand by conquering|conquer(?:ing|ed)? new (?:areas|land)|defend(?:ing)? (?:land|the land)|conquering land was (?:definitely|a big part|the main))\b/i;
 const LEARNING_UNSUPPORTED_SPEED_OR_TERRAIN_RE =
-  /\b(?:(?:arm(?:y|ies)|soldiers?)[^.?!]*(?:easy|easily|easier|more easily|quickly|faster|efficiently|more effectively|effectively)|(?:easy|easily|easier|more easily|quickly|faster|efficiently|more effectively|effectively)[^.?!]*(?:arm(?:y|ies)|soldiers?)|move(?: around)? quickly|quickly helped|faster|efficiently|more effectively|effectively|muddy?|paved path|forests?)\b/i;
+  /\b(?:(?:arm(?:y|ies)|soldiers?|military)[^.?!]*(?:easy|easily|easier|more easily|quickly|faster|efficiently|more effectively|effectively)|(?:easy|easily|easier|more easily|quickly|faster|efficiently|more effectively|effectively)[^.?!]*(?:arm(?:y|ies)|soldiers?|military)|move(?: around)? quickly|quickly helped|faster|efficiently|more effectively|effectively|muddy?|paved path|forests?)\b/i;
 const LEARNING_UNSUPPORTED_EMPIRE_GROWTH_RE =
   /\b(?:empires? (?:can |could |might |may |often )?(?:grow|expand)|empires? expand[^.?!]*(?:often|armies?|army|conquer)|often involves armies?|help(?:ed|s|ing)? the empire (?:grow|stay strong)|empire (?:can |could |might |may |often )?(?:grow|stay strong)|stay strong)\b/i;
 const REVIEW_OFF_ANCHOR_RE =
-  /\b(lego|brick|building blocks?|fundamental piece|wall|organs?|virus(?:es)?|eat|breathe|reproduc\w*|grow\w*|respond(?:ing)? to its environment|outer boundary|cell membrane|outer layer|stomach|lung|molecules?|atoms?|proteins?|processes of life|function on its own|can do on its own|all by itself|what a cell can do|main jobs?)\b/i;
+  /\b(lego|brick|building blocks?|fundamental piece|important function|what a cell is|size and status|wall|organs?|virus(?:es)?|eat|breathe|reproduc\w*|grow\w*|respond(?:ing)? to its environment|outer boundary|cell membrane|outer layer|stomach|lung|molecules?|atoms?|proteins?|processes of life|function on its own|can do on its own|all by itself|what a cell can do|main jobs?)\b/i;
 const REVIEW_CHALLENGE_MODE_RE =
   /\b(?:quick check[^.?!]*try to trip you up|some scientists claim|devil'?s advocate)\b/i;
 const CONCRETE_NEXT_PRACTICE_RE =
@@ -610,9 +612,9 @@ const SOURCE_BOUND_TRIPWIRE_TERMS: Array<{
 }> = [
   {
     response:
-      /\b(?:arm(?:y|ies)|soldiers?)\b[^,.;?!]*(?:easy|easily|more easily|easier|effective(?:ly)?|efficient(?:ly)?|faster|quickly)|(?:easy|easily|more easily|easier|effective(?:ly)?|efficient(?:ly)?|faster|quickly)[^,.;?!]*\b(?:arm(?:y|ies)|soldiers?)\b/i,
+      /\b(?:arm(?:y|ies)|soldiers?|military)\b[^,.;?!]*(?:easy|easily|more easily|easier|effective(?:ly)?|efficient(?:ly)?|faster|quickly)|(?:easy|easily|more easily|easier|effective(?:ly)?|efficient(?:ly)?|faster|quickly)[^,.;?!]*\b(?:arm(?:y|ies)|soldiers?|military)\b/i,
     source:
-      /\b(?:arm(?:y|ies)|soldiers?)\b[^,.;?!]*(?:easy|easily|more easily|easier|effective(?:ly)?|efficient(?:ly)?|faster|quickly)|(?:easy|easily|more easily|easier|effective(?:ly)?|efficient(?:ly)?|faster|quickly)[^,.;?!]*\b(?:arm(?:y|ies)|soldiers?)\b/i,
+      /\b(?:arm(?:y|ies)|soldiers?|military)\b[^,.;?!]*(?:easy|easily|more easily|easier|effective(?:ly)?|efficient(?:ly)?|faster|quickly)|(?:easy|easily|more easily|easier|effective(?:ly)?|efficient(?:ly)?|faster|quickly)[^,.;?!]*\b(?:arm(?:y|ies)|soldiers?|military)\b/i,
     label: 'army speed/ease/effectiveness',
   },
   {
@@ -644,6 +646,11 @@ const SOURCE_BOUND_TRIPWIRE_TERMS: Array<{
     source:
       /\bspecial pathways?\b|\bbuilt long ago\b|\b(?:was|were) built\b|\bbuilt to\b|\bancient times\b/i,
     label: 'unsupported historical framing',
+  },
+  {
+    response: /\brich soil\b|\bsoil\b/i,
+    source: /\brich soil\b|\bsoil\b/i,
+    label: 'unsupported land/soil detail',
   },
 ];
 const FREEFORM_EXAMPLE_TERMS: Array<{
@@ -1017,6 +1024,22 @@ function analyzeTurn(input: {
       code: 'review_challenge_mode_leak',
       message:
         "The review flow leaked Devil's Advocate/challenge-mode behavior instead of staying in calibrated recall and relearning.",
+      mode: definition.mode,
+      turnIndex,
+      snippet: snippet(response),
+    });
+  }
+
+  if (
+    definition.mode === 'recitation' &&
+    turnIndex === 1 &&
+    RECITATION_SETUP_PREMATURE_MODEL_RE.test(response)
+  ) {
+    issues.push({
+      severity: 'fail',
+      code: 'recitation_setup_gave_model_answer',
+      message:
+        'The recitation setup turn should invite the learner to recite first, not provide the answer before hearing them.',
       mode: definition.mode,
       turnIndex,
       snippet: snippet(response),

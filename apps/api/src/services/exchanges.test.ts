@@ -1472,6 +1472,31 @@ describe('source provenance audit', () => {
     expect(safe.sourceAudit.reason).toMatch(/unsupported source-bound phrase/i);
   });
 
+  it('removes unsupported land details from source-thin explanations', () => {
+    const sourceEvidence = buildExchangeSourceEvidence(
+      {
+        ...baseContext,
+        topicTitle: 'Ancient trade and Rome',
+        topicDescription:
+          'Ancient civilizations traded surplus grain or pottery for metal tools.',
+      },
+      'Can you explain it from scratch?',
+    );
+    const audit = auditExchangeSources(
+      { relied_on: ['current_topic'], insufficient: false },
+      sourceEvidence,
+    );
+
+    const safe = applySourceAuditSafetyFallback(
+      'A place might have rich soil for growing grain. Ancient civilizations traded surplus grain for metal tools.',
+      audit,
+    );
+
+    expect(safe.response).not.toMatch(/rich soil|soil/i);
+    expect(safe.response).toContain('surplus grain for metal tools');
+    expect(safe.sourceAudit.reason).toMatch(/unsupported land\/soil detail/i);
+  });
+
   it('removes unsupported brick and house analogies from short source replies', () => {
     const sourceEvidence = buildExchangeSourceEvidence(
       {
@@ -1563,7 +1588,7 @@ describe('source provenance audit', () => {
     );
 
     const safe = applySourceAuditSafetyFallback(
-      'Roman roads were special pathways built long ago. Roman roads helped armies move between places. This helped armies move quickly and easily across the empire.',
+      'Roman roads were special pathways built long ago. Roman roads helped armies move between places. This made it easier for the Roman military to travel.',
       audit,
     );
 
@@ -1571,7 +1596,7 @@ describe('source provenance audit', () => {
       'Roman roads helped armies move between places.',
     );
     expect(safe.response).not.toMatch(/special pathways|built long ago/i);
-    expect(safe.response).not.toMatch(/quickly|easily/i);
+    expect(safe.response).not.toMatch(/easier|military/i);
     expect(safe.sourceAudit.reason).toMatch(/army speed\/ease\/effectiveness/i);
     expect(safe.sourceAudit.reason).toMatch(/unsupported historical framing/i);
   });
