@@ -163,7 +163,10 @@ describe('DictationChoiceScreen', () => {
     });
 
     // goBackOrReplace was called by the back button
-    expect(mockGoBackOrReplace).toHaveBeenCalled();
+    expect(mockGoBackOrReplace).toHaveBeenCalledWith(
+      expect.anything(),
+      '/(app)/practice',
+    );
     // push to playback must NOT have been called
     expect(mockPush).not.toHaveBeenCalled();
   });

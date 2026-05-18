@@ -1085,6 +1085,43 @@ describe('ChatShell', () => {
       expect(mockGetMicrophonePermissionStatus).toHaveBeenCalled();
       expect(mockClearTranscript).not.toHaveBeenCalled();
     });
+
+    // BUG-141 break test (classify-before-format): When the hook's error
+    // message does NOT contain the literal word "permission" (e.g. localized
+    // string, OEM-substituted wording), the OLD substring-matching code
+    // would skip recovery on resume even though the OS reports the
+    // permission as granted. Classification by OS permission-status enum
+    // recovers correctly regardless of the error string's wording.
+    it('clears stale errors on resume even when error text omits "permission" [BUG-141]', async () => {
+      mockSttState = {
+        ...mockSttState,
+        status: 'error',
+        // Localized / OEM-substituted message that doesn't contain "permission"
+        error: 'Mikrofontilgang er nødvendig for tale',
+      };
+      mockGetMicrophonePermissionStatus.mockResolvedValue({
+        granted: true,
+        canAskAgain: false,
+      });
+
+      renderChatShell({ verificationType: 'teach_back' });
+      const appStateChangedListener = addEventListenerSpy.mock.calls.at(
+        -1,
+      )?.[1] as ((status: string) => void) | undefined;
+      expect(appStateChangedListener).toBeInstanceOf(Function);
+
+      await act(async () => {
+        appStateChangedListener?.('active');
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      // OS status is the authoritative classifier; the message wording does
+      // not gate recovery. clearTranscript MUST be called.
+      expect(mockGetMicrophonePermissionStatus).toHaveBeenCalled();
+      expect(mockClearTranscript).toHaveBeenCalled();
+    });
   });
 
   // -----------------------------------------------------------------------
@@ -1438,10 +1475,10 @@ describe('ChatShell', () => {
           exchangesMax: 4,
         },
       });
-      expect(getByTestId('escalation-rung-strip')).toBeTruthy();
-      expect(getByText(/RUNG 2/)).toBeTruthy();
-      expect(getByText(/BUILDING/)).toBeTruthy();
-      expect(getByText(/2 of 4/)).toBeTruthy();
+      expect(getByTestId('escalation-rung-strip'));
+      // BUG-145: User-visible label is positive progress framing, not a
+      // countdown-of-failure ("X of Y exchanges").
+      expect(getByText('Step 2 of 4'));
     });
 
     it('falls back to subtitle when pedagogicalState is absent', () => {
@@ -1449,7 +1486,64 @@ describe('ChatShell', () => {
         subtitle: "I'm here to help",
       });
       expect(queryByTestId('escalation-rung-strip')).toBeNull();
-      expect(getByText("I'm here to help")).toBeTruthy();
+      expect(getByText("I'm here to help"));
+    });
+
+    // BUG-140: RUNG/PHASE engine jargon must never reach production users.
+    // The raw debug label is gated behind __DEV__; user-visible copy is the
+    // positive progress label only.
+    it('renders RUNG/PHASE debug label only when __DEV__', () => {
+      const { queryByTestId } = renderChatShell({
+        pedagogicalState: {
+          rung: 3,
+          phase: 'STRETCHING',
+          exchangesUsed: 1,
+          exchangesMax: 4,
+        },
+      });
+      // jest runs with __DEV__=true under jest-expo preset, so the debug label
+      // appears in this environment. Assert testID exists in dev:
+      expect(queryByTestId('escalation-rung-debug-label')).toBeTruthy();
+    });
+
+    // BUG-140 break test: When __DEV__ is false (production bundle), the
+    // RUNG/PHASE jargon must not render. The visible label collapses to the
+    // progress copy only.
+    it('hides RUNG/PHASE jargon in production builds (BUG-140)', () => {
+      const originalDev = (globalThis as { __DEV__?: boolean }).__DEV__;
+      (globalThis as { __DEV__?: boolean }).__DEV__ = false;
+      try {
+        const { queryByTestId, queryByText, getByText } = renderChatShell({
+          pedagogicalState: {
+            rung: 3,
+            phase: 'STRETCHING',
+            exchangesUsed: 1,
+            exchangesMax: 4,
+          },
+        });
+        expect(queryByTestId('escalation-rung-debug-label')).toBeNull();
+        expect(queryByText(/RUNG/)).toBeNull();
+        expect(queryByText(/STRETCHING/)).toBeNull();
+        // Positive progress copy still renders
+        expect(getByText('Step 1 of 4'));
+      } finally {
+        (globalThis as { __DEV__?: boolean }).__DEV__ = originalDev;
+      }
+    });
+
+    // BUG-145: When the learner has not yet sent an exchange (exchangesUsed=0),
+    // showing "Step 0 of 4" reads as pressure before they've started.
+    // Hide the progress label until they've made an exchange.
+    it('hides the progress label when exchangesUsed is 0 (BUG-145)', () => {
+      const { queryByTestId } = renderChatShell({
+        pedagogicalState: {
+          rung: 1,
+          phase: 'WARMING_UP',
+          exchangesUsed: 0,
+          exchangesMax: 4,
+        },
+      });
+      expect(queryByTestId('pedagogical-progress-label')).toBeNull();
     });
   });
 
@@ -1458,8 +1552,8 @@ describe('ChatShell', () => {
       const { getByTestId, getByText } = renderChatShell({
         memoryHint: "Last week you mixed up the sign — I'll watch for that.",
       });
-      expect(getByTestId('chat-memory-hint')).toBeTruthy();
-      expect(getByText(/mixed up the sign/)).toBeTruthy();
+      expect(getByTestId('chat-memory-hint'));
+      expect(getByText(/mixed up the sign/));
     });
 
     it('does not render memory chip when memoryHint is absent', () => {

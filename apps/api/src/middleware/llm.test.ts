@@ -191,4 +191,37 @@ describe('llmMiddleware', () => {
     expect(registerProvider).toHaveBeenCalledTimes(1);
     expect(next).toHaveBeenCalledTimes(2);
   });
+
+  it('[BUG-96 / A1-HIGH BREAK] flips initialized=true even when registerProvider throws', async () => {
+    // Break test: BEFORE the fix, `initialized = true` ran AFTER registerProvider.
+    // If the second register call threw, the first provider stayed in the
+    // registry but `initialized` remained false; the next request re-entered
+    // the init block and threw "provider already registered" instead of the
+    // original error. With the try/finally fix, failed init is terminal:
+    // the flag flips, the next request skips registration, and any downstream
+    // routeAndCall surfaces the missing-provider error directly.
+    (registerProvider as jest.Mock)
+      .mockImplementationOnce(() => {
+        /* gemini OK */
+      })
+      .mockImplementationOnce(() => {
+        throw new Error('openai registration failed');
+      });
+
+    const c = createMockContext({
+      GEMINI_API_KEY: 'gem-key',
+      OPENAI_API_KEY: 'oai-key',
+    });
+    const next = jest.fn().mockResolvedValue(undefined);
+
+    await expect(llmMiddleware(c, next)).rejects.toThrow(
+      'openai registration failed',
+    );
+
+    // Second invocation must short-circuit — no further registerProvider calls.
+    // Without the fix, the gemini provider would be re-registered here.
+    (registerProvider as jest.Mock).mockClear();
+    await llmMiddleware(c, next);
+    expect(registerProvider).not.toHaveBeenCalled();
+  });
 });

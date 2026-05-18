@@ -311,19 +311,26 @@ export function ChatShell({
     void requestMicrophonePermission();
   }, [requestMicrophonePermission]);
 
+  // BUG-141: STT permission detection must classify-before-format. Previously
+  // this branch string-matched `sttError.toLowerCase().includes('permission')`,
+  // which silently breaks if the hook's canonical message ever changes (e.g.
+  // localization, OEM substitution) and also false-matches any error string
+  // that mentions the word "permission". Instead, classify against the OS
+  // permission-status enum (granted/canAskAgain) — structured data the hook
+  // already exposes via getMicrophonePermissionStatus().
   useEffect(() => {
     const sub = AppState.addEventListener('change', (next) => {
       if (next !== 'active') return;
 
       void (async () => {
         try {
+          // Only act if the hook is currently in error state. Reading the live
+          // OS permission status here is the authoritative classifier — if it
+          // is now granted while the hook still reports error, the error was
+          // a stale permission-denial. No string matching required.
+          if (speechStatus !== 'error') return;
           const permissionStatus = await getMicrophonePermissionStatus();
-          const granted = permissionStatus?.granted ?? false;
-          if (
-            granted &&
-            speechStatus === 'error' &&
-            sttError?.toLowerCase().includes('permission')
-          ) {
+          if (permissionStatus?.granted) {
             clearTranscript();
           }
         } catch {
@@ -333,7 +340,7 @@ export function ChatShell({
     });
 
     return () => sub.remove();
-  }, [clearTranscript, getMicrophonePermissionStatus, speechStatus, sttError]);
+  }, [clearTranscript, getMicrophonePermissionStatus, speechStatus]);
 
   // TTS hook
   const {
@@ -495,23 +502,47 @@ export function ChatShell({
     }
   }, [isListening, transcript]);
 
-  // Surface STT errors — previously swallowed silently
+  // Surface STT errors — previously swallowed silently.
+  // BUG-141: Classify-before-format. Use the OS permission-status enum from
+  // the speech-recognition hook as the authoritative signal rather than
+  // string-matching the error message (which silently breaks if the hook's
+  // canonical wording changes and false-matches unrelated errors that happen
+  // to contain the word "permission"). String matching remains as a strict
+  // last-resort fallback for the case where the permission lookup itself
+  // throws or the module is unavailable.
   useEffect(() => {
     if (!sttError) return;
-    const isPermissionError = sttError.toLowerCase().includes('permission');
-    platformAlert(
-      'Voice input error',
-      isPermissionError
-        ? 'Microphone access is needed for voice input. Please enable it in Settings.'
-        : sttError,
-      isPermissionError
-        ? [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Open Settings', onPress: () => Linking.openSettings() },
-          ]
-        : undefined,
-    );
-  }, [sttError]);
+    let cancelled = false;
+    void (async () => {
+      let isPermissionError = false;
+      try {
+        const permissionStatus = await getMicrophonePermissionStatus();
+        if (permissionStatus) {
+          // Structured classification: hook is in error AND OS reports
+          // permission is not granted ⇒ permission-denied error.
+          isPermissionError = !permissionStatus.granted;
+        }
+      } catch {
+        /* fall through to the last-resort fallback below */
+      }
+      if (cancelled) return;
+      platformAlert(
+        'Voice input error',
+        isPermissionError
+          ? 'Microphone access is needed for voice input. Please enable it in Settings.'
+          : sttError,
+        isPermissionError
+          ? [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Open Settings', onPress: () => Linking.openSettings() },
+            ]
+          : undefined,
+      );
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [sttError, getMicrophonePermissionStatus]);
 
   // Voice transcript preview actions
   const handleVoiceSend = useCallback(() => {
@@ -669,23 +700,41 @@ export function ChatShell({
                 testID="escalation-rung-strip"
                 className="flex-row items-center gap-1.5 mt-1"
               >
-                <Text
-                  className="text-[10px] text-text-tertiary tracking-wide"
-                  style={{
-                    fontFamily: Platform.select({
-                      ios: 'Menlo',
-                      android: 'monospace',
-                      default: 'monospace',
-                    }),
-                  }}
-                >
-                  RUNG {pedagogicalState.rung} · {pedagogicalState.phase}
-                </Text>
-                <View className="w-[3px] h-[3px] rounded-full bg-text-tertiary" />
-                <Text className="text-[10px] text-text-tertiary tracking-wide">
-                  {pedagogicalState.exchangesUsed} of{' '}
-                  {pedagogicalState.exchangesMax} exchanges
-                </Text>
+                {__DEV__ ? (
+                  // BUG-140: Internal engine telemetry is dev-only. Production
+                  // users (incl. 11-17yo learners) never see RUNG/PHASE jargon
+                  // — that violates the "no app jargon" rule.
+                  <>
+                    <Text
+                      testID="escalation-rung-debug-label"
+                      className="text-[10px] text-text-tertiary tracking-wide"
+                      style={{
+                        fontFamily: Platform.select({
+                          ios: 'Menlo',
+                          android: 'monospace',
+                          default: 'monospace',
+                        }),
+                      }}
+                    >
+                      RUNG {pedagogicalState.rung} · {pedagogicalState.phase}
+                    </Text>
+                    <View className="w-[3px] h-[3px] rounded-full bg-text-tertiary" />
+                  </>
+                ) : null}
+                {/* BUG-145: Reframe "X of Y exchanges" (countdown-of-failure) as
+                    positive progress copy. Only show when there is meaningful
+                    progress to communicate (>=1 exchange used). */}
+                {pedagogicalState.exchangesUsed > 0 ? (
+                  <Text
+                    testID="pedagogical-progress-label"
+                    className="text-[10px] text-text-tertiary tracking-wide"
+                  >
+                    {t('session.chatShell.stepProgress', {
+                      current: pedagogicalState.exchangesUsed,
+                      total: pedagogicalState.exchangesMax,
+                    })}
+                  </Text>
+                ) : null}
               </View>
             ) : resolvedSubtitle ? (
               <Text className="text-xs text-text-secondary">

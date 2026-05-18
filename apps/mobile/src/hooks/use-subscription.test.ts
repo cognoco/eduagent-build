@@ -8,6 +8,7 @@ import {
   useJoinByokWaitlist,
   useRemoveFamilyProfile,
 } from './use-subscription';
+import { NotFoundError } from '../lib/api-errors';
 import {
   useCreateCheckout,
   useCancelSubscription,
@@ -281,9 +282,11 @@ describe('useFamilySubscription', () => {
     expect(result.current.data).toBeNull();
   });
 
-  it('returns null when the family endpoint throws API error 404 (production api-client path)', async () => {
-    // Simulate the production api-client throwing instead of returning a Response
-    mockFetch.mockRejectedValueOnce(new Error('API error 404: Not Found'));
+  it('returns null when the family endpoint throws NotFoundError (production api-client path)', async () => {
+    // [BUG-160] Simulate the production api-client throwing the typed
+    // NotFoundError (the actual class thrown for 404 in api-client.ts:269)
+    // instead of a generic Error with a status-prefixed message.
+    mockFetch.mockRejectedValueOnce(new NotFoundError('Not Found'));
 
     const { result } = renderHook(() => useFamilySubscription(), {
       wrapper: createWrapper(),
@@ -294,6 +297,28 @@ describe('useFamilySubscription', () => {
     });
 
     expect(result.current.data).toBeNull();
+  });
+
+  // [BREAK] [BUG-160] String-matching on formatted error message is fragile —
+  // if the formatter strips the "API error 404:" prefix or changes the
+  // structure (e.g. localized), the hook stops recognising 404 and surfaces
+  // it as a fatal error to the UI. Classifying on the raw NotFoundError type
+  // is stable across formatter changes.
+  it('[BREAK] does not classify by string match — a 404-like generic Error is treated as fatal, only NotFoundError returns null', async () => {
+    // A plain Error whose message looks like a formatted 404 must NOT be
+    // silently swallowed — only the typed NotFoundError thrown by api-client
+    // is a "no family subscription" signal.
+    mockFetch.mockRejectedValueOnce(new Error('Some other 404-shaped string'));
+
+    const { result } = renderHook(() => useFamilySubscription(), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => {
+      expect(result.current.isError).toBe(true);
+    });
+    expect(result.current.error).toBeInstanceOf(Error);
+    expect(result.current.error).not.toBeInstanceOf(NotFoundError);
   });
 });
 

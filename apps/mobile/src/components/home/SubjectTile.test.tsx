@@ -17,8 +17,8 @@ const baseProps: SubjectTileProps = {
 describe('SubjectTile', () => {
   it('renders subject name and hint', () => {
     const { getByText } = render(<SubjectTile {...baseProps} />);
-    expect(getByText('Algebra')).toBeTruthy();
-    expect(getByText('Continue Linear equations')).toBeTruthy();
+    expect(getByText('Algebra'));
+    expect(getByText('Continue Linear equations'));
   });
 
   it('fires onPress when tapped', () => {
@@ -38,7 +38,7 @@ describe('SubjectTile', () => {
 
   it('renders the icon tile', () => {
     const { getByTestId } = render(<SubjectTile {...baseProps} />);
-    expect(getByTestId('home-subject-card-abc-123-icon')).toBeTruthy();
+    expect(getByTestId('home-subject-card-abc-123-icon'));
   });
 
   it('uses the subject shelf tint for the card background and border', () => {

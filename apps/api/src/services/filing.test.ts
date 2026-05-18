@@ -268,11 +268,19 @@ describe('resolveFilingResult', () => {
     expect(typeof resolveFilingResult).toBe('function');
   });
 
-  // TODO: Add integration tests with real DB fixtures for:
-  // - Creating new shelf/book/chapter/topic
-  // - Reusing existing shelf/book by case-insensitive name match
-  // - Concurrent creation race (FOR UPDATE locking)
-  // - Invalid shelf/book ID from LLM (error path)
+  // Integration coverage lives in services/filing.integration.test.ts.
+  // The TODO that used to sit here (concurrent creation race, FOR UPDATE
+  // locking) is now closed by:
+  //   - "[CR-FIL-DEDUP-INDEX-12-FOLLOWUP] concurrent shelf creation
+  //     produces exactly one row" (subjects-level race, unique-index +
+  //     onConflictDoNothing)
+  //   - "[CR-FIL-DEDUP-INDEX-12-FOLLOWUP] concurrent book creation
+  //     produces exactly one row" (curriculum_books-level race)
+  //   - "[BUG-841 / F-SVC-008] retry with same topic title is idempotent —
+  //     no duplicate row" (topic-level idempotency)
+  // Chapters are not a separate table — they are a text column on
+  // curriculum_topics, so the topic-level idempotency above is the
+  // chapter-row-equivalent guarantee.
 });
 
 // ---------------------------------------------------------------------------

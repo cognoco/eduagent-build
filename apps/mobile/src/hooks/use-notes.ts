@@ -246,6 +246,7 @@ export function useUpdateNote(): UseMutationResult<
   { noteId: string; content: string }
 > {
   const client = useApiClient();
+  const { activeProfile } = useProfile();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -258,15 +259,37 @@ export function useUpdateNote(): UseMutationResult<
       return (await res.json()) as { note: NoteResponse };
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['book-notes'] });
-      void queryClient.invalidateQueries({ queryKey: ['topic-notes'] });
-      void queryClient.invalidateQueries({ queryKey: ['all-notes'] });
+      // [BUG-163] Scope invalidations by active profile id so a mutation on
+      // this profile cannot invalidate another profile's note caches on a
+      // shared device. Note keys all carry profileId as a leading or
+      // trailing key segment; we use a predicate so we match both
+      // ['book-notes', subjectId, bookId, profileId] and
+      // ['all-notes', profileId, subjectId] without enumerating every
+      // (subjectId, bookId, topicId) combination.
+      const pid = activeProfile?.id;
+      void queryClient.invalidateQueries({
+        predicate: (query) => {
+          const key = query.queryKey;
+          if (typeof key[0] !== 'string') return false;
+          if (
+            key[0] !== 'book-notes' &&
+            key[0] !== 'topic-notes' &&
+            key[0] !== 'all-notes'
+          ) {
+            return false;
+          }
+          // Match this profile's keys only — every note query factory
+          // includes profileId somewhere in the key tuple.
+          return key.some((segment) => segment === pid);
+        },
+      });
     },
   });
 }
 
 export function useDeleteNoteById(): UseMutationResult<void, Error, string> {
   const client = useApiClient();
+  const { activeProfile } = useProfile();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -277,10 +300,23 @@ export function useDeleteNoteById(): UseMutationResult<void, Error, string> {
       await assertOk(res);
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['book-notes'] });
-      void queryClient.invalidateQueries({ queryKey: ['topic-notes'] });
-      void queryClient.invalidateQueries({ queryKey: ['note-topic-ids'] });
-      void queryClient.invalidateQueries({ queryKey: ['all-notes'] });
+      // [BUG-163] Scope invalidations by active profile id — see useUpdateNote.
+      const pid = activeProfile?.id;
+      void queryClient.invalidateQueries({
+        predicate: (query) => {
+          const key = query.queryKey;
+          if (typeof key[0] !== 'string') return false;
+          if (
+            key[0] !== 'book-notes' &&
+            key[0] !== 'topic-notes' &&
+            key[0] !== 'note-topic-ids' &&
+            key[0] !== 'all-notes'
+          ) {
+            return false;
+          }
+          return key.some((segment) => segment === pid);
+        },
+      });
     },
   });
 }

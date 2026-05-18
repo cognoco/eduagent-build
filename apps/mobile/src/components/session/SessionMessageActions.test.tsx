@@ -77,9 +77,9 @@ describe('SessionMessageActions stage gating', () => {
       />,
     );
 
-    expect(getByTestId('quick-chip-too_hard')).toBeTruthy();
-    expect(getByTestId('quick-chip-explain_differently')).toBeTruthy();
-    expect(getByTestId('quick-chip-hint')).toBeTruthy();
+    expect(getByTestId('quick-chip-too_hard'));
+    expect(getByTestId('quick-chip-explain_differently'));
+    expect(getByTestId('quick-chip-hint'));
     expect(
       getByTestId('message-feedback-controls-evt-1').props.className,
     ).toContain('ms-auto');

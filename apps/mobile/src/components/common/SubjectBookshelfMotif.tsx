@@ -19,11 +19,11 @@ export function SubjectBookshelfMotif({
   return (
     <View
       testID={testID}
+      className="bg-surface/72"
       style={{
         width: 52,
         height: 44,
         borderRadius: 13,
-        backgroundColor: 'rgba(255,255,255,0.72)',
         borderColor: tint.solid + '33',
         borderWidth: 1,
         justifyContent: 'flex-end',
@@ -53,11 +53,11 @@ export function SubjectBookshelfMotif({
             }}
           >
             <View
+              className="bg-surface/42"
               style={{
                 width: 2,
                 height: Math.max(10, spine.height - 14),
                 borderRadius: 999,
-                backgroundColor: 'rgba(255,255,255,0.42)',
                 alignSelf: 'center',
                 marginTop: 6,
               }}

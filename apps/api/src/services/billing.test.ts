@@ -229,6 +229,12 @@ function createMockDb({
     },
     insert: jest.fn().mockReturnValue({
       values: jest.fn().mockReturnValue({
+        // [BUG-116] ensureFreeSubscription uses onConflictDoNothing to survive
+        // concurrent-insert races (UNIQUE(account_id) constraint). Expose the
+        // method in the mock so the chain does not throw "not a function".
+        onConflictDoNothing: jest.fn().mockReturnValue({
+          returning: jest.fn().mockResolvedValue(insertReturning),
+        }),
         returning: jest.fn().mockResolvedValue(insertReturning),
       }),
     }),
@@ -1562,6 +1568,9 @@ function createFamilyMockDb({
     },
     insert: jest.fn().mockReturnValue({
       values: jest.fn().mockReturnValue({
+        onConflictDoNothing: jest.fn().mockReturnValue({
+          returning: jest.fn().mockResolvedValue(insertReturning),
+        }),
         returning: jest.fn().mockResolvedValue(insertReturning),
       }),
     }),

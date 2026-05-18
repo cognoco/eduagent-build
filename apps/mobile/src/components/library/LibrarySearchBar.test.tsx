@@ -28,7 +28,7 @@ describe('LibrarySearchBar', () => {
       />,
     );
     screen.getByTestId('library-search-input');
-    expect(screen.getByPlaceholderText('Search shelves...')).toBeTruthy();
+    expect(screen.getByPlaceholderText('Search shelves...'));
   });
 
   it('calls onChangeText when typing', () => {

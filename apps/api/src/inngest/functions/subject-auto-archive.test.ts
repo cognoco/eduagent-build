@@ -7,7 +7,10 @@ import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 
 const mockDatabaseModule = createDatabaseModuleMock();
 
-jest.mock('@eduagent/database', () => mockDatabaseModule.module);
+jest.mock(
+  '@eduagent/database' /* gc1-allow: inngest unit test — prevents real Neon connection; real DB exercised via .integration.test.ts harness */,
+  () => mockDatabaseModule.module,
+);
 
 const mockArchiveInactiveSubjects = jest.fn().mockResolvedValue([]);
 
@@ -64,8 +67,10 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 describe('subjectAutoArchive', () => {
-  it('should be defined as an Inngest function', () => {
-    expect(subjectAutoArchive).toBeTruthy();
+  it('should be defined as an Inngest function with the expected id', () => {
+    expect((subjectAutoArchive as { opts?: { id?: string } }).opts?.id).toBe(
+      'subject-auto-archive',
+    );
   });
 
   it('should have the correct function id', () => {

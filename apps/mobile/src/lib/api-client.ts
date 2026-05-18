@@ -212,6 +212,13 @@ export function useApiClient(): ApiClient {
         // instead of signing the user out.
         if (res.status === 401) {
           if (__DEV__) {
+            // [BUG-132] The token field below logs ONLY presence
+            // ("present" | "null") — never the raw token value. This is a
+            // dev-build only diagnostic for the 401-dedup logic; the actual
+            // JWT is intentionally never serialised into the log line so the
+            // dev console can't accidentally leak it to crash reports,
+            // screen recordings, or third-party log shippers. Do not change
+            // the ternary below to log the token itself.
             console.warn(
               `[AUTH-DEBUG] 401 received | token=${
                 token ? 'present' : 'null'

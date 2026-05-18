@@ -19,8 +19,8 @@ describe('CoachBand', () => {
 
   it('renders the headline', () => {
     const { getByTestId, getByText } = render(<CoachBand {...baseProps} />);
-    expect(getByTestId('home-coach-band')).toBeTruthy();
-    expect(getByText(/Linear equations/)).toBeTruthy();
+    expect(getByTestId('home-coach-band'));
+    expect(getByText(/Linear equations/));
   });
 
   it('fires onContinue when Continue is tapped', () => {
@@ -43,7 +43,7 @@ describe('CoachBand', () => {
 
   it('renders explicit eyebrow text', () => {
     const { getByText } = render(<CoachBand {...baseProps} />);
-    expect(getByText(/TONIGHT/)).toBeTruthy();
+    expect(getByText(/TONIGHT/));
   });
 
   it('renders time-aware eyebrow when none provided', () => {
@@ -54,7 +54,7 @@ describe('CoachBand', () => {
     const { unmount, getByText } = render(
       <CoachBand {...baseProps} eyebrow={undefined} now={morning} />,
     );
-    expect(getByText(/THIS MORNING/)).toBeTruthy();
+    expect(getByText(/THIS MORNING/));
     unmount();
 
     const { unmount: u2, getByText: g2 } = render(
@@ -71,6 +71,6 @@ describe('CoachBand', () => {
 
   it('renders estimated minutes', () => {
     const { getByText } = render(<CoachBand {...baseProps} />);
-    expect(getByText('4 min')).toBeTruthy();
+    expect(getByText('4 min'));
   });
 });

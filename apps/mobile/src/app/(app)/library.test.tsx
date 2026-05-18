@@ -793,7 +793,7 @@ describe('LibraryScreen', () => {
       // Match on the topic-count segment only — the subject-count segment's
       // grammar ("1 subject" vs "1 subjects") may shift if proper i18next
       // pluralization lands later, and that change is unrelated to BUG-971.
-      expect(screen.getByText(/· 3 topics\b/)).toBeTruthy();
+      expect(screen.getByText(/· 3 topics\b/));
     });
 
     it('omits the topic count segment entirely when there are no topics', () => {

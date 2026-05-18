@@ -214,7 +214,7 @@ describe('AccommodationScreen', () => {
 
     fireEvent.press(screen.getByTestId('accommodation-guide-toggle'));
 
-    expect(screen.getByText(/Audio-First · Active/)).toBeTruthy();
+    expect(screen.getByText(/Audio-First · Active/));
   });
 
   describe('child mode (childProfileId param)', () => {
@@ -235,7 +235,7 @@ describe('AccommodationScreen', () => {
     it('shows the child name in the title', () => {
       render(<AccommodationScreen />, { wrapper: createWrapper() });
 
-      expect(screen.getByText(/Mia's learning preferences/)).toBeTruthy();
+      expect(screen.getByText(/Mia's learning preferences/));
     });
 
     it('passes childProfileId when changing accommodation mode', () => {

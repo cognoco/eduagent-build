@@ -19,10 +19,11 @@ jest.mock('../lib/api-client', () => ({
   },
 }));
 
+const mockUseProfile = jest.fn(() => ({
+  activeProfile: { id: 'test-profile-id', isOwner: true },
+}));
 jest.mock('../lib/profile', () => ({
-  useProfile: () => ({
-    activeProfile: { id: 'test-profile-id', isOwner: true },
-  }),
+  useProfile: () => mockUseProfile(),
 }));
 
 let queryClient: QueryClient;
@@ -148,6 +149,67 @@ describe('useChildConsentStatus', () => {
     });
 
     expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  // [BREAK] [BUG-164] Without parent identity in the cache key, two
+  // different parents on a shared device looking up the same childProfileId
+  // would share a cache entry — and parent B could see parent A's
+  // consent-status response (or vice versa). The fix includes the active
+  // (parent) profile id in the key so caches are partitioned per parent.
+  it('[BREAK] does not serve parent A child consent status to parent B (cross-account leak)', async () => {
+    const childId = '550e8400-e29b-41d4-a716-446655440000';
+
+    mockUseProfile.mockReturnValue({
+      activeProfile: { id: 'parent-A', isOwner: true },
+    });
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          consentStatus: 'CONSENTED',
+          respondedAt: '2025-01-15T10:00:00.000Z',
+          consentType: 'GDPR',
+        }),
+        { status: 200 },
+      ),
+    );
+
+    const wrapper = createWrapper();
+    const parentA = renderHook(() => useChildConsentStatus(childId), {
+      wrapper,
+    });
+
+    await waitFor(() => {
+      expect(parentA.result.current.isSuccess).toBe(true);
+    });
+    expect(parentA.result.current.data?.consentStatus).toBe('CONSENTED');
+
+    // Switch to parent B WITHOUT clearing the QueryClient — simulates the
+    // shared-device leak window.
+    mockUseProfile.mockReturnValue({
+      activeProfile: { id: 'parent-B', isOwner: true },
+    });
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          consentStatus: 'WITHDRAWN',
+          respondedAt: null,
+          consentType: 'GDPR',
+        }),
+        { status: 200 },
+      ),
+    );
+
+    const parentB = renderHook(() => useChildConsentStatus(childId), {
+      wrapper,
+    });
+
+    await waitFor(() => {
+      expect(parentB.result.current.isSuccess).toBe(true);
+    });
+
+    // Parent B must get their own fetched data, not parent A's cached one.
+    expect(parentB.result.current.data?.consentStatus).toBe('WITHDRAWN');
+    expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 });
 

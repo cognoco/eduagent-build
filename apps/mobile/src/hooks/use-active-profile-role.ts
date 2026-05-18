@@ -17,17 +17,59 @@ import { useParentProxy } from './use-parent-proxy';
 // proxy mode.
 export type ActiveProfileRole = 'owner' | 'impersonated-child' | 'child';
 
-export function useActiveProfileRole(): ActiveProfileRole | null {
-  const { activeProfile } = useProfile();
+export interface ActiveProfileRoleState {
+  /**
+   * Resolved role for the active profile, or null when no profile is loaded.
+   * IMPORTANT: `null` does NOT distinguish "still loading" from "loaded but
+   * missing" — consumers that need to gate UI on the difference must read
+   * `isLoading` as well. Use the simpler `useActiveProfileRole()` wrapper
+   * when the distinction does not matter (most copy/role-aware screens).
+   */
+  role: ActiveProfileRole | null;
+  /**
+   * True while the underlying profile query is still resolving. Falls to
+   * false once a profile is loaded OR the query has resolved with no
+   * active profile. Use this to suppress role-gated UI flicker (e.g. a
+   * "no access" banner that would briefly flash before the owner profile
+   * loads).
+   */
+  isLoading: boolean;
+}
+
+/**
+ * [BUG-130] Structured variant that distinguishes "loading" from "loaded
+ * but no active profile". Prefer this over `useActiveProfileRole()` when a
+ * role-gated UI element would otherwise flash the wrong state during the
+ * initial load (e.g. showing "child" copy briefly before the owner profile
+ * resolves). The legacy single-return shape collapsed both states to
+ * `null`, which is fragile null-as-falsy — callers that branched on
+ * "missing" silently fired during the loading window too.
+ */
+export function useActiveProfileRoleState(): ActiveProfileRoleState {
+  const { activeProfile, isLoading } = useProfile();
   const { isParentProxy } = useParentProxy();
 
-  if (!activeProfile) return null;
+  if (!activeProfile) {
+    return { role: null, isLoading };
+  }
   // Precedence matters: in production isParentProxy implies !isOwner (see
   // useParentProxy contract), but tests can set the flags independently.
   // Putting proxy first is also defensive — if a future bug ever flips an
   // owner profile into proxy mode, we'd rather hide destructive actions
   // than expose them.
-  if (isParentProxy) return 'impersonated-child';
-  if (activeProfile.isOwner) return 'owner';
-  return 'child';
+  if (isParentProxy) return { role: 'impersonated-child', isLoading: false };
+  if (activeProfile.isOwner) return { role: 'owner', isLoading: false };
+  return { role: 'child', isLoading: false };
+}
+
+/**
+ * Convenience wrapper that returns just the role (or null). Existing
+ * call-sites that don't need to distinguish loading from missing keep
+ * using this — fragile null-as-falsy is preserved where the caller has
+ * already accepted that trade-off. New code that gates destructive or
+ * privacy-sensitive UI should prefer `useActiveProfileRoleState()` so
+ * "still loading" doesn't render the wrong role briefly.
+ */
+export function useActiveProfileRole(): ActiveProfileRole | null {
+  return useActiveProfileRoleState().role;
 }

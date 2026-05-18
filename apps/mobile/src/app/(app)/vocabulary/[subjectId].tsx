@@ -50,6 +50,14 @@ function CefrBadge({ level }: { level: string | null | undefined }) {
   );
 }
 
+// [BUG-NOTION-262] Fixed row height (excl. mb-2 spacer) so VirtualizedList's
+// getItemLayout can skip layout passes for off-screen items. Rows clip if the
+// translation wraps past ~2 lines, which we accept for the perf win — the
+// term and translation remain visible.
+const VOCAB_ROW_HEIGHT = 96;
+const VOCAB_ROW_GAP = 8;
+const VOCAB_ROW_TOTAL = VOCAB_ROW_HEIGHT + VOCAB_ROW_GAP;
+
 function VocabularyRow({
   item,
   onDelete,
@@ -65,6 +73,7 @@ function VocabularyRow({
   return (
     <View
       className="bg-surface rounded-card px-4 py-3 mb-2 flex-row items-center"
+      style={{ height: VOCAB_ROW_HEIGHT }}
       testID={`vocab-item-${item.id}`}
     >
       <View className="flex-1">
@@ -280,6 +289,15 @@ export default function VocabularyListScreen() {
               colors={colors}
             />
           )}
+          getItemLayout={(_data, index) => ({
+            length: VOCAB_ROW_TOTAL,
+            offset: VOCAB_ROW_TOTAL * index,
+            index,
+          })}
+          initialNumToRender={12}
+          maxToRenderPerBatch={12}
+          windowSize={5}
+          removeClippedSubviews
           testID="vocabulary-list"
         />
       )}

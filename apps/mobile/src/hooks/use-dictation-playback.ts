@@ -113,76 +113,93 @@ export function useDictationPlayback(config: PlaybackConfig): PlaybackControls {
     return splitIntoChunks(text, size);
   };
 
+  // [BUG-166] Recursive playback driver — see speakChunkRef wiring below for
+  // why this lives in a ref rather than a useCallback with an explicit deps
+  // array. The function reads all mutable config (pace, language, sentences,
+  // punctuation, chunkSize) via `configRef.current` so a config change
+  // mid-playback is picked up on the next chunk boundary without needing to
+  // remount or restart playback.
+  const speakChunkRef = useRef<
+    (sentenceIndex: number, chunkIndex: number) => void
+  >(() => {
+    /* placeholder — replaced by the real implementation on first render */
+  });
+
+  speakChunkRef.current = (sentenceIndex: number, chunkIndex: number) => {
+    const chunks = getChunksForSentence(sentenceIndex);
+    chunkIndexRef.current = chunkIndex;
+
+    if (chunkIndex >= chunks.length || chunks.length === 0) {
+      setState('complete');
+      return;
+    }
+
+    setState('speaking');
+    const { rate } = PACE_CONFIG[configRef.current.pace];
+
+    Speech.speak(chunks[chunkIndex] ?? '', {
+      language: configRef.current.language,
+      rate,
+      onDone: () => {
+        if (stateRef.current === 'paused') return;
+
+        // RF-02: Read pace config fresh — user may have changed pace mid-speech
+        const paceConfig = PACE_CONFIG[configRef.current.pace];
+
+        const isLastChunk = chunkIndex >= chunks.length - 1;
+        const isLastSentence =
+          sentenceIndex >= configRef.current.sentences.length - 1;
+
+        if (isLastChunk && isLastSentence) {
+          setState('complete');
+          return;
+        }
+
+        setState('waiting');
+
+        if (isLastChunk) {
+          // Sentence boundary — longer pause, advance to next sentence
+          const nextSentenceIndex = sentenceIndex + 1;
+          const action = () => {
+            setCurrentIndex(nextSentenceIndex);
+            speakChunkRef.current(nextSentenceIndex, 0);
+          };
+          nextActionRef.current = action;
+          pauseTimerRef.current = setTimeout(action, paceConfig.sentencePause);
+        } else {
+          // Chunk boundary — writing pause proportional to chunk word count
+          const chunkWordCount = (chunks[chunkIndex] ?? '')
+            .split(/\s+/)
+            .filter(Boolean).length;
+          const chunkPause = chunkWordCount * paceConfig.chunkPausePerWord;
+          const nextChunkIndex = chunkIndex + 1;
+          const action = () => {
+            speakChunkRef.current(sentenceIndex, nextChunkIndex);
+          };
+          nextActionRef.current = action;
+          pauseTimerRef.current = setTimeout(action, chunkPause);
+        }
+      },
+      // H6: Reset state on TTS failure so playback never stays frozen in 'speaking'.
+      // onStopped fires when Speech.stop() is called externally (pause/skip),
+      // which is already handled by the pause/skip callbacks, so no extra reset needed there.
+      onError: () => {
+        if (stateRef.current !== 'paused') {
+          setState('idle');
+        }
+      },
+    });
+  };
+
+  // Stable wrapper so the public controls (start/pause/repeat/skip) can
+  // depend on a referentially-equal function across renders without
+  // triggering the react-hooks/exhaustive-deps suppression we removed.
+  // The ref always points at the latest implementation, which always reads
+  // the latest config via configRef.
   const speakChunk = useCallback(
     (sentenceIndex: number, chunkIndex: number) => {
-      const chunks = getChunksForSentence(sentenceIndex);
-      chunkIndexRef.current = chunkIndex;
-
-      if (chunkIndex >= chunks.length || chunks.length === 0) {
-        setState('complete');
-        return;
-      }
-
-      setState('speaking');
-      const { rate } = PACE_CONFIG[configRef.current.pace];
-
-      Speech.speak(chunks[chunkIndex] ?? '', {
-        language: configRef.current.language,
-        rate,
-        onDone: () => {
-          if (stateRef.current === 'paused') return;
-
-          // RF-02: Read pace config fresh — user may have changed pace mid-speech
-          const paceConfig = PACE_CONFIG[configRef.current.pace];
-
-          const isLastChunk = chunkIndex >= chunks.length - 1;
-          const isLastSentence =
-            sentenceIndex >= configRef.current.sentences.length - 1;
-
-          if (isLastChunk && isLastSentence) {
-            setState('complete');
-            return;
-          }
-
-          setState('waiting');
-
-          if (isLastChunk) {
-            // Sentence boundary — longer pause, advance to next sentence
-            const nextSentenceIndex = sentenceIndex + 1;
-            const action = () => {
-              setCurrentIndex(nextSentenceIndex);
-              speakChunk(nextSentenceIndex, 0);
-            };
-            nextActionRef.current = action;
-            pauseTimerRef.current = setTimeout(
-              action,
-              paceConfig.sentencePause,
-            );
-          } else {
-            // Chunk boundary — writing pause proportional to chunk word count
-            const chunkWordCount = (chunks[chunkIndex] ?? '')
-              .split(/\s+/)
-              .filter(Boolean).length;
-            const chunkPause = chunkWordCount * paceConfig.chunkPausePerWord;
-            const nextChunkIndex = chunkIndex + 1;
-            const action = () => {
-              speakChunk(sentenceIndex, nextChunkIndex);
-            };
-            nextActionRef.current = action;
-            pauseTimerRef.current = setTimeout(action, chunkPause);
-          }
-        },
-        // H6: Reset state on TTS failure so playback never stays frozen in 'speaking'.
-        // onStopped fires when Speech.stop() is called externally (pause/skip),
-        // which is already handled by the pause/skip callbacks, so no extra reset needed there.
-        onError: () => {
-          if (stateRef.current !== 'paused') {
-            setState('idle');
-          }
-        },
-      });
+      speakChunkRef.current(sentenceIndex, chunkIndex);
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
 

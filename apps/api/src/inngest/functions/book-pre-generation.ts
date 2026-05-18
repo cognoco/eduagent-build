@@ -15,6 +15,19 @@ export const bookPreGeneration = inngest.createFunction(
   {
     id: 'book-pre-generation',
     name: 'Pre-generate next books after topic generation',
+    // [BUG-156] Idempotency on bookId — two parallel `app/book.topics-generated`
+    // events for the same bookId (operator replay, double-dispatch from a
+    // session-completed pipeline) would both run the prep step + per-book LLM
+    // calls. persistBookTopics has its own idempotency guard so duplicate
+    // writes don't land, but the LLM tokens are already burned by the time
+    // that guard kicks in. Idempotency at the function level short-circuits
+    // the second run before any work happens (24h window).
+    idempotency: 'event.data.bookId',
+    // [BUG-156] Bound concurrency per-subject so a runaway session-completed
+    // fan-out across many books in the same subject does not stampede the LLM
+    // provider; per-bookId idempotency already prevents duplicate-event work
+    // — the concurrency key spreads parallelism across subjects.
+    concurrency: { limit: 5, key: 'event.data.subjectId' },
   },
   { event: 'app/book.topics-generated' },
   async ({ event, step }) => {
@@ -53,8 +66,8 @@ export const bookPreGeneration = inngest.createFunction(
           and(
             eq(curriculumBooks.subjectId, subjectId),
             eq(curriculumBooks.topicsGenerated, false),
-            gt(curriculumBooks.sortOrder, currentBook.sortOrder)
-          )
+            gt(curriculumBooks.sortOrder, currentBook.sortOrder),
+          ),
         )
         .orderBy(asc(curriculumBooks.sortOrder))
         .limit(2);
@@ -113,7 +126,7 @@ export const bookPreGeneration = inngest.createFunction(
           const topics = await generateBookTopics(
             book.title,
             book.description ?? '',
-            prep.learnerAge
+            prep.learnerAge,
           );
           await persistBookTopics(
             db,
@@ -121,10 +134,10 @@ export const bookPreGeneration = inngest.createFunction(
             subjectId,
             book.id,
             topics.topics,
-            topics.connections
+            topics.connections,
           );
           return book.title;
-        }
+        },
       );
       if (title) generated.push(title);
     }
@@ -134,5 +147,5 @@ export const bookPreGeneration = inngest.createFunction(
       generated,
       timestamp: new Date().toISOString(),
     };
-  }
+  },
 );

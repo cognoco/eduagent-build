@@ -125,9 +125,12 @@ jest.mock('../../../hooks/use-sessions', () => ({
   }),
 }));
 
-jest.mock('../../../lib/navigation', () => ({
-  goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
-}));
+jest.mock(
+  '../../../lib/navigation' /* gc1-allow: goBackOrReplace calls router.back which requires native navigation context */,
+  () => ({
+    goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
+  }),
+);
 
 const LanguageSetup = require('./language-setup').default;
 

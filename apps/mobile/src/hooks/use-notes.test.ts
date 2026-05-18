@@ -5,7 +5,13 @@
 import { renderHook, waitFor, act } from '@testing-library/react-native';
 import { QueryClient } from '@tanstack/react-query';
 import { createQueryWrapper } from '../test-utils/app-hook-test-utils';
-import { useBookNotes, useCreateNote, useNoteTopicIds } from './use-notes';
+import {
+  useBookNotes,
+  useCreateNote,
+  useNoteTopicIds,
+  useUpdateNote,
+  useDeleteNoteById,
+} from './use-notes';
 
 const mockFetch = jest.fn();
 jest.mock('../lib/api-client', () => ({
@@ -267,6 +273,151 @@ describe('useCreateNote', () => {
 // ---------------------------------------------------------------------------
 // useNoteTopicIds
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// useUpdateNote / useDeleteNoteById — cross-account invalidation safety
+// [BUG-163]
+// ---------------------------------------------------------------------------
+
+// [BREAK] [BUG-163] Before the fix, useUpdateNote / useDeleteNoteById called
+//   invalidateQueries({ queryKey: ['book-notes'] }) (no profileId)
+// which prefix-matched ALL profiles. On a shared device, updating profile A's
+// note would invalidate (and trigger background refetches of) profile B's
+// cached note state — silently bridging cache lifecycles across identities.
+// The fix scopes invalidation by predicate. We verify by capturing the
+// predicate passed to invalidateQueries and running it against synthetic
+// query keys for both the active profile and a different profile —
+// sidesteps the test wrapper's `gcTime: 0` which evicts setQueryData
+// entries before they can be inspected via getQueryState.
+function runInvalidatePredicate(
+  invalidateSpy: jest.SpyInstance,
+  queryKey: readonly unknown[],
+): boolean {
+  const calls = invalidateSpy.mock.calls as Array<
+    [{ predicate?: (query: { queryKey: readonly unknown[] }) => boolean }]
+  >;
+  return calls.some(([filter]) => {
+    const predicate = filter?.predicate;
+    if (!predicate) return false;
+    return predicate({ queryKey });
+  });
+}
+
+describe('useUpdateNote and useDeleteNoteById (profile-scoped invalidation)', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    queryClient?.clear();
+  });
+
+  it('[BREAK] useUpdateNote invalidate-predicate matches active profile only', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          note: {
+            id: 'note-1',
+            topicId: 'topic-1',
+            profileId: 'test-profile-id',
+            content: 'updated',
+            createdAt: '2026-01-01T00:00:00.000Z',
+            updatedAt: '2026-01-01T00:00:00.000Z',
+          },
+        }),
+        { status: 200 },
+      ),
+    );
+
+    const wrapper = createWrapper();
+    const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries');
+
+    const { result } = renderHook(() => useUpdateNote(), { wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync({
+        noteId: 'note-1',
+        content: 'updated',
+      });
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    expect(
+      runInvalidatePredicate(invalidateSpy, [
+        'book-notes',
+        'subject-1',
+        'book-1',
+        'test-profile-id',
+      ]),
+    ).toBe(true);
+    expect(
+      runInvalidatePredicate(invalidateSpy, [
+        'topic-notes',
+        'subject-1',
+        'topic-1',
+        'test-profile-id',
+      ]),
+    ).toBe(true);
+    expect(
+      runInvalidatePredicate(invalidateSpy, ['all-notes', 'test-profile-id']),
+    ).toBe(true);
+
+    // A DIFFERENT profile's note keys MUST NOT match the predicate.
+    expect(
+      runInvalidatePredicate(invalidateSpy, [
+        'book-notes',
+        'subject-1',
+        'book-1',
+        'other-profile-id',
+      ]),
+    ).toBe(false);
+    expect(
+      runInvalidatePredicate(invalidateSpy, [
+        'topic-notes',
+        'subject-1',
+        'topic-1',
+        'other-profile-id',
+      ]),
+    ).toBe(false);
+    expect(
+      runInvalidatePredicate(invalidateSpy, ['all-notes', 'other-profile-id']),
+    ).toBe(false);
+  });
+
+  it('[BREAK] useDeleteNoteById invalidate-predicate matches active profile only', async () => {
+    mockFetch.mockResolvedValueOnce(new Response(null, { status: 204 }));
+
+    const wrapper = createWrapper();
+    const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries');
+
+    const { result } = renderHook(() => useDeleteNoteById(), { wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync('note-1');
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    expect(
+      runInvalidatePredicate(invalidateSpy, [
+        'note-topic-ids',
+        'test-profile-id',
+      ]),
+    ).toBe(true);
+    expect(
+      runInvalidatePredicate(invalidateSpy, [
+        'note-topic-ids',
+        'other-profile-id',
+      ]),
+    ).toBe(false);
+  });
+});
 
 describe('useNoteTopicIds', () => {
   beforeEach(() => {

@@ -50,7 +50,7 @@ describe('FamilyOrientationCue', () => {
     render(<FamilyOrientationCue />);
 
     await waitFor(() => {
-      expect(screen.getByTestId('family-orientation-cue')).toBeTruthy();
+      expect(screen.getByTestId('family-orientation-cue'));
     });
   });
 

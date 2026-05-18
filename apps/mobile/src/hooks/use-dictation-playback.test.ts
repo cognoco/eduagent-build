@@ -639,6 +639,181 @@ describe('useDictationPlayback', () => {
     );
   });
 
+  // -------------------------------------------------------------------------
+  // [BUG-166 / BREAK] Removing the react-hooks/exhaustive-deps suppression on
+  // speakChunk must not regress mid-playback config changes. These tests
+  // exercise the four config fields the original closure would have staled:
+  // sentences, language, punctuationReadAloud, and chunkSize. If a future
+  // refactor re-introduces a stale closure (e.g. moves config back into a
+  // useCallback dep array without including these fields), these tests fail.
+  // -------------------------------------------------------------------------
+  it('[BREAK / BUG-166] picks up language change mid-playback', () => {
+    let capturedOnDone: (() => void) | undefined;
+    mockSpeak.mockImplementation((_text, options) => {
+      capturedOnDone = options?.onDone;
+    });
+
+    const { result, rerender } = renderHook(
+      (props: { language: string }) =>
+        useDictationPlayback({
+          sentences: TEST_SENTENCES,
+          pace: 'slow',
+          punctuationReadAloud: false,
+          language: props.language,
+        }),
+      { initialProps: { language: 'en' } },
+    );
+
+    act(() => {
+      result.current.start();
+    });
+    act(() => {
+      jest.advanceTimersByTime(4000); // past countdown
+    });
+
+    // First call goes out with 'en'
+    expect(mockSpeak).toHaveBeenLastCalledWith(
+      'First sentence.',
+      expect.objectContaining({ language: 'en' }),
+    );
+
+    // Caller flips language mid-flight
+    rerender({ language: 'es' });
+
+    // Advance to next sentence — must use the new language
+    act(() => {
+      capturedOnDone?.();
+    });
+    act(() => {
+      jest.advanceTimersByTime(5000); // sentence pause for slow pace
+    });
+
+    expect(mockSpeak).toHaveBeenLastCalledWith(
+      'Second sentence.',
+      expect.objectContaining({ language: 'es' }),
+    );
+  });
+
+  it('[BREAK / BUG-166] picks up punctuationReadAloud change mid-playback', () => {
+    let capturedOnDone: (() => void) | undefined;
+    mockSpeak.mockImplementation((_text, options) => {
+      capturedOnDone = options?.onDone;
+    });
+
+    const { result, rerender } = renderHook(
+      (props: { punctuationReadAloud: boolean }) =>
+        useDictationPlayback({
+          sentences: TEST_SENTENCES,
+          pace: 'slow',
+          punctuationReadAloud: props.punctuationReadAloud,
+          language: 'en',
+        }),
+      { initialProps: { punctuationReadAloud: false } },
+    );
+
+    act(() => {
+      result.current.start();
+    });
+    act(() => {
+      jest.advanceTimersByTime(4000);
+    });
+
+    expect(mockSpeak).toHaveBeenLastCalledWith(
+      'First sentence.',
+      expect.objectContaining({ language: 'en' }),
+    );
+
+    // Flip to spoken punctuation mid-flight
+    rerender({ punctuationReadAloud: true });
+
+    act(() => {
+      capturedOnDone?.();
+    });
+    act(() => {
+      jest.advanceTimersByTime(5000);
+    });
+
+    // Next sentence must use withPunctuation text
+    expect(mockSpeak).toHaveBeenLastCalledWith(
+      'Second sentence period',
+      expect.objectContaining({ language: 'en' }),
+    );
+  });
+
+  it('[BREAK / BUG-166] picks up sentences array swap mid-playback', () => {
+    let capturedOnDone: (() => void) | undefined;
+    mockSpeak.mockImplementation((_text, options) => {
+      capturedOnDone = options?.onDone;
+    });
+
+    const REPLACEMENT_SENTENCES: DictationSentence[] = [
+      {
+        text: 'Original kept.',
+        withPunctuation: 'Original kept period',
+        wordCount: 2,
+      },
+      {
+        text: 'Replaced second sentence.',
+        withPunctuation: 'Replaced second sentence period',
+        wordCount: 3,
+      },
+    ];
+
+    const { result, rerender } = renderHook(
+      (props: { sentences: DictationSentence[] }) =>
+        useDictationPlayback({
+          sentences: props.sentences,
+          pace: 'slow',
+          punctuationReadAloud: false,
+          language: 'en',
+        }),
+      {
+        initialProps: {
+          sentences: [
+            {
+              text: 'Original kept.',
+              withPunctuation: 'Original kept period',
+              wordCount: 2,
+            },
+            {
+              text: 'Original second.',
+              withPunctuation: 'Original second period',
+              wordCount: 2,
+            },
+          ],
+        },
+      },
+    );
+
+    act(() => {
+      result.current.start();
+    });
+    act(() => {
+      jest.advanceTimersByTime(4000);
+    });
+
+    expect(mockSpeak).toHaveBeenLastCalledWith(
+      'Original kept.',
+      expect.objectContaining({ language: 'en' }),
+    );
+
+    // Swap sentences[] mid-flight
+    rerender({ sentences: REPLACEMENT_SENTENCES });
+
+    act(() => {
+      capturedOnDone?.();
+    });
+    act(() => {
+      jest.advanceTimersByTime(5000);
+    });
+
+    // Next sentence must come from the NEW sentences array, not the captured one
+    expect(mockSpeak).toHaveBeenLastCalledWith(
+      'Replaced second sentence.',
+      expect.objectContaining({ language: 'en' }),
+    );
+  });
+
   it('falls back to splitIntoChunks when no pre-computed chunks exist', () => {
     mockSpeak.mockImplementation((_text, options) => {
       options?.onDone?.();

@@ -1,11 +1,56 @@
 import { z } from 'zod';
+import { isoDateField } from './common.ts';
 import { profileSchema } from './profiles.ts';
 import { consentStatusSchema, consentTypeSchema } from './consent.ts';
 import { learningProfileSchema } from './learning-profiles.ts';
 
+/**
+ * [BUG-206] Narrowed export row shape.
+ *
+ * The 18 GDPR-export tables in `dataExportSchema` were previously typed as
+ * `z.record(z.string(), z.unknown())`, which made it impossible to centralise
+ * the contract for future tightening — every table was an inline ad-hoc
+ * schema. We do not have hand-written zod schemas for every table (the
+ * canonical row types live in `@eduagent/database` as Drizzle inferred
+ * types), and spelling out 18 full schemas here would push churn into
+ * ~25 downstream call sites without bounded value.
+ *
+ * Compromise: every export row goes through `dataExportRowSchema` — same
+ * runtime shape as before, but centrally defined so a future PR can tighten
+ * one table at a time by replacing its per-table alias below.
+ */
+export const dataExportRowSchema = z.record(z.string(), z.unknown());
+export type DataExportRow = z.infer<typeof dataExportRowSchema>;
+
+/**
+ * Per-table row schemas. Today they are all aliases of `dataExportRowSchema`;
+ * PRs that author a stricter schema for, e.g., `subjects` should replace
+ * the alias here.
+ */
+export const dataExportSubjectRowSchema = dataExportRowSchema;
+export const dataExportCurriculumRowSchema = dataExportRowSchema;
+export const dataExportCurriculumTopicRowSchema = dataExportRowSchema;
+export const dataExportLearningSessionRowSchema = dataExportRowSchema;
+export const dataExportSessionEventRowSchema = dataExportRowSchema;
+export const dataExportSessionSummaryRowSchema = dataExportRowSchema;
+export const dataExportRetentionCardRowSchema = dataExportRowSchema;
+export const dataExportAssessmentRowSchema = dataExportRowSchema;
+export const dataExportXpLedgerRowSchema = dataExportRowSchema;
+export const dataExportStreakRowSchema = dataExportRowSchema;
+export const dataExportNotificationPreferenceRowSchema = dataExportRowSchema;
+export const dataExportLearningModeRowSchema = dataExportRowSchema;
+export const dataExportTeachingPreferenceRowSchema = dataExportRowSchema;
+export const dataExportParkingLotItemRowSchema = dataExportRowSchema;
+export const dataExportSessionEmbeddingRowSchema = dataExportRowSchema;
+export const dataExportSubscriptionRowSchema = dataExportRowSchema;
+export const dataExportQuotaPoolRowSchema = dataExportRowSchema;
+export const dataExportTopUpCreditRowSchema = dataExportRowSchema;
+export const dataExportNeedsDeepeningTopicRowSchema = dataExportRowSchema;
+export const dataExportFamilyLinkRowSchema = dataExportRowSchema;
+
 export const accountDeletionResponseSchema = z.object({
   message: z.string(),
-  gracePeriodEnds: z.string().datetime(),
+  gracePeriodEnds: isoDateField,
 });
 
 export type AccountDeletionResponse = z.infer<
@@ -21,8 +66,8 @@ export type CancelDeletionResponse = z.infer<
 
 export const accountDeletionStatusResponseSchema = z.object({
   scheduled: z.boolean(),
-  deletionScheduledAt: z.string().datetime().nullable(),
-  gracePeriodEnds: z.string().datetime().nullable(),
+  deletionScheduledAt: isoDateField.nullable(),
+  gracePeriodEnds: isoDateField.nullable(),
 });
 
 export type AccountDeletionStatusResponse = z.infer<
@@ -35,42 +80,49 @@ export const dataExportConsentSchema = z.object({
   consentType: consentTypeSchema,
   status: consentStatusSchema,
   parentEmail: z.string().email().nullable(),
-  requestedAt: z.string().datetime(),
-  respondedAt: z.string().datetime().nullable(),
+  requestedAt: isoDateField,
+  respondedAt: isoDateField.nullable(),
 });
 
 export const dataExportSchema = z.object({
   account: z.object({
     email: z.string().email(),
-    createdAt: z.string().datetime(),
+    createdAt: isoDateField,
   }),
   profiles: z.array(profileSchema),
   consentStates: z.array(dataExportConsentSchema),
-  // GDPR Article 15 — all personal data
-  subjects: z.array(z.record(z.string(), z.unknown())).optional(),
-  curricula: z.array(z.record(z.string(), z.unknown())).optional(),
-  curriculumTopics: z.array(z.record(z.string(), z.unknown())).optional(),
-  learningSessions: z.array(z.record(z.string(), z.unknown())).optional(),
-  sessionEvents: z.array(z.record(z.string(), z.unknown())).optional(),
-  sessionSummaries: z.array(z.record(z.string(), z.unknown())).optional(),
-  retentionCards: z.array(z.record(z.string(), z.unknown())).optional(),
-  assessments: z.array(z.record(z.string(), z.unknown())).optional(),
-  xpLedger: z.array(z.record(z.string(), z.unknown())).optional(),
-  streaks: z.array(z.record(z.string(), z.unknown())).optional(),
+  // GDPR Article 15 — all personal data.
+  // [BUG-206] Each table is `dataExportRowSchema` (centralised passthrough)
+  // instead of the previous inline `z.record(z.string(), z.unknown())`.
+  // Per-table aliases above let future PRs tighten one table at a time.
+  subjects: z.array(dataExportSubjectRowSchema).optional(),
+  curricula: z.array(dataExportCurriculumRowSchema).optional(),
+  curriculumTopics: z.array(dataExportCurriculumTopicRowSchema).optional(),
+  learningSessions: z.array(dataExportLearningSessionRowSchema).optional(),
+  sessionEvents: z.array(dataExportSessionEventRowSchema).optional(),
+  sessionSummaries: z.array(dataExportSessionSummaryRowSchema).optional(),
+  retentionCards: z.array(dataExportRetentionCardRowSchema).optional(),
+  assessments: z.array(dataExportAssessmentRowSchema).optional(),
+  xpLedger: z.array(dataExportXpLedgerRowSchema).optional(),
+  streaks: z.array(dataExportStreakRowSchema).optional(),
   notificationPreferences: z
-    .array(z.record(z.string(), z.unknown()))
+    .array(dataExportNotificationPreferenceRowSchema)
     .optional(),
-  learningModes: z.array(z.record(z.string(), z.unknown())).optional(),
-  teachingPreferences: z.array(z.record(z.string(), z.unknown())).optional(),
-  parkingLotItems: z.array(z.record(z.string(), z.unknown())).optional(),
-  sessionEmbeddings: z.array(z.record(z.string(), z.unknown())).optional(),
-  subscriptions: z.array(z.record(z.string(), z.unknown())).optional(),
-  quotaPools: z.array(z.record(z.string(), z.unknown())).optional(),
-  topUpCredits: z.array(z.record(z.string(), z.unknown())).optional(),
-  needsDeepeningTopics: z.array(z.record(z.string(), z.unknown())).optional(),
-  familyLinks: z.array(z.record(z.string(), z.unknown())).optional(),
+  learningModes: z.array(dataExportLearningModeRowSchema).optional(),
+  teachingPreferences: z
+    .array(dataExportTeachingPreferenceRowSchema)
+    .optional(),
+  parkingLotItems: z.array(dataExportParkingLotItemRowSchema).optional(),
+  sessionEmbeddings: z.array(dataExportSessionEmbeddingRowSchema).optional(),
+  subscriptions: z.array(dataExportSubscriptionRowSchema).optional(),
+  quotaPools: z.array(dataExportQuotaPoolRowSchema).optional(),
+  topUpCredits: z.array(dataExportTopUpCreditRowSchema).optional(),
+  needsDeepeningTopics: z
+    .array(dataExportNeedsDeepeningTopicRowSchema)
+    .optional(),
+  familyLinks: z.array(dataExportFamilyLinkRowSchema).optional(),
   learningProfiles: z.array(learningProfileSchema).optional(),
-  exportedAt: z.string().datetime(),
+  exportedAt: isoDateField,
 });
 
 export type DataExport = z.infer<typeof dataExportSchema>;

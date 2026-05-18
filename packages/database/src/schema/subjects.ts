@@ -223,6 +223,46 @@ export const topicConnections = pgTable('topic_connections', {
     .defaultNow(),
 });
 
+// [BUG-226 / P3] topic_connections has NO profileId column and no RLS policy.
+// Ownership today is enforced TRANSITIVELY via the parent chain:
+//   topic_connections.topic_a_id → curriculum_topics
+//   topic_connections.topic_b_id → curriculum_topics
+//   curriculum_topics.book_id    → curriculum_books
+//   curriculum_books.subject_id  → subjects
+//   subjects.profile_id          → profiles.id
+//
+// Every reader MUST resolve topicIds via the profile-scoped curriculum_topics
+// path BEFORE querying topic_connections (canonical example:
+//   apps/api/src/services/curriculum.ts:1080-1098 — filters by topicIds that
+//   were themselves resolved through a profile-scoped curriculum read).
+//
+// Direct reads against topic_connections without a parent-chain pre-filter
+// are forbidden and would leak cross-profile connection edges.
+//
+// Status as of 2026-05-18 (Worker W15 — packages/database review):
+//   • All current readers go through the parent chain (verified via grep).
+//   • No new RLS migration is shipped in this batch — adding profileId would
+//     require: (1) a backfill from topic_a_id → topics → books → subjects,
+//     (2) a check constraint that topic_a and topic_b share the same
+//     profileId (no cross-profile edges), (3) an RLS policy mirroring
+//     subjects'. Migration is non-trivial and product-shaped (cross-profile
+//     "shared curriculum" features could change the answer).
+//
+// Path forward (deferred to a dedicated migration):
+//   1. ALTER TABLE topic_connections ADD COLUMN profile_id uuid;
+//   2. UPDATE topic_connections SET profile_id = (
+//        SELECT s.profile_id FROM curriculum_topics t
+//          JOIN curriculum_books b ON b.id = t.book_id
+//          JOIN subjects s ON s.id = b.subject_id
+//          WHERE t.id = topic_a_id
+//      );
+//   3. ALTER TABLE topic_connections ALTER COLUMN profile_id SET NOT NULL,
+//                                    ADD CONSTRAINT topic_connections_same_profile
+//                                      CHECK (...) — requires fn or trigger.
+//   4. ALTER TABLE topic_connections ENABLE ROW LEVEL SECURITY;
+//   5. CREATE POLICY topic_connections_profile_isolation ON topic_connections
+//        USING (profile_id = NULLIF(current_setting('app.profile_id', true), '')::uuid);
+
 export const curriculumAdaptations = pgTable('curriculum_adaptations', {
   id: uuid('id')
     .primaryKey()

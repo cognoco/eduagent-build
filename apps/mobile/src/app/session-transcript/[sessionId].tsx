@@ -13,7 +13,8 @@ import {
   Text,
   View,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useAuth } from '@clerk/clerk-expo';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { SessionTranscriptExchange } from '@eduagent/schemas';
@@ -21,7 +22,7 @@ import { useSessionTranscript } from '../../hooks/use-sessions';
 import { goBackOrReplace } from '../../lib/navigation';
 import { stripEnvelopeJson } from '../../lib/strip-envelope';
 import { useThemeColors } from '../../lib/theme';
-import { ErrorFallback } from '../../components/common';
+import { ErrorFallback, TimeoutLoader } from '../../components/common';
 import { formatApiError } from '../../lib/format-api-error';
 import { ArchivedTranscriptCard } from './_components/archived-transcript-card';
 
@@ -49,6 +50,12 @@ export default function SessionTranscriptScreen() {
   const sessionId = Array.isArray(params.sessionId)
     ? params.sessionId[0]
     : params.sessionId;
+  // [BUG-134] Auth gate — this route is at the root, not under (app)/, so
+  // the (app)/_layout.tsx auth guard does NOT fire on deep-link entry.
+  // Without this check, an unauthenticated user opening a transcript deep
+  // link sees a spinner and then a useless error (the API call fails with
+  // 401 once auth headers are missing).
+  const { isLoaded: authIsLoaded, isSignedIn } = useAuth();
 
   const transcript = useSessionTranscript(sessionId ?? '');
 
@@ -59,6 +66,20 @@ export default function SessionTranscriptScreen() {
         : [],
     [transcript.data],
   );
+
+  if (!authIsLoaded) {
+    return (
+      <View
+        className="flex-1 bg-background items-center justify-center"
+        testID="session-transcript-auth-loading"
+      >
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
+  if (!isSignedIn) {
+    return <Redirect href="/sign-in" />;
+  }
 
   if (!sessionId) {
     return (
@@ -86,17 +107,31 @@ export default function SessionTranscriptScreen() {
     );
   }
 
+  // [BUG-142] Transcript loading needs an escape hatch. Without a timeout the
+  // user can sit forever on a spinner when the network is slow or the server
+  // is down. TimeoutLoader spins for 15s then flips to ErrorFallback with
+  // Retry + Back to library — matching the session-summary pattern and the
+  // standard error fallback rule in CLAUDE.md > UX Resilience Rules.
   if (transcript.isLoading) {
     return (
-      <View
-        className="flex-1 bg-background items-center justify-center"
+      <TimeoutLoader
+        isLoading={transcript.isLoading}
+        timeoutMs={15_000}
         testID="session-transcript-loading"
-      >
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text className="mt-3 text-body-sm text-text-secondary">
-          Loading transcript...
-        </Text>
-      </View>
+        loadingLabel="Loading transcript..."
+        title="Still loading"
+        message="The transcript is taking longer than usual. Try again or head back to your library."
+        primaryAction={{
+          label: 'Retry',
+          onPress: () => void transcript.refetch(),
+          testID: 'session-transcript-timeout-retry',
+        }}
+        secondaryAction={{
+          label: 'Back to library',
+          onPress: () => goBackOrReplace(router, '/(app)/library'),
+          testID: 'session-transcript-timeout-back',
+        }}
+      />
     );
   }
 
@@ -133,11 +168,18 @@ export default function SessionTranscriptScreen() {
           summary={transcript.data.summary}
           onBack={() => goBackOrReplace(router, '/(app)/library')}
           onContinueTopic={() => {
+            // [BUG-152] Use the object form for router.push instead of a
+            // string template. On web the path goes through a different
+            // resolver than native and string-templated routes can fail
+            // to encode special characters in the param. The object form
+            // is the typed-route shape Expo Router prefers.
             if (transcript.data?.archived !== true) return;
-            if (!transcript.data.summary.topicId) return;
-            router.push(
-              `/(app)/session/start?topicId=${transcript.data.summary.topicId}`,
-            );
+            const topicId = transcript.data.summary.topicId;
+            if (!topicId) return;
+            router.push({
+              pathname: '/(app)/session/start',
+              params: { topicId },
+            });
           }}
         />
       </View>

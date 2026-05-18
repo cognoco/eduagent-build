@@ -23,8 +23,8 @@ beforeEach(() => jest.clearAllMocks());
 describe('without cooldown', () => {
   it('renders the card with retention signal', () => {
     render(<RemediationCard {...defaultProps} />);
-    expect(screen.getByTestId('remediation-card')).toBeTruthy();
-    expect(screen.getByTestId('retention-signal-fading')).toBeTruthy();
+    expect(screen.getByTestId('remediation-card'));
+    expect(screen.getByTestId('retention-signal-fading'));
   });
 
   it('calls onRelearnTopic on primary CTA press', () => {
@@ -88,7 +88,7 @@ describe('with active cooldown', () => {
         cooldownEndsAt={inFuture(30 * 60_000)}
       />,
     );
-    expect(screen.getByText(/You can try again in 30 minutes/)).toBeTruthy();
+    expect(screen.getByText(/You can try again in 30 minutes/));
   });
 
   it('shows hours cooldown message for 1-4 hours', () => {
@@ -98,7 +98,7 @@ describe('with active cooldown', () => {
         cooldownEndsAt={inFuture(2 * 60 * 60_000)}
       />,
     );
-    expect(screen.getByText(/You can try again in about 2 hours/)).toBeTruthy();
+    expect(screen.getByText(/You can try again in about 2 hours/));
   });
 
   it('shows tomorrow message for >4 hours', () => {
@@ -108,7 +108,7 @@ describe('with active cooldown', () => {
         cooldownEndsAt={inFuture(5 * 60 * 60_000)}
       />,
     );
-    expect(screen.getByText(/Come back tomorrow/)).toBeTruthy();
+    expect(screen.getByText(/Come back tomorrow/));
   });
 
   it('renders library link when onBookPress provided and fires it', () => {
@@ -182,7 +182,7 @@ describe('retention status passthrough', () => {
     'passes %s through to RetentionSignal',
     (status) => {
       render(<RemediationCard {...defaultProps} retentionStatus={status} />);
-      expect(screen.getByTestId(`retention-signal-${status}`)).toBeTruthy();
+      expect(screen.getByTestId(`retention-signal-${status}`));
     },
   );
 });

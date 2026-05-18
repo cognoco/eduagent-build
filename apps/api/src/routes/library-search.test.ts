@@ -16,7 +16,10 @@ import { createDatabaseModuleMock } from '../test-utils/database-module';
 
 const mockDatabaseModule = createDatabaseModuleMock();
 
-jest.mock('@eduagent/database', () => mockDatabaseModule.module);
+jest.mock(
+  '@eduagent/database' /* gc1-allow: route unit test — DB middleware injected via mock; real DB covered by route integration / e2e tests */,
+  () => mockDatabaseModule.module,
+);
 
 // ---------------------------------------------------------------------------
 // Mock account + profile services (required by auth middleware)

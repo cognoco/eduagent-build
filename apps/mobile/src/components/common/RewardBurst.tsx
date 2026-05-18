@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import Animated, {
+  cancelAnimation,
   Easing,
   useAnimatedStyle,
   useReducedMotion,
@@ -10,6 +11,7 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
+import { useThemeColors } from '../../lib/theme';
 import { BrandCelebration } from './BrandCelebration';
 
 export type RewardBurstVariant =
@@ -151,6 +153,7 @@ export function RewardBurst({
 }: RewardBurstProps) {
   const { width, height } = useWindowDimensions();
   const reduceMotion = useReducedMotion();
+  const colors = useThemeColors();
   const config = VARIANT_CONFIG[variant];
   const progress = useSharedValue(reduceMotion ? 1 : 0);
   const badgeScale = useSharedValue(reduceMotion ? 1 : 0.7);
@@ -196,7 +199,12 @@ export function RewardBurst({
       onCompleteRef.current?.();
     }, DURATIONS[intensity] + 120);
 
-    return () => clearTimeout(doneTimer);
+    return () => {
+      clearTimeout(doneTimer);
+      cancelAnimation(progress);
+      cancelAnimation(badgeScale);
+      cancelAnimation(badgeOpacity);
+    };
   }, [badgeOpacity, badgeScale, intensity, progress, reduceMotion]);
 
   const badgeStyle = useAnimatedStyle(() => ({
@@ -225,6 +233,7 @@ export function RewardBurst({
           badgeStyle,
           {
             backgroundColor: config.colors[0],
+            shadowColor: colors.textPrimary,
             top:
               intensity === 'hero'
                 ? height * 0.2
@@ -237,7 +246,9 @@ export function RewardBurst({
         {intensity === 'hero' ? (
           <BrandCelebration size={80} testID={`${testID ?? 'reward'}-brand`} />
         ) : null}
-        <Text style={styles.badgeText}>{message ?? config.label}</Text>
+        <Text style={[styles.badgeText, { color: colors.textInverse }]}>
+          {message ?? config.label}
+        </Text>
       </Animated.View>
     </View>
   );
@@ -300,13 +311,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 10,
     position: 'absolute',
-    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.16,
     shadowRadius: 18,
   },
   badgeText: {
-    color: '#ffffff',
     fontSize: 18,
     fontWeight: '800',
     textAlign: 'center',

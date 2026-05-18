@@ -30,7 +30,7 @@ import type { AuthUser } from '../middleware/auth';
 import { idempotencyPreflight } from '../middleware/idempotency';
 import { requireProfileId } from '../middleware/profile-scope';
 import { assertNotProxyMode } from '../middleware/proxy-guard';
-import { streamSSEUtf8 } from '../services/streaming/sse-utf8';
+import { streamSSEUtf8 } from '../route-utils/sse-utf8';
 import { addBreadcrumb, captureException } from '../services/sentry';
 import { createLogger } from '../services/logger';
 import {
@@ -70,7 +70,10 @@ import {
 } from '../services/interleaved';
 import { generateRecallBridge } from '../services/recall-bridge';
 import { getProfileAgeBracket } from '../services/profile';
-import { markPersisted } from '../services/idempotency-marker';
+import {
+  markPersisted,
+  MAX_IDEMPOTENCY_KEY_LENGTH,
+} from '../services/idempotency-marker';
 import { CircuitOpenError } from '../services/llm';
 import {
   isTopicIntentMatcherEnabled,
@@ -80,12 +83,16 @@ import {
 
 const logger = createLogger();
 
+// [BUG-98 / A1-MED] Stack traces are no longer included in the fields that
+// flow into structured logs (Logpush → Grafana/Datadog). Sentry captures the
+// error object directly so the stack is preserved in Sentry's frame view —
+// we just don't echo it through logger.error any more, which prevents stack
+// leakage through downstream log processors.
 function getErrorDebugFields(err: unknown): {
   error: string;
   errorName: string;
   cause?: string;
   causeName?: string;
-  stack?: string;
   circuitKey?: string;
 } {
   const cause = err instanceof Error ? err.cause : undefined;
@@ -100,7 +107,6 @@ function getErrorDebugFields(err: unknown): {
     errorName: err instanceof Error ? err.name : typeof err,
     cause: cause instanceof Error ? cause.message : undefined,
     causeName: cause instanceof Error ? cause.name : undefined,
-    stack: err instanceof Error ? err.stack : undefined,
     circuitKey,
   };
 }
@@ -222,13 +228,20 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
   )
 
   // Get session state
-  .get('/sessions/:sessionId', async (c) => {
-    const db = c.get('db');
-    const profileId = requireProfileId(c.get('profileId'));
-    const session = await getSession(db, profileId, c.req.param('sessionId'));
-    if (!session) return notFound(c, 'Session not found');
-    return c.json({ session });
-  })
+  // [BUG-95 / A1-HIGH] zValidator('param', sessionIdParamsSchema) added per
+  // the self-documented BUG-CONT-DEPTH-SWEEP follow-up. Malformed sessionIds
+  // are rejected with 400 before any DB call.
+  .get(
+    '/sessions/:sessionId',
+    zValidator('param', sessionIdParamsSchema),
+    async (c) => {
+      const db = c.get('db');
+      const profileId = requireProfileId(c.get('profileId'));
+      const session = await getSession(db, profileId, c.req.param('sessionId'));
+      if (!session) return notFound(c, 'Session not found');
+      return c.json({ session });
+    },
+  )
 
   .patch(
     '/sessions/:sessionId/clear-continuation-depth',
@@ -296,13 +309,23 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
   // Send a message (the core learning exchange)
   .post(
     '/sessions/:sessionId/messages',
+    zValidator('param', sessionIdParamsSchema),
     zValidator('json', sessionMessageSchema),
     async (c) => {
       const db = c.get('db');
       const profileId = requireProfileId(c.get('profileId'));
       const subscriptionId = c.get('subscriptionId');
       const sessionId = c.req.param('sessionId');
-      const clientId = c.req.header('Idempotency-Key')?.trim() || undefined;
+      // [BUG-100 / A1-LOW] Defensive length check in addition to the middleware
+      // bound. Idempotency middleware already rejects keys > MAX length, but
+      // this handler can also be reached via paths that bypass that
+      // middleware; duplicating the cap keeps the value used as a cache key
+      // from ever exceeding the documented contract.
+      const rawClientId = c.req.header('Idempotency-Key')?.trim();
+      const clientId =
+        rawClientId && rawClientId.length <= MAX_IDEMPOTENCY_KEY_LENGTH
+          ? rawClientId
+          : undefined;
 
       const llmTier = c.get('llmTier');
       const subscriptionTier = c.get('subscriptionTier');
@@ -360,84 +383,93 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
     },
   )
 
-  .get('/sessions/:sessionId/transcript', async (c) => {
-    const db = c.get('db');
-    const profileId = requireProfileId(c.get('profileId'));
-    const transcript = await getSessionTranscript(
-      db,
-      profileId,
-      c.req.param('sessionId'),
-    );
-    if (!transcript) return notFound(c, 'Session not found');
-    return c.json(transcript);
-  })
-
-  .post('/sessions/:sessionId/evaluate-depth', async (c) => {
-    const db = c.get('db');
-    const profileId = requireProfileId(c.get('profileId'));
-    const sessionId = c.req.param('sessionId');
-    const transcript = await getSessionTranscript(db, profileId, sessionId);
-    if (!transcript) return notFound(c, 'Session not found');
-    if (transcript.archived) {
-      return apiError(
-        c,
-        410,
-        ERROR_CODES.SESSION_ARCHIVED,
-        'Session transcript has been archived',
+  .get(
+    '/sessions/:sessionId/transcript',
+    zValidator('param', sessionIdParamsSchema),
+    async (c) => {
+      const db = c.get('db');
+      const profileId = requireProfileId(c.get('profileId'));
+      const transcript = await getSessionTranscript(
+        db,
+        profileId,
+        c.req.param('sessionId'),
       );
-    }
+      if (!transcript) return notFound(c, 'Session not found');
+      return c.json(transcript);
+    },
+  )
 
-    const ageBracket = await getProfileAgeBracket(db, profileId);
-    const result = await evaluateSessionDepth(transcript, { ageBracket });
-    const learnerWordCount = transcript.exchanges.reduce((sum, exchange) => {
-      if (exchange.role !== 'user') return sum;
-      return sum + exchange.content.split(/\s+/).filter(Boolean).length;
-    }, 0);
+  .post(
+    '/sessions/:sessionId/evaluate-depth',
+    zValidator('param', sessionIdParamsSchema),
+    async (c) => {
+      const db = c.get('db');
+      const profileId = requireProfileId(c.get('profileId'));
+      const sessionId = c.req.param('sessionId');
+      const transcript = await getSessionTranscript(db, profileId, sessionId);
+      if (!transcript) return notFound(c, 'Session not found');
+      if (transcript.archived) {
+        return apiError(
+          c,
+          410,
+          ERROR_CODES.SESSION_ARCHIVED,
+          'Session transcript has been archived',
+        );
+      }
 
-    // [A-1] [BUG-653] Observability events — consumed by ask-gate-observe.ts.
-    // safeSend isolates the dispatch: the depth result is already in hand and is
-    // what the client asked for; a dispatch hiccup must not fail the request.
-    // Both events are independent calls so a failure on the first does not
-    // suppress the second.
-    await safeSend(
-      () =>
-        inngest.send({
-          name: 'app/ask.gate_decision',
-          data: {
-            sessionId,
-            meaningful: result.meaningful,
-            reason: result.reason,
-            method: result.method,
-            exchangeCount: transcript.session.exchangeCount,
-            learnerWordCount,
-            topicCount: result.topics.length,
-          },
-        }),
-      'ask.gate_decision',
-      { sessionId, profileId, method: result.method },
-    );
+      const ageBracket = await getProfileAgeBracket(db, profileId);
+      const result = await evaluateSessionDepth(transcript, { ageBracket });
+      const learnerWordCount = transcript.exchanges.reduce((sum, exchange) => {
+        if (exchange.role !== 'user') return sum;
+        return sum + exchange.content.split(/\s+/).filter(Boolean).length;
+      }, 0);
 
-    if (result.method === 'fail_open') {
+      // [A-1] [BUG-653] Observability events — consumed by ask-gate-observe.ts.
+      // safeSend isolates the dispatch: the depth result is already in hand and is
+      // what the client asked for; a dispatch hiccup must not fail the request.
+      // Both events are independent calls so a failure on the first does not
+      // suppress the second.
       await safeSend(
         () =>
           inngest.send({
-            name: 'app/ask.gate_timeout',
+            name: 'app/ask.gate_decision',
             data: {
               sessionId,
+              meaningful: result.meaningful,
+              reason: result.reason,
+              method: result.method,
               exchangeCount: transcript.session.exchangeCount,
+              learnerWordCount,
+              topicCount: result.topics.length,
             },
           }),
-        'ask.gate_timeout',
-        { sessionId, profileId },
+        'ask.gate_decision',
+        { sessionId, profileId, method: result.method },
       );
-    }
 
-    return c.json(result);
-  })
+      if (result.method === 'fail_open') {
+        await safeSend(
+          () =>
+            inngest.send({
+              name: 'app/ask.gate_timeout',
+              data: {
+                sessionId,
+                exchangeCount: transcript.session.exchangeCount,
+              },
+            }),
+          'ask.gate_timeout',
+          { sessionId, profileId },
+        );
+      }
+
+      return c.json(result);
+    },
+  )
 
   // Stream a message response via SSE
   .post(
     '/sessions/:sessionId/stream',
+    zValidator('param', sessionIdParamsSchema),
     zValidator('json', sessionMessageSchema),
     async (c) => {
       const db = c.get('db');
@@ -445,7 +477,14 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
       const subscriptionId = c.get('subscriptionId');
       const sessionId = c.req.param('sessionId');
       const input = c.req.valid('json');
-      const clientId = c.req.header('Idempotency-Key')?.trim() || undefined;
+      // [BUG-100 / A1-LOW] Belt-and-suspenders length cap — see the matching
+      // comment on /messages above.
+      const rawStreamClientId = c.req.header('Idempotency-Key')?.trim();
+      const clientId =
+        rawStreamClientId &&
+        rawStreamClientId.length <= MAX_IDEMPOTENCY_KEY_LENGTH
+          ? rawStreamClientId
+          : undefined;
 
       const session = await getSession(db, profileId, sessionId);
       if (!session) return notFound(c, 'Session not found');
@@ -945,6 +984,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
   // Close a session
   .post(
     '/sessions/:sessionId/close',
+    zValidator('param', sessionIdParamsSchema),
     zValidator('json', sessionCloseSchema),
     async (c) => {
       const db = c.get('db');
@@ -1001,6 +1041,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
 
   .post(
     '/sessions/:sessionId/system-prompt',
+    zValidator('param', sessionIdParamsSchema),
     zValidator('json', systemPromptBodySchema),
     async (c) => {
       const db = c.get('db');
@@ -1020,6 +1061,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
 
   .post(
     '/sessions/:sessionId/events',
+    zValidator('param', sessionIdParamsSchema),
     zValidator('json', sessionAnalyticsEventSchema),
     async (c) => {
       const db = c.get('db');
@@ -1033,6 +1075,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
 
   .post(
     '/sessions/:sessionId/input-mode',
+    zValidator('param', sessionIdParamsSchema),
     zValidator('json', sessionInputModeSchema),
     async (c) => {
       const db = c.get('db');
@@ -1050,6 +1093,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
   // Sync homework problem metadata + analytics events
   .post(
     '/sessions/:sessionId/homework-state',
+    zValidator('param', sessionIdParamsSchema),
     zValidator('json', homeworkStateSyncSchema),
     async (c) => {
       const db = c.get('db');
@@ -1069,6 +1113,7 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
   // Flag content as incorrect
   .post(
     '/sessions/:sessionId/flag',
+    zValidator('param', sessionIdParamsSchema),
     zValidator('json', contentFlagSchema),
     async (c) => {
       const db = c.get('db');

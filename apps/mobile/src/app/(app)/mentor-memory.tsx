@@ -323,6 +323,28 @@ export default function MentorMemoryScreen() {
         </View>
       </View>
 
+      {/*
+        [BUG-NOTION-256] Virtualization decision: this screen has six
+        sequential .map() calls (learning style, interests, strengths,
+        struggles, communication notes, suppressed inferences) interleaved
+        with non-list content (consent prompt, accommodation badge,
+        TellMentorInput, privacy actions). Each individual section is
+        bounded small in production usage — interests/strengths are gated
+        to ~8 entries each by the inference pipeline and the others are
+        capped lower — so total per-section item counts stay under ~10.
+
+        Nesting FlatList inside a ScrollView (or stacking six FlatLists)
+        defeats virtualization (infinite height inside ScrollView) and
+        breaks scrolling. Section-level virtualization via a single
+        outer SectionList would force a non-trivial rewrite of the
+        heterogeneous header/footer content; the cost outweighs the
+        marginal perf win at the current bounded item counts.
+
+        If interests/strengths begin to grow unbounded in production,
+        revisit by lifting the whole screen into a SectionList with the
+        consent/accommodation content as ListHeaderComponent and the
+        privacy actions as ListFooterComponent.
+      */}
       <ScrollView
         className="flex-1 px-5"
         contentContainerStyle={{ paddingBottom: 24 }}

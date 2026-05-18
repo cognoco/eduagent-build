@@ -6,6 +6,7 @@
 // ---------------------------------------------------------------------------
 
 import { eq } from 'drizzle-orm';
+import { z } from 'zod';
 import {
   subscriptions,
   quotaPools,
@@ -18,6 +19,8 @@ import type { SubscriptionTier, SubscriptionStatus } from '@eduagent/schemas';
 import { getTierConfig, isValidTransition } from '../subscription';
 import { captureException } from '../sentry';
 import { createLogger } from '../logger';
+import { safeSend } from '../safe-non-core';
+import { inngest } from '../../inngest/client';
 import {
   mapSubscriptionRow,
   mapQuotaPoolRow,
@@ -29,6 +32,28 @@ import {
 const logger = createLogger();
 
 // ---------------------------------------------------------------------------
+// [BUG-120] Zod input contract for activateSubscriptionFromCheckout
+// Stripe webhook payloads are external input — validate that accountId is
+// non-empty, stripeSubscriptionId starts with the expected `sub_` prefix,
+// tier is a known paid tier, and eventTimestamp is parseable. Without this,
+// a malformed webhook (e.g. tier='' from a metadata typo) reaches the DB
+// layer and either throws an opaque enum error or silently inserts a bad
+// row.
+// ---------------------------------------------------------------------------
+
+const activateCheckoutInputSchema = z.object({
+  accountId: z.string().min(1, 'accountId required'),
+  stripeSubscriptionId: z
+    .string()
+    .min(1, 'stripeSubscriptionId required')
+    .startsWith('sub_', 'stripeSubscriptionId must start with sub_'),
+  tier: z.enum(['plus', 'family', 'pro']),
+  eventTimestamp: z.string().refine((s) => !Number.isNaN(Date.parse(s)), {
+    message: 'eventTimestamp must be ISO-8601 / parseable by Date',
+  }),
+});
+
+// ---------------------------------------------------------------------------
 // getSubscriptionByAccountId
 // ---------------------------------------------------------------------------
 
@@ -38,7 +63,7 @@ const logger = createLogger();
  */
 export async function getSubscriptionByAccountId(
   db: Database,
-  accountId: string
+  accountId: string,
 ): Promise<SubscriptionRow | null> {
   const repo = createAccountRepository(db, accountId);
   const row = await repo.subscriptions.findFirst();
@@ -63,7 +88,7 @@ export async function createSubscription(
     stripeSubscriptionId?: string;
     trialEndsAt?: string;
     status?: SubscriptionStatus;
-  }
+  },
 ): Promise<SubscriptionRow> {
   const [subRow] = await db
     .insert(subscriptions)
@@ -109,7 +134,7 @@ export async function createSubscription(
 export async function updateSubscriptionFromWebhook(
   db: Database,
   stripeSubscriptionId: string,
-  updates: WebhookSubscriptionUpdate
+  updates: WebhookSubscriptionUpdate,
 ): Promise<SubscriptionRow | null> {
   // Load current row (BD-10: via standalone helper — keyed by Stripe ID, not accountId)
   const existing = await findSubscriptionByStripeId(db, stripeSubscriptionId);
@@ -148,7 +173,7 @@ export async function updateSubscriptionFromWebhook(
       });
       captureException(
         new Error(
-          `Invalid Stripe subscription transition: ${existing.status} -> ${updates.status}`
+          `Invalid Stripe subscription transition: ${existing.status} -> ${updates.status}`,
         ),
         {
           extra: {
@@ -156,7 +181,7 @@ export async function updateSubscriptionFromWebhook(
             fromStatus: existing.status,
             toStatus: updates.status,
           },
-        }
+        },
       );
       return mapSubscriptionRow(existing);
     }
@@ -195,7 +220,7 @@ export async function updateSubscriptionFromWebhook(
 export async function linkStripeCustomer(
   db: Database,
   accountId: string,
-  stripeCustomerId: string
+  stripeCustomerId: string,
 ): Promise<SubscriptionRow | null> {
   const repo = createAccountRepository(db, accountId);
   const existing = await repo.subscriptions.findFirst();
@@ -227,7 +252,7 @@ export async function linkStripeCustomer(
  */
 export async function getQuotaPool(
   db: Database,
-  subscriptionId: string
+  subscriptionId: string,
 ): Promise<QuotaPoolRow | null> {
   const row = await findQuotaPool(db, subscriptionId);
   return row ? mapQuotaPoolRow(row) : null;
@@ -244,7 +269,7 @@ export async function getQuotaPool(
 export async function resetMonthlyQuota(
   db: Database,
   subscriptionId: string,
-  newLimit: number
+  newLimit: number,
 ): Promise<QuotaPoolRow | null> {
   const existing = await findQuotaPool(db, subscriptionId);
 
@@ -283,16 +308,82 @@ const FREE_TIER_LIMIT = getTierConfig('free').monthlyQuota;
  * Ensures an account has a subscription row for metering.
  * If no subscription exists, auto-provisions a free-tier subscription + quota pool.
  * This prevents free-tier users from bypassing metering entirely.
+ *
+ * [BUG-116] Race-safe: two concurrent first-webhook calls (e.g. RevenueCat
+ * delivering INITIAL_PURCHASE and a parallel metering middleware request)
+ * both saw `no subscription`, both attempted INSERT, the second crashed
+ * against the UNIQUE(account_id) constraint. We now use ON CONFLICT DO
+ * NOTHING on the insert and fall back to a re-read so the loser of the race
+ * sees the row inserted by the winner. The quota-pool insert is best-effort
+ * — if the unique(subscription_id) constraint trips, the other writer
+ * already created it, so we no-op.
  */
 export async function ensureFreeSubscription(
   db: Database,
-  accountId: string
+  accountId: string,
 ): Promise<SubscriptionRow> {
   const existing = await getSubscriptionByAccountId(db, accountId);
   if (existing) return existing;
-  return createSubscription(db, accountId, 'free', FREE_TIER_LIMIT, {
-    status: 'active',
-  });
+
+  // Attempt the insert with ON CONFLICT DO NOTHING. If we win the race, we
+  // get the inserted row back. If another writer beat us, returning() yields
+  // an empty array and we re-read.
+  const now = new Date();
+  const cycleResetAt = new Date(now);
+  cycleResetAt.setMonth(cycleResetAt.getMonth() + 1);
+  const tierConfig = getTierConfig('free');
+
+  const [inserted] = await db
+    .insert(subscriptions)
+    .values({
+      accountId,
+      tier: 'free',
+      status: 'active',
+      stripeCustomerId: null,
+      stripeSubscriptionId: null,
+      trialEndsAt: null,
+    })
+    .onConflictDoNothing({ target: subscriptions.accountId })
+    .returning();
+
+  if (inserted) {
+    // We won the race — also create the quota pool. Same race-safe insert.
+    await db
+      .insert(quotaPools)
+      .values({
+        subscriptionId: inserted.id,
+        monthlyLimit: FREE_TIER_LIMIT,
+        usedThisMonth: 0,
+        dailyLimit: tierConfig.dailyLimit,
+        usedToday: 0,
+        cycleResetAt,
+      })
+      .onConflictDoNothing({ target: quotaPools.subscriptionId });
+    return mapSubscriptionRow(inserted);
+  }
+
+  // Lost the race — the other writer's row should now be visible. Re-read.
+  const winner = await getSubscriptionByAccountId(db, accountId);
+  if (winner) return winner;
+
+  // Extremely unlikely fallthrough: ON CONFLICT fired but the re-read still
+  // returns null (would indicate the row was deleted between the two reads,
+  // or a partition-level isolation issue). Escalate so we know, and surface
+  // a hard error rather than continuing in an inconsistent state.
+  captureException(
+    new Error(
+      'ensureFreeSubscription: ON CONFLICT fired but re-read returned null',
+    ),
+    {
+      extra: {
+        context: 'billing.ensure_free_subscription.race_fallthrough',
+        accountId,
+      },
+    },
+  );
+  throw new Error(
+    'ensureFreeSubscription: failed to insert and failed to re-read existing',
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -306,7 +397,7 @@ export async function ensureFreeSubscription(
  */
 export async function markSubscriptionCancelled(
   db: Database,
-  subscriptionId: string
+  subscriptionId: string,
 ): Promise<void> {
   await db
     .update(subscriptions)
@@ -329,7 +420,7 @@ export async function updateQuotaPoolLimit(
   db: Database,
   subscriptionId: string,
   newLimit: number,
-  dailyLimit: number | null
+  dailyLimit: number | null,
 ): Promise<void> {
   await db
     .update(quotaPools)
@@ -358,8 +449,37 @@ export async function activateSubscriptionFromCheckout(
   accountId: string,
   stripeSubscriptionId: string,
   tier: 'plus' | 'family' | 'pro',
-  eventTimestamp: string
+  eventTimestamp: string,
 ): Promise<SubscriptionRow | null> {
+  // [BUG-120] Validate input — webhook metadata is externally controlled. A
+  // malformed accountId/tier/sub-id/timestamp must be rejected with an Error
+  // the webhook handler can escalate to Sentry, not silently coerced.
+  const parsed = activateCheckoutInputSchema.safeParse({
+    accountId,
+    stripeSubscriptionId,
+    tier,
+    eventTimestamp,
+  });
+  if (!parsed.success) {
+    const flat = parsed.error.flatten();
+    logger.error('[billing] activateSubscriptionFromCheckout invalid input', {
+      event: 'billing.activate_checkout.invalid_input',
+      issues: flat,
+    });
+    captureException(
+      new Error('activateSubscriptionFromCheckout: invalid input'),
+      {
+        extra: {
+          context: 'billing.activate_checkout.invalid_input',
+          issues: flat,
+        },
+      },
+    );
+    throw new Error(
+      `activateSubscriptionFromCheckout: invalid input — ${JSON.stringify(flat)}`,
+    );
+  }
+
   const existing = await getSubscriptionByAccountId(db, accountId);
 
   if (!existing) {
@@ -370,8 +490,64 @@ export async function activateSubscriptionFromCheckout(
     });
   }
 
-  // Already linked — idempotent return (same or different Stripe sub ID)
+  // [BUG-111] When the account already has a linked Stripe subscription we
+  // return the existing row idempotently — but if the incoming Stripe sub ID
+  // DIFFERS, the new activation is silently dropped. That can happen when:
+  //   (a) Stripe replays an old completed checkout after the user upgraded.
+  //   (b) A new checkout completes for a different product before the prior
+  //       sub was cancelled.
+  // Either way, dropping silently means the new paid subscription is never
+  // attached and the user's tier/limit can be stale. Capture the divergence
+  // so we can detect and triage it instead of finding out via support.
   if (existing.stripeSubscriptionId) {
+    if (existing.stripeSubscriptionId !== stripeSubscriptionId) {
+      logger.warn(
+        '[billing] checkout activation dropped — account already linked to different Stripe sub',
+        {
+          event: 'billing.activate_checkout.divergent_sub_dropped',
+          accountId,
+          existingStripeSubscriptionId: existing.stripeSubscriptionId,
+          incomingStripeSubscriptionId: stripeSubscriptionId,
+          existingTier: existing.tier,
+          incomingTier: tier,
+        },
+      );
+      captureException(
+        new Error(
+          'activateSubscriptionFromCheckout: account already linked to a different Stripe subscription',
+        ),
+        {
+          extra: {
+            context: 'billing.activate_checkout.divergent_sub_dropped',
+            accountId,
+            existingStripeSubscriptionId: existing.stripeSubscriptionId,
+            incomingStripeSubscriptionId: stripeSubscriptionId,
+            existingTier: existing.tier,
+            incomingTier: tier,
+          },
+        },
+      );
+      // Non-core observability dispatch — must never throw, must always
+      // surface failures (CLAUDE.md "Silent recovery without escalation is
+      // banned"). Sentry alone is not queryable as a time-series metric.
+      await safeSend(
+        () =>
+          inngest.send({
+            name: 'app/billing.activate_checkout.divergent_sub_dropped',
+            data: {
+              accountId,
+              existingStripeSubscriptionId: existing.stripeSubscriptionId,
+              incomingStripeSubscriptionId: stripeSubscriptionId,
+              existingTier: existing.tier,
+              incomingTier: tier,
+              timestamp: new Date().toISOString(),
+            },
+          }),
+        'billing.activate_checkout.divergent_sub_dropped',
+        { accountId },
+      );
+    }
+    // Same Stripe sub ID → genuine idempotent retry, OK to no-op silently.
     return existing;
   }
 
@@ -394,7 +570,7 @@ export async function activateSubscriptionFromCheckout(
     db,
     existing.id,
     tierConfig.monthlyQuota,
-    tierConfig.dailyLimit
+    tierConfig.dailyLimit,
   );
 
   if (!updated)

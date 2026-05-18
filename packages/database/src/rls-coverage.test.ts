@@ -28,6 +28,18 @@ const RLS_EXCEPTIONS: Record<string, string> = {
   // accounts is keyed by clerk_user_id, not profile_id.
   // The profile_id column in the grep match is actually the profiles table
   // referencing accounts, not accounts having a profile_id.
+
+  // topic_connections has NO profile_id column and no RLS policy.
+  // Scanned as profile-scoped because the BUG-226 comment block (describing
+  // the deferred RLS migration) sits inside its pgTable scan window.
+  // Ownership is enforced TRANSITIVELY: topic_a_id / topic_b_id →
+  //   curriculum_topics → curriculum_books → subjects → subjects.profile_id.
+  // Every reader must resolve topicIds through a profile-scoped curriculum
+  // read before querying topic_connections. Path forward: add profile_id
+  // column + backfill + RLS policy (tracked as BUG-226, P3, deferred).
+  topic_connections:
+    'BUG-226 (P3): transitive ownership via topics→books→subjects; ' +
+    'dedicated migration required for direct profile_id + RLS',
 };
 
 function getProfileScopedTables(): string[] {

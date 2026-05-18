@@ -104,6 +104,25 @@ const validEventData = {
   sessionId: 'session-1',
 };
 
+describe('post-session-suggestions [BUG-157] function-level guards', () => {
+  // Duplicate `app/filing.completed` events for the same book would burn
+  // an extra LLM call before the in-step count>=2 dedup fires; idempotency
+  // at the function level short-circuits the second run before any LLM
+  // tokens are burned.
+  it('declares idempotency on event.data.bookId', () => {
+    const opts = (postSessionSuggestions as any).opts;
+    expect(opts.idempotency).toBe('event.data.bookId');
+  });
+
+  it('declares concurrency keyed on event.data.profileId', () => {
+    const opts = (postSessionSuggestions as any).opts;
+    expect(opts.concurrency).toEqual({
+      limit: 5,
+      key: 'event.data.profileId',
+    });
+  });
+});
+
 describe('post-session-suggestions [BUG-639 / J-3]', () => {
   it('returns skipped:invalid_json when LLM emits malformed JSON (no throw, no retry)', async () => {
     mockRouteAndCall.mockResolvedValue({

@@ -148,7 +148,10 @@ describe('TextPreviewScreen', () => {
     });
 
     // goBackOrReplace was called by the back button
-    expect(mockGoBackOrReplace).toHaveBeenCalled();
+    expect(mockGoBackOrReplace).toHaveBeenCalledWith(
+      expect.anything(),
+      '/(app)/dictation',
+    );
     // push to playback must NOT have been called
     expect(mockPush).not.toHaveBeenCalled();
   });

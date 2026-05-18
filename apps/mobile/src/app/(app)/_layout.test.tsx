@@ -560,9 +560,9 @@ describe('AppLayout', () => {
     renderLayout();
 
     await waitFor(() => {
-      expect(screen.getByTestId('post-approval-landing')).toBeTruthy();
+      expect(screen.getByTestId('post-approval-landing'));
     });
-    expect(screen.getByTestId('post-approval-continue')).toBeTruthy();
+    expect(screen.getByTestId('post-approval-continue'));
   });
 
   it('does not show post-approval landing when user already has subjects (BUG-544)', () => {
@@ -712,7 +712,7 @@ describe('AppLayout', () => {
     renderLayout();
 
     screen.getByTestId('consent-pending-gate');
-    expect(screen.getByText('Checking automatically…')).toBeTruthy();
+    expect(screen.getByText('Checking automatically…'));
   });
 
   // Permission setup gate is JIT-disabled — permissions are requested at

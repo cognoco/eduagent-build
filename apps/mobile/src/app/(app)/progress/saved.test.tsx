@@ -1,0 +1,461 @@
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react-native';
+
+import SavedBookmarksScreen from './saved';
+
+// ── Translation stub ─────────────────────────────────────────────────────────
+
+jest.mock('react-i18next', () => ({
+  initReactI18next: { type: '3rdParty', init: jest.fn() },
+  useTranslation: () => ({
+    t: (key: string, opts?: Record<string, unknown>) => {
+      const map: Record<string, string> = {
+        'progress.saved.pageTitle': 'Saved',
+        'progress.saved.subjectPageTitle': 'Saved for this subject',
+        'progress.saved.subjectSubtitle': 'Bookmarks for this subject',
+        'progress.saved.dateToday': 'Today',
+        'progress.saved.dateYesterday': 'Yesterday',
+        'progress.saved.dateDaysAgo': `${String(opts?.count ?? '')} days ago`,
+        'progress.saved.dateWeeksAgo': `${String(opts?.count ?? '')} weeks ago`,
+        'progress.saved.bookmarkLabel': `Bookmark from ${String(opts?.subject ?? '')}`,
+        'progress.saved.removeBookmark': 'Remove bookmark',
+        'progress.saved.tapToExpand': 'Tap to expand',
+        'progress.saved.deleteTitle': 'Delete bookmark?',
+        'progress.saved.deleteMessage':
+          'This will remove the bookmark permanently.',
+        'progress.saved.deleteConfirm': 'Delete',
+        'progress.saved.deleteErrorTitle': 'Could not delete bookmark',
+        'progress.saved.errorLoad': "We couldn't load your saved items",
+        'progress.saved.errorNetwork': 'Check your connection and try again.',
+        'progress.saved.retryLabel': 'Retry',
+        'progress.saved.emptyTitle': 'Nothing saved yet',
+        'progress.saved.emptySubtitle':
+          'Bookmark passages during sessions and they will appear here.',
+        'progress.saved.goToLibrary': 'Go to library',
+        'common.cancel': 'Cancel',
+        'common.tryAgain': 'Try Again',
+        'common.goBack': 'Go back',
+      };
+      if (key in map) return map[key]!;
+      return key;
+    },
+  }),
+}));
+
+// ── Expo Router ──────────────────────────────────────────────────────────────
+
+const mockReplace = jest.fn();
+const mockPush = jest.fn();
+const mockGoBackOrReplace = jest.fn();
+const mockLocalSearchParams = jest.fn(() => ({}));
+
+jest.mock('expo-router', () => ({
+  useLocalSearchParams: () => mockLocalSearchParams(),
+  useRouter: () => ({
+    back: jest.fn(),
+    replace: mockReplace,
+    push: mockPush,
+  }),
+}));
+
+// ── External native/UI module boundaries (gc1-allow) ────────────────────────
+
+jest.mock(
+  '../../../lib/navigation' /* gc1-allow: unit test boundary; real impl requires expo-router Router */,
+  () => ({
+    goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
+  }),
+);
+
+const mockPlatformAlert = jest.fn();
+jest.mock(
+  '../../../lib/platform-alert' /* gc1-allow: Alert.alert is native; stub captures calls for assertion */,
+  () => ({
+    platformAlert: (...args: unknown[]) => mockPlatformAlert(...args),
+  }),
+);
+
+// Ionicons uses native font loading — stub it out
+jest.mock('@expo/vector-icons', () => ({
+  Ionicons: () => null,
+}));
+
+// react-native-markdown-display pulls in native text rendering
+jest.mock(
+  'react-native-markdown-display' /* gc1-allow: third-party native renderer */,
+  () => {
+    const { Text } = require('react-native');
+    return ({ children }: { children: string }) => <Text>{children}</Text>;
+  },
+);
+
+// ── Hooks under test ─────────────────────────────────────────────────────────
+
+const mockUseBookmarks = jest.fn();
+const mockDeleteBookmarkMutateAsync = jest.fn();
+const mockUseDeleteBookmark = jest.fn();
+
+jest.mock(
+  '../../../hooks/use-bookmarks' /* gc1-allow: hook needs QueryClientProvider + API client; unit-test boundary */,
+  () => ({
+    useBookmarks: (...args: unknown[]) => mockUseBookmarks(...args),
+    useDeleteBookmark: (...args: unknown[]) => mockUseDeleteBookmark(...args),
+  }),
+);
+
+const mockUseParentProxy = jest.fn();
+jest.mock(
+  '../../../hooks/use-parent-proxy' /* gc1-allow: hook reads SecureStore (native) + profile context; stub pins proxy state for deterministic tests */,
+  () => ({
+    useParentProxy: () => mockUseParentProxy(),
+  }),
+);
+
+// ── Fixtures ─────────────────────────────────────────────────────────────────
+
+const BOOKMARK_1 = {
+  id: 'bk-1',
+  subjectName: 'Spanish',
+  topicTitle: 'Greetings',
+  content: 'Hola means hello.',
+  createdAt: new Date().toISOString(), // today
+};
+
+const BOOKMARK_2 = {
+  id: 'bk-2',
+  subjectName: 'Math',
+  topicTitle: null as string | null,
+  content: 'Pythagorean theorem: a² + b² = c²',
+  createdAt: new Date().toISOString(),
+};
+
+// ── Helper ────────────────────────────────────────────────────────────────────
+
+type BookmarkFixture = {
+  id: string;
+  subjectName: string;
+  topicTitle: string | null;
+  content: string;
+  createdAt: string;
+};
+
+function mockHooks({
+  bookmarks = [] as BookmarkFixture[],
+  isLoading = false,
+  isError = false,
+  hasNextPage = false,
+  isFetchingNextPage = false,
+  fetchNextPage = jest.fn(),
+  refetch = jest.fn(),
+  isParentProxy = false,
+} = {}) {
+  mockUseBookmarks.mockReturnValue({
+    data: isLoading || isError ? undefined : { pages: [{ bookmarks }] },
+    isLoading,
+    isError,
+    error: isError ? new Error('Network failure') : null,
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
+    refetch,
+  });
+
+  mockUseDeleteBookmark.mockReturnValue({
+    mutateAsync: mockDeleteBookmarkMutateAsync,
+  });
+
+  mockUseParentProxy.mockReturnValue({ isParentProxy });
+}
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
+describe('SavedBookmarksScreen', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockLocalSearchParams.mockReturnValue({});
+    mockDeleteBookmarkMutateAsync.mockResolvedValue(undefined);
+  });
+
+  // ── Loading state ──────────────────────────────────────────────────────────
+
+  describe('loading state', () => {
+    it('shows the loading spinner when bookmarks are loading', () => {
+      mockHooks({ isLoading: true });
+      render(<SavedBookmarksScreen />);
+      screen.getByTestId('saved-loading');
+    });
+
+    it('shows the page title while loading', () => {
+      mockHooks({ isLoading: true });
+      render(<SavedBookmarksScreen />);
+      screen.getByText('Saved');
+    });
+
+    it('does not render bookmark rows while loading', () => {
+      mockHooks({ isLoading: true });
+      render(<SavedBookmarksScreen />);
+      expect(screen.queryByTestId('bookmark-row-bk-1')).toBeNull();
+    });
+  });
+
+  // ── Empty state ────────────────────────────────────────────────────────────
+
+  describe('empty state', () => {
+    it('shows the empty title when there are no bookmarks', () => {
+      mockHooks({ bookmarks: [] });
+      render(<SavedBookmarksScreen />);
+      screen.getByText('Nothing saved yet');
+    });
+
+    it('shows the empty subtitle', () => {
+      mockHooks({ bookmarks: [] });
+      render(<SavedBookmarksScreen />);
+      screen.getByText(
+        'Bookmark passages during sessions and they will appear here.',
+      );
+    });
+
+    it('shows the "Go to library" CTA with correct testID', () => {
+      mockHooks({ bookmarks: [] });
+      render(<SavedBookmarksScreen />);
+      screen.getByTestId('saved-empty-library-cta');
+    });
+
+    it('navigates to library when "Go to library" is pressed', () => {
+      mockHooks({ bookmarks: [] });
+      render(<SavedBookmarksScreen />);
+      fireEvent.press(screen.getByTestId('saved-empty-library-cta'));
+      expect(mockGoBackOrReplace).toHaveBeenCalledWith(
+        expect.anything(),
+        '/(app)/library',
+      );
+    });
+  });
+
+  // ── Error state ────────────────────────────────────────────────────────────
+
+  describe('error state', () => {
+    it('shows the error container when the query fails', () => {
+      mockHooks({ isError: true });
+      render(<SavedBookmarksScreen />);
+      screen.getByTestId('saved-error');
+    });
+
+    it('shows the error load text', () => {
+      mockHooks({ isError: true });
+      render(<SavedBookmarksScreen />);
+      screen.getByText("We couldn't load your saved items");
+    });
+
+    it('shows the network error message from the thrown error', () => {
+      mockHooks({ isError: true });
+      render(<SavedBookmarksScreen />);
+      screen.getByText('Network failure');
+    });
+
+    it('shows retry button with correct testID', () => {
+      mockHooks({ isError: true });
+      render(<SavedBookmarksScreen />);
+      screen.getByTestId('saved-retry');
+    });
+
+    it('calls refetch when retry is pressed', () => {
+      const refetch = jest.fn();
+      mockHooks({ isError: true, refetch });
+      render(<SavedBookmarksScreen />);
+      fireEvent.press(screen.getByTestId('saved-retry'));
+      expect(refetch).toHaveBeenCalled();
+    });
+
+    it('shows back button in error state and navigates to progress on press', () => {
+      mockHooks({ isError: true });
+      render(<SavedBookmarksScreen />);
+      const back = screen.getByTestId('saved-error-back');
+      fireEvent.press(back);
+      expect(mockGoBackOrReplace).toHaveBeenCalledWith(
+        expect.anything(),
+        '/(app)/progress',
+      );
+    });
+  });
+
+  // ── Success / happy path ───────────────────────────────────────────────────
+
+  describe('success — bookmark list', () => {
+    it('renders one row per bookmark', () => {
+      mockHooks({ bookmarks: [BOOKMARK_1, BOOKMARK_2] });
+      render(<SavedBookmarksScreen />);
+      screen.getByTestId('bookmark-row-bk-1');
+      screen.getByTestId('bookmark-row-bk-2');
+    });
+
+    it('renders subject name in the row', () => {
+      mockHooks({ bookmarks: [BOOKMARK_1] });
+      render(<SavedBookmarksScreen />);
+      screen.getByText(/Spanish/);
+    });
+
+    it('renders topic title alongside subject name when present', () => {
+      mockHooks({ bookmarks: [BOOKMARK_1] });
+      render(<SavedBookmarksScreen />);
+      // subject · topic format
+      screen.getByText(/Greetings/);
+    });
+
+    it('renders bookmark content as collapsed text (max 5 lines)', () => {
+      mockHooks({ bookmarks: [BOOKMARK_1] });
+      render(<SavedBookmarksScreen />);
+      screen.getByText('Hola means hello.');
+    });
+
+    it('shows page title "Saved" when no subjectId param', () => {
+      mockLocalSearchParams.mockReturnValue({});
+      mockHooks({ bookmarks: [BOOKMARK_1] });
+      render(<SavedBookmarksScreen />);
+      screen.getByText('Saved');
+    });
+
+    it('shows subject-scoped title when subjectId param is set', () => {
+      mockLocalSearchParams.mockReturnValue({ subjectId: 's1' });
+      mockHooks({ bookmarks: [BOOKMARK_1] });
+      render(<SavedBookmarksScreen />);
+      screen.getByText('Saved for this subject');
+      screen.getByText('Bookmarks for this subject');
+    });
+
+    it('the FlatList renders with the correct testID', () => {
+      mockHooks({ bookmarks: [BOOKMARK_1] });
+      render(<SavedBookmarksScreen />);
+      screen.getByTestId('saved-bookmarks-list');
+    });
+  });
+
+  // ── Navigation ─────────────────────────────────────────────────────────────
+
+  describe('navigation', () => {
+    it('back button calls goBackOrReplace to progress route', () => {
+      mockHooks({ bookmarks: [] });
+      render(<SavedBookmarksScreen />);
+      fireEvent.press(screen.getByTestId('saved-back'));
+      expect(mockGoBackOrReplace).toHaveBeenCalledWith(
+        expect.anything(),
+        '/(app)/progress',
+      );
+    });
+  });
+
+  // ── Delete bookmark ────────────────────────────────────────────────────────
+
+  describe('delete bookmark', () => {
+    it('shows delete button for owner (non-proxy) users', () => {
+      mockHooks({ bookmarks: [BOOKMARK_1], isParentProxy: false });
+      render(<SavedBookmarksScreen />);
+      screen.getByTestId('bookmark-delete-bk-1');
+    });
+
+    it('hides delete button for parent-proxy users', () => {
+      mockHooks({ bookmarks: [BOOKMARK_1], isParentProxy: true });
+      render(<SavedBookmarksScreen />);
+      // BUG-CANDIDATE: If parent can see bookmarks but delete is hidden for proxy,
+      // verify the delete button is absent — this is the correct behavior.
+      expect(screen.queryByTestId('bookmark-delete-bk-1')).toBeNull();
+    });
+
+    it('shows a confirmation dialog before deleting', () => {
+      mockHooks({ bookmarks: [BOOKMARK_1] });
+      render(<SavedBookmarksScreen />);
+      fireEvent.press(screen.getByTestId('bookmark-delete-bk-1'));
+      expect(mockPlatformAlert).toHaveBeenCalledWith(
+        'Delete bookmark?',
+        'This will remove the bookmark permanently.',
+        expect.arrayContaining([
+          expect.objectContaining({ text: 'Cancel', style: 'cancel' }),
+          expect.objectContaining({ text: 'Delete', style: 'destructive' }),
+        ]),
+      );
+    });
+
+    it('does not delete until user confirms', () => {
+      mockHooks({ bookmarks: [BOOKMARK_1] });
+      render(<SavedBookmarksScreen />);
+      fireEvent.press(screen.getByTestId('bookmark-delete-bk-1'));
+      expect(mockDeleteBookmarkMutateAsync).not.toHaveBeenCalled();
+    });
+
+    it('calls deleteBookmark.mutateAsync with the bookmark id after confirmation', async () => {
+      mockHooks({ bookmarks: [BOOKMARK_1] });
+      render(<SavedBookmarksScreen />);
+      fireEvent.press(screen.getByTestId('bookmark-delete-bk-1'));
+
+      const buttons = mockPlatformAlert.mock.calls[0]?.[2] as Array<{
+        text: string;
+        onPress?: () => void;
+      }>;
+      buttons.find((b) => b.text === 'Delete')?.onPress?.();
+
+      await waitFor(() => {
+        expect(mockDeleteBookmarkMutateAsync).toHaveBeenCalledWith('bk-1');
+      });
+    });
+
+    it('shows an error alert when deletion fails', async () => {
+      mockDeleteBookmarkMutateAsync.mockRejectedValueOnce(
+        new Error('Server failure'),
+      );
+      mockHooks({ bookmarks: [BOOKMARK_1] });
+      render(<SavedBookmarksScreen />);
+      fireEvent.press(screen.getByTestId('bookmark-delete-bk-1'));
+
+      const buttons = mockPlatformAlert.mock.calls[0]?.[2] as Array<{
+        text: string;
+        onPress?: () => void;
+      }>;
+      buttons.find((b) => b.text === 'Delete')?.onPress?.();
+
+      await waitFor(() => {
+        expect(mockPlatformAlert).toHaveBeenLastCalledWith(
+          'Could not delete bookmark',
+          'Server failure',
+        );
+      });
+    });
+  });
+
+  // ── Pagination ─────────────────────────────────────────────────────────────
+
+  describe('pagination', () => {
+    it('does not show footer spinner when not fetching next page', () => {
+      mockHooks({
+        bookmarks: [BOOKMARK_1],
+        hasNextPage: true,
+        isFetchingNextPage: false,
+      });
+      render(<SavedBookmarksScreen />);
+      // Footer spinner does not render when isFetchingNextPage is false
+      // (it renders inside ListFooterComponent only when isFetchingNextPage is true)
+      // We can't directly assert the absence of the spinner here by testID because
+      // ActivityIndicator has no testID in the footer; we just ensure no crash.
+      expect(screen.getByTestId('saved-bookmarks-list'));
+    });
+  });
+
+  // ── Parent/child boundary ──────────────────────────────────────────────────
+
+  describe('parent proxy (guardian viewing child bookmarks)', () => {
+    it('shows bookmarks without delete buttons when in parent-proxy mode', () => {
+      mockHooks({
+        bookmarks: [BOOKMARK_1, BOOKMARK_2],
+        isParentProxy: true,
+      });
+      render(<SavedBookmarksScreen />);
+      screen.getByTestId('bookmark-row-bk-1');
+      screen.getByTestId('bookmark-row-bk-2');
+      expect(screen.queryByTestId('bookmark-delete-bk-1')).toBeNull();
+      expect(screen.queryByTestId('bookmark-delete-bk-2')).toBeNull();
+    });
+  });
+});

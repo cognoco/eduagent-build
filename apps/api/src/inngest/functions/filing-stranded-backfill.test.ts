@@ -35,7 +35,10 @@ const mockDatabaseModule = createDatabaseModuleMock({
     },
   },
 });
-jest.mock('@eduagent/database', () => mockDatabaseModule.module);
+jest.mock(
+  '@eduagent/database' /* gc1-allow: inngest unit test — prevents real Neon connection; real DB exercised via .integration.test.ts harness */,
+  () => mockDatabaseModule.module,
+);
 
 const mockInngestTransport = createInngestTransportCapture();
 jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {

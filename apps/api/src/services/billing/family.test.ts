@@ -1,13 +1,16 @@
 const mockFindSubscriptionById = jest.fn();
 
-jest.mock('@eduagent/database', () => {
-  const actual = jest.requireActual('@eduagent/database');
-  return {
-    ...actual,
-    findSubscriptionById: (...args: unknown[]) =>
-      mockFindSubscriptionById(...args),
-  };
-});
+jest.mock(
+  '@eduagent/database' /* gc1-allow: service unit test — db boundary mocked; real DB covered by sibling .integration.test.ts where present */,
+  () => {
+    const actual = jest.requireActual('@eduagent/database');
+    return {
+      ...actual,
+      findSubscriptionById: (...args: unknown[]) =>
+        mockFindSubscriptionById(...args),
+    };
+  },
+);
 
 import type { Database } from '@eduagent/database';
 

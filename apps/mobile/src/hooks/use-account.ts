@@ -4,6 +4,7 @@ import {
   type UseMutationResult,
   type UseQueryResult,
 } from '@tanstack/react-query';
+import { useAuth } from '@clerk/clerk-expo';
 import {
   accountDeletionStatusResponseSchema,
   type AccountDeletionStatusResponse,
@@ -53,9 +54,14 @@ export function useDeletionStatus(): UseQueryResult<
   Error
 > {
   const client = useApiClient();
+  // [BUG-126 / BUG-159] Scope the cache by Clerk userId so a previous user's
+  // deletion-status cache cannot be served stale to the next signed-in user on
+  // a shared device. Mirrors the use-profiles.ts pattern documented in
+  // memory/project_cross_account_leak_2026_05_10.md.
+  const { isSignedIn, userId } = useAuth();
 
   return useQuery({
-    queryKey: ['account', 'deletion-status'],
+    queryKey: ['account', 'deletion-status', userId],
     staleTime: 30_000,
     retry: 1,
     retryDelay: 250,
@@ -64,6 +70,7 @@ export function useDeletionStatus(): UseQueryResult<
       await assertOk(res);
       return accountDeletionStatusResponseSchema.parse(await res.json());
     },
+    enabled: !!isSignedIn,
   });
 }
 

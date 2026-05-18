@@ -13,6 +13,7 @@ import {
   useSkipSummary,
   useSubmitSummary,
   useTopicParkingLot,
+  useAddParkingLotItem,
   computeFilingRefetchInterval,
 } from './use-sessions';
 import { queryKeys } from '../lib/query-keys';
@@ -1252,6 +1253,65 @@ describe('useTopicParkingLot', () => {
     expect(mockFetch).toHaveBeenCalled();
     expect(result.current.data?.[0]?.question).toBe(
       'Why does factoring help here?',
+    );
+  });
+});
+
+// [BUG-165] useAddParkingLotItem must scope cache invalidation to the active
+// profile so a mutation on this profile cannot invalidate another profile's
+// parking-lot cache on a shared device. Before the fix, the invalidation key
+// was ['parking-lot', sessionId] — prefix-matched both profiles via TanStack
+// prefix matching.
+describe('useAddParkingLotItem (profile-scoped invalidation)', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    queryClient.clear();
+  });
+
+  it('[BREAK] invalidates parking-lot only for the active profile id', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          item: {
+            id: 'item-1',
+            question: 'Why does this work?',
+            explored: false,
+            createdAt: '2026-02-15T10:00:00.000Z',
+          },
+        }),
+        { status: 200 },
+      ),
+    );
+
+    const wrapper = createWrapper();
+    const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries');
+
+    const { result } = renderHook(() => useAddParkingLotItem('session-1'), {
+      wrapper,
+    });
+
+    await act(async () => {
+      await result.current.mutateAsync({ question: 'Why does this work?' });
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    // Active profile's parking-lot key MUST be the invalidated key.
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        queryKey: queryKeys.sessions.parkingLot('session-1', 'test-profile-id'),
+      }),
+    );
+    // The pre-fix shape ['parking-lot', sessionId] would prefix-match every
+    // profile via TanStack invalidation — that shape MUST NOT be present.
+    expect(invalidateSpy).not.toHaveBeenCalledWith(
+      expect.objectContaining({ queryKey: ['parking-lot', 'session-1'] }),
     );
   });
 });

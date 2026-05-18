@@ -415,15 +415,23 @@ describe('useGenerateBookTopics', () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    // Should invalidate books, book detail, and curriculum queries
+    // [BUG-162] Invalidations are now scoped by active profile id so a
+    // mutation on this profile cannot accidentally invalidate another
+    // profile's cache on a shared device.
     expect(invalidateSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ queryKey: ['books', 'subject-1'] }),
+      expect.objectContaining({
+        queryKey: ['books', 'subject-1', 'test-profile-id'],
+      }),
     );
     expect(invalidateSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ queryKey: ['book', 'subject-1', 'book-1'] }),
+      expect.objectContaining({
+        queryKey: ['book', 'subject-1', 'book-1', 'test-profile-id'],
+      }),
     );
     expect(invalidateSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ queryKey: ['curriculum', 'subject-1'] }),
+      expect.objectContaining({
+        queryKey: ['curriculum', 'subject-1', 'test-profile-id'],
+      }),
     );
   });
 
@@ -458,15 +466,61 @@ describe('useGenerateBookTopics', () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    // Should invalidate using the LATEST IDs (subject-2, book-2), not stale ones
+    // Should invalidate using the LATEST IDs (subject-2, book-2), not stale
+    // ones — and scoped to the active profile id [BUG-162].
     expect(invalidateSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ queryKey: ['books', 'subject-2'] }),
+      expect.objectContaining({
+        queryKey: ['books', 'subject-2', 'test-profile-id'],
+      }),
     );
     expect(invalidateSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ queryKey: ['book', 'subject-2', 'book-2'] }),
+      expect.objectContaining({
+        queryKey: ['book', 'subject-2', 'book-2', 'test-profile-id'],
+      }),
     );
     expect(invalidateSpy).toHaveBeenCalledWith(
-      expect.objectContaining({ queryKey: ['curriculum', 'subject-2'] }),
+      expect.objectContaining({
+        queryKey: ['curriculum', 'subject-2', 'test-profile-id'],
+      }),
+    );
+  });
+
+  // [BREAK] [BUG-162] Without profileId in the curriculum invalidation key,
+  // a book-topics generation on profile A would invalidate profile B's
+  // curriculum cache for the same subjectId on a shared device — silently
+  // bridging cache lifecycles across identities.
+  it('[BREAK] curriculum invalidation includes profileId so it cannot invalidate another profile cache', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify(mockBookWithTopics), { status: 200 }),
+    );
+
+    const wrapper = createWrapper();
+    const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries');
+
+    const { result } = renderHook(
+      () => useGenerateBookTopics('subject-1', 'book-1'),
+      { wrapper },
+    );
+
+    await act(async () => {
+      await result.current.mutateAsync(undefined);
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    // Verify the curriculum invalidation key has exactly 3 segments — the
+    // missing-profileId form ['curriculum', 'subject-1'] would silently
+    // match ALL profiles via prefix match. The fixed form must NOT match
+    // a different profile's key.
+    expect(invalidateSpy).not.toHaveBeenCalledWith(
+      expect.objectContaining({ queryKey: ['curriculum', 'subject-1'] }),
+    );
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        queryKey: ['curriculum', 'subject-1', 'test-profile-id'],
+      }),
     );
   });
 });

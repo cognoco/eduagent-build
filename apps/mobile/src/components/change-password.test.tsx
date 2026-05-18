@@ -64,6 +64,10 @@ describe('ChangePassword', () => {
 
   it('shows mismatch error when confirm differs from new password', () => {
     renderWithProviders(<ChangePassword />);
+    // [BUG-129] currentPassword is now required — fill it in so the test
+    // exercises the mismatch path rather than failing at the new
+    // empty-current-password gate.
+    fireEvent.changeText(screen.getByTestId('current-password'), 'OldPass1!');
     fireEvent.changeText(screen.getByTestId('new-password'), 'NewPass123!');
     fireEvent.changeText(screen.getByTestId('confirm-password'), 'Different1!');
     fireEvent.press(screen.getByTestId('update-password-button'));
@@ -77,6 +81,33 @@ describe('ChangePassword', () => {
     fireEvent.changeText(screen.getByTestId('confirm-password'), 'short');
     fireEvent.press(screen.getByTestId('update-password-button'));
     expect(mockUpdatePassword).not.toHaveBeenCalled();
+  });
+
+  // -------------------------------------------------------------------------
+  // [BUG-129 / BREAK] currentPassword must be validated client-side. Pre-fix
+  // submission with an empty currentPassword would fire a Clerk API request
+  // that returned a generic error — wasted round-trip and a poor signal to
+  // the user. The fix blocks submission and surfaces a clear "Enter your
+  // current password" message.
+  // -------------------------------------------------------------------------
+  it('[BREAK / BUG-129] does not call updatePassword when current password is empty', () => {
+    renderWithProviders(<ChangePassword />);
+    // Leave current-password blank — fill only new + confirm.
+    fireEvent.changeText(screen.getByTestId('new-password'), 'NewPass123!');
+    fireEvent.changeText(screen.getByTestId('confirm-password'), 'NewPass123!');
+    fireEvent.press(screen.getByTestId('update-password-button'));
+    expect(mockUpdatePassword).not.toHaveBeenCalled();
+    screen.getByText('Enter your current password');
+  });
+
+  it('[BREAK / BUG-129] does not call updatePassword when current password is too short', () => {
+    renderWithProviders(<ChangePassword />);
+    fireEvent.changeText(screen.getByTestId('current-password'), 'short');
+    fireEvent.changeText(screen.getByTestId('new-password'), 'NewPass123!');
+    fireEvent.changeText(screen.getByTestId('confirm-password'), 'NewPass123!');
+    fireEvent.press(screen.getByTestId('update-password-button'));
+    expect(mockUpdatePassword).not.toHaveBeenCalled();
+    screen.getByText('Enter your current password');
   });
 
   it('calls user.updatePassword on valid submission', async () => {

@@ -151,6 +151,42 @@ describe('useSkipTopic', () => {
     queryClient.clear();
   });
 
+  // [BREAK] [BUG-161] All 5 curriculum mutations (skip/unskip/challenge/
+  // add-topic/adapt) invalidate the curriculum cache. Before the fix, the
+  // invalidation key was ['curriculum', subjectId] — missing profileId.
+  // A useSkipTopic mutation on the active profile would invalidate ANY
+  // cached curriculum for the same subjectId across profiles (e.g. a
+  // parent's cache for the same shared subjectId), causing unnecessary
+  // refetches and silently bridging cache lifecycles across identities.
+  it('[BREAK] invalidates curriculum scoped to the active profile id', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ message: 'Topic skipped' }), {
+        status: 200,
+      }),
+    );
+
+    const wrapper = createWrapper();
+    const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries');
+
+    const { result } = renderHook(() => useSkipTopic('subject-1'), {
+      wrapper,
+    });
+
+    await act(async () => {
+      await result.current.mutateAsync('topic-1');
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        queryKey: ['curriculum', 'subject-1', 'test-profile-id'],
+      }),
+    );
+  });
+
   it('calls POST to skip a topic', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({ message: 'Topic skipped' }), {

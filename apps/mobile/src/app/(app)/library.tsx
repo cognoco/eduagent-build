@@ -5,6 +5,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  SectionList,
   Text,
   View,
 } from 'react-native';
@@ -812,15 +813,189 @@ export default function LibraryScreen() {
         />
       </View>
 
-      {/* Scrollable subject list */}
-      <ScrollView
-        className="flex-1 px-5"
-        style={{ zIndex: 0 }}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
-        keyboardShouldPersistTaps="handled"
-      >
-        {renderContent()}
-      </ScrollView>
+      {/* Scrollable subject list — SectionList when the populated subject path
+          is active so VirtualizedList recycles off-screen ShelfRows. Other
+          branches (loading, error, empty, search) fall through to ScrollView
+          via renderContent(). [BUG-NOTION-254] */}
+      {(() => {
+        const isSearching = debouncedQuery.trim().length > 0;
+        const isErrorState =
+          !hasSubjectData &&
+          (subjectsQuery.isError || activeSubjectsFallbackQuery.isError);
+        const useVirtualList =
+          !isSubjectsLoading &&
+          !isErrorState &&
+          subjects.length > 0 &&
+          !isSearching;
+
+        if (!useVirtualList) {
+          return (
+            <ScrollView
+              className="flex-1 px-5"
+              style={{ zIndex: 0 }}
+              contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
+              keyboardShouldPersistTaps="handled"
+            >
+              {renderContent()}
+            </ScrollView>
+          );
+        }
+
+        const showingStaleCachedData =
+          (subjectsQuery.isError ||
+            activeSubjectsFallbackQuery.isError ||
+            progressQuery.isError) &&
+          subjects.length > 0;
+        const shelfGroups = SUBJECT_STATUS_GROUPS.map((status) => ({
+          status,
+          subjects: visibleSubjects.filter(
+            (subject) => subject.status === status,
+          ),
+        })).filter((group) => group.subjects.length > 0);
+        const showShelfGroupLabels = shelfGroups.length > 1;
+        const curriculumComplete =
+          !!progressQuery.data?.subjects.length &&
+          progressQuery.data.subjects.every(
+            (subject) =>
+              subject.topicsTotal > 0 &&
+              subject.topicsVerified >= subject.topicsTotal,
+          );
+
+        const sections = shelfGroups.map((group) => ({
+          status: group.status,
+          // SectionList renders one ShelfRow per data item; the section
+          // header below carries the group label (only when >1 group exists).
+          data: group.subjects,
+        }));
+
+        return (
+          <SectionList
+            className="flex-1 px-5"
+            style={{ zIndex: 0 }}
+            sections={sections}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
+            keyboardShouldPersistTaps="handled"
+            initialNumToRender={10}
+            maxToRenderPerBatch={10}
+            windowSize={5}
+            removeClippedSubviews
+            testID="shelves-list"
+            ListHeaderComponent={
+              <>
+                {showingStaleCachedData && (
+                  <Pressable
+                    onPress={handleRetry}
+                    className="bg-surface-elevated rounded-card px-4 py-3 mb-3 flex-row items-center"
+                    testID="library-stale-banner"
+                  >
+                    <Text className="text-body-sm text-text-secondary flex-1">
+                      {t('library.staleBanner.message')}
+                    </Text>
+                    <Text className="text-body-sm font-semibold text-primary ms-3">
+                      {t('common.retry')}
+                    </Text>
+                  </Pressable>
+                )}
+
+                {curriculumComplete && (
+                  <View
+                    className="bg-surface rounded-card px-4 py-5 mb-3"
+                    testID="library-curriculum-complete"
+                  >
+                    <View className="flex-row items-start">
+                      <View className="me-3 mt-1">
+                        <BrandCelebration size={56} />
+                      </View>
+                      <View className="flex-1">
+                        <Text className="text-body font-semibold text-text-primary">
+                          {t('library.curriculumComplete.title')}
+                        </Text>
+                        <Text className="text-body-sm text-text-secondary mt-2">
+                          {t('library.curriculumComplete.message')}
+                        </Text>
+                      </View>
+                    </View>
+                    <Pressable
+                      onPress={() =>
+                        router.push({
+                          pathname: '/create-subject',
+                          params: { returnTo: 'library' },
+                        } as Href)
+                      }
+                      className="bg-primary rounded-button py-3 mt-4 items-center"
+                      testID="library-add-subject"
+                    >
+                      <Text className="text-text-inverse text-body font-semibold">
+                        {t('library.curriculumComplete.addSubject')}
+                      </Text>
+                    </Pressable>
+                  </View>
+                )}
+
+                {nextLearningSubject ? (
+                  <Pressable
+                    onPress={() => handleShelfPress(nextLearningSubject.id)}
+                    className="bg-primary-soft rounded-card px-4 py-4 mb-3 flex-row items-center"
+                    accessibilityRole="button"
+                    accessibilityLabel={t(
+                      'library.nextAction.accessibilityLabel',
+                      { subject: nextLearningSubject.name },
+                    )}
+                    testID="library-next-action"
+                  >
+                    <View className="flex-1 pr-3">
+                      <Text className="text-body font-semibold text-text-primary">
+                        {t('library.nextAction.title', {
+                          subject: nextLearningSubject.name,
+                        })}
+                      </Text>
+                      <Text className="text-body-sm text-text-secondary mt-1">
+                        {t('library.nextAction.message')}
+                      </Text>
+                    </View>
+                    <Text className="text-body-sm font-semibold text-primary">
+                      {t('library.nextAction.cta')}
+                    </Text>
+                  </Pressable>
+                ) : null}
+              </>
+            }
+            renderSectionHeader={({ section }) =>
+              showShelfGroupLabels ? (
+                <Text className="text-caption font-bold text-text-secondary mt-1 mb-2">
+                  {t(`library.sections.${section.status}`)}
+                </Text>
+              ) : null
+            }
+            renderItem={({ item: subject }) => {
+              const retData = retentionDataBySubjectId.get(subject.id);
+              const books = booksBySubjectId.get(subject.id) ?? [];
+              const bookCount = books.length;
+              const progress = progressBySubjectId.get(subject.id);
+              const topicsTotal = progress?.topicsTotal ?? 0;
+              const topicsCompleted = progress?.topicsCompleted ?? 0;
+              const topicProgress = `${topicsCompleted}/${topicsTotal}`;
+              const isFinished =
+                topicsTotal > 0 &&
+                (progress?.topicsVerified ?? 0) >= topicsTotal;
+              return (
+                <ShelfRow
+                  subjectId={subject.id}
+                  name={subject.name}
+                  bookCount={bookCount}
+                  topicProgress={topicProgress}
+                  reviewDueCount={retData?.reviewDueCount ?? 0}
+                  isFinished={isFinished}
+                  status={subject.status}
+                  tint={subjectTintsById.get(subject.id)}
+                  onPress={handleShelfPress}
+                />
+              );
+            }}
+          />
+        );
+      })()}
 
       {/* Manage subjects modal */}
       <Modal

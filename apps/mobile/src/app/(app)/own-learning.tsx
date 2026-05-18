@@ -1,11 +1,28 @@
 import { View } from 'react-native';
+import { Redirect } from 'expo-router';
 
 import { LearnerScreen } from '../../components/home';
 import { OWN_LEARNING_RETURN_TO } from '../../lib/navigation';
 import { useProfile } from '../../lib/profile';
+import { useParentProxy } from '../../hooks/use-parent-proxy';
+import { resolveTabShape } from './_layout';
 
 export default function OwnLearningScreen(): React.ReactElement {
-  const { activeProfile } = useProfile();
+  const { activeProfile, profiles } = useProfile();
+  const { isParentProxy } = useParentProxy();
+
+  // [BUG-135] The (app)/_layout.tsx whitelist hides the own-learning TAB
+  // BUTTON for the learner tab shape (solo owner or child-on-parent-account),
+  // but a direct push, deep link, or push notification to /(app)/own-learning
+  // still mounts this screen. Rendering the LearnerScreen "Own Learning" hub
+  // for learners would double up on their default home and confuse the
+  // navigation model — redirect them to /home, which is the canonical entry
+  // for that shape. resolveTabShape() is the single source of truth for the
+  // shape decision (see CLAUDE.md > Profile Shapes).
+  const tabShape = resolveTabShape({ activeProfile, profiles, isParentProxy });
+  if (tabShape !== 'guardian') {
+    return <Redirect href="/(app)/home" />;
+  }
 
   return (
     <View className="flex-1">

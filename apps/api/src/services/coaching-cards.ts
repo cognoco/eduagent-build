@@ -34,7 +34,7 @@ import { captureException } from './sentry';
 function silentDegrade(
   err: unknown,
   surface: string,
-  extra?: Record<string, unknown>
+  extra?: Record<string, unknown>,
 ): void {
   captureException(err, {
     extra: { surface: 'coaching-cards', priority: surface, ...extra },
@@ -63,7 +63,7 @@ function reviewDueCopy(
   count: number,
   topicTitle: string | null,
   bookTitle: string | null,
-  age: number | null
+  age: number | null,
 ): { title: string; body: string } {
   const young = age !== null && age < 13;
   if (topicTitle && bookTitle) {
@@ -88,7 +88,7 @@ function continueBookCopy(
   topicTitle: string,
   bookTitle: string,
   topicDesc: string | null,
-  age: number | null
+  age: number | null,
 ): { title: string; body: string } {
   const young = age !== null && age < 13;
   return {
@@ -102,7 +102,7 @@ function continueBookCopy(
 function bookSuggestionCopy(
   bookTitle: string,
   subjectName: string,
-  age: number | null
+  age: number | null,
 ): { title: string; body: string } {
   const young = age !== null && age < 13;
   return {
@@ -115,7 +115,7 @@ function bookSuggestionCopy(
 
 function homeworkConnectionCopy(
   skill: string,
-  age: number | null
+  age: number | null,
 ): { title: string; body: string } {
   const young = age !== null && age < 13;
   return {
@@ -141,7 +141,7 @@ function homeworkConnectionCopy(
  */
 export async function precomputeCoachingCard(
   db: Database,
-  profileId: string
+  profileId: string,
 ): Promise<CoachingCard> {
   const now = new Date();
   const expiresAt = new Date(now.getTime() + TTL_MS).toISOString();
@@ -170,7 +170,7 @@ export async function precomputeCoachingCard(
   // decayed-for-today before it reaches a display path. The returned object
   // exposes isOnGracePeriod + graceDaysRemaining directly.
   const streakRow = await repo.streaks.findCurrentForToday(
-    now.toISOString().slice(0, 10)
+    now.toISOString().slice(0, 10),
   );
 
   // --- Check urgency boost before priority cascade ---
@@ -182,8 +182,8 @@ export async function precomputeCoachingCard(
       .where(
         and(
           eq(subjects.profileId, profileId),
-          gt(subjects.urgencyBoostUntil, now)
-        )
+          gt(subjects.urgencyBoostUntil, now),
+        ),
       );
     boostedSubjectIds = new Set(boostedSubjects.map((s) => s.id));
   } catch (err) {
@@ -193,14 +193,14 @@ export async function precomputeCoachingCard(
 
   // --- Priority 1: review_due ---
   const overdueCards = allCards.filter(
-    (c) => c.nextReviewAt && c.nextReviewAt.getTime() <= now.getTime()
+    (c) => c.nextReviewAt && c.nextReviewAt.getTime() <= now.getTime(),
   );
 
   if (overdueCards.length > 0) {
     // Pick the most overdue card (earliest nextReviewAt)
     const mostOverdue = overdueCards.sort(
       (a, b) =>
-        (a.nextReviewAt?.getTime() ?? 0) - (b.nextReviewAt?.getTime() ?? 0)
+        (a.nextReviewAt?.getTime() ?? 0) - (b.nextReviewAt?.getTime() ?? 0),
     )[0];
     if (!mostOverdue)
       throw new Error('Expected most-overdue card after non-empty sort');
@@ -234,7 +234,7 @@ export async function precomputeCoachingCard(
       overdueCards.length,
       topicTitle,
       bookTitle,
-      learnerAge
+      learnerAge,
     );
 
     return {
@@ -281,7 +281,7 @@ export async function precomputeCoachingCard(
       db,
       profileId,
       boostedSubjectIds,
-      { id, expiresAt, createdAt, learnerAge }
+      { id, expiresAt, createdAt, learnerAge },
     );
     if (hwConnectionCard) return hwConnectionCard;
   } catch (err) {
@@ -329,7 +329,7 @@ export async function precomputeCoachingCard(
       db,
       profileId,
       boostedSubjectIds,
-      { id, expiresAt, createdAt, learnerAge }
+      { id, expiresAt, createdAt, learnerAge },
     );
     if (continueBookCard) return continueBookCard;
   } catch (err) {
@@ -343,7 +343,7 @@ export async function precomputeCoachingCard(
       db,
       profileId,
       boostedSubjectIds,
-      { id, expiresAt, createdAt, learnerAge }
+      { id, expiresAt, createdAt, learnerAge },
     );
     if (bookSuggestionCard) return bookSuggestionCard;
   } catch (err) {
@@ -375,7 +375,7 @@ export async function precomputeCoachingCard(
   // [BUG-55] When no retention cards exist, find a topic from the curriculum
   // instead of using profileId as topicId (which is semantically wrong).
   const fallbackTopicId: string | null =
-    allCards.length > 0 ? allCards[0]?.topicId ?? null : null;
+    allCards.length > 0 ? (allCards[0]?.topicId ?? null) : null;
   // No retention cards = new learner, return curriculum_complete start prompt
   if (!fallbackTopicId) {
     return {
@@ -421,7 +421,7 @@ const ACTIVITY_TYPE_LABELS: Record<string, { domain: string; emoji: string }> =
 function quizDiscoveryCopy(
   activityType: string,
   count: number,
-  age: number | null
+  age: number | null,
 ): { title: string; body: string } {
   const young = age !== null && age < 13;
   const label = ACTIVITY_TYPE_LABELS[activityType] ?? {
@@ -444,7 +444,7 @@ function quizDiscoveryCopy(
 async function findQuizDiscoveryCard(
   db: Database,
   profileId: string,
-  meta: CardMeta
+  meta: CardMeta,
 ): Promise<CoachingCard | null> {
   const counts = await db
     .select({
@@ -455,8 +455,8 @@ async function findQuizDiscoveryCard(
     .where(
       and(
         eq(quizMissedItems.profileId, profileId),
-        eq(quizMissedItems.surfaced, false)
-      )
+        eq(quizMissedItems.surfaced, false),
+      ),
     )
     .groupBy(quizMissedItems.activityType);
 
@@ -504,7 +504,7 @@ async function findContinueBookCard(
   db: Database,
   profileId: string,
   boostedSubjectIds: Set<string>,
-  meta: CardMeta
+  meta: CardMeta,
 ): Promise<CoachingCard | null> {
   // Find books with generated topics for active subjects
   const booksWithSubjects = await db
@@ -520,8 +520,8 @@ async function findContinueBookCard(
       and(
         eq(subjects.profileId, profileId),
         eq(subjects.status, 'active'),
-        eq(curriculumBooks.topicsGenerated, true)
-      )
+        eq(curriculumBooks.topicsGenerated, true),
+      ),
     )
     .orderBy(asc(curriculumBooks.sortOrder));
 
@@ -549,8 +549,8 @@ async function findContinueBookCard(
             and(
               inArray(curriculumTopics.curriculumId, curriculumIds),
               inArray(curriculumTopics.bookId, bookIds),
-              eq(curriculumTopics.skipped, false)
-            )
+              eq(curriculumTopics.skipped, false),
+            ),
           )
           .orderBy(asc(curriculumTopics.sortOrder))
       : [];
@@ -563,11 +563,11 @@ async function findContinueBookCard(
       and(
         inArray(learningSessions.topicId, topicIds),
         eq(learningSessions.profileId, profileId),
-        gte(learningSessions.exchangeCount, 1)
-      )
+        gte(learningSessions.exchangeCount, 1),
+      ),
     );
   const topicsWithSessions = new Set(
-    sessionsForTopics.map((s) => s.topicId).filter(Boolean)
+    sessionsForTopics.map((s) => s.topicId).filter(Boolean),
   );
   const topicsByBook = new Map<string, typeof allTopics>();
   for (const topic of allTopics) {
@@ -593,7 +593,7 @@ async function findContinueBookCard(
           topic.title,
           book.bookTitle,
           topic.description,
-          meta.learnerAge
+          meta.learnerAge,
         );
 
         return {
@@ -624,14 +624,14 @@ async function findBookSuggestionCard(
   db: Database,
   profileId: string,
   boostedSubjectIds: Set<string>,
-  meta: CardMeta
+  meta: CardMeta,
 ): Promise<CoachingCard | null> {
   // Find active subjects with books
   const activeSubjects = await db
     .select({ id: subjects.id, name: subjects.name })
     .from(subjects)
     .where(
-      and(eq(subjects.profileId, profileId), eq(subjects.status, 'active'))
+      and(eq(subjects.profileId, profileId), eq(subjects.status, 'active')),
     );
 
   if (activeSubjects.length === 0) return null;
@@ -659,7 +659,7 @@ async function findBookSuggestionCard(
       const bsCopy = bookSuggestionCopy(
         nextUnbuilt.title,
         subject.name,
-        meta.learnerAge
+        meta.learnerAge,
       );
 
       return {
@@ -693,7 +693,7 @@ async function findHomeworkConnectionCard(
   db: Database,
   profileId: string,
   boostedSubjectIds: Set<string>,
-  meta: CardMeta
+  meta: CardMeta,
 ): Promise<CoachingCard | null> {
   // Find recent homework sessions (last 7 days) with summaries
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -708,8 +708,8 @@ async function findHomeworkConnectionCard(
       and(
         eq(learningSessions.profileId, profileId),
         eq(learningSessions.sessionType, 'homework'),
-        gt(learningSessions.createdAt, sevenDaysAgo)
-      )
+        gt(learningSessions.createdAt, sevenDaysAgo),
+      ),
     )
     .orderBy(desc(learningSessions.createdAt))
     .limit(10);
@@ -737,7 +737,7 @@ async function findHomeworkConnectionCard(
     .select({ id: subjects.id, name: subjects.name })
     .from(subjects)
     .where(
-      and(eq(subjects.profileId, profileId), eq(subjects.status, 'active'))
+      and(eq(subjects.profileId, profileId), eq(subjects.status, 'active')),
     );
 
   if (activeSubjects.length === 0) return null;
@@ -756,8 +756,8 @@ async function findHomeworkConnectionCard(
     .where(
       and(
         inArray(curriculumTopics.curriculumId, curriculumIds),
-        eq(curriculumTopics.skipped, false)
-      )
+        eq(curriculumTopics.skipped, false),
+      ),
     );
 
   if (allTopics.length === 0) return null;
@@ -771,12 +771,37 @@ async function findHomeworkConnectionCard(
       and(
         inArray(learningSessions.topicId, topicIds),
         eq(learningSessions.profileId, profileId),
-        gte(learningSessions.exchangeCount, 1)
-      )
+        gte(learningSessions.exchangeCount, 1),
+      ),
     );
   const coveredTopicIds = new Set(
-    sessionsForTopics.map((s) => s.topicId).filter(Boolean)
+    sessionsForTopics.map((s) => s.topicId).filter(Boolean),
   );
+
+  // [BUG-252] Batch-fetch books for ALL topics with a bookId so the per-match
+  // book lookup below becomes an O(1) Map read instead of a sequential N+1
+  // round-trip (previously: 1 findFirst per matched topic, up to ~30 per call).
+  const uniqueBookIds = [
+    ...new Set(
+      allTopics.map((t) => t.bookId).filter((id): id is string => id != null),
+    ),
+  ];
+  const booksById = new Map<
+    string,
+    { id: string; title: string; emoji: string | null; subjectId: string }
+  >();
+  if (uniqueBookIds.length > 0) {
+    const bookRows = await db
+      .select({
+        id: curriculumBooks.id,
+        title: curriculumBooks.title,
+        emoji: curriculumBooks.emoji,
+        subjectId: curriculumBooks.subjectId,
+      })
+      .from(curriculumBooks)
+      .where(inArray(curriculumBooks.id, uniqueBookIds));
+    for (const b of bookRows) booksById.set(b.id, b);
+  }
 
   // Match skills against uncovered topic titles/descriptions
   const allSkills = [...skillsBySubject.values()].flat();
@@ -789,15 +814,13 @@ async function findHomeworkConnectionCard(
     for (const skill of allSkills) {
       const skillLower = skill.toLowerCase();
       if (titleLower.includes(skillLower) || descLower.includes(skillLower)) {
-        // Find the book for context
+        // Find the book for context (O(1) Map lookup — see BUG-252 batch above)
         let bookTitle: string | null = null;
         let bookEmoji: string | null = null;
         let matchSubjectId: string | null = null;
 
         if (topic.bookId) {
-          const book = await db.query.curriculumBooks?.findFirst?.({
-            where: eq(curriculumBooks.id, topic.bookId),
-          });
+          const book = booksById.get(topic.bookId);
           if (book) {
             bookTitle = book.title;
             bookEmoji = book.emoji;
@@ -808,7 +831,7 @@ async function findHomeworkConnectionCard(
         // Resolve subject for boost check
         if (!matchSubjectId) {
           const curriculum = allCurricula.find(
-            (c) => c.id === topic.curriculumId
+            (c) => c.id === topic.curriculumId,
           );
           matchSubjectId = curriculum?.subjectId ?? null;
         }
@@ -854,7 +877,7 @@ async function findHomeworkConnectionCard(
 export async function writeCoachingCardCache(
   db: Database,
   profileId: string,
-  card: CoachingCard
+  card: CoachingCard,
 ): Promise<void> {
   const now = new Date();
   const expiresAt = new Date(now.getTime() + TTL_MS);
@@ -866,7 +889,7 @@ export async function writeCoachingCardCache(
       ...current,
       legacyCoachingCard: card,
     }),
-    { expiresAt }
+    { expiresAt },
   );
 }
 
@@ -880,7 +903,7 @@ export async function writeCoachingCardCache(
  */
 export async function readCoachingCardCache(
   db: Database,
-  profileId: string
+  profileId: string,
 ): Promise<CoachingCard | null> {
   const cached = await readHomeSurfaceCacheData(db, profileId);
   if (!cached) return null;
@@ -937,7 +960,7 @@ export interface CoachingCardResponse {
  */
 export async function getCoachingCardForProfile(
   db: Database,
-  profileId: string
+  profileId: string,
 ): Promise<CoachingCardResponse> {
   // Check session count for cold-start detection (real activity only)
   const countResult = await db
@@ -946,8 +969,8 @@ export async function getCoachingCardForProfile(
     .where(
       and(
         eq(learningSessions.profileId, profileId),
-        gte(learningSessions.exchangeCount, 1)
-      )
+        gte(learningSessions.exchangeCount, 1),
+      ),
     );
 
   const sessionCount = countResult[0]?.count ?? 0;

@@ -113,8 +113,10 @@ describe('reviewDueSend', () => {
   });
 
   describe('configuration', () => {
-    it('is defined as an Inngest function', () => {
-      expect(reviewDueSend).toBeTruthy();
+    it('is defined as an Inngest function with the expected id', () => {
+      expect((reviewDueSend as { opts?: { id?: string } }).opts?.id).toBe(
+        'review-due-send',
+      );
     });
 
     it('triggers on app/retention.review-due', () => {

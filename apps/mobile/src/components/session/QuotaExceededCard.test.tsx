@@ -1,8 +1,27 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react-native';
 
 const mockPush = jest.fn();
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush }),
+}));
+
+// BUG-143: child "notify parent" action calls useNotifyParentSubscribe.
+// Mock the settings hook surface so the card can exercise notify state
+// without spinning the full API client / React Query infrastructure.
+const mockNotifyMutate = jest.fn();
+jest.mock('../../hooks/use-settings', () => ({
+  // gc1-allow: useNotifyParentSubscribe is a thin react-query wrapper around
+  // a real network mutation — mocked at the hook boundary so this UI test
+  // can drive sending/sent/failed states deterministically.
+  useNotifyParentSubscribe: () => ({
+    mutate: mockNotifyMutate,
+    isPending: false,
+  }),
 }));
 
 const { QuotaExceededCard } = require('./QuotaExceededCard');
@@ -39,11 +58,10 @@ describe('QuotaExceededCard', () => {
     expect(mockPush).toHaveBeenCalledWith('/(app)/subscription');
   });
 
-  it('child view: shows ask-your-parent message', () => {
+  it('child view: shows quota-exceeded card and never offers owner upgrade', () => {
     render(<QuotaExceededCard details={ownerDetails} isOwner={false} />);
 
     screen.getByTestId('quota-exceeded-card');
-    screen.getByText('Ask parent');
     expect(screen.queryByTestId('quota-upgrade-btn')).toBeNull();
   });
 
@@ -74,5 +92,68 @@ describe('QuotaExceededCard', () => {
     render(<QuotaExceededCard details={ownerDetails} isOwner={false} />);
     expect(screen.queryByText(/upgrade/i)).toBeNull();
     expect(screen.queryByText(/plan/i)).toBeNull();
+  });
+
+  // BUG-143: child variant must offer an interactive notify-parent primary
+  // action AND surface an approximate reset window. Previously the "ask
+  // parent" hint was a static View with no recovery path and no time info.
+  describe('BUG-143 child recovery actions', () => {
+    it('renders an interactive notify-parent button (not a static View)', () => {
+      render(<QuotaExceededCard details={ownerDetails} isOwner={false} />);
+      const btn = screen.getByTestId('quota-notify-parent-btn');
+      expect(btn).toBeTruthy();
+      expect(btn.props.accessibilityRole).toBe('button');
+    });
+
+    it('shows a reset-time hint so the child knows when the limit lifts', () => {
+      render(<QuotaExceededCard details={ownerDetails} isOwner={false} />);
+      // monthly variant → monthly hint
+      const hint = screen.getByTestId('quota-reset-hint');
+      expect(hint.props.children).toMatch(/monthly limit resets/i);
+    });
+
+    it('switches to daily reset hint when reason is daily', () => {
+      const daily = { ...ownerDetails, reason: 'daily' as const };
+      render(<QuotaExceededCard details={daily} isOwner={false} />);
+      const hint = screen.getByTestId('quota-reset-hint');
+      expect(hint.props.children).toMatch(/daily limit resets/i);
+    });
+
+    it('tapping notify-parent invokes the mutation', () => {
+      render(<QuotaExceededCard details={ownerDetails} isOwner={false} />);
+      fireEvent.press(screen.getByTestId('quota-notify-parent-btn'));
+      expect(mockNotifyMutate).toHaveBeenCalledTimes(1);
+    });
+
+    it('shows confirmation copy after successful notify', async () => {
+      mockNotifyMutate.mockImplementation((_v, opts) => {
+        opts?.onSuccess?.();
+      });
+      render(<QuotaExceededCard details={ownerDetails} isOwner={false} />);
+      fireEvent.press(screen.getByTestId('quota-notify-parent-btn'));
+      await waitFor(() => {
+        expect(
+          screen.getByText('Sent — parent has been notified'),
+        ).toBeTruthy();
+      });
+    });
+
+    it('offers a retry when notify fails (transient error must be recoverable)', async () => {
+      mockNotifyMutate.mockImplementation((_v, opts) => {
+        opts?.onError?.(new Error('network down'));
+      });
+      render(<QuotaExceededCard details={ownerDetails} isOwner={false} />);
+      fireEvent.press(screen.getByTestId('quota-notify-parent-btn'));
+      await waitFor(() => {
+        expect(
+          screen.getByText('Could not send — tap to try again'),
+        ).toBeTruthy();
+      });
+    });
+
+    it('keeps Go home as a secondary navigation escape (H5 preserved)', () => {
+      render(<QuotaExceededCard details={ownerDetails} isOwner={false} />);
+      expect(screen.getByTestId('quota-go-home-btn')).toBeTruthy();
+    });
   });
 });

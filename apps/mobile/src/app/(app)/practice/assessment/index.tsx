@@ -26,13 +26,18 @@ import { Button } from '../../../../components/common/Button';
 import { ErrorFallback } from '../../../../components/common/ErrorFallback';
 import { RewardBurst } from '../../../../components/common/RewardBurst';
 import { hapticSuccess } from '../../../../lib/haptics';
-import { isAssessmentReadinessReply } from './assessment-readiness';
+// [BUG-138 / BUG-227] Underscore-prefixed helpers so Expo Router does NOT
+// treat them as route files in /(app)/practice/assessment/. Per CLAUDE.md
+// Repo-Specific Guardrails rule 16: any non-route helper file inside the
+// app/ tree must be `_` prefixed (or live in a `_components` / `_hooks`
+// folder), otherwise Expo Router registers it as a phantom route.
+import { isAssessmentReadinessReply } from './_assessment-readiness';
 import {
   assessmentFeedbackNeedsPrompt,
   buildAssessmentFirstQuestion,
   buildAssessmentNextActionPrompt,
   buildAssessmentOpeningMessage,
-} from './assessment-copy';
+} from './_assessment-copy';
 
 function buildAssessmentChatMessages(input: {
   openingMessage: string;

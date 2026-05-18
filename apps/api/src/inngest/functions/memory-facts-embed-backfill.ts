@@ -19,7 +19,16 @@ interface BackfillBatchResult {
 }
 
 export const memoryFactsEmbedBackfill = inngest.createFunction(
-  { id: 'memory-facts-embed-backfill' },
+  {
+    id: 'memory-facts-embed-backfill',
+    // [BUG-155] Global concurrency=1. Hourly cron can overlap when a prior run
+    // takes longer than 1 hour (large backlog after Voyage outage). Without
+    // this guard, two parallel runs both pick up the same rows-with-NULL-
+    // embedding, both call Voyage on the same fact text, and burn quota twice
+    // even though the UPDATE…WHERE embedding IS NULL idempotency clause means
+    // only one write lands.
+    concurrency: { limit: 1 },
+  },
   { cron: '0 * * * *' },
   async ({ step }) => {
     let apiKey: string;
@@ -70,7 +79,7 @@ export const memoryFactsEmbedBackfill = inngest.createFunction(
             .where(
               cursor
                 ? and(isNull(memoryFacts.embedding), gt(memoryFacts.id, cursor))
-                : isNull(memoryFacts.embedding)
+                : isNull(memoryFacts.embedding),
             )
             .orderBy(asc(memoryFacts.id))
             .limit(BATCH_SIZE);
@@ -89,7 +98,7 @@ export const memoryFactsEmbedBackfill = inngest.createFunction(
               source: 'embed_backfill',
             });
             const result = await embedFactText(row.text, (text) =>
-              generateEmbedding(text, apiKey)
+              generateEmbedding(text, apiKey),
             );
             if (!result.ok) {
               failed += 1;
@@ -115,9 +124,9 @@ export const memoryFactsEmbedBackfill = inngest.createFunction(
                 (update) =>
                   sql`(${update.id}::uuid, ${
                     update.profileId
-                  }::uuid, ${vectorToDriver(update.vector)}::vector)`
+                  }::uuid, ${vectorToDriver(update.vector)}::vector)`,
               ),
-              sql`, `
+              sql`, `,
             );
             await db.execute(sql`
             UPDATE memory_facts
@@ -135,7 +144,7 @@ export const memoryFactsEmbedBackfill = inngest.createFunction(
             lastId: rows.at(-1)?.id ?? cursor,
             scanned: rows.length,
           };
-        }
+        },
       );
 
       totalEmbedded += batch.embedded;
@@ -156,5 +165,5 @@ export const memoryFactsEmbedBackfill = inngest.createFunction(
       ...summary,
     });
     return summary;
-  }
+  },
 );

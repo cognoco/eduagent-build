@@ -159,12 +159,16 @@ jobs:
       # production deploys, allowing a staging deploy to run migrations on prod (and vice
       # versa). Selecting by event/input makes the target unambiguous in the YAML itself
       # and removes the dependency on whoever last set the repo-level fallback secret.
-      # [CR-PR129-HIGH] Fail fast when the STAGING secret is empty during a
-      # staging deploy. GitHub Actions' `cond && A || B` ternary evaluates as
-      # `(cond && A) || B`, so an empty `secrets.DATABASE_URL_STAGING` would
-      # silently fall through to `DATABASE_URL_PRODUCTION` — i.e. a staging
-      # deploy could run migrations on the production database. Verify the
-      # intended secret was actually set before any URL assignment is used.
+      # [CR-PR129-HIGH / BUG-241] Fail fast when the STAGING secret is empty
+      # during a staging deploy. GitHub Actions' `cond && A || B` ternary
+      # evaluates as `(cond && A) || B`, so an empty
+      # `secrets.DATABASE_URL_STAGING` would silently fall through to
+      # `DATABASE_URL_PRODUCTION` — i.e. a staging deploy could run
+      # migrations on the production database. The downstream ternaries at
+      # the env: blocks of the verify / baseline / migrate steps below all
+      # share the same evaluation pattern, so this Assert step is the single
+      # chokepoint that protects all of them. Verify the intended secret was
+      # actually set before any URL assignment is used.
       - name: Assert correct DATABASE_URL secret is set for deploy target
         env:
           IS_STAGING: ${{ github.event_name == 'push' || inputs.api_environment == 'staging' }}
@@ -235,21 +239,30 @@ jobs:
           echo "Deploying API to ${DEPLOY_ENV}"
           pnpm exec wrangler deploy --env "${DEPLOY_ENV}" --var "DEPLOY_SHA:${GITHUB_SHA:0:8}"
 
-      # When DOPPLER_TOKEN is missing the sync step silently skipped, leaving
-      # the Worker secrets stale — any value set in Doppler since the gap
-      # opened never reached production. The step now ALWAYS runs and emits a
-      # GitHub Actions warning when DOPPLER_TOKEN is absent, so deploys
-      # surface the broken integration rather than masking it. Add the
+      # [BUG-238] When DOPPLER_TOKEN is missing the sync step previously
+      # degraded to a GitHub Actions warning and exited 0, leaving Worker
+      # secrets stale — any value set in Doppler since the gap opened never
+      # reached production. Silent stale-secret deploys are how billing
+      # webhooks start failing in production without anyone knowing.
+      #
+      # New posture: missing DOPPLER_TOKEN is a hard fail. Either add the
       # repo/org secret `DOPPLER_TOKEN` (a Doppler service-account token
-      # scoped to the project) to restore automatic sync.
+      # scoped to the project) or explicitly opt out of sync for this run by
+      # setting the workflow secret `SKIP_DOPPLER_SYNC=true` AND running
+      # `pnpm secrets:sync stg|prd` locally before triggering the deploy.
       - name: Sync secrets from Doppler to Worker
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
+          SKIP_DOPPLER_SYNC: ${{ secrets.SKIP_DOPPLER_SYNC }}
         run: |
-          if [ -z "${DOPPLER_TOKEN:-}" ]; then
-            echo "::warning title=Doppler→Worker sync skipped::DOPPLER_TOKEN is not set as a GitHub Actions secret. Worker secrets will NOT be synced from Doppler on this deploy. Run \`pnpm secrets:sync stg|prd\` locally to sync, or add DOPPLER_TOKEN to repo secrets to fix automatic sync."
+          if [ "${SKIP_DOPPLER_SYNC:-false}" = "true" ]; then
+            echo "::warning title=Doppler→Worker sync explicitly skipped::SKIP_DOPPLER_SYNC=true was set as a workflow secret. Worker secrets were NOT synced — operator must have run \`pnpm secrets:sync\` locally for this deploy."
             exit 0
+          fi
+          if [ -z "${DOPPLER_TOKEN:-}" ]; then
+            echo "::error title=Doppler→Worker sync FAILED::DOPPLER_TOKEN is not set as a GitHub Actions secret. Worker secrets cannot be synced from Doppler, so this deploy would ship with stale secrets. Either add DOPPLER_TOKEN to repo secrets (Doppler service-account token scoped to the mentomate project), or set SKIP_DOPPLER_SYNC=true workflow secret after running \`pnpm secrets:sync stg|prd\` locally."
+            exit 1
           fi
           DEPLOY_ENV="${{ github.event_name == 'push' && 'staging' || inputs.api_environment }}"
           # Map wrangler env names to Doppler config short names

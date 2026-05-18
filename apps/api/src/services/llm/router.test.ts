@@ -426,6 +426,66 @@ describe('LLM Router', () => {
 
       expect(result.model).toBe('gemini-2.5-pro');
     });
+
+    // [BUG-114] Pins the deliberate retry asymmetry: routeAndCall retries
+    // transient failures (MAX_RETRIES=3 → 4 attempts), routeAndStream does
+    // NOT retry at the router layer because streaming bytes cannot be
+    // replayed without double-emission. The streaming path either falls
+    // over to the secondary provider or throws — never makes multiple
+    // attempts on the same provider. If this test starts failing because
+    // someone added withRetry into routeAndStream, read the long comment
+    // above MAX_RETRIES in router.ts before "fixing" it.
+    it('[BUG-114] does NOT retry a failing primary stream provider — single attempt then fallback', async () => {
+      _clearProviders();
+      _resetCircuits();
+      // Count attempts on the failing primary so we can prove only one was
+      // made even though MAX_RETRIES=3 would have produced four on the
+      // non-streaming path.
+      let primaryStreamAttempts = 0;
+      const countingFailing: LLMProvider = {
+        ...createMockProvider('gemini'),
+        chatStream(): ChatStreamResult {
+          primaryStreamAttempts += 1;
+          return makeChatStreamResult(
+            {
+              [Symbol.asyncIterator]() {
+                return {
+                  async next(): Promise<IteratorResult<string>> {
+                    throw new Error('Transient first-byte failure');
+                  },
+                };
+              },
+            },
+            Promise.resolve<StopReason>('unknown'),
+          );
+        },
+      };
+      registerProvider(countingFailing);
+      registerProvider(createMockProvider('openai'));
+
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
+      try {
+        const result = await routeAndStream(
+          [{ role: 'user', content: 'test' }],
+          1,
+        );
+        // Drain so the fallback hop actually runs.
+        const chunks: string[] = [];
+        for await (const chunk of result.stream) chunks.push(chunk);
+
+        // Exactly one attempt on the primary — no retry loop. (The
+        // non-streaming routeAndCall would have produced 4 here.)
+        expect(primaryStreamAttempts).toBe(1);
+        // Stream succeeded via fallback.
+        expect(result.fallbackUsed).toBe(true);
+        expect(chunks.join('')).toContain('Mock streamed');
+      } finally {
+        warnSpy.mockRestore();
+        _clearProviders();
+        _resetCircuits();
+        registerProvider(createMockProvider('gemini'));
+      }
+    });
   });
 
   describe('streaming fallback (pre-first-byte failure)', () => {

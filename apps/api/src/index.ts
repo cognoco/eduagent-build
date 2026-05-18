@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
+import { secureHeaders } from 'hono/secure-headers';
 import { HTTPException } from 'hono/http-exception';
 import * as Sentry from '@sentry/cloudflare';
 
@@ -133,28 +134,32 @@ type Env = { Bindings: Bindings; Variables: Variables };
 // ---------------------------------------------------------------------------
 const api = new Hono<Env>();
 
-// CORS — allow local dev and production origins; must run before auth so OPTIONS preflight succeeds
+// [BUG-244] CORS — explicit production allowlist. The previous policy allowed
+// any `*.mentomate.com` subdomain with `credentials: true`. That's a subdomain
+// takeover risk: if any dangling CNAME, abandoned preview deploy, or future
+// vendor subdomain ends up under attacker control, the attacker can read
+// cookies / authenticated responses for the whole API. We now enumerate every
+// allowed production origin by exact match and keep localhost wildcards only
+// because dev clients vary by port.
+const ALLOWED_PRODUCTION_ORIGINS: ReadonlySet<string> = new Set([
+  'https://mentomate.com',
+  'https://www.mentomate.com',
+  'https://app.mentomate.com',
+  // Web staging — used by Playwright E2E and stakeholder previews.
+  'https://stg.mentomate.com',
+  'https://app-stg.mentomate.com',
+]);
+
 api.use(
   '*',
   cors({
     origin: (origin) => {
       if (!origin) return '';
-      // Allow any localhost port (Metro, Expo web, etc.)
+      // Allow any localhost / 127.0.0.1 port (Metro, Expo web, Playwright).
       if (/^https?:\/\/localhost(:\d+)?$/.test(origin)) return origin;
       if (/^https?:\/\/127\.0\.0\.1(:\d+)?$/.test(origin)) return origin;
-      // Production origins — require https
-      try {
-        const url = new URL(origin);
-        if (
-          url.protocol === 'https:' &&
-          (url.hostname.endsWith('.mentomate.com') ||
-            url.hostname === 'mentomate.com')
-        )
-          return origin;
-      } catch {
-        // Invalid URL — reject
-      }
-      return '';
+      // Production: exact-match allowlist only. No subdomain wildcards.
+      return ALLOWED_PRODUCTION_ORIGINS.has(origin) ? origin : '';
     },
     allowHeaders: [
       'Content-Type',
@@ -175,6 +180,18 @@ api.use(
     maxAge: 3600,
   }),
 );
+
+// [BUG-245] Global security headers — JSON API needs the standard defensive
+// set even though the typical client is a mobile/native app. The defaults
+// emit `Strict-Transport-Security`, `X-Content-Type-Options: nosniff`,
+// `Referrer-Policy: no-referrer`, `Cross-Origin-Resource-Policy: same-origin`,
+// `X-Frame-Options: SAMEORIGIN`, etc. We disable the default Content Security
+// Policy because this is a JSON API (CSP applies to HTML responses) and the
+// only HTML we serve is the consent-web flow which sets its own CSP on the
+// page itself.
+// contentSecurityPolicy omitted intentionally — this is a JSON API; CSP
+// applies to HTML responses. The consent-web flow sets its own per-page CSP.
+api.use('*', secureHeaders());
 
 // Request logging — runs before auth so every request (including public) is logged
 api.use('*', requestLogger);

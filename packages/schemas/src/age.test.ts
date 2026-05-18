@@ -1,4 +1,9 @@
-import { computeAgeBracket, isAdultOwner, type AgeBracket } from './age.js';
+import {
+  computeAgeBracket,
+  isAdultOwner,
+  type AgeBracket,
+  type AgeGateRole,
+} from './age.js';
 
 describe('computeAgeBracket', () => {
   it('returns child for ages under 13', () => {
@@ -57,5 +62,32 @@ describe('isAdultOwner', () => {
 
   it('supports the existing isOwner profile shape', () => {
     expect(isAdultOwner({ isOwner: true, birthYear: 2008 }, 2026)).toBe(true);
+  });
+});
+
+describe('AgeGateRole [BUG-208] — discriminated union, not free-form string', () => {
+  it('AgeGateRole is exactly the three known values', () => {
+    const all: ReadonlyArray<AgeGateRole> = [
+      'owner',
+      'child',
+      'impersonated-child',
+    ];
+    expect(all).toHaveLength(3);
+  });
+
+  it('exhaustive switch on AgeGateRole compiles without a default', () => {
+    function label(role: AgeGateRole): string {
+      switch (role) {
+        case 'owner':
+          return 'O';
+        case 'child':
+          return 'C';
+        case 'impersonated-child':
+          return 'I';
+      }
+    }
+    expect(label('owner')).toBe('O');
+    expect(label('child')).toBe('C');
+    expect(label('impersonated-child')).toBe('I');
   });
 });

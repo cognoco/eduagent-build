@@ -37,6 +37,10 @@ import { probesFlow } from './flows/probes';
 import { bookSuggestionRegenerationFlow } from './flows/book-suggestion-regeneration';
 import { progressSummaryFlow } from './flows/progress-summary';
 import { assessmentEvaluationFlow } from './flows/assessment-evaluation';
+// [BUG-125] Snapshot coverage for the two prompt builders the pre-commit
+// hook was previously blind to. See flow files for context.
+import { languagePromptsFlow } from './flows/language-prompts';
+import { adaptiveTeachingFlow } from './flows/adaptive-teaching';
 import {
   listFlows,
   parseCliArgs,
@@ -88,6 +92,8 @@ const FLOWS: FlowDefinition[] = [
   bookSuggestionRegenerationFlow as FlowDefinition,
   progressSummaryFlow as FlowDefinition,
   assessmentEvaluationFlow as FlowDefinition,
+  languagePromptsFlow as FlowDefinition,
+  adaptiveTeachingFlow as FlowDefinition,
 ];
 
 async function main(): Promise<void> {

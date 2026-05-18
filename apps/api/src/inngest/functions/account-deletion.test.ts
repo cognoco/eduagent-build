@@ -33,8 +33,12 @@ describe('scheduledDeletion', () => {
     mockAccountExists.mockResolvedValue(true);
   });
 
-  it('should be defined as an Inngest function', () => {
-    expect(scheduledDeletion).toBeTruthy();
+  it('should be defined as an Inngest function with the expected id', () => {
+    // Bug 203: previously a truthy check that passed for any value. Assert
+    // the actual Inngest-function id so a renamed/misexported function fails.
+    expect((scheduledDeletion as { opts?: { id?: string } }).opts?.id).toBe(
+      'scheduled-account-deletion',
+    );
   });
 
   it('should have the correct function id', () => {

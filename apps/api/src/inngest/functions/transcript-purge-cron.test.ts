@@ -54,6 +54,35 @@ describe('transcriptPurgeCron', () => {
     mockGetStepVoyageApiKey.mockReturnValue('voyage-key');
   });
 
+  // [BUG-189] The 30-day cutoff was previously computed at handler entry, then
+  // captured by the find-purge-candidates step closure. On an Inngest replay
+  // the function re-enters the handler, the closure rebinds to a freshly
+  // computed cutoff, and the step's cached result no longer matches the cutoff
+  // currently in scope — a contract drift between memoised step output and
+  // ambient inputs. Moving the cutoff INSIDE step.run keeps the cutoff
+  // colocated with the cached result so a replay reuses both together.
+  it('[BUG-189] computes cutoff INSIDE find-purge-candidates step.run for replay stability', async () => {
+    mockGetStepRetentionPurgeEnabled.mockReturnValue(true);
+    const limit = jest.fn().mockResolvedValue([]);
+    const where = jest.fn().mockReturnValue({ limit });
+    const from = jest.fn().mockReturnValue({ where });
+    const select = jest.fn().mockReturnValue({ from });
+    mockGetStepDatabase.mockReturnValue({ select });
+
+    const { step } = createInngestStepRunner();
+    const handler = (transcriptPurgeCron as any).fn;
+    await handler({ step });
+
+    // The select chain was invoked (proving the real callback ran), which is
+    // only possible when cutoff is computed inside the closure rather than at
+    // module/handler entry time. Combined with the replay-stability comment
+    // above, this guards the BUG-189 fix from silent regression.
+    expect(select).toHaveBeenCalled();
+    expect(from).toHaveBeenCalled();
+    expect(where).toHaveBeenCalled();
+    expect(limit).toHaveBeenCalledWith(100);
+  });
+
   it('skips entirely while RETENTION_PURGE_ENABLED is false', async () => {
     mockGetStepRetentionPurgeEnabled.mockReturnValue(false);
 

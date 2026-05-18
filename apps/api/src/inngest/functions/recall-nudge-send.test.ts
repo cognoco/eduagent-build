@@ -136,8 +136,10 @@ describe('recallNudgeSend', () => {
   });
 
   describe('configuration', () => {
-    it('is defined as an Inngest function', () => {
-      expect(recallNudgeSend).toBeTruthy();
+    it('is defined as an Inngest function with the expected id', () => {
+      expect((recallNudgeSend as { opts?: { id?: string } }).opts?.id).toBe(
+        'recall-nudge-send',
+      );
     });
 
     it('triggers on app/recall-nudge.send', () => {

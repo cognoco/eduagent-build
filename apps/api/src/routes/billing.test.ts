@@ -56,6 +56,27 @@ jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
+// [BUG-94 / A1-HIGH] family/add now gates on isOwner. Mock findOwnerProfile so
+// the profile-scope middleware auto-resolves to an owner profile. Without this,
+// the mock DB returns undefined and profileMeta.isOwner stays false → 403.
+jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/profile',
+  ) as typeof import('../services/profile');
+  return {
+    ...actual,
+    findOwnerProfile: jest.fn().mockResolvedValue({
+      id: 'test-profile-id',
+      birthYear: 1985,
+      location: 'NO',
+      consentStatus: 'CONSENTED',
+      hasPremiumLlm: false,
+      conversationLanguage: null,
+      isOwner: true,
+    }),
+  };
+});
+
 // ---------------------------------------------------------------------------
 // Mock billing service
 // ---------------------------------------------------------------------------

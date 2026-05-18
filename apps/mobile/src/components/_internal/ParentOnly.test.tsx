@@ -29,7 +29,7 @@ describe('ParentOnly', () => {
       </ParentOnly>,
     );
 
-    expect(getByText('Inner')).toBeTruthy();
+    expect(getByText('Inner'));
     expect(mockReplace).not.toHaveBeenCalled();
   });
 

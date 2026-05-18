@@ -542,7 +542,12 @@
       "childDailyMessage": "Du har nådd dagens spørsmålsgrense.",
       "childMonthlyMessage": "Du har nådd denne månedens spørsmålsgrense.",
       "askParent": "Spør en forelder",
-      "topUpCredits": "Fyll på kreditter"
+      "topUpCredits": "Fyll på kreditter",
+      "notifyParent": "Varsle en foresatt",
+      "notifyParentSent": "Sendt – en foresatt har blitt varslet",
+      "notifyParentRetry": "Kunne ikke sende – trykk for å prøve igjen",
+      "resetHintDaily": "Din daglige grense nullstilles ved midnatt.",
+      "resetHintMonthly": "Din månedlige grense nullstilles den 1."
     },
     "libraryPrompt": {
       "wantToSee": "Vil du se dine tidligere leksjoner?",
@@ -577,7 +582,8 @@
       "textMode": "Tekstmodus",
       "switchToVoiceMode": "Bytt til talemodus",
       "voiceMode": "Talemodus",
-      "screenReaderVoiceNote": "Skjermleser er på. Taleinndata er ikke tilgjengelig. Bruk tekstinndata nedenfor."
+      "screenReaderVoiceNote": "Skjermleser er på. Taleinndata er ikke tilgjengelig. Bruk tekstinndata nedenfor.",
+      "stepProgress": "Steg {{current}} av {{total}}"
     },
     "filingFailed": {
       "retryInProgress": "Et nytt forsøk er allerede i gang.",
@@ -618,7 +624,9 @@
       "yesAddLabel": "Ja, legg til i biblioteket",
       "yesAdd": "Ja, legg til",
       "noThanksLabel": "Nei takk",
-      "noThanks": "Nei takk"
+      "noThanks": "Nei takk",
+      "tryAgain": "Prøv igjen",
+      "skipForNow": "Hopp over for nå"
     },
     "parkingLot": {
       "title": "Parkeringsplass",

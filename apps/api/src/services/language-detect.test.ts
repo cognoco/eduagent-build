@@ -149,4 +149,24 @@ describe('detectLanguageSubject', () => {
 
     expect(result).toBeNull();
   });
+
+  // Red-green proof [BUG-110]: revert to `.match(/\{[\s\S]*\}/)` and this
+  // fails — the regex cannot pierce a markdown ```json fence and returns
+  // null, so the detector silently falls back to the hint instead of
+  // honoring the LLM's classification.
+  it('[BUG-110] extracts JSON from markdown-fenced LLM response', async () => {
+    mockRouteAndCall.mockResolvedValueOnce({
+      response:
+        '```json\n{"isLanguageLearning": true, "languageCode": "fr"}\n```',
+      provider: 'gemini',
+      model: 'gemini-2.5-flash',
+      latencyMs: 50,
+      stopReason: 'stop',
+    });
+
+    const result = await detectLanguageSubject('French');
+
+    expect(result).not.toBeNull();
+    expect(result!.code).toBe('fr');
+  });
 });

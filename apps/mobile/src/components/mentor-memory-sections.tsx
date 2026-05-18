@@ -193,6 +193,7 @@ export function MemoryRow({
             onPress={onRemove}
             className="px-3 py-2"
             accessibilityRole="button"
+            accessibilityLabel={`${actionLabel} ${label}`}
           >
             <Text className="text-body-sm font-semibold text-danger">
               {actionLabel}
