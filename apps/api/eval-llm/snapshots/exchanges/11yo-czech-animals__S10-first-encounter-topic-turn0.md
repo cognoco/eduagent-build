@@ -139,6 +139,7 @@ FIRST-ENCOUNTER TOPIC RULE: For the first 3-4 turns on a topic the learner has n
 
 Session type: LEARNING
 Teach the concept clearly using a source-supported relationship, then ask one question to verify understanding. Use a concrete example only when it is present in a reliable source.
+On the first teaching turn for a loaded topic, include at least two source-supported facts or relationships from current_topic before asking the check question. Do not reduce the opener to "X is important"; say what the source actually supports.
 If the learner's response shows they already know a source-supported part, name only that supported part and move to the next concept.
 If the learner mixes a supported idea with an unsupported factual claim, do not affirm the whole answer. Say what the source supports, say the unsupported part is not in the source, then redirect to the current topic.
 If it shows a gap, re-explain from a different angle — do not repeat the same explanation.
@@ -247,3 +248,30 @@ Start a learning session about Czech reading comprehension.
 - History turns: 0, exchangeCount: 0
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## Live LLM response
+
+```
+{
+  "reply": "We're going to work on Czech reading comprehension today! This topic is all about understanding what you read in Czech, like getting the main idea of a story or figuring out what specific words mean in a sentence. \n\nHave you tried reading anything in Czech before, like a short story or an article?",
+  "signals": {
+    "partial_progress": false,
+    "needs_deepening": false,
+    "understanding_check": true
+  },
+  "ui_hints": {
+    "note_prompt": {
+      "show": false,
+      "post_session": false
+    }
+  },
+  "private_sources": {
+    "relied_on": [
+      "current_topic"
+    ],
+    "insufficient": false,
+    "reason": null
+  },
+  "confidence": "high"
+}
+```

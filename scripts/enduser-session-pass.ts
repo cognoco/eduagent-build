@@ -590,6 +590,8 @@ const LEARNING_UNSUPPORTED_SPEED_OR_TERRAIN_RE =
   /\b(?:(?:arm(?:y|ies)|soldiers?|military)[^.?!]*(?:easy|easily|easier|more easily|quickly|faster|efficiently|more effectively|effectively)|(?:easy|easily|easier|more easily|quickly|faster|efficiently|more effectively|effectively)[^.?!]*(?:arm(?:y|ies)|soldiers?|military)|move(?: around)? quickly|quickly helped|faster|efficiently|more effectively|effectively|muddy?|paved path|forests?)\b/i;
 const LEARNING_UNSUPPORTED_EMPIRE_GROWTH_RE =
   /\b(?:empires? (?:can |could |might |may |often )?(?:grow|expand)|empires? expand[^.?!]*(?:often|armies?|army|conquer)|often involves armies?|help(?:ed|s|ing)? the empire (?:grow|stay strong)|empire (?:can |could |might |may |often )?(?:grow|stay strong)|stay strong)\b/i;
+const CELL_AUTONOMY_SOURCE_BOUND_RE =
+  /\b(?:cells?|cell)\b[^.?!]{0,120}\b(?:can do on its own|what a cell can do|all by itself)\b|\b(?:can do on its own|what a cell can do|all by itself)\b[^.?!]{0,120}\b(?:cells?|cell)\b/i;
 const REVIEW_OFF_ANCHOR_RE =
   /\b(lego|brick|building blocks?|fundamental piece|important function|what a cell is|size and status|wall|organs?|virus(?:es)?|eat|breathe|reproduc\w*|grow\w*|respond(?:ing)? to its environment|outer boundary|cell membrane|outer layer|stomach|lung|molecules?|atoms?|proteins?|processes of life|function on its own|can do on its own|all by itself|what a cell can do|main jobs?)\b/i;
 const REVIEW_CHALLENGE_MODE_RE =
@@ -636,8 +638,8 @@ const SOURCE_BOUND_TRIPWIRE_TERMS: Array<{
     label: 'unsupported analogy',
   },
   {
-    response: /\bcan do on its own\b|\bwhat a cell can do\b|\ball by itself\b/i,
-    source: /\bcan do on its own\b|\bwhat a cell can do\b|\ball by itself\b/i,
+    response: CELL_AUTONOMY_SOURCE_BOUND_RE,
+    source: CELL_AUTONOMY_SOURCE_BOUND_RE,
     label: 'cell autonomy phrase',
   },
   {

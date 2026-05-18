@@ -1572,6 +1572,34 @@ describe('source provenance audit', () => {
     expect(safe.sourceAudit.reason).toMatch(/cell autonomy phrase/i);
   });
 
+  it('does not treat ordinary algebra wording as a biology source drift', () => {
+    const sourceEvidence = buildExchangeSourceEvidence(
+      {
+        ...baseContext,
+        sessionType: 'homework',
+        topicTitle: undefined,
+        topicDescription: undefined,
+        rawInput: 'Solve 3x + 5 = 20.',
+      },
+      'How do I start?',
+    );
+    const audit = auditExchangeSources(
+      {
+        relied_on: ['homework_problem', 'deterministic_reasoning'],
+        insufficient: false,
+      },
+      sourceEvidence,
+    );
+
+    const safe = applySourceAuditSafetyFallback(
+      'The goal is to get x all by itself. Start by subtracting 5 from both sides.',
+      audit,
+    );
+
+    expect(safe.response).toContain('get x all by itself');
+    expect(safe.sourceAudit.reason ?? '').not.toMatch(/cell autonomy phrase/i);
+  });
+
   it('removes unsupported speed claims from current-topic replies', () => {
     const sourceEvidence = buildExchangeSourceEvidence(
       {

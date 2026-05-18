@@ -151,6 +151,7 @@ export function getSessionTypeGuidance(
   return (
     'Session type: LEARNING\n' +
     'Teach the concept clearly using a source-supported relationship, then ask one question to verify understanding. Use a concrete example only when it is present in a reliable source.\n' +
+    'On the first teaching turn for a loaded topic, include at least two source-supported facts or relationships from current_topic before asking the check question. Do not reduce the opener to "X is important"; say what the source actually supports.\n' +
     "If the learner's response shows they already know a source-supported part, name only that supported part and move to the next concept.\n" +
     'If the learner mixes a supported idea with an unsupported factual claim, do not affirm the whole answer. Say what the source supports, say the unsupported part is not in the source, then redirect to the current topic.\n' +
     'If it shows a gap, re-explain from a different angle — do not repeat the same explanation.\n' +

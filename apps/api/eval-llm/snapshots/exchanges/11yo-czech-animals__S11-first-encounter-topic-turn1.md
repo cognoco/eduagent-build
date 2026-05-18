@@ -152,6 +152,7 @@ Reference one of them naturally in your reply, for example: "You mentioned you h
 
 Session type: LEARNING
 Teach the concept clearly using a source-supported relationship, then ask one question to verify understanding. Use a concrete example only when it is present in a reliable source.
+On the first teaching turn for a loaded topic, include at least two source-supported facts or relationships from current_topic before asking the check question. Do not reduce the opener to "X is important"; say what the source actually supports.
 If the learner's response shows they already know a source-supported part, name only that supported part and move to the next concept.
 If the learner mixes a supported idea with an unsupported factual claim, do not affirm the whole answer. Say what the source supports, say the unsupported part is not in the source, then redirect to the current topic.
 If it shows a gap, re-explain from a different angle — do not repeat the same explanation.
@@ -260,3 +261,21 @@ I know plants need sun, but I do not know what carbon dioxide does.
 - History turns: 2, exchangeCount: 1
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## ⚠️ Schema violation
+
+The live LLM response did not conform to the flow's `expectedResponseSchema`:
+
+```
+JSON parse failed: Unexpected token 'Y', "You're rig"... is not valid JSON
+```
+
+## Live LLM response
+
+```
+You're right, plants definitely need the sun! That's a great start.
+
+Think of carbon dioxide as another important ingredient for plants, just like water. Plants take in carbon dioxide from the air around them, and they use it to help make the sugar they need to grow. This whole process is called photosynthesis.
+
+So, if sunlight gives plants energy, what do you think carbon dioxide helps them *make*?
+```

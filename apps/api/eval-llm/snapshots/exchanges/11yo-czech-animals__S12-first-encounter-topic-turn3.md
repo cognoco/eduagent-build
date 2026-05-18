@@ -160,6 +160,7 @@ Reference one of them naturally in your reply, for example: "You mentioned you h
 
 Session type: LEARNING
 Teach the concept clearly using a source-supported relationship, then ask one question to verify understanding. Use a concrete example only when it is present in a reliable source.
+On the first teaching turn for a loaded topic, include at least two source-supported facts or relationships from current_topic before asking the check question. Do not reduce the opener to "X is important"; say what the source actually supports.
 If the learner's response shows they already know a source-supported part, name only that supported part and move to the next concept.
 If the learner mixes a supported idea with an unsupported factual claim, do not affirm the whole answer. Say what the source supports, say the unsupported part is not in the source, then redirect to the current topic.
 If it shows a gap, re-explain from a different angle — do not repeat the same explanation.
@@ -268,3 +269,23 @@ I mix up ingredients and energy.
 - History turns: 4, exchangeCount: 3
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
+
+## ⚠️ Schema violation
+
+The live LLM response did not conform to the flow's `expectedResponseSchema`:
+
+```
+JSON parse failed: Unexpected token 'T', "That's a v"... is not valid JSON
+```
+
+## Live LLM response
+
+```
+That's a very common thing to mix up! Think of it like baking a cake.
+
+To bake a cake, you need **ingredients** like flour, sugar, and eggs. You also need **energy**, like the heat from an oven, to make those ingredients change into a cake.
+
+For a plant, water and carbon dioxide are like the flour and eggs – they are the **ingredients** the plant uses. The plant uses sunlight as **energy** to mix those ingredients together and "bake" its own food, which is sugar.
+
+Does thinking about baking a cake help you see the difference between ingredients and energy for the plant?
+```

@@ -731,8 +731,10 @@ const SOURCE_BOUND_SENTENCE_TERMS: Array<{
   { label: 'wine', response: /\bwine\b/i, source: /\bwine\b/i },
   {
     label: 'cell autonomy phrase',
-    response: /\bcan do on its own\b|\bwhat a cell can do\b/i,
-    source: /\bcan do on its own\b|\bwhat a cell can do\b/i,
+    response:
+      /\b(?:cells?|cell)\b[^.?!]{0,120}\b(?:can do on its own|what a cell can do|all by itself)\b|\b(?:can do on its own|what a cell can do|all by itself)\b[^.?!]{0,120}\b(?:cells?|cell)\b/i,
+    source:
+      /\b(?:cells?|cell)\b[^.?!]{0,120}\b(?:can do on its own|what a cell can do|all by itself)\b|\b(?:can do on its own|what a cell can do|all by itself)\b[^.?!]{0,120}\b(?:cells?|cell)\b/i,
   },
   {
     label: 'building-block analogy',

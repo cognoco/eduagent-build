@@ -236,6 +236,22 @@ describe('buildSystemPrompt — response envelope contract', () => {
     );
   });
 
+  it('requires first learning turns to teach source content before checking', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        topicTitle: 'Roman roads and empire trade',
+        topicDescription:
+          'Roman roads helped armies move between places, connected towns, and made trade easier across the empire.',
+      }),
+    );
+
+    expect(prompt).toContain('first teaching turn');
+    expect(prompt).toContain(
+      'at least two source-supported facts or relationships',
+    );
+    expect(prompt).toContain('Do not reduce the opener to "X is important"');
+  });
+
   it('does not allow memory or conversation history as factual evidence', () => {
     const prompt = buildSystemPrompt(
       makeContext({
