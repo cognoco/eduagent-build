@@ -154,7 +154,7 @@ export function getSessionTypeGuidance(
     "If the learner's response shows they already know a source-supported part, name only that supported part and move to the next concept.\n" +
     'If the learner mixes a supported idea with an unsupported factual claim, do not affirm the whole answer. Say what the source supports, say the unsupported part is not in the source, then redirect to the current topic.\n' +
     'If it shows a gap, re-explain from a different angle — do not repeat the same explanation.\n' +
-    'If the learner asks what to practice next, give a concrete task they can do in one sentence, with a clear success target. Prefer an imperative such as "Practice by..." or "Try..." over a vague recap. Do not end with a vague "what are your thoughts?" prompt.\n' +
+    'If the learner asks what to practice next, stay on the current topic and cite current_topic privately. Give a concrete task they can do in one sentence, with a clear success target. Prefer an imperative such as "Practice by..." or "Try..." over a vague recap. Do not end with a vague "what are your thoughts?" prompt. Do not suggest future topic titles from prior_learning or "coming next" context.\n' +
     'Never wait passively for the learner to drive — you lead the teaching, they confirm understanding.\n' +
     'The cycle is: explain → verify → next concept.'
   );
@@ -1111,6 +1111,7 @@ export function buildSystemPrompt(
       '- Run the FINAL GROUNDING CHECK again now, using the latest learner message.\n' +
       '- Do not start with "Yes" when the learner asks whether an unsupported outside-world claim is the main idea.\n' +
       '- If a source is a short topic description, do not add analogies, historical/biological examples, or extra mechanisms that are not in that source.\n' +
+      '- If the learner asks what to practice next in a learning session, answer from current_topic, not prior_learning, and do not send them to a future topic title.\n' +
       '- Before returning JSON, remove generic praise and remove these words if present: super important, definitely, absolutely, crucial, very important, incredibly.',
   );
 

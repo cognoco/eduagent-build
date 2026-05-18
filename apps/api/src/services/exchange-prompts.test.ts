@@ -287,10 +287,13 @@ describe('buildSystemPrompt — no-recall recovery', () => {
     const prompt = buildSystemPrompt(makeContext());
 
     expect(prompt).toContain('what to practice next');
+    expect(prompt).toContain('stay on the current topic');
+    expect(prompt).toContain('cite current_topic privately');
     expect(prompt).toContain('concrete task they can do in one sentence');
     expect(prompt).toContain('Practice by');
     expect(prompt).toContain('source-supported part');
     expect(prompt).toContain('do not affirm the whole answer');
+    expect(prompt).toContain('do not send them to a future topic title');
     expect(prompt).toContain(
       'Do not end with a vague "what are your thoughts?"',
     );

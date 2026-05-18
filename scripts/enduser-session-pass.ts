@@ -435,6 +435,8 @@ const REVIEW_OFF_ANCHOR_RE =
   /\b(lego|brick|building blocks?|wall|organs?|virus(?:es)?|eat|breathe|reproduc\w*|grow\w*|respond(?:ing)? to its environment|outer boundary|cell membrane|outer layer|stomach|lung|molecules?|atoms?|proteins?|processes of life|function on its own|all by itself|what a cell can do|main jobs?)\b/i;
 const CONCRETE_NEXT_PRACTICE_RE =
   /\b(try|practice|explain in one sentence|one-sentence|compare|write|say|answer this|task)\b/i;
+const FUTURE_TOPIC_TITLE_RE =
+  /\b(?:World History|Biology|Algebra) Topic \d+\b/i;
 const SELF_CHECK_RE = /\b(check|substitut|plug|back into|reverse|undo)\b/i;
 const SOURCE_AUDIT_FAIL_STATUSES = new Set([
   'parse_failed',
@@ -628,6 +630,22 @@ function analyzeTurn(input: {
       code: 'learning_next_practice_vague',
       message:
         'The learner asked what to practice next, but the reply did not give a concrete practice task.',
+      mode: definition.mode,
+      turnIndex,
+      snippet: snippet(response),
+    });
+  }
+
+  if (
+    definition.mode === 'learning' &&
+    turnIndex === 5 &&
+    FUTURE_TOPIC_TITLE_RE.test(response)
+  ) {
+    issues.push({
+      severity: 'fail',
+      code: 'learning_next_practice_future_topic',
+      message:
+        'The learner asked what to practice next, but the reply sent them to a future topic instead of giving a current-topic practice task.',
       mode: definition.mode,
       turnIndex,
       snippet: snippet(response),

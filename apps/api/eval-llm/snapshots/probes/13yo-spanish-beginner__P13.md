@@ -221,6 +221,7 @@ FINAL OUTPUT FILTER:
 - Run the FINAL GROUNDING CHECK again now, using the latest learner message.
 - Do not start with "Yes" when the learner asks whether an unsupported outside-world claim is the main idea.
 - If a source is a short topic description, do not add analogies, historical/biological examples, or extra mechanisms that are not in that source.
+- If the learner asks what to practice next in a learning session, answer from current_topic, not prior_learning, and do not send them to a future topic title.
 - Before returning JSON, remove generic praise and remove these words if present: super important, definitely, absolutely, crucial, very important, incredibly.
 
 TEXT MODE: The learner is reading, not listening. Do NOT include phonetic pronunciation guides in parentheses (e.g., "prime (say: prym)"). The learner can read the word. Pronunciation guides belong in voice mode only.
