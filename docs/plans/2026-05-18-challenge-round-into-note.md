@@ -737,9 +737,28 @@ describe('challenge round envelope fields', () => {
       reply: 'Strong work.',
       signals: {
         challenge_round_evaluation: [
-          { concept: 'photosynthesis vs respiration', result: 'solid', evidence: 'learner described both directions of energy flow' },
-          { concept: 'role of ATP', result: 'partial', evidence: 'mentioned energy currency, missed structure' },
-          { concept: 'where it happens', result: 'misconception', evidence: 'said nucleus instead of chloroplast', correction: 'occurs in chloroplasts' },
+          {
+            concept: 'photosynthesis vs respiration',
+            result: 'solid',
+            evidence: 'learner described both directions of energy flow',
+            answerEventId: 'event-solid-1',
+            learnerQuote: 'photosynthesis stores energy in glucose and respiration releases it',
+          },
+          {
+            concept: 'role of ATP',
+            result: 'partial',
+            evidence: 'mentioned energy currency, missed structure',
+            answerEventId: 'event-partial-1',
+            learnerQuote: 'ATP is like energy money',
+          },
+          {
+            concept: 'where it happens',
+            result: 'misconception',
+            evidence: 'said nucleus instead of chloroplast',
+            correction: 'occurs in chloroplasts',
+            answerEventId: 'event-misconception-1',
+            learnerQuote: 'photosynthesis happens in the nucleus',
+          },
         ],
       },
       confidence: 'high',
@@ -788,6 +807,8 @@ export const challengeRoundEvaluationItemSchema = z.object({
   concept: z.string().min(1).max(200),
   result: z.enum(['solid', 'partial', 'missing', 'misconception']),
   evidence: z.string().min(1).max(500),
+  answerEventId: z.string().min(1).max(120),
+  learnerQuote: z.string().min(1).max(500),
   correction: z.string().min(1).max(500).optional(),
 });
 
@@ -810,6 +831,8 @@ note_draft: z
   })
   .optional(),
 ```
+
+**HIGH-6 invariant:** `answerEventId` and `learnerQuote` are required because note drafting must be grounded in the learner's exact words. Downstream code must pass only `learnerQuote` values from `result === 'solid'` items to the drafter. The full challenge transcript is not an acceptable draft source because it may contain partial answers or misconceptions.
 
 - [ ] **Step 4: Run test green**
 
