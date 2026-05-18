@@ -104,3 +104,51 @@ Generate the quiz round.
 
 - Fine-grained age: 17. Interests passed: French literature, philosophy, existentialism, creative writing.
 - Library topics passed: Camus — L'Étranger; French subjunctive; essay structure; Enlightenment thinkers.
+
+## Live LLM response
+
+```
+```json
+{
+  "theme": "Capitals of Thought: The Birthplaces of Ideas and Absurdity",
+  "questions": [
+    {
+      "country": "Algeria",
+      "correctAnswer": "Algiers",
+      "distractors": ["Oran", "Constantine", "Tlemcen"],
+      "funFact": "Algiers is sometimes called 'Alger la Blanche' (Algiers the White) due to its striking white buildings visible from the sea."
+    },
+    {
+      "country": "United Kingdom",
+      "correctAnswer": "London",
+      "distractors": ["Manchester", "Edinburgh", "Liverpool"],
+      "funFact": "London's famous clock tower, often mistakenly called Big Ben, is officially named Elizabeth Tower, with Big Ben being the large bell inside it."
+    },
+    {
+      "country": "Germany",
+      "correctAnswer": "Berlin",
+      "distractors": ["Munich", "Hamburg", "Frankfurt"],
+      "funFact": "Berlin boasts more bridges than Venice, with over 1,700 spanning its various canals and rivers."
+    },
+    {
+      "country": "Netherlands",
+      "correctAnswer": "Amsterdam",
+      "distractors": ["Rotterdam", "The Hague", "Utrecht"],
+      "funFact": "Amsterdam has around 881,000 bicycles, outnumbering its human residents."
+    },
+    {
+      "country": "Denmark",
+      "correctAnswer": "Copenhagen",
+      "distractors": ["Aarhus", "Odense", "Aalborg"],
+      "funFact": "Copenhagen's Tivoli Gardens amusement park, opened in 1843, famously inspired Walt Disney."
+    },
+    {
+      "country": "Portugal",
+      "correctAnswer": "Lisbon",
+      "distractors": ["Porto", "Coimbra", "Braga"],
+      "funFact": "Lisbon is one of the oldest cities in Western Europe, predating Rome by several centuries."
+    }
+  ]
+}
+```
+```

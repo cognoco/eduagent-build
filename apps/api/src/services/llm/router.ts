@@ -357,12 +357,17 @@ function getFallbackConfig(
   primary: ModelConfig,
   rung: EscalationRung,
 ): ModelConfig | null {
+  const shared = {
+    responseFormat: primary.responseFormat,
+  } satisfies Pick<ModelConfig, 'responseFormat'>;
+
   if (primary.provider === 'anthropic' && providers.has('gemini')) {
     const isLight = rung <= 2;
     return {
       provider: 'gemini',
       model: isLight ? 'gemini-2.5-flash' : 'gemini-2.5-pro',
       maxTokens: MIN_REPLY_MAX_TOKENS,
+      ...shared,
     };
   }
 
@@ -372,6 +377,7 @@ function getFallbackConfig(
       provider: 'gemini',
       model: isLight ? 'gemini-2.5-flash' : 'gemini-2.5-pro',
       maxTokens: MIN_REPLY_MAX_TOKENS,
+      ...shared,
     };
   }
 
@@ -386,12 +392,14 @@ function getFallbackConfig(
         provider: 'openai',
         model: 'gpt-4o-mini',
         maxTokens: MIN_REPLY_MAX_TOKENS,
+        ...shared,
       };
     }
     return {
       provider: 'openai',
       model: 'gpt-4o',
       maxTokens: MIN_REPLY_MAX_TOKENS,
+      ...shared,
     };
   }
 
@@ -400,6 +408,7 @@ function getFallbackConfig(
       provider: 'anthropic',
       model: ANTHROPIC_SONNET_MODEL,
       maxTokens: MIN_REPLY_MAX_TOKENS,
+      ...shared,
     };
   }
 
@@ -597,6 +606,7 @@ export async function routeAndCall(
     // both. Phase 1 Task 3.
     flow?: string;
     sessionId?: string;
+    responseFormat?: 'json';
   },
 ): Promise<RouteResult> {
   const capability = getMessageCapability(messages);
@@ -604,11 +614,10 @@ export async function routeAndCall(
     conversationLanguage: _options?.conversationLanguage,
     pronouns: _options?.pronouns,
   });
-  const config = getModelConfig(
-    rung,
-    _options?.llmTier,
-    _options?.preferredProvider,
-  );
+  const config = {
+    ...getModelConfig(rung, _options?.llmTier, _options?.preferredProvider),
+    ...(_options?.responseFormat ? { responseFormat: 'json' as const } : {}),
+  };
   const provider = providers.get(config.provider);
   if (!provider) {
     throw new Error(`No provider registered for: ${config.provider}`);
@@ -976,6 +985,7 @@ export async function routeAndStream(
     // [LLM-TRUNCATE-01] Metric labels — see routeAndCall for rationale.
     flow?: string;
     sessionId?: string;
+    responseFormat?: 'json';
   },
 ): Promise<StreamResult> {
   const capability = getMessageCapability(messages);
@@ -983,11 +993,10 @@ export async function routeAndStream(
     conversationLanguage: options?.conversationLanguage,
     pronouns: options?.pronouns,
   });
-  const config = getModelConfig(
-    rung,
-    options?.llmTier,
-    options?.preferredProvider,
-  );
+  const config = {
+    ...getModelConfig(rung, options?.llmTier, options?.preferredProvider),
+    ...(options?.responseFormat ? { responseFormat: 'json' as const } : {}),
+  };
   const provider = providers.get(config.provider);
   if (!provider) {
     throw new Error(`No provider registered for: ${config.provider}`);

@@ -103,3 +103,75 @@ Generate the quiz round.
 
 - Fine-grained age: 13. Interests passed: horses, showjumping, eventing, nature photography.
 - Library topics passed: Spanish present tense verbs; Spanish family vocabulary; Spanish numbers 1-1000; Spain geography.
+
+## Live LLM response
+
+```
+```json
+{
+  "theme": "Capitals of Countries with Legendary Equestrian History and Modern Showjumping Stars!",
+  "questions": [
+    {
+      "country": "Argentina",
+      "correctAnswer": "Buenos Aires",
+      "distractors": [
+        "Córdoba",
+        "Rosario",
+        "Mendoza"
+      ],
+      "funFact": "Buenos Aires boasts the widest avenue in the world, Avenida 9 de Julio, which has up to 16 lanes!"
+    },
+    {
+      "country": "Mexico",
+      "correctAnswer": "Mexico City",
+      "distractors": [
+        "Guadalajara",
+        "Monterrey",
+        "Puebla"
+      ],
+      "funFact": "Mexico City is built on what was once an ancient lake, and it's actually sinking a few inches every year!"
+    },
+    {
+      "country": "Colombia",
+      "correctAnswer": "Bogotá",
+      "distractors": [
+        "Medellín",
+        "Cali",
+        "Cartagena"
+      ],
+      "funFact": "Bogotá is the third-highest capital city in the world, sitting over 8,660 feet above sea level in the Andes mountains."
+    },
+    {
+      "country": "France",
+      "correctAnswer": "Paris",
+      "distractors": [
+        "Marseille",
+        "Lyon",
+        "Nice"
+      ],
+      "funFact": "There's a secret apartment at the very top of the Eiffel Tower that its designer, Gustave Eiffel, used for entertaining important guests."
+    },
+    {
+      "country": "Germany",
+      "correctAnswer": "Berlin",
+      "distractors": [
+        "Munich",
+        "Hamburg",
+        "Frankfurt"
+      ],
+      "funFact": "Berlin has more bridges than Venice, with around 1,700 bridges crisscrossing its many canals and rivers."
+    },
+    {
+      "country": "Netherlands",
+      "correctAnswer": "Amsterdam",
+      "distractors": [
+        "Rotterdam",
+        "The Hague",
+        "Utrecht"
+      ],
+      "funFact": "Amsterdam has more bicycles than residents, with over 800,000 bikes navigating its charming streets and canals."
+    }
+  ]
+}
+```
+```

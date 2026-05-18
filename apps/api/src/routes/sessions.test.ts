@@ -1377,6 +1377,46 @@ describe('session routes', () => {
       expect(body).toContain('"content":"world!"');
     });
 
+    it('[SOURCE-AUDIT] replaces streamed text when source audit applies a safety fallback', async () => {
+      (streamMessage as jest.Mock).mockResolvedValueOnce({
+        stream: (async function* () {
+          yield 'Unsupported ';
+          yield 'history answer';
+        })(),
+        onComplete: jest.fn().mockResolvedValue({
+          response:
+            'I need reliable source material before answering that factually.',
+          sourceReplacement:
+            'I need reliable source material before answering that factually.',
+          exchangeCount: 1,
+          escalationRung: 1,
+          expectedResponseMinutes: 3,
+          aiEventId: EVENT_ID,
+        }),
+      });
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/stream`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ message: 'Why did ancient cities trade?' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(200);
+      const body = await res.text();
+      expect(body).toContain('"type":"chunk"');
+      expect(body).toContain('"content":"Unsupported "');
+      expect(body).toContain('"type":"replace"');
+      expect(body).toContain(
+        'I need reliable source material before answering that factually.',
+      );
+      expect(body).toContain('"type":"done"');
+      expect(body).toContain(`"aiEventId":"${EVENT_ID}"`);
+    });
+
     it('[CHAT-STREAM-FALLBACK] falls back to non-streaming when the stream fails before visible text', async () => {
       mockSafeRefundQuota.mockClear();
       (processMessage as jest.Mock).mockResolvedValueOnce({

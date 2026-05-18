@@ -92,9 +92,9 @@ export function normalizeReplyText(text: string): string {
 }
 
 const EMBEDDED_ENVELOPE_TAIL_RE =
-  /["\u201c\u201d]\s*,\s*["\u201c\u201d](?:signals|ui_hints|confidence)["\u201c\u201d]\s*:/;
+  /["\u201c\u201d]\s*,\s*["\u201c\u201d](?:signals|ui_hints|private_sources|confidence)["\u201c\u201d]\s*:/;
 const EMBEDDED_ENVELOPE_CONFIRM_RE =
-  /["\u201c\u201d](?:partial_progress|needs_deepening|understanding_check|ready_to_finish|retrieval_score|note_prompt|post_session|fluency_drill|confidence)["\u201c\u201d]\s*:/;
+  /["\u201c\u201d](?:partial_progress|needs_deepening|understanding_check|ready_to_finish|retrieval_score|note_prompt|post_session|fluency_drill|private_sources|relied_on|insufficient|confidence)["\u201c\u201d]\s*:/;
 
 /**
  * Some live models occasionally copy the envelope side-channel back into the

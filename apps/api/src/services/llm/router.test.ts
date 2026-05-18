@@ -243,6 +243,18 @@ describe('LLM Router', () => {
       },
     );
 
+    it('passes JSON response format through to the selected provider', async () => {
+      _clearProviders();
+      const spy = createCapturingProvider('gemini');
+      registerProvider(spy);
+
+      await routeAndCall([{ role: 'user', content: 'Return JSON' }], 1, {
+        responseFormat: 'json',
+      });
+
+      expect(spy.lastConfig?.responseFormat).toBe('json');
+    });
+
     afterAll(() => {
       // Restore the suite-level mock registration the other describe blocks
       // rely on so test ordering remains independent.

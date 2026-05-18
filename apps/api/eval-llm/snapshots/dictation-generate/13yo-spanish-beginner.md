@@ -124,3 +124,134 @@ Generate a dictation for me.
 - Native language drives punctuation-name mapping.
 - Interests wired (audit P0.1): horses, showjumping, eventing, nature photography.
 - Library topics wired (audit P0.1): Spanish present tense verbs, Spanish family vocabulary, Spanish numbers 1-1000, Spain geography.
+
+## Live LLM response
+
+```
+```json
+{
+  "sentences": [
+    {
+      "text": "The young rider gripped the reins tightly.",
+      "withPunctuation": "The young rider gripped the reins tightly period",
+      "wordCount": 6,
+      "chunks": [
+        "The young rider",
+        "gripped the reins tightly."
+      ],
+      "chunksWithPunctuation": [
+        "The young rider",
+        "gripped the reins tightly period"
+      ]
+    },
+    {
+      "text": "Her brave mare, Estrella, whinnied softly.",
+      "withPunctuation": "Her brave mare comma Estrella comma whinnied softly period",
+      "wordCount": 6,
+      "chunks": [
+        "Her brave mare comma Estrella comma",
+        "whinnied softly."
+      ],
+      "chunksWithPunctuation": [
+        "Her brave mare comma Estrella comma",
+        "whinnied softly period"
+      ]
+    },
+    {
+      "text": "Sunlight dappled through ancient oak leaves.",
+      "withPunctuation": "Sunlight dappled through ancient oak leaves period",
+      "wordCount": 6,
+      "chunks": [
+        "Sunlight dappled",
+        "through ancient oak leaves."
+      ],
+      "chunksWithPunctuation": [
+        "Sunlight dappled",
+        "through ancient oak leaves period"
+      ]
+    },
+    {
+      "text": "A dusty trail led towards distant hills.",
+      "withPunctuation": "A dusty trail led towards distant hills period",
+      "wordCount": 7,
+      "chunks": [
+        "A dusty trail",
+        "led towards distant hills."
+      ],
+      "chunksWithPunctuation": [
+        "A dusty trail",
+        "led towards distant hills period"
+      ]
+    },
+    {
+      "text": "She knew, instinctively, the way ahead.",
+      "withPunctuation": "She knew comma instinctively comma the way ahead period",
+      "wordCount": 6,
+      "chunks": [
+        "She knew comma instinctively comma",
+        "the way ahead."
+      ],
+      "chunksWithPunctuation": [
+        "She knew comma instinctively comma",
+        "the way ahead period"
+      ]
+    },
+    {
+      "text": "They galloped past a crumbling stone wall.",
+      "withPunctuation": "They galloped past a crumbling stone wall period",
+      "wordCount": 7,
+      "chunks": [
+        "They galloped past",
+        "a crumbling stone wall."
+      ],
+      "chunksWithPunctuation": [
+        "They galloped past",
+        "a crumbling stone wall period"
+      ]
+    },
+    {
+      "text": "Could they reach the hacienda by evening?",
+      "withPunctuation": "Could they reach the hacienda by evening question mark",
+      "wordCount": 7,
+      "chunks": [
+        "Could they reach",
+        "the hacienda by evening question mark"
+      ],
+      "chunksWithPunctuation": [
+        "Could they reach",
+        "the hacienda by evening question mark"
+      ]
+    },
+    {
+      "text": "Every shadow held a secret.",
+      "withPunctuation": "Every shadow held a secret period",
+      "wordCount": 5,
+      "chunks": [
+        "Every shadow",
+        "held a secret."
+      ],
+      "chunksWithPunctuation": [
+        "Every shadow",
+        "held a secret period"
+      ]
+    },
+    {
+      "text": "Their adventure had just begun.",
+      "withPunctuation": "Their adventure had just begun period",
+      "wordCount": 5,
+      "chunks": [
+        "Their adventure",
+        "had just begun."
+      ],
+      "chunksWithPunctuation": [
+        "Their adventure",
+        "had just begun period"
+      ]
+    }
+  ],
+  "title": "Estrella's Journey",
+  "topic": "Adventure with a horse in a Spanish-inspired setting",
+  "language": "en"
+}
+```
+```

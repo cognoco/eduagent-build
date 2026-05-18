@@ -90,3 +90,67 @@ V lese žil starý medvěd. Každé ráno se probouzel a hledal med. Jednoho dne
 - System prompt is fully static — identical across every profile.
 - Language is auto-detected by the LLM, not passed as a parameter.
 - No personalization surface at all. Appropriate for a pure utility.
+
+## Live LLM response
+
+```
+```json
+{
+  "sentences": [
+    {
+      "text": "V lese žil starý medvěd.",
+      "withPunctuation": "V lese žil starý medvěd period",
+      "wordCount": 5,
+      "chunks": [
+        "V lese žil",
+        "starý medvěd."
+      ],
+      "chunksWithPunctuation": [
+        "V lese žil",
+        "starý medvěd period"
+      ]
+    },
+    {
+      "text": "Každé ráno se probouzel a hledal med.",
+      "withPunctuation": "Každé ráno se probouzel a hledal med period",
+      "wordCount": 8,
+      "chunks": [
+        "Každé ráno",
+        "se probouzel",
+        "a hledal med."
+      ],
+      "chunksWithPunctuation": [
+        "Každé ráno",
+        "se probouzel",
+        "a hledal med period"
+      ]
+    },
+    {
+      "text": "Jednoho dne však med nemohl najít.",
+      "withPunctuation": "Jednoho dne však med nemohl najít period",
+      "wordCount": 7,
+      "chunks": [
+        "Jednoho dne však",
+        "med nemohl najít."
+      ],
+      "chunksWithPunctuation": [
+        "Jednoho dne však",
+        "med nemohl najít period"
+      ]
+    },
+    {
+      "text": "Co se stalo?",
+      "withPunctuation": "Co se stalo question mark",
+      "wordCount": 3,
+      "chunks": [
+        "Co se stalo?"
+      ],
+      "chunksWithPunctuation": [
+        "Co se stalo question mark"
+      ]
+    }
+  ],
+  "language": "cs"
+}
+```
+```

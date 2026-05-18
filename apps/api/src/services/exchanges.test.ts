@@ -10,6 +10,9 @@ import {
 import { makeChatStreamResult } from './llm/types';
 import {
   buildSystemPrompt,
+  auditExchangeSources,
+  applySourceAuditSafetyFallback,
+  buildExchangeSourceEvidence,
   classifyExchangeOutcome,
   parseExchangeEnvelope,
   processExchange,
@@ -212,7 +215,7 @@ describe('buildSystemPrompt', () => {
       homeworkMode: 'check_answer',
     });
     expect(prompt).toContain('CHECK MY ANSWER');
-    expect(prompt).toContain('similar worked example');
+    expect(prompt).toContain('keep it tiny');
     expect(prompt).toContain('not a conversation');
   });
 
@@ -223,7 +226,7 @@ describe('buildSystemPrompt', () => {
       homeworkMode: 'help_me',
     });
     expect(prompt).toContain('HELP ME SOLVE IT');
-    expect(prompt).toContain('similar worked example');
+    expect(prompt).toContain('next move or a tiny similar example');
     expect(prompt).toContain('Explain the approach briefly');
   });
 
@@ -1171,6 +1174,167 @@ describe('parseExchangeEnvelope schema-failure fallback [BUG-934][BUG-935]', () 
     const result = parseExchangeEnvelope(raw, ctx);
 
     expect(result.cleanResponse).toBe('plain text, no json at all');
+  });
+
+  it('strips embedded envelope tails from raw prose fallback text', () => {
+    const raw =
+      'What do you get after subtracting 5 from both sides?","signals":{"partial_progress":true,"needs_deepening":false,"understanding_check":false},"ui_hints":{"note_prompt":{"show":false,"post_session":false}}}';
+
+    const result = parseExchangeEnvelope(raw, ctx);
+
+    expect(result.envelopeParseFailed).toBe(true);
+    expect(result.cleanResponse).toBe(
+      'What do you get after subtracting 5 from both sides?',
+    );
+    expect(result.cleanResponse).not.toContain('signals');
+    expect(result.cleanResponse).not.toContain('ui_hints');
+  });
+
+  it('extracts private source provenance from a valid envelope', () => {
+    const raw = JSON.stringify({
+      reply: 'Roads made moving people and goods easier.',
+      signals: {
+        partial_progress: false,
+        needs_deepening: false,
+        understanding_check: false,
+      },
+      ui_hints: { note_prompt: { show: false, post_session: false } },
+      private_sources: {
+        relied_on: ['current_topic'],
+        insufficient: false,
+        reason: 'The current topic describes Roman roads and trade.',
+      },
+    });
+
+    const result = parseExchangeEnvelope(raw, ctx);
+
+    expect(result.privateSources).toEqual({
+      relied_on: ['current_topic'],
+      insufficient: false,
+      reason: 'The current topic describes Roman roads and trade.',
+    });
+  });
+});
+
+describe('source provenance audit', () => {
+  const evidence = buildExchangeSourceEvidence(
+    {
+      ...baseContext,
+      topicTitle: 'Roman roads and empire trade',
+      topicDescription:
+        'How Roman roads helped armies, towns, and trade stay connected.',
+    },
+    'Give me a quick example with Rome.',
+  );
+
+  it('passes when the model relies on an available reliable source', () => {
+    const audit = auditExchangeSources(
+      { relied_on: ['current_topic'], insufficient: false },
+      evidence,
+    );
+
+    expect(audit.status).toBe('ok');
+    expect(audit.reliableReliedOnSourceIds).toEqual(['current_topic']);
+  });
+
+  it('fails when the model invents a source id', () => {
+    const audit = auditExchangeSources(
+      { relied_on: ['forum_post_123'], insufficient: false },
+      evidence,
+    );
+
+    expect(audit.status).toBe('unsupported_sources');
+    expect(audit.unsupportedSourceIds).toEqual(['forum_post_123']);
+  });
+
+  it('fails when the model relies only on memory for factual support', () => {
+    const audit = auditExchangeSources(
+      { relied_on: ['mentor_memory'], insufficient: false },
+      [
+        {
+          id: 'mentor_memory',
+          kind: 'mentor_memory',
+          reliability: 'memory_only',
+          label: 'Mentor memory',
+          reliableForFacts: false,
+        },
+      ],
+    );
+
+    expect(audit.status).toBe('missing_reliable_source');
+    expect(audit.reliableReliedOnSourceIds).toEqual([]);
+  });
+
+  it('records an intentional insufficient-source outcome', () => {
+    const audit = auditExchangeSources(
+      {
+        relied_on: ['learner_message'],
+        insufficient: true,
+        reason: 'Learner asked for a factual answer without source material.',
+      },
+      buildExchangeSourceEvidence(baseContext, 'Tell me why Atlantis sank.'),
+    );
+
+    expect(audit.status).toBe('insufficient_reliable_sources');
+    expect(audit.insufficient).toBe(true);
+  });
+
+  it('replaces unsupported factual replies when no reliable source exists', () => {
+    const audit = auditExchangeSources(
+      { relied_on: ['learner_message'], insufficient: false },
+      buildExchangeSourceEvidence(
+        { ...baseContext, topicTitle: undefined, topicDescription: undefined },
+        'Tell me a historical fact without source material.',
+      ),
+    );
+
+    const safe = applySourceAuditSafetyFallback(
+      'Here is an unsupported historical claim.',
+      audit,
+    );
+
+    expect(safe.response).toMatch(/reliable source material/i);
+    expect(safe.sourceAudit.status).toBe('insufficient_reliable_sources');
+  });
+
+  it('standardizes intentional no-source replies into useful non-factual guidance', () => {
+    const audit = auditExchangeSources(
+      {
+        relied_on: ['learner_message'],
+        insufficient: true,
+        reason: 'No trusted history source was provided.',
+      },
+      buildExchangeSourceEvidence(
+        { ...baseContext, topicTitle: undefined, topicDescription: undefined },
+        'Was trade mostly about things civilizations lacked?',
+      ),
+    );
+
+    const safe = applySourceAuditSafetyFallback(
+      'Please share your source material.',
+      audit,
+    );
+
+    expect(safe.response).toMatch(/source-check question/i);
+    expect(safe.response).toMatch(/should not answer it from memory/i);
+    expect(safe.sourceAudit.reason).toMatch(/no-source safety fallback/i);
+  });
+
+  it('adds recitation_text as a reliable source for wording feedback', () => {
+    const sourceEvidence = buildExchangeSourceEvidence(
+      { ...baseContext, topicTitle: undefined, effectiveMode: 'recitation' },
+      'Roman roads connected towns.',
+    );
+
+    expect(sourceEvidence).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'recitation_text',
+          reliableForFacts: true,
+          reliability: 'learner_provided',
+        }),
+      ]),
+    );
   });
 });
 

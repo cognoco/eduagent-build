@@ -73,7 +73,10 @@ type GeminiPart =
 interface GeminiRequest {
   contents: Array<{ role: 'user' | 'model'; parts: GeminiPart[] }>;
   systemInstruction?: { parts: Array<{ text: string }> };
-  generationConfig: { maxOutputTokens: number };
+  generationConfig: {
+    maxOutputTokens: number;
+    responseMimeType?: 'application/json';
+  };
   safetySettings: GeminiSafetySetting[];
 }
 
@@ -138,7 +141,12 @@ function toGeminiRequest(
 
   const request: GeminiRequest = {
     contents,
-    generationConfig: { maxOutputTokens: config.maxTokens },
+    generationConfig: {
+      maxOutputTokens: config.maxTokens,
+      ...(config.responseFormat === 'json'
+        ? { responseMimeType: 'application/json' as const }
+        : {}),
+    },
     safetySettings: SAFETY_SETTINGS_FOR_MINORS,
   };
 

@@ -56,6 +56,11 @@ describe('buildExchangeHistory', () => {
           understanding_check: boolean;
         };
         ui_hints: { note_prompt: { show: boolean; post_session: boolean } };
+        private_sources?: {
+          relied_on?: string[];
+          insufficient?: boolean;
+          reason?: string;
+        };
       };
 
       // Reply text is preserved verbatim.
@@ -78,6 +83,11 @@ describe('buildExchangeHistory', () => {
       // ui_hints.note_prompt also fully populated — same drift class.
       expect(envelope.ui_hints).toEqual({
         note_prompt: { show: false, post_session: false },
+      });
+      expect(envelope.private_sources).toEqual({
+        relied_on: ['conversation_history'],
+        insufficient: false,
+        reason: 'Rewrapped prior assistant turn for conversation continuity.',
       });
     }
   });

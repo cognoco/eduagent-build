@@ -124,3 +124,87 @@ Generate a dictation for me.
 - Native language drives punctuation-name mapping.
 - Interests wired (audit P0.1): horses, forest animals, nature journaling, drawing.
 - Library topics wired (audit P0.1): Czech reading comprehension, basic fractions, human body systems, water cycle.
+
+## Live LLM response
+
+```
+```json
+{
+  "sentences": [
+    {
+      "text": "Dívka se tiše vydala do lesa.",
+      "withPunctuation": "Dívka se tiše vydala do lesa tečka",
+      "wordCount": 6,
+      "chunks": ["Dívka se tiše vydala", "do lesa."],
+      "chunksWithPunctuation": ["Dívka se tiše vydala", "do lesa tečka"]
+    },
+    {
+      "text": "Slunce prosvítalo hustými větvemi.",
+      "withPunctuation": "Slunce prosvítalo hustými větvemi tečka",
+      "wordCount": 5,
+      "chunks": ["Slunce prosvítalo", "hustými větvemi."],
+      "chunksWithPunctuation": ["Slunce prosvítalo", "hustými větvemi tečka"]
+    },
+    {
+      "text": "U tůně čekal vznešený jelen.",
+      "withPunctuation": "U tůně čekal vznešený jelen tečka",
+      "wordCount": 5,
+      "chunks": ["U tůně čekal", "vznešený jelen."],
+      "chunksWithPunctuation": ["U tůně čekal", "vznešený jelen tečka"]
+    },
+    {
+      "text": "Jeho srst zářila odpoledním světlem.",
+      "withPunctuation": "Jeho srst zářila odpoledním světlem tečka",
+      "wordCount": 5,
+      "chunks": ["Jeho srst zářila", "odpoledním světlem."],
+      "chunksWithPunctuation": ["Jeho srst zářila", "odpoledním světlem tečka"]
+    },
+    {
+      "text": "Dívka si sedla a začala kreslit.",
+      "withPunctuation": "Dívka si sedla a začala kreslit tečka",
+      "wordCount": 6,
+      "chunks": ["Dívka si sedla", "a začala kreslit."],
+      "chunksWithPunctuation": ["Dívka si sedla", "a začala kreslit tečka"]
+    },
+    {
+      "text": "Slyšela šumění nedalekého potoka.",
+      "withPunctuation": "Slyšela šumění nedalekého potoka tečka",
+      "wordCount": 5,
+      "chunks": ["Slyšela šumění", "nedalekého potoka."],
+      "chunksWithPunctuation": ["Slyšela šumění", "nedalekého potoka tečka"]
+    },
+    {
+      "text": "Voda se vlnila mezi kameny tiše.",
+      "withPunctuation": "Voda se vlnila mezi kameny tiše tečka",
+      "wordCount": 6,
+      "chunks": ["Voda se vlnila", "mezi kameny tiše."],
+      "chunksWithPunctuation": ["Voda se vlnila", "mezi kameny tiše tečka"]
+    },
+    {
+      "text": "Do zápisníku skicovala staré duby.",
+      "withPunctuation": "Do zápisníku skicovala staré duby tečka",
+      "wordCount": 5,
+      "chunks": ["Do zápisníku skicovala", "staré duby."],
+      "chunksWithPunctuation": ["Do zápisníku skicovala", "staré duby tečka"]
+    },
+    {
+      "text": "Bylo to její tajné místo, plné klidu.",
+      "withPunctuation": "Bylo to její tajné místo čárka plné klidu tečka",
+      "wordCount": 8,
+      "chunks": ["Bylo to její tajné místo", "plné klidu."],
+      "chunksWithPunctuation": ["Bylo to její tajné místo čárka", "plné klidu tečka"]
+    },
+    {
+      "text": "Cítila radost z každého okamžiku.",
+      "withPunctuation": "Cítila radost z každého okamžiku tečka",
+      "wordCount": 6,
+      "chunks": ["Cítila radost", "z každého okamžiku."],
+      "chunksWithPunctuation": ["Cítila radost", "z každého okamžiku tečka"]
+    }
+  ],
+  "title": "Lesní putování",
+  "topic": "Dobrodružství v lese a pozorování přírody",
+  "language": "cs"
+}
+```
+```

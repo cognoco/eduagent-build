@@ -85,3 +85,7 @@ USER: Use dinosaurs if it fits.
 ## Builder notes
 
 - Dimension: interest-context
+
+## Live LLM response
+
+> **Error:** `live budget exceeded (20 calls); re-run with --max-live-calls to raise`

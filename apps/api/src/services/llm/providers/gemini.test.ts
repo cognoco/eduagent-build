@@ -39,7 +39,7 @@ function sseChunks(texts: string[]): string {
       (text) =>
         `data: ${JSON.stringify({
           candidates: [{ content: { parts: [{ text }] } }],
-        })}`
+        })}`,
     )
     .join('\n\n');
 }
@@ -85,7 +85,7 @@ describe('Gemini Provider', () => {
   describe('chat()', () => {
     it('sends correct request format and returns response text', async () => {
       fetchSpy.mockResolvedValue(
-        mockFetchResponse(geminiResponse('Hello from Gemini!'))
+        mockFetchResponse(geminiResponse('Hello from Gemini!')),
       );
 
       const messages: ChatMessage[] = [
@@ -106,6 +106,23 @@ describe('Gemini Provider', () => {
         { role: 'user', parts: [{ text: 'Hello world' }] },
       ]);
       expect(body.generationConfig.maxOutputTokens).toBe(4096);
+    });
+
+    it('requests JSON mode when responseFormat is json', async () => {
+      fetchSpy.mockResolvedValue(
+        mockFetchResponse(geminiResponse('{"reply":"Hello","signals":{}}')),
+      );
+
+      await provider.chat([{ role: 'user', content: 'Hello world' }], {
+        ...DEFAULT_CONFIG,
+        responseFormat: 'json',
+      });
+
+      const body = JSON.parse(fetchSpy.mock.calls[0][1].body);
+      expect(body.generationConfig).toMatchObject({
+        maxOutputTokens: 4096,
+        responseMimeType: 'application/json',
+      });
     });
 
     it('separates system messages into systemInstruction', async () => {
@@ -158,7 +175,7 @@ describe('Gemini Provider', () => {
       fetchSpy.mockResolvedValue(new Response('Rate limited', { status: 429 }));
 
       await expect(
-        provider.chat([{ role: 'user', content: 'test' }], DEFAULT_CONFIG)
+        provider.chat([{ role: 'user', content: 'test' }], DEFAULT_CONFIG),
       ).rejects.toThrow('Gemini API request failed (429)');
     });
 
@@ -166,7 +183,7 @@ describe('Gemini Provider', () => {
       fetchSpy.mockResolvedValue(mockFetchResponse({ candidates: [] }));
 
       await expect(
-        provider.chat([{ role: 'user', content: 'test' }], DEFAULT_CONFIG)
+        provider.chat([{ role: 'user', content: 'test' }], DEFAULT_CONFIG),
       ).rejects.toThrow('Gemini returned empty response');
     });
 
@@ -174,11 +191,11 @@ describe('Gemini Provider', () => {
       fetchSpy.mockResolvedValue(
         mockFetchResponse({
           error: { message: 'Invalid API key', code: 403 },
-        })
+        }),
       );
 
       await expect(
-        provider.chat([{ role: 'user', content: 'test' }], DEFAULT_CONFIG)
+        provider.chat([{ role: 'user', content: 'test' }], DEFAULT_CONFIG),
       ).rejects.toThrow('Gemini API error: Invalid API key');
     });
 
@@ -227,7 +244,7 @@ describe('Gemini Provider', () => {
   describe('safety settings for minors', () => {
     it('includes safetySettings for minors in every request', async () => {
       fetchSpy.mockResolvedValue(
-        mockFetchResponse(geminiResponse('safe response'))
+        mockFetchResponse(geminiResponse('safe response')),
       );
 
       await provider.chat([{ role: 'user', content: 'test' }], DEFAULT_CONFIG);
@@ -257,14 +274,14 @@ describe('Gemini Provider', () => {
         mockFetchResponse({
           promptFeedback: { blockReason: 'SAFETY' },
           candidates: [],
-        })
+        }),
       );
 
       await expect(
         provider.chat(
           [{ role: 'user', content: 'harmful prompt' }],
-          DEFAULT_CONFIG
-        )
+          DEFAULT_CONFIG,
+        ),
       ).rejects.toThrow('content safety filters');
     });
 
@@ -277,11 +294,11 @@ describe('Gemini Provider', () => {
               finishReason: 'SAFETY',
             },
           ],
-        })
+        }),
       );
 
       await expect(
-        provider.chat([{ role: 'user', content: 'test' }], DEFAULT_CONFIG)
+        provider.chat([{ role: 'user', content: 'test' }], DEFAULT_CONFIG),
       ).rejects.toThrow('blocked by content safety filters');
     });
   });
@@ -341,7 +358,7 @@ describe('Gemini Provider', () => {
       const chunks: string[] = [];
       for await (const chunk of provider.chatStream(
         [{ role: 'user', content: 'test' }],
-        DEFAULT_CONFIG
+        DEFAULT_CONFIG,
       )) {
         chunks.push(chunk);
       }
@@ -354,7 +371,7 @@ describe('Gemini Provider', () => {
 
       for await (const _ of provider.chatStream(
         [{ role: 'user', content: 'test' }],
-        DEFAULT_CONFIG
+        DEFAULT_CONFIG,
       )) {
         // consume stream
       }
@@ -370,7 +387,7 @@ describe('Gemini Provider', () => {
       await expect(async () => {
         for await (const _ of provider.chatStream(
           [{ role: 'user', content: 'test' }],
-          DEFAULT_CONFIG
+          DEFAULT_CONFIG,
         )) {
           // consume stream
         }
@@ -390,7 +407,7 @@ describe('Gemini Provider', () => {
       const chunks: string[] = [];
       for await (const chunk of provider.chatStream(
         [{ role: 'user', content: 'test' }],
-        DEFAULT_CONFIG
+        DEFAULT_CONFIG,
       )) {
         chunks.push(chunk);
       }
@@ -410,7 +427,7 @@ describe('Gemini Provider', () => {
       const chunks: string[] = [];
       for await (const chunk of provider.chatStream(
         [{ role: 'user', content: 'test' }],
-        DEFAULT_CONFIG
+        DEFAULT_CONFIG,
       )) {
         chunks.push(chunk);
       }
@@ -423,7 +440,7 @@ describe('Gemini Provider', () => {
 
       for await (const _ of provider.chatStream(
         [{ role: 'user', content: 'test' }],
-        DEFAULT_CONFIG
+        DEFAULT_CONFIG,
       )) {
         // consume stream
       }
@@ -447,13 +464,13 @@ describe('Gemini Provider', () => {
         new Response(stream, {
           status: 200,
           headers: { 'Content-Type': 'text/event-stream' },
-        })
+        }),
       );
       const chunks: string[] = [];
       const streamPromise = (async () => {
         for await (const chunk of provider.chatStream(
           [{ role: 'user', content: 'test' }],
-          DEFAULT_CONFIG
+          DEFAULT_CONFIG,
         )) {
           chunks.push(chunk);
         }
@@ -464,7 +481,7 @@ describe('Gemini Provider', () => {
       const error = await caughtError;
       expect(error).toBeInstanceOf(Error);
       expect((error as Error).message).toBe(
-        'Gemini stream stalled: no data received for 10s'
+        'Gemini stream stalled: no data received for 10s',
       );
       expect(chunks).toEqual(['first']);
       jest.useRealTimers();
@@ -479,7 +496,7 @@ describe('Gemini Provider', () => {
       await expect(async () => {
         for await (const _ of provider.chatStream(
           [{ role: 'user', content: 'test' }],
-          DEFAULT_CONFIG
+          DEFAULT_CONFIG,
         )) {
           // consume stream
         }

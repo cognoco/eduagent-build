@@ -179,6 +179,83 @@ describe('buildSystemPrompt — scope-boundary app-help exception', () => {
   });
 });
 
+describe('buildSystemPrompt — response envelope contract', () => {
+  it('makes the JSON-only shape explicit to reduce provider drift', () => {
+    const prompt = buildSystemPrompt(makeContext());
+
+    expect(prompt).toContain('Reply with ONLY valid JSON');
+    expect(prompt).toContain('must begin with `{` and end with `}`');
+    expect(prompt).toContain('Do not wrap it in markdown fences');
+  });
+
+  it('requires private source provenance in the envelope', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        topicTitle: 'Photosynthesis',
+        topicDescription: 'How plants turn sunlight into usable energy.',
+      }),
+    );
+
+    expect(prompt).toContain('PRIVATE SOURCE CONTRACT');
+    expect(prompt).toContain('private_sources');
+    expect(prompt).toContain('relied_on');
+    expect(prompt).toContain('current_topic');
+    expect(prompt).toContain('reliable_for_facts="true"');
+    expect(prompt).toContain('never show it, source IDs');
+  });
+
+  it('does not allow memory or conversation history as factual evidence', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        sourceEvidence: [
+          {
+            id: 'mentor_memory',
+            kind: 'mentor_memory',
+            reliability: 'memory_only',
+            label: 'Mentor memory',
+            excerpt: 'Learner once mentioned liking space.',
+            reliableForFacts: false,
+          },
+        ],
+      }),
+    );
+
+    expect(prompt).toContain('mentor_memory');
+    expect(prompt).toContain('reliable_for_facts="false"');
+    expect(prompt).toMatch(/Conversation history, mentor memory/i);
+    expect(prompt).toMatch(/NOT evidence for factual teaching claims/i);
+  });
+});
+
+describe('buildSystemPrompt — homework brevity', () => {
+  it('caps youth help-me turns so first homework help stays chat-sized', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        sessionType: 'homework',
+        homeworkMode: 'help_me',
+      }),
+    );
+
+    expect(prompt).toContain('Hard cap: stay under about 120 words');
+    expect(prompt).toContain(
+      'show only the next move or a tiny similar example',
+    );
+    expect(prompt).toContain('Do not give a full step-by-step worked example');
+  });
+
+  it('keeps check-answer examples tiny instead of launching a full lesson', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        sessionType: 'homework',
+        homeworkMode: 'check_answer',
+      }),
+    );
+
+    expect(prompt).toContain('keep it tiny');
+    expect(prompt).toContain('one setup line and the key correction step only');
+  });
+});
+
 describe('buildSystemPrompt — no-recall recovery', () => {
   it('adds global no-recall recovery guidance to ordinary learning prompts', () => {
     const prompt = buildSystemPrompt(makeContext());
@@ -219,6 +296,26 @@ describe('buildSystemPrompt — no-recall recovery', () => {
     expect(prompt).toContain('Session type: RECITATION PRACTICE');
     expect(prompt).toContain('give a small starting cue');
     expect(prompt).not.toContain('NO-RECALL RECOVERY');
+  });
+
+  it('keeps text recitation feedback scoped to wording, not heard delivery', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({ effectiveMode: 'recitation', inputMode: 'text' }),
+    );
+
+    expect(prompt).toContain('Because this is text input');
+    expect(prompt).toContain('Comment only on wording');
+    expect(prompt).toContain('do NOT claim to hear pace');
+  });
+
+  it('allows delivery feedback only for voice recitation', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({ effectiveMode: 'recitation', inputMode: 'voice' }),
+    );
+
+    expect(prompt).toContain('Because this is voice input');
+    expect(prompt).toContain('pace, confidence, expression');
+    expect(prompt).not.toContain('do NOT claim to hear pace');
   });
 
   it('makes continuation scoring re-teach after low recall', () => {

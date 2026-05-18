@@ -86,6 +86,9 @@ export function getSessionTypeGuidance(
     const brevity = isYouth
       ? 'Be very brief: 1-2 sentences plus an example. Young learners want speed, not essays.'
       : 'Be brief: usually 2-6 sentences, focused on the exact problem in front of the learner.';
+    const lengthCap = isYouth
+      ? 'Hard cap: stay under about 120 words unless the learner explicitly asks for a full worked example.'
+      : 'Avoid long worked solutions unless the learner explicitly asks for one.';
 
     if (homeworkMode === 'check_answer') {
       return (
@@ -93,8 +96,10 @@ export function getSessionTypeGuidance(
         'The learner wants their answer verified. ' +
         brevity +
         '\n' +
+        lengthCap +
+        '\n' +
         'Say whether the answer is right or wrong. If wrong, point to the specific error and explain why briefly.\n' +
-        'Then show a similar worked example (different numbers/context) so the learner sees the correct method.\n' +
+        'If you show a similar worked example, keep it tiny: one setup line and the key correction step only.\n' +
         'Do not reveal the final answer to the actual homework problem.\n' +
         'Do not ask Socratic follow-up questions — the learner wants a check, not a conversation.'
       );
@@ -106,7 +111,10 @@ export function getSessionTypeGuidance(
         'The learner wants guidance on how to approach this problem. ' +
         brevity +
         '\n' +
-        'Explain the approach briefly, then show a similar worked example (different numbers/context).\n' +
+        lengthCap +
+        '\n' +
+        'Explain the approach briefly, then show only the next move or a tiny similar example (different numbers/context).\n' +
+        'Do not give a full step-by-step worked example unless the learner asks for one or is stuck after trying.\n' +
         'Let the learner try the actual problem. Provide brief targeted feedback when they respond.\n' +
         'Do not reveal the final answer to the actual homework problem.\n' +
         'Ask a question only when it genuinely helps unblock the learner.'
@@ -119,8 +127,10 @@ export function getSessionTypeGuidance(
       'CRITICAL: This is a homework session. Default to concise explanation and answer-checking, not Socratic interrogation.\n' +
       brevity +
       '\n' +
+      lengthCap +
+      '\n' +
       'If the learner asks you to check an answer, say whether it is right, identify the error if needed, and explain why.\n' +
-      'Show a similar worked example (different numbers/context) when explaining methods.\n' +
+      'When explaining methods, use the smallest useful example; avoid full worked examples unless requested.\n' +
       'Do not reveal the final answer unless the learner has already shown it.\n' +
       'Ask a question only when it genuinely helps unblock the learner.'
     );
@@ -207,8 +217,8 @@ function getExchangeEnvelopeInstruction(context: {
       : '  "signals": { "partial_progress": <bool>, "needs_deepening": <bool>, "understanding_check": <bool> },';
 
   const uiHints = context.isLanguageMode
-    ? '  "ui_hints": { "note_prompt": { "show": <bool>, "post_session": <bool> }, "fluency_drill": { "active": <bool>, "duration_s": <15-90>, "score": { "correct": <int>, "total": <int> } } }'
-    : '  "ui_hints": { "note_prompt": { "show": <bool>, "post_session": <bool> } }';
+    ? '  "ui_hints": { "note_prompt": { "show": <bool>, "post_session": <bool> }, "fluency_drill": { "active": <bool>, "duration_s": <15-90>, "score": { "correct": <int>, "total": <int> } } },'
+    : '  "ui_hints": { "note_prompt": { "show": <bool>, "post_session": <bool> } },';
 
   const signalGuidance: string[] = [];
   if (!context.isRecitation) {
@@ -235,12 +245,15 @@ function getExchangeEnvelopeInstruction(context: {
   return (
     'RESPONSE FORMAT — CRITICAL:\n' +
     'Reply with ONLY valid JSON in this exact shape, no prose before or after:\n' +
+    'Your entire response must begin with `{` and end with `}`. Do not wrap it in markdown fences.\n' +
     '{\n' +
     '  "reply": "<your full message to the learner — prose, newlines allowed>",\n' +
     `${signals}\n` +
     `${uiHints}\n` +
+    '  "private_sources": { "relied_on": ["<source id>", "..."], "insufficient": <bool>, "reason": "<private reason for audit>" },\n' +
+    '  "confidence": "<low|medium|high>"\n' +
     '}\n' +
-    'The `reply` field is the ONLY thing the learner sees. Do not mention JSON, signals, or ui_hints in the reply text. Do not include markers like [PARTIAL_PROGRESS] or [NEEDS_DEEPENING] — use the `signals` object instead.\n' +
+    'The `reply` field is the ONLY thing the learner sees. Do not mention JSON, signals, ui_hints, private_sources, or source IDs in the reply text. Do not include markers like [PARTIAL_PROGRESS] or [NEEDS_DEEPENING] — use the `signals` object instead.\n' +
     'For line breaks inside the `reply` string, write the JSON escape `\\n` (backslash + n). NEVER write the literal two characters `\\\\n` (an escaped backslash followed by n) — that renders to the learner as visible "\\n" text instead of a real line break.\n' +
     '\n' +
     'Signal guidance:\n' +
@@ -299,6 +312,68 @@ function serializeSignalsToReflect(
 
   if (Object.keys(compact).length === 0) return null;
   return escapeXml(JSON.stringify(compact).slice(0, 1000));
+}
+
+function buildPrivateSourceContractBlock(context: ExchangeContext): string {
+  const fallbackEvidence: NonNullable<ExchangeContext['sourceEvidence']> = [];
+  if (context.topicTitle || context.topicDescription) {
+    fallbackEvidence.push({
+      id: 'current_topic',
+      kind: 'current_topic',
+      reliability: 'trusted_app_content',
+      label: 'Loaded curriculum topic',
+      excerpt: [context.topicTitle, context.topicDescription]
+        .filter(Boolean)
+        .join(': '),
+      reliableForFacts: true,
+    });
+  }
+  if (context.interleavedTopics?.length) {
+    fallbackEvidence.push({
+      id: 'interleaved_topics',
+      kind: 'interleaved_topics',
+      reliability: 'trusted_app_content',
+      label: 'Loaded interleaved curriculum topics',
+      excerpt: context.interleavedTopics
+        .map((topic) =>
+          [topic.title, topic.description].filter(Boolean).join(': '),
+        )
+        .join(' | '),
+      reliableForFacts: true,
+    });
+  }
+
+  const evidence = context.sourceEvidence ?? fallbackEvidence;
+  const sourceLines =
+    evidence.length > 0
+      ? evidence
+          .map((item) => {
+            const excerpt = item.excerpt
+              ? ` excerpt="${escapeXml(item.excerpt)}"`
+              : '';
+            return (
+              `<source id="${sanitizeXmlValue(item.id, 80)}" ` +
+              `kind="${item.kind}" reliability="${item.reliability}" ` +
+              `reliable_for_facts="${item.reliableForFacts ? 'true' : 'false'}" ` +
+              `label="${sanitizeXmlValue(item.label, 160)}"${excerpt}/>`
+            );
+          })
+          .join('\n')
+      : '<source_pack_empty reason="no server-provided source material for this turn"/>';
+
+  return (
+    'PRIVATE SOURCE CONTRACT — NON-NEGOTIABLE:\n' +
+    '- The <source_pack> below is the only source material you may rely on for this turn.\n' +
+    '- Sources with reliable_for_facts="true" may support factual teaching, app-navigation claims, or deterministic problem solving.\n' +
+    '- Sources with reliable_for_facts="false" may support personalization or what the learner said, but they are NOT evidence for factual teaching claims.\n' +
+    '- Conversation history, mentor memory, learner memory, and learner messages are not reliable factual sources. Never use them as proof that an outside-world fact is true.\n' +
+    '- In recitation mode, source id "recitation_text" is reliable only for feedback on the learner-provided wording. It is not proof that outside-world facts inside the recitation are true.\n' +
+    '- Never rely on model memory, forums, chats, or unstated assumptions as a source. If the source pack does not support a factual claim, do not make that claim.\n' +
+    '- If the source pack has no reliable_for_facts="true" source, you MUST avoid factual teaching claims, set private_sources.insufficient=true, and keep the learner-facing reply brief and honest: say you do not have enough reliable material to answer confidently, ask for the worksheet/text/photo/source, or answer only the non-factual help you can safely provide.\n' +
+    '- If the source pack has reliable sources but they do not support the specific factual answer, set private_sources.insufficient=true and do not invent the missing fact.\n' +
+    '- Always fill private_sources.relied_on with the exact source IDs you used. Set private_sources.insufficient=true when reliable support is missing or too thin. This is private audit data; never show it, source IDs, or private audit details to the learner.\n' +
+    `<source_pack>\n${sourceLines}\n</source_pack>`
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -413,6 +488,7 @@ export function buildSystemPrompt(
       '- If the learner says "I am a complete beginner", "I do not know anything about this", "I have never studied this", or similar, that is GROUND TRUTH. Do not contradict it, do not assume hidden prior knowledge, and do not flatter them with implied competence ("you already know …", "as you know …").\n' +
       '- When a fact would help your teaching but you do not have it, either ask one short question or proceed without that fact. Never confabulate.',
   );
+  sections.push(buildPrivateSourceContractBlock(context));
 
   if (!isRecitation) {
     sections.push(
@@ -594,6 +670,10 @@ export function buildSystemPrompt(
 
   // Recitation mode — overrides teaching/escalation behaviour
   if (isRecitation) {
+    const recitationFeedbackScope =
+      context.inputMode === 'voice'
+        ? '   - Because this is voice input, comment briefly on delivery: pace, confidence, expression.\n'
+        : '   - Because this is text input, do NOT claim to hear pace, confidence, expression, pronunciation, or delivery. Comment only on wording, structure, completeness, and clarity of the written recitation.\n';
     sections.push(
       'Session type: RECITATION PRACTICE (BETA)\n' +
         'The learner wants to recite something from memory — a poem, song lyrics, multiplication tables, or other memorised text.\n' +
@@ -605,11 +685,11 @@ export function buildSystemPrompt(
         '   - Quote the parts that came through clearly.\n' +
         '   - Note any parts that seemed unclear, garbled, or missing.\n' +
         '   - If you recognise the text, gently note any differences from the original — but frame them as "I noticed a small change" not "you got it wrong".\n' +
-        '   - Comment briefly on delivery: pace, confidence, expression.\n' +
+        recitationFeedbackScope +
         '4. Offer to let them try again or move on.\n\n' +
         'Keep feedback encouraging. Use "not yet" framing for missed parts.\n' +
         'If the learner says they cannot remember or replies with only an acknowledgement after you offer help, give a small starting cue or offer to review the first part together. Do not keep demanding the full recitation.\n' +
-        'If you do not recognise the text, say so honestly and base feedback only on clarity and delivery.',
+        'If you do not recognise the text, say so honestly and base feedback only on what the current input mode lets you observe.',
     );
   }
 

@@ -90,3 +90,7 @@ The dinosaur roared loudly. It was bigger than a bus. Nearby, a small lizard wat
 - System prompt is fully static — identical across every profile.
 - Language is auto-detected by the LLM, not passed as a parameter.
 - No personalization surface at all. Appropriate for a pure utility.
+
+## Live LLM response
+
+> **Error:** `live budget exceeded (20 calls); re-run with --max-live-calls to raise`

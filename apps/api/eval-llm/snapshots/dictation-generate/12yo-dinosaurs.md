@@ -128,3 +128,121 @@ Generate a dictation for me.
 - Native language drives punctuation-name mapping.
 - Interests wired (audit P0.1): dinosaurs, fossils, paleontology, extinction events, volcanoes.
 - Library topics wired (audit P0.1): Mesozoic era, fossilization, plate tectonics, long division.
+
+## Live LLM response
+
+```
+```json
+{
+  "sentences": [
+    {
+      "text": "The ancient world rumbled constantly.",
+      "withPunctuation": "The ancient world rumbled constantly period",
+      "wordCount": 6,
+      "chunks": [
+        "The ancient world",
+        "rumbled constantly."
+      ],
+      "chunksWithPunctuation": [
+        "The ancient world",
+        "rumbled constantly period"
+      ]
+    },
+    {
+      "text": "Giant creatures roamed vast, primeval forests.",
+      "withPunctuation": "Giant creatures roamed vast comma primeval forests period",
+      "wordCount": 7,
+      "chunks": [
+        "Giant creatures roamed",
+        "vast, primeval forests."
+      ],
+      "chunksWithPunctuation": [
+        "Giant creatures roamed",
+        "vast comma primeval forests period"
+      ]
+    },
+    {
+      "text": "Deep underground, magma shifted restlessly.",
+      "withPunctuation": "Deep underground comma magma shifted restlessly period",
+      "wordCount": 6,
+      "chunks": [
+        "Deep underground,",
+        "magma shifted restlessly."
+      ],
+      "chunksWithPunctuation": [
+        "Deep underground comma",
+        "magma shifted restlessly period"
+      ]
+    },
+    {
+      "text": "A young paleontologist discovered a strange, fossilized bone.",
+      "withPunctuation": "A young paleontologist discovered a strange comma fossilized bone period",
+      "wordCount": 9,
+      "chunks": [
+        "A young paleontologist",
+        "discovered a strange, fossilized bone."
+      ],
+      "chunksWithPunctuation": [
+        "A young paleontologist",
+        "discovered a strange comma fossilized bone period"
+      ]
+    },
+    {
+      "text": "He carefully brushed away hardened layers of earth.",
+      "withPunctuation": "He carefully brushed away hardened layers of earth period",
+      "wordCount": 8,
+      "chunks": [
+        "He carefully brushed away",
+        "hardened layers of earth."
+      ],
+      "chunksWithPunctuation": [
+        "He carefully brushed away",
+        "hardened layers of earth period"
+      ]
+    },
+    {
+      "text": "The mountain peak began to glow ominously.",
+      "withPunctuation": "The mountain peak began to glow ominously period",
+      "wordCount": 7,
+      "chunks": [
+        "The mountain peak",
+        "began to glow ominously."
+      ],
+      "chunksWithPunctuation": [
+        "The mountain peak",
+        "began to glow ominously period"
+      ]
+    },
+    {
+      "text": "Tremors shook the very ground beneath their feet.",
+      "withPunctuation": "Tremors shook the very ground beneath their feet period",
+      "wordCount": 9,
+      "chunks": [
+        "Tremors shook the very ground",
+        "beneath their feet."
+      ],
+      "chunksWithPunctuation": [
+        "Tremors shook the very ground",
+        "beneath their feet period"
+      ]
+    },
+    {
+      "text": "Would this era of giants truly last forever?",
+      "withPunctuation": "Would this era of giants truly last forever question mark",
+      "wordCount": 8,
+      "chunks": [
+        "Would this era of giants",
+        "truly last forever?"
+      ],
+      "chunksWithPunctuation": [
+        "Would this era of giants",
+        "truly last forever question mark"
+      ]
+    }
+  ],
+  "title": "An Ancient Earth Chronicle",
+  "topic": "Prehistoric adventure with geological and paleontological themes",
+  "language": "en"
+}
+```
+```

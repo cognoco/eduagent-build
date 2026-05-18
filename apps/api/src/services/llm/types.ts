@@ -13,6 +13,8 @@ export interface ModelConfig {
   provider: 'gemini' | 'openai' | 'anthropic' | 'mock';
   model: string;
   maxTokens: number;
+  /** Ask providers with native support to constrain output to JSON. */
+  responseFormat?: 'json';
 }
 
 /** Multimodal message parts for vision/image input */
@@ -78,7 +80,7 @@ export interface ChatStreamResult extends AsyncIterable<string> {
  */
 export function makeChatStreamResult(
   stream: AsyncIterable<string>,
-  stopReasonPromise: Promise<StopReason>
+  stopReasonPromise: Promise<StopReason>,
 ): ChatStreamResult {
   return {
     stream,

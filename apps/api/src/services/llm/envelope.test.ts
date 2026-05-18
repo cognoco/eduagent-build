@@ -208,6 +208,12 @@ describe('parseEnvelope', () => {
       expect(stripEmbeddedEnvelopeTail(leaked)).toBe('Nice work!');
     });
 
+    it('removes a private source side-channel copied into reply text', () => {
+      const leaked =
+        'Use the roads example.","private_sources":{"relied_on":["current_topic"],"insufficient":false},"confidence":"high"}';
+      expect(stripEmbeddedEnvelopeTail(leaked)).toBe('Use the roads example.');
+    });
+
     it('leaves ordinary teaching prose about a signals field alone', () => {
       const text =
         'In this example, "signals": means clues that point to an answer.';
@@ -246,6 +252,33 @@ describe('parseEnvelope', () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.envelope.ui_hints?.note_prompt?.show).toBe(true);
+    }
+  });
+
+  it('accepts private source provenance for internal audits', () => {
+    const result = parseEnvelope(
+      '{"reply": "noted", "private_sources": {"relied_on": ["current_topic"], "insufficient": false, "reason": "Grounded in topic source."}}',
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.envelope.private_sources?.relied_on).toEqual([
+        'current_topic',
+      ]);
+      expect(result.envelope.private_sources?.insufficient).toBe(false);
+    }
+  });
+
+  it('tolerates string-shaped private source values without dropping the visible reply', () => {
+    const result = parseEnvelope(
+      '{"reply": "noted", "private_sources": {"relied_on": "current_topic", "insufficient": "false", "reason": "Grounded in topic source."}}',
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.envelope.reply).toBe('noted');
+      expect(result.envelope.private_sources?.relied_on).toEqual([
+        'current_topic',
+      ]);
+      expect(result.envelope.private_sources?.insufficient).toBe(false);
     }
   });
 
