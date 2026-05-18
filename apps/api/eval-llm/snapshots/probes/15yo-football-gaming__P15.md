@@ -250,7 +250,3 @@ Yep — and I think I can explain why the edge case works too, if you want.
 - inputMode: text, learningMode: casual
 - topicTitle: algebra equations
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
-
-## Live LLM response
-
-> **Error:** `live budget exceeded (20 calls); re-run with --max-live-calls to raise`

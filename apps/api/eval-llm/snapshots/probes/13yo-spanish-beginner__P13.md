@@ -235,7 +235,3 @@ I used 'ser' because… actually wait, is tiredness temporary? Maybe I should us
 - inputMode: text, learningMode: serious
 - topicTitle: Spanish present tense verbs
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
-
-## Live LLM response
-
-> **Error:** `live budget exceeded (20 calls); re-run with --max-live-calls to raise`

@@ -227,7 +227,3 @@ Yeah let's stop, I'm done for today.
 - inputMode: text, learningMode: casual
 - topicTitle: Czech reading comprehension
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
-
-## Live LLM response
-
-> **Error:** `live budget exceeded (20 calls); re-run with --max-live-calls to raise`

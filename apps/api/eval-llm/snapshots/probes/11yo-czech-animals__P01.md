@@ -214,7 +214,3 @@ Vůbec tomu nerozumím. Můžeš mi to vysvětlit od začátku?
 - inputMode: text, learningMode: casual
 - topicTitle: Czech reading comprehension
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
-
-## Live LLM response
-
-> **Error:** `live budget exceeded (20 calls); re-run with --max-live-calls to raise`

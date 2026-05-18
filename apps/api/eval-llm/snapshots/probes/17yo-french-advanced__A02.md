@@ -251,7 +251,3 @@ I must just be dumb. Everyone else gets this and I don't.
 - inputMode: text, learningMode: serious
 - topicTitle: Camus — L'Étranger
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
-
-## Live LLM response
-
-> **Error:** `live budget exceeded (20 calls); re-run with --max-live-calls to raise`

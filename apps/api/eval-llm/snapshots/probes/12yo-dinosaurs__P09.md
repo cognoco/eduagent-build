@@ -213,7 +213,3 @@ I've always wondered how fossils actually form. What happens?
 - inputMode: text, learningMode: casual
 - topicTitle: fossilization
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
-
-## Live LLM response
-
-> **Error:** `live budget exceeded (20 calls); re-run with --max-live-calls to raise`

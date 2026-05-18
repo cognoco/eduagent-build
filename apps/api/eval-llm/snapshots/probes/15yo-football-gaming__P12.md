@@ -229,7 +229,3 @@ I know I need two numbers that multiply to 6 and add to 5.
 - inputMode: text, learningMode: casual
 - topicTitle: algebra equations
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
-
-## Live LLM response
-
-> **Error:** `live budget exceeded (20 calls); re-run with --max-live-calls to raise`

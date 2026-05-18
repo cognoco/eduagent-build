@@ -220,7 +220,3 @@ Like, do you actually care about helping me or is it just programmed in?
 - inputMode: text, learningMode: casual
 - topicTitle: Mesozoic era
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
-
-## Live LLM response
-
-> **Error:** `live budget exceeded (20 calls); re-run with --max-live-calls to raise`

@@ -245,7 +245,3 @@ The Civil War was mainly about states' rights, not just slavery.
 - inputMode: text, learningMode: casual
 - topicTitle: US history: Civil War
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
-
-## Live LLM response
-
-> **Error:** `live budget exceeded (20 calls); re-run with --max-live-calls to raise`

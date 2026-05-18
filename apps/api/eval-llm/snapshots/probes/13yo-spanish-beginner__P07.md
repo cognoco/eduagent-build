@@ -243,7 +243,3 @@ Okay, I want to practice speaking some Spanish sentences now.
 - inputMode: voice, learningMode: serious
 - topicTitle: Spanish present tense verbs
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
-
-## Live LLM response
-
-> **Error:** `live budget exceeded (20 calls); re-run with --max-live-calls to raise`

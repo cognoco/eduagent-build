@@ -78,7 +78,3 @@ Use very simple, encouraging language — short sentences, everyday words, no gr
 - ageYears=11 — explanation register calibrated to age.
 - preferredExplanations=["stories","examples"] — tone shaped by style preferences.
 - Struggle history NOT used (gap flagged in audit P2) — recurring patterns not surfaced to reviewer.
-
-## Live LLM response
-
-> **Error:** `live budget exceeded (20 calls); re-run with --max-live-calls to raise`

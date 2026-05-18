@@ -232,7 +232,3 @@ Alright I get that part, what's next?
 - inputMode: text, learningMode: casual
 - topicTitle: (none — casual mode)
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
-
-## Live LLM response
-
-> **Error:** `live budget exceeded (20 calls); re-run with --max-live-calls to raise`

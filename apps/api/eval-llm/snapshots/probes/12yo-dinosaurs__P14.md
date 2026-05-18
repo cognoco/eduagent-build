@@ -231,7 +231,3 @@ Yeah I think I remember. Let's pick up from step 3.
 - inputMode: text, learningMode: casual
 - topicTitle: Mesozoic era
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
-
-## Live LLM response
-
-> **Error:** `live budget exceeded (20 calls); re-run with --max-live-calls to raise`

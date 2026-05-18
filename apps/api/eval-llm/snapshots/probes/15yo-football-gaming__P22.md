@@ -247,7 +247,3 @@ I feel like I really know this well now — can we try something harder?
 - inputMode: text, learningMode: casual
 - topicTitle: algebra equations
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
-
-## Live LLM response
-
-> **Error:** `live budget exceeded (20 calls); re-run with --max-live-calls to raise`

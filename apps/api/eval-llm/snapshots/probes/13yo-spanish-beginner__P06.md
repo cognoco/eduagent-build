@@ -241,7 +241,3 @@ Can you show me a worked example of ser vs estar in a sentence about family?
 - inputMode: text, learningMode: serious
 - topicTitle: Spanish present tense verbs
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
-
-## Live LLM response
-
-> **Error:** `live budget exceeded (20 calls); re-run with --max-live-calls to raise`

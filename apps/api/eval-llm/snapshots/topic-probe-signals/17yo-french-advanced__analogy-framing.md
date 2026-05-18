@@ -85,7 +85,3 @@ USER: Anything around music.
 ## Builder notes
 
 - Dimension: analogy-framing
-
-## Live LLM response
-
-> **Error:** `live budget exceeded (20 calls); re-run with --max-live-calls to raise`

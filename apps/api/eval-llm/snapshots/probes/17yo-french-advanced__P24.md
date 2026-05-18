@@ -250,7 +250,3 @@ Je veux qu'on travaille sur les connecteurs logiques — j'en ai besoin pour mon
 - inputMode: text, learningMode: serious
 - topicTitle: Camus — L'Étranger
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
-
-## Live LLM response
-
-> **Error:** `live budget exceeded (20 calls); re-run with --max-live-calls to raise`

@@ -87,7 +87,3 @@ Generate the suggestions now.
 - subjectName: dinosaurs
 - studiedTopics: 4 (2+2 split path)
 - existingTitles: 2 books + 0 suggestions to avoid
-
-## Live LLM response
-
-> **Error:** `live budget exceeded (20 calls); re-run with --max-live-calls to raise`

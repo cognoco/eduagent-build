@@ -244,7 +244,3 @@ Okay so fossilization is basically when an animal dies and gets buried really fa
 - inputMode: text, learningMode: casual
 - topicTitle: fossilization
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
-
-## Live LLM response
-
-> **Error:** `live budget exceeded (20 calls); re-run with --max-live-calls to raise`
