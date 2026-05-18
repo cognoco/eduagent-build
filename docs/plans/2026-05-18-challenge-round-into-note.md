@@ -38,7 +38,7 @@ This plan was adversarially reviewed before execution. The following findings sh
 - **MED-3** — `MIN_LEXICAL_OVERLAP_NOTE_DRAFT = 0.4` is a guess. Resolved by Task 6 calibration step + TODO marker.
 - **MED-4** — Inngest event-name registration must be cited, not assumed. Resolved in Task 9 Step 5.
 - **MED-5** — `topic-completion.ts` contract for the new column is not specified. Resolved in Task 9 Step 1.5.
-- **MED-6** — Decline-cooldown smoke is impractical with a hardcoded 24h. Resolved in Final Validation Smoke 5.
+- **MED-6** — Decline-cooldown smoke is impractical with a hardcoded 24h. Resolved in Final Validation Smoke 6.
 - **MED-7** — `verifyXp` / `verifyPendingXp` left-in-place fate clarified in Task 0.2 Step 7.
 - **LOW-1** — Rollback sections use the prescribed format even pre-launch (Task 0.1).
 - **LOW-2** — State→prompt mapping table added in Task 7 Step 3.
@@ -48,6 +48,9 @@ This plan was adversarially reviewed before execution. The following findings sh
 - **HIGH-8** — "Server-owned mastery" was overstated. The server owns policy and caps, but correctness still depends on LLM evaluation quality. Resolved by Task 5/7/11: add adversarial misconception false-positive tests and phrase the invariant as "server-owned conservative gating over structured LLM evidence."
 - **MED-8** — `retentionStatus === 'strong'` only would make Challenge Rounds too rare for learners who are doing well in a first session. Resolved by Task 3: permit a current-session high-confidence path (`new|strong` retention with longer correct streak and no struggle).
 - **MED-9** — Mid-round app close/session timeout was promised but not given an implementation task. Resolved by Task 8.5: persist pending draft recovery state and add an explicit integration test.
+- **CRIT-9** — Empty evaluation arrays must never mark mastery. The initial decision sketch treated `solid.length === evals.length` as verified, which is true for `0 === 0`. Resolved in Task 5 with an explicit empty-evaluation test and `outcome: 'invalid'`.
+- **HIGH-9** — Tests were scattered through tasks but there was no acceptance-level coverage contract. Resolved by adding "Test Coverage Contract" below; implementation is not complete unless every row has a passing test or an explicit follow-up ID.
+- **MED-10** — The lexical-overlap guard used ASCII tokenization, which rejects accented Latin and non-spaced scripts unfairly. Resolved in Task 6: use Unicode-aware tokenization with a character n-gram fallback and add accented Latin + Japanese regression tests.
 
 ---
 
@@ -182,6 +185,32 @@ This plan was adversarially reviewed before execution. The following findings sh
 
 ---
 
+### Test Coverage Contract
+
+This feature is not complete until every row below is covered by a passing test or has an explicit tracked follow-up ID approved before implementation continues.
+
+| Layer | Required coverage | Test location |
+|---|---|---|
+| Sunset DB/schema | `learningModes.mode`, `consecutiveSummarySkips`, learning-mode API schemas/routes/hooks/UI/i18n are removed; XP writer always writes immediate `verified` while existing `pending|decayed` reads still work. | Task 0.1-0.6 unit + integration tests |
+| Envelope schema | `challenge_round_offer`, per-concept evaluation with `answerEventId`/`learnerQuote`, `challenge_round`, and `note_draft` with source answer event ids parse and reject malformed shapes. | `packages/schemas/src/llm-envelope.test.ts` |
+| Session metadata schema | `challengeRound` accepts valid states, defaults optional fields safely, accumulates evaluations, accepts pending draft recovery state, rejects invalid states/evaluation shapes. | `packages/schemas/src/sessions.test.ts` |
+| Trigger evaluator | Hard-gates homework/freeform/practice/quiz, struggling states, low quota, cooldown, duplicate/in-flight states; allows strong retention path and current-session-new-topic path. | `apps/api/src/services/challenge-round/trigger.test.ts` |
+| State machine | Valid transitions, illegal transitions, one-round cap, question cap, evaluation accumulation, abort from any active state, no duplicate offer race. | `apps/api/src/services/challenge-round/state.test.ts` |
+| Mastery decision | all solid → verified; mixed → no mastery + review targets + solid quotes only; all missing → reteach; empty eval → invalid/no mastery; any misconception blocks mastery. | `apps/api/src/services/challenge-round/evaluation.test.ts` |
+| Note draft guard | Accepts solid learner quotes, rejects hallucinated/low-overlap drafts, rejects drafts that overlap only with non-solid quotes, handles accented Latin and non-spaced scripts, preserves short drafts, never validates empty. | `apps/api/src/services/challenge-round/note-draft.test.ts` |
+| Prompt/eval harness | Offer only when eligible/confident; no offer when confused/homework; active round emits structured eval; known misconception must not be solid; draft uses learner words; no draft on all missing. | `apps/api/eval-llm/scenarios/challenge-round.ts`, `pnpm eval:llm`, `pnpm eval:llm --live` |
+| `processExchange` integration | Strips ineligible offer signals, transitions offered/active/drafting, persists accumulated evaluations, sends completed event once, handles malformed envelopes without UI advancement. | `apps/api/src/services/exchanges.integration.test.ts` |
+| Routes | `maybe-offer`, `accept`, `decline`, `abort` are profile-scoped, reject cross-profile/cross-topic mismatch, persist cooldown, handle already-offered race as 200 no-op, reject invalid state transitions cleanly. | `apps/api/src/routes/challenge-round.test.ts` |
+| Inngest fan-out | Verified sets mastery flag only on complete all-solid evidence; partial writes review targets and no mastery; reteach/no-solid writes no note and no mastery; empty eval invalid path is observable. | `apps/api/src/inngest/functions/challenge-round-completed.test.ts` + integration |
+| Notes provenance | `source: 'challenge_round'` is accepted, stored, returned, defaults existing/user-created notes to `user`, and coexists with exact-session dedupe. | `packages/schemas/src/notes.test.ts`, `apps/api/src/services/notes.test.ts`, route tests |
+| Mobile hook/UI | Hook calls correct endpoints, saves note with source/session/topic, offer card buttons call the right actions, draft review preserves edit state and surfaces save errors/retry. | Mobile Jest tests in Task 10 |
+| Mobile streaming | New signals/ui_hints are detected only after valid envelope parse, stripped from visible text, reset/cleared after save/skip, and do not flash when server strips ineligible offers. | `use-session-streaming.test.tsx`, `strip-envelope.test.ts` |
+| Quick chip | `Too easy` eligible path shows offer; ineligible path preserves old prompt; chip hidden/disabled during offered/accepted/active/drafting; rapid taps dedupe. | `SessionAccessories.test.tsx`, `session-types.test.ts` |
+| End-to-end | all-solid happy path; partial note path; homework never offers; mid-round recovery; decline cooldown; duplicate offer race. | `tests/integration/challenge-round.integration.test.ts` |
+| Manual smoke | Sunset, system offer, `Too easy`, partial outcome, mid-round recovery, cooldown. | Final Validation |
+
+---
+
 ## File Structure
 
 ### Phase 0 — Sunset Files
@@ -227,7 +256,7 @@ This plan was adversarially reviewed before execution. The following findings sh
 - `apps/api/src/services/challenge-round/caps.ts` + `.test.ts` — `MAX_CHALLENGE_QUESTIONS = 3`, cooldown const, overlap threshold.
 - `apps/api/src/routes/challenge-round.ts` + `.test.ts` — accept/decline/abort/maybe-offer endpoints.
 - `apps/api/src/inngest/functions/challenge-round-completed.ts` + `.test.ts` + `.integration.test.ts` — fan-out for metrics + review-target writes.
-- `apps/api/eval-llm/scenarios/challenge-round.ts` — 6-scenario matrix.
+- `apps/api/eval-llm/scenarios/challenge-round.ts` — 7-scenario matrix.
 - `packages/database/src/schema/challenge-round-cooldowns.ts` — per-profile/per-topic cooldown rows.
 - `packages/database/src/migrations/####_challenge_round_cooldowns.sql` — generated.
 - `packages/database/src/migrations/####_notes_source.sql` — generated.
@@ -783,6 +812,7 @@ describe('challenge round envelope fields', () => {
         note_draft: {
           content: 'Photosynthesis uses light to convert CO2 and water into glucose...',
           source_concepts: ['photosynthesis vs respiration', 'role of ATP'],
+          source_answer_event_ids: ['event-solid-1', 'event-solid-2'],
         },
       },
       confidence: 'high',
@@ -828,6 +858,7 @@ note_draft: z
   .object({
     content: z.string().min(1).max(2000),
     source_concepts: z.array(z.string()).min(1).max(10),
+    source_answer_event_ids: z.array(z.string()).min(1).max(10),
   })
   .optional(),
 ```
@@ -892,6 +923,9 @@ describe('sessionMetadata.challengeRound', () => {
 
 ```typescript
 // packages/schemas/src/sessions.ts (additions)
+// Import challengeRoundEvaluationItemSchema from ./llm-envelope. If that creates
+// a barrel cycle, extract the evaluation item schema to
+// packages/schemas/src/challenge-round.ts and import it from both modules.
 
 export const challengeRoundStateEnum = z.enum([
   'offered',
@@ -911,6 +945,7 @@ export const challengeRoundSessionStateSchema = z.object({
   offerCount: z.number().int().min(0).default(0),
   topicId: z.string().uuid().optional(),
   declinedDontAskAgain: z.boolean().default(false),
+  evaluations: z.array(challengeRoundEvaluationItemSchema).max(10).default([]),
 });
 
 // extend existing sessionMetadataSchema:
@@ -1008,6 +1043,7 @@ const baseInput = {
   retentionStatus: 'strong' as const,
   struggleStatus: 'normal' as const,
   recentCorrectStreak: 2,
+  currentSessionSolidAnswerCount: 2,
   quotaFractionRemaining: 0.5,
   challengeRoundState: undefined,
   cooldownLastOfferedAt: null,
@@ -1041,6 +1077,30 @@ describe('evaluateChallengeReadiness', () => {
     for (const status of ['fading', 'weak', 'forgotten'] as const) {
       expect(evaluateChallengeReadiness({ ...baseInput, retentionStatus: status }).eligible).toBe(false);
     }
+  });
+
+  it('allows a new topic when the current session shows sustained solid answers', () => {
+    expect(
+      evaluateChallengeReadiness({
+        ...baseInput,
+        retentionStatus: 'new',
+        recentCorrectStreak: 4,
+        currentSessionSolidAnswerCount: 4,
+        exchangeCount: 7,
+      }).eligible,
+    ).toBe(true);
+  });
+
+  it('does not allow a new topic on only a short lucky streak', () => {
+    expect(
+      evaluateChallengeReadiness({
+        ...baseInput,
+        retentionStatus: 'new',
+        recentCorrectStreak: 2,
+        currentSessionSolidAnswerCount: 2,
+        exchangeCount: 5,
+      }).eligible,
+    ).toBe(false);
   });
 
   it('hard-gates when streak below 2', () => {
@@ -1114,6 +1174,9 @@ import {
 const CHALLENGE_OFFER_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 const MIN_EXCHANGES = 5;
 const MIN_CORRECT_STREAK = 2;
+const MIN_NEW_TOPIC_EXCHANGES = 7;
+const MIN_NEW_TOPIC_SOLID_ANSWERS = 4;
+const MIN_NEW_TOPIC_CORRECT_STREAK = 4;
 const MIN_QUOTA_FRACTION = 0.05;
 
 export interface ChallengeReadinessInput {
@@ -1122,6 +1185,7 @@ export interface ChallengeReadinessInput {
   retentionStatus: z.infer<typeof retentionStatusSchema>;
   struggleStatus: z.infer<typeof struggleStatusSchema>;
   recentCorrectStreak: number;
+  currentSessionSolidAnswerCount: number;
   quotaFractionRemaining: number;
   challengeRoundState: z.infer<typeof challengeRoundSessionStateSchema> | undefined;
   cooldownLastOfferedAt: Date | null;
@@ -1140,8 +1204,14 @@ export function evaluateChallengeReadiness(input: ChallengeReadinessInput): Chal
   }
   if (input.struggleStatus !== 'normal') return { eligible: false, reason: 'struggle' };
   if (input.exchangeCount < MIN_EXCHANGES) return { eligible: false, reason: 'exchanges_below_min' };
-  if (input.retentionStatus !== 'strong') return { eligible: false, reason: 'retention' };
   if (input.recentCorrectStreak < MIN_CORRECT_STREAK) return { eligible: false, reason: 'streak' };
+  const retentionEligible =
+    input.retentionStatus === 'strong' ||
+    (input.retentionStatus === 'new' &&
+      input.exchangeCount >= MIN_NEW_TOPIC_EXCHANGES &&
+      input.recentCorrectStreak >= MIN_NEW_TOPIC_CORRECT_STREAK &&
+      input.currentSessionSolidAnswerCount >= MIN_NEW_TOPIC_SOLID_ANSWERS);
+  if (!retentionEligible) return { eligible: false, reason: 'retention' };
   if (input.quotaFractionRemaining < MIN_QUOTA_FRACTION) return { eligible: false, reason: 'quota' };
   if (input.challengeRoundState && input.challengeRoundState.state !== 'complete' && input.challengeRoundState.state !== 'aborted') {
     if (input.challengeRoundState.declinedDontAskAgain) return { eligible: false, reason: 'session_decline' };
@@ -1241,20 +1311,22 @@ describe('challenge-round state transitions', () => {
     expect(next?.questionIndex).toBe(0);
     expect(next?.totalQuestions).toBe(3);
   });
-  it('active -> drafting when last question answered', () => {
+  it('active -> drafting when last question answered and preserves all evaluations', () => {
     const next = transitionChallengeState(
-      { state: 'active', offerCount: 1, questionIndex: 2, totalQuestions: 3 },
-      { type: 'answer_complete' },
+      { state: 'active', offerCount: 1, questionIndex: 2, totalQuestions: 3, evaluations: [{ concept: 'a', result: 'solid', evidence: 'x', answerEventId: 'e1', learnerQuote: 'a' }] },
+      { type: 'answer_complete', evaluation: [{ concept: 'b', result: 'solid', evidence: 'y', answerEventId: 'e2', learnerQuote: 'b' }] },
     );
     expect(next?.state).toBe('drafting');
+    expect(next?.evaluations).toHaveLength(2);
   });
   it('active -> active advances when more questions remain', () => {
     const next = transitionChallengeState(
       { state: 'active', offerCount: 1, questionIndex: 0, totalQuestions: 3 },
-      { type: 'answer_complete' },
+      { type: 'answer_complete', evaluation: [{ concept: 'a', result: 'solid', evidence: 'x', answerEventId: 'e1', learnerQuote: 'a' }] },
     );
     expect(next?.state).toBe('active');
     expect(next?.questionIndex).toBe(1);
+    expect(next?.evaluations).toHaveLength(1);
   });
   it('rejects illegal transition (complete -> active)', () => {
     expect(() =>
@@ -1272,17 +1344,21 @@ describe('challenge-round state transitions', () => {
 ```typescript
 // apps/api/src/services/challenge-round/state.ts
 import type { z } from 'zod';
-import { challengeRoundSessionStateSchema } from '@eduagent/schemas';
+import {
+  challengeRoundEvaluationItemSchema,
+  challengeRoundSessionStateSchema,
+} from '@eduagent/schemas';
 import { enforceChallengeQuestionCap, MAX_CHALLENGE_QUESTIONS } from './caps';
 
 type State = z.infer<typeof challengeRoundSessionStateSchema>;
+type Eval = z.infer<typeof challengeRoundEvaluationItemSchema>;
 
 export type StateTransition =
   | { type: 'offer'; topicId: string }
   | { type: 'accept' }
   | { type: 'decline'; dontAskAgain: boolean }
   | { type: 'start'; totalQuestions: number }
-  | { type: 'answer_complete' }
+  | { type: 'answer_complete'; evaluation: Eval[] }
   | { type: 'draft_ready' }
   | { type: 'complete' }
   | { type: 'abort' };
@@ -1317,8 +1393,9 @@ export function transitionChallengeState(prev: State | undefined, ev: StateTrans
     case 'answer_complete': {
       if (prev?.state !== 'active') throw new Error('illegal: answer_complete requires active');
       const next = (prev.questionIndex ?? 0) + 1;
-      if (next >= (prev.totalQuestions ?? MAX_CHALLENGE_QUESTIONS)) return { ...prev, state: 'drafting' };
-      return { ...prev, questionIndex: next };
+      const evaluations = [...(prev.evaluations ?? []), ...ev.evaluation];
+      if (next >= (prev.totalQuestions ?? MAX_CHALLENGE_QUESTIONS)) return { ...prev, state: 'drafting', evaluations };
+      return { ...prev, questionIndex: next, evaluations };
     }
     case 'draft_ready':
       if (prev?.state !== 'drafting') throw new Error('illegal: draft_ready requires drafting');
@@ -1360,18 +1437,18 @@ cd apps/api && pnpm exec jest src/services/challenge-round/caps.test.ts src/serv
 import { decideMasteryAndReview, summarizeEvaluation } from './evaluation';
 
 const allSolid = [
-  { concept: 'a', result: 'solid' as const, evidence: 'x' },
-  { concept: 'b', result: 'solid' as const, evidence: 'y' },
-  { concept: 'c', result: 'solid' as const, evidence: 'z' },
+  { concept: 'a', result: 'solid' as const, evidence: 'x', answerEventId: 'e1', learnerQuote: 'I said a clearly' },
+  { concept: 'b', result: 'solid' as const, evidence: 'y', answerEventId: 'e2', learnerQuote: 'I said b clearly' },
+  { concept: 'c', result: 'solid' as const, evidence: 'z', answerEventId: 'e3', learnerQuote: 'I said c clearly' },
 ];
 const mixed = [
-  { concept: 'a', result: 'solid' as const, evidence: 'x' },
-  { concept: 'b', result: 'partial' as const, evidence: 'y' },
-  { concept: 'c', result: 'misconception' as const, evidence: 'z', correction: 'C' },
+  { concept: 'a', result: 'solid' as const, evidence: 'x', answerEventId: 'e1', learnerQuote: 'I said a clearly' },
+  { concept: 'b', result: 'partial' as const, evidence: 'y', answerEventId: 'e2', learnerQuote: 'I partly said b' },
+  { concept: 'c', result: 'misconception' as const, evidence: 'z', correction: 'C', answerEventId: 'e3', learnerQuote: 'I said c incorrectly' },
 ];
 const allMissing = [
-  { concept: 'a', result: 'missing' as const, evidence: 'x' },
-  { concept: 'b', result: 'missing' as const, evidence: 'y' },
+  { concept: 'a', result: 'missing' as const, evidence: 'x', answerEventId: 'e1', learnerQuote: 'idk' },
+  { concept: 'b', result: 'missing' as const, evidence: 'y', answerEventId: 'e2', learnerQuote: 'pass' },
 ];
 
 describe('decideMasteryAndReview', () => {
@@ -1381,6 +1458,7 @@ describe('decideMasteryAndReview', () => {
     expect(d.markMasteryVerified).toBe(true);
     expect(d.reviewTargets).toEqual([]);
     expect(d.solidConcepts).toEqual(['a', 'b', 'c']);
+    expect(d.solidAnswerQuotes).toEqual(['I said a clearly', 'I said b clearly', 'I said c clearly']);
   });
   it('mixed -> partial, review targets for partial+misconception, NOT mastered', () => {
     const d = decideMasteryAndReview(mixed);
@@ -1388,6 +1466,7 @@ describe('decideMasteryAndReview', () => {
     expect(d.markMasteryVerified).toBe(false);
     expect(d.reviewTargets.map(r => r.concept).sort()).toEqual(['b', 'c']);
     expect(d.solidConcepts).toEqual(['a']);
+    expect(d.solidAnswerQuotes).toEqual(['I said a clearly']);
   });
   it('all missing -> reteach, no note, no review targets', () => {
     const d = decideMasteryAndReview(allMissing);
@@ -1395,13 +1474,27 @@ describe('decideMasteryAndReview', () => {
     expect(d.solidConcepts).toEqual([]);
     expect(d.markMasteryVerified).toBe(false);
   });
+  it('empty evaluation -> invalid, no note, no mastery (CRIT-9)', () => {
+    const d = decideMasteryAndReview([]);
+    expect(d.outcome).toBe('invalid');
+    expect(d.markMasteryVerified).toBe(false);
+    expect(d.solidConcepts).toEqual([]);
+    expect(d.solidAnswerQuotes).toEqual([]);
+    expect(d.reviewTargets).toEqual([]);
+  });
   it('any misconception blocks mastery even if majority solid', () => {
     const mostlySolid = [
-      { concept: 'a', result: 'solid' as const, evidence: 'x' },
-      { concept: 'b', result: 'solid' as const, evidence: 'y' },
-      { concept: 'c', result: 'misconception' as const, evidence: 'z', correction: 'C' },
+      { concept: 'a', result: 'solid' as const, evidence: 'x', answerEventId: 'e1', learnerQuote: 'solid a' },
+      { concept: 'b', result: 'solid' as const, evidence: 'y', answerEventId: 'e2', learnerQuote: 'solid b' },
+      { concept: 'c', result: 'misconception' as const, evidence: 'z', correction: 'C', answerEventId: 'e3', learnerQuote: 'wrong c' },
     ];
     expect(decideMasteryAndReview(mostlySolid).markMasteryVerified).toBe(false);
+  });
+  it('does not expose partial or misconception quotes for note drafting', () => {
+    const d = decideMasteryAndReview(mixed);
+    expect(d.solidAnswerQuotes).toEqual(['I said a clearly']);
+    expect(d.solidAnswerQuotes).not.toContain('I partly said b');
+    expect(d.solidAnswerQuotes).not.toContain('I said c incorrectly');
   });
 });
 
@@ -1423,20 +1516,28 @@ type Eval = z.infer<typeof challengeRoundEvaluationItemSchema>;
 
 export interface ReviewTarget {
   concept: string;
+  answerEventId: string;
   misconception?: string;
   correction?: string;
   source: 'challenge_round';
 }
 
 export interface MasteryDecision {
-  outcome: 'verified' | 'partial' | 'reteach';
+  outcome: 'verified' | 'partial' | 'reteach' | 'invalid';
   markMasteryVerified: boolean;
   solidConcepts: string[];
+  solidAnswerQuotes: string[];
   reviewTargets: ReviewTarget[];
 }
 
 export function decideMasteryAndReview(evals: Eval[]): MasteryDecision {
-  const solid = evals.filter(e => e.result === 'solid').map(e => e.concept);
+  if (evals.length === 0) {
+    return { outcome: 'invalid', markMasteryVerified: false, solidConcepts: [], solidAnswerQuotes: [], reviewTargets: [] };
+  }
+
+  const solidItems = evals.filter(e => e.result === 'solid');
+  const solid = solidItems.map(e => e.concept);
+  const solidAnswerQuotes = solidItems.map(e => e.learnerQuote);
   const hasMisconception = evals.some(e => e.result === 'misconception');
   const hasPartial = evals.some(e => e.result === 'partial');
   const allMissing = evals.length > 0 && evals.every(e => e.result === 'missing');
@@ -1444,16 +1545,17 @@ export function decideMasteryAndReview(evals: Eval[]): MasteryDecision {
     .filter(e => e.result === 'partial' || e.result === 'misconception')
     .map(e => ({
       concept: e.concept,
+      answerEventId: e.answerEventId,
       misconception: e.result === 'misconception' ? e.evidence : undefined,
       correction: e.correction,
       source: 'challenge_round' as const,
     }));
 
-  if (allMissing) return { outcome: 'reteach', markMasteryVerified: false, solidConcepts: [], reviewTargets };
+  if (allMissing) return { outcome: 'reteach', markMasteryVerified: false, solidConcepts: [], solidAnswerQuotes: [], reviewTargets };
   if (solid.length === evals.length && !hasMisconception && !hasPartial) {
-    return { outcome: 'verified', markMasteryVerified: true, solidConcepts: solid, reviewTargets: [] };
+    return { outcome: 'verified', markMasteryVerified: true, solidConcepts: solid, solidAnswerQuotes, reviewTargets: [] };
   }
-  return { outcome: 'partial', markMasteryVerified: false, solidConcepts: solid, reviewTargets };
+  return { outcome: 'partial', markMasteryVerified: false, solidConcepts: solid, solidAnswerQuotes, reviewTargets };
 }
 
 export function summarizeEvaluation(evals: Eval[]) {
@@ -1489,7 +1591,7 @@ cd apps/api && pnpm exec jest src/services/challenge-round/evaluation.test.ts
 // apps/api/src/services/challenge-round/note-draft.test.ts
 import { validateNoteDraft } from './note-draft';
 
-const learnerAnswers = [
+const solidLearnerQuotes = [
   'Photosynthesis happens in chloroplasts. The plant uses light energy to convert carbon dioxide and water into glucose.',
   'ATP is the energy currency of the cell.',
 ];
@@ -1497,19 +1599,38 @@ const learnerAnswers = [
 describe('validateNoteDraft', () => {
   it('accepts draft that overlaps with learner content', () => {
     const draft = 'Photosynthesis takes place in chloroplasts. Light energy converts carbon dioxide and water into glucose. ATP is the cell energy currency.';
-    expect(validateNoteDraft(draft, learnerAnswers).ok).toBe(true);
+    expect(validateNoteDraft(draft, solidLearnerQuotes).ok).toBe(true);
   });
   it('rejects draft that invents content with low overlap', () => {
     const draft = 'The Krebs cycle is essential for cellular respiration and produces NADH and FADH2 electron carriers.';
-    expect(validateNoteDraft(draft, learnerAnswers).ok).toBe(false);
+    expect(validateNoteDraft(draft, solidLearnerQuotes).ok).toBe(false);
   });
   it('rejects empty draft', () => {
-    expect(validateNoteDraft('', learnerAnswers).ok).toBe(false);
+    expect(validateNoteDraft('', solidLearnerQuotes).ok).toBe(false);
   });
   it('reports overlap ratio in result', () => {
-    const r = validateNoteDraft('Photosynthesis happens in chloroplasts. ATP is energy currency.', learnerAnswers);
+    const r = validateNoteDraft('Photosynthesis happens in chloroplasts. ATP is energy currency.', solidLearnerQuotes);
     expect(r.ok).toBe(true);
     expect(r.overlapRatio).toBeGreaterThan(0.4);
+  });
+  it('accepts short but meaningful drafts', () => {
+    expect(validateNoteDraft('ATP stores energy.', ['ATP stores energy.']).ok).toBe(true);
+  });
+  it('rejects draft that only overlaps with non-solid answer text', () => {
+    const partialOrWrongQuotes = ['photosynthesis happens in the nucleus', 'ATP means atomic transfer power'];
+    const draft = 'Photosynthesis happens in the nucleus and ATP means atomic transfer power.';
+    expect(validateNoteDraft(draft, solidLearnerQuotes)).toMatchObject({ ok: false });
+    expect(validateNoteDraft(draft, partialOrWrongQuotes)).toMatchObject({ ok: true });
+  });
+  it('handles accented Latin learner text (MED-10)', () => {
+    const quotes = ['Fotosyntéza probíhá v chloroplastech a vytváří glukózu.'];
+    const draft = 'Fotosyntéza probíhá v chloroplastech a vytváří glukózu.';
+    expect(validateNoteDraft(draft, quotes).ok).toBe(true);
+  });
+  it('handles non-spaced learner text with character n-gram fallback (MED-10)', () => {
+    const quotes = ['光合成は葉緑体で行われます'];
+    const draft = '光合成は葉緑体で行われます';
+    expect(validateNoteDraft(draft, quotes).ok).toBe(true);
   });
 });
 ```
@@ -1526,14 +1647,28 @@ const STOPWORDS = new Set([
   'has', 'have', 'had', 'do', 'does', 'did', 'i', 'you', 'they', 'we', 'he', 'she',
 ]);
 
-function tokenize(text: string): Set<string> {
-  return new Set(
+function characterNgrams(text: string, n = 2): Set<string> {
+  const chars = Array.from(
     text
-      .toLowerCase()
-      .replace(/[^a-z0-9\s]/g, ' ')
+      .normalize('NFKC')
+      .toLocaleLowerCase()
+      .replace(/[^\p{L}\p{N}]/gu, ''),
+  );
+  const grams = new Set<string>();
+  for (let i = 0; i <= chars.length - n; i += 1) grams.add(chars.slice(i, i + n).join(''));
+  return grams;
+}
+
+function tokenize(text: string): Set<string> {
+  const wordTokens = new Set(
+    text
+      .normalize('NFKC')
+      .toLocaleLowerCase()
+      .replace(/[^\p{L}\p{N}\s]/gu, ' ')
       .split(/\s+/)
       .filter(t => t.length > 2 && !STOPWORDS.has(t)),
   );
+  return wordTokens.size > 1 ? wordTokens : characterNgrams(text);
 }
 
 export interface DraftValidationResult {
@@ -1542,10 +1677,10 @@ export interface DraftValidationResult {
   reason?: string;
 }
 
-export function validateNoteDraft(draft: string, learnerAnswers: string[]): DraftValidationResult {
+export function validateNoteDraft(draft: string, solidLearnerQuotes: string[]): DraftValidationResult {
   if (!draft.trim()) return { ok: false, overlapRatio: 0, reason: 'empty' };
   const draftTokens = tokenize(draft);
-  const learnerTokens = tokenize(learnerAnswers.join(' '));
+  const learnerTokens = tokenize(solidLearnerQuotes.join(' '));
   if (draftTokens.size === 0) return { ok: false, overlapRatio: 0, reason: 'no_content_tokens' };
   let overlap = 0;
   for (const tok of draftTokens) if (learnerTokens.has(tok)) overlap += 1;
@@ -1554,6 +1689,8 @@ export function validateNoteDraft(draft: string, learnerAnswers: string[]): Draf
   return { ok: true, overlapRatio: ratio };
 }
 ```
+
+**HIGH-6 implementation rule:** callers must pass `decision.solidAnswerQuotes`, not the full transcript and not all challenge answers. If `solidAnswerQuotes.length === 0`, do not call the drafter and do not emit `ui_hints.note_draft`.
 
 - [ ] **Step 3: Run green + commit**
 
@@ -1564,7 +1701,7 @@ cd apps/api && pnpm exec jest src/services/challenge-round/note-draft.test.ts
 
 - [ ] **Step 4: Calibrate `MIN_LEXICAL_OVERLAP_NOTE_DRAFT` against the eval harness (MED-3)**
 
-The 0.4 threshold in `caps.ts` is a guess. After Task 8 (Tier 2 eval harness wired), run the 6-scenario suite and emit the overlap ratio for each `note_draft`. Log a histogram. If 0.4 produces false rejects on the `draft-note-uses-learner-words` scenario, lower; if it accepts the obviously-hallucinated drafts in adversarial scenarios (add 2 such scenarios to `challenge-round.ts` for this calibration), raise.
+The 0.4 threshold in `caps.ts` is a guess. After Task 8 (Tier 2 eval harness wired), run the 7-scenario suite and emit the overlap ratio for each `note_draft`. Log a histogram. If 0.4 produces false rejects on the `draft-note-uses-learner-words` scenario, lower; if it accepts the obviously-hallucinated drafts in adversarial scenarios (add 2 such scenarios to `challenge-round.ts` for this calibration), raise.
 
 Annotate the constant in `caps.ts`:
 
@@ -1613,7 +1750,7 @@ Constraints:
 - Maximum ${MAX_CHALLENGE_QUESTIONS} questions per round (do not exceed; the server will cap).
 - One question per turn. No multi-part questions.
 - Match the learner's age and energy. Do not use academic jargon.
-- After EACH learner answer, emit "signals.challenge_round_evaluation" with ONE item describing the concept assessed and result in {solid, partial, missing, misconception}.
+- After EACH learner answer, emit "signals.challenge_round_evaluation" with ONE item describing the concept assessed, result in {solid, partial, missing, misconception}, the learner answer event id, and a short `learnerQuote` copied from the learner's answer.
 - When all questions are answered, set "ui_hints.challenge_round.active": false and proceed to drafting.
 
 Failure framing is banned. Never use "failed", "wrong", "incorrect", "struggle", "weak". Use "got it", "close", "let's tighten this", "not quite yet".
@@ -1624,7 +1761,8 @@ The Challenge Round is complete. Draft a learner-owned note in "ui_hints.note_dr
 
 Hard rules:
 - Use ONLY content the learner actually said in their challenge answers. Do not invent facts they did not state.
-- Pull from concepts the evaluation marked "solid". Do NOT include partial or misconception concepts.
+- Pull from the `learnerQuote` values attached to concepts the evaluation marked "solid". Do NOT include partial, missing, or misconception concepts.
+- If a concept is marked solid but its `learnerQuote` is vague ("yes", "got it", "I know"), exclude it from the draft rather than inventing detail.
 - 2-5 short sentences. Written in the learner's voice ("I learned that...", "in my own words...").
 - Title is NOT included; the note system handles that.
 
@@ -1739,6 +1877,21 @@ export const challengeRoundScenarios: Scenario[] = [
     ],
     sessionMetadata: { challengeRound: { state: 'active', offerCount: 1, questionIndex: 1, totalQuestions: 3 } },
     expected: { signalsMustInclude: ['challenge_round_evaluation'], evaluationResultIn: ['solid', 'partial'] },
+  },
+  {
+    name: 'misconception-must-not-be-solid',
+    profileAge: 15,
+    sessionType: 'learning',
+    history: [
+      { role: 'assistant', content: 'Where does photosynthesis happen, and why does that location matter?' },
+      { role: 'user', content: 'Photosynthesis happens in the nucleus because that is where the plant stores instructions.' },
+    ],
+    sessionMetadata: { challengeRound: { state: 'active', offerCount: 1, questionIndex: 1, totalQuestions: 3 } },
+    expected: {
+      signalsMustInclude: ['challenge_round_evaluation'],
+      evaluationResultForConceptMustNotBe: { conceptIncludes: 'where', result: 'solid' },
+      evaluationResultMustInclude: ['misconception'],
+    },
   },
   {
     name: 'draft-note-uses-learner-words',
@@ -1878,6 +2031,7 @@ const readiness = evaluateChallengeReadiness({
   retentionStatus: topicProgress?.retentionStatus ?? 'forgotten',
   struggleStatus: topicProgress?.struggleStatus ?? 'normal',
   recentCorrectStreak: computeRecentCorrectStreak(session),
+  currentSessionSolidAnswerCount: computeCurrentSessionSolidAnswerCount(session),
   quotaFractionRemaining: quota.fractionRemaining,
   challengeRoundState: session.metadata?.challengeRound,
   cooldownLastOfferedAt: cooldown?.lastOfferedAt ?? null,
@@ -1915,14 +2069,18 @@ if (envelope.signals?.challenge_round_offer && topicProgress?.topicId) {
 
 // state transition on each evaluation in active state
 if (envelope.signals?.challenge_round_evaluation && session.metadata?.challengeRound?.state === 'active') {
+  const previousChallengeRound = session.metadata.challengeRound;
   session.metadata = {
     ...session.metadata,
-    challengeRound: transitionChallengeState(session.metadata.challengeRound, { type: 'answer_complete' }),
+    challengeRound: transitionChallengeState(previousChallengeRound, {
+      type: 'answer_complete',
+      evaluation: envelope.signals.challenge_round_evaluation,
+    }),
   };
   await persistSessionMetadata(session.id, session.metadata);
 }
 
-// dispatch Inngest fan-out on completion (drafting -> with evaluation array)
+// dispatch Inngest fan-out on completion (full accumulated evaluation array)
 if (
   envelope.signals?.challenge_round_evaluation &&
   session.metadata?.challengeRound?.state === 'drafting'
@@ -1931,7 +2089,7 @@ if (
     sessionId: session.id,
     profileId: session.profileId,
     topicId: session.metadata.challengeRound.topicId!,
-    evaluation: envelope.signals.challenge_round_evaluation,
+    evaluation: session.metadata.challengeRound.evaluations ?? [],
   });
 }
 ```
@@ -1972,9 +2130,51 @@ describe('processExchange — challenge round dispatch', () => {
 pnpm eval:llm --live
 ```
 
-Expected: all 6 challenge-round scenarios pass schema validation.
+Expected: all 7 challenge-round scenarios pass schema validation.
 
 - [ ] **Step 7: Commit**
+
+```bash
+/commit
+```
+
+---
+
+### Task 8.5 — Mid-round recovery and pending draft handoff (MED-9)
+
+**Files:**
+- Modify: `apps/api/src/services/session/session-crud.ts` — close/auto-close handling
+- Modify: `apps/api/src/services/session/session-exchange.ts` — next-session/post-session handoff
+- Modify: `packages/schemas/src/sessions.ts` — optional `challengeRound.pendingDraft` metadata if needed
+- Modify/Create tests near session close + exchange services
+
+- [ ] **Step 1: Define recovery state**
+
+When a session ends while `challengeRound.state ∈ {'active','drafting'}`, inspect `challengeRound.evaluations`:
+
+- If there is at least one `solid` item, compute `decision = decideMasteryAndReview(evaluations)` and persist:
+  - the weak-spot review targets via the chosen durable target from Task 0.0.
+  - `challengeRound.pendingDraft = { solidAnswerQuotes, solidConcepts, createdAt }` in session metadata, or an equivalent durable row if Task 0.0 chose a table.
+- If there are zero `solid` items, persist weak spots if present, set `challengeRound.state = 'aborted'`, and do not create a note draft.
+- Never mark `masteryChallengeVerifiedAt` from an auto-closed/incomplete round unless the round reached `drafting` with all expected questions answered and every evaluation is `solid`.
+
+- [ ] **Step 2: Surface pending draft explicitly**
+
+On next app open/session resume/post-session summary, if a pending challenge draft exists, show the same `DraftedNoteReview` component with copy:
+
+> "You explained a few strong pieces before we stopped. Want to save those as a note?"
+
+Actions remain explicit: `Save note`, `Edit first`, `Skip`. No auto-save.
+
+- [ ] **Step 3: Tests**
+
+Add tests for:
+- active round + one solid answer + app close → pending draft exists, no mastery flag, weak spots persisted.
+- active round + zero solid answers + app close → no draft, no mastery flag.
+- drafting round + all solid + app close before save → pending draft exists; mastery flag only if the round had all expected evaluations.
+- saving recovered draft writes `source: 'challenge_round'` and links `sessionId`.
+
+- [ ] **Step 4: Commit**
 
 ```bash
 /commit
@@ -2084,13 +2284,14 @@ export const challengeRoundRoutes = new Hono()
   })
   .post('/decline', async (c) => {
     const body = declineSchema.parse(await c.req.json());
+    const db = c.get('db');
     const session = await getSessionById(body.sessionId, c.get('profileId'));
     session.metadata = {
       ...session.metadata,
       challengeRound: transitionChallengeState(session.metadata?.challengeRound, { type: 'decline', dontAskAgain: body.dontAskAgain }),
     };
     await persistSessionMetadata(session.id, session.metadata);
-    await recordCooldown({ profileId: c.get('profileId'), topicId: body.topicId, outcome: 0 });
+    await recordCooldown(db, { profileId: c.get('profileId'), topicId: body.topicId, outcome: 0 });
     await safeSend('challenge.round.declined', { sessionId: body.sessionId, topicId: body.topicId });
     return c.json({ ok: true });
   })
@@ -2112,10 +2313,12 @@ Helper `loadReadinessInput` queries the same data `processExchange` uses (sessio
 
 ```typescript
 // apps/api/src/services/challenge-round/cooldown.ts
-import { db } from '@/db';
-import { challengeRoundCooldowns } from '@eduagent/database';
+import { challengeRoundCooldowns, type Database } from '@eduagent/database';
 
-export async function recordCooldown(input: { profileId: string; topicId: string; outcome: number }): Promise<void> {
+export async function recordCooldown(
+  db: Database,
+  input: { profileId: string; topicId: string; outcome: number },
+): Promise<void> {
   await db
     .insert(challengeRoundCooldowns)
     .values({ profileId: input.profileId, topicId: input.topicId, lastOutcome: input.outcome })
@@ -2135,19 +2338,21 @@ import { decideMasteryAndReview } from '@/services/challenge-round/evaluation';
 import { upsertReviewTargets } from '@/services/retention-data';
 import { markMasteryChallengeVerified } from '@/services/topic-completion';
 import { recordCooldown } from '@/services/challenge-round/cooldown';
+import { getStepDatabase } from '../db';
 
 export const challengeRoundCompleted = inngest.createFunction(
   { id: 'challenge-round-completed', name: 'Challenge Round Completed' },
   { event: 'challenge.round.completed' },
   async ({ event, step }) => {
     const { sessionId, profileId, topicId, evaluation } = event.data;
+    const db = getStepDatabase();
     const decision = decideMasteryAndReview(evaluation);
-    await step.run('persist-review-targets', () => upsertReviewTargets(profileId, topicId, decision.reviewTargets));
+    await step.run('persist-review-targets', () => upsertReviewTargets(db, profileId, topicId, decision.reviewTargets));
     if (decision.markMasteryVerified) {
-      await step.run('mark-mastery-verified', () => markMasteryChallengeVerified(profileId, topicId, new Date()));
+      await step.run('mark-mastery-verified', () => markMasteryChallengeVerified(db, profileId, topicId, new Date()));
     }
     await step.run('record-cooldown', () =>
-      recordCooldown({
+      recordCooldown(db, {
         profileId,
         topicId,
         outcome: decision.markMasteryVerified ? 2 : decision.outcome === 'reteach' ? 3 : 1,
@@ -2175,8 +2380,8 @@ Expected: only the call sites added in this PR. If anything else exists (unlikel
 - [ ] **Step 6: Tests**
 
 Write tests for:
-- Routes: accept/decline/maybe-offer/abort all transition session metadata correctly, decline persists cooldown.
-- Inngest function: verified outcome → mastery flag set, no review targets; partial outcome → review targets, no mastery flag; reteach outcome → cooldown=3, no review targets.
+- Routes: accept/decline/maybe-offer/abort all transition session metadata correctly; decline persists cooldown; cross-profile and cross-topic session mismatches are rejected; already-offered race returns a 200 no-op; illegal transitions return a typed client-safe error.
+- Inngest function: verified outcome → mastery flag set, no review targets; partial outcome → review targets, no mastery flag; reteach outcome → cooldown=3, no review targets; empty evaluation → `invalid`, no mastery flag, no note, no review targets, observable structured log/metric.
 
 ```bash
 pnpm exec nx run api:test
@@ -2500,9 +2705,17 @@ describe('challenge round end-to-end', () => {
       const isLast = i === 2;
       mockRouteAndCall({
         reply: isLast ? 'great' : 'next question',
-        signals: { challenge_round_evaluation: [{ concept: `c${i}`, result: 'solid', evidence: 'said it correctly' }] },
+        signals: {
+          challenge_round_evaluation: [{
+            concept: `c${i}`,
+            result: 'solid',
+            evidence: 'said it correctly',
+            answerEventId: `event-${i}`,
+            learnerQuote: `correct learner answer ${i}`,
+          }],
+        },
         ui_hints: isLast
-          ? { note_draft: { content: 'I learned that X, Y, and Z based on what I said.', source_concepts: ['c0', 'c1', 'c2'] } }
+          ? { note_draft: { content: 'I learned that X, Y, and Z based on what I said.', source_concepts: ['c0', 'c1', 'c2'], source_answer_event_ids: ['e0', 'e1', 'e2'] } }
           : { challenge_round: { active: true, question_index: i + 1, total_questions: 3 } },
         confidence: 'high',
       });
@@ -2522,9 +2735,9 @@ describe('challenge round end-to-end', () => {
       profileId: profile.id,
       topicId: topic.id,
       evaluation: [
-        { concept: 'c0', result: 'solid', evidence: 'x' },
-        { concept: 'c1', result: 'solid', evidence: 'y' },
-        { concept: 'c2', result: 'solid', evidence: 'z' },
+        { concept: 'c0', result: 'solid', evidence: 'x', answerEventId: 'e0', learnerQuote: 'correct learner answer 0' },
+        { concept: 'c1', result: 'solid', evidence: 'y', answerEventId: 'e1', learnerQuote: 'correct learner answer 1' },
+        { concept: 'c2', result: 'solid', evidence: 'z', answerEventId: 'e2', learnerQuote: 'correct learner answer 2' },
       ],
     });
 
@@ -2540,17 +2753,30 @@ describe('challenge round end-to-end', () => {
   });
 
   it('partial: 2 solid + 1 misconception saves only the 2 concepts, persists 1 review target, no mastery flip', async () => {
-    const { db, profile, topic } = await seedEligibleSession();
+    const { db, app, profile, topic, session } = await seedEligibleSession();
     await runInngestEvent('challenge.round.completed', {
-      sessionId: 'sid', profileId: profile.id, topicId: topic.id,
+      sessionId: session.id, profileId: profile.id, topicId: topic.id,
       evaluation: [
-        { concept: 'c0', result: 'solid', evidence: 'x' },
-        { concept: 'c1', result: 'solid', evidence: 'y' },
-        { concept: 'c2', result: 'misconception', evidence: 'said wrong thing', correction: 'right thing' },
+        { concept: 'c0', result: 'solid', evidence: 'x', answerEventId: 'e0', learnerQuote: 'solid learner wording one' },
+        { concept: 'c1', result: 'solid', evidence: 'y', answerEventId: 'e1', learnerQuote: 'solid learner wording two' },
+        { concept: 'c2', result: 'misconception', evidence: 'said wrong thing', correction: 'right thing', answerEventId: 'e2', learnerQuote: 'wrong learner wording' },
       ],
     });
+    const saveRes = await app.request(`/subjects/${topic.subjectId}/topics/${topic.id}/notes`, {
+      method: 'POST',
+      body: JSON.stringify({
+        content: 'solid learner wording one\nsolid learner wording two',
+        sessionId: session.id,
+        source: 'challenge_round',
+      }),
+    });
+    expect(saveRes.status).toBe(200);
     const tp = await db.query.topicProgress.findFirst({ where: and(eq(topicProgress.profileId, profile.id), eq(topicProgress.topicId, topic.id)) });
     expect(tp?.masteryChallengeVerifiedAt).toBeNull();
+    const notes = await db.query.topicNotes.findMany({ where: and(eq(topicNotes.profileId, profile.id), eq(topicNotes.topicId, topic.id)) });
+    expect(notes).toHaveLength(1);
+    expect(notes[0].content).toContain('solid learner wording one');
+    expect(notes[0].content).not.toContain('wrong learner wording');
     const rts = await db.query.reviewTargets.findMany({ where: and(eq(reviewTargets.profileId, profile.id), eq(reviewTargets.topicId, topic.id), eq(reviewTargets.source, 'challenge_round')) });
     expect(rts).toHaveLength(1);
     expect(rts[0].correction).toBe('right thing');
@@ -2589,7 +2815,7 @@ pnpm exec jest tests/integration/challenge-round.integration.test.ts
 - [ ] **Step 1: Append to CLAUDE.md "Non-Negotiable Engineering Rules"**
 
 ```markdown
-- Challenge Round mastery decisions are server-owned and conservative. The LLM proposes per-concept evaluations via `signals.challenge_round_evaluation`; the server runs `decideMasteryAndReview()` and sets `masteryChallengeVerifiedAt` only when EVERY concept evaluates `solid`. Any `partial`, `missing`, or `misconception` blocks mastery and routes the weak concepts to review targets with `source: 'challenge_round'`. Notes drafted from Challenge Rounds must pass the lexical-overlap hallucination guard in `services/challenge-round/note-draft.ts` before being shown to the learner. The Challenge mode toggle (`learningMode: 'serious' | 'casual'`) was removed; today's `casual` is the single default tone and rigor is now expressed per-Challenge-Round rather than globally.
+- Challenge Round mastery policy is server-owned and conservative over structured LLM evidence. The LLM proposes per-concept evaluations via `signals.challenge_round_evaluation`; each item must include `answerEventId` and `learnerQuote`. The server runs `decideMasteryAndReview()` and sets `masteryChallengeVerifiedAt` only when EVERY concept evaluates `solid`. Any `partial`, `missing`, or `misconception` blocks mastery and routes the weak concepts to durable review targets with `source: 'challenge_round'`. Notes drafted from Challenge Rounds must use only `solidAnswerQuotes` and pass the lexical-overlap hallucination guard in `services/challenge-round/note-draft.ts` before being shown to the learner. The Challenge mode toggle (`learningMode: 'serious' | 'casual'`) was removed; today's `casual` is the single default tone and rigor is now expressed per-Challenge-Round rather than globally.
 ```
 
 - [ ] **Step 2: Add a short section to `docs/project_context.md`**
@@ -2611,13 +2837,14 @@ After Task 12, run the full validation matrix before declaring the feature compl
 - [ ] `pnpm exec nx run-many -t lint` — green
 - [ ] `pnpm exec nx run-many -t typecheck` — green
 - [ ] `pnpm exec nx run-many -t test` — green
-- [ ] `pnpm eval:llm --live` — all 6 challenge-round scenarios pass schema validation
+- [ ] `pnpm eval:llm --live` — all 7 challenge-round scenarios pass schema validation
 - [ ] `pnpm exec jest tests/integration/challenge-round.integration.test.ts` — green
 - [ ] **Manual smoke 1 — sunset:** Launch the app on emulator. Open a session. Confirm: no Explorer/Challenge mode header button; no Learning Mode section in More; tone is consistent.
 - [ ] **Manual smoke 2 — system-initiated CR:** Complete a learning session with 6+ exchanges, strong answers, in `strong` retention. Accept the offer. Answer 3 challenge questions correctly. Save the drafted note. Verify it appears under the topic in Library with `source: 'challenge_round'`. Verify mastery shows challenge-verified.
 - [ ] **Manual smoke 3 — Too easy chip path:** In an eligible session, tap "Too easy". Verify the offer card appears immediately. Accept. In an ineligible session (e.g., exchange 3 of 5), tap "Too easy". Verify the chip behaves as before (LLM nudges harder).
 - [ ] **Manual smoke 4 — partial outcome:** Run a Challenge Round with 1 solid + 1 misconception. Verify saved note contains only the solid concept text; verify a review target was persisted with the correction.
-- [ ] **Manual smoke 5 — decline cooldown (MED-6 — impractical at 24h, manually expire):** Decline an offer with "Don't ask again". Finish the session. In Postgres (`db:studio:dev`), manually UPDATE the `challenge_round_cooldowns` row for that profile+topic, setting `last_offered_at = NOW() - INTERVAL '23 hours'`. Start a new session on the same topic with the same readiness conditions — verify no offer appears. Then UPDATE `last_offered_at = NOW() - INTERVAL '25 hours'` and verify the offer DOES appear. Alternatively, gate `CHALLENGE_OFFER_COOLDOWN_HOURS` on `process.env.NODE_ENV === 'test' ? 0.01 : 24` for smokes — but the manual UPDATE is simpler and doesn't change production code.
+- [ ] **Manual smoke 5 — mid-round recovery:** Accept a Challenge Round, answer one question solidly, then close/end the session before the round finishes. Re-open the app. Verify the pending draft offer appears, saving it creates a `source: 'challenge_round'` note, and mastery is NOT marked.
+- [ ] **Manual smoke 6 — decline cooldown (MED-6 — impractical at 24h, manually expire):** Decline an offer with "Don't ask again". Finish the session. In Postgres (`db:studio:dev`), manually UPDATE the `challenge_round_cooldowns` row for that profile+topic, setting `last_offered_at = NOW() - INTERVAL '23 hours'`. Start a new session on the same topic with the same readiness conditions — verify no offer appears. Then UPDATE `last_offered_at = NOW() - INTERVAL '25 hours'` and verify the offer DOES appear. Alternatively, gate `CHALLENGE_OFFER_COOLDOWN_HOURS` on `process.env.NODE_ENV === 'test' ? 0.01 : 24` for smokes — but the manual UPDATE is simpler and doesn't change production code.
 - [ ] Sentry: zero errors tagged `challenge.envelope_parse` or `challenge.state_illegal` in smoke runs.
 
 ---

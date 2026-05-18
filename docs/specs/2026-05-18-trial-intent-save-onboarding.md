@@ -75,6 +75,20 @@ A pre-signup answer routes the preview. A post-signup save choice creates the ac
 
 Add a lightweight pre-signup intent question and a constrained preview path. After signup, do not restart onboarding. Show a short save-and-personalize wizard that asks where to save the thing the user just tried: my learning, my child's learning, or both. The wizard creates the correct profile structure and lands the user on the correct home surface.
 
+### Reuse-First Constraint
+
+This is not a new app shell, a replacement Home, or a second full onboarding system. Reuse the existing auth, profile creation, session, subject, learner Home, and parent Home machinery wherever possible.
+
+New work should be a thin layer around the current product:
+
+- Signed-out preview routes.
+- Preview state handoff through signup.
+- Post-auth save wizard.
+- Optional bounded preview lesson API.
+- Small Parent Home hierarchy adjustments if the current ordering still feels noisy.
+
+Do not create a parallel profile model, a new bottom navigation system, a duplicate parent dashboard, a second subject-creation pipeline, or a broad feature-reveal framework for this spec.
+
 ## Scope
 
 ### In Scope
@@ -96,6 +110,7 @@ Add a lightweight pre-signup intent question and a constrained preview path. Aft
 - Session style and normal-session length preferences.
 - Landing rules after the wizard.
 - Failure modes for auth handoff, abandoned preview state, parent/child ambiguity, and consent.
+- Reuse of existing Home surfaces, with only a light Parent Home clarity pass if needed.
 
 ### Out of Scope
 
@@ -109,6 +124,8 @@ Add a lightweight pre-signup intent question and a constrained preview path. Aft
 - Long subject-list onboarding.
 - Making the preview lesson an unlimited support chat.
 - Child-to-parent account invite/linking if no existing family-invite backend exists. V1 should support creating a child profile on the parent's account; separate-device invite/link can be a follow-up unless an invite service already exists by implementation time.
+- Replacing learner Home, parent Home, the bottom nav, or the current parent dashboard.
+- Creating a new progressive feature-unlock system. Existing tabs/features can remain; this spec only changes entry, save, and first-landing emphasis.
 
 ## User Journeys
 
@@ -359,6 +376,34 @@ CTA variants:
 - Both child-first: "Open parent home"
 - Both self-first: "Continue lesson"
 
+### Account Shell And Overwhelm
+
+Current Home already contains much of the command-center behavior:
+
+- Learner Home already exposes homework help, ask anything, practice, study-new actions, and subject continuation.
+- Parent Home already exposes add-child setup, child cards, progress, reports, nudges, and tonight prompts.
+
+This spec should not rebuild those surfaces. The overwhelm fix is narrower:
+
+- Route users to the correct existing Home branch earlier.
+- Preserve stable bottom-nav anchors after account creation.
+- Emphasize one relevant primary action in Home instead of making every feature feel equally urgent.
+- Keep secondary actions available but quieter.
+
+For V1, do not hide or unlock major features dynamically. If an area is not useful yet, its empty state should point to an existing next action, such as continuing the first lesson or adding a child.
+
+### Parent Home Clarity Pass
+
+If parent-intent users still land on a visually busy Home after the new front door, adjust `ParentHomeScreen` by reordering and reweighting existing sections rather than adding new parent features.
+
+Preferred hierarchy:
+
+1. **Today**: one primary family action, such as add first child, help a child start, read a report, send a nudge, or inspect an attention item.
+2. **Children**: existing child cards with one obvious primary action per child.
+3. **Family**: existing family management and account-adjacent actions, quieter than the daily command area.
+
+The goal is a clearer parent Home, not a new dashboard.
+
 ## Routing And Landing Rules
 
 | Pre-signup intent | Preview route | Save default | Final landing |
@@ -388,6 +433,8 @@ If the final account has an owner profile but zero linked children, existing app
 | Profile API | `apps/api/src/routes/profiles.ts`, `apps/api/src/services/profile.ts` |
 | Subject creation | `apps/api/src/routes/subjects.ts`, `apps/api/src/services/subject.ts` |
 | Current onboarding dimensions | `apps/mobile/src/app/(app)/onboarding/*`, `apps/api/src/routes/onboarding.ts` |
+
+Reuse rule: prefer adapting these surfaces over creating preview-specific duplicates. Add new components only when the current component cannot safely be used because preview is signed out, intentionally constrained, or must avoid saved-memory/account claims.
 
 ### New Mobile State
 
@@ -544,6 +591,7 @@ Do not claim that the full chat was saved when it was not.
 5. Add save wizard screens/components.
 6. Use existing `/profiles` POST to create owner and child profiles in sequence.
 7. Land self users in learner continuation and parent users in parent home.
+8. Confirm existing learner Home and parent Home cover the target landing jobs before adding any new Home components.
 
 ### Phase 2: Preview Lesson Engine
 
@@ -561,6 +609,15 @@ Do not claim that the full chat was saved when it was not.
 2. If it does not exist, add a future family-invite spec.
 3. Keep "Create child profile on this device/account" as the v1 supported path.
 
+### Phase 4: Parent Home Clarity Pass, If Needed
+
+Only run this phase if implementation review or usability testing shows parent Home remains overwhelming after the new routing/save flow.
+
+1. Reorder existing `ParentHomeScreen` sections toward Today -> Children -> Family.
+2. Reuse existing child cards, reports, nudge actions, family summary, and add-child actions.
+3. Avoid adding new data dependencies unless an existing query already exposes the needed state.
+4. Keep learner Home unchanged unless trial/save routing reveals a concrete first-use bug.
+
 ## Acceptance Criteria
 
 1. Given a signed-out user taps "Try a quick lesson", when the preview starts, then the first screen asks who they are setting it up for.
@@ -575,6 +632,9 @@ Do not claim that the full chat was saved when it was not.
 10. Given the user changes their mind on the save screen, when they choose a different save target, then the app creates the profile structure implied by the save target, not by the original pre-signup answer.
 11. Given preview state is older than 24 hours, when signup completes, then the app falls back to normal profile creation with a friendly message instead of crashing or looping.
 12. Given no preview state exists, when a new signed-in account has no profile, then existing `CreateProfileGate` behavior remains unchanged.
+13. Given a user completes signup and profile setup, when they enter the full app, then the existing bottom navigation remains the stable account shell.
+14. Given a parent-intent user completes child setup, when they land on Home, then existing parent Home actions are reused and the top area presents one clear next family action.
+15. Given an area has no useful data yet, when the user opens it, then it shows a helpful empty state pointing to an existing next action rather than introducing a new feature gate.
 
 ## Failure Modes
 
@@ -655,6 +715,8 @@ If server-backed preview is implemented:
   - self only -> learner
   - child linked -> parent home
   - both -> according to chosen priority and created profiles
+- Confirm no duplicate Home, bottom nav, parent dashboard, profile model, or subject-creation path was introduced.
+- Confirm Parent Home changes, if any, reuse existing data and actions.
 - Confirm `services/trial.ts` billing behavior is untouched.
 - Confirm no direct LLM provider call was added.
 - If prompt files are added or changed, run `pnpm eval:llm` and stage snapshots.
@@ -665,3 +727,4 @@ If server-backed preview is implemented:
 - **2026-05-18:** Parent-intent users do not default into learner chat. They see parent setup/child-link value first, with sample lesson as a secondary path.
 - **2026-05-18:** The preview lesson is internally named "preview" to avoid coupling to billing trial state, even if the visible lesson header can say "Trial lesson".
 - **2026-05-18:** Post-signup wizard should feel like saving the thing the user just did, not starting over with a generic onboarding questionnaire.
+- **2026-05-18:** Current learner Home and parent Home already contain the main command-center ingredients. This spec should reuse them and change front-door routing, save handoff, and first-landing emphasis before adding new Home surfaces.
