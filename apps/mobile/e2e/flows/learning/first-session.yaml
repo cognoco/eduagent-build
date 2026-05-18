@@ -8,6 +8,7 @@
 # Prerequisite: Seeded user with 1 subject (scenario: with-subject)
 appId: com.mentomate.app
 tags:
+  - pr-blocking
   - smoke
   - learning
 ---
