@@ -10,6 +10,7 @@
 # Tags: regression, smoke, library
 appId: com.mentomate.app
 tags:
+  - pr-blocking
   - regression
   - smoke
   - library

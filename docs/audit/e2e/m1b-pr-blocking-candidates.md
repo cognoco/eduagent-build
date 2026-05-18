@@ -85,6 +85,23 @@ Listed in rough priority order (top = most critical to a typical mobile change).
 
 | Date | Flow | Runner | Run 1 | Run 2 | Elapsed | Decision |
 |---|---|---|---|---|---|---|
-| _pending_ | _candidate name_ | _agent / human_ | _pass/fail_ | _pass/fail_ | _seconds_ | _promote / reject (reason)_ |
+| 2026-05-18 | `learning/start-session.yaml` | test-machine agent (Opus, WHPX Pixel API 34) | pass | pass | r1: 181s / r2: 138s (full seed-and-run.sh; flow content ~30-40s) | promote |
+| 2026-05-18 | `regression/bug-238-tab-bar-no-leak.yaml` | test-machine agent (Opus, WHPX Pixel API 34) | pass | pass | r1: 179s / r2: 187s (full seed-and-run.sh; flow content ~25s) | promote |
+| 2026-05-18 | `auth/welcome-text-first-time.yaml` | test-machine agent (Opus, WHPX Pixel API 34) | fail | — | 189s (failed at `runFlow ../_setup/launch-devclient.yaml` first step) | **reject — stale wiring**. The flow uses the DEPRECATED `_setup/launch-devclient.yaml` (which uses Maestro `launchApp`, unreliable on WHPX per BUG-19). The setup file's own header says it is deprecated and that callers should now assume `seed-and-run.sh --no-seed` has already brought the app to the sign-in screen — but this flow has not been migrated. Needs a flow-rewrite PR before it can be a pr-blocking candidate. |
+| 2026-05-18 | `learning/first-session.yaml` | test-machine agent (Opus, WHPX Pixel API 34) | — | — | not run | **reject — same drift as core-learning/home-layout** (carryover-list). Line 28-29 asserts `home-subject-carousel` without a `scrollUntilVisible` first, and on the current LearnerScreen layout the carousel sits below the action chips on small phones. Promotion requires the same fix already applied to `learning/home-layout.yaml` and `learning/core-learning.yaml` in commit `552d0b7f0`. Static-only triage — not run end-to-end to save emulator time. |
+
+### Elapsed-time interpretation
+
+The "Elapsed" column reports two numbers when applicable:
+
+- **Full seed-and-run.sh time** — includes ADB launch + dev-client launcher orchestration + Metro bundle download + sign-in. On WHPX cold it is ~3 min; warm-cache run ~2 min.
+- **Flow content time** — what runs AFTER `seed-and-sign-in.yaml COMPLETED`. This is the figure that maps to the brief's 90 s budget.
+
+For the two promoted flows the content time is well under 90 s. The total seed-and-run.sh time is not the right comparator because the brief's budget is per-flow runtime in CI, where the dev-client install / bundle is amortised (or replaced with a pre-built release APK).
+
+### Infrastructure notes from the verification session (2026-05-18)
+
+- **Dev-client launcher state is sticky between sessions.** The launcher's "DEVELOPMENT SERVERS" list persists user-added entries across `pm clear`. The session began with only `http://10.0.2.2:8081` discoverable (from Metro mDNS), so the standard BUG-7 workaround (`adb reverse tcp:8081 tcp:8082` + tap `http://10.0.2.2:8082`) had no `:8082` row to tap. Adding `http://10.0.2.2:8082` once via the launcher's "New development server" UI restored the expected entry.
+- **System UI ANR recovery is non-destructive.** When the WHPX emulator's `com.android.systemui` wedged, tapping "Wait" in the system-issued ANR dialog restored functionality without a snapshot wipe or emulator reboot. Persistent dev-client servers (added above) survived the recovery.
 
 When the table fills out, copy the final set into `docs/audit/e2e/m1b-execution-brief.md` under "Step 3 — current pr-blocking flows" so the brief reflects ground truth.

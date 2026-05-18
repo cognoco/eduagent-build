@@ -15,6 +15,7 @@
 # Usage: ./scripts/seed-and-run.sh learning-active flows/learning/start-session.yaml
 appId: com.mentomate.app
 tags:
+  - pr-blocking
   - smoke
   - learning
 ---
