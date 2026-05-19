@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { SubjectProgressRow, hasSubjectActivity } from './SubjectProgressRow';
 import type { SubjectInventory } from '@eduagent/schemas';
+import { getSubjectTint } from '../../lib/subject-tints';
 
 jest.mock(
   './AccordionTopicList' /* gc1-allow: pre-existing mock carried through PR 7 rename */,
@@ -140,6 +141,14 @@ describe('SubjectProgressRow headline', () => {
     screen.getByText('0 topics started · 0 mastered');
     screen.getByText('0 min · 0 sessions');
     screen.getByTestId('card-bar');
+  });
+
+  it('falls back to the canonical subject tint when no tint is provided', () => {
+    render(<SubjectProgressRow subject={makeSubject()} testID="card" />);
+
+    expect(screen.getByTestId('card-bookshelf').props.style.borderColor).toBe(
+      `${getSubjectTint('sub-1', 'light').solid}33`,
+    );
   });
 });
 

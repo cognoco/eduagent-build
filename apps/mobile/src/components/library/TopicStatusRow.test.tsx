@@ -8,17 +8,19 @@ describe('TopicStatusRow', () => {
     onPress.mockClear();
   });
 
-  it('renders continue-now and calls onPress', () => {
-    const { getByTestId } = render(
+  it('renders continue-now with session count and calls onPress', () => {
+    const { getByTestId, getByText } = render(
       <TopicStatusRow
         state="continue-now"
         title="Linear Equations"
         chapterName="Grand Overview"
+        sessionCount={4}
         onPress={onPress}
         testID="row-continue"
       />,
     );
 
+    getByText('4 sessions');
     fireEvent.press(getByTestId('row-continue'));
     expect(onPress).toHaveBeenCalledTimes(1);
   });

@@ -99,9 +99,13 @@ export function TopicStatusRow({
     }
   })();
 
+  const shouldShowSessionCount =
+    (state === 'continue-now' || state === 'started') &&
+    sessionCount !== undefined;
+
   const subtitleParts = [
     chapterName,
-    state === 'started' && sessionCount !== undefined
+    shouldShowSessionCount
       ? `${sessionCount} ${sessionCount === 1 ? 'session' : 'sessions'}`
       : null,
   ].filter(Boolean) as string[];
@@ -165,7 +169,7 @@ export function TopicStatusRow({
             </Text>
           ) : null}
 
-          {state === 'started' && sessionCount !== undefined ? (
+          {shouldShowSessionCount ? (
             <Text className="mt-0.5 text-caption text-text-secondary">
               {sessionCount} {sessionCount === 1 ? 'session' : 'sessions'}
             </Text>

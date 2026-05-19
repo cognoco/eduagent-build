@@ -651,6 +651,40 @@ export default function BookScreen() {
     return map;
   }, [topics]);
 
+  const continueNowTopic = useMemo(() => {
+    if (!continueNowTopicId) {
+      return null;
+    }
+    return topicById.get(continueNowTopicId) ?? null;
+  }, [continueNowTopicId, topicById]);
+
+  const visibleStartedTopicIds = useMemo(
+    () => startedTopicIds.filter((topicId) => topicById.has(topicId)),
+    [startedTopicIds, topicById],
+  );
+
+  const isBookComplete = useMemo(
+    () =>
+      activeTopics.length > 0 &&
+      activeTopics.every((topic) => topicStudiedIds.has(topic.id)),
+    [activeTopics, topicStudiedIds],
+  );
+
+  const resumeTargetTopicId = useMemo((): string | null => {
+    const topicId = resumeTargetQuery.data?.topicId;
+    if (!topicId || !topicById.has(topicId)) {
+      return null;
+    }
+    return topicId;
+  }, [resumeTargetQuery.data?.topicId, topicById]);
+
+  const primaryContinueTopicId =
+    (continueNowTopic ? continueNowTopic.id : null) ?? resumeTargetTopicId;
+
+  const primaryContinueTopic = primaryContinueTopicId
+    ? (topicById.get(primaryContinueTopicId) ?? null)
+    : null;
+
   const doneTopics = useMemo((): CurriculumTopic[] => {
     const lastSessionByTopicId = new Map<string, string>();
     for (const session of sessions) {
@@ -685,19 +719,22 @@ export default function BookScreen() {
   // --- Chapter-first topic grouping ---
   // Groups ALL active topics by chapter, with each topic annotated by its state.
   const chapterSections = useMemo(() => {
-    const upNextId = upNextTopic?.id ?? null;
+    const continueId = primaryContinueTopicId;
+    const upNextId = continueId ? null : (upNextTopic?.id ?? null);
     const groups = groupTopicsByChapter(activeTopics);
     return groups.map((group) => {
       type TopicWithState = {
         topic: CurriculumTopic;
-        state: 'started' | 'up-next' | 'done' | 'later';
+        state: 'continue-now' | 'started' | 'up-next' | 'done' | 'later';
         sessionCount: number;
       };
       const items: TopicWithState[] = [];
       for (const topic of group.topics) {
         if (topic.skipped) continue;
         let state: TopicWithState['state'];
-        if (topic.id === upNextId) {
+        if (topic.id === continueId) {
+          state = 'continue-now';
+        } else if (topic.id === upNextId) {
           state = 'up-next';
         } else if (topicStudiedIds.has(topic.id)) {
           state = 'done';
@@ -712,8 +749,14 @@ export default function BookScreen() {
           sessionCount: sessionCountByTopicId.get(topic.id) ?? 0,
         });
       }
-      // Sort: up-next first, then started, then later, then done
-      const stateOrder = { 'up-next': 0, started: 1, later: 2, done: 3 };
+      // Sort by the same decision priority as the sticky CTA.
+      const stateOrder = {
+        'continue-now': 0,
+        started: 1,
+        'up-next': 2,
+        later: 3,
+        done: 4,
+      };
       items.sort(
         (a, b) =>
           stateOrder[a.state] - stateOrder[b.state] ||
@@ -723,19 +766,13 @@ export default function BookScreen() {
     });
   }, [
     activeTopics,
+    primaryContinueTopicId,
     upNextTopic,
     topicStudiedIds,
     inProgressTopicIds,
     sessionCountByTopicId,
   ]);
   const hasMultipleChapters = chapterSections.length > 1;
-
-  const isBookComplete = useMemo(
-    () =>
-      activeTopics.length > 0 &&
-      activeTopics.every((topic) => topicStudiedIds.has(topic.id)),
-    [activeTopics, topicStudiedIds],
-  );
 
   useEffect(() => {
     if (wasBookComplete.current === null) {
@@ -766,18 +803,6 @@ export default function BookScreen() {
     isReadOnly,
     shouldAutoExpandThinTopicList,
   ]);
-
-  const continueNowTopic = useMemo(() => {
-    if (!continueNowTopicId) {
-      return null;
-    }
-    return topicById.get(continueNowTopicId) ?? null;
-  }, [continueNowTopicId, topicById]);
-
-  const visibleStartedTopicIds = useMemo(
-    () => startedTopicIds.filter((topicId) => topicById.has(topicId)),
-    [startedTopicIds, topicById],
-  );
 
   useEffect(() => {
     if (continueNowTopicId && !continueNowTopic) {
@@ -933,13 +958,17 @@ export default function BookScreen() {
 
   // --- Start learning: follow the status-first CTA priority ---
   const handleStartLearning = useCallback(() => {
-    if (resumeTargetQuery.data) {
+    if (
+      resumeTargetQuery.data &&
+      primaryContinueTopicId &&
+      resumeTargetQuery.data.topicId === primaryContinueTopicId
+    ) {
       pushLearningResumeTarget(router, resumeTargetQuery.data);
       return;
     }
 
-    if (continueNowTopicId) {
-      const topic = topicById.get(continueNowTopicId);
+    if (primaryContinueTopicId) {
+      const topic = topicById.get(primaryContinueTopicId);
       if (topic) {
         router.push({
           pathname: '/(app)/topic/[topicId]',
@@ -973,10 +1002,15 @@ export default function BookScreen() {
           pathname: '/(app)/topic/[topicId]',
           params: { topicId: topic.id, subjectId, bookId },
         } as Href);
+        return;
       }
     }
+
+    if (resumeTargetQuery.data) {
+      pushLearningResumeTarget(router, resumeTargetQuery.data);
+    }
   }, [
-    continueNowTopicId,
+    primaryContinueTopicId,
     topicById,
     upNextTopic,
     startedTopicIds,
@@ -1681,10 +1715,9 @@ export default function BookScreen() {
           </View>
         ) : null}
 
-        {/* [BUG-895] "Continue now" section removed — the sticky CTA at the
-            bottom of the screen already exposes the same action and now
-            includes the topic title (▶ Continue: {title}). Keeping both
-            duplicated the affordance and bloated decision time. */}
+        {/* The sticky CTA and the highlighted topic row share the same
+            status-first target, but rows remain overview links. The green CTA
+            is the only learning-chat entry point on this list. */}
 
         {/* Topics grouped by chapter, then state within chapter */}
         {chapterSections.length > 0 ? (
@@ -1706,12 +1739,12 @@ export default function BookScreen() {
                         : undefined
                     }
                     title={topic.title}
-                    sessionCount={state === 'started' ? count : undefined}
-                    onPress={
-                      state === 'up-next'
-                        ? () => handleTopicStart(topic.id, topic.title)
-                        : () => handleTopicPress(topic.id)
+                    sessionCount={
+                      state === 'continue-now' || state === 'started'
+                        ? count
+                        : undefined
                     }
+                    onPress={() => handleTopicPress(topic.id)}
                     testID={`${state}-row-${topic.id}`}
                   />
                 ))}
@@ -1919,7 +1952,7 @@ export default function BookScreen() {
       {/* Sticky CTA - adapts to learner state */}
       {activeTopics.length > 0 && !isReadOnly
         ? (() => {
-            const hasContinue = !!continueNowTopic;
+            const hasContinue = !!primaryContinueTopic;
             const hasUpNext = !!upNextTopic;
             const hasStarted = visibleStartedTopicIds.length > 0;
 
@@ -1934,11 +1967,8 @@ export default function BookScreen() {
             let label: string;
             if (hasContinue) {
               // [BUG-895] Surface the topic title in the sticky CTA so the
-              // user knows exactly which topic they're resuming. Previously
-              // this was a generic "Continue learning" alongside an in-list
-              // "Continue now" section that named the topic — which made the
-              // page show two affordances for the same action.
-              const continueTitle = continueNowTopic?.title ?? '';
+              // user knows exactly which highlighted row they're resuming.
+              const continueTitle = primaryContinueTopic?.title ?? '';
               const truncatedContinueTitle =
                 continueTitle.length > 25
                   ? `${continueTitle.slice(0, 24)}...`

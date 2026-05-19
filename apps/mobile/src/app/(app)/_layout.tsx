@@ -119,6 +119,29 @@ export function computeVisibleTabs(
   }
 }
 
+export function resolveHomeTabPresentation(
+  shape: TabShape,
+  isParentProxy = false,
+): {
+  titleKey: 'tabs.familyHub' | 'tabs.myLearning';
+  accessibilityLabelKey: 'tabs.familyHubLabel' | 'tabs.myLearningLabel';
+  iconName: 'Home' | 'School';
+} {
+  if (shape === 'guardian' && !isParentProxy) {
+    return {
+      titleKey: 'tabs.familyHub',
+      accessibilityLabelKey: 'tabs.familyHubLabel',
+      iconName: 'Home',
+    };
+  }
+
+  return {
+    titleKey: 'tabs.myLearning',
+    accessibilityLabelKey: 'tabs.myLearningLabel',
+    iconName: 'School',
+  };
+}
+
 // Routes where the entire tab bar is hidden (immersive / full-screen UX).
 const FULL_SCREEN_ROUTES = new Set([
   'onboarding',
@@ -1383,6 +1406,10 @@ export default function AppLayout() {
     () => computeVisibleTabs(tabShape, isParentProxy),
     [isParentProxy, tabShape],
   );
+  const homeTabPresentation = resolveHomeTabPresentation(
+    tabShape,
+    isParentProxy,
+  );
 
   // Sync Clerk auth state with RevenueCat identity (runs on auth change)
   useRevenueCatIdentity();
@@ -1738,16 +1765,21 @@ export default function AppLayout() {
           <Tabs.Screen
             name="home"
             options={{
-              title: t('tabs.home'),
+              title: t(homeTabPresentation.titleKey),
               tabBarButtonTestID: 'tab-home',
-              tabBarAccessibilityLabel: t('tabs.homeLabel'),
+              tabBarAccessibilityLabel: t(
+                homeTabPresentation.accessibilityLabelKey,
+              ),
               // Lazy-load the Home tab so the initial mount only renders the
               // visible gate screens (consent, profile creation). The trade-off
               // is a brief spinner on the first Home tap, but it cuts ~200ms
               // off the critical auth→gate path on low-end devices.
               lazy: true,
               tabBarIcon: ({ focused }) => (
-                <TabIcon name="Home" focused={focused} />
+                <TabIcon
+                  name={homeTabPresentation.iconName}
+                  focused={focused}
+                />
               ),
             }}
           />

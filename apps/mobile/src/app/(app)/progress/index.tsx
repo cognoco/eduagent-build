@@ -55,6 +55,8 @@ import { copyRegisterFor, type CopyRegister } from '../../../lib/copy-register';
 import { useLinkedChildren, useProfile } from '../../../lib/profile';
 import { isProfileStale } from '../../../lib/progress';
 import { bucketAccountAge, hashProfileId, track } from '../../../lib/analytics';
+import { getSubjectTintMap } from '../../../lib/subject-tints';
+import { useTheme } from '../../../lib/theme';
 
 function heroCopy(
   input: {
@@ -502,6 +504,7 @@ export default function ProgressScreen(): React.ReactElement {
   const { activeProfile } = useProfile();
   const linkedChildren = useLinkedChildren();
   const hasLinked = linkedChildren.length > 0;
+  const { colorScheme } = useTheme();
   const requestedProfileId = Array.isArray(rawRequestedProfileId)
     ? rawRequestedProfileId[0]
     : rawRequestedProfileId;
@@ -572,6 +575,14 @@ export default function ProgressScreen(): React.ReactElement {
   const hasFocusedOnceRef = useRef(false);
 
   const inventory = inventoryQuery.data;
+  const subjectTintsById = useMemo(
+    () =>
+      getSubjectTintMap(
+        inventory?.subjects.map((subject) => subject.subjectId) ?? [],
+        colorScheme,
+      ),
+    [colorScheme, inventory?.subjects],
+  );
   const hero = heroCopy(
     {
       topicsMastered: inventory?.global.topicsMastered ?? 0,
@@ -1095,6 +1106,7 @@ export default function ProgressScreen(): React.ReactElement {
                       <View key={subject.subjectId} className="mt-3">
                         <SubjectProgressRow
                           subject={subject}
+                          tint={subjectTintsById.get(subject.subjectId)}
                           testID={`progress-subject-${subject.subjectId}`}
                         />
                       </View>

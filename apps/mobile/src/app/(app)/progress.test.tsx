@@ -20,6 +20,7 @@ import {
   useProfileWeeklyReports,
   useRefreshProgressSnapshot,
 } from '../../hooks/use-progress';
+import { getSubjectTintMap } from '../../lib/subject-tints';
 import ProgressScreen from './progress/index';
 
 jest.mock('react-i18next', () => ({
@@ -1119,6 +1120,43 @@ describe('ProgressScreen — progressive disclosure', () => {
     screen.getByText('Latest report');
     screen.getByText('Recent sessions');
     expect(screen.queryByText('Your week')).toBeNull();
+  });
+
+  it('uses the shared subject tint map for progress subject rows', () => {
+    const biologySubject = {
+      ...fullSubject,
+      subjectId: 's2',
+      subjectName: 'Biology',
+      topics: { ...fullSubject.topics, mastered: 1, inProgress: 1 },
+      activeMinutes: 12,
+      sessionsCount: 2,
+    };
+    mockLinkedChildren = [makeLinkedChild()];
+    mockSearchParams = { profileId: 'child-1' };
+    mockHooks({
+      inventory: {
+        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 4 },
+        subjects: [fullSubject],
+      },
+      childInventory: {
+        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 4 },
+        subjects: [fullSubject, biologySubject],
+      },
+      sessions: [],
+    });
+    const tintMap = getSubjectTintMap(['s1', 's2'], 'light');
+
+    render(<ProgressScreen />);
+
+    expect(
+      screen.getByTestId('progress-subject-s1-bookshelf').props.style
+        .borderColor,
+    ).toBe(`${tintMap.get('s1')!.solid}33`);
+    expect(
+      screen.getByTestId('progress-subject-s2-bookshelf').props.style
+        .borderColor,
+    ).toBe(`${tintMap.get('s2')!.solid}33`);
+    expect(tintMap.get('s1')?.solid).not.toBe(tintMap.get('s2')?.solid);
   });
 
   it('does not render the recent milestones block on the progress overview', () => {
