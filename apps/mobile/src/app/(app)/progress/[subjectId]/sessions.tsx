@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTranslation } from 'react-i18next';
-import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ErrorFallback } from '../../../../components/common';
 import { useSubjectSessions } from '../../../../hooks/use-subject-sessions';
@@ -10,11 +10,18 @@ import { useProgressInventory } from '../../../../hooks/use-progress';
 import { goBackOrReplace } from '../../../../lib/navigation';
 import { formatRelativeDate } from '../../../../lib/format-relative-date';
 import { classifyApiError } from '../../../../lib/format-api-error';
+import { useProfile } from '../../../../lib/profile';
+import { useActiveProfileRole } from '../../../../hooks/use-active-profile-role';
+import { buildSessionDetailHref } from '../../../../lib/session-detail-navigation';
 
 export default function SubjectSessionsScreen(): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { activeProfile } = useProfile();
+  const activeProfileRole = useActiveProfileRole();
+  const proxyChildProfileId =
+    activeProfileRole === 'impersonated-child' ? activeProfile?.id : undefined;
   const { subjectId } = useLocalSearchParams<{ subjectId: string }>();
 
   const inventoryQuery = useProgressInventory();
@@ -141,14 +148,14 @@ export default function SubjectSessionsScreen(): React.ReactElement {
               <Pressable
                 key={session.id}
                 onPress={() =>
-                  router.push({
-                    pathname: '/session-summary/[sessionId]',
-                    params: {
+                  router.push(
+                    buildSessionDetailHref({
                       sessionId: session.id,
-                      ...(subjectId ? { subjectId } : {}),
-                      ...(session.topicId ? { topicId: session.topicId } : {}),
-                    },
-                  } as Href)
+                      subjectId,
+                      topicId: session.topicId,
+                      childProfileId: proxyChildProfileId,
+                    }),
+                  )
                 }
                 className="bg-surface rounded-card p-4 mt-3"
                 accessibilityRole="button"

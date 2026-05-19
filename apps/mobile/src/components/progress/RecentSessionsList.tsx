@@ -1,9 +1,11 @@
 import { Pressable, Text, View } from 'react-native';
-import { useRouter, type Href } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import type { UseQueryResult } from '@tanstack/react-query';
 import type { ChildSession } from '@eduagent/schemas';
 import { useProfile } from '../../lib/profile';
+import { useActiveProfileRole } from '../../hooks/use-active-profile-role';
+import { buildSessionDetailHref } from '../../lib/session-detail-navigation';
 
 type ReportingComponentProps = {
   profileId: string;
@@ -34,8 +36,13 @@ export function RecentSessionsList({
   const { t } = useTranslation();
   const router = useRouter();
   const { activeProfile } = useProfile();
+  const activeProfileRole = useActiveProfileRole();
   const sessions = sessionsQuery.data ?? [];
   const isActiveProfile = activeProfile?.id === profileId;
+  const childProfileIdForSessionDetail =
+    activeProfileRole === 'impersonated-child' || !isActiveProfile
+      ? profileId
+      : undefined;
 
   return (
     <View className="mt-6" testID="recent-sessions-list">
@@ -75,17 +82,12 @@ export function RecentSessionsList({
           <Pressable
             key={session.sessionId}
             onPress={() => {
-              if (isActiveProfile) {
-                router.push(`/session-summary/${session.sessionId}` as Href);
-                return;
-              }
-              router.push({
-                pathname: '/(app)/child/[profileId]/session/[sessionId]',
-                params: {
-                  profileId,
+              router.push(
+                buildSessionDetailHref({
                   sessionId: session.sessionId,
-                },
-              } as Href);
+                  childProfileId: childProfileIdForSessionDetail,
+                }),
+              );
             }}
             className="bg-surface rounded-card p-4 mt-3"
             accessibilityLabel={t('parentView.index.viewSessionFrom', {

@@ -48,6 +48,9 @@ import { StudyCTA } from '../../../components/library/StudyCTA';
 import { NoteInput } from '../../../components/library/NoteInput';
 import { formatApiError } from '../../../lib/format-api-error';
 import { platformAlert } from '../../../lib/platform-alert';
+import { useProfile } from '../../../lib/profile';
+import { useActiveProfileRole } from '../../../hooks/use-active-profile-role';
+import { buildSessionDetailHref } from '../../../lib/session-detail-navigation';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -263,6 +266,10 @@ export default function TopicDetailScreen() {
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
   const { t } = useTranslation();
+  const { activeProfile } = useProfile();
+  const activeProfileRole = useActiveProfileRole();
+  const proxyChildProfileId =
+    activeProfileRole === 'impersonated-child' ? activeProfile?.id : undefined;
   const {
     subjectId: paramSubjectId,
     bookId: paramBookId,
@@ -499,15 +506,15 @@ export default function TopicDetailScreen() {
   };
 
   const handleSessionPress = (sessionId: string) => {
-    router.push({
-      pathname: '/session-summary/[sessionId]',
-      params: {
+    router.push(
+      buildSessionDetailHref({
         sessionId,
-        ...(subjectId ? { subjectId } : {}),
-        ...(topicId ? { topicId } : {}),
-        ...(paramBookId ? { bookId: paramBookId } : {}),
-      },
-    } as Href);
+        subjectId,
+        topicId,
+        bookId: paramBookId,
+        childProfileId: proxyChildProfileId,
+      }),
+    );
   };
 
   // ---------------------------------------------------------------------------

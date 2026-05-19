@@ -78,6 +78,7 @@ const mockUseOverallProgress = jest.fn();
 const mockUseAllBooks = jest.fn();
 const mockUseLibrarySearch = jest.fn();
 const mockUpdateSubjectMutateAsync = jest.fn();
+const mockUseActiveProfileRole = jest.fn(() => 'owner');
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({ push: mockPush, replace: jest.fn() }),
@@ -99,6 +100,13 @@ jest.mock(
   '../../hooks/use-progress' /* gc1-allow: hook boundary mocked to isolate retention UI */,
   () => ({
     useOverallProgress: () => mockUseOverallProgress(),
+  }),
+);
+
+jest.mock(
+  '../../hooks/use-active-profile-role' /* gc1-allow: screen tests isolate role state */,
+  () => ({
+    useActiveProfileRole: () => mockUseActiveProfileRole(),
   }),
 );
 

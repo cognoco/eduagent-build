@@ -100,6 +100,7 @@ jest.mock(
         pronouns: null,
         consentStatus: null,
       },
+      profiles: [{ id: PROFILE_ID, isOwner: true }],
     }),
   }),
 );

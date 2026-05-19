@@ -63,6 +63,9 @@ import {
   goBackOrReplace,
   pushLearningResumeTarget,
 } from '../../../../../lib/navigation';
+import { useProfile } from '../../../../../lib/profile';
+import { useActiveProfileRole } from '../../../../../hooks/use-active-profile-role';
+import { buildSessionDetailHref } from '../../../../../lib/session-detail-navigation';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -280,6 +283,10 @@ export default function BookScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const themeColors = useThemeColors();
+  const { activeProfile } = useProfile();
+  const activeProfileRole = useActiveProfileRole();
+  const proxyChildProfileId =
+    activeProfileRole === 'impersonated-child' ? activeProfile?.id : undefined;
   const { t } = useTranslation();
   const params = useLocalSearchParams<{
     subjectId: string;
@@ -850,30 +857,30 @@ export default function BookScreen() {
   // --- Session press: navigate to session summary/transcript ---
   const handleSessionPress = useCallback(
     (session: BookSession) => {
-      router.push({
-        pathname: '/session-summary/[sessionId]',
-        params: {
+      router.push(
+        buildSessionDetailHref({
           sessionId: session.id,
           subjectId,
-          ...(session.topicId ? { topicId: session.topicId } : {}),
-        },
-      } as Href);
+          topicId: session.topicId,
+          childProfileId: proxyChildProfileId,
+        }),
+      );
     },
-    [router, subjectId],
+    [proxyChildProfileId, router, subjectId],
   );
 
   const handleNoteSourcePress = useCallback(
     (sessionId: string, topicId?: string | null) => {
-      router.push({
-        pathname: '/session-summary/[sessionId]',
-        params: {
+      router.push(
+        buildSessionDetailHref({
           sessionId,
           subjectId,
-          ...(topicId ? { topicId } : {}),
-        },
-      } as Href);
+          topicId,
+          childProfileId: proxyChildProfileId,
+        }),
+      );
     },
-    [router, subjectId],
+    [proxyChildProfileId, router, subjectId],
   );
 
   // --- Long-press: context menu for moving topic to a different book ---
