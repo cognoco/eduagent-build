@@ -123,13 +123,13 @@ export function getProxyMode(): boolean {
 
 export type ApiClient = ReturnType<typeof hc<AppType>>;
 
-export interface IdempotencyReplayBody {
-  replayed: true;
-  clientId: string;
-  status: 'persisted';
-  assistantTurnReady: boolean;
-  latestExchangeId: string | null;
-}
+// [CCR PR #281 / B68] Idempotent-replay response shape is owned by
+// @eduagent/schemas (`maybeReplayResponseSchema` / `MaybeReplayResponse`).
+// `IdempotencyReplayBody` is kept as a backward-compatible re-export so
+// existing imports (sse.ts, use-sessions.ts) keep working without a sweep,
+// but it is now an alias of the shared schema type — server + mobile cannot
+// drift.
+export type { MaybeReplayResponse as IdempotencyReplayBody } from '@eduagent/schemas';
 
 export function withIdempotencyKey(
   headers: Record<string, string>,

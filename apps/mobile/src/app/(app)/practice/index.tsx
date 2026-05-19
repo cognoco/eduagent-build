@@ -35,6 +35,7 @@ import { useParentProxy } from '../../../hooks/use-parent-proxy';
 import { useAssessmentEligibleTopics } from '../../../hooks/use-assessments';
 import { useTheme, useThemeColors } from '../../../lib/theme';
 import { getSubjectTint } from '../../../lib/subject-tints';
+import { withOpacity } from '../../../lib/color-opacity';
 
 const PRACTICE_WEB_MAX_WIDTH = 560;
 
@@ -809,7 +810,7 @@ export default function PracticeScreen(): React.ReactElement {
                     style={[
                       styles.practiceModeCard,
                       {
-                        borderColor: tint.solid + '33',
+                        borderColor: withOpacity(tint.solid, 0.2),
                         backgroundColor: tint.soft,
                       },
                       pointerStyle(),

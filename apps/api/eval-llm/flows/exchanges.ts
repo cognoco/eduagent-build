@@ -79,7 +79,6 @@ const SCENARIO_SPECS: readonly ScenarioSpec[] = [
       verificationType: 'standard',
       exchangeCount: 0,
       isFirstEncounter: false,
-      isFirstSessionOfSubject: false,
       retentionStatus: { status: 'new' },
     },
     appliesTo: () => true,
@@ -87,7 +86,7 @@ const SCENARIO_SPECS: readonly ScenarioSpec[] = [
   {
     id: 'S10-first-encounter-topic-turn0',
     purpose:
-      'First-encounter topic turn 0 — teach exactly one idea, then ask a focused prior-knowledge probe',
+      'First-encounter topic turn 0 — anchor on a starting concept with one-clause reason and execute; no open-ended intake question',
     history: [],
     contextOverrides: {
       escalationRung: 1,
@@ -95,7 +94,6 @@ const SCENARIO_SPECS: readonly ScenarioSpec[] = [
       verificationType: 'standard',
       exchangeCount: 0,
       isFirstEncounter: true,
-      isFirstSessionOfSubject: false,
       retentionStatus: { status: 'new' },
     },
     appliesTo: () => true,
@@ -103,7 +101,7 @@ const SCENARIO_SPECS: readonly ScenarioSpec[] = [
   {
     id: 'S11-first-encounter-topic-turn1',
     purpose:
-      'First-encounter topic turn 1 — react to the learner signal, teach one nugget, ask one follow-up',
+      'First-encounter topic turn 1 — continue teaching the proposed direction; vagueness from learner = consent, do not re-probe',
     history: [
       {
         role: 'assistant',
@@ -122,7 +120,6 @@ const SCENARIO_SPECS: readonly ScenarioSpec[] = [
       verificationType: 'standard',
       exchangeCount: 1,
       isFirstEncounter: true,
-      isFirstSessionOfSubject: false,
       retentionStatus: { status: 'new' },
       extractedSignalsToReflect: {
         currentKnowledge: 'knows plants need sunlight',
@@ -133,7 +130,7 @@ const SCENARIO_SPECS: readonly ScenarioSpec[] = [
   {
     id: 'S12-first-encounter-topic-turn3',
     purpose:
-      'First-encounter topic turn 3 — final allowed probe turn before normal teaching resumes',
+      'First-encounter topic turn 3 — last turn the execution rule applies; normal teach-and-check resumes on turn 4',
     history: [
       {
         role: 'assistant',
@@ -160,27 +157,10 @@ const SCENARIO_SPECS: readonly ScenarioSpec[] = [
       verificationType: 'standard',
       exchangeCount: 3,
       isFirstEncounter: true,
-      isFirstSessionOfSubject: false,
       retentionStatus: { status: 'new' },
       extractedSignalsToReflect: {
         currentKnowledge: 'mixes up ingredients and energy',
       },
-    },
-    appliesTo: () => true,
-  },
-  {
-    id: 'S13-first-session-subject-turn0',
-    purpose:
-      'Very first subject session turn 0 — subject-level opener wins over topic probe',
-    history: [],
-    contextOverrides: {
-      escalationRung: 1,
-      sessionType: 'learning',
-      verificationType: 'standard',
-      exchangeCount: 0,
-      isFirstEncounter: true,
-      isFirstSessionOfSubject: true,
-      retentionStatus: { status: 'new' },
     },
     appliesTo: () => true,
   },
@@ -195,7 +175,6 @@ const SCENARIO_SPECS: readonly ScenarioSpec[] = [
       verificationType: 'standard',
       exchangeCount: 0,
       isFirstEncounter: false,
-      isFirstSessionOfSubject: false,
       retentionStatus: { status: 'strong' },
     },
     appliesTo: () => true,
@@ -339,7 +318,6 @@ const SCENARIO_SPECS: readonly ScenarioSpec[] = [
       verificationType: 'standard',
       exchangeCount: 1,
       isFirstEncounter: false,
-      isFirstSessionOfSubject: false,
       retentionStatus: { status: 'new' },
     },
     appliesTo: () => true,
@@ -354,7 +332,6 @@ const SCENARIO_SPECS: readonly ScenarioSpec[] = [
       verificationType: 'standard',
       exchangeCount: 1,
       isFirstEncounter: false,
-      isFirstSessionOfSubject: false,
       retentionStatus: { status: 'new' },
     },
     appliesTo: () => true,
@@ -369,7 +346,6 @@ const SCENARIO_SPECS: readonly ScenarioSpec[] = [
       verificationType: 'standard',
       exchangeCount: 1,
       isFirstEncounter: false,
-      isFirstSessionOfSubject: false,
       retentionStatus: { status: 'new' },
     },
     appliesTo: () => true,
@@ -384,7 +360,6 @@ const SCENARIO_SPECS: readonly ScenarioSpec[] = [
       verificationType: 'standard',
       exchangeCount: 1,
       isFirstEncounter: false,
-      isFirstSessionOfSubject: false,
       retentionStatus: { status: 'new' },
     },
     appliesTo: () => true,
@@ -515,7 +490,6 @@ function buildBaseContext(profile: EvalProfile): ExchangeContext {
       : undefined,
     exchangeCount: 0,
     isFirstEncounter: false,
-    isFirstSessionOfSubject: false,
     extractedSignalsToReflect: null,
     inputMode: 'text',
     llmTier: 'standard',

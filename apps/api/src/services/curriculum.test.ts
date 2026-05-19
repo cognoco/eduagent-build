@@ -20,6 +20,7 @@ import {
   persistBookTopics,
   previewCurriculumTopic,
   expandExistingBookTopics,
+  generateBookTopicsWithFallback,
 } from './curriculum';
 import type {
   CurriculumInput,
@@ -2058,5 +2059,124 @@ describe('expandExistingBookTopics', () => {
     const [, , , context] = generateBookTopics.mock.calls[0];
     // Service passes `undefined` (not empty string) when there's no context.
     expect(context).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// generateBookTopicsWithFallback — shared helper used by both the create-book
+// route handler and the expand-existing-book service. Centralises the
+// generateBookTopics → captureException → buildFallbackBookTopics sequence so
+// each call site only supplies its distinguishing `sentryContext` (notably the
+// `phase` tag).
+// ---------------------------------------------------------------------------
+
+describe('generateBookTopicsWithFallback', () => {
+  function llmOutput(): BookTopicGenerationResult {
+    return {
+      topics: [
+        {
+          title: 'Topic A',
+          description: 'desc',
+          chapter: 'C1',
+          sortOrder: 1,
+          estimatedMinutes: 20,
+        },
+      ],
+      connections: [],
+    } as unknown as BookTopicGenerationResult;
+  }
+
+  function fallbackOutput(): BookTopicGenerationResult {
+    return {
+      topics: [
+        {
+          title: 'Fallback Topic',
+          description: 'deterministic',
+          chapter: 'C1',
+          sortOrder: 1,
+          estimatedMinutes: 15,
+        },
+      ],
+      connections: [],
+    } as unknown as BookTopicGenerationResult;
+  }
+
+  it('happy path: returns LLM output, never calls fallback or captureException', async () => {
+    const generateBookTopics = jest.fn().mockResolvedValue(llmOutput());
+    const captureException = jest.fn();
+    const buildFallbackBookTopics = jest.fn(() => fallbackOutput());
+    const sentryContext = {
+      profileId: PROFILE_ID,
+      extra: {
+        phase: 'book_topic_generation_fallback',
+        subjectId: SUBJECT_ID,
+        bookId: 'book-1',
+        bookTitle: 'Ancient Egypt',
+      },
+    };
+
+    const result = await generateBookTopicsWithFallback(
+      'Ancient Egypt',
+      'Explore pyramids',
+      12,
+      'prior knowledge blob',
+      {
+        generateBookTopics,
+        captureException,
+        buildFallbackBookTopics,
+        sentryContext,
+      },
+    );
+
+    expect(generateBookTopics).toHaveBeenCalledTimes(1);
+    expect(generateBookTopics).toHaveBeenCalledWith(
+      'Ancient Egypt',
+      'Explore pyramids',
+      12,
+      'prior knowledge blob',
+    );
+    expect(captureException).not.toHaveBeenCalled();
+    expect(buildFallbackBookTopics).not.toHaveBeenCalled();
+    expect(result).toEqual(llmOutput());
+  });
+
+  it('fallback path: when generateBookTopics throws, captureException is called with sentryContext verbatim and fallback is returned', async () => {
+    const error = new Error('LLM upstream timeout');
+    const generateBookTopics = jest.fn().mockRejectedValue(error);
+    const captureException = jest.fn();
+    const buildFallbackBookTopics = jest.fn(() => fallbackOutput());
+    const sentryContext = {
+      profileId: PROFILE_ID,
+      extra: {
+        phase: 'book_topic_expansion_fallback',
+        subjectId: SUBJECT_ID,
+        bookId: 'book-1',
+        bookTitle: 'Ancient Egypt',
+      },
+    };
+
+    const result = await generateBookTopicsWithFallback(
+      'Ancient Egypt',
+      'Explore pyramids',
+      14,
+      undefined,
+      {
+        generateBookTopics,
+        captureException,
+        buildFallbackBookTopics,
+        sentryContext,
+      },
+    );
+
+    expect(generateBookTopics).toHaveBeenCalledTimes(1);
+    expect(captureException).toHaveBeenCalledTimes(1);
+    // sentryContext is passed through verbatim — no wrapping, no mutation.
+    expect(captureException).toHaveBeenCalledWith(error, sentryContext);
+    expect(buildFallbackBookTopics).toHaveBeenCalledTimes(1);
+    expect(buildFallbackBookTopics).toHaveBeenCalledWith(
+      'Ancient Egypt',
+      'Explore pyramids',
+    );
+    expect(result).toEqual(fallbackOutput());
   });
 });

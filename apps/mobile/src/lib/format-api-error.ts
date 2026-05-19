@@ -79,6 +79,21 @@ function isForbiddenError(error: unknown): error is ForbiddenLike {
   );
 }
 
+// [CCR PR #282] ConsentRequiredError carries the stable name and an
+// `errorCode = 'CONSENT_REQUIRED'` property (see packages/schemas/src/errors.ts).
+// Requiring BOTH (name + errorCode shape) is the anti-spoofing pattern used by
+// the other typed-error guards in this file — a plain Error with a spoofed
+// `name = 'ConsentRequiredError'` and no errorCode property will not match.
+type ConsentRequiredLike = Error & { errorCode: string };
+function isConsentRequiredError(error: unknown): error is ConsentRequiredLike {
+  return (
+    error instanceof Error &&
+    error.name === 'ConsentRequiredError' &&
+    'errorCode' in error &&
+    (error as { errorCode?: unknown }).errorCode === 'CONSENT_REQUIRED'
+  );
+}
+
 // Thunks resolve at call time so they reflect the active language, not
 // whatever language i18next had at module-load time.
 //
@@ -480,6 +495,23 @@ function classifyApiErrorCore(error: unknown): ClassifiedApiErrorCore {
     return { message: error.message, category: 'quota', recovery: 'none' };
   }
 
+  // Typed 403 — ConsentRequiredError from api-client.ts. Consent gating cannot
+  // be retried by tapping a button — the parent must complete the consent flow
+  // off-screen first. Surface go-back so the standard ErrorFallback hides the
+  // Retry primary action; otherwise users would loop on Retry hitting the same
+  // 403/CONSENT_REQUIRED. Classified BEFORE ForbiddenError so the more
+  // specific consent branch wins (api-client throws ConsentRequiredError for
+  // 403/CONSENT_REQUIRED and ForbiddenError for all other 403s).
+  if (isConsentRequiredError(error)) {
+    return {
+      message:
+        friendlyMessage(error.message) ??
+        (error.message || i18next.t('errors.forbidden')),
+      category: 'auth',
+      recovery: 'go-back',
+    };
+  }
+
   // Typed 403 — ForbiddenError from api-client.ts
   if (isForbiddenError(error)) {
     const effectiveCode = error.apiCode ?? error.errorCode;
@@ -710,6 +742,46 @@ function classifyApiErrorCore(error: unknown): ClassifiedApiErrorCore {
 
 export function classifyApiError(error: unknown): FormattedApiError {
   return formatClassifiedApiError(classifyApiErrorCore(error));
+}
+
+/**
+ * [CCR PR #282] Centralized error-code extraction.
+ *
+ * Screens MUST NOT inspect `error.name === 'ForbiddenError' | ...` directly.
+ * Classification — including extracting a stable error code — belongs at the
+ * API-client boundary (this module), per the UX Resilience rule in CLAUDE.md.
+ *
+ * Returns the canonical code used elsewhere in the codebase:
+ *   - `apiCode` / `code` / `errorCode` on the typed error object (preferred)
+ *   - 'FORBIDDEN'         for typed ForbiddenError instances
+ *   - 'CONSENT_REQUIRED'  for typed ConsentRequiredError instances
+ *   - 'QUOTA_EXCEEDED'    for typed QuotaExceededError instances
+ *   - `undefined` if none of the above apply
+ *
+ * Uses the SAME HMR-safe name+shape guards as the classifier, so a plain Error
+ * with a spoofed `.name` and no required shape property cannot impersonate a
+ * typed error.
+ */
+export function extractApiErrorCode(error: unknown): string | undefined {
+  if (!error || typeof error !== 'object') return undefined;
+
+  const apiError = error as {
+    apiCode?: unknown;
+    errorCode?: unknown;
+    code?: unknown;
+  };
+
+  if (typeof apiError.apiCode === 'string') return apiError.apiCode;
+  if (typeof apiError.errorCode === 'string') return apiError.errorCode;
+  if (typeof apiError.code === 'string') return apiError.code;
+
+  // Anti-spoofing: only return name-based codes when the typed-error shape
+  // guards match (require both name AND the matching shape property).
+  if (isForbiddenError(error)) return 'FORBIDDEN';
+  if (isConsentRequiredError(error)) return 'CONSENT_REQUIRED';
+  if (isQuotaExceededError(error)) return 'QUOTA_EXCEEDED';
+
+  return undefined;
 }
 
 /**

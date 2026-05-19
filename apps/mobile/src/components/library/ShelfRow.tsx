@@ -6,6 +6,7 @@ import type { SubjectStatus } from '@eduagent/schemas';
 
 import type { LearningSubjectTint } from '../../lib/learning-subject-tints';
 import { useSubjectTint, useThemeColors } from '../../lib/theme';
+import { withOpacity } from '../../lib/color-opacity';
 
 interface ShelfRowProps {
   subjectId: string;
@@ -166,14 +167,14 @@ export function ShelfRow({
       ? {
           testID: `shelf-row-paused-${subjectId}`,
           label: t('library.row.paused'),
-          backgroundColor: colors.warning + '22',
+          backgroundColor: withOpacity(colors.warning, 0.133),
           color: colors.warning,
         }
       : rowStatus === 'archived'
         ? {
             testID: `shelf-row-archived-${subjectId}`,
             label: t('library.row.archived'),
-            backgroundColor: colors.textSecondary + '22',
+            backgroundColor: withOpacity(colors.textSecondary, 0.133),
             color: colors.textSecondary,
           }
         : null;
@@ -215,7 +216,7 @@ export function ShelfRow({
           position: 'relative',
           overflow: 'hidden',
           backgroundColor: tint.soft,
-          borderColor: tint.solid + '33',
+          borderColor: withOpacity(tint.solid, 0.2),
           borderRadius: 18,
           borderWidth: 1,
           minHeight: 92,
@@ -368,7 +369,7 @@ export function ShelfRow({
                       paddingHorizontal: 8,
                       paddingVertical: 3,
                       borderRadius: 10,
-                      backgroundColor: colors.retentionWeak + '22',
+                      backgroundColor: withOpacity(colors.retentionWeak, 0.133),
                     }}
                   >
                     <Ionicons
@@ -398,7 +399,7 @@ export function ShelfRow({
                       paddingHorizontal: 8,
                       paddingVertical: 3,
                       borderRadius: 10,
-                      backgroundColor: colors.success + '22',
+                      backgroundColor: withOpacity(colors.success, 0.133),
                     }}
                   >
                     <Ionicons

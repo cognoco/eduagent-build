@@ -51,7 +51,6 @@
     "nativeLanguage": "en",
     "exchangeCount": 1,
     "isFirstEncounter": false,
-    "isFirstSessionOfSubject": false,
     "extractedSignalsToReflect": null,
     "inputMode": "text",
     "llmTier": "standard",

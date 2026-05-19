@@ -508,3 +508,26 @@ export const outboxSpilloverResultSchema = z.object({
   written: z.number().int().nonnegative(),
 });
 export type OutboxSpilloverResult = z.infer<typeof outboxSpilloverResultSchema>;
+
+// [CCR PR #281 / B68] Idempotent session replay body — returned by the
+// metering middleware (`maybeReplayIdempotentSessionRequest`) when a request
+// carrying an Idempotency-Key for a `/sessions/:id/messages` or
+// `/sessions/:id/stream` POST has already been processed. The accompanying
+// `Idempotency-Replay: true` header is set on the response by the server.
+//
+// Canonical schema lives here so:
+//   - apps/api/src/middleware/metering.ts can type `c.json(...)` against it
+//   - apps/mobile/src/lib/api-client.ts can drop its local type alias and
+//     import this single source of truth (avoids future contract drift)
+//
+// `replayed` is `true` literal — the success branch only fires on a real
+// replay hit. `status` is `'persisted'` literal — replay only happens after
+// the original turn was committed end-to-end.
+export const maybeReplayResponseSchema = z.object({
+  replayed: z.literal(true),
+  clientId: z.string(),
+  status: z.literal('persisted'),
+  assistantTurnReady: z.boolean(),
+  latestExchangeId: z.string().nullable(),
+});
+export type MaybeReplayResponse = z.infer<typeof maybeReplayResponseSchema>;
