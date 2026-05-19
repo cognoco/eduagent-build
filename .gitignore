@@ -101,7 +101,8 @@ _scratchpad.md
 # These often embed environment-specific URLs, project IDs, and other
 # infra hints that should not be tracked. Force-add (`git add -f`) if
 # a doc is genuinely meant to be checked in.
-plans/
+# Leading slash anchors to repo root — must NOT match docs/plans/.
+/plans/
 
 # Archon runtime artifacts
 .archon/state/
