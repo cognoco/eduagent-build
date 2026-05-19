@@ -35,6 +35,14 @@ jest.mock('../../../lib/profile', () => ({
       pronouns: null,
       consentStatus: null,
     },
+    profiles: [
+      {
+        id: 'test-profile-id',
+        accountId: 'test-account-id',
+        displayName: 'Test Learner',
+        isOwner: true,
+      },
+    ],
   }),
   ProfileContext: {
     Provider: ({ children }: { children: React.ReactNode }) => children,

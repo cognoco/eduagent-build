@@ -30,6 +30,7 @@ import { platformAlert } from '../../../lib/platform-alert';
 // blocks the renderer (BUG-892). For the quit-quiz confirmation we use a
 // styled in-app Modal — same pattern as parent withdraw-consent (BUG-553).
 import { formatApiError } from '../../../lib/format-api-error';
+import { homeHrefForReturnTo } from '../../../lib/navigation';
 import { useThemeColors } from '../../../lib/theme';
 import { Sentry } from '../../../lib/sentry';
 import { useQuizFlow } from './_layout';
@@ -67,7 +68,9 @@ export default function QuizPlayScreen(): React.ReactElement {
     setRound,
     setCompletionResult,
   } = useQuizFlow();
-  const exitHref = returnTo === 'practice' ? '/(app)/practice' : '/(app)/quiz';
+  const exitHref = returnTo
+    ? homeHrefForReturnTo(returnTo)
+    : ('/(app)/quiz' as Href);
   const completeRound = useCompleteRound();
   const completeRoundMutate = completeRound.mutate;
   const checkAnswer = useCheckAnswer();
@@ -675,11 +678,9 @@ export default function QuizPlayScreen(): React.ReactElement {
     return 'text-text-secondary';
   }
 
-  // [BUG-691] The "tap anywhere to continue" affordance must NOT overlap the
-  // Quit X button. Previously the entire screen was a Pressable wrapping the
-  // header, so on Android a single tap on Quit could bubble to the parent and
-  // advance the question while the confirmation dialog opened. Splitting the
-  // root into a View + a body-only continue-Pressable removes the overlap.
+  // [BUG-691 / UX-QZ-01] Continue is an explicit button, not a hidden
+  // tap-anywhere affordance. That keeps the Quit X isolated and gives users a
+  // visible next step after feedback.
   const continueActive =
     answerState !== 'unanswered' &&
     answerState !== 'checking' &&
@@ -768,11 +769,7 @@ export default function QuizPlayScreen(): React.ReactElement {
         </Text>
       </View>
 
-      <Pressable
-        className="flex-1"
-        onPress={continueActive ? handleContinue : undefined}
-        testID="quiz-play-body"
-      >
+      <View className="flex-1" testID="quiz-play-body">
         {/* [IMP-7] Non-blocking warning when answer-check API fails. The quiz
           continues with the result assumed wrong; this banner lets the user
           know so they don't think their connection is fine. */}
@@ -990,26 +987,6 @@ export default function QuizPlayScreen(): React.ReactElement {
               <Text className="mt-4 text-center text-body-sm text-text-secondary">
                 {t('quiz.play.savingRound')}
               </Text>
-            ) : !isFinalQuestion ? (
-              <Pressable
-                onPress={(event) => {
-                  event?.stopPropagation?.();
-                  handleContinue();
-                }}
-                className="mt-4 min-h-[48px] flex-row items-center justify-center gap-2 rounded-button bg-primary px-5 py-3"
-                accessibilityRole="button"
-                accessibilityLabel="Next question"
-                testID="quiz-next-question"
-              >
-                <Text className="text-body font-semibold text-text-inverse">
-                  {t('quiz.play.nextQuestion')}
-                </Text>
-                <Ionicons
-                  name="arrow-forward"
-                  size={18}
-                  color={colors.textInverse}
-                />
-              </Pressable>
             ) : null}
             {currentQuestion.funFact ? (
               <View className="mt-4 rounded-card bg-surface p-4">
@@ -1090,7 +1067,28 @@ export default function QuizPlayScreen(): React.ReactElement {
             </View>
           </View>
         ) : null}
-      </Pressable>
+      </View>
+
+      {!isFinalQuestion && continueActive ? (
+        <View className="px-5 pt-3" testID="quiz-next-question-footer">
+          <Pressable
+            onPress={handleContinue}
+            className="min-h-[52px] flex-row items-center justify-center gap-2 rounded-button bg-primary px-5 py-3"
+            accessibilityRole="button"
+            accessibilityLabel="Next question"
+            testID="quiz-next-question"
+          >
+            <Text className="text-body font-semibold text-text-inverse">
+              {t('quiz.play.nextQuestion')}
+            </Text>
+            <Ionicons
+              name="arrow-forward"
+              size={18}
+              color={colors.textInverse}
+            />
+          </Pressable>
+        </View>
+      ) : null}
 
       {/* [BUG-892] Quit confirmation rendered as an in-app Modal so web does
           not hit window.confirm via Alert.alert mapping (which freezes the

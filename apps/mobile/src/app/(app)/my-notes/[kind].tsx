@@ -17,6 +17,8 @@ import { useProfileSessionsArchive } from '../../../hooks/use-progress';
 import { useProfile } from '../../../lib/profile';
 import { OWN_LEARNING_RETURN_TO } from '../../../lib/navigation';
 import { useThemeColors } from '../../../lib/theme';
+import { useActiveProfileRole } from '../../../hooks/use-active-profile-role';
+import { buildSessionDetailHref } from '../../../lib/session-detail-navigation';
 
 type MyNotesKind = 'sessions' | 'notes' | 'bookmarks';
 type GroupMode = 'date' | 'subject';
@@ -314,6 +316,9 @@ export default function MyNotesListScreen(): React.ReactElement {
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
   const { activeProfile } = useProfile();
+  const activeProfileRole = useActiveProfileRole();
+  const proxyChildProfileId =
+    activeProfileRole === 'impersonated-child' ? activeProfile?.id : undefined;
   const params = useLocalSearchParams<{
     kind?: string;
     returnTo?: string | string[];
@@ -386,10 +391,12 @@ export default function MyNotesListScreen(): React.ReactElement {
 
   const handleItemPress = (item: ArchiveItem): void => {
     if (item.kind === 'sessions' && item.sessionId) {
-      router.push({
-        pathname: '/session-summary/[sessionId]',
-        params: { sessionId: item.sessionId },
-      } as Href);
+      router.push(
+        buildSessionDetailHref({
+          sessionId: item.sessionId,
+          childProfileId: proxyChildProfileId,
+        }),
+      );
       return;
     }
 
@@ -402,10 +409,12 @@ export default function MyNotesListScreen(): React.ReactElement {
     }
 
     if (item.sessionId) {
-      router.push({
-        pathname: '/session-summary/[sessionId]',
-        params: { sessionId: item.sessionId },
-      } as Href);
+      router.push(
+        buildSessionDetailHref({
+          sessionId: item.sessionId,
+          childProfileId: proxyChildProfileId,
+        }),
+      );
     }
   };
 

@@ -451,57 +451,51 @@ function ConversationStarterCard({
 }): React.ReactElement {
   const colors = useThemeColors();
   const accent = tint?.solid ?? colors.primary;
+  const bubbleColor = tint?.soft ?? colors.primarySoft;
 
   return (
     <View
       testID={`parent-home-tonight-${prompt.key}`}
       style={{
-        backgroundColor: tint?.soft ?? colors.primarySoft,
-        borderColor: tint ? tint.solid + '26' : colors.primary + '26',
-        borderRadius: 26,
-        borderWidth: 1,
-        minHeight: 76,
-        shadowColor: accent,
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.08,
-        shadowRadius: 6,
-        elevation: 1,
+        backgroundColor: bubbleColor,
+        borderRadius: 30,
+        minHeight: 58,
       }}
     >
       <View
         style={{
           alignItems: 'center',
-          backgroundColor: 'transparent',
-          borderRadius: 26,
+          backgroundColor: bubbleColor,
+          borderRadius: 30,
           flexDirection: 'row',
-          paddingHorizontal: 14,
-          paddingVertical: 12,
+          paddingHorizontal: 16,
+          paddingVertical: 10,
         }}
       >
         <View
           testID={`parent-home-tonight-icon-${prompt.key}`}
           style={{
             alignItems: 'center',
-            backgroundColor: tint?.soft ?? colors.primarySoft,
+            backgroundColor: bubbleColor,
             borderRadius: 999,
-            height: 40,
+            height: 30,
             justifyContent: 'center',
-            width: 40,
+            width: 30,
           }}
         >
-          <Ionicons name="chatbubble-outline" size={21} color={accent} />
+          <Ionicons name="chatbubble-outline" size={20} color={accent} />
         </View>
         <Text
           testID={`parent-home-tonight-text-${prompt.key}`}
           style={{
-            backgroundColor: 'transparent',
+            backgroundColor: bubbleColor,
             color: colors.textPrimary,
             flex: 1,
-            fontSize: 16,
+            fontSize: 15,
             fontWeight: '400',
             includeFontPadding: false,
-            lineHeight: 22,
-            marginLeft: 12,
+            lineHeight: 21,
+            marginLeft: 10,
           }}
         >
           {prompt.text}

@@ -815,6 +815,58 @@ describe('ProgressScreen — progressive disclosure', () => {
     screen.getByTestId('session-card-session-1');
   });
 
+  it('opens proxy recent sessions in the child-safe detail screen', () => {
+    mockUseActiveProfileRole.mockReturnValue('impersonated-child');
+    mockActiveProfile = {
+      id: 'child-id',
+      displayName: 'Lilly',
+      createdAt: '2026-01-01T00:00:00Z',
+      isOwner: false,
+    } as Profile;
+    mockHooks({
+      inventory: {
+        global: { ...baseGlobal, totalSessions: 3, totalActiveMinutes: 12 },
+        subjects: [fullSubject],
+        currentlyWorkingOn: [],
+      },
+      sessions: [
+        {
+          sessionId: 'session-1',
+          subjectId: 'subject-1',
+          subjectName: 'Math',
+          topicId: 'topic-1',
+          topicTitle: 'Fractions',
+          sessionType: 'learning',
+          startedAt: '2026-05-15T10:00:00Z',
+          endedAt: null,
+          exchangeCount: 3,
+          escalationRung: 1,
+          durationSeconds: 600,
+          wallClockSeconds: 600,
+          displayTitle: 'Learning',
+          displaySummary: 'Practiced comparing fractions.',
+          homeworkSummary: null,
+          highlight: null,
+          narrative: null,
+          conversationPrompt: null,
+          engagementSignal: null,
+        },
+      ],
+    });
+
+    render(<ProgressScreen />);
+
+    fireEvent.press(screen.getByTestId('progress-show-all-sessions'));
+    fireEvent.press(screen.getByTestId('session-card-session-1'));
+
+    expect(
+      jest.requireMock('expo-router').useRouter().push,
+    ).toHaveBeenCalledWith({
+      pathname: '/(app)/child/[profileId]/session/[sessionId]',
+      params: { profileId: 'child-id', sessionId: 'session-1' },
+    });
+  });
+
   it('renders empty latest report and recent focus states without duplicate surfaces', () => {
     mockLinkedChildren = [makeLinkedChild()];
     mockSearchParams = { profileId: 'child-1' };
@@ -940,6 +992,50 @@ describe('ProgressScreen — progressive disclosure', () => {
     expect(
       jest.requireMock('expo-router').useRouter().push,
     ).toHaveBeenCalledWith('/(app)/library');
+  });
+
+  it('keeps Lilly report visible in proxy mode even when inventory is empty', () => {
+    mockUseActiveProfileRole.mockReturnValue('impersonated-child');
+    mockActiveProfile = {
+      id: 'child-id',
+      displayName: 'Lilly',
+      createdAt: '2026-01-01T00:00:00Z',
+      isOwner: false,
+    } as Profile;
+    mockHooks({
+      inventory: { global: { ...baseGlobal, totalSessions: 0 }, subjects: [] },
+      weeklyReports: [
+        {
+          id: 'weekly-lilly',
+          reportWeek: '2026-05-11',
+          viewedAt: null,
+          createdAt: '2026-05-17T00:00:00Z',
+          headlineStat: {
+            label: 'topics mastered',
+            value: 2,
+            comparison: '+2 this week',
+          },
+          thisWeek: {
+            totalSessions: 4,
+            totalActiveMinutes: 95,
+            topicsMastered: 2,
+            topicsExplored: 6,
+            vocabularyTotal: 12,
+            streakBest: 3,
+          },
+        },
+      ],
+    });
+
+    render(<ProgressScreen />);
+
+    screen.getByText("Lilly's progress");
+    screen.getByTestId('progress-latest-report-card');
+    screen.getByText('2 topics mastered');
+    expect(
+      screen.queryByText('Progress appears after the first study session'),
+    ).toBeNull();
+    expect(useProfileWeeklyReports).toHaveBeenCalledWith('child-id');
   });
 
   it('opens the requested child progress profile from route params', () => {
