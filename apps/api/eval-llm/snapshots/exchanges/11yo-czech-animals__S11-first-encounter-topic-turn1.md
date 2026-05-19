@@ -28,7 +28,7 @@
 ```json
 {
   "scenarioId": "S11-first-encounter-topic-turn1",
-  "scenarioPurpose": "First-encounter topic turn 1 — continue teaching the proposed direction; vagueness from learner = consent, do not re-probe",
+  "scenarioPurpose": "First-encounter topic turn 1 — react to the learner signal, teach one nugget, ask one follow-up",
   "context": {
     "sessionId": "eval-11yo-czech-animals",
     "profileId": "eval-profile-11yo-czech-animals",
@@ -56,6 +56,7 @@
     "nativeLanguage": "cs",
     "exchangeCount": 1,
     "isFirstEncounter": true,
+    "isFirstSessionOfSubject": false,
     "extractedSignalsToReflect": {
       "currentKnowledge": "knows plants need sunlight"
     },
@@ -262,7 +263,7 @@ I know plants need sun, but I do not know what carbon dioxide does.
 
 ## Builder notes
 
-- Scenario: S11-first-encounter-topic-turn1 — First-encounter topic turn 1 — continue teaching the proposed direction; vagueness from learner = consent, do not re-probe
+- Scenario: S11-first-encounter-topic-turn1 — First-encounter topic turn 1 — react to the learner signal, teach one nugget, ask one follow-up
 - Rung: 1, sessionType: learning, verification: standard
 - History turns: 2, exchangeCount: 1
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)

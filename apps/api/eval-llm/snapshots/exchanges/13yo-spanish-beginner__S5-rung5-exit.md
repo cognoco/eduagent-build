@@ -74,6 +74,7 @@
     ],
     "exchangeCount": 5,
     "isFirstEncounter": false,
+    "isFirstSessionOfSubject": false,
     "extractedSignalsToReflect": null,
     "inputMode": "text",
     "llmTier": "standard",

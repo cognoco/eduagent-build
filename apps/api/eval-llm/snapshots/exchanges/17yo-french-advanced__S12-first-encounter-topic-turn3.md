@@ -28,7 +28,7 @@
 ```json
 {
   "scenarioId": "S12-first-encounter-topic-turn3",
-  "scenarioPurpose": "First-encounter topic turn 3 — last turn the execution rule applies; normal teach-and-check resumes on turn 4",
+  "scenarioPurpose": "First-encounter topic turn 3 — final allowed probe turn before normal teaching resumes",
   "context": {
     "sessionId": "eval-17yo-french-advanced",
     "profileId": "eval-profile-17yo-french-advanced",
@@ -70,6 +70,7 @@
     ],
     "exchangeCount": 3,
     "isFirstEncounter": true,
+    "isFirstSessionOfSubject": false,
     "extractedSignalsToReflect": {
       "currentKnowledge": "mixes up ingredients and energy"
     },
@@ -276,7 +277,7 @@ I mix up ingredients and energy.
 
 ## Builder notes
 
-- Scenario: S12-first-encounter-topic-turn3 — First-encounter topic turn 3 — last turn the execution rule applies; normal teach-and-check resumes on turn 4
+- Scenario: S12-first-encounter-topic-turn3 — First-encounter topic turn 3 — final allowed probe turn before normal teaching resumes
 - Rung: 1, sessionType: learning, verification: standard
 - History turns: 4, exchangeCount: 3
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)

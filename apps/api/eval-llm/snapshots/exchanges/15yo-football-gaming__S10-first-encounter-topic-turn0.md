@@ -28,7 +28,7 @@
 ```json
 {
   "scenarioId": "S10-first-encounter-topic-turn0",
-  "scenarioPurpose": "First-encounter topic turn 0 — anchor on a starting concept with one-clause reason and execute; no open-ended intake question",
+  "scenarioPurpose": "First-encounter topic turn 0 — teach exactly one idea, then ask a focused prior-knowledge probe",
   "context": {
     "sessionId": "eval-15yo-football-gaming",
     "profileId": "eval-profile-15yo-football-gaming",
@@ -47,6 +47,7 @@
     "nativeLanguage": "en",
     "exchangeCount": 0,
     "isFirstEncounter": true,
+    "isFirstSessionOfSubject": false,
     "extractedSignalsToReflect": null,
     "inputMode": "text",
     "llmTier": "standard",
@@ -247,7 +248,7 @@ Start a learning session about algebra equations.
 
 ## Builder notes
 
-- Scenario: S10-first-encounter-topic-turn0 — First-encounter topic turn 0 — anchor on a starting concept with one-clause reason and execute; no open-ended intake question
+- Scenario: S10-first-encounter-topic-turn0 — First-encounter topic turn 0 — teach exactly one idea, then ask a focused prior-knowledge probe
 - Rung: 1, sessionType: learning, verification: standard
 - History turns: 0, exchangeCount: 0
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)

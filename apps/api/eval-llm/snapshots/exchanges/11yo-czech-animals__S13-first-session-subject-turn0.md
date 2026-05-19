@@ -47,11 +47,11 @@
     "nativeLanguage": "cs",
     "exchangeCount": 0,
     "isFirstEncounter": true,
+    "isFirstSessionOfSubject": true,
     "extractedSignalsToReflect": null,
     "inputMode": "text",
     "llmTier": "standard",
     "verificationType": "standard",
-    "isFirstSessionOfSubject": true,
     "retentionStatus": {
       "status": "new"
     }
