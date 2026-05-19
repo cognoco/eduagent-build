@@ -8,9 +8,12 @@
 # Prerequisite: Seeded user with 1 subject (scenario: with-subject)
 appId: com.mentomate.app
 tags:
-  - pr-blocking
   - smoke
   - learning
+# DEMOTED 2026-05-19: BUG-35 flake — `pressKey: Enter` is not reliably
+# triggering `onSubmitEditing` in the dev-client build on WHPX; the user
+# message bubble does not render after Enter. Re-promote after BUG-35 is
+# resolved on the test environment.
 ---
 # 1. Seed & sign in
 - runFlow:

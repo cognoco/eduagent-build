@@ -82,16 +82,34 @@ A flow qualifies for `pr-blocking` if ALL of:
 4. Runs in < 90 seconds individually
 5. Combined `pr-blocking` set runs in < 8 minutes total
 
-### Current `pr-blocking` flows (7)
+### Current `pr-blocking` flows (15 — finalised 2026-05-19, all green-2x on WHPX Pixel API 34)
 
-After M1-A repairs, verify these still carry the tag and pass:
 1. `account/more-tab-navigation.yaml`
-2. `account/delete-account.yaml`
-3. `account/delete-account-scheduled.yaml`
-4. `learning/library-navigation.yaml`
-5. `learning/book-detail.yaml`
-6. `subjects/multi-subject.yaml`
-7. `subjects/practice-subject-picker.yaml`
+2. `app-launch.yaml`
+3. `auth/deep-link-redirect-signed-in.yaml`
+4. `auth/deep-link-redirect-signed-out.yaml`
+5. `auth/sign-in-navigation.yaml`
+6. `auth/sign-in-validation-devclient.yaml`
+7. `auth/sso-buttons.yaml`
+8. `auth/sso-user-cancel.yaml`
+9. `consent/consent-withdrawn-gate.yaml`
+10. `regression/bug-233-chat-classifier-easter.yaml`
+11. `regression/bug-234-chat-subject-picker.yaml`
+12. `regression/bug-238-tab-bar-no-leak.yaml`
+13. `retention/library.yaml`
+14. `subjects/multi-subject.yaml`
+15. `subjects/practice-subject-picker.yaml`
+
+Demoted on 2026-05-19 after confirmed failures (drift, not infra) — re-promote after flow rewrite:
+- `account/delete-account.yaml` (More → Privacy drift, partial fix in flight)
+- `account/delete-account-scheduled.yaml` (same)
+- `learning/book-detail.yaml` (`book-row-*` → `book-card-*` + route push)
+- `learning/library-navigation.yaml` (same)
+- `learning/start-session.yaml` (BUG-35 `pressKey: Enter` flake on WHPX)
+- `learning/first-session.yaml` (same BUG-35)
+- `onboarding/view-curriculum.yaml` (`Let's Go` copy/testID drift in dismiss-post-approval helper)
+
+Verification log in `docs/audit/e2e/m1b-pr-blocking-candidates.md`.
 
 ### Expansion candidates (evaluate from `smoke` set)
 

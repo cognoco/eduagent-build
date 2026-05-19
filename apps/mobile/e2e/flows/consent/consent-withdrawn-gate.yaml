@@ -17,6 +17,7 @@
 # Usage: ./scripts/seed-and-run.sh consent-withdrawn-solo flows/consent/consent-withdrawn-gate.yaml
 appId: com.mentomate.app
 tags:
+  - pr-blocking
   - nightly
   - consent
   - gdpr

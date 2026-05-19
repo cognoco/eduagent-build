@@ -20,6 +20,7 @@
 # Library is a single view showing shelves-list directly. No tab strip.
 appId: com.mentomate.app
 tags:
+  - pr-blocking
   - nightly
   - retention
 ---

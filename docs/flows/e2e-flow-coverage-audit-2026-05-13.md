@@ -167,27 +167,27 @@ The Primary Finding's root cause — the More-tab refactor — was addressed by 
 | `account/account-lifecycle.yaml` | More anchor updated | `DEFERRED:VERIFY` — 2026-05-18 verification run: fails at `assertVisible "Display name" is visible`. Account screen copy or layout has drifted post-M1-A; needs flow-author update. |
 | `account/app-language-edit.yaml` | Routes through `nav-to-more-account.yaml` | `DEFERRED:VERIFY` — 2026-05-18 verification run: Norwegian switch succeeds, then `scrollUntilVisible id: sign-out-button` fails (timeout 10s). The post-translation More screen pushes sign-out further down; flow needs longer scroll or different anchor. |
 | `account/change-password.yaml` | Routes through Account | ✅ passing (verified 2026-05-18, WHPX Pixel API 34, single run end-to-end) |
-| `account/delete-account.yaml` | Routes through Privacy | `DEFERRED:VERIFY` (not re-run in 2026-05-18 session; tagged `pr-blocking` so any breakage will surface in CI immediately) |
-| `account/delete-account-scheduled.yaml` | Routes through Privacy | `DEFERRED:VERIFY` (not re-run in 2026-05-18 session; tagged `pr-blocking` so any breakage will surface in CI immediately) |
-| `account/export-data.yaml` | Routes through Privacy | `DEFERRED:VERIFY` |
-| `account/learner-mentor-memory.yaml` | More anchor updated | `DEFERRED:VERIFY` |
-| `account/learner-mentor-memory-populated.yaml` | More anchor updated | `DEFERRED:VERIFY` |
-| `account/more-impersonated-child.yaml` | Anchor + role gating updated | `DEFERRED:VERIFY` |
-| `account/more-tab-navigation.yaml` | Updated; tagged `pr-blocking` | ✅ passing (verified 2026-05-18, WHPX Pixel API 34, single run end-to-end through More → Help → Sign-out) |
-| `account/settings-toggles.yaml` | Routes via Notifications sub-screen | `DEFERRED:VERIFY` — 2026-05-18 verification run: Maestro Kotlin TestRunner crashed before any flow step ran. Re-run needed on a fresh Maestro session (driver fatigue suspected). |
-| `billing/child-paywall.yaml` | Optional-true tightened in PR #305 | `DEFERRED:VERIFY` |
-| `billing/family-pool.yaml` | Routes through Account | `DEFERRED:VERIFY` |
-| `billing/static-comparison-family.yaml` | Routes through Account | `DEFERRED:VERIFY` |
-| `billing/static-comparison-pro.yaml` | Routes through Account | `DEFERRED:VERIFY` |
-| `billing/subscription.yaml` | Routes through Account | `DEFERRED:VERIFY` |
-| `billing/subscription-details.yaml` | Routes through Account | `DEFERRED:VERIFY` |
-| `billing/upgrade-confirmed-state.yaml` | Routes through Account | `DEFERRED:VERIFY` |
-| `billing/upgrade-pending-state.yaml` | Routes through Account | `DEFERRED:VERIFY` |
+| `account/delete-account.yaml` | Routes through Privacy | ❌ FAIL (verified 2026-05-19) — confirmed `more-row-delete-account` no longer rendered at More tab root; row moved under More → Privacy. Partial flow fix applied (route through Privacy + new `delete-account-warning-body-1/2` testIDs added to source); confirming-stage `delete-account-confirm-final` still needs scroll-recovery work. **Demoted to `nightly` until rewrite passes 2x.** |
+| `account/delete-account-scheduled.yaml` | Routes through Privacy | ❌ FAIL (verified 2026-05-19) — same More → Privacy drift as `delete-account.yaml`. **Demoted to `nightly`.** |
+| `account/export-data.yaml` | Routes through Privacy | ✅ passing (verified 2026-05-19, WHPX Pixel API 34). |
+| `account/learner-mentor-memory.yaml` | More anchor updated | ❌ FAIL (verified 2026-05-19) — More navigation succeeds, then `assertVisible id: mentor-memory-all-empty` fails after tapping `more-row-mentor-memory`. Memory empty-state testID has drifted. Stays `nightly`. |
+| `account/learner-mentor-memory-populated.yaml` | More anchor updated | ❌ FAIL (verified 2026-05-19) — flow expects `learner-screen` after `parent-with-children` sign-in but lands on `parent-home-screen` (parent profile is guardian). Same drift class as several billing flows. Stays `nightly`. |
+| `account/more-impersonated-child.yaml` | Anchor + role gating updated | ❌ FAIL (verified 2026-05-19) — same `learner-screen` vs `parent-home-screen` drift. Flow needs to switch to child first, or assert `parent-home-screen` initially. Stays `nightly`. |
+| `account/more-tab-navigation.yaml` | Updated; tagged `pr-blocking` | ✅ passing (re-verified 2026-05-19, WHPX Pixel API 34, end-to-end). |
+| `account/settings-toggles.yaml` | Routes via Notifications sub-screen | `DEFERRED:VERIFY` — 2026-05-18 verification run: Maestro Kotlin TestRunner crashed before any flow step ran. Re-run still needed (not retried in 2026-05-19 session). |
+| `billing/child-paywall.yaml` | Optional-true tightened in PR #305 | ❌ FAIL (verified 2026-05-19) — same `learner-screen` drift after `trial-expired-child` sign-in. Stays `nightly`. |
+| `billing/family-pool.yaml` | Routes through Account | ❌ FAIL (verified 2026-05-19) — same `learner-screen` drift. Stays `nightly`. |
+| `billing/static-comparison-family.yaml` | Routes through Account | ❌ FAIL (verified 2026-05-19) — same `learner-screen` drift. Stays `nightly`. |
+| `billing/static-comparison-pro.yaml` | Routes through Account | ❌ FAIL (verified 2026-05-19) — same `learner-screen` drift. Stays `nightly`. |
+| `billing/subscription.yaml` | Routes through Account | ❌ FAIL (verified 2026-05-19) — Subscription screen reached, "Trial" assertion passes, then `assertVisible "Upgrade"` fails. Upgrade CTA copy/visibility has drifted. Stays `nightly`. |
+| `billing/subscription-details.yaml` | Routes through Account | ✅ passing (verified 2026-05-19, WHPX Pixel API 34). |
+| `billing/upgrade-confirmed-state.yaml` | Routes through Account | ❌ FAIL (verified 2026-05-19) — `static-tier-plus` testID not visible after the Plus-tier confirmed state expectation. Confirmed state screen layout drifted. Stays `nightly`. |
+| `billing/upgrade-pending-state.yaml` | Routes through Account | ❌ FAIL (verified 2026-05-19) — `static-tier-free` testID not visible. Pending state screen layout drifted. Stays `nightly`. |
 | `learning/core-learning.yaml` | M1-A tightened post-session tab regression guard | `DEFERRED:VERIFY` — 2026-05-18 verification run: carousel scroll fix from M1-B commit `552d0b7f0` advances the flow through ~18 assertions, then fails at `assertVisible id: learning-mode-sheet` after tapping `learning-mode-header-button`. Either the sheet's testID changed or the open animation needs longer settle — separate from the carryover-list M1-A blockers (APK + carousel) which are resolved. |
-| `onboarding/create-profile-standalone.yaml` | More anchor updated | `DEFERRED:VERIFY` |
+| `onboarding/create-profile-standalone.yaml` | More anchor updated | ❌ FAIL (verified 2026-05-19) — More → Account → Profile navigation succeeds, then `assertVisible "New profile"` fails after tapping `profiles-add-button`. Add-profile screen heading copy has drifted. Stays `nightly`. |
 | `parent/parent-tabs.yaml` | More anchor updated | `DEFERRED:VERIFY` — 2026-05-18 verification run: tab sweep from M1-B commit `089ef9c75` lets all four tab taps succeed, then fails at `scrollUntilVisible id: sign-out-button` on the More tab (timeout 10s). Same drift class as `app-language-edit.yaml`. |
 | `post-auth-comprehensive-devclient.yaml` | M1-A removed crash-inducing taps to deleted theme features (Phase 5) + stale Phase-3 assertions | `DEFERRED:M1-COMPREHENSIVE` — full rewrite still required; per-file DEFERRED notice retained in YAML |
-| `regression/bug-239-parent-add-child.yaml` | More anchor updated | `DEFERRED:VERIFY` |
+| `regression/bug-239-parent-add-child.yaml` | More anchor updated | ❌ FAIL (verified 2026-05-19) — More → add-child-link tap succeeds, then `assertVisible id: create-profile-name` fails. Create-profile screen testID has drifted. Stays `nightly`. |
 
 ### Broken Inventory References (3 rows above)
 
@@ -257,8 +257,8 @@ Each row is classified by its blocker:
 
 Per `docs/audit/e2e/m1b-execution-brief.md` "Exit criteria":
 
-1. ✅ `bash scripts/validate-maestro-flows.sh` exits 0 (verified on this branch, 0.35 s).
+1. ✅ `bash scripts/validate-maestro-flows.sh` exits 0 (verified on this branch, 0.22 s on 2026-05-19).
 2. ✅ Validator wired into `.github/workflows/docs-checks.yml` (advisory).
-3. ⏸️ `pr-blocking` tag set is **7 today** (target 15-25). Expansion plan in `docs/audit/e2e/m1b-pr-blocking-candidates.md`; test-machine agent owns the green-twice verification.
-4. ✅ Every non-setup flow has a `tags:` block (C7: 149 / 149 passing).
-5. 🟡 Every inventory row classified (this section). "Verified passing" stamps still depend on emulator runs (`DEFERRED:VERIFY`).
+3. ✅ `pr-blocking` tag set is **15 flows** (target 15-25), all green-2x on 2026-05-19. Final set listed in `docs/audit/e2e/m1b-pr-blocking-candidates.md`.
+4. ✅ Every non-setup flow has a `tags:` block (C7: 150 / 150 passing).
+5. ✅ Every inventory row has a definitive stamp — either ✅ passing, ❌ FAIL with a specific drift note + demotion to `nightly`, or a documented `DEFERRED` class (M1-COMPREHENSIVE / INFRA / CLERK / DEVICE / TESTID / SEED / UI / INVENTORY).
