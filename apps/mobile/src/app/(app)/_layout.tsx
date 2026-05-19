@@ -54,6 +54,10 @@ import {
   type ActiveProfileRole,
 } from '../../hooks/use-active-profile-role';
 import { useMentorLanguageSync } from '../../hooks/use-mentor-language-sync';
+import { FEATURE_FLAGS } from '../../lib/feature-flags';
+import { getPreviewState } from '../../lib/preview-onboarding-state';
+// Note: clearPreviewState is NOT imported here. [CRITICAL-B2] cleanup is
+// owned by the wizard's Step-3 success path (Task 14) and by sign-out.
 
 initNotificationHandler();
 
@@ -709,6 +713,36 @@ function CreateProfileGate(): React.ReactElement {
           </Text>
         </Pressable>
       </GateContent>
+    </View>
+  );
+}
+
+/**
+ * [CRITICAL-A2] Save-wizard gate — shown when a user arrives post-OAuth with
+ * a valid preview-onboarding state (they previewed the app before signing up).
+ * Renders INLINE (not as a nested Expo Router route) so it stays mounted across
+ * the profile-creation transition (ProfileProvider auto-activates the first
+ * profile; a nested route would unmount mid-wizard at that point).
+ *
+ * Task 12 fills in the multi-step UI. This stub satisfies the Task 11 wiring
+ * test (`save-wizard-gate` testID) and the `onComplete` callback contract.
+ */
+function SaveWizardGate({
+  onComplete: _onComplete,
+}: {
+  onComplete: () => void;
+}): React.ReactElement {
+  // TODO(Task 12): Replace stub with the real multi-step save wizard.
+  // `_onComplete` is prefixed with `_` (unused-vars convention) because the
+  // real step logic (Task 12) will wire it; the stub renders a placeholder.
+  const insets = useSafeAreaInsets();
+  return (
+    <View
+      className="flex-1 bg-background items-center justify-center px-6"
+      style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
+      testID="save-wizard-gate"
+    >
+      <ActivityIndicator size="large" />
     </View>
   );
 }
@@ -1530,6 +1564,42 @@ export default function AppLayout() {
     }
   }, [isLoaded, isSignedIn]);
 
+  // [CRITICAL-A2] Preview-state probe — async, resolves once on mount.
+  // Determines whether to show the SaveWizardGate (inline gate, not a route).
+  // Initial state is 'loading' to hold rendering until the probe settles,
+  // preventing a transient CreateProfileGate flash while the async read runs.
+  const [previewProbeState, setPreviewProbeState] = React.useState<
+    'loading' | 'present' | 'absent'
+  >('loading');
+  // [HIGH-A2] Wizard completion sentinel. previewProbeState alone never flips
+  // back to 'absent' after mount; the wizard signals completion via onComplete.
+  const [wizardDone, setWizardDone] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!FEATURE_FLAGS.PREVIEW_ONBOARDING_ENABLED) {
+      setPreviewProbeState('absent');
+      return;
+    }
+    let cancelled = false;
+    void getPreviewState().then((s) => {
+      if (cancelled) return;
+      setPreviewProbeState(s ? 'present' : 'absent');
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // [CRITICAL-B2] DELIBERATELY no auto-cleanup effect here. A previous
+  // iteration had:
+  //   useEffect(() => { if (activeProfile && profiles.length > 0) clearPreviewState() })
+  // — that races the wizard's owner-POST → child-POST sequence and wipes
+  // `createdOwnerProfileId` between the two calls, destroying the [HIGH-4]
+  // resume guard. Cleanup is owned by:
+  //   (a) TTL inside getPreviewState (1h)
+  //   (b) sign-out-cleanup (Task 4)
+  //   (c) wizard's explicit clearPreviewState() on Step-3 success (Task 14)
+
   if (!isLoaded)
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -1660,6 +1730,48 @@ export default function AppLayout() {
   //
   // key={themeKey} removed — crashes Android Fabric (MENTOMATE-MOBILE-6).
   // NativeWind vars() style updates propagate without remounting.
+
+  // [CRITICAL-A2] Gate ordering — preview probe + wizard branch.
+  // These sit ABOVE !activeProfile so the wizard stays mounted when
+  // ProfileProvider auto-activates the first profile mid-wizard
+  // (profile.ts:154-174). Without this ordering the wizard would unmount
+  // after Step 2's POST succeeds.
+  //
+  // [CRITICAL-A3] Ordering guarantees (non-negotiable):
+  //   1. !isLoaded → spinner  (auth not loaded; do not render any app UI)
+  //   2. !isSignedIn → Redirect  (signed-out user must not see the wizard)
+  //   3. pendingAuthRedirect spinner  (OAuth-return redirect-replay)
+  //   4. isProfileLoading spinner  (profile query in flight)
+  //   5. profileLoadError fallback  (independent of preview state)
+  //   6. preview-probe-loading spinner  ← HERE
+  //   7. SaveWizardGate branch  ← HERE
+  //   8. !activeProfile → CreateProfileGate  (existing)
+  //   9. consent gates → Tabs  (existing)
+  if (
+    FEATURE_FLAGS.PREVIEW_ONBOARDING_ENABLED &&
+    previewProbeState === 'loading'
+  ) {
+    return (
+      <View
+        className="flex-1 bg-background items-center justify-center"
+        testID="preview-state-loading"
+      >
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
+
+  if (
+    FEATURE_FLAGS.PREVIEW_ONBOARDING_ENABLED &&
+    previewProbeState === 'present' &&
+    !wizardDone
+  ) {
+    return (
+      <FeedbackProvider>
+        <SaveWizardGate onComplete={() => setWizardDone(true)} />
+      </FeedbackProvider>
+    );
+  }
 
   // No profile exists — show gate that pushes to profile creation modal
   if (!activeProfile) {
