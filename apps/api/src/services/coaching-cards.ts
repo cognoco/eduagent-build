@@ -208,20 +208,29 @@ export async function precomputeCoachingCard(
     // Priority scales: 7 base + 1 per overdue card, capped at 10
     const priority = Math.min(7 + overdueCards.length - 1, 10);
 
-    // Enrich with book context if topic belongs to a book
+    // Enrich with book context if topic belongs to a book.
+    // [BUG-NOTION-263] Single leftJoin replaces two sequential single-row
+    // lookups (topic findFirst → book findFirst) — one round-trip instead of
+    // two. The leftJoin preserves the "topic without a book" case (book row
+    // is null).
     let topicTitle: string | null = null;
     let bookTitle: string | null = null;
     try {
-      const overdueTopicRow = await db.query.curriculumTopics?.findFirst?.({
-        where: eq(curriculumTopics.id, mostOverdue.topicId),
-      });
-      topicTitle = overdueTopicRow?.title ?? null;
-      if (overdueTopicRow?.bookId) {
-        const book = await db.query.curriculumBooks?.findFirst?.({
-          where: eq(curriculumBooks.id, overdueTopicRow.bookId),
-        });
-        bookTitle = book?.title ?? null;
-      }
+      const rows = await db
+        .select({
+          topicTitle: curriculumTopics.title,
+          bookTitle: curriculumBooks.title,
+        })
+        .from(curriculumTopics)
+        .leftJoin(
+          curriculumBooks,
+          eq(curriculumBooks.id, curriculumTopics.bookId),
+        )
+        .where(eq(curriculumTopics.id, mostOverdue.topicId))
+        .limit(1);
+      const row = rows[0];
+      topicTitle = row?.topicTitle ?? null;
+      bookTitle = row?.bookTitle ?? null;
     } catch (err) {
       silentDegrade(err, 'review_due_book_enrichment', {
         profileId,

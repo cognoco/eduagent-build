@@ -157,6 +157,22 @@ jest.mock('../services/kv' /* gc1-allow: pattern-a conversion */, () => {
 });
 
 // ---------------------------------------------------------------------------
+// Mock Sentry — [BUG-97] verifies KV failures are captured, not swallowed
+// ---------------------------------------------------------------------------
+
+const mockCaptureException = jest.fn();
+
+jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/sentry',
+  ) as typeof import('../services/sentry');
+  return {
+    ...actual,
+    captureException: (...args: unknown[]) => mockCaptureException(...args),
+  };
+});
+
+// ---------------------------------------------------------------------------
 // Mock Stripe SDK
 // ---------------------------------------------------------------------------
 
@@ -261,6 +277,7 @@ beforeEach(() => {
   mockGetQuotaPool.mockResolvedValue(null);
   mockLinkStripeCustomer.mockResolvedValue(null);
   mockReadSubscriptionStatus.mockResolvedValue(null);
+  mockCaptureException.mockReset();
   mockListFamilyMembers.mockResolvedValue([]);
   mockAddProfileToSubscription.mockResolvedValue(null);
   mockRemoveProfileFromSubscription.mockResolvedValue(null);
@@ -801,6 +818,47 @@ describe('billing routes', () => {
     it('returns 401 without auth header', async () => {
       const res = await app.request('/v1/subscription/status', {}, TEST_ENV);
       expect(res.status).toBe(401);
+    });
+
+    // [BUG-97 / A1-MED] KV throws → fallback to DB AND captureException fired.
+    // Break test: revert the try/catch in billing.ts and this turns into a 500.
+    it('falls back to DB and captures the error when KV read throws', async () => {
+      // KVNamespace is a Workers global omitted from tsconfig.spec.json (same
+      // reason as kv.test.ts — adding it globally cascades ~430 type errors).
+      // We only need the value to flow through the env; cast via unknown.
+      const fakeKv = {} as unknown;
+      const kvError = new Error('KV namespace unavailable');
+      mockReadSubscriptionStatus.mockRejectedValueOnce(kvError);
+      mockGetSubscriptionByAccountId.mockResolvedValue(mockSubscription());
+      mockGetQuotaPool.mockResolvedValue(mockQuotaPool());
+
+      const res = await app.request(
+        '/v1/subscription/status',
+        { headers: AUTH_HEADERS },
+        { ...TEST_ENV, SUBSCRIPTION_KV: fakeKv },
+      );
+
+      // Without the try/catch the unhandled rejection bubbles → 500.
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      // DB fallback wins — values come from mockSubscription + mockQuotaPool.
+      expect(body.status.tier).toBe('plus');
+      expect(body.status.status).toBe('active');
+      expect(body.status.monthlyLimit).toBe(500);
+      expect(body.status.usedThisMonth).toBe(42);
+
+      // Silent recovery is banned — the error must be captured.
+      expect(mockCaptureException).toHaveBeenCalledTimes(1);
+      const [capturedErr, capturedCtx] = mockCaptureException.mock.calls[0];
+      expect(capturedErr).toBe(kvError);
+      expect(capturedCtx).toEqual(
+        expect.objectContaining({
+          extra: expect.objectContaining({
+            context: 'billing.subscriptionStatus.kvRead',
+            accountId: 'test-account-id',
+          }),
+        }),
+      );
     });
   });
 

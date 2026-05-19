@@ -50,6 +50,7 @@ import { readSubscriptionStatus } from '../services/kv';
 import { apiError, notFound } from '../errors';
 import { BRAND_COLOR_PRIMARY } from '../services/brand';
 import { createLogger } from '../services/logger';
+import { captureException } from '../services/sentry';
 import type { ProfileMeta } from '../middleware/profile-scope';
 
 const logger = createLogger();
@@ -585,22 +586,43 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     const kv = c.env.SUBSCRIPTION_KV;
     const freeTier = getTierConfig('free');
 
-    // Try KV first (fast path)
+    // Try KV first (fast path).
+    // [BUG-97 / A1-MED] Wrap KV read in try/catch — KV outages must not 500.
+    // Per CLAUDE.md "Silent recovery without escalation is banned": fall
+    // through to the DB path but emit Sentry + structured log on KV failure
+    // so we can detect cache outages, not just observe slow latency.
     if (kv) {
-      const cached = await readSubscriptionStatus(kv, account.id);
-      if (cached) {
-        return c.json(
-          subscriptionStatusResponseSchema.parse({
-            status: {
-              tier: cached.tier,
-              status: cached.status,
-              monthlyLimit: cached.monthlyLimit,
-              usedThisMonth: cached.usedThisMonth,
-              dailyLimit: cached.dailyLimit,
-              usedToday: cached.usedToday,
-            },
-          }),
+      try {
+        const cached = await readSubscriptionStatus(kv, account.id);
+        if (cached) {
+          return c.json(
+            subscriptionStatusResponseSchema.parse({
+              status: {
+                tier: cached.tier,
+                status: cached.status,
+                monthlyLimit: cached.monthlyLimit,
+                usedThisMonth: cached.usedThisMonth,
+                dailyLimit: cached.dailyLimit,
+                usedToday: cached.usedToday,
+              },
+            }),
+          );
+        }
+      } catch (err) {
+        logger.error(
+          '[billing] readSubscriptionStatus KV read failed — falling back to DB',
+          {
+            accountId: account.id,
+            error: err instanceof Error ? err.message : String(err),
+          },
         );
+        captureException(err, {
+          extra: {
+            context: 'billing.subscriptionStatus.kvRead',
+            accountId: account.id,
+          },
+        });
+        // Fall through to DB fetch below.
       }
     }
 

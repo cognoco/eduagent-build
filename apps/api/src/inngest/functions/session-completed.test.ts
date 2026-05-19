@@ -551,6 +551,39 @@ describe('sessionCompleted', () => {
     );
   });
 
+  // [BUG-146] Per CLAUDE.md "Inngest" rule, every receiver-style function
+  // must declare a concurrency cap so a flurry of events cannot stampede
+  // the LLM provider and Neon connection pool. session-completed runs
+  // heavy LLM work (analyze, insights, recap, summary) plus Voyage
+  // embeddings — without this cap, one user generating 50 completed
+  // sessions in a minute would saturate the provider and pool.
+  // Break test: remove the concurrency option from createFunction → fails.
+  it('[BUG-146] declares a per-profile concurrency cap', () => {
+    const opts = (sessionCompleted as any).opts;
+    expect(opts.concurrency).toBeDefined();
+    expect(opts.concurrency).toEqual(
+      expect.objectContaining({
+        limit: expect.any(Number),
+        key: 'event.data.profileId',
+      }),
+    );
+    // Limit must be bounded — anything over ~50 would defeat the purpose
+    // for heavy-LLM workloads. We pick 25 to mirror weekly-progress-push.
+    expect(opts.concurrency.limit).toBeGreaterThan(0);
+    expect(opts.concurrency.limit).toBeLessThanOrEqual(50);
+  });
+
+  // [BUG-154] Function-level idempotency on sessionId prevents duplicate
+  // app/session.completed deliveries from re-firing the whole pipeline
+  // (which would re-emit dedup-events, re-write coaching cards, etc.).
+  // Inngest step.run memoization only protects within a single invocation;
+  // duplicate event deliveries are a separate concern that requires the
+  // function-level idempotency key.
+  it('[BUG-154] declares function-level idempotency on sessionId', () => {
+    const opts = (sessionCompleted as any).opts;
+    expect(opts.idempotency).toBe('event.data.sessionId');
+  });
+
   it('does not wait for filing when the session was auto-closed', async () => {
     const { mockStep } = (await executeSteps(
       createEventData({ topicId: null, summaryStatus: 'auto_closed' }),
