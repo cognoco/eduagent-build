@@ -166,6 +166,12 @@ export interface RenderScreenOptions {
    * set this to `false` and the routedFetch is still returned for assertions.
    */
   installGlobalFetch?: boolean;
+  /**
+   * Override the `switchProfile` implementation in the ProfileContext. Use
+   * this to test profile-switch error paths (e.g. simulate a failed switch).
+   * Default: `async () => ({ success: true })`.
+   */
+  switchProfile?: ProfileContextValue['switchProfile'];
 }
 
 export interface RenderScreenResult {
@@ -216,7 +222,7 @@ export function renderScreen(
   const profileContextValue: ProfileContextValue = {
     profiles,
     activeProfile,
-    switchProfile: async () => ({ success: true }),
+    switchProfile: opts.switchProfile ?? (async () => ({ success: true })),
     isLoading: false,
     profileLoadError: null,
     profileWasRemoved: false,

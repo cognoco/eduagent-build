@@ -60,6 +60,14 @@ export type MeteringEnv = {
     subscriptionId: string;
     subscriptionTier: SubscriptionTier;
     llmTier: LLMTier;
+    /**
+     * [CR-2026-05-19-C6] Pool that funded the decrement, so refund paths
+     * (LLM failure handlers in routes/sessions.ts) can return the credit to
+     * the same pool instead of inflating monthly quota by 1 per failure.
+     */
+    quotaDecrementSource: 'monthly' | 'top_up';
+    /** Set when quotaDecrementSource === 'top_up'. */
+    quotaDecrementTopUpCreditId?: string;
   };
 };
 
@@ -511,6 +519,15 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
     // Store subscriptionId for potential refund on LLM failure
     c.set('subscriptionId', subscriptionId);
     c.set('subscriptionTier', tier);
+    // [CR-2026-05-19-C6] Thread the decrement source so refund paths can
+    // credit the correct pool.
+    c.set(
+      'quotaDecrementSource',
+      decrement.source === 'top_up' ? 'top_up' : 'monthly',
+    );
+    if (decrement.topUpCreditId) {
+      c.set('quotaDecrementTopUpCreditId', decrement.topUpCreditId);
+    }
 
     // Expose the LLM tier so session route handlers can thread it to the LLM router.
     // Plus keeps the base tier standard; session exchange routing promotes its
@@ -525,6 +542,9 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
       await safeRefundQuota(db, subscriptionId, {
         route: `metering.${c.req.method}.${c.req.path}`,
         profileId,
+        // [CR-2026-05-19-C6] Refund to the same pool the decrement consumed.
+        source: decrement.source === 'top_up' ? 'top_up' : 'monthly',
+        topUpCreditId: decrement.topUpCreditId,
       });
       return;
     }

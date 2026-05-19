@@ -676,15 +676,11 @@ export const revenuecatWebhookRoute = new Hono<{
     return c.json({ received: true, skipped: true });
   }
 
-  // Ensure free subscription exists for the account (auto-provisioning)
-  await ensureFreeSubscription(db, accountId);
-
-  // [BUG-624 / A-8] In production, sandbox events MUST NOT mutate state.
-  // The previous implementation only warned and fell through, so a single
-  // RevenueCat sandbox INITIAL_PURCHASE could activate a paid subscription on
-  // a real production account. Reject sandbox events outright in production;
-  // accept them in non-prod environments so QA can drive flows from sandbox
-  // purchases against staging/dev data.
+  // [CR-2026-05-19-H6/H7] SANDBOX guard MUST run before ensureFreeSubscription
+  // so that sandbox-in-prod events do not provision subscription rows / quota
+  // pools for accounts that should not have them in production. Ordering:
+  // resolveAccountId → isRevenuecatEventProcessed (idempotency) → SANDBOX guard
+  // → ensureFreeSubscription → event-type dispatch.
   if (event.environment === 'SANDBOX') {
     if (c.env.ENVIRONMENT === 'production') {
       logger.warn(
@@ -710,6 +706,8 @@ export const revenuecatWebhookRoute = new Hono<{
       },
     );
   }
+
+  await ensureFreeSubscription(db, accountId);
 
   // Dispatch to event-specific handler
   switch (event.type) {

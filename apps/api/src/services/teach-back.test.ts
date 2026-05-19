@@ -2,8 +2,29 @@ import {
   shouldTriggerTeachBack,
   mapTeachBackRubricToSm2,
   parseTeachBackAssessment,
+  teachBackAssessmentFromEnvelopeSignal,
 } from './teach-back';
 import type { TeachBackAssessment } from '@eduagent/schemas';
+
+function eventWithEnvelopeSignal(signal: Record<string, unknown> | null): {
+  content: string;
+  metadata: unknown;
+} {
+  return {
+    content: 'Want to try something? Teach it to me. [prose only]',
+    metadata: signal ? { signals: { teach_back_assessment: signal } } : null,
+  };
+}
+
+function eventWithRawEnvelopeContent(envelope: Record<string, unknown>): {
+  content: string;
+  metadata: unknown;
+} {
+  return {
+    content: JSON.stringify(envelope),
+    metadata: null,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // shouldTriggerTeachBack
@@ -114,11 +135,16 @@ describe('mapTeachBackRubricToSm2', () => {
 // ---------------------------------------------------------------------------
 
 describe('parseTeachBackAssessment', () => {
-  it('parses a valid JSON assessment', () => {
-    const response =
-      'Can you explain more about that?\n' +
-      '{"completeness": 4, "accuracy": 3, "clarity": 5, "overallQuality": 4, "weakestArea": "accuracy", "gapIdentified": "missed energy conservation"}';
-    const result = parseTeachBackAssessment(response);
+  it('parses a valid assessment from envelope signal in metadata (canonical path)', () => {
+    const event = eventWithEnvelopeSignal({
+      completeness: 4,
+      accuracy: 3,
+      clarity: 5,
+      overall_quality: 4,
+      weakest_area: 'accuracy',
+      gap_identified: 'missed energy conservation',
+    });
+    const result = parseTeachBackAssessment(event);
     expect(result).toEqual({
       completeness: 4,
       accuracy: 3,
@@ -129,25 +155,82 @@ describe('parseTeachBackAssessment', () => {
     });
   });
 
-  it('parses assessment with null gapIdentified', () => {
-    const response =
-      '{"completeness": 5, "accuracy": 5, "clarity": 4, "overallQuality": 5, "weakestArea": "clarity", "gapIdentified": null}';
-    const result = parseTeachBackAssessment(response);
+  it('parses assessment with null gap_identified', () => {
+    const event = eventWithEnvelopeSignal({
+      completeness: 5,
+      accuracy: 5,
+      clarity: 4,
+      overall_quality: 5,
+      weakest_area: 'clarity',
+      gap_identified: null,
+    });
+    const result = parseTeachBackAssessment(event);
     expect(result?.gapIdentified).toBeNull();
   });
 
-  it('returns null when no JSON found', () => {
-    expect(parseTeachBackAssessment('Just a plain response')).toBeNull();
+  it('parses from raw envelope JSON in content (transition path)', () => {
+    const event = eventWithRawEnvelopeContent({
+      reply: 'Hmm — can you tell me more about why?',
+      signals: {
+        teach_back_assessment: {
+          completeness: 3,
+          accuracy: 4,
+          clarity: 3,
+          overall_quality: 3,
+          weakest_area: 'completeness',
+          gap_identified: 'skipped definition of equilibrium',
+        },
+      },
+    });
+    const result = parseTeachBackAssessment(event);
+    expect(result).toEqual({
+      completeness: 3,
+      accuracy: 4,
+      clarity: 3,
+      overallQuality: 3,
+      weakestArea: 'completeness',
+      gapIdentified: 'skipped definition of equilibrium',
+    });
   });
 
-  it('returns null for malformed JSON', () => {
-    expect(parseTeachBackAssessment('{completeness: not valid}')).toBeNull();
+  it('returns null when no envelope signal and content is plain prose', () => {
+    expect(
+      parseTeachBackAssessment({
+        content: 'Just a plain response with no JSON anywhere.',
+        metadata: null,
+      }),
+    ).toBeNull();
   });
 
-  it('clamps scores to 0-5 range', () => {
+  it('returns null when raw envelope JSON content is malformed', () => {
+    expect(
+      parseTeachBackAssessment({
+        content: '{completeness: not valid}',
+        metadata: null,
+      }),
+    ).toBeNull();
+  });
+
+  it('returns null when legacy free-text JSON blob is embedded in prose (post-migration contract)', () => {
+    // [CR-2026-05-19-C5] After envelope migration, free-text JSON blobs in
+    // prose violate the contract and MUST NOT be parseable. The envelope
+    // signal in metadata is now the only path.
     const response =
-      '{"completeness": 10, "accuracy": -1, "clarity": 3, "overallQuality": 7, "weakestArea": "accuracy", "gapIdentified": null}';
-    const result = parseTeachBackAssessment(response);
+      'Can you explain more about that?\n' +
+      '{"completeness": 4, "accuracy": 3, "clarity": 5, "overallQuality": 4, "weakestArea": "accuracy", "gapIdentified": "missed energy conservation"}';
+    expect(parseTeachBackAssessment(response)).toBeNull();
+  });
+
+  it('clamps scores to 0-5 range in envelope signal', () => {
+    const event = eventWithEnvelopeSignal({
+      completeness: 10,
+      accuracy: -1,
+      clarity: 3,
+      overall_quality: 7,
+      weakest_area: 'accuracy',
+      gap_identified: null,
+    });
+    const result = parseTeachBackAssessment(event);
     expect(result?.completeness).toBe(5);
     expect(result?.accuracy).toBe(0);
     expect(result?.clarity).toBe(3);
@@ -155,23 +238,85 @@ describe('parseTeachBackAssessment', () => {
   });
 
   it('defaults missing numeric fields to 3', () => {
-    const response =
-      '{"completeness": 4, "accuracy": 4, "clarity": 4, "overallQuality": 4, "weakestArea": "clarity"}';
-    const result = parseTeachBackAssessment(response);
+    const event = eventWithEnvelopeSignal({
+      completeness: 4,
+      accuracy: 4,
+      // clarity, overall_quality, gap_identified missing
+      weakest_area: 'clarity',
+    });
+    const result = parseTeachBackAssessment(event);
+    expect(result?.clarity).toBe(3);
+    expect(result?.overallQuality).toBe(3);
     expect(result?.gapIdentified).toBeNull();
   });
 
-  it('infers weakestArea when invalid value provided', () => {
-    const response =
-      '{"completeness": 4, "accuracy": 2, "clarity": 3, "overallQuality": 3, "weakestArea": "invalid", "gapIdentified": null}';
-    const result = parseTeachBackAssessment(response);
+  it('infers weakest_area when invalid value provided', () => {
+    const event = eventWithEnvelopeSignal({
+      completeness: 4,
+      accuracy: 2,
+      clarity: 3,
+      overall_quality: 3,
+      weakest_area: 'invalid',
+      gap_identified: null,
+    });
+    const result = parseTeachBackAssessment(event);
     expect(result?.weakestArea).toBe('accuracy'); // lowest score
   });
 
   it('breaks weakestArea ties favoring accuracy', () => {
-    const response =
-      '{"completeness": 3, "accuracy": 3, "clarity": 3, "overallQuality": 3, "weakestArea": "invalid", "gapIdentified": null}';
-    const result = parseTeachBackAssessment(response);
+    const event = eventWithEnvelopeSignal({
+      completeness: 3,
+      accuracy: 3,
+      clarity: 3,
+      overall_quality: 3,
+      weakest_area: 'invalid',
+      gap_identified: null,
+    });
+    const result = parseTeachBackAssessment(event);
     expect(result?.weakestArea).toBe('accuracy');
+  });
+
+  it('returns null when envelope signal lacks both required fields (completeness and accuracy)', () => {
+    const event = eventWithEnvelopeSignal({
+      clarity: 4,
+      overall_quality: 4,
+    });
+    expect(parseTeachBackAssessment(event)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// teachBackAssessmentFromEnvelopeSignal — direct mapping helper
+// ---------------------------------------------------------------------------
+
+describe('teachBackAssessmentFromEnvelopeSignal', () => {
+  it('maps a complete envelope signal to consumer shape', () => {
+    const result = teachBackAssessmentFromEnvelopeSignal({
+      completeness: 4,
+      accuracy: 5,
+      clarity: 3,
+      overall_quality: 4,
+      weakest_area: 'clarity',
+      gap_identified: 'glossed analogy',
+    });
+    expect(result).toEqual({
+      completeness: 4,
+      accuracy: 5,
+      clarity: 3,
+      overallQuality: 4,
+      weakestArea: 'clarity',
+      gapIdentified: 'glossed analogy',
+    });
+  });
+
+  it('returns null when both required fields are missing', () => {
+    const result = teachBackAssessmentFromEnvelopeSignal({
+      clarity: 4,
+      overall_quality: 4,
+    } as unknown as {
+      completeness: number;
+      accuracy: number;
+    });
+    expect(result).toBeNull();
   });
 });

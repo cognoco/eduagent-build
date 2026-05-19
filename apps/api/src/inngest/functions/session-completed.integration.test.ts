@@ -770,13 +770,8 @@ describe('session-completed integration', () => {
 
     await seedLearningProfile(profileId);
 
-    // Seed an ai_response event with a parseable EVALUATE assessment JSON
-    // parseEvaluateAssessment looks for: {"challengePassed": bool, "quality": number}
-    const evaluateAssessmentJson = JSON.stringify({
-      challengePassed: true,
-      flawIdentified: 'The formula was reversed',
-      quality: 4,
-    });
+    // Seed an ai_response event with the EVALUATE assessment in metadata
+    // (envelope contract — signals.evaluate_assessment, not free-text JSON).
     await db.insert(sessionEvents).values([
       {
         sessionId,
@@ -793,7 +788,17 @@ describe('session-completed integration', () => {
         subjectId,
         topicId,
         eventType: 'ai_response',
-        content: `You correctly identified the flaw. ${evaluateAssessmentJson}`,
+        content:
+          'You correctly identified the flaw — the formula was reversed.',
+        metadata: {
+          signals: {
+            evaluate_assessment: {
+              challenge_passed: true,
+              flaw_identified: 'The formula was reversed',
+              quality: 4,
+            },
+          },
+        },
       },
     ]);
 
@@ -856,16 +861,8 @@ describe('session-completed integration', () => {
 
     await seedLearningProfile(profileId);
 
-    // Seed an ai_response event with a parseable TEACH_BACK assessment JSON
-    // parseTeachBackAssessment looks for: {"completeness": n, "accuracy": n, "clarity": n}
-    const teachBackAssessmentJson = JSON.stringify({
-      completeness: 4,
-      accuracy: 4,
-      clarity: 3,
-      overallQuality: 4,
-      weakestArea: 'clarity',
-      gapIdentified: 'Could be clearer on light reactions',
-    });
+    // Seed an ai_response event with the TEACH_BACK assessment in metadata
+    // (envelope contract — signals.teach_back_assessment, not free-text JSON).
     await db.insert(sessionEvents).values([
       {
         sessionId,
@@ -882,7 +879,20 @@ describe('session-completed integration', () => {
         subjectId,
         topicId,
         eventType: 'ai_response',
-        content: `Good explanation! ${teachBackAssessmentJson}`,
+        content:
+          'Good explanation — can you tell me more about the light reactions?',
+        metadata: {
+          signals: {
+            teach_back_assessment: {
+              completeness: 4,
+              accuracy: 4,
+              clarity: 3,
+              overall_quality: 4,
+              weakest_area: 'clarity',
+              gap_identified: 'Could be clearer on light reactions',
+            },
+          },
+        },
       },
     ]);
 

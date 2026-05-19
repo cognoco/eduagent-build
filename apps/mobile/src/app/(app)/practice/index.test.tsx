@@ -61,13 +61,21 @@ jest.mock(
   }),
 );
 
-jest.mock('../../../hooks/use-progress', () => ({
-  useReviewSummary: () => mockUseReviewSummary(),
-}));
+jest.mock(
+  '../../../hooks/use-progress', // gc1-allow: pattern-a; screen unit-scope — requireActual keeps non-overridden exports real; targeted override isolates review summary return shape
+  () => ({
+    ...jest.requireActual('../../../hooks/use-progress'),
+    useReviewSummary: () => mockUseReviewSummary(),
+  }),
+);
 
-jest.mock('../../../hooks/use-quiz', () => ({
-  useQuizStats: () => mockUseQuizStats(),
-}));
+jest.mock(
+  '../../../hooks/use-quiz', // gc1-allow: pattern-a; screen unit-scope — requireActual keeps non-overridden exports real; targeted override isolates quiz stats return shape
+  () => ({
+    ...jest.requireActual('../../../hooks/use-quiz'),
+    useQuizStats: () => mockUseQuizStats(),
+  }),
+);
 
 jest.mock(
   '../../../hooks/use-subjects' /* gc1-allow: hook requires QueryClientProvider; not runnable in unit env */,
@@ -76,9 +84,13 @@ jest.mock(
   }),
 );
 
-jest.mock('../../../hooks/use-assessments', () => ({
-  useAssessmentEligibleTopics: () => mockUseAssessmentEligibleTopics(),
-}));
+jest.mock(
+  '../../../hooks/use-assessments', // gc1-allow: pattern-a; screen unit-scope — requireActual keeps non-overridden exports real; targeted override isolates assessment eligibility return shape
+  () => ({
+    ...jest.requireActual('../../../hooks/use-assessments'),
+    useAssessmentEligibleTopics: () => mockUseAssessmentEligibleTopics(),
+  }),
+);
 
 const PracticeScreen = require('./index').default;
 

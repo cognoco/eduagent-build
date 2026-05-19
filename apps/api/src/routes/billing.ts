@@ -153,7 +153,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     const subscription = await getSubscriptionByAccountId(db, account.id);
 
     if (!subscription) {
-      // No subscription yet — return free-tier defaults
+      // No subscription yet -- return free-tier defaults
       return c.json(
         subscriptionResponseSchema.parse({
           subscription: {
@@ -207,7 +207,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
   })
 
   // Create Stripe Checkout session
-  // Dormant for mobile — kept for future web client. Mobile uses RevenueCat IAP.
+  // Dormant for mobile -- kept for future web client. Mobile uses RevenueCat IAP.
   .post(
     '/subscription/checkout',
     zValidator('json', checkoutRequestSchema),
@@ -216,7 +216,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       const db = c.get('db');
       const account = c.get('account');
 
-      // BUG-77: Return 404 (not 500) when Stripe is unconfigured — these
+      // BUG-77: Return 404 (not 500) when Stripe is unconfigured -- these
       // endpoints are dormant for mobile. 404 communicates "feature not
       // available" rather than misleading "server error".
       const stripeKey = c.env.STRIPE_SECRET_KEY;
@@ -254,7 +254,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
 
       // [BUG-101 / A1-LOW] Fail loudly instead of silently redirecting to
       // production. Previously a missing APP_URL on staging would route the
-      // user to mentomate.com/billing/success after paying — confusing at
+      // user to mentomate.com/billing/success after paying -- confusing at
       // best and a session-leak vector at worst (the prod web app would
       // receive a checkout session ID that originated on staging).
       const appUrl = c.env.APP_URL;
@@ -297,11 +297,22 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
   )
 
   // Cancel subscription (set cancel_at_period_end)
-  // Dormant for mobile — kept for future web client. Mobile cancellation
+  // Dormant for mobile -- kept for future web client. Mobile cancellation
   // handled by platform subscription management (App Store / Google Play).
   .post('/subscription/cancel', async (c) => {
     const db = c.get('db');
     const account = c.get('account');
+
+    // [CR-2026-05-19-H1] Only the account owner can cancel a subscription.
+    const activeProfileMetaCancel = c.get('profileMeta');
+    if (activeProfileMetaCancel?.isOwner !== true) {
+      return apiError(
+        c,
+        403,
+        ERROR_CODES.FORBIDDEN,
+        'Only the account owner can cancel a subscription.',
+      );
+    }
 
     const subscription = await getSubscriptionByAccountId(db, account.id);
     if (!subscription?.stripeSubscriptionId) {
@@ -333,7 +344,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     if (!periodEndTs) {
       // [logging sweep] structured logger so PII fields land as JSON context
       logger.error(
-        '[billing] Subscription returned no current_period_end — falling back to current timestamp',
+        '[billing] Subscription returned no current_period_end -- falling back to current timestamp',
         {
           stripeSubscriptionId: subscription.stripeSubscriptionId,
         },
@@ -356,7 +367,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
   })
 
   // Purchase top-up credits via Stripe Payment Intent
-  // Dormant for mobile — kept for future web client. Mobile top-ups use
+  // Dormant for mobile -- kept for future web client. Mobile top-ups use
   // RevenueCat consumable IAP (see subscription.tsx handleTopUp).
   .post(
     '/subscription/top-up',
@@ -366,7 +377,18 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       const db = c.get('db');
       const account = c.get('account');
 
-      // Check tier eligibility — Free tier cannot purchase top-ups
+      // [CR-2026-05-19-H1] Only the account owner can purchase top-up credits.
+      const activeProfileMetaTopup = c.get('profileMeta');
+      if (activeProfileMetaTopup?.isOwner !== true) {
+        return apiError(
+          c,
+          403,
+          ERROR_CODES.FORBIDDEN,
+          'Only the account owner can purchase top-up credits.',
+        );
+      }
+
+      // Check tier eligibility -- Free tier cannot purchase top-ups
       const subscription = await getSubscriptionByAccountId(db, account.id);
       const tier = subscription?.tier ?? 'free';
       const priceCents = getTopUpPriceCents(tier);
@@ -400,7 +422,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
         await linkStripeCustomer(db, account.id, customerId);
       }
 
-      // Tier-based pricing: Plus €10/500, Family/Pro €5/500
+      // Tier-based pricing: Plus EUR10/500, Family/Pro EUR5/500
       const paymentIntent = await stripe.paymentIntents.create({
         amount: priceCents,
         currency: 'eur',
@@ -551,11 +573,22 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
   })
 
   // Create Stripe Customer Portal session
-  // Dormant for mobile — kept for future web client. Mobile billing managed
+  // Dormant for mobile -- kept for future web client. Mobile billing managed
   // through platform subscription management (App Store / Google Play).
   .post('/subscription/portal', async (c) => {
     const db = c.get('db');
     const account = c.get('account');
+
+    // [CR-2026-05-19-H1] Only the account owner can access the billing portal.
+    const activeProfileMetaPortal = c.get('profileMeta');
+    if (activeProfileMetaPortal?.isOwner !== true) {
+      return apiError(
+        c,
+        403,
+        ERROR_CODES.FORBIDDEN,
+        'Only the account owner can access the billing portal.',
+      );
+    }
 
     const subscription = await getSubscriptionByAccountId(db, account.id);
     if (!subscription?.stripeCustomerId) {
@@ -587,7 +620,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
     const freeTier = getTierConfig('free');
 
     // Try KV first (fast path).
-    // [BUG-97 / A1-MED] Wrap KV read in try/catch — KV outages must not 500.
+    // [BUG-97 / A1-MED] Wrap KV read in try/catch -- KV outages must not 500.
     // Per CLAUDE.md "Silent recovery without escalation is banned": fall
     // through to the DB path but emit Sentry + structured log on KV failure
     // so we can detect cache outages, not just observe slow latency.
@@ -610,7 +643,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
         }
       } catch (err) {
         logger.error(
-          '[billing] readSubscriptionStatus KV read failed — falling back to DB',
+          '[billing] readSubscriptionStatus KV read failed -- falling back to DB',
           {
             accountId: account.id,
             error: err instanceof Error ? err.message : String(err),
@@ -699,7 +732,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
       // [BUG-94 / A1-HIGH] isOwner gate parity with /family/remove. Without
       // this, a non-owner child active on the parent's account could add
       // arbitrary profiles to the family subscription while only the parent
-      // (owner) can remove them — asymmetric and exploitable.
+      // (owner) can remove them -- asymmetric and exploitable.
       if (activeProfileMeta?.isOwner !== true) {
         return apiError(
           c,
@@ -804,7 +837,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
   .post('/byok-waitlist', zValidator('json', byokWaitlistSchema), async (c) => {
     const db = c.get('db');
     const account = c.get('account');
-    // Use the authenticated account's email — never trust caller-supplied email
+    // Use the authenticated account's email -- never trust caller-supplied email
     const email = account.email;
 
     await addToByokWaitlist(db, email);
@@ -821,7 +854,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
   // ---------------------------------------------------------------------------
   // Stripe Checkout landing pages [UX-DE-M10]
   // Stripe redirects to these after checkout. They are public (no auth needed
-  // here — Stripe appends session_id which is opaque) and render a minimal
+  // here -- Stripe appends session_id which is opaque) and render a minimal
   // HTML page so the user always has at least one actionable path.
   // ---------------------------------------------------------------------------
 
@@ -838,7 +871,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Subscription confirmed — MentoMate</title>
+  <title>Subscription confirmed -- MentoMate</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -892,7 +925,7 @@ export const billingRoutes = new Hono<BillingRouteEnv>()
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Checkout cancelled — MentoMate</title>
+  <title>Checkout cancelled -- MentoMate</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {

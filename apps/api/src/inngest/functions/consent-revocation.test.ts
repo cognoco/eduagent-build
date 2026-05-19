@@ -503,6 +503,70 @@ describe('archive path — auto preference, age 14', () => {
 });
 
 // ---------------------------------------------------------------------------
+// [CR-2026-05-19-H19] Multi-parent family — delete-notice owner resolution
+//
+// Break test: getFamilyOwnerProfileId is called by `choose-final-action`
+// BEFORE `delete-child-profile`. After the cascade delete, family_links rows
+// for the child no longer exist, so a second call to getFamilyOwnerProfileId
+// would return zero rows and fall back to the event-sender parentProfileId.
+// In multi-parent families where the event-sender is NOT the owner, that
+// would route the delete notice to the wrong account.
+//
+// Fix: `record-parent-delete-notice` must reuse the ownerProfileId computed
+// in `choose-final-action` rather than re-querying after deletion. This test
+// simulates the post-deletion state (second invocation returns the fallback
+// value) and asserts that the notice still lands on the pre-deletion owner.
+// ---------------------------------------------------------------------------
+
+describe('[CR-2026-05-19-H19] multi-parent family — delete-notice owner resolution', () => {
+  it('records delete notice against the owner resolved BEFORE deletion, not after cascade', async () => {
+    // First call (inside `choose-final-action`, before deletion): returns the
+    // real owner-of-the-family ('owner-profile-001'). Any subsequent call
+    // simulates the post-cascade state where family_links is gone — falls back
+    // to the event-sender ('coparent-profile-001'). The fix must NOT call
+    // getFamilyOwnerProfileId a second time; if it does, the notice would
+    // route to the wrong account.
+    mockGetFamilyOwnerProfileId
+      .mockResolvedValueOnce('owner-profile-001')
+      .mockResolvedValue('coparent-profile-001');
+
+    await executeRevocation({
+      childProfileId: 'child-001',
+      // Event sender is the co-parent, NOT the account owner.
+      parentProfileId: 'coparent-profile-001',
+    });
+
+    expect(mockRecordPendingNotice).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        ownerProfileId: 'owner-profile-001',
+        type: 'consent_deleted',
+      }),
+    );
+    // Make the wrong-owner assertion explicit so the test name is unambiguous.
+    expect(mockRecordPendingNotice).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        ownerProfileId: 'coparent-profile-001',
+        type: 'consent_deleted',
+      }),
+    );
+  });
+
+  it('resolves owner exactly once across the entire revocation flow (no post-deletion re-query)', async () => {
+    mockGetFamilyOwnerProfileId.mockResolvedValue('owner-profile-001');
+
+    await executeRevocation({
+      childProfileId: 'child-001',
+      parentProfileId: 'coparent-profile-001',
+    });
+
+    // Exactly one call: inside `choose-final-action`, before any mutation.
+    expect(mockGetFamilyOwnerProfileId).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // [FIX-INNGEST-3] Idempotency and concurrency config break tests
 // ---------------------------------------------------------------------------
 

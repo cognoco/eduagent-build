@@ -1,70 +1,66 @@
-import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
+import { fireEvent, waitFor, act } from '@testing-library/react-native';
 import { Alert } from 'react-native';
-import React from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { RoutedMockFetch } from '../../../test-utils/mock-api-routes';
+import { renderScreen, cleanupScreen } from '../../../test-utils/screen-render';
 import PickBookScreen from './[subjectId]';
 
 // ---------------------------------------------------------------------------
-// Fetch-boundary mock — mockFetch assigned inside factory to bypass hoisting
+// Fetch-boundary mock — mockFetch assigned inside factory to bypass hoisting.
+// lib/api-client is mocked at the transport boundary so the real Hono RPC
+// client routes through our routed mock fetch, keeping React Query, assertOk,
+// and all hooks real.
 // ---------------------------------------------------------------------------
 
 let mockFetch: RoutedMockFetch;
 
-jest.mock('../../../lib/api-client', () => {
-  const {
-    createRoutedMockFetch,
-    mockApiClientFactory,
-  } = require('../../../test-utils/mock-api-routes');
-  mockFetch = createRoutedMockFetch();
-  return mockApiClientFactory(mockFetch);
-});
-
-jest.mock('../../../lib/profile', () => ({
-  useProfile: () => ({
-    activeProfile: {
-      id: 'test-profile-id',
-      accountId: 'test-account-id',
-      displayName: 'Test Learner',
-      isOwner: true,
-      hasPremiumLlm: false,
-      conversationLanguage: 'en',
-      pronouns: null,
-      consentStatus: null,
-    },
-  }),
-  ProfileContext: {
-    Provider: ({ children }: { children: React.ReactNode }) => children,
+jest.mock(
+  '../../../lib/api-client', // gc1-allow: transport-boundary — routed mock fetch drives real hooks
+  () => {
+    const {
+      createRoutedMockFetch,
+      mockApiClientFactory,
+    } = require('../../../test-utils/mock-api-routes');
+    mockFetch = createRoutedMockFetch();
+    return mockApiClientFactory(mockFetch);
   },
-}));
+);
 
 // ---------------------------------------------------------------------------
 // External / rendering mocks (kept — not API hooks)
 // ---------------------------------------------------------------------------
 
-jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
-}));
+jest.mock(
+  'react-native-safe-area-context', // gc1-allow: native-boundary
+  () => ({
+    useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+  }),
+);
 
-jest.mock('../../../components/common', () => ({
-  BookPageFlipAnimation: () => null,
-  MagicPenAnimation: () => null,
-}));
+jest.mock(
+  '../../../components/common', // gc1-allow: native-boundary — animation components use react-native-reanimated unavailable in Jest
+  () => ({
+    BookPageFlipAnimation: () => null,
+    MagicPenAnimation: () => null,
+  }),
+);
 
 const mockPush = jest.fn();
 const mockBack = jest.fn();
 const mockReplace = jest.fn();
 const mockCanGoBack = jest.fn();
 
-jest.mock('expo-router', () => ({
-  useLocalSearchParams: () => ({ subjectId: 'sub-1' }),
-  useRouter: () => ({
-    push: mockPush,
-    back: mockBack,
-    replace: mockReplace,
-    canGoBack: mockCanGoBack,
+jest.mock(
+  'expo-router', // gc1-allow: native-boundary
+  () => ({
+    useLocalSearchParams: () => ({ subjectId: 'sub-1' }),
+    useRouter: () => ({
+      push: mockPush,
+      back: mockBack,
+      replace: mockReplace,
+      canGoBack: mockCanGoBack,
+    }),
   }),
-}));
+);
 
 // ---------------------------------------------------------------------------
 // Default API route responses
@@ -115,79 +111,73 @@ function resetRoutes() {
 }
 
 // ---------------------------------------------------------------------------
-// QueryClient wrapper
-// ---------------------------------------------------------------------------
-
-function createWrapper() {
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false, gcTime: 0 } },
-  });
-  function Wrapper({ children }: { children: React.ReactNode }) {
-    return (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-    );
-  }
-  return { queryClient, Wrapper };
-}
-
-// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
-describe('PickBookScreen', () => {
-  let TestWrapper: React.ComponentType<{ children: React.ReactNode }>;
+// Helper: render with real ProfileContext (soloLearner) + routed mock fetch
+// already wired into lib/api-client mock above.
+function renderPickBook() {
+  return renderScreen(<PickBookScreen />, {
+    profile: 'soloLearner',
+    routedFetch: mockFetch,
+    installGlobalFetch: false,
+  });
+}
 
+describe('PickBookScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockCanGoBack.mockReturnValue(true);
     resetRoutes();
-    const { Wrapper } = createWrapper();
-    TestWrapper = Wrapper;
+  });
+
+  afterEach(() => {
+    cleanupScreen();
   });
 
   it('renders suggestion cards', async () => {
-    const { getByText } = render(<PickBookScreen />, { wrapper: TestWrapper });
+    const { result } = renderPickBook();
 
     await waitFor(
       () => {
-        getByText('Europe');
+        result.getByText('Europe');
       },
       { timeout: 8_000 },
     );
-    getByText('Asia');
+    result.getByText('Asia');
   });
 
   it('renders subject name as heading', async () => {
-    const { getByText } = render(<PickBookScreen />, { wrapper: TestWrapper });
+    const { result } = renderPickBook();
 
     await waitFor(() => {
-      getByText('Geography');
+      result.getByText('Geography');
     });
   });
 
   it('renders "Something else..." option', async () => {
-    const { getByText } = render(<PickBookScreen />, { wrapper: TestWrapper });
+    const { result } = renderPickBook();
 
     await waitFor(() => {
-      getByText('Something else...');
+      result.getByText('Something else...');
     });
   });
 
   it('renders "Pick what interests you" subtitle', async () => {
-    const { getByText } = render(<PickBookScreen />, { wrapper: TestWrapper });
+    const { result } = renderPickBook();
 
     await waitFor(() => {
-      getByText('Pick what interests you');
+      result.getByText('Pick what interests you');
     });
   });
 
   it('navigates to book on successful filing', async () => {
-    const { getByText } = render(<PickBookScreen />, { wrapper: TestWrapper });
+    const { result } = renderPickBook();
 
     await waitFor(() => {
-      getByText('Europe');
+      result.getByText('Europe');
     });
-    fireEvent.press(getByText('Europe'));
+    fireEvent.press(result.getByText('Europe'));
 
     await waitFor(() => {
       expect(mockPush).toHaveBeenCalledWith(
@@ -203,17 +193,17 @@ describe('PickBookScreen', () => {
   // shelf stack with the shelf-list ancestor BEFORE pushing the book leaf,
   // so back from the book screen lands on shelf — not Tabs Home.
   it('seeds the shelf ancestor before pushing the book leaf on suggestion success', async () => {
-    const { getByText } = render(<PickBookScreen />, { wrapper: TestWrapper });
+    const { result } = renderPickBook();
 
     // 3000ms allows for the 800ms useStickyLoading hold plus React re-render
     // overhead that accumulates after prior tests in this file.
     await waitFor(
       () => {
-        getByText('Europe');
+        result.getByText('Europe');
       },
       { timeout: 3000 },
     );
-    fireEvent.press(getByText('Europe'));
+    fireEvent.press(result.getByText('Europe'));
 
     await waitFor(() => {
       expect(mockPush).toHaveBeenCalledTimes(2);
@@ -240,19 +230,17 @@ describe('PickBookScreen', () => {
       isNew: { shelf: false, book: true, chapter: true },
     });
 
-    const { getByText, getByTestId } = render(<PickBookScreen />, {
-      wrapper: TestWrapper,
-    });
+    const { result } = renderPickBook();
 
     await waitFor(() => {
-      getByText('Something else...');
+      result.getByText('Something else...');
     });
-    fireEvent.press(getByText('Something else...'));
+    fireEvent.press(result.getByText('Something else...'));
     fireEvent.changeText(
-      getByTestId('pick-book-custom-input'),
+      result.getByTestId('pick-book-custom-input'),
       'My custom book',
     );
-    fireEvent.press(getByTestId('pick-book-custom-submit'));
+    fireEvent.press(result.getByTestId('pick-book-custom-submit'));
 
     await waitFor(() => {
       expect(mockPush).toHaveBeenCalledTimes(2);
@@ -277,12 +265,12 @@ describe('PickBookScreen', () => {
       ),
     );
 
-    const { getByText } = render(<PickBookScreen />, { wrapper: TestWrapper });
+    const { result } = renderPickBook();
 
     await waitFor(() => {
-      getByText('Europe');
+      result.getByText('Europe');
     });
-    fireEvent.press(getByText('Europe'));
+    fireEvent.press(result.getByText('Europe'));
 
     await waitFor(() => {
       expect(alertSpy).toHaveBeenCalledWith(
@@ -297,15 +285,13 @@ describe('PickBookScreen', () => {
   });
 
   it('shows custom input when "Something else..." is tapped', async () => {
-    const { getByText, getByTestId } = render(<PickBookScreen />, {
-      wrapper: TestWrapper,
-    });
+    const { result } = renderPickBook();
 
     await waitFor(() => {
-      getByText('Something else...');
+      result.getByText('Something else...');
     });
-    fireEvent.press(getByText('Something else...'));
-    getByTestId('pick-book-custom-input');
+    fireEvent.press(result.getByText('Something else...'));
+    result.getByTestId('pick-book-custom-input');
   });
 
   it('shows loading spinner when suggestions are loading', async () => {
@@ -315,10 +301,8 @@ describe('PickBookScreen', () => {
     });
     mockFetch.setRoute('/book-suggestions', () => suggestionsPromise);
 
-    const { getByTestId } = render(<PickBookScreen />, {
-      wrapper: TestWrapper,
-    });
-    getByTestId('pick-book-loading');
+    const { result } = renderPickBook();
+    result.getByTestId('pick-book-loading');
 
     resolveResponse(
       new Response(JSON.stringify(DEFAULT_SUGGESTIONS), {
@@ -335,20 +319,15 @@ describe('PickBookScreen', () => {
       ),
     );
 
-    const { getByTestId, getByText, queryByTestId } = render(
-      <PickBookScreen />,
-      {
-        wrapper: TestWrapper,
-      },
-    );
+    const { result } = renderPickBook();
 
     await waitFor(() => {
-      getByTestId('pick-book-suggestions-inline-error');
+      result.getByTestId('pick-book-suggestions-inline-error');
     });
-    expect(queryByTestId('pick-book-error')).toBeNull();
-    getByText('Suggestions did not load');
-    getByTestId('pick-book-inline-retry');
-    getByTestId('pick-book-custom-input');
+    expect(result.queryByTestId('pick-book-error')).toBeNull();
+    result.getByText('Suggestions did not load');
+    result.getByTestId('pick-book-inline-retry');
+    result.getByTestId('pick-book-custom-input');
   });
 
   it('keeps blocking error state for not-found suggestions errors', async () => {
@@ -360,15 +339,13 @@ describe('PickBookScreen', () => {
       ),
     );
 
-    const { getByTestId, getByText } = render(<PickBookScreen />, {
-      wrapper: TestWrapper,
-    });
+    const { result } = renderPickBook();
 
     await waitFor(() => {
-      getByTestId('pick-book-error');
+      result.getByTestId('pick-book-error');
     });
-    getByText('Go Back');
-    getByTestId('pick-book-back-button');
+    result.getByText('Go Back');
+    result.getByTestId('pick-book-back-button');
   });
 
   it('auto-opens custom input when suggestions are empty', async () => {
@@ -377,30 +354,26 @@ describe('PickBookScreen', () => {
       curriculumBookCount: 0,
     });
 
-    const { getByTestId } = render(<PickBookScreen />, {
-      wrapper: TestWrapper,
-    });
+    const { result } = renderPickBook();
 
     // useStickyLoading holds the loading view for 800ms after the query resolves.
     // The full-suite environment adds ~200ms of overhead; 3s gives safe headroom.
     await waitFor(
       () => {
         // BUG-318: When suggestions load empty, custom input auto-opens
-        getByTestId('pick-book-custom-input');
+        result.getByTestId('pick-book-custom-input');
       },
       { timeout: 3000 },
     );
   });
 
   it('back button replaces shelf without relying on back history', async () => {
-    const { getByTestId } = render(<PickBookScreen />, {
-      wrapper: TestWrapper,
-    });
+    const { result } = renderPickBook();
 
     await waitFor(() => {
-      getByTestId('pick-book-back');
+      result.getByTestId('pick-book-back');
     });
-    fireEvent.press(getByTestId('pick-book-back'));
+    fireEvent.press(result.getByTestId('pick-book-back'));
 
     expect(mockReplace).toHaveBeenCalledWith({
       pathname: '/(app)/shelf/[subjectId]',
@@ -414,14 +387,12 @@ describe('PickBookScreen', () => {
     it('renders fallback heading when subject lookup misses', async () => {
       mockFetch.setRoute('/subjects', { subjects: [] });
 
-      const { getByText, getByTestId } = render(<PickBookScreen />, {
-        wrapper: TestWrapper,
-      });
+      const { result } = renderPickBook();
 
       await waitFor(() => {
-        getByTestId('pick-book-screen');
+        result.getByTestId('pick-book-screen');
       });
-      getByText('Subject');
+      result.getByText('Subject');
     });
 
     it('still allows filing a suggestion when subject is undefined', async () => {
@@ -437,14 +408,12 @@ describe('PickBookScreen', () => {
         isNew: { shelf: false, book: true, chapter: true },
       });
 
-      const { getByText } = render(<PickBookScreen />, {
-        wrapper: TestWrapper,
-      });
+      const { result } = renderPickBook();
 
       await waitFor(() => {
-        getByText('Europe');
+        result.getByText('Europe');
       });
-      fireEvent.press(getByText('Europe'));
+      fireEvent.press(result.getByText('Europe'));
 
       await waitFor(() => {
         expect(mockPush).toHaveBeenCalledWith(
@@ -486,15 +455,17 @@ describe('PickBookScreen', () => {
         curriculumBookCount: 0,
       });
 
-      const { getByTestId, queryByTestId } = render(<PickBookScreen />, {
-        wrapper: TestWrapper,
-      });
+      const { result } = renderPickBook();
 
       await waitFor(() => {
-        getByTestId('pick-book-suggestion-grid-flat');
+        result.getByTestId('pick-book-suggestion-grid-flat');
       });
-      expect(queryByTestId('pick-book-suggestion-section-related')).toBeNull();
-      expect(queryByTestId('pick-book-suggestion-section-explore')).toBeNull();
+      expect(
+        result.queryByTestId('pick-book-suggestion-section-related'),
+      ).toBeNull();
+      expect(
+        result.queryByTestId('pick-book-suggestion-section-explore'),
+      ).toBeNull();
     });
 
     it('renders related + explore sections when hasAnyBook = true', async () => {
@@ -522,15 +493,13 @@ describe('PickBookScreen', () => {
         curriculumBookCount: 3,
       });
 
-      const { getByTestId, queryByTestId } = render(<PickBookScreen />, {
-        wrapper: TestWrapper,
-      });
+      const { result } = renderPickBook();
 
       await waitFor(() => {
-        getByTestId('pick-book-suggestion-section-related');
+        result.getByTestId('pick-book-suggestion-section-related');
       });
-      expect(getByTestId('pick-book-suggestion-section-explore'));
-      expect(queryByTestId('pick-book-suggestion-grid-flat')).toBeNull();
+      expect(result.getByTestId('pick-book-suggestion-section-explore'));
+      expect(result.queryByTestId('pick-book-suggestion-grid-flat')).toBeNull();
     });
 
     it('renders legacy null-category section under headers when hasAnyBook = true', async () => {
@@ -558,15 +527,15 @@ describe('PickBookScreen', () => {
         curriculumBookCount: 2,
       });
 
-      const { getByTestId, queryByTestId } = render(<PickBookScreen />, {
-        wrapper: TestWrapper,
-      });
+      const { result } = renderPickBook();
 
       await waitFor(() => {
-        getByTestId('pick-book-suggestion-section-explore');
+        result.getByTestId('pick-book-suggestion-section-explore');
       });
-      expect(getByTestId('pick-book-suggestion-section-legacy'));
-      expect(queryByTestId('pick-book-suggestion-section-related')).toBeNull();
+      expect(result.getByTestId('pick-book-suggestion-section-legacy'));
+      expect(
+        result.queryByTestId('pick-book-suggestion-section-related'),
+      ).toBeNull();
     });
 
     it('suppresses section header when its category is empty', async () => {
@@ -585,14 +554,14 @@ describe('PickBookScreen', () => {
         curriculumBookCount: 2,
       });
 
-      const { queryByTestId, getByTestId } = render(<PickBookScreen />, {
-        wrapper: TestWrapper,
-      });
+      const { result } = renderPickBook();
 
       await waitFor(() => {
-        getByTestId('pick-book-suggestion-section-related');
+        result.getByTestId('pick-book-suggestion-section-related');
       });
-      expect(queryByTestId('pick-book-suggestion-section-explore')).toBeNull();
+      expect(
+        result.queryByTestId('pick-book-suggestion-section-explore'),
+      ).toBeNull();
     });
   });
 
@@ -612,23 +581,21 @@ describe('PickBookScreen', () => {
         return filingPromise;
       });
 
-      const { getByText, getByTestId, rerender } = render(<PickBookScreen />, {
-        wrapper: TestWrapper,
-      });
+      const { result } = renderPickBook();
 
       await waitFor(() => {
-        getByText('Europe');
+        result.getByText('Europe');
       });
 
       // Trigger handlePickSuggestion — kicks off filing
-      fireEvent.press(getByText('Europe'));
-      rerender(<PickBookScreen />);
+      fireEvent.press(result.getByText('Europe'));
+      result.rerender(<PickBookScreen />);
 
       // Force the showSkip timer to fire (8s) so the Skip button renders.
       jest.advanceTimersByTime(8_000);
-      rerender(<PickBookScreen />);
+      result.rerender(<PickBookScreen />);
 
-      const skipBtn = getByTestId('pick-book-filing-skip');
+      const skipBtn = result.getByTestId('pick-book-filing-skip');
       fireEvent.press(skipBtn);
 
       // Skip routed user to the shelf.

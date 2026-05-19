@@ -1000,12 +1000,12 @@ export function buildSystemPrompt(
   }
 
   // EVALUATE verification type — Devil's Advocate (FR128-133)
-  // TODO: EVAL-MIGRATION — This prompt instructs the LLM to embed a JSON
-  // assessment block in free-text, which contradicts the envelope contract
-  // (CLAUDE.md → "LLM Response Envelope"). Migrate to a dedicated envelope
-  // signal (e.g. `signals.evaluate_assessment`) and parse via parseEnvelope.
+  // The assessment flows through the structured envelope as
+  // `signals.evaluate_assessment` (see packages/schemas/src/llm-envelope.ts).
+  // Nothing about the assessment may appear in `reply` — that field is the
+  // learner-visible prose only.
   // Note (2026-05-06): includes a TRANSITION PHRASE block added for the
-  // learning-path-clarity-pass spec; migrate it with the rest of this section.
+  // learning-path-clarity-pass spec.
   if (
     !isReviewMode &&
     !isRecitation &&
@@ -1026,20 +1026,19 @@ export function buildSystemPrompt(
         'The student must identify and explain the specific error.\n' +
         `Difficulty rung ${rung}/4: ${rungDescription}\n` +
         'After the student responds, assess whether they correctly identified the flaw.\n' +
-        'Output TWO sections:\n' +
-        '1. Your conversational response (visible to student)\n' +
-        '2. A JSON assessment block on a new line:\n' +
-        '{"challengePassed": true/false, "flawIdentified": "description of what they found", "quality": 0-5}',
+        'Emit the assessment ONLY via the response envelope at signals.evaluate_assessment. Do NOT embed JSON, code fences, or rubric numbers in the visible reply. Schema:\n' +
+        '  signals.evaluate_assessment: { "challenge_passed": true|false, "flaw_identified": "short description of what they found (omit when false)", "quality": 0-5 }\n' +
+        'The `reply` field contains ONLY the prose the learner sees (your reaction, explanation, or follow-up question).',
     );
   }
 
   // TEACH_BACK verification type — Feynman Technique (FR138-143)
-  // TODO: EVAL-MIGRATION — Same as EVALUATE above: the embedded JSON
-  // assessment block must be migrated to an envelope signal (e.g.
-  // `signals.teach_back_assessment`). Until then, the caller must parse
-  // the raw response text for the trailing JSON block.
+  // The rubric flows through the structured envelope as
+  // `signals.teach_back_assessment` (see packages/schemas/src/llm-envelope.ts).
+  // Nothing about the rubric may appear in `reply` — that field is the
+  // learner-visible prose only.
   // Note (2026-05-06): includes a TRANSITION PHRASE block added for the
-  // learning-path-clarity-pass spec; migrate it with the rest of this section.
+  // learning-path-clarity-pass spec.
   if (
     !isReviewMode &&
     !isRecitation &&
@@ -1056,10 +1055,9 @@ export function buildSystemPrompt(
         'The learner is the teacher — they must explain the concept to you.\n' +
         'Ask naive follow-up questions. Probe for gaps in the explanation.\n' +
         'Never correct the learner directly — they are the teacher.\n' +
-        'Output TWO sections:\n' +
-        '1. Your conversational follow-up question (visible to student)\n' +
-        '2. A JSON assessment block on a new line:\n' +
-        '{"completeness": 0-5, "accuracy": 0-5, "clarity": 0-5, "overallQuality": 0-5, "weakestArea": "completeness"|"accuracy"|"clarity", "gapIdentified": "description or null"}',
+        'Emit the rubric ONLY via the response envelope at signals.teach_back_assessment. Do NOT embed JSON, code fences, or rubric numbers in the visible reply. Schema:\n' +
+        '  signals.teach_back_assessment: { "completeness": 0-5, "accuracy": 0-5, "clarity": 0-5, "overall_quality": 0-5, "weakest_area": "completeness"|"accuracy"|"clarity", "gap_identified": "short description or null" }\n' +
+        'The `reply` field contains ONLY your naive follow-up question or reaction (the prose the learner sees).',
     );
   }
 

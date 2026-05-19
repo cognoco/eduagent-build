@@ -236,8 +236,8 @@ export const filingRoutes = new Hono<FilingRouteEnv>()
     // core-send: filing.completed — the session-completed chain waits 60s for
     // this event via waitForEvent. Silent dispatch loss would hang that chain
     // until timeout and leave the user with a broken post-filing flow.
-    await inngest
-      .send({
+    try {
+      await inngest.send({
         name: 'app/filing.completed',
         data: {
           bookId: result.bookId,
@@ -246,13 +246,29 @@ export const filingRoutes = new Hono<FilingRouteEnv>()
           sessionId: body.sessionId,
           timestamp: new Date().toISOString(),
         },
-      })
-      .catch((err) => {
-        captureException(err, {
-          profileId,
-          extra: { event: 'app/filing.completed', bookId: result.bookId },
-        });
       });
+    } catch (err) {
+      // Capture context BEFORE rethrowing so Sentry has the session/profile
+      // attached. The global onError handler will also see the throw and
+      // return a 5xx to the client so it retries — exactly what we want for
+      // a CORE event whose silent drop would hang the session-completed
+      // waitForEvent chain (streaks/XP/memory extraction).
+      captureException(err, {
+        profileId,
+        extra: {
+          event: 'app/filing.completed',
+          bookId: result.bookId,
+          sessionId: body.sessionId,
+        },
+      });
+      logger.error('[filing] CORE app/filing.completed dispatch failed', {
+        profileId,
+        sessionId: body.sessionId,
+        bookId: result.bookId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      throw err;
+    }
 
     return c.json(
       filingResultSchema.parse(

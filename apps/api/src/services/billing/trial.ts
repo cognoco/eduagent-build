@@ -25,7 +25,7 @@ export type { SubscriptionRow };
  */
 export async function expireTrialSubscription(
   db: Database,
-  subscriptionId: string
+  subscriptionId: string,
 ): Promise<void> {
   await db
     .update(subscriptions)
@@ -46,7 +46,7 @@ export async function downgradeQuotaPool(
   db: Database,
   subscriptionId: string,
   monthlyLimit: number,
-  dailyLimit: number | null = null
+  dailyLimit: number | null = null,
 ): Promise<void> {
   // Only update pools that haven't already been downgraded to this limit.
   // This prevents retries from resetting usage counters for already-transitioned subscriptions.
@@ -70,10 +70,17 @@ export async function downgradeQuotaPool(
 /**
  * Resets the daily question counter for ALL quota pools.
  * Called by the daily Inngest cron at 01:00 UTC.
+ *
+ * [CR-2026-05-19-C7] Accepts a `db | tx` so quota-reset can wrap both this
+ * call and `resetExpiredQuotaCycles` in a single ACID transaction. Running
+ * the two helpers in separate connections caused the daily reset row count
+ * to be undercounted whenever a cycle boundary coincided with the cron tick:
+ * if `resetExpiredQuotaCycles` raced ahead it zeroed `used_today` first, and
+ * `resetDailyQuotas`' `usedToday > 0` filter then missed those rows.
  */
 export async function resetDailyQuotas(
   db: Database,
-  now: Date
+  now: Date,
 ): Promise<number> {
   const result = await db
     .update(quotaPools)
@@ -91,10 +98,15 @@ export async function resetDailyQuotas(
  * Finds all quota pools whose billing cycle has elapsed and resets them.
  * For each pool: resets usedThisMonth to 0, updates monthlyLimit to match
  * the subscription tier, and advances cycleResetAt by one month.
+ *
+ * [CR-2026-05-19-C7] See `resetDailyQuotas` — the caller MUST invoke these
+ * two helpers inside the same `db.transaction()` callback so they observe a
+ * consistent snapshot of `used_today` (and so a retry of one does not
+ * double-reset state the other already committed).
  */
 export async function resetExpiredQuotaCycles(
   db: Database,
-  now: Date
+  now: Date,
 ): Promise<number> {
   const free = getTierConfig('free');
   const plus = getTierConfig('plus');
@@ -137,12 +149,12 @@ export async function resetExpiredQuotaCycles(
  */
 export async function findExpiredTrials(
   db: Database,
-  now: Date
+  now: Date,
 ): Promise<SubscriptionRow[]> {
   const rows = await db.query.subscriptions.findMany({
     where: and(
       eq(subscriptions.status, 'trial'),
-      lte(subscriptions.trialEndsAt, now)
+      lte(subscriptions.trialEndsAt, now),
     ),
   });
   return rows.map(mapSubscriptionRow);
@@ -156,13 +168,13 @@ export async function findSubscriptionsByTrialDateRange(
   db: Database,
   status: SubscriptionStatus,
   rangeStart: Date,
-  rangeEnd: Date
+  rangeEnd: Date,
 ): Promise<SubscriptionRow[]> {
   const rows = await db.query.subscriptions.findMany({
     where: and(
       eq(subscriptions.status, status),
       gte(subscriptions.trialEndsAt, rangeStart),
-      lte(subscriptions.trialEndsAt, rangeEnd)
+      lte(subscriptions.trialEndsAt, rangeEnd),
     ),
   });
   return rows.map(mapSubscriptionRow);
@@ -181,7 +193,7 @@ export async function findSubscriptionsByTrialDateRange(
 export async function transitionToExtendedTrial(
   db: Database,
   subscriptionId: string,
-  extendedMonthlyQuota: number
+  extendedMonthlyQuota: number,
 ): Promise<void> {
   await db
     .update(subscriptions)
@@ -213,15 +225,15 @@ export async function transitionToExtendedTrial(
 export async function findExpiredTrialsByDaysSinceEnd(
   db: Database,
   now: Date,
-  daysAgo: number
+  daysAgo: number,
 ): Promise<SubscriptionRow[]> {
   const targetDate = new Date(now);
   targetDate.setDate(targetDate.getDate() - daysAgo);
   const dayStart = new Date(
-    targetDate.toISOString().slice(0, 10) + 'T00:00:00.000Z'
+    targetDate.toISOString().slice(0, 10) + 'T00:00:00.000Z',
   );
   const dayEnd = new Date(
-    targetDate.toISOString().slice(0, 10) + 'T23:59:59.999Z'
+    targetDate.toISOString().slice(0, 10) + 'T23:59:59.999Z',
   );
 
   return findSubscriptionsByTrialDateRange(db, 'expired', dayStart, dayEnd);

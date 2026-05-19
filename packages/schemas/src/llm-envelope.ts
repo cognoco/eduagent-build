@@ -66,6 +66,68 @@ const privateSourcesSchema = z.preprocess(
     .optional(),
 );
 
+// ---------------------------------------------------------------------------
+// EVALUATE assessment signal — Devil's Advocate verification result (FR128-133)
+// Replaces the legacy free-text trailing JSON block that violated the envelope
+// contract. The LLM emits this inside signals; the learner-visible prose lives
+// in `reply` only.
+// ---------------------------------------------------------------------------
+const evaluateAssessmentSignalSchema = z.preprocess(
+  optionalObjectInput,
+  z
+    .object({
+      challenge_passed: z.preprocess(nullToUndefined, z.boolean()),
+      flaw_identified: z.preprocess((value) => {
+        if (typeof value !== 'string') return undefined;
+        const trimmed = value.trim();
+        return trimmed.length > 0 ? trimmed : undefined;
+      }, z.string().max(1000).optional()),
+      quality: z.preprocess((value) => {
+        if (typeof value !== 'number') return undefined;
+        return Math.max(0, Math.min(5, Math.round(value)));
+      }, z.number().int().min(0).max(5).optional()),
+    })
+    .optional(),
+);
+
+// ---------------------------------------------------------------------------
+// TEACH_BACK assessment signal — Feynman technique rubric (FR138-143)
+// Replaces the legacy free-text trailing JSON block that violated the envelope
+// contract.
+// ---------------------------------------------------------------------------
+const teachBackWeakestAreaSchema = z.preprocess(
+  (value) => {
+    if (typeof value !== 'string') return undefined;
+    const valid = ['completeness', 'accuracy', 'clarity'];
+    return valid.includes(value) ? value : undefined;
+  },
+  z.enum(['completeness', 'accuracy', 'clarity']).optional(),
+);
+
+const teachBackScoreSchema = z.preprocess((value) => {
+  if (typeof value !== 'number') return undefined;
+  return Math.max(0, Math.min(5, Math.round(value)));
+}, z.number().int().min(0).max(5).optional());
+
+const teachBackAssessmentSignalSchema = z.preprocess(
+  optionalObjectInput,
+  z
+    .object({
+      completeness: teachBackScoreSchema,
+      accuracy: teachBackScoreSchema,
+      clarity: teachBackScoreSchema,
+      overall_quality: teachBackScoreSchema,
+      weakest_area: teachBackWeakestAreaSchema,
+      gap_identified: z.preprocess((value) => {
+        if (value === null) return null;
+        if (typeof value !== 'string') return undefined;
+        const trimmed = value.trim();
+        return trimmed.length > 0 ? trimmed : null;
+      }, z.string().max(1000).nullable().optional()),
+    })
+    .optional(),
+);
+
 const signalsSchema = z.preprocess(
   optionalObjectInput,
   z
@@ -83,6 +145,18 @@ const signalsSchema = z.preprocess(
         nullToUndefined,
         z.number().min(0).max(1).optional(),
       ),
+      /**
+       * EVALUATE (Devil's Advocate) verification result (FR128-133).
+       * Present only when the AI turn was an EVALUATE assessment turn.
+       * Replaces the legacy free-text trailing JSON block.
+       */
+      evaluate_assessment: evaluateAssessmentSignalSchema,
+      /**
+       * TEACH_BACK (Feynman) rubric assessment (FR138-143).
+       * Present only when the AI turn was a TEACH_BACK assessment turn.
+       * Replaces the legacy free-text trailing JSON block.
+       */
+      teach_back_assessment: teachBackAssessmentSignalSchema,
     })
     .optional(),
 );

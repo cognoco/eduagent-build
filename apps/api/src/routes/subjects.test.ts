@@ -455,6 +455,26 @@ describe('POST /v1/subjects/resolve', () => {
 
     expect(res.status).toBe(400);
   });
+
+  it('[BREAK / BUG-93] returns 400 when profileId is absent (requireProfileId guard)', async () => {
+    const app = new Hono<TestEnv>();
+    app.use('*', async (c, next) => {
+      c.set('db', {} as Database);
+      c.set('profileId', undefined);
+      await next();
+    });
+    app.route('/v1', subjectRoutes);
+
+    const res = await app.request('/v1/subjects/resolve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rawInput: 'chem' }),
+    });
+
+    // requireProfileId must reject before the resolver is called
+    expect(res.status).toBe(400);
+    expect(resolveSubjectNameMock).not.toHaveBeenCalled();
+  });
 });
 
 // ---------------------------------------------------------------------------

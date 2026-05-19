@@ -274,6 +274,138 @@ describe('llmResponseEnvelopeSchema', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// EVALUATE / TEACH_BACK assessment signals — added to replace the legacy
+// "embed a JSON block in free-text reply" antipattern (CR-2026-05-19-C5).
+// ---------------------------------------------------------------------------
+
+describe('signals.evaluate_assessment', () => {
+  it('accepts a complete evaluate_assessment payload', () => {
+    const parsed = llmResponseEnvelopeSchema.parse({
+      reply: 'Nice catch — the cause and effect were swapped.',
+      signals: {
+        evaluate_assessment: {
+          challenge_passed: true,
+          flaw_identified: 'inverted cause-effect',
+          quality: 4,
+        },
+      },
+    });
+    expect(parsed.signals?.evaluate_assessment).toEqual({
+      challenge_passed: true,
+      flaw_identified: 'inverted cause-effect',
+      quality: 4,
+    });
+  });
+
+  it('clamps quality to [0,5] integer', () => {
+    const parsed = llmResponseEnvelopeSchema.parse({
+      reply: 'ok',
+      signals: {
+        evaluate_assessment: {
+          challenge_passed: false,
+          quality: 99,
+        },
+      },
+    });
+    expect(parsed.signals?.evaluate_assessment?.quality).toBe(5);
+  });
+
+  it('coerces evaluate_assessment to undefined when non-object passed', () => {
+    const parsed = llmResponseEnvelopeSchema.parse({
+      reply: 'ok',
+      signals: {
+        evaluate_assessment: null,
+      },
+    });
+    expect(parsed.signals?.evaluate_assessment).toBeUndefined();
+  });
+
+  it('rejects evaluate_assessment without challenge_passed (required field)', () => {
+    const result = llmResponseEnvelopeSchema.safeParse({
+      reply: 'ok',
+      signals: {
+        evaluate_assessment: {
+          quality: 4,
+        },
+      },
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('signals.teach_back_assessment', () => {
+  it('accepts a complete teach_back_assessment payload', () => {
+    const parsed = llmResponseEnvelopeSchema.parse({
+      reply: 'Can you tell me more about the light reactions?',
+      signals: {
+        teach_back_assessment: {
+          completeness: 4,
+          accuracy: 3,
+          clarity: 5,
+          overall_quality: 4,
+          weakest_area: 'accuracy',
+          gap_identified: 'missed energy conservation',
+        },
+      },
+    });
+    expect(parsed.signals?.teach_back_assessment).toEqual({
+      completeness: 4,
+      accuracy: 3,
+      clarity: 5,
+      overall_quality: 4,
+      weakest_area: 'accuracy',
+      gap_identified: 'missed energy conservation',
+    });
+  });
+
+  it('clamps each rubric score to [0,5] integer', () => {
+    const parsed = llmResponseEnvelopeSchema.parse({
+      reply: 'ok',
+      signals: {
+        teach_back_assessment: {
+          completeness: 99,
+          accuracy: -3,
+          clarity: 3.7,
+          overall_quality: 4,
+        },
+      },
+    });
+    expect(parsed.signals?.teach_back_assessment?.completeness).toBe(5);
+    expect(parsed.signals?.teach_back_assessment?.accuracy).toBe(0);
+    // 3.7 rounds to 4
+    expect(parsed.signals?.teach_back_assessment?.clarity).toBe(4);
+  });
+
+  it('coerces invalid weakest_area to undefined', () => {
+    const parsed = llmResponseEnvelopeSchema.parse({
+      reply: 'ok',
+      signals: {
+        teach_back_assessment: {
+          completeness: 4,
+          accuracy: 4,
+          weakest_area: 'made_up_area',
+        },
+      },
+    });
+    expect(parsed.signals?.teach_back_assessment?.weakest_area).toBeUndefined();
+  });
+
+  it('accepts null gap_identified (LLM signalling "no gap")', () => {
+    const parsed = llmResponseEnvelopeSchema.parse({
+      reply: 'ok',
+      signals: {
+        teach_back_assessment: {
+          completeness: 5,
+          accuracy: 5,
+          gap_identified: null,
+        },
+      },
+    });
+    expect(parsed.signals?.teach_back_assessment?.gap_identified).toBeNull();
+  });
+});
+
 describe('normaliseSignals', () => {
   it('fills defaults for empty signals object', () => {
     const result: NormalisedEnvelopeSignals = normaliseSignals({});

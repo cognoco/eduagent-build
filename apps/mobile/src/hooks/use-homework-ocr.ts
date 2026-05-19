@@ -28,10 +28,18 @@ function isTextRecognitionAvailable(): boolean {
 
 export type OcrStatus = 'idle' | 'processing' | 'done' | 'error';
 
+export type OcrErrorCode =
+  | 'NOT_HOMEWORK'
+  | 'LOW_QUALITY'
+  | 'NO_TEXT'
+  | 'ML_KIT_UNAVAILABLE'
+  | 'CACHE_FAILED';
+
 export interface UseHomeworkOcrResult {
   text: string | null;
   status: OcrStatus;
   error: string | null;
+  errorCode: OcrErrorCode | undefined;
   failCount: number;
   process: (uri: string) => Promise<void>;
   retry: () => Promise<void>;
@@ -247,6 +255,9 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
   const [text, setText] = useState<string | null>(null);
   const [status, setStatus] = useState<OcrStatus>('idle');
   const [error, setError] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<OcrErrorCode | undefined>(
+    undefined,
+  );
   const [failCount, setFailCount] = useState(0);
   const currentUriRef = useRef<string | null>(null);
   const cancelRef = useRef<AbortController | null>(null);
@@ -263,10 +274,11 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
     };
   }, []);
 
-  const finishAsError = useCallback((message: string) => {
+  const finishAsError = useCallback((message: string, code: OcrErrorCode) => {
     if (!mountedRef.current) return;
     setFailCount((prev) => prev + 1);
     setError(message);
+    setErrorCode(code);
     setStatus('error');
   }, []);
 
@@ -276,6 +288,7 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
     if (!mountedRef.current) return;
     setStatus('idle');
     setError(null);
+    setErrorCode(undefined);
   }, []);
 
   const resolveSuccess = useCallback(
@@ -344,6 +357,7 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
 
       setStatus('processing');
       setError(null);
+      setErrorCode(undefined);
       if (!isRetry) {
         setText(null);
         setFailCount(0);
@@ -367,13 +381,14 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
           return;
         }
         if (serverResult?.text) {
-          finishAsError(NON_HOMEWORK_ERROR_MESSAGE);
+          finishAsError(NON_HOMEWORK_ERROR_MESSAGE, 'NOT_HOMEWORK');
           return;
         }
         finishAsError(
           Platform.OS === 'android'
             ? 'Text recognition is not available in this build. A new app build is required.'
             : 'Text recognition is not available. Please rebuild the app.',
+          'ML_KIT_UNAVAILABLE',
         );
         return;
       }
@@ -397,11 +412,12 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
               return;
             }
             if (serverResult?.text) {
-              finishAsError(NON_HOMEWORK_ERROR_MESSAGE);
+              finishAsError(NON_HOMEWORK_ERROR_MESSAGE, 'NOT_HOMEWORK');
               return;
             }
             finishAsError(
               "We couldn't read that clearly. Try taking the photo again with better lighting.",
+              'LOW_QUALITY',
             );
             return;
           }
@@ -420,10 +436,10 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
             return;
           }
           if (serverResult?.text) {
-            finishAsError(NON_HOMEWORK_ERROR_MESSAGE);
+            finishAsError(NON_HOMEWORK_ERROR_MESSAGE, 'NOT_HOMEWORK');
             return;
           }
-          finishAsError(NON_HOMEWORK_ERROR_MESSAGE);
+          finishAsError(NON_HOMEWORK_ERROR_MESSAGE, 'NOT_HOMEWORK');
           return;
         }
         const serverResult = await tryServerFallback(uri, controller.signal);
@@ -432,10 +448,10 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
           return;
         }
         if (serverResult?.text) {
-          finishAsError(NON_HOMEWORK_ERROR_MESSAGE);
+          finishAsError(NON_HOMEWORK_ERROR_MESSAGE, 'NOT_HOMEWORK');
           return;
         }
-        finishAsError("Couldn't read any text from the image");
+        finishAsError("Couldn't read any text from the image", 'NO_TEXT');
       } catch (err) {
         // [BUG-681] If recognizeText threw because we aborted (rare — the
         // native module typically does not honor signals), treat as a cancel
@@ -448,11 +464,12 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
           return;
         }
         if (serverResult?.text) {
-          finishAsError(NON_HOMEWORK_ERROR_MESSAGE);
+          finishAsError(NON_HOMEWORK_ERROR_MESSAGE, 'NOT_HOMEWORK');
           return;
         }
         finishAsError(
           "We couldn't read that clearly. Try taking the photo again with better lighting.",
+          'LOW_QUALITY',
         );
       }
     },
@@ -468,6 +485,8 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
       } catch (e) {
         setStatus('error');
         setError(e instanceof Error ? e.message : 'Failed to cache image');
+        setErrorCode('CACHE_FAILED');
+        setFailCount((prev) => prev + 1);
         return;
       }
       currentUriRef.current = stableUri;
@@ -481,5 +500,5 @@ export function useHomeworkOcr(): UseHomeworkOcrResult {
     await runOcr(currentUriRef.current, true);
   }, [runOcr]);
 
-  return { text, status, error, failCount, process, retry, cancel };
+  return { text, status, error, errorCode, failCount, process, retry, cancel };
 }

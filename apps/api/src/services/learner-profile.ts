@@ -33,6 +33,7 @@ import {
   renderPromptTemplate,
   sanitizeXmlValue,
 } from './llm/sanitize';
+import { extractFirstJsonObject } from './llm/extract-json';
 import { projectAiResponseContent } from './llm/project-response';
 import { createLogger } from './logger';
 import { captureException } from './sentry';
@@ -1723,9 +1724,11 @@ export async function analyzeSessionTranscript(
   if (!result.response) return null;
 
   try {
-    const jsonMatch = result.response.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return null;
-    const parsed = JSON.parse(jsonMatch[0]) as unknown;
+    // Use brace-depth walker instead of greedy regex — handles markdown fences,
+    // trailing prose after the JSON, and nested braces correctly.
+    const jsonText = extractFirstJsonObject(result.response);
+    if (!jsonText) return null;
+    const parsed = JSON.parse(jsonText) as unknown;
     const validated = sessionAnalysisOutputSchema.safeParse(parsed);
     if (!validated.success) return null;
     return filterUnsupportedResolvedTopics(validated.data, transcriptText);

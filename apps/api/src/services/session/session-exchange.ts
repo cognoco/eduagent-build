@@ -17,6 +17,7 @@ import {
 import type {
   ConversationLanguage,
   LearningSession,
+  LlmResponseEnvelope,
   SessionMessageInput,
   LearningStyle,
   StrengthEntry,
@@ -38,6 +39,7 @@ import {
   auditExchangeSources,
   applySourceAuditSafetyFallback,
   inferObviousReliableSourceForAudit,
+  MAX_INTERVIEW_EXCHANGES,
   type ExchangeContext,
   type ExchangeFallback,
   type ExchangeSourceAudit,
@@ -101,6 +103,41 @@ import {
   recordPracticeActivityEvent,
   type RecordPracticeActivityEventInput,
 } from '../practice-activity-events';
+
+/**
+ * [BUG-92 / CR-2026-05-19-C4] Decide whether the interview / onboarding loop
+ * should terminate on this turn.
+ *
+ * Contract:
+ *   - Returns `true` if the LLM emitted `signals.ready_to_finish`
+ *     (passed in as `llmReadyToFinish`).
+ *   - Returns `true` if the session is on the interview/onboarding fast path
+ *     (`metadata.onboardingFastPath` object present) AND the persisted
+ *     `exchangeCount` has reached {@link MAX_INTERVIEW_EXCHANGES}. This is
+ *     the server-side hard cap mandated by the envelope contract in
+ *     CLAUDE.md — without it, an LLM that never emits the signal lets the
+ *     interview run all the way to MAX_EXCHANGES_PER_SESSION (50).
+ *   - Returns `false` otherwise. Non-interview sessions are not capped here
+ *     and rely on the global MAX_EXCHANGES_PER_SESSION ceiling.
+ *
+ * Extracted as a pure function so the cap logic is unit-testable without
+ * spinning up the full processMessage DB pipeline.
+ */
+export function resolveReadyToFinish(input: {
+  llmReadyToFinish: boolean;
+  exchangeCount: number;
+  sessionMetadata: Record<string, unknown> | null;
+}): boolean {
+  if (input.llmReadyToFinish) return true;
+  const meta = input.sessionMetadata;
+  const isInterviewFlow =
+    meta != null &&
+    meta['onboardingFastPath'] != null &&
+    typeof meta['onboardingFastPath'] === 'object' &&
+    !Array.isArray(meta['onboardingFastPath']);
+  if (!isInterviewFlow) return false;
+  return input.exchangeCount >= MAX_INTERVIEW_EXCHANGES;
+}
 
 const BANNED_FILLER_OPENERS = [
   "i'm so proud",
@@ -300,6 +337,24 @@ export interface ExchangeBehavioralMetrics {
   llmModel?: string;
   /** True when streaming fell back from the initial provider before first byte. */
   llmFallbackUsed?: boolean;
+  /**
+   * Bug #348: EVALUATE assessment signal (snake_case wire shape) emitted by the
+   * LLM in `envelope.signals.evaluate_assessment`. Persisted under
+   * `aiMetadata.signals.evaluate_assessment` so `parseEvaluateAssessment`
+   * (services/evaluate.ts) can read it back from `session_events.metadata`.
+   */
+  evaluateAssessment?: NonNullable<
+    NonNullable<LlmResponseEnvelope['signals']>['evaluate_assessment']
+  >;
+  /**
+   * Bug #348: TEACH_BACK assessment signal (snake_case wire shape) emitted by
+   * the LLM in `envelope.signals.teach_back_assessment`. Persisted under
+   * `aiMetadata.signals.teach_back_assessment` so `parseTeachBackAssessment`
+   * (services/teach-back.ts) can read it back from `session_events.metadata`.
+   */
+  teachBackAssessment?: NonNullable<
+    NonNullable<LlmResponseEnvelope['signals']>['teach_back_assessment']
+  >;
 }
 
 function mapRetrievalScoreToDepth(score: number): 'low' | 'mid' | 'high' {
@@ -1712,6 +1767,25 @@ export async function persistExchangeResult(
         llmFallbackUsed: behavioral.llmFallbackUsed,
       }),
     }),
+    // Bug #348: persist envelope.signals.{evaluate_assessment,teach_back_assessment}
+    // verbatim (snake_case wire shape) so parseEvaluateAssessment /
+    // parseTeachBackAssessment can read them back from session_events.metadata.
+    // Both parsers look for `metadata.signals.<key>` exactly — the shape here
+    // MUST match envelope wire shape, not a camelCased rename. Only the keys
+    // that were actually emitted are written; an undefined value means the
+    // turn was not EVALUATE / TEACH_BACK and no `signals` object is added.
+    ...(behavioral &&
+      (behavioral.evaluateAssessment !== undefined ||
+        behavioral.teachBackAssessment !== undefined) && {
+        signals: {
+          ...(behavioral.evaluateAssessment !== undefined && {
+            evaluate_assessment: behavioral.evaluateAssessment,
+          }),
+          ...(behavioral.teachBackAssessment !== undefined && {
+            teach_back_assessment: behavioral.teachBackAssessment,
+          }),
+        },
+      }),
   };
 
   let insertedUserEventId: string | undefined;
@@ -1998,6 +2072,16 @@ export async function processMessage(
   envelopeParseFailureReason?: string;
   fluencyDrill?: FluencyDrillAnnotation;
   sourceAudit?: ExchangeSourceAudit;
+  /**
+   * F1.1 — Surface the interview-close signal to the route layer so the
+   * mobile client / route handler can finalize an onboarding interview
+   * deterministically. `true` when either the LLM emitted
+   * `signals.ready_to_finish` OR this session is on the interview/onboarding
+   * fast path AND the server-side hard cap {@link MAX_INTERVIEW_EXCHANGES}
+   * has been reached. Always present for parity with the envelope contract.
+   * [BUG-92 / CR-2026-05-19-C4]
+   */
+  readyToFinish: boolean;
 }> {
   // Early exchange limit check — runs before expensive prepareExchangeContext
   // which performs 9+ parallel DB queries and a quota check (issue #15, review item #4)
@@ -2096,6 +2180,10 @@ export async function processMessage(
       llmRoutingReason: context.llmRoutingReason,
       llmProvider: result.provider,
       llmModel: result.model,
+      // Bug #348: forward EVALUATE / TEACH_BACK assessment signals onto
+      // aiMetadata.signals so parseEvaluate/TeachBackAssessment can read them.
+      evaluateAssessment: result.evaluateAssessment,
+      teachBackAssessment: result.teachBackAssessment,
     },
     options?.clientId,
   );
@@ -2123,6 +2211,14 @@ export async function processMessage(
     );
   }
 
+  // [BUG-92 / CR-2026-05-19-C4] Apply the server-side hard cap for interview /
+  // onboarding flows. See `resolveReadyToFinish` JSDoc for the contract.
+  const readyToFinish = resolveReadyToFinish({
+    llmReadyToFinish: result.readyToFinish,
+    exchangeCount: persisted.exchangeCount,
+    sessionMetadata: session.metadata as Record<string, unknown> | null,
+  });
+
   return {
     response: result.response,
     escalationRung: effectiveRung,
@@ -2134,6 +2230,7 @@ export async function processMessage(
     envelopeParseFailureReason: result.envelopeParseFailureReason,
     fluencyDrill: result.fluencyDrill ?? undefined,
     sourceAudit: result.sourceAudit,
+    readyToFinish,
   };
 }
 
@@ -2378,6 +2475,10 @@ export async function streamMessage(
           llmProvider: result.provider,
           llmModel: result.model,
           llmFallbackUsed: result.fallbackUsed === true,
+          // Bug #348: forward EVALUATE / TEACH_BACK assessment signals from
+          // the parsed envelope onto aiMetadata.signals.
+          evaluateAssessment: parsed.evaluateAssessment,
+          teachBackAssessment: parsed.teachBackAssessment,
         },
         options?.clientId,
       );

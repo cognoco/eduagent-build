@@ -251,15 +251,18 @@ export const consentRevocation = inngest.createFunction(
       return { sent: true };
     });
 
+    // [CR-2026-05-19-H19] Use the ownerProfileId resolved in `choose-final-action`
+    // BEFORE deletion. After `delete-child-profile` runs, `profiles` row is gone
+    // and FK ON DELETE CASCADE has already removed the child's `family_links`
+    // rows — so re-running getFamilyOwnerProfileId here would return zero rows
+    // and fall back to event-sender parentProfileId. In multi-parent families
+    // where the event-sender is NOT the account owner, that lands the delete
+    // notice on the wrong account. Mirror the archive branch which already uses
+    // the pre-deletion archiveDecision.ownerProfileId.
     await step.run('record-parent-delete-notice', async () => {
       const db = getStepDatabase();
-      const ownerProfileId = await getFamilyOwnerProfileId(
-        db,
-        childProfileId,
-        parentProfileId,
-      );
       await recordPendingNotice(db, {
-        ownerProfileId,
+        ownerProfileId: archiveDecision.ownerProfileId,
         type: 'consent_deleted',
         childName: childProfile.displayName,
       });

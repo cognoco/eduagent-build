@@ -41,6 +41,28 @@ import { stripPhoneticHints } from './llm/sanitize';
 
 const logger = createLogger();
 
+/**
+ * F1.1 — Server-side hard cap on interview / onboarding exchanges. Per the
+ * envelope contract in CLAUDE.md ("Every envelope signal must have a
+ * server-side hard cap so the flow terminates even if the LLM never emits the
+ * signal"), interview-style flows MUST terminate at this exchange count even
+ * when `signals.ready_to_finish` is never received. Callers that drive
+ * interview/onboarding loops (see `processMessage` in
+ * `services/session/session-exchange.ts`) force `readyToFinish = true` once
+ * the session's `exchangeCount` reaches this number.
+ *
+ * Non-interview flows (regular learning, homework, language, recitation) are
+ * still bounded by `MAX_EXCHANGES_PER_SESSION` (50) and ignore this constant.
+ *
+ * Value justification: 4 exchanges is the example cap cited in CLAUDE.md and
+ * the docs/architecture.md envelope contract — short enough that the
+ * interview never runs unbounded, long enough to capture goals, current
+ * knowledge, and interests in a fast-path onboarding chat.
+ *
+ * [BUG-92 / CR-2026-05-19-C4]
+ */
+export const MAX_INTERVIEW_EXCHANGES = 4;
+
 const SERVER_NOTE_RE = /<\/?server_note[^>]*>/gi;
 
 export function sanitizeUserContent(content: string): string {
@@ -280,11 +302,35 @@ export interface ExchangeResult {
    * F1.1 — LLM signalled `signals.ready_to_finish` in the envelope. Interview /
    * onboarding flows consume this to terminate the loop early; non-interview
    * flows can ignore it. Always present (false when the LLM did not emit the
-   * signal, or for fallback paths). Pair with a server-side hard cap
-   * (MAX_INTERVIEW_EXCHANGES) in the caller — never trust this flag alone.
-   * [BUG-92]
+   * signal, or for fallback paths). Pair with the server-side hard cap
+   * {@link MAX_INTERVIEW_EXCHANGES} in the caller — never trust this flag
+   * alone. `processMessage` (session-exchange.ts) forces this to `true` once
+   * `exchangeCount >= MAX_INTERVIEW_EXCHANGES` on a session that carries
+   * interview/onboarding metadata, so the loop terminates even if the LLM
+   * never emits the signal.
+   * [BUG-92 / CR-2026-05-19-C4]
    */
   readyToFinish: boolean;
+  /**
+   * Bug #348: EVALUATE assessment signal (snake_case wire shape) lifted from
+   * `envelope.signals.evaluate_assessment`. The session-exchange persistence
+   * layer writes this under `aiMetadata.signals.evaluate_assessment` where
+   * `parseEvaluateAssessment` (services/evaluate.ts) reads it back. Undefined
+   * on non-EVALUATE turns and on every fallback path.
+   */
+  evaluateAssessment?: NonNullable<
+    NonNullable<LlmResponseEnvelope['signals']>['evaluate_assessment']
+  >;
+  /**
+   * Bug #348: TEACH_BACK assessment signal (snake_case wire shape) lifted from
+   * `envelope.signals.teach_back_assessment`. The session-exchange persistence
+   * layer writes this under `aiMetadata.signals.teach_back_assessment` where
+   * `parseTeachBackAssessment` (services/teach-back.ts) reads it back.
+   * Undefined on non-TEACH_BACK turns and on every fallback path.
+   */
+  teachBackAssessment?: NonNullable<
+    NonNullable<LlmResponseEnvelope['signals']>['teach_back_assessment']
+  >;
 }
 
 /** Streaming variant result */
@@ -1107,6 +1153,12 @@ export async function processExchange(
     // applyAppHelpSignalGuard for app-help turns. Hard cap stays the caller's
     // responsibility — never trust this flag alone.
     readyToFinish: finalParsed.readyToFinish,
+    // Bug #348: pass the EVALUATE / TEACH_BACK assessment signals through to
+    // session-exchange.persistExchangeResult so they land at
+    // aiMetadata.signals.{evaluate_assessment,teach_back_assessment} on the
+    // ai_response row, where parseEvaluate/TeachBackAssessment read them back.
+    evaluateAssessment: finalParsed.evaluateAssessment,
+    teachBackAssessment: finalParsed.teachBackAssessment,
   };
 }
 
@@ -1207,6 +1259,27 @@ export interface ParsedExchangeEnvelope {
    * don't have to re-parse the envelope a second time.
    */
   readyToFinish: boolean;
+  /**
+   * Bug #348: EVALUATE assessment signal (snake_case wire shape) lifted from
+   * `envelope.signals.evaluate_assessment`. Forwarded verbatim so the
+   * persistence layer can write it under `aiMetadata.signals.evaluate_assessment`
+   * where `parseEvaluateAssessment` (services/evaluate.ts) reads it back.
+   * Undefined when the LLM did not emit the signal (i.e. non-EVALUATE turns).
+   */
+  evaluateAssessment?: NonNullable<
+    NonNullable<LlmResponseEnvelope['signals']>['evaluate_assessment']
+  >;
+  /**
+   * Bug #348: TEACH_BACK assessment signal (snake_case wire shape) lifted from
+   * `envelope.signals.teach_back_assessment`. Forwarded verbatim so the
+   * persistence layer can write it under
+   * `aiMetadata.signals.teach_back_assessment` where `parseTeachBackAssessment`
+   * (services/teach-back.ts) reads it back. Undefined when the LLM did not
+   * emit the signal (i.e. non-TEACH_BACK turns).
+   */
+  teachBackAssessment?: NonNullable<
+    NonNullable<LlmResponseEnvelope['signals']>['teach_back_assessment']
+  >;
 }
 
 const EMPTY_PARSED_ENVELOPE: ParsedExchangeEnvelope = {
@@ -1221,6 +1294,8 @@ const EMPTY_PARSED_ENVELOPE: ParsedExchangeEnvelope = {
   retrievalScore: undefined,
   privateSources: undefined,
   readyToFinish: false,
+  evaluateAssessment: undefined,
+  teachBackAssessment: undefined,
 };
 
 // ExchangeFallback + ExchangeFallbackReason are imported from
@@ -1407,6 +1482,14 @@ function envelopeToParsedExchange(
         ? signals.retrieval_score
         : undefined,
     readyToFinish: signals.ready_to_finish === true,
+    // Bug #348: forward EVALUATE / TEACH_BACK assessment signals verbatim
+    // (snake_case wire shape). The persistence layer writes them under
+    // aiMetadata.signals.{evaluate_assessment,teach_back_assessment} where the
+    // downstream parsers in services/evaluate.ts and services/teach-back.ts
+    // expect to find them. Without this hop, every EVALUATE/TEACH_BACK
+    // assessment is silently dropped between LLM and ai_response row.
+    evaluateAssessment: signals.evaluate_assessment,
+    teachBackAssessment: signals.teach_back_assessment,
   };
 }
 

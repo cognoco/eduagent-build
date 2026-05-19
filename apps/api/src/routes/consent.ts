@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+﻿import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import {
   consentRequestSchema,
@@ -14,6 +14,7 @@ import type { Database } from '@eduagent/database';
 import type { AuthUser } from '../middleware/auth';
 import type { Account } from '../services/account';
 import { requireProfileId } from '../middleware/profile-scope';
+import type { ProfileMeta } from '../middleware/profile-scope';
 import { getProfile } from '../services/profile';
 import {
   requestConsent,
@@ -34,39 +35,11 @@ import { notFound, forbidden, apiError } from '../errors';
 import { inngest } from '../inngest/client';
 import { safeSend } from '../services/safe-non-core';
 
-// [BUG-655 / A-11] /consent/respond is unauthenticated (a parent clicks an
-// emailed link, no session). The token is a 122-bit UUID so brute-force is
-// infeasible, but the endpoint still needs rate limiting to prevent DoS and
-// to slow any future weakening of the token format. Same in-memory
-// sliding-window pattern as feedback.ts; cap is per source IP.
-//
-// [BUG-99 / A1-MED — ACCEPTED LIMITATION] Worker isolates each maintain
-// independent state. The effective ceiling is
-// CONSENT_RESPOND_RATE_LIMIT_MAX × N isolates per hour per IP. For this
-// endpoint we accept this as a known limitation because:
-//   1. The token is a 122-bit UUID — brute-forcing it at any rate is
-//      computationally infeasible. The rate limiter is defense-in-depth
-//      against a hypothetical future weakening of the token format, not a
-//      load-bearing security control.
-//   2. The endpoint is single-use — once a token is consumed (approved or
-//      denied), all subsequent attempts return 409 CONFLICT regardless of
-//      rate. The attack surface per IP is bounded by the number of issued
-//      tokens that are still pending in the 24h consent window.
-//   3. Cross-isolate accuracy requires Durable Objects (or a heavy-weight
-//      KV fixed-window counter that pays an extra round-trip per request
-//      and is still racy due to KV's eventual consistency, up to 60s).
-//      Neither is justified for a low-volume parent flow.
-//   4. Failure mode is bounded: even with 100 active isolates, the
-//      effective ceiling is 3000 attempts/IP/hr — still hostile to
-//      enumeration if the token format is ever weakened.
-// If traffic grows or the token format changes, revisit with a Durable
-// Object-backed limiter (CF Workers RPC pattern).
-const CONSENT_RESPOND_RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+const CONSENT_RESPOND_RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
 const CONSENT_RESPOND_RATE_LIMIT_MAX = 30;
 const CONSENT_RESPOND_MAP_MAX_ENTRIES = 10_000;
 const consentRespondTimestamps = new Map<string, number[]>();
 
-// Exported for tests only — reset Map state between cases.
 export function __resetConsentRespondRateLimit(): void {
   consentRespondTimestamps.clear();
 }
@@ -79,11 +52,6 @@ function isConsentRespondRateLimited(ipKey: string): boolean {
   if (timestamps.length === 0 && existing !== undefined) {
     consentRespondTimestamps.delete(ipKey);
   }
-  // Only evict when admitting a NEW key would push us past the cap. A
-  // returning IP that's already tracked updates in place, so it never
-  // punishes an unrelated quiet user. FIFO order (Map insertion order) is
-  // fine for abuse prevention — eviction targets keys quiet long enough to
-  // age past the head.
   const isNewKey =
     !consentRespondTimestamps.has(ipKey) && timestamps.length === 0;
   if (
@@ -102,14 +70,10 @@ function isConsentRespondRateLimited(ipKey: string): boolean {
   return false;
 }
 
-// [BUG-625 / A-10] Mask third-party PII before returning to a profile that
-// may not own the address. Format: keep first character + last character of
-// the local part, replace middle with "***", keep domain. Empty/short locals
-// fall back to "***@domain". Returns null for null/undefined input.
 function maskEmail(email: string | null): string | null {
   if (!email) return null;
   const atIdx = email.lastIndexOf('@');
-  if (atIdx <= 0) return null; // malformed — don't echo
+  if (atIdx <= 0) return null;
   const local = email.slice(0, atIdx);
   const domain = email.slice(atIdx + 1);
   if (!domain) return null;
@@ -130,6 +94,7 @@ type ConsentRouteEnv = {
     db: Database;
     account: Account;
     profileId: string | undefined;
+    profileMeta: ProfileMeta | undefined;
   };
 };
 
@@ -142,7 +107,6 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
       const account = c.get('account');
       const input = c.req.valid('json');
 
-      // Verify the childProfileId belongs to the authenticated user's account
       const childProfile = await getProfile(
         db,
         input.childProfileId,
@@ -155,7 +119,6 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
         );
       }
 
-      // Guard: child cannot send consent email to their own account email
       if (
         account.email.toLowerCase() === input.parentEmail.trim().toLowerCase()
       ) {
@@ -167,10 +130,6 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
         );
       }
 
-      // BUG-240: Consent page is served by THIS API worker at /v1/consent-page.
-      // API_ORIGIN must be set — falling back to c.req.url would allow Host header
-      // injection (OWASP A03) since Cloudflare Workers populate it from the
-      // attacker-supplied Host header.
       const apiOrigin = c.env.API_ORIGIN;
       if (!apiOrigin) {
         throw new Error('API_ORIGIN env var is required');
@@ -197,12 +156,6 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
         throw error;
       }
 
-      // Dispatch Inngest event for reminder workflow
-      // NOTE: parentEmail is intentionally omitted — PII must not be in event payloads.
-      // The consent-reminders function looks up parentEmail from the DB.
-      // safeSend wrapper: consent request must succeed even if Inngest is unreachable
-      // (same pattern as session close — BUG-54). [A-23] escalates failures to Sentry
-      // so we can query how often the GDPR reminder workflow is permanently skipped.
       await safeSend(
         () =>
           inngest.send({
@@ -234,12 +187,6 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
       const db = c.get('db');
       const input = c.req.valid('json');
 
-      // [BUG-655 / A-11] Rate-limit by source IP — endpoint is intentionally
-      // unauthenticated so a parent can act from an email link without a
-      // session. CF-Connecting-IP is set by Cloudflare's edge from the real
-      // client; fall back to a single shared bucket only when absent
-      // (local/test). 30 attempts / IP / hour is generous for legit double-
-      // taps yet hostile to enumeration / spray.
       const ipKey =
         c.req.header('cf-connecting-ip') ??
         c.req.header('x-forwarded-for') ??
@@ -279,8 +226,6 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
     },
   )
   .get('/consent/my-status', async (c) => {
-    // This route intentionally works without a profile —
-    // returns null values when no profile is resolved.
     const profileId = c.get('profileId');
     if (!profileId) {
       return c.json(
@@ -296,22 +241,27 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
     return c.json(
       myConsentStatusSchema.parse({
         consentStatus: state?.status ?? null,
-        // [BUG-625 / A-10] parentEmail is third-party PII (the parent's address,
-        // not the requesting profile's). The mobile reminder banner needs *some*
-        // identifier to confirm "consent request sent to <X>", but returning the
-        // full address lets a child session enumerate the parent's email.
-        // Mask to "p***@example.com" — preserves verification UX, reduces leak.
         parentEmail: maskEmail(state?.parentEmail ?? null),
         consentType: state?.consentType ?? null,
       }),
     );
   })
 
-  // Get consent status for a child (parent view, includes respondedAt for countdown)
   .get('/consent/:childProfileId/status', async (c) => {
     const db = c.get('db');
     const parentProfileId = requireProfileId(c.get('profileId'));
     const childProfileId = c.req.param('childProfileId');
+
+    // [CR-2026-05-19-H1] Only the account owner can read child consent status.
+    const activeProfileMetaStatus = c.get('profileMeta');
+    if (activeProfileMetaStatus?.isOwner !== true) {
+      return apiError(
+        c,
+        403,
+        ERROR_CODES.FORBIDDEN,
+        'Only the account owner can manage child consent.',
+      );
+    }
 
     try {
       const state = await getChildConsentForParent(
@@ -343,20 +293,25 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
     }
   })
 
-  // Revoke consent for a child (parent-initiated, GDPR Art. 7(3))
   .put('/consent/:childProfileId/revoke', async (c) => {
     const db = c.get('db');
     const parentProfileId = requireProfileId(c.get('profileId'));
     const childProfileId = c.req.param('childProfileId');
 
+    // [CR-2026-05-19-H1] Only the account owner can revoke child consent.
+    const activeProfileMetaRevoke = c.get('profileMeta');
+    if (activeProfileMetaRevoke?.isOwner !== true) {
+      return apiError(
+        c,
+        403,
+        ERROR_CODES.FORBIDDEN,
+        'Only the account owner can revoke child consent.',
+      );
+    }
+
     try {
       const state = await revokeConsent(db, childProfileId, parentProfileId);
 
-      // Schedule 7-day grace period deletion via Inngest
-      // safeSend wrapper: revocation must succeed even if Inngest is unreachable
-      // (same pattern as consent request — BUG-64, session close — BUG-54). [A-23]
-      // escalates failures to Sentry so we can query how often the GDPR 7-day
-      // deletion grace period job is skipped.
       await safeSend(
         () =>
           inngest.send({
@@ -389,11 +344,21 @@ export const consentRoutes = new Hono<ConsentRouteEnv>()
     }
   })
 
-  // Restore consent (cancel revocation, within 7-day grace period)
   .put('/consent/:childProfileId/restore', async (c) => {
     const db = c.get('db');
     const parentProfileId = requireProfileId(c.get('profileId'));
     const childProfileId = c.req.param('childProfileId');
+
+    // [CR-2026-05-19-H1] Only the account owner can restore child consent.
+    const activeProfileMetaRestore = c.get('profileMeta');
+    if (activeProfileMetaRestore?.isOwner !== true) {
+      return apiError(
+        c,
+        403,
+        ERROR_CODES.FORBIDDEN,
+        'Only the account owner can restore child consent.',
+      );
+    }
 
     try {
       const state = await restoreConsent(db, childProfileId, parentProfileId);

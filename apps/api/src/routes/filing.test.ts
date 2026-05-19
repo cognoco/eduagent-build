@@ -462,5 +462,59 @@ describe('filing routes', () => {
         expect.objectContaining({ filedFrom: 'session_filing' }),
       );
     });
+
+    // [CR-2026-05-19-C3] Break test: app/filing.completed is a CORE dispatch.
+    // If inngest.send() rejects, the route MUST surface a 5xx so the client
+    // retries. Silent recovery (.catch swallowing) would hang the
+    // session-completed waitForEvent chain (streaks/XP/memory extraction).
+    it('[CR-2026-05-19-C3] returns 5xx when app/filing.completed dispatch fails', async () => {
+      const { inngest } = await import('../inngest/client');
+      const { captureException } = await import('../services/sentry');
+      const sendMock = inngest.send as jest.Mock;
+      const captureMock = captureException as jest.Mock;
+      const dispatchError = new Error('Inngest down');
+
+      sendMock.mockClear();
+      captureMock.mockClear();
+
+      // Reject the next inngest.send (app/filing.completed) so we can verify
+      // the route does NOT swallow the failure.
+      sendMock.mockRejectedValueOnce(dispatchError);
+
+      const res = await app.request(
+        '/v1/filing',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            rawInput: 'photosynthesis',
+            sessionId: '00000000-0000-4000-8000-000000000123',
+          }),
+        },
+        TEST_ENV,
+      );
+
+      // Must NOT be 200 — silent recovery would falsely tell the client the
+      // filing completed when the downstream chain never received the event.
+      expect(res.status).toBeGreaterThanOrEqual(500);
+      expect(res.status).toBeLessThan(600);
+
+      // Sentry MUST be notified for observability — captureException-then-throw
+      // is the canonical pattern.
+      expect(captureMock).toHaveBeenCalledWith(
+        dispatchError,
+        expect.objectContaining({
+          extra: expect.objectContaining({
+            event: 'app/filing.completed',
+          }),
+        }),
+      );
+
+      // Confirm the failing send was the filing.completed event (not some
+      // unrelated upstream dispatch).
+      expect(sendMock).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'app/filing.completed' }),
+      );
+    });
   });
 });

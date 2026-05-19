@@ -58,6 +58,8 @@ const TEST_ACCOUNTS = [
   { clerkUserId: `${PREFIX}-04`, email: `${PREFIX}-04@integration.test` },
   { clerkUserId: `${PREFIX}-05`, email: `${PREFIX}-05@integration.test` },
   { clerkUserId: `${PREFIX}-06`, email: `${PREFIX}-06@integration.test` },
+  { clerkUserId: `${PREFIX}-07`, email: `${PREFIX}-07@integration.test` },
+  { clerkUserId: `${PREFIX}-08`, email: `${PREFIX}-08@integration.test` },
 ];
 
 const ALL_EMAILS = TEST_ACCOUNTS.map((a) => a.email);
@@ -325,6 +327,80 @@ describe('Quota metering (integration)', () => {
     // Top-up was rolled back for the 2 losers — only 1 credit consumed.
     const topUps = await loadTopUps(seeded.subscription.id);
     expect(topUps[0]!.remaining).toBe(4);
+  });
+
+  // [BREAK / CR-2026-05-19-C6] Top-up consumption followed by LLM-failure refund
+  // MUST credit the top-up batch, not decrement the monthly pool. Pre-fix:
+  // incrementQuota unconditionally ran `usedThisMonth = GREATEST(usedThisMonth - 1, 0)`
+  // — so every LLM failure on a top-up consumption inflated the monthly pool by 1.
+  it('[BREAK CR-2026-05-19-C6] LLM-failure refund after top-up consumption credits top-up, not monthly', async () => {
+    const account = await seedAccount(6);
+    const seeded = await seedSubscriptionWithQuota({
+      accountId: account.id,
+      tier: 'plus',
+      monthlyLimit: 10,
+      usedThisMonth: 10, // monthly exhausted — forces top-up path
+      dailyLimit: null,
+      usedToday: 3,
+    });
+    const topUp = await seedTopUpCredit({
+      subscriptionId: seeded.subscription.id,
+      amount: 5,
+      remaining: 5,
+    });
+
+    // Consume one top-up credit
+    const decrement = await decrementQuota(
+      createIntegrationDb(),
+      seeded.subscription.id,
+    );
+    expect(decrement.success).toBe(true);
+    expect(decrement.source).toBe('top_up');
+    expect(decrement.topUpCreditId).toBe(topUp.id);
+
+    let pool = await loadQuotaPool(seeded.subscription.id);
+    let topUps = await loadTopUps(seeded.subscription.id);
+    expect(pool!.usedThisMonth).toBe(10); // unchanged
+    expect(pool!.usedToday).toBe(4);
+    expect(topUps[0]!.remaining).toBe(4);
+
+    // Simulate LLM failure → refund. Caller threads source + id back.
+    await incrementQuota(
+      createIntegrationDb(),
+      seeded.subscription.id,
+      undefined,
+      { source: decrement.source, topUpCreditId: decrement.topUpCreditId },
+    );
+
+    pool = await loadQuotaPool(seeded.subscription.id);
+    topUps = await loadTopUps(seeded.subscription.id);
+
+    // Monthly pool MUST NOT have been inflated.
+    expect(pool!.usedThisMonth).toBe(10);
+    // Daily counter rolled back (the slot is freed).
+    expect(pool!.usedToday).toBe(3);
+    // Top-up batch was credited back.
+    expect(topUps[0]!.remaining).toBe(5);
+  });
+
+  // [REGRESSION / CR-2026-05-19-C6] Legacy callers that omit `source` still
+  // refund the monthly pool (back-compat) — they were the only refund path
+  // before the fix and shouldn't break.
+  it('[CR-2026-05-19-C6] legacy refund without source falls back to monthly pool', async () => {
+    const account = await seedAccount(7);
+    const seeded = await seedSubscriptionWithQuota({
+      accountId: account.id,
+      tier: 'plus',
+      monthlyLimit: 10,
+      usedThisMonth: 5,
+      usedToday: 2,
+    });
+
+    await incrementQuota(createIntegrationDb(), seeded.subscription.id);
+
+    const pool = await loadQuotaPool(seeded.subscription.id);
+    expect(pool!.usedThisMonth).toBe(4);
+    expect(pool!.usedToday).toBe(1);
   });
 
   it('concurrent decrements do not over-consume', async () => {

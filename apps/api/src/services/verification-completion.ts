@@ -64,7 +64,10 @@ export async function processEvaluateCompletion(
   for (let i = 0; i < events.length; i++) {
     const candidate = events[i];
     if (!candidate) continue;
-    assessment = parseEvaluateAssessment(candidate.content);
+    assessment = parseEvaluateAssessment({
+      content: candidate.content,
+      metadata: candidate.metadata,
+    });
     if (assessment) {
       assessmentEventIndex = i;
       break;
@@ -110,7 +113,10 @@ export async function processEvaluateCompletion(
     for (let i = assessmentEventIndex + 1; i < events.length; i++) {
       const evt = events[i];
       if (!evt) break;
-      const priorAssessment = parseEvaluateAssessment(evt.content);
+      const priorAssessment = parseEvaluateAssessment({
+        content: evt.content,
+        metadata: evt.metadata,
+      });
       if (priorAssessment && !priorAssessment.challengePassed) {
         consecutiveFailures++;
       } else {
@@ -212,7 +218,10 @@ export async function processTeachBackCompletion(
   let assessment = null;
   let assessmentEvent: (typeof events)[number] | null = null;
   for (const event of events) {
-    const parsed = parseTeachBackAssessment(event.content);
+    const parsed = parseTeachBackAssessment({
+      content: event.content,
+      metadata: event.metadata,
+    });
     if (parsed) {
       assessment = parsed;
       assessmentEvent = event;

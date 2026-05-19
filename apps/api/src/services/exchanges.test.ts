@@ -18,6 +18,7 @@ import {
   parseExchangeEnvelope,
   processExchange,
   streamExchange,
+  MAX_INTERVIEW_EXCHANGES,
 } from './exchanges';
 import type { ExchangeContext } from './exchanges';
 
@@ -500,7 +501,12 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('THINK DEEPER');
     expect(prompt).toContain("Devil's Advocate");
     expect(prompt).toContain('Difficulty rung 2/4');
-    expect(prompt).toContain('challengePassed');
+    // [CR-2026-05-19-C5] Assessment now flows through the envelope signal,
+    // not a free-text JSON blob in the reply. The prompt must name the
+    // envelope path and forbid embedding JSON in the visible reply.
+    expect(prompt).toContain('signals.evaluate_assessment');
+    expect(prompt).toContain('challenge_passed');
+    expect(prompt).toMatch(/Do NOT embed JSON.*in the visible reply/);
   });
 
   it('includes a learner-facing transition phrase in EVALUATE prompt section', () => {
@@ -528,9 +534,13 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toContain('TEACH BACK');
     expect(prompt).toContain('Feynman Technique');
     expect(prompt).toContain('curious but clueless student');
+    // [CR-2026-05-19-C5] Rubric flows through the envelope signal — no
+    // free-text JSON in the reply.
+    expect(prompt).toContain('signals.teach_back_assessment');
     expect(prompt).toContain('completeness');
     expect(prompt).toContain('accuracy');
     expect(prompt).toContain('clarity');
+    expect(prompt).toMatch(/Do NOT embed JSON.*in the visible reply/);
   });
 
   it('includes a learner-facing transition phrase in TEACH_BACK prompt section', () => {
@@ -1146,6 +1156,28 @@ describe('processExchange — readyToFinish surfacing', () => {
     } finally {
       registerProvider(createMockProvider('gemini'));
     }
+  });
+});
+
+// [BUG-92 / CR-2026-05-19-C4] The envelope contract in CLAUDE.md mandates a
+// server-side hard cap per envelope signal so the flow terminates even if
+// the LLM never emits the signal. MAX_INTERVIEW_EXCHANGES is the cap for
+// `signals.ready_to_finish` in interview/onboarding flows. The constant must
+// stay exported, numeric, and small enough that an interview cannot run
+// unbounded. A drift here (e.g. raised to 50 to match MAX_EXCHANGES_PER_SESSION,
+// or removed entirely) re-introduces the original unbounded-interview bug.
+describe('MAX_INTERVIEW_EXCHANGES', () => {
+  it('[BUG-92] is exported as a positive integer cap', () => {
+    expect(typeof MAX_INTERVIEW_EXCHANGES).toBe('number');
+    expect(Number.isInteger(MAX_INTERVIEW_EXCHANGES)).toBe(true);
+    expect(MAX_INTERVIEW_EXCHANGES).toBeGreaterThan(0);
+  });
+
+  it('[BUG-92] is small enough to bound the interview (current contract: 4)', () => {
+    // Lock the cap at 4 to match the CLAUDE.md example and the
+    // docs/architecture.md envelope contract. If the product decision changes,
+    // update this assertion AND the JSDoc on the constant in the same commit.
+    expect(MAX_INTERVIEW_EXCHANGES).toBe(4);
   });
 });
 
@@ -2148,5 +2180,82 @@ describe('buildUserContent', () => {
     expect(parts[0]).toEqual(
       expect.objectContaining({ mimeType: 'image/png' }),
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Bug #348: envelope assessment signals must be surfaced onto
+// ParsedExchangeEnvelope so persistExchangeResult can write them under
+// aiMetadata.signals.* where the evaluate/teach-back parsers read them.
+// Without this, every EVALUATE / TEACH_BACK assessment is silently dropped.
+// ---------------------------------------------------------------------------
+describe('parseExchangeEnvelope assessment-signal pass-through [bug #348]', () => {
+  const ctx = { sessionId: 's-348', profileId: 'p-348', flow: 'evaluate' };
+
+  it('surfaces signals.evaluate_assessment verbatim (snake_case wire shape)', () => {
+    const raw = JSON.stringify({
+      reply:
+        'Mostly right, but tell me again — what does a catalyst do to activation energy?',
+      signals: {
+        understanding_check: false,
+        evaluate_assessment: {
+          challenge_passed: true,
+          flaw_identified: 'Did not mention pathway change.',
+          quality: 4,
+        },
+      },
+    });
+
+    const result = parseExchangeEnvelope(raw, ctx);
+
+    // Snake-case forwarded verbatim — parsers in services/evaluate.ts read this
+    // exact shape from metadata.signals.evaluate_assessment.
+    expect(result.evaluateAssessment).toEqual({
+      challenge_passed: true,
+      flaw_identified: 'Did not mention pathway change.',
+      quality: 4,
+    });
+    expect(result.teachBackAssessment).toBeUndefined();
+  });
+
+  it('surfaces signals.teach_back_assessment verbatim (snake_case wire shape)', () => {
+    const raw = JSON.stringify({
+      reply: 'Good summary! What would happen if there was no oxygen?',
+      signals: {
+        understanding_check: false,
+        teach_back_assessment: {
+          completeness: 3,
+          accuracy: 4,
+          clarity: 2,
+          overall_quality: 3,
+          weakest_area: 'clarity',
+          gap_identified: 'No explanation of WHY oxygen is required.',
+        },
+      },
+    });
+
+    const result = parseExchangeEnvelope(raw, ctx);
+
+    expect(result.teachBackAssessment).toEqual({
+      completeness: 3,
+      accuracy: 4,
+      clarity: 2,
+      overall_quality: 3,
+      weakest_area: 'clarity',
+      gap_identified: 'No explanation of WHY oxygen is required.',
+    });
+    expect(result.evaluateAssessment).toBeUndefined();
+  });
+
+  it('leaves both undefined on non-assessment turns (no key pollution)', () => {
+    const raw = JSON.stringify({
+      reply: 'Yes, 2 + 2 = 4.',
+      signals: { understanding_check: false },
+    });
+
+    const result = parseExchangeEnvelope(raw, ctx);
+
+    expect(result.evaluateAssessment).toBeUndefined();
+    expect(result.teachBackAssessment).toBeUndefined();
   });
 });

@@ -64,6 +64,10 @@ const mockGetProfile = jest.fn().mockResolvedValue({
   birthYear: null,
   location: null,
   consentStatus: 'CONSENTED',
+  // [CR-2026-05-19-H1] isOwner:true so owner-gated routes pass in happy-path tests.
+  isOwner: true,
+  hasPremiumLlm: false,
+  conversationLanguage: 'en',
 });
 
 jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
@@ -140,6 +144,7 @@ import { app } from '../index';
 import { ForbiddenError } from '../errors';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 import { extractDrizzleParamValues } from '../test-utils/drizzle-introspection';
+import { ERROR_CODES } from '@eduagent/schemas';
 
 const TEST_ENV = {
   ...BASE_AUTH_ENV,
@@ -841,6 +846,75 @@ describe('dashboard routes', () => {
         message: 'Report not found',
       });
       expect(body).not.toHaveProperty('error');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // [CR-2026-05-19-H1] Break tests — non-owner profile must be rejected from
+  // all child-dashboard routes that require assertOwnerAndParentAccess.
+  // A child on a parent's account (isOwner:false) must get 403, not data.
+  // -------------------------------------------------------------------------
+
+  describe('[CR-2026-05-19-H1] non-owner profile is rejected from parent dashboard routes', () => {
+    const NON_OWNER_PROFILE_ID = 'c0000000-0000-4000-c000-000000000001';
+    const NON_OWNER_HEADERS = makeAuthHeaders({
+      'X-Profile-Id': NON_OWNER_PROFILE_ID,
+    });
+
+    beforeEach(() => {
+      // Override getProfile so X-Profile-Id resolves to a non-owner profile.
+      mockGetProfile.mockResolvedValue({
+        id: NON_OWNER_PROFILE_ID,
+        birthYear: 2012,
+        location: null,
+        consentStatus: 'CONSENTED',
+        isOwner: false,
+        hasPremiumLlm: false,
+        conversationLanguage: 'en',
+      });
+      // Family link exists — IDOR check would pass, but isOwner gate must fire first.
+      mockFindFamilyLink.mockResolvedValue({
+        parentProfileId: NON_OWNER_PROFILE_ID,
+        childProfileId: PROFILE_ID,
+      });
+    });
+
+    it('[BREAK] GET /dashboard/children/:id returns 403 for non-owner profile', async () => {
+      const res = await app.request(
+        `/v1/dashboard/children/${PROFILE_ID}`,
+        { headers: NON_OWNER_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
+      // isOwner gate fires at route entry — service must not be called.
+      expect(mockGetChildDetail).not.toHaveBeenCalled();
+    });
+
+    it('[BREAK] GET /dashboard/children/:id/weekly-reports returns 403 for non-owner profile', async () => {
+      const res = await app.request(
+        `/v1/dashboard/children/${PROFILE_ID}/weekly-reports`,
+        { headers: NON_OWNER_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
+    });
+
+    it('[BREAK] GET /dashboard/children/:id/progress-summary returns 403 for non-owner profile', async () => {
+      const res = await app.request(
+        `/v1/dashboard/children/${PROFILE_ID}/progress-summary`,
+        { headers: NON_OWNER_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
     });
   });
 });

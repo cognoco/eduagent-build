@@ -223,21 +223,23 @@ jest.mock('react-i18next', () => ({
   }),
 }));
 
-jest.mock('../../hooks/use-progress', () => ({
-  // gc1-allow: wraps useApiClient fetch boundary — needs network stub in unit tests
-  ...jest.requireActual('../../hooks/use-progress'),
-  fetchLearningResumeTarget: jest.fn(),
-  useChildInventory: jest.fn(),
-  useChildProgressSummary: jest.fn(),
-  useLearningResumeTarget: jest.fn(),
-  useOverallProgress: jest.fn(),
-  useProgressInventory: jest.fn(),
-  useProgressMilestones: jest.fn(),
-  useProfileSessions: jest.fn(),
-  useProfileReports: jest.fn(),
-  useProfileWeeklyReports: jest.fn(),
-  useRefreshProgressSnapshot: jest.fn(),
-}));
+jest.mock(
+  '../../hooks/use-progress' /* gc1-allow: transport-boundary — hooks wrap useApiClient Hono RPC; requires mock fetch in unit tests */,
+  () => ({
+    ...jest.requireActual('../../hooks/use-progress'),
+    fetchLearningResumeTarget: jest.fn(),
+    useChildInventory: jest.fn(),
+    useChildProgressSummary: jest.fn(),
+    useLearningResumeTarget: jest.fn(),
+    useOverallProgress: jest.fn(),
+    useProgressInventory: jest.fn(),
+    useProgressMilestones: jest.fn(),
+    useProfileSessions: jest.fn(),
+    useProfileReports: jest.fn(),
+    useProfileWeeklyReports: jest.fn(),
+    useRefreshProgressSnapshot: jest.fn(),
+  }),
+);
 const mockUseSubjects = jest.fn(() => ({
   data: [] as Array<{ id: string; name: string; status: string }>,
 }));
@@ -252,26 +254,33 @@ jest.mock('../../hooks/use-active-profile-role' /* gc1-allow */, () => ({
   useActiveProfileRole: () => mockUseActiveProfileRole(),
 }));
 let mockLinkedChildren: Profile[] = [];
-jest.mock('../../lib/profile', () => ({
-  useProfile: () => ({
-    activeProfile: {
-      id: 'test-profile-id',
-      displayName: 'Test Learner',
-      createdAt: '2026-01-01T00:00:00Z',
-      isOwner: true,
-    },
-    profiles: [],
+jest.mock(
+  '../../lib/profile' /* gc1-allow: context-boundary — useProfile and useLinkedChildren read from ProfileContext.Provider which is not set up in these bare render() unit tests */,
+  () => ({
+    useProfile: () => ({
+      activeProfile: {
+        id: 'test-profile-id',
+        displayName: 'Test Learner',
+        createdAt: '2026-01-01T00:00:00Z',
+        isOwner: true,
+      },
+      profiles: [],
+    }),
+    useLinkedChildren: () => mockLinkedChildren,
   }),
-  useLinkedChildren: () => mockLinkedChildren,
-}));
-jest.mock('../../lib/analytics', () => ({
-  bucketAccountAge: jest.fn(() => '91+'),
-  hashProfileId: jest.fn((id: string) => `hashed-${id}`),
-  track: jest.fn(),
-}));
-jest.mock('../../lib/api-client', () => ({
-  useApiClient: () => ({}),
-}));
+);
+// lib/analytics — real implementation: bucketAccountAge and hashProfileId are
+// pure functions; track() calls Sentry.addBreadcrumb which is globally stubbed
+// in test-setup.ts. No mock needed.
+jest.mock('../../lib/analytics', () =>
+  jest.requireActual('../../lib/analytics'),
+);
+jest.mock(
+  '../../lib/api-client' /* gc1-allow: transport-boundary — Hono RPC client requires a real HTTP transport; hooks are already mocked above so this stub is a safety net */,
+  () => ({
+    useApiClient: () => ({}),
+  }),
+);
 let mockSearchParams: { profileId?: string | string[] } = {};
 jest.mock('expo-router', () => {
   const ReactReq = jest.requireActual<typeof import('react')>('react');

@@ -89,6 +89,11 @@ jest.mock('../services/profile' /* gc1-allow: pattern-a conversion */, () => {
         birthYear: null,
         location: null,
         consentStatus: 'CONSENTED',
+        // [CR-2026-05-19-H1] isOwner:true so owner-gated routes pass in
+        // happy-path tests. Break tests override this to isOwner:false.
+        isOwner: true,
+        hasPremiumLlm: false,
+        conversationLanguage: 'en',
       })),
   };
 });
@@ -156,6 +161,7 @@ jest.mock(
 import { app } from '../index';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 import { extractDrizzleParamValues } from '../test-utils/drizzle-introspection';
+import { ERROR_CODES } from '@eduagent/schemas';
 
 const TEST_ENV = {
   ...BASE_AUTH_ENV,
@@ -558,6 +564,87 @@ describe('learner-profile routes', () => {
 
       expect(res.status).toBe(403);
       expect(mockUpdateAccommodationMode).not.toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // [CR-2026-05-19-H1] Break tests — non-owner profile must be rejected from
+  // all parent-child routes that require assertOwnerAndParentAccess.
+  // A child on a parent's account (isOwner:false) must get 403, not data.
+  // -------------------------------------------------------------------------
+
+  describe('[CR-2026-05-19-H1] non-owner profile is rejected from parent child routes', () => {
+    const NON_OWNER_PROFILE_ID = 'd0000000-0000-4000-d000-000000000001';
+    const NON_OWNER_HEADERS = makeAuthHeaders({
+      'X-Profile-Id': NON_OWNER_PROFILE_ID,
+    });
+
+    beforeEach(() => {
+      // Override getProfile so X-Profile-Id resolves to a non-owner profile.
+      const profileServiceMock = jest.requireMock(
+        '../services/profile',
+      ) as Record<string, jest.Mock>;
+
+      profileServiceMock['getProfile']!.mockImplementation(
+        async (_db: unknown, profileId: string) => ({
+          id: profileId,
+          birthYear: 2012,
+          location: null,
+          consentStatus: 'CONSENTED',
+          isOwner: false,
+          hasPremiumLlm: false,
+          conversationLanguage: 'en',
+        }),
+      );
+      // Family link exists — IDOR check would pass, but isOwner gate must fire first.
+      mockFindFamilyLink.mockResolvedValue({
+        parentProfileId: NON_OWNER_PROFILE_ID,
+        childProfileId: OWN_CHILD_PROFILE_ID,
+      });
+    });
+
+    it('[BREAK] GET /learner-profile/:profileId returns 403 for non-owner profile', async () => {
+      const res = await app.request(
+        `/v1/learner-profile/${OWN_CHILD_PROFILE_ID}`,
+        { headers: NON_OWNER_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
+      // isOwner gate fires at route entry — service must not be called.
+      expect(mockGetOrCreateLearningProfile).not.toHaveBeenCalled();
+    });
+
+    it('[BREAK] DELETE /learner-profile/:profileId/all returns 403 for non-owner profile', async () => {
+      const res = await app.request(
+        `/v1/learner-profile/${OWN_CHILD_PROFILE_ID}/all`,
+        { method: 'DELETE', headers: NON_OWNER_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
+      expect(mockDeleteAllMemory).not.toHaveBeenCalled();
+    });
+
+    it('[BREAK] POST /learner-profile/:profileId/consent returns 403 for non-owner profile', async () => {
+      const res = await app.request(
+        `/v1/learner-profile/${OWN_CHILD_PROFILE_ID}/consent`,
+        {
+          method: 'POST',
+          headers: NON_OWNER_HEADERS,
+          body: JSON.stringify({ consent: 'granted' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body).toMatchObject({ code: ERROR_CODES.FORBIDDEN });
+      expect(mockGrantMemoryConsent).not.toHaveBeenCalled();
     });
   });
 });

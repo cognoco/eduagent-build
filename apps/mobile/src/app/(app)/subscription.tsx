@@ -30,7 +30,6 @@ import { assertOk } from '../../lib/assert-ok';
 
 import { UsageMeter } from '../../components/common';
 import { TrackedView } from '../../components/common/TrackedView';
-import { ParentOnly } from '../../components/_internal/ParentOnly';
 import {
   useSubscription,
   useUsage,
@@ -601,15 +600,24 @@ function ChildPaywall(): React.ReactElement {
 // Main Subscription Screen
 // ---------------------------------------------------------------------------
 
+/**
+ * SubscriptionScreen renders SubscriptionContent for all users.
+ *
+ * SubscriptionContent is responsible for:
+ *   - Showing ChildPaywall to non-owner profiles whose subscription is
+ *     expired / quota-exceeded.
+ *   - Redirecting non-owner profiles with active subscriptions away (via
+ *     ParentOnly inside SubscriptionContent, which gates the management UI).
+ *
+ * We intentionally do NOT wrap the outer screen in ParentOnly so that
+ * non-owner profiles can reach the ChildPaywall branch. ParentOnly is applied
+ * around the owner-only management content inside SubscriptionContent.
+ */
 export default function SubscriptionScreen() {
-  return (
-    <ParentOnly>
-      <SubscriptionContent />
-    </ParentOnly>
-  );
+  return <SubscriptionContent />;
 }
 
-function SubscriptionContent(): React.ReactElement {
+function SubscriptionContent(): React.ReactElement | null {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const colors = useThemeColors();
@@ -699,6 +707,30 @@ function SubscriptionContent(): React.ReactElement {
       mountedRef.current = false;
     };
   }, []);
+
+  // Non-owner profiles that do NOT need the child paywall redirect to home.
+  // We compute this early so the useEffect runs unconditionally (React hooks
+  // rules require all hooks before any conditional early-returns below).
+  // The effect is a no-op when data is still loading or the paywall should show.
+  const isChildEarly = activeProfile ? !activeProfile.isOwner : false;
+  const subHasLoadErrorEarly =
+    (subError && !subscription) || (usageError && !usage);
+  const trialOrExpiredEarly =
+    !subHasLoadErrorEarly &&
+    (subscription?.status === 'expired' ||
+      subscription?.status === 'cancelled' ||
+      (!subscription && !subLoading));
+  const quotaExhaustedEarly =
+    !subHasLoadErrorEarly && usage?.warningLevel === 'exceeded';
+  const showPaywall =
+    isChildEarly && (trialOrExpiredEarly || quotaExhaustedEarly);
+  useEffect(() => {
+    // Redirect children who don't need the paywall (active sub or load error)
+    // away from the owner-only management UI.
+    if (isChildEarly && !subLoading && !usageLoading && !showPaywall) {
+      router.replace('/');
+    }
+  }, [isChildEarly, subLoading, usageLoading, showPaywall, router]);
 
   // RevenueCat hooks
   const {
@@ -1170,16 +1202,18 @@ function SubscriptionContent(): React.ReactElement {
   // Child profile gate — child sees the child-friendly paywall
   // ---------------------------------------------------------------------------
 
-  const isChild = activeProfile ? !activeProfile.isOwner : false;
-  const hasLoadError = (subError && !subscription) || (usageError && !usage);
-  const trialOrExpired =
-    !hasLoadError &&
-    (subscription?.status === 'expired' ||
-      subscription?.status === 'cancelled' ||
-      (!subscription && !subLoading));
-  const quotaExhausted = !hasLoadError && usage?.warningLevel === 'exceeded';
+  // Reuse variables computed early for the child-redirect useEffect above.
+  const isChild = isChildEarly;
+  const hasLoadError = subHasLoadErrorEarly;
+  const trialOrExpired = trialOrExpiredEarly;
+  const quotaExhausted = quotaExhaustedEarly;
+
   if (isChild && (trialOrExpired || quotaExhausted)) {
     return <ChildPaywall />;
+  }
+
+  if (isChild) {
+    return null;
   }
 
   // ---------------------------------------------------------------------------
