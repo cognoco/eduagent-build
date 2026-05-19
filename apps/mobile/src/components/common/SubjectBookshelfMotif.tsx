@@ -1,6 +1,7 @@
 import { View } from 'react-native';
 
 import type { LearningSubjectTint } from '../../lib/learning-subject-tints';
+import { withOpacity } from '../../lib/color-opacity';
 
 // Hoisted to module scope — geometry/opacity only, no theme or prop dependencies.
 // Stable reference prevents FlatList row remounts on parent re-renders.
@@ -26,7 +27,7 @@ export function SubjectBookshelfMotif({
         width: 52,
         height: 44,
         borderRadius: 13,
-        borderColor: tint.solid + '33',
+        borderColor: withOpacity(tint.solid, 0.2),
         borderWidth: 1,
         justifyContent: 'flex-end',
         paddingHorizontal: 7,

@@ -24,6 +24,7 @@ import {
   claimBookForGeneration,
   moveTopicToBook,
   expandExistingBookTopics,
+  generateBookTopicsWithFallback,
 } from '../services/curriculum';
 import { getBookSessions } from '../services/session';
 import { generateBookTopics } from '../services/book-generation';
@@ -154,29 +155,27 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
 
         const learnerAge = await getProfileAge(db, profileId);
 
-        let generated: BookTopicGenerationResult;
-        try {
-          generated = await generateBookTopics(
+        const generated: BookTopicGenerationResult =
+          await generateBookTopicsWithFallback(
             claimed.title,
             claimed.description ?? '',
             learnerAge,
             priorKnowledge,
-          );
-        } catch (error) {
-          captureException(error, {
-            profileId,
-            extra: {
-              phase: 'book_topic_generation_fallback',
-              subjectId,
-              bookId,
-              bookTitle: claimed.title,
+            {
+              generateBookTopics,
+              captureException,
+              buildFallbackBookTopics,
+              sentryContext: {
+                profileId,
+                extra: {
+                  phase: 'book_topic_generation_fallback',
+                  subjectId,
+                  bookId,
+                  bookTitle: claimed.title,
+                },
+              },
             },
-          });
-          generated = buildFallbackBookTopics(
-            claimed.title,
-            claimed.description ?? '',
           );
-        }
 
         const persisted = await persistBookTopics(
           db,

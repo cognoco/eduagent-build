@@ -18,7 +18,11 @@ import { createMiddleware } from 'hono/factory';
 import type { Context } from 'hono';
 import type { Database } from '@eduagent/database';
 import { ERROR_CODES } from '@eduagent/schemas';
-import type { SubscriptionTier, SubscriptionStatus } from '@eduagent/schemas';
+import type {
+  SubscriptionTier,
+  SubscriptionStatus,
+  MaybeReplayResponse,
+} from '@eduagent/schemas';
 import type { Account } from '../services/account';
 import type { LLMTier } from '../services/subscription';
 import type { ProfileMeta } from './profile-scope';
@@ -40,6 +44,7 @@ import { lookupAssistantTurnState } from '../services/idempotency-assistant-stat
 import {
   readSubscriptionStatus,
   writeSubscriptionStatus,
+  deleteSubscriptionStatus,
   type CachedSubscriptionStatus,
 } from '../services/kv';
 import { createLogger } from '../services/logger';
@@ -234,13 +239,18 @@ async function maybeReplayIdempotentSessionRequest(
   });
 
   c.header('Idempotency-Replay', 'true');
-  return c.json({
+  // [CCR PR #281 / B68] Type the response body against the shared schema
+  // (`MaybeReplayResponse` in @eduagent/schemas) so server + mobile cannot
+  // drift. Mobile's `IdempotencyReplayBody` is the same shape and now
+  // re-exports this type.
+  const body: MaybeReplayResponse = {
     replayed: true,
     clientId: key,
     status: 'persisted',
     assistantTurnReady: state.assistantTurnReady,
     latestExchangeId: state.latestExchangeId,
-  });
+  };
+  return c.json(body);
 }
 
 // ---------------------------------------------------------------------------
@@ -304,6 +314,30 @@ async function safeWriteKV(
       accountId,
       error: error instanceof Error ? error.message : String(error),
     });
+  }
+}
+
+// [CCR PR #281 / B67] After `safeRefundQuota` undoes a decrement, the KV
+// snapshot still encodes the *pre-refund* `usedThisMonth` / `usedToday`. Any
+// follow-up request served from cache would over-count usage and could return
+// a spurious 402 QUOTA_EXCEEDED. The cheapest correct fix is to invalidate
+// the cache entry — the next request falls through to DB and backfills KV
+// with the post-refund counters via the existing miss path. Silent recovery
+// is banned: on delete failure we emit a structured warn so the failure
+// rate is queryable (CLAUDE.md → "Silent recovery without escalation is
+// banned").
+async function safeDeleteKV(kv: KVNamespace, accountId: string): Promise<void> {
+  try {
+    await deleteSubscriptionStatus(kv, accountId);
+  } catch (error) {
+    logger.warn(
+      '[metering] KV delete failed — cache may serve stale counters until TTL',
+      {
+        event: 'metering.kv_delete_failed',
+        accountId,
+        error: error instanceof Error ? error.message : String(error),
+      },
+    );
   }
 }
 
@@ -526,6 +560,15 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
         route: `metering.${c.req.method}.${c.req.path}`,
         profileId,
       });
+      // [CCR PR #281 / B67] Strip the in-flight quota headers (already handled
+      // by skipping `withQuotaHeaders` on this branch) AND invalidate the KV
+      // snapshot — the pre-refund counters live there and would feed the next
+      // request a stale, post-decrement view of usage. Without this, a 400 on
+      // a metered route refunds the DB but leaves a "user is one question
+      // closer to the cap" snapshot in KV until the 24h TTL expires.
+      if (kv) {
+        await safeDeleteKV(kv, account.id);
+      }
       return;
     }
 

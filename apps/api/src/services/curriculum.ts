@@ -1460,6 +1460,55 @@ export async function persistBookTopics(
 }
 
 /**
+ * Generate book topics with deterministic fallback on LLM failure.
+ *
+ * Centralises the `generateBookTopics → captureException → buildFallbackBookTopics`
+ * sequence that previously lived inline at two call sites (the create-book
+ * route handler and the expand-existing-book service). Each call site passes
+ * its own `sentryContext` so the distinguishing `phase` tag (e.g.
+ * `book_topic_generation_fallback` vs `book_topic_expansion_fallback`) is
+ * preserved in Sentry.
+ *
+ * Dependencies are injected so the helper can be tested without touching the
+ * real LLM provider or Sentry client.
+ */
+export async function generateBookTopicsWithFallback(
+  bookTitle: string,
+  bookDescription: string,
+  learnerAge: number,
+  expansionContext: string | undefined,
+  deps: {
+    generateBookTopics: (
+      bookTitle: string,
+      bookDescription: string,
+      learnerAge: number,
+      context?: string,
+    ) => Promise<BookTopicGenerationResult>;
+    captureException: (
+      error: unknown,
+      context?: { profileId?: string; extra?: Record<string, unknown> },
+    ) => void;
+    buildFallbackBookTopics: (
+      bookTitle: string,
+      bookDescription: string,
+    ) => BookTopicGenerationResult;
+    sentryContext: { profileId?: string; extra?: Record<string, unknown> };
+  },
+): Promise<BookTopicGenerationResult> {
+  try {
+    return await deps.generateBookTopics(
+      bookTitle,
+      bookDescription,
+      learnerAge,
+      expansionContext,
+    );
+  } catch (error) {
+    deps.captureException(error, deps.sentryContext);
+    return deps.buildFallbackBookTopics(bookTitle, bookDescription);
+  }
+}
+
+/**
  * Orchestrates the "expand an already-generated thin book" flow.
  *
  * Called when a book has already been claimed/generated but has fewer than
@@ -1467,8 +1516,8 @@ export async function persistBookTopics(
  *
  * Pipeline:
  *   1. Build expansion context from priorKnowledge + existing topic titles.
- *   2. Call generateBookTopics; on failure, capture and fall back to
- *      buildFallbackBookTopics (deterministic).
+ *   2. Call generateBookTopicsWithFallback; on LLM failure it captures the
+ *      exception and falls back to buildFallbackBookTopics (deterministic).
  *   3. Run prepareTopicExpansion to de-dupe against existing titles and
  *      enforce MIN/MAX constraints.
  *   4. Persist with appendToExisting=true and return the resulting book.
@@ -1513,29 +1562,26 @@ export async function expandExistingBookTopics(
     .filter((value): value is string => !!value?.trim())
     .join('\n');
 
-  let generated: BookTopicGenerationResult;
-  try {
-    generated = await deps.generateBookTopics(
-      existing.book.title,
-      existing.book.description ?? '',
-      deps.learnerAge,
-      expansionContext || undefined,
-    );
-  } catch (error) {
-    deps.captureException(error, {
-      profileId,
-      extra: {
-        phase: 'book_topic_expansion_fallback',
-        subjectId,
-        bookId,
-        bookTitle: existing.book.title,
+  const generated = await generateBookTopicsWithFallback(
+    existing.book.title,
+    existing.book.description ?? '',
+    deps.learnerAge,
+    expansionContext || undefined,
+    {
+      generateBookTopics: deps.generateBookTopics,
+      captureException: deps.captureException,
+      buildFallbackBookTopics,
+      sentryContext: {
+        profileId,
+        extra: {
+          phase: 'book_topic_expansion_fallback',
+          subjectId,
+          bookId,
+          bookTitle: existing.book.title,
+        },
       },
-    });
-    generated = buildFallbackBookTopics(
-      existing.book.title,
-      existing.book.description ?? '',
-    );
-  }
+    },
+  );
 
   const expansion = prepareTopicExpansion(
     generated,
