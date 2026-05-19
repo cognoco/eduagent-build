@@ -114,7 +114,8 @@ test('single learner UX screenshot crawl', async ({ page }) => {
     page
       .getByTestId('camera-view')
       .or(page.getByTestId('manual-entry-button'))
-      .or(page.getByTestId('grant-permission-button')),
+      .or(page.getByTestId('grant-permission-button'))
+      .first(),
   ).toBeVisible({ timeout: 30_000 });
   await capture(page, '14-homework-camera');
 
