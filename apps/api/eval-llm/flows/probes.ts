@@ -170,7 +170,6 @@ function buildBaseContext(profile: EvalProfile): ExchangeContext {
     knownVocabulary: profile.recentQuizAnswers.vocabulary.length
       ? profile.recentQuizAnswers.vocabulary
       : undefined,
-    learningMode: profile.learningMode,
     exchangeCount: 0,
     inputMode: 'text',
     llmTier: 'standard',
@@ -197,14 +196,11 @@ function buildProbeContext(
     ...base,
     ...probe.contextOverrides,
     exchangeHistory: history,
-    // When the probe sets learningMode to 'casual' (or casual is inherited from
-    // the profile default) and does NOT supply an explicit topicTitle override,
-    // clear topicTitle — mirrors the exchanges.ts casual-mode branch.
+    // When the probe does NOT supply an explicit topicTitle override,
+    // keep the base topicTitle from the profile.
     topicTitle: hasTopicTitleOverride
       ? probe.contextOverrides.topicTitle
-      : probe.contextOverrides.learningMode === 'casual'
-        ? undefined
-        : base.topicTitle,
+      : base.topicTitle,
   };
 }
 
@@ -722,10 +718,8 @@ export const probesFlow: FlowDefinition<ProbeScenarioInput> = {
         `History turns: ${
           input.context.exchangeHistory.length
         }, exchangeCount: ${input.context.exchangeCount ?? 0}`,
-        `inputMode: ${input.context.inputMode ?? 'text'}, learningMode: ${
-          input.context.learningMode ?? 'default'
-        }`,
-        `topicTitle: ${input.context.topicTitle ?? '(none — casual mode)'}`,
+        `inputMode: ${input.context.inputMode ?? 'text'}`,
+        `topicTitle: ${input.context.topicTitle ?? '(none — freeform)'}`,
         `sourceEvidence: ${sourceEvidence
           .map(
             (item) =>

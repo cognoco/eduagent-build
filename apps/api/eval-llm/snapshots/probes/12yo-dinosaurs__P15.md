@@ -19,7 +19,6 @@
 | Target language | — |
 | Struggles | long division (math); Austria vs Australia (geography) |
 | Strengths | dinosaur classification (science); reading comprehension (reading) |
-| Learning mode | casual |
 | Preferred explanations | humor, examples, stories |
 | Pace | quick |
 | Analogy domain | nature |
@@ -80,7 +79,6 @@
     "teachingPreference": "humor",
     "analogyDomain": "nature",
     "nativeLanguage": "en",
-    "learningMode": "casual",
     "exchangeCount": 8,
     "inputMode": "text",
     "llmTier": "standard",
@@ -294,7 +292,7 @@ Yep — and I think I can explain why the edge case works too, if you want.
 - Probe: P15 [standard] — 4-correct streak — tutor should escalate the challenge rung (all profiles, exchangeCount 8)
 - Rung: 2, sessionType: learning, verification: standard
 - History turns: 8, exchangeCount: 8
-- inputMode: text, learningMode: casual
+- inputMode: text
 - topicTitle: Mesozoic era
 - sourceEvidence: learner_message:context, current_topic:reliable, conversation_history:context, prior_learning:context, mentor_memory:context, accommodation:context
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs

@@ -8,7 +8,7 @@ import { IntentCard } from '../../../components/home/IntentCard';
 import { useQuizStats } from '../../../hooks/use-quiz';
 import { useSubjects } from '../../../hooks/use-subjects';
 import { useVocabulary } from '../../../hooks/use-vocabulary';
-import { goBackOrReplace, homeHrefForReturnTo } from '../../../lib/navigation';
+import { homeHrefForReturnTo } from '../../../lib/navigation';
 import { useThemeColors } from '../../../lib/theme';
 import { useQuizFlow } from './_layout';
 
@@ -120,6 +120,7 @@ export default function QuizIndexScreen(): React.ReactElement {
         subject.status === 'active',
     ) ?? [];
   const isPracticeReturn = returnTo === 'practice';
+  const returnTarget = returnTo ?? null;
 
   const capitalsStats = stats?.find((stat) => stat.activityType === 'capitals');
   const capitalsSubtitle =
@@ -155,7 +156,7 @@ export default function QuizIndexScreen(): React.ReactElement {
     setActivityType('vocabulary');
     setSubjectId(subjectId);
     setLanguageName(languageName);
-    setReturnTo(isPracticeReturn ? 'practice' : null);
+    setReturnTo(returnTarget);
     setRound(null);
     setPrefetchedRoundId(null);
     setCompletionResult(null);
@@ -163,7 +164,12 @@ export default function QuizIndexScreen(): React.ReactElement {
     // if the context update hasn't propagated by first render (web timing gap).
     router.push({
       pathname: '/(app)/quiz/launch',
-      params: { activityType: 'vocabulary', subjectId },
+      params: {
+        activityType: 'vocabulary',
+        subjectId,
+        languageName,
+        ...(returnTarget ? { returnTo: returnTarget } : {}),
+      },
     } as never);
   };
   const handleBack = () => {
@@ -177,7 +183,7 @@ export default function QuizIndexScreen(): React.ReactElement {
       return;
     }
 
-    goBackOrReplace(router, '/(app)/practice');
+    router.replace('/(app)/practice' as never);
   };
 
   return (
@@ -256,13 +262,16 @@ export default function QuizIndexScreen(): React.ReactElement {
               setActivityType('capitals');
               setSubjectId(null);
               setLanguageName(null);
-              setReturnTo(isPracticeReturn ? 'practice' : null);
+              setReturnTo(returnTarget);
               setRound(null);
               setPrefetchedRoundId(null);
               setCompletionResult(null);
               router.push({
                 pathname: '/(app)/quiz/launch',
-                params: { activityType: 'capitals' },
+                params: {
+                  activityType: 'capitals',
+                  ...(returnTarget ? { returnTo: returnTarget } : {}),
+                },
               } as never);
             }}
             testID="quiz-capitals"
@@ -310,13 +319,16 @@ export default function QuizIndexScreen(): React.ReactElement {
               setActivityType('guess_who');
               setSubjectId(null);
               setLanguageName(null);
-              setReturnTo(isPracticeReturn ? 'practice' : null);
+              setReturnTo(returnTarget);
               setRound(null);
               setPrefetchedRoundId(null);
               setCompletionResult(null);
               router.push({
                 pathname: '/(app)/quiz/launch',
-                params: { activityType: 'guess_who' },
+                params: {
+                  activityType: 'guess_who',
+                  ...(returnTarget ? { returnTo: returnTarget } : {}),
+                },
               } as never);
             }}
             testID="quiz-guess-who"

@@ -19,7 +19,7 @@ describe('parseCliArgs', () => {
         'S1-rung1-teach-new',
         'S3-rung3-evaluate',
         'S5-rung5-exit',
-      ])
+      ]),
     );
     expect(options.scenarioFilter?.size).toBe(3);
   });
@@ -63,7 +63,6 @@ describe('runHarness scenario fan-out', () => {
     struggles: [],
     strengths: [],
     recentQuizAnswers: { capitals: [], vocabulary: [], guessWho: [] },
-    learningMode: 'serious',
     preferredExplanations: ['examples'],
     pacePreference: 'thorough',
   };
@@ -160,7 +159,7 @@ describe('runHarness live budget cap', () => {
     expect(calls.count).toBe(1);
     expect(summary.liveCallsOk).toBe(1);
     const budgetSkips = summary.skipped.filter((s) =>
-      s.reason.includes('live budget exceeded')
+      s.reason.includes('live budget exceeded'),
     );
     expect(budgetSkips.length).toBe(2);
   });

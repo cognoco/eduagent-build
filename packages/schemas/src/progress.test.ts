@@ -6,7 +6,6 @@ import {
   reviewDueCardSchema,
   challengeCardSchema,
   coachingCardSchema,
-  learningModeSchema,
   celebrationNameSchema,
   celebrationReasonSchema,
   celebrationLevelSchema,
@@ -17,14 +16,12 @@ import {
   streakSchema,
   xpSummarySchema,
   notificationPrefsSchema,
-  learningModeUpdateSchema,
   celebrationLevelUpdateSchema,
   celebrationLevelQuerySchema,
   celebrationSeenSchema,
   pushTokenRegisterSchema,
   notificationPrefsResponseSchema,
   getNotificationsResponseSchema,
-  getLearningModeResponseSchema,
   getCelebrationLevelResponseSchema,
   pendingCelebrationsResponseSchema,
   celebrationSeenResponseSchema,
@@ -105,17 +102,6 @@ const baseCard = {
 // ---------------------------------------------------------------------------
 // Enum schemas
 // ---------------------------------------------------------------------------
-describe('learningModeSchema', () => {
-  it('accepts serious and casual', () => {
-    expect(learningModeSchema.safeParse('serious').success).toBe(true);
-    expect(learningModeSchema.safeParse('casual').success).toBe(true);
-  });
-
-  it('rejects invalid mode', () => {
-    expect(learningModeSchema.safeParse('relaxed').success).toBe(false);
-  });
-});
-
 describe('celebrationNameSchema', () => {
   it('accepts all 4 celebration names', () => {
     for (const val of [
@@ -344,14 +330,6 @@ describe('notificationPrefsSchema', () => {
 // ---------------------------------------------------------------------------
 // Update schemas
 // ---------------------------------------------------------------------------
-describe('learningModeUpdateSchema', () => {
-  it('wraps a valid learning mode', () => {
-    expect(
-      learningModeUpdateSchema.safeParse({ mode: 'serious' }).success,
-    ).toBe(true);
-  });
-});
-
 describe('celebrationLevelUpdateSchema', () => {
   it('accepts celebrationLevel with optional childProfileId', () => {
     expect(
@@ -447,14 +425,6 @@ describe('getNotificationsResponseSchema', () => {
       },
     });
     expect(result.success).toBe(true);
-  });
-});
-
-describe('getLearningModeResponseSchema', () => {
-  it('accepts mode serious', () => {
-    expect(
-      getLearningModeResponseSchema.safeParse({ mode: 'serious' }).success,
-    ).toBe(true);
   });
 });
 

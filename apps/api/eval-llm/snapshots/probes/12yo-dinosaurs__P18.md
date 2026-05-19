@@ -19,7 +19,6 @@
 | Target language | — |
 | Struggles | long division (math); Austria vs Australia (geography) |
 | Strengths | dinosaur classification (science); reading comprehension (reading) |
-| Learning mode | casual |
 | Preferred explanations | humor, examples, stories |
 | Pace | quick |
 | Analogy domain | nature |
@@ -35,6 +34,7 @@
     "sessionId": "eval-probe-12yo-dinosaurs",
     "profileId": "eval-profile-12yo-dinosaurs",
     "subjectName": "Science",
+    "topicTitle": "Mesozoic era",
     "sessionType": "learning",
     "escalationRung": 1,
     "exchangeHistory": [
@@ -63,7 +63,6 @@
     "teachingPreference": "humor",
     "analogyDomain": "nature",
     "nativeLanguage": "en",
-    "learningMode": "casual",
     "exchangeCount": 3,
     "inputMode": "text",
     "llmTier": "standard",
@@ -113,6 +112,7 @@ PRIVATE SOURCE CONTRACT — NON-NEGOTIABLE:
 - Always fill private_sources.relied_on with the exact source IDs you used. Set private_sources.insufficient=true when reliable support is missing or too thin. This is private audit data; never show it, source IDs, or private audit details to the learner.
 <source_pack>
 <source id="learner_message" kind="learner_message" reliability="learner_provided" reliable_for_facts="false" label="Current learner message" excerpt="What&apos;s the funniest dinosaur fact you know?"/>
+<source id="current_topic" kind="current_topic" reliability="trusted_app_content" reliable_for_facts="true" label="Loaded curriculum topic" excerpt="Mesozoic era"/>
 <source id="conversation_history" kind="conversation_history" reliability="conversation_only" reliable_for_facts="false" label="Recent conversation history" excerpt="assistant: We&apos;ve covered the basics of Mesozoic era. Let&apos;s go a bit deeper — what do you think the main challenge is here? user: Probably making sure you apply the right approach in the right situation. assistant: Good instinct. Can you think of a situation where the obvious approach would actually go wrong? user: Like when long division is involved — then ..."/>
 <source id="prior_learning" kind="prior_learning" reliability="memory_only" reliable_for_facts="false" label="Prior learning summary" excerpt="Recently completed topics: fossilization, plate tectonics. Demonstrated strength in: dinosaur classification, reading comprehension."/>
 <source id="mentor_memory" kind="mentor_memory" reliability="memory_only" reliable_for_facts="false" label="Mentor memory and summaries" excerpt="Recent semantically-similar session: learner was working on Mesozoic era and had trouble with long division. They responded well to humor-based explanations. About this learner: - Confident with: dinosaur classification (science); reading comprehension (reading). - They learn best with humor and examples and stories-based explanations, a quicker pace. - Sch..."/>
@@ -152,6 +152,8 @@ Pacing: Relaxed. Take your time with explanations. Use more examples and analogi
 Tone: Warm and encouraging. Use everyday language. Light humor is fine.
 Assessment: Low-pressure. Frame checks as curiosity, not tests.
 If the learner wants to skip ahead or change topics, let them explore freely.
+
+Current topic: <topic_title>Mesozoic era</topic_title>
 
 Subject: <subject_name>Science</subject_name>
 
@@ -269,7 +271,7 @@ What's the funniest dinosaur fact you know?
 - Probe: P18 [standard] — 12yo casual humor mode — tutor should match the energy
 - Rung: 1, sessionType: learning, verification: standard
 - History turns: 4, exchangeCount: 3
-- inputMode: text, learningMode: casual
-- topicTitle: (none — casual mode)
-- sourceEvidence: learner_message:context, conversation_history:context, prior_learning:context, mentor_memory:context, accommodation:context
+- inputMode: text
+- topicTitle: Mesozoic era
+- sourceEvidence: learner_message:context, current_topic:reliable, conversation_history:context, prior_learning:context, mentor_memory:context, accommodation:context
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs

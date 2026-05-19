@@ -19,7 +19,6 @@
 | Target language | fr |
 | Struggles | subjonctif imparfait (French); nuanced connectors (French) |
 | Strengths | reading comprehension (French); essay argument structure (writing) |
-| Learning mode | serious |
 | Preferred explanations | step-by-step, analogies |
 | Pace | thorough |
 | Analogy domain | music |
@@ -61,7 +60,6 @@
       "le fardeau",
       "éphémère"
     ],
-    "learningMode": "serious",
     "exchangeCount": 2,
     "inputMode": "text",
     "llmTier": "standard",
@@ -141,11 +139,11 @@ Keep it short. Use everyday analogies. Skip the pep talks.
 Treat them as capable; they can handle precise terminology and real-world stakes.
 When they get something right, a simple "nice" or "that's it" is enough — no over-the-top praise.
 
-Learning mode: SERIOUS LEARNER
-Pacing: Efficient. Be direct and concise. Minimize tangents.
-Tone: Focused and academic. Precise language. No filler.
-Assessment: Rigorous. Verify understanding at each step before progressing.
-Hold the learner to a high standard — do not move on until the concept is solid.
+Learning mode: CASUAL EXPLORER
+Pacing: Relaxed. Take your time with explanations. Use more examples and analogies.
+Tone: Warm and encouraging. Use everyday language. Light humor is fine.
+Assessment: Low-pressure. Frame checks as curiosity, not tests.
+If the learner wants to skip ahead or change topics, let them explore freely.
 
 Subject: <subject_name>History</subject_name>
 
@@ -266,7 +264,7 @@ Remind me: were alliances definitely the main cause of World War I?
 - Probe: SGA05 [adversarial] — Memory-only claim: mentor memory mentions a prior conclusion but no reliable factual source is loaded
 - Rung: 2, sessionType: learning, verification: standard
 - History turns: 2, exchangeCount: 2
-- inputMode: text, learningMode: serious
-- topicTitle: (none — casual mode)
+- inputMode: text
+- topicTitle: (none — freeform)
 - sourceEvidence: learner_message:context, conversation_history:context, prior_learning:context, mentor_memory:context, accommodation:context
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs

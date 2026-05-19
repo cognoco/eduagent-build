@@ -436,7 +436,6 @@ import {
   recordSystemPrompt,
   recordSessionEvent,
   setSessionInputMode,
-  skipSummary,
   startFirstCurriculumSession,
   SessionExchangeLimitError,
 } from '../services/session';
@@ -1275,7 +1274,6 @@ describe('session routes', () => {
           sessionId: SESSION_ID,
           summaryStatus: 'accepted',
           qualityRating: 4,
-          summaryTrackingHandled: true,
         }),
       });
     });
@@ -1326,43 +1324,13 @@ describe('session routes', () => {
 
       const body = await res.json();
       expect(body.summary.status).toBe('skipped');
-      expect(body.consecutiveSummarySkips).toBeUndefined();
       expect(mockInngestSend).toHaveBeenCalledWith({
         name: 'app/session.completed',
         data: expect.objectContaining({
           sessionId: SESSION_ID,
           summaryStatus: 'skipped',
-          summaryTrackingHandled: true,
         }),
       });
-    });
-
-    it('returns consecutiveSummarySkips when the counter increments', async () => {
-      const mockedSkipSummary = skipSummary as jest.Mock;
-      mockedSkipSummary.mockResolvedValueOnce({
-        summary: {
-          id: 'summary-1',
-          sessionId: SESSION_ID,
-          content: '',
-          aiFeedback: null,
-          status: 'skipped',
-        },
-        consecutiveSummarySkips: 5,
-      });
-
-      const res = await app.request(
-        `/v1/sessions/${SESSION_ID}/summary/skip`,
-        {
-          method: 'POST',
-          headers: AUTH_HEADERS,
-        },
-        TEST_ENV,
-      );
-
-      expect(res.status).toBe(200);
-
-      const body = await res.json();
-      expect(body.consecutiveSummarySkips).toBe(5);
     });
   });
 

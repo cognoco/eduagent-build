@@ -168,7 +168,6 @@ describe('getSessionSummary', () => {
       nextTopicId: null,
     });
     // getSessionXpEntry calls db.query.learningSessions.findFirst then repo.xpLedger
-    // getConsecutiveSummarySkips calls db.query.learningModes.findFirst
     const sessionRow = buildSessionRow();
 
     const db = {
@@ -178,10 +177,6 @@ describe('getSessionSummary', () => {
         },
         sessionSummaries: {
           findFirst: jest.fn().mockResolvedValue(summaryRow),
-        },
-        // getConsecutiveSummarySkips uses learningModes (profile settings table)
-        learningModes: {
-          findFirst: jest.fn().mockResolvedValue(undefined),
         },
         // xpLedger queried by getSessionXpEntry scoped repo — also needs query stub
         xpLedger: {
@@ -208,7 +203,6 @@ describe('getSessionSummary', () => {
           findFirst: jest.fn().mockResolvedValue(buildSessionRow()),
         },
         sessionSummaries: { findFirst: summaryFindFirst },
-        learningModes: { findFirst: jest.fn().mockResolvedValue(undefined) },
         xpLedger: { findFirst: jest.fn().mockResolvedValue(undefined) },
       },
     } as unknown as import('@eduagent/database').Database;
@@ -319,52 +313,6 @@ describe('skipSummary', () => {
 
     expect(result.summary.status).toBe('accepted');
     expect(db.insert).not.toHaveBeenCalled();
-  });
-
-  it('does not increment skip counter when previous status was already skipped', async () => {
-    // When the row already has status 'skipped', calling skipSummary again should
-    // NOT increment the consecutive-skips counter (avoid double-counting).
-    const existingRow = buildSummaryRow({ status: 'skipped' });
-    const sessionRow = buildSessionRow();
-
-    const returningChain = jest.fn().mockResolvedValue([existingRow]);
-    const whereChain = { returning: returningChain };
-    const updateSetChain = { where: jest.fn().mockReturnValue(whereChain) };
-    const insertValuesChain = {
-      values: jest.fn().mockResolvedValue([existingRow]),
-    };
-
-    const db = {
-      select: jest.fn().mockReturnValue({
-        from: jest.fn().mockReturnValue({
-          where: jest.fn().mockReturnValue({
-            limit: jest.fn().mockResolvedValue([sessionRow]),
-          }),
-        }),
-      }),
-      query: {
-        learningSessions: {
-          findFirst: jest.fn().mockResolvedValue(sessionRow),
-        },
-        sessionSummaries: {
-          findFirst: jest.fn().mockResolvedValue(existingRow),
-        },
-        profileSettings: { findFirst: jest.fn().mockResolvedValue(undefined) },
-      },
-      insert: jest.fn().mockReturnValue(insertValuesChain),
-      update: jest
-        .fn()
-        .mockReturnValue({ set: jest.fn().mockReturnValue(updateSetChain) }),
-    } as unknown as import('@eduagent/database').Database;
-
-    // We can't intercept incrementSummarySkips directly (no internal mock per GC1),
-    // but we CAN assert that the result does NOT include a consecutiveSummarySkips
-    // field when the previous status was already 'skipped'. The service only calls
-    // incrementSummarySkips when existingStatus !== 'skipped'.
-    const result = await skipSummary(db, 'prof-1', 'sess-1');
-
-    // When previous status was already 'skipped', result.consecutiveSummarySkips must be absent.
-    expect(result).not.toHaveProperty('consecutiveSummarySkips');
   });
 });
 

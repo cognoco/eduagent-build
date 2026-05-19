@@ -35,7 +35,15 @@ tags:
 
 - takeScreenshot: practice-picker-01-home
 
-# ── 3. Verify intent card stack is loaded ──────────────────────────────
+# ── 3. Verify subject carousel is loaded ──────────────────────────────
+# The carousel sits below the action chips on the current LearnerScreen layout,
+# so scroll until it's on-screen before asserting.
+- scrollUntilVisible:
+    element:
+      id: "home-subject-carousel"
+    direction: DOWN
+    timeout: 10000
+
 - assertVisible:
     id: "home-subject-carousel"
 
@@ -43,7 +51,14 @@ tags:
 
 # ── 4. Tap the Practice quick-action button ───────────────────────────
 # home-action-practice is the redesigned quick-action button in LearnerScreen.
-# It navigates to /(app)/practice without a subject-picker modal.
+# After the carousel scroll above, scroll back up to bring the action chip
+# into view before tapping.
+- scrollUntilVisible:
+    element:
+      id: "home-action-practice"
+    direction: UP
+    timeout: 10000
+
 - tapOn:
     id: "home-action-practice"
 

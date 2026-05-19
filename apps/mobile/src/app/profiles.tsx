@@ -44,6 +44,7 @@ export default function ProfilesScreen() {
   const [pendingChildId, setPendingChildId] = useState<string | null>(null);
   const [pendingChildName, setPendingChildName] = useState('');
   const renameInputRef = useRef<TextInput>(null);
+  const switchInFlightRef = useRef(false);
 
   const canEditProfile = (profileId: string) => {
     if (!activeProfile) return false;
@@ -154,7 +155,8 @@ export default function ProfilesScreen() {
   // false reassurance about security and would mask a real server-side
   // regression behind a green client check.
   const handleSwitch = async (profileId: string) => {
-    if (isSwitching) return;
+    if (isSwitching || switchInFlightRef.current) return;
+    switchInFlightRef.current = true;
     setIsSwitching(true);
     const timeoutId = setTimeout(() => {
       setIsSwitching(false);
@@ -174,6 +176,12 @@ export default function ProfilesScreen() {
       // Close modal AFTER a successful switch to avoid dismissing the screen
       // when the profile change did not actually complete.
       handleClose();
+      if (result?.persistenceFailed) {
+        platformAlert(
+          'Profile switched',
+          'We could not save this profile choice on this device. You may need to pick it again after reopening the app.',
+        );
+      }
     } catch (err) {
       // [BUG-822] switchProfile may throw (network failure, Clerk error, etc.)
       // instead of returning {success:false}. Surface the typed server reason
@@ -183,6 +191,7 @@ export default function ProfilesScreen() {
       platformAlert('Could not switch profiles', formatApiError(err));
     } finally {
       clearTimeout(timeoutId);
+      switchInFlightRef.current = false;
       setIsSwitching(false);
     }
   };

@@ -56,6 +56,11 @@ interface ScenarioSpec {
   history: HistoryTurn[];
   contextOverrides: Partial<ExchangeContext>;
   /**
+   * Freeform scenarios strip the base topicTitle so the prompt renders the
+   * no-topic branch (e.g. ask-anything / casual freeform exchanges).
+   */
+  freeform?: boolean;
+  /**
    * Filter out scenarios that only make sense for a subset of profiles.
    * Returning false means "this scenario is skipped for this profile".
    */
@@ -283,15 +288,15 @@ const SCENARIO_SPECS: readonly ScenarioSpec[] = [
   },
   {
     id: 'S8-casual-freeform',
-    purpose: 'Freeform / casual-mode branch (no topic, casual tone)',
+    purpose: 'Freeform / casual branch (no topic)',
     history: HISTORY_S8_FREEFORM,
     contextOverrides: {
       escalationRung: 1,
       sessionType: 'learning',
       verificationType: 'standard',
-      learningMode: 'casual',
       exchangeCount: 1,
     },
+    freeform: true,
     appliesTo: () => true,
   },
   {
@@ -508,7 +513,6 @@ function buildBaseContext(profile: EvalProfile): ExchangeContext {
     knownVocabulary: profile.recentQuizAnswers.vocabulary.length
       ? profile.recentQuizAnswers.vocabulary
       : undefined,
-    learningMode: profile.learningMode,
     exchangeCount: 0,
     isFirstEncounter: false,
     isFirstSessionOfSubject: false,
@@ -530,14 +534,13 @@ function buildScenarioContext(
     (t) => ({ role: t.role, content: t.content }),
   );
 
+  // Freeform scenarios strip the topicTitle so the prompt rendering tests the
+  // no-topic branch. All other scenarios keep the profile's chosen topic.
   return {
     ...base,
     ...spec.contextOverrides,
     exchangeHistory: history,
-    topicTitle:
-      spec.contextOverrides.learningMode === 'casual'
-        ? undefined
-        : base.topicTitle,
+    topicTitle: spec.freeform ? undefined : base.topicTitle,
   };
 }
 

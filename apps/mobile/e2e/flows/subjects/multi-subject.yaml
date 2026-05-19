@@ -42,15 +42,23 @@ tags:
 - assertVisible:
     id: "tab-more"
 
-# ── Visual integrity: intent card stack ────────────────────────────────
-# With active subjects, the intent cards must render (not loading spinner forever).
+# ── Visual integrity: subject carousel ────────────────────────────────
+# With active subjects, the carousel must render (not loading spinner forever).
+# The carousel sits below the action chips on the current LearnerScreen layout,
+# so scroll until it's on-screen before asserting.
+- scrollUntilVisible:
+    element:
+      id: "home-subject-carousel"
+    direction: DOWN
+    timeout: 10000
+
 - assertVisible:
     id: "home-subject-carousel"
 
 # 3. Screenshot: home screen — captures what's actually rendering
 - takeScreenshot: multi-subject-01-home
 
-# 4. Physics (active subject) card MUST be visible on home screen.
+# 4. Physics (active subject) card MUST be visible in the now-on-screen carousel.
 #    home-subject-card-${id} is the testID in LearnerScreen.tsx (home-subject-carousel).
 #    seed-and-run.sh provides ACTIVE_SUBJECT_ID for the Physics subject.
 - extendedWaitUntil:

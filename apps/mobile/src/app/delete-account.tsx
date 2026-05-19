@@ -383,10 +383,16 @@ export default function DeleteAccountScreen() {
           </View>
         ) : (
           <>
-            <Text className="text-body text-text-secondary mb-4">
+            <Text
+              testID="delete-account-warning-body-1"
+              className="text-body text-text-secondary mb-4"
+            >
               {t('account.warningBody1')}
             </Text>
-            <Text className="text-body text-text-secondary mb-6">
+            <Text
+              testID="delete-account-warning-body-2"
+              className="text-body text-text-secondary mb-6"
+            >
               {t('account.warningBody2')}
             </Text>
 

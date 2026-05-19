@@ -11,8 +11,6 @@ import {
   createScopedRepository,
   type Database,
 } from '@eduagent/database';
-import { getLearningMode, getLearningModeRules } from './settings';
-
 export interface XpEvent {
   profileId: string;
   topicId: string;
@@ -36,7 +34,7 @@ export const REFLECTION_XP_MULTIPLIER = 1.5;
  */
 export function calculateTopicXp(
   masteryScore: number,
-  verificationDepth: 'recall' | 'explain' | 'transfer'
+  verificationDepth: 'recall' | 'explain' | 'transfer',
 ): number {
   const baseXp = 100 * masteryScore;
 
@@ -54,6 +52,7 @@ export function calculateTopicXp(
 
 /**
  * Verifies pending XP — returns the verified amount (same as pending).
+ * Preserved for decayed-XP re-verification; new topics ship as 'verified' directly post-sunset.
  */
 export function verifyXp(pendingAmount: number): number {
   return pendingAmount;
@@ -86,7 +85,7 @@ export async function insertSessionXpEntry(
   db: Database,
   profileId: string,
   topicId: string | null,
-  subjectId: string
+  subjectId: string,
 ): Promise<void> {
   if (!topicId) return;
 
@@ -95,7 +94,7 @@ export async function insertSessionXpEntry(
     where: and(
       eq(assessments.profileId, profileId),
       eq(assessments.topicId, topicId),
-      eq(assessments.status, 'passed')
+      eq(assessments.status, 'passed'),
     ),
   });
   if (!assessment || !assessment.masteryScore) return;
@@ -105,12 +104,8 @@ export async function insertSessionXpEntry(
   const existing = await repo.xpLedger.findFirst(eq(xpLedger.topicId, topicId));
   if (existing) return;
 
-  // 3. Determine XP status based on learning mode
-  //    Casual: completion XP awarded as 'verified' immediately
-  //    Serious: XP starts as 'pending', verified on delayed recall
-  const { mode } = await getLearningMode(db, profileId);
-  const rules = getLearningModeRules(mode);
-  const xpStatus = rules.verifiedXpOnly ? 'pending' : 'verified';
+  // 3. XP awarded as 'verified' immediately for all topics post-sunset.
+  const xpStatus = 'verified' as const;
 
   // 4. Calculate and insert. onConflictDoNothing closes the TOCTOU window
   // between the findFirst above and the insert: two concurrent session
@@ -131,7 +126,7 @@ export async function insertSessionXpEntry(
       subjectId,
       amount,
       status: xpStatus,
-      verifiedAt: xpStatus === 'verified' ? new Date() : undefined,
+      verifiedAt: new Date(),
     })
     .onConflictDoNothing({
       target: [xpLedger.profileId, xpLedger.topicId],
@@ -147,7 +142,7 @@ export async function syncXpLedgerStatus(
   db: Database,
   profileId: string,
   topicId: string,
-  newStatus: 'verified' | 'decayed'
+  newStatus: 'verified' | 'decayed',
 ): Promise<boolean> {
   const now = new Date();
   const result = await db
@@ -157,13 +152,13 @@ export async function syncXpLedgerStatus(
       ...(newStatus === 'verified' ? { verifiedAt: now } : {}),
     })
     .where(
-      and(eq(xpLedger.profileId, profileId), eq(xpLedger.topicId, topicId))
+      and(eq(xpLedger.profileId, profileId), eq(xpLedger.topicId, topicId)),
     )
     .returning({ id: xpLedger.id });
 
   if (result.length === 0) {
     console.debug(
-      `[syncXpLedgerStatus] No xp_ledger row for profile=${profileId} topic=${topicId} — skipped`
+      `[syncXpLedgerStatus] No xp_ledger row for profile=${profileId} topic=${topicId} — skipped`,
     );
     return false;
   }
@@ -173,12 +168,12 @@ export async function syncXpLedgerStatus(
 export async function applyReflectionMultiplier(
   db: Database,
   profileId: string,
-  sessionId: string
+  sessionId: string,
 ): Promise<{ applied: boolean; newAmount: number }> {
   const session = await db.query.learningSessions.findFirst({
     where: and(
       eq(learningSessions.id, sessionId),
-      eq(learningSessions.profileId, profileId)
+      eq(learningSessions.profileId, profileId),
     ),
   });
   if (!session?.topicId) {
@@ -187,7 +182,7 @@ export async function applyReflectionMultiplier(
 
   const repo = createScopedRepository(db, profileId);
   const entry = await repo.xpLedger.findFirst(
-    eq(xpLedger.topicId, session.topicId)
+    eq(xpLedger.topicId, session.topicId),
   );
   if (!entry) {
     return { applied: false, newAmount: 0 };
@@ -208,8 +203,8 @@ export async function applyReflectionMultiplier(
       and(
         eq(xpLedger.id, entry.id),
         eq(xpLedger.profileId, profileId),
-        eq(xpLedger.reflectionMultiplierApplied, false)
-      )
+        eq(xpLedger.reflectionMultiplierApplied, false),
+      ),
     )
     .returning({ id: xpLedger.id });
 
@@ -223,12 +218,12 @@ export async function applyReflectionMultiplier(
 export async function getSessionXpEntry(
   db: Database,
   profileId: string,
-  sessionId: string
+  sessionId: string,
 ): Promise<{ baseXp: number; reflectionBonusXp: number } | null> {
   const session = await db.query.learningSessions.findFirst({
     where: and(
       eq(learningSessions.id, sessionId),
-      eq(learningSessions.profileId, profileId)
+      eq(learningSessions.profileId, profileId),
     ),
   });
   if (!session?.topicId) {
@@ -237,7 +232,7 @@ export async function getSessionXpEntry(
 
   const repo = createScopedRepository(db, profileId);
   const entry = await repo.xpLedger.findFirst(
-    eq(xpLedger.topicId, session.topicId)
+    eq(xpLedger.topicId, session.topicId),
   );
   if (!entry) {
     return null;

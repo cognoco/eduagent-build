@@ -4,7 +4,6 @@ import {
   accounts,
   createDatabase,
   generateUUIDv7,
-  learningModes,
   profiles,
   sessionSummaries,
   subjects,
@@ -151,13 +150,9 @@ describe('session summary integration', () => {
 
     const firstResult = await skipSummary(db, profileId, session.id);
     const secondResult = await skipSummary(db, profileId, session.id);
-    const learningModeRow = await db.query.learningModes.findFirst({
-      where: eq(learningModes.profileId, profileId),
-    });
 
     expect(firstResult.summary.status).toBe('skipped');
     expect(secondResult.summary.status).toBe('skipped');
-    expect(learningModeRow?.consecutiveSummarySkips).toBe(1);
   });
 
   it('returns an existing submitted summary unchanged when skipping later', async () => {
@@ -178,9 +173,6 @@ describe('session summary integration', () => {
     });
 
     const result = await skipSummary(db, profileId, session.id);
-    const learningModeRow = await db.query.learningModes.findFirst({
-      where: eq(learningModes.profileId, profileId),
-    });
 
     expect(result).toEqual({
       summary: {
@@ -191,10 +183,9 @@ describe('session summary integration', () => {
         status: 'submitted',
       },
     });
-    expect(learningModeRow).toBeUndefined();
   });
 
-  it('evaluates and stores a submitted summary, then resets consecutive skips', async () => {
+  it('evaluates and stores a submitted summary', async () => {
     const { profileId } = await seedProfile();
     const subjectId = await seedSubject(profileId);
     const session = await startSession(db, profileId, subjectId, {
@@ -207,11 +198,6 @@ describe('session summary integration', () => {
       reason: 'user_ended',
       summaryStatus: 'pending',
     });
-    await db.insert(learningModes).values({
-      profileId,
-      mode: 'serious',
-      consecutiveSummarySkips: 3,
-    });
 
     const result = await submitSummary(db, profileId, session.id, {
       content:
@@ -223,9 +209,6 @@ describe('session summary integration', () => {
         eq(sessionSummaries.sessionId, session.id),
         eq(sessionSummaries.profileId, profileId),
       ),
-    });
-    const learningModeRow = await db.query.learningModes.findFirst({
-      where: eq(learningModes.profileId, profileId),
     });
 
     expect(result.summary).toEqual(
@@ -243,7 +226,6 @@ describe('session summary integration', () => {
         status: 'accepted',
       }),
     );
-    expect(learningModeRow?.consecutiveSummarySkips).toBe(0);
     expect(llmProviderCalls).toHaveLength(1);
     expect(llmProviderCalls[0]!.config.model).toBe('gemini-2.5-flash');
     expect(llmProviderCalls[0]!.messages).toEqual(

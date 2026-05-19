@@ -19,7 +19,6 @@
 | Target language | — |
 | Struggles | fraction addition (math); long multi-clause sentences (reading) |
 | Strengths | vocabulary retention (Czech) |
-| Learning mode | casual |
 | Preferred explanations | stories, examples |
 | Pace | thorough |
 | Analogy domain | nature |
@@ -64,7 +63,6 @@
     "teachingPreference": "stories",
     "analogyDomain": "nature",
     "nativeLanguage": "cs",
-    "learningMode": "casual",
     "exchangeCount": 4,
     "inputMode": "text",
     "llmTier": "standard",
@@ -279,7 +277,7 @@ I got the first part right but the second part is still fuzzy for me.
 - Probe: P16 [standard] — Mixed performance mid-session — some right, some wrong (all profiles, exchangeCount 4)
 - Rung: 2, sessionType: learning, verification: standard
 - History turns: 4, exchangeCount: 4
-- inputMode: text, learningMode: casual
+- inputMode: text
 - topicTitle: Czech reading comprehension
 - sourceEvidence: learner_message:context, current_topic:reliable, conversation_history:context, prior_learning:context, mentor_memory:context, accommodation:context
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs

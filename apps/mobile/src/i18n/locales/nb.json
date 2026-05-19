@@ -278,24 +278,6 @@
   "more": {
     "screenTitle": "Mer",
     "active": "Aktiv",
-    "learningMode": {
-      "sectionHeader": "{{name}}s læringsmodus",
-      "subtitle": "Gjelder for dine egne læringsøkter.",
-      "subtitleWithChildren": "Gjelder for dine egne økter. For å endre et barns, åpne profilen deres fra dashbordet.",
-      "childPreferencesAccessLabel": "Åpne {{name}}s profilinnstillinger",
-      "childPreferencesLink": "For å endre {{name}}s innstillinger, trykk på profilen deres på Hjem →",
-      "familyPreferencesLink": "For å endre et barns innstillinger, trykk på profilen deres på Hjem →",
-      "sheetTitle": "Læringsmodus",
-      "sheetEffectMessage": "Gjelder fra neste melding.",
-      "casual": {
-        "title": "Utforsker",
-        "description": "Lær i ditt eget tempo. Mentoren din er avslappet og oppmuntrende. Du tjener poeng med en gang og kan hoppe over repetisjoner."
-      },
-      "serious": {
-        "title": "Utfordringsmodus",
-        "description": "Utfordre deg selv mer. Mentoren din holder deg på sporet. Du tjener poeng etter å ha bevist at du husker, og repetisjoner hjelper med å feste kunnskapen."
-      }
-    },
     "accommodation": {
       "sectionHeader": "Din læringstilpasning",
       "viewAndManage": "Vis og administrer",
@@ -2229,8 +2211,10 @@
     },
     "home": "Hjem",
     "homeLabel": "Hjem",
-    "myLearning": "Min læring",
-    "myLearningLabel": "Min læring",
+    "familyHub": "Family Hub",
+    "familyHubLabel": "Family Hub",
+    "myLearning": "My Learning",
+    "myLearningLabel": "My Learning",
     "family": "Familie",
     "library": "Bibliotek",
     "libraryLabel": "Bibliotek",

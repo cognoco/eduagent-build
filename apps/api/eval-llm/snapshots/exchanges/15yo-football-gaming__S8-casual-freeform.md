@@ -19,7 +19,6 @@
 | Target language | — |
 | Struggles | factoring polynomials (math); Reconstruction era (history) |
 | Strengths | mental arithmetic (math); Newton's laws (physics) |
-| Learning mode | casual |
 | Preferred explanations | examples, analogies |
 | Pace | quick |
 | Analogy domain | sports |
@@ -29,7 +28,7 @@
 ```json
 {
   "scenarioId": "S8-casual-freeform",
-  "scenarioPurpose": "Freeform / casual-mode branch (no topic, casual tone)",
+  "scenarioPurpose": "Freeform / casual branch (no topic)",
   "context": {
     "sessionId": "eval-15yo-football-gaming",
     "profileId": "eval-profile-15yo-football-gaming",
@@ -50,7 +49,6 @@
     "teachingPreference": "examples",
     "analogyDomain": "sports",
     "nativeLanguage": "en",
-    "learningMode": "casual",
     "exchangeCount": 1,
     "isFirstEncounter": false,
     "extractedSignalsToReflect": null,
@@ -243,7 +241,7 @@ Can we just chat for a bit? Nothing heavy.
 
 ## Builder notes
 
-- Scenario: S8-casual-freeform — Freeform / casual-mode branch (no topic, casual tone)
+- Scenario: S8-casual-freeform — Freeform / casual branch (no topic)
 - Rung: 1, sessionType: learning, verification: standard
 - History turns: 1, exchangeCount: 1
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)

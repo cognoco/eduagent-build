@@ -108,7 +108,6 @@ describe('exchangesFlow', () => {
       const s8 = scenarios.find((s) => s.scenarioId === 'S8-casual-freeform');
       expect(s8?.input.context.topicTitle).toBeUndefined();
       expect(s8?.input.context.sessionType).toBe('learning');
-      expect(s8?.input.context.learningMode).toBe('casual');
     });
 
     it('exchangeHistory substitutes profile-specific tokens', () => {

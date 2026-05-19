@@ -130,6 +130,12 @@ jest.mock(
   '../../../lib/navigation' /* gc1-allow: navigation helper mock keeps screen unit-scoped */,
   () => ({
     goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
+    homeHrefForReturnTo: (returnTo: string) =>
+      returnTo === 'practice'
+        ? '/(app)/practice'
+        : returnTo === 'own-learning'
+          ? '/(app)/own-learning'
+          : '/(app)/home',
   }),
 );
 

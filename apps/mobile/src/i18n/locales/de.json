@@ -278,24 +278,6 @@
   "more": {
     "screenTitle": "Mehr",
     "active": "Aktiv",
-    "learningMode": {
-      "sectionHeader": "{{name}}s Lernmodus",
-      "subtitle": "Gilt für deine eigenen Lernsitzungen.",
-      "subtitleWithChildren": "Gilt für deine eigenen Sitzungen. Um die eines Kindes zu ändern, öffne dessen Profil im Dashboard.",
-      "childPreferencesAccessLabel": "Profileinstellungen von {{name}} öffnen",
-      "childPreferencesLink": "Um {{name}}s Einstellungen zu ändern, tippe auf das Profil auf der Startseite →",
-      "familyPreferencesLink": "Um die Einstellungen eines Kindes zu ändern, tippe auf das Profil auf der Startseite →",
-      "sheetTitle": "Lernmodus",
-      "sheetEffectMessage": "Gilt ab deiner nächsten Nachricht.",
-      "casual": {
-        "title": "Entdecker",
-        "description": "Lerne in deinem eigenen Tempo. Dein Mentor ist entspannt und ermutigend. Du verdienst sofort Punkte und kannst Wiederholungen überspringen."
-      },
-      "serious": {
-        "title": "Herausforderungsmodus",
-        "description": "Fordere dich mehr heraus. Dein Mentor hält dich auf Kurs. Du verdienst Punkte, nachdem du bewiesen hast, dass du dich erinnerst, und Wiederholungen helfen, das Wissen zu festigen."
-      }
-    },
     "accommodation": {
       "sectionHeader": "Deine Lernanpassung",
       "viewAndManage": "Anzeigen & verwalten",
@@ -2229,8 +2211,10 @@
     },
     "home": "Start",
     "homeLabel": "Start",
-    "myLearning": "Mein Lernen",
-    "myLearningLabel": "Mein Lernen",
+    "familyHub": "Family Hub",
+    "familyHubLabel": "Family Hub",
+    "myLearning": "My Learning",
+    "myLearningLabel": "My Learning",
     "family": "Familie",
     "library": "Bibliothek",
     "libraryLabel": "Bibliothek",

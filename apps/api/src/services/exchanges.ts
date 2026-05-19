@@ -21,7 +21,6 @@ import type {
 } from './llm';
 import { createLogger } from './logger';
 import {
-  type LearningMode,
   type HomeworkMode,
   type InputMode,
   type SessionType,
@@ -181,8 +180,6 @@ export interface ExchangeContext {
   knownVocabulary?: string[];
   /** EVALUATE difficulty rung 1-4 (FR128-133) */
   evaluateDifficultyRung?: 1 | 2 | 3 | 4;
-  /** Learning mode: 'serious' (default) or 'casual' — affects tutoring tone */
-  learningMode?: LearningMode;
   /** SM-2 retention status for the current topic */
   retentionStatus?: {
     status: 'new' | 'strong' | 'fading' | 'weak' | 'forgotten';
@@ -233,6 +230,8 @@ export interface ExchangeContext {
   onboardingSignals?: ExtractedInterviewSignals;
   /** True when this profile has not previously completed an exchange on this topic. */
   isFirstEncounter?: boolean;
+  /** True on the first session this profile has ever started for this subject. */
+  isFirstSessionOfSubject?: boolean;
   /** Topic-probe signals extracted from the prior learner turn, when available. */
   extractedSignalsToReflect?: {
     goals?: string;

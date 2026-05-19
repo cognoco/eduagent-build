@@ -20,6 +20,7 @@ import {
   useProfileWeeklyReports,
   useRefreshProgressSnapshot,
 } from '../../hooks/use-progress';
+import { getSubjectTintMap } from '../../lib/subject-tints';
 import ProgressScreen from './progress/index';
 
 jest.mock('react-i18next', () => ({
@@ -1011,6 +1012,50 @@ describe('ProgressScreen — progressive disclosure', () => {
     ).toHaveBeenCalledWith('/(app)/library');
   });
 
+  it('keeps Lilly report visible in proxy mode even when inventory is empty', () => {
+    mockUseActiveProfileRole.mockReturnValue('impersonated-child');
+    mockActiveProfile = {
+      id: 'child-id',
+      displayName: 'Lilly',
+      createdAt: '2026-01-01T00:00:00Z',
+      isOwner: false,
+    } as Profile;
+    mockHooks({
+      inventory: { global: { ...baseGlobal, totalSessions: 0 }, subjects: [] },
+      weeklyReports: [
+        {
+          id: 'weekly-lilly',
+          reportWeek: '2026-05-11',
+          viewedAt: null,
+          createdAt: '2026-05-17T00:00:00Z',
+          headlineStat: {
+            label: 'topics mastered',
+            value: 2,
+            comparison: '+2 this week',
+          },
+          thisWeek: {
+            totalSessions: 4,
+            totalActiveMinutes: 95,
+            topicsMastered: 2,
+            topicsExplored: 6,
+            vocabularyTotal: 12,
+            streakBest: 3,
+          },
+        },
+      ],
+    });
+
+    render(<ProgressScreen />);
+
+    screen.getByText("Lilly's progress");
+    screen.getByTestId('progress-latest-report-card');
+    screen.getByText('2 topics mastered');
+    expect(
+      screen.queryByText('Progress appears after the first study session'),
+    ).toBeNull();
+    expect(useProfileWeeklyReports).toHaveBeenCalledWith('child-id');
+  });
+
   it('opens the requested child progress profile from route params', () => {
     mockLinkedChildren = [childProgressProfile];
     mockSearchParams = { profileId: 'child-1' };
@@ -1188,6 +1233,43 @@ describe('ProgressScreen — progressive disclosure', () => {
     screen.getByText('Latest report');
     screen.getByText('Recent sessions');
     expect(screen.queryByText('Your week')).toBeNull();
+  });
+
+  it('uses the shared subject tint map for progress subject rows', () => {
+    const biologySubject = {
+      ...fullSubject,
+      subjectId: 's2',
+      subjectName: 'Biology',
+      topics: { ...fullSubject.topics, mastered: 1, inProgress: 1 },
+      activeMinutes: 12,
+      sessionsCount: 2,
+    };
+    mockLinkedChildren = [makeLinkedChild()];
+    mockSearchParams = { profileId: 'child-1' };
+    mockHooks({
+      inventory: {
+        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 4 },
+        subjects: [fullSubject],
+      },
+      childInventory: {
+        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 4 },
+        subjects: [fullSubject, biologySubject],
+      },
+      sessions: [],
+    });
+    const tintMap = getSubjectTintMap(['s1', 's2'], 'light');
+
+    render(<ProgressScreen />);
+
+    expect(
+      screen.getByTestId('progress-subject-s1-bookshelf').props.style
+        .borderColor,
+    ).toBe(`${tintMap.get('s1')!.solid}33`);
+    expect(
+      screen.getByTestId('progress-subject-s2-bookshelf').props.style
+        .borderColor,
+    ).toBe(`${tintMap.get('s2')!.solid}33`);
+    expect(tintMap.get('s1')?.solid).not.toBe(tintMap.get('s2')?.solid);
   });
 
   it('does not render the recent milestones block on the progress overview', () => {

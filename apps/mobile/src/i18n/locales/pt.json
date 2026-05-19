@@ -303,24 +303,6 @@
   "more": {
     "screenTitle": "Mais",
     "active": "Ativo",
-    "learningMode": {
-      "sectionHeader": "Modo de Aprendizado de {{name}}",
-      "subtitle": "Aplica-se às suas próprias sessões de aprendizado.",
-      "subtitleWithChildren": "Aplica-se às suas próprias sessões. Para mudar a de uma criança, abra o perfil dela no painel.",
-      "childPreferencesAccessLabel": "Abrir preferências de perfil de {{name}}",
-      "childPreferencesLink": "Para alterar as preferências de {{name}}, toque no perfil na tela Início →",
-      "familyPreferencesLink": "Para alterar as preferências de uma criança, toque no perfil na tela Início →",
-      "sheetTitle": "Modo de aprendizagem",
-      "sheetEffectMessage": "Entra em vigor a partir da tua próxima mensagem.",
-      "casual": {
-        "title": "Explorador",
-        "description": "Aprenda no seu próprio ritmo. Seu mentor é relaxado e encorajador. Você ganha pontos imediatamente e pode pular as revisões."
-      },
-      "serious": {
-        "title": "Modo desafio",
-        "description": "Exija mais de si mesmo. Seu mentor mantém você no caminho certo. Você ganha pontos depois de provar que se lembra, e as revisões ajudam a fixar o conteúdo."
-      }
-    },
     "accommodation": {
       "sectionHeader": "Sua acomodação de aprendizagem",
       "viewAndManage": "Ver e gerenciar",
@@ -2254,8 +2236,10 @@
     },
     "home": "Início",
     "homeLabel": "Início",
-    "myLearning": "Meu aprendizado",
-    "myLearningLabel": "Meu aprendizado",
+    "familyHub": "Family Hub",
+    "familyHubLabel": "Family Hub",
+    "myLearning": "My Learning",
+    "myLearningLabel": "My Learning",
     "family": "Família",
     "library": "Biblioteca",
     "libraryLabel": "Biblioteca",

@@ -282,7 +282,7 @@ describe('BookScreen', () => {
       }),
     );
 
-    const { getByTestId, queryByTestId, getByText } = render(<BookScreen />);
+    const { getByTestId, getByText, queryByTestId } = render(<BookScreen />);
 
     getByTestId('book-screen');
     getByText('Algebra');
@@ -650,12 +650,11 @@ describe('BookScreen', () => {
 
     const { getByTestId, queryByTestId, getByText } = render(<BookScreen />);
 
-    // [BUG-895] The "Continue now" in-list row was removed in favour of the
-    // sticky "▶ Continue: <title>" CTA at the bottom of the screen. The
-    // started topic still surfaces in its own section.
-    expect(queryByTestId('continue-now-row')).toBeNull();
+    // The in-list highlight and the sticky CTA point at the same topic.
+    getByTestId('continue-now-row-topic-1');
     getByTestId('started-row-topic-2');
     getByText('2 sessions');
+    expect(queryByTestId('up-next-row-topic-3')).toBeNull();
     // Sticky CTA names the continue topic explicitly.
     getByText('▶ Continue: Linear Equations');
 
@@ -699,11 +698,24 @@ describe('BookScreen', () => {
     getByTestId('started-row-topic-6');
   });
 
-  it('renders the hero up-next state on a fresh book and starts a session', () => {
+  it('renders the hero up-next state, opens topic overview from the row, and starts chat only from the sticky CTA', () => {
     const { getByTestId, getByText } = render(<BookScreen />);
 
     getByTestId('up-next-row-topic-1');
     getByText('▶ Start: Linear Equations');
+
+    fireEvent.press(getByTestId('up-next-row-topic-1'));
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/topic/[topicId]',
+      params: {
+        topicId: 'topic-1',
+        subjectId: 'sub-1',
+        bookId: 'book-1',
+        chapter: 'Foundations',
+      },
+    });
+
+    mockPush.mockClear();
 
     fireEvent.press(getByTestId('book-start-learning'));
     expect(mockPush).toHaveBeenCalledWith({
@@ -769,7 +781,24 @@ describe('BookScreen', () => {
       },
     });
 
-    const { getByTestId } = render(<BookScreen />);
+    const { getByTestId, getByText, queryByTestId } = render(<BookScreen />);
+
+    getByText('▶ Continue: Quadratic Equations');
+    getByTestId('continue-now-row-topic-2');
+    expect(queryByTestId('up-next-row-topic-1')).toBeNull();
+
+    fireEvent.press(getByTestId('continue-now-row-topic-2'));
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/topic/[topicId]',
+      params: {
+        topicId: 'topic-2',
+        subjectId: 'sub-1',
+        bookId: 'book-1',
+        chapter: 'Foundations',
+      },
+    });
+
+    mockPush.mockClear();
 
     fireEvent.press(getByTestId('book-start-learning'));
     expect(mockPush).toHaveBeenCalledWith({
@@ -835,8 +864,8 @@ describe('BookScreen', () => {
     const { getByTestId } = render(<BookScreen />);
 
     getByTestId('retention-error-banner');
-    // [BUG-895] continue-now-row removed; the sticky CTA still surfaces a
-    // way to resume the topic, so the page stays actionable on retention error.
+    // Session-backed state stays actionable even when retention data fails.
+    getByTestId('continue-now-row-topic-1');
     getByTestId('book-start-learning');
 
     fireEvent.press(getByTestId('retention-error-retry'));
@@ -935,6 +964,7 @@ describe('BookScreen', () => {
       params: {
         sessionId: 'sess-1',
         subjectId: 'sub-1',
+        bookId: 'book-1',
         topicId: 'topic-1',
       },
     });
@@ -1051,12 +1081,11 @@ describe('BookScreen', () => {
       }),
     );
 
-    const { getByText, queryByTestId } = render(<BookScreen />);
+    const { getByText, getByTestId } = render(<BookScreen />);
 
-    // [BUG-895] Sticky CTA names the topic so the duplicated "Continue now"
-    // section in-list could be removed without losing context.
+    // The sticky CTA names the same topic that the book list marks as current.
     getByText('▶ Continue: Linear Equations');
-    expect(queryByTestId('continue-now-row')).toBeNull();
+    getByTestId('continue-now-row-topic-1');
   });
 
   it('truncates a long continue-topic title in the sticky CTA [BUG-895]', () => {

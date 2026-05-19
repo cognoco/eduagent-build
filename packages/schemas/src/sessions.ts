@@ -390,7 +390,6 @@ export const sessionSummarySchema = z.object({
   nextTopicReason: z.string().nullable(),
   baseXp: z.number().nullable().optional(),
   reflectionBonusXp: z.number().nullable().optional(),
-  consecutiveSummarySkips: z.number().optional(),
 });
 export type SessionSummary = z.infer<typeof sessionSummarySchema>;
 
@@ -402,7 +401,6 @@ export const skipSummaryResponseSchema = z.object({
     aiFeedback: true,
     status: true,
   }),
-  consecutiveSummarySkips: z.number().optional(),
   pipelineQueued: z.boolean().optional(),
 });
 export type SkipSummaryResponse = z.infer<typeof skipSummaryResponseSchema>;

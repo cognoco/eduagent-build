@@ -19,7 +19,6 @@
 | Target language | — |
 | Struggles | fraction addition (math); long multi-clause sentences (reading) |
 | Strengths | vocabulary retention (Czech) |
-| Learning mode | casual |
 | Preferred explanations | stories, examples |
 | Pace | thorough |
 | Analogy domain | nature |
@@ -80,7 +79,6 @@
     "teachingPreference": "stories",
     "analogyDomain": "nature",
     "nativeLanguage": "cs",
-    "learningMode": "casual",
     "exchangeCount": 8,
     "inputMode": "text",
     "llmTier": "standard",
@@ -291,7 +289,7 @@ I feel like I really know this well now — can we try something harder?
 - Probe: P22 [standard] — Strong retention — tutor should push to rung 3 challenge, not re-teach (all profiles)
 - Rung: 3, sessionType: learning, verification: standard
 - History turns: 8, exchangeCount: 8
-- inputMode: text, learningMode: casual
+- inputMode: text
 - topicTitle: Czech reading comprehension
 - sourceEvidence: learner_message:context, current_topic:reliable, conversation_history:context, prior_learning:context, mentor_memory:context, accommodation:context
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs

@@ -6,7 +6,7 @@
 // promise so the cold-path DB load is bounded to one round-trip.
 //
 // The dependencies that make the fan-out (fetchPriorTopics, getTeachingPreference,
-// getLearningMode, fetchCrossSubjectHighlights, getLearningProfile) are mocked
+// getLearningModeRecord, fetchCrossSubjectHighlights, getLearningProfile) are mocked
 // at the module boundary so we can count call counts and time the work.
 // ---------------------------------------------------------------------------
 
@@ -46,14 +46,15 @@ jest.mock('../retention-data' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
-const mockGetLearningMode = jest.fn();
+const mockGetLearningModeRecord = jest.fn();
 jest.mock('../settings' /* gc1-allow: pattern-a conversion */, () => {
   const actual = jest.requireActual(
     '../settings',
   ) as typeof import('../settings');
   return {
     ...actual,
-    getLearningMode: (...args: unknown[]) => mockGetLearningMode(...args),
+    getLearningModeRecord: (...args: unknown[]) =>
+      mockGetLearningModeRecord(...args),
   };
 });
 
@@ -112,7 +113,7 @@ describe('[BUG-667 / S-10] getOrLoadSessionSupplementary — concurrent fetch mu
     mockFetchPriorTopics.mockResolvedValue([]);
     mockFetchCrossSubjectHighlights.mockResolvedValue([]);
     mockGetTeachingPreference.mockResolvedValue(null);
-    mockGetLearningMode.mockResolvedValue(null);
+    mockGetLearningModeRecord.mockResolvedValue(null);
     mockGetLearningProfile.mockResolvedValue(null);
     mockGetSubject.mockResolvedValue(null);
     mockLoadProfileRowById.mockResolvedValue(null);
@@ -161,7 +162,7 @@ describe('[BUG-667 / S-10] getOrLoadSessionSupplementary — concurrent fetch mu
     // Each fan-out query must have run exactly once across both callers.
     expect(mockFetchPriorTopics).toHaveBeenCalledTimes(1);
     expect(mockGetTeachingPreference).toHaveBeenCalledTimes(1);
-    expect(mockGetLearningMode).toHaveBeenCalledTimes(1);
+    expect(mockGetLearningModeRecord).toHaveBeenCalledTimes(1);
     expect(mockFetchCrossSubjectHighlights).toHaveBeenCalledTimes(1);
     expect(mockGetLearningProfile).toHaveBeenCalledTimes(1);
 
@@ -253,7 +254,7 @@ describe('[BUG-667 / S-10] getOrLoadSessionSupplementary — concurrent fetch mu
     expect(mockGetTeachingPreference).not.toHaveBeenCalled();
     expect(mockFetchCrossSubjectHighlights).not.toHaveBeenCalled();
     // But the always-on lookups still fire.
-    expect(mockGetLearningMode).toHaveBeenCalledTimes(1);
+    expect(mockGetLearningModeRecord).toHaveBeenCalledTimes(1);
     expect(mockGetLearningProfile).toHaveBeenCalledTimes(1);
   });
 
@@ -278,7 +279,7 @@ describe('[BUG-667 / S-10] getOrLoadSessionSupplementary — concurrent fetch mu
 
   it('clear during in-flight fetch does not resurrect stale supplementary cache', async () => {
     let resolveLearningMode!: (value: { mode: 'casual' }) => void;
-    mockGetLearningMode.mockReturnValueOnce(
+    mockGetLearningModeRecord.mockReturnValueOnce(
       new Promise((resolve) => {
         resolveLearningMode = resolve;
       }),

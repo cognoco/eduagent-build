@@ -43,8 +43,9 @@ tags:
       id: "learner-screen"
     timeout: 15000
 
-# 3. Navigate to Library tab
-- tapOn: "Library Tab"
+# 3. Navigate to Library tab (use testID — survives i18n + copy edits)
+- tapOn:
+    id: "tab-library"
 
 # 4. Wait for Library to load
 - extendedWaitUntil:

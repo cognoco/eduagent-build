@@ -753,7 +753,6 @@ describe('sessionSummarySchema', () => {
       nextTopicReason: 'Builds on loops',
       baseXp: 100,
       reflectionBonusXp: 50,
-      consecutiveSummarySkips: 0,
     });
     expect(result.success).toBe(true);
   });
@@ -785,7 +784,6 @@ describe('skipSummaryResponseSchema', () => {
         aiFeedback: null,
         status: 'skipped',
       },
-      consecutiveSummarySkips: 2,
       pipelineQueued: true,
     });
     expect(result.success).toBe(true);

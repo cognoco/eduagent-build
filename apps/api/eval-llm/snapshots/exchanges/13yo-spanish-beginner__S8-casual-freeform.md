@@ -19,7 +19,6 @@
 | Target language | es |
 | Struggles | ser vs estar (Spanish); irregular verbs (Spanish) |
 | Strengths | Spanish pronunciation (Spanish) |
-| Learning mode | serious |
 | Preferred explanations | step-by-step, examples |
 | Pace | thorough |
 | Analogy domain | nature |
@@ -29,7 +28,7 @@
 ```json
 {
   "scenarioId": "S8-casual-freeform",
-  "scenarioPurpose": "Freeform / casual-mode branch (no topic, casual tone)",
+  "scenarioPurpose": "Freeform / casual branch (no topic)",
   "context": {
     "sessionId": "eval-13yo-spanish-beginner",
     "profileId": "eval-profile-13yo-spanish-beginner",
@@ -56,7 +55,6 @@
       "la escuela",
       "el perro"
     ],
-    "learningMode": "casual",
     "exchangeCount": 1,
     "isFirstEncounter": false,
     "extractedSignalsToReflect": null,
@@ -249,7 +247,7 @@ Can we just chat for a bit? Nothing heavy.
 
 ## Builder notes
 
-- Scenario: S8-casual-freeform — Freeform / casual-mode branch (no topic, casual tone)
+- Scenario: S8-casual-freeform — Freeform / casual branch (no topic)
 - Rung: 1, sessionType: learning, verification: standard
 - History turns: 1, exchangeCount: 1
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)

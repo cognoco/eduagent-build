@@ -1,4 +1,5 @@
 import {
+  act,
   render,
   screen,
   fireEvent,
@@ -206,6 +207,64 @@ describe('ProfilesScreen', () => {
       expect(mockSwitchProfile).toHaveBeenCalledWith('owner-id');
     });
     expect(screen.queryByTestId('proxy-confirm-modal')).toBeNull();
+  });
+
+  it('ignores duplicate profile switch taps while a switch is in flight', async () => {
+    let resolveSwitch!: (value: { success: true }) => void;
+    const slowSwitchProfile = jest.fn(
+      () =>
+        new Promise<{ success: true }>((resolve) => {
+          resolveSwitch = resolve;
+        }),
+    );
+    useProfile.mockReturnValue({
+      profiles: [ownerProfile, childProfile],
+      activeProfile: childProfile,
+      switchProfile: slowSwitchProfile,
+      isLoading: false,
+    });
+
+    render(<ProfilesScreen />);
+
+    fireEvent.press(screen.getByTestId('profile-row-owner-id'));
+    fireEvent.press(screen.getByTestId('profile-row-owner-id'));
+
+    expect(slowSwitchProfile).toHaveBeenCalledTimes(1);
+    expect(slowSwitchProfile).toHaveBeenCalledWith('owner-id');
+
+    await act(async () => {
+      resolveSwitch({ success: true });
+    });
+
+    await waitFor(() => {
+      expect(mockBack).toHaveBeenCalled();
+    });
+  });
+
+  it('warns when the device could not persist the switched profile choice', async () => {
+    const switchWithPersistenceFailure = jest
+      .fn()
+      .mockResolvedValue({ success: true, persistenceFailed: true });
+    useProfile.mockReturnValue({
+      profiles: [ownerProfile, childProfile],
+      activeProfile: childProfile,
+      switchProfile: switchWithPersistenceFailure,
+      isLoading: false,
+    });
+
+    render(<ProfilesScreen />);
+
+    fireEvent.press(screen.getByTestId('profile-row-owner-id'));
+
+    await waitFor(() => {
+      expect(switchWithPersistenceFailure).toHaveBeenCalledWith('owner-id');
+    });
+    await waitFor(() => {
+      expect(mockPlatformAlert).toHaveBeenCalledWith(
+        'Profile switched',
+        'We could not save this profile choice on this device. You may need to pick it again after reopening the app.',
+      );
+    });
   });
 
   it('navigates to create-profile on add button for family tier', () => {

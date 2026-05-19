@@ -55,6 +55,8 @@ import { copyRegisterFor, type CopyRegister } from '../../../lib/copy-register';
 import { useLinkedChildren, useProfile } from '../../../lib/profile';
 import { isProfileStale } from '../../../lib/progress';
 import { bucketAccountAge, hashProfileId, track } from '../../../lib/analytics';
+import { getSubjectTintMap } from '../../../lib/subject-tints';
+import { useTheme } from '../../../lib/theme';
 
 function heroCopy(
   input: {
@@ -502,6 +504,7 @@ export default function ProgressScreen(): React.ReactElement {
   const { activeProfile } = useProfile();
   const linkedChildren = useLinkedChildren();
   const hasLinked = linkedChildren.length > 0;
+  const { colorScheme } = useTheme();
   const requestedProfileId = Array.isArray(rawRequestedProfileId)
     ? rawRequestedProfileId[0]
     : rawRequestedProfileId;
@@ -572,6 +575,14 @@ export default function ProgressScreen(): React.ReactElement {
   const hasFocusedOnceRef = useRef(false);
 
   const inventory = inventoryQuery.data;
+  const subjectTintsById = useMemo(
+    () =>
+      getSubjectTintMap(
+        inventory?.subjects.map((subject) => subject.subjectId) ?? [],
+        colorScheme,
+      ),
+    [colorScheme, inventory?.subjects],
+  );
   const hero = heroCopy(
     {
       topicsMastered: inventory?.global.topicsMastered ?? 0,
@@ -686,14 +697,17 @@ export default function ProgressScreen(): React.ReactElement {
     !!inventory &&
     !profileSessionsQuery.isLoading &&
     isProfileStale({ sessionCount, lastSessionAt });
+  const isParentProxyView = role === 'impersonated-child';
   // TODO: D-RP-18 Phase 2 — add 'ineligible' once API provides the discriminator.
   // Until then, no-reports-yet and truly-ineligible both collapse to 'awaiting'.
-  const progressSurfaceState: 'empty' | 'awaiting' | 'ready' =
-    isEmpty || (isViewingSelf && isStale)
+  // Report evidence must win over the empty/stale fallback. Otherwise a
+  // report can flash in from the reports query and then disappear as soon as
+  // the inventory/session queries resolve to an empty or stale shell.
+  const progressSurfaceState: 'empty' | 'awaiting' | 'ready' = hasAnyReports
+    ? 'ready'
+    : isEmpty || (isViewingSelf && isStale)
       ? 'empty'
-      : hasAnyReports
-        ? 'ready'
-        : 'awaiting';
+      : 'awaiting';
 
   const hasLanguageSubject = inventory?.subjects?.some(
     (s) => s.pedagogyMode === 'four_strands',
@@ -705,7 +719,6 @@ export default function ProgressScreen(): React.ReactElement {
     (child) => child.id === selectedProfileId,
   );
   const selectedChildName = selectedChild?.displayName;
-  const isParentProxyView = role === 'impersonated-child';
   const progressPageTitle = isParentProxyView
     ? t('progress.pageTitleProfile', {
         name: activeProfile?.displayName ?? t('progress.pageTitleFallbackName'),
@@ -1095,6 +1108,7 @@ export default function ProgressScreen(): React.ReactElement {
                       <View key={subject.subjectId} className="mt-3">
                         <SubjectProgressRow
                           subject={subject}
+                          tint={subjectTintsById.get(subject.subjectId)}
                           testID={`progress-subject-${subject.subjectId}`}
                         />
                       </View>

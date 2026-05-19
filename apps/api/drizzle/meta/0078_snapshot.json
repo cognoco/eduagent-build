@@ -1,5 +1,5 @@
 {
-  "id": "a1b2c3d4-e5f6-4789-abcd-ef0123456789",
+  "id": "bd735255-3bc9-4ed9-8562-9a403816e627",
   "prevId": "81821d84-f8cc-4ca4-854d-6518d9f3d098",
   "version": "7",
   "dialect": "postgresql",
@@ -3986,21 +3986,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "mode": {
-          "name": "mode",
-          "type": "learning_mode",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'serious'"
-        },
-        "consecutive_summary_skips": {
-          "name": "consecutive_summary_skips",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
         "median_response_seconds": {
           "name": "median_response_seconds",
           "type": "integer",
@@ -7146,11 +7131,6 @@
       "name": "celebration_level",
       "schema": "public",
       "values": ["all", "big_only", "off"]
-    },
-    "public.learning_mode": {
-      "name": "learning_mode",
-      "schema": "public",
-      "values": ["serious", "casual"]
     },
     "public.notification_type": {
       "name": "notification_type",
