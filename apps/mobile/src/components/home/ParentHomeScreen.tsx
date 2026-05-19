@@ -28,10 +28,7 @@ import { platformAlert } from '../../lib/platform-alert';
 import { useLinkedChildren } from '../../lib/profile';
 import { useTheme, useThemeColors } from '../../lib/theme';
 import { getSubjectTintMap } from '../../lib/subject-tints';
-import {
-  SUBJECT_TINT_PALETTE,
-  type SubjectTint,
-} from '../../lib/design-tokens';
+import { type SubjectTint } from '../../lib/design-tokens';
 import { MentomateLogo } from '../MentomateLogo';
 import {
   WithdrawalCountdownBanner,
@@ -460,39 +457,39 @@ function ConversationStarterCard({
       testID={`parent-home-tonight-${prompt.key}`}
       style={{
         backgroundColor: tint?.soft ?? colors.primarySoft,
-        borderColor: tint ? tint.solid + '33' : colors.primary + '33',
-        borderRadius: 18,
+        borderColor: tint ? tint.solid + '26' : colors.primary + '26',
+        borderRadius: 26,
         borderWidth: 1,
-        minHeight: 108,
+        minHeight: 76,
         shadowColor: accent,
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-        elevation: 2,
+        shadowOpacity: 0.08,
+        shadowRadius: 6,
+        elevation: 1,
       }}
     >
       <View
         style={{
           alignItems: 'center',
           backgroundColor: 'transparent',
-          borderRadius: 18,
+          borderRadius: 26,
           flexDirection: 'row',
-          paddingHorizontal: 16,
-          paddingVertical: 18,
+          paddingHorizontal: 14,
+          paddingVertical: 12,
         }}
       >
         <View
           testID={`parent-home-tonight-icon-${prompt.key}`}
           style={{
             alignItems: 'center',
-            backgroundColor: colors.surface,
+            backgroundColor: tint?.soft ?? colors.primarySoft,
             borderRadius: 999,
-            height: 58,
+            height: 40,
             justifyContent: 'center',
-            width: 58,
+            width: 40,
           }}
         >
-          <Ionicons name="chatbubble-outline" size={28} color={accent} />
+          <Ionicons name="chatbubble-outline" size={21} color={accent} />
         </View>
         <Text
           testID={`parent-home-tonight-text-${prompt.key}`}
@@ -500,11 +497,11 @@ function ConversationStarterCard({
             backgroundColor: 'transparent',
             color: colors.textPrimary,
             flex: 1,
-            fontSize: 21,
-            fontWeight: '500',
+            fontSize: 16,
+            fontWeight: '400',
             includeFontPadding: false,
-            lineHeight: 30,
-            marginLeft: 16,
+            lineHeight: 22,
+            marginLeft: 12,
           }}
         >
           {prompt.text}
@@ -515,17 +512,18 @@ function ConversationStarterCard({
 }
 
 function ChildActionButton({
+  accentColor,
   icon,
   label,
   onPress,
   testID,
 }: {
+  accentColor: string;
   icon: React.ComponentProps<typeof Ionicons>['name'];
   label: string;
   onPress: () => void;
   testID: string;
 }): React.ReactElement {
-  const colors = useThemeColors();
   const handlePress = (event?: GestureResponderEvent): void => {
     event?.stopPropagation();
     onPress();
@@ -540,9 +538,10 @@ function ChildActionButton({
       accessibilityLabel={label}
       testID={testID}
     >
-      <Ionicons name={icon} size={18} color={colors.primary} />
+      <Ionicons name={icon} size={18} color={accentColor} />
       <Text
-        className="text-caption font-semibold text-primary mt-1 text-center"
+        className="text-caption font-semibold mt-1 text-center"
+        style={{ color: accentColor }}
         numberOfLines={1}
         adjustsFontSizeToFit
       >
@@ -555,6 +554,7 @@ function ChildActionButton({
 function ChildCommandCard({
   child,
   dashboardChild,
+  tint,
   onOpenProfile,
   onOpenProgress,
   onOpenReports,
@@ -563,6 +563,7 @@ function ChildCommandCard({
 }: {
   child: Profile;
   dashboardChild: DashboardChild | undefined;
+  tint: SubjectTint | undefined;
   onOpenProfile: () => void;
   onOpenProgress: () => void;
   onOpenReports: () => void;
@@ -570,6 +571,8 @@ function ChildCommandCard({
   t: Translate;
 }): React.ReactElement {
   const colors = useThemeColors();
+  const accent = tint?.solid ?? colors.primary;
+  const softAccent = tint?.soft ?? colors.primarySoft;
 
   return (
     <View className="rounded-card px-4 py-4 bg-surface">
@@ -577,9 +580,9 @@ function ChildCommandCard({
         onPress={onOpenProfile}
         className="flex-row items-center bg-background rounded-button px-3 py-3"
         style={{
-          borderColor: colors.primary + '24',
+          borderColor: accent + '24',
           borderWidth: 1,
-          shadowColor: colors.primary,
+          shadowColor: accent,
           shadowOffset: { width: 0, height: 2 },
           shadowOpacity: 0.08,
           shadowRadius: 5,
@@ -591,7 +594,8 @@ function ChildCommandCard({
         testID={`parent-home-check-child-${child.id}`}
       >
         <View
-          className="w-11 h-11 rounded-full bg-primary items-center justify-center me-3"
+          className="w-11 h-11 rounded-full items-center justify-center me-3"
+          style={{ backgroundColor: accent }}
           accessibilityElementsHidden
         >
           <Text className="text-h3 font-bold text-text-inverse">
@@ -610,27 +614,31 @@ function ChildCommandCard({
           </Text>
         </View>
         <View
-          className="w-9 h-9 rounded-full bg-primary-soft items-center justify-center ms-3"
+          className="w-9 h-9 rounded-full items-center justify-center ms-3"
+          style={{ backgroundColor: softAccent }}
           accessibilityElementsHidden
         >
-          <Ionicons name="chevron-forward" size={20} color={colors.primary} />
+          <Ionicons name="chevron-forward" size={20} color={accent} />
         </View>
       </Pressable>
 
       <View className="flex-row gap-2 mt-4">
         <ChildActionButton
+          accentColor={accent}
           icon="stats-chart-outline"
           label={t('home.parent.childCard.progressAction')}
           onPress={onOpenProgress}
           testID={`parent-home-child-progress-${child.id}`}
         />
         <ChildActionButton
+          accentColor={accent}
           icon="document-text-outline"
           label={t('home.parent.childCard.reportsAction')}
           onPress={onOpenReports}
           testID={`parent-home-weekly-report-${child.id}`}
         />
         <ChildActionButton
+          accentColor={accent}
           icon="heart-outline"
           label={t('home.parent.childCard.nudgeAction')}
           onPress={onOpenNudge}
@@ -876,28 +884,22 @@ export function ParentHomeScreen({
     () => buildTonightPrompts(linkedChildren, dashboard, t),
     [linkedChildren, dashboard, t],
   );
+  const childTintsById = useMemo(
+    () =>
+      getSubjectTintMap(
+        linkedChildren.map((child) => child.id),
+        colorScheme,
+      ),
+    [colorScheme, linkedChildren],
+  );
   const promptTintsByKey = useMemo(() => {
     const tints = new Map<string, SubjectTint>();
-    const palette = SUBJECT_TINT_PALETTE[colorScheme];
-
-    if (linkedChildren.length === 1) {
-      tonightPrompts.forEach((prompt, index) => {
-        const tint = palette[index % palette.length] ?? palette[0];
-        if (tint) tints.set(prompt.key, tint);
-      });
-      return tints;
-    }
-
-    const childTintsById = getSubjectTintMap(
-      tonightPrompts.map((prompt) => prompt.childId),
-      colorScheme,
-    );
     tonightPrompts.forEach((prompt) => {
       const tint = childTintsById.get(prompt.childId);
       if (tint) tints.set(prompt.key, tint);
     });
     return tints;
-  }, [colorScheme, linkedChildren.length, tonightPrompts]);
+  }, [childTintsById, tonightPrompts]);
 
   const navigateToCreateChildProfile = useCallback(() => {
     if (Platform.OS === 'web') {
@@ -1053,7 +1055,7 @@ export function ParentHomeScreen({
             <Text className="text-h3 font-bold text-text-primary mb-3">
               {t(tonightTitleKey(now))}
             </Text>
-            <View style={{ gap: 10 }}>
+            <View style={{ gap: 6 }}>
               <ParentTransitionNotice
                 profileId={activeProfile?.id}
                 childNames={childNames}
@@ -1110,6 +1112,7 @@ export function ParentHomeScreen({
               key={child.id}
               child={child}
               dashboardChild={findDashboardChild(dashboard, child.id)}
+              tint={childTintsById.get(child.id)}
               onOpenProfile={() => pushChildProfile(child.id)}
               onOpenProgress={() => pushChildProgress(child.id)}
               onOpenReports={() => pushChildReports(child.id)}
