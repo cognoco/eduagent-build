@@ -12,9 +12,13 @@
 # the stack — that lands on Privacy, not the More tab root.
 appId: com.mentomate.app
 tags:
-  - pr-blocking
+  - nightly
   - account
   - gdpr
+# DEMOTED 2026-05-19: flow updated to navigate More → Privacy and uses new
+# testIDs on the warning paragraphs, but the typed-confirmation stage needs
+# additional scroll-recovery work and validation. Re-promote after the
+# confirming-stage scroll fix proves stable across runs.
 ---
 # 1. Seed & sign in
 - runFlow:

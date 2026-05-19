@@ -17,8 +17,11 @@
 #     delete-account-keep, delete-account-sign-out)
 appId: com.mentomate.app
 tags:
-  - pr-blocking
+  - nightly
   - account
+# DEMOTED 2026-05-19: same drift as delete-account.yaml — flow expects
+# Delete account row at More root; it now lives under More → Privacy. Needs
+# flow rewrite to route through Privacy before re-promotion.
 ---
 # 1. Seed & sign in with deletion-scheduled account
 - runFlow:

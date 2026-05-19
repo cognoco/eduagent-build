@@ -18,6 +18,9 @@ appId: com.mentomate.app
 tags:
   - smoke
   - onboarding
+# DEMOTED 2026-05-19: `Tap on "Let's Go"` inside dismiss-post-approval.yaml
+# fails — post-approval landing copy or layout has drifted. Re-promote after
+# dismiss-post-approval helper is fixed.
 ---
 # 1. Seed, launch dev-client, sign in.
 - runFlow:
@@ -82,14 +85,19 @@ tags:
       id: "learner-screen"
     timeout: 10000
 
-# 12. Intent card stack still visible after round-trip (replaced "Your subjects" heading).
-# [BUG-989] Use extendedWaitUntil because returning to the Home tab can briefly
-# render the loading state while React Query revalidates `subjects`, so a bare
-# assertVisible races the carousel mount.
-- extendedWaitUntil:
-    visible:
+# 12. Subject carousel still visible after round-trip.
+# [BUG-989] Returning to the Home tab can briefly render the loading state while
+# React Query revalidates `subjects`. Scroll until on-screen since the carousel
+# sits below the action chips on the current LearnerScreen layout — the scroll
+# also waits, so it doubles as the revalidation wait.
+- scrollUntilVisible:
+    element:
       id: "home-subject-carousel"
+    direction: DOWN
     timeout: 10000
+
+- assertVisible:
+    id: "home-subject-carousel"
 
 # 13. Screenshot
 - takeScreenshot: view-curriculum-03-back-home

@@ -60,13 +60,22 @@ tags:
     timeout: 5000
 
 # ── M07 regression: home screen has real content (not empty) ──────────
-# Verify subject carousel loaded — catches blank home screen.
-- assertVisible:
-    id: "home-subject-carousel"
-
 # Coach band proves the user has an active subject (learning-active seed)
+# and is above the fold on small phones — assert it before any scroll.
 - assertVisible:
     id: "home-coach-band-continue"
+
+# Subject carousel sits below the action chips on the current LearnerScreen
+# layout (small phones need a scroll to bring it on-screen). Scroll until
+# visible, then assert.
+- scrollUntilVisible:
+    element:
+      id: "home-subject-carousel"
+    direction: DOWN
+    timeout: 10000
+
+- assertVisible:
+    id: "home-subject-carousel"
 
 # ── Negative assertions: empty state must not appear ───────────────────
 # Full text match required — Maestro on Android can't reliably match substrings
@@ -74,7 +83,15 @@ tags:
 - assertNotVisible:
     text: "Add your first subject"
 
-# 3. Start session via coach band continue button
+# 3. Start session via coach band continue button.
+#    After the carousel scroll above, the coach band is off-screen. Scroll
+#    back up to bring it into view before tapping.
+- scrollUntilVisible:
+    element:
+      id: "home-coach-band-continue"
+    direction: UP
+    timeout: 10000
+
 - tapOn:
     id: "home-coach-band-continue"
 

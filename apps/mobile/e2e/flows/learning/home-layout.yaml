@@ -40,34 +40,24 @@ tags:
 
 - takeScreenshot: home-layout-01-landed
 
-# ── Part 1: Subject carousel ──────────────────────────────────────────
-# learning-active seeds at least one subject, so the carousel branch renders.
+# Current layout (top to bottom) on LearnerScreen.tsx:
+#   header -> EarlyAdopterCard -> NudgeBanner -> CoachBand (when resumable)
+#   -> "What do you need right now?" (intentHeading)
+#   -> 4 action chips: homework, ask-anything, practice, study-new
+#   -> Subject carousel "YOUR SUBJECTS"
+# The flow walks the screen top-to-bottom, scrolling as needed for each
+# section, since on small phones (Galaxy S10e) only the header + CoachBand
+# fit above the fold.
+
+# ── Part 1: Coach band (above the fold for learning-active seed) ──────
+# learning-active prereq: at least one active subject and a due session.
+# The coach band MUST render — contract gate on the seed scenario.
 - assertVisible:
-    id: "home-subject-carousel"
+    id: "home-coach-band-continue"
 
-- assertVisible:
-    id: "home-subject-card-${SUBJECT_ID}"
+- takeScreenshot: home-layout-01-coach-band
 
-# The "New subject" add-tile is appended after the seeded cards when not in
-# parent-proxy mode (learner persona only). Assert it exists in the carousel.
-- assertVisible:
-    id: "home-add-subject-tile"
-
-- takeScreenshot: home-layout-02-carousel-visible
-
-# ── Part 2: Ask-anything bar ─────────────────────────────────────────
-- scrollUntilVisible:
-    element:
-      id: "home-ask-anything"
-    direction: DOWN
-    timeout: 10000
-
-- assertVisible:
-    id: "home-ask-anything"
-
-- takeScreenshot: home-layout-03-ask-anything
-
-# ── Part 3: Action chips ─────────────────────────────────────────────
+# ── Part 2: Action chips (scroll if needed) ──────────────────────────
 - scrollUntilVisible:
     element:
       id: "home-action-study-new"
@@ -83,22 +73,29 @@ tags:
 - assertVisible:
     id: "home-action-practice"
 
-- takeScreenshot: home-layout-04-action-chips
+- assertVisible:
+    id: "home-ask-anything"
 
-# ── Part 4: Coach band (seed contract: learning-active has a resumable session) ──
-# The flow's documented prerequisite is "at least one active subject and a due
-# session" (scenario: learning-active). The coach band MUST render for this
-# seed; making it optional masked seed-contract regressions. Keep the scroll
-# optional (it's a best-effort discovery step), but require the final
-# assertion so a missing resumable-session UI fails the test.
+- takeScreenshot: home-layout-02-action-chips
+
+# ── Part 3: Subject carousel ──────────────────────────────────────────
+# learning-active seeds at least one subject, so the carousel branch renders.
+# Carousel sits below the action chips; scroll until it's on-screen.
 - scrollUntilVisible:
     element:
-      id: "home-coach-band"
+      id: "home-subject-carousel"
     direction: DOWN
     timeout: 10000
-    optional: true  # justified: scroll is discovery only — assertVisible below is the contract gate
 
 - assertVisible:
-    id: "home-coach-band-continue"
+    id: "home-subject-carousel"
 
-- takeScreenshot: home-layout-05-coach-band
+- assertVisible:
+    id: "home-subject-card-${SUBJECT_ID}"
+
+# The "New subject" add-tile is appended after the seeded cards when not in
+# parent-proxy mode (learner persona only). Assert it exists in the carousel.
+- assertVisible:
+    id: "home-add-subject-tile"
+
+- takeScreenshot: home-layout-03-carousel-visible

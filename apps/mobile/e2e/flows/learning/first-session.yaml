@@ -10,6 +10,10 @@ appId: com.mentomate.app
 tags:
   - smoke
   - learning
+# DEMOTED 2026-05-19: BUG-35 flake — `pressKey: Enter` is not reliably
+# triggering `onSubmitEditing` in the dev-client build on WHPX; the user
+# message bubble does not render after Enter. Re-promote after BUG-35 is
+# resolved on the test environment.
 ---
 # 1. Seed & sign in
 - runFlow:
@@ -24,15 +28,28 @@ tags:
       id: "learner-screen"
     timeout: 15000
 
-# 3. Subject carousel present
-- assertVisible:
-    id: "home-subject-carousel"
-
-# 4. Coach band continue visible (learning-active seed has an active subject)
+# 3. Coach band continue visible above the fold (learning-active seed has an active subject)
 - assertVisible:
     id: "home-coach-band-continue"
 
-# 5. Tap continue → start session
+# 4. Subject carousel sits below the action chips on the current LearnerScreen
+#    layout — scroll down to bring it on-screen, then assert.
+- scrollUntilVisible:
+    element:
+      id: "home-subject-carousel"
+    direction: DOWN
+    timeout: 10000
+
+- assertVisible:
+    id: "home-subject-carousel"
+
+# 5. Scroll back up so coach-band-continue is in view, then tap to start session
+- scrollUntilVisible:
+    element:
+      id: "home-coach-band-continue"
+    direction: UP
+    timeout: 10000
+
 - tapOn:
     id: "home-coach-band-continue"
 

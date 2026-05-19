@@ -43,6 +43,8 @@ import {
 import { useLibrarySearch } from '../../hooks/use-library-search';
 import { ShimmerSkeleton } from '../../components/common/ShimmerSkeleton';
 import { getSubjectTintMap } from '../../lib/subject-tints';
+import { useActiveProfileRole } from '../../hooks/use-active-profile-role';
+import { buildSessionDetailHref } from '../../lib/session-detail-navigation';
 
 // ---------------------------------------------------------------------------
 // Local types
@@ -143,6 +145,9 @@ export default function LibraryScreen() {
   const { colorScheme } = useTheme();
   const { activeProfile, profiles } = useProfile();
   const isGuardian = isGuardianProfile(activeProfile, profiles);
+  const activeProfileRole = useActiveProfileRole();
+  const proxyChildProfileId =
+    activeProfileRole === 'impersonated-child' ? activeProfile?.id : undefined;
 
   // ---- Search state -------------------------------------------------------
   const [searchQuery, setSearchQuery] = useState('');
@@ -362,16 +367,16 @@ export default function LibraryScreen() {
 
   const handleSessionPress = useCallback(
     (sessionId: string, subjectId: string, topicId: string | null) => {
-      router.push({
-        pathname: '/session-summary/[sessionId]',
-        params: {
+      router.push(
+        buildSessionDetailHref({
           sessionId,
           subjectId,
-          ...(topicId ? { topicId } : {}),
-        },
-      } as Href);
+          topicId,
+          childProfileId: proxyChildProfileId,
+        }),
+      );
     },
-    [router],
+    [proxyChildProfileId, router],
   );
 
   const handleRetry = (): void => {

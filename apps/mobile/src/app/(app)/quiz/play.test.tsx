@@ -268,6 +268,7 @@ describe('QuizPlayScreen', () => {
     await waitFor(() => {
       screen.getByTestId('quiz-next-question');
     });
+    screen.getByTestId('quiz-next-question-footer');
     screen.getByText('Next question');
     screen.getByText('Bratislava sits on the Danube.');
 
@@ -662,9 +663,9 @@ describe('QuizPlayScreen — shuffledOptions derived synchronously (BUG-STALE-OP
     fireEvent.press(screen.getByTestId('quiz-option-0'));
     await waitFor(() => screen.getByText('Correct'));
 
-    // Advance to Q2 via the body continue Pressable (after 250ms guard)
+    // Advance to Q2 via the visible next-question button (after 250ms guard)
     await new Promise((r) => setTimeout(r, 280));
-    fireEvent.press(screen.getByTestId('quiz-play-body'));
+    fireEvent.press(screen.getByTestId('quiz-next-question'));
 
     // Now immediately tap option-0; with useMemo, shuffledOptions is already
     // bound to Q2's options in the same render that shows Q2.
@@ -744,9 +745,9 @@ describe('QuizPlayScreen — tap-to-continue synchronous reset (BUG-929)', () =>
     fireEvent.press(screen.getByTestId('quiz-option-0'));
     await waitFor(() => screen.getByText('Correct'));
 
-    // Wait past the 250ms continue gate, then tap the body to advance.
+    // Wait past the 250ms continue gate, then press the visible button.
     await new Promise((r) => setTimeout(r, 280));
-    fireEvent.press(screen.getByTestId('quiz-play-body'));
+    fireEvent.press(screen.getByTestId('quiz-next-question'));
 
     // Q2 is now showing. Every option Pressable must report disabled === false
     // on this render. Before the fix, all four were disabled until the next
@@ -790,7 +791,7 @@ describe('QuizPlayScreen — tap-to-continue synchronous reset (BUG-929)', () =>
     await waitFor(() => screen.getByText('Correct'));
 
     await new Promise((r) => setTimeout(r, 280));
-    fireEvent.press(screen.getByTestId('quiz-play-body'));
+    fireEvent.press(screen.getByTestId('quiz-next-question'));
 
     // Single tap on Q+1's option-0 must record. No re-tap allowed.
     mockCheckAnswer.mockResolvedValueOnce({
@@ -848,7 +849,7 @@ describe('QuizPlayScreen — tap-to-continue synchronous reset (BUG-929)', () =>
     await waitFor(() => screen.getByText('Correct'));
 
     await new Promise((r) => setTimeout(r, 280));
-    fireEvent.press(screen.getByTestId('quiz-play-body'));
+    fireEvent.press(screen.getByTestId('quiz-next-question'));
 
     expect(screen.queryByText('Correct')).toBeNull();
     expect(screen.queryByText('Not quite')).toBeNull();
@@ -898,7 +899,7 @@ describe('QuizPlayScreen — tap-to-continue synchronous reset (BUG-929)', () =>
 
     // Advance to Q2.
     await new Promise((r) => setTimeout(r, 280));
-    fireEvent.press(screen.getByTestId('quiz-play-body'));
+    fireEvent.press(screen.getByTestId('quiz-next-question'));
 
     // Q2 is now showing. The free-text field must be EMPTY — not 'Bratislava'.
     const field = screen.getByTestId('quiz-free-text-field');
@@ -947,7 +948,7 @@ describe('QuizPlayScreen — tap-to-continue synchronous reset (BUG-929)', () =>
     // since the timer only ticks on the setInterval (1000 ms). The critical
     // check is that advancing resets the display immediately to 0s.
     await new Promise((r) => setTimeout(r, 280));
-    fireEvent.press(screen.getByTestId('quiz-play-body'));
+    fireEvent.press(screen.getByTestId('quiz-next-question'));
 
     // Q2's first render — elapsed display must show 0s, not stale time.
     // The Text renders as {Math.floor(elapsedMs / 1000)}s → children is [0, "s"].
@@ -1064,11 +1065,6 @@ describe('QuizPlayScreen — error feedback [BUG-799 / BUG-806]', () => {
     fireEvent.press(screen.getByTestId('quiz-option-0'));
     // Wait for handleAnswer's `continueEnabledAtRef = Date.now() + 250`.
     await waitFor(() => screen.getByTestId('quiz-play-screen'));
-    await new Promise((r) => setTimeout(r, 280));
-    // [BUG-691] handleContinue is now scoped to the body Pressable so the
-    // Quit X in the header can never bubble to it. With a 1-question round,
-    // handleContinue calls submitRound → completeRound.
-    fireEvent.press(screen.getByTestId('quiz-play-body'));
   }
 
   it('[BREAK / BUG-806] completeRound onError uses formatApiError, not instanceof', async () => {
@@ -1106,21 +1102,44 @@ describe('QuizPlayScreen — error feedback [BUG-799 / BUG-806]', () => {
     );
   });
 
-  // [BUG-691] The root container is a plain View, not a Pressable. The
-  // Quit X button cannot bubble its press to the continue handler because
-  // the continue Pressable is scoped to the body, sibling of the header.
-  it('[BUG-691] root is not a Pressable — Quit cannot trigger handleContinue', async () => {
+  // [BUG-691] Continue is explicit. The body is not a hidden continue target,
+  // so the Quit X cannot bubble into an answer-advance action.
+  it('[BUG-691] body tap does not continue or interfere with Quit', async () => {
     mockCheckAnswer.mockResolvedValueOnce({ correct: true });
+    mockRound = {
+      id: 'round-691',
+      activityType: 'capitals' as const,
+      theme: 'Europe',
+      total: 2,
+      questions: [
+        {
+          type: 'capitals' as const,
+          country: 'Slovakia',
+          options: ['Bratislava', 'Prague', 'Warsaw', 'Budapest'],
+          isLibraryItem: true,
+          freeTextEligible: false,
+        },
+        {
+          type: 'capitals' as const,
+          country: 'France',
+          options: ['Paris', 'Lyon', 'Madrid', 'Rome'],
+          isLibraryItem: true,
+          freeTextEligible: false,
+        },
+      ],
+    };
     render(<QuizPlayScreen />);
 
     // Resolve the answer so continueActive is true
     fireEvent.press(screen.getByTestId('quiz-option-0'));
     await waitFor(() => screen.getByTestId('quiz-play-screen'));
     await new Promise((r) => setTimeout(r, 280));
+    fireEvent.press(screen.getByTestId('quiz-play-body'));
+    screen.getByTestId('quiz-next-question');
 
     // [BUG-892] Press the Quit button. This must open the styled in-app
-    // confirmation modal (NOT call platformAlert/window.confirm) and must
-    // NOT submit the round (which would mean handleContinue also fired).
+    // confirmation modal (NOT call platformAlert/window.confirm), and the
+    // earlier body tap must NOT submit the round.
     fireEvent.press(screen.getByTestId('quiz-play-quit'));
     screen.getByTestId('quiz-quit-confirm');
     screen.getByTestId('quiz-quit-save');
@@ -1134,7 +1153,7 @@ describe('QuizPlayScreen — error feedback [BUG-799 / BUG-806]', () => {
       expect.any(String),
       expect.any(Array),
     );
-    expect(mockCompleteRoundMutate).toHaveBeenCalledTimes(1);
+    expect(mockCompleteRoundMutate).not.toHaveBeenCalled();
   });
 
   // [BUG-892] On Expo Web, platformAlert routes through window.confirm for

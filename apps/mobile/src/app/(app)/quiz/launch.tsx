@@ -12,6 +12,7 @@ import {
 import { DeskLampAnimation } from '../../../components/common';
 import { ErrorFallback } from '../../../components/common/ErrorFallback';
 import { useGenerateRound } from '../../../hooks/use-quiz';
+import { homeHrefForReturnTo } from '../../../lib/navigation';
 import { useThemeColors } from '../../../lib/theme';
 import { useQuizFlow } from './_layout';
 
@@ -122,8 +123,9 @@ export default function QuizLaunchScreen(): React.ReactElement {
     routeReturnTo !== null && routeReturnTo !== undefined
       ? routeReturnTo
       : (returnTo ?? null);
-  const exitHref =
-    effectiveReturnTo === 'practice' ? '/(app)/practice' : '/(app)/quiz';
+  const exitHref = effectiveReturnTo
+    ? homeHrefForReturnTo(effectiveReturnTo)
+    : ('/(app)/quiz' as Href);
   const generateRound = useGenerateRound();
   const generateRoundMutate = generateRound.mutate;
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
