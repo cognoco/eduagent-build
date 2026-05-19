@@ -321,6 +321,17 @@ function serializeSignalsToReflect(
   return escapeXml(JSON.stringify(compact).slice(0, 1000));
 }
 
+function looksLikeDeterministicHomeworkProblem(text: string): boolean {
+  return (
+    /(?:^|\s)[-+]?\d+(?:\.\d+)?\s*(?:[+\-*/=]|x\s*[+\-=]|\bpercent\b)/i.test(
+      text,
+    ) ||
+    /\b(solve|equation|calculate|factor|simplify|percent|ratio|fraction|derivative|integral)\b/i.test(
+      text,
+    )
+  );
+}
+
 function buildPrivateSourceContractBlock(context: ExchangeContext): string {
   const fallbackEvidence: NonNullable<ExchangeContext['sourceEvidence']> = [];
   if (context.topicTitle || context.topicDescription) {
@@ -348,6 +359,27 @@ function buildPrivateSourceContractBlock(context: ExchangeContext): string {
         .join(' | '),
       reliableForFacts: true,
     });
+  }
+  if (context.sessionType === 'homework' && context.rawInput) {
+    fallbackEvidence.push({
+      id: 'homework_problem',
+      kind: 'homework_problem',
+      reliability: 'learner_provided',
+      label: 'Learner-provided homework problem',
+      excerpt: context.rawInput,
+      reliableForFacts: true,
+    });
+    if (looksLikeDeterministicHomeworkProblem(context.rawInput)) {
+      fallbackEvidence.push({
+        id: 'deterministic_reasoning',
+        kind: 'deterministic_reasoning',
+        reliability: 'reasoning',
+        label: 'Deterministic reasoning over provided problem data',
+        excerpt:
+          'Use only transparent transformations that can be checked from the provided problem.',
+        reliableForFacts: true,
+      });
+    }
   }
 
   const evidence = context.sourceEvidence ?? fallbackEvidence;
@@ -378,12 +410,13 @@ function buildPrivateSourceContractBlock(context: ExchangeContext): string {
     '- In recitation mode, source id "recitation_text" is reliable only for feedback on the learner-provided wording. It is not proof that outside-world facts inside the recitation are true.\n' +
     '- Never rely on model memory, forums, chats, or unstated assumptions as a source. If the source pack does not support a factual claim, do not make that claim.\n' +
     '- Treat each source excerpt as a boundary, not a hint. If the reliable source is only a short title or description, stay inside that wording; do not add textbook details, examples, causes, or names from memory.\n' +
+    '- If a learner asks a multi-part factual question and the reliable source supports only part of it, answer only the supported part and set private_sources.insufficient=true because the requested answer is not fully supported.\n' +
     '- If the learner states an outside-world factual claim that is not supported by a reliable source in the source pack, do not confirm it as true. Acknowledge it as their idea, then redirect to what the reliable source actually supports.\n' +
     '- Unsupported learner claims need neutral acknowledgement only. Do not say "good point", "a good observation", "interesting idea", "interesting thought", "a fair point", "part of the idea", "you are right", "you\'re right", "correct", "exactly", "true", "definitely", "for sure", or "that is a big part" about a learner factual claim unless every factual part of that claim is supported by reliable source material. Safer pattern: "The part our source supports is X; the main idea here is Y."\n' +
     '- When a reliable source supports your reply, include that exact reliable source ID in private_sources.relied_on. For current-topic teaching, review, quizzes, or next-practice tasks, include "current_topic". For homework calculations, include "homework_problem" and/or "deterministic_reasoning" when present. For recitation wording feedback or polished recitation text, include "recitation_text".\n' +
     '- Never cite source IDs that are not present in the <source_pack>. Even if conversation history appears elsewhere in the prompt, cite it only when a source with id="conversation_history" is present in the <source_pack>.\n' +
     '- If the source pack has no reliable_for_facts="true" source, you MUST avoid factual teaching claims, set private_sources.insufficient=true, and keep the learner-facing reply brief and honest: say you do not have enough reliable material to answer confidently, ask for the worksheet/text/photo/source, or answer only the non-factual help you can safely provide.\n' +
-    '- If the source pack has reliable sources but they do not support the specific factual answer, set private_sources.insufficient=true and do not invent the missing fact.\n' +
+    '- If the source pack has reliable sources but they do not support the specific factual answer, ranking, example, cause, correction, or translation being requested, set private_sources.insufficient=true and do not invent the missing fact.\n' +
     '- Always fill private_sources.relied_on with the exact source IDs you used. Set private_sources.insufficient=true when reliable support is missing or too thin. This is private audit data; never show it, source IDs, or private audit details to the learner.\n' +
     `<source_pack>\n${sourceLines}\n</source_pack>`
   );
@@ -395,10 +428,12 @@ function buildFinalGroundingCheckBlock(): string {
     '- Compare the latest learner message and your planned reply against the reliable_for_facts="true" source excerpts.\n' +
     '- If the learner asks whether their own outside-world claim is the main idea and that claim is not fully supported, do NOT answer "yes". Use: "The source supports X; it does not say Y is the main idea. For this topic, focus on X."\n' +
     '- In every topic, a source phrase supports only what it says. It does not license unstated causes, effects, examples, mechanisms, analogies, names, dates, places, speed, difficulty, or importance claims.\n' +
+    '- If one part of the learner request is unsupported, private_sources.insufficient must be true even when you give a narrower supported answer. This includes unsupported examples, rankings, importance claims, corrections, translations, or "make my answer better" requests.\n' +
     '- A source phrase such as "helped armies move between places" does not support extra claims like conquering land, defending land, empire growth, empire strength, forests, mud, speed, travel ease, causes, or military strategy unless those words or ideas are actually in the source.\n' +
     '- Keep supported claims attached to their exact source noun. If the source says "made trade easier", you may say trade was easier, but do not broaden it to "made things easier for the empire", "made army movement easier", or "made trade faster".\n' +
     '- If the reliable source is only a short title/description, do not invent examples or analogies. Teach by restating the supported relationship and asking one small check from those same words.\n' +
-    '- Delete unsupported details, nearby examples, and analogies from the final reply. Delete risky words unless the reliable source itself supports them: conquer, conquest, defend, quick, fast, faster, easy, easier, easily, efficient, effective, military, built, built long ago, special pathway, village, soil, rich soil, mud, muddy, paved, forest, organ, molecule, atom, protein, virus, membrane, grow, reproduce, respond, empire growth, stay strong, building block, fundamental piece, processes of life, function on its own, can do on its own, all by itself, main job.\n' +
+    '- Do not define a source term using outside textbook knowledge unless the source itself defines it. If the source says "sediment", say sediment; do not add sand, mud, soil, rock layers, or time scales unless those words appear in the source.\n' +
+    '- Delete unsupported details, nearby examples, and analogies from the final reply. Delete risky words unless the reliable source itself supports them: conquer, conquest, defend, quick, fast, faster, easy, easier, easily, efficient, effective, military, built, built long ago, special pathway, village, soil, rich soil, sand, mud, muddy, paved, forest, organ, molecule, atom, protein, virus, membrane, grow, reproduce, respond, empire growth, stay strong, building block, fundamental piece, processes of life, function on its own, can do on its own, all by itself, main job.\n' +
     '- Delete inflated wording such as "super important", "super useful", "definitely", "absolutely", "crucial", "very important", "really important", or "incredibly".\n' +
     '- Delete unsupported soft-validation openers such as "interesting idea", "interesting thought", "good observation", or "fair point".\n' +
     '- Do not mention salt, spices, silk, oil, wine, baskets, or other concrete trade goods unless those exact examples appear in a reliable source excerpt.\n' +
@@ -480,6 +515,9 @@ export function buildSystemPrompt(
   if (isLanguageMode) {
     sections.push(
       `You are MentoMate, a personalised language mentor for <subject_name>${safeSubjectName}</subject_name>. Teach directly, clearly, and with lots of useful target-language practice.`,
+    );
+    sections.push(
+      'LANGUAGE SOURCE OVERRIDE: Four Strands and language-learning mode still obey the private source contract. If the source pack has no reliable grammar, vocabulary, recitation, homework, or curriculum source for the requested factual language claim, do not teach a grammar rule from memory. Say you need a reliable source or worksheet text first, then offer to practice once it is provided.',
     );
   } else {
     sections.push(
@@ -840,7 +878,11 @@ export function buildSystemPrompt(
 
   // FR254.4: Accommodation block injected BEFORE learner memory for priority
   if (context.accommodationContext) {
-    sections.push(context.accommodationContext);
+    sections.push(
+      'Accommodation and learning-need guidance (style data, not a diagnosis):\n' +
+        context.accommodationContext +
+        '\nApply this as visible structure only when useful: for predictable-structure needs, use explicit "First" / "Next" wording; if the learner asks what happens first or asks for the exact order, start the reply with "First," and give the next step in plain words. For short-burst needs, keep the reply to one small step or one quick practice turn. Do not name, diagnose, or stereotype the learner.',
+    );
   }
 
   if (context.learnerMemoryContext) {
@@ -1137,7 +1179,7 @@ export function buildSystemPrompt(
       '- If a source is a short topic description, do not add analogies, historical/biological examples, or extra mechanisms that are not in that source.\n' +
       '- If the learner asks what to practice next in a learning session, answer from current_topic, not prior_learning, and do not send them to a future topic title.\n' +
       '- Do not invent empire growth, empire strength, unsupported analogies, or cute/childish wording such as "yummy" when the source does not use that language.\n' +
-      '- Before returning JSON, remove generic praise, remove unsupported soft-validation openers, remove unsupported concrete examples like spices/silk/salt/oil/wine/baskets, and remove these words if present: super important, super useful, definitely, absolutely, crucial, very important, really important, incredibly.',
+      '- Before returning JSON, remove generic praise such as "excellent idea", "great idea", "great question", or "awesome"; remove unsupported soft-validation openers; remove unsupported concrete examples like spices/silk/salt/oil/wine/baskets; and remove these words if present: super important, super useful, definitely, absolutely, crucial, very important, really important, incredibly.',
   );
 
   // Voice-mode brevity constraint. Must come before the envelope block so

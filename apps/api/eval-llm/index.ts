@@ -37,6 +37,10 @@ import { probesFlow } from './flows/probes';
 import { bookSuggestionRegenerationFlow } from './flows/book-suggestion-regeneration';
 import { progressSummaryFlow } from './flows/progress-summary';
 import { assessmentEvaluationFlow } from './flows/assessment-evaluation';
+// [BUG-125] Snapshot coverage for the two prompt builders the pre-commit
+// hook was previously blind to. See flow files for context.
+import { languagePromptsFlow } from './flows/language-prompts';
+import { adaptiveTeachingFlow } from './flows/adaptive-teaching';
 import {
   listFlows,
   parseCliArgs,
@@ -88,6 +92,8 @@ const FLOWS: FlowDefinition[] = [
   bookSuggestionRegenerationFlow as FlowDefinition,
   progressSummaryFlow as FlowDefinition,
   assessmentEvaluationFlow as FlowDefinition,
+  languagePromptsFlow as FlowDefinition,
+  adaptiveTeachingFlow as FlowDefinition,
 ];
 
 async function main(): Promise<void> {
@@ -120,6 +126,8 @@ async function main(): Promise<void> {
   if (options.live) {
     console.log(`Live calls OK:      ${summary.liveCallsOk}`);
     console.log(`Live calls failed:  ${summary.liveCallsFailed}`);
+    console.log(`Quality warnings:   ${summary.qualityWarnings}`);
+    console.log(`Quality failures:   ${summary.qualityFailures}`);
   }
   if (summary.skipped.length > 0) {
     console.log(`Skipped:            ${summary.skipped.length}`);
@@ -128,6 +136,13 @@ async function main(): Promise<void> {
     }
   }
   console.log('─────────────────────────────────────────');
+
+  if (options.live && summary.qualityFailures > 0) {
+    console.error(
+      'Quality gate failed. Open the snapshots with "Quality issues" sections for the scenario-level failures.',
+    );
+    process.exit(1);
+  }
 
   // Baseline regression guard — only meaningful after a live run. Tier-1
   // runs emit an empty envelopeMetrics map and would trip the baseline for

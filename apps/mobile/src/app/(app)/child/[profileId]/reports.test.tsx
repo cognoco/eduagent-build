@@ -35,21 +35,30 @@ jest.mock('react-native-safe-area-context', () => ({
 }));
 
 const mockUseChildDetail = jest.fn();
-jest.mock('../../../../hooks/use-dashboard', () => ({
-  useChildDetail: (...args: unknown[]) => mockUseChildDetail(...args),
-}));
+jest.mock(
+  '../../../../hooks/use-dashboard' /* gc1-allow: wraps useApiClient fetch boundary — needs network stub in unit tests */,
+  () => ({
+    useChildDetail: (...args: unknown[]) => mockUseChildDetail(...args),
+  }),
+);
 
 const mockUseChildReports = jest.fn();
 const mockUseChildWeeklyReports = jest.fn();
-jest.mock('../../../../hooks/use-progress', () => ({
-  useChildReports: (...args: unknown[]) => mockUseChildReports(...args),
-  useChildWeeklyReports: (...args: unknown[]) =>
-    mockUseChildWeeklyReports(...args),
-}));
+jest.mock(
+  '../../../../hooks/use-progress' /* gc1-allow: wraps useApiClient fetch boundary — needs network stub in unit tests */,
+  () => ({
+    useChildReports: (...args: unknown[]) => mockUseChildReports(...args),
+    useChildWeeklyReports: (...args: unknown[]) =>
+      mockUseChildWeeklyReports(...args),
+  }),
+);
 
-jest.mock('../../../../lib/navigation', () => ({
-  goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
-}));
+jest.mock(
+  '../../../../lib/navigation' /* gc1-allow: goBackOrReplace calls router.back which requires native navigation context */,
+  () => ({
+    goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
+  }),
+);
 
 const { default: ChildReportsScreen, getNextReportInfo } =
   require('./reports') as {

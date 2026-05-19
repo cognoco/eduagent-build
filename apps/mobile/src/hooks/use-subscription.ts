@@ -13,6 +13,7 @@ import type {
   FamilySubscription,
 } from '@eduagent/schemas';
 import { useApiClient } from '../lib/api-client';
+import { NotFoundError } from '../lib/api-errors';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
@@ -124,13 +125,12 @@ export function useFamilySubscription(
         const data = await res.json();
         return data.family as FamilySubscription;
       } catch (error) {
-        // Production api-client throws before returning the Response, so the
-        // res.status === 404 check above is unreachable in production.
-        // Catch the thrown error here instead.
-        if (
-          error instanceof Error &&
-          error.message.startsWith('API error 404')
-        ) {
+        // [BUG-160] Production api-client throws before returning the Response,
+        // so the res.status === 404 check above is unreachable in production.
+        // Classify on the raw typed error (per CLAUDE.md "Classify errors
+        // before formatting") instead of string-matching the formatted message,
+        // which is fragile when the formatter changes.
+        if (error instanceof NotFoundError) {
           return null;
         }
         throw error;

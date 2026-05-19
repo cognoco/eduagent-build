@@ -8,7 +8,10 @@ const mockDatabaseModule = createDatabaseModuleMock({
   },
 });
 
-jest.mock('@eduagent/database', () => mockDatabaseModule.module);
+jest.mock(
+  '@eduagent/database' /* gc1-allow: service unit test — db boundary mocked; real DB covered by sibling .integration.test.ts where present */,
+  () => mockDatabaseModule.module,
+);
 
 // [BREAK] Sentry is a true external boundary — mock it to assert escalation.
 const mockCaptureException = jest.fn();
@@ -96,8 +99,20 @@ function createMockDb(): Database {
     }),
     select: jest.fn().mockReturnValue({
       from: jest.fn().mockReturnValue({
+        // [BUG-NOTION-263] review_due enrichment uses a leftJoin; default to
+        // an empty result so happy-path tests (no overdue topic in mock DB)
+        // produce a null book context without throwing.
+        leftJoin: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            limit: jest.fn().mockResolvedValue([]),
+          }),
+        }),
         where: jest.fn().mockReturnValue({
           for: jest.fn().mockResolvedValue([]),
+        }),
+        // some chains call .orderBy(...).limit(...) directly
+        orderBy: jest.fn().mockReturnValue({
+          limit: jest.fn().mockResolvedValue([]),
         }),
       }),
     }),
@@ -500,13 +515,18 @@ describe('precomputeCoachingCard', () => {
     setupScopedRepo({ retentionCardsFindMany: [overdueCard] });
     const db = createMockDb();
 
-    // Make the enrichment query (db.query.curriculumTopics.findFirst) throw
-    db.query = {
-      ...db.query,
-      curriculumTopics: {
-        findFirst: jest.fn().mockRejectedValue(new Error('DB connection lost')),
-      },
-    } as unknown as typeof db.query;
+    // [BUG-NOTION-263] Enrichment is now a single leftJoin via db.select().
+    // Make the joined select chain throw so the catch block in
+    // precomputeCoachingCard fires.
+    (db.select as jest.Mock).mockReturnValueOnce({
+      from: jest.fn().mockReturnValue({
+        leftJoin: jest.fn().mockReturnValue({
+          where: jest.fn().mockReturnValue({
+            limit: jest.fn().mockRejectedValue(new Error('DB connection lost')),
+          }),
+        }),
+      }),
+    });
 
     mockCaptureException.mockClear();
 

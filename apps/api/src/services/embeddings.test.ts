@@ -18,7 +18,10 @@ function mockDatabaseModuleFactory() {
   }).module;
 }
 
-jest.mock('@eduagent/database', () => mockDatabaseModuleFactory());
+jest.mock(
+  '@eduagent/database' /* gc1-allow: service unit test — db boundary mocked; real DB covered by sibling .integration.test.ts where present */,
+  () => mockDatabaseModuleFactory(),
+);
 
 // ---------------------------------------------------------------------------
 // Voyage AI fetch mock helpers
@@ -120,7 +123,7 @@ describe('generateEmbedding', () => {
           model: 'voyage-3.5',
           input_type: 'document',
         }),
-      }
+      },
     );
   });
 
@@ -128,7 +131,7 @@ describe('generateEmbedding', () => {
     mockFetchError(401, 'Unauthorized: invalid API key');
 
     await expect(generateEmbedding('Some text', 'bad-key')).rejects.toThrow(
-      'Voyage AI embedding request failed (401): Unauthorized: invalid API key'
+      'Voyage AI embedding request failed (401): Unauthorized: invalid API key',
     );
   });
 
@@ -136,7 +139,7 @@ describe('generateEmbedding', () => {
     mockFetchError(500, 'Internal server error');
 
     await expect(generateEmbedding('Some text', TEST_API_KEY)).rejects.toThrow(
-      'Voyage AI embedding request failed (500): Internal server error'
+      'Voyage AI embedding request failed (500): Internal server error',
     );
   });
 
@@ -144,7 +147,7 @@ describe('generateEmbedding', () => {
     mockFetchError(429, 'Rate limit exceeded');
 
     await expect(generateEmbedding('Some text', TEST_API_KEY)).rejects.toThrow(
-      'Voyage AI embedding request failed (429): Rate limit exceeded'
+      'Voyage AI embedding request failed (429): Rate limit exceeded',
     );
   });
 });
@@ -154,7 +157,7 @@ describe('generateEmbedding', () => {
 // ---------------------------------------------------------------------------
 
 function createMockDb(
-  events: Array<{ eventType: string; content: string }>
+  events: Array<{ eventType: string; content: string }>,
 ): Database {
   return {
     query: {
@@ -189,7 +192,7 @@ describe('extractSessionContent', () => {
       'What is photosynthesis?\n\n' +
         'Photosynthesis is how plants convert light to energy.\n\n' +
         'How does chlorophyll work?\n\n' +
-        'Chlorophyll absorbs light energy from the sun.'
+        'Chlorophyll absorbs light energy from the sun.',
     );
   });
 
@@ -199,7 +202,7 @@ describe('extractSessionContent', () => {
     const result = await extractSessionContent(db, SESSION_ID, PROFILE_ID);
 
     expect(result).toBe(
-      `Session ${SESSION_ID} \u2014 no conversation events recorded`
+      `Session ${SESSION_ID} \u2014 no conversation events recorded`,
     );
   });
 
@@ -261,7 +264,7 @@ describe('storeSessionEmbedding', () => {
       'profile-001',
       'topic-001',
       'Test content',
-      TEST_API_KEY
+      TEST_API_KEY,
     );
 
     expect(storeEmbedding).toHaveBeenCalledWith(mockDb, {
@@ -286,7 +289,7 @@ describe('storeSessionEmbedding', () => {
       'profile-001',
       null,
       'Test content',
-      TEST_API_KEY
+      TEST_API_KEY,
     );
 
     expect(storeEmbedding).toHaveBeenCalledWith(mockDb, {

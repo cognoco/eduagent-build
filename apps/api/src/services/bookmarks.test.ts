@@ -8,14 +8,17 @@
 // bookmarks table is projected to plain reply text.
 // ---------------------------------------------------------------------------
 
-jest.mock('@eduagent/database', () => {
-  const actual = jest.requireActual('@eduagent/database');
-  return {
-    ...actual,
-    // We override the database exports used at import time; the test supplies
-    // a fake db instance directly, so the table references just need to exist.
-  };
-});
+jest.mock(
+  '@eduagent/database' /* gc1-allow: service unit test — db boundary mocked; real DB covered by sibling .integration.test.ts where present */,
+  () => {
+    const actual = jest.requireActual('@eduagent/database');
+    return {
+      ...actual,
+      // We override the database exports used at import time; the test supplies
+      // a fake db instance directly, so the table references just need to exist.
+    };
+  },
+);
 
 import { createBookmark } from './bookmarks';
 
@@ -92,7 +95,7 @@ describe('createBookmark — [BUG-934] legacy raw-envelope projection', () => {
     const bookmark = await createBookmark(
       db as Parameters<typeof createBookmark>[0],
       'profile-id-1',
-      'event-id-1'
+      'event-id-1',
     );
 
     // The returned bookmark content must be plain reply text, not raw JSON.
@@ -102,7 +105,7 @@ describe('createBookmark — [BUG-934] legacy raw-envelope projection', () => {
 
     // The value written to the DB must also be projected.
     expect(capturedInsertValues[0]?.content).toBe(
-      'Photosynthesis converts light into energy.'
+      'Photosynthesis converts light into energy.',
     );
   });
 
@@ -114,7 +117,7 @@ describe('createBookmark — [BUG-934] legacy raw-envelope projection', () => {
     const bookmark = await createBookmark(
       db as Parameters<typeof createBookmark>[0],
       'profile-id-1',
-      'event-id-1'
+      'event-id-1',
     );
 
     expect(bookmark.content).toBe(plainContent);

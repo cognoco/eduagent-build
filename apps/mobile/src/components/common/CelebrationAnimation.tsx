@@ -58,7 +58,7 @@ function toRad(deg: number): number {
  */
 export function CelebrationAnimation({
   size = 120,
-  color = '#22c55e',
+  color = '#22c55e', // brand: success green for celebration burst
   accentColor,
   onComplete,
   testID,

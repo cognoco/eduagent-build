@@ -1,4 +1,4 @@
-import type { FlowDefinition, Scenario } from './types';
+import type { FlowDefinition, QualityIssue, Scenario } from './types';
 import { PROFILES, type EvalProfile } from '../fixtures/profiles';
 import { writeSnapshot } from './snapshot';
 import {
@@ -15,7 +15,8 @@ import {
 //   --live                 hit the real LLM providers (opt-in, costs credits)
 //   --flow <id>            only run this flow (repeatable)
 //   --profile <id>         only run this profile (repeatable)
-//   --scenarios core|full|<csv>  restrict which scenarios run (exchanges flow)
+//   --scenarios core|full|source-grounding|personalization|homework-source|book-suggestions|<csv>
+//                             restrict scenarios for enumerated flows
 //   --max-live-calls N     hard cap on live LLM calls (default 20)
 //   --list                 list registered flows and fixtures and exit
 // ---------------------------------------------------------------------------
@@ -60,6 +61,8 @@ export interface RunSummary {
   snapshotsWritten: number;
   liveCallsOk: number;
   liveCallsFailed: number;
+  qualityWarnings: number;
+  qualityFailures: number;
   skipped: Array<{ flowId: string; profileId: string; reason: string }>;
   /**
    * Per-envelope-flow signal aggregates, populated only for --live runs on
@@ -91,7 +94,7 @@ export function parseCliArgs(argv: string[]): {
       const next = argv[++i];
       if (next) profileFilter.add(next);
     } else if (arg === '--scenarios') {
-      // `--scenarios core|full|S1,S3` — "core" and "full" are sugar.
+      // `--scenarios core|full|S1,S3` — suite names and "core" are sugar.
       // `core` expands to S1,S3,S5 (highest-signal default).
       const next = argv[++i];
       if (next) {
@@ -101,6 +104,22 @@ export function parseCliArgs(argv: string[]): {
           scenarioFilter.add('S1-rung1-teach-new');
           scenarioFilter.add('S3-rung3-evaluate');
           scenarioFilter.add('S5-rung5-exit');
+        } else if (next === 'source-grounding') {
+          addScenarioRange(scenarioFilter, 'SGA', 1, 6);
+        } else if (next === 'personalization') {
+          addScenarioRange(scenarioFilter, 'PM', 1, 8);
+        } else if (next === 'homework-source') {
+          addScenarioRange(scenarioFilter, 'HW', 1, 4);
+        } else if (next === 'book-suggestions') {
+          for (const id of [
+            'relevance-diversity',
+            'age-register-adult',
+            'four-strands-language',
+            'source-neutral',
+            'duplicate-tiny-avoidance',
+          ]) {
+            scenarioFilter.add(id);
+          }
         } else {
           for (const s of next.split(',')) {
             if (s.trim()) scenarioFilter.add(s.trim());
@@ -133,11 +152,22 @@ export function parseCliArgs(argv: string[]): {
   return { options, listOnly };
 }
 
+function addScenarioRange(
+  scenarioFilter: Set<string>,
+  prefix: string,
+  start: number,
+  end: number,
+): void {
+  for (let i = start; i <= end; i++) {
+    scenarioFilter.add(`${prefix}${i.toString().padStart(2, '0')}`);
+  }
+}
+
 const DEFAULT_MAX_LIVE_CALLS = 20;
 
 export async function runHarness(
   flows: FlowDefinition[],
-  options: RunOptions
+  options: RunOptions,
 ): Promise<RunSummary> {
   const summary: RunSummary = {
     flowsRun: 0,
@@ -145,6 +175,8 @@ export async function runHarness(
     snapshotsWritten: 0,
     liveCallsOk: 0,
     liveCallsFailed: 0,
+    qualityWarnings: 0,
+    qualityFailures: 0,
     skipped: [],
     envelopeMetrics: {},
   };
@@ -154,10 +186,10 @@ export async function runHarness(
   const samplesByFlow = new Map<string, SampleMetrics[]>();
 
   const activeFlows = flows.filter(
-    (f) => !options.flowFilter || options.flowFilter.has(f.id)
+    (f) => !options.flowFilter || options.flowFilter.has(f.id),
   );
   const activeProfiles = PROFILES.filter(
-    (p) => !options.profileFilter || options.profileFilter.has(p.id)
+    (p) => !options.profileFilter || options.profileFilter.has(p.id),
   );
 
   const maxLiveCalls = options.maxLiveCalls ?? DEFAULT_MAX_LIVE_CALLS;
@@ -220,6 +252,7 @@ export async function runHarness(
           let liveModel: string | undefined;
           let liveError: string | undefined;
           let schemaViolation: string | undefined;
+          let qualityIssues: QualityIssue[] | undefined;
 
           if (options.live && flow.runLive) {
             if (liveCallsMade >= maxLiveCalls) {
@@ -244,24 +277,59 @@ export async function runHarness(
                 }
 
                 if (flow.expectedResponseSchema && liveResponse) {
-                  try {
-                    const jsonMatch = liveResponse.match(/\{[\s\S]*\}/);
-                    const parsed = JSON.parse(
-                      jsonMatch ? jsonMatch[0] : liveResponse
-                    );
-                    const result =
-                      flow.expectedResponseSchema.safeParse(parsed);
-                    if (!result.success) {
+                  const rawResult =
+                    flow.expectedResponseSchema.safeParse(liveResponse);
+                  if (!rawResult.success) {
+                    try {
+                      const jsonMatch = liveResponse.match(/\{[\s\S]*\}/);
+                      const parsed = JSON.parse(
+                        jsonMatch ? jsonMatch[0] : liveResponse,
+                      );
+                      const result =
+                        flow.expectedResponseSchema.safeParse(parsed);
+                      if (!result.success) {
+                        schemaViolation =
+                          result.error instanceof Error
+                            ? result.error.message
+                            : JSON.stringify(result.error);
+                      }
+                    } catch (parseErr) {
                       schemaViolation =
-                        result.error instanceof Error
-                          ? result.error.message
-                          : JSON.stringify(result.error);
+                        parseErr instanceof Error
+                          ? `JSON parse failed: ${parseErr.message}`
+                          : 'JSON parse failed';
                     }
-                  } catch (parseErr) {
-                    schemaViolation =
-                      parseErr instanceof Error
-                        ? `JSON parse failed: ${parseErr.message}`
-                        : 'JSON parse failed';
+                  }
+                }
+
+                if (flow.evaluateQuality && liveResponse) {
+                  try {
+                    qualityIssues = flow.evaluateQuality({
+                      input: item.input,
+                      messages,
+                      liveResponse,
+                      profile,
+                      scenarioId: item.scenarioId,
+                    });
+                  } catch (qualityErr) {
+                    qualityIssues = [
+                      {
+                        severity: 'error',
+                        code: 'quality-check-threw',
+                        message:
+                          qualityErr instanceof Error
+                            ? qualityErr.message
+                            : String(qualityErr),
+                      },
+                    ];
+                  }
+
+                  for (const issue of qualityIssues) {
+                    if (issue.severity === 'warning') {
+                      summary.qualityWarnings++;
+                    } else {
+                      summary.qualityFailures++;
+                    }
                   }
                 }
               } catch (err) {
@@ -284,6 +352,7 @@ export async function runHarness(
             liveModel,
             liveError,
             schemaViolation,
+            qualityIssues,
           });
 
           summary.snapshotsWritten++;

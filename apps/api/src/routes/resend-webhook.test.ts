@@ -855,4 +855,78 @@ describe('[CCR-PR120-M7] svix-id replay dedup', () => {
     };
     expect(__internal.SVIX_DEDUP_TTL_SECONDS).toBe(300);
   });
+
+  // [BUG-118] The dedup key must be written BEFORE the Inngest dispatch.
+  // The prior implementation wrote it fire-and-forget AFTER processing,
+  // leaving a race window in which a parallel duplicate that arrived
+  // between the .get() and the post-processing .put() would also see no key
+  // and re-process. We assert the call ordering against the same KV mock
+  // to pin the new contract.
+  it('[BUG-118] writes dedup record BEFORE invoking event handlers', async () => {
+    const order: string[] = [];
+    const kv: KVNamespaceLike = {
+      get: jest.fn().mockResolvedValue(null),
+      put: jest.fn().mockImplementation(async () => {
+        order.push('kv.put');
+      }),
+    };
+    (inngest.send as jest.Mock).mockImplementation(async () => {
+      order.push('inngest.send');
+    });
+    const env = { ...TEST_ENV, IDEMPOTENCY_KV: kv };
+
+    const rawBody = JSON.stringify({
+      type: 'email.bounced',
+      data: { email_id: 'e_order', to: 'a@b.com' },
+    });
+    const id = 'msg_order_check';
+    const ts = nowTimestamp();
+    const sig = await signPayload(rawBody, id, ts);
+
+    const res = await app.request(
+      '/webhooks/resend',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'svix-id': id,
+          'svix-timestamp': ts,
+          'svix-signature': sig,
+        },
+        body: rawBody,
+      },
+      env,
+    );
+
+    expect(res.status).toBe(200);
+    // The KV write must happen FIRST (before processing dispatches Inngest).
+    expect(order[0]).toBe('kv.put');
+    expect(order).toContain('inngest.send');
+    expect(order.indexOf('kv.put')).toBeLessThan(order.indexOf('inngest.send'));
+  });
+
+  it('[BUG-118] pre-write failure surfaces as observability signal (no silent recovery)', async () => {
+    const kv: KVNamespaceLike = {
+      get: jest.fn().mockResolvedValue(null),
+      put: jest.fn().mockRejectedValue(new Error('kv put boom')),
+    };
+    const env = { ...TEST_ENV, IDEMPOTENCY_KV: kv };
+
+    const res = await makeRequest(
+      { type: 'email.delivered', data: { to: 'a@b.com' } },
+      {},
+      env,
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockLoggerWarn).toHaveBeenCalledWith(
+      expect.stringContaining('svix-id dedup pre-write failed'),
+      expect.objectContaining({ error: 'kv put boom' }),
+    );
+    expect(inngest.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'app/resend-webhook.dedup_prewrite_failed',
+      }),
+    );
+  });
 });

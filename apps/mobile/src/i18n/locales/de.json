@@ -549,7 +549,12 @@
       "childDailyMessage": "Du hast das heutige Fragenlimit erreicht.",
       "childMonthlyMessage": "Du hast das Fragenlimit für diesen Monat erreicht.",
       "askParent": "Eltern fragen",
-      "topUpCredits": "Guthaben aufladen"
+      "topUpCredits": "Guthaben aufladen",
+      "notifyParent": "Eltern benachrichtigen",
+      "notifyParentSent": "Gesendet – Eltern wurden benachrichtigt",
+      "notifyParentRetry": "Senden fehlgeschlagen – zum Wiederholen tippen",
+      "resetHintDaily": "Dein Tageslimit wird um Mitternacht zurückgesetzt.",
+      "resetHintMonthly": "Dein Monatslimit wird am 1. zurückgesetzt."
     },
     "libraryPrompt": {
       "wantToSee": "Möchtest du deine früheren Lektionen sehen?",
@@ -584,7 +589,8 @@
       "textMode": "Textmodus",
       "switchToVoiceMode": "In den Sprachmodus wechseln",
       "voiceMode": "Sprachmodus",
-      "screenReaderVoiceNote": "Bildschirmleser ist an. Spracheingabe ist nicht verfügbar. Nutze die Texteingabe unten."
+      "screenReaderVoiceNote": "Bildschirmleser ist an. Spracheingabe ist nicht verfügbar. Nutze die Texteingabe unten.",
+      "stepProgress": "Schritt {{current}} von {{total}}"
     },
     "filingFailed": {
       "retryInProgress": "Ein Wiederholungsversuch läuft bereits.",
@@ -625,7 +631,9 @@
       "yesAddLabel": "Ja, zur Bibliothek hinzufügen",
       "yesAdd": "Ja, hinzufügen",
       "noThanksLabel": "Nein, danke",
-      "noThanks": "Nein, danke"
+      "noThanks": "Nein, danke",
+      "tryAgain": "Erneut versuchen",
+      "skipForNow": "Jetzt überspringen"
     },
     "parkingLot": {
       "title": "Parkplatz",

@@ -56,6 +56,7 @@ export function useSkipTopic(
   subjectId: string,
 ): UseMutationResult<{ message: string }, Error, string> {
   const client = useApiClient();
+  const { activeProfile } = useProfile();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -68,8 +69,10 @@ export function useSkipTopic(
       return (await res.json()) as { message: string };
     },
     onSuccess: () => {
+      // [BUG-161] Scope invalidation to the active profile so a mutation
+      // never targets another profile's curriculum cache on a shared device.
       void queryClient.invalidateQueries({
-        queryKey: ['curriculum', subjectId],
+        queryKey: ['curriculum', subjectId, activeProfile?.id],
       });
     },
   });
@@ -79,6 +82,7 @@ export function useUnskipTopic(
   subjectId: string,
 ): UseMutationResult<{ message: string }, Error, string> {
   const client = useApiClient();
+  const { activeProfile } = useProfile();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -91,8 +95,9 @@ export function useUnskipTopic(
       return (await res.json()) as { message: string };
     },
     onSuccess: () => {
+      // [BUG-161] Scope invalidation to the active profile.
       void queryClient.invalidateQueries({
-        queryKey: ['curriculum', subjectId],
+        queryKey: ['curriculum', subjectId, activeProfile?.id],
       });
     },
   });
@@ -102,6 +107,7 @@ export function useChallengeCurriculum(
   subjectId: string,
 ): UseMutationResult<{ curriculum: Curriculum }, Error, string> {
   const client = useApiClient();
+  const { activeProfile } = useProfile();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -118,8 +124,9 @@ export function useChallengeCurriculum(
       return (await res.json()) as { curriculum: Curriculum };
     },
     onSuccess: () => {
+      // [BUG-161] Scope invalidation to the active profile.
       void queryClient.invalidateQueries({
-        queryKey: ['curriculum', subjectId],
+        queryKey: ['curriculum', subjectId, activeProfile?.id],
       });
     },
   });
@@ -133,6 +140,7 @@ export function useAddCurriculumTopic(
   CurriculumTopicAddInput
 > {
   const client = useApiClient();
+  const { activeProfile } = useProfile();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -148,8 +156,9 @@ export function useAddCurriculumTopic(
     },
     onSuccess: (result) => {
       if (result.mode === 'create') {
+        // [BUG-161] Scope invalidation to the active profile.
         void queryClient.invalidateQueries({
-          queryKey: ['curriculum', subjectId],
+          queryKey: ['curriculum', subjectId, activeProfile?.id],
         });
       }
     },
@@ -179,6 +188,7 @@ export function useAdaptCurriculum(
   subjectId: string,
 ): UseMutationResult<CurriculumAdaptResponse, Error, CurriculumAdaptRequest> {
   const client = useApiClient();
+  const { activeProfile } = useProfile();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -193,8 +203,9 @@ export function useAdaptCurriculum(
       return (await res.json()) as unknown as CurriculumAdaptResponse;
     },
     onSuccess: () => {
+      // [BUG-161] Scope invalidation to the active profile.
       void queryClient.invalidateQueries({
-        queryKey: ['curriculum', subjectId],
+        queryKey: ['curriculum', subjectId, activeProfile?.id],
       });
     },
   });

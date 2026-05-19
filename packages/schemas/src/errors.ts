@@ -284,10 +284,79 @@ const errorCodeValues = Object.values(ERROR_CODES) as [
 ];
 export const errorCodeSchema = z.enum(errorCodeValues);
 
+/**
+ * [BUG-210] Typed detail shapes for the `apiError.details` payload.
+ *
+ * `details` is shaped by the `code`. We model the known per-code shapes so
+ * mobile (and tests) can discriminate without `as any`. Codes that don't
+ * carry detail payload pass `undefined`. Unrecognised codes fall back to
+ * `apiErrorDetailsRecordSchema` so server-only metadata (e.g. validation
+ * issue arrays from Zod) remain expressible without forcing every shape
+ * into this file.
+ */
+
+/** QUOTA_EXCEEDED details — mirrors `quotaExceededSchema.details` in billing.ts. */
+const quotaExceededDetailsSchema = z.object({
+  tier: z.enum(['free', 'plus', 'family', 'pro']),
+  reason: z.enum(['monthly', 'daily']),
+  monthlyLimit: z.number().int(),
+  usedThisMonth: z.number().int(),
+  dailyLimit: z.number().int().nullable(),
+  usedToday: z.number().int(),
+  topUpCreditsRemaining: z.number().int(),
+  upgradeOptions: z.array(
+    z.object({
+      tier: z.enum(['plus', 'family', 'pro']),
+      monthlyQuota: z.number().int(),
+      priceMonthly: z.number(),
+    }),
+  ),
+});
+
+/** VALIDATION_ERROR details — Zod's `.issues` array shape (subset). */
+const validationErrorDetailsSchema = z.object({
+  issues: z.array(
+    z.object({
+      path: z.array(z.union([z.string(), z.number()])),
+      message: z.string(),
+      code: z.string().optional(),
+    }),
+  ),
+});
+
+/** RATE_LIMITED details — surfaces retryAfter so the client can back off. */
+const rateLimitedDetailsSchema = z.object({
+  retryAfter: z.number().optional(),
+  code: z.string().optional(),
+});
+
+/** RESOURCE_GONE / SESSION_ARCHIVED details — pointer to the gone entity. */
+const resourceGoneDetailsSchema = z.object({
+  id: z.string().optional(),
+  code: z.string().optional(),
+});
+
+/**
+ * Permissive fallback for codes whose detail payload is server-defined or
+ * still in flux. Always an object — never a primitive — so consumers can
+ * safely property-access without runtime guards.
+ */
+const apiErrorDetailsRecordSchema = z.record(z.string(), z.unknown());
+
+export const apiErrorDetailsSchema = z.union([
+  quotaExceededDetailsSchema,
+  validationErrorDetailsSchema,
+  rateLimitedDetailsSchema,
+  resourceGoneDetailsSchema,
+  apiErrorDetailsRecordSchema,
+]);
+
+export type ApiErrorDetails = z.infer<typeof apiErrorDetailsSchema>;
+
 export const apiErrorSchema = z.object({
   code: errorCodeSchema,
   message: z.string(),
-  details: z.unknown().optional(),
+  details: apiErrorDetailsSchema.optional(),
 });
 
 export type ApiError = z.infer<typeof apiErrorSchema>;

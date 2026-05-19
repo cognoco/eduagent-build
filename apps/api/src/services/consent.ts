@@ -127,9 +127,16 @@ function mapConsentRow(row: typeof consentStates.$inferSelect): ConsentState {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Approximate age from birth year using the current calendar year. */
+/**
+ * Approximate age from birth year using the current UTC calendar year.
+ *
+ * Uses getUTCFullYear() (not getFullYear()) so the computed age is
+ * independent of the host process timezone — important for tests running
+ * on developer machines outside UTC and for environments that don't run in
+ * UTC (Cloudflare Workers do, but this contract should not depend on that).
+ */
 export function calculateAge(birthYear: number): number {
-  return new Date().getFullYear() - birthYear;
+  return new Date().getUTCFullYear() - birthYear;
 }
 
 // ---------------------------------------------------------------------------

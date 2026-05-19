@@ -168,6 +168,24 @@ jobs:
       - name: scripts/* tests
         run: pnpm exec jest --config scripts/jest.config.cjs --no-coverage
 
+      # [BUG-246] Change-class advisory: walks the PR diff and prints the
+      # "you touched X, run Y" matrix from docs/change-classes.md so authors
+      # have a visible reminder of which integration tests, migrations, or
+      # eval runs the change implies. Advisory only (continue-on-error +
+      # --no-fail) — the underlying validation commands run as their own
+      # CI steps; this step is the human-readable surface so reviewers can
+      # confirm the right validation was performed. Promote to a blocking
+      # gate by removing continue-on-error once the advisory output has
+      # stabilized.
+      - name: Change-class advisory (BUG-246)
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          echo "Inspecting push delta vs origin/${BASE_REF}..."
+          bash scripts/check-change-class.sh --branch || true
+
       # PR builds: only lint/test/typecheck/build projects affected by the diff.
       # Push to main: full validation across all projects.
       # Mobile build excluded in both — requires EAS CLI, handled by mobile-ci.yml.

@@ -19,6 +19,7 @@ import {
   curriculumTopics,
   learningSessions,
   createDatabase,
+  generateUUIDv7,
 } from '@eduagent/database';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import { resolve } from 'path';
@@ -55,10 +56,8 @@ function createIntegrationDb() {
 // ---------------------------------------------------------------------------
 
 const PREFIX = 'integration-filing';
-const ACCOUNT = {
-  clerkUserId: `${PREFIX}-user1`,
-  email: `${PREFIX}-user1@integration.test`,
-};
+const RUN_ID = generateUUIDv7();
+let seedCounter = 0;
 
 // ---------------------------------------------------------------------------
 // Seed helpers
@@ -66,10 +65,13 @@ const ACCOUNT = {
 
 async function seedAccountAndProfile() {
   const db = createIntegrationDb();
+  const idx = ++seedCounter;
+  const clerkUserId = `${PREFIX}-${RUN_ID}-${idx}`;
+  const email = `${PREFIX}-${RUN_ID}-${idx}@integration.test`;
 
   const [account] = await db
     .insert(accounts)
-    .values({ clerkUserId: ACCOUNT.clerkUserId, email: ACCOUNT.email })
+    .values({ clerkUserId, email })
     .returning();
 
   const [profile] = await db
@@ -88,7 +90,8 @@ async function seedAccountAndProfile() {
 async function cleanup() {
   const db = createIntegrationDb();
   const found = await db.query.accounts.findMany({
-    where: eq(accounts.email, ACCOUNT.email),
+    where: (accounts, { like }) =>
+      like(accounts.clerkUserId, `${PREFIX}-${RUN_ID}-%`),
   });
   const ids = found.map((a: typeof accounts.$inferSelect) => a.id);
   if (ids.length > 0) {
@@ -853,5 +856,276 @@ describe('fileToLibrary (LLM mock, schema validation)', () => {
     await expect(
       fileToLibrary({}, emptyIndex, mockRouteAndCall),
     ).rejects.toThrow('Filing requires either rawInput or sessionTranscript');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [Phase 4 additions] Filing concurrency — chapter idempotency and
+// Inngest-retry-style repeated identical payloads
+// ---------------------------------------------------------------------------
+
+describe('resolveFilingResult — chapter-level idempotency (integration)', () => {
+  // Chapters are not a DB table — they are a text column on curriculum_topics.
+  // Idempotency is enforced at the topic level (book_id, lower(title) unique).
+  // These tests confirm that repeated filings for the SAME chapter+topic do
+  // not produce duplicate topic rows, which is the relevant invariant.
+
+  it('same chapter name on retry does not create duplicate topics', async () => {
+    const { profile } = await seedAccountAndProfile();
+    const db = createIntegrationDb();
+
+    const base = {
+      profileId: profile.id,
+      filingResponse: {
+        shelf: { name: 'Chemistry Retry' },
+        book: {
+          name: 'Organic Compounds',
+          emoji: '🧪',
+          description: 'Organic',
+        },
+        chapter: { name: 'Hydrocarbons' },
+        topic: { title: 'Methane', description: 'Simplest hydrocarbon' },
+      } satisfies FilingLlmOutput,
+      filedFrom: 'session_filing' as const,
+    };
+
+    const first = await resolveFilingResult(db, base);
+    const second = await resolveFilingResult(db, base);
+    const third = await resolveFilingResult(db, base);
+
+    // All three must resolve to the same topicId.
+    expect(second.topicId).toBe(first.topicId);
+    expect(third.topicId).toBe(first.topicId);
+
+    // Also: same bookId (no duplicate book rows).
+    expect(second.bookId).toBe(first.bookId);
+
+    // Chapter must be consistent.
+    expect(second.chapter).toBe('Hydrocarbons');
+
+    // Exactly one topic row in the book.
+    const allTopics = await db.query.curriculumTopics.findMany({
+      where: and(
+        eq(curriculumTopics.bookId, first.bookId),
+        sql`lower(${curriculumTopics.title}) = lower(${'Methane'})`,
+      ),
+    });
+    expect(allTopics).toHaveLength(1);
+  });
+
+  it('different chapter name with same topic title still deduplicates on (bookId, lower(title))', async () => {
+    // If the LLM suggests a different chapter name but the same topic title
+    // (e.g., retry with slightly different prompt), the topic must not be
+    // duplicated. The unique index is on (book_id, lower(title)), not chapter.
+    const { profile } = await seedAccountAndProfile();
+    const db = createIntegrationDb();
+
+    const firstPayload = {
+      profileId: profile.id,
+      filingResponse: {
+        shelf: { name: 'Science Alt' },
+        book: { name: 'Physics Alt', emoji: '⚛️', description: 'Physics' },
+        chapter: { name: 'Chapter A' },
+        topic: { title: 'Wave–particle duality', description: 'Quantum' },
+      } satisfies FilingLlmOutput,
+      filedFrom: 'session_filing' as const,
+    };
+    const secondPayload = {
+      ...firstPayload,
+      filingResponse: {
+        ...firstPayload.filingResponse,
+        // Same topic title, different chapter name — the LLM "changed its mind"
+        chapter: { name: 'Chapter B' },
+      },
+    };
+
+    const first = await resolveFilingResult(db, firstPayload);
+    const second = await resolveFilingResult(db, secondPayload);
+
+    // Dedup is on (bookId, lower(title)) so topicId must match.
+    expect(second.topicId).toBe(first.topicId);
+
+    // Only one topic row exists.
+    const allTopics = await db.query.curriculumTopics.findMany({
+      where: and(
+        eq(curriculumTopics.bookId, first.bookId),
+        sql`lower(${curriculumTopics.title}) = lower(${'Wave–particle duality'})`,
+      ),
+    });
+    expect(allTopics).toHaveLength(1);
+  });
+});
+
+describe('resolveFilingResult — Inngest retry idempotency (integration)', () => {
+  // Simulates an Inngest function retrying after transient failure with the
+  // same filing payload. All three levels (shelf + book + topic) must remain
+  // idempotent across N retries.
+
+  it('5 retries of the same full payload produce exactly one row at every level', async () => {
+    const { profile } = await seedAccountAndProfile();
+    const db = createIntegrationDb();
+
+    const payload = {
+      profileId: profile.id,
+      filingResponse: {
+        shelf: { name: 'Retry Science' },
+        book: { name: 'Retry Biology', emoji: '🧬', description: 'Biology' },
+        chapter: { name: 'Retry Chapter' },
+        topic: { title: 'Retry Topic', description: 'Retry description' },
+      } satisfies FilingLlmOutput,
+      filedFrom: 'session_filing' as const,
+    };
+
+    const results = [];
+    for (let i = 0; i < 5; i++) {
+      results.push(await resolveFilingResult(db, payload));
+    }
+
+    // All runs must return the same IDs.
+    for (const r of results) {
+      expect(r.shelfId).toBe(results[0]!.shelfId);
+      expect(r.bookId).toBe(results[0]!.bookId);
+      expect(r.topicId).toBe(results[0]!.topicId);
+    }
+
+    // Row counts at each level must be exactly 1.
+    const subjectRows = await db
+      .select()
+      .from(subjects)
+      .where(
+        and(
+          eq(subjects.profileId, profile.id),
+          sql`lower(${subjects.name}) = lower(${'Retry Science'})`,
+        ),
+      );
+    expect(subjectRows).toHaveLength(1);
+
+    const bookRows = await db
+      .select()
+      .from(curriculumBooks)
+      .where(
+        and(
+          eq(curriculumBooks.subjectId, results[0]!.shelfId),
+          sql`lower(${curriculumBooks.title}) = lower(${'Retry Biology'})`,
+        ),
+      );
+    expect(bookRows).toHaveLength(1);
+
+    const topicRows = await db
+      .select()
+      .from(curriculumTopics)
+      .where(
+        and(
+          eq(curriculumTopics.bookId, results[0]!.bookId),
+          sql`lower(${curriculumTopics.title}) = lower(${'Retry Topic'})`,
+        ),
+      );
+    expect(topicRows).toHaveLength(1);
+  });
+});
+
+describe('resolveFilingResult — concurrent topic creation (integration)', () => {
+  // Break test: two concurrent workers trying to create the SAME topic inside
+  // the same book must resolve to a single row. The DB-level unique index
+  // on (book_id, lower(title)) enforces this.
+  it('[CR-FIL-DEDUP-INDEX-12] concurrent topic creation produces exactly one row', async () => {
+    const { profile } = await seedAccountAndProfile();
+    const db = createIntegrationDb();
+
+    // Pre-create shelf + book so the race is isolated to the topic layer.
+    const [subject] = await db
+      .insert(subjects)
+      .values({
+        profileId: profile.id,
+        name: 'ConcurrentTopicShelf',
+        status: 'active',
+        pedagogyMode: 'socratic',
+      })
+      .returning();
+    await db.insert(curricula).values({ subjectId: subject!.id, version: 1 });
+    const [book] = await db
+      .insert(curriculumBooks)
+      .values({
+        subjectId: subject!.id,
+        title: 'ConcurrentTopicBook',
+        sortOrder: 0,
+        topicsGenerated: true,
+      })
+      .returning();
+
+    const makePayload = () => ({
+      profileId: profile.id,
+      filingResponse: {
+        shelf: { id: subject!.id },
+        book: { id: book!.id },
+        chapter: { name: 'Concurrent Chapter' },
+        topic: { title: 'Concurrent Topic', description: 'Race test' },
+      } satisfies FilingLlmOutput,
+      filedFrom: 'session_filing' as const,
+    });
+
+    const [resultA, resultB] = await Promise.all([
+      resolveFilingResult(db, makePayload()),
+      resolveFilingResult(db, makePayload()),
+    ]);
+
+    // Both concurrent workers must resolve to the same topicId.
+    expect(resultA.topicId).toBe(resultB.topicId);
+
+    // Exactly ONE topic row exists for this (bookId, title) combination.
+    const rows = await db
+      .select()
+      .from(curriculumTopics)
+      .where(
+        and(
+          eq(curriculumTopics.bookId, book!.id),
+          sql`lower(${curriculumTopics.title}) = lower(${'Concurrent Topic'})`,
+        ),
+      );
+    expect(rows).toHaveLength(1);
+  });
+});
+
+describe('buildLibraryIndex — profile isolation (integration)', () => {
+  it('does not include subjects from another profile in the index', async () => {
+    const profile1 = await seedAccountAndProfile();
+    const profile2 = await seedAccountAndProfile();
+    const db = createIntegrationDb();
+
+    // File a topic to profile1
+    await resolveFilingResult(db, {
+      profileId: profile1.profile.id,
+      filingResponse: {
+        shelf: { name: 'Profile1 Subject' },
+        book: { name: 'Profile1 Book', emoji: '📚', description: 'P1' },
+        chapter: { name: 'P1 Chapter' },
+        topic: { title: 'P1 Topic', description: 'Profile 1 topic' },
+      },
+      filedFrom: 'session_filing',
+    });
+
+    // File a topic to profile2
+    await resolveFilingResult(db, {
+      profileId: profile2.profile.id,
+      filingResponse: {
+        shelf: { name: 'Profile2 Subject' },
+        book: { name: 'Profile2 Book', emoji: '📖', description: 'P2' },
+        chapter: { name: 'P2 Chapter' },
+        topic: { title: 'P2 Topic', description: 'Profile 2 topic' },
+      },
+      filedFrom: 'session_filing',
+    });
+
+    // Build index for profile1 — must not include profile2's shelf.
+    const index1 = await buildLibraryIndex(db, profile1.profile.id);
+    const shelfNames1 = index1.shelves.map((s) => s.name);
+    expect(shelfNames1).toContain('Profile1 Subject');
+    expect(shelfNames1).not.toContain('Profile2 Subject');
+
+    // Build index for profile2 — must not include profile1's shelf.
+    const index2 = await buildLibraryIndex(db, profile2.profile.id);
+    const shelfNames2 = index2.shelves.map((s) => s.name);
+    expect(shelfNames2).toContain('Profile2 Subject');
+    expect(shelfNames2).not.toContain('Profile1 Subject');
   });
 });

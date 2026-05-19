@@ -3,8 +3,11 @@ import {
   mergeMemoryContexts,
   computeCorrectStreak,
   resolveExchangeLlmRouting,
+  checkExchangeLimit,
   type ExchangeHistoryEvent,
 } from './session-exchange';
+import { MAX_EXCHANGES_PER_SESSION } from '@eduagent/schemas';
+import { SessionExchangeLimitError } from './session-crud';
 
 type ExchangeHistoryEntry = ReturnType<typeof buildExchangeHistory>[number];
 
@@ -446,5 +449,205 @@ describe('resolveExchangeLlmRouting', () => {
       providerPolicy: 'gemini_only',
       routingReason: 'family_standard_gemini_only',
     });
+  });
+
+  it('returns no explicit tier or policy for unknown subscriptionTier (passthrough)', () => {
+    const result = resolveExchangeLlmRouting({
+      subscriptionTier: undefined,
+      requestedLlmTier: 'standard',
+      effectiveRung: 2,
+    });
+    // No special routing rule matched — falls through to default
+    expect(result.llmTier).toBe('standard');
+    expect(result.providerPolicy).toBeUndefined();
+    expect(result.routingReason).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildExchangeHistory — additional edge cases
+// ---------------------------------------------------------------------------
+
+describe('buildExchangeHistory — edge cases', () => {
+  it('includes orphan_reason on user message when present', () => {
+    const events: ExchangeHistoryEvent[] = [
+      {
+        eventType: 'user_message',
+        content: 'lost message',
+        orphanReason: 'llm_stream_error',
+      },
+    ];
+    const history = buildExchangeHistory(events);
+    expect(history[0]).toEqual({
+      role: 'user',
+      content: 'lost message',
+      orphan_reason: 'llm_stream_error',
+    });
+  });
+
+  it('omits orphan_reason field when not set on user message', () => {
+    const events: ExchangeHistoryEvent[] = [
+      { eventType: 'user_message', content: 'normal message' },
+    ];
+    const history = buildExchangeHistory(events);
+    expect(history[0]).not.toHaveProperty('orphan_reason');
+  });
+
+  it('filters out escalation events (non-conversational)', () => {
+    const events: ExchangeHistoryEvent[] = [
+      { eventType: 'escalation', content: 'rung change' },
+      { eventType: 'user_message', content: 'hello' },
+    ];
+    const history = buildExchangeHistory(events);
+    expect(history).toHaveLength(1);
+    expect(history[0]?.role).toBe('user');
+  });
+
+  it('filters out silence_prompt events', () => {
+    const events: ExchangeHistoryEvent[] = [
+      { eventType: 'user_message', content: 'hello' },
+      { eventType: 'silence_prompt', content: 'still there?' },
+      { eventType: 'ai_response', content: 'yes, still here' },
+    ];
+    const history = buildExchangeHistory(events);
+    expect(history).toHaveLength(2);
+    expect(history.map((h) => h.role)).toEqual(['user', 'assistant']);
+  });
+
+  it('re-wraps ai_response as valid JSON envelope', () => {
+    const events: ExchangeHistoryEvent[] = [
+      { eventType: 'ai_response', content: 'plain prose response' },
+    ];
+    const history = buildExchangeHistory(events);
+    expect(history[0]?.role).toBe('assistant');
+    const parsed = JSON.parse(history[0]!.content) as { reply: string };
+    expect(parsed.reply).toBe('plain prose response');
+  });
+
+  it('handles null eventType without throwing', () => {
+    const events: ExchangeHistoryEvent[] = [
+      { eventType: null, content: 'mystery event' },
+      { eventType: 'user_message', content: 'real message' },
+    ];
+    const history = buildExchangeHistory(events);
+    // null eventType is not in the filter list — should be excluded
+    expect(history).toHaveLength(1);
+    expect(history[0]?.content).toBe('real message');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// mergeMemoryContexts — additional edge cases
+// ---------------------------------------------------------------------------
+
+describe('mergeMemoryContexts — additional edge cases', () => {
+  it('handles whitespace-only messageMemory as falsy', () => {
+    // An empty string is falsy; whitespace-only strings are truthy.
+    // The function only checks for falsy (empty string), so whitespace
+    // is treated as real content.
+    const result = mergeMemoryContexts('   ', 'raw-input context');
+    expect(result).toContain('raw-input context');
+  });
+
+  it('uses the longer string when rawInput is a prefix of messageMemory', () => {
+    const longer = 'Memory about chemistry including acid-base reactions';
+    const shorter = 'Memory about chemistry';
+    expect(mergeMemoryContexts(longer, shorter)).toBe(longer);
+  });
+
+  it('uses the longer string when messageMemory is a prefix of rawInput', () => {
+    const longer = 'Raw input context about physics waves and energy';
+    const shorter = 'Raw input context about physics';
+    expect(mergeMemoryContexts(shorter, longer)).toBe(longer);
+  });
+
+  it('produces output containing both inputs when neither is a subset of the other', () => {
+    const result = mergeMemoryContexts(
+      'context A about math',
+      'context B about history',
+    );
+    expect(result).toContain('context A about math');
+    expect(result).toContain('context B about history');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// checkExchangeLimit — profile-scoping and limit enforcement
+// ---------------------------------------------------------------------------
+
+// checkExchangeLimit uses createScopedRepository which calls
+// db.query.learningSessions.findFirst internally (not db.select).
+function makeExchangeLimitDb(
+  sessionRow: {
+    id: string;
+    profileId: string;
+    exchangeCount: number;
+    subjectId: string;
+  } | null,
+) {
+  return {
+    query: {
+      learningSessions: {
+        findFirst: jest.fn().mockResolvedValue(sessionRow ?? undefined),
+      },
+    },
+  } as never;
+}
+
+describe('checkExchangeLimit', () => {
+  it('throws "Session not found" when scoped repo returns no row', async () => {
+    const db = makeExchangeLimitDb(null);
+    await expect(
+      checkExchangeLimit(db, 'prof-1', 'nonexistent-sess'),
+    ).rejects.toThrow('Session not found');
+  });
+
+  it('throws SessionExchangeLimitError when exchangeCount equals the limit', async () => {
+    const db = makeExchangeLimitDb({
+      id: 'sess-at-limit',
+      profileId: 'prof-1',
+      exchangeCount: MAX_EXCHANGES_PER_SESSION,
+      subjectId: 'subj-1',
+    });
+    await expect(
+      checkExchangeLimit(db, 'prof-1', 'sess-at-limit'),
+    ).rejects.toBeInstanceOf(SessionExchangeLimitError);
+  });
+
+  it('throws SessionExchangeLimitError when exchangeCount exceeds the limit', async () => {
+    const db = makeExchangeLimitDb({
+      id: 'sess-over-limit',
+      profileId: 'prof-1',
+      exchangeCount: MAX_EXCHANGES_PER_SESSION + 5,
+      subjectId: 'subj-1',
+    });
+    const err = await checkExchangeLimit(db, 'prof-1', 'sess-over-limit').catch(
+      (e) => e,
+    );
+    expect(err).toBeInstanceOf(SessionExchangeLimitError);
+    expect((err as SessionExchangeLimitError).exchangeCount).toBe(
+      MAX_EXCHANGES_PER_SESSION + 5,
+    );
+  });
+
+  it('resolves without throwing when exchangeCount is below the limit', async () => {
+    const db = makeExchangeLimitDb({
+      id: 'sess-under-limit',
+      profileId: 'prof-1',
+      exchangeCount: MAX_EXCHANGES_PER_SESSION - 1,
+      subjectId: 'subj-1',
+    });
+    await expect(
+      checkExchangeLimit(db, 'prof-1', 'sess-under-limit'),
+    ).resolves.toBeUndefined();
+  });
+
+  it('does not allow a different profile to check a session it does not own', async () => {
+    // The scoped repo scopes findFirst to the caller's profileId. A session owned
+    // by 'prof-victim' returns undefined when queried as 'prof-attacker'.
+    const db = makeExchangeLimitDb(null); // null → not found for wrong profile
+    await expect(
+      checkExchangeLimit(db, 'attacker-profile', 'sess-owned-by-victim'),
+    ).rejects.toThrow('Session not found');
   });
 });

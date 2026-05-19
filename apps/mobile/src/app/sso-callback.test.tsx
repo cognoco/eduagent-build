@@ -121,8 +121,8 @@ describe('SSOCallbackScreen', () => {
         jest.advanceTimersByTime(10_000);
       });
 
-      expect(screen.getByTestId('sso-fallback-back')).toBeTruthy();
-      expect(screen.getByText('Back to sign in')).toBeTruthy();
+      expect(screen.getByTestId('sso-fallback-back'));
+      expect(screen.getByText('Back to sign in'));
     });
 
     it('routes back to /(auth)/sign-in when fallback button is pressed', () => {

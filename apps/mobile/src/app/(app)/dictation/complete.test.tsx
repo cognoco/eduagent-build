@@ -160,7 +160,10 @@ describe('DictationCompleteScreen', () => {
     });
 
     // Cancel already navigated via goBackOrReplace; push must NOT fire
-    expect(mockGoBackOrReplace).toHaveBeenCalled();
+    expect(mockGoBackOrReplace).toHaveBeenCalledWith(
+      expect.anything(),
+      '/(app)/practice',
+    );
     expect(mockPush).not.toHaveBeenCalled();
   });
 

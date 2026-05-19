@@ -400,6 +400,52 @@ describe('usePurchase', () => {
     );
   });
 
+  // [BUG-167] usePurchase must scope the customerInfo invalidation by
+  // Clerk userId so a purchase by user A on a shared device cannot
+  // invalidate user B's entitlement cache. The customerInfo query key
+  // includes userId (see useCustomerInfo) — the invalidation key must
+  // mirror that scope.
+  it('invalidates customer info scoped to the current userId, not another user', async () => {
+    mockUseAuth.mockReturnValue({
+      isSignedIn: true,
+      userId: 'clerk_user_A',
+    });
+
+    const wrapper = createWrapper();
+    const invalidateSpy = jest.spyOn(queryClient, 'invalidateQueries');
+
+    const mockPackage = {
+      identifier: '$rc_monthly',
+      packageType: 'MONTHLY',
+      product: { identifier: 'com.eduagent.plus.monthly' },
+    } as never;
+
+    const { result } = renderHook(() => usePurchase(), { wrapper });
+
+    await act(async () => {
+      result.current.mutate(mockPackage);
+    });
+
+    await waitFor(() => {
+      expect(result.current.isSuccess).toBe(true);
+    });
+
+    // Active user's customerInfo key MUST be the invalidated key.
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        queryKey: ['revenuecat', 'customerInfo', 'clerk_user_A'],
+      }),
+    );
+    // The pre-fix shape ['revenuecat', 'customerInfo'] would prefix-match
+    // every user's entitlement cache via TanStack invalidation — that shape
+    // MUST NOT be present.
+    expect(invalidateSpy).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        queryKey: ['revenuecat', 'customerInfo'],
+      }),
+    );
+  });
+
   it('handles purchase error (user cancellation)', async () => {
     (Purchases.purchasePackage as jest.Mock).mockRejectedValueOnce(
       new Error('User cancelled'),

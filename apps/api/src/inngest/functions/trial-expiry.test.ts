@@ -6,7 +6,10 @@ import { createDatabaseModuleMock } from '../../test-utils/database-module';
 
 const mockDatabaseModule = createDatabaseModuleMock();
 
-jest.mock('@eduagent/database', () => mockDatabaseModule.module);
+jest.mock(
+  '@eduagent/database' /* gc1-allow: inngest unit test — prevents real Neon connection; real DB exercised via .integration.test.ts harness */,
+  () => mockDatabaseModule.module,
+);
 
 // [BUG-843] Mock the inngest client + sentry capture so per-trial failures
 // can assert on escalation surfaces without a real network round-trip. Use
@@ -84,10 +87,11 @@ jest.mock(
   },
 );
 
-// [BUG-699-FOLLOWUP] getRecentNotificationCount gates dedup: default 0 so
-// existing tests continue to send. Individual tests override to simulate a
-// prior successful send (retry path).
-const mockGetRecentNotificationCount = jest.fn().mockResolvedValue(0);
+// [BUG-117] checkAndLogRateLimitInternal gates dedup atomically (advisory
+// lock + read + insert in a single transaction). Default false = not limited
+// = caller may send. Individual tests override to true to simulate a prior
+// send (retry path) or a concurrent send winning the lock.
+const mockCheckAndLogRateLimitInternal = jest.fn().mockResolvedValue(false);
 jest.mock(
   '../../services/settings' /* gc1-allow: pattern-a conversion */,
   () => {
@@ -96,8 +100,8 @@ jest.mock(
     ) as typeof import('../../services/settings');
     return {
       ...actual,
-      getRecentNotificationCount: (...args: unknown[]) =>
-        mockGetRecentNotificationCount(...args),
+      checkAndLogRateLimitInternal: (...args: unknown[]) =>
+        mockCheckAndLogRateLimitInternal(...args),
     };
   },
 );
@@ -171,8 +175,10 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 describe('trialExpiry', () => {
-  it('should be defined as an Inngest function', () => {
-    expect(trialExpiry).toBeTruthy();
+  it('should be defined as an Inngest function with the expected id', () => {
+    expect((trialExpiry as { opts?: { id?: string } }).opts?.id).toBe(
+      'trial-expiry-check',
+    );
   });
 
   it('should have the correct function id', () => {
@@ -637,9 +643,10 @@ describe('trialExpiry', () => {
         .mockResolvedValueOnce([trialEndingSoon]) // 3-day warning
         .mockResolvedValue([]);
 
-      // Simulate: prior run already wrote a trial_expiry log entry for this
-      // owner profile. getRecentNotificationCount returns 1 → dedup fires.
-      mockGetRecentNotificationCount.mockResolvedValue(1);
+      // [BUG-117] Simulate: the atomic rate-limit check finds a prior log
+      // row in the 24h window (or a concurrent caller won the advisory lock
+      // and inserted first). Either way, our caller is rate-limited.
+      mockCheckAndLogRateLimitInternal.mockResolvedValueOnce(true);
 
       const { result } = await executeSteps();
 

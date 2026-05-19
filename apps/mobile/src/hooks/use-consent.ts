@@ -122,7 +122,11 @@ export function useChildConsentStatus(
   const { activeProfile } = useProfile();
 
   return useQuery({
-    queryKey: ['consent', 'child', childProfileId],
+    // [BUG-164] Include parent identity (activeProfile?.id) so the same
+    // childProfileId fetched under two different parent accounts on a
+    // shared device does not collide. The server scopes the response by
+    // the requesting parent, so the cache key must mirror that scope.
+    queryKey: ['consent', 'child', childProfileId, activeProfile?.id],
     queryFn: async ({ signal: querySignal }): Promise<ChildConsentData> => {
       if (!childProfileId) {
         throw new Error('childProfileId is required to fetch consent status');

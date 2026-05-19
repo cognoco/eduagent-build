@@ -4,6 +4,17 @@ import type { SessionMessageActionsProps } from './SessionMessageActions';
 import type { ChatMessage } from '../session';
 import { tokens } from '../../lib/design-tokens';
 
+const mockNotifyParentMutate = jest.fn();
+jest.mock(
+  '../../hooks/use-settings' /* gc1-allow: quota card notify mutation is outside SessionMessageActions stage-gating contract */,
+  () => ({
+    useNotifyParentSubscribe: () => ({
+      mutate: mockNotifyParentMutate,
+      isPending: false,
+    }),
+  }),
+);
+
 const baseMessage: ChatMessage = {
   id: 'ai-1',
   role: 'assistant',
@@ -77,9 +88,9 @@ describe('SessionMessageActions stage gating', () => {
       />,
     );
 
-    expect(getByTestId('quick-chip-too_hard')).toBeTruthy();
-    expect(getByTestId('quick-chip-explain_differently')).toBeTruthy();
-    expect(getByTestId('quick-chip-hint')).toBeTruthy();
+    expect(getByTestId('quick-chip-too_hard'));
+    expect(getByTestId('quick-chip-explain_differently'));
+    expect(getByTestId('quick-chip-hint'));
     expect(
       getByTestId('message-feedback-controls-evt-1').props.className,
     ).toContain('ms-auto');

@@ -88,6 +88,35 @@ function makeApp(db: FakeDb) {
   return app;
 }
 
+// Helper: build an app that simulates a proxy (non-owner) session
+function makeProxyApp(db: FakeDb) {
+  const app = new Hono<{ Variables: AppVariables }>();
+
+  app.use('*', async (c, next) => {
+    c.set('db', db as AppVariables['db']);
+    c.set('profileId', PROFILE_ID);
+    c.set('profileMeta', { isOwner: false } as AppVariables['profileMeta']);
+    await next();
+  });
+
+  app.route('/v1', noteRoutes);
+  return app;
+}
+
+// Helper: build an app with no profileId resolved (simulates missing/inactive profile)
+function makeNoProfileApp(db: FakeDb) {
+  const app = new Hono<{ Variables: AppVariables }>();
+
+  app.use('*', async (c, next) => {
+    c.set('db', db as AppVariables['db']);
+    // profileId intentionally left unset — requireProfileId will throw 400
+    await next();
+  });
+
+  app.route('/v1', noteRoutes);
+  return app;
+}
+
 describe('note routes', () => {
   describe('GET /v1/notes', () => {
     it('returns global notes for the active profile', async () => {
@@ -187,6 +216,58 @@ describe('note routes', () => {
       expect(res.status).toBe(400);
       expect(db.selectRows).toHaveLength(2);
     });
+
+    it('returns 400 for limit over max (51)', async () => {
+      const db = makeFakeDb({ noteExists: false });
+      const app = makeApp(db);
+
+      const res = await app.request('/v1/notes?limit=51');
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 400 for non-numeric limit', async () => {
+      const db = makeFakeDb({ noteExists: false });
+      const app = makeApp(db);
+
+      const res = await app.request('/v1/notes?limit=abc');
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 400 for invalid cursor (not a UUID)', async () => {
+      const db = makeFakeDb({ noteExists: false });
+      const app = makeApp(db);
+
+      const res = await app.request('/v1/notes?cursor=not-a-uuid');
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 400 for invalid subjectId (not a UUID)', async () => {
+      const db = makeFakeDb({ noteExists: false });
+      const app = makeApp(db);
+
+      const res = await app.request('/v1/notes?subjectId=not-a-uuid');
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 400 when no profileId is resolved (missing/inactive profile)', async () => {
+      const db = makeFakeDb({ noteExists: false });
+      const app = makeNoProfileApp(db);
+
+      const res = await app.request('/v1/notes');
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 200 with empty notes array (not 404)', async () => {
+      const db = makeFakeDb({ noteExists: false });
+      db.selectRows = [[]]; // empty result from service
+      const app = makeApp(db);
+
+      const res = await app.request('/v1/notes');
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.notes).toEqual([]);
+      expect(body.nextCursor).toBeNull();
+    });
   });
 
   describe('DELETE /v1/subjects/:subjectId/topics/:topicId/note', () => {
@@ -216,6 +297,227 @@ describe('note routes', () => {
       expect(res.status).toBe(404);
       expect(db.selectRows).toHaveLength(0);
       expect(db.deleteRows).toHaveLength(1);
+    });
+
+    it('returns 403 when in proxy mode (isOwner=false)', async () => {
+      const db = makeFakeDb({ noteExists: true });
+      const app = makeProxyApp(db);
+
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/topics/${TOPIC_ID}/note`,
+        { method: 'DELETE' },
+      );
+
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body.code).toBe('PROXY_MODE');
+    });
+
+    it('returns 400 for non-UUID subjectId', async () => {
+      const db = makeFakeDb({ noteExists: true });
+      const app = makeApp(db);
+
+      const res = await app.request(
+        `/v1/subjects/not-a-uuid/topics/${TOPIC_ID}/note`,
+        { method: 'DELETE' },
+      );
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 400 for non-UUID topicId', async () => {
+      const db = makeFakeDb({ noteExists: true });
+      const app = makeApp(db);
+
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/topics/not-a-uuid/note`,
+        { method: 'DELETE' },
+      );
+      expect(res.status).toBe(400);
+    });
+  });
+
+  describe('DELETE /v1/notes/:noteId', () => {
+    it('returns 204 on successful delete', async () => {
+      const db = makeFakeDb({ noteExists: true, deleteSucceeds: true });
+      const app = makeApp(db);
+
+      const res = await app.request(`/v1/notes/${NOTE_ID}`, {
+        method: 'DELETE',
+      });
+
+      expect(res.status).toBe(204);
+    });
+
+    it('returns 404 when note not found', async () => {
+      const db = makeFakeDb({ noteExists: false, deleteSucceeds: false });
+      const app = makeApp(db);
+
+      const res = await app.request(`/v1/notes/${NOTE_ID}`, {
+        method: 'DELETE',
+      });
+
+      expect(res.status).toBe(404);
+    });
+
+    it('returns 400 for non-UUID noteId', async () => {
+      const db = makeFakeDb({ noteExists: true });
+      const app = makeApp(db);
+
+      const res = await app.request('/v1/notes/not-a-uuid', {
+        method: 'DELETE',
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 403 when in proxy mode (isOwner=false)', async () => {
+      const db = makeFakeDb({ noteExists: true, deleteSucceeds: true });
+      const app = makeProxyApp(db);
+
+      const res = await app.request(`/v1/notes/${NOTE_ID}`, {
+        method: 'DELETE',
+      });
+
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body.code).toBe('PROXY_MODE');
+    });
+  });
+
+  describe('POST /v1/subjects/:subjectId/topics/:topicId/notes', () => {
+    it('returns 403 when in proxy mode (isOwner=false)', async () => {
+      const db = makeFakeDb({ noteExists: false });
+      const app = makeProxyApp(db);
+
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/topics/${TOPIC_ID}/notes`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content: 'Note content' }),
+        },
+      );
+
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body.code).toBe('PROXY_MODE');
+    });
+
+    it('returns 400 for missing content field', async () => {
+      const db = makeFakeDb({ noteExists: false });
+      const app = makeApp(db);
+
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/topics/${TOPIC_ID}/notes`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        },
+      );
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 400 for non-UUID subjectId', async () => {
+      const db = makeFakeDb({ noteExists: false });
+      const app = makeApp(db);
+
+      const res = await app.request(
+        `/v1/subjects/not-a-uuid/topics/${TOPIC_ID}/notes`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content: 'Note content' }),
+        },
+      );
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 400 for non-UUID topicId', async () => {
+      const db = makeFakeDb({ noteExists: false });
+      const app = makeApp(db);
+
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/topics/not-a-uuid/notes`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content: 'Note content' }),
+        },
+      );
+      expect(res.status).toBe(400);
+    });
+  });
+
+  describe('PATCH /v1/notes/:noteId', () => {
+    it('returns 403 when in proxy mode (isOwner=false)', async () => {
+      const db = makeFakeDb({ noteExists: true });
+      const app = makeProxyApp(db);
+
+      const res = await app.request(`/v1/notes/${NOTE_ID}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: 'Updated content' }),
+      });
+
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body.code).toBe('PROXY_MODE');
+    });
+
+    it('returns 400 for missing content field', async () => {
+      const db = makeFakeDb({ noteExists: true });
+      const app = makeApp(db);
+
+      const res = await app.request(`/v1/notes/${NOTE_ID}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 400 for non-UUID noteId', async () => {
+      const db = makeFakeDb({ noteExists: true });
+      const app = makeApp(db);
+
+      const res = await app.request('/v1/notes/not-a-uuid', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: 'Updated content' }),
+      });
+      expect(res.status).toBe(400);
+    });
+  });
+
+  describe('GET /v1/notes/topic-ids', () => {
+    it('returns 400 when no profileId is resolved', async () => {
+      const db = makeFakeDb({ noteExists: false });
+      const app = makeNoProfileApp(db);
+
+      const res = await app.request('/v1/notes/topic-ids');
+      expect(res.status).toBe(400);
+    });
+  });
+
+  describe('GET /v1/subjects/:subjectId/topics/:topicId/sessions', () => {
+    it('returns 400 for non-UUID subjectId', async () => {
+      const db = makeFakeDb({ noteExists: false });
+      const app = makeApp(db);
+
+      const res = await app.request(
+        `/v1/subjects/not-a-uuid/topics/${TOPIC_ID}/sessions`,
+      );
+      expect(res.status).toBe(400);
+    });
+
+    it('returns 400 for non-UUID topicId', async () => {
+      const db = makeFakeDb({ noteExists: false });
+      const app = makeApp(db);
+
+      const res = await app.request(
+        `/v1/subjects/${SUBJECT_ID}/topics/not-a-uuid/sessions`,
+      );
+      expect(res.status).toBe(400);
     });
   });
 });

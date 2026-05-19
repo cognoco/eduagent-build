@@ -549,7 +549,12 @@
       "childDailyMessage": "今日の質問の上限に達しました。",
       "childMonthlyMessage": "今月の質問の上限に達しました。",
       "askParent": "保護者に頼む",
-      "topUpCredits": "クレジットを追加"
+      "topUpCredits": "クレジットを追加",
+      "notifyParent": "保護者に通知",
+      "notifyParentSent": "送信済み — 保護者に通知しました",
+      "notifyParentRetry": "送信できませんでした — タップして再試行",
+      "resetHintDaily": "毎日の上限は午前0時にリセットされます。",
+      "resetHintMonthly": "毎月の上限は1日にリセットされます。"
     },
     "libraryPrompt": {
       "wantToSee": "前のレッスンを見ますか？",
@@ -584,7 +589,8 @@
       "textMode": "テキストモード",
       "switchToVoiceMode": "音声モードに切り替え",
       "voiceMode": "音声モード",
-      "screenReaderVoiceNote": "スクリーンリーダーがオンです。音声入力は利用できません。下のテキスト入力を使用してください。"
+      "screenReaderVoiceNote": "スクリーンリーダーがオンです。音声入力は利用できません。下のテキスト入力を使用してください。",
+      "stepProgress": "ステップ{{current}}/{{total}}"
     },
     "filingFailed": {
       "retryInProgress": "再試行はすでに進行中です。",
@@ -625,7 +631,9 @@
       "yesAddLabel": "はい、ライブラリに追加します",
       "yesAdd": "はい、追加する",
       "noThanksLabel": "いいえ",
-      "noThanks": "いいえ"
+      "noThanks": "いいえ",
+      "tryAgain": "再試行",
+      "skipForNow": "今はスキップ"
     },
     "parkingLot": {
       "title": "パーキングロット",

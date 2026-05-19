@@ -7,7 +7,10 @@ const mockDatabaseModule = createDatabaseModuleMock({
   },
 });
 
-jest.mock('@eduagent/database', () => mockDatabaseModule.module);
+jest.mock(
+  '@eduagent/database' /* gc1-allow: service unit test — db boundary mocked; real DB covered by sibling .integration.test.ts where present */,
+  () => mockDatabaseModule.module,
+);
 
 jest.mock('./settings' /* gc1-allow: pattern-a conversion */, () => {
   const actual = jest.requireActual(

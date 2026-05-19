@@ -19,6 +19,9 @@
 
 import { eq, gte } from 'drizzle-orm';
 import { learningSessions, profiles } from '@eduagent/database';
+// [BUG-248] Use the same canonical step-database helper everywhere else in
+// the file does — no new import needed for the SQL-side dedup; drizzle's
+// selectDistinct produces a `SELECT DISTINCT profile_id` plan.
 import { inngest } from '../client';
 import { getStepDatabase } from '../helpers';
 import { refreshProgressSnapshot } from '../../services/snapshot-aggregation';
@@ -35,13 +38,20 @@ export const dailySnapshotCron = inngest.createFunction(
         const since = new Date();
         since.setUTCDate(since.getUTCDate() - 90);
 
-        const rows = await db.query.learningSessions.findMany({
-          where: gte(learningSessions.startedAt, since),
-          columns: { profileId: true },
-        });
+        // [BUG-248] Push dedup to SQL with `selectDistinct` instead of
+        // loading every learning-session row from the last 90 days and
+        // de-duplicating profileIds in JS. The previous approach scaled with
+        // session volume (heavy learners with hundreds of sessions all
+        // collapsed to one profileId); the SELECT DISTINCT plan now scales
+        // with the number of active profiles instead — orders of magnitude
+        // smaller payload over the wire and far less driver-side memory.
+        const rows = await db
+          .selectDistinct({ profileId: learningSessions.profileId })
+          .from(learningSessions)
+          .where(gte(learningSessions.startedAt, since));
 
-        return [...new Set(rows.map((row) => row.profileId))];
-      }
+        return rows.map((row) => row.profileId);
+      },
     );
 
     if (activeProfileIds.length === 0) {
@@ -56,18 +66,26 @@ export const dailySnapshotCron = inngest.createFunction(
         batch.map((profileId) => ({
           name: 'app/progress.snapshot.refresh' as const,
           data: { profileId },
-        }))
+        })),
       );
     }
 
     return { status: 'completed', queuedProfiles: activeProfileIds.length };
-  }
+  },
 );
 
 export const dailySnapshotRefresh = inngest.createFunction(
   {
     id: 'progress-daily-snapshot-refresh',
     name: 'Refresh one progress snapshot',
+    // [BUG-253] Bound parallelism on the fan-out receiver. The cron emits up
+    // to thousands of `app/progress.snapshot.refresh` events; each refresh
+    // runs ~6 parallel DB queries inside refreshProgressSnapshot. Without a
+    // concurrency cap the receivers would all execute simultaneously and
+    // exhaust the Neon connection pool. limit=50 matches the transcript-purge
+    // pattern and keeps DB pressure bounded while still draining the daily
+    // batch within the cron's 21-hour gap.
+    concurrency: { limit: 50 },
   },
   { event: 'app/progress.snapshot.refresh' },
   async ({ event, step }) => {
@@ -99,5 +117,5 @@ export const dailySnapshotRefresh = inngest.createFunction(
         throw error; // re-throw so Inngest retries this step
       }
     });
-  }
+  },
 );

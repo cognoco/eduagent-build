@@ -124,7 +124,7 @@ describe('QuizHistoryScreen', () => {
       refetch: jest.fn(),
     });
     render(<QuizHistoryScreen />);
-    expect(screen.getByTestId('quiz-history-loading')).toBeTruthy();
+    expect(screen.getByTestId('quiz-history-loading'));
     screen.getByText('quiz.history.loadingText');
     screen.getByTestId('quiz-history-loading-back');
   });
@@ -160,7 +160,7 @@ describe('QuizHistoryScreen', () => {
       refetch: jest.fn(),
     });
     render(<QuizHistoryScreen />);
-    expect(screen.getByTestId('quiz-history-empty')).toBeTruthy();
+    expect(screen.getByTestId('quiz-history-empty'));
     fireEvent.press(screen.getByTestId('quiz-history-try-quiz'));
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/(app)/quiz',
@@ -177,7 +177,7 @@ describe('QuizHistoryScreen', () => {
       refetch,
     });
     render(<QuizHistoryScreen />);
-    expect(screen.getByTestId('quiz-history-error')).toBeTruthy();
+    expect(screen.getByTestId('quiz-history-error'));
 
     fireEvent.press(screen.getByTestId('quiz-history-retry'));
     expect(refetch).toHaveBeenCalled();

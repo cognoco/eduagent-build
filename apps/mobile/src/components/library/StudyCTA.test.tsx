@@ -25,7 +25,7 @@ describe('StudyCTA', () => {
 
   it('defaults testID to study-cta', () => {
     render(<StudyCTA label="Study" variant="primary" onPress={onPress} />);
-    expect(screen.getByTestId('study-cta')).toBeTruthy();
+    expect(screen.getByTestId('study-cta'));
   });
 
   it('respects custom testID', () => {
@@ -37,7 +37,7 @@ describe('StudyCTA', () => {
         testID="custom-cta"
       />,
     );
-    expect(screen.getByTestId('custom-cta')).toBeTruthy();
+    expect(screen.getByTestId('custom-cta'));
   });
 
   it('calls onPress when pressed (primary variant)', () => {

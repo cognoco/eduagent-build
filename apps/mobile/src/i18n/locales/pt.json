@@ -574,7 +574,12 @@
       "childDailyMessage": "Você atingiu o limite de perguntas de hoje.",
       "childMonthlyMessage": "Você atingiu o limite de perguntas deste mês.",
       "askParent": "Perguntar aos pais",
-      "topUpCredits": "Recarregar créditos"
+      "topUpCredits": "Recarregar créditos",
+      "notifyParent": "Avisar responsável",
+      "notifyParentSent": "Enviado — o responsável foi notificado",
+      "notifyParentRetry": "Não foi possível enviar — toque para tentar novamente",
+      "resetHintDaily": "Seu limite diário reinicia à meia-noite.",
+      "resetHintMonthly": "Seu limite mensal reinicia no dia 1."
     },
     "libraryPrompt": {
       "wantToSee": "Quer ver suas lições anteriores?",
@@ -609,7 +614,8 @@
       "textMode": "Modo de texto",
       "switchToVoiceMode": "Mudar para modo de voz",
       "voiceMode": "Modo de voz",
-      "screenReaderVoiceNote": "O leitor de tela está ativado. A entrada de voz não está disponível. Use a entrada de texto abaixo."
+      "screenReaderVoiceNote": "O leitor de tela está ativado. A entrada de voz não está disponível. Use a entrada de texto abaixo.",
+      "stepProgress": "Passo {{current}} de {{total}}"
     },
     "filingFailed": {
       "retryInProgress": "Uma nova tentativa já está em andamento.",
@@ -650,7 +656,9 @@
       "yesAddLabel": "Sim, adicionar à biblioteca",
       "yesAdd": "Sim, adicione",
       "noThanksLabel": "Não, obrigado",
-      "noThanks": "Não, obrigado"
+      "noThanks": "Não, obrigado",
+      "tryAgain": "Tentar novamente",
+      "skipForNow": "Pular por agora"
     },
     "parkingLot": {
       "title": "Estacionamento",

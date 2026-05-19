@@ -21,6 +21,9 @@ import {
   sessionEmbeddings,
   quizRounds,
   quizMissedItems,
+  progressSummaries,
+  milestones,
+  pendingNotices,
 } from './schema/index.js';
 import { createScopedRepository } from './repository.js';
 import type { Database } from './client.js';
@@ -421,6 +424,196 @@ describe('createScopedRepository', () => {
       expect(repo).toHaveProperty('sessionEmbeddings');
       expect(repo).toHaveProperty('quizRounds');
       expect(repo).toHaveProperty('quizMissedItems');
+      expect(repo).toHaveProperty('pendingNotices');
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // [BUG-219 / P1-HIGH] progressSummaries scoped helpers — break test
+  //
+  // Before the fix, callers reached into `db.query.progressSummaries.*`
+  // directly with their own where clauses, so a missed `profileId` predicate
+  // would leak rows. The scoped helper enforces profileId in every call.
+  // ---------------------------------------------------------------------------
+
+  describe('[BUG-219] progressSummaries — profileId scoping', () => {
+    it('findMany auto-injects profileId filter', async () => {
+      const { db, findMany } = createMockDb();
+      const repo = createScopedRepository(db, TEST_PROFILE_ID);
+
+      await repo.progressSummaries.findMany();
+
+      expect(findMany).toHaveBeenCalledWith({
+        where: eq(progressSummaries.profileId, TEST_PROFILE_ID),
+      });
+    });
+
+    it('findFirst auto-injects profileId filter', async () => {
+      const { db, findFirst } = createMockDb();
+      const repo = createScopedRepository(db, TEST_PROFILE_ID);
+
+      await repo.progressSummaries.findFirst();
+
+      expect(findFirst).toHaveBeenCalledWith({
+        where: eq(progressSummaries.profileId, TEST_PROFILE_ID),
+      });
+    });
+
+    it('findFirst composes profileId with extra condition', async () => {
+      const { db, findFirst } = createMockDb();
+      const repo = createScopedRepository(db, TEST_PROFILE_ID);
+      const extra = sql`1 = 1`;
+
+      await repo.progressSummaries.findFirst(extra);
+
+      expect(findFirst).toHaveBeenCalledWith({
+        where: and(eq(progressSummaries.profileId, TEST_PROFILE_ID), extra),
+      });
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // [BUG-219 / P1-HIGH] milestones scoped helpers — break test
+  // ---------------------------------------------------------------------------
+
+  describe('[BUG-219] milestones — profileId scoping', () => {
+    it('findMany auto-injects profileId filter', async () => {
+      const { db, findMany } = createMockDb();
+      const repo = createScopedRepository(db, TEST_PROFILE_ID);
+
+      await repo.milestones.findMany();
+
+      expect(findMany).toHaveBeenCalledWith({
+        where: eq(milestones.profileId, TEST_PROFILE_ID),
+      });
+    });
+
+    it('findById composes profileId with the id predicate', async () => {
+      const { db, findFirst } = createMockDb();
+      const repo = createScopedRepository(db, TEST_PROFILE_ID);
+
+      await repo.milestones.findById('milestone-1');
+
+      // Must include BOTH the profileId scope AND the id predicate so a
+      // caller cannot read a sibling profile's milestone by passing the
+      // wrong id.
+      expect(findFirst).toHaveBeenCalledWith({
+        where: and(
+          eq(milestones.profileId, TEST_PROFILE_ID),
+          eq(milestones.id, 'milestone-1'),
+        ),
+      });
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // [BUG-224 / P2-MED] pendingNotices scoped helpers — break test
+  //
+  // pendingNotices is keyed on ownerProfileId, not profileId, so it cannot
+  // share scopedWhere(). The break test pins the predicate so a future
+  // refactor that drops the ownerProfileId filter (or accidentally swaps it
+  // for a `profileId` reference that does not exist on this table) will
+  // fail CI.
+  // ---------------------------------------------------------------------------
+
+  describe('[BUG-224] pendingNotices — ownerProfileId scoping', () => {
+    it('findMany auto-injects ownerProfileId filter', async () => {
+      const { db, findMany } = createMockDb();
+      const repo = createScopedRepository(db, TEST_PROFILE_ID);
+
+      await repo.pendingNotices.findMany();
+
+      expect(findMany).toHaveBeenCalledWith({
+        where: eq(pendingNotices.ownerProfileId, TEST_PROFILE_ID),
+      });
+    });
+
+    it('findById composes ownerProfileId with the id predicate', async () => {
+      const { db, findFirst } = createMockDb();
+      const repo = createScopedRepository(db, TEST_PROFILE_ID);
+
+      await repo.pendingNotices.findById('notice-1');
+
+      expect(findFirst).toHaveBeenCalledWith({
+        where: and(
+          eq(pendingNotices.ownerProfileId, TEST_PROFILE_ID),
+          eq(pendingNotices.id, 'notice-1'),
+        ),
+      });
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // [BUG-218 / P1-HIGH] topicSuggestions.findByBook — TOCTOU break test
+  //
+  // The pre-fix implementation issued two sequential queries:
+  //   1. SELECT … FROM curriculum_books WHERE id = $1
+  //   2. SELECT … FROM subjects WHERE id = $book.subjectId AND profile_id = $me
+  //   3. SELECT … FROM topic_suggestions WHERE book_id = $1
+  //
+  // Between step 2 and step 3, the book's subject FK could be rewritten (or a
+  // subject reparented) so that the read in step 3 returned rows the caller no
+  // longer owned. The fix collapses ownership + read into ONE query.
+  //
+  // This test fails on the old two-query implementation (it would call
+  // `db.query.curriculumBooks.findFirst` first) and passes on the new
+  // single-query implementation (it calls `db.select().from(topicSuggestions)`
+  // with both joins inside the same statement).
+  // ---------------------------------------------------------------------------
+
+  describe('[BUG-218] topicSuggestions.findByBook — single-query ownership', () => {
+    it('issues exactly one SELECT (no TOCTOU window between ownership check and read)', async () => {
+      const innerJoinCalls: unknown[][] = [];
+      const whereCalls: unknown[][] = [];
+      const fromCalls: unknown[][] = [];
+
+      const chain: Record<string, unknown> = {};
+      chain.select = jest.fn(() => chain);
+      chain.from = jest.fn((...args: unknown[]) => {
+        fromCalls.push(args);
+        return chain;
+      });
+      chain.innerJoin = jest.fn((...args: unknown[]) => {
+        innerJoinCalls.push(args);
+        return chain;
+      });
+      chain.where = jest.fn((...args: unknown[]) => {
+        whereCalls.push(args);
+        return chain;
+      });
+      // Make the chain awaitable — drizzle resolves chained selects as thenables.
+      (chain as { then?: unknown }).then = (
+        onFulfilled: (v: unknown) => unknown,
+      ) => Promise.resolve([]).then(onFulfilled);
+
+      // query.curriculumBooks.findFirst would be the smoking gun for the
+      // OLD two-query implementation — if it is ever called, the TOCTOU
+      // window is back.
+      const curriculumBooksFindFirst = jest.fn();
+      const subjectsFindFirst = jest.fn();
+      const topicSuggestionsFindMany = jest.fn();
+      const db = {
+        ...chain,
+        query: {
+          curriculumBooks: { findFirst: curriculumBooksFindFirst },
+          subjects: { findFirst: subjectsFindFirst },
+          topicSuggestions: { findMany: topicSuggestionsFindMany },
+        },
+      } as unknown as Database;
+
+      const repo = createScopedRepository(db, TEST_PROFILE_ID);
+      await repo.topicSuggestions.findByBook('book-1');
+
+      // Single SELECT chain — no separate ownership pre-check.
+      expect(curriculumBooksFindFirst).not.toHaveBeenCalled();
+      expect(subjectsFindFirst).not.toHaveBeenCalled();
+      expect(topicSuggestionsFindMany).not.toHaveBeenCalled();
+
+      // Joins both curriculum_books and subjects so ownership is enforced
+      // inside the SQL alongside the row read.
+      expect(fromCalls).toHaveLength(1);
+      expect(innerJoinCalls).toHaveLength(2);
+      expect(whereCalls).toHaveLength(1);
     });
   });
 });

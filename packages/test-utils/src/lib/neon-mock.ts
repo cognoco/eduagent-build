@@ -56,6 +56,7 @@ export function createMockDb(): unknown {
     update: chainFn(),
     delete: chainFn(),
     select: chainFn(),
+    selectDistinct: chainFn(),
     execute: jest.fn().mockResolvedValue([]),
   };
 }

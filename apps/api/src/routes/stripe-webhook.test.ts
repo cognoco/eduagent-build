@@ -423,8 +423,12 @@ describe('test-mode event guard', () => {
 // Stale event rejection
 // ---------------------------------------------------------------------------
 
-describe('stale event rejection', () => {
-  it('returns 400 for events older than 48 hours', async () => {
+describe('stale event handling [BUG-113]', () => {
+  it('acks stale events with 200 (NOT 400) so Stripe does not retry indefinitely', async () => {
+    // [BUG-113 break test] A 400 response causes Stripe to retry the webhook
+    // for up to 72h — a single stale payload becomes a retry storm. The fix
+    // returns 200 so Stripe stops retrying, while logger.warn + Sentry
+    // captureException keep the drop queryable.
     const staleCreated = Math.floor(Date.now() / 1000) - 49 * 60 * 60; // 49 hours ago
     const stripeSub = makeSubscription({ status: 'active' });
     (verifyWebhookSignature as jest.Mock).mockResolvedValue(
@@ -441,10 +445,22 @@ describe('stale event rejection', () => {
       TEST_ENV,
     );
 
-    expect(res.status).toBe(400);
+    // 200 ack — Stripe stops retrying. Must NOT be 4xx.
+    expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.code).toBe('STALE_EVENT');
+    expect(body.received).toBe(true);
+    expect(body.stale).toBe(true);
+    // The event is dropped — no billing mutation.
     expect(updateSubscriptionFromWebhook).not.toHaveBeenCalled();
+    // The drop is escalated to Sentry so we can query the rate.
+    expect(captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          context: 'stripe.webhook.stale_event_dropped',
+        }),
+      }),
+    );
   });
 
   it('accepts events within the 48-hour window', async () => {
@@ -1010,6 +1026,64 @@ describe('checkout.session.completed', () => {
     );
 
     expect(writeSubscriptionStatus).not.toHaveBeenCalled();
+  });
+
+  // [BUG-119] Duplicate checkout.session.completed must be safe. Stripe
+  // redelivers completed webhooks (retry on transient 5xx, manual re-send
+  // via dashboard, account-level webhook replays). The previous suite had
+  // NO route-level coverage for the "same event arrives twice" path;
+  // downstream guarantee lives in activateSubscriptionFromCheckout but no
+  // test pinned that contract at the route surface.
+  it('handles duplicate checkout.session.completed safely (idempotent) [BUG-119]', async () => {
+    const session = makeCheckoutSession();
+    const event = makeStripeEvent('checkout.session.completed', session);
+    (verifyWebhookSignature as jest.Mock).mockResolvedValue(event);
+    (activateSubscriptionFromCheckout as jest.Mock).mockResolvedValue(
+      mockUpdatedSubscription(),
+    );
+
+    const res1 = await app.request(
+      '/stripe/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'valid_sig' },
+        body: '{}',
+      },
+      TEST_ENV,
+    );
+    expect(res1.status).toBe(200);
+
+    const res2 = await app.request(
+      '/stripe/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'valid_sig' },
+        body: '{}',
+      },
+      TEST_ENV,
+    );
+    expect(res2.status).toBe(200);
+
+    // Both attempts call into the activator; the activator is the
+    // idempotency boundary and was called with identical args both times.
+    expect(activateSubscriptionFromCheckout).toHaveBeenCalledTimes(2);
+    expect(activateSubscriptionFromCheckout).toHaveBeenNthCalledWith(
+      1,
+      mockDb,
+      'acc-1',
+      'sub_stripe_123',
+      'plus',
+      expect.any(String),
+    );
+    expect(activateSubscriptionFromCheckout).toHaveBeenNthCalledWith(
+      2,
+      mockDb,
+      'acc-1',
+      'sub_stripe_123',
+      'plus',
+      expect.any(String),
+    );
+    expect(captureException).not.toHaveBeenCalled();
   });
 });
 

@@ -49,10 +49,13 @@ Return exactly one JSON object with this shape:
 
 Rules:
 - `narrative` must be 40-1500 characters, self-contained, and mention at least one topic from `topicsCovered` by name.
+- At least one `topicsCovered` item must exactly match a phrase that appears in `narrative`; the provided topic title is usually the safest anchor.
 - `topicsCovered` must contain 1-20 concrete topic anchors from the transcript.
 - `sessionState` should be `completed` when the learner reached a clear stopping point, `paused-mid-topic` when the conversation stopped while a topic was still in progress, and `auto-closed` when the session was ended by the system (timeout, silence, or hard caps) rather than by an explicit close.
 - `reEntryRecommendation` must be 20-400 characters and tell the next mentor exactly where to pick up.
 - Keep the summary factual. Do not mention policies, prompts, or that this is an internal note.
+- Stay evidence-bound to the transcript. Do not infer mastery, confidence, emotion, or understanding beyond what the learner actually said or demonstrated.
+- If the learner only says "I think I see" or similar, write that they said they think they see the connection; do not upgrade it to "felt they understood", "mastered", or "clearly understood".
 ```
 
 ## Generated prompt — user

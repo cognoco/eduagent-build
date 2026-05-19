@@ -628,12 +628,32 @@ describe('useSessionStreaming', () => {
         await result.current.continueWithMessage('test');
       });
 
-      // animateResponse should be called with an error message
+      // BUG-144: The no-subject fallback used to animate the error into the
+      // transcript as a plain AI message — user got un-actionable text and
+      // had no retry path. The fallback now appends a typed system message
+      // (kind: 'reconnect_prompt'), which activates the inline Reconnect
+      // affordance via SessionMessageActions. animateResponse must NOT be
+      // called in this path.
       const { animateResponse } = require('./ChatShell');
-      expect(animateResponse).toHaveBeenCalledWith(
+      expect(animateResponse).not.toHaveBeenCalled();
+
+      // Verify a reconnect-prompt system message was appended.
+      const setMessagesCalls = (opts.setMessages as jest.Mock).mock.calls;
+      const appendedMessages: any[] = [];
+      for (const [updater] of setMessagesCalls) {
+        if (typeof updater === 'function') {
+          const next = updater([]);
+          if (Array.isArray(next)) appendedMessages.push(...next);
+        }
+      }
+      const reconnectPrompt = appendedMessages.find(
+        (m) => m?.kind === 'reconnect_prompt',
+      );
+      expect(reconnectPrompt).toBeDefined();
+      expect(reconnectPrompt.role).toBe('assistant');
+      expect(reconnectPrompt.isSystemPrompt).toBe(true);
+      expect(reconnectPrompt.content).toEqual(
         expect.stringContaining('select a subject'),
-        opts.setMessages,
-        opts.setIsStreaming,
       );
     });
 

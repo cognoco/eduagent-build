@@ -943,12 +943,35 @@ describe('processExchange', () => {
 // ---------------------------------------------------------------------------
 
 describe('streamExchange', () => {
-  it('returns an async iterable stream', async () => {
+  // [BUG-197] Replaces the prior weak assertion (`expect(result.stream).toBeTruthy()`)
+  // which any truthy value (including {}) passed. The streaming contract is an
+  // async-iterable yielding string chunks — pin that explicitly so a regression
+  // that returns the wrong shape is caught.
+  it('returns an async iterable stream of strings with provider/model metadata', async () => {
     const result = await streamExchange(baseContext, 'Explain quadratics');
 
-    expect(result.stream).toBeTruthy();
-    expect(typeof result.provider).toBe('string');
+    // Shape: must be async-iterable, not just truthy.
+    expect(typeof result.stream[Symbol.asyncIterator]).toBe('function');
+
+    // Provider/model: the mock provider is registered as 'gemini' in the
+    // beforeAll above, so we know the routed value rather than only asserting
+    // the type. Catches the bug where the result is returned with stale or
+    // missing routing metadata.
+    expect(result.provider).toBe('gemini');
     expect(typeof result.model).toBe('string');
+    expect(result.model.length).toBeGreaterThan(0);
+
+    // sourceEvidence is always present (may be empty array, but is wired).
+    expect(Array.isArray(result.sourceEvidence)).toBe(true);
+
+    // Draining the stream yields at least one non-empty string chunk —
+    // confirms the underlying provider actually produced bytes, not just a
+    // shape-correct empty stream.
+    const chunks: string[] = [];
+    for await (const chunk of result.stream) chunks.push(chunk);
+    expect(chunks.length).toBeGreaterThan(0);
+    expect(chunks.every((c) => typeof c === 'string')).toBe(true);
+    expect(chunks.join('').length).toBeGreaterThan(0);
   });
 
   it('stream yields string chunks', async () => {
@@ -968,6 +991,161 @@ describe('streamExchange', () => {
     const result = await streamExchange(context, 'Help');
 
     expect(result.newEscalationRung).toBe(4);
+  });
+
+  // [BUG-201] Real envelope integration test. The previous suite only used the
+  // default mock provider (echoes prompt text, not envelope JSON), so the test
+  // never exercised the streaming envelope reader (`teeEnvelopeStream` →
+  // `streamEnvelopeReply`). This registers a provider that yields a well-
+  // formed envelope JSON across multiple chunks and verifies:
+  //   1. cleanReplyStream yields ONLY the reply text (no envelope JSON leak)
+  //   2. rawResponsePromise resolves to the full concatenated envelope
+  //   3. The envelope signals/ui_hints survive the round trip (parse-able)
+  it('[BUG-201] streams clean reply text from a well-formed envelope across chunks', async () => {
+    const envelopeJson = JSON.stringify({
+      reply: 'A quadratic is ax^2 + bx + c. Try x^2 + 2x + 1.',
+      signals: {
+        partial_progress: false,
+        needs_deepening: false,
+        understanding_check: true,
+        ready_to_finish: false,
+      },
+      ui_hints: {
+        note_prompt: { show: false, post_session: false },
+      },
+    });
+    // Split into 13-char chunks to force the envelope reader to handle the
+    // reply value crossing chunk boundaries (the actual symptom that prompted
+    // the bug — single-chunk responses do not exercise the boundary code).
+    const chunkSize = 13;
+    const provider: LLMProvider = {
+      id: 'gemini',
+      async chat(_messages: ChatMessage[], _config: ModelConfig) {
+        return { content: envelopeJson, stopReason: 'stop' as StopReason };
+      },
+      chatStream() {
+        const s = (async function* () {
+          for (let i = 0; i < envelopeJson.length; i += chunkSize) {
+            yield envelopeJson.slice(i, i + chunkSize);
+          }
+        })();
+        return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
+      },
+    };
+    registerProvider(provider);
+
+    try {
+      const result = await streamExchange(
+        baseContext,
+        'What is a quadratic equation?',
+      );
+
+      // Drain the visible stream first — the rawResponsePromise only settles
+      // after the source stream has been fully consumed (see teeEnvelopeStream
+      // contract in stream-envelope.test.ts).
+      const visibleChunks: string[] = [];
+      for await (const chunk of result.stream) visibleChunks.push(chunk);
+      const visible = visibleChunks.join('');
+
+      // Visible text is the decoded reply, no envelope leak.
+      expect(visible).toBe('A quadratic is ax^2 + bx + c. Try x^2 + 2x + 1.');
+      expect(visible).not.toContain('signals');
+      expect(visible).not.toContain('ui_hints');
+      expect(visible).not.toContain('ready_to_finish');
+
+      // Raw promise resolves to the full original envelope JSON so the
+      // onComplete classifier can re-parse signals.
+      const raw = await result.rawResponsePromise;
+      const parsedRaw = JSON.parse(raw);
+      expect(parsedRaw.reply).toBe(
+        'A quadratic is ax^2 + bx + c. Try x^2 + 2x + 1.',
+      );
+      expect(parsedRaw.signals.understanding_check).toBe(true);
+      expect(parsedRaw.signals.ready_to_finish).toBe(false);
+    } finally {
+      registerProvider(createMockProvider('gemini'));
+    }
+  });
+});
+
+// [F1.1 / BUG-92] readyToFinish surfacing. The envelope signal is parsed but
+// before this test the ExchangeResult shape lacked the field, so no upstream
+// caller could see it without re-parsing. Break test: set the LLM to emit
+// ready_to_finish=true → assert the result carries it through. Also pins the
+// app-help guard's forced override so a future regression that lets app-help
+// turns leak ready_to_finish into the result is caught.
+describe('processExchange — readyToFinish surfacing', () => {
+  it('[BUG-92] propagates signals.ready_to_finish from envelope to result', async () => {
+    const provider: LLMProvider = {
+      id: 'gemini',
+      async chat(_messages: ChatMessage[], _config: ModelConfig) {
+        return {
+          content: JSON.stringify({
+            reply: 'Sounds like we covered enough — ready to wrap up?',
+            signals: {
+              partial_progress: false,
+              needs_deepening: false,
+              understanding_check: false,
+              ready_to_finish: true,
+            },
+          }),
+          stopReason: 'stop' as StopReason,
+        };
+      },
+      chatStream() {
+        const s = (async function* () {
+          yield '';
+        })();
+        return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
+      },
+    };
+    registerProvider(provider);
+
+    try {
+      const result = await processExchange(baseContext, 'I think I get it now');
+      expect(result.readyToFinish).toBe(true);
+    } finally {
+      registerProvider(createMockProvider('gemini'));
+    }
+  });
+
+  it('[BUG-92] defaults to false when the LLM omits ready_to_finish', async () => {
+    // The default mock provider does not return an envelope; the parser's
+    // fallback path must default readyToFinish to false.
+    const result = await processExchange(baseContext, 'Hello');
+    expect(result.readyToFinish).toBe(false);
+  });
+
+  it('[BUG-92] app-help turns force readyToFinish=false even if the model emits true', async () => {
+    const provider: LLMProvider = {
+      id: 'gemini',
+      async chat(_messages: ChatMessage[], _config: ModelConfig) {
+        return {
+          content: JSON.stringify({
+            reply: 'You can find your notes in Library.',
+            signals: { ready_to_finish: true },
+          }),
+          stopReason: 'stop' as StopReason,
+        };
+      },
+      chatStream() {
+        const s = (async function* () {
+          yield '';
+        })();
+        return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
+      },
+    };
+    registerProvider(provider);
+
+    try {
+      const result = await processExchange(
+        baseContext,
+        'Where do I find my notes?',
+      );
+      expect(result.readyToFinish).toBe(false);
+    } finally {
+      registerProvider(createMockProvider('gemini'));
+    }
   });
 });
 
@@ -1579,6 +1757,83 @@ describe('source provenance audit', () => {
     expect(safe.response).not.toMatch(/rich soil|soil/i);
     expect(safe.response).toContain('surplus grain for metal tools');
     expect(safe.sourceAudit.reason).toMatch(/unsupported land\/soil detail/i);
+  });
+
+  it('removes unsupported sediment definitions from source-thin fossil explanations', () => {
+    const sourceEvidence = buildExchangeSourceEvidence(
+      {
+        ...baseContext,
+        topicTitle: 'Fossilization basics',
+        topicDescription:
+          'Fossils often form when remains are buried by sediment. Over time, minerals can replace hard parts such as bones or shells, preserving their shape.',
+      },
+      'Can you explain how fossils form from this source?',
+    );
+    const audit = auditExchangeSources(
+      { relied_on: ['current_topic'], insufficient: false },
+      sourceEvidence,
+    );
+
+    const safe = applySourceAuditSafetyFallback(
+      'Fossils form when remains are buried by sediment. Think of sediment like sand or mud settling down. Over a really long time, minerals preserve the shape.',
+      audit,
+    );
+
+    expect(safe.response).toContain(
+      'Fossils form when remains are buried by sediment.',
+    );
+    expect(safe.response).not.toMatch(/sand|mud|really long time/i);
+    expect(safe.sourceAudit.reason).toMatch(/unsupported sediment definition/i);
+  });
+
+  it('removes unsupported soft-validation openers from source-thin replies', () => {
+    const sourceEvidence = buildExchangeSourceEvidence(
+      {
+        ...baseContext,
+        topicTitle: 'Ancient trade',
+        topicDescription:
+          'Ancient civilizations traded to get things they lacked and build connections with other places.',
+      },
+      'So did they mostly trade salt and silk?',
+    );
+    const audit = auditExchangeSources(
+      { relied_on: ['current_topic'], insufficient: true },
+      sourceEvidence,
+    );
+
+    const safe = applySourceAuditSafetyFallback(
+      "That's an interesting thought about trade items. The source supports that ancient civilizations traded to get things they lacked.",
+      audit,
+    );
+
+    expect(safe.response).not.toMatch(/interesting thought/i);
+    expect(safe.response).toContain('The source supports');
+    expect(safe.sourceAudit.reason).toMatch(/unsupported soft validation/i);
+  });
+
+  it('removes generic praise openers from source-supported practice replies', () => {
+    const sourceEvidence = buildExchangeSourceEvidence(
+      {
+        ...baseContext,
+        topicTitle: 'Spanish present tense speaking practice',
+        topicDescription:
+          'Practice short present-tense Spanish sentences aloud using familiar verbs and simple everyday actions.',
+      },
+      'Let me practice saying three quick Spanish sentences.',
+    );
+    const audit = auditExchangeSources(
+      { relied_on: ['current_topic'], insufficient: false },
+      sourceEvidence,
+    );
+
+    const safe = applySourceAuditSafetyFallback(
+      'Excellent idea! Start with one short sentence aloud.',
+      audit,
+    );
+
+    expect(safe.response).not.toMatch(/Excellent idea/i);
+    expect(safe.response).toContain('Start with one short sentence aloud');
+    expect(safe.sourceAudit.reason).toMatch(/generic praise/i);
   });
 
   it('removes unsupported brick and house analogies from short source replies', () => {

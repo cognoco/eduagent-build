@@ -1,5 +1,6 @@
 import type { Database } from '@eduagent/database';
 import {
+  calculateAge,
   checkConsentRequired,
   createGrantedConsentState,
   createPendingConsentState,
@@ -11,7 +12,9 @@ import {
 } from './consent';
 
 const NOW = new Date('2025-01-15T10:00:00.000Z');
-const CURRENT_YEAR = new Date().getFullYear();
+// Must mirror SUT: calculateAge() uses getUTCFullYear() so tests stay correct
+// regardless of host TZ (e.g. running locally in UTC+1 across a year boundary).
+const CURRENT_YEAR = new Date().getUTCFullYear();
 const EMAIL_OPTIONS = { resendApiKey: 'test-resend-api-key' };
 const originalFetch = global.fetch;
 const fetchMock = jest.fn() as jest.MockedFunction<typeof fetch>;
@@ -129,6 +132,31 @@ beforeEach(() => {
 
 afterAll(() => {
   global.fetch = originalFetch;
+});
+
+// ---------------------------------------------------------------------------
+// calculateAge — UTC contract (bug 105)
+// ---------------------------------------------------------------------------
+
+describe('calculateAge', () => {
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('returns the difference between current UTC year and birth year', () => {
+    // Pin the wall clock to a UTC instant where local-time year would differ
+    // from UTC year for any timezone west of UTC.
+    jest.useFakeTimers().setSystemTime(new Date('2025-01-01T01:00:00.000Z'));
+    expect(calculateAge(2000)).toBe(25);
+  });
+
+  it('is timezone-independent across year boundary (regression: bug 105)', () => {
+    // 2026-01-01 00:30 UTC. In timezones east of UTC (e.g. CET/UTC+1) this is
+    // still 2026; in zones west of UTC (e.g. EST/UTC-5) the LOCAL date is
+    // 2025-12-31. getUTCFullYear() must return 2026 either way.
+    jest.useFakeTimers().setSystemTime(new Date('2026-01-01T00:30:00.000Z'));
+    expect(calculateAge(2010)).toBe(16);
+  });
 });
 
 // ---------------------------------------------------------------------------

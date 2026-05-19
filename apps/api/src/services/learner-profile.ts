@@ -84,7 +84,9 @@ Rules:
 - "interests": only include explicit enthusiasm, repeated curiosity, or strong engagement.
 - "strengths": only include clear mastery.
 - "struggles": only include repeated confusion on the same concept.
-- "resolvedTopics": include concepts that started shaky and ended with understanding. Use this field when one of the {knownStruggles} below visibly clicks during this session.
+- "resolvedTopics": only include concepts that started shaky and later have learner-demonstrated evidence: the learner explains the idea, applies a method, completes a relevant step, or gives a correct answer with reasoning. Use this field when one of the {knownStruggles} below visibly clicks during this session.
+- Do not treat "makes sense", "I think I see", "got it", "okay", "thanks", "can we try one more", or one correct acknowledgement as mastery or a resolved topic by itself. Only emit strengths or resolvedTopics when the learner explains or applies the idea correctly.
+- If a learner merely says an explanation helped, record the useful style in "explanationEffectiveness" or "communicationNotes" and keep "resolvedTopics" null.
 - "communicationNotes": short notes like "prefers short explanations" or "responds well to examples".
 - "urgencyDeadline": if the learner mentions an upcoming test, exam, quiz, or deadline, extract the reason and estimate how many days away it is (1-30). Return null if no deadline is mentioned.
 - Return null for any field without signal.
@@ -1593,6 +1595,31 @@ export async function deleteAllMemory(
 
 const MAX_TRANSCRIPT_EVENTS = 100;
 
+export function filterUnsupportedResolvedTopics(
+  analysis: SessionAnalysisOutput,
+  transcriptText: string,
+): SessionAnalysisOutput {
+  if (!analysis.resolvedTopics?.length) return analysis;
+  if (hasLearnerResolutionEvidence(transcriptText)) return analysis;
+
+  return {
+    ...analysis,
+    resolvedTopics: null,
+  };
+}
+
+function hasLearnerResolutionEvidence(transcriptText: string): boolean {
+  const learnerText = transcriptText
+    .split(/\r?\n/)
+    .filter((line) => /^\s*Learner:/i.test(line))
+    .join('\n')
+    .toLowerCase();
+
+  return /\b(?:because|therefore|so the|that means|it means|answer is|the answer|equals|solve|solved|i would|i'd|i get|i got|it happens when|is when|are when)\b|=/.test(
+    learnerText,
+  );
+}
+
 export async function analyzeSessionTranscript(
   transcript: Array<{ eventType: string; content: string }>,
   subjectName: string | null,
@@ -1701,7 +1728,7 @@ export async function analyzeSessionTranscript(
     const parsed = JSON.parse(jsonMatch[0]) as unknown;
     const validated = sessionAnalysisOutputSchema.safeParse(parsed);
     if (!validated.success) return null;
-    return validated.data;
+    return filterUnsupportedResolvedTopics(validated.data, transcriptText);
   } catch (err) {
     logger.warn('Failed to parse session analysis', {
       error: err instanceof Error ? err.message : String(err),

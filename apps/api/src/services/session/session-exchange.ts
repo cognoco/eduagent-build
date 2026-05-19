@@ -2,7 +2,7 @@
 // Session Exchange — message processing, context preparation, persistence
 // ---------------------------------------------------------------------------
 
-import { eq, and, asc, desc, inArray, lt, sql, gte, ne } from 'drizzle-orm';
+import { eq, and, desc, inArray, lt, sql, gte, ne } from 'drizzle-orm';
 import {
   learningSessions,
   sessionEvents,
@@ -562,6 +562,11 @@ async function maybeDispatchTopicProbeExtraction(
   if (!payload) return;
 
   try {
+    // core-send: compensation pattern — on dispatch failure the catch
+    // block below rolls back the topicProbeFiredAt marker so a future
+    // exchange can re-attempt. safeSend would swallow the error and leave
+    // the marker set, permanently disabling topic-probe extraction for
+    // this session. [BUG-104 / BUG-230]
     await inngest.send({
       name: 'app/topic-probe.requested',
       data: payload,
@@ -885,15 +890,27 @@ export async function prepareExchangeContext(
         ),
       )
       .limit(1),
-    db.query.sessionEvents.findMany({
-      where: and(
-        eq(sessionEvents.sessionId, sessionId),
-        eq(sessionEvents.profileId, profileId),
-      ),
-      // [BUG-913 sweep] Tie-break by id when created_at collides — see
-      // session-crud.ts getSessionTranscript for the full rationale.
-      orderBy: [asc(sessionEvents.createdAt), asc(sessionEvents.id)],
-    }),
+    // [BUG-251] Defensive hard cap on the per-session event scan.
+    // A natural session has at most MAX_EXCHANGES_PER_SESSION (50) exchange
+    // pairs + a small number of ancillary events (drills, system marks).
+    // Fetch the most-recent 400 in DESC order (>7x headroom) and re-sort
+    // ascending in JS so downstream consumers (buildExchangeHistory,
+    // computeCorrectStreak, partialProgress trailing-count) still see
+    // chronological order. The DESC + reverse pattern is necessary because
+    // a plain `limit` with ASC ordering would truncate the latest events
+    // (exactly the opposite of what state-reconstruction needs).
+    db.query.sessionEvents
+      .findMany({
+        where: and(
+          eq(sessionEvents.sessionId, sessionId),
+          eq(sessionEvents.profileId, profileId),
+        ),
+        // [BUG-913 sweep] Tie-break by id when created_at collides — see
+        // session-crud.ts getSessionTranscript for the full rationale.
+        orderBy: [desc(sessionEvents.createdAt), desc(sessionEvents.id)],
+        limit: 400,
+      })
+      .then((rows) => rows.slice().reverse()),
     semanticMemoryRetrievalEnabled
       ? userMessageVectorPromise.then((userMessageVector) =>
           retrieveRelevantMemory(

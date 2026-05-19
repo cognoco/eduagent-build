@@ -221,10 +221,15 @@ describeIfDb('nudge service (integration)', () => {
   // ── 1. Happy path ──────────────────────────────────────────────────────────
 
   it('creates a nudge row end-to-end', async () => {
+    // Pass deterministic midday UTC to avoid quiet-hours suppression
+    // (QUIET_HOURS_START=21, QUIET_HOURS_END=7 — 14:00 UTC is always outside).
+    const midDayUtc = new Date();
+    midDayUtc.setUTCHours(14, 0, 0, 0);
     const result = await createNudge(db, {
       fromProfileId: parentAProfileId,
       toProfileId: childXProfileId,
       template: 'you_got_this',
+      now: midDayUtc,
     });
 
     expect(result.nudge.fromProfileId).toBe(parentAProfileId);

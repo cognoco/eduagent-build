@@ -128,8 +128,10 @@ beforeEach(() => {
 });
 
 describe('consentReminder', () => {
-  it('should be defined as an Inngest function', () => {
-    expect(consentReminder).toBeTruthy();
+  it('should be defined as an Inngest function with the expected id', () => {
+    expect((consentReminder as { opts?: { id?: string } }).opts?.id).toBe(
+      'consent-reminder',
+    );
   });
 
   it('should have the correct function id', () => {

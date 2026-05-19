@@ -476,17 +476,33 @@ export const stripeWebhookRoute = new Hono<{
   const kv = c.env.SUBSCRIPTION_KV;
   const eventTimestamp = new Date(event.created * 1000).toISOString();
 
-  // Reject stale events (>48 hours old) — Stripe retries for up to 72h,
-  // so we allow a wide window. The idempotency guard in
-  // updateSubscriptionFromWebhook handles duplicate/out-of-order events.
+  // [BUG-113] Stale events (>48h old) are acknowledged (200) and dropped, NOT
+  // rejected with 4xx. A 4xx response causes Stripe to RETRY the webhook for
+  // up to 72h — meaning a single stale event becomes a permanent retry storm
+  // and floods the endpoint with the same payload until Stripe gives up. The
+  // idempotency guard in updateSubscriptionFromWebhook already handles
+  // duplicate/out-of-order events safely, so the only purpose of this guard
+  // is to prevent acting on stale data. Ack + no-op + escalate so we still
+  // see the drop in Sentry without inviting infinite retries.
   const eventAge = Date.now() - event.created * 1000;
   if (eventAge > 48 * 60 * 60 * 1000) {
-    return apiError(
-      c,
-      400,
-      ERROR_CODES.STALE_EVENT,
-      'Event too old — rejected to prevent replay',
+    logger.warn('[stripe-webhook] stale event dropped (acked 200)', {
+      eventId: event.id,
+      eventType: event.type,
+      eventAgeHours: Math.round(eventAge / (60 * 60 * 1000)),
+    });
+    captureException(
+      new Error('Stripe webhook event older than 48h — acknowledged + dropped'),
+      {
+        extra: {
+          context: 'stripe.webhook.stale_event_dropped',
+          eventId: event.id,
+          eventType: event.type,
+          eventAgeMs: eventAge,
+        },
+      },
     );
+    return c.json({ received: true, stale: true });
   }
 
   switch (event.type) {

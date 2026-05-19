@@ -93,6 +93,17 @@ function isoDate(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
+// [BUG-250] Snapshot session lookups are bounded to this rolling window so
+// heavy learners do not materialise their entire session history on every
+// cron tick. See the comment in loadProgressStateOnce where this is used.
+const SNAPSHOT_SESSION_WINDOW_MONTHS = 24;
+
+function sessionWindowStart(): Date {
+  const cutoff = new Date();
+  cutoff.setUTCMonth(cutoff.getUTCMonth() - SNAPSHOT_SESSION_WINDOW_MONTHS);
+  return cutoff;
+}
+
 function defaultMetrics(): ProgressMetrics {
   return {
     totalSessions: 0,
@@ -223,20 +234,26 @@ async function loadProgressStateOnce(
 
   const topicRows =
     curriculumIds.length > 0
-      ? (
+      ? // [BUG-259] Push the `skipped=false` filter to SQL — the previous
+        // implementation loaded every topic row (including skipped) and
+        // discarded them in JS, wasting payload bandwidth and driver-side
+        // memory for users with large curricula. Matches the
+        // coaching-cards.ts:759 pattern.
+        (
           await db.query.curriculumTopics.findMany({
-            where: inArray(curriculumTopics.curriculumId, curriculumIds),
+            where: and(
+              inArray(curriculumTopics.curriculumId, curriculumIds),
+              eq(curriculumTopics.skipped, false),
+            ),
           })
-        )
-          .filter((topic) => !topic.skipped)
-          .map((topic) => {
-            const subjectId = curriculumSubjectMap.get(topic.curriculumId);
-            if (!subjectId)
-              throw new Error(
-                `No subject found for curriculumId ${topic.curriculumId}`,
-              );
-            return { ...topic, subjectId };
-          })
+        ).map((topic) => {
+          const subjectId = curriculumSubjectMap.get(topic.curriculumId);
+          if (!subjectId)
+            throw new Error(
+              `No subject found for curriculumId ${topic.curriculumId}`,
+            );
+          return { ...topic, subjectId };
+        })
       : [];
 
   const topicsById = new Map(topicRows.map((topic) => [topic.id, topic]));
@@ -263,10 +280,21 @@ async function loadProgressStateOnce(
     vocabularyRows,
     vocabularyCardRows,
   ] = await Promise.all([
+    // [BUG-250] Bound the session scan to the last 24 months. The previous
+    // unbounded query loaded every lifetime session row per profile, which on
+    // heavy learners (700+ sessions) multiplied across the daily cron fan-out
+    // produced significant nightly memory pressure for no useful signal —
+    // sessions older than 2 years are not surfaced in any user-facing metric
+    // (weekly digests, recent activity, current-week deltas) and the
+    // pedagogical relevance of multi-year-old activity is already captured by
+    // mastery / retention card state, not raw session rows. If true lifetime
+    // totals are needed later, pre-aggregate into a counters table (cheap
+    // count, no row materialisation) rather than reverting this bound.
     db.query.learningSessions.findMany({
       where: and(
         eq(learningSessions.profileId, profileId),
         gte(learningSessions.exchangeCount, 1),
+        gte(learningSessions.startedAt, sessionWindowStart()),
       ),
     }),
     db.query.assessments.findMany({

@@ -18,6 +18,7 @@ import {
   addCurriculumTopic,
   adaptCurriculumFromPerformance,
   persistBookTopics,
+  previewCurriculumTopic,
 } from './curriculum';
 import type {
   CurriculumInput,
@@ -1623,5 +1624,167 @@ describe('getBooks (BUG-884)', () => {
       return false;
     }
     expect(deepContains(capturedWhereCalls, 'curriculum-latest')).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [BUG-110] generateCurriculum + previewCurriculumTopic — depth-aware JSON
+// extraction. The old `.match(/\[[\s\S]*\]/)` and `.match(/\{[\s\S]*\}/)`
+// failed inside markdown fences and could grab past the JSON end when the
+// LLM appended prose.
+// ---------------------------------------------------------------------------
+
+function providerReturning(content: string): LLMProvider {
+  return {
+    id: 'gemini',
+    async chat() {
+      return { content, stopReason: 'stop' as StopReason };
+    },
+    chatStream() {
+      const s = (async function* () {
+        yield content;
+      })();
+      return makeChatStreamResult(s, Promise.resolve<StopReason>('stop'));
+    },
+  };
+}
+
+describe('[BUG-110] generateCurriculum JSON array extraction', () => {
+  afterEach(() => {
+    registerProvider(createMockProvider('gemini'));
+  });
+
+  // Red-green proof: revert to `result.response.match(/\[[\s\S]*\]/)` and
+  // this test fails — the regex returns null because the `[` and `]` are
+  // INSIDE the markdown fence and the LLM's trailing prose forms part of
+  // the greedy `[\s\S]*` capture.
+  it('parses a JSON array wrapped in markdown ```json fences', async () => {
+    const arr = JSON.stringify([
+      {
+        title: 'Photosynthesis',
+        description: 'How plants make food',
+        relevance: 'core',
+        estimatedMinutes: 25,
+      },
+    ]);
+    registerProvider(
+      providerReturning(
+        `Here is the curriculum:\n\`\`\`json\n${arr}\n\`\`\`\n\nLet me know if you want changes.`,
+      ),
+    );
+
+    const topics = await generateCurriculum(defaultInput);
+    expect(topics).toHaveLength(1);
+    expect(topics[0]!.title).toBe('Photosynthesis');
+  });
+
+  it('does not grab past the array when the LLM appends prose', async () => {
+    // The legacy regex `\[[\s\S]*\]` is greedy and would extend the match to
+    // any later `]` in the trailing prose. The depth walker stops at the
+    // matching close bracket.
+    const arr = JSON.stringify([
+      {
+        title: 'Cells',
+        description: 'Basic units of life',
+        relevance: 'core',
+        estimatedMinutes: 20,
+      },
+    ]);
+    registerProvider(
+      providerReturning(
+        `${arr}\n\nFootnote: see chapter [1] for more details and [2] for examples.`,
+      ),
+    );
+
+    const topics = await generateCurriculum(defaultInput);
+    expect(topics).toHaveLength(1);
+    expect(topics[0]!.title).toBe('Cells');
+  });
+});
+
+describe('[BUG-110+109] previewCurriculumTopic resilience', () => {
+  afterEach(() => {
+    registerProvider(createMockProvider('gemini'));
+  });
+
+  // Red-green proof: revert to `result.response.match(/\{[\s\S]*\}/)` and the
+  // regex returns null when the response is wrapped in markdown — caller
+  // falls back to the heuristic preview, missing the LLM's improvement.
+  it('parses a JSON object wrapped in markdown fences', async () => {
+    const obj = JSON.stringify({
+      title: 'Mitosis',
+      description: 'Cell division phases',
+      estimatedMinutes: 25,
+    });
+    registerProvider(providerReturning(`Sure!\n\`\`\`json\n${obj}\n\`\`\`\n`));
+
+    const preview = await previewCurriculumTopic('Biology', 'mitosis');
+    expect(preview.title).toBe('Mitosis');
+    expect(preview.estimatedMinutes).toBe(25);
+  });
+
+  // Red-green proof for [BUG-109]: revert the catch block to bare `catch {}`
+  // and the warn spy receives zero calls — every transport failure is
+  // invisible. With the fix, the structured log captures the surface +
+  // error message so support can query it.
+  it('[BUG-109] logs (not silently swallows) when LLM call throws', async () => {
+    const consoleSpy = jest
+      .spyOn(console, 'warn')
+      .mockImplementation(() => undefined);
+    const blowupProvider: LLMProvider = {
+      id: 'gemini',
+      async chat() {
+        throw new Error('LLM transport boom');
+      },
+      chatStream() {
+        return makeChatStreamResult(
+          {
+            [Symbol.asyncIterator]() {
+              return {
+                async next(): Promise<IteratorResult<string>> {
+                  throw new Error('LLM transport boom');
+                },
+              };
+            },
+          },
+          Promise.resolve<StopReason>('stop'),
+        );
+      },
+    };
+    registerProvider(blowupProvider);
+
+    const preview = await previewCurriculumTopic('Biology', 'mitosis');
+
+    // Fallback preview is still returned — UX does not break.
+    expect(preview.title.length).toBeGreaterThan(0);
+    // But the failure is no longer invisible.
+    expect(consoleSpy).toHaveBeenCalled();
+    const logged = consoleSpy.mock.calls
+      .map((c) =>
+        c.map((x) => (typeof x === 'string' ? x : JSON.stringify(x))).join(' '),
+      )
+      .join('\n');
+    expect(logged).toMatch(/curriculum\.preview_topic\.failed/);
+    expect(logged).toMatch(/LLM transport boom/);
+    consoleSpy.mockRestore();
+  });
+
+  it('[BUG-109] logs (not silently swallows) when LLM returns no JSON', async () => {
+    const consoleSpy = jest
+      .spyOn(console, 'warn')
+      .mockImplementation(() => undefined);
+    registerProvider(providerReturning('Sorry, no JSON for you today.'));
+
+    const preview = await previewCurriculumTopic('Biology', 'mitosis');
+
+    expect(preview.title.length).toBeGreaterThan(0);
+    expect(consoleSpy).toHaveBeenCalled();
+    const logged = consoleSpy.mock.calls
+      .map((c) =>
+        c.map((x) => (typeof x === 'string' ? x : JSON.stringify(x))).join(' '),
+      )
+      .join('\n');
+    expect(logged).toMatch(/curriculum\.preview_topic\.no_json/);
+    consoleSpy.mockRestore();
   });
 });

@@ -31,6 +31,12 @@ pnpm eval:llm
 # run only one flow
 pnpm eval:llm -- --flow quiz-capitals
 
+# run a named adversarial suite within an enumerated flow
+pnpm eval:llm -- --flow probes --scenarios source-grounding
+pnpm eval:llm -- --flow probes --scenarios personalization
+pnpm eval:llm -- --flow probes --scenarios homework-source
+pnpm eval:llm -- --flow book-suggestion-regeneration --scenarios book-suggestions
+
 # run only one profile across all flows
 pnpm eval:llm -- --profile 09yo-dinosaurs
 
@@ -42,6 +48,22 @@ doppler run -- pnpm eval:llm -- --live
 ```
 
 Snapshots land in `apps/api/eval-llm/snapshots/<flow-id>/<profile-id>.md`.
+
+## Focused Live Gates
+
+The root `package.json` exposes focused runners for launch-risk areas:
+
+| Script | Coverage |
+|---|---|
+| `pnpm test:llm:source-grounding` | no source, thin source, reliable source, unsupported learner claim, memory-only claim, forum/chat-like source |
+| `pnpm test:llm:personalization-matrix` | ages 11/13/17/18, ADHD-style support, autism-style support, no accommodation, serious/casual study, returning learner history |
+| `pnpm test:llm:provider-degradation` | Gemini/OpenAI/Claude timeout, 503, malformed JSON, and rate-limit degradation; includes Gemini-only policy protection |
+| `pnpm test:llm:homework-source` | enough problem text, too little problem text, conflicting learner answer, photo-like/source context |
+| `pnpm test:llm:post-session-artifacts` | session summaries, learner recaps, session analysis/memory notes, parent progress summaries, and assessment/challenge evaluation artifacts |
+| `pnpm test:llm:artifact-personalization` | internal summaries, learner recaps, learner-memory insights, parent summaries, and challenge feedback for current details, updated learner preferences, concrete next actions, and cross-artifact variation |
+| `pnpm test:llm:book-suggestions` | relevance, diversity, age register, Four Strands language suggestions, source-neutral descriptions, duplicate/tiny-book avoidance |
+
+The probe-based suites intentionally include learning, review/practice, homework, free chat, and Four Strands language scenarios so failures are not hidden behind the happy-path tutoring loop.
 
 ## Adding a flow
 

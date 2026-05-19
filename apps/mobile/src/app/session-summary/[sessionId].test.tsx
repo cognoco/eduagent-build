@@ -7,6 +7,7 @@ import {
   waitFor,
 } from '@testing-library/react-native';
 import React from 'react';
+import { useAuth } from '@clerk/clerk-expo';
 import { platformAlert } from '../../lib/platform-alert';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
@@ -25,6 +26,8 @@ const mockParams = {
   escalationRung: '2',
 } as Record<string, string | undefined>;
 
+// [BUG-134] Test-side: Redirect stub so we can observe the auth-gate output
+// without pulling in a real navigation context.
 jest.mock('expo-router', () => ({
   useRouter: () => ({
     replace: mockReplace,
@@ -33,6 +36,10 @@ jest.mock('expo-router', () => ({
     canGoBack: mockCanGoBack,
   }),
   useLocalSearchParams: () => mockParams,
+  Redirect: ({ href }: { href: string }) => {
+    const { Text } = require('react-native');
+    return <Text testID={`mock-redirect-${href}`}>redirect:{href}</Text>;
+  },
 }));
 
 jest.mock('react-native-safe-area-context', () => ({
@@ -383,6 +390,12 @@ describe('SessionSummaryScreen', () => {
     // Create a fresh wrapper (and QueryClient) per test to prevent cross-test
     // query cache contamination from async fetch-boundary responses.
     Wrapper = createWrapper();
+    // [BUG-134] Default to signed-in for SessionSummary tests; auth-gate
+    // break tests override below.
+    (useAuth as jest.Mock).mockReturnValue({
+      isLoaded: true,
+      isSignedIn: true,
+    });
   });
 
   afterEach(async () => {
@@ -1407,6 +1420,68 @@ describe('SessionSummaryScreen', () => {
       await waitFor(() => {
         expect(mockClearSummaryDraft).toHaveBeenCalled();
       });
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // [BUG-134] Auth gate — deep-link entry to root-level screen
+  // ---------------------------------------------------------------------------
+  describe('auth gate [BUG-134]', () => {
+    it('redirects to /sign-in when an unauthenticated user opens a session-summary deep-link', () => {
+      // Break test: session-summary lives at the project root (not under
+      // (app)/), so the (app)/_layout auth guard never fires. Without the
+      // in-screen guard, an unauthenticated user gets a permanent loader.
+      (useAuth as jest.Mock).mockReturnValue({
+        isLoaded: true,
+        isSignedIn: false,
+      });
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      screen.getByTestId('mock-redirect-/sign-in');
+      // The actual summary UI must not render — the redirect must come
+      // before any data UI is reached.
+      expect(screen.queryByTestId('summary-title')).toBeNull();
+      expect(screen.queryByTestId('session-takeaways')).toBeNull();
+    });
+
+    it('shows a spinner (not redirect) while Clerk is still hydrating', () => {
+      (useAuth as jest.Mock).mockReturnValue({
+        isLoaded: false,
+        isSignedIn: false,
+      });
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+      screen.getByTestId('session-summary-auth-loading');
+      expect(screen.queryByTestId('mock-redirect-/sign-in')).toBeNull();
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // [BUG-139] 404 must be classified by the shared classifier, not by raw
+  // HTTP status duck-typing inline in the screen.
+  // ---------------------------------------------------------------------------
+  describe('expired-session classification [BUG-139]', () => {
+    it('shows the expired UI when transcript fetch returns 404', async () => {
+      // Server returns 404 — `assertOk()` throws an Error with .status = 404,
+      // and the shared `classifyApiError()` categorises it as 'not-found'.
+      // The screen MUST surface the expired UI rather than the generic
+      // catch-all — proving the classifier (not inline status duck-typing)
+      // drives the branch.
+      mockFetch.setRoute(
+        'transcript',
+        () =>
+          new Response(JSON.stringify({ message: 'Gone' }), { status: 404 }),
+      );
+
+      render(<SessionSummaryScreen />, { wrapper: Wrapper });
+
+      await waitFor(() => {
+        screen.getByTestId('expired-session-go-home');
+      });
+      // It must NOT fall through to the generic "Session not found"
+      // catch-all — that branch is for non-404 errors.
+      expect(screen.queryByTestId('session-not-found-go-home')).toBeNull();
     });
   });
 });

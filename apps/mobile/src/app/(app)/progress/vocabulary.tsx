@@ -1,4 +1,4 @@
-import { ScrollView, Text, View, Pressable } from 'react-native';
+import { FlatList, ScrollView, Text, View, Pressable } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -149,106 +149,133 @@ export default function VocabularyBrowserScreen(): React.ReactElement {
         </View>
       </View>
 
-      <ScrollView
-        className="flex-1 px-5"
-        contentContainerStyle={{ paddingBottom: insets.bottom + 28 }}
-      >
-        {isLoading ? (
-          <>
-            <SkeletonRow />
-            <SkeletonRow />
-          </>
-        ) : isError && !inventory ? (
-          <View testID="vocab-browser-error">
-            <ErrorFallback
-              title={t('progress.vocabulary.errorTitle')}
-              message={t('progress.vocabulary.errorMessage')}
-              primaryAction={{
-                label: t('common.tryAgain'),
-                onPress: () => void refetch(),
-                testID: 'vocab-browser-retry',
-              }}
-              secondaryAction={{
-                label: t('common.goBack'),
-                onPress: () =>
-                  goBackOrReplace(router, '/(app)/progress' as const),
-                testID: 'vocab-browser-go-back',
-              }}
-              testID="vocab-browser-error-fallback"
+      {(() => {
+        // [BUG-NOTION-255] When showing the populated subject list, render via
+        // FlatList so VirtualizedList recycles off-screen rows. The other
+        // branches (loading skeleton, error, empty states) are bounded/small
+        // and stay in a plain ScrollView to keep layout and a11y testIDs
+        // unchanged.
+        const showSubjectList =
+          !isLoading &&
+          !(isError && !inventory) &&
+          hasLanguageSubject &&
+          !isEmpty;
+
+        if (showSubjectList) {
+          return (
+            <FlatList
+              className="flex-1 px-5"
+              data={subjectsWithVocab}
+              keyExtractor={(s) => s.subjectId}
+              renderItem={({ item }) => <SubjectVocabSection subject={item} />}
+              contentContainerStyle={{ paddingBottom: insets.bottom + 28 }}
+              initialNumToRender={8}
+              maxToRenderPerBatch={8}
+              windowSize={5}
+              removeClippedSubviews
             />
-          </View>
-        ) : !isLoading && !isError && !hasLanguageSubject ? (
-          <View
-            className="flex-1 items-center justify-center px-6"
-            testID="vocab-browser-no-language"
+          );
+        }
+
+        return (
+          <ScrollView
+            className="flex-1 px-5"
+            contentContainerStyle={{ paddingBottom: insets.bottom + 28 }}
           >
-            <Text className="text-text-secondary text-center text-base">
-              {t('progress.vocabulary.noLanguageMessage')}
-            </Text>
-            <Pressable
-              onPress={() => router.replace('/(app)/progress' as Href)}
-              className="mt-4 rounded-lg bg-primary px-6 py-3"
-              accessibilityRole="button"
-              accessibilityLabel={t('common.goBack')}
-              testID="vocab-browser-no-language-back"
-            >
-              <Text className="text-text-inverse font-medium">
-                {t('common.goBack')}
-              </Text>
-            </Pressable>
-          </View>
-        ) : isEmpty && newLearner ? (
-          <View
-            className="bg-surface rounded-card p-5 mt-4 items-center"
-            testID="vocab-browser-new-learner"
-          >
-            <Text className="text-h3 font-semibold text-text-primary text-center">
-              {t('progress.vocabulary.newLearnerTitle')}
-            </Text>
-            <Text className="text-body-sm text-text-secondary text-center mt-2">
-              {t('progress.vocabulary.newLearnerSubtitle')}
-            </Text>
-            <Pressable
-              onPress={() => router.replace('/(app)/progress' as Href)}
-              className="bg-background rounded-button px-5 py-3 mt-4"
-              accessibilityRole="button"
-              accessibilityLabel={t('common.goBack')}
-              testID="vocab-browser-new-learner-back"
-            >
-              <Text className="text-body font-semibold text-text-primary">
-                {t('common.goBack')}
-              </Text>
-            </Pressable>
-          </View>
-        ) : isEmpty ? (
-          <View
-            className="bg-surface rounded-card p-5 mt-4 items-center"
-            testID="vocab-browser-empty"
-          >
-            <Text className="text-h3 font-semibold text-text-primary text-center">
-              {t('progress.vocabulary.emptyTitle')}
-            </Text>
-            <Text className="text-body-sm text-text-secondary text-center mt-2">
-              {emptyMessage}
-            </Text>
-            <Pressable
-              onPress={() => router.replace('/(app)/progress' as Href)}
-              className="bg-background rounded-button px-5 py-3 mt-4"
-              accessibilityRole="button"
-              accessibilityLabel={t('progress.vocabulary.emptyBackLabel')}
-              testID="vocab-browser-empty-back"
-            >
-              <Text className="text-body font-semibold text-text-primary">
-                {t('common.goBack')}
-              </Text>
-            </Pressable>
-          </View>
-        ) : (
-          subjectsWithVocab.map((subject) => (
-            <SubjectVocabSection key={subject.subjectId} subject={subject} />
-          ))
-        )}
-      </ScrollView>
+            {isLoading ? (
+              <>
+                <SkeletonRow />
+                <SkeletonRow />
+              </>
+            ) : isError && !inventory ? (
+              <View testID="vocab-browser-error">
+                <ErrorFallback
+                  title={t('progress.vocabulary.errorTitle')}
+                  message={t('progress.vocabulary.errorMessage')}
+                  primaryAction={{
+                    label: t('common.tryAgain'),
+                    onPress: () => void refetch(),
+                    testID: 'vocab-browser-retry',
+                  }}
+                  secondaryAction={{
+                    label: t('common.goBack'),
+                    onPress: () =>
+                      goBackOrReplace(router, '/(app)/progress' as const),
+                    testID: 'vocab-browser-go-back',
+                  }}
+                  testID="vocab-browser-error-fallback"
+                />
+              </View>
+            ) : !hasLanguageSubject ? (
+              <View
+                className="flex-1 items-center justify-center px-6"
+                testID="vocab-browser-no-language"
+              >
+                <Text className="text-text-secondary text-center text-base">
+                  {t('progress.vocabulary.noLanguageMessage')}
+                </Text>
+                <Pressable
+                  onPress={() => router.replace('/(app)/progress' as Href)}
+                  className="mt-4 rounded-lg bg-primary px-6 py-3"
+                  accessibilityRole="button"
+                  accessibilityLabel={t('common.goBack')}
+                  testID="vocab-browser-no-language-back"
+                >
+                  <Text className="text-text-inverse font-medium">
+                    {t('common.goBack')}
+                  </Text>
+                </Pressable>
+              </View>
+            ) : isEmpty && newLearner ? (
+              <View
+                className="bg-surface rounded-card p-5 mt-4 items-center"
+                testID="vocab-browser-new-learner"
+              >
+                <Text className="text-h3 font-semibold text-text-primary text-center">
+                  {t('progress.vocabulary.newLearnerTitle')}
+                </Text>
+                <Text className="text-body-sm text-text-secondary text-center mt-2">
+                  {t('progress.vocabulary.newLearnerSubtitle')}
+                </Text>
+                <Pressable
+                  onPress={() => router.replace('/(app)/progress' as Href)}
+                  className="bg-background rounded-button px-5 py-3 mt-4"
+                  accessibilityRole="button"
+                  accessibilityLabel={t('common.goBack')}
+                  testID="vocab-browser-new-learner-back"
+                >
+                  <Text className="text-body font-semibold text-text-primary">
+                    {t('common.goBack')}
+                  </Text>
+                </Pressable>
+              </View>
+            ) : (
+              <View
+                className="bg-surface rounded-card p-5 mt-4 items-center"
+                testID="vocab-browser-empty"
+              >
+                <Text className="text-h3 font-semibold text-text-primary text-center">
+                  {t('progress.vocabulary.emptyTitle')}
+                </Text>
+                <Text className="text-body-sm text-text-secondary text-center mt-2">
+                  {emptyMessage}
+                </Text>
+                <Pressable
+                  onPress={() => router.replace('/(app)/progress' as Href)}
+                  className="bg-background rounded-button px-5 py-3 mt-4"
+                  accessibilityRole="button"
+                  accessibilityLabel={t('progress.vocabulary.emptyBackLabel')}
+                  testID="vocab-browser-empty-back"
+                >
+                  <Text className="text-body font-semibold text-text-primary">
+                    {t('common.goBack')}
+                  </Text>
+                </Pressable>
+              </View>
+            )}
+          </ScrollView>
+        );
+      })()}
     </View>
   );
 }

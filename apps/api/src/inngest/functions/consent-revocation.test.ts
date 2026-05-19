@@ -164,8 +164,10 @@ afterEach(() => {
 });
 
 describe('consentRevocation', () => {
-  it('is defined as an Inngest function', () => {
-    expect(consentRevocation).toBeTruthy();
+  it('is defined as an Inngest function with the expected id', () => {
+    expect((consentRevocation as { opts?: { id?: string } }).opts?.id).toBe(
+      'consent-revocation',
+    );
   });
 
   it('triggers on app/consent.revoked event', () => {

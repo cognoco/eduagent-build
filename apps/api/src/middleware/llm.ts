@@ -24,45 +24,57 @@ let initialized = false;
 
 export const llmMiddleware = createMiddleware<LLMEnv>(async (c, next) => {
   if (!initialized) {
-    const geminiKey = c.env?.GEMINI_API_KEY;
-    const openaiKey = c.env?.OPENAI_API_KEY;
+    // [BUG-96 / A1-HIGH] Wrap provider registration in try/finally so
+    // `initialized` flips even on partial-registration failure. Previously
+    // the flag was set AFTER the registerProvider calls; if one threw, the
+    // already-registered providers stayed in the registry but `initialized`
+    // remained false, so the next request re-registered them and threw
+    // "provider already registered". Setting the flag in `finally` makes
+    // failed init terminal per-isolate — the next request short-circuits
+    // and any router call surfaces the missing-provider error directly,
+    // which is louder and easier to debug than the duplicate-registration
+    // symptom that masked the real cause.
+    try {
+      const geminiKey = c.env?.GEMINI_API_KEY;
+      const openaiKey = c.env?.OPENAI_API_KEY;
 
-    if (geminiKey) {
-      registerProvider(createGeminiProvider(geminiKey));
-    }
-
-    if (openaiKey) {
-      registerProvider(createOpenAIProvider(openaiKey));
-    }
-
-    const anthropicKey = c.env?.ANTHROPIC_API_KEY;
-    if (anthropicKey) {
-      registerProvider(createAnthropicProvider(anthropicKey));
-    }
-
-    const hasAnyProvider = geminiKey || openaiKey || anthropicKey;
-
-    if (!hasAnyProvider) {
-      if (
-        c.env?.ENVIRONMENT === 'test' ||
-        // Fallback: Jest sets NODE_ENV at module level — process.env is
-        // acceptable here because this branch only fires in Node.js tests
-        // (CF Workers never reach this path without API keys).
-        process.env['NODE_ENV'] === 'test'
-      ) {
-        // [logging sweep] structured logger so PII fields land as JSON context
-        logger.warn(
-          '[llm] No LLM API keys set — skipping provider registration (test environment)'
-        );
-      } else {
-        const env = c.env?.ENVIRONMENT ?? 'development';
-        throw new Error(
-          `At least one LLM API key is required (GEMINI_API_KEY or OPENAI_API_KEY) (environment: ${env})`
-        );
+      if (geminiKey) {
+        registerProvider(createGeminiProvider(geminiKey));
       }
-    }
 
-    initialized = true;
+      if (openaiKey) {
+        registerProvider(createOpenAIProvider(openaiKey));
+      }
+
+      const anthropicKey = c.env?.ANTHROPIC_API_KEY;
+      if (anthropicKey) {
+        registerProvider(createAnthropicProvider(anthropicKey));
+      }
+
+      const hasAnyProvider = geminiKey || openaiKey || anthropicKey;
+
+      if (!hasAnyProvider) {
+        if (
+          c.env?.ENVIRONMENT === 'test' ||
+          // Fallback: Jest sets NODE_ENV at module level — process.env is
+          // acceptable here because this branch only fires in Node.js tests
+          // (CF Workers never reach this path without API keys).
+          process.env['NODE_ENV'] === 'test'
+        ) {
+          // [logging sweep] structured logger so PII fields land as JSON context
+          logger.warn(
+            '[llm] No LLM API keys set — skipping provider registration (test environment)',
+          );
+        } else {
+          const env = c.env?.ENVIRONMENT ?? 'development';
+          throw new Error(
+            `At least one LLM API key is required (GEMINI_API_KEY or OPENAI_API_KEY) (environment: ${env})`,
+          );
+        }
+      }
+    } finally {
+      initialized = true;
+    }
   }
   await next();
 });

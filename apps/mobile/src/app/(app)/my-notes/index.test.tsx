@@ -1,4 +1,9 @@
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react-native';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createRoutedMockFetch } from '../../../test-utils/mock-api-routes';
@@ -100,5 +105,48 @@ describe('MyNotesHubScreen', () => {
     fireEvent.press(screen.getByTestId('my-notes-back'));
 
     expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
+  });
+
+  it('shows the sessions count pill once sessions load', async () => {
+    mockFetch.setRoute('/progress/sessions', {
+      sessions: [
+        {
+          sessionId: 'a0000000-0000-4000-a000-000000000030',
+          subjectId: 'a0000000-0000-4000-a000-000000000010',
+          subjectName: 'Chemistry',
+          topicId: 'a0000000-0000-4000-a000-000000000020',
+          topicTitle: 'Chemical Bonds',
+          sessionType: 'learning',
+          startedAt: '2026-05-15T10:00:00.000Z',
+          endedAt: '2026-05-15T10:04:00.000Z',
+          exchangeCount: 4,
+          escalationRung: 1,
+          durationSeconds: 120,
+          wallClockSeconds: 240,
+          displayTitle: 'Learning',
+          displaySummary: 'Covalent bonds clicked.',
+          homeworkSummary: null,
+          highlight: 'Covalent bonds clicked.',
+          narrative: null,
+          conversationPrompt: null,
+          engagementSignal: null,
+          drills: [],
+        },
+      ],
+    });
+    render(<MyNotesHubScreen />, { wrapper: createWrapper() });
+
+    await waitFor(() => screen.getByText('1'));
+  });
+
+  it('navigates to sessions, notes, and bookmarks list from hub', () => {
+    render(<MyNotesHubScreen />, { wrapper: createWrapper() });
+
+    fireEvent.press(screen.getByTestId('my-notes-sessions'));
+    expect(mockPush).toHaveBeenCalledWith('/(app)/my-notes/sessions');
+    jest.clearAllMocks();
+
+    fireEvent.press(screen.getByTestId('my-notes-bookmarks'));
+    expect(mockPush).toHaveBeenCalledWith('/(app)/my-notes/bookmarks');
   });
 });

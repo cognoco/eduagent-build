@@ -1,7 +1,7 @@
 import { promises as fs } from 'node:fs';
 import * as path from 'node:path';
 import type { EvalProfile } from '../fixtures/profiles';
-import type { FlowDefinition, PromptMessages } from './types';
+import type { FlowDefinition, PromptMessages, QualityIssue } from './types';
 
 // ---------------------------------------------------------------------------
 // Snapshot writer — produces one markdown file per (flow × profile).
@@ -28,6 +28,8 @@ export interface SnapshotInputs {
   liveError?: string; // error message if live call failed
   /** Response failed expectedResponseSchema validation — message describes how. */
   schemaViolation?: string;
+  /** Semantic quality gate issues from flow.evaluateQuality. */
+  qualityIssues?: QualityIssue[];
 }
 
 const SNAPSHOTS_DIR = path.resolve(__dirname, '..', 'snapshots');
@@ -115,12 +117,23 @@ function renderSnapshot(inputs: SnapshotInputs): string {
     sections.push(`## ⚠️ Schema violation`);
     sections.push(``);
     sections.push(
-      `The live LLM response did not conform to the flow's \`expectedResponseSchema\`:`
+      `The live LLM response did not conform to the flow's \`expectedResponseSchema\`:`,
     );
     sections.push(``);
     sections.push('```');
     sections.push(schemaViolation);
     sections.push('```');
+    sections.push(``);
+  }
+
+  if (inputs.qualityIssues && inputs.qualityIssues.length > 0) {
+    sections.push(`## ⚠️ Quality issues`);
+    sections.push(``);
+    for (const issue of inputs.qualityIssues) {
+      sections.push(
+        `- **${issue.severity.toUpperCase()} ${issue.code}:** ${issue.message}`,
+      );
+    }
     sections.push(``);
   }
 
@@ -136,7 +149,7 @@ function renderSnapshot(inputs: SnapshotInputs): string {
       sections.push(
         `> **Provider:** \`${liveProvider ?? 'unknown'}\` — **Model:** \`${
           liveModel ?? 'unknown'
-        }\``
+        }\``,
       );
       sections.push(``);
     }

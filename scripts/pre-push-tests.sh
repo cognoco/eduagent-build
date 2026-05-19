@@ -14,8 +14,9 @@
 #   - Per-file lint (ESLint + Prettier via lint-staged)
 #   - GC1 ratchet, eval snapshot guard, i18n staleness guard
 #
-# Skip with: git push --no-verify
-# Skip with: SKIP_PRE_PUSH=1 git push
+# Skip with: git push --no-verify     (preferred — Git-native, used by tooling)
+# Skip with: SKIP_PRE_PUSH=1 git push  (escape hatch for broken harness only;
+#                                       emits a loud audit warning to stderr)
 # Protected branches (skipped): main + PREPUSH_SKIP_BRANCHES
 
 set -euo pipefail
@@ -27,7 +28,27 @@ PREPUSH_SKIP_BRANCHES="${PREPUSH_SKIP_BRANCHES:-main}"
 ZERO_SHA="0000000000000000000000000000000000000000"
 
 if [[ "${SKIP_PRE_PUSH:-}" == "1" ]]; then
-  echo "pre-push: SKIP_PRE_PUSH=1, skipping"
+  # [BUG-240] SKIP_PRE_PUSH is an escape hatch for emergency hotfixes when
+  # the validation harness itself is broken (e.g. tsc OOM, jest haste-map
+  # corruption, network failure during eval:llm). Use sparingly: every
+  # bypass must be followed by a manual `pnpm exec nx run-many -t test` on
+  # the pushed commit. The warning here writes a single audit line to the
+  # terminal AND stderr so:
+  #   - the operator who typed `SKIP_PRE_PUSH=1 git push` sees they were
+  #     loud about bypassing the gate (no silent skip),
+  #   - any wrapping script / CI capture that tees stderr can grep for
+  #     "PRE-PUSH BYPASSED" to surface the bypass after the fact.
+  # The supported way to skip cleanly is `git push --no-verify`; if you
+  # find yourself reaching for SKIP_PRE_PUSH instead, fix the harness.
+  branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo 'unknown')"
+  sha="$(git rev-parse --short HEAD 2>/dev/null || echo 'unknown')"
+  echo "" >&2
+  echo "================================================================" >&2
+  echo "  WARNING: PRE-PUSH BYPASSED via SKIP_PRE_PUSH=1" >&2
+  echo "  branch=${branch} sha=${sha} user=${USER:-unknown}" >&2
+  echo "  Validation NOT run. Follow up with full nx test on the push." >&2
+  echo "================================================================" >&2
+  echo "" >&2
   exit 0
 fi
 

@@ -2,7 +2,8 @@
 // in chronological order. Before this screen existed there was no UI path
 // from /session-summary/<id> back to the actual conversation, even though
 // the API has always returned the exchanges via GET /sessions/:id/transcript.
-import { render, screen, fireEvent } from '@testing-library/react-native';
+import { act, render, screen, fireEvent } from '@testing-library/react-native';
+import { useAuth } from '@clerk/clerk-expo';
 
 const mockUseLocalSearchParams = jest.fn();
 const mockReplace = jest.fn();
@@ -21,9 +22,17 @@ let mockTranscriptResult: {
   refetch: jest.fn(),
 };
 
+// [BUG-134] Test override: stub Redirect so we can assert when the auth
+// gate fires without pulling in the real expo-router navigation context.
+// Default isSignedIn: true here so the existing transcript-rendering tests
+// keep passing; the deep-link-without-auth break test below flips it.
 jest.mock('expo-router', () => ({
   useRouter: () => ({ replace: mockReplace, push: mockPush }),
   useLocalSearchParams: () => mockUseLocalSearchParams(),
+  Redirect: ({ href }: { href: string }) => {
+    const { Text } = require('react-native');
+    return <Text testID={`mock-redirect-${href}`}>redirect:{href}</Text>;
+  },
 }));
 
 jest.mock('react-native-safe-area-context', () => ({
@@ -66,6 +75,12 @@ describe('SessionTranscriptScreen [BUG-889]', () => {
       isError: false,
       refetch: jest.fn(),
     };
+    // [BUG-134] default to signed-in for all transcript tests; deep-link
+    // gate test overrides this below.
+    (useAuth as jest.Mock).mockReturnValue({
+      isLoaded: true,
+      isSignedIn: true,
+    });
   });
 
   it('shows the loading state while transcript is fetching', () => {
@@ -327,6 +342,108 @@ describe('SessionTranscriptScreen [BUG-889]', () => {
       ]);
       render(<SessionTranscriptScreen />);
       screen.getByText('Great work on fractions today!');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // [BUG-152] Continue-topic CTA must push a typed (object) route, not a
+  // string-templated one — the latter is fragile on web.
+  // -------------------------------------------------------------------------
+  describe('archived transcript continue-topic [BUG-152]', () => {
+    it('pushes the typed object route shape, not a string-templated URL', () => {
+      mockTranscriptResult = {
+        data: {
+          archived: true,
+          archivedAt: '2026-03-12T10:00:00.000Z',
+          summary: {
+            narrative: 'A great session about fractions.',
+            topicsCovered: ['fractions'],
+            sessionState: 'completed',
+            reEntryRecommendation: 'Try fraction word problems next.',
+            learnerRecap: 'Today you mastered fractions.',
+            topicId: 'topic-xyz',
+          },
+        },
+        isLoading: false,
+        isError: false,
+        refetch: jest.fn(),
+      };
+
+      render(<SessionTranscriptScreen />);
+      fireEvent.press(screen.getByTestId('archived-continue-topic-cta'));
+
+      expect(mockPush).toHaveBeenCalledTimes(1);
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/(app)/session/start',
+        params: { topicId: 'topic-xyz' },
+      });
+      // Break-test guard: must NOT be a string template.
+      expect(mockPush).not.toHaveBeenCalledWith(expect.any(String));
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // [BUG-134] Auth gate — deep-link entry to root-level screen
+  // -------------------------------------------------------------------------
+  describe('auth gate [BUG-134]', () => {
+    it('redirects to /sign-in when an unauthenticated user opens a transcript deep-link', () => {
+      // Break test: this route lives at the project root (not under (app)/),
+      // so the (app) layout's auth guard does not run. Without the in-screen
+      // guard the unauthenticated user would hit a permanent loading spinner.
+      (useAuth as jest.Mock).mockReturnValue({
+        isLoaded: true,
+        isSignedIn: false,
+      });
+
+      render(<SessionTranscriptScreen />);
+
+      screen.getByTestId('mock-redirect-/sign-in');
+      // The transcript loading / error UI must NOT render — the screen
+      // must short-circuit to the redirect before any data UI is reached.
+      expect(screen.queryByTestId('session-transcript-loading')).toBeNull();
+      expect(screen.queryByTestId('session-transcript-error')).toBeNull();
+    });
+
+    it('shows a spinner (not redirect) while Clerk is still hydrating', () => {
+      (useAuth as jest.Mock).mockReturnValue({
+        isLoaded: false,
+        isSignedIn: false,
+      });
+
+      render(<SessionTranscriptScreen />);
+      screen.getByTestId('session-transcript-auth-loading');
+      expect(screen.queryByTestId('mock-redirect-/sign-in')).toBeNull();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // [BUG-142] Loading timeout — escape hatch from unbounded spinner
+  // -------------------------------------------------------------------------
+  describe('loading timeout [BUG-142]', () => {
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('shows a Retry + Back action after the 15s timeout window elapses', () => {
+      jest.useFakeTimers();
+      mockTranscriptResult = {
+        data: undefined,
+        isLoading: true,
+        isError: false,
+        refetch: jest.fn(),
+      };
+
+      render(<SessionTranscriptScreen />);
+      // Spinner first
+      screen.getByTestId('session-transcript-loading');
+
+      act(() => {
+        jest.advanceTimersByTime(15_000);
+      });
+
+      // After 15s the loader must flip to the actionable fallback.
+      screen.getByTestId('session-transcript-timeout-retry');
+      screen.getByTestId('session-transcript-timeout-back');
     });
   });
 });

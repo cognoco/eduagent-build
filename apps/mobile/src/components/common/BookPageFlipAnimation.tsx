@@ -53,6 +53,7 @@ function PageTextLines({
   h: number;
   dark: boolean;
 }) {
+  // brand: slate-500 (#64748b) for muted text-line strokes on dark page backgrounds
   const c = dark ? '#64748b' : INK;
   return (
     <>

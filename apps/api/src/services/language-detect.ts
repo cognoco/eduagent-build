@@ -1,4 +1,4 @@
-import { routeAndCall, type ChatMessage } from './llm';
+import { extractFirstJsonObject, routeAndCall, type ChatMessage } from './llm';
 import { escapeXml } from './llm/sanitize';
 import {
   detectLanguageHint,
@@ -33,7 +33,7 @@ function entryToDetection(entry: LanguageEntry): LanguageDetection {
 }
 
 export async function detectLanguageSubject(
-  rawInput: string
+  rawInput: string,
 ): Promise<LanguageDetection | null> {
   const hint = detectLanguageHint(rawInput);
   if (!hint) {
@@ -52,12 +52,14 @@ export async function detectLanguageSubject(
 
   try {
     const result = await routeAndCall(messages, 1);
-    const jsonMatch = result.response.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
+    // [PROMPT-INJECT-110] Depth-aware extractor; strips markdown fences and
+    // doesn't grab past the JSON when the LLM appends prose.
+    const jsonStr = extractFirstJsonObject(result.response);
+    if (!jsonStr) {
       return entryToDetection(hint);
     }
 
-    const parsed = JSON.parse(jsonMatch[0]) as {
+    const parsed = JSON.parse(jsonStr) as {
       isLanguageLearning?: unknown;
       languageCode?: unknown;
     };

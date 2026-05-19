@@ -29,6 +29,22 @@ export interface ResponseValidator {
   safeParse(value: unknown): { success: boolean; error?: unknown };
 }
 
+export type QualityIssueSeverity = 'warning' | 'error';
+
+export interface QualityIssue {
+  severity: QualityIssueSeverity;
+  code: string;
+  message: string;
+}
+
+export interface QualityCheckContext<Input = unknown> {
+  input: Input;
+  messages: PromptMessages;
+  liveResponse: string;
+  profile: EvalProfile;
+  scenarioId?: string;
+}
+
 /**
  * A scenario groups a scenarioId with the Input it generates. Used by flows
  * that exercise the same prompt builder across multiple branches — e.g. the
@@ -92,6 +108,14 @@ export interface FlowDefinition<Input = unknown> {
    * text leave this unset.
    */
   expectedResponseSchema?: ResponseValidator;
+
+  /**
+   * Optional semantic quality gate for live responses. Schema validation says
+   * "did the model return the right shape?"; this hook says "did the model
+   * satisfy the scenario contract?" Error issues fail the CLI quality gate;
+   * warnings are rendered for review without failing the run.
+   */
+  evaluateQuality?(context: QualityCheckContext<Input>): QualityIssue[];
 
   /**
    * Set true when this flow returns the shared LLM response envelope (the

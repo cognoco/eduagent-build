@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isoDateField } from './common.ts';
 
 export const quizActivityTypeSchema = z.enum([
   'capitals',
@@ -216,7 +217,10 @@ export const recentRoundSchema = z.object({
   score: z.number().int().nonnegative(),
   total: z.number().int().positive(),
   xpEarned: z.number().int().nonnegative(),
-  completedAt: z.string(),
+  /** [BUG-209] Strict ISO datetime — also accepts Date objects from
+   *  neon-serverless rows. Previously a bare `z.string()` which let
+   *  empty strings through. */
+  completedAt: isoDateField,
 });
 export type RecentRound = z.infer<typeof recentRoundSchema>;
 
@@ -343,9 +347,15 @@ export const completedRoundDetailResponseSchema = quizRoundResponseSchema
     score: z.number().int().nonnegative().nullable(),
     xpEarned: z.number().int().nonnegative().nullable(),
     celebrationTier: z.enum(['perfect', 'great', 'nice']),
-    completedAt: z.string().optional(),
+    /** [BUG-209] Strict ISO datetime — also accepts Date objects from
+     *  neon-serverless rows. Optional because in-progress rounds have not
+     *  completed yet. */
+    completedAt: isoDateField.optional(),
     questions: z.array(completedRoundQuestionSchema),
-    results: z.unknown(),
+    /** [BUG-207] Persisted per-question grading rows stored on the round's
+     *  `results` JSONB column. The DB column is `notNull().default([])`, so
+     *  empty array is the in-progress / no-grades-yet state. */
+    results: z.array(validatedQuestionResultSchema),
   });
 export type CompletedRoundDetailResponse = z.infer<
   typeof completedRoundDetailResponseSchema

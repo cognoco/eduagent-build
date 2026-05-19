@@ -7,7 +7,10 @@ const mockDatabaseModule = createDatabaseModuleMock({
   },
 });
 
-jest.mock('@eduagent/database', () => mockDatabaseModule.module);
+jest.mock(
+  '@eduagent/database' /* gc1-allow: service unit test — db boundary mocked; real DB covered by sibling .integration.test.ts where present */,
+  () => mockDatabaseModule.module,
+);
 
 import { createScopedRepository, type Database } from '@eduagent/database';
 import {
@@ -250,35 +253,73 @@ describe('getStreakDisplayInfo', () => {
 // DB-aware functions (require mock database)
 // ---------------------------------------------------------------------------
 
-function createMockStreakDb(): {
+/**
+ * Build a mock Database whose transaction(fn) passes a tx that supports the
+ * exact chain recordSessionActivity needs after the [BUG-103] fix:
+ *   tx.select().from().where().for('update').limit(1)        -> existingRows
+ *   tx.insert().values().onConflictDoNothing().returning()   -> insertedRows
+ *   tx.update().set().where()                                -> resolved
+ */
+function createMockStreakDb(opts?: {
+  existingRows?: unknown[];
+  insertedRows?: unknown[];
+}): {
   db: Database;
   insertValues: jest.Mock;
   updateSet: jest.Mock;
   updateWhere: jest.Mock;
+  transactionSpy: jest.Mock;
 } {
   const updateWhere = jest.fn().mockResolvedValue(undefined);
   const updateSet = jest.fn().mockReturnValue({ where: updateWhere });
+
+  const insertedRows = opts?.insertedRows ?? [
+    { currentStreak: 1, longestStreak: 1 },
+  ];
+  const onConflictDoNothing = jest.fn().mockReturnValue({
+    returning: jest.fn().mockResolvedValue(insertedRows),
+  });
   const insertValues = jest.fn().mockReturnValue({
-    returning: jest.fn().mockResolvedValue([]),
+    onConflictDoNothing,
+    returning: jest.fn().mockResolvedValue(insertedRows),
   });
 
-  const db = {
+  const existingRows = opts?.existingRows ?? [];
+  const selectLimit = jest.fn().mockResolvedValue(existingRows);
+  const selectFor = jest.fn().mockReturnValue({ limit: selectLimit });
+  const selectWhere = jest.fn().mockReturnValue({ for: selectFor });
+  const selectFrom = jest.fn().mockReturnValue({ where: selectWhere });
+  const select = jest.fn().mockReturnValue({ from: selectFrom });
+
+  const tx = {
+    select,
     insert: jest.fn().mockReturnValue({ values: insertValues }),
     update: jest.fn().mockReturnValue({ set: updateSet }),
+  };
+  const transactionSpy = jest
+    .fn()
+    .mockImplementation(async (fn: (tx: unknown) => unknown) => fn(tx));
+
+  const db = {
+    select,
+    insert: jest.fn().mockReturnValue({ values: insertValues }),
+    update: jest.fn().mockReturnValue({ set: updateSet }),
+    transaction: transactionSpy,
   } as unknown as Database;
 
-  return { db, insertValues, updateSet, updateWhere };
+  return { db, insertValues, updateSet, updateWhere, transactionSpy };
 }
 
 describe('recordSessionActivity', () => {
   it('creates a new streak row on first session (no existing streak)', async () => {
-    (createScopedRepository as jest.Mock).mockReturnValue({
-      streaks: { findFirst: jest.fn().mockResolvedValue(null) },
+    const { db, insertValues, transactionSpy } = createMockStreakDb({
+      existingRows: [],
+      insertedRows: [{ currentStreak: 1, longestStreak: 1 }],
     });
-    const { db, insertValues } = createMockStreakDb();
 
-    await recordSessionActivity(db, 'profile-1', '2026-02-10');
+    const result = await recordSessionActivity(db, 'profile-1', '2026-02-10');
 
+    expect(transactionSpy).toHaveBeenCalledTimes(1);
     expect(insertValues).toHaveBeenCalledWith(
       expect.objectContaining({
         profileId: 'profile-1',
@@ -286,24 +327,24 @@ describe('recordSessionActivity', () => {
         longestStreak: 1,
         lastActivityDate: '2026-02-10',
         gracePeriodStartDate: null,
-      })
+      }),
     );
+    expect(result).toEqual({ currentStreak: 1, longestStreak: 1 });
   });
 
   it('updates existing streak row on subsequent sessions', async () => {
-    (createScopedRepository as jest.Mock).mockReturnValue({
-      streaks: {
-        findFirst: jest.fn().mockResolvedValue({
+    const { db, updateSet } = createMockStreakDb({
+      existingRows: [
+        {
           id: 'streak-1',
           profileId: 'profile-1',
           currentStreak: 3,
           longestStreak: 5,
           lastActivityDate: '2026-02-09',
           gracePeriodStartDate: null,
-        }),
-      },
+        },
+      ],
     });
-    const { db, updateSet } = createMockStreakDb();
 
     await recordSessionActivity(db, 'profile-1', '2026-02-10');
 
@@ -312,39 +353,116 @@ describe('recordSessionActivity', () => {
         currentStreak: 4,
         longestStreak: 5,
         lastActivityDate: '2026-02-10',
-      })
+      }),
     );
   });
 
   it('does not call update when inserting a new streak', async () => {
-    (createScopedRepository as jest.Mock).mockReturnValue({
-      streaks: { findFirst: jest.fn().mockResolvedValue(null) },
+    const { db } = createMockStreakDb({
+      existingRows: [],
+      insertedRows: [{ currentStreak: 1, longestStreak: 1 }],
     });
-    const { db } = createMockStreakDb();
 
     await recordSessionActivity(db, 'profile-1', '2026-02-10');
 
-    expect(db.update).not.toHaveBeenCalled();
+    expect(db.update as jest.Mock).not.toHaveBeenCalled();
   });
 
   it('does not call insert when updating an existing streak', async () => {
-    (createScopedRepository as jest.Mock).mockReturnValue({
-      streaks: {
-        findFirst: jest.fn().mockResolvedValue({
+    const { db } = createMockStreakDb({
+      existingRows: [
+        {
           id: 'streak-1',
           profileId: 'profile-1',
           currentStreak: 1,
           longestStreak: 1,
           lastActivityDate: '2026-02-09',
           gracePeriodStartDate: null,
-        }),
-      },
+        },
+      ],
     });
-    const { db } = createMockStreakDb();
 
     await recordSessionActivity(db, 'profile-1', '2026-02-10');
 
-    expect(db.insert).not.toHaveBeenCalled();
+    expect(db.insert as jest.Mock).not.toHaveBeenCalled();
+  });
+
+  // [BUG-103] BREAK TEST — the fix wraps read-modify-write in a transaction
+  // with SELECT ... FOR UPDATE. Without that wrapping, two concurrent calls
+  // would each call repo.streaks.findFirst() (no lock), both see the same
+  // baseline, both compute +1, and the second UPDATE would silently
+  // overwrite the first.
+  //
+  // We assert structurally that the fix is present: db.transaction is
+  // invoked once per call, and each invocation issues
+  // `select(...).from(...).where(...).for('update').limit(1)`.
+  it('[BREAK] [BUG-103] uses db.transaction with SELECT ... FOR UPDATE for read-modify-write', async () => {
+    const selectLimit = jest
+      .fn()
+      .mockResolvedValueOnce([
+        {
+          id: 'streak-1',
+          profileId: 'profile-1',
+          currentStreak: 3,
+          longestStreak: 5,
+          lastActivityDate: '2026-02-09',
+          gracePeriodStartDate: null,
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: 'streak-1',
+          profileId: 'profile-1',
+          currentStreak: 4,
+          longestStreak: 5,
+          lastActivityDate: '2026-02-10',
+          gracePeriodStartDate: null,
+        },
+      ]);
+    const selectFor = jest.fn().mockReturnValue({ limit: selectLimit });
+    const selectWhere = jest.fn().mockReturnValue({ for: selectFor });
+    const selectFrom = jest.fn().mockReturnValue({ where: selectWhere });
+    const select = jest.fn().mockReturnValue({ from: selectFrom });
+
+    const updateSet = jest.fn().mockReturnValue({
+      where: jest.fn().mockResolvedValue(undefined),
+    });
+    const update = jest.fn().mockReturnValue({ set: updateSet });
+
+    const tx = { select, insert: jest.fn(), update };
+    // Serialise transactions to simulate row-lock semantics
+    let inFlight: Promise<unknown> = Promise.resolve();
+    const db = {
+      select,
+      insert: jest.fn(),
+      update,
+      transaction: jest.fn().mockImplementation(async (fn: any) => {
+        const prev = inFlight;
+        let resolveNext!: () => void;
+        inFlight = new Promise<void>((r) => {
+          resolveNext = r;
+        });
+        await prev;
+        try {
+          return await fn(tx);
+        } finally {
+          resolveNext!();
+        }
+      }),
+    } as unknown as Database;
+
+    const [a, b] = await Promise.all([
+      recordSessionActivity(db, 'profile-1', '2026-02-10'),
+      recordSessionActivity(db, 'profile-1', '2026-02-10'),
+    ]);
+
+    expect(a.currentStreak).toBe(4);
+    expect(b.currentStreak).toBe(4);
+    expect(updateSet).toHaveBeenCalledTimes(2);
+    // Structural assertions — proves the fix shape is in place.
+    expect(db.transaction as jest.Mock).toHaveBeenCalledTimes(2);
+    expect(selectFor).toHaveBeenCalledTimes(2);
+    expect(selectLimit).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -461,18 +579,48 @@ describe('getStreakData', () => {
 });
 
 describe('getXpSummary', () => {
-  it('aggregates XP totals from ledger entries', async () => {
-    (createScopedRepository as jest.Mock).mockReturnValue({
-      xpLedger: {
-        findMany: jest.fn().mockResolvedValue([
-          { amount: 50, topicId: 'topic-1', status: 'verified' },
-          { amount: 30, topicId: 'topic-2', status: 'pending' },
-          { amount: 20, topicId: 'topic-1', status: 'decayed' },
-          { amount: 40, topicId: 'topic-3', status: 'verified' },
-        ]),
-      },
+  /**
+   * [BUG-249] Post-fix, getXpSummary aggregates in SQL via two selects:
+   *   1. select({status, sum, topics}).from(xpLedger).where(...).groupBy(status)
+   *   2. select({sum, topics}).from(xpLedger).where(...)             — total
+   *
+   * The mock returns the grouped rows on the first .where() (followed by
+   * .groupBy()) and the total row array on the second .where() (awaited
+   * directly).
+   */
+  function makeXpDb(
+    grouped: Array<{ status: string; sum: number; topics: number }>,
+    total: { sum: number; topics: number } | null,
+  ): Database {
+    let whereCall = 0;
+    const totalThenable = Promise.resolve(total ? [total] : []);
+    const where = jest.fn().mockImplementation(() => {
+      whereCall += 1;
+      if (whereCall === 1) {
+        return {
+          groupBy: jest.fn().mockResolvedValue(grouped),
+        };
+      }
+      return {
+        then: totalThenable.then.bind(totalThenable),
+        catch: totalThenable.catch.bind(totalThenable),
+        finally: totalThenable.finally.bind(totalThenable),
+      };
     });
-    const { db } = createMockStreakDb();
+    const from = jest.fn().mockReturnValue({ where });
+    const select = jest.fn().mockReturnValue({ from });
+    return { select } as unknown as Database;
+  }
+
+  it('aggregates XP totals from ledger entries (SQL-side aggregation)', async () => {
+    const db = makeXpDb(
+      [
+        { status: 'verified', sum: 90, topics: 2 },
+        { status: 'pending', sum: 30, topics: 1 },
+        { status: 'decayed', sum: 20, topics: 1 },
+      ],
+      { sum: 140, topics: 3 },
+    );
 
     const result = await getXpSummary(db, 'profile-1');
 
@@ -485,12 +633,7 @@ describe('getXpSummary', () => {
   });
 
   it('returns zero summary when no XP entries exist', async () => {
-    (createScopedRepository as jest.Mock).mockReturnValue({
-      xpLedger: {
-        findMany: jest.fn().mockResolvedValue([]),
-      },
-    });
-    const { db } = createMockStreakDb();
+    const db = makeXpDb([], null);
 
     const result = await getXpSummary(db, 'profile-1');
 
@@ -502,22 +645,50 @@ describe('getXpSummary', () => {
     expect(result.topicsVerified).toBe(0);
   });
 
-  it('counts unique topics correctly with duplicate entries', async () => {
-    (createScopedRepository as jest.Mock).mockReturnValue({
-      xpLedger: {
-        findMany: jest.fn().mockResolvedValue([
-          { amount: 50, topicId: 'topic-1', status: 'verified' },
-          { amount: 25, topicId: 'topic-1', status: 'verified' },
-          { amount: 30, topicId: 'topic-2', status: 'pending' },
-        ]),
-      },
-    });
-    const { db } = createMockStreakDb();
+  it('counts unique topics correctly via SQL COUNT(DISTINCT)', async () => {
+    const db = makeXpDb(
+      [
+        { status: 'verified', sum: 75, topics: 1 },
+        { status: 'pending', sum: 30, topics: 1 },
+      ],
+      { sum: 105, topics: 2 },
+    );
 
     const result = await getXpSummary(db, 'profile-1');
 
     expect(result.totalXp).toBe(105);
-    expect(result.topicsCompleted).toBe(2); // unique topics
-    expect(result.topicsVerified).toBe(1); // only topic-1 is verified
+    expect(result.topicsCompleted).toBe(2);
+    expect(result.topicsVerified).toBe(1);
+  });
+
+  // [BUG-249] BREAK TEST — pre-fix called `repo.xpLedger.findMany()` with no
+  // limit, then reduced in JS. For a profile with N topics this materialised
+  // N rows over the wire per /v1/me/streak request. The fix moves the
+  // aggregation server-side; this test asserts that getXpSummary never calls
+  // repo.xpLedger.findMany — any future regression that re-introduces the
+  // unbounded fetch fails CI.
+  it('[BREAK] [BUG-249] never calls repo.xpLedger.findMany() — aggregation must stay server-side', async () => {
+    const findManyMock = jest.fn().mockResolvedValue([
+      ...Array.from({ length: 1000 }, (_, i) => ({
+        amount: 10,
+        topicId: `topic-${i}`,
+        status: 'verified' as const,
+      })),
+    ]);
+    (createScopedRepository as jest.Mock).mockReturnValue({
+      xpLedger: { findMany: findManyMock },
+    });
+
+    const db = makeXpDb([{ status: 'verified', sum: 10000, topics: 1000 }], {
+      sum: 10000,
+      topics: 1000,
+    });
+
+    const result = await getXpSummary(db, 'profile-1');
+
+    expect(findManyMock).not.toHaveBeenCalled();
+    expect(result.totalXp).toBe(10000);
+    expect(result.topicsCompleted).toBe(1000);
+    expect(result.topicsVerified).toBe(1000);
   });
 });

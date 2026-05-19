@@ -1,13 +1,13 @@
 import { resolveCelebrationLevelForAccommodation } from './celebration-level';
 
 describe('resolveCelebrationLevelForAccommodation', () => {
-  it('forces celebrations on for none, audio-first, and missing accommodation', () => {
+  it('honors stored celebration level for none, audio-first, and missing accommodation', () => {
     expect(resolveCelebrationLevelForAccommodation(undefined, 'off')).toBe(
-      'all',
+      'off',
     );
-    expect(resolveCelebrationLevelForAccommodation('none', 'off')).toBe('all');
+    expect(resolveCelebrationLevelForAccommodation('none', 'off')).toBe('off');
     expect(resolveCelebrationLevelForAccommodation('audio-first', 'off')).toBe(
-      'all',
+      'off',
     );
   });
 

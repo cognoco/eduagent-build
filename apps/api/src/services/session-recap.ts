@@ -92,6 +92,7 @@ export function buildRecapPrompt(
     '- One sentence that mirrors what the learner specifically did in this session',
     '- Mention the concept or skill they worked through',
     '- Not a grade and not generic praise',
+    '- Stay evidence-bound: do not infer mastery, confidence, or "really understood" unless the transcript shows the learner demonstrating it',
     `- Tone: ${ageVoiceTier}`,
     '- Max 150 characters',
     '',
@@ -99,6 +100,7 @@ export function buildRecapPrompt(
     '- 2 to 4 items',
     '- Each item is a single sentence in second person',
     '- Each item names a specific concept, connection, or skill from the transcript',
+    '- Use practiced, noticed, connected, or asked about when evidence is partial; avoid mastered, nailed, aced, or fully understood',
     '- No markdown bullets in the JSON; return plain strings',
     `- Tone: ${ageVoiceTier}`,
     '- Max 200 characters per item',
@@ -120,9 +122,10 @@ export function buildRecapPrompt(
   basePrompt.push(
     '',
     `A likely next topic is <next_topic>${safeTitle}</next_topic>.`,
-    'If the connection is genuinely clear, set nextTopicReason to one sentence explaining why it follows from this session.',
+    'If the connection is genuinely clear, set nextTopicReason to one short sentence explaining why it follows from this session.',
     'If the connection is weak or unclear, set nextTopicReason to null.',
-    'Max 120 characters for nextTopicReason.',
+    'nextTopicReason must be 12 words or fewer and max 120 characters.',
+    'If your reason is longer, shorten it before returning JSON.',
   );
 
   return basePrompt.join('\n');
@@ -342,6 +345,13 @@ export async function generateLearnerRecap(
   // reason for UI rendering. No envelope signals (close, escalate, widgets) drive
   // any state machine here — session termination already happened. We therefore
   // validate against learnerRecapLlmOutputSchema directly instead of parseEnvelope.
+  //
+  // [BUG-123] Each failure branch below emits a structured
+  // `llm.envelope.parse_failed` log so this surface is queryable in
+  // production alongside the other LLM parse surfaces (see envelope.ts:242).
+  // Tag is `recap.learner` so dashboards can split failures per call site.
+  // Without the explicit emission these failures were silent — only
+  // observable as missing recap UI for the learner.
   const result = await routeAndCall(
     [
       {
@@ -364,10 +374,15 @@ export async function generateLearnerRecap(
 
   const jsonObject = extractFirstJsonObject(result.response);
   if (!jsonObject) {
-    logger.warn('Learner recap JSON extraction failed', {
+    // [BUG-123] Structured parse-failed metric so this surface joins the
+    // unified `llm.envelope.parse_failed` dashboard.
+    logger.warn('llm.envelope.parse_failed', {
+      surface: 'recap.learner',
+      reason: 'no_json_object_in_response',
       sessionId: input.sessionId,
       provider: result.provider,
       model: result.model,
+      rawSnippet: result.response.slice(0, 200),
     });
     return null;
   }
@@ -376,18 +391,24 @@ export async function generateLearnerRecap(
   try {
     parsed = JSON.parse(jsonObject);
   } catch (error) {
-    logger.warn('Learner recap JSON parse failed', {
+    logger.warn('llm.envelope.parse_failed', {
+      surface: 'recap.learner',
+      reason: 'json_parse_error',
       sessionId: input.sessionId,
       error: error instanceof Error ? error.message : String(error),
+      rawSnippet: jsonObject.slice(0, 200),
     });
     return null;
   }
 
   const validated = learnerRecapLlmOutputSchema.safeParse(parsed);
   if (!validated.success) {
-    logger.warn('Learner recap schema validation failed', {
+    logger.warn('llm.envelope.parse_failed', {
+      surface: 'recap.learner',
+      reason: 'schema_validation_failed',
       sessionId: input.sessionId,
       error: validated.error.message,
+      rawSnippet: jsonObject.slice(0, 200),
     });
     return null;
   }

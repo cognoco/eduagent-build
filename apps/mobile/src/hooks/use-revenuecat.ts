@@ -192,6 +192,7 @@ export function usePurchase(): UseMutationResult<
   Error,
   PurchasesPackage
 > {
+  const { userId } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -202,8 +203,12 @@ export function usePurchase(): UseMutationResult<
       return result;
     },
     onSuccess: () => {
+      // [BUG-167] Scope invalidation by Clerk userId so a purchase on this
+      // user cannot invalidate another user's cached entitlements on a
+      // shared device. The customerInfo key includes userId (see
+      // useCustomerInfo) so we mirror that scope here.
       void queryClient.invalidateQueries({
-        queryKey: ['revenuecat', 'customerInfo'],
+        queryKey: ['revenuecat', 'customerInfo', userId],
       });
     },
   });
@@ -226,6 +231,7 @@ export function useRestorePurchases(): UseMutationResult<
   Error,
   void
 > {
+  const { userId } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -234,8 +240,9 @@ export function useRestorePurchases(): UseMutationResult<
       return info;
     },
     onSuccess: () => {
+      // [BUG-167] Scope invalidation by Clerk userId — see usePurchase.
       void queryClient.invalidateQueries({
-        queryKey: ['revenuecat', 'customerInfo'],
+        queryKey: ['revenuecat', 'customerInfo', userId],
       });
     },
   });

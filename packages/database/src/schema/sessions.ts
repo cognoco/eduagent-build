@@ -11,7 +11,11 @@ import {
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
-import type { LlmSummary } from '@eduagent/schemas';
+import type {
+  LlmSummary,
+  OnboardingDraftExchangeHistory,
+  OnboardingDraftExtractedSignals,
+} from '@eduagent/schemas';
 import { profiles } from './profiles';
 import { subjects, curriculumTopics } from './subjects';
 import { generateUUIDv7 } from '../utils/uuid';
@@ -73,6 +77,12 @@ export const filingStatusEnum = pgEnum('filing_status', [
   'filing_recovered',
 ]);
 
+// [BUG-225 / P3] onboarding_drafts jsonb columns must be validated on read.
+// Consumers MUST pass the raw value through one of:
+//   • parseOnboardingDraftExchangeHistory(raw)
+//   • parseOnboardingDraftExtractedSignals(raw)
+// from @eduagent/schemas/db-jsonb before treating the value as the typed
+// shape. The $type<…> annotations below are TS hints only.
 export const onboardingDrafts = pgTable('onboarding_drafts', {
   id: uuid('id')
     .primaryKey()
@@ -83,8 +93,14 @@ export const onboardingDrafts = pgTable('onboarding_drafts', {
   subjectId: uuid('subject_id')
     .notNull()
     .references(() => subjects.id, { onDelete: 'cascade' }),
-  exchangeHistory: jsonb('exchange_history').notNull().default([]),
-  extractedSignals: jsonb('extracted_signals').notNull().default({}),
+  exchangeHistory: jsonb('exchange_history')
+    .notNull()
+    .default([])
+    .$type<OnboardingDraftExchangeHistory>(),
+  extractedSignals: jsonb('extracted_signals')
+    .notNull()
+    .default({})
+    .$type<OnboardingDraftExtractedSignals>(),
   status: draftStatusEnum('status').notNull().default('in_progress'),
   failureCode: text('failure_code'),
   expiresAt: timestamp('expires_at', { withTimezone: true }),
@@ -240,6 +256,13 @@ export const sessionSummaries = pgTable(
     // docs/specs/2026-05-05-tiered-conversation-retention.md
     // NOTE: `narrative` above remains the legacy parent-facing recap field.
     // `llmSummary` is a separate self-note used for transcript retention.
+    //
+    // [BUG-222 / P2-MED] The `$type<LlmSummary | null>()` cast is TS-only —
+    // a corrupted row would surface as a runtime crash several call sites
+    // later. Consumers MUST pass the raw value through
+    // `parseSessionSummaryLlmSummary(raw)` from `@eduagent/schemas/db-jsonb`
+    // before treating it as a typed LlmSummary; the parser returns null on
+    // schema failure so the read path can degrade gracefully.
     llmSummary: jsonb('llm_summary').$type<LlmSummary | null>(),
     summaryGeneratedAt: timestamp('summary_generated_at', {
       withTimezone: true,

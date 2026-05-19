@@ -305,6 +305,16 @@ beforeEach(() => {
   mockListEligibleSelfReportProfileIdsAtLocalHour9.mockResolvedValue([]);
 });
 
+// [BUG-260] The receiver function must cap parallelism. Without this,
+// the Monday-morning cron fan-out can stampede Neon and the
+// Resend/push providers when many parents qualify in the same UTC hour.
+describe('[BUG-260] weeklyProgressPushGenerate concurrency', () => {
+  it('declares a concurrency limit on the receiver', () => {
+    const opts = (weeklyProgressPushGenerate as any).opts;
+    expect(opts.concurrency).toEqual({ limit: 25 });
+  });
+});
+
 describe('weekly-progress-push isLocalHour9 (BUG-640 / J-4)', () => {
   // Helper: count how many of the 24 Monday-UTC hours match for a TZ.
   // Picks a Monday well clear of DST transitions: 2026-04-13 (Mon).

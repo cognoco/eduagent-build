@@ -61,17 +61,20 @@ jobs:
     timeout-minutes: 20
     env:
       CI: true
-      # Keep the fallback aligned with the committed staging worker mapping in
-      # docs/deployment-and-secrets.md; repos can override with E2E_API_URL.
-      # NOTE: switching E2E_API_URL from *.workers.dev to a custom domain
-      # (e.g. api-test.mentomate.com) will also change Playwright from 1 → 4
-      # workers via the usesSharedStagingApi check in playwright.config.ts.
+      # [BUG-239] Non-secret config still surfaced via env: so workflow logs
+      # can show what we're pointing at. The seed secret / Clerk secret are
+      # injected via Doppler at runtime (see "Run Playwright smoke suite"
+      # below) instead of being read straight from GitHub Actions secrets —
+      # the local-vs-CI parity rule in memory project_playwright_e2e_setup.md
+      # is "always run with doppler -c stg so TEST_SEED_SECRET matches the
+      # .dev.vars the wrangler dev server reads". If CI bypasses Doppler and
+      # GitHub's repo-level TEST_SEED_SECRET drifts from Doppler stg, every
+      # seed call returns 403 with no signal that the source of truth split.
+      # Sourcing from Doppler stg in CI keeps the secret single-sourced.
       EXPO_PUBLIC_API_URL: ${{ vars.E2E_API_URL || 'https://api-stg.mentomate.com' }}
       EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY_PREVIEW }}
       PLAYWRIGHT_API_URL: ${{ vars.E2E_API_URL || 'https://api-stg.mentomate.com' }}
       PLAYWRIGHT_SKIP_LOCAL_API: '1'
-      PLAYWRIGHT_TEST_SEED_SECRET: ${{ secrets.TEST_SEED_SECRET }}
-      CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
     steps:
       - uses: actions/checkout@v4
 
@@ -93,8 +96,29 @@ jobs:
       - name: Install Playwright browser
         run: pnpm exec playwright install --with-deps chromium
 
-      - name: Run Playwright smoke suite
-        run: pnpm run test:e2e:web:smoke
+      # [BUG-239] Install Doppler CLI so the smoke run reads its secrets from
+      # Doppler stg (the single source of truth) instead of GitHub Actions
+      # repo-level secrets, which silently drift. DOPPLER_TOKEN_STG must be
+      # a Doppler service-account token scoped to the mentomate project's
+      # stg config (read-only is sufficient).
+      - name: Install Doppler CLI
+        run: |
+          curl -Ls --tlsv1.2 --proto "=https" --retry 3 https://cli.doppler.com/install.sh | sudo sh
+          doppler --version
+
+      - name: Run Playwright smoke suite (via doppler run -c stg)
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_STG }}
+        run: |
+          if [ -z "${DOPPLER_TOKEN:-}" ]; then
+            echo "::error title=Doppler token missing::DOPPLER_TOKEN_STG is not set as a GitHub Actions secret. Playwright cannot be run with doppler -c stg, so TEST_SEED_SECRET may drift from .dev.vars and every /__test/seed call will 403. See memory project_playwright_e2e_setup.md."
+            exit 1
+          fi
+          # Map Doppler's stg secrets to the env names Playwright expects.
+          doppler run -p mentomate -c stg --command "\
+            export PLAYWRIGHT_TEST_SEED_SECRET=\"\$TEST_SEED_SECRET\"; \
+            export CLERK_SECRET_KEY=\"\$CLERK_SECRET_KEY\"; \
+            pnpm run test:e2e:web:smoke"
 
       # [BUG-979 / CCR-PR123-M-3] Reset seeded staging accounts independently
       # of Playwright's globalTeardown. Reason: this workflow uses

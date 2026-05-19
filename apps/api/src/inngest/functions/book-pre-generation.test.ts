@@ -146,8 +146,10 @@ describe('bookPreGeneration', () => {
     delete process.env['DATABASE_URL'];
   });
 
-  it('should be defined as an Inngest function', () => {
-    expect(bookPreGeneration).toBeTruthy();
+  it('should be defined as an Inngest function with the expected id', () => {
+    expect((bookPreGeneration as { opts?: { id?: string } }).opts?.id).toBe(
+      'book-pre-generation',
+    );
   });
 
   it('should have the correct function id', () => {

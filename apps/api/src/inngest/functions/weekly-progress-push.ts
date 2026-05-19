@@ -398,6 +398,12 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
   {
     id: 'progress-weekly-parent-push-generate',
     name: 'Send one weekly parent progress summary',
+    // [BUG-260] Bound parallelism on the fan-out receiver. The cron fans out
+    // up to all eligible parents on Monday at their local 09:00; without a
+    // concurrency cap the receivers stampede Neon and the Resend / push
+    // providers simultaneously. limit=25 mirrors the cadence already used for
+    // weekly-self-report fan-out and keeps DB + provider pressure bounded.
+    concurrency: { limit: 25 },
   },
   { event: 'app/weekly-progress-push.generate' },
   async ({ event, step }) => {

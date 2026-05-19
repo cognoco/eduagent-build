@@ -22,7 +22,7 @@ describe('TopicSessionRow', () => {
         onPress={onPress}
       />,
     );
-    expect(screen.getByTestId('session-row-abc-123')).toBeTruthy();
+    expect(screen.getByTestId('session-row-abc-123'));
   });
 
   it('renders date', () => {

@@ -23,6 +23,7 @@ import {
   LlmStreamError,
   LlmEnvelopeError,
   PersistCurriculumError,
+  apiErrorSchema,
   classifyOrphanError,
 } from './errors.js';
 import type { QuotaExceededDetails } from './errors.js';
@@ -175,6 +176,83 @@ describe('typed error classes [BUG-644]', () => {
   // directly in the schemas package (would invert the dep graph), but we
   // can verify the class identity via the constructor `name` and prove a
   // round-trip throw/catch over a Promise still satisfies instanceof.
+  describe('apiErrorSchema.details [BUG-210] — typed detail union', () => {
+    it('accepts QUOTA_EXCEEDED with the canonical details payload', () => {
+      const result = apiErrorSchema.safeParse({
+        code: 'QUOTA_EXCEEDED',
+        message: 'Quota exceeded',
+        details: QUOTA_DETAILS,
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('accepts VALIDATION_ERROR with a Zod-shaped issues array', () => {
+      const result = apiErrorSchema.safeParse({
+        code: 'VALIDATION_ERROR',
+        message: 'Validation failed',
+        details: {
+          issues: [
+            { path: ['body', 'email'], message: 'Invalid email' },
+            { path: ['body', 'age'], message: 'Too small', code: 'too_small' },
+          ],
+        },
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('accepts RATE_LIMITED with retryAfter', () => {
+      const result = apiErrorSchema.safeParse({
+        code: 'RATE_LIMITED',
+        message: 'Slow down',
+        details: { retryAfter: 30 },
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('accepts GONE / SESSION_ARCHIVED with an id pointer', () => {
+      const result = apiErrorSchema.safeParse({
+        code: 'SESSION_ARCHIVED',
+        message: 'Session was deleted',
+        details: { id: 'sess_123' },
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('accepts errors with no details (omitted)', () => {
+      const result = apiErrorSchema.safeParse({
+        code: 'NOT_FOUND',
+        message: 'Resource not found',
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('REJECTS a primitive details payload (must be an object)', () => {
+      const result = apiErrorSchema.safeParse({
+        code: 'INTERNAL_ERROR',
+        message: 'Boom',
+        details: 'just a string',
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('REJECTS an unknown top-level error code', () => {
+      const result = apiErrorSchema.safeParse({
+        code: 'TOTALLY_INVENTED_CODE',
+        message: 'Nope',
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('accepts an unknown-code-shape details (record fallback)', () => {
+      const result = apiErrorSchema.safeParse({
+        code: 'INTERNAL_ERROR',
+        message: 'Boom',
+        details: { traceId: 'abc', component: 'session' },
+      });
+      expect(result.success).toBe(true);
+    });
+  });
+
   it('instanceof survives a Promise.reject / catch round-trip', async () => {
     await expect(
       Promise.reject(new ForbiddenError('nope')),

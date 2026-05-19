@@ -1351,8 +1351,8 @@ describe('CreateSubjectScreen', () => {
     );
 
     // Primary button says "Start", secondary says "Change"
-    expect(screen.getByText('Start')).toBeTruthy();
-    expect(screen.getByText('Change')).toBeTruthy();
+    expect(screen.getByText('Start'));
+    expect(screen.getByText('Change'));
 
     // Heavier card must NOT be visible
     expect(screen.queryByTestId('subject-single-suggestion-card')).toBeNull();
@@ -1378,8 +1378,8 @@ describe('CreateSubjectScreen', () => {
     expect(screen.getByTestId('subject-confident-message').props.children).toBe(
       "We'll start with Calculus.",
     );
-    expect(screen.getByText('Start')).toBeTruthy();
-    expect(screen.getByText('Change')).toBeTruthy();
+    expect(screen.getByText('Start'));
+    expect(screen.getByText('Change'));
 
     // Heavier card must NOT be visible
     expect(screen.queryByTestId('subject-single-suggestion-card')).toBeNull();
@@ -1471,8 +1471,8 @@ describe('CreateSubjectScreen', () => {
 
     // Heavier card with Accept/Edit — not the confident card
     expect(screen.queryByTestId('subject-confident-card')).toBeNull();
-    expect(screen.getByTestId('subject-suggestion-accept')).toBeTruthy();
-    expect(screen.getByText('Accept')).toBeTruthy();
+    expect(screen.getByTestId('subject-suggestion-accept'));
+    expect(screen.getByText('Accept'));
   });
 });
 

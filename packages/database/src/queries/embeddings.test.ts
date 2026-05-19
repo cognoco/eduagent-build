@@ -54,49 +54,57 @@ describe('findSimilarTopics', () => {
     expect(flatValues).toContain(TEST_PROFILE_ID);
   });
 
-  it('produces a different query with vs without profileId', async () => {
-    const mockWith = createMockDb();
-    mockWith.execute.mockResolvedValueOnce({ rows: [] });
-    await findSimilarTopics(mockWith.db, TEST_EMBEDDING, 5, TEST_PROFILE_ID);
-
-    const mockWithout = createMockDb();
-    mockWithout.execute.mockResolvedValueOnce({ rows: [] });
-    await findSimilarTopics(mockWithout.db, TEST_EMBEDDING, 5);
-
-    const queryWith = JSON.stringify(mockWith.execute.mock.calls[0][0]);
-    const queryWithout = JSON.stringify(mockWithout.execute.mock.calls[0][0]);
-    expect(queryWith).not.toEqual(queryWithout);
-  });
-
-  it('executes cosine distance query without profileId filter', async () => {
-    const mockRows = [
-      { id: 'id-2', topicId: null, content: 'geometry intro', distance: 0.25 },
-    ];
-    const { db, execute } = createMockDb();
-    execute.mockResolvedValueOnce({ rows: mockRows });
-
-    const result = await findSimilarTopics(db, TEST_EMBEDDING, 3);
-
-    expect(execute).toHaveBeenCalledTimes(1);
-    expect(result).toEqual(mockRows);
-  });
-
   it('returns empty array when no matches found', async () => {
     const { db, execute } = createMockDb();
     execute.mockResolvedValueOnce({ rows: [] });
 
-    const result = await findSimilarTopics(db, TEST_EMBEDDING);
+    const result = await findSimilarTopics(
+      db,
+      TEST_EMBEDDING,
+      5,
+      TEST_PROFILE_ID,
+    );
 
     expect(result).toEqual([]);
   });
 
-  it('defaults limit to 5', async () => {
+  // ---------------------------------------------------------------------------
+  // [BUG-221 / P1-HIGH] profileId is required — break tests
+  //
+  // The signature change (profileId moved from optional to required) is the
+  // primary defence. The runtime guard below catches callers that bypass the
+  // type system (raw JS in tests, casts, dynamic invocations) by passing an
+  // empty string. Without the guard, `WHERE profile_id = ''` would return no
+  // rows and the bug would surface as "search broken" instead of "search
+  // unscoped".
+  // ---------------------------------------------------------------------------
+
+  it('throws when profileId is an empty string (defence-in-depth runtime guard)', async () => {
+    const { db } = createMockDb();
+    await expect(findSimilarTopics(db, TEST_EMBEDDING, 5, '')).rejects.toThrow(
+      /profileId is required/,
+    );
+  });
+
+  it('throws when profileId is a whitespace-only string', async () => {
+    const { db } = createMockDb();
+    await expect(
+      findSimilarTopics(db, TEST_EMBEDDING, 5, '   '),
+    ).rejects.toThrow(/profileId is required/);
+  });
+
+  it('always includes profile_id = $profileId in the issued SQL', async () => {
     const { db, execute } = createMockDb();
     execute.mockResolvedValueOnce({ rows: [] });
 
-    await findSimilarTopics(db, TEST_EMBEDDING);
+    await findSimilarTopics(db, TEST_EMBEDDING, 5, TEST_PROFILE_ID);
 
-    expect(execute).toHaveBeenCalledTimes(1);
+    const sqlArg = execute.mock.calls[0][0];
+    // The drizzle SQL object should contain the literal "profile_id" string
+    // in one of its query chunks. Serialise and grep.
+    const serialised = JSON.stringify(sqlArg);
+    expect(serialised).toMatch(/profile_id/);
+    expect(serialised).toContain(TEST_PROFILE_ID);
   });
 });
 

@@ -14,7 +14,17 @@ import {
   topicNotes,
   type Database,
 } from '@eduagent/database';
-import { createNote, createNoteForSession, listAllNotes } from './notes';
+import {
+  createNote,
+  createNoteForSession,
+  deleteNoteById,
+  getNote,
+  getNotesForBook,
+  getNotesForTopic,
+  getTopicIdsWithNotes,
+  listAllNotes,
+  updateNote,
+} from './notes';
 
 loadDatabaseEnv(resolve(__dirname, '../../../..'));
 
@@ -258,5 +268,328 @@ describeIfDb('listAllNotes (integration)', () => {
       ]),
     );
     expect(result.notes).toHaveLength(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Cross-topic archive order — notes are globally ordered, not per-topic
+// ---------------------------------------------------------------------------
+
+describeIfDb('listAllNotes — cross-topic archive order (integration)', () => {
+  beforeAll(async () => {
+    db = createDatabase(process.env.DATABASE_URL!);
+  });
+
+  afterAll(async () => {
+    await db
+      .delete(accounts)
+      .where(like(accounts.clerkUserId, `clerk_allnotes_${RUN_ID}%`));
+  });
+
+  it('orders notes globally by descending id, not per-topic', async () => {
+    const { profileId } = await seedProfile();
+    const topicA = await seedTopic(profileId, 'Physics', 'Gravity');
+    const topicB = await seedTopic(profileId, 'Chemistry', 'Acids');
+
+    // Insert into topicA first, then topicB — UUIDv7 ensures topicB notes
+    // have higher ids and therefore appear first when sorted desc.
+    await createNote(
+      db,
+      profileId,
+      topicA.subjectId,
+      topicA.topicId,
+      'Physics note — created first',
+    );
+    await createNote(
+      db,
+      profileId,
+      topicB.subjectId,
+      topicB.topicId,
+      'Chemistry note — created second',
+    );
+
+    const result = await listAllNotes(db, profileId);
+    expect(result.notes).toHaveLength(2);
+    // Newest first (global order), not grouped per topic
+    expect(result.notes[0]!.subjectName).toBe('Chemistry');
+    expect(result.notes[1]!.subjectName).toBe('Physics');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Orphaned session references — handler must not crash on null sessionId rows
+// ---------------------------------------------------------------------------
+
+describeIfDb('listAllNotes — orphaned session references (integration)', () => {
+  beforeAll(async () => {
+    db = createDatabase(process.env.DATABASE_URL!);
+  });
+
+  afterAll(async () => {
+    await db
+      .delete(accounts)
+      .where(like(accounts.clerkUserId, `clerk_allnotes_${RUN_ID}%`));
+  });
+
+  it('returns notes with null sessionId without crashing', async () => {
+    const { profileId } = await seedProfile();
+    const { topicId } = await seedTopic(profileId, 'Biology', 'Cell Division');
+
+    // Insert a note with no sessionId directly (bypasses session validation).
+    await db.insert(topicNotes).values({
+      profileId,
+      topicId,
+      sessionId: null,
+      content: 'No session attached.',
+    });
+
+    const result = await listAllNotes(db, profileId);
+    const note = result.notes.find((n) => n.content === 'No session attached.');
+    expect(note).toBeDefined();
+    expect(note!.sessionId).toBeNull();
+  });
+
+  it('getTopicIdsWithNotes returns topicId even when sessionId is null', async () => {
+    const { profileId } = await seedProfile();
+    const { topicId } = await seedTopic(profileId, 'History', 'Ancient Egypt');
+
+    await db.insert(topicNotes).values({
+      profileId,
+      topicId,
+      sessionId: null,
+      content: 'Session-less note.',
+    });
+
+    const ids = await getTopicIdsWithNotes(db, profileId);
+    expect(ids).toContain(topicId);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Pagination stability — cursors must not skip or duplicate items
+// ---------------------------------------------------------------------------
+
+describeIfDb('listAllNotes — pagination stability (integration)', () => {
+  beforeAll(async () => {
+    db = createDatabase(process.env.DATABASE_URL!);
+  });
+
+  afterAll(async () => {
+    await db
+      .delete(accounts)
+      .where(like(accounts.clerkUserId, `clerk_allnotes_${RUN_ID}%`));
+  });
+
+  it('cursor pagination yields no duplicates and no skips across all pages', async () => {
+    const { profileId } = await seedProfile();
+    const { topicId } = await seedTopic(profileId, 'Mathematics', 'Algebra');
+
+    const TOTAL = 7;
+    for (let i = 0; i < TOTAL; i++) {
+      await db.insert(topicNotes).values({
+        profileId,
+        topicId,
+        content: `Note ${i}`,
+      });
+    }
+
+    const collected: string[] = [];
+    let cursor: string | null = null;
+
+    do {
+      const page = await listAllNotes(db, profileId, {
+        limit: 3,
+        cursor: cursor ?? undefined,
+      });
+      for (const note of page.notes) {
+        expect(collected).not.toContain(note.id); // no duplicates
+        collected.push(note.id);
+      }
+      cursor = page.nextCursor;
+    } while (cursor !== null);
+
+    expect(collected).toHaveLength(TOTAL);
+  });
+
+  it('stale cursor from a deleted item does not crash — returns remaining items', async () => {
+    const { profileId } = await seedProfile();
+    const { subjectId, topicId } = await seedTopic(
+      profileId,
+      'Geography',
+      'Continents',
+    );
+
+    // Create 3 notes; UUIDv7 ensures the last insert has highest id.
+    await createNote(db, profileId, subjectId, topicId, 'Continent 1');
+    await createNote(db, profileId, subjectId, topicId, 'Continent 2');
+    await createNote(db, profileId, subjectId, topicId, 'Continent 3');
+
+    // Get first page (newest note).
+    const page1 = await listAllNotes(db, profileId, { limit: 1 });
+    expect(page1.nextCursor).not.toBeNull();
+
+    // Delete the note at the cursor boundary between pages.
+    await deleteNoteById(db, profileId, page1.notes[0]!.id);
+
+    // Using the saved cursor after the deletion must not throw.
+    const page2 = await listAllNotes(db, profileId, {
+      limit: 2,
+      cursor: page1.nextCursor!,
+    });
+    // We still get the remaining items older than the deleted cursor note.
+    expect(Array.isArray(page2.notes)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Profile isolation — all CRUD functions enforce profileId
+// ---------------------------------------------------------------------------
+
+describeIfDb('notes profile isolation (integration)', () => {
+  let ownerProfileId: string;
+  let otherProfileId: string;
+
+  beforeAll(async () => {
+    db = createDatabase(process.env.DATABASE_URL!);
+    const owner = await seedProfile();
+    const other = await seedProfile();
+    ownerProfileId = owner.profileId;
+    otherProfileId = other.profileId;
+  });
+
+  afterAll(async () => {
+    await db
+      .delete(accounts)
+      .where(like(accounts.clerkUserId, `clerk_allnotes_${RUN_ID}%`));
+  });
+
+  it('getNote — rejects cross-profile access (NotFoundError)', async () => {
+    const { subjectId, topicId } = await seedTopic(
+      ownerProfileId,
+      'Art',
+      'Impressionism',
+    );
+    // verifyTopicOwnership checks subjects.profileId — other profile must be rejected.
+    await expect(
+      getNote(db, otherProfileId, subjectId, topicId),
+    ).rejects.toThrow('Topic not found');
+  });
+
+  it('getNotesForBook — rejects cross-profile subject access', async () => {
+    const { subjectId, topicId } = await seedTopic(
+      ownerProfileId,
+      'Chemistry P2',
+      'Organic',
+    );
+    // Scoped repo will not find subject for otherProfile.
+    await expect(
+      getNotesForBook(db, otherProfileId, subjectId, topicId),
+    ).rejects.toThrow('Subject not found');
+  });
+
+  it('getNotesForTopic — rejects cross-profile topic access', async () => {
+    const { subjectId, topicId } = await seedTopic(
+      ownerProfileId,
+      'Physics P2',
+      'Optics',
+    );
+    await expect(
+      getNotesForTopic(db, otherProfileId, subjectId, topicId),
+    ).rejects.toThrow('Topic not found');
+  });
+
+  it('updateNote — rejects cross-profile update with NotFoundError', async () => {
+    const { subjectId, topicId } = await seedTopic(
+      ownerProfileId,
+      'History P2',
+      'French Revolution',
+    );
+    const note = await createNote(
+      db,
+      ownerProfileId,
+      subjectId,
+      topicId,
+      'Original content',
+    );
+
+    // BUG-CANDIDATE-CRITICAL: if updateNote omits profileId scope, any profile
+    // could overwrite this note. Break test: must throw.
+    await expect(
+      updateNote(db, otherProfileId, note.id, 'Hijacked content'),
+    ).rejects.toThrow('Note not found');
+  });
+
+  it('deleteNoteById — cross-profile delete returns false (note survives)', async () => {
+    const { subjectId, topicId } = await seedTopic(
+      ownerProfileId,
+      'Music',
+      'Harmony',
+    );
+    const note = await createNote(
+      db,
+      ownerProfileId,
+      subjectId,
+      topicId,
+      'Original note',
+    );
+
+    // BUG-CANDIDATE-CRITICAL: if deleteNoteById omits profileId scope, any
+    // profile could delete notes they do not own.
+    const deleted = await deleteNoteById(db, otherProfileId, note.id);
+    expect(deleted).toBe(false);
+
+    // The note must still exist for the owner.
+    const ownerNote = await getNote(db, ownerProfileId, subjectId, topicId);
+    expect(ownerNote).not.toBeNull();
+  });
+
+  it('createNote — cannot create note on another profile topic', async () => {
+    const { subjectId, topicId } = await seedTopic(
+      ownerProfileId,
+      'Literature',
+      'Romanticism',
+    );
+
+    // verifyTopicOwnership must reject this: otherProfile does not own this subject.
+    await expect(
+      createNote(db, otherProfileId, subjectId, topicId, 'Injected note'),
+    ).rejects.toThrow('Topic not found');
+  });
+
+  it('listAllNotes — never leaks notes from another profile', async () => {
+    const { topicId: ownerTopicId } = await seedTopic(
+      ownerProfileId,
+      'Biology P3',
+      'Genetics',
+    );
+    const { topicId: otherTopicId } = await seedTopic(
+      otherProfileId,
+      'Physics P3',
+      'Thermodynamics',
+    );
+
+    await db.insert(topicNotes).values([
+      {
+        profileId: ownerProfileId,
+        topicId: ownerTopicId,
+        content: 'Owner note — must be private',
+      },
+      {
+        profileId: otherProfileId,
+        topicId: otherTopicId,
+        content: 'Other profile note — must be private',
+      },
+    ]);
+
+    const ownerResult = await listAllNotes(db, ownerProfileId);
+    const otherResult = await listAllNotes(db, otherProfileId);
+
+    const ownerContents = ownerResult.notes.map((n) => n.content);
+    const otherContents = otherResult.notes.map((n) => n.content);
+
+    expect(ownerContents).toContain('Owner note — must be private');
+    expect(ownerContents).not.toContain('Other profile note — must be private');
+    expect(otherContents).toContain('Other profile note — must be private');
+    expect(otherContents).not.toContain('Owner note — must be private');
   });
 });

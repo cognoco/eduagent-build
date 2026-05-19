@@ -20,7 +20,16 @@ module.exports = {
     // Strip .js extensions from relative imports (nodenext source uses .js)
     '^(\\.{1,2}/.*)\\.[jt]s$': '$1',
   },
-  modulePathIgnorePatterns: ['\\.claude/worktrees'],
+  // Prevent haste-map from scanning git worktrees at .worktrees/ (monorepo root).
+  // '<rootDir>/.worktrees/' is the primary guard; the cross-platform pattern
+  // '[/\\]\\.worktrees' also handles paths where <rootDir> expansion uses
+  // backslashes on Windows. Both are kept for belt-and-suspenders coverage.
+  modulePathIgnorePatterns: [
+    '<rootDir>/.worktrees/',
+    '[/\\\\]\\.worktrees',
+    '\\.claude/worktrees',
+  ],
+  testPathIgnorePatterns: ['<rootDir>/.worktrees/'],
   moduleFileExtensions: ['ts', 'js'],
   testMatch: ['<rootDir>/packages/test-utils/src/**/*.test.ts'],
   coverageDirectory: '<rootDir>/coverage/packages/test-utils',

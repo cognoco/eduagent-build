@@ -529,7 +529,7 @@ describe('PickBookScreen', () => {
       await waitFor(() => {
         getByTestId('pick-book-suggestion-section-related');
       });
-      expect(getByTestId('pick-book-suggestion-section-explore')).toBeTruthy();
+      expect(getByTestId('pick-book-suggestion-section-explore'));
       expect(queryByTestId('pick-book-suggestion-grid-flat')).toBeNull();
     });
 
@@ -565,7 +565,7 @@ describe('PickBookScreen', () => {
       await waitFor(() => {
         getByTestId('pick-book-suggestion-section-explore');
       });
-      expect(getByTestId('pick-book-suggestion-section-legacy')).toBeTruthy();
+      expect(getByTestId('pick-book-suggestion-section-legacy'));
       expect(queryByTestId('pick-book-suggestion-section-related')).toBeNull();
     });
 

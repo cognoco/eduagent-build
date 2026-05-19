@@ -142,6 +142,17 @@ export default function ProfilesScreen() {
   }, [subscription, familyData, router, profiles.length, t]);
 
   // UX-DE-L13: timeout on profile switch
+  //
+  // [BUG-133] The client-side `profiles[]` array used by this screen (and by
+  // handleProfileTap below) is a UX hint only. The authoritative ownership
+  // check lives server-side in `POST /v1/profiles/switch` (see
+  // `lib/profile.ts#switchProfile`), which rejects any profileId not linked
+  // to the signed-in account. If a tampered client passed an unrelated
+  // profileId here, switchProfile would return `{success:false}` and the
+  // alert path below would surface the typed server error. We therefore do
+  // NOT add a redundant client-side ownership guard — doing so would be
+  // false reassurance about security and would mask a real server-side
+  // regression behind a green client check.
   const handleSwitch = async (profileId: string) => {
     if (isSwitching) return;
     setIsSwitching(true);
@@ -302,15 +313,25 @@ export default function ProfilesScreen() {
             );
           })}
 
-          <Pressable
-            onPress={handleAddProfile}
-            className="flex-row items-center justify-center bg-surface rounded-card px-4 py-3.5 mt-4"
-            testID="profiles-add-button"
-          >
-            <Text className="text-body font-semibold text-primary">
-              + Add profile
-            </Text>
-          </Pressable>
+          {/*
+            [BUG-127] isOwner client-side gate. Per CLAUDE.md Profile Shapes,
+            "Add child" must only be visible to account owners (guardian or
+            solo) — children acting on a parent's account must never see the
+            add-profile affordance. Server-side enforcement remains the
+            source of truth, but the button must not even render for
+            non-owners.
+          */}
+          {activeProfile?.isOwner && (
+            <Pressable
+              onPress={handleAddProfile}
+              className="flex-row items-center justify-center bg-surface rounded-card px-4 py-3.5 mt-4"
+              testID="profiles-add-button"
+            >
+              <Text className="text-body font-semibold text-primary">
+                + Add profile
+              </Text>
+            </Pressable>
+          )}
         </ScrollView>
       )}
       <Modal

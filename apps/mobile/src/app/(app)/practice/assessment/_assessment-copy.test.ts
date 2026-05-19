@@ -4,7 +4,7 @@ import {
   buildAssessmentNextActionPrompt,
   buildAssessmentOpeningMessage,
   ensureAssessmentFeedbackHasPrompt,
-} from './assessment-copy';
+} from './_assessment-copy';
 import en from '../../../../i18n/locales/en.json';
 import type { Translate } from '../../../../i18n';
 

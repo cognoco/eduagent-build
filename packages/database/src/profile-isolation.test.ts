@@ -18,6 +18,9 @@ import {
   sessionSummaries,
   bookmarks,
   notificationPreferences,
+  progressSummaries,
+  milestones,
+  pendingNotices,
 } from './schema/index.js';
 import type { Database } from './client.js';
 
@@ -143,7 +146,30 @@ describe('Profile Isolation (R-005)', () => {
         table: notificationPreferences,
         hasFindMany: true,
       },
+      // [BUG-219] new scoped helpers — included so the isolation matrix
+      // continues to enforce profile-scoping on every namespace exposed by
+      // the repository.
+      {
+        name: 'progressSummaries',
+        table: progressSummaries,
+        hasFindMany: true,
+      },
+      { name: 'milestones', table: milestones, hasFindMany: true },
     ];
+
+    // [BUG-224] pendingNotices is keyed on ownerProfileId, not profileId, so
+    // it gets its own assertion — the parametric matrix above would assert
+    // against `table.profileId` which does not exist on pendingNotices.
+    it('pendingNotices.findMany scopes to ownerProfileId', async () => {
+      const { db, findMany } = createTrackingMockDb();
+      const repo = createScopedRepository(db, CHILD_PROFILE_ID);
+
+      await repo.pendingNotices.findMany();
+
+      expect(findMany).toHaveBeenCalledWith({
+        where: eq(pendingNotices.ownerProfileId, CHILD_PROFILE_ID),
+      });
+    });
 
     it.each(domains)(
       '$name.findFirst scopes to child profile only',

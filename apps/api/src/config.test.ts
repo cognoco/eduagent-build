@@ -62,8 +62,26 @@ describe('validateProductionKeys', () => {
         CLERK_SECRET_KEY: 'sk_test_xxx',
         CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
         CLERK_AUDIENCE: 'eduagent-api-staging',
+        // [BUG-242] Inngest signing + event keys are required in staging too
+        // — wrong-env keys would either accept unsigned webhook POSTs or
+        // silently drop outbound dispatches.
+        INNGEST_SIGNING_KEY: 'signkey_stg_xxx',
+        INNGEST_EVENT_KEY: 'evtkey_stg_xxx',
       }),
     ).toEqual([]);
+  });
+
+  // [BUG-242] Staging must require Inngest signing + event keys (per-env).
+  it('returns missing Inngest keys for staging when absent', () => {
+    const missing = validateProductionKeys({
+      ...BASE_ENV,
+      ENVIRONMENT: 'staging',
+      CLERK_SECRET_KEY: 'sk_test_xxx',
+      CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
+      CLERK_AUDIENCE: 'eduagent-api-staging',
+    });
+    expect(missing).toContain('INNGEST_SIGNING_KEY');
+    expect(missing).toContain('INNGEST_EVENT_KEY');
   });
 
   it('returns missing keys for production with no secrets', () => {
@@ -75,6 +93,9 @@ describe('validateProductionKeys', () => {
     expect(missing).toContain('CLERK_SECRET_KEY');
     expect(missing).toContain('CLERK_JWKS_URL');
     expect(missing).toContain('CLERK_AUDIENCE');
+    // [BUG-242] Inngest keys must be enforced in production too.
+    expect(missing).toContain('INNGEST_SIGNING_KEY');
+    expect(missing).toContain('INNGEST_EVENT_KEY');
     expect(missing).toContain('GEMINI_API_KEY');
     expect(missing).toContain('VOYAGE_API_KEY');
     expect(missing).toContain('RESEND_API_KEY');
@@ -87,7 +108,8 @@ describe('validateProductionKeys', () => {
     // OPENAI_API_KEY is optional — alternative to GEMINI_API_KEY
     expect(missing).not.toContain('OPENAI_API_KEY');
     expect(missing).toContain('REVENUECAT_WEBHOOK_SECRET');
-    expect(missing).toHaveLength(8);
+    // 8 originals + 2 new Inngest keys = 10
+    expect(missing).toHaveLength(10);
   });
 
   it('returns empty array for production with all required secrets present', () => {
@@ -97,6 +119,9 @@ describe('validateProductionKeys', () => {
       CLERK_SECRET_KEY: 'sk_live_xxx',
       CLERK_JWKS_URL: 'https://clerk.example.com/.well-known/jwks.json',
       CLERK_AUDIENCE: 'eduagent-api',
+      // [BUG-242] Inngest keys part of the required set.
+      INNGEST_SIGNING_KEY: 'signkey_prd_xxx',
+      INNGEST_EVENT_KEY: 'evtkey_prd_xxx',
       GEMINI_API_KEY: 'gemini-key',
       VOYAGE_API_KEY: 'voyage-key',
       RESEND_API_KEY: 're_xxx',
@@ -130,13 +155,18 @@ describe('validateProductionKeys', () => {
       CLERK_SECRET_KEY: 'sk_live_xxx',
       CLERK_JWKS_URL: 'https://clerk.example.com/.well-known/jwks.json',
       CLERK_AUDIENCE: 'eduagent-api',
-      // Missing: VOYAGE_API_KEY, RESEND_API_KEY
+      // Missing: INNGEST keys, VOYAGE_API_KEY, RESEND_API_KEY
       // API_ORIGIN is provided by BASE_ENV (non-optional in schema)
       GEMINI_API_KEY: 'gemini-key',
       // Stripe keys are optional — not in production required list
     });
 
     expect(missing).toEqual([
+      // [BUG-242] Inngest keys come right after the Clerk auth block in the
+      // STAGING_AND_PRODUCTION_REQUIRED_KEYS array, so they appear before
+      // the production-only LLM/email/billing keys.
+      'INNGEST_SIGNING_KEY',
+      'INNGEST_EVENT_KEY',
       'VOYAGE_API_KEY',
       'RESEND_API_KEY',
       'RESEND_WEBHOOK_SECRET',
@@ -169,6 +199,7 @@ describe('validateEnv', () => {
   });
 
   // [SEC-1 / BUG-717] Staging now requires Clerk auth keys.
+  // [BUG-242] Staging also requires Inngest signing + event keys per-env.
   it('parses valid staging env with required Clerk keys (API_ORIGIN optional)', () => {
     const env = validateEnv({
       ENVIRONMENT: 'staging',
@@ -176,6 +207,8 @@ describe('validateEnv', () => {
       CLERK_SECRET_KEY: 'sk_test_xxx',
       CLERK_JWKS_URL: 'https://clerk.test/.well-known/jwks.json',
       CLERK_AUDIENCE: 'eduagent-api-staging',
+      INNGEST_SIGNING_KEY: 'signkey_stg_xxx',
+      INNGEST_EVENT_KEY: 'evtkey_stg_xxx',
     });
 
     expect(env.ENVIRONMENT).toBe('staging');
@@ -208,6 +241,9 @@ describe('validateEnv', () => {
       CLERK_SECRET_KEY: 'sk_live_xxx',
       CLERK_JWKS_URL: 'https://clerk.example.com/.well-known/jwks.json',
       CLERK_AUDIENCE: 'eduagent-api',
+      // [BUG-242] Inngest keys required in production.
+      INNGEST_SIGNING_KEY: 'signkey_prd_xxx',
+      INNGEST_EVENT_KEY: 'evtkey_prd_xxx',
       GEMINI_API_KEY: 'gemini-key',
       OPENAI_API_KEY: 'openai-key',
       VOYAGE_API_KEY: 'voyage-key',

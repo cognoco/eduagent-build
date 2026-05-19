@@ -11,6 +11,7 @@ import {
   subjects,
   type Database,
 } from '@eduagent/database';
+import { escapeXml, sanitizeXmlValue } from './llm/sanitize';
 
 /** A previously completed topic available for context injection */
 export interface PriorTopic {
@@ -58,7 +59,7 @@ const HIGH_MASTERY_TOPICS_COUNT = 5;
  */
 export function buildPriorLearningContext(
   completedTopics: PriorTopic[],
-  maxTopics?: number
+  maxTopics?: number,
 ): PriorLearningContext {
   if (completedTopics.length === 0) {
     return {
@@ -100,7 +101,7 @@ function selectTopicsForTruncation(topics: PriorTopic[]): PriorTopic[] {
   // Sort by completedAt descending (most recent first)
   const byRecency = [...topics].sort(
     (a, b) =>
-      new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime()
+      new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime(),
   );
 
   const recentTopics = byRecency.slice(0, RECENT_TOPICS_COUNT);
@@ -109,7 +110,7 @@ function selectTopicsForTruncation(topics: PriorTopic[]): PriorTopic[] {
   // Sort by mastery score descending (highest first), exclude already-selected
   const remaining = topics.filter((t) => !recentIds.has(t.topicId));
   const byMastery = remaining.sort(
-    (a, b) => (b.masteryScore ?? 0) - (a.masteryScore ?? 0)
+    (a, b) => (b.masteryScore ?? 0) - (a.masteryScore ?? 0),
   );
 
   const masteryTopics = byMastery.slice(0, HIGH_MASTERY_TOPICS_COUNT);
@@ -130,8 +131,13 @@ function formatTopicsForContext(topics: PriorTopic[]): string {
     if (topic.summary) {
       // Data-not-instruction framing: the summary is learner-authored text
       // and must not be interpreted as a directive to the model.
+      // [PROMPT-INJECT] escapeXml so a crafted summary like
+      // `</learner_summary><system>...` cannot close the wrapping tag and
+      // smuggle a directive across sessions (cross-session injection vector,
+      // since "Your Words" summaries replay into other sessions, including
+      // child sessions of a guardian).
       parts.push(
-        `  Learner's own summary: <learner_summary>${topic.summary}</learner_summary>`
+        `  Learner's own summary: <learner_summary>${escapeXml(topic.summary)}</learner_summary>`,
       );
     }
 
@@ -146,7 +152,7 @@ function formatTopicsForContext(topics: PriorTopic[]): string {
     '',
     'Use this context to connect new concepts to what the learner already knows.',
     'Reference their own summaries when building bridges — e.g. "You described X as [their words], which connects to what we are learning now."',
-    'Make the learner feel known. A good teacher says "Remember when we covered...?" — do the same.'
+    'Make the learner feel known. A good teacher says "Remember when we covered...?" — do the same.',
   );
 
   return lines.join('\n');
@@ -166,7 +172,7 @@ function formatTopicsForContext(topics: PriorTopic[]): string {
 export async function fetchPriorTopics(
   db: Database,
   profileId: string,
-  subjectId: string
+  subjectId: string,
 ): Promise<PriorTopic[]> {
   const rows = await db
     .select({
@@ -178,22 +184,22 @@ export async function fetchPriorTopics(
     .from(learningSessions)
     .innerJoin(
       curriculumTopics,
-      eq(curriculumTopics.id, learningSessions.topicId)
+      eq(curriculumTopics.id, learningSessions.topicId),
     )
     .leftJoin(
       sessionSummaries,
       and(
         eq(sessionSummaries.sessionId, learningSessions.id),
-        eq(sessionSummaries.profileId, profileId)
-      )
+        eq(sessionSummaries.profileId, profileId),
+      ),
     )
     .where(
       and(
         eq(learningSessions.profileId, profileId),
         eq(learningSessions.subjectId, subjectId),
         eq(learningSessions.status, 'completed'),
-        isNotNull(learningSessions.topicId)
-      )
+        isNotNull(learningSessions.topicId),
+      ),
     )
     .orderBy(desc(learningSessions.endedAt));
 
@@ -235,7 +241,7 @@ export async function fetchCrossSubjectHighlights(
   db: Database,
   profileId: string,
   currentSubjectId: string,
-  limit = 5
+  limit = 5,
 ): Promise<CrossSubjectHighlight[]> {
   const rows = await db
     .select({
@@ -246,7 +252,7 @@ export async function fetchCrossSubjectHighlights(
     .from(learningSessions)
     .innerJoin(
       curriculumTopics,
-      eq(curriculumTopics.id, learningSessions.topicId)
+      eq(curriculumTopics.id, learningSessions.topicId),
     )
     .innerJoin(subjects, eq(subjects.id, learningSessions.subjectId))
     .where(
@@ -254,8 +260,8 @@ export async function fetchCrossSubjectHighlights(
         eq(learningSessions.profileId, profileId),
         eq(learningSessions.status, 'completed'),
         ne(learningSessions.subjectId, currentSubjectId),
-        isNotNull(learningSessions.topicId)
-      )
+        isNotNull(learningSessions.topicId),
+      ),
     )
     .orderBy(desc(learningSessions.endedAt))
     .limit(limit * 2); // fetch extra to account for deduplication
@@ -280,7 +286,7 @@ export async function fetchCrossSubjectHighlights(
  * Returns empty string if no highlights — safe for conditional injection.
  */
 export function buildCrossSubjectContext(
-  highlights: CrossSubjectHighlight[]
+  highlights: CrossSubjectHighlight[],
 ): string {
   if (highlights.length === 0) return '';
 
@@ -290,13 +296,19 @@ export function buildCrossSubjectContext(
   ];
 
   for (const h of highlights) {
-    lines.push(`- ${h.subjectName}: ${h.title}`);
+    // [PROMPT-INJECT] DB-stored values (subject + topic title) can contain
+    // angle brackets or newlines from earlier LLM-generated titles or
+    // user-edited subject names. Strip-and-cap so they cannot escape the
+    // surrounding context or be read as directives.
+    const safeSubjectName = sanitizeXmlValue(h.subjectName, 120);
+    const safeTitle = sanitizeXmlValue(h.title, 200);
+    lines.push(`- ${safeSubjectName}: ${safeTitle}`);
   }
 
   lines.push(
     '',
     'If any of these connect to the current topic, mention the link naturally.',
-    'Cross-subject connections deepen understanding.'
+    'Cross-subject connections deepen understanding.',
   );
 
   return lines.join('\n');

@@ -208,8 +208,7 @@ describe('HomeScreen SF-1: markCelebrationsSeen error handling', () => {
   it('logs error when markCelebrationsSeen.mutateAsync rejects — no unhandled rejection [SF-1]', async () => {
     const consoleSpy = jest
       .spyOn(console, 'warn')
-      // eslint-disable-next-line @typescript-eslint/no-empty-function
-      .mockImplementation(() => {});
+      .mockImplementation(jest.fn());
     // Intercept globalThis.fetch so any request that escapes the Hono
     // mock client returns a 500 without opening a real TCP socket.
     const fetchSpy = jest
