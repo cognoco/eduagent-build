@@ -1,7 +1,16 @@
-import { SESSION_ANALYSIS_PROMPT } from '../../src/services/learner-profile';
+import {
+  filterUnsupportedResolvedTopics,
+  SESSION_ANALYSIS_PROMPT,
+} from '../../src/services/learner-profile';
+import { sessionAnalysisOutputSchema } from '@eduagent/schemas';
 import type { EvalProfile } from '../fixtures/profiles';
-import type { FlowDefinition, PromptMessages } from '../runner/types';
+import type {
+  FlowDefinition,
+  PromptMessages,
+  QualityIssue,
+} from '../runner/types';
 import { callLlm } from '../runner/llm-bootstrap';
+import { parseFirstJsonObject, qualityError } from '../runner/quality';
 
 // ---------------------------------------------------------------------------
 // Flow adapter — Session Analysis
@@ -21,6 +30,45 @@ interface SessionAnalysisInput {
   rawInput: string;
   /** Synthesized transcript passed as the user message. */
   transcriptText: string;
+}
+
+interface SessionAnalysisLike {
+  strengths?: unknown;
+  resolvedTopics?: unknown;
+}
+
+function nonEmptyArray(value: unknown): boolean {
+  return Array.isArray(value) && value.length > 0;
+}
+
+function evaluateSessionAnalysisQuality(liveResponse: string): QualityIssue[] {
+  const parsed = parseFirstJsonObject<SessionAnalysisLike>(liveResponse);
+  if (!parsed) {
+    return [
+      qualityError(
+        'session-analysis.parse',
+        'Live response did not contain a parseable session-analysis JSON object.',
+      ),
+    ];
+  }
+  const issues: QualityIssue[] = [];
+  if (nonEmptyArray(parsed.strengths)) {
+    issues.push(
+      qualityError(
+        'session-analysis.strength-overreach',
+        'Synthetic transcript has no clear mastery demonstration, so strengths should stay null.',
+      ),
+    );
+  }
+  if (nonEmptyArray(parsed.resolvedTopics)) {
+    issues.push(
+      qualityError(
+        'session-analysis.resolved-overreach',
+        'Synthetic transcript has only "makes more sense" evidence, not a correct learner explanation/application.',
+      ),
+    );
+  }
+  return issues;
 }
 
 /**
@@ -67,7 +115,7 @@ function inferSubjectFromTopic(topic: string): string {
   if (/philosoph|existentialis|camus/.test(lower)) return 'Philosophy';
   if (
     /biolog|body|cycle|animal|dinosaur|fossil|paleontolog|mesozoic|plate/.test(
-      lower
+      lower,
     )
   )
     return 'Science';
@@ -90,11 +138,13 @@ export const sessionAnalysisFlow: FlowDefinition<SessionAnalysisInput> = {
     // Reproduce the production substitution logic verbatim.
     const system = SESSION_ANALYSIS_PROMPT.replace('{subject}', input.subject)
       .replace('{topic}', input.topic)
-      .replace('{rawInput}', input.rawInput);
+      .replace('{rawInput}', input.rawInput)
+      .replaceAll('{knownStruggles}', '(none)')
+      .replaceAll('{suppressedTopics}', '(none)');
 
     return {
       system,
-      user: input.transcriptText,
+      user: `<transcript>\n${input.transcriptText}\n</transcript>`,
       notes: [
         `Interpolates: subject=${input.subject}, topic=${input.topic}.`,
         `MISSING: existing struggles/interests — prompt emits duplicates it can't see.`,
@@ -106,15 +156,27 @@ export const sessionAnalysisFlow: FlowDefinition<SessionAnalysisInput> = {
   },
 
   async runLive(
-    _input: SessionAnalysisInput,
-    messages: PromptMessages
+    input: SessionAnalysisInput,
+    messages: PromptMessages,
   ): Promise<string> {
-    return callLlm(
+    const response = await callLlm(
       [
         { role: 'system', content: messages.system },
         { role: 'user', content: messages.user ?? '' },
       ],
-      { flow: 'session-analysis', rung: 2 }
+      { flow: 'session-analysis', rung: 2 },
     );
+    const parsed = parseFirstJsonObject(response);
+    const validated = sessionAnalysisOutputSchema.safeParse(parsed);
+    if (!validated.success) return response;
+    return JSON.stringify(
+      filterUnsupportedResolvedTopics(validated.data, input.transcriptText),
+      null,
+      2,
+    );
+  },
+
+  evaluateQuality({ liveResponse }): QualityIssue[] {
+    return evaluateSessionAnalysisQuality(liveResponse);
   },
 };

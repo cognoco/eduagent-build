@@ -796,6 +796,26 @@ const SOURCE_BOUND_SENTENCE_TERMS: Array<{
     response: /\brich soil\b|\bsoil\b/i,
     source: /\brich soil\b|\bsoil\b/i,
   },
+  {
+    label: 'unsupported sediment definition',
+    response:
+      /\bsand\b|\bmud\b|\blayers? of rock\b|\bmillions of years\b|\breally long time\b|\btiny bits?\b/i,
+    source:
+      /\bsand\b|\bmud\b|\blayers? of rock\b|\bmillions of years\b|\breally long time\b|\btiny bits?\b/i,
+  },
+  {
+    label: 'unsupported soft validation',
+    response:
+      /\binteresting (?:thought|idea)\b|\bgood (?:point|observation)\b|\bfair point\b/i,
+    source:
+      /\binteresting (?:thought|idea)\b|\bgood (?:point|observation)\b|\bfair point\b/i,
+  },
+  {
+    label: 'generic praise',
+    response:
+      /\bexcellent idea\b|\bgreat idea\b|\bgreat question\b|\bawesome\b/i,
+    source: /\bexcellent idea\b|\bgreat idea\b|\bgreat question\b|\bawesome\b/i,
+  },
 ];
 
 function appendAuditReason(

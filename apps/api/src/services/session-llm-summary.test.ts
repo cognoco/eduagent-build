@@ -96,6 +96,13 @@ describe('buildSessionSummaryPrompt', () => {
     expect(prompt.user).toContain('<subject>Math /subject </subject>');
     expect(prompt.user).toContain('<topic>Fractions topic </topic>');
     expect(prompt.system).toContain('Return exactly one JSON object');
+    expect(prompt.system).toContain('Stay evidence-bound to the transcript');
+    expect(prompt.system).toContain(
+      'exactly match a phrase that appears in `narrative`',
+    );
+    expect(prompt.system).toContain(
+      'do not upgrade it to "felt they understood"',
+    );
   });
 });
 

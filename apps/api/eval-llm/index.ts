@@ -126,6 +126,8 @@ async function main(): Promise<void> {
   if (options.live) {
     console.log(`Live calls OK:      ${summary.liveCallsOk}`);
     console.log(`Live calls failed:  ${summary.liveCallsFailed}`);
+    console.log(`Quality warnings:   ${summary.qualityWarnings}`);
+    console.log(`Quality failures:   ${summary.qualityFailures}`);
   }
   if (summary.skipped.length > 0) {
     console.log(`Skipped:            ${summary.skipped.length}`);
@@ -134,6 +136,13 @@ async function main(): Promise<void> {
     }
   }
   console.log('─────────────────────────────────────────');
+
+  if (options.live && summary.qualityFailures > 0) {
+    console.error(
+      'Quality gate failed. Open the snapshots with "Quality issues" sections for the scenario-level failures.',
+    );
+    process.exit(1);
+  }
 
   // Baseline regression guard — only meaningful after a live run. Tier-1
   // runs emit an empty envelopeMetrics map and would trip the baseline for

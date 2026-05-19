@@ -28,7 +28,10 @@ jest.mock('./logger' /* gc1-allow: pattern-a conversion */, () => {
 });
 
 import {
+  buildPrompt,
+  extractBookSuggestionJson,
   generateCategorizedBookSuggestions,
+  sanitizeBookSuggestionOutput,
   COOLDOWN_MS,
 } from './book-suggestion-generation';
 
@@ -523,6 +526,50 @@ describe('generateCategorizedBookSuggestions', () => {
           expect.objectContaining({ role: 'user' }),
         ]),
         2,
+        { responseFormat: 'json' },
+      );
+    });
+
+    it('retries malformed JSON once and inserts the repaired sanitized suggestions', async () => {
+      const subject = makeSubject();
+      routeAndCallMock
+        .mockResolvedValueOnce({
+          response:
+            '{"suggestions":[{"title":"Broken","description":"x","emoji":"📚","category":"explore"}], essel',
+        })
+        .mockResolvedValueOnce(
+          makeLlmResult([
+            {
+              title: 'Evidence and Causes',
+              description:
+                'Compare causes in 1914, the early 20th century, and 80% claims through evidence.',
+              emoji: '📚',
+              category: 'explore',
+            },
+          ]),
+        );
+
+      const { tx, mocks } = makeTx({});
+      const { db } = makeDb(subject, async (cb) => cb(tx));
+
+      await generateCategorizedBookSuggestions(db, PROFILE_ID, SUBJECT_ID);
+
+      expect(routeAndCallMock).toHaveBeenCalledTimes(2);
+      const retryMessages = routeAndCallMock.mock.calls[1]?.[0] as Array<{
+        content: string;
+      }>;
+      expect(retryMessages[retryMessages.length - 1]?.content).toContain(
+        'previous response failed validation',
+      );
+      expect(mocks.insertValues).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({
+            title: 'Evidence and Causes',
+            description: expect.not.stringMatching(
+              /1914|early 20th century|80%/,
+            ),
+          }),
+        ]),
       );
     });
   });
@@ -739,6 +786,96 @@ describe('generateCategorizedBookSuggestions', () => {
       )[0]!.map((s) => s.title);
       expect(insertedTitles).not.toContain('Ancient Rome History');
       expect(insertedTitles).toContain('Brand New Topic Here');
+    });
+  });
+});
+
+describe('buildPrompt', () => {
+  it('asks suggestion descriptions to stay source-neutral and non-tiny', () => {
+    const messages = buildPrompt({
+      subjectName: 'History',
+      existingBookTitles: ['Causes of World War I'],
+      existingSuggestionTitles: ['Tiny War Facts'],
+      studiedTopics: ['Alliances', 'Militarism'],
+    });
+    const system = String(messages[0]?.content ?? '');
+
+    expect(system).toContain('source-neutral learning objectives');
+    expect(system).toContain('Do not include precise dates, years');
+    expect(system).toContain('early 20th century');
+    expect(system).toContain('Avoid tiny/novelty/remedial shelves');
+  });
+
+  it('asks Four Strands language suggestions to cover all strands visibly', () => {
+    const messages = buildPrompt({
+      subjectName: 'French Four Strands practice',
+      languageName: 'French',
+      existingBookTitles: ['Basic Greetings'],
+      existingSuggestionTitles: ['Vocabulary Flashcards'],
+      studiedTopics: [
+        'Useful input',
+        'Meaning-focused output',
+        'Language-focused learning',
+        'Fluency practice',
+      ],
+    });
+    const system = String(messages[0]?.content ?? '');
+    const user = String(messages[1]?.content ?? '');
+
+    expect(system).toContain('make the set visibly cover all four strands');
+    expect(system).toContain('meaning-focused input');
+    expect(system).toContain('language-focused learning/form');
+    expect(system).toContain('fluency suggestion should use words');
+    expect(user).toContain('<target_language>French</target_language>');
+  });
+});
+
+describe('sanitizeBookSuggestionOutput', () => {
+  it('removes precise source-specific details from descriptions', () => {
+    const sanitized = sanitizeBookSuggestionOutput({
+      suggestions: [
+        {
+          title: 'Compare Evidence',
+          description:
+            'Look at 1914, early 20th century arguments, and 80% statistics.',
+          emoji: '📚',
+          category: 'explore',
+        },
+      ],
+    });
+
+    expect(sanitized.suggestions[0]?.description).not.toMatch(
+      /1914|early 20th century|80%/,
+    );
+    expect(sanitized.suggestions[0]?.description).toContain(
+      'the period being studied',
+    );
+  });
+});
+
+describe('extractBookSuggestionJson', () => {
+  it('repairs provider-inserted prose after category fields', () => {
+    const parsed = extractBookSuggestionJson(`{
+      "suggestions": [
+        {
+          "title": "Everyday Conversations",
+          "description": "Practice listening and speaking.",
+          "emoji": "🎧",
+          "category": "related"
+          Cohort 'related' means this builds on studied topics.
+        }
+      ]
+    }`);
+
+    expect(parsed).toEqual({
+      suggestions: [
+        {
+          title: 'Everyday Conversations',
+          description: 'Practice listening and speaking.',
+          emoji: '🎧',
+          category: 'related',
+        },
+      ],
     });
   });
 });

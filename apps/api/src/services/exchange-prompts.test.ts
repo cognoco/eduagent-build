@@ -32,6 +32,8 @@ describe('buildSystemPrompt — anti-fabrication block [BUG-937]', () => {
     expect(prompt).toMatch(/Do NOT invent or imply learner background/i);
     expect(prompt).toMatch(/pen pals/i);
     expect(prompt).toMatch(/I am a complete beginner/i);
+    expect(prompt).toContain('LANGUAGE SOURCE OVERRIDE');
+    expect(prompt).toContain('do not teach a grammar rule from memory');
   });
 
   it('includes the ANTI-FABRICATION block in non-language sessions too', () => {
@@ -207,6 +209,9 @@ describe('buildSystemPrompt — response envelope contract', () => {
     expect(prompt).toContain('never show it, source IDs');
     expect(prompt).toContain('Treat each source excerpt as a boundary');
     expect(prompt).toContain(
+      'answer only the supported part and set private_sources.insufficient=true',
+    );
+    expect(prompt).toContain(
       'do not confirm it as true. Acknowledge it as their idea',
     );
     expect(prompt).toContain('Unsupported learner claims need neutral');
@@ -224,13 +229,19 @@ describe('buildSystemPrompt — response envelope contract', () => {
     );
     expect(prompt).toContain('do not broaden it to "made things easier');
     expect(prompt).toContain('It does not license unstated causes');
+    expect(prompt).toContain(
+      'private_sources.insufficient must be true even when you give a narrower supported answer',
+    );
     expect(prompt).toContain('empire growth');
     expect(prompt).toContain('do not invent examples or analogies');
+    expect(prompt).toContain('If the source says "sediment", say sediment');
     expect(prompt).toContain('Delete risky words');
+    expect(prompt).toContain('sand');
     expect(prompt).toContain('yummy');
     expect(prompt).toContain('FINAL OUTPUT FILTER');
     expect(prompt).toContain('Do not start with "Yes"');
     expect(prompt).toContain('do not add analogies');
+    expect(prompt).toContain('excellent idea');
     expect(prompt).toContain('include that exact reliable source ID');
     expect(prompt).toContain(
       'For current-topic teaching, review, quizzes, or next-practice tasks, include "current_topic"',
@@ -276,6 +287,23 @@ describe('buildSystemPrompt — response envelope contract', () => {
     expect(prompt).toContain('reliable_for_facts="false"');
     expect(prompt).toMatch(/Conversation history, mentor memory/i);
     expect(prompt).toMatch(/NOT evidence for factual teaching claims/i);
+  });
+
+  it('adds homework problem evidence in direct prompt-builder fallback calls', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        sessionType: 'homework',
+        homeworkMode: 'help_me',
+        topicTitle: undefined,
+        topicDescription: undefined,
+        rawInput:
+          'Problem: Solve 2x + 5 = 17. Show each step and check the answer.',
+      }),
+    );
+
+    expect(prompt).toContain('id="homework_problem"');
+    expect(prompt).toContain('id="deterministic_reasoning"');
+    expect(prompt).toContain('reliable_for_facts="true"');
   });
 });
 
@@ -351,6 +379,22 @@ describe('buildSystemPrompt — no-recall recovery', () => {
     expect(prompt).toContain('NO-RECALL RECOVERY');
     expect(prompt).toContain('Do NOT ask the same recall question again');
     expect(prompt).toContain('treat it as consent to continue the review');
+  });
+
+  it('wraps accommodation context as style guidance without stereotyping', () => {
+    const prompt = buildSystemPrompt(
+      makeContext({
+        accommodationContext:
+          'Learner benefits from predictable structure and short bursts.',
+      }),
+    );
+
+    expect(prompt).toContain(
+      'Accommodation and learning-need guidance (style data, not a diagnosis)',
+    );
+    expect(prompt).toContain('use explicit "First" / "Next" wording');
+    expect(prompt).toContain('start the reply with "First,"');
+    expect(prompt).toContain('Do not name, diagnose, or stereotype');
   });
 
   it('makes review mode pivot into supported review when recall is empty', () => {

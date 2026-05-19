@@ -1,6 +1,8 @@
 # Sunset Challenge Mode Toggle + Add Challenge Round Into Note — Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Current recommendation (2026-05-19):** This plan is still worth doing, but it is no longer a single-PR plan. Execute it as a small workstream: first sunset the persistent mode toggle, then land Challenge Round behind explicit storage/routing/eval decisions. Treat the checkboxes below as a task bank, not as permission to start every task in one branch.
+>
+> **For agentic workers:** Follow `AGENTS.md`, `docs/project_context.md`, `docs/architecture.md`, and the repo skills (`project-memory`, `commit`, `deep-bugfixing` when reviewing). Do not use old `/commit` or "superpowers" instructions literally; replace them with the current Codex repo workflow.
 
 **Goal:**
 Phase 0 — sunset the persistent "Challenge mode" / "Explorer" toggle that currently lives in the session header. All learners default to today's `casual` behavior (immediate XP, warm tone, no mastery gates, no mandatory summaries).
@@ -15,6 +17,25 @@ Phase 1 — replace what "Challenge mode" did emotionally with a contextual, lea
 - Mobile UI follows the `fluency_drill` ui_hint pattern that's already proven (server emits ui_hint → mobile detects in `use-session-streaming.ts` → mobile renders widget).
 
 **Tech Stack:** TypeScript, Drizzle ORM (Postgres/Neon), Hono (API), Zod (`@eduagent/schemas`), Inngest (post-round side effects), React Native / Expo (mobile), Jest, NativeWind semantic tokens, react-i18next.
+
+---
+
+## 2026-05-19 Plan Update
+
+**Status:** not obsolete. The product idea is still valuable: the current `note_prompt` flow can ask whether to write something down, but it does not yet turn a learner's own strong challenge answers into a reviewed note, nor does it conservatively remember weak spots.
+
+**Why update the plan now:** the new LLM quality runners (`source-grounding`, `personalization-matrix`, `provider-degradation`, `homework-source`, `post-session-artifacts`, `artifact-personalization`, `book-suggestions`) give this feature better guardrails, but they do not implement the feature. The plan should use those gates instead of pretending `pnpm eval:llm --live` alone is enough.
+
+**Execution shape:**
+
+1. **PR A — Sunset Learning Mode Toggle.** Remove the persistent Explorer/Challenge toggle, learning-mode prompt branches, summary-skip behavior, and XP delay branch. Keep reads of legacy XP states where current consumers still need them.
+2. **PR B — Challenge Round Target Decision.** Produce or update `docs/plans/2026-05-18-challenge-round-targets.md` with the actual storage targets for weak spots, challenge verification, pending draft recovery, scoped session metadata helpers, and routing policy. Do not implement Challenge Round until this is signed off.
+3. **PR C — Envelope + Prompt + Eval Harness.** Add challenge envelope schemas, prompt blocks, parser plumbing, and offline/live eval scenarios, including language four-strands cases and explicit no-offer cases for review, quiz, homework, and free chat.
+4. **PR D — Server State + Side Effects.** Add the challenge-round state machine, scoped routes, note provenance, durable weak-spot persistence, conservative mastery decision, cooldowns, and Inngest fan-out.
+5. **PR E — Mobile UI.** Add the offer card, in-round banner, drafted-note review, `Too easy` entry path, save/edit/skip handling, and recovery UI.
+6. **PR F — Docs + Release Gate.** Update project docs, run the full validation matrix, and decide whether the feature remains behind a flag for staged dogfooding.
+
+**Scope correction:** Challenge Round v1 is for ordinary learning sessions, including language learning/four-strands topics. Homework, review, quiz, practice/recall/dictation, and free chat/ask-anything are not Challenge Round entry points in v1, but they must be covered by tests and eval scenarios so "no offer" is intentional and stable.
 
 ---
 
@@ -81,7 +102,7 @@ This plan was adversarially reviewed before execution. The following findings sh
 - **Retention/review** (`apps/api/src/services/retention-data.ts`) — accept `source: 'challenge_round'` on review-target writes.
 - **Notes** (`apps/api/src/services/notes.ts`, `apps/mobile/src/hooks/use-notes.ts`) — reused for drafted-note persistence; add `source` column.
 
-**Out of scope:** Practice / recall / dictation / quiz / freeform/ask-anything sessions for v1 (trigger evaluator hard-gates these). Homework permanently excluded (`feedback_homework_not_socratic.md`). Parent dashboard badge for challenge-verified mastery (schema lands; UI badge is v2). Voice-only flow, rewards/streaks, multi-round per session, parent-challenges-child.
+**Out of scope:** Homework, review, quiz, practice / recall / dictation, and freeform/ask-anything sessions for v1 (trigger evaluator hard-gates these, and eval coverage asserts no-offer behavior). Homework remains explain-and-verify, not Socratic (`feedback_homework_not_socratic.md`). Parent dashboard badge for challenge-verified mastery (schema lands; UI badge is v2). Voice-only flow, rewards/streaks, multi-round per session, parent-challenges-child.
 
 ### What exists today (with line citations)
 **Persistent Challenge mode toggle (to be removed):**
@@ -123,22 +144,30 @@ This plan was adversarially reviewed before execution. The following findings sh
 - Any review-target persistence with `source: 'challenge_round'` provenance.
 - Any "Too easy chip → server-side eligibility → maybe Challenge Round" routing.
 
-### What this PR adds
-- **Phase 0 (sunset):**
+### What this workstream adds
+
+The original version of this section described a single PR. That is too large. Keep the same target behavior, but ship it as the PR sequence in the 2026-05-19 update.
+
+- **PR A / Phase 0 (sunset):**
   - DB migration: drop `mode`, `consecutiveSummarySkips` columns from `learningModes`; drop `learningModeEnum`.
   - Code removals: `learningModeSchema`/`Update`/`Response`, `getLearningModeRules`, `getLearningModeGuidance`, learning-mode routes + hooks + UI + i18n keys + tests.
   - XP collapse: single `'verified'` path immediately; remove `'pending'`/`verifiedXpOnly` branch.
   - Prompt collapse: single warm-but-direct tone (today's `casual` tone is the new default — see Recommended scope below).
-- **Phase 1 (feature):**
+- **PR B (target decision):**
+  - Decision doc for actual weak-spot persistence target, challenge-verified storage target, pending-draft recovery target, scoped session metadata helpers, and routing-floor policy.
+- **PR C / Phase 1 foundation (envelope + prompt + eval):**
   - Envelope additions: `signals.challenge_round_offer`, `signals.challenge_round_evaluation`, `ui_hints.challenge_round`, `ui_hints.note_draft`.
+  - Challenge Round prompt/eval scenarios, including four-strands language learning, unsupported/off-topic learner claims, and no-offer cases for homework/review/quiz/free chat.
+- **PR D / Phase 1 server:**
   - `apps/api/src/services/challenge-round/` module: trigger evaluator, state machine, caps, prompt blocks, evaluation parser, note drafter, mastery decision.
   - `sessionMetadata.challengeRound` state field.
   - `challenge_round_cooldowns` table (per-profile/per-topic cooldown rows).
   - `notes.source` column with `'user' | 'challenge_round'`.
-  - `topicProgress.masteryChallengeVerifiedAt` column.
-  - `reviewTargets.source` column.
-  - Mobile components: `ChallengeOfferCard`, `ChallengeRoundBanner`, `DraftedNoteReview` + `use-challenge-round` hook.
+  - Challenge-verified mastery target chosen by PR B.
+  - Durable weak-spot target chosen by PR B.
   - Inngest function: `challenge.round.completed` for fan-out.
+- **PR E / Phase 1 mobile:**
+  - Mobile components: `ChallengeOfferCard`, `ChallengeRoundBanner`, `DraftedNoteReview` + `use-challenge-round` hook.
   - "Too easy" chip handler extended: on tap, calls `POST /challenge-round/maybe-offer`; server-side `evaluateChallengeReadiness` decides; if eligible, transitions to `offered` and the LLM's next response includes the offer; otherwise, the chip dispatches today's `too_easy` system prompt.
 
 ### Walkthrough per entry
@@ -152,7 +181,7 @@ This plan was adversarially reviewed before execution. The following findings sh
 - **Homework session:** Trigger evaluator hard-gates `false`. Never offered, even if "Too easy" chip is tapped. **Risk: zero by design.**
 - **Learner declines offer:** `challengeRound.state = 'declined'`. Trigger evaluator suppresses for the rest of this session. Persists cooldown row (`challenge_round_cooldowns`) for ≥24h on the topic. **Risk: low.**
 - **Session ends mid-Challenge Round (back gesture, app close, timeout):** Server-side auto-completes: if ≥1 solid concept, drafted-note offered on next app open via the existing pending-note pattern (extend `ui_hints.note_prompt` to carry the drafted content for `post_session` variant). If zero solid, no artifact. **Risk: medium** — covered in Failure Modes.
-- **Practice / recall / dictation / interleaved sessions:** Trigger evaluator hard-gates `false` for v1. Plumbing exists for future expansion.
+- **Review / quiz / practice / recall / dictation sessions:** Trigger evaluator hard-gates `false` for v1. Plumbing exists for future expansion, but no offer should appear in these flows.
 - **Ask-anything / freeform:** No `topicId` → no note target → trigger hard-gated `false`.
 - **Existing users with `learningMode = 'serious'` row in DB:** Migration overwrites all rows to one consistent default before column drop. Pre-launch — no real users to surprise.
 
@@ -183,11 +212,12 @@ This plan was adversarially reviewed before execution. The following findings sh
 | Challenge Round bypasses paid routing policy | Implementation calls provider directly or mutates provider/model outside `resolveExchangeLlmRouting()` | Wrong plan/model cost, Family standard may cross-provider fallback | Route all Challenge Round turns through the existing session exchange pipeline. Tests assert Family standard keeps `llmProviderPolicy='gemini_only'`, Plus active/drafting turns route as advanced only from rung 4, and OpenAI/GPT is absent before rung 5. |
 
 ### Recommended scope (v1)
+- **Ship as multiple PRs, not one.** Phase 0 can land independently. Phase 1 starts only after the storage/routing target doc is signed off.
 - **Sunset Phase 0 is destructive but safe pre-launch.** Migration drops two columns + an enum. No backcompat shims. (`feedback_pre_launch_no_users.md`.)
 - **Default tone is today's `casual`.** Warm + concrete examples. The "rigor + delayed XP + mandatory summaries" experience is NOT preserved as a setting; rigor is now expressed *through Challenge Rounds* per-topic per-moment, not as a global vibe.
-- **Header button slot freed.** No replacement in this PR (decision: keep header lean; if we add a future button it gets its own design pass). The trophy/compass icons retire.
+- **Header button slot freed.** No replacement in the sunset PR (decision: keep header lean; if we add a future button it gets its own design pass). The trophy/compass icons retire.
 - **"Too easy" chip becomes the learner-initiated Challenge Round entry.** When server-side gates allow, tapping it triggers an offer card. When they don't, falls back to today's behavior. No new chip; no new icon.
-- **Learning + interleaved sessions only.** Homework explicitly excluded. Freeform/ask-anything deferred.
+- **Ordinary learning sessions only.** Include language learning / four-strands topics in v1 eligibility. Homework, review, quiz, practice/recall/dictation, and freeform/ask-anything are explicit no-offer cases with tests.
 - **3 challenge questions max per round, 1 round per session, 1 challenge offer per topic per 24h.**
 - **Routing policy:** Offer turns use normal routing. Accepted/active/drafting Challenge Round turns apply a routing-only minimum rung of 4 because they require deeper evaluation and note synthesis. This floor is fed into `resolveExchangeLlmRouting()`; it is not a direct provider override. Plus/add-on profiles can therefore use advanced help at rung 4, Family standard remains Gemini-only, and OpenAI remains blocked until rung 5+.
 - **Quota policy:** Readiness requires an absolute remaining-turn budget, not only a percent threshold. Use `MIN_CHALLENGE_REMAINING_TURNS = 5` for v1 (acceptance/round/draft buffer) and keep any percentage rule only as an additional free-tier cost guard if needed.
@@ -205,12 +235,15 @@ This feature is not complete until every row below is covered by a passing test 
 | Sunset DB/schema | `learningModes.mode`, `consecutiveSummarySkips`, learning-mode API schemas/routes/hooks/UI/i18n are removed; XP writer always writes immediate `verified` while existing `pending|decayed` reads still work. | Task 0.1-0.6 unit + integration tests |
 | Envelope schema | `challenge_round_offer`, per-concept evaluation with `answerEventId`/`learnerQuote`, `challenge_round`, and `note_draft` with source answer event ids parse and reject malformed shapes. | `packages/schemas/src/llm-envelope.test.ts` |
 | Session metadata schema | `challengeRound` accepts valid states, defaults optional fields safely, accumulates evaluations, accepts pending draft recovery state, rejects invalid states/evaluation shapes. | `packages/schemas/src/sessions.test.ts` |
-| Trigger evaluator | Hard-gates homework/freeform/practice/quiz, struggling states, low quota, cooldown, duplicate/in-flight states; allows strong retention path and current-session-new-topic path. | `apps/api/src/services/challenge-round/trigger.test.ts` |
+| Trigger evaluator | Hard-gates homework/review/quiz/freeform/practice/recall/dictation, struggling states, low quota, cooldown, duplicate/in-flight states; allows ordinary learning sessions, including language four-strands topics, through strong-retention and current-session-new-topic paths. | `apps/api/src/services/challenge-round/trigger.test.ts` |
+| Flow matrix | Learning can offer when ready; language four-strands learning can offer when ready; homework/review/quiz/free chat never offer; interleaved behavior is explicitly chosen in the target-decision doc before implementation. | `apps/api/src/services/challenge-round/trigger.test.ts`, `apps/api/eval-llm/scenarios/challenge-round.ts` |
 | Commercial LLM routing | Offer uses normal routing; accepted/active/drafting applies only a resolver-fed rung-4 floor; Family standard remains Gemini-only including fallback; Plus/add-on advanced routes only from rung 4; OpenAI/GPT only appears at rung 5+. | `apps/api/src/services/session/session-exchange.test.ts`, `apps/api/src/services/llm/router.test.ts`, `scripts/premium-routing-pass.ts` |
 | State machine | Valid transitions, illegal transitions, one-round cap, question cap, evaluation accumulation, abort from any active state, no duplicate offer race. | `apps/api/src/services/challenge-round/state.test.ts` |
 | Mastery decision | all solid → verified; mixed → no mastery + review targets + solid quotes only; all missing → reteach; empty eval → invalid/no mastery; any misconception blocks mastery. | `apps/api/src/services/challenge-round/evaluation.test.ts` |
 | Note draft guard | Accepts solid learner quotes, rejects hallucinated/low-overlap drafts, rejects drafts that overlap only with non-solid quotes, handles accented Latin and non-spaced scripts, preserves short drafts, never validates empty. | `apps/api/src/services/challenge-round/note-draft.test.ts` |
-| Prompt/eval harness | Offer only when eligible/confident; no offer when confused/homework; active round emits structured eval; known misconception must not be solid; draft uses learner words; no draft on all missing. | `apps/api/eval-llm/scenarios/challenge-round.ts`, `pnpm eval:llm`, `pnpm eval:llm --live` |
+| Prompt/eval harness | Offer only when eligible/confident; no offer when confused/homework/review/quiz/free chat; language four-strands cases cover meaning-focused input, meaning-focused output, language-focused learning, and fluency practice; active round emits structured eval; known misconception must not be solid; draft uses learner words; no draft on all missing. | `apps/api/eval-llm/scenarios/challenge-round.ts`, `pnpm eval:llm`, `pnpm eval:llm --live` |
+| Source grounding | If Challenge Round references source material, the model stays inside reliable source material or says there is not enough support; memory-only, thin-source, forum/chat-like, and unsupported learner-claim cases do not become notes or mastery evidence. | `pnpm test:llm:source-grounding`, `pnpm test:llm:homework-source`, challenge-round eval scenarios |
+| Artifact personalization | Challenge notes, post-session summaries, next-topic suggestions, retention updates, and communication prompts vary naturally, stay age-appropriate, and do not fabricate what the learner understood. | `pnpm test:llm:post-session-artifacts`, `pnpm test:llm:artifact-personalization`, `pnpm test:llm:personalization-matrix` |
 | Session exchange integration | `processExchange`/`streamExchange` strip ineligible offer signals; `session-exchange` transitions offered/active/drafting, persists accumulated evaluations, sends completed event once, and malformed envelope fallback does not mutate challenge state. | `apps/api/src/services/exchanges.test.ts`, `apps/api/src/services/session/session-exchange.test.ts`, `apps/api/src/services/session/session-exchange.integration.test.ts` |
 | Streaming/SSE contract | `ParsedExchangeEnvelope` exposes challenge fields explicitly; `streamMessage.onComplete()` returns them; `apps/api/src/routes/sessions.ts` forwards them on the `done` frame; mobile consumes only the typed `done` fields. | `apps/api/src/services/exchanges.test.ts`, `apps/api/src/services/session/session-exchange.test.ts`, `apps/api/src/routes/sessions.test.ts`, `use-session-streaming.test.tsx` |
 | Routes | `maybe-offer`, `accept`, `decline`, `abort` are profile-scoped, reject cross-profile/cross-topic mismatch, persist cooldown, handle already-offered race as 200 no-op, reject invalid state transitions cleanly. | `apps/api/src/routes/challenge-round.test.ts` |
@@ -312,9 +345,9 @@ This feature is not complete until every row below is covered by a passing test 
 
 ## Tasks
 
-> **Convention:** Each task is one logical commit. TDD: write the failing test, run it red, implement, run it green, commit via `/commit` (the only authorized commit path — CLAUDE.md → Git Commits).
+> **Convention:** Each task is one logical commit. TDD: write the failing test, run it red, implement, run it green, then commit through the current repo commit workflow (`.agents/skills/commit/SKILL.md`). Any older `/commit` snippets in this task bank are shorthand for that workflow, not literal instructions.
 
-> **Phase boundary:** Tasks 0.1–0.6 are the sunset. Tasks 1–12 are the feature. Phase 1 depends on Phase 0 being green (the prompt-builder changes in 0.3 are the seam Phase 1 plugs into).
+> **Phase boundary:** Tasks 0.1–0.6 are the sunset and should be one small PR. Task 0.0/0.0a are the target-decision PR and must be signed off before feature implementation. Tasks 1–12 are the Challenge Round feature task bank and should be split across schema/eval, server, mobile, and docs PRs. Phase 1 depends on Phase 0 being green (the prompt-builder changes in 0.3 are the seam Phase 1 plugs into).
 
 ---
 
@@ -1111,8 +1144,8 @@ describe('evaluateChallengeReadiness', () => {
     expect(evaluateChallengeReadiness({ ...baseInput, sessionType: 'homework' }).eligible).toBe(false);
   });
 
-  it('eligible for interleaved sessions', () => {
-    expect(evaluateChallengeReadiness({ ...baseInput, sessionType: 'interleaved' }).eligible).toBe(true);
+  it('hard-gates interleaved sessions in v1 unless the target decision explicitly opts them in', () => {
+    expect(evaluateChallengeReadiness({ ...baseInput, sessionType: 'interleaved' }).eligible).toBe(false);
   });
 
   it('hard-gates when struggling', () => {
@@ -1272,7 +1305,7 @@ export interface ChallengeReadinessResult {
 }
 
 export function evaluateChallengeReadiness(input: ChallengeReadinessInput): ChallengeReadinessResult {
-  if (input.sessionType !== 'learning' && input.sessionType !== 'interleaved') {
+  if (input.sessionType !== 'learning') {
     return { eligible: false, reason: 'session_type' };
   }
   if (input.struggleStatus !== 'normal') return { eligible: false, reason: 'struggle' };
@@ -3001,13 +3034,20 @@ Document: trigger evaluator location, prompt module, envelope signal names, mobi
 
 ## Final Validation
 
-After Task 12, run the full validation matrix before declaring the feature complete:
+After Task 12, run the full validation matrix before declaring the feature complete. Individual PRs can run a targeted subset, but the full workstream is not complete until this list is green or has explicit approved follow-up IDs.
 
 - [ ] `pnpm exec nx run-many -t lint` — green
 - [ ] `pnpm exec nx run-many -t typecheck` — green
 - [ ] `pnpm exec nx run-many -t test` — green
 - [ ] `pnpm eval:llm --live` — all 7 challenge-round scenarios pass schema validation
 - [ ] `pnpm test:llm:premium-routing` — Plus/Family/add-on routing still obeys rung 4+/GPT rung 5+/Family Gemini-only policy
+- [ ] `pnpm test:llm:provider-degradation` — Gemini/OpenAI/Claude timeout, 503, malformed JSON, and rate-limit cases recover without provider-policy leaks
+- [ ] `pnpm test:llm:source-grounding` — reliable-source behavior stays grounded and unsupported/memory-only/forum-like claims are refused or caveated
+- [ ] `pnpm test:llm:homework-source` — homework remains explain-and-verify and does not solve from memory when source/problem text is insufficient
+- [ ] `pnpm test:llm:personalization-matrix` — age, accommodation, seriousness, and returning-learner history improve tone without stereotypes or overload
+- [ ] `pnpm test:llm:post-session-artifacts` — summaries, notes, next actions, challenge-round notes, and retention updates do not fabricate understanding
+- [ ] `pnpm test:llm:artifact-personalization` — generated insights/communication prompts/summaries/next actions are personal, varied, and updated
+- [ ] `pnpm test:llm:book-suggestions` — shared prompt/harness changes have not regressed next-book suggestion quality
 - [ ] `pnpm exec jest tests/integration/challenge-round.integration.test.ts` — green
 - [ ] **Manual smoke 1 — sunset:** Launch the app on emulator. Open a session. Confirm: no Explorer/Challenge mode header button; no Learning Mode section in More; tone is consistent.
 - [ ] **Manual smoke 2 — system-initiated CR:** Complete a learning session with 6+ exchanges, strong answers, in `strong` retention. Accept the offer. Answer 3 challenge questions correctly. Save the drafted note. Verify it appears under the topic in Library with `source: 'challenge_round'`. Verify mastery shows challenge-verified.
@@ -3021,7 +3061,7 @@ After Task 12, run the full validation matrix before declaring the feature compl
 
 ## Out of Scope (Explicitly)
 
-These are valid concerns that this plan does NOT address. Each is a tracked follow-up, not part of this PR.
+These are valid concerns that this plan does NOT address. Each is a tracked follow-up, not part of the v1 workstream.
 
 - **Offline queueing of note saves.** v1 requires online. In-component draft state survives backgrounding but not app kill.
 - **Voice-only flow for challenge answers.** Reuses existing voice input; no special handling.
@@ -3032,5 +3072,5 @@ These are valid concerns that this plan does NOT address. Each is a tracked foll
 - **Homework-mode Challenge Round.** Homework is explain+verify, not Socratic. Permanently excluded.
 - **Parent-challenges-child.** Deferred.
 - **Rename `learning_modes` DB table** to something matching its post-sunset contents (`user_preferences` or `profile_pace_settings`). Worthwhile cleanup; separate small PR.
-- **Repurpose the freed header button slot.** No replacement in this PR.
+- **Repurpose the freed header button slot.** No replacement in the sunset PR.
 - **Translated copy for `session.challenge.*` keys** in non-en locales. Stub with English fallback in v1; localization pass follows.

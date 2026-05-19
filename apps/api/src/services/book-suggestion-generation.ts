@@ -19,6 +19,7 @@ import { AGE_STYLE_GUIDANCE } from './book-generation';
 export const COOLDOWN_MS = 5 * 60 * 1000;
 const logger = createLogger();
 const RECENT_TOPIC_LIMIT = 20;
+const BOOK_SUGGESTION_JSON_ATTEMPTS = 2;
 
 type FailureReason =
   | 'quota'
@@ -33,6 +34,44 @@ type FailureReason =
 
 export type GenerationOutcome = 'success' | FailureReason;
 
+interface BookSuggestionGenerationResult {
+  suggestions: Array<{
+    title: string;
+    description: string;
+    emoji: string;
+    category: 'related' | 'explore';
+  }>;
+}
+
+function sanitizeSourceNeutralDescription(description: string): string {
+  return description
+    .replace(
+      /\b(?:early|late|mid(?:dle)?)[-\s]+(?:\d{1,2}(?:st|nd|rd|th)|twentieth|nineteenth|eighteenth|seventeenth)\s+century\b/gi,
+      'the period being studied',
+    )
+    .replace(
+      /\b(?:\d{1,2}(?:st|nd|rd|th)|twentieth|nineteenth|eighteenth|seventeenth)\s+century\b/gi,
+      'the period being studied',
+    )
+    .replace(/\b(?:1[5-9]\d{2}|20\d{2})\b/g, 'the period being studied')
+    .replace(/\b\d+(?:\.\d+)?\s*%/g, 'a measured share')
+    .replace(/\b\d+(?:\.\d+)?\s*percent\b/gi, 'a measured share')
+    .replace(/\bthe\s+the period being studied\b/gi, 'the period being studied')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+export function sanitizeBookSuggestionOutput(
+  result: BookSuggestionGenerationResult,
+): BookSuggestionGenerationResult {
+  return {
+    suggestions: result.suggestions.map((suggestion) => ({
+      ...suggestion,
+      description: sanitizeSourceNeutralDescription(suggestion.description),
+    })),
+  };
+}
+
 function emitFailureMetric(
   profileId: string,
   subjectId: string,
@@ -44,6 +83,51 @@ function emitFailureMetric(
     subjectId,
     reason,
   });
+}
+
+async function callBookSuggestionGenerationJson(
+  messages: ChatMessage[],
+): Promise<BookSuggestionGenerationResult | null> {
+  let lastFailure = '';
+  for (let attempt = 0; attempt < BOOK_SUGGESTION_JSON_ATTEMPTS; attempt++) {
+    const attemptMessages =
+      attempt === 0
+        ? messages
+        : [
+            ...messages,
+            {
+              role: 'user' as const,
+              content: [
+                'The previous response failed validation.',
+                'Return the requested suggestions again as valid JSON only.',
+                'Do not use markdown, comments, trailing commas, or text outside the JSON object.',
+                `Validation failure: ${lastFailure.slice(0, 500)}`,
+              ].join('\n'),
+            },
+          ];
+
+    const result = await routeAndCall(attemptMessages, 2, {
+      responseFormat: 'json',
+    });
+
+    let json: unknown;
+    try {
+      json = extractBookSuggestionJson(result.response);
+    } catch (error) {
+      lastFailure = error instanceof Error ? error.message : String(error);
+      continue;
+    }
+
+    const validated = bookSuggestionGenerationResultSchema.safeParse(json);
+    if (validated.success) return sanitizeBookSuggestionOutput(validated.data);
+
+    lastFailure =
+      validated.error instanceof Error
+        ? validated.error.message
+        : JSON.stringify(validated.error);
+  }
+
+  return null;
 }
 
 export async function generateCategorizedBookSuggestions(
@@ -162,14 +246,12 @@ export async function generateCategorizedBookSuggestions(
         existingSuggestionTitles,
         studiedTopics,
       });
-      const result = await routeAndCall(messages, 2);
-      const json = extractJson(result.response);
-      const validated = bookSuggestionGenerationResultSchema.safeParse(json);
-      if (!validated.success) {
+      const validated = await callBookSuggestionGenerationJson(messages);
+      if (!validated) {
         emitFailureMetric(profileId, subjectId, 'parse');
         return 'parse';
       }
-      parsed = validated.data;
+      parsed = validated;
     } catch (error) {
       const reason = classifyError(error);
       emitFailureMetric(profileId, subjectId, reason);
@@ -249,6 +331,8 @@ export function buildPrompt(args: {
 Language-specific rules:
 - Suggestions should be practice lanes inside ${safeLanguageName}, not generic school subjects or the language name by itself.
 - Prefer useful communication themes, vocabulary domains, grammar-in-context, pronunciation/listening practice, culture, media, and real-life situations.
+- If the subject is Four Strands practice, make the set visibly cover all four strands across the four suggestions: meaning-focused input, meaning-focused output, language-focused learning/form, and fluency development.
+- For Four Strands practice, make the strand visible in the descriptions; the fluency suggestion should use words like "fluency", "fluent", "smooth", or "natural speech".
 - Titles should be concrete and pickable, like "Travel Conversations", "Music and Lyrics", or "Everyday Speaking".`
     : '';
 
@@ -256,6 +340,9 @@ Language-specific rules:
 - Each suggestion has: title (1-200 chars), description (1+ chars), emoji (1+ chars), category ("related" or "explore").
 - Titles MUST NOT be (case-insensitive) equivalent to any title in the EXISTING list.
 - Titles MUST NOT duplicate each other.
+- If the subject name or existing context says adult or 18+, use adult-learning register: direct, specific, calm, and never childish.
+- Avoid tiny/novelty/remedial shelves. Do not use "Tiny", "Quick Tricks", "Basics" duplicates, "Amazing", "Wonders", sticker-like, or mascot-like framing when the existing shelf already covers basics.
+- Descriptions must be source-neutral learning objectives, not factual mini-lessons. Do not include precise dates, years, century/decade labels, percentages, statistics, or unsupported factual specifics anywhere. Forbidden examples: "1914", "summer of 1914", "early 20th century", "1940s", "80%". For history/science, prefer "investigate evidence" or "compare explanations" over asserting facts that require a source.
 
 Return ONLY valid JSON in this exact shape:
 {"suggestions":[{"title":"...","description":"...","emoji":"...","category":"related"}]}`;
@@ -282,10 +369,30 @@ Generate the suggestions now.`;
   ];
 }
 
-function extractJson(response: string): unknown {
+export function extractBookSuggestionJson(response: string): unknown {
   const objectMatch = response.match(/\{[\s\S]*\}/);
   if (!objectMatch) throw new Error('LLM response did not contain JSON');
-  return JSON.parse(objectMatch[0]);
+  const jsonText = objectMatch[0];
+  try {
+    return JSON.parse(jsonText);
+  } catch (error) {
+    const repaired = repairBookSuggestionJson(jsonText);
+    if (repaired !== jsonText) {
+      try {
+        return JSON.parse(repaired);
+      } catch {
+        // Preserve the original parse error for clearer diagnostics.
+      }
+    }
+    throw error;
+  }
+}
+
+function repairBookSuggestionJson(jsonText: string): string {
+  return jsonText.replace(
+    /("category"\s*:\s*"(?:related|explore)")\s+[^{}[\]",]*(?=\s*})/gi,
+    '$1',
+  );
 }
 
 function classifyError(error: unknown): FailureReason {

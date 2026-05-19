@@ -1759,6 +1759,83 @@ describe('source provenance audit', () => {
     expect(safe.sourceAudit.reason).toMatch(/unsupported land\/soil detail/i);
   });
 
+  it('removes unsupported sediment definitions from source-thin fossil explanations', () => {
+    const sourceEvidence = buildExchangeSourceEvidence(
+      {
+        ...baseContext,
+        topicTitle: 'Fossilization basics',
+        topicDescription:
+          'Fossils often form when remains are buried by sediment. Over time, minerals can replace hard parts such as bones or shells, preserving their shape.',
+      },
+      'Can you explain how fossils form from this source?',
+    );
+    const audit = auditExchangeSources(
+      { relied_on: ['current_topic'], insufficient: false },
+      sourceEvidence,
+    );
+
+    const safe = applySourceAuditSafetyFallback(
+      'Fossils form when remains are buried by sediment. Think of sediment like sand or mud settling down. Over a really long time, minerals preserve the shape.',
+      audit,
+    );
+
+    expect(safe.response).toContain(
+      'Fossils form when remains are buried by sediment.',
+    );
+    expect(safe.response).not.toMatch(/sand|mud|really long time/i);
+    expect(safe.sourceAudit.reason).toMatch(/unsupported sediment definition/i);
+  });
+
+  it('removes unsupported soft-validation openers from source-thin replies', () => {
+    const sourceEvidence = buildExchangeSourceEvidence(
+      {
+        ...baseContext,
+        topicTitle: 'Ancient trade',
+        topicDescription:
+          'Ancient civilizations traded to get things they lacked and build connections with other places.',
+      },
+      'So did they mostly trade salt and silk?',
+    );
+    const audit = auditExchangeSources(
+      { relied_on: ['current_topic'], insufficient: true },
+      sourceEvidence,
+    );
+
+    const safe = applySourceAuditSafetyFallback(
+      "That's an interesting thought about trade items. The source supports that ancient civilizations traded to get things they lacked.",
+      audit,
+    );
+
+    expect(safe.response).not.toMatch(/interesting thought/i);
+    expect(safe.response).toContain('The source supports');
+    expect(safe.sourceAudit.reason).toMatch(/unsupported soft validation/i);
+  });
+
+  it('removes generic praise openers from source-supported practice replies', () => {
+    const sourceEvidence = buildExchangeSourceEvidence(
+      {
+        ...baseContext,
+        topicTitle: 'Spanish present tense speaking practice',
+        topicDescription:
+          'Practice short present-tense Spanish sentences aloud using familiar verbs and simple everyday actions.',
+      },
+      'Let me practice saying three quick Spanish sentences.',
+    );
+    const audit = auditExchangeSources(
+      { relied_on: ['current_topic'], insufficient: false },
+      sourceEvidence,
+    );
+
+    const safe = applySourceAuditSafetyFallback(
+      'Excellent idea! Start with one short sentence aloud.',
+      audit,
+    );
+
+    expect(safe.response).not.toMatch(/Excellent idea/i);
+    expect(safe.response).toContain('Start with one short sentence aloud');
+    expect(safe.sourceAudit.reason).toMatch(/generic praise/i);
+  });
+
   it('removes unsupported brick and house analogies from short source replies', () => {
     const sourceEvidence = buildExchangeSourceEvidence(
       {
