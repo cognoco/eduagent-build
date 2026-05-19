@@ -33,7 +33,7 @@ import {
   processEvaluateCompletion,
   processTeachBackCompletion,
 } from '../../services/verification-completion';
-import { captureException } from '../../services/sentry'; // RED: named import breaks jest.spyOn
+import * as sentry from '../../services/sentry';
 import { createLogger } from '../../services/logger';
 import { queueCelebration } from '../../services/celebrations';
 import {
@@ -205,7 +205,7 @@ async function runIsolated(
   } catch (err) {
     // [FIX-INNGEST-1] Structured tag so we can query soft-step failure rate
     // per step name. Required by "Silent Recovery Without Escalation is Banned".
-    captureException(err, {
+    sentry.captureException(err, {
       profileId,
       extra: { step: name, surface: 'session-completed' },
     });
@@ -276,7 +276,7 @@ export const sessionCompleted = inngest.createFunction(
         const timeoutErr = new Error(
           'session-completed: filing waitForEvent timed out after 60s',
         );
-        captureException(timeoutErr, { profileId });
+        sentry.captureException(timeoutErr, { profileId });
         // [logging sweep] structured logger so PII fields land as JSON context
         logger.warn(
           '[session-completed] filing waitForEvent timed out — proceeding with stale topic placement',
@@ -421,7 +421,7 @@ export const sessionCompleted = inngest.createFunction(
             // an unknown verificationType arriving here is a contract drift
             // signal (new type added without a handler). Without Sentry we
             // can't quantify how often this fires and where it originates.
-            captureException(
+            sentry.captureException(
               new Error(
                 `session-completed: unknown verificationType ${String(
                   verificationType,
@@ -841,7 +841,7 @@ export const sessionCompleted = inngest.createFunction(
               // Without Sentry we can't see how often the insights LLM is
               // returning unparseable output and parents are silently getting
               // template highlights instead of personalised recaps.
-              captureException(
+              sentry.captureException(
                 new Error(
                   `session-completed: generate-session-insights validation failed: ${result.reason}`,
                 ),
@@ -1054,7 +1054,7 @@ export const sessionCompleted = inngest.createFunction(
             },
           };
         } catch (err) {
-          captureException(err, {
+          sentry.captureException(err, {
             profileId,
             extra: {
               step: 'generate-llm-summary',
