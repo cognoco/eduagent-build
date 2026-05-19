@@ -38,6 +38,10 @@ fi
 TOKEN_RE='\[[A-Z][A-Z0-9_]{2,}\]'
 # SSE sentinels — strip these out before re-checking the line for any remaining marker.
 ALLOWLIST_RE='\[(DONE|OK)\]'
+# Pure comment lines in TypeScript service files can legitimately use tags like
+# [SECURITY] without representing an LLM prompt marker. Ignore comment-only lines
+# so the check stays focused on executable prompt content and string literals.
+COMMENT_LINE_RE='^[[:space:]]*(//|/\*|\*|\*/)'
 # Lines that are *describing a forbidden marker* rather than emitting one.
 NEGATION_RE="(do not|don't|never use|avoid|instead of|markers like|not \[|no \[|pre-migration|legacy|historical|was derived from|used to be|after the (envelope )?migration|before the (envelope )?migration|free-text marker|previous marker|the marker)"
 
@@ -53,6 +57,10 @@ while IFS= read -r -d '' f; do
     # Strip allowlisted sentinels; if no marker pattern remains, skip line.
     stripped=$(printf '%s' "$line" | sed -E "s/$ALLOWLIST_RE//g")
     if ! printf '%s' "$stripped" | grep -qE "$TOKEN_RE"; then
+      continue
+    fi
+
+    if printf '%s' "$line" | grep -qE "$COMMENT_LINE_RE"; then
       continue
     fi
 
