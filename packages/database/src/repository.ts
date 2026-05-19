@@ -44,6 +44,9 @@ import {
   monthlyReports,
   weeklyReports,
   learningProfiles,
+  progressSummaries,
+  milestones,
+  pendingNotices,
   vocabulary,
   vocabularyRetentionCards,
   dictationResults,
@@ -587,21 +590,40 @@ export function createScopedRepository(db: Database, profileId: string) {
       },
     },
     topicSuggestions: {
+      /**
+       * Return topic suggestions for a book, scoped to the current profile.
+       *
+       * [BUG-218 / P1-HIGH] TOCTOU fix: the previous implementation issued two
+       * sequential queries — one to confirm the book existed and was owned by
+       * a subject this profile owns, then a separate query to read its
+       * suggestions. Between those two reads, a subject could be reparented or
+       * the book's subject FK rewritten, allowing a stale ownership check to
+       * authorise a read against a book the profile no longer owned. The fix
+       * collapses this into a single query that enforces ownership inside the
+       * SELECT via books→subjects joins, so the row-visibility predicate and
+       * the ownership predicate evaluate as one snapshot.
+       */
       async findByBook(bookId: string) {
-        const book = await db.query.curriculumBooks.findFirst({
-          where: eq(curriculumBooks.id, bookId),
-        });
-        if (!book) return [];
-        const subject = await db.query.subjects.findFirst({
-          where: and(
-            eq(subjects.id, book.subjectId),
-            eq(subjects.profileId, profileId),
-          ),
-        });
-        if (!subject) return [];
-        return db.query.topicSuggestions.findMany({
-          where: eq(topicSuggestions.bookId, bookId),
-        });
+        return db
+          .select({
+            id: topicSuggestions.id,
+            bookId: topicSuggestions.bookId,
+            title: topicSuggestions.title,
+            createdAt: topicSuggestions.createdAt,
+            usedAt: topicSuggestions.usedAt,
+          })
+          .from(topicSuggestions)
+          .innerJoin(
+            curriculumBooks,
+            eq(curriculumBooks.id, topicSuggestions.bookId),
+          )
+          .innerJoin(subjects, eq(subjects.id, curriculumBooks.subjectId))
+          .where(
+            and(
+              eq(topicSuggestions.bookId, bookId),
+              eq(subjects.profileId, profileId),
+            ),
+          );
       },
     },
 
@@ -1127,6 +1149,76 @@ export function createScopedRepository(db: Database, profileId: string) {
       async findMany(extraWhere?: SQL) {
         return db.query.celebrationEvents.findMany({
           where: scopedWhere(celebrationEvents, extraWhere),
+        });
+      },
+    },
+
+    // [BUG-219 / P1-HIGH] progressSummaries — scoped-repo helpers. Previously
+    // every caller had to repeat `eq(progressSummaries.profileId, X)` by hand
+    // (or worse, query the table by id alone), opening the door to cross-
+    // profile reads. Centralising the predicate here makes the contract
+    // enforceable by `profile-isolation.test.ts` and matches every other
+    // single-table scoped namespace above.
+    progressSummaries: {
+      async findMany(extraWhere?: SQL) {
+        return db.query.progressSummaries.findMany({
+          where: scopedWhere(progressSummaries, extraWhere),
+        });
+      },
+      async findFirst(extraWhere?: SQL) {
+        return db.query.progressSummaries.findFirst({
+          where: scopedWhere(progressSummaries, extraWhere),
+        });
+      },
+    },
+
+    // [BUG-219 / P1-HIGH] milestones — same rationale as progressSummaries.
+    // `findById` enforces profileId in the WHERE clause so a caller cannot
+    // accidentally read a milestone owned by a sibling profile by passing the
+    // wrong id.
+    milestones: {
+      async findMany(extraWhere?: SQL, orderBy?: SQL | SQL[]) {
+        return db.query.milestones.findMany({
+          where: scopedWhere(milestones, extraWhere),
+          ...(orderBy ? { orderBy } : {}),
+        });
+      },
+      async findFirst(extraWhere?: SQL) {
+        return db.query.milestones.findFirst({
+          where: scopedWhere(milestones, extraWhere),
+        });
+      },
+      async findById(milestoneId: string) {
+        return db.query.milestones.findFirst({
+          where: scopedWhere(milestones, eq(milestones.id, milestoneId)),
+        });
+      },
+    },
+
+    // [BUG-224 / P2-MED] pendingNotices uses ownerProfileId (not profileId),
+    // so it cannot share scopedWhere(). Implement it explicitly so callers
+    // stop reaching for `db.query.pendingNotices.*` directly and the scoping
+    // contract stays centralised.
+    pendingNotices: {
+      async findMany(extraWhere?: SQL, orderBy?: SQL | SQL[]) {
+        const ownerFilter = eq(pendingNotices.ownerProfileId, profileId);
+        return db.query.pendingNotices.findMany({
+          where: extraWhere ? and(ownerFilter, extraWhere) : ownerFilter,
+          ...(orderBy ? { orderBy } : {}),
+        });
+      },
+      async findFirst(extraWhere?: SQL) {
+        const ownerFilter = eq(pendingNotices.ownerProfileId, profileId);
+        return db.query.pendingNotices.findFirst({
+          where: extraWhere ? and(ownerFilter, extraWhere) : ownerFilter,
+        });
+      },
+      async findById(noticeId: string) {
+        return db.query.pendingNotices.findFirst({
+          where: and(
+            eq(pendingNotices.ownerProfileId, profileId),
+            eq(pendingNotices.id, noticeId),
+          ),
         });
       },
     },

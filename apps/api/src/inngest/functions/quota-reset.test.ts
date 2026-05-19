@@ -48,7 +48,10 @@ const mockDatabaseModule = createDatabaseModuleMock({
   },
 });
 
-jest.mock('@eduagent/database', () => mockDatabaseModule.module);
+jest.mock(
+  '@eduagent/database' /* gc1-allow: inngest unit test — prevents real Neon connection; real DB exercised via .integration.test.ts harness */,
+  () => mockDatabaseModule.module,
+);
 
 // subscription: getTierConfig is a pure static config lookup — use real code.
 
@@ -99,8 +102,10 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 describe('quotaReset', () => {
-  it('should be defined as an Inngest function', () => {
-    expect(quotaReset).toBeTruthy();
+  it('should be defined as an Inngest function with the expected id', () => {
+    expect((quotaReset as { opts?: { id?: string } }).opts?.id).toBe(
+      'quota-reset',
+    );
   });
 
   it('should have the correct function id', () => {

@@ -52,7 +52,7 @@ const BOUNCE_DELAY_MS = 600;
  */
 export function CheckmarkPopAnimation({
   size = 80,
-  color = '#22c55e',
+  color = '#22c55e', // brand: success green for checkmark pop animation
   strokeWidth = 3,
   onComplete,
   testID,

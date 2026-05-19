@@ -2,6 +2,7 @@
 export * from './common';
 export * from './errors';
 export * from './age';
+export * from './ids';
 
 // Profiles
 export * from './profiles';
@@ -49,6 +50,10 @@ export * from './quiz-utils';
 // LLM Response Envelope (shared contract for all structured-output LLM flows)
 export * from './llm-envelope';
 export * from './llm-summary';
+
+// Database JSONB parsers (BUG-220 / BUG-222 / BUG-225) — runtime validation
+// helpers for jsonb columns that drizzle types as `unknown` or via `$type<…>`.
+export * from './db-jsonb';
 
 // Stream fallback contract — SSE frame + typed reasons shared with mobile
 export * from './stream-fallback';

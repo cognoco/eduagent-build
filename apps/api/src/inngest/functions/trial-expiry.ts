@@ -78,7 +78,7 @@ import {
   TRIAL_EXTENDED_DAYS,
 } from '../../services/trial';
 import { sendPushNotification } from '../../services/notifications';
-import { getRecentNotificationCount } from '../../services/settings';
+import { checkAndLogRateLimitInternal } from '../../services/settings';
 import { findOwnerProfile } from '../../services/profile';
 
 async function sendTrialNotificationToAccountOwner(
@@ -88,29 +88,39 @@ async function sendTrialNotificationToAccountOwner(
     title: string;
     body: string;
     type: 'trial_expiry';
-  }
+  },
 ): Promise<{ sent: boolean; reason?: string }> {
   const ownerProfile = await findOwnerProfile(db, accountId);
   if (!ownerProfile) {
     return { sent: false, reason: 'no_owner_profile' };
   }
 
-  // [BUG-699-FOLLOWUP] Best-effort dedup by notification log. Read-then-write
-  // is NOT atomic: two concurrent step.run invocations (Inngest retry racing
-  // a fresh daily cron run) could both see count===0 and both send. The daily
-  // cron cadence + retries=2 keeps the race window narrow in practice; if
-  // duplicate sends are ever observed, promote to a (profile_id, type, day)
-  // unique constraint on notificationLog so the DB rejects the race loser.
-  const recentCount = await getRecentNotificationCount(
+  // [BUG-117] Atomic dedup. The previous implementation was a read-then-write
+  // pair on notificationLog (getRecentNotificationCount → conditional send +
+  // log). Two concurrent step.run invocations (e.g. an Inngest retry racing
+  // a fresh daily cron run, or two parallel observers landing in the same
+  // millisecond) could both observe count===0 and both fire the push.
+  //
+  // checkAndLogRateLimitInternal wraps the count check and the log insert
+  // in a single transaction with a pg_advisory_xact_lock keyed on
+  // ('rate-limit:<profileId>:<type>'). Concurrent callers serialize on the
+  // lock, so the second caller observes the first caller's log row and the
+  // race window is closed at the DB level. maxCount=1 within a 24h window
+  // preserves the original "one push per 24h" semantics.
+  const limited = await checkAndLogRateLimitInternal(
     db,
     ownerProfile.id,
     'trial_expiry',
-    24
+    { hours: 24, maxCount: 1 },
   );
-  if (recentCount > 0) {
+  if (limited) {
     return { sent: false, reason: 'dedup_24h' };
   }
 
+  // NOTE: checkAndLogRateLimitInternal has ALREADY inserted the
+  // notificationLog row inside the same transaction that gated us. If the
+  // push itself fails, we accept the unsent-but-logged state — a duplicate
+  // push (user-visible) is worse than an unsent one (recoverable).
   return sendPushNotification(db, {
     profileId: ownerProfile.id,
     title: payload.title,
@@ -139,7 +149,7 @@ export const trialExpiry = inngest.createFunction(
           await transitionToExtendedTrial(
             db,
             trial.id,
-            EXTENDED_TRIAL_MONTHLY_EQUIVALENT
+            EXTENDED_TRIAL_MONTHLY_EQUIVALENT,
           );
           count++;
         } catch (err) {
@@ -157,7 +167,7 @@ export const trialExpiry = inngest.createFunction(
               step: 'process-expired-trials',
               trialId: trial.id,
               err,
-            })
+            }),
           );
         }
       }
@@ -169,7 +179,7 @@ export const trialExpiry = inngest.createFunction(
     if (expiredResult.failures.length > 0) {
       await step.sendEvent(
         'escalate-process-expired-trials',
-        expiredResult.failures
+        expiredResult.failures,
       );
     }
     const expiredCount = expiredResult.count;
@@ -184,7 +194,7 @@ export const trialExpiry = inngest.createFunction(
         const extendedTrials = await findExpiredTrialsByDaysSinceEnd(
           db,
           now,
-          TRIAL_EXTENDED_DAYS
+          TRIAL_EXTENDED_DAYS,
         );
 
         let count = 0;
@@ -197,7 +207,7 @@ export const trialExpiry = inngest.createFunction(
               db,
               trial.id,
               freeTier.monthlyQuota,
-              freeTier.dailyLimit
+              freeTier.dailyLimit,
             );
             count++;
           } catch (err) {
@@ -215,20 +225,20 @@ export const trialExpiry = inngest.createFunction(
                 step: 'process-extended-trial-expiry',
                 trialId: trial.id,
                 err,
-              })
+              }),
             );
           }
         }
 
         return { count, failures };
-      }
+      },
     );
 
     // [SWEEP-J7] Memoized batch dispatch outside step.run.
     if (extendedResult.failures.length > 0) {
       await step.sendEvent(
         'escalate-process-extended-trial-expiry',
-        extendedResult.failures
+        extendedResult.failures,
       );
     }
     const extendedExpiredCount = extendedResult.count;
@@ -257,17 +267,17 @@ export const trialExpiry = inngest.createFunction(
         const targetDate = new Date(now);
         targetDate.setDate(targetDate.getDate() + daysRemaining);
         const targetDayStart = new Date(
-          targetDate.toISOString().slice(0, 10) + 'T00:00:00.000Z'
+          targetDate.toISOString().slice(0, 10) + 'T00:00:00.000Z',
         );
         const targetDayEnd = new Date(
-          targetDate.toISOString().slice(0, 10) + 'T23:59:59.999Z'
+          targetDate.toISOString().slice(0, 10) + 'T23:59:59.999Z',
         );
 
         const trialsToWarn = await findSubscriptionsByTrialDateRange(
           db,
           'trial',
           targetDayStart,
-          targetDayEnd
+          targetDayEnd,
         );
 
         for (const trial of trialsToWarn) {
@@ -278,7 +288,7 @@ export const trialExpiry = inngest.createFunction(
               title: 'Trial ending soon',
               body: warningMessage,
               type: 'trial_expiry',
-            }
+            },
           );
           if (result.sent) sent++;
         }
@@ -301,17 +311,17 @@ export const trialExpiry = inngest.createFunction(
           const targetDate = new Date(now);
           targetDate.setDate(targetDate.getDate() - daysSinceEnd);
           const targetDayStart = new Date(
-            targetDate.toISOString().slice(0, 10) + 'T00:00:00.000Z'
+            targetDate.toISOString().slice(0, 10) + 'T00:00:00.000Z',
           );
           const targetDayEnd = new Date(
-            targetDate.toISOString().slice(0, 10) + 'T23:59:59.999Z'
+            targetDate.toISOString().slice(0, 10) + 'T23:59:59.999Z',
           );
 
           const expiredTrials = await findSubscriptionsByTrialDateRange(
             db,
             'expired',
             targetDayStart,
-            targetDayEnd
+            targetDayEnd,
           );
 
           for (const trial of expiredTrials) {
@@ -322,14 +332,14 @@ export const trialExpiry = inngest.createFunction(
                 title: 'Your trial has ended',
                 body: message,
                 type: 'trial_expiry',
-              }
+              },
             );
             if (result.sent) sent++;
           }
         }
 
         return sent;
-      }
+      },
     );
 
     return {
@@ -340,5 +350,5 @@ export const trialExpiry = inngest.createFunction(
       warningsSent,
       softLandingSent,
     };
-  }
+  },
 );

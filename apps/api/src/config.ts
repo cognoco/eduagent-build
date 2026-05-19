@@ -51,6 +51,19 @@ const envSchema = z.object({
   // RevenueCat — webhook authentication
   REVENUECAT_WEBHOOK_SECRET: z.string().min(1).optional(),
 
+  // Inngest — webhook signing key (validates inbound calls from Inngest Cloud
+  // to /v1/inngest) and event ingestion key (outbound inngest.send()). Both
+  // must be set per-environment in Doppler (mentomate dev/stg/prd). Without
+  // a signing key the `serve()` helper from `inngest/hono` accepts unsigned
+  // POSTs (dev posture). With wrong-env signing key, Inngest Cloud's request
+  // signature won't verify and the cross-env webhook is rejected at the
+  // Inngest SDK boundary. We add both to the schema so missing values fail
+  // env-validation at boot (loud) instead of silently disabling signature
+  // checks (cross-env webhook replay risk).
+  // [BUG-242]
+  INNGEST_SIGNING_KEY: z.string().min(1).optional(),
+  INNGEST_EVENT_KEY: z.string().min(1).optional(),
+
   // Empty-reply stream guard — per-request kill switch for the
   // [EMPTY-REPLY-GUARD] classifier in streamMessage.onComplete and
   // streamInterviewExchange.onComplete. When 'false', the service skips
@@ -154,6 +167,14 @@ const STAGING_AND_PRODUCTION_REQUIRED_KEYS: readonly (keyof Env)[] = [
   'CLERK_SECRET_KEY',
   'CLERK_JWKS_URL',
   'CLERK_AUDIENCE',
+  // [BUG-242] Inngest signing + event keys must be per-env. Missing values
+  // would either disable signature validation on the webhook (dev posture in
+  // prod = unsigned POSTs accepted) or silently drop outbound dispatches. Both
+  // are catastrophic if either staging or production has the wrong env's key,
+  // so we enforce presence in both tiers and rely on Doppler to inject the
+  // env-correct value.
+  'INNGEST_SIGNING_KEY',
+  'INNGEST_EVENT_KEY',
 ] as const;
 
 // ---------------------------------------------------------------------------

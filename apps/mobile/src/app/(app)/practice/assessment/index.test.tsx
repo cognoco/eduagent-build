@@ -1,4 +1,4 @@
-import { isAssessmentReadinessReply } from './assessment-readiness';
+import { isAssessmentReadinessReply } from './_assessment-readiness';
 
 describe('assessment readiness replies', () => {
   it('detects first-turn readiness replies that should not be graded', () => {

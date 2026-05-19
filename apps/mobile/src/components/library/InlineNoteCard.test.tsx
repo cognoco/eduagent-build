@@ -13,8 +13,8 @@ describe('InlineNoteCard', () => {
 
   it('renders source line and content preview', () => {
     render(<InlineNoteCard {...baseProps} />);
-    expect(screen.getByText('From session · Apr 24')).toBeTruthy();
-    expect(screen.getByText(/Remember to check/)).toBeTruthy();
+    expect(screen.getByText('From session · Apr 24'));
+    expect(screen.getByText(/Remember to check/));
   });
 
   it('expands on press', () => {
@@ -37,6 +37,6 @@ describe('InlineNoteCard', () => {
 
   it('renders without source line for quick notes', () => {
     render(<InlineNoteCard {...baseProps} sourceLine="Note · Apr 24" />);
-    expect(screen.getByText('Note · Apr 24')).toBeTruthy();
+    expect(screen.getByText('Note · Apr 24'));
   });
 });

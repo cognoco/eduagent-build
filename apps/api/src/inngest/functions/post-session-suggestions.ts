@@ -32,6 +32,17 @@ export const postSessionSuggestions = inngest.createFunction(
   {
     id: 'post-session-suggestions',
     name: 'Generate topic suggestions after filing',
+    // [BUG-157] Idempotency on bookId — duplicate `app/filing.completed`
+    // events for the same book (operator replay, double-dispatch) would each
+    // re-run the dedup count check; while the in-step count>=2 gate prevents
+    // duplicate inserts, two near-simultaneous events can both observe
+    // count=0, both call the LLM, both insert. Idempotency at the function
+    // level short-circuits the second run before any LLM tokens are burned.
+    // 24h window: longer than any realistic session-completion replay.
+    idempotency: 'event.data.bookId',
+    // Bound concurrency per-profile so a flurry of filings from one learner
+    // does not stampede the LLM provider.
+    concurrency: { limit: 5, key: 'event.data.profileId' },
   },
   { event: 'app/filing.completed' },
   async ({ event, step }) => {
@@ -49,7 +60,7 @@ export const postSessionSuggestions = inngest.createFunction(
         '[post-session-suggestions] invalid payload — skipping retries',
         {
           issues,
-        }
+        },
       );
       // Structured escalation per global "no silent recovery" rule —
       // captureException keeps the case in Sentry for queryable counts.
@@ -61,7 +72,7 @@ export const postSessionSuggestions = inngest.createFunction(
             reason: 'invalid_payload',
             issues,
           },
-        }
+        },
       );
       return {
         status: 'skipped' as const,
@@ -86,7 +97,7 @@ export const postSessionSuggestions = inngest.createFunction(
       const ownerSubject = await db.query.subjects.findFirst({
         where: and(
           eq(subjects.id, book.subjectId),
-          eq(subjects.profileId, profileId)
+          eq(subjects.profileId, profileId),
         ),
       });
       if (!ownerSubject)
@@ -103,8 +114,8 @@ export const postSessionSuggestions = inngest.createFunction(
         .where(
           and(
             eq(topicSuggestions.bookId, bookId),
-            isNull(topicSuggestions.usedAt)
-          )
+            isNull(topicSuggestions.usedAt),
+          ),
         );
       if (existing[0] && existing[0].count >= 2) {
         return {
@@ -158,7 +169,7 @@ Suggest exactly 2 new topic titles that would be natural next steps within this 
               reason: 'no_json_found',
               rawResponseLength: llmResult.response.length,
             },
-          }
+          },
         );
         return {
           status: 'skipped' as const,
@@ -214,5 +225,5 @@ Suggest exactly 2 new topic titles that would be natural next steps within this 
     });
 
     return { ...result, timestamp: new Date().toISOString() };
-  }
+  },
 );

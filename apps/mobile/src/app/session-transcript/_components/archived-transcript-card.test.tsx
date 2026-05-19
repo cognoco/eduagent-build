@@ -21,8 +21,8 @@ describe('ArchivedTranscriptCard', () => {
 
   it('renders archived date in a friendly format', () => {
     const { getByText } = render(<ArchivedTranscriptCard {...props} />);
-    expect(getByText(/archived on/i)).toBeTruthy();
-    expect(getByText(/2026/i)).toBeTruthy();
+    expect(getByText(/archived on/i));
+    expect(getByText(/2026/i));
   });
 
   it('renders topic chips for each topicsCovered entry', () => {
@@ -32,7 +32,7 @@ describe('ArchivedTranscriptCard', () => {
 
   it('renders the re-entry recommendation', () => {
     const { getByText } = render(<ArchivedTranscriptCard {...props} />);
-    expect(getByText(/4-digit dividend/i)).toBeTruthy();
+    expect(getByText(/4-digit dividend/i));
   });
 
   it('calls onContinueTopic when CTA is pressed', () => {

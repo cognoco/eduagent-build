@@ -30,7 +30,7 @@ scripts/check-change-class.sh --branch     # check all changes vs main
 | **security-sensitive** | `**/billing/**`, `**/auth/**`, `**/clerk*` | — | `test:api:integration` | Break tests required; no silent recovery |
 | **ci-deploy** | `.github/workflows/**`, `wrangler.toml` | — | — | Manual review; check credential separation |
 | **expo-config** | `app.config.*`, `eas.json` | — | — | May need native build; OTA can't ship native changes |
-| **e2e** | `tests/e2e/**`, `apps/mobile/e2e/**`, `playwright.config` | — | `test:e2e:web:smoke` | Full suite via Doppler `-c stg` |
+| **e2e** | `tests/e2e/**`, `apps/mobile/e2e/**`, `playwright.config` | — | `test:e2e:web:smoke` | Full suite via Doppler `-c stg`. Mobile smoke pack: `bash apps/mobile/e2e/scripts/run-smoke.sh` (see `docs/e2e-smoke-pack.md`) |
 | **lint-config** | `eslint.config.*`, `.lintstagedrc.*`, `.husky/**`, `tsconfig*.json` | `lint`, `tsc --build` | — | |
 | **retention** | `packages/retention/src/**` | `nx test retention`, `test:api:unit` | — | |
 | **eval-harness** | `apps/api/eval-llm/**` (non-snapshots) | `eval:llm` | — | |

@@ -33,7 +33,7 @@ import {
   processEvaluateCompletion,
   processTeachBackCompletion,
 } from '../../services/verification-completion';
-import { captureException } from '../../services/sentry'; // RED: named import breaks jest.spyOn
+import * as sentry from '../../services/sentry';
 import { createLogger } from '../../services/logger';
 import { queueCelebration } from '../../services/celebrations';
 import {
@@ -177,6 +177,22 @@ interface DashboardStepResult extends StepOutcome {
   streak: { currentStreak: number; longestStreak: number } | null;
 }
 
+// [BUG-181] update-vocabulary-retention previously assigned language
+// progress to closure variables (`let previousLanguageProgress` /
+// `let nextLanguageProgress`) read by check-milestone-completion. On
+// Inngest replay, step.run results are memoized but closure assignments
+// inside the memoized function body are NOT re-executed — the downstream
+// step would see `null` and silently miss milestone celebrations.
+// Carry the values through the step result instead.
+interface VocabularyRetentionStepResult extends StepOutcome {
+  previousLanguageProgress: Awaited<
+    ReturnType<typeof getCurrentLanguageProgress>
+  > | null;
+  nextLanguageProgress: Awaited<
+    ReturnType<typeof getCurrentLanguageProgress>
+  > | null;
+}
+
 // Close reasons that indicate no user engagement — SM-2 fallback should not apply.
 // The plan listed 'crash_recovery' and 'app_background' but these do not exist
 // in the codebase as of 2026-04-16. Add them here if they are introduced.
@@ -205,7 +221,7 @@ async function runIsolated(
   } catch (err) {
     // [FIX-INNGEST-1] Structured tag so we can query soft-step failure rate
     // per step name. Required by "Silent Recovery Without Escalation is Banned".
-    captureException(err, {
+    sentry.captureException(err, {
       profileId,
       extra: { step: name, surface: 'session-completed' },
     });
@@ -235,7 +251,26 @@ async function runCritical(
 }
 
 export const sessionCompleted = inngest.createFunction(
-  { id: 'session-completed', name: 'Process session completion' },
+  {
+    id: 'session-completed',
+    name: 'Process session completion',
+    // [BUG-146] Per-profile concurrency cap. This function fans out heavy
+    // LLM work (analyzeSessionTranscript, generateSessionInsights,
+    // generateLearnerRecap, generateAndStoreLlmSummary) plus Voyage
+    // embeddings and Neon writes. Without a cap, a flurry of session-
+    // completed events for one profile would stampede the LLM provider
+    // and Neon connection pool. limit=25 mirrors the heavy-LLM cadence
+    // used by weekly-progress-push; keying on profileId spreads parallelism
+    // across profiles without serialising the whole function.
+    concurrency: { limit: 25, key: 'event.data.profileId' },
+    // [BUG-154] Function-level idempotency keyed on sessionId prevents
+    // duplicate `app/session.completed` deliveries for the same session
+    // from re-triggering the pipeline (which would re-emit dedup-events
+    // and re-run all enrichment steps). Inngest memoizes step.run results
+    // within a single invocation, but only function-level idempotency
+    // dedupes across separate event deliveries.
+    idempotency: 'event.data.sessionId',
+  },
   { event: 'app/session.completed' },
   async ({ event, step }) => {
     const {
@@ -276,7 +311,7 @@ export const sessionCompleted = inngest.createFunction(
         const timeoutErr = new Error(
           'session-completed: filing waitForEvent timed out after 60s',
         );
-        captureException(timeoutErr, { profileId });
+        sentry.captureException(timeoutErr, { profileId });
         // [logging sweep] structured logger so PII fields land as JSON context
         logger.warn(
           '[session-completed] filing waitForEvent timed out — proceeding with stale topic placement',
@@ -322,12 +357,6 @@ export const sessionCompleted = inngest.createFunction(
     }
 
     const outcomes: StepOutcome[] = [];
-    let previousLanguageProgress: Awaited<
-      ReturnType<typeof getCurrentLanguageProgress>
-    > | null = null;
-    let nextLanguageProgress: Awaited<
-      ReturnType<typeof getCurrentLanguageProgress>
-    > | null = null;
 
     const loadTopicTitle = async (
       db: ReturnType<typeof getStepDatabase>,
@@ -421,7 +450,7 @@ export const sessionCompleted = inngest.createFunction(
             // an unknown verificationType arriving here is a contract drift
             // signal (new type added without a handler). Without Sentry we
             // can't quantify how often this fires and where it originates.
-            captureException(
+            sentry.captureException(
               new Error(
                 `session-completed: unknown verificationType ${String(
                   verificationType,
@@ -495,10 +524,19 @@ export const sessionCompleted = inngest.createFunction(
     // leaving relearn cards with nextReviewAt=null and never re-surfacing.
     // Reset first, then SM-2 advances from baseline using effectiveQuality.
     //
-    // Note: we intentionally do NOT bump `updatedAt` here. The next step
-    // (update-retention) reads the card and uses `updatedAt` for both the
-    // D-01 double-counting guard and the optimistic-lock WHERE clause; bumping
-    // it here would cause SM-2 to short-circuit and skip the advance.
+    // [BUG-185] The next step (update-retention) reads the card and uses
+    // `updatedAt` for both the D-01 double-counting guard and the
+    // optimistic-lock WHERE clause. This step MUST preserve the existing
+    // `updatedAt` value — bumping it here would cause SM-2 to short-circuit
+    // and skip the advance.
+    //
+    // Previously this relied on Drizzle's implicit "omit field from SET =
+    // don't change it" behaviour. That contract is invisible at the call
+    // site: a future maintainer adding `$onUpdateFn(() => new Date())` to
+    // retentionCards in the schema would silently break the D-01 guard.
+    // The fix below makes the preservation explicit via a self-referencing
+    // SQL expression so the contract is visible in code and survives any
+    // future schema-level auto-update hook.
     outcomes.push(
       await step.run('relearn-retention-reset', async () => {
         const sessionMode = event.data.mode as string | undefined;
@@ -527,6 +565,12 @@ export const sessionCompleted = inngest.createFunction(
               xpStatus: 'pending',
               nextReviewAt: null,
               lastReviewedAt: null,
+              // [BUG-185] Explicitly preserve updatedAt against the column
+              // itself. This is a no-op at the SQL level but documents the
+              // contract that update-retention depends on this value being
+              // unchanged, and prevents accidental bump from any future
+              // Drizzle $onUpdateFn on retentionCards.updatedAt.
+              updatedAt: sql`${retentionCards.updatedAt}`,
             })
             .where(
               and(
@@ -571,16 +615,30 @@ export const sessionCompleted = inngest.createFunction(
       }),
     );
 
-    outcomes.push(
-      await step.run('update-vocabulary-retention', async () => {
+    // [BUG-181] Return language progress through the step result so the value
+    // survives Inngest replay memoization. Mutating closure vars inside
+    // step.run is replay-unsafe — on replay the memoized result is reused but
+    // the closure assignments are NOT re-executed.
+    const vocabularyOutcome = (await step.run(
+      'update-vocabulary-retention',
+      async (): Promise<VocabularyRetentionStepResult> => {
         if (!subjectId) {
           return {
             step: 'update-vocabulary-retention',
             status: 'skipped' as const,
+            previousLanguageProgress: null,
+            nextLanguageProgress: null,
           };
         }
 
-        return runIsolated(
+        let stepPrevious: Awaited<
+          ReturnType<typeof getCurrentLanguageProgress>
+        > | null = null;
+        let stepNext: Awaited<
+          ReturnType<typeof getCurrentLanguageProgress>
+        > | null = null;
+
+        const isolated = await runIsolated(
           'update-vocabulary-retention',
           profileId,
           async () => {
@@ -596,7 +654,7 @@ export const sessionCompleted = inngest.createFunction(
               return;
             }
 
-            previousLanguageProgress = await getCurrentLanguageProgress(
+            stepPrevious = await getCurrentLanguageProgress(
               db,
               profileId,
               subjectId,
@@ -626,7 +684,7 @@ export const sessionCompleted = inngest.createFunction(
                 content: entry.content,
               }));
 
-            const cefrLevel = previousLanguageProgress?.currentLevel ?? null;
+            const cefrLevel = stepPrevious?.currentLevel ?? null;
 
             const extractedVocabulary = await extractVocabularyFromTranscript(
               transcript,
@@ -635,7 +693,7 @@ export const sessionCompleted = inngest.createFunction(
             );
 
             if (extractedVocabulary.length === 0) {
-              nextLanguageProgress = previousLanguageProgress;
+              stepNext = stepPrevious;
               return;
             }
 
@@ -656,22 +714,31 @@ export const sessionCompleted = inngest.createFunction(
                   ...item,
                   cefrLevel: parsedLevel.success ? parsedLevel.data : undefined,
                   milestoneId:
-                    previousLanguageProgress?.currentMilestone?.milestoneId ??
-                    undefined,
+                    stepPrevious?.currentMilestone?.milestoneId ?? undefined,
                   quality,
                 };
               }),
             );
 
-            nextLanguageProgress = await getCurrentLanguageProgress(
+            stepNext = await getCurrentLanguageProgress(
               db,
               profileId,
               subjectId,
             );
           },
         );
-      }),
-    );
+
+        return {
+          ...isolated,
+          previousLanguageProgress: stepPrevious,
+          nextLanguageProgress: stepNext,
+        };
+      },
+    )) as unknown as VocabularyRetentionStepResult;
+    outcomes.push(vocabularyOutcome);
+
+    const previousLanguageProgress = vocabularyOutcome.previousLanguageProgress;
+    const nextLanguageProgress = vocabularyOutcome.nextLanguageProgress;
 
     // Step 1c: Update needs-deepening progress (FR63)
     outcomes.push(
@@ -841,7 +908,7 @@ export const sessionCompleted = inngest.createFunction(
               // Without Sentry we can't see how often the insights LLM is
               // returning unparseable output and parents are silently getting
               // template highlights instead of personalised recaps.
-              captureException(
+              sentry.captureException(
                 new Error(
                   `session-completed: generate-session-insights validation failed: ${result.reason}`,
                 ),
@@ -1054,7 +1121,7 @@ export const sessionCompleted = inngest.createFunction(
             },
           };
         } catch (err) {
-          captureException(err, {
+          sentry.captureException(err, {
             profileId,
             extra: {
               step: 'generate-llm-summary',

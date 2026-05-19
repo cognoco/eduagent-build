@@ -708,6 +708,7 @@ export function useAddParkingLotItem(
   sessionId: string,
 ): UseMutationResult<{ item: ParkingLotItem }, Error, { question: string }> {
   const client = useApiClient();
+  const { activeProfile } = useProfile();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -720,8 +721,11 @@ export function useAddParkingLotItem(
       return (await res.json()) as { item: ParkingLotItem };
     },
     onSuccess: () => {
+      // [BUG-165] Scope invalidation to the active profile so a mutation on
+      // this profile cannot touch another profile's parking-lot cache on a
+      // shared device. Mirrors the queryKeys.sessions.parkingLot factory.
       void queryClient.invalidateQueries({
-        queryKey: ['parking-lot', sessionId],
+        queryKey: queryKeys.sessions.parkingLot(sessionId, activeProfile?.id),
       });
     },
   });

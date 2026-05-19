@@ -12,14 +12,27 @@ const col = (name: string) => ({ name });
 
 const mockSnapshotDb = createTransactionalMockDb({
   query: {
-    learningSessions: {
-      findMany: jest.fn().mockResolvedValue([]),
-    },
     profiles: {
       findFirst: jest.fn().mockResolvedValue({ id: 'profile-001' }),
     },
   },
 });
+
+/**
+ * Sets up the selectDistinct chain on mockSnapshotDb to resolve with the
+ * given rows. The production code calls:
+ *   db.selectDistinct({ profileId }).from(learningSessions).where(gte(...))
+ * so we mock: selectDistinct → { from: { where: Promise<rows> } }
+ */
+function mockSelectDistinctRows(rows: { profileId: string }[]): void {
+  (
+    mockSnapshotDb as unknown as { selectDistinct: jest.Mock }
+  ).selectDistinct.mockReturnValue({
+    from: jest.fn().mockReturnValue({
+      where: jest.fn().mockResolvedValue(rows),
+    }),
+  });
+}
 
 const mockDatabaseModule = createDatabaseModuleMock({
   db: mockSnapshotDb,
@@ -111,7 +124,7 @@ describe('dailySnapshotCron', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     process.env['DATABASE_URL'] = 'postgresql://test:test@localhost/test';
-    mockSnapshotDb.query.learningSessions.findMany.mockResolvedValue([]);
+    mockSelectDistinctRows([]);
   });
 
   afterEach(() => {
@@ -119,7 +132,9 @@ describe('dailySnapshotCron', () => {
   });
 
   it('should be defined as an Inngest function', () => {
-    expect(dailySnapshotCron).toBeTruthy();
+    expect((dailySnapshotCron as { opts?: { id?: string } }).opts?.id).toBe(
+      'progress-daily-snapshot',
+    );
   });
 
   it('should have the correct function id', () => {
@@ -135,7 +150,7 @@ describe('dailySnapshotCron', () => {
   });
 
   it('returns queuedProfiles:0 when no profiles were active in the last 90 days', async () => {
-    mockSnapshotDb.query.learningSessions.findMany.mockResolvedValue([]);
+    mockSelectDistinctRows([]);
 
     const { result } = await executeCronSteps();
 
@@ -143,7 +158,7 @@ describe('dailySnapshotCron', () => {
   });
 
   it('sends fan-out events for each active profile', async () => {
-    mockSnapshotDb.query.learningSessions.findMany.mockResolvedValue([
+    mockSelectDistinctRows([
       { profileId: 'profile-001' },
       { profileId: 'profile-002' },
       { profileId: 'profile-003' },
@@ -174,17 +189,16 @@ describe('dailySnapshotCron', () => {
     expect(result).toEqual({ status: 'completed', queuedProfiles: 3 });
   });
 
-  it('deduplicates profiles that appear in multiple sessions', async () => {
-    mockSnapshotDb.query.learningSessions.findMany.mockResolvedValue([
-      { profileId: 'profile-001' },
+  it('uses selectDistinct to deduplicate profiles at the SQL level', async () => {
+    // selectDistinct produces one row per unique profileId in SQL —
+    // the mock simulates what the DB returns after DISTINCT.
+    mockSelectDistinctRows([
       { profileId: 'profile-001' },
       { profileId: 'profile-002' },
-      { profileId: 'profile-001' },
     ]);
 
     const { result } = await executeCronSteps();
 
-    // Only 2 unique profiles despite 4 rows
     expect(result).toEqual({ status: 'completed', queuedProfiles: 2 });
   });
 
@@ -193,7 +207,7 @@ describe('dailySnapshotCron', () => {
     const rows = Array.from({ length: 250 }, (_, i) => ({
       profileId: `profile-${String(i).padStart(3, '0')}`,
     }));
-    mockSnapshotDb.query.learningSessions.findMany.mockResolvedValue(rows);
+    mockSelectDistinctRows(rows);
 
     const { runner, result } = await executeCronSteps();
 
@@ -246,7 +260,9 @@ describe('dailySnapshotRefresh', () => {
   });
 
   it('should be defined as an Inngest function', () => {
-    expect(dailySnapshotRefresh).toBeTruthy();
+    expect((dailySnapshotRefresh as { opts?: { id?: string } }).opts?.id).toBe(
+      'progress-daily-snapshot-refresh',
+    );
   });
 
   it('should have the correct function id', () => {

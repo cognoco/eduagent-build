@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { verificationTypeSchema } from './assessments.ts';
+import { isoDateField } from './common.ts';
 import {
   celebrationReasonSchema,
   pendingCelebrationSchema,
@@ -154,8 +155,8 @@ export const sessionMetadataSchema = z
       .optional(),
     /** Topic-probe signals extracted asynchronously from early session turns. */
     extractedSignals: extractedInterviewSignalsSchema.optional(),
-    topicProbeFiredAt: z.string().datetime().optional(),
-    topicProbeExtractedAt: z.string().datetime().optional(),
+    topicProbeFiredAt: isoDateField.optional(),
+    topicProbeExtractedAt: isoDateField.optional(),
     topicProbeExtractionStatus: z
       .enum(['pending', 'completed', 'failed'])
       .optional(),
@@ -171,7 +172,7 @@ export const sessionMetadataSchema = z
     continuationOpenerStartedExchange: z.number().int().min(0).optional(),
     continuationDepth: z.enum(['low', 'mid', 'high']).optional(),
     reviewCalibrationAttempts: z.number().int().min(0).optional(),
-    reviewCalibrationFiredAt: z.string().datetime().optional(),
+    reviewCalibrationFiredAt: isoDateField.optional(),
   })
   .strip();
 export type SessionMetadata = z.infer<typeof sessionMetadataSchema>;
@@ -223,6 +224,18 @@ export type SummaryStatus = z.infer<typeof summaryStatusSchema>;
 
 export const MIN_EXCHANGES_FOR_TOPIC_COMPLETION = 5;
 
+/**
+ * Maximum exchanges allowed per session — defense-in-depth cap so a session
+ * can never run away (e.g. if the LLM never emits a finish signal). Both
+ * server (enforces hard cap before invoking the LLM) and mobile (uses to
+ * predict when the next message will be rejected) need this constant, so it
+ * lives in the shared schemas package.
+ *
+ * Moved here from `apps/api/src/services/session/session-crud.ts` in
+ * 2026-05-18 schemas tightening (BUG-211).
+ */
+export const MAX_EXCHANGES_PER_SESSION = 50;
+
 export const escalationRungSchema = z.number().int().min(1).max(5);
 export type EscalationRung = z.infer<typeof escalationRungSchema>;
 
@@ -257,14 +270,14 @@ export const learningSessionSchema = z.object({
   status: sessionStatusSchema,
   escalationRung: escalationRungSchema,
   exchangeCount: z.number().int(),
-  startedAt: z.string().datetime(),
-  lastActivityAt: z.string().datetime(),
-  endedAt: z.string().datetime().nullable(),
+  startedAt: isoDateField,
+  lastActivityAt: isoDateField,
+  endedAt: isoDateField.nullable(),
   durationSeconds: z.number().int().nullable(),
   wallClockSeconds: z.number().int().nullable(),
   metadata: sessionMetadataSchema.optional(),
   rawInput: z.string().nullable().optional(),
-  filedAt: z.string().datetime().nullable(),
+  filedAt: isoDateField.nullable(),
   filingStatus: filingStatusSchema.nullable(),
   filingRetryCount: z.number().int().nonnegative(),
 });
@@ -307,7 +320,7 @@ export const sessionTranscriptExchangeSchema = z.object({
   eventId: z.string().uuid().optional(),
   role: z.enum(['user', 'assistant']),
   content: z.string(),
-  timestamp: z.string().datetime(),
+  timestamp: isoDateField,
   escalationRung: z.number().int().min(1).max(5).optional(),
   isSystemPrompt: z.boolean().optional(),
 });
@@ -323,7 +336,7 @@ export const sessionTranscriptSchema = z.object({
     sessionType: sessionTypeSchema,
     inputMode: inputModeSchema.default('text'),
     verificationType: verificationTypeSchema.nullable().optional(),
-    startedAt: z.string().datetime(),
+    startedAt: isoDateField,
     exchangeCount: z.number().int(),
     milestonesReached: z.array(celebrationReasonSchema).default([]),
     wallClockSeconds: z.number().int().nullable().optional(),
@@ -412,7 +425,7 @@ export const parkingLotItemSchema = z.object({
   id: z.string().uuid(),
   question: z.string(),
   explored: z.boolean(),
-  createdAt: z.string().datetime(),
+  createdAt: isoDateField,
 });
 export type ParkingLotItem = z.infer<typeof parkingLotItemSchema>;
 

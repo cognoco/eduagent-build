@@ -1,6 +1,10 @@
 #!/usr/bin/env sh
 set -e
-pnpm exec lint-staged
+# --concurrent false: On Windows, parallel chunk execution (the default) runs 8
+# simultaneous `node --stack-size=65536` processes which exhausts process
+# handles / memory and causes SIGKILL on large staged sets. Serial execution is
+# slower but reliable. Harmless on macOS/Linux (cost is a few extra seconds).
+pnpm exec lint-staged --concurrent false
 
 # Eval-harness guard: prompt-touching files require an accompanying snapshot
 # diff. Without this, prompt drift ships silently (the eval harness only

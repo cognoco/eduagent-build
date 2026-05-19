@@ -101,11 +101,14 @@ jest.mock('../../../lib/theme', () => ({
   }),
 }));
 
-jest.mock('../../../lib/navigation', () => ({
-  goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
-  pushLearningResumeTarget: (...args: unknown[]) =>
-    mockPushLearningResumeTarget(...args),
-}));
+jest.mock(
+  '../../../lib/navigation' /* gc1-allow: goBackOrReplace calls router.back which requires native navigation context */,
+  () => ({
+    goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
+    pushLearningResumeTarget: (...args: unknown[]) =>
+      mockPushLearningResumeTarget(...args),
+  }),
+);
 
 // ---------------------------------------------------------------------------
 // Default API data

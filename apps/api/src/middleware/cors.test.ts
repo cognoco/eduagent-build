@@ -18,6 +18,14 @@ describe('CORS middleware', () => {
     'https://localhost.evil.com',
     'https://mentomate.com.evil.com',
     'http://app.mentomate.com', // http rejected for production
+    // [BUG-244] Subdomain-takeover defense: any *.mentomate.com hostname not
+    // in the explicit ALLOWED_PRODUCTION_ORIGINS allowlist must be rejected.
+    // Previously the policy allowed every .mentomate.com subdomain with
+    // credentials:true, which let any compromised vendor / dangling CNAME
+    // read authenticated responses.
+    'https://attacker.mentomate.com',
+    'https://preview-pr-42.mentomate.com',
+    'https://anything-not-allowlisted.mentomate.com',
   ];
 
   const REQUIRED_HEADERS = [
@@ -95,7 +103,7 @@ describe('CORS middleware', () => {
 
       expect(res.status).toBe(200);
       expect(res.headers.get('Access-Control-Allow-Origin')).toBe(
-        'http://localhost:8081'
+        'http://localhost:8081',
       );
     });
 
@@ -109,6 +117,28 @@ describe('CORS middleware', () => {
       });
 
       expect(res.headers.get('Access-Control-Allow-Credentials')).toBe('true');
+    });
+  });
+
+  // [BUG-245] Global hono/secure-headers middleware — the JSON API must
+  // emit the standard defensive header set on every response. We assert the
+  // load-bearing ones (nosniff blocks MIME sniffing, X-Frame-Options blocks
+  // clickjacking of any HTML response, Referrer-Policy keeps tokens out of
+  // outbound Referer). The headers are global, so any route is a fine probe.
+  describe('global security headers (BUG-245)', () => {
+    it('sets X-Content-Type-Options: nosniff', async () => {
+      const res = await app.request('/v1/health');
+      expect(res.headers.get('X-Content-Type-Options')).toBe('nosniff');
+    });
+
+    it('sets X-Frame-Options', async () => {
+      const res = await app.request('/v1/health');
+      expect(res.headers.get('X-Frame-Options')).toBeTruthy();
+    });
+
+    it('sets Referrer-Policy', async () => {
+      const res = await app.request('/v1/health');
+      expect(res.headers.get('Referrer-Policy')).toBeTruthy();
     });
   });
 

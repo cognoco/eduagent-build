@@ -9,7 +9,10 @@ const mockDatabaseModule = createDatabaseModuleMock({
   },
 });
 
-jest.mock('@eduagent/database', () => mockDatabaseModule.module);
+jest.mock(
+  '@eduagent/database' /* gc1-allow: service unit test — db boundary mocked; real DB covered by sibling .integration.test.ts where present */,
+  () => mockDatabaseModule.module,
+);
 
 import { createScopedRepository, type Database } from '@eduagent/database';
 import type { ProgressMetrics } from '@eduagent/schemas';

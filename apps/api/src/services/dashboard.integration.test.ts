@@ -247,6 +247,45 @@ async function seedSession(input: {
   return session!.id;
 }
 
+/** Like seedSession but accepts an explicit id so UUIDv7 ordering is deterministic. */
+async function seedSessionWithId(input: {
+  id: string;
+  profileId: string;
+  subjectId: string;
+  topicId?: string | null;
+  sessionType?: 'learning' | 'homework' | 'interleaved';
+  startedAt: Date;
+  endedAt?: Date | null;
+  exchangeCount: number;
+  durationSeconds?: number | null;
+  wallClockSeconds?: number | null;
+  escalationRung?: number;
+  status?: 'active' | 'completed' | 'auto_closed';
+  metadata?: Record<string, unknown>;
+}): Promise<string> {
+  const [session] = await db
+    .insert(learningSessions)
+    .values({
+      id: input.id,
+      profileId: input.profileId,
+      subjectId: input.subjectId,
+      topicId: input.topicId ?? null,
+      sessionType: input.sessionType ?? 'learning',
+      status: input.status ?? 'completed',
+      exchangeCount: input.exchangeCount,
+      escalationRung: input.escalationRung ?? 1,
+      startedAt: input.startedAt,
+      lastActivityAt: input.endedAt ?? input.startedAt,
+      endedAt: input.endedAt ?? input.startedAt,
+      durationSeconds: input.durationSeconds ?? null,
+      wallClockSeconds: input.wallClockSeconds ?? null,
+      metadata: input.metadata ?? {},
+    })
+    .returning({ id: learningSessions.id });
+
+  return session!.id;
+}
+
 async function seedSessionEvent(input: {
   sessionId: string;
   profileId: string;
@@ -1119,7 +1158,18 @@ describe('dashboard service integration', () => {
     const learningStartedAt = subtractDays(new Date(), 1);
     const homeworkStartedAt = subtractDays(new Date(), 2);
 
-    const learningSessionId = await seedSession({
+    // Pre-generate UUIDs with guaranteed ordering to make desc(id) sort
+    // deterministic regardless of DB insert speed (two inserts in the same
+    // millisecond would have non-deterministic random bits).
+    const learningId = generateUUIDv7();
+    await new Promise((r) => setTimeout(r, 2));
+    const homeworkId = generateUUIDv7();
+    // homeworkId must lexicographically follow learningId so desc(id) puts
+    // homework first. Assert here so failures are obvious.
+    expect(homeworkId > learningId).toBe(true);
+
+    const learningSessionId = await seedSessionWithId({
+      id: learningId,
       profileId: childProfileId,
       subjectId,
       topicId: topicIds[0],
@@ -1130,7 +1180,8 @@ describe('dashboard service integration', () => {
       durationSeconds: 480,
       wallClockSeconds: 500,
     });
-    const homeworkSessionId = await seedSession({
+    const homeworkSessionId = await seedSessionWithId({
+      id: homeworkId,
       profileId: childProfileId,
       subjectId,
       sessionType: 'homework',
@@ -1206,5 +1257,321 @@ describe('dashboard service integration', () => {
         engagementSignal: 'curious',
       }),
     );
+  });
+
+  // ---------------------------------------------------------------------------
+  // Phase 4 additions — ordering, null recap fields, parent/child boundaries
+  // ---------------------------------------------------------------------------
+
+  it('session ordering: homework session created after learning session sorts first (desc UUIDv7)', async () => {
+    // getProfileSessions orders by desc(id) where id is UUIDv7 — a UUIDv7
+    // created later always sorts before an earlier one regardless of startedAt.
+    // This test confirms mixed homework+learning sessions respect that order.
+    //
+    // Pre-generate UUIDs with guaranteed ordering: sleep 2ms between calls so
+    // the timestamp component differs even under high DB load. This makes the
+    // test deterministic regardless of insertion speed.
+    const learningId = generateUUIDv7();
+    await new Promise((r) => setTimeout(r, 2));
+    const homeworkId = generateUUIDv7();
+    // Sanity: homeworkId must sort after learningId (both are UUIDv7 strings,
+    // lexicographic order matches chronological for same-prefix UUIDs).
+    expect(homeworkId > learningId).toBe(true);
+
+    const { profileId: parentProfileId } = await seedProfile({
+      displayName: 'Ordering Parent',
+      birthYear: 1980,
+    });
+    const { profileId: childProfileId } = await seedProfile({
+      displayName: 'Ordering Child',
+      birthYear: 2012,
+    });
+    await seedFamilyLink(parentProfileId, childProfileId);
+
+    const subjectId = await seedSubject({
+      profileId: childProfileId,
+      name: 'Mixed Subject',
+    });
+    const { topicIds } = await seedCurriculum(subjectId, ['Topic A']);
+    const now = getStableMidWeekNow();
+
+    // Seed learning session first using the pre-generated lower UUIDv7
+    const learningSessionId = await seedSessionWithId({
+      id: learningId,
+      profileId: childProfileId,
+      subjectId,
+      topicId: topicIds[0],
+      sessionType: 'learning',
+      startedAt: subtractDays(now, 2),
+      endedAt: subtractDays(now, 2),
+      exchangeCount: 5,
+    });
+    // Seed homework session using the pre-generated higher UUIDv7 → sorts first
+    const homeworkSessionId = await seedSessionWithId({
+      id: homeworkId,
+      profileId: childProfileId,
+      subjectId,
+      sessionType: 'homework',
+      startedAt: subtractDays(now, 1),
+      endedAt: null,
+      exchangeCount: 3,
+      metadata: {
+        homeworkSummary: {
+          problemCount: 4,
+          practicedSkills: ['fractions'],
+          independentProblemCount: 2,
+          guidedProblemCount: 2,
+          summary: '4 problems on fractions.',
+          displayTitle: 'Homework Session',
+        },
+      },
+    });
+
+    const sessions = await getChildSessions(
+      db,
+      parentProfileId,
+      childProfileId,
+    );
+
+    expect(sessions.length).toBeGreaterThanOrEqual(2);
+    // Homework (seeded later = higher UUIDv7) must sort before learning
+    const positions = sessions.map((s) => s.sessionId);
+    const homeworkIdx = positions.indexOf(homeworkSessionId);
+    const learningIdx = positions.indexOf(learningSessionId);
+    expect(homeworkIdx).toBeGreaterThanOrEqual(0);
+    expect(learningIdx).toBeGreaterThanOrEqual(0);
+    expect(homeworkIdx).toBeLessThan(learningIdx);
+
+    // Homework session must render its displayTitle from homeworkSummary
+    const homeworkSession = sessions.find(
+      (s) => s.sessionId === homeworkSessionId,
+    );
+    expect(homeworkSession).toBeDefined();
+    expect(homeworkSession!.sessionType).toBe('homework');
+    expect(homeworkSession!.displayTitle).toBe('Homework Session');
+    expect(homeworkSession!.displaySummary).toBe('4 problems on fractions.');
+
+    // Learning session must render its topicTitle
+    const learningSession = sessions.find(
+      (s) => s.sessionId === learningSessionId,
+    );
+    expect(learningSession).toBeDefined();
+    expect(learningSession!.sessionType).toBe('learning');
+    expect(learningSession!.topicTitle).toBe('Topic A');
+  });
+
+  it('null recap fields: getChildSessionDetail with no sessionSummary row does not crash', async () => {
+    // A session exists but no session_summaries row was ever written (e.g.
+    // LLM summary timed out or was skipped). highlight, narrative, and
+    // conversationPrompt must be null — not a runtime crash.
+    const { profileId: parentProfileId } = await seedProfile({
+      displayName: 'Null Recap Parent',
+      birthYear: 1979,
+    });
+    const { profileId: childProfileId } = await seedProfile({
+      displayName: 'Null Recap Child',
+      birthYear: 2013,
+    });
+    await seedFamilyLink(parentProfileId, childProfileId);
+
+    const subjectId = await seedSubject({
+      profileId: childProfileId,
+      name: 'Null Recap Subject',
+    });
+    const { topicIds } = await seedCurriculum(subjectId, ['Topic NR']);
+    const sessionId = await seedSession({
+      profileId: childProfileId,
+      subjectId,
+      topicId: topicIds[0],
+      sessionType: 'learning',
+      startedAt: subtractDays(getStableMidWeekNow(), 1),
+      endedAt: subtractDays(getStableMidWeekNow(), 1),
+      exchangeCount: 4,
+    });
+    // Deliberately do NOT call seedSessionSummary — no summary row exists.
+
+    const detail = await getChildSessionDetail(
+      db,
+      parentProfileId,
+      childProfileId,
+      sessionId,
+    );
+
+    expect(detail).not.toBeNull();
+    expect(detail!.sessionId).toBe(sessionId);
+    expect(detail!.highlight).toBeNull();
+    expect(detail!.narrative).toBeNull();
+    expect(detail!.conversationPrompt).toBeNull();
+    expect(detail!.engagementSignal).toBeNull();
+    // Session itself must still render correctly
+    expect(detail!.subjectName).toBe('Null Recap Subject');
+    expect(detail!.topicTitle).toBe('Topic NR');
+    expect(detail!.exchangeCount).toBe(4);
+  });
+
+  it('profile boundary: getChildrenForParent returns ONLY the linked child, not another child linked to a different parent', async () => {
+    // P0 guard: parent A must NOT see child B's data even though both children
+    // exist in the same DB. This test seeds two isolated parent→child pairs
+    // and asserts that each parent's dashboard is completely isolated.
+    //
+    // BUG-CANDIDATE-CRITICAL if either assertion below fails: profile-scoping leak.
+    const { profileId: parentA } = await seedProfile({
+      displayName: 'Parent A',
+      birthYear: 1975,
+    });
+    const { profileId: childA } = await seedProfile({
+      displayName: 'Child A',
+      birthYear: 2012,
+    });
+    const { profileId: parentB } = await seedProfile({
+      displayName: 'Parent B',
+      birthYear: 1978,
+    });
+    const { profileId: childB } = await seedProfile({
+      displayName: 'Child B',
+      birthYear: 2013,
+    });
+
+    await seedFamilyLink(parentA, childA);
+    await seedFamilyLink(parentB, childB);
+
+    const subjectA = await seedSubject({
+      profileId: childA,
+      name: 'Child A Subject',
+    });
+    const subjectB = await seedSubject({
+      profileId: childB,
+      name: 'Child B Subject',
+    });
+    const now = getStableMidWeekNow();
+    await seedSession({
+      profileId: childA,
+      subjectId: subjectA,
+      startedAt: subtractDays(now, 1),
+      exchangeCount: 5,
+    });
+    await seedSession({
+      profileId: childB,
+      subjectId: subjectB,
+      startedAt: subtractDays(now, 1),
+      exchangeCount: 7,
+    });
+
+    const childrenForParentA = await getChildrenForParent(db, parentA);
+    const childrenForParentB = await getChildrenForParent(db, parentB);
+
+    // Parent A sees ONLY Child A
+    expect(childrenForParentA).toHaveLength(1);
+    expect(childrenForParentA[0]!.profileId).toBe(childA);
+    expect(childrenForParentA[0]!.displayName).toBe('Child A');
+
+    // Parent B sees ONLY Child B
+    expect(childrenForParentB).toHaveLength(1);
+    expect(childrenForParentB[0]!.profileId).toBe(childB);
+    expect(childrenForParentB[0]!.displayName).toBe('Child B');
+
+    // Cross-account check: no child from the other parent leaks through
+    const parentAProfileIds = childrenForParentA.map((c) => c.profileId);
+    const parentBProfileIds = childrenForParentB.map((c) => c.profileId);
+    expect(parentAProfileIds).not.toContain(childB);
+    expect(parentBProfileIds).not.toContain(childA);
+  });
+
+  it('profile boundary: getChildDetail throws ForbiddenError when parent is not linked to child', async () => {
+    // BUG-CANDIDATE-CRITICAL if this does not throw: any parent could read
+    // any child's detail by guessing a UUID.
+    const { profileId: unrelatedParent } = await seedProfile({
+      displayName: 'Unrelated Parent',
+      birthYear: 1980,
+    });
+    const { profileId: targetChild } = await seedProfile({
+      displayName: 'Target Child',
+      birthYear: 2011,
+    });
+    // No family link between unrelatedParent and targetChild.
+
+    await expect(
+      getChildDetail(db, unrelatedParent, targetChild),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
+  it('profile boundary: getChildSessions throws ForbiddenError for unlinked parent', async () => {
+    // BUG-CANDIDATE-CRITICAL if this returns sessions instead of throwing.
+    const { profileId: unrelatedParent } = await seedProfile({
+      displayName: 'Stranger Parent SV',
+      birthYear: 1977,
+    });
+    const { profileId: innocentChild } = await seedProfile({
+      displayName: 'Innocent Child SV',
+      birthYear: 2014,
+    });
+    // No family link.
+
+    await expect(
+      getChildSessions(db, unrelatedParent, innocentChild),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
+  it('getChildrenForParent returns empty array when parent has no linked children', async () => {
+    const { profileId: loneParent } = await seedProfile({
+      displayName: 'Lone Parent',
+      birthYear: 1985,
+    });
+    // No family links seeded.
+    const children = await getChildrenForParent(db, loneParent);
+    expect(children).toEqual([]);
+  });
+
+  it('mixed sessions: dashboard week counts include both homework and learning sessions', async () => {
+    // Both session types must contribute to sessionsThisWeek when they each
+    // have exchangeCount >= 1 and fall within the current week.
+    const { profileId: parentProfileId } = await seedProfile({
+      displayName: 'Mixed Parent',
+      birthYear: 1981,
+    });
+    const { profileId: childProfileId } = await seedProfile({
+      displayName: 'Mixed Child',
+      birthYear: 2012,
+    });
+    await seedFamilyLink(parentProfileId, childProfileId);
+
+    const subjectId = await seedSubject({
+      profileId: childProfileId,
+      name: 'Mixed Weekly Subject',
+    });
+    const now = getStableMidWeekNow();
+
+    // One learning + one homework, both this week
+    await seedSession({
+      profileId: childProfileId,
+      subjectId,
+      sessionType: 'learning',
+      startedAt: subtractDays(now, 1),
+      exchangeCount: 5,
+    });
+    await seedSession({
+      profileId: childProfileId,
+      subjectId,
+      sessionType: 'homework',
+      startedAt: subtractDays(now, 2),
+      exchangeCount: 3,
+      metadata: {
+        homeworkSummary: {
+          problemCount: 3,
+          practicedSkills: ['fractions'],
+          independentProblemCount: 1,
+          guidedProblemCount: 2,
+          summary: '3 homework problems.',
+          displayTitle: 'Homework',
+        },
+      },
+    });
+
+    const children = await getChildrenForParent(db, parentProfileId);
+
+    expect(children).toHaveLength(1);
+    // Both session types must be counted in the this-week tally
+    expect(children[0]!.sessionsThisWeek).toBe(2);
+    expect(children[0]!.exchangesThisWeek).toBe(8); // 5 + 3
   });
 });

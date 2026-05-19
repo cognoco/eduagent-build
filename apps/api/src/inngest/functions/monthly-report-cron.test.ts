@@ -403,7 +403,9 @@ afterEach(() => {
 
 describe('monthlyReportCron', () => {
   it('should be defined as an Inngest function', () => {
-    expect(monthlyReportCron).toBeTruthy();
+    expect((monthlyReportCron as { opts?: { id?: string } }).opts?.id).toBe(
+      'progress-monthly-report',
+    );
   });
 
   it('should have the correct function id', () => {
@@ -642,7 +644,9 @@ describe('monthlyReportCron', () => {
 
 describe('monthlyReportGenerate', () => {
   it('should be defined as an Inngest function', () => {
-    expect(monthlyReportGenerate).toBeTruthy();
+    expect((monthlyReportGenerate as { opts?: { id?: string } }).opts?.id).toBe(
+      'progress-monthly-report-generate',
+    );
   });
 
   it('should have the correct function id', () => {

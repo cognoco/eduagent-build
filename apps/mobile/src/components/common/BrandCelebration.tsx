@@ -8,6 +8,7 @@ import Svg, {
   Stop,
 } from 'react-native-svg';
 import Animated, {
+  cancelAnimation,
   useSharedValue,
   useAnimatedProps,
   useAnimatedStyle,
@@ -221,6 +222,41 @@ export function BrandCelebration({
     ringOp,
     pathDraw,
     happyBounce,
+  ]);
+
+  // Cancel all in-flight animations on unmount to prevent warnings and memory leaks.
+  useEffect(() => {
+    return () => {
+      cancelAnimation(pathDraw);
+      cancelAnimation(studentR);
+      cancelAnimation(studentInR);
+      cancelAnimation(dot1R);
+      cancelAnimation(dot2R);
+      cancelAnimation(dot3R);
+      cancelAnimation(spark1);
+      cancelAnimation(spark2);
+      cancelAnimation(spark3);
+      cancelAnimation(mentorR);
+      cancelAnimation(mentorInR);
+      cancelAnimation(ringOp);
+      cancelAnimation(happyBounce);
+      cancelAnimation(containerOp);
+    };
+  }, [
+    pathDraw,
+    studentR,
+    studentInR,
+    dot1R,
+    dot2R,
+    dot3R,
+    spark1,
+    spark2,
+    spark3,
+    mentorR,
+    mentorInR,
+    ringOp,
+    happyBounce,
+    containerOp,
   ]);
 
   // --- Animated props ---

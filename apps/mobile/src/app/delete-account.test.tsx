@@ -487,7 +487,7 @@ describe('DeleteAccountScreen', () => {
       render(<DeleteAccountScreen />, { wrapper: Wrapper });
       fireEvent.press(screen.getByTestId('delete-account-confirm'));
 
-      expect(screen.getByTestId('delete-account-family-warning')).toBeTruthy();
+      expect(screen.getByTestId('delete-account-family-warning'));
       screen.getByText(/linked child profiles/i);
       expect(
         screen.getByText(/permanently deleted along with your account/i),

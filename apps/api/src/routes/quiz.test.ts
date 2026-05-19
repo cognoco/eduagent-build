@@ -229,8 +229,20 @@ const COMPLETED_ROUND = {
   xpEarned: 15,
   completedAt: new Date('2026-04-18T10:00:00Z'),
   results: [
-    { questionIndex: 0, correct: true, answerGiven: 'Vienna', timeMs: 3000 },
-    { questionIndex: 1, correct: false, answerGiven: 'Munich', timeMs: 5000 },
+    {
+      questionIndex: 0,
+      correct: true,
+      correctAnswer: 'Vienna',
+      answerGiven: 'Vienna',
+      timeMs: 3000,
+    },
+    {
+      questionIndex: 1,
+      correct: false,
+      correctAnswer: 'Berlin',
+      answerGiven: 'Munich',
+      timeMs: 5000,
+    },
   ],
 };
 

@@ -30,9 +30,9 @@ describe('ProgressPillRow', () => {
 
   it('renders a pill for each child plus the own-profile pill', () => {
     const { getByText } = render(<ProgressPillRow {...baseProps} />);
-    expect(getByText('Alice')).toBeTruthy();
-    expect(getByText('Bob')).toBeTruthy();
-    expect(getByText('Mine')).toBeTruthy();
+    expect(getByText('Alice'));
+    expect(getByText('Bob'));
+    expect(getByText('Mine'));
   });
 
   it('fires onSelect with the correct profileId when a child pill is pressed', () => {
@@ -79,6 +79,6 @@ describe('ProgressPillRow', () => {
 
   it('renders the container with the correct testID', () => {
     const { getByTestId } = render(<ProgressPillRow {...baseProps} />);
-    expect(getByTestId('progress-parent-pill-row')).toBeTruthy();
+    expect(getByTestId('progress-parent-pill-row'));
   });
 });

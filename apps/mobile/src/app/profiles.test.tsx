@@ -382,6 +382,46 @@ describe('ProfilesScreen', () => {
     });
   });
 
+  // -------------------------------------------------------------------------
+  // [BUG-127 / BREAK] Non-owners (children on a parent's account) must NOT
+  // see the "+ Add profile" button. Per CLAUDE.md Profile Shapes the
+  // add-child affordance requires isOwner; a child acting on the parent's
+  // account should have no way to trigger create-profile.
+  // -------------------------------------------------------------------------
+  it('[BREAK / BUG-127] hides "+ Add profile" button for non-owner active profile', () => {
+    useProfile.mockReturnValue({
+      profiles: [ownerProfile, childProfile],
+      activeProfile: childProfile,
+      switchProfile: mockSwitchProfile,
+      isLoading: false,
+    });
+
+    render(<ProfilesScreen />);
+
+    // The list still renders — what must be gone is the add affordance.
+    screen.getByTestId('profile-row-owner-id');
+    screen.getByTestId('profile-row-child-id');
+    expect(screen.queryByTestId('profiles-add-button')).toBeNull();
+    expect(screen.queryByText('+ Add profile')).toBeNull();
+  });
+
+  it('[BUG-127] still shows "+ Add profile" button for owner active profile', () => {
+    mockUseSubscription.mockReturnValue({ data: { tier: 'family' } });
+    mockUseFamilySubscription.mockReturnValue({
+      data: { profileCount: 1, maxProfiles: 4 },
+    });
+    useProfile.mockReturnValue({
+      profiles: [ownerProfile],
+      activeProfile: ownerProfile,
+      switchProfile: mockSwitchProfile,
+      isLoading: false,
+    });
+
+    render(<ProfilesScreen />);
+
+    screen.getByTestId('profiles-add-button');
+  });
+
   it('closes rename modal on cancel', () => {
     useProfile.mockReturnValue({
       profiles: [ownerProfile, childProfile],

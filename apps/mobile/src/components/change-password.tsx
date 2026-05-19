@@ -28,6 +28,16 @@ export function ChangePassword(): React.JSX.Element {
     setError(null);
     setSuccess(false);
 
+    // [BUG-129] currentPassword must not be empty — Clerk's updatePassword
+    // would reject an empty value with a generic API error, but submitting
+    // a known-empty value wastes a request and gives the user no useful
+    // feedback. Match the server's minimum (Clerk enforces ≥8 characters);
+    // we don't accept anything shorter than the server contract.
+    if (currentPassword.length < 8) {
+      setError('Enter your current password');
+      return;
+    }
+
     if (newPassword.length < 8) {
       setError('Password must be at least 8 characters');
       return;

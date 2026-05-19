@@ -202,28 +202,44 @@ function StandardFilingPrompt({
       <View className="flex-row gap-3">
         <Pressable
           onPress={async () => {
-            try {
-              const result = await filing.mutateAsync({
-                sessionId: activeSessionId ?? undefined,
-                sessionMode: effectiveMode as 'freeform' | 'homework',
-              });
-              setShowFilingPrompt(false);
-              navigateToSessionSummary(result.shelfId, result.bookId);
-            } catch {
-              platformAlert(
-                t('session.filingPrompt.addFailedTitle'),
-                t('session.filingPrompt.addFailedMessage'),
-                [
-                  {
-                    text: t('common.done'),
-                    onPress: () => {
-                      setFilingDismissed(true);
-                      navigateToSessionSummary();
+            // BUG-149: Recovery alert must offer a retry primary AND a
+            // skip secondary — a transient network failure used to
+            // permanently lose the session-to-book link because the only
+            // option was Done (which silently dismissed + navigated away).
+            // The retry handler re-invokes the same mutation; recursion is
+            // bounded by the user explicitly choosing Skip.
+            const runFiling = async (): Promise<void> => {
+              try {
+                const result = await filing.mutateAsync({
+                  sessionId: activeSessionId ?? undefined,
+                  sessionMode: effectiveMode as 'freeform' | 'homework',
+                });
+                setShowFilingPrompt(false);
+                navigateToSessionSummary(result.shelfId, result.bookId);
+              } catch {
+                platformAlert(
+                  t('session.filingPrompt.addFailedTitle'),
+                  t('session.filingPrompt.addFailedMessage'),
+                  [
+                    {
+                      text: t('session.filingPrompt.tryAgain'),
+                      onPress: () => {
+                        void runFiling();
+                      },
                     },
-                  },
-                ],
-              );
-            }
+                    {
+                      text: t('session.filingPrompt.skipForNow'),
+                      style: 'cancel',
+                      onPress: () => {
+                        setFilingDismissed(true);
+                        navigateToSessionSummary();
+                      },
+                    },
+                  ],
+                );
+              }
+            };
+            await runFiling();
           }}
           disabled={filing.isPending}
           className="flex-1 bg-primary rounded-xl py-3 items-center min-h-[44px] justify-center"

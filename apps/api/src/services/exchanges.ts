@@ -276,6 +276,15 @@ export interface ExchangeResult {
   envelopeParseFailureReason?: ParseEnvelopeFailureReason;
   /** Private provenance audit for this turn; never shown to the learner. */
   sourceAudit?: ExchangeSourceAudit;
+  /**
+   * F1.1 — LLM signalled `signals.ready_to_finish` in the envelope. Interview /
+   * onboarding flows consume this to terminate the loop early; non-interview
+   * flows can ignore it. Always present (false when the LLM did not emit the
+   * signal, or for fallback paths). Pair with a server-side hard cap
+   * (MAX_INTERVIEW_EXCHANGES) in the caller — never trust this flag alone.
+   * [BUG-92]
+   */
+  readyToFinish: boolean;
 }
 
 /** Streaming variant result */
@@ -1072,6 +1081,12 @@ export async function processExchange(
     envelopeParseFailed: finalParsed.envelopeParseFailed,
     envelopeParseFailureReason: finalParsed.envelopeParseFailureReason,
     sourceAudit: sourceSafe.sourceAudit,
+    // [F1.1 / BUG-92] Expose the interview-close signal to upstream callers so
+    // session-exchange / interview routes can terminate the loop without
+    // re-parsing the envelope. App-help guard already forces it to false via
+    // applyAppHelpSignalGuard for app-help turns. Hard cap stays the caller's
+    // responsibility — never trust this flag alone.
+    readyToFinish: finalParsed.readyToFinish,
   };
 }
 

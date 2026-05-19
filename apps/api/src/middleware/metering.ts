@@ -379,6 +379,25 @@ export const meteringMiddleware = createMiddleware<MeteringEnv>(
       cached = null;
     }
 
+    // [BUG-115] Same protection for monthly exhaustion. resetMonthlyQuota
+    // (called at billing-cycle rollover from cron / subscription state
+    // transitions) clears used_this_month in DB but cannot invalidate KV
+    // entries from outside the request path. Without this fall-through, a
+    // user whose KV reports monthlyLimit=100/usedThisMonth=100 keeps getting
+    // 402 QUOTA_EXCEEDED for up to one KV TTL after the DB-level reset —
+    // billing cycle has rolled over but the user is still blocked. The DB has
+    // the authoritative cycleResetAt; the cache does not, so we pessimistically
+    // drop to DB whenever KV reports monthly exhaustion. The immediate atomic
+    // decrementQuota call below will re-establish a clean KV write derived
+    // from the post-reset DB state.
+    if (
+      cached &&
+      cached.monthlyLimit > 0 &&
+      cached.usedThisMonth >= cached.monthlyLimit
+    ) {
+      cached = null;
+    }
+
     if (cached) {
       // KV hit — use cached values (CR3: subscriptionId now in cache)
       subscriptionId = cached.subscriptionId;

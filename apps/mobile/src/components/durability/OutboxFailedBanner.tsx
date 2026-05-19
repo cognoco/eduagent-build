@@ -56,6 +56,8 @@ export function OutboxFailedBanner({
           <Pressable
             testID={`outbox-copy-${entry.id}`}
             className="mt-2 self-start rounded-button bg-surface-elevated px-3 py-2"
+            accessibilityRole="button"
+            accessibilityLabel={t('session.outboxFailed.copyMessage')}
             onPress={async () => {
               await Clipboard.setStringAsync(entry.content);
               await deletePermanentlyFailed(profileId, flow, entry.id);
@@ -71,6 +73,8 @@ export function OutboxFailedBanner({
       {onEscalate ? (
         <Pressable
           className="mt-3 self-start rounded-button bg-primary px-4 py-2"
+          accessibilityRole="button"
+          accessibilityLabel={t('session.outboxFailed.sendToSupport')}
           onPress={() => {
             void onEscalate().then(refresh);
           }}

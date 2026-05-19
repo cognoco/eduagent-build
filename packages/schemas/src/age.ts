@@ -1,7 +1,25 @@
 export type AgeBracket = 'child' | 'adolescent' | 'adult';
 
+/**
+ * The active-profile role discriminator. Mirrors
+ * `ActiveProfileRole` in apps/mobile/src/hooks/use-active-profile-role.ts —
+ * kept here as the canonical type so server-side ageing logic and mobile
+ * gating share a single source.
+ *
+ * - 'owner':              adult/parent on their OWN profile (no parent in scope)
+ * - 'child':              child profile signed in directly (rare — app is 11+)
+ * - 'impersonated-child': parent acting AS a child via the proxy banner
+ */
+export type AgeGateRole = 'owner' | 'child' | 'impersonated-child';
+
 export interface AgeGateProfile {
-  role?: 'owner' | 'child' | 'impersonated-child' | string | null;
+  /**
+   * [BUG-208] Narrowed from `string | null` to the discriminated union so
+   * exhaustive `switch` / `if` checks compile-error when a new role is
+   * added. `null` means "unknown / not loaded yet"; `undefined` means the
+   * caller relied on the older `isOwner` flag.
+   */
+  role?: AgeGateRole | null;
   isOwner?: boolean | null;
   birthYear?: number | null;
 }

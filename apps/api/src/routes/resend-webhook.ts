@@ -360,6 +360,45 @@ export const resendWebhookRoute = new Hono<{
         'Webhook already processed (svix-id replay)',
       );
     }
+
+    // [BUG-118] Record the dedup key BEFORE processing, not after. The prior
+    // implementation wrote it fire-and-forget at the end of the handler; a
+    // parallel duplicate that arrived between the .get() and the post-
+    // processing .put() would also see no key and re-process. Writing first
+    // shrinks the race window to the put-acknowledgement latency. If the put
+    // fails we still escalate (silent recovery is banned) and continue — the
+    // downstream handler is idempotent for our event types (Inngest event
+    // emission with a stable timestamp, structured log), so a missed dedup
+    // record is recoverable; a SILENT duplicate write is the regression we
+    // are guarding against.
+    try {
+      await dedupKv.put(dedupKey, '1', {
+        expirationTtl: SVIX_DEDUP_TTL_SECONDS,
+      });
+    } catch (err) {
+      logger.warn(
+        '[resend] svix-id dedup pre-write failed; continuing with weakened replay protection',
+        {
+          event: 'resend.dedup_prewrite_failed',
+          webhookId,
+          error: err instanceof Error ? err.message : String(err),
+        },
+      );
+      captureException(err, {
+        extra: { context: 'resend-webhook.dedup.prewrite', webhookId },
+      });
+      await safeSend(
+        () =>
+          inngest.send({
+            name: 'app/resend-webhook.dedup_prewrite_failed',
+            data: {
+              webhookId,
+              timestamp: new Date().toISOString(),
+            },
+          }),
+        'resend-webhook.dedup-prewrite-failed',
+      );
+    }
   } else if (
     c.env.ENVIRONMENT === 'production' ||
     c.env.ENVIRONMENT === 'staging'
@@ -417,25 +456,11 @@ export const resendWebhookRoute = new Hono<{
       break;
   }
 
-  // [CCR-PR120-M7] Record the svix-id AFTER processing. KV writes are
-  // fire-and-forget: if KV is briefly unavailable we still return 200 (the
-  // event was processed), but we'd lose dedup for this id. Acceptable: Resend
-  // does not retry on 2xx, so a 5xx from us here would cause an actual
-  // duplicate retry — worse than a missed dedup record.
-  if (dedupKv) {
-    void dedupKv
-      .put(dedupKey, '1', { expirationTtl: SVIX_DEDUP_TTL_SECONDS })
-      .catch((err: unknown) => {
-        logger.warn('[resend] svix-id dedup write failed', {
-          event: 'resend.dedup_write_failed',
-          webhookId,
-          error: err instanceof Error ? err.message : String(err),
-        });
-        captureException(err, {
-          extra: { context: 'resend-webhook.dedup.put', webhookId },
-        });
-      });
-  }
+  // [BUG-118] The dedup key was written BEFORE processing (above) — no
+  // post-processing put is needed. The previous fire-and-forget post-write
+  // left a race window in which a parallel duplicate that arrived between
+  // the .get() and the post-processing .put() would also see no key and
+  // re-process.
 
   return c.json({ received: true });
 });

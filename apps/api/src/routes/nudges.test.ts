@@ -20,7 +20,10 @@ const mockDatabaseModule = createDatabaseModuleMock({
   },
 });
 
-jest.mock('@eduagent/database', () => mockDatabaseModule.module);
+jest.mock(
+  '@eduagent/database' /* gc1-allow: route unit test — DB middleware injected via mock; real DB covered by route integration / e2e tests */,
+  () => mockDatabaseModule.module,
+);
 
 jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
   const actual = jest.requireActual(

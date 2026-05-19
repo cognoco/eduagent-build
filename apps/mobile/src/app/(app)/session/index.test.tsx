@@ -209,6 +209,12 @@ jest.mock(
       mutate: mockUpdateLearningModeMutate,
       isPending: mockLearningModePending,
     }),
+    // QuotaExceededCard imports useNotifyParentSubscribe; must be present or
+    // the component crashes before the test can assert on quota-exceeded-card.
+    useNotifyParentSubscribe: () => ({
+      mutate: jest.fn(),
+      isPending: false,
+    }),
   }),
 );
 

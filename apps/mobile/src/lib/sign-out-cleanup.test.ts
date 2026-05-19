@@ -96,6 +96,76 @@ describe('clearProfileSecureStorageOnSignOut [BUG-723 / SEC-7]', () => {
     );
   });
 
+  // -------------------------------------------------------------------------
+  // [BUG-128 / BREAK] Prefix-based AsyncStorage scan picks up summary-draft
+  // (and any future multi-component-key writer) whose individual key shapes
+  // we cannot enumerate at sign-out. Without this scan, children's drafts
+  // would accumulate across accounts on a shared device.
+  // -------------------------------------------------------------------------
+  it('[BREAK / BUG-128] removes AsyncStorage keys matching summary-draft prefix on sign-out', async () => {
+    const draftKeysForChildA = [
+      'summary-draft-child-a-session-1',
+      'summary-draft-child-a-session-2',
+    ];
+    const draftKeysForChildB = ['summary-draft-child-b-session-9'];
+    const unrelatedKey = 'unrelated-key';
+
+    jest
+      .spyOn(AsyncStorage, 'getAllKeys')
+      .mockResolvedValue([
+        ...draftKeysForChildA,
+        ...draftKeysForChildB,
+        unrelatedKey,
+      ]);
+    const multiRemoveSpy = jest
+      .spyOn(AsyncStorage, 'multiRemove')
+      .mockResolvedValue(undefined);
+
+    await clearProfileSecureStorageOnSignOut(['child-a', 'child-b']);
+
+    // The prefix-scan multiRemove must be called with all matched draft keys,
+    // not the unrelated key.
+    const allRemovedKeys = multiRemoveSpy.mock.calls.flatMap(
+      (c) => c[0] as readonly string[],
+    );
+    for (const key of [...draftKeysForChildA, ...draftKeysForChildB]) {
+      expect(allRemovedKeys).toContain(key);
+    }
+    expect(allRemovedKeys).not.toContain(unrelatedKey);
+  });
+
+  it('[BUG-128] tolerates AsyncStorage.getAllKeys failure without aborting cleanup', async () => {
+    jest
+      .spyOn(AsyncStorage, 'getAllKeys')
+      .mockRejectedValue(new Error('AsyncStorage unavailable'));
+    jest.spyOn(AsyncStorage, 'multiRemove').mockResolvedValue(undefined);
+
+    await expect(
+      clearProfileSecureStorageOnSignOut(['child-a']),
+    ).resolves.toBeUndefined();
+    // SecureStore wipes still ran despite the prefix scan failing.
+    expect(mockDelete).toHaveBeenCalled();
+  });
+
+  it('[BUG-128] does not call multiRemove for prefix scan when no keys match', async () => {
+    jest
+      .spyOn(AsyncStorage, 'getAllKeys')
+      .mockResolvedValue(['unrelated-1', 'unrelated-2']);
+    const multiRemoveSpy = jest
+      .spyOn(AsyncStorage, 'multiRemove')
+      .mockResolvedValue(undefined);
+
+    await clearProfileSecureStorageOnSignOut(['child-a']);
+
+    // multiRemove may still be called for outbox/GLOBAL_ASYNCSTORAGE_KEYS,
+    // but never with the unrelated keys from the prefix scan.
+    const allRemovedKeys = multiRemoveSpy.mock.calls.flatMap(
+      (c) => c[0] as readonly string[],
+    );
+    expect(allRemovedKeys).not.toContain('unrelated-1');
+    expect(allRemovedKeys).not.toContain('unrelated-2');
+  });
+
   describe('[CR-SIGNOUT-TIMEOUT-10] timeout protection', () => {
     beforeEach(() => {
       jest.useFakeTimers();

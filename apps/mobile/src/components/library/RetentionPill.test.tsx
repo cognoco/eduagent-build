@@ -4,30 +4,30 @@ import { RetentionPill } from './RetentionPill';
 describe('RetentionPill', () => {
   it('renders still-remembered status with green dot and label', () => {
     render(<RetentionPill status="strong" />);
-    expect(screen.getByText('Still remembered')).toBeTruthy();
-    expect(screen.getByTestId('retention-pill-dot')).toBeTruthy();
+    expect(screen.getByText('Still remembered'));
+    expect(screen.getByTestId('retention-pill-dot'));
   });
 
   it('renders getting-fuzzy status', () => {
     render(<RetentionPill status="fading" />);
-    expect(screen.getByText('Getting fuzzy')).toBeTruthy();
+    expect(screen.getByText('Getting fuzzy'));
   });
 
   it('renders compact variant (no label)', () => {
     render(<RetentionPill status="weak" size="small" />);
     expect(screen.queryByText('Needs a quick refresh')).toBeNull();
-    expect(screen.getByTestId('retention-pill-dot')).toBeTruthy();
+    expect(screen.getByTestId('retention-pill-dot'));
   });
 
   it('renders large variant', () => {
     render(<RetentionPill status="strong" size="large" />);
-    expect(screen.getByText('Still remembered')).toBeTruthy();
+    expect(screen.getByText('Still remembered'));
   });
 
   it('renders elapsed-days copy when the review is at least two days old', () => {
     render(<RetentionPill status="strong" daysSinceLastReview={9} />);
-    expect(screen.getByText('Remembered after 9 days')).toBeTruthy();
-    expect(screen.getByTestId('retention-pill-elapsed')).toBeTruthy();
+    expect(screen.getByText('Remembered after 9 days'));
+    expect(screen.getByTestId('retention-pill-elapsed'));
   });
 
   it('hides elapsed-days copy below the suppression threshold', () => {

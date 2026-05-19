@@ -26,7 +26,10 @@ const mockDatabaseModule = createDatabaseModuleMock({
   },
 });
 
-jest.mock('@eduagent/database', () => mockDatabaseModule.module);
+jest.mock(
+  '@eduagent/database' /* gc1-allow: inngest unit test — prevents real Neon connection; real DB exercised via .integration.test.ts harness */,
+  () => mockDatabaseModule.module,
+);
 
 const mockInngestTransport = createInngestTransportCapture();
 jest.mock('../client', () => mockInngestTransport.module); // gc1-allow: inngest framework boundary
@@ -92,8 +95,10 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 describe('topupExpiryReminder', () => {
-  it('should be defined as an Inngest function', () => {
-    expect(topupExpiryReminder).toBeTruthy();
+  it('should be defined as an Inngest function with the expected id', () => {
+    expect((topupExpiryReminder as { opts?: { id?: string } }).opts?.id).toBe(
+      'topup-expiry-reminder',
+    );
   });
 
   it('returns completed status with zero reminders when no credits expiring', async () => {
@@ -198,8 +203,13 @@ describe('topupExpiryReminder', () => {
         super(...args);
       }
     }
-    // @ts-expect-error — temporarily override Date for the in-handler `new Date()`
-    global.Date = BrokenDate;
+    // [BUG-231] Cast through `unknown` rather than @ts-expect-error: we
+    // deliberately swap in a Date subclass whose no-arg constructor yields
+    // Invalid Date, which is not structurally assignable to DateConstructor.
+    // The cast records the intentional incompatibility instead of muting
+    // the type checker, which would also hide an unrelated regression in
+    // the surrounding test scaffolding.
+    global.Date = BrokenDate as unknown as DateConstructor;
 
     try {
       mockFindExpiringTopUpCredits.mockResolvedValue([]);
@@ -242,8 +252,13 @@ describe('topupExpiryReminder', () => {
         super(...args);
       }
     }
-    // @ts-expect-error — temporarily override Date for the in-handler `new Date()`
-    global.Date = BrokenDate;
+    // [BUG-231] Cast through `unknown` rather than @ts-expect-error: we
+    // deliberately swap in a Date subclass whose no-arg constructor yields
+    // Invalid Date, which is not structurally assignable to DateConstructor.
+    // The cast records the intentional incompatibility instead of muting
+    // the type checker, which would also hide an unrelated regression in
+    // the surrounding test scaffolding.
+    global.Date = BrokenDate as unknown as DateConstructor;
 
     try {
       mockFindExpiringTopUpCredits.mockResolvedValue([]);

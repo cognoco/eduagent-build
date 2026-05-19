@@ -1,3 +1,25 @@
+// ---------------------------------------------------------------------------
+// [BUG-131] Web fallback security disclosure.
+//
+// On native (iOS/Android), this module delegates to expo-secure-store which
+// stores values in Keychain / Keystore — encrypted at rest, isolated per app,
+// and protected by the OS sandbox.
+//
+// On web, expo-secure-store is unavailable and we fall back to plain
+// `localStorage` (or an in-memory map if localStorage itself is blocked).
+// localStorage is NOT a secure store:
+//   - readable by any JavaScript running on the same origin (incl. XSS)
+//   - persists indefinitely, surviving sign-out unless explicitly cleared
+//   - synchronously accessible to extensions in some browsers
+//
+// Consumers must treat values read/written on web as best-effort plaintext.
+// Sensitive material (auth tokens, child PII) should NOT be persisted via
+// this module on web; route those through Clerk's session cookie (which is
+// HttpOnly and managed outside JS) or skip persistence entirely. The runtime
+// warning below fires once per process so the leak is visible in dev/web
+// without spamming the console.
+// ---------------------------------------------------------------------------
+
 import { Platform } from 'react-native';
 import * as ExpoSecureStore from 'expo-secure-store';
 
@@ -6,6 +28,28 @@ type SetOptions = Parameters<typeof ExpoSecureStore.setItemAsync>[2];
 type DeleteOptions = Parameters<typeof ExpoSecureStore.deleteItemAsync>[1];
 
 const memoryStorage = new Map<string, string>();
+
+// One-shot warning so the web fallback is visible in dev consoles but never
+// floods the log on every storage call. Reset by tests via `__resetWebFallbackWarning`.
+let _webFallbackWarningEmitted = false;
+
+function warnWebFallbackOnce(): void {
+  if (_webFallbackWarningEmitted) return;
+  _webFallbackWarningEmitted = true;
+  console.warn(
+    '[secure-storage] Web fallback in use: values are stored in plain localStorage ' +
+      '(or memory) and are NOT encrypted. Do not persist sensitive data through ' +
+      'this module on web — see secure-storage.ts header for details.',
+  );
+}
+
+/**
+ * Test-only helper to reset the one-shot warning latch. Lets specs assert that
+ * the warning fires exactly once per process; not part of the runtime API.
+ */
+export function __resetWebFallbackWarning(): void {
+  _webFallbackWarningEmitted = false;
+}
 
 function getWebStorage(): Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> {
   if (typeof globalThis !== 'undefined' && 'localStorage' in globalThis) {
@@ -38,6 +82,7 @@ export async function getItemAsync(
   options?: GetOptions,
 ): Promise<string | null> {
   if (Platform.OS === 'web') {
+    warnWebFallbackOnce();
     return getWebStorage().getItem(key);
   }
 
@@ -52,6 +97,7 @@ export async function setItemAsync(
   options?: SetOptions,
 ): Promise<void> {
   if (Platform.OS === 'web') {
+    warnWebFallbackOnce();
     getWebStorage().setItem(key, value);
     return;
   }
@@ -68,6 +114,7 @@ export async function deleteItemAsync(
   options?: DeleteOptions,
 ): Promise<void> {
   if (Platform.OS === 'web') {
+    warnWebFallbackOnce();
     getWebStorage().removeItem(key);
     return;
   }

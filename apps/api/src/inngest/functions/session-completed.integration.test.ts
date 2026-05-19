@@ -1407,8 +1407,6 @@ describe('session-completed integration', () => {
       step,
     });
 
-    captureExceptionSpy.mockRestore(); // RED: mockRestore before assertion — spy has no records after restore
-
     // step.sendEvent called with app/session.filing_timed_out
     const sendEventCalls = (step.sendEvent as jest.Mock).mock.calls as Array<
       [string, unknown]
@@ -1426,6 +1424,8 @@ describe('session-completed integration', () => {
       }),
       expect.objectContaining({ profileId }),
     );
+
+    captureExceptionSpy.mockRestore();
   });
 });
 

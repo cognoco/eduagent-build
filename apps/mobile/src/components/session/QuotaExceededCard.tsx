@@ -1,7 +1,9 @@
-import { Pressable, Text, View } from 'react-native';
+import { useState } from 'react';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import type { QuotaExceededDetails } from '../../lib/api-client';
+import { useNotifyParentSubscribe } from '../../hooks/use-settings';
 
 export interface QuotaExceededCardProps {
   details: QuotaExceededDetails;
@@ -19,8 +21,18 @@ export function QuotaExceededCard({
 }: QuotaExceededCardProps): React.ReactElement {
   const router = useRouter();
   const { t } = useTranslation();
+  const notifyParent = useNotifyParentSubscribe();
+  const [notifyState, setNotifyState] = useState<
+    'idle' | 'sending' | 'sent' | 'failed'
+  >('idle');
 
   const isDailyLimit = details.reason === 'daily';
+  // BUG-143: Surface an approximate reset window so the child knows when
+  // they can use the app again. QuotaExceededDetails doesn't carry an
+  // exact resetsAt — fall back to the canonical wording per reason.
+  const resetHint = isDailyLimit
+    ? t('session.quota.resetHintDaily')
+    : t('session.quota.resetHintMonthly');
 
   return (
     <View
@@ -84,16 +96,63 @@ export function QuotaExceededCard({
               : t('session.quota.childMonthlyMessage')}
           </Text>
 
-          <View
-            className="bg-surface-elevated rounded-button py-3 px-4 items-center mb-2"
-            testID="quota-ask-parent"
+          {/* BUG-143: Show approximate reset time so the child knows when
+              the limit lifts. Replaces the partial dead-end of a static
+              "ask parent" View with no recovery information. */}
+          <Text
+            className="text-caption text-text-tertiary mb-3"
+            testID="quota-reset-hint"
           >
-            <Text className="text-body-sm text-text-secondary">
-              {t('session.quota.askParent')}
-            </Text>
-          </View>
+            {resetHint}
+          </Text>
 
-          {/* H5: Give child a navigation escape so they're not stuck in the locked session */}
+          {/* BUG-143: Primary recovery — notify the parent in one tap rather
+              than leaving the child with a non-interactive "ask parent"
+              View. Disabled after success so the child can't spam the
+              parent's inbox. */}
+          <Pressable
+            onPress={() => {
+              if (notifyState !== 'idle' && notifyState !== 'failed') return;
+              setNotifyState('sending');
+              notifyParent.mutate(undefined, {
+                onSuccess: () => setNotifyState('sent'),
+                onError: () => setNotifyState('failed'),
+              });
+            }}
+            disabled={notifyState === 'sending' || notifyState === 'sent'}
+            className={`rounded-button py-3 items-center min-h-[44px] justify-center mb-2 ${
+              notifyState === 'sent' ? 'bg-surface-elevated' : 'bg-primary'
+            }`}
+            accessibilityRole="button"
+            accessibilityLabel={
+              notifyState === 'sent'
+                ? t('session.quota.notifyParentSent')
+                : t('session.quota.notifyParent')
+            }
+            testID="quota-notify-parent-btn"
+          >
+            {notifyState === 'sending' ? (
+              <ActivityIndicator color="white" />
+            ) : (
+              <Text
+                className={`text-body-sm font-semibold ${
+                  notifyState === 'sent'
+                    ? 'text-text-secondary'
+                    : 'text-text-inverse'
+                }`}
+              >
+                {notifyState === 'sent'
+                  ? t('session.quota.notifyParentSent')
+                  : notifyState === 'failed'
+                    ? t('session.quota.notifyParentRetry')
+                    : t('session.quota.notifyParent')}
+              </Text>
+            )}
+          </Pressable>
+
+          {/* H5: Give child a navigation escape so they're not stuck in the
+              locked session. Demoted to secondary action per BUG-143 — the
+              primary recovery is now "Notify parent". */}
           <Pressable
             onPress={() => router.push(homeHref as Href)}
             className="bg-surface-elevated rounded-button py-3 items-center min-h-[44px] justify-center"

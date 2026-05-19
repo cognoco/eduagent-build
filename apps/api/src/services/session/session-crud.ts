@@ -47,6 +47,7 @@ import {
   extractedInterviewSignalsSchema,
   llmSummarySchema,
   engagementSignalSchema,
+  MAX_EXCHANGES_PER_SESSION,
 } from '@eduagent/schemas';
 import { NotFoundError } from '../../errors';
 import { insertSessionEvent } from './session-events';
@@ -84,8 +85,14 @@ export class SubjectInactiveError extends Error {
   }
 }
 
-/** Maximum exchanges allowed per session (defense-in-depth — issue #15) */
-export const MAX_EXCHANGES_PER_SESSION = 50;
+/**
+ * Maximum exchanges allowed per session (defense-in-depth — issue #15).
+ *
+ * Canonical definition lives in `@eduagent/schemas` so mobile can import it
+ * (BUG-211, 2026-05-18). Re-exported here for backward compatibility with
+ * existing API call sites; new code should import from `@eduagent/schemas`.
+ */
+export { MAX_EXCHANGES_PER_SESSION } from '@eduagent/schemas';
 
 export class SessionExchangeLimitError extends Error {
   constructor(public readonly exchangeCount: number) {
@@ -1654,30 +1661,55 @@ export async function listProfileSessions(
   const page = hasMore ? rows.slice(0, limit) : rows;
 
   return {
-    sessions: await hydrateChildSessions(db, page),
+    sessions: await hydrateChildSessions(db, profileId, page),
     nextCursor: hasMore ? (page[page.length - 1]?.id ?? null) : null,
   };
 }
 
+/**
+ * [BUG-102 / BUG-106] hydrateChildSessions takes an explicit `profileId` and
+ * filters every secondary query by it (defence-in-depth). Pre-fix the function
+ * trusted that `sessions` had already been scoped upstream and ran batch
+ * fetches purely by sessionId/subjectId/topicId. If a caller passed in
+ * cross-account session rows (or upstream scoping regressed), session
+ * summaries, subject names, topic titles and ai_response drill rows would
+ * leak across accounts.
+ *
+ * Per CLAUDE.md: the scoped repository can't express multi-table joins, so we
+ * use direct `db.select()` / `db.query.*` with explicit
+ * `eq(*.profileId, profileId)` predicates. `curriculumTopics` has no
+ * `profileId` column — for that table we enforce isolation through the
+ * closest owning ancestor (`subjects.profileId`) via innerJoin.
+ */
 async function hydrateChildSessions(
   db: Database,
+  profileId: string,
   sessions: LearningSessionRow[],
 ): Promise<ChildSession[]> {
   if (sessions.length === 0) return [];
 
+  // Belt-and-braces: drop any row that leaked in for a different profileId.
+  // Upstream listProfileSessions already scopes via createScopedRepository,
+  // but this guard makes hydrateChildSessions safe for any future caller.
+  const ownedSessions = sessions.filter((s) => s.profileId === profileId);
+  if (ownedSessions.length === 0) return [];
+
   // Batch-fetch highlights from session_summaries for all sessions
-  const sessionIds = sessions.map((s) => s.id);
+  const sessionIds = ownedSessions.map((s) => s.id);
 
   // [BUG-526] Batch-fetch subject names and topic titles so the mobile
   // client can render structured context instead of relying on the highlight string.
-  const uniqueSubjectIds = [...new Set(sessions.map((s) => s.subjectId))];
+  const uniqueSubjectIds = [...new Set(ownedSessions.map((s) => s.subjectId))];
   const uniqueTopicIds = [
-    ...new Set(sessions.map((s) => s.topicId).filter(Boolean) as string[]),
+    ...new Set(ownedSessions.map((s) => s.topicId).filter(Boolean) as string[]),
   ];
 
   const [summaries, subjectRows, topicRows, drillRows] = await Promise.all([
     db.query.sessionSummaries.findMany({
-      where: inArray(sessionSummaries.sessionId, sessionIds),
+      where: and(
+        inArray(sessionSummaries.sessionId, sessionIds),
+        eq(sessionSummaries.profileId, profileId),
+      ),
       columns: {
         sessionId: true,
         highlight: true,
@@ -1688,15 +1720,31 @@ async function hydrateChildSessions(
     }),
     uniqueSubjectIds.length > 0
       ? db.query.subjects.findMany({
-          where: inArray(subjects.id, uniqueSubjectIds),
+          where: and(
+            inArray(subjects.id, uniqueSubjectIds),
+            eq(subjects.profileId, profileId),
+          ),
           columns: { id: true, name: true },
         })
       : Promise.resolve([]),
     uniqueTopicIds.length > 0
-      ? db.query.curriculumTopics.findMany({
-          where: inArray(curriculumTopics.id, uniqueTopicIds),
-          columns: { id: true, title: true },
-        })
+      ? db
+          .select({
+            id: curriculumTopics.id,
+            title: curriculumTopics.title,
+          })
+          .from(curriculumTopics)
+          .innerJoin(
+            curriculumBooks,
+            eq(curriculumTopics.bookId, curriculumBooks.id),
+          )
+          .innerJoin(subjects, eq(curriculumBooks.subjectId, subjects.id))
+          .where(
+            and(
+              inArray(curriculumTopics.id, uniqueTopicIds),
+              eq(subjects.profileId, profileId),
+            ),
+          )
       : Promise.resolve([]),
     // Fluency-drill outcomes for each session, oldest first. Sparse: most
     // ai_response rows have null drill columns, so the IS NOT NULL filter
@@ -1712,6 +1760,7 @@ async function hydrateChildSessions(
       .where(
         and(
           inArray(sessionEvents.sessionId, sessionIds),
+          eq(sessionEvents.profileId, profileId),
           eq(sessionEvents.eventType, 'ai_response'),
           isNotNull(sessionEvents.drillTotal),
         ),
@@ -1736,7 +1785,7 @@ async function hydrateChildSessions(
     drillsBySession.set(row.sessionId, list);
   }
 
-  return sessions.map((s) => {
+  return ownedSessions.map((s) => {
     const metadata = getSessionMetadata(s.metadata);
     const homeworkSummary = metadata.homeworkSummary ?? null;
 

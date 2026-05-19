@@ -2,12 +2,14 @@ import {
   capitalsLlmOutputSchema,
   capitalsQuestionSchema,
   completeRoundInputSchema,
+  completedRoundDetailResponseSchema,
   generateRoundInputSchema,
   guessWhoLlmOutputSchema,
   guessWhoQuestionSchema,
   questionResultSchema,
   quizActivityTypeSchema,
   quizQuestionSchema,
+  recentRoundSchema,
   vocabularyLlmOutputSchema,
   vocabularyQuestionSchema,
 } from './quiz.js';
@@ -382,6 +384,117 @@ describe('quiz schemas', () => {
           answerMode: 'voice',
         }),
       ).toThrow();
+    });
+  });
+
+  describe('recentRoundSchema [BUG-209] — completedAt is a strict ISO datetime', () => {
+    const UUID = '550e8400-e29b-41d4-a716-446655440000';
+    const base = {
+      id: UUID,
+      activityType: 'capitals' as const,
+      theme: 'EU capitals',
+      score: 8,
+      total: 10,
+      xpEarned: 80,
+    };
+
+    it('accepts a valid ISO datetime', () => {
+      const result = recentRoundSchema.safeParse({
+        ...base,
+        completedAt: '2026-05-18T12:00:00.000Z',
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('accepts a JS Date (Drizzle row compat)', () => {
+      const result = recentRoundSchema.safeParse({
+        ...base,
+        completedAt: new Date('2026-05-18T12:00:00.000Z'),
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('REJECTS an empty string (previously accepted by bare z.string())', () => {
+      const result = recentRoundSchema.safeParse({
+        ...base,
+        completedAt: '',
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('REJECTS an arbitrary non-ISO string', () => {
+      const result = recentRoundSchema.safeParse({
+        ...base,
+        completedAt: 'sometime last week',
+      });
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe('completedRoundDetailResponseSchema [BUG-207] — typed results array', () => {
+    const UUID = '550e8400-e29b-41d4-a716-446655440000';
+    const base = {
+      id: UUID,
+      activityType: 'capitals' as const,
+      activityLabel: 'Capitals',
+      theme: 'EU capitals',
+      total: 1,
+      status: 'completed' as const,
+      score: 1,
+      xpEarned: 10,
+      celebrationTier: 'perfect' as const,
+      completedAt: '2026-05-18T12:00:00.000Z',
+      questions: [
+        {
+          type: 'capitals' as const,
+          country: 'France',
+          options: ['Paris', 'Berlin', 'Madrid', 'Rome'],
+          funFact: 'Fact',
+          isLibraryItem: false,
+          correctAnswer: 'Paris',
+          acceptedAliases: ['Paris'],
+        },
+      ],
+    };
+
+    it('accepts a typed validatedQuestionResult array in results', () => {
+      const result = completedRoundDetailResponseSchema.safeParse({
+        ...base,
+        results: [
+          {
+            questionIndex: 0,
+            correct: true,
+            correctAnswer: 'Paris',
+            answerGiven: 'Paris',
+          },
+        ],
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('accepts an empty results array (in-progress / pre-grading)', () => {
+      const result = completedRoundDetailResponseSchema.safeParse({
+        ...base,
+        results: [],
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('REJECTS arbitrary object — results must match validatedQuestionResultSchema', () => {
+      const result = completedRoundDetailResponseSchema.safeParse({
+        ...base,
+        results: [{ totallyMadeUpField: 'nope' }],
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('accepts Date object on completedAt (Drizzle row compat)', () => {
+      const result = completedRoundDetailResponseSchema.safeParse({
+        ...base,
+        completedAt: new Date('2026-05-18T12:00:00.000Z'),
+        results: [],
+      });
+      expect(result.success).toBe(true);
     });
   });
 

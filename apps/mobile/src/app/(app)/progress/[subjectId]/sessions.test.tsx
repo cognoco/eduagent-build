@@ -80,9 +80,12 @@ jest.mock('../../../../lib/format-api-error', () => ({
   }),
 }));
 
-jest.mock('../../../../lib/navigation', () => ({
-  goBackOrReplace: jest.fn(),
-}));
+jest.mock(
+  '../../../../lib/navigation' /* gc1-allow: goBackOrReplace calls router.back which requires native navigation context */,
+  () => ({
+    goBackOrReplace: jest.fn(),
+  }),
+);
 
 const mockUseSubjectSessions = jest.fn();
 jest.mock('../../../../hooks/use-subject-sessions', () => ({

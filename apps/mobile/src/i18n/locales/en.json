@@ -543,7 +543,12 @@
       "childDailyMessage": "You've reached today's question limit.",
       "childMonthlyMessage": "You've reached this month's question limit.",
       "askParent": "Ask parent",
-      "topUpCredits": "Top up credits"
+      "topUpCredits": "Top up credits",
+      "notifyParent": "Notify parent",
+      "notifyParentSent": "Sent — parent has been notified",
+      "notifyParentRetry": "Could not send — tap to try again",
+      "resetHintDaily": "Your daily limit resets at midnight.",
+      "resetHintMonthly": "Your monthly limit resets on the 1st."
     },
     "libraryPrompt": {
       "wantToSee": "Want to see your previous lessons?",
@@ -578,7 +583,8 @@
       "textMode": "Text mode",
       "switchToVoiceMode": "Switch to voice mode",
       "voiceMode": "Voice mode",
-      "screenReaderVoiceNote": "Screen reader is on. Voice input is not available. Use text input below."
+      "screenReaderVoiceNote": "Screen reader is on. Voice input is not available. Use text input below.",
+      "stepProgress": "Step {{current}} of {{total}}"
     },
     "filingFailed": {
       "retryInProgress": "A retry is already in progress.",
@@ -619,7 +625,9 @@
       "yesAddLabel": "Yes, add to library",
       "yesAdd": "Yes, add it",
       "noThanksLabel": "No thanks",
-      "noThanks": "No thanks"
+      "noThanks": "No thanks",
+      "tryAgain": "Try again",
+      "skipForNow": "Skip for now"
     },
     "parkingLot": {
       "title": "Parking lot",

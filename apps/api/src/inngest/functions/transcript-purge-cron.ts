@@ -30,10 +30,16 @@ export const transcriptPurgeCron = inngest.createFunction(
       return { status: 'disabled', queued: 0 };
     }
 
-    const cutoff = new Date();
-    cutoff.setUTCDate(cutoff.getUTCDate() - 30);
-
+    // [BUG-189] Cutoff is computed INSIDE step.run for replay stability. If the
+    // step is replayed (Inngest retry, operator re-run), the cached result is
+    // reused and the cutoff value the original run computed is what drives the
+    // result — moving the `new Date()` call inside the step keeps the boundary
+    // deterministic relative to the captured step output rather than depending
+    // on wall-clock at the moment the function handler is invoked.
     const candidates = await step.run('find-purge-candidates', async () => {
+      const cutoff = new Date();
+      cutoff.setUTCDate(cutoff.getUTCDate() - 30);
+
       const db = getStepDatabase();
       return db
         .select({

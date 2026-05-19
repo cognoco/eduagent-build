@@ -40,7 +40,7 @@ export function OnboardingStepIndicator({
         })}
       </View>
       <View className="items-center">
-        <Text className="text-xs text-muted">
+        <Text className="text-caption text-muted">
           Step {activeStep} of {safeTotalSteps}
         </Text>
         {activeStepLabel ? (

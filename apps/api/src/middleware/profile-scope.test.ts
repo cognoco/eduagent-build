@@ -111,8 +111,11 @@ describe('profileScopeMiddleware', () => {
   });
 
   it('returns 403 with proper error body when profile does not belong to account', async () => {
-    // eslint-disable-next-line @typescript-eslint/no-empty-function
-    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    // [BUG-231] Use `jest.fn()` (typed empty mock) instead of `() => {}` so
+    // we don't need to suppress @typescript-eslint/no-empty-function. The
+    // intent — silence noisy warnings during this assertion — is preserved
+    // and the spy's call record stays inspectable below.
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(jest.fn());
     const app = createApp();
     const res = await app.request('/test', {
       headers: { 'X-Profile-Id': 'other-account-profile' },
@@ -172,8 +175,8 @@ describe('profileScopeMiddleware', () => {
   // auth-scoping code paths.
   it('escalates via logger.error + captureException when findOwnerProfile throws', async () => {
     const { findOwnerProfile } = jest.requireMock('../services/profile');
-    // eslint-disable-next-line @typescript-eslint/no-empty-function
-    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    // [BUG-231] See above — jest.fn() avoids the empty-function suppression.
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(jest.fn());
     (captureException as jest.Mock).mockClear();
 
     const dbError = new Error('DB connection lost');

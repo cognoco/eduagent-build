@@ -50,8 +50,8 @@ describe('WithdrawalCountdownBanner', () => {
       />,
     );
 
-    expect(screen.getByText("Liam's account closes in 6 days")).toBeTruthy();
-    expect(screen.getByText('Reverse')).toBeTruthy();
+    expect(screen.getByText("Liam's account closes in 6 days"));
+    expect(screen.getByText('Reverse'));
   });
 
   it('renders multi-child summary with per-child rows', () => {
@@ -64,9 +64,9 @@ describe('WithdrawalCountdownBanner', () => {
       />,
     );
 
-    expect(screen.getByText('2 accounts closing soon')).toBeTruthy();
-    expect(screen.getByTestId('withdrawal-countdown-row-c1')).toBeTruthy();
-    expect(screen.getByTestId('withdrawal-countdown-row-c2')).toBeTruthy();
+    expect(screen.getByText('2 accounts closing soon'));
+    expect(screen.getByTestId('withdrawal-countdown-row-c1'));
+    expect(screen.getByTestId('withdrawal-countdown-row-c2'));
   });
 
   it('calls useRestoreConsent.mutate with the right id when Reverse is pressed', () => {
@@ -100,6 +100,6 @@ describe('WithdrawalCountdownBanner', () => {
       />,
     );
 
-    expect(screen.getByText(/in 1 day$/)).toBeTruthy();
+    expect(screen.getByText(/in 1 day$/));
   });
 });

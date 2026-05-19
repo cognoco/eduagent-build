@@ -197,6 +197,69 @@ describe('streamEnvelopeReply', () => {
     const stream = streamEnvelopeReply(fromChunks(['{"reply":"a\\nb"}']));
     expect(await collect(stream)).toBe('a\nb');
   });
+
+  // -----------------------------------------------------------------------
+  // [BUG-124] maxTailPendingChars overflow path.
+  //
+  // The tail-pending buffer caps at 512 chars. When the buffered candidate
+  // exceeds the cap WITHOUT being a real envelope side-channel, the helper
+  // must release the buffered text back to the visible stream instead of
+  // silently dropping it. The previous suite had no test for this branch —
+  // a regression that flipped the overflow behavior to "discard" would have
+  // shipped silently.
+  // -----------------------------------------------------------------------
+  it('[BUG-124] flushes the tail-pending buffer back to the stream when content exceeds the 512-char cap', async () => {
+    // The tail filter activates when the model copies an envelope-tail
+    // lookalike INTO the reply string (e.g. literal `","signals":`). It
+    // buffers up to `maxTailPendingChars` = 512 chars while waiting to
+    // confirm whether the lookalike is a real side-channel. If the buffer
+    // crosses 512 chars without a confirming key, the helper must release
+    // the buffered bytes back to the visible stream rather than discard
+    // them.
+    const visibleHead = 'Hello there. ';
+    // 700 chars of `A` — guaranteed not to contain `partial_progress`,
+    // `needs_deepening`, etc., so the confirm-key regex never matches.
+    const longTail = 'A'.repeat(700);
+    const replyValue = `${visibleHead}","signals":${longTail}`;
+    // Valid JSON envelope; JSON.stringify escapes the inner quotes so the
+    // on-wire form has `\",\"signals\":` inside the reply string.
+    const envelope = JSON.stringify({ reply: replyValue });
+
+    const stream = streamEnvelopeReply(chunked(envelope, 17));
+    const output = await collect(stream);
+
+    // The visible head must always make it through (yielded before the
+    // tail-trigger fired).
+    expect(output).toContain(visibleHead);
+    // The overflow path must yield the buffered text rather than silently
+    // dropping it — pin >512 chars to prove the cap branch fired and
+    // released.
+    expect(output.length).toBeGreaterThan(512);
+  });
+
+  it('[BUG-124] stays bounded — tail-pending does not grow without limit', async () => {
+    // Same shape as above but with a 10k-char run. If the cap were broken,
+    // the helper would buffer all 10k inside `tailPending` before yielding
+    // anything past the tail trigger; with the cap intact, it releases
+    // around 512 chars and continues normally — total memory for the helper
+    // stays O(cap), not O(input).
+    //
+    // A pathological O(n^2) regression in the tail-pending branch
+    // (re-scanning the whole buffer per chunk) blows well past 1s on 10k
+    // chars, so wall-clock is a meaningful proxy for the cap holding.
+    const visibleHead = 'prefix. ';
+    const hugeTail = 'B'.repeat(10_000);
+    const replyValue = `${visibleHead}","signals":${hugeTail}`;
+    const envelope = JSON.stringify({ reply: replyValue });
+
+    const start = Date.now();
+    const stream = streamEnvelopeReply(chunked(envelope, 23));
+    const output = await collect(stream);
+    const elapsedMs = Date.now() - start;
+
+    expect(output).toContain(visibleHead);
+    expect(elapsedMs).toBeLessThan(1000);
+  });
 });
 
 describe('teeEnvelopeStream', () => {

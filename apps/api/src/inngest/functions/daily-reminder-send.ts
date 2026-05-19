@@ -19,6 +19,13 @@ export const dailyReminderSend = inngest.createFunction(
     // [FIX-INNGEST-4] Inngest replay / operator re-fire must not push twice.
     // event.id is unique per sendEvent call; dedupes within 24h.
     idempotency: 'event.id',
+    // [BUG-253] Bound parallelism on the fan-out receiver. The cron upstream
+    // can fan out hundreds-to-thousands of daily-reminder events in a single
+    // burst; each handler hits Neon for the notification-log dedup read and
+    // again for the push-notification send. limit=50 caps Neon connection
+    // pressure and matches the transcript-purge / daily-snapshot-refresh
+    // pattern.
+    concurrency: { limit: 50 },
   },
   { event: 'app/daily-reminder.send' },
   async ({ event, step }) => {
@@ -44,7 +51,7 @@ export const dailyReminderSend = inngest.createFunction(
           db,
           profileId,
           'daily_reminder',
-          24
+          24,
         );
       } catch (err) {
         captureException(err, {
@@ -105,5 +112,5 @@ export const dailyReminderSend = inngest.createFunction(
     }
 
     return result;
-  }
+  },
 );

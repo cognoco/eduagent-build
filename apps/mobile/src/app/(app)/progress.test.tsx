@@ -223,7 +223,21 @@ jest.mock('react-i18next', () => ({
   }),
 }));
 
-jest.mock('../../hooks/use-progress');
+jest.mock('../../hooks/use-progress', () => ({
+  // gc1-allow: wraps useApiClient fetch boundary — needs network stub in unit tests
+  ...jest.requireActual('../../hooks/use-progress'),
+  fetchLearningResumeTarget: jest.fn(),
+  useChildInventory: jest.fn(),
+  useChildProgressSummary: jest.fn(),
+  useLearningResumeTarget: jest.fn(),
+  useOverallProgress: jest.fn(),
+  useProgressInventory: jest.fn(),
+  useProgressMilestones: jest.fn(),
+  useProfileSessions: jest.fn(),
+  useProfileReports: jest.fn(),
+  useProfileWeeklyReports: jest.fn(),
+  useRefreshProgressSnapshot: jest.fn(),
+}));
 const mockUseSubjects = jest.fn(() => ({
   data: [] as Array<{ id: string; name: string; status: string }>,
 }));

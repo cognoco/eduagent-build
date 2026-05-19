@@ -8,6 +8,7 @@ import { useAssessmentEligibleTopics } from '../../../hooks/use-assessments';
 import { Button } from '../../../components/common/Button';
 import { ErrorFallback } from '../../../components/common/ErrorFallback';
 import { useThemeColors } from '../../../lib/theme';
+import { goBackOrReplace, PRACTICE_HREF } from '../../../lib/navigation';
 import type { Translate } from '../../../i18n';
 
 function formatStudiedAt(isoDate: string, t: Translate): string {
@@ -53,7 +54,7 @@ export default function AssessmentPickerScreen(): React.ReactElement {
     >
       <View className="flex-row items-center mb-6">
         <Pressable
-          onPress={() => router.back()}
+          onPress={() => goBackOrReplace(router, PRACTICE_HREF)}
           className="mr-3 min-h-[44px] min-w-[44px] items-center justify-center"
           accessibilityRole="button"
           accessibilityLabel={t('common.goBack', 'Go back')}
@@ -85,7 +86,7 @@ export default function AssessmentPickerScreen(): React.ReactElement {
           secondaryAction={{
             label: t('common.goBack', 'Go back'),
             testID: 'assessment-picker-error-back',
-            onPress: () => router.back(),
+            onPress: () => goBackOrReplace(router, PRACTICE_HREF),
           }}
         />
       ) : isLoading && loadTimedOut ? (
@@ -103,7 +104,7 @@ export default function AssessmentPickerScreen(): React.ReactElement {
           secondaryAction={{
             label: t('common.goBack', 'Go back'),
             testID: 'assessment-picker-timeout-back',
-            onPress: () => router.back(),
+            onPress: () => goBackOrReplace(router, PRACTICE_HREF),
           }}
           testID="assessment-picker-timeout"
         />

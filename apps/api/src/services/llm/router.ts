@@ -258,6 +258,15 @@ export const MIN_REPLY_MAX_TOKENS = 8192;
 
 // Premium candidates used only when an entitled profile reaches the advanced
 // rungs, or when a comparison runner explicitly requests a provider.
+//
+// [BUG-121] The default constant lives here as a fallback only. The model id
+// MUST be overridable at runtime so an OpenAI model retirement (4xx with no
+// transient fallback) can be rotated through Doppler without a code deploy.
+// Use `setOpenAIAdvancedModel(...)` from a bootstrap site (e.g. middleware
+// or worker entry point) to inject a Doppler-sourced env value. Adding the
+// schema entry to `config.ts` and wiring `c.env.OPENAI_ADVANCED_MODEL` into
+// `middleware/llm.ts` are the small follow-up changes that complete this
+// rotation path — left for a separate PR that owns those files.
 export const OPENAI_ADVANCED_MODEL = 'gpt-5.4';
 export const OPENAI_ADVANCED_MODEL_CANDIDATES = [
   OPENAI_ADVANCED_MODEL,
@@ -274,11 +283,32 @@ export function getOpenAIAdvancedModel(): OpenAIAdvancedModel {
   return openAIAdvancedModelOverride ?? OPENAI_ADVANCED_MODEL;
 }
 
-export function _setOpenAIAdvancedModelForTesting(
+/**
+ * Set the runtime-active OpenAI advanced model id, replacing the hardcoded
+ * default. Intended to be called once at process / worker boot from a Doppler-
+ * sourced env value. Pass `null` to clear and fall back to
+ * `OPENAI_ADVANCED_MODEL`.
+ *
+ * The model id must be one of `OPENAI_ADVANCED_MODEL_CANDIDATES` so an env
+ * typo cannot silently route traffic to a model the codebase has never been
+ * tested against — add new ids to the candidates array first, then ship the
+ * env change.
+ *
+ * [BUG-121]
+ */
+export function setOpenAIAdvancedModel(
   model: OpenAIAdvancedModel | null,
 ): void {
   openAIAdvancedModelOverride = model;
 }
+
+/**
+ * @deprecated Test-suite alias for the production setter. Prefer
+ * `setOpenAIAdvancedModel` at new call sites; the under-prefixed name was
+ * historically used to discourage non-test callers when the value was
+ * hardcoded. [BUG-121]
+ */
+export const _setOpenAIAdvancedModelForTesting = setOpenAIAdvancedModel;
 
 function getModelConfig(
   rung: EscalationRung,
@@ -596,6 +626,34 @@ export class CircuitOpenError extends Error {
 
 // ---------------------------------------------------------------------------
 // Retry helper for transient failures
+//
+// [BUG-114] Retry asymmetry between routeAndCall and routeAndStream is
+// DELIBERATE — do not "fix" it by adding withRetry to the streaming path.
+//
+// routeAndCall (non-streaming, here):
+//   • Each attempt is an atomic POST that either returns the full reply or
+//     throws. Retrying simply re-issues the same request — idempotent from
+//     the provider's perspective, and the caller observes a single result.
+//   • MAX_RETRIES = 3 (4 total attempts) absorbs transient first-byte
+//     failures (DNS blips, TCP resets, brief 5xx) before falling through to
+//     the cross-provider fallback path. Tuned in router.test.ts:
+//     `routeAndCall retry on transient failure`.
+//
+// routeAndStream (streaming, line ~1033):
+//   • The provider opens a long-lived chunked response. Once bytes have been
+//     handed to the caller, the LLM has already started generating text;
+//     replaying the request would mean (a) the user sees the start of the
+//     reply twice or (b) we buffer the entire stream server-side just to
+//     swallow it on retry. Both defeat the point of streaming.
+//   • Pre-first-byte failures DO happen but are intentionally NOT retried at
+//     the router layer. They surface to `wrapStreamWithCircuitBreaker` which
+//     either falls over to the secondary provider in a single hop OR throws
+//     CircuitOpenError. The caller (session-exchange.streamMessage) then
+//     emits the SSE `fallback` frame so the client can re-request.
+//   • A future refactor that wants to buffer-and-retry the FIRST chunk only
+//     must (a) keep the streaming contract — yield bytes as they arrive —
+//     and (b) avoid double-emission. Don't drop withRetry into routeAndStream
+//     unconditionally without solving both.
 // ---------------------------------------------------------------------------
 
 const MAX_RETRIES = 3; // Up to 4 total attempts

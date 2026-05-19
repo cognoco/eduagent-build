@@ -275,7 +275,7 @@ describe('Integration: Stripe Webhook guards', () => {
     expect(body.code).toBe('MISSING_SIGNATURE');
   });
 
-  it('rejects stale events older than 48 hours', async () => {
+  it('acknowledges and drops stale events older than 48 hours', async () => {
     const staleEvent = buildStripeEvent(
       'customer.subscription.updated',
       {
@@ -297,9 +297,8 @@ describe('Integration: Stripe Webhook guards', () => {
       TEST_ENV,
     );
 
-    expect(res.status).toBe(400);
-    const body = await res.json();
-    expect(body.code).toBe('STALE_EVENT');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ received: true, stale: true });
     expect(mockKvPut).not.toHaveBeenCalled();
   });
 });

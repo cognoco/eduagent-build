@@ -132,13 +132,17 @@ export const QUICK_CHIP_CONFIG: Record<
   },
 };
 
+// BUG-151: Copy must not promise a "Reconnect button below" verbatim — the
+// affordance is a Reconnect chip rendered next to the failing message only
+// when the error is reconnectable. Phrase the prompt so it works regardless
+// of which path surfaces it and so it doesn't reference UI that may not be
+// visible.
 export const RECONNECT_PROMPT =
-  'Lost connection — check your network and use the Reconnect button below to try again.';
+  'Lost connection — check your network and tap Reconnect to try again.';
 
 export const TIMEOUT_PROMPT = 'Your session timed out. Please try again.';
 
-export const SERVER_ERROR_PROMPT =
-  'Server error — tap the Reconnect button to try again.';
+export const SERVER_ERROR_PROMPT = 'Server error — tap Reconnect to try again.';
 
 export const CONFIG_ERROR_PROMPT =
   'Server configuration error — try again in a moment.';

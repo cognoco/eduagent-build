@@ -9,7 +9,13 @@ import {
   ActivityIndicator,
   InteractionManager,
 } from 'react-native';
-import { useRouter, useLocalSearchParams, type Href } from 'expo-router';
+import {
+  useRouter,
+  useLocalSearchParams,
+  Redirect,
+  type Href,
+} from 'expo-router';
+import { useAuth } from '@clerk/clerk-expo';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -32,7 +38,7 @@ import { useTotalSessionCount } from '../../hooks/use-session-context';
 import { usePostSessionNotificationAsk } from '../../hooks/use-post-session-notification-ask';
 import { goBackOrReplace, homeHrefForReturnTo } from '../../lib/navigation';
 import { platformAlert } from '../../lib/platform-alert';
-import { formatApiError } from '../../lib/format-api-error';
+import { formatApiError, classifyApiError } from '../../lib/format-api-error';
 import { Sentry } from '../../lib/sentry';
 import {
   readSummaryDraft,
@@ -87,6 +93,12 @@ export default function SessionSummaryScreen() {
   const summaryHomeHref = homeHrefForReturnTo(returnTo);
   const colors = useThemeColors();
   const { t } = useTranslation();
+  // [BUG-134] Auth gate — this route is at the root, not under (app)/, so
+  // the (app)/_layout.tsx auth guard does NOT fire on deep-link entry.
+  // Without this check, an unauthenticated user opening a /session-summary
+  // deep link hits the loading spinner → dead-end ErrorFallback with no
+  // path to sign-in.
+  const { isLoaded: authIsLoaded, isSignedIn } = useAuth();
 
   const [summaryText, setSummaryText] = useState('');
   const [aiFeedback, setAiFeedback] = useState<string | null>(null);
@@ -390,6 +402,24 @@ export default function SessionSummaryScreen() {
     router.replace(summaryHomeHref as Href);
   };
 
+  // [BUG-134] Auth gate (see comment at top of component).
+  // Wait for Clerk to load — until then we don't know whether the user is
+  // authenticated. Showing a spinner avoids a flicker-to-sign-in when the
+  // user IS authenticated but Clerk hasn't hydrated yet.
+  if (!authIsLoaded) {
+    return (
+      <View
+        className="flex-1 bg-background items-center justify-center"
+        testID="session-summary-auth-loading"
+      >
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
+  if (!isSignedIn) {
+    return <Redirect href="/sign-in" />;
+  }
+
   if (!sessionId) {
     return (
       <ErrorFallback
@@ -405,12 +435,17 @@ export default function SessionSummaryScreen() {
     );
   }
 
+  // [BUG-139] Classify the transcript-load error through the shared
+  // classifier, not via raw HTTP status duck-typing. Per CLAUDE.md UX
+  // Resilience Rules, "classification happens at the API client boundary"
+  // and screens must NEVER parse HTTP status codes. `classifyApiError`
+  // handles both typed error classes (NotFoundError, ResourceGoneError)
+  // and status-tagged plain errors thrown by `assertOk()` — a single
+  // surface so a future client refactor (e.g. switching `assertOk` to
+  // throw typed classes) cannot silently mis-route the UX.
   const isSessionExpired =
     transcript.isError &&
-    typeof transcript.error === 'object' &&
-    transcript.error !== null &&
-    'status' in transcript.error &&
-    (transcript.error as { status?: unknown }).status === 404;
+    classifyApiError(transcript.error).category === 'not-found';
 
   if (isSessionExpired) {
     return (
@@ -1178,8 +1213,12 @@ export default function SessionSummaryScreen() {
         summaryText.length === 0 &&
         reflectionBonusXp != null ? (
           <View className="rounded-card p-4 mb-4" testID="xp-bonus-missed">
+            {/* BUG-150: Reframe "You missed +N XP" (punitive loss-framing)
+                as a forward-looking invitation. Skipping reflection is a
+                normal choice, not a failure to flag — the prior copy
+                violated the "positive framing / no struggle" rule. */}
             <Text className="text-body-sm text-text-secondary">
-              You missed +{reflectionBonusXp} XP
+              Write a reflection next time to earn +{reflectionBonusXp} XP.
             </Text>
           </View>
         ) : null}

@@ -3,6 +3,9 @@ import {
   isGreeting,
   errorHasCode,
   isReconnectableSessionError,
+  reconnectPromptForError,
+  RECONNECT_PROMPT,
+  SERVER_ERROR_PROMPT,
 } from './session-types';
 
 describe('getConversationStage', () => {
@@ -148,5 +151,24 @@ describe('isReconnectableSessionError', () => {
       apiCode: 'EXCHANGE_LIMIT_EXCEEDED',
     });
     expect(isReconnectableSessionError(err)).toBe(false);
+  });
+});
+
+// BUG-151: Reconnect-prompt copy must not promise a UI button that doesn't
+// render. The previous wording said "use the Reconnect button below" — fine
+// for the reconnectable path where SessionMessageActions renders a Reconnect
+// chip, but misleading anywhere else.
+describe('RECONNECT_PROMPT copy (BUG-151)', () => {
+  it('does not reference a non-existent "button below"', () => {
+    expect(RECONNECT_PROMPT.toLowerCase()).not.toContain('button below');
+    expect(SERVER_ERROR_PROMPT.toLowerCase()).not.toContain('button below');
+  });
+
+  it('reconnectPromptForError returns the same wording for network errors', () => {
+    const networkErr = new TypeError('Network request failed');
+    expect(reconnectPromptForError(networkErr)).toBe(RECONNECT_PROMPT);
+    expect(reconnectPromptForError(networkErr).toLowerCase()).not.toContain(
+      'button below',
+    );
   });
 });

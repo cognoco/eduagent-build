@@ -21,6 +21,13 @@ async function emitJsonErrorFrame(stream: SSEStreamingApi): Promise<void> {
  * [BUG-881] Wrapper around Hono's `streamSSE` that ensures the response
  * `Content-Type` declares `charset=utf-8`.
  *
+ * **Why this lives in `route-utils/` (not `services/`):** this helper is a
+ * thin Hono framework adapter — it consumes `hono` types (`Context`,
+ * `SSEStreamingApi`) and produces a `Response`. Per the API governance
+ * rules in CLAUDE.md, `services/` is reserved for framework-agnostic
+ * business logic. Framework-bound helpers belong alongside the routes
+ * that use them, in `route-utils/`.
+ *
  * **Why this exists:** Hono 4.x sets `Content-Type: text/event-stream`
  * without a charset. React Native's `XMLHttpRequest` (used by the mobile
  * SSE consumer in `apps/mobile/src/lib/sse.ts` since `response.body` is

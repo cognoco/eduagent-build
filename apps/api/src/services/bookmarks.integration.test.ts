@@ -14,7 +14,7 @@ import {
   subjects,
   type Database,
 } from '@eduagent/database';
-import { like } from 'drizzle-orm';
+import { eq, like } from 'drizzle-orm';
 import {
   createBookmark,
   deleteBookmark,
@@ -387,3 +387,192 @@ describeIfDb('Bookmarks (integration)', () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// Additional integration tests — pagination stability, orphaned topic rows
+// ---------------------------------------------------------------------------
+
+describeIfDb('Bookmarks — pagination stability (integration)', () => {
+  beforeAll(async () => {
+    db = createDatabase(process.env.DATABASE_URL!);
+    await seedTestData();
+  });
+
+  afterAll(async () => {
+    await db
+      .delete(accounts)
+      .where(like(accounts.clerkUserId, `clerk_integ_bkmk_${RUN_ID}%`));
+  });
+
+  it('cursor pagination across multiple pages yields no duplicates', async () => {
+    // Create a fresh session + 5 ai_response events and bookmark them all.
+    const [freshSession] = await db
+      .insert(learningSessions)
+      .values({ profileId, subjectId, status: 'completed' })
+      .returning({ id: learningSessions.id });
+
+    const eventIds: string[] = [];
+    for (let i = 0; i < 5; i++) {
+      const [ev] = await db
+        .insert(sessionEvents)
+        .values({
+          sessionId: freshSession!.id,
+          profileId,
+          subjectId,
+          eventType: 'ai_response',
+          content: `Stable pagination event ${i}`,
+        })
+        .returning({ id: sessionEvents.id });
+      eventIds.push(ev!.id);
+    }
+
+    // Bookmark all 5 events.
+    for (const evId of eventIds) {
+      await createBookmark(db, profileId, evId);
+    }
+
+    // Page through 2 at a time — collect all ids.
+    const collected: string[] = [];
+    let cursor: string | null = null;
+
+    let attempts = 0;
+    do {
+      const page = await listBookmarks(db, profileId, {
+        limit: 2,
+        cursor: cursor ?? undefined,
+      });
+      for (const bm of page.bookmarks) {
+        expect(collected).not.toContain(bm.id); // no duplicates
+        collected.push(bm.id);
+      }
+      cursor = page.nextCursor;
+      attempts++;
+      if (attempts > 20) break; // safety guard against infinite loop
+    } while (cursor !== null);
+
+    // Must have visited at least the 5 newly created bookmarks (plus any
+    // bookmarks seeded by earlier tests in the same suite run).
+    expect(collected.length).toBeGreaterThanOrEqual(5);
+  });
+
+  it('cursor pagination returns correct nextCursor on boundary', async () => {
+    const [freshSession] = await db
+      .insert(learningSessions)
+      .values({ profileId, subjectId, status: 'completed' })
+      .returning({ id: learningSessions.id });
+
+    const [ev1] = await db
+      .insert(sessionEvents)
+      .values({
+        sessionId: freshSession!.id,
+        profileId,
+        subjectId,
+        eventType: 'ai_response',
+        content: 'Boundary cursor event A',
+      })
+      .returning({ id: sessionEvents.id });
+
+    const bm1 = await createBookmark(db, profileId, ev1!.id);
+
+    // A single-item page at limit=1 must have a non-null cursor pointing
+    // to the id of the last emitted item so the next page starts after it.
+    const page = await listBookmarks(db, profileId, { limit: 1 });
+    // The cursor equals the id of the last item in this page.
+    expect(page.nextCursor).toBe(page.bookmarks[page.bookmarks.length - 1]!.id);
+
+    // Cleanup
+    await deleteBookmark(db, profileId, bm1.id);
+  });
+});
+
+describeIfDb('Bookmarks — orphaned topic references (integration)', () => {
+  beforeAll(async () => {
+    db = createDatabase(process.env.DATABASE_URL!);
+    await seedTestData();
+  });
+
+  afterAll(async () => {
+    await db
+      .delete(accounts)
+      .where(like(accounts.clerkUserId, `clerk_integ_bkmk_${RUN_ID}%`));
+  });
+
+  it('listBookmarks includes bookmark even when topicId is null (ON DELETE SET NULL)', async () => {
+    // The bookmarks table has topicId ON DELETE SET NULL, so after a topic is
+    // deleted the row survives with topicId=null. listBookmarks uses leftJoin
+    // on curriculum_topics so it must still return the row.
+    const [nullTopicRow] = await db
+      .insert(bookmarks)
+      .values({
+        profileId,
+        sessionId,
+        eventId: generateUUIDv7(),
+        subjectId,
+        topicId: null,
+        content: 'Orphaned topic bookmark',
+      })
+      .returning({ id: bookmarks.id });
+
+    const result = await listBookmarks(db, profileId, {});
+    const ids = result.bookmarks.map((b) => b.id);
+    expect(ids).toContain(nullTopicRow!.id);
+
+    // topicTitle must be null (leftJoin yields null for missing join row)
+    const found = result.bookmarks.find((b) => b.id === nullTopicRow!.id);
+    expect(found!.topicTitle).toBeNull();
+
+    // Cleanup
+    await db.delete(bookmarks).where(eq(bookmarks.id, nullTopicRow!.id));
+  });
+
+  it('listSessionBookmarks returns empty array for session with no bookmarks', async () => {
+    const [emptySession] = await db
+      .insert(learningSessions)
+      .values({ profileId, subjectId, status: 'active' })
+      .returning({ id: learningSessions.id });
+
+    const result = await listSessionBookmarks(db, profileId, emptySession!.id);
+    expect(result).toEqual([]);
+  });
+});
+
+describeIfDb(
+  'Bookmarks — subjectId filter profile isolation (integration)',
+  () => {
+    beforeAll(async () => {
+      db = createDatabase(process.env.DATABASE_URL!);
+      await seedTestData();
+    });
+
+    afterAll(async () => {
+      await db
+        .delete(accounts)
+        .where(like(accounts.clerkUserId, `clerk_integ_bkmk_${RUN_ID}%`));
+    });
+
+    it('subjectId filter does not leak cross-profile bookmarks sharing a subjectId row', async () => {
+      // Direct insert: a cross-profile bookmark referencing subjectId
+      // (the subject is owned by profileId, but we assign it to otherProfileId).
+      // This tests that the listBookmarks WHERE clause includes profileId AND subjectId.
+      const [xpBm] = await db
+        .insert(bookmarks)
+        .values({
+          profileId: otherProfileId,
+          sessionId,
+          eventId: generateUUIDv7(),
+          subjectId,
+          topicId: null,
+          content: 'Cross-profile bookmark on same subjectId',
+        })
+        .returning({ id: bookmarks.id });
+
+      // Active profile filtered by subjectId should not see otherProfile's bookmark.
+      const result = await listBookmarks(db, profileId, { subjectId });
+      const ids = result.bookmarks.map((b) => b.id);
+      expect(ids).not.toContain(xpBm!.id);
+
+      // Cleanup
+      await db.delete(bookmarks).where(eq(bookmarks.id, xpBm!.id));
+    });
+  },
+);

@@ -6,7 +6,10 @@ export function resolveCelebrationLevelForAccommodation(
 ): CelebrationLevel {
   if (
     accommodationMode === 'short-burst' ||
-    accommodationMode === 'predictable'
+    accommodationMode === 'predictable' ||
+    accommodationMode === 'none' ||
+    accommodationMode === 'audio-first' ||
+    accommodationMode === undefined
   ) {
     return celebrationLevel;
   }

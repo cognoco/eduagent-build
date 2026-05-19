@@ -46,7 +46,11 @@ jest.mock('react-i18next', () => ({
   }),
 }));
 
-jest.mock('../../../hooks/use-progress');
+jest.mock('../../../hooks/use-progress', () => ({
+  // gc1-allow: wraps useApiClient fetch boundary — needs network stub in unit tests
+  ...jest.requireActual('../../../hooks/use-progress'),
+  useProgressInventory: jest.fn(),
+}));
 jest.mock('expo-router', () => ({
   useRouter: () => ({ back: jest.fn(), push: jest.fn(), replace: jest.fn() }),
 }));

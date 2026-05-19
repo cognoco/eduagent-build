@@ -29,7 +29,7 @@ export function SettingsRow({
         ...(Platform.OS === 'web' && onPress ? { cursor: 'pointer' } : {}),
       })}
       accessibilityLabel={label}
-      accessibilityRole="button"
+      accessibilityRole={onPress ? 'button' : undefined}
       testID={testID}
     >
       <View className="flex-1 pr-3">

@@ -156,12 +156,18 @@ jobs:
       - name: Enable pgvector extension
         run: psql "$DATABASE_URL" -c 'CREATE EXTENSION IF NOT EXISTS vector;'
 
-      # CFG-12: Intentionally using db:push here (not migrate). Reason: this is the
-      # scheduled/manual E2E suite; migration validation is covered by ci.yml on every PR.
-      # db:push is also required here because pnpm strict isolation prevents drizzle-kit
-      # from finding @neondatabase/serverless — falling back to its built-in pg driver via push.
-      - name: Apply database schema
-        run: pnpm --filter @eduagent/database db:push
+      # [BUG-243] Use drizzle-kit migrate (not db:push) so committed migration
+      # SQL is the source of truth for the E2E DB schema — same posture as
+      # ci.yml and the deploy.yml staging/production deploys. CLAUDE.md
+      # "Staging and production must use committed migration SQL plus
+      # drizzle-kit migrate" — the divergence here used to let push silently
+      # accept schema that the migration SQL would have rejected, hiding
+      # migration-SQL breakage from E2E. Running from `working-directory:
+      # packages/database` (not via pnpm --filter) sidesteps the pnpm strict
+      # isolation issue that previously forced db:push.
+      - name: Apply database migrations
+        working-directory: packages/database
+        run: pnpm exec drizzle-kit migrate
 
       - name: Run API integration tests
         run: pnpm exec jest --config tests/integration/jest.config.cjs --maxWorkers=2
@@ -228,18 +234,19 @@ jobs:
           path: apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
           key: apk-debug-${{ hashFiles('apps/mobile/app.json', 'apps/mobile/package.json', 'apps/mobile/plugins/**', 'apps/mobile/assets/**', 'pnpm-lock.yaml') }}
 
-      # --- Phase 1: strict pnpm install + schema push ---
-      # db:push MUST run before shamefully-hoist. In strict mode, pnpm
-      # isolates drizzle-kit so it can't find @neondatabase/serverless
-      # (which only supports Neon's WebSocket protocol, not plain PostgreSQL).
-      # This lets drizzle-kit fall back to its built-in pg driver.
+      # --- Phase 1: strict pnpm install + schema migrate ---
+      # [BUG-243] Use drizzle-kit migrate (not push) for the Maestro DB —
+      # same posture as ci.yml + deploy.yml. Run from the package directory
+      # so drizzle-kit resolves @neondatabase/serverless via the package's
+      # own node_modules (pnpm strict isolation otherwise hides it).
       - run: pnpm install
 
       - name: Enable pgvector extension
         run: psql "$DATABASE_URL" -c 'CREATE EXTENSION IF NOT EXISTS vector;'
 
-      - name: Apply database schema
-        run: pnpm --filter @eduagent/database db:push
+      - name: Apply database migrations
+        working-directory: packages/database
+        run: pnpm exec drizzle-kit migrate
 
       # --- Phase 2: hoisted install for React Native native builds ---
       # Gradle runs `node` scripts that expect flat node_modules.

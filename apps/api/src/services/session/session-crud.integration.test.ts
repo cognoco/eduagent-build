@@ -7,6 +7,8 @@ import {
   generateUUIDv7,
   learningSessions,
   profiles,
+  sessionEvents,
+  sessionSummaries,
   subjects,
   type Database,
 } from '@eduagent/database';
@@ -110,5 +112,71 @@ describeIfDb('listProfileSessions (integration)', () => {
 
     expect(result.sessions).toEqual([]);
     expect(result.nextCursor).toBeNull();
+  });
+
+  // [BUG-102 / BUG-106] BREAK TEST — pre-fix, hydrateChildSessions batched
+  // session_summaries, subjects, curriculum_topics, and ai_response drill
+  // events purely by sessionId/subjectId/topicId, with no profileId
+  // predicate. We simulate the leak by seeding an extra summary AND an
+  // ai_response drill row owned by a sibling profile that point at the
+  // owner's session row. Without the fix those rows would be returned in
+  // the owner's archive view.
+  it('[BREAK] [BUG-102/106] hydrateChildSessions filters secondary rows by profileId', async () => {
+    const owner = await seedProfileWithSubject('Biology');
+    const sibling = await seedProfileWithSubject('Biology-sibling');
+
+    const [ownerSession] = await db
+      .insert(learningSessions)
+      .values({
+        profileId: owner.profileId,
+        subjectId: owner.subjectId,
+        exchangeCount: 1,
+      })
+      .returning({ id: learningSessions.id });
+
+    // Owner-authored summary (correct)
+    await db.insert(sessionSummaries).values({
+      sessionId: ownerSession!.id,
+      profileId: owner.profileId,
+      narrative: 'owner-narrative',
+      highlight: 'owner-highlight',
+      content: 'owner-content',
+      status: 'accepted',
+    });
+
+    // Simulated leak: sibling-owned summary at the same sessionId. The
+    // pre-fix WHERE-only-by-sessionId query would happily return this row.
+    await db.insert(sessionSummaries).values({
+      sessionId: ownerSession!.id,
+      profileId: sibling.profileId,
+      narrative: 'LEAK-sibling-narrative',
+      highlight: 'LEAK-sibling-highlight',
+      content: 'LEAK-sibling-content',
+      status: 'accepted',
+    });
+
+    // Simulated leak: sibling-owned drill event also pointing at the owner
+    // session — same shape of cross-account leak.
+    await db.insert(sessionEvents).values({
+      sessionId: ownerSession!.id,
+      profileId: sibling.profileId,
+      subjectId: sibling.subjectId,
+      eventType: 'ai_response',
+      content: 'LEAK',
+      drillCorrect: 9999,
+      drillTotal: 9999,
+    });
+
+    const result = await listProfileSessions(db, owner.profileId);
+
+    expect(result.sessions).toHaveLength(1);
+    const row = result.sessions[0]!;
+    // Narrative must be the owner's, never the sibling's.
+    expect(row.narrative).toBe('owner-narrative');
+    expect(row.highlight).toBe('owner-highlight');
+    // Drills must not include the sibling's leak event.
+    expect(row.drills).not.toContainEqual(
+      expect.objectContaining({ correct: 9999, total: 9999 }),
+    );
   });
 });

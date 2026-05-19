@@ -1,6 +1,7 @@
 import { addBreadcrumb, captureException } from './sentry';
 import { createLogger } from './logger';
 import { inngest } from '../inngest/client';
+import { safeSend } from './safe-non-core';
 
 const logger = createLogger();
 
@@ -78,13 +79,19 @@ export async function markPersisted(params: {
         key,
       },
     });
-    inngest
-      .send({
-        name: 'app/idempotency.mark_failed',
-        data: { profileId, flow },
-      })
-      .catch(() => {
-        // Fire-and-forget: best-effort event; failure is non-fatal.
-      });
+    // [BUG-107] Non-core telemetry dispatch must go through safeSend per
+    // CLAUDE.md "Silent recovery without escalation is banned" — bare
+    // inngest.send(...).catch(() => {}) erases all observability of dispatch
+    // failures. safeSend captures dispatch failures + timeouts in Sentry and
+    // logs them with `surface` while still never throwing into the caller.
+    await safeSend(
+      () =>
+        inngest.send({
+          name: 'app/idempotency.mark_failed',
+          data: { profileId, flow },
+        }),
+      'idempotency.mark_failed',
+      { profileId, flow },
+    );
   }
 }

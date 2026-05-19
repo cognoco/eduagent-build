@@ -166,6 +166,49 @@ const uiHintsSchema = z.preprocess(
     .optional(),
 );
 
+// ---------------------------------------------------------------------------
+// [BUG-213] Exhaustive "normalised" signals shape.
+//
+// `signalsSchema` keeps every field optional at the parse layer — the LLM
+// often omits whole sections, and Zod must accept that without rejecting
+// the entire envelope. But state-machine consumers want to write exhaustive
+// `if`/`switch` ladders without `?.` everywhere. `NormalisedEnvelopeSignals`
+// is the typed "after defaults applied" shape, and `normaliseSignals()`
+// fills the gaps deterministically. Consumers that want exhaustiveness call
+// `normaliseSignals(envelope.signals)` once and branch on the result; legacy
+// consumers that still read `envelope.signals?.xxx` are unchanged.
+// ---------------------------------------------------------------------------
+
+export interface NormalisedEnvelopeSignals {
+  /** Interview flow: model believes it has enough to conclude. */
+  ready_to_finish: boolean;
+  /** Main loop: learner response showed partial understanding — hold escalation. */
+  partial_progress: boolean;
+  /** Main loop: rung-5 exit protocol fired — queue topic for remediation. */
+  needs_deepening: boolean;
+  /** Main loop: the AI message contains an understanding check. Observational. */
+  understanding_check: boolean;
+  /** Continuation opener: delayed score for the learner's retrieval answer.
+   *  null (not undefined) when not scored — distinguishes "no score yet" from
+   *  "score of 0". */
+  retrieval_score: number | null;
+}
+
+export function normaliseSignals(
+  signals:
+    | z.infer<typeof signalsSchema>
+    | NormalisedEnvelopeSignals
+    | undefined,
+): NormalisedEnvelopeSignals {
+  return {
+    ready_to_finish: signals?.ready_to_finish ?? false,
+    partial_progress: signals?.partial_progress ?? false,
+    needs_deepening: signals?.needs_deepening ?? false,
+    understanding_check: signals?.understanding_check ?? false,
+    retrieval_score: signals?.retrieval_score ?? null,
+  };
+}
+
 export const llmResponseEnvelopeSchema = z.object({
   /**
    * The text the learner actually sees. All prose lives here.

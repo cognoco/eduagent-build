@@ -44,7 +44,7 @@ jest.mock('../services/session' /* gc1-allow: pattern-a conversion */, () => {
       .fn()
       .mockResolvedValue({ reply: 'test', exchangeCount: 1 }),
     getSession: jest.fn().mockResolvedValue({
-      id: 'session-1',
+      id: 'a0000000-0000-4000-a000-000000000001',
       status: 'active',
       sessionType: 'homework',
     }),
@@ -58,7 +58,7 @@ jest.mock('../services/session' /* gc1-allow: pattern-a conversion */, () => {
     // metering coverage on POST /sessions/:id/evaluate-depth.
     getSessionTranscript: jest.fn().mockResolvedValue({
       session: {
-        sessionId: 'session-1',
+        sessionId: 'a0000000-0000-4000-a000-000000000001',
         subjectId: 'subject-1',
         topicId: null,
         sessionType: 'learning',
@@ -432,7 +432,7 @@ describe('metering middleware', () => {
   describe('LLM routes with quota available', () => {
     it('rejects parent-proxy LLM requests before quota lookup/decrement', async () => {
       const res = await app.request(
-        '/v1/sessions/session-1/messages',
+        '/v1/sessions/a0000000-0000-4000-a000-000000000001/messages',
         {
           method: 'POST',
           headers: { ...AUTH_HEADERS, 'X-Proxy-Mode': 'true' },
@@ -488,7 +488,7 @@ describe('metering middleware', () => {
       });
 
       const res = await app.request(
-        '/v1/sessions/session-1/messages',
+        '/v1/sessions/a0000000-0000-4000-a000-000000000001/messages',
         {
           method: 'POST',
           headers: { ...AUTH_HEADERS, 'X-Profile-Id': 'child-profile-id' },
@@ -509,7 +509,7 @@ describe('metering middleware', () => {
       fakeKV.store.set('idem:test-profile-id:session:retry-key', '1');
 
       const res = await app.request(
-        '/v1/sessions/session-1/messages',
+        '/v1/sessions/a0000000-0000-4000-a000-000000000001/messages',
         {
           method: 'POST',
           headers: { ...AUTH_HEADERS, 'Idempotency-Key': 'retry-key' },
@@ -545,7 +545,7 @@ describe('metering middleware', () => {
       });
 
       const res = await app.request(
-        '/v1/sessions/session-1/messages',
+        '/v1/sessions/a0000000-0000-4000-a000-000000000001/messages',
         {
           method: 'POST',
           headers: AUTH_HEADERS,
@@ -564,7 +564,8 @@ describe('metering middleware', () => {
         expect.anything(),
         'sub-1',
         expect.objectContaining({
-          route: 'metering.POST./v1/sessions/session-1/messages',
+          route:
+            'metering.POST./v1/sessions/a0000000-0000-4000-a000-000000000001/messages',
           profileId: 'test-profile-id',
         }),
       );
@@ -585,7 +586,7 @@ describe('metering middleware', () => {
       });
 
       const res = await app.request(
-        '/v1/sessions/session-1/recall-bridge',
+        '/v1/sessions/a0000000-0000-4000-a000-000000000001/recall-bridge',
         {
           method: 'POST',
           headers: AUTH_HEADERS,
@@ -621,7 +622,7 @@ describe('metering middleware', () => {
       });
 
       const res = await app.request(
-        '/v1/sessions/session-1/evaluate-depth',
+        '/v1/sessions/a0000000-0000-4000-a000-000000000001/evaluate-depth',
         {
           method: 'POST',
           headers: AUTH_HEADERS,
@@ -654,7 +655,7 @@ describe('metering middleware', () => {
       });
 
       const res = await app.request(
-        '/v1/sessions/session-1/evaluate-depth',
+        '/v1/sessions/a0000000-0000-4000-a000-000000000001/evaluate-depth',
         {
           method: 'POST',
           headers: AUTH_HEADERS,
@@ -679,7 +680,7 @@ describe('metering middleware', () => {
       });
 
       const res = await app.request(
-        '/v1/sessions/session-1/recall-bridge',
+        '/v1/sessions/a0000000-0000-4000-a000-000000000001/recall-bridge',
         {
           method: 'POST',
           headers: AUTH_HEADERS,
@@ -705,7 +706,7 @@ describe('metering middleware', () => {
       });
 
       const res = await app.request(
-        '/v1/sessions/session-1/messages',
+        '/v1/sessions/a0000000-0000-4000-a000-000000000001/messages',
         {
           method: 'POST',
           headers: AUTH_HEADERS,
@@ -734,7 +735,7 @@ describe('metering middleware', () => {
       });
 
       const res = await app.request(
-        '/v1/sessions/session-1/messages',
+        '/v1/sessions/a0000000-0000-4000-a000-000000000001/messages',
         {
           method: 'POST',
           headers: AUTH_HEADERS,
@@ -760,7 +761,7 @@ describe('metering middleware', () => {
       });
 
       const res = await app.request(
-        '/v1/sessions/session-1/messages',
+        '/v1/sessions/a0000000-0000-4000-a000-000000000001/messages',
         {
           method: 'POST',
           headers: AUTH_HEADERS,
@@ -794,7 +795,7 @@ describe('metering middleware', () => {
       });
 
       const res = await app.request(
-        '/v1/sessions/session-1/messages',
+        '/v1/sessions/a0000000-0000-4000-a000-000000000001/messages',
         {
           method: 'POST',
           headers: AUTH_HEADERS,
@@ -819,7 +820,7 @@ describe('metering middleware', () => {
       });
 
       const res = await app.request(
-        '/v1/sessions/session-1/messages',
+        '/v1/sessions/a0000000-0000-4000-a000-000000000001/messages',
         {
           method: 'POST',
           headers: AUTH_HEADERS,
@@ -858,7 +859,7 @@ describe('metering middleware', () => {
       });
 
       const res = await app.request(
-        '/v1/sessions/session-1/messages',
+        '/v1/sessions/a0000000-0000-4000-a000-000000000001/messages',
         {
           method: 'POST',
           headers: AUTH_HEADERS,
@@ -898,7 +899,7 @@ describe('metering middleware', () => {
       });
 
       const res = await app.request(
-        '/v1/sessions/session-1/messages',
+        '/v1/sessions/a0000000-0000-4000-a000-000000000001/messages',
         {
           method: 'POST',
           headers: AUTH_HEADERS,
@@ -938,7 +939,7 @@ describe('metering middleware', () => {
       });
 
       const res = await app.request(
-        '/v1/sessions/session-1/messages',
+        '/v1/sessions/a0000000-0000-4000-a000-000000000001/messages',
         {
           method: 'POST',
           headers: AUTH_HEADERS,
@@ -979,7 +980,7 @@ describe('metering middleware', () => {
       });
 
       const res = await app.request(
-        '/v1/sessions/session-1/messages',
+        '/v1/sessions/a0000000-0000-4000-a000-000000000001/messages',
         {
           method: 'POST',
           headers: AUTH_HEADERS,
@@ -1027,7 +1028,7 @@ describe('metering middleware', () => {
       });
 
       const res = await app.request(
-        '/v1/sessions/session-1/messages',
+        '/v1/sessions/a0000000-0000-4000-a000-000000000001/messages',
         {
           method: 'POST',
           headers: AUTH_HEADERS,
@@ -1055,7 +1056,7 @@ describe('metering middleware', () => {
       });
 
       await app.request(
-        '/v1/sessions/session-1/messages',
+        '/v1/sessions/a0000000-0000-4000-a000-000000000001/messages',
         {
           method: 'POST',
           headers: AUTH_HEADERS,
@@ -1091,7 +1092,7 @@ describe('metering middleware', () => {
       });
 
       const res = await app.request(
-        '/v1/sessions/session-1/messages',
+        '/v1/sessions/a0000000-0000-4000-a000-000000000001/messages',
         {
           method: 'POST',
           headers: AUTH_HEADERS,
@@ -1134,7 +1135,7 @@ describe('metering middleware', () => {
       });
 
       const res = await app.request(
-        '/v1/sessions/session-1/messages',
+        '/v1/sessions/a0000000-0000-4000-a000-000000000001/messages',
         {
           method: 'POST',
           headers: AUTH_HEADERS,
@@ -1179,7 +1180,7 @@ describe('metering middleware', () => {
       });
 
       const res = await app.request(
-        '/v1/sessions/session-1/messages',
+        '/v1/sessions/a0000000-0000-4000-a000-000000000001/messages',
         {
           method: 'POST',
           headers: AUTH_HEADERS,
@@ -1237,7 +1238,7 @@ describe('metering middleware', () => {
       });
 
       const res = await app.request(
-        '/v1/sessions/session-1/messages',
+        '/v1/sessions/a0000000-0000-4000-a000-000000000001/messages',
         {
           method: 'POST',
           headers: AUTH_HEADERS,
@@ -1278,7 +1279,7 @@ describe('metering middleware', () => {
       });
 
       const res = await app.request(
-        '/v1/sessions/session-1/messages',
+        '/v1/sessions/a0000000-0000-4000-a000-000000000001/messages',
         {
           method: 'POST',
           headers: AUTH_HEADERS,
@@ -1317,7 +1318,7 @@ describe('metering middleware', () => {
       });
 
       const res = await app.request(
-        '/v1/sessions/session-1/messages',
+        '/v1/sessions/a0000000-0000-4000-a000-000000000001/messages',
         {
           method: 'POST',
           headers: AUTH_HEADERS,
@@ -1354,7 +1355,7 @@ describe('metering middleware', () => {
       });
 
       const res = await app.request(
-        '/v1/sessions/session-1/messages',
+        '/v1/sessions/a0000000-0000-4000-a000-000000000001/messages',
         {
           method: 'POST',
           headers: AUTH_HEADERS,
@@ -1391,7 +1392,7 @@ describe('metering middleware', () => {
       });
 
       const res = await app.request(
-        '/v1/sessions/session-1/messages',
+        '/v1/sessions/a0000000-0000-4000-a000-000000000001/messages',
         {
           method: 'POST',
           headers: AUTH_HEADERS,
@@ -1430,7 +1431,7 @@ describe('metering middleware', () => {
       );
 
       const res = await app.request(
-        '/v1/sessions/session-1/stream',
+        '/v1/sessions/a0000000-0000-4000-a000-000000000001/stream',
         {
           method: 'POST',
           headers: AUTH_HEADERS,
@@ -1453,7 +1454,7 @@ describe('metering middleware', () => {
       );
 
       const res = await app.request(
-        '/v1/sessions/session-1/messages/',
+        '/v1/sessions/a0000000-0000-4000-a000-000000000001/messages/',
         {
           method: 'POST',
           headers: AUTH_HEADERS,

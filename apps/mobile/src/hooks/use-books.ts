@@ -113,6 +113,7 @@ export function useGenerateBookTopics(
   BookTopicGenerateInput | undefined
 > {
   const client = useApiClient();
+  const { activeProfile } = useProfile();
   const queryClient = useQueryClient();
 
   // Internal mutation that carries subjectId + bookId in its variables so that
@@ -142,16 +143,19 @@ export function useGenerateBookTopics(
       // request — not the closed-over hook params which may have changed if
       // the user navigated between subjects while generation was in flight.
       const { subjectId: sid, bookId: bid } = variables;
-      // Scope invalidation to the affected subject to avoid re-fetching every
-      // book/curriculum query across all subjects (over-invalidation).
+      // [BUG-162] Scope invalidation to the affected subject AND active
+      // profile so a mutation on this profile never touches another
+      // profile's cache on a shared device. The query keys for books/book/
+      // curriculum already include profileId as the trailing key segment.
+      const pid = activeProfile?.id;
       void queryClient.invalidateQueries({
-        queryKey: ['books', sid],
+        queryKey: ['books', sid, pid],
       });
       void queryClient.invalidateQueries({
-        queryKey: ['book', sid, bid],
+        queryKey: ['book', sid, bid, pid],
       });
       void queryClient.invalidateQueries({
-        queryKey: ['curriculum', sid],
+        queryKey: ['curriculum', sid, pid],
       });
     },
   });

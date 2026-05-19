@@ -103,6 +103,6 @@ describe('LearningPreferencesScreen', () => {
     mockLearnerProfile = { accommodationMode: 'short-burst' };
     render(<LearningPreferencesScreen />, { wrapper: createWrapper() });
 
-    expect(screen.getByText('Short-Burst')).toBeTruthy();
+    expect(screen.getByText('Short-Burst'));
   });
 });

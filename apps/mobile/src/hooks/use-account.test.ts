@@ -16,6 +16,14 @@ jest.mock('../lib/api-client', () => ({
   },
 }));
 
+const mockUseAuth = jest.fn(() => ({
+  isSignedIn: true,
+  userId: 'user_A',
+}));
+jest.mock('@clerk/clerk-expo', () => ({
+  useAuth: () => mockUseAuth(),
+}));
+
 let queryClient: QueryClient;
 
 function createWrapper() {
@@ -164,6 +172,57 @@ describe('useDeletionStatus', () => {
     expect(result.current.data?.gracePeriodEnds).toBe(
       '2026-02-24T00:00:00.000Z',
     );
+  });
+
+  // [BREAK] [BUG-126 / BUG-159] Cross-account leak: User A's deletion-status
+  // cache must NOT be served to User B on the same QueryClient. Without
+  // userId in the key, the second render would return User A's cached data
+  // and skip the fetch entirely. With userId-scoped keys, User B gets a fresh
+  // fetch and User A's "scheduled: true" status never leaks across sign-out.
+  it('[BREAK] does not serve user A deletion-status to user B (cross-account leak)', async () => {
+    mockUseAuth.mockReturnValue({ isSignedIn: true, userId: 'user_A' });
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          scheduled: true,
+          deletionScheduledAt: '2026-02-17T00:00:00.000Z',
+          gracePeriodEnds: '2026-02-24T00:00:00.000Z',
+        }),
+        { status: 200 },
+      ),
+    );
+
+    const wrapper = createWrapper();
+    const userARender = renderHook(() => useDeletionStatus(), { wrapper });
+
+    await waitFor(() => {
+      expect(userARender.result.current.isSuccess).toBe(true);
+    });
+    expect(userARender.result.current.data?.scheduled).toBe(true);
+
+    // Switch identity (e.g. sign-out + new sign-in on shared device) WITHOUT
+    // clearing the QueryClient — simulates the leak window.
+    mockUseAuth.mockReturnValue({ isSignedIn: true, userId: 'user_B' });
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          scheduled: false,
+          deletionScheduledAt: null,
+          gracePeriodEnds: null,
+        }),
+        { status: 200 },
+      ),
+    );
+
+    const userBRender = renderHook(() => useDeletionStatus(), { wrapper });
+
+    await waitFor(() => {
+      expect(userBRender.result.current.isSuccess).toBe(true);
+    });
+
+    // User B MUST get their own fetched data, not User A's cached scheduled=true.
+    expect(userBRender.result.current.data?.scheduled).toBe(false);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
   });
 
   it('surfaces errors when GET /account/deletion-status returns non-2xx', async () => {

@@ -247,4 +247,227 @@ describe('MyNotesListScreen', () => {
 
     await waitFor(() => screen.getByText('Ionic bonds transfer electrons.'));
   });
+
+  it('shows empty state for sessions when API returns empty array', async () => {
+    mockKind = 'sessions';
+    mockFetch.setRoute('/progress/sessions', {
+      sessions: [],
+      nextCursor: null,
+    });
+    render(<MyNotesListScreen />, { wrapper: createWrapper() });
+
+    await waitFor(() => screen.getByTestId('my-notes-empty'));
+    screen.getByText('No sessions yet');
+    screen.getByText("They'll show up here as you learn.");
+  });
+
+  it('shows empty state for bookmarks when API returns empty array', async () => {
+    mockKind = 'bookmarks';
+    mockFetch.setRoute('/bookmarks', { bookmarks: [], nextCursor: null });
+    render(<MyNotesListScreen />, { wrapper: createWrapper() });
+
+    await waitFor(() => screen.getByTestId('my-notes-empty'));
+    screen.getByText('No bookmarks yet');
+  });
+
+  it('shows error state for sessions and retries', async () => {
+    mockKind = 'sessions';
+    mockFetch.setRoute(
+      '/progress/sessions',
+      () =>
+        new Response(JSON.stringify({ error: 'server error' }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    );
+    render(<MyNotesListScreen />, { wrapper: createWrapper() });
+
+    await waitFor(() => screen.getByTestId('my-notes-error'));
+    screen.getByText("Couldn't load sessions");
+
+    mockFetch.setRoute('/progress/sessions', {
+      sessions: [sessionRow],
+      nextCursor: null,
+    });
+    fireEvent.press(screen.getByTestId('my-notes-retry'));
+
+    await waitFor(() => screen.getByText('Chemistry'));
+  });
+
+  it('shows error state for bookmarks and retries', async () => {
+    mockKind = 'bookmarks';
+    mockFetch.setRoute(
+      '/bookmarks',
+      () =>
+        new Response(JSON.stringify({ error: 'server error' }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    );
+    render(<MyNotesListScreen />, { wrapper: createWrapper() });
+
+    await waitFor(() => screen.getByTestId('my-notes-error'));
+    screen.getByText("Couldn't load bookmarks");
+
+    mockFetch.setRoute('/bookmarks', {
+      bookmarks: [bookmarkRow],
+      nextCursor: null,
+    });
+    fireEvent.press(screen.getByTestId('my-notes-retry'));
+
+    await waitFor(() => screen.getByText('A covalent bond shares electrons.'));
+  });
+
+  it('fetches another sessions page when load-more is pressed', async () => {
+    mockKind = 'sessions';
+    mockFetch.setRoute('/progress/sessions', (url: string) => {
+      if (url.includes('cursor=')) {
+        return {
+          sessions: [
+            {
+              ...sessionRow,
+              sessionId: 'a0000000-0000-4000-a000-000000000031',
+              highlight: 'Second page session.',
+              startedAt: '2026-05-12T10:00:00.000Z',
+            },
+          ],
+          nextCursor: null,
+        };
+      }
+      return { sessions: [sessionRow], nextCursor: SESSION_ID };
+    });
+    render(<MyNotesListScreen />, { wrapper: createWrapper() });
+
+    await waitFor(() => screen.getByText('Covalent bonds clicked.'));
+    fireEvent.press(screen.getByTestId('my-notes-load-more'));
+
+    await waitFor(() => screen.getByText('Second page session.'));
+  });
+
+  it('fetches another bookmarks page when load-more is pressed', async () => {
+    mockKind = 'bookmarks';
+    mockFetch.setRoute('/bookmarks', (url: string) => {
+      if (url.includes('cursor=')) {
+        return {
+          bookmarks: [
+            {
+              ...bookmarkRow,
+              id: 'a0000000-0000-4000-a000-000000000051',
+              content: 'Second page bookmark.',
+              createdAt: '2026-05-12T10:00:00.000Z',
+            },
+          ],
+          nextCursor: null,
+        };
+      }
+      return { bookmarks: [bookmarkRow], nextCursor: BOOKMARK_ID };
+    });
+    render(<MyNotesListScreen />, { wrapper: createWrapper() });
+
+    await waitFor(() => screen.getByText('A covalent bond shares electrons.'));
+    fireEvent.press(screen.getByTestId('my-notes-load-more'));
+
+    await waitFor(() => screen.getByText('Second page bookmark.'));
+  });
+
+  it('groups sessions by subject when subject toggle is selected', async () => {
+    mockKind = 'sessions';
+    const secondSession = {
+      ...sessionRow,
+      sessionId: 'a0000000-0000-4000-a000-000000000032',
+      subjectId: 'a0000000-0000-4000-a000-000000000011',
+      subjectName: 'Physics',
+      topicId: 'a0000000-0000-4000-a000-000000000021',
+      topicTitle: 'Newton Laws',
+      highlight: 'Force equals mass times acceleration.',
+      startedAt: '2026-05-14T10:00:00.000Z',
+    };
+    mockFetch.setRoute('/progress/sessions', {
+      sessions: [sessionRow, secondSession],
+      nextCursor: null,
+    });
+
+    render(<MyNotesListScreen />, { wrapper: createWrapper() });
+    await waitFor(() => screen.getByText('Chemistry'));
+
+    fireEvent.press(screen.getByTestId('my-notes-group-subject'));
+
+    // Both subject headers should be visible after switching to subject group
+    screen.getAllByText('Chemistry');
+    screen.getAllByText('Physics');
+    screen.getByText('Force equals mass times acceleration.');
+  });
+
+  it('groups notes by date by default and switches to subject', async () => {
+    mockKind = 'notes';
+    const secondNote = {
+      ...noteRow,
+      id: 'a0000000-0000-4000-a000-000000000041',
+      subjectId: 'a0000000-0000-4000-a000-000000000011',
+      subjectName: 'Physics',
+      topicId: 'a0000000-0000-4000-a000-000000000021',
+      topicTitle: 'Newton Laws',
+      content: 'F = ma is Newton second law.',
+      updatedAt: '2026-05-14T10:00:00.000Z',
+    };
+    mockFetch.setRoute('/notes', {
+      notes: [noteRow, secondNote],
+      nextCursor: null,
+    });
+
+    render(<MyNotesListScreen />, { wrapper: createWrapper() });
+    await waitFor(() => screen.getByText('Ionic bonds transfer electrons.'));
+
+    // Switch to subject grouping — headers become subject names
+    fireEvent.press(screen.getByTestId('my-notes-group-subject'));
+
+    screen.getAllByText('Chemistry');
+    screen.getAllByText('Physics');
+    screen.getByText('F = ma is Newton second law.');
+  });
+
+  it('subtitle shows correct item count', async () => {
+    mockKind = 'sessions';
+    mockFetch.setRoute('/progress/sessions', {
+      sessions: [sessionRow],
+      nextCursor: null,
+    });
+    render(<MyNotesListScreen />, { wrapper: createWrapper() });
+
+    await waitFor(() => screen.getByText('1 session'));
+  });
+
+  it('back button on list navigates to my-notes hub', () => {
+    render(<MyNotesListScreen />, { wrapper: createWrapper() });
+    fireEvent.press(screen.getByTestId('my-notes-list-back'));
+
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/my-notes');
+  });
+
+  it('bookmark with null topicId falls back to session-summary navigation', async () => {
+    mockKind = 'bookmarks';
+    const bookmarkNoTopic = {
+      ...bookmarkRow,
+      topicId: null,
+      topicTitle: null,
+    };
+    mockFetch.setRoute('/bookmarks', {
+      bookmarks: [bookmarkNoTopic],
+      nextCursor: null,
+    });
+
+    render(<MyNotesListScreen />, { wrapper: createWrapper() });
+
+    await waitFor(() =>
+      screen.getByTestId(`my-notes-row-bookmarks-${BOOKMARK_ID}`),
+    );
+    fireEvent.press(
+      screen.getByTestId(`my-notes-row-bookmarks-${BOOKMARK_ID}`),
+    );
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/session-summary/[sessionId]',
+      params: { sessionId: SESSION_ID },
+    });
+  });
 });

@@ -10,6 +10,10 @@ import {
   uniqueIndex,
   jsonb,
 } from 'drizzle-orm/pg-core';
+import type {
+  CoachingCardCacheData,
+  CoachingCardPendingCelebrations,
+} from '@eduagent/schemas';
 import { profiles } from './profiles';
 import { curriculumTopics, subjects } from './subjects';
 import { learningSessions } from './sessions';
@@ -187,6 +191,15 @@ export const learningModes = pgTable('learning_modes', {
     .defaultNow(),
 });
 
+// [BUG-220 / P1-HIGH] coaching_card_cache.card_data and .pending_celebrations
+// are jsonb columns whose runtime shape must be validated on read. Drizzle's
+// $type<…>() is TS-only and provides no runtime guarantee. Consumers MUST
+// pass the raw value through one of:
+//   • parseCoachingCardCacheData(raw)        — for cardData
+//   • coachingCardPendingCelebrationsSchema  — for pendingCelebrations
+// from @eduagent/schemas/db-jsonb before treating the value as the typed
+// shape. The $type<…> annotation here is purely a TS hint so the read site
+// gets autocomplete; it does NOT skip the parse step.
 export const coachingCardCache = pgTable('coaching_card_cache', {
   id: uuid('id')
     .primaryKey()
@@ -195,8 +208,11 @@ export const coachingCardCache = pgTable('coaching_card_cache', {
     .notNull()
     .references(() => profiles.id, { onDelete: 'cascade' })
     .unique(),
-  cardData: jsonb('card_data').notNull(),
-  pendingCelebrations: jsonb('pending_celebrations').notNull().default([]),
+  cardData: jsonb('card_data').notNull().$type<CoachingCardCacheData>(),
+  pendingCelebrations: jsonb('pending_celebrations')
+    .notNull()
+    .default([])
+    .$type<CoachingCardPendingCelebrations>(),
   celebrationsSeenByChild: timestamp('celebrations_seen_by_child', {
     withTimezone: true,
   }),

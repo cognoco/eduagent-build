@@ -35,8 +35,9 @@ function getCopy(
     };
   }
 
-  const bracket =
-    birthYear == null ? 'adolescent' : computeAgeBracket(birthYear);
+  // When birthYear is null (unknown age), default to adult/neutral copy —
+  // not adolescent, since parents and adult owners commonly have no birthYear set.
+  const bracket = birthYear == null ? 'adult' : computeAgeBracket(birthYear);
 
   if (bracket === 'adult') {
     return {
@@ -101,11 +102,16 @@ export function TellMentorInput({
         onChangeText={onChangeText}
         multiline
         placeholder={copy.placeholder}
+        accessibilityLabel={copy.placeholder}
+        testID="tell-mentor-input-field"
         className="bg-background rounded-card px-4 py-3 text-body text-text-primary min-h-[96px]"
       />
       <Pressable
         onPress={onSubmit}
         disabled={disabled}
+        testID="tell-mentor-submit"
+        accessibilityRole="button"
+        accessibilityLabel={isPending ? 'Saving' : 'Save'}
         className={`rounded-button px-4 py-3 items-center mt-3 ${
           disabled ? 'bg-primary/50' : 'bg-primary'
         }`}

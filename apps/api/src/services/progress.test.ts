@@ -8,7 +8,10 @@ const mockDatabaseModule = createDatabaseModuleMock({
   },
 });
 
-jest.mock('@eduagent/database', () => mockDatabaseModule.module);
+jest.mock(
+  '@eduagent/database' /* gc1-allow: service unit test — db boundary mocked; real DB covered by sibling .integration.test.ts where present */,
+  () => mockDatabaseModule.module,
+);
 
 const mockGetPracticeActivitySummary = jest.fn().mockResolvedValue({
   ...emptyPracticeActivitySummary,
@@ -1530,5 +1533,161 @@ describe('resolveTopicSubject', () => {
       subjectName: 'Mathematics',
       topicTitle: 'Algebra Basics',
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 4 additions — profile isolation, null recap, retention edge cases
+// ---------------------------------------------------------------------------
+
+describe('getSubjectProgress — profile isolation', () => {
+  // The scoped repository enforces profileId at the DB level. The test
+  // validates that our service correctly passes the caller's profileId
+  // through createScopedRepository so the repo filter is applied.
+
+  it('returns null when the subject exists but belongs to a different profile', async () => {
+    // Simulate: repo.subjects.findFirst returns undefined because the subject
+    // is owned by a different profile (scoped repo filtered it out).
+    setupScopedRepo({ subjectFindFirst: undefined });
+    const db = createMockDb();
+
+    const foreignSubjectId = 'foreign-subject-id';
+    const result = await getSubjectProgress(db, profileId, foreignSubjectId);
+
+    // Must return null — not throw, and not return data belonging to another profile.
+    expect(result).toBeNull();
+  });
+
+  it('passes the correct profileId to createScopedRepository on every call', async () => {
+    // Break test: if getSubjectProgress hard-codes or silently substitutes a
+    // profileId, this check will fail.
+    setupScopedRepo({ subjectFindFirst: undefined });
+    const db = createMockDb();
+    const callerProfileId = 'specific-profile-id-12345';
+
+    await getSubjectProgress(db, callerProfileId, subjectId);
+
+    expect(createScopedRepository).toHaveBeenCalledWith(db, callerProfileId);
+  });
+});
+
+describe('getOverallProgress — profile isolation', () => {
+  it('returns empty subjects for a profile that has no subjects at all', async () => {
+    // Simulates a child profile that has just been created — no enrolled subjects.
+    setupScopedRepo({ subjectsFindMany: [] });
+    const db = createMockDb();
+
+    const result = await getOverallProgress(db, profileId);
+
+    expect(result.subjects).toEqual([]);
+    expect(result.totalTopicsCompleted).toBe(0);
+    expect(result.totalTopicsVerified).toBe(0);
+  });
+
+  it('passes the correct profileId to createScopedRepository', async () => {
+    setupScopedRepo({ subjectsFindMany: [] });
+    const db = createMockDb();
+    const callerProfileId = 'isolated-profile-xyz';
+
+    await getOverallProgress(db, callerProfileId);
+
+    expect(createScopedRepository).toHaveBeenCalledWith(db, callerProfileId);
+  });
+});
+
+describe('getTopicProgress — null recap fields', () => {
+  it('returns null summaryExcerpt when no session summary exists', async () => {
+    const topic = mockTopicRow();
+    setupScopedRepo({
+      subjectFindFirst: mockSubjectRow(),
+      retentionCardFindFirst: undefined,
+      assessmentsFindMany: [],
+      sessionsFindMany: [mockSessionRow({ topicId })],
+      needsDeepeningFindMany: [],
+      xpLedgerFindMany: [],
+      sessionSummariesFindMany: [], // No summary rows
+    });
+    const db = {
+      query: {
+        curricula: { findFirst: jest.fn().mockResolvedValue(undefined) },
+        curriculumTopics: {
+          findFirst: jest.fn().mockResolvedValue(topic),
+          findMany: jest.fn().mockResolvedValue([]),
+        },
+      },
+    } as unknown as Database;
+
+    const result = await getTopicProgress(db, profileId, subjectId, topicId);
+
+    expect(result).not.toBeNull();
+    // null summaryExcerpt must not cause a crash or type error
+    expect(result!.summaryExcerpt).toBeNull();
+  });
+
+  it('returns null retentionStatus when no retention card exists', async () => {
+    const topic = mockTopicRow();
+    setupScopedRepo({
+      subjectFindFirst: mockSubjectRow(),
+      retentionCardFindFirst: undefined, // No card
+      assessmentsFindMany: [],
+      sessionsFindMany: [mockSessionRow({ topicId })],
+      needsDeepeningFindMany: [],
+      xpLedgerFindMany: [],
+    });
+    const db = {
+      query: {
+        curricula: { findFirst: jest.fn().mockResolvedValue(undefined) },
+        curriculumTopics: {
+          findFirst: jest.fn().mockResolvedValue(topic),
+          findMany: jest.fn().mockResolvedValue([]),
+        },
+      },
+    } as unknown as Database;
+
+    const result = await getTopicProgress(db, profileId, subjectId, topicId);
+
+    expect(result).not.toBeNull();
+    expect(result!.retentionStatus).toBeNull();
+    expect(result!.daysSinceLastReview).toBeNull();
+    expect(result!.xpStatus).toBeNull();
+  });
+
+  it('returns null xpStatus when no XP ledger entry exists', async () => {
+    const topic = mockTopicRow();
+    setupScopedRepo({
+      subjectFindFirst: mockSubjectRow(),
+      retentionCardFindFirst: undefined,
+      assessmentsFindMany: [],
+      sessionsFindMany: [],
+      needsDeepeningFindMany: [],
+      xpLedgerFindMany: [], // No XP
+    });
+    const db = {
+      query: {
+        curricula: { findFirst: jest.fn().mockResolvedValue(undefined) },
+        curriculumTopics: {
+          findFirst: jest.fn().mockResolvedValue(topic),
+          findMany: jest.fn().mockResolvedValue([]),
+        },
+      },
+    } as unknown as Database;
+
+    const result = await getTopicProgress(db, profileId, subjectId, topicId);
+
+    expect(result).not.toBeNull();
+    expect(result!.xpStatus).toBeNull();
+    expect(result!.masteryScore).toBeNull();
+  });
+});
+
+describe('getContinueSuggestion — profile isolation', () => {
+  it('passes the correct profileId to createScopedRepository', async () => {
+    const callerProfileId = 'isolated-suggestion-profile';
+    setupScopedRepo({ subjectsFindMany: [] });
+    const db = createMockDb();
+
+    await getContinueSuggestion(db, callerProfileId);
+
+    expect(createScopedRepository).toHaveBeenCalledWith(db, callerProfileId);
   });
 });

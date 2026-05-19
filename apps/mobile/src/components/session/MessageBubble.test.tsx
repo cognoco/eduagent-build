@@ -100,7 +100,7 @@ describe('verification badge styling', () => {
         verificationBadge="evaluate"
       />,
     );
-    expect(getByText('✓ THINK-DEEPER CLEARED')).toBeTruthy();
+    expect(getByText('✓ THINK-DEEPER CLEARED'));
   });
 
   it('renders teach_back badge as inline text below the bubble', () => {
@@ -111,7 +111,7 @@ describe('verification badge styling', () => {
         verificationBadge="teach_back"
       />,
     );
-    expect(getByText('✓ TEACH-BACK CLEARED')).toBeTruthy();
+    expect(getByText('✓ TEACH-BACK CLEARED'));
   });
 
   it('does not render badge for user messages', () => {

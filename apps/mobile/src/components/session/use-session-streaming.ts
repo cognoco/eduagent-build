@@ -6,7 +6,7 @@ import type {
   HomeworkProblem,
 } from '@eduagent/schemas';
 import type { FluencyDrillEvent } from '../../lib/sse';
-import { animateResponse, type ChatMessage } from './ChatShell';
+import type { ChatMessage } from './ChatShell';
 import type {
   useStreamMessage,
   useStartSession,
@@ -592,11 +592,24 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
           const errorMessage = hasSubject
             ? "Couldn't start your session. Check your connection and try again."
             : 'Please select a subject first so I can help you learn.';
-          animationCleanupRef.current = animateResponse(
-            errorMessage,
-            setMessages,
-            setIsStreaming,
-          );
+          // BUG-144: Render the fallback as a typed system message rather
+          // than animating it as a regular AI reply. The 'reconnect_prompt'
+          // kind activates the inline retry affordance in the message list,
+          // so the user can tap to retry instead of being stranded with
+          // plain text. We append a final non-streaming message directly
+          // because animateResponse uses an untyped streamId and produces
+          // chat-flavored output without any actionable hooks.
+          setIsStreaming(false);
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: createLocalMessageId('ai'),
+              role: 'assistant',
+              content: errorMessage,
+              isSystemPrompt: true,
+              kind: 'reconnect_prompt',
+            },
+          ]);
           return;
         }
 
@@ -1150,7 +1163,14 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
 
       return [];
     } catch (error) {
+      // BUG-147: Silent recovery without escalation is banned (CLAUDE.md
+      // "Code Quality Guards"). Promote to structured Sentry capture so
+      // celebration-fetch failures are queryable in telemetry instead of
+      // disappearing into device-local console logs only.
       console.error('[Session] Failed to fetch celebrations:', error);
+      Sentry.captureException(error, {
+        tags: { surface: 'fetch_celebrations' },
+      });
       return [];
     }
   }, [apiClient]);

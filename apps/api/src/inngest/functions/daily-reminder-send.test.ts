@@ -95,8 +95,10 @@ describe('dailyReminderSend', () => {
   });
 
   describe('configuration', () => {
-    it('is defined as an Inngest function', () => {
-      expect(dailyReminderSend).toBeTruthy();
+    it('is defined as an Inngest function with the expected id', () => {
+      expect((dailyReminderSend as { opts?: { id?: string } }).opts?.id).toBe(
+        'daily-reminder-send',
+      );
     });
 
     it('triggers on app/daily-reminder.send', () => {

@@ -106,19 +106,19 @@ export const REGISTRY_EXCEPTIONS: ReadonlyArray<{
 }> = [
   {
     file: 'apps/mobile/src/lib/secure-storage.ts',
-    line: 49,
+    line: 94,
     reason:
       'Wrapper module — this is the setItemAsync function definition, not a callsite. The scanner matches the function signature; the key parameter is caller-supplied.',
   },
   {
     file: 'apps/mobile/src/lib/secure-storage.ts',
-    line: 60,
+    line: 106,
     reason:
       'Wrapper module — delegates to ExpoSecureStore.setItemAsync (with options). Not a callsite that writes app data; caller-supplied key.',
   },
   {
     file: 'apps/mobile/src/lib/secure-storage.ts',
-    line: 62,
+    line: 108,
     reason:
       'Wrapper module — delegates to ExpoSecureStore.setItemAsync (without options). Not a callsite that writes app data; caller-supplied key.',
   },
@@ -164,6 +164,23 @@ export const SIGNOUT_CLEANUP_TIMEOUT_MS = 3_000;
 
 const OUTBOX_FLOWS = ['session'] as const;
 
+// [BUG-128] Prefixes whose keys we cannot enumerate ahead of time (e.g.
+// summary-draft uses `summary-draft-${profileId}-${sessionId}` and we do not
+// retain a list of all session ids the user ever drafted against). For any
+// store that exposes a `getAllKeys()` API (AsyncStorage does; expo-secure-store
+// does NOT), we scan post-hoc and remove matching keys at sign-out time so
+// per-child drafts cannot accumulate across accounts on a shared device.
+//
+// IMPORTANT scope note: today summary-draft writes to SecureStore (no
+// getAllKeys), so this scan is effectively a no-op for production data. The
+// proper fix is to (a) move the draft index to AsyncStorage, or (b) maintain
+// an AsyncStorage-side index of active draft keys per profile that
+// summary-draft.ts updates on every write/clear. Both options live in
+// summary-draft.ts which is outside this worker's file scope — recorded as a
+// follow-up. Until then this scan still serves as a forward-only guard so any
+// future migration to AsyncStorage is automatically wiped on sign-out.
+const ASYNCSTORAGE_PREFIX_WIPE: ReadonlyArray<string> = ['summary-draft-'];
+
 export async function clearProfileSecureStorageOnSignOut(
   profileIds: ReadonlyArray<string>,
 ): Promise<void> {
@@ -189,6 +206,29 @@ export async function clearProfileSecureStorageOnSignOut(
     }
   }
 
+  // [BUG-128] Best-effort AsyncStorage prefix scan. Catches summary-draft and
+  // any other multi-component-key writer that lands in AsyncStorage. The
+  // promise wrapper isolates getAllKeys failures from the rest of cleanup —
+  // an AsyncStorage error here must not block SecureStore wipes or sign-out.
+  const prefixScanRemoval = (async () => {
+    if (ASYNCSTORAGE_PREFIX_WIPE.length === 0) return;
+    let allKeys: readonly string[];
+    try {
+      allKeys = await AsyncStorage.getAllKeys();
+    } catch {
+      return; // getAllKeys failed — non-fatal, skip prefix scan
+    }
+    const matched = allKeys.filter((k) =>
+      ASYNCSTORAGE_PREFIX_WIPE.some((prefix) => k.startsWith(prefix)),
+    );
+    if (matched.length === 0) return;
+    try {
+      await AsyncStorage.multiRemove(matched);
+    } catch {
+      // Per-key failure is non-fatal — same policy as the static lists below.
+    }
+  })();
+
   // Run in parallel with per-key error isolation. SecureStore.deleteItemAsync
   // is a no-op on missing keys, so we never need to check existence first.
   const cleanup = Promise.all([
@@ -208,6 +248,7 @@ export async function clearProfileSecureStorageOnSignOut(
           // Per-key failure is non-fatal — same policy as outbox + SecureStore.
         })
       : Promise.resolve(),
+    prefixScanRemoval,
   ]);
 
   // [CR-SIGNOUT-TIMEOUT-10] Hard cap so a stuck Keychain/Keystore can't

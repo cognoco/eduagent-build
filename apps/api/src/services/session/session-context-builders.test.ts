@@ -38,17 +38,20 @@ function makeDbStub(fixtures: {
 // surface so the function returns a stub that surfaces the test's `subject`
 // fixture.
 let mockSubjectFixture: { name: string } | null = null;
-jest.mock('@eduagent/database', () => {
-  const actual = jest.requireActual('@eduagent/database');
-  return {
-    ...actual,
-    createScopedRepository: () => ({
-      subjects: {
-        findFirst: async () => mockSubjectFixture,
-      },
-    }),
-  };
-});
+jest.mock(
+  '@eduagent/database' /* gc1-allow: createScopedRepository is the only DB call in buildResumeContext; real DB exercised by session integration tests (e.g. services/session/session-crud.integration.test.ts) */,
+  () => {
+    const actual = jest.requireActual('@eduagent/database');
+    return {
+      ...actual,
+      createScopedRepository: () => ({
+        subjects: {
+          findFirst: async () => mockSubjectFixture,
+        },
+      }),
+    };
+  },
+);
 
 describe('buildResumeContext', () => {
   beforeEach(() => {

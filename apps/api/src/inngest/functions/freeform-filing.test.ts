@@ -53,19 +53,22 @@ const mockDatabaseModule = createDatabaseModuleMock({
   },
 });
 
-jest.mock('@eduagent/database', () => ({
-  ...mockDatabaseModule.module,
-  // [M8b] createScopedRepository must be present in the mock so the production
-  // code path compiles and runs. We wire sessions.findFirst through to the
-  // existing mockDb.query.learningSessions.findFirst so test setup (beforeEach
-  // overrides) continues to control what the step sees.
-  createScopedRepository: (_db: unknown, _profileId: string) => ({
-    sessions: {
-      findFirst: (extraWhere?: unknown) =>
-        mockDb.query.learningSessions.findFirst(extraWhere),
-    },
+jest.mock(
+  '@eduagent/database' /* gc1-allow: inngest unit test — prevents real Neon connection; real DB exercised via .integration.test.ts harness */,
+  () => ({
+    ...mockDatabaseModule.module,
+    // [M8b] createScopedRepository must be present in the mock so the production
+    // code path compiles and runs. We wire sessions.findFirst through to the
+    // existing mockDb.query.learningSessions.findFirst so test setup (beforeEach
+    // overrides) continues to control what the step sees.
+    createScopedRepository: (_db: unknown, _profileId: string) => ({
+      sessions: {
+        findFirst: (extraWhere?: unknown) =>
+          mockDb.query.learningSessions.findFirst(extraWhere),
+      },
+    }),
   }),
-}));
+);
 
 // ---------------------------------------------------------------------------
 // Mock services
@@ -187,8 +190,10 @@ describe('freeformFilingRetry', () => {
     delete process.env['DATABASE_URL'];
   });
 
-  it('should be defined as an Inngest function', () => {
-    expect(freeformFilingRetry).toBeTruthy();
+  it('should be defined as an Inngest function with the expected id', () => {
+    expect((freeformFilingRetry as { opts?: { id?: string } }).opts?.id).toBe(
+      'freeform-filing-retry',
+    );
   });
 
   it('should have the correct function id', () => {
