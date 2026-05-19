@@ -66,6 +66,28 @@ const privateSourcesSchema = z.preprocess(
     .optional(),
 );
 
+/**
+ * Per-concept evaluation produced during a Challenge Round. The LLM scores
+ * each concept the learner explained back; the server uses these to draft a
+ * note from `solid` items only and to persist weak spots for the rest.
+ *
+ * `answerEventId` + `learnerQuote` are required so the note drafter can
+ * synthesise from the learner's exact words (HIGH-6 from the Challenge Round
+ * plan). The drafter MUST refuse to use any item where these are missing or
+ * where the result is not `solid`.
+ */
+export const challengeRoundEvaluationItemSchema = z.object({
+  concept: z.string().min(1).max(200),
+  result: z.enum(['solid', 'partial', 'missing', 'misconception']),
+  evidence: z.string().min(1).max(500),
+  answerEventId: z.string().min(1).max(120),
+  learnerQuote: z.string().min(1).max(500),
+  correction: z.string().min(1).max(500).optional(),
+});
+export type ChallengeRoundEvaluationItem = z.infer<
+  typeof challengeRoundEvaluationItemSchema
+>;
+
 const signalsSchema = z.preprocess(
   optionalObjectInput,
   z
@@ -83,6 +105,13 @@ const signalsSchema = z.preprocess(
         nullToUndefined,
         z.number().min(0).max(1).optional(),
       ),
+      /** Challenge Round: model is proposing a challenge round at this turn. Server gates eligibility. */
+      challenge_round_offer: optionalBooleanSchema,
+      /** Challenge Round: per-concept evaluation of the learner's explanations. Drives mastery + note + weak-spot persistence. */
+      challenge_round_evaluation: z
+        .array(challengeRoundEvaluationItemSchema)
+        .max(10)
+        .optional(),
     })
     .optional(),
 );
@@ -156,12 +185,47 @@ const fluencyDrillSchema = z.preprocess(
     .optional(),
 );
 
+const challengeRoundUiHintSchema = z.preprocess(
+  optionalObjectInput,
+  z
+    .object({
+      active: falseWhenMissingBooleanSchema,
+      question_index: z.preprocess(
+        nullToUndefined,
+        z.number().int().min(0).max(9).optional(),
+      ),
+      total_questions: z.preprocess(
+        nullToUndefined,
+        z.number().int().min(1).max(10).optional(),
+      ),
+    })
+    .optional(),
+);
+
+const noteDraftUiHintSchema = z.preprocess(
+  optionalObjectInput,
+  z
+    .object({
+      content: z.string().min(1).max(2000),
+      source_concepts: z.array(z.string().min(1).max(200)).min(1).max(10),
+      source_answer_event_ids: z
+        .array(z.string().min(1).max(120))
+        .min(1)
+        .max(10),
+    })
+    .optional(),
+);
+
 const uiHintsSchema = z.preprocess(
   optionalObjectInput,
   z
     .object({
       note_prompt: notePromptSchema,
       fluency_drill: fluencyDrillSchema,
+      /** Challenge Round in-progress banner state — mobile renders question N of M. */
+      challenge_round: challengeRoundUiHintSchema,
+      /** Challenge Round drafted note awaiting learner save/edit/skip. */
+      note_draft: noteDraftUiHintSchema,
     })
     .optional(),
 );
@@ -192,6 +256,10 @@ export interface NormalisedEnvelopeSignals {
    *  null (not undefined) when not scored — distinguishes "no score yet" from
    *  "score of 0". */
   retrieval_score: number | null;
+  /** Challenge Round: LLM is proposing a challenge at this turn (server gates). */
+  challenge_round_offer: boolean;
+  /** Challenge Round: per-concept evaluations. Empty array when not in a round. */
+  challenge_round_evaluation: ChallengeRoundEvaluationItem[];
 }
 
 export function normaliseSignals(
@@ -206,6 +274,8 @@ export function normaliseSignals(
     needs_deepening: signals?.needs_deepening ?? false,
     understanding_check: signals?.understanding_check ?? false,
     retrieval_score: signals?.retrieval_score ?? null,
+    challenge_round_offer: signals?.challenge_round_offer ?? false,
+    challenge_round_evaluation: signals?.challenge_round_evaluation ?? [],
   };
 }
 
