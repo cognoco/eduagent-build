@@ -90,9 +90,3 @@ Write 1-2 sentences answering: where is this child now, what changed recently, a
 ## Builder notes
 
 - Progress summary for parent Progress surface; not a period report.
-
-## Live LLM response
-
-```
-Emma has completed 6 learning sessions for a total of 140 active minutes, mastering 4 topics. Her current learning streak is 3 days, reflecting recent engagement. Continuing regular sessions would be a gentle next step.
-```

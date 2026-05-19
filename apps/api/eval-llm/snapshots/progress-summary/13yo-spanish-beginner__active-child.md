@@ -146,9 +146,3 @@ Write 1-2 sentences answering: where is this child now, what changed recently, a
 ## Builder notes
 
 - Progress summary for parent Progress surface; not a period report.
-
-## Live LLM response
-
-```
-Emma has completed 6 learning sessions, accumulated 140 active minutes, and mastered 4 topics while learning 42 vocabulary words. She has maintained a 3-day learning streak, with her latest session on May 13th. Emma is progressing in Spanish, having mastered 3 of 7 topics in one module and 1 of 4 in another. Continuing her Spanish learning would be a gentle next step.
-```

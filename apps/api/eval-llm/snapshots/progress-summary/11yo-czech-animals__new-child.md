@@ -120,9 +120,3 @@ Write 1-2 sentences answering: where is this child now, what changed recently, a
 ## Builder notes
 
 - Progress summary for parent Progress surface; not a period report.
-
-## Live LLM response
-
-```
-Emma has just started learning Czech, completing her first session today for 18 minutes. She has begun a 3-day learning streak. The next step is to continue exploring the Czech topics.
-```

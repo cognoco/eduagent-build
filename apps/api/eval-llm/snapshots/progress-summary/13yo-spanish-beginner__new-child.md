@@ -120,9 +120,3 @@ Write 1-2 sentences answering: where is this child now, what changed recently, a
 ## Builder notes
 
 - Progress summary for parent Progress surface; not a period report.
-
-## Live LLM response
-
-```
-Emma has completed 1 Spanish session, studying for 18 minutes and learning 42 vocabulary words. She has a current streak of 3 days. Her next step could be to continue exploring the remaining 7 Spanish topics.
-```

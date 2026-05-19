@@ -146,9 +146,3 @@ Write 1-2 sentences answering: where is this child now, what changed recently, a
 ## Builder notes
 
 - Progress summary for parent Progress surface; not a period report.
-
-## Live LLM response
-
-```
-Emma has completed 6 sessions, accumulating 140 minutes of active learning and mastering 4 topics overall. On May 8th, she studied two Spanish subjects, mastering 3 topics in one and 1 topic in the other. Emma can continue exploring her Spanish studies.
-```

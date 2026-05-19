@@ -146,9 +146,3 @@ Write 1-2 sentences answering: where is this child now, what changed recently, a
 ## Builder notes
 
 - Progress summary for parent Progress surface; not a period report.
-
-## Live LLM response
-
-```
-Emma had a recent learning session today, adding to her total of 6 sessions and 140 active minutes. She has mastered 4 topics and learned 42 vocabulary words. With a current streak of 3 days, Emma might enjoy continuing her French studies to explore more topics.
-```

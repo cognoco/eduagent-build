@@ -146,9 +146,3 @@ Write 1-2 sentences answering: where is this child now, what changed recently, a
 ## Builder notes
 
 - Progress summary for parent Progress surface; not a period report.
-
-## Live LLM response
-
-```
-Emma is actively learning French across two modules, having mastered 3 of 7 topics in one and 1 of 4 in another. Her latest session yesterday continued her 3-day active streak, and she can now gently continue her progress in either French module.
-```

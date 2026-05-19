@@ -120,9 +120,3 @@ Write 1-2 sentences answering: where is this child now, what changed recently, a
 ## Builder notes
 
 - Progress summary for parent Progress surface; not a period report.
-
-## Live LLM response
-
-```
-Emma recently completed her first session, spending 18 active minutes on math activities and establishing a 3-day learning streak. She has 0 of 7 math topics mastered, and continuing with her math lessons would be a natural next step.
-```
