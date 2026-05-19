@@ -12,13 +12,14 @@ jest.mock('react-native-safe-area-context', () => ({
 const mockPush = jest.fn();
 const mockBack = jest.fn();
 const mockReplace = jest.fn();
+let mockCanGoBack = true;
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({
     push: mockPush,
     back: mockBack,
     replace: mockReplace,
-    canGoBack: jest.fn(() => true),
+    canGoBack: () => mockCanGoBack,
   }),
 }));
 
@@ -147,6 +148,7 @@ describe('AssessmentPickerScreen', () => {
     mockTopics = [];
     mockIsLoading = false;
     mockIsError = false;
+    mockCanGoBack = true;
   });
 
   afterEach(() => {
@@ -162,6 +164,43 @@ describe('AssessmentPickerScreen', () => {
     const { getByTestId } = render(<AssessmentPickerScreen />);
     fireEvent.press(getByTestId('assessment-picker-back'));
     expect(mockBack).toHaveBeenCalledTimes(1);
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  // [BUG-232 / X1-MED / CLAUDE.md Rule 17] Cross-stack screens must not call
+  // bare router.back() — when canGoBack is false (deep link, cold start into
+  // this leaf), the fallback must route to the practice tab parent. Reverting
+  // the goBackOrReplace wiring back to router.back() makes these red.
+  describe('cross-stack back fallback when canGoBack=false', () => {
+    beforeEach(() => {
+      mockCanGoBack = false;
+    });
+
+    it('replaces to practice index from header back button', () => {
+      const { getByTestId } = render(<AssessmentPickerScreen />);
+      fireEvent.press(getByTestId('assessment-picker-back'));
+      expect(mockBack).not.toHaveBeenCalled();
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/practice');
+    });
+
+    it('replaces to practice index from error fallback back button', () => {
+      mockIsError = true;
+      const { getByTestId } = render(<AssessmentPickerScreen />);
+      fireEvent.press(getByTestId('assessment-picker-error-back'));
+      expect(mockBack).not.toHaveBeenCalled();
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/practice');
+    });
+
+    it('replaces to practice index from timeout fallback back button', () => {
+      mockIsLoading = true;
+      const { getByTestId } = render(<AssessmentPickerScreen />);
+      act(() => {
+        jest.advanceTimersByTime(15_001);
+      });
+      fireEvent.press(getByTestId('assessment-picker-timeout-back'));
+      expect(mockBack).not.toHaveBeenCalled();
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/practice');
+    });
   });
 
   describe('loading state', () => {

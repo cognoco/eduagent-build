@@ -1150,6 +1150,39 @@ describe('ChatShell', () => {
     getByTestId('message-image-msg-img');
   });
 
+  // [BUG-NOTION-257] Homework thumbnails must hint the platform image cache so
+  // FlatList scroll-back does not re-decode the file. expo-image is not in the
+  // workspace; we rely on RN Image's `cache` source prop.
+  it('sets cache hint on homework image to avoid re-decoding on scroll (NOTION-257)', () => {
+    const messagesWithImage: ChatMessage[] = [
+      {
+        id: 'msg-img-cache',
+        role: 'user',
+        content: 'Photo of my notes',
+        imageUri: 'file:///cache/homework-456.jpg',
+      },
+    ];
+
+    const { getByTestId } = render(
+      <ChatShell
+        title="Test"
+        messages={messagesWithImage}
+        onSend={jest.fn()}
+        isStreaming={false}
+      />,
+    );
+
+    const img = getByTestId('message-image-msg-img-cache');
+    // RN normalizes `source` to either an object or an array of sources
+    // depending on the host platform; accept both shapes.
+    const source = img.props.source;
+    const normalized = Array.isArray(source) ? source[0] : source;
+    expect(normalized).toMatchObject({
+      uri: 'file:///cache/homework-456.jpg',
+      cache: 'force-cache',
+    });
+  });
+
   // -----------------------------------------------------------------------
   // Animation wiring (ANIM-IMPROVE)
   // -----------------------------------------------------------------------

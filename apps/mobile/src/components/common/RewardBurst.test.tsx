@@ -11,6 +11,8 @@ describe('RewardBurst', () => {
 
   it('renders the outer accessible container with testID', () => {
     render(<RewardBurst variant="vocabulary" testID="reward-burst" />);
+    // includeHiddenElements: the container itself has accessibilityElementsHidden
+    // to hide the decoration from screen readers — RTLR respects that by default.
     const el = screen.getByTestId('reward-burst', {
       includeHiddenElements: true,
     });
@@ -45,6 +47,7 @@ describe('RewardBurst', () => {
         testID="reward-burst"
       />,
     );
+    // Text is inside the accessibility-hidden burst container
     screen.getByText('Great job!', { includeHiddenElements: true });
   });
 

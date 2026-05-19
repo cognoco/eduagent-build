@@ -234,9 +234,17 @@ export function ChatShell({
       <View>
         {msg.imageUri && !failedImages.has(msg.id) && (
           <View className="self-end max-w-[85%] mb-1">
+            {/* [BUG-NOTION-257] Hint the platform image cache so homework
+                thumbnails are not re-decoded on every FlatList scroll-back.
+                expo-image is not in the workspace (only expo-image-picker /
+                expo-image-manipulator), so we rely on the RN Image cache
+                policy. `force-cache` instructs iOS to serve from disk cache
+                when present; on Android the prop is a no-op but harmless.
+                If/when expo-image is added, swap to <Image contentFit="contain"
+                cachePolicy="memory-disk" /> from expo-image. */}
             <Image
               testID={`message-image-${msg.id}`}
-              source={{ uri: msg.imageUri }}
+              source={{ uri: msg.imageUri, cache: 'force-cache' }}
               className="w-full aspect-[4/3] rounded-lg"
               resizeMode="contain"
               accessibilityLabel="Homework image"
