@@ -225,6 +225,31 @@ describe('QuizIndexScreen', () => {
     expect(mockReplace).toHaveBeenCalledWith('/(app)/practice');
   });
 
+  it('uses a deterministic Practice fallback instead of browser history', () => {
+    mockCanGoBack.mockReturnValue(true);
+
+    render(<QuizIndexScreen />, { wrapper: Wrapper });
+
+    fireEvent.press(screen.getByTestId('quiz-back'));
+
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/practice');
+    expect(mockBack).not.toHaveBeenCalled();
+  });
+
+  it('preserves learner-home return target when starting a quiz', async () => {
+    mockSearchParams = { returnTo: 'learner-home' };
+
+    render(<QuizIndexScreen />, { wrapper: Wrapper });
+
+    await waitFor(() => screen.getByTestId('quiz-capitals'));
+    fireEvent.press(screen.getByTestId('quiz-capitals'));
+
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/quiz/launch',
+      params: { activityType: 'capitals', returnTo: 'learner-home' },
+    });
+  });
+
   // [BUG-752] Render coverage: empty / data / error / subject states.
   describe('[BUG-752] render states', () => {
     it('renders Capitals and Guess Who cards with default subtitles when no stats', () => {
