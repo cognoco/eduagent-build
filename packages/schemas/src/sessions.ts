@@ -222,13 +222,17 @@ export const sessionMetadataSchema = z
   .strip();
 export type SessionMetadata = z.infer<typeof sessionMetadataSchema>;
 
+export const sessionStartMetadataSchema = sessionMetadataSchema.omit({
+  challengeRound: true,
+});
+
 export const sessionStartSchema = z.object({
   subjectId: z.string().uuid(),
   topicId: z.string().uuid().optional(),
   sessionType: sessionTypeSchema.default('learning'),
   verificationType: z.enum(['standard', 'evaluate', 'teach_back']).optional(),
   inputMode: inputModeSchema.default('text'),
-  metadata: sessionMetadataSchema.optional(),
+  metadata: sessionStartMetadataSchema.optional(),
   rawInput: z.string().max(500).nullable().optional(),
 });
 export type SessionStartInput = z.infer<typeof sessionStartSchema>;

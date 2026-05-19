@@ -479,6 +479,24 @@ describe('sessionStartSchema', () => {
       }).success,
     ).toBe(false);
   });
+
+  it('strips server-owned challengeRound metadata from client starts', () => {
+    const result = sessionStartSchema.parse({
+      subjectId: UUID,
+      metadata: {
+        inputMode: 'voice',
+        challengeRound: {
+          state: 'active',
+          offerCount: 1,
+          topicId: UUID,
+          evaluations: [],
+        },
+      },
+    });
+
+    expect(result.metadata).toEqual({ inputMode: 'voice' });
+    expect(result.metadata).not.toHaveProperty('challengeRound');
+  });
 });
 
 // ---------------------------------------------------------------------------

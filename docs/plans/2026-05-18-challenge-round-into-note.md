@@ -2312,7 +2312,7 @@ describe('session exchange — challenge round dispatch', () => {
       content: JSON.stringify({ reply: 'try a challenge?', signals: { challenge_round_offer: true }, confidence: 'medium' }),
     });
     await processMessage(db, profile.id, session.id, { message: 'got it' });
-    const refetched = await getSession(session.id, profile.id);
+    const refetched = await getSession(db, profile.id, session.id);
     expect(refetched.metadata.challengeRound.state).toBe('offered');
   });
 });
@@ -2449,12 +2449,11 @@ import { evaluateChallengeReadiness } from '@/services/challenge-round/trigger';
 import { recordCooldown } from '@/services/challenge-round/cooldown';
 // NOTE (2026-05-19 targets doc): `getSessionById` does not exist. Real helper is
 // `getSession(db, profileId, sessionId)` — already scoped via createScopedRepository.
-// `persistSessionMetadata` does not exist yet either; Task 8 Step 0 extracts it
-// from the file-local `updateSessionMetadata` in session-exchange.ts. The code
-// blocks below use the names retained from the original plan — when implementing,
-// substitute `getSession(db, profileId, sessionId)` and the new
-// `persistSessionMetadata(db, profileId, sessionId, partial)` extracted in Task 8 Step 0.
-import { getSession, persistSessionMetadata } from '@/services/session/session-crud';
+// `persistSessionMetadata` is a post-Task-8 extraction from the file-local
+// `updateSessionMetadata` in session-exchange.ts; keep it profile-scoped as
+// `persistSessionMetadata(db, profileId, sessionId, partial)`.
+import { persistSessionMetadata } from '@/services/session/session-metadata';
+import { getSession } from '@/services/session/session-crud';
 import { safeSend } from '@/services/safe-non-core';
 
 const maybeOfferSchema = z.object({ sessionId: z.string().uuid(), topicId: z.string().uuid() });
@@ -2465,6 +2464,7 @@ const abortSchema = z.object({ sessionId: z.string().uuid() });
 export const challengeRoundRoutes = new Hono()
   .post('/maybe-offer', async (c) => {
     const body = maybeOfferSchema.parse(await c.req.json());
+    const db = c.get('db');
     const profileId = c.get('profileId');
     const session = await getSession(db, profileId, body.sessionId);
 
@@ -2481,40 +2481,45 @@ export const challengeRoundRoutes = new Hono()
       ...session.metadata,
       challengeRound: transitionChallengeState(session.metadata?.challengeRound, { type: 'offer', topicId: body.topicId }),
     };
-    await persistSessionMetadata(session.id, session.metadata);
+    await persistSessionMetadata(db, profileId, session.id, session.metadata);
     return c.json({ offered: true });
   })
   .post('/accept', async (c) => {
     const body = acceptSchema.parse(await c.req.json());
-    const session = await getSession(db, c.get('profileId'), body.sessionId);
+    const db = c.get('db');
+    const profileId = c.get('profileId');
+    const session = await getSession(db, profileId, body.sessionId);
     session.metadata = {
       ...session.metadata,
       challengeRound: transitionChallengeState(session.metadata?.challengeRound, { type: 'accept' }),
     };
-    await persistSessionMetadata(session.id, session.metadata);
+    await persistSessionMetadata(db, profileId, session.id, session.metadata);
     return c.json({ ok: true });
   })
   .post('/decline', async (c) => {
     const body = declineSchema.parse(await c.req.json());
     const db = c.get('db');
-    const session = await getSession(db, c.get('profileId'), body.sessionId);
+    const profileId = c.get('profileId');
+    const session = await getSession(db, profileId, body.sessionId);
     session.metadata = {
       ...session.metadata,
       challengeRound: transitionChallengeState(session.metadata?.challengeRound, { type: 'decline', dontAskAgain: body.dontAskAgain }),
     };
-    await persistSessionMetadata(session.id, session.metadata);
-    await recordCooldown(db, { profileId: c.get('profileId'), topicId: body.topicId, outcome: 0 });
+    await persistSessionMetadata(db, profileId, session.id, session.metadata);
+    await recordCooldown(db, { profileId, topicId: body.topicId, outcome: 0 });
     await safeSend('challenge.round.declined', { sessionId: body.sessionId, topicId: body.topicId });
     return c.json({ ok: true });
   })
   .post('/abort', async (c) => {
     const body = abortSchema.parse(await c.req.json());
-    const session = await getSession(db, c.get('profileId'), body.sessionId);
+    const db = c.get('db');
+    const profileId = c.get('profileId');
+    const session = await getSession(db, profileId, body.sessionId);
     session.metadata = {
       ...session.metadata,
       challengeRound: transitionChallengeState(session.metadata?.challengeRound, { type: 'abort' }),
     };
-    await persistSessionMetadata(session.id, session.metadata);
+    await persistSessionMetadata(db, profileId, session.id, session.metadata);
     return c.json({ ok: true });
   });
 ```
