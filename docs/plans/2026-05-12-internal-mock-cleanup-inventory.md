@@ -20,11 +20,74 @@ The W1-W17 Notion bug-fix swarm (commit `1391d7490`) and Wave 2 coverage hardeni
 
 - Total mock rows: **1,056 → 1,264** (+208 rows, +41 new test files).
 - Internal-ish mocks: **618 → 718** (+100). P1 grew by 31, P2 by 69.
-- Several "✅ Done" claims have regressed because new break tests added new mocks in cleaned files. The Top Files table below carries `Regressed from "✅ Done"` markers where this applies.
-- `apps/api/src/routes/progress.test.ts` (9) and `apps/api/src/inngest/functions/email-digest-channel.test.ts` (7) are new entries in the top-file ranking and were not previously annotated.
 - The integration mock guard (`apps/api/src/test-utils/integration-mock-guard.test.ts`) is still green — `P0 = 0`. Forward-only ratchet held.
 
-The takeaway: forward-only guards prevented integration breaches, but no guard prevents unit-test files from adding internal mocks during fast bug-fix swarms. The active cleanup wave should both drain top files and consider strengthening unit-test guidance for swarm authors.
+### Annotation Status Audit (2026-05-19, post-Wave-2)
+
+The inventory generator was extended to record an `annotation` column distinguishing already-converted mocks from true forward-only risks. Of the **718 internal-ish mock rows**:
+
+| Annotation status | Count | Meaning |
+| --- | ---: | --- |
+| `gc1-allow` | 280 | Annotated with a boundary label (`external-boundary`, `transport-boundary`, etc.) but not factored via `requireActual`. Mostly route/middleware tests where the target is a DB-shaped or service-shaped boundary the test legitimately replaces. |
+| `pattern-a; gc1-allow` | 266 | `jest.requireActual('<target>')` + `gc1-allow:` label — fully converted. |
+| `pattern-a` | 28 | `requireActual` used but no explicit `gc1-allow:` label. Cosmetic gap; should be annotated. |
+| **`bare`** | **131** | **True forward-only risk — no annotation, no `requireActual`. This is the real cleanup queue.** |
+
+Implication: the raw "P1 = 345 / P2 = 373" totals overstate real risk by ~5.5×. The W1-W17 swarm authored break tests with `gc1-allow` discipline; the inventory previously couldn't see that. **The 131 bare rows are the actionable backlog.**
+
+> Pre-fix snapshot (2026-05-19, before generator regex fix): the first pass reported 180 bare mocks because the `gc1-allow` detection regex used `$` without the `m` flag, so trailing-line-comment annotations on `jest.mock(...)` calls were not matched. After fixing the regex (commit pending), 49 false-bare entries reclassified to `gc1-allow`. Always trust the regenerated post-fix snapshot.
+
+### Top Files with BARE Mocks (refreshed 2026-05-19, post-Wave-2)
+
+| File | Bare count | Notes |
+| --- | ---: | --- |
+| `apps/mobile/src/app/(app)/subscription.test.tsx` | 6 | P2 billing/IAP screen — top bare-mock concentration after mentor-memory cleanup. |
+| `apps/mobile/src/app/(app)/_layout.test.tsx` | 5 | App-shell layout test; mocks `./_layout` and friends. |
+| `apps/mobile/src/app/(app)/progress/[subjectId]/sessions.test.tsx` | 5 | Progress drill-down. |
+| `apps/mobile/src/app/(app)/progress.test.tsx` | 4 | Progress tab. |
+| `apps/mobile/src/app/create-subject.test.tsx` | 4 | Subject creation flow. Has existing routed-fetch usage — partial conversion. |
+| `apps/mobile/src/app/(app)/home.test.tsx` | 3 | Home tab. |
+| `apps/mobile/src/app/(app)/homework/camera.test.tsx` | 3 | Camera/OCR screen. |
+| `apps/mobile/src/app/(app)/pick-book/[subjectId].test.tsx` | 3 | Book picker. |
+| `apps/mobile/src/app/(app)/practice/index.test.tsx` | 3 | Practice landing. |
+| `apps/mobile/src/app/(app)/quiz/index.test.tsx` | 3 | Quiz landing. |
+| `apps/mobile/src/app/(app)/quiz/launch.test.tsx` | 3 | Quiz launch. |
+| `apps/mobile/src/app/(app)/topic/recall-test.test.tsx` | 3 | Recall test. |
+
+The bare backlog is **entirely mobile screens** at this point. The new `apps/mobile/src/test-utils/screen-render.tsx` harness (built in Wave 2) is the canonical replacement pattern for these conversions.
+
+### Wave 1 (2026-05-19) — Outcomes
+
+Five parallel agents audited the previously-named top API files. Net result:
+
+| File | Mocks removed | Annotations added | Real change |
+| --- | ---: | ---: | --- |
+| `apps/api/src/inngest/functions/session-completed.test.ts` | 0 | 1 | Already pattern-A clean; one missing `gc1-allow` annotation added. 98/98 pass. |
+| `apps/api/src/inngest/functions/monthly-report-cron.test.ts` | 0 | 0 | Already fully annotated. 46/46 pass. The +1 mock vs 2026-05-14 was a new mock added with `gc1-allow` intact. |
+| `apps/api/src/inngest/functions/email-digest-channel.test.ts` | 0 | 2 (label corrections) | Already pattern-A clean; two labels updated (`sentry`=observability, `client`=transport-boundary). 31/31 pass. |
+| `apps/api/src/routes/filing.test.ts` | 1 (`../services/llm`) | 0 | Converted LLM mock to `registerLlmProviderFixture`. 12/12 pass. |
+| `apps/api/src/routes/progress.test.ts` | 0 | 0 | Already pattern-A clean from the W1-W17 swarm. 41/41 pass. |
+
+Takeaway: forward-only ratchets and swarm author discipline are working on the API side. The remaining real cleanup is **mobile bare mocks**, replaced via the now-established `screen-render.tsx` harness (U7).
+
+### Wave 2 (2026-05-19) — Outcomes
+
+Five parallel agents on mobile bare-mock files. Net result:
+
+| File | Bare removed | Pattern-A converted | Retained boundary | Test result |
+| --- | ---: | ---: | ---: | --- |
+| `apps/mobile/src/test-utils/screen-render.tsx` | — | — | — | **New harness** (U7) — `renderScreen`, `cleanupScreen`, `NAMED_PROFILES`, `ERROR_RESPONSES`; composes existing `createRoutedMockFetch` + `createTestProfile` + `ProfileContext`. |
+| `apps/mobile/src/app/(app)/child/[profileId]/mentor-memory.test.tsx` | 7 | 0 | 4 | 5/5 pass. Surfaced i18n-assertion drift (old assertions matched stubbed keys, not real translated copy) and `useChildMemory` envelope shape bug. |
+| `apps/mobile/src/hooks/use-sessions.test.ts` | 3 (api-client, api, profile) | 0 | 1 (`../lib/sse` transport) | 38/38 pass. Uses real api-client + global fetch + real `ProfileContext` + `setActiveProfileId`. Removed redundant Clerk override. |
+| `apps/mobile/src/hooks/use-homework-ocr.test.ts` | 2 (profile, api) | 1 (analytics) | 4 | 19/19 pass. |
+| `apps/mobile/src/lib/sign-out.test.ts` | 2 (`./auth-transition`, `./pending-auth-redirect`) | 2 (sign-out-cleanup, api-client) | 1 (Sentry) | 10/10 pass. Cross-account leak coverage from `project_cross_account_leak_2026_05_10` verified intact. |
+| `apps/mobile/src/components/session/ChatShell.test.tsx` | 4 (annotations) | 0 | 4 native | 81/81 pass. The 4 internal mocks already had `gc1-allow` labels — exposed an inventory regex bug (fixed in same wave). |
+
+**Bare-mock count: 180 → 131** (after both the agent work and the generator regex fix that surfaced 49 already-annotated mocks the prior pass missed). All five tests passed without weakening any assertion.
+
+### Known follow-up
+
+- `mockApiClientFactory` helper (`apps/mobile/src/test-utils/mock-api-routes.ts`) had a path-specific Hono client interop issue in the mentor-memory conversion — inlining the factory body in the test fixed it; the helper still works for shallower paths (`create-subject.test.tsx`). Worth hardening so it resolves `hono/client` consistently regardless of caller depth.
 
 ## Scan Snapshot
 

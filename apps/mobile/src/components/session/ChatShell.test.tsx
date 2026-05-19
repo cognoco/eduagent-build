@@ -15,6 +15,7 @@ import { ChatShell, type ChatMessage } from './ChatShell';
 const mockBack = jest.fn();
 const mockReplace = jest.fn();
 jest.mock('expo-router', () => ({
+  // gc1-allow: native-boundary — Expo Router is a platform nav module unavailable in Jest
   useRouter: () => ({
     back: mockBack,
     replace: mockReplace,
@@ -28,11 +29,13 @@ jest.mock('expo-router', () => ({
 // the dormant-instance behaviour.
 let mockIsFocused = true;
 jest.mock('@react-navigation/native', () => ({
+  // gc1-allow: native-boundary — React Navigation hooks require native navigation context unavailable in Jest
   useIsFocused: () => mockIsFocused,
 }));
 
 let mockSafeAreaInsets = { top: 0, bottom: 0, left: 0, right: 0 };
 jest.mock('react-native-safe-area-context', () => ({
+  // gc1-allow: native-boundary — safe area context requires native device metrics unavailable in Jest
   useSafeAreaInsets: () => mockSafeAreaInsets,
 }));
 
@@ -42,6 +45,7 @@ jest.mock('../../lib/math-format', () => ({ // gc1-allow: render tests only need
 }));
 
 jest.mock('@expo/vector-icons', () => {
+  // gc1-allow: native-boundary — vector icons requires native font assets unavailable in Jest
   const { Text } = require('react-native');
   return {
     Ionicons: ({ name, ...rest }: { name: string }) => (

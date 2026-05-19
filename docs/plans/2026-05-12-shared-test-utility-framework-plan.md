@@ -23,7 +23,7 @@ The cleanup should not start by editing hundreds of tests one by one. First, est
 | U4 | API local DB runner | Partial support in `tests/integration/api-setup.ts` | Make local Postgres an explicit opt-in integration-test mode. |
 | U5 | API LLM provider fixtures | **Established first pass**: `apps/api/src/test-utils/llm-provider-fixtures.ts` | Keep router/envelope/prompt logic real while supplying deterministic provider responses. |
 | U6 | API external fetch/provider helpers | Existing `fetch-interceptor.ts` | Mock true external HTTP boundaries only: JWKS, LLM provider HTTP, embeddings, email, push. |
-| U7 | Mobile render harness | Hook-level partial helper exists | Render screens with QueryClient, profile/auth fixtures, routed API responses, and teardown. |
+| U7 | Mobile render harness | **Established 2026-05-19**: `apps/mobile/src/test-utils/screen-render.tsx` | Render screens with QueryClient, profile/auth fixtures, routed API responses, and teardown. Exposes `renderScreen`, `cleanupScreen`, `NAMED_PROFILES` (soloLearner, guardian, linkedChild, parentSelf), `ERROR_RESPONSES` (quotaExhausted, forbidden, gone, networkError, validation). Proof test: `apps/mobile/src/app/(app)/child/[profileId]/mentor-memory.test.tsx` (5/5 pass). |
 | U8 | Mobile native boundary shim catalog | Scattered per-test mocks | Standardize approved Jest shims for router, safe area, icons, SecureStore, alerts, Sentry, theme/native color scheme. |
 
 ## Build Order
@@ -167,49 +167,40 @@ pnpm exec jest -c tests/integration/jest.config.cjs learning-session.integration
 
 Result on 2026-05-12: **blocked by environment**, because `DATABASE_URL` is not set. The suite loads through TypeScript before failing in integration setup.
 
-### Phase 3 - Mobile Screen Harness
+### Phase 3 - Mobile Screen Harness (Established 2026-05-19)
 
 **Purpose:** Mobile tests have the largest mock volume. Build one render harness so screens can use real hooks and route-shaped data.
 
 Utilities:
 
-- U7: mobile render harness
-- U8: native boundary shim catalog
+- U7: mobile render harness — **Established.** `apps/mobile/src/test-utils/screen-render.tsx`
+- U8: native boundary shim catalog — Existing `apps/mobile/src/test-utils/native-shims.ts` covers the common shims; per-test annotation labels (`native-boundary`, `external-boundary`, `observability`, `transport-boundary`) are used.
 
 Tasks:
 
-- Add a screen-level render helper that composes:
-  - `QueryClientProvider`
-  - controlled profile/auth context
-  - routed API mock fetch
-  - default native shims
-  - teardown/query cleanup
-- Reuse `createRoutedMockFetch` and `mockApiClientFactory` rather than replacing them.
-- Promote `createTestProfile` into named profile fixtures:
-  - solo learner
-  - parent
-  - linked child learner
-  - parent learning as self
-- Add error response helpers:
-  - quota exhausted
-  - forbidden
-  - gone
-  - network error
-  - validation error
-- Create a native shim catalog with approved mocks and labels.
-- Convert one screen that already uses routed API mocks but has open-handle/act noise.
+- **Done:** Screen-level render helper that composes:
+  - `QueryClientProvider` with test defaults (`gcTime: 0`, `retry: false` on queries + mutations)
+  - controlled profile/auth context via `ProfileContext.Provider`
+  - routed API mock fetch via `createRoutedMockFetch`
+  - default native shims via `native-shims.ts`
+  - `cleanupScreen(queryClient)` — cancels in-flight queries, clears cache, runs RTL `cleanup()`
+- **Done:** Reuses `createRoutedMockFetch`, `mockApiClientFactory`, and `createTestProfile` rather than replacing them.
+- **Done:** `NAMED_PROFILES` fixtures: `soloLearner`, `guardian`, `linkedChild`, `parentSelf`.
+- **Done:** `ERROR_RESPONSES` helpers: `quotaExhausted` (429), `forbidden` (403), `gone` (410), `networkError`, `validation` (400).
+- **Done:** Proof conversion `apps/mobile/src/app/(app)/child/[profileId]/mentor-memory.test.tsx` — 7 internal mocks removed, 4 boundary mocks retained, 5/5 pass.
 
-Representative proof tests:
+Known follow-up:
 
-- `apps/mobile/src/app/(app)/home.test.tsx`
-- `apps/mobile/src/app/create-subject.test.tsx`
-- `apps/mobile/src/app/session-summary/[sessionId].test.tsx`
+- `mockApiClientFactory` has a path-specific Hono client interop issue (inlining the factory body works around it). Harden so it resolves `hono/client` once at helper load and works regardless of caller depth.
 
-Done when:
+Verification:
 
-- One screen uses the shared render harness.
-- The proof test passes and Jest exits cleanly.
-- The utility exposes teardown so query timers/open handles do not leak.
+```powershell
+$env:NX_DAEMON='false'; $env:NX_ISOLATE_PLUGINS='false'
+cd apps/mobile; pnpm exec jest --runTestsByPath "src/app/(app)/child/[profileId]/mentor-memory.test.tsx" --no-coverage
+```
+
+Result on 2026-05-19: **passed**, 5 tests.
 
 Verification:
 

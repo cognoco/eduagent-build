@@ -1,6 +1,10 @@
 import { renderHook, act } from '@testing-library/react-native';
 import { NativeModules } from 'react-native';
 import { useHomeworkOcr, NON_HOMEWORK_ERROR_MESSAGE } from './use-homework-ocr';
+import {
+  createHookWrapper,
+  createTestProfile,
+} from '../test-utils/app-hook-test-utils';
 
 const mockFetch = jest.fn();
 const mockTrackHomeworkOcrGateAccepted = jest.fn();
@@ -19,53 +23,75 @@ class MockFormData {
   }
 }
 
+// @clerk/clerk-expo is a third-party auth SDK — cannot run without native
+// Clerk runtime. The global test-setup mock covers most cases; this local
+// override narrows getToken to a deterministic resolved value for OCR tests.
 jest.mock('@clerk/clerk-expo', () => ({
+  // gc1-allow: external-boundary
   useAuth: () => ({
     getToken: jest.fn().mockResolvedValue('test-token'),
   }),
 }));
 
-jest.mock('../lib/profile', () => ({
-  useProfile: () => ({
-    activeProfile: { id: 'profile-1' },
-  }),
-}));
+// Use requireActual so all pure helpers (hashProfileId, bucketAccountAge, track,
+// etc.) stay real. Only the three gate-telemetry functions are overridden with
+// jest.fn() so assertions can verify they were called with the correct payload.
+// Sentry.addBreadcrumb is globally stubbed in test-setup.ts, so the real
+// implementations run safely without any network or native dependency.
+jest.mock('../lib/analytics', () => {
+  const actual = jest.requireActual(
+    '../lib/analytics',
+  ) as typeof import('../lib/analytics');
+  return {
+    ...actual,
+    trackHomeworkOcrGateAccepted: (...args: unknown[]) =>
+      mockTrackHomeworkOcrGateAccepted(...args),
+    trackHomeworkOcrGateRejected: (...args: unknown[]) =>
+      mockTrackHomeworkOcrGateRejected(...args),
+    trackHomeworkOcrGateShortcircuit: (...args: unknown[]) =>
+      mockTrackHomeworkOcrGateShortcircuit(...args),
+  };
+});
 
-jest.mock('../lib/api', () => ({
-  getApiUrl: () => 'http://localhost:8787',
-}));
-
-jest.mock('../lib/analytics', () => ({
-  trackHomeworkOcrGateAccepted: (...args: unknown[]) =>
-    mockTrackHomeworkOcrGateAccepted(...args),
-  trackHomeworkOcrGateRejected: (...args: unknown[]) =>
-    mockTrackHomeworkOcrGateRejected(...args),
-  trackHomeworkOcrGateShortcircuit: (...args: unknown[]) =>
-    mockTrackHomeworkOcrGateShortcircuit(...args),
-}));
-
-// Simulate ML Kit native module being linked
-NativeModules.TextRecognition = { recognize: jest.fn() };
-
-const mockRecognize = jest.fn();
+// ML Kit TextRecognition requires a native module (JNI / ObjC) that is not
+// available in the Jest runtime — shim the default export so recognizeText()
+// can be controlled per-test via mockRecognize.
 jest.mock('@react-native-ml-kit/text-recognition', () => ({
+  // gc1-allow: native-boundary
   __esModule: true,
   default: {
     recognize: (...args: unknown[]) => mockRecognize(...args),
   },
 }));
 
-const mockManipulateAsync = jest.fn();
+// expo-image-manipulator wraps native image processing APIs (CGImageDestination
+// on iOS, BitmapFactory on Android) that have no JSVM equivalent.
 jest.mock('expo-image-manipulator', () => ({
+  // gc1-allow: native-boundary
   manipulateAsync: (...args: unknown[]) => mockManipulateAsync(...args),
   SaveFormat: { JPEG: 'jpeg' },
 }));
 
-const mockCopyAsync = jest.fn().mockResolvedValue(undefined);
+// expo-file-system/legacy wraps the native file system APIs (NSFileManager /
+// java.io.File) that are not available in the Jest runtime.
 jest.mock('expo-file-system/legacy', () => ({
+  // gc1-allow: native-boundary
   cacheDirectory: 'file:///cache/',
   copyAsync: (...args: unknown[]) => mockCopyAsync(...args),
 }));
+
+// Simulate ML Kit native module being linked
+NativeModules.TextRecognition = { recognize: jest.fn() };
+
+const mockRecognize = jest.fn();
+const mockManipulateAsync = jest.fn();
+const mockCopyAsync = jest.fn().mockResolvedValue(undefined);
+
+function createWrapper() {
+  return createHookWrapper({
+    activeProfile: createTestProfile({ id: 'profile-1' }),
+  }).wrapper;
+}
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -73,6 +99,7 @@ beforeEach(() => {
   mockRecognize.mockReset();
   mockManipulateAsync.mockReset();
   mockManipulateAsync.mockResolvedValue({ uri: 'file:///cache/resized.jpg' });
+  mockCopyAsync.mockResolvedValue(undefined);
   formDataGlobal.FormData = MockFormData as unknown as typeof FormData;
   global.fetch = mockFetch as typeof fetch;
 });
@@ -83,7 +110,9 @@ afterAll(() => {
 
 describe('useHomeworkOcr', () => {
   it('starts in idle status', () => {
-    const { result } = renderHook(() => useHomeworkOcr());
+    const { result } = renderHook(() => useHomeworkOcr(), {
+      wrapper: createWrapper(),
+    });
 
     expect(result.current.status).toBe('idle');
     expect(result.current.text).toBeNull();
@@ -94,7 +123,9 @@ describe('useHomeworkOcr', () => {
   it('valid OCR text reaches status=done unchanged', async () => {
     mockRecognize.mockResolvedValue({ text: 'Solve for x: 2x + 5 = 13' });
 
-    const { result } = renderHook(() => useHomeworkOcr());
+    const { result } = renderHook(() => useHomeworkOcr(), {
+      wrapper: createWrapper(),
+    });
 
     await act(async () => {
       await result.current.process('file:///tmp/photo.jpg');
@@ -115,7 +146,9 @@ describe('useHomeworkOcr', () => {
   it('copies image to stable cache path before processing', async () => {
     mockRecognize.mockResolvedValue({ text: 'Solve for x: 2x + 5 = 13' });
 
-    const { result } = renderHook(() => useHomeworkOcr());
+    const { result } = renderHook(() => useHomeworkOcr(), {
+      wrapper: createWrapper(),
+    });
 
     await act(async () => {
       await result.current.process('file:///tmp/photo.jpg');
@@ -130,7 +163,9 @@ describe('useHomeworkOcr', () => {
   it('resizes cached image to 1600px width before OCR', async () => {
     mockRecognize.mockResolvedValue({ text: 'Solve for x: 2x + 5 = 13' });
 
-    const { result } = renderHook(() => useHomeworkOcr());
+    const { result } = renderHook(() => useHomeworkOcr(), {
+      wrapper: createWrapper(),
+    });
 
     await act(async () => {
       await result.current.process('file:///tmp/photo.jpg');
@@ -157,7 +192,9 @@ describe('useHomeworkOcr', () => {
       ),
     );
 
-    const { result } = renderHook(() => useHomeworkOcr());
+    const { result } = renderHook(() => useHomeworkOcr(), {
+      wrapper: createWrapper(),
+    });
 
     await act(async () => {
       await result.current.process('file:///tmp/photo.jpg');
@@ -203,7 +240,9 @@ describe('useHomeworkOcr', () => {
       ),
     );
 
-    const { result } = renderHook(() => useHomeworkOcr());
+    const { result } = renderHook(() => useHomeworkOcr(), {
+      wrapper: createWrapper(),
+    });
 
     await act(async () => {
       await result.current.process('file:///tmp/photo.jpg');
@@ -243,7 +282,9 @@ describe('useHomeworkOcr', () => {
       ),
     );
 
-    const { result } = renderHook(() => useHomeworkOcr());
+    const { result } = renderHook(() => useHomeworkOcr(), {
+      wrapper: createWrapper(),
+    });
 
     await act(async () => {
       await result.current.process('file:///tmp/photo.jpg');
@@ -278,7 +319,9 @@ describe('useHomeworkOcr', () => {
         }),
       );
 
-    const { result } = renderHook(() => useHomeworkOcr());
+    const { result } = renderHook(() => useHomeworkOcr(), {
+      wrapper: createWrapper(),
+    });
 
     await act(async () => {
       await result.current.process('file:///tmp/photo.jpg');
@@ -302,7 +345,9 @@ describe('useHomeworkOcr', () => {
       confidence: 0.9,
     });
 
-    const { result } = renderHook(() => useHomeworkOcr());
+    const { result } = renderHook(() => useHomeworkOcr(), {
+      wrapper: createWrapper(),
+    });
 
     await act(async () => {
       await result.current.process('file:///tmp/photo.jpg');
@@ -325,7 +370,9 @@ describe('useHomeworkOcr', () => {
       confidence: 0.9,
     });
 
-    const { result } = renderHook(() => useHomeworkOcr());
+    const { result } = renderHook(() => useHomeworkOcr(), {
+      wrapper: createWrapper(),
+    });
 
     await act(async () => {
       await result.current.process('file:///tmp/photo.jpg');
@@ -353,7 +400,9 @@ describe('useHomeworkOcr', () => {
       ),
     );
 
-    const { result } = renderHook(() => useHomeworkOcr());
+    const { result } = renderHook(() => useHomeworkOcr(), {
+      wrapper: createWrapper(),
+    });
 
     await act(async () => {
       await result.current.process('file:///tmp/photo.jpg');
@@ -381,7 +430,9 @@ describe('useHomeworkOcr', () => {
       ),
     );
 
-    const { result } = renderHook(() => useHomeworkOcr());
+    const { result } = renderHook(() => useHomeworkOcr(), {
+      wrapper: createWrapper(),
+    });
 
     await act(async () => {
       await result.current.process('file:///tmp/photo.jpg');
@@ -410,7 +461,9 @@ describe('useHomeworkOcr', () => {
       ),
     );
 
-    const { result } = renderHook(() => useHomeworkOcr());
+    const { result } = renderHook(() => useHomeworkOcr(), {
+      wrapper: createWrapper(),
+    });
 
     try {
       await act(async () => {
@@ -428,7 +481,9 @@ describe('useHomeworkOcr', () => {
     mockRecognize.mockRejectedValue(new Error('ML Kit crash'));
     mockFetch.mockRejectedValueOnce(new Error('server down'));
 
-    const { result } = renderHook(() => useHomeworkOcr());
+    const { result } = renderHook(() => useHomeworkOcr(), {
+      wrapper: createWrapper(),
+    });
 
     await act(async () => {
       await result.current.process('file:///tmp/photo.jpg');
@@ -449,7 +504,9 @@ describe('useHomeworkOcr', () => {
         text: Array.from({ length: 130 }, () => 'word').join(' '),
       });
 
-    const { result } = renderHook(() => useHomeworkOcr());
+    const { result } = renderHook(() => useHomeworkOcr(), {
+      wrapper: createWrapper(),
+    });
 
     await act(async () => {
       await result.current.process('file:///tmp/photo.jpg');
@@ -469,7 +526,9 @@ describe('useHomeworkOcr', () => {
       })
       .mockResolvedValueOnce({ text: 'What is new text found' });
 
-    const { result } = renderHook(() => useHomeworkOcr());
+    const { result } = renderHook(() => useHomeworkOcr(), {
+      wrapper: createWrapper(),
+    });
 
     await act(async () => {
       await result.current.process('file:///tmp/photo1.jpg');
@@ -484,7 +543,9 @@ describe('useHomeworkOcr', () => {
   });
 
   it('retry() is a no-op when no image has been processed', async () => {
-    const { result } = renderHook(() => useHomeworkOcr());
+    const { result } = renderHook(() => useHomeworkOcr(), {
+      wrapper: createWrapper(),
+    });
 
     await act(async () => {
       await result.current.retry();
@@ -508,7 +569,9 @@ describe('useHomeworkOcr', () => {
     });
     mockRecognize.mockReturnValue(recognizePromise);
 
-    const { result } = renderHook(() => useHomeworkOcr());
+    const { result } = renderHook(() => useHomeworkOcr(), {
+      wrapper: createWrapper(),
+    });
 
     // Kick off the OCR run — do NOT await; it suspends inside recognizeText.
     // Note: process() awaits copyToCache first, then calls runOcr. Drain
@@ -562,7 +625,9 @@ describe('useHomeworkOcr', () => {
       },
     );
 
-    const { result } = renderHook(() => useHomeworkOcr());
+    const { result } = renderHook(() => useHomeworkOcr(), {
+      wrapper: createWrapper(),
+    });
 
     let processPromise: Promise<void> = Promise.resolve();
     await act(async () => {
