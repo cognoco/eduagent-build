@@ -24,7 +24,7 @@ import type {
   MonthlyReportData,
   SubjectMonthlyDetail,
 } from '@eduagent/schemas';
-import { ForbiddenError } from '@eduagent/schemas';
+import { ForbiddenError, SchemaDriftError } from '@eduagent/schemas';
 import { routeAndCall } from './llm';
 import {
   generateMonthlyReportData,
@@ -1359,9 +1359,6 @@ describe('mapMonthlyReportRow — schema drift vs missing row [CCR PR #215]', ()
       reportData: 'not-an-object' as unknown as MonthlyReportData,
     };
     const db = createMockDb({ findFirstResult: badRow });
-
-    const { SchemaDriftError } =
-      require('@eduagent/schemas') as typeof import('@eduagent/schemas');
 
     await expect(
       getMonthlyReportForProfile(db, UUID.child, UUID.report),

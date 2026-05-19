@@ -77,7 +77,7 @@ const mockGetPracticeActivitySummary = jest
   .fn()
   .mockResolvedValue(emptyPracticeActivitySummary);
 jest.mock(
-  '../../services/practice-activity-summary' /* gc1-allow: unit test boundary for Inngest handler; full DB path covered by practice-activity-summary tests */,
+  '../../services/practice-activity-summary' /* gc1-allow: asserts call-contract — verifies the handler invokes getPracticeActivitySummary with the exact { profileId, period, previousPeriod } window shape (see "loads practice activity summary for the report week" test). End-to-end DB path is covered by weekly-progress-push.integration.test.ts; the schema-conforming arg assertion is not introspectable through fetch interception. */,
   () => ({
     getPracticeActivitySummary: (...args: unknown[]) =>
       mockGetPracticeActivitySummary(...args),
@@ -87,7 +87,7 @@ jest.mock(
 const mockGetLatestSnapshot = jest.fn().mockResolvedValue(null);
 const mockGetLatestSnapshotOnOrBefore = jest.fn().mockResolvedValue(null);
 jest.mock(
-  '../../services/snapshot-aggregation' /* gc1-allow: unit test boundary */,
+  '../../services/snapshot-aggregation' /* gc1-allow: drives the CURRENT/PREVIOUS snapshot pair into the handler under fake-timer dates so the test can assert (a) the 14-day MAX_SNAPSHOT_GAP_MS clamp branch, (b) the self-report two-call ordering (mockResolvedValueOnce x2), and (c) the precise reportData persisted to weeklyReports. Hitting real progress_snapshots from this DB-less suite would require time-traveling rows that the sibling weekly-progress-push.integration.test.ts already exercises end-to-end. */,
   () => ({
     getLatestSnapshot: (...args: unknown[]) => mockGetLatestSnapshot(...args),
     getLatestSnapshotOnOrBefore: (...args: unknown[]) =>
@@ -115,7 +115,7 @@ const mockGenerateWeeklyReportData = jest.fn().mockReturnValue({
   practiceSummary: emptyPracticeActivitySummary,
 });
 jest.mock(
-  '../../services/weekly-report' /* gc1-allow: unit test boundary */,
+  '../../services/weekly-report' /* gc1-allow: asserts call-contract — verifies the handler invokes generateWeeklyReportData with (name, reportWeek, latestMetrics, cappedPreviousMetrics, practiceSummary) in that exact positional order. The argument-shape test is the SUT contract; integration sibling weekly-progress-push.integration.test.ts covers the persisted output. */,
   () => ({
     generateWeeklyReportData: (...args: unknown[]) =>
       mockGenerateWeeklyReportData(...args),
@@ -127,7 +127,7 @@ const mockListEligibleSelfReportProfileIdsAtLocalHour9 = jest
   .fn()
   .mockResolvedValue([]);
 jest.mock(
-  '../../services/solo-progress-reports' /* gc1-allow: unit test boundary */,
+  '../../services/solo-progress-reports' /* gc1-allow: drives self-report eligibility deterministically — used to inject "PARENT_ID is solo-eligible" into the cron dispatch branch ("queues eligible self-report profiles") without seeding the full session/activity chain that the eligibility query traverses. Integration sibling exercises the real eligibility SQL against a real DB. */,
   () => ({
     listEligibleSelfReportProfileIds: (...args: unknown[]) =>
       mockListEligibleSelfReportProfileIds(...args),
@@ -147,7 +147,7 @@ const mockFormatWeeklyProgressEmail = jest.fn(
   }),
 );
 jest.mock(
-  '../../services/notifications' /* gc1-allow: unit test boundary */,
+  '../../services/notifications' /* gc1-allow: asserts dispatch policy — the "self_report_only" branch test asserts sendPushNotification + sendEmail are NEVER called when a parent has no linked children but is self-report-eligible. Verifying "function not called" requires the spy; integration sibling weekly-progress-push.integration.test.ts exercises the real Expo/Resend pipeline through fetch interception. */,
   () => ({
     sendPushNotification: (...args: unknown[]) =>
       mockSendPushNotification(...args),
@@ -164,7 +164,7 @@ jest.mock(
 const mockGetRecentNotificationCount = jest.fn().mockResolvedValue(0);
 const mockLogNotification = jest.fn().mockResolvedValue(undefined);
 jest.mock(
-  '../../services/settings' /* gc1-allow: unit test boundary */,
+  '../../services/settings' /* gc1-allow: bypasses the 24h dedup gate so the dispatch-decision tests can run without seeding notificationLog. The dedup behaviour itself (recent-count > 0 → throttled) is covered by the "[BUG-699-FOLLOWUP] does not re-push when a weekly_progress notification was logged in the last 24h" case in the integration sibling, which primes a real notificationLog row. */,
   () => ({
     getRecentNotificationCount: (...args: unknown[]) =>
       mockGetRecentNotificationCount(...args),

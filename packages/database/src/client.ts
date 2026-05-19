@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { Pool as NeonPool, neonConfig } from '@neondatabase/serverless';
 import { drizzle as drizzleNeon } from 'drizzle-orm/neon-serverless';
 import { drizzle as drizzlePg } from 'drizzle-orm/node-postgres';
@@ -33,7 +34,26 @@ export interface CreateDatabaseOptions {
 // Module-level pool cache — survives across requests within the same Cloudflare
 // Worker isolate. Non-Worker callers can opt into this default to avoid repeated
 // Neon WebSocket handshakes.
+//
+// SECURITY: The cache is keyed by a sha256 hash of the DSN rather than the raw
+// DSN. The raw DSN contains the database password in plaintext; using it as a
+// Map key would retain the credential in process memory for the lifetime of
+// the cache and expose it to anything that can enumerate the keys (heap dump,
+// memory inspection, debugger). The hash is stable per-DSN (same input → same
+// digest, so cache hits still work) but not reversible to the password.
 const neonPoolCache = new Map<string, NeonPool>();
+
+function neonPoolCacheKey(dsn: string): string {
+  return createHash('sha256').update(dsn).digest('hex');
+}
+
+/**
+ * Internal test seam — exposes the neon pool cache for regression tests that
+ * need to assert cache behaviour (hits, misses, key shape). Not part of the
+ * public API; do not consume from production code.
+ */
+export const __internal_neonPoolCache = neonPoolCache;
+export const __internal_neonPoolCacheKey = neonPoolCacheKey;
 
 // Per-request Neon pools must be closed by request middleware. Store those
 // pools behind the Drizzle handle without exposing transport details to callers.
@@ -88,13 +108,14 @@ export function createDatabase(
       return db;
     }
 
-    let pool = neonPoolCache.get(databaseUrl);
+    const cacheKey = neonPoolCacheKey(databaseUrl);
+    let pool = neonPoolCache.get(cacheKey);
     if (!pool) {
       pool = new NeonPool({
         connectionString: databaseUrl,
         connectionTimeoutMillis: 10_000,
       });
-      neonPoolCache.set(databaseUrl, pool);
+      neonPoolCache.set(cacheKey, pool);
     }
     return drizzleNeon(pool, { schema });
   }

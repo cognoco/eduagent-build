@@ -385,6 +385,37 @@ describe('queryKeys.retention', () => {
   });
 });
 
+describe('queryKeys.library', () => {
+  it('retention — with profileId', () => {
+    expect(queryKeys.library.retention('prof-abc')).toEqual([
+      'library',
+      'retention',
+      'prof-abc',
+    ]);
+  });
+
+  it('retention — undefined profileId preserves slot', () => {
+    expect(queryKeys.library.retention(undefined)).toEqual([
+      'library',
+      'retention',
+      undefined,
+    ]);
+  });
+
+  // CCR PR #251 guard: the inline literal in use-library-context.ts and the
+  // `setLibraryRetention` test helper in library.test.tsx use this exact key
+  // shape. If the factory ever drifts, prime-then-read fixtures and
+  // production reads will silently miss each other.
+  it('retention — matches the literal used by test-helper setLibraryRetention', () => {
+    const profileId = 'test-profile-id';
+    expect(queryKeys.library.retention(profileId)).toEqual([
+      'library',
+      'retention',
+      profileId,
+    ]);
+  });
+});
+
 describe('queryKeys.languageProgress', () => {
   it('subject', () => {
     expect(queryKeys.languageProgress.subject('prof-abc', 'sub-1')).toEqual([

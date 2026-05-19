@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import type {
@@ -43,6 +44,17 @@ function formatDateOnly(
   });
 }
 
+/**
+ * Normalize a mixed monthly (YYYY-MM) / daily (YYYY-MM-DD) date string into a
+ * comparable YYYY-MM-DD key. Lexicographic compare of mixed formats is wrong:
+ *   '2026-04' > '2026-03-31'  (correct by accident)
+ *   '2026-04' < '2026-04-01'  (WRONG — they should be equal-or-equivalent)
+ * Padding the month-only form to its first day makes localeCompare safe.
+ */
+function toSortKey(date: string): string {
+  return /^\d{4}-\d{2}$/.test(date) ? `${date}-01` : date;
+}
+
 export function ReportsList({
   monthlyReports,
   weeklyReports,
@@ -55,18 +67,24 @@ export function ReportsList({
 }: ReportsListProps): React.ReactElement {
   const { t } = useTranslation();
 
-  const allItems: ReportListItem[] = [
-    ...weeklyReports.map((report) => ({
-      kind: 'weekly' as const,
-      report,
-      sortDate: report.reportWeek,
-    })),
-    ...monthlyReports.map((report) => ({
-      kind: 'monthly' as const,
-      report,
-      sortDate: report.reportMonth,
-    })),
-  ].sort((a, b) => b.sortDate.localeCompare(a.sortDate));
+  const allItems: ReportListItem[] = useMemo(
+    () =>
+      [
+        ...weeklyReports.map((report) => ({
+          kind: 'weekly' as const,
+          report,
+          sortDate: report.reportWeek,
+        })),
+        ...monthlyReports.map((report) => ({
+          kind: 'monthly' as const,
+          report,
+          sortDate: report.reportMonth,
+        })),
+      ].sort((a, b) =>
+        toSortKey(b.sortDate).localeCompare(toSortKey(a.sortDate)),
+      ),
+    [monthlyReports, weeklyReports],
+  );
 
   const reportItems = limit !== undefined ? allItems.slice(0, limit) : allItems;
   const isEmpty = monthlyReports.length === 0 && weeklyReports.length === 0;

@@ -814,14 +814,41 @@ describe('resolveTabShape', () => {
     ).toBe('learner');
   });
 
-  it('returns guardian when activeProfile is null', () => {
+  // [CCR PR #215 / Bug 305] Unknown/unloaded profile defaults to 'learner'
+  // (least-privilege 4-tab shape) rather than 'guardian' (full mentoring
+  // hub). A legitimate guardian briefly seeing the learner shape during
+  // profile load is acceptable; a non-guardian seeing the mentoring hub
+  // leaks intent.
+  it('returns learner when activeProfile is null', () => {
     expect(
       resolveTabShape({
         activeProfile: null,
         profiles: [],
         isParentProxy: false,
       }),
-    ).toBe('guardian');
+    ).toBe('learner');
+  });
+
+  it('returns learner when activeProfile is undefined', () => {
+    expect(
+      resolveTabShape({
+        activeProfile: undefined,
+        profiles: [],
+        isParentProxy: false,
+      }),
+    ).toBe('learner');
+  });
+
+  it('returns learner when activeProfile is null even with linked children present', () => {
+    // Defensive: if profiles[] has children but activeProfile hasn't loaded
+    // yet, we still pick the safer shape until activeProfile is known.
+    expect(
+      resolveTabShape({
+        activeProfile: null,
+        profiles: [{ isOwner: true }, { isOwner: false }],
+        isParentProxy: false,
+      }),
+    ).toBe('learner');
   });
 });
 

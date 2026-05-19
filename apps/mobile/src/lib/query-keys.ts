@@ -233,6 +233,20 @@ export const queryKeys = {
   },
 
   // ------------------------------------------------------------------
+  // library domain
+  //
+  // CCR PR #251: `/library/retention` aggregate query previously used an
+  // inline literal `['library', 'retention', activeProfile?.id]` in
+  // use-library-context.ts. Promoted to the typed registry so callers (and
+  // tests that prime the cache via `setLibraryRetention`) consume a single
+  // key factory rather than duplicating the literal.
+  // ------------------------------------------------------------------
+  library: {
+    retention: (profileId: string | undefined) =>
+      ['library', 'retention', profileId] as const,
+  },
+
+  // ------------------------------------------------------------------
   // languageProgress domain
   // ------------------------------------------------------------------
   languageProgress: {

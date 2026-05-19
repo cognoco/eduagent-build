@@ -1,11 +1,13 @@
-import { eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import {
   accounts,
   createDatabase,
   dictationResults,
   practiceActivityEvents,
   profiles,
+  subjects,
 } from '@eduagent/database';
+import { SubjectNotFoundError } from '@eduagent/schemas';
 import { loadDatabaseEnv } from '@eduagent/test-utils';
 import { resolve } from 'path';
 import { recordDictationResult, getDictationStreak } from './result';
@@ -31,6 +33,12 @@ const ACCOUNT = {
   clerkUserId: `${PREFIX}-01`,
   email: `${PREFIX}-user1@integration.test`,
 };
+// [SECURITY] Second account used for cross-profile IDOR break tests — profile A
+// owns a subject, profile B (attacker) tries to record dictation against it.
+const VICTIM_ACCOUNT = {
+  clerkUserId: `${PREFIX}-victim`,
+  email: `${PREFIX}-victim@integration.test`,
+};
 
 function getServerDate(): string {
   return new Date().toISOString().slice(0, 10);
@@ -45,7 +53,7 @@ function getPreviousDate(dateStr: string): string {
 async function cleanupTestAccounts() {
   const db = createIntegrationDb();
   const rows = await db.query.accounts.findMany({
-    where: inArray(accounts.email, [ACCOUNT.email]),
+    where: inArray(accounts.email, [ACCOUNT.email, VICTIM_ACCOUNT.email]),
   });
   if (rows.length > 0) {
     await db.delete(accounts).where(
@@ -59,6 +67,8 @@ async function cleanupTestAccounts() {
 
 let accountId: string;
 let profileId: string;
+let victimProfileId: string;
+let victimSubjectId: string;
 
 beforeAll(async () => {
   await cleanupTestAccounts();
@@ -81,16 +91,45 @@ beforeAll(async () => {
     })
     .returning();
   profileId = prof!.id;
+
+  // Victim account: owns the subject the attacker (profileId) tries to abuse.
+  const [victimAcct] = await db
+    .insert(accounts)
+    .values({
+      clerkUserId: VICTIM_ACCOUNT.clerkUserId,
+      email: VICTIM_ACCOUNT.email,
+    })
+    .returning();
+  const [victimProf] = await db
+    .insert(profiles)
+    .values({
+      accountId: victimAcct!.id,
+      displayName: 'Victim Learner',
+      birthYear: 2010,
+      isOwner: true,
+    })
+    .returning();
+  victimProfileId = victimProf!.id;
+  const [victimSubject] = await db
+    .insert(subjects)
+    .values({
+      profileId: victimProfileId,
+      name: 'Victim Subject',
+    })
+    .returning();
+  victimSubjectId = victimSubject!.id;
 });
 
 beforeEach(async () => {
   const db = createIntegrationDb();
   await db
     .delete(practiceActivityEvents)
-    .where(eq(practiceActivityEvents.profileId, profileId));
+    .where(
+      inArray(practiceActivityEvents.profileId, [profileId, victimProfileId]),
+    );
   await db
     .delete(dictationResults)
-    .where(eq(dictationResults.profileId, profileId));
+    .where(inArray(dictationResults.profileId, [profileId, victimProfileId]));
 });
 
 afterAll(async () => {
@@ -208,6 +247,89 @@ describe('recordDictationResult (integration)', () => {
     expect(rows[0]!.sentenceCount).toBe(6);
     expect(rows[0]!.mistakeCount).toBe(1);
     expect(rows[0]!.reviewed).toBe(true);
+  });
+
+  // [SECURITY-IDOR] CCR PR #241 break test. Without ownership validation, an
+  // attacker (profile B) could submit a dictation result with another user's
+  // (profile A) subjectId — the row + practice_activity_events entry would
+  // both be tagged with the victim's subject, polluting their progress
+  // surfaces. The guard in `recordDictationResult` rejects with
+  // SubjectNotFoundError BEFORE any write happens.
+  it('[SECURITY-IDOR] rejects cross-profile subjectId — no dictation_result or practice_activity_event row written', async () => {
+    const db = createIntegrationDb();
+    const today = getServerDate();
+
+    await expect(
+      recordDictationResult(db, profileId, {
+        localDate: today,
+        sentenceCount: 5,
+        mistakeCount: 2,
+        mode: 'homework',
+        reviewed: false,
+        // Attacker (profileId) supplies VICTIM's subjectId in an attempt to
+        // plant rows under the victim's subject.
+        subjectId: victimSubjectId,
+      }),
+    ).rejects.toBeInstanceOf(SubjectNotFoundError);
+
+    // No dictation row written under either profile.
+    const attackerRows = await db.query.dictationResults.findMany({
+      where: eq(dictationResults.profileId, profileId),
+    });
+    expect(attackerRows).toHaveLength(0);
+    const victimRows = await db.query.dictationResults.findMany({
+      where: eq(dictationResults.profileId, victimProfileId),
+    });
+    expect(victimRows).toHaveLength(0);
+
+    // No practice_activity_event row written tagged with the victim's subject.
+    const events = await db
+      .select()
+      .from(practiceActivityEvents)
+      .where(eq(practiceActivityEvents.subjectId, victimSubjectId));
+    expect(events).toHaveLength(0);
+
+    // And none written under the attacker's profile either.
+    const attackerEvents = await db
+      .select()
+      .from(practiceActivityEvents)
+      .where(eq(practiceActivityEvents.profileId, profileId));
+    expect(attackerEvents).toHaveLength(0);
+  });
+
+  it('[SECURITY-IDOR] accepts owned subjectId — writes succeed', async () => {
+    const db = createIntegrationDb();
+    const today = getServerDate();
+
+    // Insert a subject owned by the test profile.
+    const [ownSubject] = await db
+      .insert(subjects)
+      .values({ profileId, name: 'Own Subject for Dictation' })
+      .returning();
+
+    const row = await recordDictationResult(db, profileId, {
+      localDate: today,
+      sentenceCount: 4,
+      mistakeCount: 0,
+      mode: 'homework',
+      reviewed: true,
+      subjectId: ownSubject!.id,
+    });
+
+    expect(row.id).toBeTruthy();
+    const events = await db
+      .select()
+      .from(practiceActivityEvents)
+      .where(
+        and(
+          eq(practiceActivityEvents.profileId, profileId),
+          eq(practiceActivityEvents.subjectId, ownSubject!.id),
+        ),
+      );
+    expect(events).toHaveLength(1);
+
+    // Cleanup the subject we just created (afterAll cleans accounts cascade).
+    await db.delete(subjects).where(eq(subjects.id, ownSubject!.id));
   });
 });
 
