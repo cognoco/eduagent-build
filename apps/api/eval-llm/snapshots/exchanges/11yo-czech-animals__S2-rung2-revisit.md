@@ -56,7 +56,6 @@
     "nativeLanguage": "cs",
     "exchangeCount": 2,
     "isFirstEncounter": false,
-    "isFirstSessionOfSubject": false,
     "extractedSignalsToReflect": null,
     "inputMode": "text",
     "llmTier": "standard",
