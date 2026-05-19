@@ -14,7 +14,7 @@ import { relative, resolve } from 'node:path';
 // push providers — are stubbed at the HTTP boundary (intercepting
 // `globalThis.fetch`) or via bare-specifier package mocks, NOT by `jest.mock`
 // on an internal `services/*` module. This guard therefore correctly flags
-// `jest.mock('./services/llm', ...)` etc. as a violation even though the
+// internal service mocks such as `services/llm` as a violation even though the
 // underlying provider call is "external" — the right escape hatch is to
 // stub at the bare-specifier / fetch boundary, not in this allowlist.
 //
