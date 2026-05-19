@@ -31,6 +31,7 @@ const customConfig = {
       /\.test\.[jt]sx?$/,
       /\.stories\.[jt]sx?$/,
       /[/\\]__mocks__[/\\].*/,
+      /[/\\]test-utils[/\\].*/,
       /[/\\]\.worktrees[/\\].*/,
     ],
     nodeModulesPaths: [
