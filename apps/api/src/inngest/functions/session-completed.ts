@@ -24,11 +24,7 @@ import {
 import { refreshProgressSnapshot } from '../../services/snapshot-aggregation';
 import { insertSessionXpEntry } from '../../services/xp';
 import { extractAndStoreHomeworkSummary } from '../../services/homework-summary';
-import {
-  incrementSummarySkips,
-  resetSummarySkips,
-  updateMedianResponseSeconds,
-} from '../../services/settings';
+import { updateMedianResponseSeconds } from '../../services/settings';
 import {
   processEvaluateCompletion,
   processTeachBackCompletion,
@@ -1453,26 +1449,6 @@ export const sessionCompleted = inngest.createFunction(
           await extractAndStoreHomeworkSummary(db, profileId, sessionId);
         });
       }),
-    );
-
-    // Step 7: Track consecutive summary skips (FR94 — Casual Explorer prompt)
-    outcomes.push(
-      await step.run('track-summary-skips', async () =>
-        runIsolated('track-summary-skips', profileId, async () => {
-          if (event.data.summaryTrackingHandled) {
-            return;
-          }
-          const db = getStepDatabase();
-          if (summaryStatus === 'skipped') {
-            await incrementSummarySkips(db, profileId);
-          } else if (
-            summaryStatus === 'submitted' ||
-            summaryStatus === 'accepted'
-          ) {
-            await resetSummarySkips(db, profileId);
-          }
-        }),
-      ),
     );
 
     outcomes.push(

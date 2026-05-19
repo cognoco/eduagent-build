@@ -812,7 +812,7 @@ export async function prepareExchangeContext(
       : Promise.resolve(undefined);
 
   // BUG-70: Supplementary data is static within a session (priorTopics,
-  // teachingPref, learningMode, learningProfile, crossSubjectHighlights).
+  // teachingPref, learningModeRecord, learningProfile, crossSubjectHighlights).
   // Loaded once on first exchange, reused for the cache TTL.
   // [BUG-667 / S-10] getOrLoadSessionSupplementary deduplicates concurrent
   // first-exchange fetches via a per-session in-flight promise mutex —
@@ -992,7 +992,6 @@ export async function prepareExchangeContext(
   // Unpack supplementary back into the names the rest of the function uses.
   const priorTopics = supp.priorTopics;
   const teachingPref = supp.teachingPref;
-  const learningModeRecord = supp.learningMode;
   const crossSubjectHighlights = supp.crossSubjectHighlights;
   const learningProfile = supp.learningProfile;
 
@@ -1591,7 +1590,6 @@ export async function prepareExchangeContext(
     interleavedTopics,
     verificationType,
     evaluateDifficultyRung,
-    learningMode: learningModeRecord.mode,
     // Gap 4: Populate retention status for prompt-level awareness
     retentionStatus: retentionStatusValue
       ? {

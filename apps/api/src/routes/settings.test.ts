@@ -45,10 +45,8 @@ jest.mock('../services/account' /* gc1-allow: pattern-a conversion */, () => {
 
 const mockGetOwnedFamilyPoolBreakdownSharing = jest.fn();
 const mockUpsertFamilyPoolBreakdownSharing = jest.fn();
-const mockUpsertLearningMode = jest.fn();
 const mockGetNotificationPrefs = jest.fn();
 const mockUpsertNotificationPrefs = jest.fn();
-const mockGetLearningMode = jest.fn();
 const mockGetWithdrawalArchivePreference = jest.fn();
 const mockUpsertWithdrawalArchivePreference = jest.fn();
 
@@ -56,7 +54,6 @@ jest.mock('../services/settings' /* gc1-allow: pattern-a conversion */, () => {
   const actual = jest.requireActual('../services/settings');
   return {
     ...actual,
-    upsertLearningMode: (...args: unknown[]) => mockUpsertLearningMode(...args),
     getOwnedFamilyPoolBreakdownSharing: (...args: unknown[]) =>
       mockGetOwnedFamilyPoolBreakdownSharing(...args),
     upsertFamilyPoolBreakdownSharing: (...args: unknown[]) =>
@@ -65,35 +62,10 @@ jest.mock('../services/settings' /* gc1-allow: pattern-a conversion */, () => {
       mockGetNotificationPrefs(...args),
     upsertNotificationPrefs: (...args: unknown[]) =>
       mockUpsertNotificationPrefs(...args),
-    getLearningMode: (...args: unknown[]) => mockGetLearningMode(...args),
     getWithdrawalArchivePreference: (...args: unknown[]) =>
       mockGetWithdrawalArchivePreference(...args),
     upsertWithdrawalArchivePreference: (...args: unknown[]) =>
       mockUpsertWithdrawalArchivePreference(...args),
-  };
-});
-
-const mockClearSessionStaticContextForProfile = jest.fn();
-jest.mock(
-  '../services/session/session-cache' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual('../services/session/session-cache');
-    return {
-      ...actual,
-      clearSessionStaticContextForProfile: (...args: unknown[]) =>
-        mockClearSessionStaticContextForProfile(...args),
-    };
-  },
-);
-
-const mockCaptureException = jest.fn();
-jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
-  const actual = jest.requireActual(
-    '../services/sentry',
-  ) as typeof import('../services/sentry');
-  return {
-    ...actual,
-    captureException: (...args: unknown[]) => mockCaptureException(...args),
   };
 });
 
@@ -136,7 +108,6 @@ beforeEach(() => {
   });
   mockGetOwnedFamilyPoolBreakdownSharing.mockResolvedValue(false);
   mockUpsertFamilyPoolBreakdownSharing.mockResolvedValue({ value: true });
-  mockUpsertLearningMode.mockResolvedValue({ mode: 'serious' });
   mockGetNotificationPrefs.mockResolvedValue({
     reviewReminders: false,
     dailyReminders: false,
@@ -155,7 +126,6 @@ beforeEach(() => {
     pushEnabled: false,
     maxDailyPush: 3,
   });
-  mockGetLearningMode.mockResolvedValue({ mode: 'serious' });
   mockGetWithdrawalArchivePreference.mockResolvedValue('auto');
   mockUpsertWithdrawalArchivePreference.mockResolvedValue({ value: 'auto' });
 });
@@ -242,54 +212,6 @@ describe('settings routes', () => {
     expect(res.status).toBe(403);
   });
 
-  it('PUT /v1/settings/learning-mode clears cached session context for the active profile', async () => {
-    const res = await app.request(
-      '/v1/settings/learning-mode',
-      {
-        method: 'PUT',
-        headers: PROFILE_HEADERS,
-        body: JSON.stringify({ mode: 'serious' }),
-      },
-      TEST_ENV,
-    );
-
-    expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({ mode: 'serious' });
-    expect(mockUpsertLearningMode).toHaveBeenCalledWith(
-      expect.anything(),
-      'profile-1',
-      'test-account-id',
-      'serious',
-    );
-    expect(mockClearSessionStaticContextForProfile).toHaveBeenCalledWith(
-      'profile-1',
-    );
-    expect(mockCaptureException).not.toHaveBeenCalled();
-  });
-
-  it('PUT /v1/settings/learning-mode reports cache clear failures without failing the update', async () => {
-    const cacheError = new Error('cache clear failed');
-    mockClearSessionStaticContextForProfile.mockImplementationOnce(() => {
-      throw cacheError;
-    });
-
-    const res = await app.request(
-      '/v1/settings/learning-mode',
-      {
-        method: 'PUT',
-        headers: PROFILE_HEADERS,
-        body: JSON.stringify({ mode: 'serious' }),
-      },
-      TEST_ENV,
-    );
-
-    expect(res.status).toBe(200);
-    expect(mockCaptureException).toHaveBeenCalledWith(cacheError, {
-      profileId: 'profile-1',
-      extra: { context: 'clear-session-static-context' },
-    });
-  });
-
   // ---------------------------------------------------------------------------
   // Validation / negative-path coverage
   // ---------------------------------------------------------------------------
@@ -342,33 +264,6 @@ describe('settings routes', () => {
 
     expect(res.status).toBe(200);
     expect(mockUpsertNotificationPrefs).toHaveBeenCalled();
-  });
-
-  it('GET /v1/settings/learning-mode returns 200 with the stored mode', async () => {
-    const res = await app.request(
-      '/v1/settings/learning-mode',
-      { headers: PROFILE_HEADERS },
-      TEST_ENV,
-    );
-
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body).toMatchObject({ mode: 'serious' });
-  });
-
-  it('PUT /v1/settings/learning-mode returns 400 when mode is not a valid enum value', async () => {
-    const res = await app.request(
-      '/v1/settings/learning-mode',
-      {
-        method: 'PUT',
-        headers: PROFILE_HEADERS,
-        body: JSON.stringify({ mode: 'super-fast-mode' }),
-      },
-      TEST_ENV,
-    );
-
-    expect(res.status).toBe(400);
-    expect(mockUpsertLearningMode).not.toHaveBeenCalled();
   });
 
   it('GET /v1/settings/withdrawal-archive returns 200 for owner callers', async () => {

@@ -18,7 +18,6 @@
 | Target language | es |
 | Struggles | ser vs estar (Spanish); irregular verbs (Spanish) |
 | Strengths | Spanish pronunciation (Spanish) |
-| Learning mode | serious |
 | Preferred explanations | step-by-step, examples |
 | Pace | thorough |
 | Analogy domain | nature |

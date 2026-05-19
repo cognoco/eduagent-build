@@ -19,7 +19,6 @@
 | Target language | — |
 | Struggles | factoring polynomials (math); Reconstruction era (history) |
 | Strengths | mental arithmetic (math); Newton's laws (physics) |
-| Learning mode | casual |
 | Preferred explanations | examples, analogies |
 | Pace | quick |
 | Analogy domain | sports |
@@ -56,7 +55,6 @@
     "teachingPreference": "examples",
     "analogyDomain": "sports",
     "nativeLanguage": "en",
-    "learningMode": "casual",
     "exchangeCount": 2,
     "inputMode": "text",
     "llmTier": "standard",
@@ -275,7 +273,7 @@ Yeah I think I remember. Let's pick up from step 3.
 - Probe: P14 [standard] — Returning learner with resume summary — fading retention (all profiles)
 - Rung: 2, sessionType: learning, verification: standard
 - History turns: 2, exchangeCount: 2
-- inputMode: text, learningMode: casual
+- inputMode: text
 - topicTitle: algebra equations
 - sourceEvidence: learner_message:context, current_topic:reliable, conversation_history:context, prior_learning:context, mentor_memory:context, accommodation:context
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs

@@ -8,7 +8,7 @@ import { getSubject } from '../subject';
 import { loadProfileRowById } from '../profile';
 import { fetchPriorTopics } from '../prior-learning';
 import { getTeachingPreference } from '../retention-data';
-import { getLearningMode } from '../settings';
+import { getLearningModeRecord } from '../settings';
 import { getLearningProfile } from '../learner-profile';
 import { fetchCrossSubjectHighlights } from '../prior-learning';
 import {
@@ -28,7 +28,7 @@ type CachedSubject = Awaited<ReturnType<typeof getSubject>>;
 export interface SessionSupplementaryData {
   priorTopics: Awaited<ReturnType<typeof fetchPriorTopics>>;
   teachingPref: Awaited<ReturnType<typeof getTeachingPreference>>;
-  learningMode: Awaited<ReturnType<typeof getLearningMode>>;
+  learningModeRecord: Awaited<ReturnType<typeof getLearningModeRecord>>;
   learningProfile: Awaited<ReturnType<typeof getLearningProfile>>;
   crossSubjectHighlights: Awaited<
     ReturnType<typeof fetchCrossSubjectHighlights>
@@ -230,9 +230,7 @@ export function clearSessionStaticContext(
 
 // NOTE: This clears only the in-memory Map of the running Worker isolate.
 // Other same-region isolates retain their caches until TTL expiry — stale
-// context can be served for up to that window after a learning-mode change.
-// Folding learningMode into the cache key would give hard invalidation but
-// also busts supplementary data that is unrelated to mode.
+// context can be served for up to that window after settings changes.
 export function clearSessionStaticContextForProfile(profileId: string): void {
   const prefix = `${profileId}:`;
   for (const key of sessionStaticContextCache.keys()) {
@@ -265,7 +263,7 @@ async function loadSessionSupplementary(
   const [
     priorTopics,
     teachingPref,
-    learningMode,
+    learningModeRecord,
     crossSubjectHighlights,
     learningProfile,
   ] = await Promise.all([
@@ -275,7 +273,7 @@ async function loadSessionSupplementary(
     isFreeform
       ? Promise.resolve(null)
       : getTeachingPreference(db, profileId, subjectId),
-    getLearningMode(db, profileId),
+    getLearningModeRecord(db, profileId),
     isFreeform
       ? Promise.resolve([])
       : fetchCrossSubjectHighlights(db, profileId, subjectId),
@@ -284,7 +282,7 @@ async function loadSessionSupplementary(
   return {
     priorTopics,
     teachingPref,
-    learningMode,
+    learningModeRecord,
     learningProfile,
     crossSubjectHighlights,
   };

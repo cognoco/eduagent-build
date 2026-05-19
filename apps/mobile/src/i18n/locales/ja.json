@@ -278,24 +278,6 @@
   "more": {
     "screenTitle": "その他",
     "active": "アクティブ",
-    "learningMode": {
-      "sectionHeader": "{{name}}さんの学習モード",
-      "subtitle": "ご自身の学習セッションに適用されます。",
-      "subtitleWithChildren": "ご自身のセッションに適用されます。お子様の設定を変更するには、ダッシュボードからプロフィールを開いてください。",
-      "childPreferencesAccessLabel": "{{name}}さんのプロフィール設定を開く",
-      "childPreferencesLink": "{{name}}さんの設定を変更するには、ホームでプロフィールをタップしてください →",
-      "familyPreferencesLink": "お子様の設定を変更するには、ホームでプロフィールをタップしてください →",
-      "sheetTitle": "学習モード",
-      "sheetEffectMessage": "次のメッセージから反映されます。",
-      "casual": {
-        "title": "エクスプローラー",
-        "description": "自分のペースで学習します。メンターはリラックスして励ましてくれます。すぐにポイントを獲得でき、要約をスキップできます。"
-      },
-      "serious": {
-        "title": "チャレンジモード",
-        "description": "さらに上を目指しましょう。メンターが学習をサポートします。覚えていることを証明した後にポイントを獲得し、要約で知識を定着させます。"
-      }
-    },
     "accommodation": {
       "sectionHeader": "あなたの学習サポート",
       "viewAndManage": "表示・管理",

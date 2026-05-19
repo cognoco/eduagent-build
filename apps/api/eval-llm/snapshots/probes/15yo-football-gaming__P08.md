@@ -19,7 +19,6 @@
 | Target language | — |
 | Struggles | factoring polynomials (math); Reconstruction era (history) |
 | Strengths | mental arithmetic (math); Newton's laws (physics) |
-| Learning mode | casual |
 | Preferred explanations | examples, analogies |
 | Pace | quick |
 | Analogy domain | sports |
@@ -64,7 +63,6 @@
     "teachingPreference": "examples",
     "analogyDomain": "sports",
     "nativeLanguage": "en",
-    "learningMode": "casual",
     "exchangeCount": 3,
     "inputMode": "text",
     "llmTier": "standard",
@@ -284,7 +282,7 @@ I kind of see the pattern but I still need a little guidance on this one.
 - Probe: P08 [standard] — 15yo math session with worked-example fading scaffold (rung 2)
 - Rung: 2, sessionType: learning, verification: standard
 - History turns: 4, exchangeCount: 3
-- inputMode: text, learningMode: casual
+- inputMode: text
 - topicTitle: algebra equations
 - sourceEvidence: learner_message:context, current_topic:reliable, conversation_history:context, prior_learning:context, mentor_memory:context, accommodation:context
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs

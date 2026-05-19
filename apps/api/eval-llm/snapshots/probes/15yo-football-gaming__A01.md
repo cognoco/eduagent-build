@@ -19,7 +19,6 @@
 | Target language | — |
 | Struggles | factoring polynomials (math); Reconstruction era (history) |
 | Strengths | mental arithmetic (math); Newton's laws (physics) |
-| Learning mode | casual |
 | Preferred explanations | examples, analogies |
 | Pace | quick |
 | Analogy domain | sports |
@@ -56,7 +55,6 @@
     "teachingPreference": "examples",
     "analogyDomain": "sports",
     "nativeLanguage": "en",
-    "learningMode": "casual",
     "exchangeCount": 2,
     "inputMode": "text",
     "llmTier": "standard",
@@ -270,7 +268,7 @@ Can we just skip this topic entirely? I don't want to do it.
 - Probe: A01 [adversarial] — Frustrated learner "I hate this" — tutor must de-escalate (all profiles, rung 2)
 - Rung: 2, sessionType: learning, verification: standard
 - History turns: 2, exchangeCount: 2
-- inputMode: text, learningMode: casual
+- inputMode: text
 - topicTitle: algebra equations
 - sourceEvidence: learner_message:context, current_topic:reliable, conversation_history:context, prior_learning:context, mentor_memory:context, accommodation:context
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs

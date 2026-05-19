@@ -294,8 +294,6 @@ jest.mock(
   },
 );
 
-const mockIncrementSummarySkips = jest.fn().mockResolvedValue(1);
-const mockResetSummarySkips = jest.fn().mockResolvedValue(undefined);
 const mockUpdateMedianResponseSeconds = jest.fn().mockResolvedValue(undefined);
 
 jest.mock(
@@ -306,9 +304,6 @@ jest.mock(
     ) as typeof import('../../services/settings');
     return {
       ...actual,
-      incrementSummarySkips: (...args: unknown[]) =>
-        mockIncrementSummarySkips(...args),
-      resetSummarySkips: (...args: unknown[]) => mockResetSummarySkips(...args),
       updateMedianResponseSeconds: (...args: unknown[]) =>
         mockUpdateMedianResponseSeconds(...args),
     };
@@ -704,7 +699,6 @@ describe('sessionCompleted', () => {
       'update-dashboard',
       'generate-embeddings',
       'extract-homework-summary',
-      'track-summary-skips',
       'update-pace-baseline',
       'queue-celebrations',
     ]);
@@ -718,7 +712,6 @@ describe('sessionCompleted', () => {
       .filter((o: any) => o.status !== 'skipped')
       .map((o: any) => o.status);
     expect(statuses).toEqual([
-      'ok',
       'ok',
       'ok',
       'ok',
@@ -1768,52 +1761,6 @@ describe('sessionCompleted', () => {
     });
   });
 
-  describe('track-summary-skips step', () => {
-    it('increments skip count when summaryStatus is skipped', async () => {
-      await executeSteps(createEventData({ summaryStatus: 'skipped' }));
-
-      expect(mockIncrementSummarySkips).toHaveBeenCalledWith(
-        expect.anything(),
-        PROFILE_ID,
-      );
-      expect(mockResetSummarySkips).not.toHaveBeenCalled();
-    });
-
-    it('resets skip count when summaryStatus is submitted', async () => {
-      await executeSteps(createEventData({ summaryStatus: 'submitted' }));
-
-      expect(mockResetSummarySkips).toHaveBeenCalledWith(
-        expect.anything(),
-        PROFILE_ID,
-      );
-      expect(mockIncrementSummarySkips).not.toHaveBeenCalled();
-    });
-
-    it('resets skip count when summaryStatus is accepted', async () => {
-      await executeSteps(createEventData({ summaryStatus: 'accepted' }));
-
-      expect(mockResetSummarySkips).toHaveBeenCalledWith(
-        expect.anything(),
-        PROFILE_ID,
-      );
-      expect(mockIncrementSummarySkips).not.toHaveBeenCalled();
-    });
-
-    it('does not increment or reset when summaryStatus is pending', async () => {
-      await executeSteps(createEventData({ summaryStatus: 'pending' }));
-
-      expect(mockIncrementSummarySkips).not.toHaveBeenCalled();
-      expect(mockResetSummarySkips).not.toHaveBeenCalled();
-    });
-
-    it('does not increment or reset when summaryStatus is undefined', async () => {
-      await executeSteps(createEventData({ summaryStatus: undefined }));
-
-      expect(mockIncrementSummarySkips).not.toHaveBeenCalled();
-      expect(mockResetSummarySkips).not.toHaveBeenCalled();
-    });
-  });
-
   // -------------------------------------------------------------------------
   // Step-level retry simulation
   // Uses manual step extraction (see helper comment above for rationale).
@@ -1908,7 +1855,6 @@ describe('sessionCompleted', () => {
       expect(mockUpdateRetentionFromSession).toHaveBeenCalled();
       expect(mockPrecomputeCoachingCard).toHaveBeenCalled();
       expect(mockRecordSessionActivity).toHaveBeenCalled();
-      expect(mockIncrementSummarySkips).toHaveBeenCalled();
 
       // Sentry captured the error
       expect(mockCaptureException).toHaveBeenCalledWith(

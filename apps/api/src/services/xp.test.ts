@@ -12,21 +12,6 @@ jest.mock(
   () => mockDatabaseModule.module,
 );
 
-jest.mock('./settings' /* gc1-allow: pattern-a conversion */, () => {
-  const actual = jest.requireActual(
-    './settings',
-  ) as typeof import('./settings');
-  return {
-    ...actual,
-    getLearningMode: jest.fn().mockResolvedValue({ mode: 'serious' }),
-    getLearningModeRules: jest.fn().mockReturnValue({
-      masteryGates: true,
-      verifiedXpOnly: true,
-      mandatorySummaries: true,
-    }),
-  };
-});
-
 import { createScopedRepository, type Database } from '@eduagent/database';
 import {
   calculateTopicXp,
@@ -38,7 +23,6 @@ import {
   getSessionXpEntry,
   REFLECTION_XP_MULTIPLIER,
 } from './xp';
-import { getLearningMode, getLearningModeRules } from './settings';
 
 // ---------------------------------------------------------------------------
 // calculateTopicXp
@@ -187,7 +171,7 @@ describe('insertSessionXpEntry', () => {
         topicId: 'topic-001',
         subjectId: 'subject-001',
         amount: 120, // 100 * 0.80 * 1.5 (explain)
-        status: 'pending',
+        status: 'verified',
       }),
     );
   });
@@ -282,16 +266,8 @@ describe('insertSessionXpEntry', () => {
     );
   });
 
-  it('inserts XP as verified immediately in casual mode', async () => {
+  it('inserts XP as verified immediately (single-path post-sunset)', async () => {
     const { db, insertValues, queryAssessmentsFindFirst } = createMockXpDb();
-
-    // Override mock for casual mode
-    (getLearningMode as jest.Mock).mockResolvedValueOnce({ mode: 'casual' });
-    (getLearningModeRules as jest.Mock).mockReturnValueOnce({
-      masteryGates: false,
-      verifiedXpOnly: false,
-      mandatorySummaries: false,
-    });
 
     queryAssessmentsFindFirst.mockResolvedValue({
       id: 'assessment-003',
@@ -312,32 +288,7 @@ describe('insertSessionXpEntry', () => {
       expect.objectContaining({
         status: 'verified',
         amount: 80,
-      }),
-    );
-  });
-
-  it('inserts XP as pending in serious mode', async () => {
-    const { db, insertValues, queryAssessmentsFindFirst } = createMockXpDb();
-
-    queryAssessmentsFindFirst.mockResolvedValue({
-      id: 'assessment-004',
-      profileId: 'profile-001',
-      topicId: 'topic-001',
-      status: 'passed',
-      masteryScore: 0.8,
-      verificationDepth: 'recall',
-    });
-
-    (createScopedRepository as jest.Mock).mockReturnValue({
-      xpLedger: { findFirst: jest.fn().mockResolvedValue(null) },
-    });
-
-    await insertSessionXpEntry(db, 'profile-001', 'topic-001', 'subject-001');
-
-    expect(insertValues).toHaveBeenCalledWith(
-      expect.objectContaining({
-        status: 'pending',
-        amount: 80,
+        verifiedAt: expect.any(Date),
       }),
     );
   });

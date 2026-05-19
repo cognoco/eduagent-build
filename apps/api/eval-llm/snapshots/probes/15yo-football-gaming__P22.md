@@ -19,7 +19,6 @@
 | Target language | — |
 | Struggles | factoring polynomials (math); Reconstruction era (history) |
 | Strengths | mental arithmetic (math); Newton's laws (physics) |
-| Learning mode | casual |
 | Preferred explanations | examples, analogies |
 | Pace | quick |
 | Analogy domain | sports |
@@ -80,7 +79,6 @@
     "teachingPreference": "examples",
     "analogyDomain": "sports",
     "nativeLanguage": "en",
-    "learningMode": "casual",
     "exchangeCount": 8,
     "inputMode": "text",
     "llmTier": "standard",
@@ -291,7 +289,7 @@ I feel like I really know this well now — can we try something harder?
 - Probe: P22 [standard] — Strong retention — tutor should push to rung 3 challenge, not re-teach (all profiles)
 - Rung: 3, sessionType: learning, verification: standard
 - History turns: 8, exchangeCount: 8
-- inputMode: text, learningMode: casual
+- inputMode: text
 - topicTitle: algebra equations
 - sourceEvidence: learner_message:context, current_topic:reliable, conversation_history:context, prior_learning:context, mentor_memory:context, accommodation:context
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs

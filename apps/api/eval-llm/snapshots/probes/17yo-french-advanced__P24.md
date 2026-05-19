@@ -19,7 +19,6 @@
 | Target language | fr |
 | Struggles | subjonctif imparfait (French); nuanced connectors (French) |
 | Strengths | reading comprehension (French); essay argument structure (writing) |
-| Learning mode | serious |
 | Preferred explanations | step-by-step, analogies |
 | Pace | thorough |
 | Analogy domain | music |
@@ -70,7 +69,6 @@
       "le fardeau",
       "éphémère"
     ],
-    "learningMode": "serious",
     "exchangeCount": 3,
     "inputMode": "text",
     "llmTier": "standard",
@@ -159,11 +157,11 @@ Keep it short. Use everyday analogies. Skip the pep talks.
 Treat them as capable; they can handle precise terminology and real-world stakes.
 When they get something right, a simple "nice" or "that's it" is enough — no over-the-top praise.
 
-Learning mode: SERIOUS LEARNER
-Pacing: Efficient. Be direct and concise. Minimize tangents.
-Tone: Focused and academic. Precise language. No filler.
-Assessment: Rigorous. Verify understanding at each step before progressing.
-Hold the learner to a high standard — do not move on until the concept is solid.
+Learning mode: CASUAL EXPLORER
+Pacing: Relaxed. Take your time with explanations. Use more examples and analogies.
+Tone: Warm and encouraging. Use everyday language. Light humor is fine.
+Assessment: Low-pressure. Frame checks as curiosity, not tests.
+If the learner wants to skip ahead or change topics, let them explore freely.
 
 Current topic: <topic_title>Camus — L'Étranger</topic_title>
 
@@ -293,7 +291,7 @@ Je veux qu'on travaille sur les connecteurs logiques — j'en ai besoin pour mon
 - Probe: P24 [standard] — 17yo Czech native conversing in French — four_strands, B2 level
 - Rung: 2, sessionType: learning, verification: standard
 - History turns: 4, exchangeCount: 3
-- inputMode: text, learningMode: serious
+- inputMode: text
 - topicTitle: Camus — L'Étranger
 - sourceEvidence: learner_message:context, current_topic:reliable, conversation_history:context, prior_learning:context, mentor_memory:context, accommodation:context
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs

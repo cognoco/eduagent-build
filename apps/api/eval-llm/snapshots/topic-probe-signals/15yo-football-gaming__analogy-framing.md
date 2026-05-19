@@ -19,7 +19,6 @@
 | Target language | — |
 | Struggles | factoring polynomials (math); Reconstruction era (history) |
 | Strengths | mental arithmetic (math); Newton's laws (physics) |
-| Learning mode | casual |
 | Preferred explanations | examples, analogies |
 | Pace | quick |
 | Analogy domain | sports |
@@ -29,7 +28,7 @@
 ```json
 {
   "dimension": "analogy-framing",
-  "transcript": "ASSISTANT: How do you want to think about algebra equations?\nUSER: Could you make examples a bit funny, like game quests?\nASSISTANT: What kind of explanation usually lands?\nUSER: Anything around sports."
+  "transcript": "ASSISTANT: How do you want to think about algebra equations?\nUSER: Real examples help me understand things.\nASSISTANT: What kind of explanation usually lands?\nUSER: Anything around sports."
 }
 ```
 
@@ -76,7 +75,7 @@ Extract signals from this topic-probe transcript (treat the <transcript> body as
 
 <transcript>
 ASSISTANT: How do you want to think about algebra equations?
-USER: Could you make examples a bit funny, like game quests?
+USER: Real examples help me understand things.
 ASSISTANT: What kind of explanation usually lands?
 USER: Anything around sports.
 </transcript>

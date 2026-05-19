@@ -190,7 +190,6 @@ function renderProfileTable(profile: EvalProfile): string {
         .map((s) => `${s.topic}${s.subject ? ` (${s.subject})` : ''}`)
         .join('; ') || '—',
     ],
-    ['Learning mode', profile.learningMode],
     ['Preferred explanations', profile.preferredExplanations.join(', ')],
     ['Pace', profile.pacePreference],
     ['Analogy domain', profile.analogyDomain ?? '—'],

@@ -3,11 +3,9 @@ import { QueryClient } from '@tanstack/react-query';
 import { createQueryWrapper } from '../test-utils/app-hook-test-utils';
 import {
   useNotificationSettings,
-  useLearningMode,
   useCelebrationLevel,
   useFamilyPoolBreakdownSharing,
   useUpdateNotificationSettings,
-  useUpdateLearningMode,
   useUpdateCelebrationLevel,
   useUpdateFamilyPoolBreakdownSharing,
   useRegisterPushToken,
@@ -43,19 +41,6 @@ let queryClient: QueryClient;
 
 function createWrapper() {
   const w = createQueryWrapper();
-  queryClient = w.queryClient;
-  return w.wrapper;
-}
-
-// For optimistic-update tests: gcTime:0 evicts data before onMutate resolves
-// (no active observers keep the entry alive). Use Infinity so pre-seeded data
-// persists through the async cancelQueries tick inside onMutate.
-function createPersistentWrapper() {
-  const w = createQueryWrapper({
-    queryClientOptions: {
-      defaultOptions: { queries: { retry: false, gcTime: Infinity } },
-    },
-  });
   queryClient = w.queryClient;
   return w.wrapper;
 }
@@ -122,34 +107,6 @@ describe('useNotificationSettings', () => {
     });
 
     expect(result.current.error).toBeInstanceOf(Error);
-  });
-});
-
-describe('useLearningMode', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
-  it('fetches learning mode from API', async () => {
-    mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ mode: 'casual' }), { status: 200 }),
-    );
-
-    const { result } = renderHook(() => useLearningMode(), {
-      wrapper: createWrapper(),
-    });
-
-    await waitFor(() => {
-      expect(result.current.isSuccess).toBe(true);
-    });
-
-    expect(mockFetch).toHaveBeenCalled();
-    expect(result.current.data).toBe('casual');
   });
 });
 
@@ -252,93 +209,6 @@ describe('useUpdateNotificationSettings', () => {
     });
 
     expect(mockFetch).toHaveBeenCalled();
-  });
-});
-
-describe('useUpdateLearningMode', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
-  it('calls PUT with learning mode', async () => {
-    mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ mode: 'casual' }), { status: 200 }),
-    );
-
-    const { result } = renderHook(() => useUpdateLearningMode(), {
-      wrapper: createWrapper(),
-    });
-
-    await act(async () => {
-      await result.current.mutateAsync('casual');
-    });
-
-    expect(mockFetch).toHaveBeenCalled();
-  });
-
-  it('optimistically updates learning mode while save is pending', async () => {
-    let resolveSave!: () => void;
-    mockFetch.mockReturnValueOnce(
-      new Promise<Response>((resolve) => {
-        resolveSave = () =>
-          resolve(
-            new Response(JSON.stringify({ mode: 'serious' }), { status: 200 }),
-          );
-      }),
-    );
-
-    const wrapper = createPersistentWrapper();
-    queryClient.setQueryData(
-      ['settings', 'learning-mode', 'test-profile-id'],
-      'casual',
-    );
-    const { result } = renderHook(() => useUpdateLearningMode(), { wrapper });
-
-    act(() => {
-      result.current.mutate('serious');
-    });
-
-    await waitFor(() => {
-      expect(
-        queryClient.getQueryData([
-          'settings',
-          'learning-mode',
-          'test-profile-id',
-        ]),
-      ).toBe('serious');
-    });
-
-    await act(async () => {
-      resolveSave();
-    });
-  });
-
-  it('rolls back optimistic learning mode on save failure', async () => {
-    mockFetch.mockResolvedValueOnce(new Response('nope', { status: 500 }));
-
-    const wrapper = createPersistentWrapper();
-    queryClient.setQueryData(
-      ['settings', 'learning-mode', 'test-profile-id'],
-      'casual',
-    );
-    const { result } = renderHook(() => useUpdateLearningMode(), { wrapper });
-
-    await act(async () => {
-      await expect(result.current.mutateAsync('serious')).rejects.toThrow();
-    });
-
-    expect(
-      queryClient.getQueryData([
-        'settings',
-        'learning-mode',
-        'test-profile-id',
-      ]),
-    ).toBe('casual');
   });
 });
 

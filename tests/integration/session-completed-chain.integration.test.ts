@@ -112,7 +112,6 @@ async function executeChain(
 
 async function seedScenario(options?: {
   includeTopic?: boolean;
-  initialSummarySkips?: number;
 }): Promise<Scenario> {
   const db = createIntegrationDb();
   const includeTopic = options?.includeTopic ?? true;
@@ -249,15 +248,6 @@ async function seedScenario(options?: {
       status: 'passed',
       masteryScore: '0.80',
       qualityRating: 4,
-    });
-  }
-
-  if (options?.initialSummarySkips != null) {
-    await db.insert(learningModes).values({
-      profileId: profile!.id,
-      mode: 'serious',
-      consecutiveSummarySkips: options.initialSummarySkips,
-      celebrationLevel: 'all',
     });
   }
 
@@ -423,7 +413,6 @@ describe('Integration: Session-Completed Chain (P0-008)', () => {
     const learningMode = await loadLearningMode(scenario.profileId);
     expect(learningMode).not.toBeNull();
     expect(learningMode!.medianResponseSeconds).toBe(30);
-    expect(learningMode!.consecutiveSummarySkips).toBe(0);
 
     const coachingCache = await loadCoachingCache(scenario.profileId);
     expect(coachingCache).not.toBeNull();
@@ -437,7 +426,7 @@ describe('Integration: Session-Completed Chain (P0-008)', () => {
     const xpEntry = await loadXpEntry(scenario.profileId, scenario.topicId!);
     expect(xpEntry).not.toBeNull();
     expect(xpEntry!.subjectId).toBe(scenario.subjectId);
-    expect(xpEntry!.status).toBe('pending');
+    expect(xpEntry!.status).toBe('verified');
 
     // Verify the REAL embeddings service called Voyage AI via fetch
     const voyageCalls = getFetchCalls('voyageai');
@@ -489,54 +478,6 @@ describe('Integration: Session-Completed Chain (P0-008)', () => {
     // Verify Voyage AI was called even without a topic
     const voyageCalls = getFetchCalls('voyageai');
     expect(voyageCalls).toHaveLength(1);
-  });
-
-  it('tracks skipped and accepted summaries through the real learning_modes row', async () => {
-    const skippedScenario = await seedScenario();
-
-    await executeChain({
-      profileId: skippedScenario.profileId,
-      sessionId: skippedScenario.sessionId,
-      topicId: skippedScenario.topicId,
-      subjectId: skippedScenario.subjectId,
-      summaryStatus: 'skipped',
-      sessionType: 'learning',
-      qualityRating: 4,
-      timestamp: SESSION_TIMESTAMP,
-    });
-
-    const skippedMode = await loadLearningMode(skippedScenario.profileId);
-    expect(skippedMode).not.toBeNull();
-    expect(skippedMode!.consecutiveSummarySkips).toBe(1);
-
-    await cleanupAccounts({
-      emails: [skippedScenario.email],
-      clerkUserIds: [skippedScenario.clerkUserId],
-    });
-    const skippedIdentityIndex = createdScenarioIdentities.findIndex(
-      (identity) => identity.email === skippedScenario.email,
-    );
-    if (skippedIdentityIndex >= 0) {
-      createdScenarioIdentities.splice(skippedIdentityIndex, 1);
-    }
-    clearFetchCalls();
-
-    const acceptedScenario = await seedScenario({ initialSummarySkips: 3 });
-
-    await executeChain({
-      profileId: acceptedScenario.profileId,
-      sessionId: acceptedScenario.sessionId,
-      topicId: acceptedScenario.topicId,
-      subjectId: acceptedScenario.subjectId,
-      summaryStatus: 'accepted',
-      sessionType: 'learning',
-      qualityRating: 4,
-      timestamp: SESSION_TIMESTAMP,
-    });
-
-    const acceptedMode = await loadLearningMode(acceptedScenario.profileId);
-    expect(acceptedMode).not.toBeNull();
-    expect(acceptedMode!.consecutiveSummarySkips).toBe(0);
   });
 
   it('isolates embedding failures without blocking the rest of the chain', async () => {

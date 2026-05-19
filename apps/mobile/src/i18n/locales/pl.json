@@ -303,24 +303,6 @@
   "more": {
     "screenTitle": "Więcej",
     "active": "Aktywny",
-    "learningMode": {
-      "sectionHeader": "Tryb nauki {{name}}",
-      "subtitle": "Dotyczy Twoich własnych sesji nauki.",
-      "subtitleWithChildren": "Dotyczy Twoich własnych sesji. Aby zmienić ustawienia dziecka, otwórz jego profil z pulpitu.",
-      "childPreferencesAccessLabel": "Otwórz preferencje profilu {{name}}",
-      "childPreferencesLink": "Aby zmienić ustawienia {{name}}, dotknij profilu na ekranie głównym →",
-      "familyPreferencesLink": "Aby zmienić ustawienia dziecka, dotknij profilu na ekranie głównym →",
-      "sheetTitle": "Tryb nauki",
-      "sheetEffectMessage": "Zadziała od Twojej następnej wiadomości.",
-      "casual": {
-        "title": "Odkrywca",
-        "description": "Ucz się we własnym tempie. Twój mentor jest zrelaksowany i zachęcający. Od razu zdobywasz punkty i możesz pomijać powtórki."
-      },
-      "serious": {
-        "title": "Tryb wyzwania",
-        "description": "Wymagaj od siebie więcej. Twój mentor pilnuje, byś nie zbaczał(a) z kursu. Zdobywasz punkty po udowodnieniu, że pamiętasz, a powtórki pomagają utrwalić wiedzę."
-      }
-    },
     "accommodation": {
       "sectionHeader": "Twoje dostosowanie nauki",
       "viewAndManage": "Wyświetl i zarządzaj",

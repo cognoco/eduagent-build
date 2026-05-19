@@ -19,7 +19,6 @@
 | Target language | es |
 | Struggles | ser vs estar (Spanish); irregular verbs (Spanish) |
 | Strengths | Spanish pronunciation (Spanish) |
-| Learning mode | serious |
 | Preferred explanations | step-by-step, examples |
 | Pace | thorough |
 | Analogy domain | nature |
@@ -71,7 +70,6 @@
       "la escuela",
       "el perro"
     ],
-    "learningMode": "casual",
     "exchangeCount": 3,
     "inputMode": "voice",
     "llmTier": "standard",
@@ -293,7 +291,7 @@ Let me practice saying three quick Spanish sentences.
 - Probe: PM05 [standard] — Personalization matrix: age 13, ADHD-style support, casual four-strands language practice
 - Rung: 2, sessionType: learning, verification: standard
 - History turns: 4, exchangeCount: 3
-- inputMode: voice, learningMode: casual
+- inputMode: voice
 - topicTitle: Spanish present tense speaking practice
 - sourceEvidence: learner_message:context, current_topic:reliable, conversation_history:context, prior_learning:context, mentor_memory:context, accommodation:context
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs

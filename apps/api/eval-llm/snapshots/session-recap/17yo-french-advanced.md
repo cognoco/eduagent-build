@@ -18,7 +18,6 @@
 | Target language | fr |
 | Struggles | subjonctif imparfait (French); nuanced connectors (French) |
 | Strengths | reading comprehension (French); essay argument structure (writing) |
-| Learning mode | serious |
 | Preferred explanations | step-by-step, analogies |
 | Pace | thorough |
 | Analogy domain | music |

@@ -12,7 +12,7 @@ interface TopicProbeSignalsInput {
 
 function buildTranscript(
   profile: EvalProfile,
-  dimension: TopicProbeSignalsInput['dimension']
+  dimension: TopicProbeSignalsInput['dimension'],
 ): string {
   const topic = profile.libraryTopics[0] ?? 'math';
   const interest = profile.interests[0] ?? {
@@ -23,13 +23,11 @@ function buildTranscript(
     interest.context === 'school'
       ? `from school, especially ${interest.label}`
       : interest.context === 'both'
-      ? `both at school and at home, especially ${interest.label}`
-      : `after school, especially ${interest.label}`;
-  const style =
-    profile.preferredExplanations.includes('humor') ||
-    profile.learningMode === 'casual'
-      ? 'Could you make examples a bit funny, like game quests?'
-      : profile.preferredExplanations.includes('step-by-step')
+        ? `both at school and at home, especially ${interest.label}`
+        : `after school, especially ${interest.label}`;
+  const style = profile.preferredExplanations.includes('humor')
+    ? 'Could you make examples a bit funny, like game quests?'
+    : profile.preferredExplanations.includes('step-by-step')
       ? 'I like patterns and exact steps more than stories.'
       : 'Real examples help me understand things.';
   const pace =
@@ -110,14 +108,14 @@ export const topicProbeSignalsFlow: FlowDefinition<TopicProbeSignalsInput> = {
 
   async runLive(
     _input: TopicProbeSignalsInput,
-    messages: PromptMessages
+    messages: PromptMessages,
   ): Promise<string> {
     return callLlm(
       [
         { role: 'system', content: messages.system },
         { role: 'user', content: messages.user ?? '' },
       ],
-      { flow: 'topic-probe-signals', rung: 2 }
+      { flow: 'topic-probe-signals', rung: 2 },
     );
   },
 };

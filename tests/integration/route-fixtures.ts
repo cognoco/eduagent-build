@@ -32,7 +32,7 @@ type AppLike = {
   request: (
     input: string,
     init?: RequestInit,
-    env?: Record<string, string>
+    env?: Record<string, string>,
   ) => Promise<Response>;
 };
 
@@ -66,7 +66,7 @@ export interface TopicSeedInput {
  */
 export function buildAuthHeaders(
   claimsOrProfileId?: TestJWTClaims | string,
-  profileId?: string
+  profileId?: string,
 ): HeadersInit {
   if (typeof claimsOrProfileId === 'string') {
     return buildSignedAuthHeaders(undefined, claimsOrProfileId);
@@ -104,7 +104,7 @@ export async function createProfileViaRoute(input: {
         birthYear: input.birthYear,
       }),
     },
-    input.env
+    input.env,
   );
 
   expect(res.status).toBe(201);
@@ -122,7 +122,7 @@ export async function createProfileViaRoute(input: {
 export async function setSubscriptionTierForProfile(
   profileId: string,
   tier: 'free' | 'plus' | 'family' | 'pro',
-  status: 'trial' | 'active' | 'past_due' | 'cancelled' | 'expired' = 'active'
+  status: 'trial' | 'active' | 'past_due' | 'cancelled' | 'expired' = 'active',
 ): Promise<void> {
   const db = createIntegrationDb();
   const profile = await db.query.profiles.findFirst({
@@ -147,7 +147,7 @@ export async function setSubscriptionTierForProfile(
 export async function seedSubject(
   profileId: string,
   name: string,
-  overrides: Partial<typeof subjects.$inferInsert> = {}
+  overrides: Partial<typeof subjects.$inferInsert> = {},
 ): Promise<{
   id: string;
   profileId: string;
@@ -232,7 +232,7 @@ export async function seedCurriculum(input: {
         targetWordCount: topic.targetWordCount ?? null,
         targetChunkCount: topic.targetChunkCount ?? null,
         filedFrom: topic.filedFrom ?? 'pre_generated',
-      }))
+      })),
     )
     .returning({ id: curriculumTopics.id });
 
@@ -355,17 +355,13 @@ export async function seedNotificationPreferences(input: {
 
 export async function seedLearningModeRecord(input: {
   profileId: string;
-  mode?: 'serious' | 'casual';
   celebrationLevel?: 'all' | 'big_only' | 'off';
-  consecutiveSummarySkips?: number;
   medianResponseSeconds?: number | null;
 }): Promise<void> {
   const db = createIntegrationDb();
   await db.insert(learningModes).values({
     profileId: input.profileId,
-    mode: input.mode ?? 'serious',
     celebrationLevel: input.celebrationLevel ?? 'all',
-    consecutiveSummarySkips: input.consecutiveSummarySkips ?? 0,
     medianResponseSeconds: input.medianResponseSeconds ?? null,
   });
 }

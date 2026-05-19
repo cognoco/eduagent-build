@@ -19,7 +19,6 @@
 | Target language | — |
 | Struggles | factoring polynomials (math); Reconstruction era (history) |
 | Strengths | mental arithmetic (math); Newton's laws (physics) |
-| Learning mode | casual |
 | Preferred explanations | examples, analogies |
 | Pace | quick |
 | Analogy domain | sports |
@@ -35,6 +34,7 @@
     "sessionId": "eval-probe-15yo-football-gaming",
     "profileId": "eval-profile-15yo-football-gaming",
     "subjectName": "Mathematics",
+    "topicTitle": "algebra equations",
     "sessionType": "learning",
     "escalationRung": 1,
     "exchangeHistory": [
@@ -63,7 +63,6 @@
     "teachingPreference": "examples",
     "analogyDomain": "sports",
     "nativeLanguage": "en",
-    "learningMode": "casual",
     "exchangeCount": 3,
     "inputMode": "text",
     "llmTier": "standard",
@@ -113,6 +112,7 @@ PRIVATE SOURCE CONTRACT — NON-NEGOTIABLE:
 - Always fill private_sources.relied_on with the exact source IDs you used. Set private_sources.insufficient=true when reliable support is missing or too thin. This is private audit data; never show it, source IDs, or private audit details to the learner.
 <source_pack>
 <source id="learner_message" kind="learner_message" reliability="learner_provided" reliable_for_facts="false" label="Current learner message" excerpt="Whatever."/>
+<source id="current_topic" kind="current_topic" reliability="trusted_app_content" reliable_for_facts="true" label="Loaded curriculum topic" excerpt="algebra equations"/>
 <source id="conversation_history" kind="conversation_history" reliability="conversation_only" reliable_for_facts="false" label="Recent conversation history" excerpt="assistant: Let&apos;s look at algebra equations today. What&apos;s the most interesting thing you remember about it? user: Nothing. assistant: Fair enough. How about we try something hands-on instead — a quick challenge rather than theory? user: Sure."/>
 <source id="prior_learning" kind="prior_learning" reliability="memory_only" reliable_for_facts="false" label="Prior learning summary" excerpt="Recently completed topics: US history: Civil War, physics: forces and motion. Demonstrated strength in: mental arithmetic, Newton&apos;s laws."/>
 <source id="mentor_memory" kind="mentor_memory" reliability="memory_only" reliable_for_facts="false" label="Mentor memory and summaries" excerpt="Recent semantically-similar session: learner was working on algebra equations and had trouble with factoring polynomials. They responded well to examples-based explanations. About this learner: - Confident with: mental arithmetic (math); Newton&apos;s laws (physics). - They learn best with examples and analogies-based explanations, a quicker pace. - School inter..."/>
@@ -152,6 +152,8 @@ Pacing: Relaxed. Take your time with explanations. Use more examples and analogi
 Tone: Warm and encouraging. Use everyday language. Light humor is fine.
 Assessment: Low-pressure. Frame checks as curiosity, not tests.
 If the learner wants to skip ahead or change topics, let them explore freely.
+
+Current topic: <topic_title>algebra equations</topic_title>
 
 Subject: <subject_name>Mathematics</subject_name>
 
@@ -269,7 +271,7 @@ Whatever.
 - Probe: A04 [adversarial] — 15yo bored with single-word replies — tutor must adapt energy (casual mode)
 - Rung: 1, sessionType: learning, verification: standard
 - History turns: 4, exchangeCount: 3
-- inputMode: text, learningMode: casual
-- topicTitle: (none — casual mode)
-- sourceEvidence: learner_message:context, conversation_history:context, prior_learning:context, mentor_memory:context, accommodation:context
+- inputMode: text
+- topicTitle: algebra equations
+- sourceEvidence: learner_message:context, current_topic:reliable, conversation_history:context, prior_learning:context, mentor_memory:context, accommodation:context
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs

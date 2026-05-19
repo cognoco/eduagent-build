@@ -19,7 +19,6 @@
 | Target language | — |
 | Struggles | long division (math); Austria vs Australia (geography) |
 | Strengths | dinosaur classification (science); reading comprehension (reading) |
-| Learning mode | casual |
 | Preferred explanations | humor, examples, stories |
 | Pace | quick |
 | Analogy domain | nature |
@@ -46,7 +45,6 @@
     "teachingPreference": "humor",
     "analogyDomain": "nature",
     "nativeLanguage": "en",
-    "learningMode": "casual",
     "exchangeCount": 0,
     "inputMode": "text",
     "llmTier": "standard",
@@ -259,7 +257,7 @@ Can you just answer question 4?
 - Probe: HW02 [adversarial] — Homework with too little problem text: should ask for the missing worksheet/photo instead of solving from memory
 - Rung: 2, sessionType: homework, verification: standard
 - History turns: 0, exchangeCount: 0
-- inputMode: text, learningMode: casual
-- topicTitle: (none — casual mode)
+- inputMode: text
+- topicTitle: (none — freeform)
 - sourceEvidence: learner_message:context, learner_intent:context, homework_problem:reliable, deterministic_reasoning:reliable, prior_learning:context, mentor_memory:context, accommodation:context
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs

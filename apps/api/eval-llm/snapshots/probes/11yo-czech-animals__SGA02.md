@@ -19,7 +19,6 @@
 | Target language | — |
 | Struggles | fraction addition (math); long multi-clause sentences (reading) |
 | Strengths | vocabulary retention (Czech) |
-| Learning mode | casual |
 | Preferred explanations | stories, examples |
 | Pace | thorough |
 | Analogy domain | nature |
@@ -48,7 +47,6 @@
     "teachingPreference": "stories",
     "analogyDomain": "nature",
     "nativeLanguage": "cs",
-    "learningMode": "casual",
     "exchangeCount": 0,
     "inputMode": "text",
     "llmTier": "standard",
@@ -258,7 +256,7 @@ So did they mostly trade salt, spices, silk, and metal tools? Which one was most
 - Probe: SGA02 [adversarial] — Thin source: loaded topic only says trade mattered; learner asks for precise unsupported goods
 - Rung: 2, sessionType: learning, verification: standard
 - History turns: 0, exchangeCount: 0
-- inputMode: text, learningMode: casual
+- inputMode: text
 - topicTitle: Ancient trade
 - sourceEvidence: learner_message:context, current_topic:reliable, prior_learning:context, mentor_memory:context, accommodation:context
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs

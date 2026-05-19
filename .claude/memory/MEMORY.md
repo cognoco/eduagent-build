@@ -88,6 +88,7 @@ Two production dead-code branches removed 2026-04-19 in commit `970a82a5`: `AgeB
 ## Brand & UX Decisions
 
 - [project_brand_dark_first.md](project_brand_dark_first.md) — Teal primary + lavender secondary. No accent picker. Dark default.
+- [project_product_roles_students_any_age.md](project_product_roles_students_any_age.md) — MentoMate is for students of any age; parent/family mode is layered on top, and parents can also study for themselves.
 - Coaching cards REMOVED, intent cards in place (archived from memory 2026-05-04).
 
 ## Persona Architecture (Epic 12 — COMPLETE, ThemeContext cleaned 2026-04-15)

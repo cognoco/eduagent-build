@@ -592,7 +592,6 @@ describe('Integration: Learning Session Lifecycle', () => {
             subjectId: subject.id,
             summaryStatus: 'accepted',
             qualityRating: 4,
-            summaryTrackingHandled: true,
           }),
         }),
       ]);
