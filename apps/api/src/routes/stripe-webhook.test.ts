@@ -1085,6 +1085,74 @@ describe('checkout.session.completed', () => {
     );
     expect(captureException).not.toHaveBeenCalled();
   });
+
+  // [BUG-119 + BUG-111] Divergent checkout.session.completed: two events with
+  // DIFFERENT stripeSubscriptionId for the same accountId. Couples with the
+  // BUG-111 timestamp-based resolution in activateSubscriptionFromCheckout
+  // (newer eventTimestamp wins, older becomes stale replay). Before BUG-111
+  // the older sub silently kept the row and the new sub was dropped — now
+  // both calls flow through the activator and the activator's internal
+  // timestamp resolution decides which wins. This route-level test pins
+  // both events make it to the activator with their distinct sub IDs.
+  it('routes divergent checkout.session.completed events to activator with distinct sub IDs [BUG-119]', async () => {
+    const firstSession = makeCheckoutSession({
+      subscription: 'sub_stripe_OLD',
+      metadata: { accountId: 'acc-1', tier: 'plus' },
+    });
+    const secondSession = makeCheckoutSession({
+      subscription: 'sub_stripe_NEW',
+      metadata: { accountId: 'acc-1', tier: 'family' },
+    });
+    (activateSubscriptionFromCheckout as jest.Mock).mockResolvedValue(
+      mockUpdatedSubscription(),
+    );
+
+    (verifyWebhookSignature as jest.Mock).mockResolvedValueOnce(
+      makeStripeEvent('checkout.session.completed', firstSession),
+    );
+    const res1 = await app.request(
+      '/stripe/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'valid_sig' },
+        body: '{}',
+      },
+      TEST_ENV,
+    );
+    expect(res1.status).toBe(200);
+
+    (verifyWebhookSignature as jest.Mock).mockResolvedValueOnce(
+      makeStripeEvent('checkout.session.completed', secondSession),
+    );
+    const res2 = await app.request(
+      '/stripe/webhook',
+      {
+        method: 'POST',
+        headers: { 'stripe-signature': 'valid_sig' },
+        body: '{}',
+      },
+      TEST_ENV,
+    );
+    expect(res2.status).toBe(200);
+
+    expect(activateSubscriptionFromCheckout).toHaveBeenCalledTimes(2);
+    expect(activateSubscriptionFromCheckout).toHaveBeenNthCalledWith(
+      1,
+      mockDb,
+      'acc-1',
+      'sub_stripe_OLD',
+      'plus',
+      expect.any(String),
+    );
+    expect(activateSubscriptionFromCheckout).toHaveBeenNthCalledWith(
+      2,
+      mockDb,
+      'acc-1',
+      'sub_stripe_NEW',
+      'family',
+      expect.any(String),
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------

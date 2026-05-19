@@ -145,6 +145,23 @@ jest.mock('../services/subject' /* gc1-allow: pattern-a conversion */, () => {
   };
 });
 
+// [BUG-93] Mock subject-resolve so the LLM-backed handler can return a
+// deterministic result without hitting routeAndCall. The metering
+// middleware must still fire BEFORE this mock — that's the assertion.
+jest.mock(
+  '../services/subject-resolve' /* gc1-allow: external LLM boundary (routeAndCall) */,
+  () => ({
+    resolveSubjectName: jest.fn().mockResolvedValue({
+      status: 'direct_match',
+      resolvedName: 'Mathematics',
+      suggestions: [],
+      focus: null,
+      focusDescription: null,
+      displayMessage: 'Mathematics',
+    }),
+  }),
+);
+
 // ---------------------------------------------------------------------------
 // Mock billing service
 // ---------------------------------------------------------------------------
@@ -692,6 +709,70 @@ describe('metering middleware', () => {
       expect(res.status).toBe(402);
       // The recall-bridge handler must NOT have been called — quota gate stopped it.
       // (route-side handler is mocked; the 402 implies middleware short-circuited.)
+    });
+
+    it('[BUG-93 / A1-CRIT] decrements quota for POST /subjects/resolve', async () => {
+      // Break test: BEFORE the fix, /subjects/resolve was missing from
+      // LLM_ROUTE_PATTERNS_POST_ONLY so decrementQuota was NEVER called for
+      // this LLM-backed endpoint. Any authenticated user could spam the
+      // resolver in a tight loop and burn unlimited LLM capacity at zero
+      // cost. Same class as BUG-623 (recall-bridge) and BUG-653
+      // (evaluate-depth). This test fails if the pattern is removed.
+      mockEnsureFreeSubscription.mockResolvedValue(mockSubscription());
+      mockGetQuotaPool.mockResolvedValue(mockQuota({ usedThisMonth: 100 }));
+      mockDecrementQuota.mockResolvedValue({
+        success: true,
+        source: 'monthly',
+        remainingMonthly: 399,
+        remainingTopUp: 0,
+        remainingDaily: null,
+      });
+
+      const res = await app.request(
+        '/v1/subjects/resolve',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ rawInput: 'maths' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(mockDecrementQuota).toHaveBeenCalledWith(
+        expect.anything(),
+        'sub-1',
+        'test-profile-id',
+      );
+      expect(res.status).toBe(200);
+    });
+
+    it('[BUG-93 / A1-CRIT] returns 402 when quota exhausted on POST /subjects/resolve', async () => {
+      // Companion break test: when quota is exhausted, the metering
+      // middleware MUST short-circuit BEFORE resolveSubjectName fires its
+      // LLM call. Otherwise the quota is meaningless on this route.
+      mockEnsureFreeSubscription.mockResolvedValue(mockSubscription());
+      mockGetQuotaPool.mockResolvedValue(
+        mockQuota({ usedThisMonth: 500, monthlyLimit: 500 }),
+      );
+      mockDecrementQuota.mockResolvedValue({
+        success: false,
+        reason: 'monthly_exhausted',
+        remainingMonthly: 0,
+        remainingTopUp: 0,
+        remainingDaily: null,
+      });
+
+      const res = await app.request(
+        '/v1/subjects/resolve',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ rawInput: 'maths' }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(402);
     });
 
     it('allows session messages when quota is under limit (DB path)', async () => {
