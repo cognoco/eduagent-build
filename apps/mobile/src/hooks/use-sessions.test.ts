@@ -1,6 +1,10 @@
 import { renderHook, waitFor, act } from '@testing-library/react-native';
 import { QueryClient } from '@tanstack/react-query';
-import { createQueryWrapper } from '../test-utils/app-hook-test-utils';
+import {
+  createHookWrapper,
+  createTestProfile,
+} from '../test-utils/app-hook-test-utils';
+import { setActiveProfileId, setProxyMode } from '../lib/api-client';
 import {
   useStartSession,
   useStartFirstCurriculumSession,
@@ -19,73 +23,43 @@ import {
 import { queryKeys } from '../lib/query-keys';
 
 const mockFetch = jest.fn();
-
-jest.mock('@clerk/clerk-expo', () => ({
-  useAuth: () => ({ getToken: jest.fn().mockResolvedValue('test-token') }),
-}));
+const originalFetch = globalThis.fetch;
 
 // prettier-ignore
-jest.mock('../lib/api-client', () => ({ // gc1-allow: hook tests need a Hono client wired to controllable fetch
-  useApiClient: () => {
-    const { hc } = require('hono/client');
-    return hc('http://localhost', {
-      fetch: async (...args: unknown[]) => {
-        const res = await mockFetch(...(args as Parameters<typeof fetch>));
-        if (!res.ok) {
-          const text = await res
-            .clone()
-            .text()
-            .catch(() => res.statusText);
-          throw new Error(`API error ${res.status}: ${text}`);
-        }
-        return res;
-      },
-    });
-  },
-  // [I-1] getProxyMode is called by useStreamMessage to inject X-Proxy-Mode.
-  getProxyMode: jest.fn().mockReturnValue(false),
-  withIdempotencyKey: (
-    headers: Record<string, string>,
-    key: string | undefined,
-  ) => (key ? { ...headers, 'X-Idempotency-Key': key } : headers),
-}));
-
-// prettier-ignore
-jest.mock('../lib/api', () => ({ // gc1-allow: stream tests need a stable local API origin
-  getApiUrl: () => 'http://localhost:8787',
-}));
-
-// prettier-ignore
-jest.mock('../lib/sse', () => ({ // gc1-allow: stream tests drive the external SSE boundary with deterministic events
+jest.mock('../lib/sse', () => ({ // gc1-allow: transport-boundary — XHR-based SSE cannot run in jest; streamSSEViaXHR and parseSSEStream are the real network boundary
   parseSSEStream: jest.fn(),
   streamSSEViaXHR: jest.fn(),
-}));
-
-// prettier-ignore
-jest.mock('../lib/profile', () => ({ // gc1-allow: session hook tests need a fixed active profile without provider setup
-  useProfile: () => ({
-    activeProfile: { id: 'test-profile-id' },
-  }),
 }));
 
 let queryClient: QueryClient;
 
 function createWrapper() {
-  const w = createQueryWrapper();
+  const w = createHookWrapper({
+    activeProfile: createTestProfile({ id: 'test-profile-id' }),
+  });
   queryClient = w.queryClient;
   return w.wrapper;
 }
 
+beforeEach(() => {
+  mockFetch.mockReset();
+  jest.clearAllMocks();
+  globalThis.fetch = mockFetch as typeof fetch;
+  setActiveProfileId('test-profile-id');
+  setProxyMode(false);
+});
+
+afterEach(() => {
+  queryClient?.clear();
+  setActiveProfileId(undefined);
+  setProxyMode(false);
+});
+
+afterAll(() => {
+  globalThis.fetch = originalFetch;
+});
+
 describe('useStartSession', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   it('passes topicId, sessionType, and inputMode to the API', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
@@ -104,7 +78,7 @@ describe('useStartSession', () => {
             durationSeconds: null,
           },
         }),
-        { status: 200 },
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
       ),
     );
 
@@ -151,7 +125,7 @@ describe('useStartSession', () => {
             durationSeconds: null,
           },
         }),
-        { status: 201 },
+        { status: 201, headers: { 'Content-Type': 'application/json' } },
       ),
     );
 
@@ -200,7 +174,7 @@ describe('useStartSession', () => {
             durationSeconds: null,
           },
         }),
-        { status: 200 },
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
       ),
     );
 
@@ -254,7 +228,7 @@ describe('useStartSession', () => {
             durationSeconds: null,
           },
         }),
-        { status: 200 },
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
       ),
     );
 
@@ -275,15 +249,6 @@ describe('useStartSession', () => {
 });
 
 describe('useSendMessage', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   it('calls POST /sessions/:sessionId/messages', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
@@ -293,7 +258,7 @@ describe('useSendMessage', () => {
           isUnderstandingCheck: false,
           exchangeCount: 1,
         }),
-        { status: 200 },
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
       ),
     );
 
@@ -315,15 +280,6 @@ describe('useSendMessage', () => {
 });
 
 describe('useCloseSession', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   it('calls POST /sessions/:sessionId/close', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
@@ -331,7 +287,7 @@ describe('useCloseSession', () => {
           message: 'Session closed',
           sessionId: 'session-1',
         }),
-        { status: 200 },
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
       ),
     );
 
@@ -358,7 +314,7 @@ describe('useCloseSession', () => {
           sessionId: 'session-1',
           wallClockSeconds: 600,
         }),
-        { status: 200 },
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
       ),
     );
 
@@ -386,7 +342,7 @@ describe('useCloseSession', () => {
           sessionId: 'session-1',
           wallClockSeconds: 600,
         }),
-        { status: 200 },
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
       ),
     );
 
@@ -416,15 +372,6 @@ describe('useCloseSession', () => {
 });
 
 describe('useSyncHomeworkState', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   it('calls POST /sessions/:sessionId/homework-state', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
@@ -435,7 +382,7 @@ describe('useSyncHomeworkState', () => {
             problems: [],
           },
         }),
-        { status: 200 },
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
       ),
     );
 
@@ -462,15 +409,6 @@ describe('useSyncHomeworkState', () => {
 });
 
 describe('useSetSessionInputMode', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   it('calls POST /sessions/:sessionId/input-mode with the requested mode', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
@@ -489,7 +427,7 @@ describe('useSetSessionInputMode', () => {
             inputMode: 'voice',
           },
         }),
-        { status: 200 },
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
       ),
     );
 
@@ -527,7 +465,7 @@ describe('useSetSessionInputMode', () => {
             inputMode: 'text',
           },
         }),
-        { status: 200 },
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
       ),
     );
 
@@ -548,15 +486,6 @@ describe('useSetSessionInputMode', () => {
 });
 
 describe('useSessionSummary', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   it('calls GET /sessions/:sessionId/summary', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
@@ -569,7 +498,7 @@ describe('useSessionSummary', () => {
             status: 'accepted',
           },
         }),
-        { status: 200 },
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
       ),
     );
 
@@ -588,7 +517,10 @@ describe('useSessionSummary', () => {
 
   it('returns null when no summary exists', async () => {
     mockFetch.mockResolvedValueOnce(
-      new Response(JSON.stringify({ summary: null }), { status: 200 }),
+      new Response(JSON.stringify({ summary: null }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
     );
 
     const { result } = renderHook(() => useSessionSummary('session-1'), {
@@ -604,15 +536,6 @@ describe('useSessionSummary', () => {
 });
 
 describe('useSubmitSummary', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   it('calls POST /sessions/:sessionId/summary with content', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
@@ -625,7 +548,7 @@ describe('useSubmitSummary', () => {
             status: 'accepted',
           },
         }),
-        { status: 200 },
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
       ),
     );
 
@@ -660,7 +583,7 @@ describe('useSubmitSummary', () => {
             status: 'accepted',
           },
         }),
-        { status: 200 },
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
       ),
     );
 
@@ -706,15 +629,6 @@ describe('useSubmitSummary', () => {
 });
 
 describe('useSkipSummary', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   it('calls POST /sessions/:sessionId/summary/skip', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
@@ -728,7 +642,7 @@ describe('useSkipSummary', () => {
           },
           consecutiveSummarySkips: 1,
         }),
-        { status: 200 },
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
       ),
     );
 
@@ -759,7 +673,7 @@ describe('useSkipSummary', () => {
           },
           consecutiveSummarySkips: 1,
         }),
-        { status: 200 },
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
       ),
     );
 
@@ -780,15 +694,6 @@ describe('useSkipSummary', () => {
 });
 
 describe('useStreamMessage', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   it('uses overrideSessionId when provided, ignoring hook sessionId', async () => {
     const { streamSSEViaXHR } = require('../lib/sse') as {
       streamSSEViaXHR: jest.Mock;
@@ -948,10 +853,7 @@ describe('useStreamMessage', () => {
   // on the SSE call, parent-proxy sessions silently bypass server proxy
   // enforcement. Asserts the header is present when getProxyMode returns true.
   it('[BREAK] injects X-Proxy-Mode:true header when proxy mode is on', async () => {
-    const apiClient = require('../lib/api-client') as {
-      getProxyMode: jest.Mock;
-    };
-    apiClient.getProxyMode.mockReturnValueOnce(true);
+    setProxyMode(true);
 
     const { streamSSEViaXHR } = require('../lib/sse') as {
       streamSSEViaXHR: jest.Mock;
@@ -981,15 +883,12 @@ describe('useStreamMessage', () => {
   // [BREAK / BUG-631 / I-3] Snapshot semantics: proxyMode must be read BEFORE
   // the async getToken() call so a profile-switch race during the await cannot
   // produce a mismatched header pair. We simulate the race by flipping
-  // getProxyMode's return value while getToken is pending.
+  // setProxyMode's value while getToken is pending.
   it('[BREAK] snapshots proxy mode before async getToken resolves', async () => {
-    const apiClient = require('../lib/api-client') as {
-      getProxyMode: jest.Mock;
-    };
     // Initial read returns true; any read AFTER snapshot would get false.
-    apiClient.getProxyMode.mockReturnValue(true);
+    setProxyMode(true);
 
-    // Make getToken a controllable deferred so we can flip getProxyMode mid-await.
+    // Make getToken a controllable deferred so we can flip proxyMode mid-await.
     let resolveToken!: (value: string) => void;
     const tokenPromise = new Promise<string>((r) => {
       resolveToken = r;
@@ -1033,7 +932,7 @@ describe('useStreamMessage', () => {
 
       // Now flip the underlying value — if the implementation reads AFTER
       // await, this regresses the header.
-      apiClient.getProxyMode.mockReturnValue(false);
+      setProxyMode(false);
 
       await act(async () => {
         resolveToken('test-token');
@@ -1047,6 +946,7 @@ describe('useStreamMessage', () => {
       expect(init.headers['X-Proxy-Mode']).toBe('true');
     } finally {
       clerk.useAuth = useAuthBefore;
+      setProxyMode(false);
     }
   });
 
@@ -1212,15 +1112,6 @@ describe('useStreamMessage', () => {
 });
 
 describe('useTopicParkingLot', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   it('calls GET /subjects/:subjectId/topics/:topicId/parking-lot', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
@@ -1235,7 +1126,7 @@ describe('useTopicParkingLot', () => {
           ],
           count: 1,
         }),
-        { status: 200 },
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
       ),
     );
 
@@ -1263,15 +1154,6 @@ describe('useTopicParkingLot', () => {
 // was ['parking-lot', sessionId] — prefix-matched both profiles via TanStack
 // prefix matching.
 describe('useAddParkingLotItem (profile-scoped invalidation)', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   it('[BREAK] invalidates parking-lot only for the active profile id', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
@@ -1283,7 +1165,7 @@ describe('useAddParkingLotItem (profile-scoped invalidation)', () => {
             createdAt: '2026-02-15T10:00:00.000Z',
           },
         }),
-        { status: 200 },
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
       ),
     );
 

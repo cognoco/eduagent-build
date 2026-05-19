@@ -15,34 +15,49 @@ import { signOutWithCleanup } from './sign-out';
 import { clearProfileSecureStorageOnSignOut } from './sign-out-cleanup';
 import { setActiveProfileId } from './api-client';
 
-// Mock all dependencies that signOutWithCleanup touches so the test is
+// Mock dependencies that signOutWithCleanup touches so the test is
 // self-contained and order-of-calls is verifiable via invocationCallOrder.
-jest.mock('@sentry/react-native', () => ({
-  // gc1-allow: external boundary — Sentry SDK
-  getCurrentScope: jest.fn(),
-  setUser: jest.fn(),
-}));
+//
+// Kept as mocks (with gc1-allow):
+//   - @sentry/react-native: external SDK (also globally stubbed in test-setup.ts;
+//     the per-file override installs controllable getCurrentScope/setUser fns).
+//   - ./sign-out-cleanup: clearProfileSecureStorageOnSignOut calls SecureStore +
+//     AsyncStorage (native boundaries globally mocked in test-setup.ts). A jest.fn()
+//     wrapper is required so invocationCallOrder is tracked for ordering assertions.
+//   - ./api-client: setActiveProfileId / setProxyMode are asserted via
+//     invocationCallOrder; jest.requireActual + targeted fn wrappers retain real
+//     exports while giving the spies needed for ordering checks.
+//
+// Removed mocks (real modules used instead):
+//   - ./auth-transition: clearTransitionState() is pure JS (no native deps,
+//     no assertion on it). Real implementation runs safely.
+//   - ./pending-auth-redirect: clearPendingAuthRedirect() is pure JS; sessionStorage
+//     is absent in Jest so writeSessionRecord() is a no-op. No assertion on it.
 
-// prettier-ignore
-jest.mock('./sign-out-cleanup', () => ({ // gc1-allow: SecureStore I/O boundary
-  clearProfileSecureStorageOnSignOut: jest.fn().mockResolvedValue(undefined),
-}));
+jest.mock(
+  '@sentry/react-native',
+  /* gc1-allow: external-boundary — Sentry SDK (also globally stubbed in test-setup.ts; per-file override installs controllable getCurrentScope/setUser) */ () => ({
+    getCurrentScope: jest.fn(),
+    setUser: jest.fn(),
+  }),
+);
 
-// prettier-ignore
-jest.mock('./auth-transition', () => ({ // gc1-allow: nav-state helper
-  clearTransitionState: jest.fn(),
-}));
+jest.mock(
+  './sign-out-cleanup',
+  /* gc1-allow: native-boundary — wraps SecureStore + AsyncStorage; spy needed for invocationCallOrder */ () => ({
+    ...jest.requireActual('./sign-out-cleanup'),
+    clearProfileSecureStorageOnSignOut: jest.fn().mockResolvedValue(undefined),
+  }),
+);
 
-// prettier-ignore
-jest.mock('./pending-auth-redirect', () => ({ // gc1-allow: nav-state helper
-  clearPendingAuthRedirect: jest.fn(),
-}));
-
-// prettier-ignore
-jest.mock('./api-client', () => ({ // gc1-allow: identity setters for ordering
-  setActiveProfileId: jest.fn(),
-  setProxyMode: jest.fn(),
-}));
+jest.mock(
+  './api-client',
+  /* gc1-allow: native-boundary — module imports expo-constants/Hono/Clerk; spy on identity setters for invocationCallOrder */ () => ({
+    ...jest.requireActual('./api-client'),
+    setActiveProfileId: jest.fn(),
+    setProxyMode: jest.fn(),
+  }),
+);
 
 // ---------------------------------------------------------------------------
 // Helpers
