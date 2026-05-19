@@ -11,6 +11,7 @@ import {
   monthlyReportDataSchema,
   monthlyReportRecordSchema,
   monthlyReportSummarySchema,
+  SchemaDriftError,
 } from '@eduagent/schemas';
 import { assertParentAccess } from './family-access';
 import { routeAndCall, type ChatMessage } from './llm';
@@ -225,9 +226,14 @@ export async function generateReportHighlights(
   }
 }
 
+// [CCR PR #215] Previously returned `null` on safeParse failure, which the
+// route conflated with "missing row" → 404 with no Sentry capture. Now:
+//   - Row missing:           caller passes null upstream → 404 (no Sentry).
+//   - Row exists but invalid: captureException + throw SchemaDriftError → 500.
+// Schema drift is a server fault, not a client-visible "not found".
 function mapMonthlyReportRow(
   row: typeof monthlyReports.$inferSelect,
-): MonthlyReportRecord | null {
+): MonthlyReportRecord {
   const result = monthlyReportRecordSchema.safeParse({
     id: row.id,
     profileId: row.profileId,
@@ -243,7 +249,16 @@ function mapMonthlyReportRow(
       profileId: row.profileId,
       error: result.error.message,
     });
-    return null;
+    captureException(result.error, {
+      profileId: row.profileId,
+      extra: {
+        context: 'mapMonthlyReportRow',
+        reportId: row.id,
+        childProfileId: row.childProfileId,
+        issues: result.error.issues,
+      },
+    });
+    throw new SchemaDriftError('MonthlyReport', result.error.issues);
   }
   return result.data;
 }

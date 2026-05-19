@@ -23,6 +23,7 @@ export {
   VocabularyNotFoundError,
   TopicNotSkippedError,
   BadRequestError,
+  SchemaDriftError,
 } from '@eduagent/schemas';
 
 export function apiError(

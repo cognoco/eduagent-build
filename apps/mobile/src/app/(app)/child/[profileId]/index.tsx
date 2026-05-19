@@ -548,7 +548,6 @@ function ConsentManagementSection({
             {daysRemaining > 0
               ? t('parentView.index.deletionGraceDays', {
                   count: daysRemaining,
-                  defaultValue: `${daysRemaining} day${daysRemaining === 1 ? '' : 's'} left to cancel deletion.`,
                 })
               : t('parentView.index.deletionGraceFallback', {
                   defaultValue:

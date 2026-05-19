@@ -14,6 +14,20 @@ import {
 import { clearJWKSCache } from '../middleware/jwt';
 
 // ---------------------------------------------------------------------------
+// Sentry mock — observe captureException for schema-drift assertions
+// ---------------------------------------------------------------------------
+
+jest.mock('../services/sentry' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../services/sentry',
+  ) as typeof import('../services/sentry');
+  return {
+    ...actual,
+    captureException: jest.fn(),
+  };
+});
+
+// ---------------------------------------------------------------------------
 // Database mock
 // ---------------------------------------------------------------------------
 
@@ -220,6 +234,10 @@ jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => {
 
 import { app } from '../index';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
+import { SchemaDriftError } from '@eduagent/schemas';
+import { captureException } from '../services/sentry';
+
+const mockCaptureException = captureException as jest.Mock;
 
 const TEST_ENV = { ...BASE_AUTH_ENV };
 const AUTH_HEADERS = makeAuthHeaders({ 'X-Profile-Id': 'test-profile-id' });
@@ -602,7 +620,7 @@ describe('progress routes', () => {
   // ---- GET /v1/progress/reports/:reportId ----------------------------------
 
   describe('GET /v1/progress/reports/:reportId', () => {
-    it('returns 404 when report not found', async () => {
+    it('returns 404 when report not found and does NOT capture to Sentry [CCR PR #215]', async () => {
       mockGetMonthlyReport.mockResolvedValueOnce(null);
 
       const res = await app.request(
@@ -614,6 +632,40 @@ describe('progress routes', () => {
       expect(res.status).toBe(404);
       const body = await res.json();
       expect(body.code).toBe('NOT_FOUND');
+      // Missing rows are a normal client outcome, not a server fault.
+      expect(mockCaptureException).not.toHaveBeenCalled();
+    });
+
+    it('returns 500 and captures Sentry when row exists but fails schema validation [CCR PR #215]', async () => {
+      // Service signals schema drift by throwing SchemaDriftError. The global
+      // error handler converts to 500 + Sentry capture. Previously this path
+      // was masked as a 404 with no capture, so schema drift was invisible.
+      const issues = [
+        { path: ['reportData'], message: 'Expected object, received string' },
+      ];
+      mockGetMonthlyReport.mockRejectedValueOnce(
+        new SchemaDriftError('MonthlyReport', issues),
+      );
+
+      const res = await app.request(
+        `/v1/progress/reports/${REPORT_ID}`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(500);
+      const body = await res.json();
+      expect(body.code).toBe('INTERNAL_ERROR');
+      expect(mockCaptureException).toHaveBeenCalledTimes(1);
+      const [errArg, contextArg] = mockCaptureException.mock.calls[0];
+      expect(errArg).toBeInstanceOf(SchemaDriftError);
+      expect(contextArg).toMatchObject({
+        requestPath: expect.stringContaining('/v1/progress/reports/'),
+        extra: expect.objectContaining({
+          resource: 'MonthlyReport',
+          issues,
+        }),
+      });
     });
 
     it('passes profileId to service (prevents cross-profile IDOR)', async () => {
@@ -671,7 +723,7 @@ describe('progress routes', () => {
   // ---- GET /v1/progress/weekly-reports/:weeklyReportId --------------------
 
   describe('GET /v1/progress/weekly-reports/:weeklyReportId', () => {
-    it('returns 404 when weekly report not found', async () => {
+    it('returns 404 when weekly report not found and does NOT capture to Sentry [CCR PR #215]', async () => {
       mockGetWeeklyReport.mockResolvedValueOnce(null);
 
       const res = await app.request(
@@ -683,6 +735,36 @@ describe('progress routes', () => {
       expect(res.status).toBe(404);
       const body = await res.json();
       expect(body.code).toBe('NOT_FOUND');
+      expect(mockCaptureException).not.toHaveBeenCalled();
+    });
+
+    it('returns 500 and captures Sentry when row exists but fails schema validation [CCR PR #215]', async () => {
+      const issues = [
+        { path: ['reportData'], message: 'Expected object, received string' },
+      ];
+      mockGetWeeklyReport.mockRejectedValueOnce(
+        new SchemaDriftError('WeeklyReport', issues),
+      );
+
+      const res = await app.request(
+        `/v1/progress/weekly-reports/${REPORT_ID}`,
+        { headers: AUTH_HEADERS },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(500);
+      const body = await res.json();
+      expect(body.code).toBe('INTERNAL_ERROR');
+      expect(mockCaptureException).toHaveBeenCalledTimes(1);
+      const [errArg, contextArg] = mockCaptureException.mock.calls[0];
+      expect(errArg).toBeInstanceOf(SchemaDriftError);
+      expect(contextArg).toMatchObject({
+        requestPath: expect.stringContaining('/v1/progress/weekly-reports/'),
+        extra: expect.objectContaining({
+          resource: 'WeeklyReport',
+          issues,
+        }),
+      });
     });
 
     it('passes profileId to service (prevents cross-profile IDOR)', async () => {

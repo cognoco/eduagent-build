@@ -16,9 +16,11 @@ import {
   weeklyReportDataSchema,
   weeklyReportRecordSchema,
   weeklyReportSummarySchema,
+  SchemaDriftError,
 } from '@eduagent/schemas';
 import { assertParentAccess } from './family-access';
 import { createLogger } from './logger';
+import { captureException } from './sentry';
 import { sumTopicsExplored } from './progress-helpers';
 
 const logger = createLogger();
@@ -128,9 +130,11 @@ export function generateWeeklyReportData(
   });
 }
 
+// [CCR PR #215] See monthly-report.ts mapMonthlyReportRow for the same
+// rationale: schema drift becomes a 500 with Sentry capture, not a silent 404.
 function mapWeeklyReportRow(
   row: typeof weeklyReports.$inferSelect,
-): WeeklyReportRecord | null {
+): WeeklyReportRecord {
   const result = weeklyReportRecordSchema.safeParse({
     id: row.id,
     profileId: row.profileId,
@@ -146,7 +150,16 @@ function mapWeeklyReportRow(
       profileId: row.profileId,
       error: result.error.message,
     });
-    return null;
+    captureException(result.error, {
+      profileId: row.profileId,
+      extra: {
+        context: 'mapWeeklyReportRow',
+        reportId: row.id,
+        childProfileId: row.childProfileId,
+        issues: result.error.issues,
+      },
+    });
+    throw new SchemaDriftError('WeeklyReport', result.error.issues);
   }
   return result.data;
 }

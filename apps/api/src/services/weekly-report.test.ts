@@ -1,5 +1,14 @@
+jest.mock('./sentry' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual('./sentry') as typeof import('./sentry');
+  return {
+    ...actual,
+    captureException: jest.fn(),
+  };
+});
+
 import type { Database } from '@eduagent/database';
-import type { ProgressMetrics } from '@eduagent/schemas';
+import type { ProgressMetrics, WeeklyReportData } from '@eduagent/schemas';
+import { SchemaDriftError } from '@eduagent/schemas';
 import {
   generateWeeklyReportData,
   getWeeklyReportForProfile,
@@ -118,5 +127,98 @@ describe('getWeeklyReportForProfile', () => {
     const params = extractDrizzleParamValues(findFirst.mock.calls[0]?.[0]);
     expect(params).toEqual(expect.arrayContaining([UUID.report, UUID.child]));
     expect(params).not.toContain(UUID.parent);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [CCR PR #215] Schema-drift break tests — mapWeeklyReportRow
+// See monthly-report.test.ts for the full rationale.
+// ---------------------------------------------------------------------------
+
+function makeWeeklyReportRow(
+  overrides: {
+    reportData?: unknown;
+  } = {},
+) {
+  const defaultReportData: WeeklyReportData = {
+    childName: 'Emma',
+    weekStart: '2026-04-27',
+    thisWeek: {
+      totalSessions: 3,
+      totalActiveMinutes: 60,
+      topicsMastered: 2,
+      topicsExplored: 3,
+      vocabularyTotal: 12,
+      streakBest: 4,
+    },
+    lastWeek: null,
+    headlineStat: {
+      label: 'Words learned',
+      value: 12,
+      comparison: 'in a first week',
+    },
+  };
+  return {
+    id: UUID.report,
+    profileId: UUID.parent,
+    childProfileId: UUID.child,
+    reportWeek: '2026-04-27',
+    reportData:
+      overrides.reportData === undefined
+        ? defaultReportData
+        : overrides.reportData,
+    viewedAt: null as Date | null,
+    createdAt: new Date('2026-04-27T00:00:00.000Z'),
+  };
+}
+
+function dbWithFirst(row: unknown): Database {
+  return {
+    query: {
+      weeklyReports: {
+        findFirst: jest.fn().mockResolvedValue(row),
+      },
+    },
+  } as unknown as Database;
+}
+
+describe('mapWeeklyReportRow — schema drift vs missing row [CCR PR #215]', () => {
+  const { captureException: capMock } = require('./sentry') as {
+    captureException: jest.Mock;
+  };
+
+  beforeEach(() => {
+    capMock.mockClear();
+  });
+
+  it('missing row → returns null, NO Sentry capture', async () => {
+    const db = dbWithFirst(undefined);
+
+    const result = await getWeeklyReportForProfile(db, UUID.child, UUID.report);
+
+    expect(result).toBeNull();
+    expect(capMock).not.toHaveBeenCalled();
+  });
+
+  it('row exists but invalid shape → throws SchemaDriftError + captures Sentry with row PK and zod issues', async () => {
+    const badRow = makeWeeklyReportRow({ reportData: 'not-an-object' });
+    const db = dbWithFirst(badRow);
+
+    await expect(
+      getWeeklyReportForProfile(db, UUID.child, UUID.report),
+    ).rejects.toBeInstanceOf(SchemaDriftError);
+
+    expect(capMock).toHaveBeenCalledTimes(1);
+    const [, contextArg] = capMock.mock.calls[0];
+    expect(contextArg).toMatchObject({
+      profileId: UUID.parent,
+      extra: expect.objectContaining({
+        context: 'mapWeeklyReportRow',
+        reportId: UUID.report,
+        childProfileId: UUID.child,
+      }),
+    });
+    expect(Array.isArray(contextArg.extra.issues)).toBe(true);
+    expect((contextArg.extra.issues as unknown[]).length).toBeGreaterThan(0);
   });
 });

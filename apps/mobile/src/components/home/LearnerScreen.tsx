@@ -51,9 +51,6 @@ import type { TranslateKey } from '../../i18n';
 
 const CREATE_SUBJECT_FROM_HOME_HREF = '/create-subject' as const;
 
-const DEFAULT_SUBJECT_ICON: React.ComponentProps<typeof Ionicons>['name'] =
-  'book-outline';
-
 type HomeIntentAction = {
   testID: string;
   icon: React.ComponentProps<typeof Ionicons>['name'];
@@ -292,7 +289,6 @@ export function LearnerScreen({
         topicsTotal: total,
         tintSolid: tint.solid,
         tintSoft: tint.soft,
-        icon: DEFAULT_SUBJECT_ICON,
       };
     });
   }, [subjects, overallProgress, resumeTarget, reviewSummary, colorScheme]);

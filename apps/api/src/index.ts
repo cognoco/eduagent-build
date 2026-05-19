@@ -22,6 +22,7 @@ import {
   RateLimitedError,
   UpstreamLlmError,
   BadRequestError,
+  SchemaDriftError,
 } from './errors';
 
 import { envValidationMiddleware } from './middleware/env-validation';
@@ -329,6 +330,30 @@ app.onError((err, c) => {
       400,
     );
   }
+  // [CCR PR #215] Schema-drift fault: a DB row exists but does not validate.
+  // Always Sentry-report so ops can catch silent schema drift; surface 500 so
+  // the client renders a real error (not 404 "missing"). Service layer already
+  // emitted captureException with row PK + zod issues; we still capture here
+  // with request context as a safety net so the handler is self-contained.
+  if (err instanceof SchemaDriftError) {
+    captureException(err, {
+      userId: c.get('user')?.userId,
+      profileId: c.get('profileId'),
+      requestPath: c.req.path,
+      extra: { resource: err.resource, issues: err.issues },
+    });
+    return c.json(
+      {
+        code: ERROR_CODES.INTERNAL_ERROR,
+        message:
+          c.env.ENVIRONMENT === 'production'
+            ? 'Internal server error'
+            : err.message,
+      },
+      500,
+    );
+  }
+
   if (err instanceof UpstreamLlmError) {
     // Track LLM-provider drift in Sentry; surface 502 so clients can retry.
     captureException(err, {

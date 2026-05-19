@@ -723,3 +723,57 @@ describe('ChildDetailScreen — profile overview', () => {
     expect(refetch).toHaveBeenCalledTimes(1);
   });
 });
+
+// ---------------------------------------------------------------------------
+// deletionGraceDays plural wiring — count=1 (singular) vs count=5 (plural)
+// ---------------------------------------------------------------------------
+
+describe('ChildDetailScreen — deletionGraceDays plural key routing', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    setupDefaultMocks();
+  });
+
+  function setupWithdrawnConsent(daysAgo: number) {
+    // respondedAt is daysAgo days in the past; grace period = 7 days
+    // daysRemaining = ceil((7 - daysAgo) * MS_PER_DAY / MS_PER_DAY) = 7 - daysAgo
+    const respondedAt = new Date(
+      Date.now() - daysAgo * 24 * 60 * 60 * 1000,
+    ).toISOString();
+    mockUseChildConsentStatus.mockReturnValue({
+      data: {
+        consentStatus: 'WITHDRAWN',
+        respondedAt,
+        consentType: 'GDPR',
+      },
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+  }
+
+  it('passes count=1 to the translation key when 1 day remains in the grace period', () => {
+    // 6 days ago → 1 day remaining (7 - 6 = 1)
+    setupWithdrawnConsent(6);
+
+    render(<ChildDetailScreen />);
+
+    // The mock t() serialises opts: key + JSON, so count=1 must appear in the output
+    const banner = screen.getByTestId('grace-period-banner');
+    expect(banner).toHaveTextContent(
+      /parentView\.index\.deletionGraceDays.*"count":1/,
+    );
+  });
+
+  it('passes count=5 to the translation key when 5 days remain in the grace period', () => {
+    // 2 days ago → 5 days remaining (7 - 2 = 5)
+    setupWithdrawnConsent(2);
+
+    render(<ChildDetailScreen />);
+
+    const banner = screen.getByTestId('grace-period-banner');
+    expect(banner).toHaveTextContent(
+      /parentView\.index\.deletionGraceDays.*"count":5/,
+    );
+  });
+});
