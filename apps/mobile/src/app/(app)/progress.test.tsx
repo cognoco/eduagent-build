@@ -942,6 +942,50 @@ describe('ProgressScreen — progressive disclosure', () => {
     ).toHaveBeenCalledWith('/(app)/library');
   });
 
+  it('keeps Lilly report visible in proxy mode even when inventory is empty', () => {
+    mockUseActiveProfileRole.mockReturnValue('impersonated-child');
+    mockActiveProfile = {
+      id: 'child-id',
+      displayName: 'Lilly',
+      createdAt: '2026-01-01T00:00:00Z',
+      isOwner: false,
+    } as Profile;
+    mockHooks({
+      inventory: { global: { ...baseGlobal, totalSessions: 0 }, subjects: [] },
+      weeklyReports: [
+        {
+          id: 'weekly-lilly',
+          reportWeek: '2026-05-11',
+          viewedAt: null,
+          createdAt: '2026-05-17T00:00:00Z',
+          headlineStat: {
+            label: 'topics mastered',
+            value: 2,
+            comparison: '+2 this week',
+          },
+          thisWeek: {
+            totalSessions: 4,
+            totalActiveMinutes: 95,
+            topicsMastered: 2,
+            topicsExplored: 6,
+            vocabularyTotal: 12,
+            streakBest: 3,
+          },
+        },
+      ],
+    });
+
+    render(<ProgressScreen />);
+
+    screen.getByText("Lilly's progress");
+    screen.getByTestId('progress-latest-report-card');
+    screen.getByText('2 topics mastered');
+    expect(
+      screen.queryByText('Progress appears after the first study session'),
+    ).toBeNull();
+    expect(useProfileWeeklyReports).toHaveBeenCalledWith('child-id');
+  });
+
   it('opens the requested child progress profile from route params', () => {
     mockLinkedChildren = [childProgressProfile];
     mockSearchParams = { profileId: 'child-1' };
