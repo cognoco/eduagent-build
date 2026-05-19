@@ -26,7 +26,7 @@ const CHILD_ID_RESTRICTED = 'cccccccc-0000-4000-8000-000000000001';
 
 // Sentry — external error tracker (no real process.env in test)
 const mockCaptureException = jest.fn();
-jest.mock('../../services/sentry' /* gc1-allow: unit test boundary */, () => ({
+jest.mock('../../services/sentry' /* gc1-allow: observability */, () => ({
   captureException: (...args: unknown[]) => mockCaptureException(...args),
 }));
 
@@ -35,7 +35,7 @@ import { createInngestTransportCapture } from '../../test-utils/inngest-transpor
 import { createInngestStepRunner } from '../../test-utils/inngest-step-runner';
 
 const mockInngestTransport = createInngestTransportCapture();
-jest.mock('../client' /* gc1-allow: pattern-a conversion */, () => {
+jest.mock('../client' /* gc1-allow: transport-boundary */, () => {
   const actual = jest.requireActual('../client') as typeof import('../client');
   return { ...actual, inngest: mockInngestTransport.module.inngest };
 });

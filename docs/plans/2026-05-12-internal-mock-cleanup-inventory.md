@@ -1,7 +1,7 @@
 # Internal Mock Cleanup Inventory
 
-**Date:** 2026-05-12 (last refreshed 2026-05-14)
-**Status:** Framework complete (Phases 0-4); P0 drained; opportunistic P1/P2 cleanup ongoing via batch + on-touch (GC6).
+**Date:** 2026-05-12 (last refreshed 2026-05-19)
+**Status:** Framework complete (Phases 0-4); P0 drained; P1/P2 grew during W1-W17 coverage-hardening swarm (2026-05-16/18) — see "Reality Drift 2026-05-19" below. Cleanup work resumes on `test-coverage-hardening`.
 **Goal:** Reduce internal mocks that hide route/service/background-job contract drift while preserving true external boundary shims.
 
 ## Why
@@ -13,6 +13,18 @@ This inventory separates:
 - **Internal behavior mocks** that can hide data-access, ownership, event-chain, LLM-envelope, and route/service contract bugs.
 - **External boundary shims** that are acceptable or necessary in Jest, such as Stripe, Sentry, Clerk, Expo native modules, React Native safe area, and Inngest transport.
 - **UI harness mocks** that are mostly ergonomics debt, especially profile/API/query hooks mocked in screen tests.
+
+## Reality Drift 2026-05-19
+
+The W1-W17 Notion bug-fix swarm (commit `1391d7490`) and Wave 2 coverage hardening (`3be793934`, `823824083`) landed many new break tests on `test-coverage-hardening`. Net effect on this inventory:
+
+- Total mock rows: **1,056 → 1,264** (+208 rows, +41 new test files).
+- Internal-ish mocks: **618 → 718** (+100). P1 grew by 31, P2 by 69.
+- Several "✅ Done" claims have regressed because new break tests added new mocks in cleaned files. The Top Files table below carries `Regressed from "✅ Done"` markers where this applies.
+- `apps/api/src/routes/progress.test.ts` (9) and `apps/api/src/inngest/functions/email-digest-channel.test.ts` (7) are new entries in the top-file ranking and were not previously annotated.
+- The integration mock guard (`apps/api/src/test-utils/integration-mock-guard.test.ts`) is still green — `P0 = 0`. Forward-only ratchet held.
+
+The takeaway: forward-only guards prevented integration breaches, but no guard prevents unit-test files from adding internal mocks during fast bug-fix swarms. The active cleanup wave should both drain top files and consider strengthening unit-test guidance for swarm authors.
 
 ## Scan Snapshot
 
@@ -33,36 +45,37 @@ Raw rows are written to `docs/plans/2026-05-12-internal-mock-cleanup-inventory.c
 | API eval-llm tests | 0 | 1 | Eval harness LLM transport mock is classified as an external boundary. |
 | **Total** | **615** | **441** | **1,056 mock call rows across 281 test files, including 1,055 `jest.mock(...)` rows.** |
 
-**Refreshed 2026-05-14** (after Phase 4 guard relocation + batch 6b boy-scout sweeps):
+**Refreshed 2026-05-19** (after W1-W17 Notion bug-fix swarm + Wave 2 coverage hardening landed many new test files):
 
 | Area | Internal-ish mocks | External mocks |
 | --- | ---: | ---: |
-| Mobile tests | 304 | 335 |
-| API Inngest tests | 127 | 51 |
-| API route + top-level integration tests | 104 | 44 |
-| API service/middleware unit tests | 83 | 25 |
+| Mobile tests | 373 | 407 |
+| API Inngest tests | 128 | 52 |
+| API route + top-level integration tests | 135 | 57 |
+| API service/middleware unit tests | 82 | 29 |
 | API eval-llm tests | 0 | 1 |
-| **Total** | **618** | **456** |
+| **Total** | **718** | **546** |
 
 Refreshed risk-class counts:
 
 | Risk class | Count |
 | --- | ---: |
 | `P0` | 0 |
-| `P1` | 314 |
-| `P2` | 304 |
-| `P3` | 456 |
+| `P1` | 345 |
+| `P2` | 373 |
+| `P3` | 546 |
 
 Per-target deltas (top targets):
 
-| Target | Count 2026-05-12 | Count 2026-05-14 |
-| --- | ---: | ---: |
-| `@eduagent/database` | 54 | 55 |
-| `../lib/profile` | 26 | 26 |
-| `../lib/api-client` | 23 | 23 |
-| `../services/account` | 23 | 22 |
-| `../helpers` | 22 | 23 |
-| `../services/profile` | 18 | — (dropped from top 10) |
+| Target | Count 2026-05-12 | Count 2026-05-14 | Count 2026-05-19 |
+| --- | ---: | ---: | ---: |
+| `@eduagent/database` | 54 | 55 | 58 |
+| `../lib/profile` | 26 | 26 | 33 |
+| `../lib/api-client` | 23 | 23 | 30 |
+| `../services/account` | 23 | 22 | 26 |
+| `../helpers` | 22 | 23 | 24 |
+| `../services/profile` | 18 | — | 23 |
+| `../../../lib/profile` | — | — | 17 |
 
 Top internal-ish mocked targets:
 
@@ -80,23 +93,23 @@ Top internal-ish mocked targets:
 | `../../../lib/profile` | 9 | Medium; UI tests often bypass provider/state behavior. |
 | `../../services/settings` | 9 | High where rate-limit, learning-mode, or notification settings behavior is replaced. |
 
-Top files by internal-ish mock count:
+Top files by internal-ish mock count (refreshed 2026-05-19):
 
-| File | Count | Initial classification |
+| File | Count | Notes |
 | --- | ---: | --- |
-| `apps/api/src/inngest/functions/session-completed.test.ts` | 18 | P1 high-risk workflow orchestrator mock cluster. |
-| `apps/mobile/src/app/(app)/library.test.tsx` | 11 | P2 UI screen harness debt. |
+| `apps/api/src/inngest/functions/session-completed.test.ts` | 18 | P1 high-risk workflow orchestrator mock cluster — still the top target for Batch 2. |
+| `apps/mobile/src/app/(app)/library.test.tsx` | 12 | P2 UI screen harness debt; grew by +1 after BUG-NOTION-254 virtualization break test. |
 | `apps/mobile/src/app/(app)/session/index.test.tsx` | 11 | P2/P1 because session recovery/streaming is user-critical. |
 | `apps/mobile/src/app/(app)/shelf/[subjectId]/book/[bookId].test.tsx` | 11 | P2 UI screen harness debt. |
-| `apps/api/src/middleware/metering.test.ts` | 9 | ✅ Done (2 internal mocks removed: JWT → JWKS interceptor, KV → fake KV). P1 quota/billing correctness risk. |
-| `apps/mobile/src/app/(app)/child/[profileId]/index.test.tsx` | 9 | P2 UI screen harness debt. |
-| `apps/mobile/src/components/home/LearnerScreen.test.tsx` | 8 | P2 UI harness debt; real theme path restored, remaining mocks are API/profile/subtree follow-up debt. |
+| `apps/api/src/routes/progress.test.ts` | 9 | **NEW in top files (2026-05-19)** — P1 progress-API contract risk. Not yet annotated. |
+| `apps/api/src/inngest/functions/monthly-report-cron.test.ts` | 8 | **Regressed from "✅ Done"** — +1 mock since 2026-05-14. Re-verify whether step-runner conversion still holds or new test added a mock. |
+| `apps/api/src/middleware/metering.test.ts` | 8 | **Regressed from "✅ Done" (was 9 → 7 after cleanup → 8)** — BUG-93 break test added a new external-LLM-boundary `gc1-allow` mock for `services/subject-resolve`. Annotation is correct; count is higher because the previous "✅ Done" snapshot only counted internal mocks. Worth a re-audit. |
+| `apps/mobile/src/components/home/LearnerScreen.test.tsx` | 8 | P2 UI harness debt; real theme path restored, remaining mocks are API/profile/subtree follow-up. |
 | `apps/mobile/src/components/home/ParentHomeScreen.test.tsx` | 8 | P2 UI screen harness debt, already annotated with many `gc1-allow` reasons. |
-| `apps/api/src/inngest/functions/monthly-report-cron.test.ts` | 7 | ✅ Done. P1 durable report workflow risk. |
-| `apps/api/src/inngest/functions/trial-expiry.test.ts` | 7 | ✅ Done (2 internal mocks removed: subscription → real getTierConfig, trial → real exports; manual step mock → inngest-step-runner). P1 billing lifecycle risk. |
-| `apps/api/src/routes/filing.test.ts` | 7 | P1 LLM/session/filing contract risk. |
-| `apps/api/src/routes/sessions.test.ts` | 7 | ✅ Done. P1 route-service-contract risk. |
-| `apps/api/src/inngest/functions/consent-revocation.test.ts` | — | ✅ Done. P1 durable consent-revocation workflow risk. |
+| `apps/api/src/inngest/functions/email-digest-channel.test.ts` | 7 | **NEW in top files (2026-05-19)** — P1 critical-workflow cluster (notifications/settings/snapshot/weekly-report). |
+| `apps/api/src/routes/filing.test.ts` | 7 | P1 LLM/session/filing contract risk — unchanged. |
+| `apps/api/src/routes/sessions.test.ts` | 7 | Previously ✅ Done; still 7 mocks (mostly external boundaries). Re-verify after next sweep. |
+| `apps/api/src/inngest/functions/trial-expiry.test.ts` | 7 | ✅ Done in prior batch — verify still holds. |
 
 Mobile internal-ish groups:
 

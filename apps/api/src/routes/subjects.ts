@@ -54,8 +54,9 @@ export const subjectRoutes = new Hono<SubjectRouteEnv>()
       // missing metering pattern this let any authenticated user (or
       // anonymous if profile auto-resolution failed) call the LLM-backed
       // resolver in a tight loop. Same class as BUG-623 (recall-bridge) and
-      // BUG-653 (evaluate-depth). Metering side of the fix is in
-      // middleware/metering.ts (LLM_ROUTE_PATTERNS_POST_ONLY).
+      // BUG-653 (evaluate-depth). Both halves are now in place: route-level
+      // requireProfileId here, and /subjects/resolve in
+      // LLM_ROUTE_PATTERNS_POST_ONLY in middleware/metering.ts.
       const profileId = requireProfileId(c.get('profileId'));
       void profileId;
       const { rawInput } = c.req.valid('json');

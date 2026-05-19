@@ -939,25 +939,90 @@ describe('activateSubscriptionFromCheckout', () => {
     expect(db.update).not.toHaveBeenCalled();
   });
 
-  it('returns existing when linked to different ID (no overwrite)', async () => {
+  it('[BUG-111] keeps existing when divergent incoming event is OLDER (stale replay)', async () => {
+    // The existing row was last updated at eventTs. An incoming event from
+    // BEFORE that timestamp (Stripe replay of an old checkout) must NOT
+    // override the newer state — that would regress the user's tier.
     const existing = mockSubscriptionRow({
       stripeSubscriptionId: 'sub_stripe_old',
       tier: 'plus',
       status: 'active',
+      lastStripeEventTimestamp: new Date(eventTs),
     });
     const db = createMockDb({ subscriptionFindFirst: existing });
+
+    const olderEventTs = '2025-01-14T12:00:00.000Z'; // 1 day before eventTs
+    const result = await activateSubscriptionFromCheckout(
+      db,
+      accountId,
+      stripeSubId,
+      'family',
+      olderEventTs,
+    );
+
+    expect(result).not.toBeNull();
+    expect(result!.stripeSubscriptionId).toBe('sub_stripe_old');
+    expect(db.update).not.toHaveBeenCalled();
+    // Divergence + escalation MUST fire — silent recovery is banned.
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.stringContaining('dropped older incoming event'),
+      }),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          resolution: 'kept_existing_dropped_incoming',
+        }),
+      }),
+    );
+  });
+
+  it('[BUG-111] UPDATES existing when divergent incoming event is NEWER — Stripe wins', async () => {
+    // Break test: BEFORE the fix, a divergent newer event was silently
+    // dropped, so a user who upgraded via a fresh checkout could be stuck
+    // on the prior tier. After the fix, Stripe is the source of truth and
+    // the newer event timestamp UPDATES the row.
+    const existing = mockSubscriptionRow({
+      stripeSubscriptionId: 'sub_stripe_old',
+      tier: 'plus',
+      status: 'active',
+      lastStripeEventTimestamp: new Date('2025-01-10T00:00:00.000Z'),
+    });
+    const updated = mockSubscriptionRow({
+      stripeSubscriptionId: stripeSubId,
+      tier: 'family',
+      status: 'active',
+      lastStripeEventTimestamp: new Date(eventTs),
+    });
+    const db = createMockDb({
+      subscriptionFindFirst: existing,
+      updateReturning: [updated],
+    });
 
     const result = await activateSubscriptionFromCheckout(
       db,
       accountId,
       stripeSubId,
       'family',
-      eventTs,
+      eventTs, // newer than existing.lastStripeEventTimestamp
     );
 
     expect(result).not.toBeNull();
-    expect(result!.stripeSubscriptionId).toBe('sub_stripe_old');
-    expect(db.update).not.toHaveBeenCalled();
+    expect(result!.stripeSubscriptionId).toBe(stripeSubId);
+    expect(result!.tier).toBe('family');
+    // Update called twice: subscription row + quota pool limit.
+    expect(db.update).toHaveBeenCalledTimes(2);
+    // Escalation MUST fire — divergence is still noteworthy even when
+    // resolved automatically. Silent recovery is banned.
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.stringContaining('applied newer event over older row'),
+      }),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          resolution: 'updated_to_incoming',
+        }),
+      }),
+    );
   });
 
   it('creates subscription when none exists', async () => {

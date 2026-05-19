@@ -981,6 +981,36 @@ describe('session routes', () => {
       expect(sendSpy).not.toHaveBeenCalled();
     });
 
+    it('[BUG-153] propagates inngest.send failure to client when CORE app/session.completed dispatch fails', async () => {
+      // Break test: BEFORE the fix, dispatchSessionCompletedEvent caught
+      // any throw from inngest.send and silently returned
+      // { pipelineQueued: false }. The user saw "session closed" but the
+      // entire post-session pipeline (retention, XP, streaks, embeddings,
+      // memory extraction, dashboard rollups) NEVER ran for that session.
+      // This is a CORE dispatch — silent drop breaks pipeline integrity.
+      // The fix captures context for Sentry then RETHROWS so the global
+      // onError handler converts it into a 5xx and the client retries.
+      sendSpy.mockRejectedValueOnce(new Error('inngest network down'));
+
+      const res = await app.request(
+        `/v1/sessions/${SESSION_ID}/close`,
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({ summaryStatus: 'skipped' }),
+        },
+        TEST_ENV,
+      );
+
+      // Must NOT be 200 — that would mean the failure was swallowed and
+      // the client thinks the session completed cleanly.
+      expect(res.status).toBeGreaterThanOrEqual(500);
+      // sendSpy was still called — it threw, not skipped.
+      expect(sendSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'app/session.completed' }),
+      );
+    });
+
     it('forwards milestonesReached to the closeSession service', async () => {
       await app.request(
         `/v1/sessions/${SESSION_ID}/close`,

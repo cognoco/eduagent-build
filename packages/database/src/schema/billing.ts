@@ -28,37 +28,55 @@ export const subscriptionTierEnum = pgEnum('subscription_tier', [
   'pro',
 ]);
 
-export const subscriptions = pgTable('subscriptions', {
-  id: uuid('id')
-    .primaryKey()
-    .$defaultFn(() => generateUUIDv7()),
-  accountId: uuid('account_id')
-    .notNull()
-    .unique()
-    .references(() => accounts.id, { onDelete: 'cascade' }),
-  stripeCustomerId: text('stripe_customer_id').unique(),
-  stripeSubscriptionId: text('stripe_subscription_id').unique(),
-  tier: subscriptionTierEnum('tier').notNull().default('free'),
-  status: subscriptionStatusEnum('status').notNull().default('trial'),
-  trialEndsAt: timestamp('trial_ends_at', { withTimezone: true }),
-  currentPeriodStart: timestamp('current_period_start', {
-    withTimezone: true,
-  }),
-  currentPeriodEnd: timestamp('current_period_end', { withTimezone: true }),
-  cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
-  lastStripeEventTimestamp: timestamp('last_stripe_event_timestamp', {
-    withTimezone: true,
-  }),
-  revenuecatOriginalAppUserId: text('revenuecat_original_app_user_id'),
-  lastRevenuecatEventId: text('last_revenuecat_event_id'),
-  lastRevenuecatEventTimestampMs: text('last_revenuecat_event_timestamp_ms'),
-  createdAt: timestamp('created_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+export const subscriptions = pgTable(
+  'subscriptions',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .$defaultFn(() => generateUUIDv7()),
+    accountId: uuid('account_id')
+      .notNull()
+      .unique()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    stripeCustomerId: text('stripe_customer_id').unique(),
+    stripeSubscriptionId: text('stripe_subscription_id').unique(),
+    tier: subscriptionTierEnum('tier').notNull().default('free'),
+    status: subscriptionStatusEnum('status').notNull().default('trial'),
+    trialEndsAt: timestamp('trial_ends_at', { withTimezone: true }),
+    currentPeriodStart: timestamp('current_period_start', {
+      withTimezone: true,
+    }),
+    currentPeriodEnd: timestamp('current_period_end', { withTimezone: true }),
+    cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+    lastStripeEventTimestamp: timestamp('last_stripe_event_timestamp', {
+      withTimezone: true,
+    }),
+    revenuecatOriginalAppUserId: text('revenuecat_original_app_user_id'),
+    lastRevenuecatEventId: text('last_revenuecat_event_id'),
+    lastRevenuecatEventTimestampMs: text('last_revenuecat_event_timestamp_ms'),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    // [BUG-116] DB-level idempotency for RevenueCat webhook events. The
+    // application-layer isRevenuecatEventProcessed() check races with
+    // ensureFreeSubscription on first-event delivery: two concurrent
+    // identical webhooks can both see "not processed" and both proceed.
+    // This partial unique index makes the race impossible at the storage
+    // layer — the second UPDATE that tries to stamp the same event_id on
+    // the same account row collides and is rejected by Postgres. The
+    // partial WHERE clause prevents accounts that have never received an
+    // RC event (lastRevenuecatEventId = NULL) from colliding with each
+    // other on NULL.
+    uniqueIndex('subscriptions_account_revenuecat_event_id_idx')
+      .on(table.accountId, table.lastRevenuecatEventId)
+      .where(sql`${table.lastRevenuecatEventId} IS NOT NULL`),
+  ],
+);
 
 export const quotaPools = pgTable(
   'quota_pools',
