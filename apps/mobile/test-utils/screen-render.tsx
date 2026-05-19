@@ -42,9 +42,12 @@ import {
   ProfileContext,
   type Profile,
   type ProfileContextValue,
-} from '../lib/profile';
-import { createRoutedMockFetch, type RoutedMockFetch } from './mock-api-routes';
-import { createTestProfile } from './app-hook-test-utils';
+} from '../src/lib/profile';
+import {
+  createRoutedMockFetch,
+  type RoutedMockFetch,
+} from '../src/test-utils/mock-api-routes';
+import { createTestProfile } from '../src/test-utils/app-hook-test-utils';
 
 process.env.EXPO_PUBLIC_API_URL ??= 'http://localhost:8787';
 

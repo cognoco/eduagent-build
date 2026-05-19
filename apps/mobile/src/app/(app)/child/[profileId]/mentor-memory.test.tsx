@@ -7,7 +7,7 @@ import {
 import {
   renderScreen,
   NAMED_PROFILES,
-} from '../../../../test-utils/screen-render';
+} from '../../../../../test-utils/screen-render';
 
 // ─── Boundary mocks (allowed: native + i18n + transport) ────────────────
 
