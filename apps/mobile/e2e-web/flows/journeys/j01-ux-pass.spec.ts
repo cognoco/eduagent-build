@@ -1,6 +1,10 @@
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
+import {
+  dismissPostApprovalIfVisible,
+  waitForScreenDismissingPostApproval,
+} from '../../helpers/post-approval';
 import { readSeedData } from '../../helpers/seed-data';
 
 const shotDir = path.join(
@@ -13,11 +17,21 @@ const shotDir = path.join(
 );
 
 async function capture(page: Page, name: string): Promise<void> {
+  await dismissPostApprovalIfVisible(page);
   await expect(page.locator('body')).toBeVisible({ timeout: 30_000 });
   await page.screenshot({
     path: path.join(shotDir, `${name}.png`),
     fullPage: true,
   });
+}
+
+async function gotoScreen(
+  page: Page,
+  url: string,
+  targetTestId: string,
+): Promise<void> {
+  await page.goto(url, { waitUntil: 'commit' });
+  await waitForScreenDismissingPostApproval(page, targetTestId);
 }
 
 test('single learner UX screenshot crawl', async ({ page }) => {
@@ -26,88 +40,119 @@ test('single learner UX screenshot crawl', async ({ page }) => {
   const seed = await readSeedData('solo-learner');
   const subjectId = seed.ids.subjectId;
 
-  await page.goto('/home', { waitUntil: 'commit' });
-  await expect(page.getByTestId('learner-screen')).toBeVisible({
-    timeout: 60_000,
-  });
+  await gotoScreen(page, '/home', 'learner-screen');
   await capture(page, '01-home');
 
-  await page.goto('/practice', { waitUntil: 'commit' });
+  await gotoScreen(page, '/practice', 'practice-screen');
   await capture(page, '02-practice-entry');
 
-  await page.goto('/home', { waitUntil: 'commit' });
-  await page.goto('/create-subject', { waitUntil: 'commit' });
+  await gotoScreen(page, '/home', 'learner-screen');
+  await gotoScreen(page, '/create-subject', 'create-subject-name');
   await capture(page, '03-study-new-click');
 
   await page.goto('/library', { waitUntil: 'commit' });
   // Wait for the subjects query + /library/retention to settle before asserting.
   // Without this, the shelf-row testID poll can race the first paint on slow CI.
   await page.waitForLoadState('networkidle');
-  await expect(page.getByTestId(`shelf-row-header-${subjectId}`)).toBeVisible({
-    timeout: 30_000,
-  });
+  await waitForScreenDismissingPostApproval(
+    page,
+    `shelf-row-header-${subjectId}`,
+    30_000,
+  );
   await capture(page, '04-library');
 
-  await page.goto(`/shelf/${subjectId}`, { waitUntil: 'commit' });
+  await gotoScreen(page, `/shelf/${subjectId}`, 'shelf-screen');
   await capture(page, '05-subject-shelf');
 
-  await page.goto('/progress', { waitUntil: 'commit' });
-  await expect(page.getByText('My progress')).toBeVisible({
-    timeout: 30_000,
-  });
+  await gotoScreen(page, '/progress', 'progress-screen');
   await capture(page, '06-progress-overview');
 
   await page.goto(`/progress/${subjectId}`, { waitUntil: 'commit' });
+  await waitForScreenDismissingPostApproval(
+    page,
+    'progress-subject-bar',
+    30_000,
+  );
   await capture(page, '07-progress-subject');
 
   await page.goto(`/progress/${subjectId}/sessions`, { waitUntil: 'commit' });
+  await expect(
+    page
+      .getByTestId('subject-sessions-empty')
+      .or(page.getByTestId('subject-sessions-error'))
+      .or(page.locator('[data-testid^="subject-session-"]').first()),
+  ).toBeVisible({ timeout: 30_000 });
   await capture(page, '08-progress-sessions');
 
-  await page.goto('/quiz', { waitUntil: 'commit' });
+  await gotoScreen(page, '/quiz', 'quiz-index-screen');
   await capture(page, '09-quiz-home');
 
-  await page.goto('/quiz/history', { waitUntil: 'commit' });
+  await gotoScreen(page, '/quiz/history', 'quiz-history-screen');
   await capture(page, '10-quiz-history');
 
-  await page.goto('/practice', { waitUntil: 'commit' });
+  await gotoScreen(page, '/practice', 'practice-screen');
   await capture(page, '11-practice');
 
-  await page.goto('/practice/assessment', { waitUntil: 'commit' });
+  await gotoScreen(page, '/practice/assessment', 'assessment-picker-screen');
   await capture(page, '12-assessment');
 
-  await page.goto('/dictation', { waitUntil: 'commit' });
+  await gotoScreen(page, '/dictation', 'dictation-choice-screen');
   await capture(page, '13-dictation');
 
   await page.goto('/homework/camera', { waitUntil: 'commit' });
+  await expect(
+    page
+      .getByTestId('camera-view')
+      .or(page.getByTestId('manual-entry-button'))
+      .or(page.getByTestId('grant-permission-button')),
+  ).toBeVisible({ timeout: 30_000 });
   await capture(page, '14-homework-camera');
 
   await page.goto('/mentor-memory', { waitUntil: 'commit' });
+  await expect(page.getByText('Mentor memory')).toBeVisible({
+    timeout: 30_000,
+  });
   await capture(page, '15-mentor-memory');
 
-  await page.goto('/own-learning', { waitUntil: 'commit' });
+  await gotoScreen(page, '/own-learning', 'learner-screen');
   await capture(page, '16-own-learning');
 
   await page.goto('/more', { waitUntil: 'commit' });
+  await expect(page.getByTestId('more-row-account')).toBeVisible({
+    timeout: 30_000,
+  });
   await capture(page, '17-more');
 
   await page.goto('/more/account', { waitUntil: 'commit' });
+  await expect(page.getByTestId('more-account-scroll')).toBeVisible({
+    timeout: 30_000,
+  });
   await capture(page, '18-more-account');
 
   await page.goto('/more/privacy', { waitUntil: 'commit' });
+  await expect(page.getByTestId('more-privacy-scroll')).toBeVisible({
+    timeout: 30_000,
+  });
   await capture(page, '19-more-privacy');
 
   await page.goto('/more/notifications', { waitUntil: 'commit' });
+  await expect(page.getByTestId('more-notifications-scroll')).toBeVisible({
+    timeout: 30_000,
+  });
   await capture(page, '20-more-notifications');
 
   await page.goto('/more/help', { waitUntil: 'commit' });
+  await expect(page.getByTestId('more-help-scroll')).toBeVisible({
+    timeout: 30_000,
+  });
   await capture(page, '21-more-help');
 
-  await page.goto('/profiles', { waitUntil: 'commit' });
+  await gotoScreen(page, '/profiles', 'profiles-screen');
   await capture(page, '22-profiles');
 
-  await page.goto('/create-subject', { waitUntil: 'commit' });
+  await gotoScreen(page, '/create-subject', 'create-subject-name');
   await capture(page, '23-create-subject');
 
-  await page.goto('/subscription', { waitUntil: 'commit' });
+  await gotoScreen(page, '/subscription', 'subscription-screen');
   await capture(page, '24-subscription');
 });
