@@ -401,6 +401,119 @@ export const b = Lib.someOtherSymbol();
     expect(ns!.namespaceAccesses).toContain('useProgressInventory');
     expect(ns!.namespaceAccesses).toContain('someOtherSymbol');
   });
+
+  // Bug-A destructuring fix — break test (red-green validated)
+  // Destructuring from a namespace import: `const { useProgressInventory } = Hooks`
+  // is functionally identical to `Hooks.useProgressInventory` and must be flagged.
+  it('flags `const { forbiddenName } = NamespaceImport` on a session surface', () => {
+    const tmpDir = path.join(
+      REPO_ROOT,
+      'apps/mobile/src/app/(app)/session/_namespace_destructure_test',
+    );
+    fs.mkdirSync(tmpDir, { recursive: true });
+    const tmpPath = path.join(tmpDir, '_destructure.tmp.ts');
+    tmpFiles.push(tmpPath);
+    tmpDirs.push(tmpDir);
+
+    // Destructuring from a namespace import — bypasses PropertyAccessExpression
+    // and ElementAccessExpression detection without the new VariableDeclaration check.
+    const tmpSource = `
+import * as Hooks from '../../../../hooks/use-progress';
+const { useProgressInventory } = Hooks;
+export function Foo() {
+  return useProgressInventory();
+}
+`.trim();
+    fs.writeFileSync(tmpPath, tmpSource, 'utf-8');
+
+    const sessionRule = SURFACE_RULES.find(
+      (r: SurfaceRule) => r.label === 'Session screens',
+    )!;
+    const violations = checkFile(tmpPath, sessionRule, barrelMap, REPO_ROOT);
+
+    expect(violations.length).toBeGreaterThan(0);
+    expect(violations.map((v: Violation) => v.symbol)).toContain(
+      'useProgressInventory',
+    );
+  });
+
+  it('collectImports captures namespace accesses from destructuring', () => {
+    const tmpPath = path.join(
+      REPO_ROOT,
+      'apps/mobile/src/lib/_surface-ownership-ns-destructure.tmp.ts',
+    );
+    tmpFiles.push(tmpPath);
+
+    const tmpSource = `
+import * as Lib from '../hooks/use-progress';
+const { useProgressInventory, someOtherSymbol } = Lib;
+`.trim();
+    fs.writeFileSync(tmpPath, tmpSource, 'utf-8');
+
+    const records = collectImports(tmpPath);
+    const ns = records.find((r: ImportRecord) => r.namespace === 'Lib');
+    expect(ns).toBeDefined();
+    expect(ns!.namespaceAccesses).toContain('useProgressInventory');
+    expect(ns!.namespaceAccesses).toContain('someOtherSymbol');
+  });
+
+  it('flags destructuring with rename (`const { forbiddenName: alias } = Ns`)', () => {
+    const tmpDir = path.join(
+      REPO_ROOT,
+      'apps/mobile/src/app/(app)/session/_namespace_destructure_rename_test',
+    );
+    fs.mkdirSync(tmpDir, { recursive: true });
+    const tmpPath = path.join(tmpDir, '_destructure_rename.tmp.ts');
+    tmpFiles.push(tmpPath);
+    tmpDirs.push(tmpDir);
+
+    // Rename in destructuring: the property key is the forbidden name; the local
+    // binding is an alias. The guard must check the property key, not the alias.
+    const tmpSource = `
+import * as Hooks from '../../../../hooks/use-progress';
+const { useProgressInventory: innocentAlias } = Hooks;
+export function Foo() {
+  return innocentAlias();
+}
+`.trim();
+    fs.writeFileSync(tmpPath, tmpSource, 'utf-8');
+
+    const sessionRule = SURFACE_RULES.find(
+      (r: SurfaceRule) => r.label === 'Session screens',
+    )!;
+    const violations = checkFile(tmpPath, sessionRule, barrelMap, REPO_ROOT);
+
+    expect(violations.length).toBeGreaterThan(0);
+    expect(violations.map((v: Violation) => v.symbol)).toContain(
+      'useProgressInventory',
+    );
+  });
+
+  it('does NOT flag destructuring of non-forbidden members from namespace import', () => {
+    const tmpDir = path.join(
+      REPO_ROOT,
+      'apps/mobile/src/app/(app)/session/_namespace_destructure_clean_test',
+    );
+    fs.mkdirSync(tmpDir, { recursive: true });
+    const tmpPath = path.join(tmpDir, '_destructure_clean.tmp.ts');
+    tmpFiles.push(tmpPath);
+    tmpDirs.push(tmpDir);
+
+    const tmpSource = `
+import * as Hooks from '../../../../hooks/use-progress';
+const { someOtherHelper } = Hooks;
+export function Foo() {
+  return someOtherHelper?.();
+}
+`.trim();
+    fs.writeFileSync(tmpPath, tmpSource, 'utf-8');
+
+    const sessionRule = SURFACE_RULES.find(
+      (r: SurfaceRule) => r.label === 'Session screens',
+    )!;
+    const violations = checkFile(tmpPath, sessionRule, barrelMap, REPO_ROOT);
+    expect(violations).toEqual([]);
+  });
 });
 
 // ---------------------------------------------------------------------------

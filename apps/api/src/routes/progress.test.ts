@@ -636,10 +636,16 @@ describe('progress routes', () => {
       expect(mockCaptureException).not.toHaveBeenCalled();
     });
 
-    it('returns 500 and captures Sentry when row exists but fails schema validation [CCR PR #215]', async () => {
+    it('returns 500 when row exists but fails schema validation [CCR PR #215]', async () => {
       // Service signals schema drift by throwing SchemaDriftError. The global
-      // error handler converts to 500 + Sentry capture. Previously this path
-      // was masked as a 404 with no capture, so schema drift was invisible.
+      // error handler converts to HTTP 500. Sentry capture happens in the
+      // service layer (mapMonthlyReportRow) with richer row-level context
+      // (row PK, profileId, childProfileId, zod issues) — NOT in the global
+      // handler, which would produce a second duplicate event per drift.
+      // Capture correctness is asserted in: services/monthly-report.test.ts
+      // (schema-drift break tests, [CCR PR #215]).
+      // In this route-level test the service is mocked, so no real captureException
+      // call flows through — we assert only the HTTP contract here.
       const issues = [
         { path: ['reportData'], message: 'Expected object, received string' },
       ];
@@ -656,16 +662,10 @@ describe('progress routes', () => {
       expect(res.status).toBe(500);
       const body = await res.json();
       expect(body.code).toBe('INTERNAL_ERROR');
-      expect(mockCaptureException).toHaveBeenCalledTimes(1);
-      const [errArg, contextArg] = mockCaptureException.mock.calls[0];
-      expect(errArg).toBeInstanceOf(SchemaDriftError);
-      expect(contextArg).toMatchObject({
-        requestPath: expect.stringContaining('/v1/progress/reports/'),
-        extra: expect.objectContaining({
-          resource: 'MonthlyReport',
-          issues,
-        }),
-      });
+      // Global handler does NOT call captureException for SchemaDriftError —
+      // the service already did. See: services/monthly-report.test.ts for the
+      // single-capture assertion.
+      expect(mockCaptureException).not.toHaveBeenCalled();
     });
 
     it('passes profileId to service (prevents cross-profile IDOR)', async () => {
@@ -738,7 +738,14 @@ describe('progress routes', () => {
       expect(mockCaptureException).not.toHaveBeenCalled();
     });
 
-    it('returns 500 and captures Sentry when row exists but fails schema validation [CCR PR #215]', async () => {
+    it('returns 500 when row exists but fails schema validation [CCR PR #215]', async () => {
+      // Service signals schema drift by throwing SchemaDriftError. The global
+      // error handler converts to HTTP 500. Sentry capture happens in the
+      // service layer (mapWeeklyReportRow) — NOT in the global handler to
+      // avoid duplicate Sentry events per drift. Capture correctness is
+      // asserted in: services/weekly-report.test.ts (schema-drift break tests,
+      // [CCR PR #215]). In this route-level test the service is mocked, so no
+      // real captureException flows through — we assert only the HTTP contract.
       const issues = [
         { path: ['reportData'], message: 'Expected object, received string' },
       ];
@@ -755,16 +762,10 @@ describe('progress routes', () => {
       expect(res.status).toBe(500);
       const body = await res.json();
       expect(body.code).toBe('INTERNAL_ERROR');
-      expect(mockCaptureException).toHaveBeenCalledTimes(1);
-      const [errArg, contextArg] = mockCaptureException.mock.calls[0];
-      expect(errArg).toBeInstanceOf(SchemaDriftError);
-      expect(contextArg).toMatchObject({
-        requestPath: expect.stringContaining('/v1/progress/weekly-reports/'),
-        extra: expect.objectContaining({
-          resource: 'WeeklyReport',
-          issues,
-        }),
-      });
+      // Global handler does NOT call captureException for SchemaDriftError —
+      // the service already did. See: services/weekly-report.test.ts for the
+      // single-capture assertion.
+      expect(mockCaptureException).not.toHaveBeenCalled();
     });
 
     it('passes profileId to service (prevents cross-profile IDOR)', async () => {

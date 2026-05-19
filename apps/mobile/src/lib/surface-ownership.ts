@@ -272,6 +272,43 @@ export function collectImports(filePath: string): ImportRecord[] {
           }
         }
       }
+      // VariableDeclaration with an ObjectBindingPattern initialised from a
+      // namespace import — `const { useProgressInventory } = Hooks` is
+      // functionally equivalent to `Hooks.useProgressInventory` and must be
+      // treated the same way.
+      //
+      // Bug-A destructuring fix: walk all ObjectBindingPattern bindings whose
+      // initializer is an identifier that resolves to a namespace import, and
+      // record each destructured element name as a namespace access.
+      if (ts.isVariableDeclaration(node)) {
+        if (
+          ts.isObjectBindingPattern(node.name) &&
+          node.initializer &&
+          ts.isIdentifier(node.initializer)
+        ) {
+          const objName = node.initializer.text;
+          const rec = byNamespace.get(objName);
+          if (rec) {
+            for (const element of node.name.elements) {
+              // element.propertyName is the key on the RHS object (the export
+              // name); element.name is the local binding. We care about the
+              // property name because that is what the namespace export provides.
+              // When there is no rename (`const { foo } = X`), propertyName is
+              // absent and name holds the property name.
+              const propName = element.propertyName
+                ? ts.isIdentifier(element.propertyName)
+                  ? element.propertyName.text
+                  : null
+                : ts.isIdentifier(element.name)
+                  ? element.name.text
+                  : null;
+              if (propName && !rec.namespaceAccesses.includes(propName)) {
+                rec.namespaceAccesses.push(propName);
+              }
+            }
+          }
+        }
+      }
       ts.forEachChild(node, visit);
     };
 

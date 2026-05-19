@@ -39,26 +39,11 @@ const mockFetch = createRoutedMockFetch();
 jest.mock(
   '../../../../lib/api-client' /* gc1-allow: transport-boundary — routed mock fetch */,
   () => {
+    const actual = jest.requireActual('../../../../lib/api-client');
     const { hc } = require('hono/client');
     return {
+      ...actual,
       useApiClient: () => hc('http://localhost', { fetch: mockFetch }),
-      setActiveProfileId: jest.fn(),
-      setProxyMode: jest.fn(),
-      setOnAuthExpired: jest.fn(),
-      clearOnAuthExpired: jest.fn(),
-      resetAuthExpiredGuard: jest.fn(),
-      getProxyMode: jest.fn().mockReturnValue(false),
-      withIdempotencyKey: jest.fn((h: Record<string, string>) => h),
-      isIdempotencyReplay: jest.fn().mockReturnValue(false),
-      NetworkError: class NetworkError extends Error {},
-      BadRequestError: class BadRequestError extends Error {},
-      ConflictError: class ConflictError extends Error {},
-      ForbiddenError: class ForbiddenError extends Error {},
-      NotFoundError: class NotFoundError extends Error {},
-      QuotaExceededError: class QuotaExceededError extends Error {},
-      RateLimitedError: class RateLimitedError extends Error {},
-      ResourceGoneError: class ResourceGoneError extends Error {},
-      UpstreamError: class UpstreamError extends Error {},
     };
   },
 );

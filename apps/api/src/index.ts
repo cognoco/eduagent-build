@@ -331,17 +331,15 @@ app.onError((err, c) => {
     );
   }
   // [CCR PR #215] Schema-drift fault: a DB row exists but does not validate.
-  // Always Sentry-report so ops can catch silent schema drift; surface 500 so
-  // the client renders a real error (not 404 "missing"). Service layer already
-  // emitted captureException with row PK + zod issues; we still capture here
-  // with request context as a safety net so the handler is self-contained.
+  // Surface 500 so the client renders a real error (not 404 "missing").
+  // DO NOT call captureException here — the service layer (mapMonthlyReportRow /
+  // mapWeeklyReportRow) already captured the ZodError with rich row-level
+  // context (row PK, profileId, childProfileId, zod issues) before throwing.
+  // A second capture here would create duplicate Sentry events per drift,
+  // doubling noise and breaking Sentry issue grouping.
+  // Sentry capture is verified in: services/monthly-report.test.ts and
+  // services/weekly-report.test.ts (schema-drift break tests, CCR PR #215).
   if (err instanceof SchemaDriftError) {
-    captureException(err, {
-      userId: c.get('user')?.userId,
-      profileId: c.get('profileId'),
-      requestPath: c.req.path,
-      extra: { resource: err.resource, issues: err.issues },
-    });
     return c.json(
       {
         code: ERROR_CODES.INTERNAL_ERROR,
