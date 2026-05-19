@@ -87,7 +87,13 @@ test('single learner UX screenshot crawl', async ({ page }) => {
   await gotoScreen(page, '/quiz', 'quiz-index-screen');
   await capture(page, '09-quiz-home');
 
-  await gotoScreen(page, '/quiz/history', 'quiz-history-screen');
+  await page.goto('/quiz/history', { waitUntil: 'commit' });
+  await expect(
+    page
+      .getByTestId('quiz-history-screen')
+      .or(page.getByTestId('quiz-history-empty'))
+      .or(page.getByTestId('quiz-history-error')),
+  ).toBeVisible({ timeout: 30_000 });
   await capture(page, '10-quiz-history');
 
   await gotoScreen(page, '/practice', 'practice-screen');

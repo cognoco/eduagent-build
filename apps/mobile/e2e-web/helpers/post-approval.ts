@@ -35,14 +35,19 @@ export async function waitForScreenDismissingPostApproval(
   const first = await Promise.race([
     postApproval
       .waitFor({ state: 'visible', timeout: timeoutMs })
-      .then(() => 'post-approval' as const),
+      .then(() => 'post-approval' as const)
+      .catch(() => null),
     target
       .waitFor({ state: 'visible', timeout: timeoutMs })
-      .then(() => 'target' as const),
+      .then(() => 'target' as const)
+      .catch(() => null),
   ]);
 
   if (first === 'post-approval') {
     await postApproval.click();
     await expect(target).toBeVisible({ timeout: timeoutMs });
+    return;
   }
+
+  await expect(target).toBeVisible({ timeout: timeoutMs });
 }
