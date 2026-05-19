@@ -17,6 +17,8 @@ jest.mock('react-native', () => {
     renderSectionHeader,
     sections,
     testID,
+    initialNumToRender,
+    windowSize,
   }: {
     ListHeaderComponent?: React.ReactNode | React.ComponentType;
     renderItem: (info: {
@@ -29,10 +31,15 @@ jest.mock('react-native', () => {
     }) => React.ReactNode;
     sections: Array<{ status: string; data: unknown[] }>;
     testID?: string;
+    initialNumToRender?: number;
+    windowSize?: number;
   }) =>
     ReactActual.createElement(
       RN.View,
-      { testID },
+      // Forward VirtualizedList props so break tests can assert on them.
+      // [BUG-NOTION-254] initialNumToRender/windowSize fingerprint the SectionList
+      // path; ScrollView.map() has neither.
+      { testID, initialNumToRender, windowSize, sections },
       typeof ListHeaderComponent === 'function'
         ? ReactActual.createElement(ListHeaderComponent)
         : ListHeaderComponent,
@@ -1194,6 +1201,50 @@ describe('LibraryScreen', () => {
       screen.getByText('Strong Subject');
       screen.getByText('Fading Subject');
       screen.getByText('Forgotten Subject');
+    });
+  });
+
+  // [BUG-NOTION-254] Break test: the populated subject list MUST be rendered
+  // by a virtualized list (SectionList) rather than ScrollView.map(), so that
+  // off-screen ShelfRow instances are recycled. Asserting the underlying
+  // VirtualizedList prop set fingerprints the SectionList path; the
+  // ScrollView.map() implementation lacks these props entirely.
+  describe('virtualization [BUG-NOTION-254]', () => {
+    it('renders the subject list via a virtualized SectionList', () => {
+      // 50 subjects — well above any plausible viewport window.
+      const subjects = Array.from({ length: 50 }, (_, i) => ({
+        id: `sub-${i}`,
+        name: `Subject ${i}`,
+        status: 'active' as const,
+      }));
+      mockUseSubjects.mockReturnValue({
+        data: subjects,
+        isLoading: false,
+        isError: false,
+      });
+      mockUseOverallProgress.mockReturnValue({
+        data: {
+          subjects: [],
+          totalTopicsCompleted: 0,
+          totalTopicsVerified: 0,
+        },
+        isLoading: false,
+        isError: false,
+      });
+
+      render(<LibraryScreen />, { wrapper: TestWrapper });
+
+      // The SectionList host carries `shelves-list` and exposes the
+      // VirtualizedList prop surface (initialNumToRender, windowSize, sections).
+      // ScrollView.map() — the old code path — has no `sections` prop and no
+      // `initialNumToRender` prop. Asserting on these props is the precise
+      // fingerprint of the virtualized path.
+      const list = screen.getByTestId('shelves-list');
+      expect(list.props.initialNumToRender).toBeDefined();
+      expect(list.props.windowSize).toBeDefined();
+      expect(Array.isArray(list.props.sections)).toBe(true);
+      // All 50 subjects live in the first (and only) section's data array.
+      expect(list.props.sections[0]?.data).toHaveLength(50);
     });
   });
 });

@@ -105,6 +105,13 @@ const LLM_ROUTE_PATTERNS_POST_ONLY = [
   /\/dictation\/generate\/?$/,
   /\/dictation\/prepare-homework\/?$/,
   /\/dictation\/review\/?$/,
+  // [BUG-93 / A1-CRIT] /subjects/resolve calls the LLM to normalize a
+  // free-text subject name. Before fix it was missing here AND missing
+  // requireProfileId at the route level, letting any authenticated user
+  // spam the resolver in a tight loop at zero cost. Same class as
+  // recall-bridge (BUG-623) and evaluate-depth (BUG-653). Route-level
+  // requireProfileId is in routes/subjects.ts.
+  /\/subjects\/resolve\/?$/,
   // Retry filing re-runs the LLM-backed filing flow. Match only UUIDs so a
   // malformed path falls through to the route validator without burning quota.
   /\/sessions\/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\/retry-filing\/?$/,

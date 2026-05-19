@@ -478,6 +478,36 @@ describe('idempotency', () => {
     );
   });
 
+  it('[BUG-116] survives DB unique-constraint violation when application idempotency check loses the race', async () => {
+    // Break test: simulate the race where two concurrent identical INITIAL_PURCHASE
+    // webhooks BOTH see isRevenuecatEventProcessed = false (because the first
+    // hasn't COMMITted its lastRevenuecatEventId update yet). The DB unique
+    // index `subscriptions_account_revenuecat_event_id_idx` rejects the second
+    // UPDATE with a duplicate-key error. The webhook handler must surface this
+    // (Sentry capture) and not crash — otherwise the duplicate would cascade
+    // into duplicate downstream effects (re-grant entitlements, duplicate KV
+    // writes). BEFORE the unique index existed, both writes would succeed and
+    // double-grant.
+    (isRevenuecatEventProcessed as jest.Mock).mockResolvedValue(false);
+    const uniqueErr = new Error(
+      'duplicate key value violates unique constraint "subscriptions_account_revenuecat_event_id_idx"',
+    );
+    (uniqueErr as unknown as { code: string }).code = '23505';
+    (activateSubscriptionFromRevenuecat as jest.Mock).mockRejectedValueOnce(
+      uniqueErr,
+    );
+
+    const res = await makeRequest(makeWebhookPayload('INITIAL_PURCHASE'));
+
+    // The handler propagates the unique-constraint error to the global onError
+    // handler (Sentry capture happens there). Status will be 500 from onError
+    // — what matters is that activateSubscriptionFromRevenuecat was called
+    // exactly once with the rejected promise, proving the DB layer was the
+    // gate, and the route did not silently 200 on a failed write.
+    expect(activateSubscriptionFromRevenuecat).toHaveBeenCalledTimes(1);
+    expect([500, 502]).toContain(res.status);
+  });
+
   it('rejects duplicate transaction IDs in NON_RENEWING_PURCHASE (BS-02) [4C.3]', async () => {
     // purchaseTopUpCredits returns null when ON CONFLICT DO NOTHING triggers
     (purchaseTopUpCredits as jest.Mock).mockResolvedValue(null);

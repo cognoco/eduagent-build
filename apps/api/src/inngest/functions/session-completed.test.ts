@@ -97,7 +97,7 @@ const mockDatabaseModule = createDatabaseModuleMock({
   },
 });
 
-jest.mock('@eduagent/database', () => mockDatabaseModule.module);
+jest.mock('@eduagent/database', () => mockDatabaseModule.module); // gc1-allow: external-boundary — unit test, real Neon DB unavailable; transactional mock supplies query/select/transaction stubs
 
 // Default fixture UUIDs used across all tests via createEventData().
 // Must satisfy z.string().uuid() — the filing-timed-out event schema

@@ -490,40 +490,57 @@ export async function activateSubscriptionFromCheckout(
     });
   }
 
-  // [BUG-111] When the account already has a linked Stripe subscription we
-  // return the existing row idempotently — but if the incoming Stripe sub ID
-  // DIFFERS, the new activation is silently dropped. That can happen when:
+  // [BUG-111] When the account already has a linked Stripe subscription and
+  // the incoming Stripe sub ID DIFFERS, we used to silently drop the new
+  // activation. That can happen when:
   //   (a) Stripe replays an old completed checkout after the user upgraded.
   //   (b) A new checkout completes for a different product before the prior
   //       sub was cancelled.
-  // Either way, dropping silently means the new paid subscription is never
-  // attached and the user's tier/limit can be stale. Capture the divergence
-  // so we can detect and triage it instead of finding out via support.
+  // The fix: Stripe is the source of truth, and `eventTimestamp` tells us
+  // which sub is newer. If the incoming event is newer than the row's
+  // `lastStripeEventTimestamp`, UPDATE the row to the new subscription. If
+  // the incoming event is older, drop it (stale replay) and escalate to
+  // Sentry + Inngest so we can triage. Same-ID retries no-op silently.
   if (existing.stripeSubscriptionId) {
     if (existing.stripeSubscriptionId !== stripeSubscriptionId) {
-      logger.warn(
-        '[billing] checkout activation dropped — account already linked to different Stripe sub',
-        {
-          event: 'billing.activate_checkout.divergent_sub_dropped',
-          accountId,
-          existingStripeSubscriptionId: existing.stripeSubscriptionId,
-          incomingStripeSubscriptionId: stripeSubscriptionId,
-          existingTier: existing.tier,
-          incomingTier: tier,
-        },
-      );
+      const incomingTs = new Date(eventTimestamp).getTime();
+      const existingTs = existing.lastStripeEventTimestamp
+        ? new Date(existing.lastStripeEventTimestamp).getTime()
+        : 0;
+      const incomingIsNewer = incomingTs > existingTs;
+
+      logger.warn('[billing] checkout activation with divergent Stripe sub', {
+        event: 'billing.activate_checkout.divergent_sub',
+        resolution: incomingIsNewer
+          ? 'updated_to_incoming'
+          : 'kept_existing_dropped_incoming',
+        accountId,
+        existingStripeSubscriptionId: existing.stripeSubscriptionId,
+        incomingStripeSubscriptionId: stripeSubscriptionId,
+        existingTier: existing.tier,
+        incomingTier: tier,
+        existingEventTimestamp: existing.lastStripeEventTimestamp,
+        incomingEventTimestamp: eventTimestamp,
+      });
       captureException(
         new Error(
-          'activateSubscriptionFromCheckout: account already linked to a different Stripe subscription',
+          incomingIsNewer
+            ? 'activateSubscriptionFromCheckout: divergent Stripe sub — applied newer event over older row'
+            : 'activateSubscriptionFromCheckout: divergent Stripe sub — dropped older incoming event',
         ),
         {
           extra: {
-            context: 'billing.activate_checkout.divergent_sub_dropped',
+            context: 'billing.activate_checkout.divergent_sub',
+            resolution: incomingIsNewer
+              ? 'updated_to_incoming'
+              : 'kept_existing_dropped_incoming',
             accountId,
             existingStripeSubscriptionId: existing.stripeSubscriptionId,
             incomingStripeSubscriptionId: stripeSubscriptionId,
             existingTier: existing.tier,
             incomingTier: tier,
+            existingEventTimestamp: existing.lastStripeEventTimestamp,
+            incomingEventTimestamp: eventTimestamp,
           },
         },
       );
@@ -533,19 +550,55 @@ export async function activateSubscriptionFromCheckout(
       await safeSend(
         () =>
           inngest.send({
-            name: 'app/billing.activate_checkout.divergent_sub_dropped',
+            name: 'app/billing.activate_checkout.divergent_sub',
             data: {
+              resolution: incomingIsNewer
+                ? 'updated_to_incoming'
+                : 'kept_existing_dropped_incoming',
               accountId,
               existingStripeSubscriptionId: existing.stripeSubscriptionId,
               incomingStripeSubscriptionId: stripeSubscriptionId,
               existingTier: existing.tier,
               incomingTier: tier,
+              existingEventTimestamp: existing.lastStripeEventTimestamp,
+              incomingEventTimestamp: eventTimestamp,
               timestamp: new Date().toISOString(),
             },
           }),
-        'billing.activate_checkout.divergent_sub_dropped',
+        'billing.activate_checkout.divergent_sub',
         { accountId },
       );
+
+      if (incomingIsNewer) {
+        // Stripe is the source of truth and the incoming event is newer —
+        // override existing row with the new subscription. Quota pool limit
+        // is also updated so the user's tier reflects the latest activation.
+        const tierConfig = getTierConfig(tier);
+        const [updatedDivergent] = await db
+          .update(subscriptions)
+          .set({
+            stripeSubscriptionId,
+            tier,
+            status: 'active',
+            lastStripeEventTimestamp: new Date(eventTimestamp),
+            updatedAt: new Date(),
+          })
+          .where(eq(subscriptions.id, existing.id))
+          .returning();
+        await updateQuotaPoolLimit(
+          db,
+          existing.id,
+          tierConfig.monthlyQuota,
+          tierConfig.dailyLimit,
+        );
+        if (!updatedDivergent)
+          throw new Error(
+            'Divergent-sub activation update did not return a row',
+          );
+        return mapSubscriptionRow(updatedDivergent);
+      }
+      // Incoming is older — stale replay. Keep existing, no-op.
+      return existing;
     }
     // Same Stripe sub ID → genuine idempotent retry, OK to no-op silently.
     return existing;

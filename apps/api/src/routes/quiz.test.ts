@@ -20,7 +20,7 @@ const mockDatabaseModule = createDatabaseModuleMock({
   includeActual: true,
 });
 
-jest.mock('@eduagent/database', () => mockDatabaseModule.module);
+jest.mock('@eduagent/database', () => mockDatabaseModule.module); // gc1-allow: external boundary — unit test, real Neon DB unavailable; db injected via middleware
 
 jest.mock('inngest/hono', () => ({
   serve: jest.fn().mockReturnValue(jest.fn()),

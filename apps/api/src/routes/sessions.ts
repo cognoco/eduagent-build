@@ -1270,9 +1270,21 @@ function qualityRatingFromSummaryStatus(
 }
 
 /**
- * BD-09: Returns whether the pipeline was successfully queued.
- * Callers surface `pipelineQueued: false` in the response so the client
- * knows post-processing (retention, XP, streaks, embeddings) may be delayed.
+ * [BUG-153] Dispatches the CORE app/session.completed event that drives the
+ * entire post-session pipeline (retention scoring, XP, streaks, embeddings,
+ * memory extraction, dashboard rollups). A silent drop here was producing
+ * stranded sessions — the user finished the session, but their streak,
+ * memories, and dashboard never updated. Per CLAUDE.md
+ * "Silent recovery without escalation is banned" AND the explicit
+ * core-send vs safe-non-core rule: this is a CORE dispatch and dispatch
+ * failure MUST short-circuit the user action so the client retries.
+ *
+ * Returns `{ pipelineQueued: true }` on success — kept for response shape
+ * compatibility with callers that include it in the response body. On
+ * failure, the error propagates (captured first for Sentry context) so
+ * the global onError handler converts it into a 5xx the client can retry.
+ *
+ * core-send: pipeline integrity — silent drop breaks dashboard/streaks/memory
  */
 async function dispatchSessionCompletedEvent(
   db: Database,
@@ -1289,13 +1301,14 @@ async function dispatchSessionCompletedEvent(
     summaryTrackingHandled?: boolean;
   },
 ): Promise<{ pipelineQueued: boolean }> {
-  try {
-    const completion = await getSessionCompletionContext(
-      db,
-      profileId,
-      sessionId,
-    );
+  const completion = await getSessionCompletionContext(
+    db,
+    profileId,
+    sessionId,
+  );
 
+  try {
+    // core-send: pipeline integrity — silent drop breaks dashboard/streaks/memory
     await inngest.send({
       name: 'app/session.completed',
       data: {
@@ -1319,17 +1332,27 @@ async function dispatchSessionCompletedEvent(
         timestamp: new Date().toISOString(),
       },
     });
-
-    return { pipelineQueued: true };
   } catch (err) {
+    // Capture context BEFORE rethrowing so Sentry has the session/profile
+    // attached. The global onError handler will also see the throw and
+    // return a 5xx to the client so it retries — exactly what we want for
+    // a CORE event whose silent drop breaks the entire post-session
+    // pipeline (retention, XP, streaks, embeddings, memory).
     captureException(err, {
       profileId,
-      extra: { sessionId },
+      extra: {
+        sessionId,
+        event: 'sessions.dispatch_completed_failed',
+        summaryStatus: options.summaryStatus,
+      },
     });
-    logger.warn('[sessions] Failed to dispatch session.completed event', {
+    logger.error('[sessions] CORE app/session.completed dispatch failed', {
       sessionId,
+      profileId,
       error: err instanceof Error ? err.message : String(err),
     });
-    return { pipelineQueued: false };
+    throw err;
   }
+
+  return { pipelineQueued: true };
 }
