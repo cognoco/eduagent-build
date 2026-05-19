@@ -184,14 +184,20 @@ api.use(
 // [BUG-245] Global security headers — JSON API needs the standard defensive
 // set even though the typical client is a mobile/native app. The defaults
 // emit `Strict-Transport-Security`, `X-Content-Type-Options: nosniff`,
-// `Referrer-Policy: no-referrer`, `Cross-Origin-Resource-Policy: same-origin`,
-// `X-Frame-Options: SAMEORIGIN`, etc. We disable the default Content Security
+// `Referrer-Policy`, `Cross-Origin-Resource-Policy: same-origin`,
+// `X-Frame-Options`, etc. We disable the default Content Security
 // Policy because this is a JSON API (CSP applies to HTML responses) and the
 // only HTML we serve is the consent-web flow which sets its own CSP on the
 // page itself.
 // contentSecurityPolicy omitted intentionally — this is a JSON API; CSP
 // applies to HTML responses. The consent-web flow sets its own per-page CSP.
-api.use('*', secureHeaders());
+api.use(
+  '*',
+  secureHeaders({
+    referrerPolicy: 'strict-origin-when-cross-origin',
+    xFrameOptions: 'DENY',
+  }),
+);
 
 // Request logging — runs before auth so every request (including public) is logged
 api.use('*', requestLogger);
