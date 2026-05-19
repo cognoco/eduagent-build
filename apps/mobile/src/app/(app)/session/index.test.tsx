@@ -209,6 +209,10 @@ jest.mock(
       mutate: mockUpdateLearningModeMutate,
       isPending: mockLearningModePending,
     }),
+    useNotifyParentSubscribe: () => ({
+      mutate: jest.fn(),
+      isPending: false,
+    }),
   }),
 );
 

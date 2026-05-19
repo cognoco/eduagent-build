@@ -106,19 +106,19 @@ export const REGISTRY_EXCEPTIONS: ReadonlyArray<{
 }> = [
   {
     file: 'apps/mobile/src/lib/secure-storage.ts',
-    line: 49,
+    line: 94,
     reason:
       'Wrapper module — this is the setItemAsync function definition, not a callsite. The scanner matches the function signature; the key parameter is caller-supplied.',
   },
   {
     file: 'apps/mobile/src/lib/secure-storage.ts',
-    line: 60,
+    line: 106,
     reason:
       'Wrapper module — delegates to ExpoSecureStore.setItemAsync (with options). Not a callsite that writes app data; caller-supplied key.',
   },
   {
     file: 'apps/mobile/src/lib/secure-storage.ts',
-    line: 62,
+    line: 108,
     reason:
       'Wrapper module — delegates to ExpoSecureStore.setItemAsync (without options). Not a callsite that writes app data; caller-supplied key.',
   },

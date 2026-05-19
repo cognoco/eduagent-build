@@ -4,6 +4,17 @@ import type { SessionMessageActionsProps } from './SessionMessageActions';
 import type { ChatMessage } from '../session';
 import { tokens } from '../../lib/design-tokens';
 
+const mockNotifyParentMutate = jest.fn();
+jest.mock(
+  '../../hooks/use-settings' /* gc1-allow: quota card notify mutation is outside SessionMessageActions stage-gating contract */,
+  () => ({
+    useNotifyParentSubscribe: () => ({
+      mutate: mockNotifyParentMutate,
+      isPending: false,
+    }),
+  }),
+);
+
 const baseMessage: ChatMessage = {
   id: 'ai-1',
   role: 'assistant',

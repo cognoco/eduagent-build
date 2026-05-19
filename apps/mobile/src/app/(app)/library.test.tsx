@@ -8,6 +8,60 @@ import {
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
+jest.mock('react-native', () => {
+  const ReactActual = require('react');
+  const RN = jest.requireActual('react-native');
+  const SectionList = ({
+    ListHeaderComponent,
+    renderItem,
+    renderSectionHeader,
+    sections,
+    testID,
+  }: {
+    ListHeaderComponent?: React.ReactNode | React.ComponentType;
+    renderItem: (info: {
+      item: unknown;
+      index: number;
+      section: { status: string; data: unknown[] };
+    }) => React.ReactNode;
+    renderSectionHeader?: (info: {
+      section: { status: string; data: unknown[] };
+    }) => React.ReactNode;
+    sections: Array<{ status: string; data: unknown[] }>;
+    testID?: string;
+  }) =>
+    ReactActual.createElement(
+      RN.View,
+      { testID },
+      typeof ListHeaderComponent === 'function'
+        ? ReactActual.createElement(ListHeaderComponent)
+        : ListHeaderComponent,
+      sections.flatMap((section) => [
+        renderSectionHeader
+          ? ReactActual.createElement(
+              ReactActual.Fragment,
+              { key: `${section.status}-header` },
+              renderSectionHeader({ section }),
+            )
+          : null,
+        ...section.data.map((item, index) =>
+          ReactActual.createElement(
+            ReactActual.Fragment,
+            { key: `${section.status}-${index}` },
+            renderItem({ item, index, section }),
+          ),
+        ),
+      ]),
+    );
+
+  return new Proxy(RN, {
+    get(target, property, receiver) {
+      if (property === 'SectionList') return SectionList;
+      return Reflect.get(target, property, receiver);
+    },
+  });
+});
+
 // Use the shared mock-i18n util so assertions reference the rendered English
 // copy from en.json (what users actually see), not bare keys. A bare-key mock
 // would only prove t() was called — not that the translation pipeline is
@@ -68,9 +122,40 @@ jest.mock(
 jest.mock(
   '../../components/common' /* gc1-allow: Reanimated worklets and SVG animations cannot run in JSDOM */,
   () => ({
-    ...jest.requireActual('../../components/common'),
     BookPageFlipAnimation: () => null,
     BrandCelebration: () => null,
+    ErrorFallback: ({
+      message,
+      primaryAction,
+      secondaryAction,
+      testID,
+    }: {
+      message: string;
+      primaryAction: { label: string; onPress: () => void; testID?: string };
+      secondaryAction?: { label: string; onPress: () => void; testID?: string };
+      testID?: string;
+    }) => {
+      const { Pressable, Text, View } = require('react-native');
+      return (
+        <View testID={testID ?? 'error-fallback'}>
+          <Text>{message}</Text>
+          <Pressable
+            onPress={primaryAction.onPress}
+            testID={primaryAction.testID}
+          >
+            <Text>{primaryAction.label}</Text>
+          </Pressable>
+          {secondaryAction ? (
+            <Pressable
+              onPress={secondaryAction.onPress}
+              testID={secondaryAction.testID}
+            >
+              <Text>{secondaryAction.label}</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      );
+    },
   }),
 );
 
@@ -97,9 +182,16 @@ jest.mock(
 );
 
 jest.mock(
+  '../../lib/format-api-error' /* gc1-allow: i18n-backed formatter imports native localization */,
+  () => ({
+    formatApiError: (error: unknown) =>
+      error instanceof Error ? error.message : 'Something went wrong',
+  }),
+);
+
+jest.mock(
   '../../lib/api-client' /* gc1-allow: API client hook wraps Clerk useAuth external boundary */,
   () => ({
-    ...jest.requireActual('../../lib/api-client'),
     useApiClient: () => ({
       library: {
         retention: {
@@ -196,7 +288,6 @@ jest.mock(
 jest.mock(
   '../../lib/profile' /* gc1-allow: ProfileProvider uses SecureStore native storage */,
   () => ({
-    ...jest.requireActual('../../lib/profile'),
     useProfile: () => ({
       activeProfile: { id: 'profile-1', isOwner: true },
       profiles: [{ id: 'profile-1', isOwner: true }],
@@ -683,7 +774,9 @@ describe('LibraryScreen', () => {
       render(<LibraryScreen />, { wrapper: TestWrapper });
 
       fireEvent.press(screen.getByTestId('manage-subjects-button'));
-      fireEvent.press(screen.getByTestId('archive-subject-sub-1'));
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('archive-subject-sub-1'));
+      });
 
       await waitFor(() => {
         expect(mockUpdateSubjectMutateAsync).toHaveBeenCalledWith({
@@ -727,7 +820,9 @@ describe('LibraryScreen', () => {
         subjectId: 'sub-1',
         status: 'archived',
       });
-      finishUpdate();
+      await act(async () => {
+        finishUpdate();
+      });
     });
   });
 
