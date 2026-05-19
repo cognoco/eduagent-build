@@ -17,7 +17,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as SecureStore from '../../lib/secure-storage';
 import { useProfile, isGuardianProfile } from '../../lib/profile';
-import { computeAgeBracket } from '@eduagent/schemas';
+import { computeAgeBracket, type Profile } from '@eduagent/schemas';
 import {
   useThemeColors,
   useTokenVars,
@@ -55,7 +55,11 @@ import {
 } from '../../hooks/use-active-profile-role';
 import { useMentorLanguageSync } from '../../hooks/use-mentor-language-sync';
 import { FEATURE_FLAGS } from '../../lib/feature-flags';
-import { getPreviewState } from '../../lib/preview-onboarding-state';
+import {
+  getPreviewState,
+  type PreviewOnboardingStateV0,
+  type SaveTarget,
+} from '../../lib/preview-onboarding-state';
 // Note: clearPreviewState is NOT imported here. [CRITICAL-B2] cleanup is
 // owned by the wizard's Step-3 success path (Task 14) and by sign-out.
 
@@ -717,6 +721,63 @@ function CreateProfileGate(): React.ReactElement {
   );
 }
 
+// ─── Save Wizard types and constants ─────────────────────────────────────────
+
+type WizardStep = 1 | 2 | 3;
+
+interface TargetOption {
+  target: SaveTarget;
+  label: string;
+  testID: string;
+}
+
+const SAVE_TARGETS: ReadonlyArray<TargetOption> = [
+  { target: 'self', label: 'My learning', testID: 'save-target-self' },
+  {
+    target: 'child',
+    label: "My child's learning",
+    testID: 'save-target-child',
+  },
+  { target: 'both', label: 'Both', testID: 'save-target-both' },
+];
+
+function defaultTargetFor(
+  state: PreviewOnboardingStateV0 | null,
+): SaveTarget | null {
+  if (!state) return null;
+  switch (state.intent) {
+    case 'self':
+      return 'self';
+    case 'child':
+      return 'child';
+    case 'both':
+      return 'both';
+    case 'not_sure':
+      return null; // ask explicitly per spec Routing And Landing Rules
+  }
+}
+
+// ─── Step placeholder components (Tasks 13 and 14) ───────────────────────────
+
+function ProfileBasicsStep(_props: {
+  target: SaveTarget;
+  previewState: PreviewOnboardingStateV0;
+  onComplete: (created: { parent: Profile; child?: Profile }) => void;
+}): React.ReactElement {
+  // Implemented in Task 13.
+  return <Text>TODO step 2</Text>;
+}
+
+function ConfirmStep(_props: {
+  target: SaveTarget;
+  previewState: PreviewOnboardingStateV0;
+  router: ReturnType<typeof useRouter>;
+  onComplete: () => void; // [HIGH-A2] layout-level wizard-done signal
+}): React.ReactElement {
+  // Implemented in Task 14.
+  return <Text>TODO step 3</Text>;
+}
+
 /**
  * [CRITICAL-A2] Save-wizard gate — shown when a user arrives post-OAuth with
  * a valid preview-onboarding state (they previewed the app before signing up).
@@ -724,26 +785,116 @@ function CreateProfileGate(): React.ReactElement {
  * the profile-creation transition (ProfileProvider auto-activates the first
  * profile; a nested route would unmount mid-wizard at that point).
  *
- * Task 12 fills in the multi-step UI. This stub satisfies the Task 11 wiring
- * test (`save-wizard-gate` testID) and the `onComplete` callback contract.
+ * Multi-step controller: Step 1 = target selection, Step 2 = profile basics
+ * (Task 13), Step 3 = confirm + landing (Task 14).
  */
 function SaveWizardGate({
-  onComplete: _onComplete,
+  onComplete,
 }: {
   onComplete: () => void;
 }): React.ReactElement {
-  // TODO(Task 12): Replace stub with the real multi-step save wizard.
-  // `_onComplete` is prefixed with `_` (unused-vars convention) because the
-  // real step logic (Task 12) will wire it; the stub renders a placeholder.
+  const router = useRouter();
   const insets = useSafeAreaInsets();
+  const [previewState, setLocalPreviewState] =
+    React.useState<PreviewOnboardingStateV0 | null>(null);
+  const [probeDone, setProbeDone] = React.useState(false);
+  const [target, setTarget] = React.useState<SaveTarget | null>(null);
+  const [step, setStep] = React.useState<WizardStep>(1);
+
+  React.useEffect(() => {
+    void getPreviewState().then((s) => {
+      setLocalPreviewState(s);
+      setTarget(defaultTargetFor(s));
+      setProbeDone(true);
+    });
+  }, []);
+
+  // [CRITICAL-3] Recovery path for "wizard mounted with no state" — happens
+  // when the 1h TTL expires between the layout's initial probe and this
+  // component's second probe, or when SecureStore is wiped externally
+  // (sign-out race). Without this, the wizard renders null and traps the user.
+  // [HIGH-A2] Signal completion to the layout BEFORE navigating, so the wizard
+  // branch in AppLayout exits cleanly and falls through to the next gate.
+  React.useEffect(() => {
+    if (probeDone && !previewState) {
+      onComplete();
+      router.replace('/(app)/home');
+    }
+  }, [probeDone, previewState, router, onComplete]);
+
+  if (!previewState) {
+    return <View testID="save-wizard-gate" className="flex-1 bg-background" />;
+  }
+
   return (
-    <View
-      className="flex-1 bg-background items-center justify-center px-6"
-      style={{ paddingTop: insets.top, paddingBottom: insets.bottom }}
+    <ScrollView
+      className="flex-1 bg-background"
+      contentContainerStyle={{
+        paddingTop: insets.top + 24,
+        paddingBottom: insets.bottom + 24,
+        paddingHorizontal: 24,
+      }}
       testID="save-wizard-gate"
     >
-      <ActivityIndicator size="large" />
-    </View>
+      <View testID={`save-wizard-step-${step}`} />
+      <Text className="text-h1 font-bold text-text-primary mb-2">
+        Great, let&apos;s save this and get you started.
+      </Text>
+
+      {step === 1 && (
+        <View>
+          <Text className="text-body text-text-secondary mb-6">
+            Where should we save this?
+          </Text>
+          {SAVE_TARGETS.map((opt) => {
+            const selected = target === opt.target;
+            return (
+              <Pressable
+                key={opt.target}
+                onPress={() => setTarget(opt.target)}
+                className={`rounded-card px-4 py-4 mb-3 ${selected ? 'bg-primary/10 border border-primary' : 'bg-surface'}`}
+                testID={opt.testID}
+                accessibilityRole="radio"
+                accessibilityState={{ selected }}
+              >
+                <Text className="text-body font-semibold text-text-primary">
+                  {opt.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+          <Pressable
+            onPress={() => target && setStep(2)}
+            disabled={!target}
+            className={`rounded-button py-3.5 items-center mt-4 ${target ? 'bg-primary' : 'bg-primary/40'}`}
+            testID="save-wizard-step-1-continue"
+            accessibilityRole="button"
+            accessibilityState={{ disabled: !target }}
+          >
+            <Text className="text-body font-semibold text-text-inverse">
+              Continue
+            </Text>
+          </Pressable>
+        </View>
+      )}
+
+      {step === 2 && (
+        <ProfileBasicsStep
+          target={target!}
+          previewState={previewState}
+          onComplete={() => setStep(3)}
+        />
+      )}
+
+      {step === 3 && (
+        <ConfirmStep
+          target={target!}
+          previewState={previewState}
+          router={router}
+          onComplete={onComplete} // [HIGH-A2] forwarded from layout
+        />
+      )}
+    </ScrollView>
   );
 }
 

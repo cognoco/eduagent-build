@@ -1146,6 +1146,176 @@ describe('resolveHomeTabPresentation', () => {
 });
 
 // ---------------------------------------------------------------------------
+// SaveWizard — Step 1 (Where to Save)
+// Tests for the multi-step save-wizard skeleton + Step 1 target selection.
+// [CRITICAL-A2] The wizard is INLINE — rendered by AppLayout's gate ordering
+// when preview state is present and wizardDone is false. Tests render the
+// full layout; SaveWizardGate is NOT exported from _layout.tsx.
+// ---------------------------------------------------------------------------
+
+describe('SaveWizard — Step 1', () => {
+  let testQueryClient: QueryClient;
+
+  function setupDefaultRoutes() {
+    mockFetch.setRoute(
+      '/consent/my-status',
+      () =>
+        new Response(
+          JSON.stringify({
+            consentStatus: null,
+            parentEmail: null,
+            consentType: null,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+    );
+    mockFetch.setRoute(
+      '/subjects',
+      () =>
+        new Response(JSON.stringify({ subjects: [] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    );
+    mockFetch.setRoute(
+      '/dashboard',
+      () =>
+        new Response(JSON.stringify({ children: [], demoMode: false }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    );
+    mockFetch.setRoute(
+      '/settings/push-token',
+      () =>
+        new Response(JSON.stringify({ registered: true }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    );
+  }
+
+  function renderWizardLayout() {
+    (useAuth as jest.Mock).mockReturnValue({
+      isLoaded: true,
+      isSignedIn: true,
+    });
+    mockUseProfile.mockReturnValue({
+      profiles: [],
+      activeProfile: null,
+      isLoading: false,
+      profileWasRemoved: false,
+      acknowledgeProfileRemoval: jest.fn(),
+      switchProfile: jest.fn(),
+    });
+    const AppLayout = require('./_layout').default;
+    return render(<AppLayout />, {
+      wrapper: ({ children }: { children: React.ReactNode }) => (
+        <QueryClientProvider client={testQueryClient}>
+          {children}
+        </QueryClientProvider>
+      ),
+    });
+  }
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    testQueryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    });
+    mockUsePathname.mockReturnValue('/home');
+    const SecureStoreMock = require('../../lib/secure-storage');
+    (SecureStoreMock.getItemAsync as jest.Mock).mockResolvedValue(null);
+    (SecureStoreMock.setItemAsync as jest.Mock).mockResolvedValue(undefined);
+    (SecureStoreMock.deleteItemAsync as jest.Mock).mockResolvedValue(undefined);
+    await clearPreviewState();
+    setupDefaultRoutes();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+  });
+
+  // [CRITICAL-3] No dead-end when wizard mounts with expired/missing state.
+  // Simulates the TTL-expiry race: layout's probe sees state as 'present'
+  // (first call), then the TTL expires before the wizard's own internal probe
+  // runs (second call returns null). The wizard must call onComplete + navigate
+  // home rather than rendering a blank dead-end screen.
+  it('redirects to /(app)/home when wizard mounts but state has expired', async () => {
+    // First call (layout probe) returns a valid state so the wizard branch is entered.
+    // Second call (wizard's internal probe) returns null to simulate TTL expiry.
+    const previewModule = require('../../lib/preview-onboarding-state');
+    let callCount = 0;
+    jest
+      .spyOn(previewModule, 'getPreviewState')
+      .mockImplementation(async () => {
+        callCount++;
+        if (callCount === 1) {
+          return {
+            intent: 'self',
+            path: 'learner_value_prop',
+            createdAt: new Date().toISOString(),
+          };
+        }
+        return null;
+      });
+
+    renderWizardLayout();
+    await waitFor(() => {
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
+    });
+    expect(screen.queryByTestId('save-wizard-step-1')).toBeNull();
+  });
+
+  it('preselects "My learning" when intent was self', async () => {
+    await setPreviewState({
+      intent: 'self',
+      path: 'learner_value_prop',
+      topicText: 't',
+      createdAt: new Date().toISOString(),
+    });
+    renderWizardLayout();
+    await screen.findByTestId('save-wizard-step-1');
+    expect(
+      screen.getByTestId('save-target-self').props.accessibilityState?.selected,
+    ).toBe(true);
+  });
+
+  it('preselects "My child" when intent was child', async () => {
+    await setPreviewState({
+      intent: 'child',
+      path: 'parent_value_prop',
+      createdAt: new Date().toISOString(),
+    });
+    renderWizardLayout();
+    await screen.findByTestId('save-wizard-step-1');
+    expect(
+      screen.getByTestId('save-target-child').props.accessibilityState
+        ?.selected,
+    ).toBe(true);
+  });
+
+  it('overrides intent when user picks a different target', async () => {
+    await setPreviewState({
+      intent: 'child',
+      path: 'parent_value_prop',
+      createdAt: new Date().toISOString(),
+    });
+    renderWizardLayout();
+    await screen.findByTestId('save-wizard-step-1');
+    fireEvent.press(screen.getByTestId('save-target-self'));
+    expect(
+      screen.getByTestId('save-target-self').props.accessibilityState?.selected,
+    ).toBe(true);
+    expect(
+      screen.getByTestId('save-target-child').props.accessibilityState
+        ?.selected,
+    ).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // [BUG-776 / M-14] buildSwitchProfileConfirmation
 // ---------------------------------------------------------------------------
 // Pre-fix the consent-gate "Switch profile" handler silently picked the
