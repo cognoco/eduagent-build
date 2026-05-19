@@ -52,8 +52,9 @@ tags:
       id: "learner-screen"
     timeout: 15000
 
-# 3. Navigate to Library tab (BUG-10: use accessibility label, not truncated text)
-- tapOn: "Library Tab"
+# 3. Navigate to Library tab (use testID — survives i18n + copy edits)
+- tapOn:
+    id: "tab-library"
 
 # 4. Wait for Library to load (Shelves tab is the default)
 - extendedWaitUntil:
@@ -89,9 +90,13 @@ tags:
 # 8. Screenshot: shelf screen
 - takeScreenshot: relearn-01-shelf
 
-# 9. Tap the first book in the Chemistry shelf
+# 9. Tap the first book in the Chemistry shelf.
+#    Disambiguate from the shelf heading "Chemistry" (top of screen) by anchoring
+#    below "1 book" (the count subtitle that always sits between the heading and
+#    the book card). The failed-recall-3x seed creates exactly one book per subject.
 - tapOn:
     text: "Chemistry"
+    below: "1 book"
 
 # 10. Wait for book detail screen
 - extendedWaitUntil:

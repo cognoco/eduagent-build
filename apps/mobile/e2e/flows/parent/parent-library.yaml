@@ -42,8 +42,9 @@ tags:
 # 4. Screenshot: parent Home before navigating
 - takeScreenshot: parent-library-01-home
 
-# 5. Tap Library tab (BUG-10: use accessibility label, not truncated text)
-- tapOn: "Library Tab"
+# 5. Tap Library tab (use testID — survives i18n + copy edits)
+- tapOn:
+    id: "tab-library"
 
 # 6. Wait for Library heading to render
 - extendedWaitUntil:
@@ -70,8 +71,9 @@ tags:
 # 10. Screenshot: Library content (Shelves tab — subject cards)
 - takeScreenshot: parent-library-02-content
 
-# 12. Navigate back to Home tab (use accessibility label to avoid matching heading)
-- tapOn: "Home Tab"
+# 12. Navigate back to Home tab (use testID — avoids matching the "Home" heading)
+- tapOn:
+    id: "tab-home"
 
 # 13. Verify parent Home is visible again
 - extendedWaitUntil:

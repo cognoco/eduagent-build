@@ -18,14 +18,28 @@ tags:
 - runFlow:
     file: ../_setup/seed-and-sign-in.yaml
 
-# The home screen should show the intent card stack
+# The home screen should show the subject carousel.
+# Scroll until on-screen since the carousel sits below the action chips on the
+# current LearnerScreen layout.
+- scrollUntilVisible:
+    element:
+      id: "home-subject-carousel"
+    direction: DOWN
+    timeout: 10000
+
 - assertVisible:
     id: "home-subject-carousel"
 
 - takeScreenshot: subject-01-home-with-intent-cards
 
-# Tap "Learn" intent card → navigates to /create-subject
-# (replaced add-subject-button which was removed from home screen)
+# Scroll back up so the action chips are in view, then tap "Learn" to navigate
+# to /create-subject (replaced add-subject-button which was removed from home).
+- scrollUntilVisible:
+    element:
+      id: "home-action-study-new"
+    direction: UP
+    timeout: 10000
+
 - tapOn:
     id: "home-action-study-new"
 

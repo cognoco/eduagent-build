@@ -3,6 +3,7 @@
 # Does NOT relaunch app (assumes app is already on sign-in screen).
 appId: com.mentomate.app
 tags:
+  - pr-blocking
   - devclient
   - auth
 ---

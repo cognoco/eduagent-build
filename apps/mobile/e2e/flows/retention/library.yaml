@@ -20,6 +20,7 @@
 # Library is a single view showing shelves-list directly. No tab strip.
 appId: com.mentomate.app
 tags:
+  - pr-blocking
   - nightly
   - retention
 ---
@@ -44,8 +45,9 @@ tags:
 # 4. Screenshot of home screen
 - takeScreenshot: home-intent-stack
 
-# 5. Navigate to Library via tab (BUG-10: use accessibility label, not truncated text)
-- tapOn: "Library Tab"
+# 5. Navigate to Library via tab (use testID — survives i18n + copy edits)
+- tapOn:
+    id: "tab-library"
 
 # 6. Wait for Library screen header
 - extendedWaitUntil:
@@ -69,8 +71,9 @@ tags:
 # 9. Screenshot of Library with shelves
 - takeScreenshot: library-shelves
 
-# 10. Return to home screen (use accessibility label to avoid matching heading)
-- tapOn: "Home Tab"
+# 10. Return to home screen (use testID — avoids matching the "Home" heading)
+- tapOn:
+    id: "tab-home"
 
 # 11. Verify home screen is visible again
 - extendedWaitUntil:

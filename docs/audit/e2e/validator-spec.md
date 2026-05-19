@@ -93,17 +93,10 @@ Extract scenario names from flow YAML files (the first positional argument in
 metadata). Cross-reference against the `SeedScenario` union type in
 `apps/api/src/services/test-seed.ts`.
 
-**Current valid scenarios (31 as of 2026-05-14):**
-`onboarding-complete`, `onboarding-no-subject`, `learning-active`,
-`retention-due`, `failed-recall-3x`, `parent-with-children`, `trial-active`,
-`trial-expired`, `multi-subject`, `multi-subject-practice`, `homework-ready`,
-`trial-expired-child`, `consent-withdrawn`, `consent-withdrawn-solo`,
-`parent-solo`, `pre-profile`, `consent-pending`, `parent-multi-child`,
-`daily-limit-reached`, `language-learner`, `language-subject-active`,
-`parent-with-reports`, `mentor-memory-populated`, `account-deletion-scheduled`,
-`parent-proxy`, `session-with-transcript`, `with-bookmarks`,
-`parent-with-weekly-report`, `parent-session-with-recap`,
-`parent-session-recap-empty`
+**Valid scenarios:** the validator extracts the `SeedScenario` union from
+`apps/api/src/services/test-seed.ts` at run time — no hardcoded list. As of
+2026-05-17 the union contains 44 scenarios. Updating `SeedScenario` in the
+API automatically widens what C4 accepts; no validator change required.
 
 **Output on failure:** `C4: <file> — references seed scenario '<name>' not in SeedScenario type`
 

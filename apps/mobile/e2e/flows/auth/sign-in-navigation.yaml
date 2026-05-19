@@ -10,6 +10,7 @@
 # auth screens are reachable and that navigation links work correctly.
 appId: com.mentomate.app
 tags:
+  - pr-blocking
   - nightly
   - auth
 ---

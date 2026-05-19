@@ -85,3 +85,43 @@ These are much higher than defaults due to WHPX emulator performance.
 ## Screenshots
 
 `takeScreenshot` saves PNGs to the flow's working directory. These are gitignored via `apps/mobile/e2e/**/*.png`.
+
+## Tag Registry
+
+Every non-`_setup` flow YAML must declare at least one tag in its frontmatter. The Maestro flow validator (`scripts/validate-maestro-flows.sh`, check C7) reads this registry and fails on tags that are not listed here. To introduce a new tag, add it to the appropriate section below in the same PR.
+
+Tag tokens below are wrapped in backticks so the validator's parser can extract them.
+
+### Execution tiers
+
+| Tag | Meaning | Run cadence |
+|---|---|---|
+| `pr-blocking` | Must pass for PR merge. Stable, deterministic, <90s each, combined set <8 min. | Every PR |
+| `smoke` | Broad coverage of critical paths. Superset of `pr-blocking`. | Nightly + on-demand |
+| `nightly` | Full regression suite. | Nightly CI |
+| `weekly` | Extended/slow flows (camera, OCR, complex multi-step). | Weekly CI |
+| `manual` | Requires human interaction or special device setup. | Manual only |
+
+`pr-blocking` qualification criteria (all must hold): currently passes on a clean Pixel API 34 emulator; covers a top-of-funnel or critical user path; deterministic (no flakiness from AI responses, timing, or network); runs in under 90 seconds individually.
+
+### Domain tags
+
+`account`, `assessment`, `auth`, `billing`, `chat`, `consent`, `dictation`, `edge`, `homework`, `learning`, `library`, `navigation`, `onboarding`, `parent`, `practice`, `progress`, `quiz`, `regression`, `retention`, `session`, `settings`, `subjects`, `summary`
+
+### Special tags
+
+| Tag | Meaning |
+|---|---|
+| `devclient` | Requires dev-client build (not release / Expo Go) |
+| `gdpr` | GDPR-specific consent flows |
+| `coppa` | COPPA-specific age-verification flows |
+| `critical` | Business-critical path (revenue, legal) |
+| `visual` | Primarily screenshot-based verification |
+| `local` | Runs against local Expo Go / dev tooling only |
+| `slow-net` | Exercises throttled-network or offline paths |
+
+### Pending review
+
+These tags appear in current flows. They are recognised by the validator to keep C7 green, but a future PR should rationalise each one — promote into a domain/special tag with a clear definition, or remove from the flows that carry it.
+
+`archive`, `camera`, `classifier`, `comprehensive`, `epic-10`, `home`, `nudge`, `placeholder`, `post-auth`, `quick`, `quota`, `stress`, `subject-creation`, `ux-dead-end`, `voice`
