@@ -55,6 +55,12 @@ jest.mock('react-i18next', () => ({
         return `Progress unlocks after you study ${opts?.subject ?? ''}`;
       if (key === 'progress.empty.withSubjectSubtitle')
         return `Study a topic in ${opts?.subject ?? ''} first.`;
+      if (key === 'progress.empty.title')
+        return 'Progress appears after the first study session';
+      if (key === 'progress.empty.subtitle')
+        return 'Sessions, mastery, reviews, and reports will appear here once there is something to measure.';
+      if (key === 'progress.startLearning') return 'Start learning';
+      if (key === 'tabs.library') return 'Library';
       if (key === 'progress.pageTitleMine') return 'My progress';
       if (key === 'progress.pageTitleProfile')
         return `${opts?.name ?? ''}'s progress`;
@@ -238,14 +244,15 @@ jest.mock('../../hooks/use-active-profile-role' /* gc1-allow */, () => ({
   useActiveProfileRole: () => mockUseActiveProfileRole(),
 }));
 let mockLinkedChildren: Profile[] = [];
+let mockActiveProfile: Profile = {
+  id: 'test-profile-id',
+  displayName: 'Test Learner',
+  createdAt: '2026-01-01T00:00:00Z',
+  isOwner: true,
+} as Profile;
 jest.mock('../../lib/profile', () => ({
   useProfile: () => ({
-    activeProfile: {
-      id: 'test-profile-id',
-      displayName: 'Test Learner',
-      createdAt: '2026-01-01T00:00:00Z',
-      isOwner: true,
-    },
+    activeProfile: mockActiveProfile,
     profiles: [],
   }),
   useLinkedChildren: () => mockLinkedChildren,
@@ -517,6 +524,12 @@ describe('ProgressScreen — progressive disclosure', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUseActiveProfileRole.mockReturnValue('owner');
+    mockActiveProfile = {
+      id: 'test-profile-id',
+      displayName: 'Test Learner',
+      createdAt: '2026-01-01T00:00:00Z',
+      isOwner: true,
+    } as Profile;
     mockUseSubjects.mockReturnValue({ data: [] });
     mockLinkedChildren = [];
     mockSearchParams = {};
@@ -859,7 +872,7 @@ describe('ProgressScreen — progressive disclosure', () => {
     expect(screen.queryByTestId('progress-new-learner-teaser')).toBeNull();
   });
 
-  it('points empty progress toward the first active subject when one exists', () => {
+  it('keeps overall empty progress global while opening the first active subject', () => {
     mockUseSubjects.mockReturnValue({
       data: [{ id: 'subject-italian', name: 'Italian', status: 'active' }],
     });
@@ -869,8 +882,50 @@ describe('ProgressScreen — progressive disclosure', () => {
 
     render(<ProgressScreen />);
 
-    screen.getByText('Progress unlocks after you study Italian');
-    screen.getByText('Study a topic in Italian first.');
+    screen.getByText('Progress appears after the first study session');
+    screen.getByText(
+      'Sessions, mastery, reviews, and reports will appear here once there is something to measure.',
+    );
+    expect(
+      screen.queryByText('Progress unlocks after you study Italian'),
+    ).toBeNull();
+    fireEvent.press(screen.getByTestId('progress-start-learning'));
+    expect(
+      jest.requireMock('expo-router').useRouter().push,
+    ).toHaveBeenCalledWith({
+      pathname: '/(app)/shelf/[subjectId]',
+      params: { subjectId: 'subject-italian' },
+    });
+  });
+
+  it('uses child-facing title and parent-safe action in proxy progress mode', () => {
+    mockUseActiveProfileRole.mockReturnValue('impersonated-child');
+    mockActiveProfile = {
+      id: 'child-id',
+      displayName: 'Lilly',
+      createdAt: '2026-01-01T00:00:00Z',
+      isOwner: false,
+    } as Profile;
+    mockUseSubjects.mockReturnValue({
+      data: [
+        { id: 'subject-programming', name: 'Programming', status: 'active' },
+      ],
+    });
+    mockHooks({
+      inventory: { global: { ...baseGlobal, totalSessions: 0 }, subjects: [] },
+    });
+
+    render(<ProgressScreen />);
+
+    screen.getByText("Lilly's progress");
+    screen.getByText('Progress appears after the first study session');
+    expect(screen.queryByText(/Programming/)).toBeNull();
+    screen.getByText('Library');
+
+    fireEvent.press(screen.getByTestId('progress-start-learning'));
+    expect(
+      jest.requireMock('expo-router').useRouter().push,
+    ).toHaveBeenCalledWith('/(app)/library');
   });
 
   it('opens the requested child progress profile from route params', () => {

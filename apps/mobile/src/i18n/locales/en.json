@@ -118,6 +118,9 @@
       "emptySubjectsTitle": "Your subjects will show up here",
       "emptySubjectsMessage": "Start one now, or just use homework help when you need it.",
       "addSubject": "Add a subject",
+      "proxySessionSummariesTitle": "Session recaps are in your parent view",
+      "proxySessionSummariesBody": "{{name}}'s notes stay private, but you can see parent-safe session summaries from their profile.",
+      "proxySessionSummariesCta": "View {{name}}'s session summaries",
       "momentum": {
         "topicLearned": "{{n}} topic learned",
         "topicsLearned": "{{n}} topics learned"
@@ -305,6 +308,10 @@
       "sectionHeader": "Your learning",
       "rowLabel": "Preferences",
       "screenTitle": "Your learning preferences"
+    },
+    "proxyPreview": {
+      "title": "Settings are paused in parent preview",
+      "description": "Switch back to your account to change settings. While viewing as a child, this area stays locked."
     },
     "mentorMemory": {
       "sectionHeader": "Mentor memory",
@@ -1546,8 +1553,8 @@
       "subtitle_other": "Complete {{count}} more sessions to see your full learning journey!"
     },
     "empty": {
-      "title": "Start your first session",
-      "subtitle": "Start your first session to see your progress here",
+      "title": "Progress appears after the first study session",
+      "subtitle": "Sessions, mastery, reviews, and reports will appear here once there is something to measure.",
       "withSubjectTitle": "Progress unlocks after you study {{subject}}",
       "withSubjectSubtitle": "Study a topic in {{subject}} first. Sessions, mastery, and reviews will appear here once there is something to measure."
     },
@@ -2209,6 +2216,7 @@
       "errorMessage": "Please try again"
     },
     "proxyBanner": {
+      "parentPreview": "Parent preview",
       "viewing": "Viewing as {{name}}",
       "switchBackLabel": "Switch back to your account",
       "switchBack": "Switch back"

@@ -135,7 +135,10 @@
           "title": "Aprender algo nuevo",
           "subtitle": "Empieza un tema o crea una materia"
         }
-      }
+      },
+      "proxySessionSummariesTitle": "Los resúmenes de sesión están en tu vista de padre",
+      "proxySessionSummariesBody": "Las notas de {{name}} siguen siendo privadas, pero puedes ver resúmenes de sesión para padres desde su perfil.",
+      "proxySessionSummariesCta": "Ver los resúmenes de sesión de {{name}}"
     },
     "notices": {
       "consentArchivedTitle": "{{name}}'s account was archived",
@@ -417,6 +420,10 @@
       "account": "Cuenta",
       "privacy": "Privacidad y datos",
       "help": "Ayuda y comentarios"
+    },
+    "proxyPreview": {
+      "title": "Los ajustes están pausados en la vista previa de padre",
+      "description": "Vuelve a tu cuenta para cambiar ajustes. Mientras ves como niño, esta área permanece bloqueada."
     }
   },
   "session": {
@@ -2140,7 +2147,8 @@
     "proxyBanner": {
       "viewing": "Viendo como {{name}}",
       "switchBackLabel": "Volver a tu cuenta",
-      "switchBack": "Volver"
+      "switchBack": "Volver",
+      "parentPreview": "Vista previa de padre"
     },
     "postApproval": {
       "celebrationLabel": "Un padre ha aprobado tu cuenta",

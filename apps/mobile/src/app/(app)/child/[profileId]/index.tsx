@@ -25,6 +25,7 @@ import { ACCOMMODATION_OPTIONS } from '../../../../lib/accommodation-options';
 import { getGracePeriodDaysRemaining } from '../../../../lib/consent-grace';
 import { FAMILY_HOME_PATH, goBackOrReplace } from '../../../../lib/navigation';
 import { platformAlert } from '../../../../lib/platform-alert';
+import { isNewLearner } from '../../../../lib/progressive-disclosure';
 import { useProfile } from '../../../../lib/profile';
 import { useThemeColors } from '../../../../lib/theme';
 
@@ -322,10 +323,12 @@ function SubjectCard({
   profileId,
   childName,
   subject,
+  showRetentionBadge,
 }: {
   profileId: string;
   childName: string;
   subject: DashboardSubject;
+  showRetentionBadge: boolean;
 }): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
@@ -357,13 +360,15 @@ function SubjectCard({
           </Text>
         ) : null}
       </View>
-      <View className="rounded-full bg-primary-soft px-3 py-1">
-        <Text className="text-caption font-semibold text-primary">
-          {t(`parentView.retention.${subject.retentionStatus}`, {
-            defaultValue: subject.retentionStatus,
-          })}
-        </Text>
-      </View>
+      {showRetentionBadge ? (
+        <View className="rounded-full bg-primary-soft px-3 py-1">
+          <Text className="text-caption font-semibold text-primary">
+            {t(`parentView.retention.${subject.retentionStatus}.label`, {
+              defaultValue: subject.retentionStatus,
+            })}
+          </Text>
+        </View>
+      ) : null}
       {canOpen ? (
         <Ionicons
           name="chevron-forward"
@@ -658,6 +663,7 @@ export default function ChildDetailScreen(): React.ReactElement {
       sortSubjectsByRecentSession(child?.subjects ?? [], sessionsQuery.data),
     [child?.subjects, sessionsQuery.data],
   );
+  const showSubjectRetentionBadges = !isNewLearner(child?.totalSessions);
   const openProgressNudgeAction = (): void => {
     if (!progressNudgeAction) return;
 
@@ -796,7 +802,7 @@ export default function ChildDetailScreen(): React.ReactElement {
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
       <View className="px-5 pt-4 pb-2 flex-row items-center">
         <Pressable
-          onPress={() => goBackOrReplace(router, FAMILY_HOME_PATH)}
+          onPress={() => router.replace(FAMILY_HOME_PATH as Href)}
           className="me-3 py-2 pe-2"
           accessibilityLabel={t('common.goBack')}
           accessibilityRole="button"
@@ -875,6 +881,7 @@ export default function ChildDetailScreen(): React.ReactElement {
                 profileId={profileId}
                 childName={childName}
                 subject={subject}
+                showRetentionBadge={showSubjectRetentionBadges}
               />
             ))}
           </View>

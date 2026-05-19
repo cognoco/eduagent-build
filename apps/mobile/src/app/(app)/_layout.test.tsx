@@ -102,6 +102,7 @@ jest.mock('../../lib/profile', () => ({
 
 // prettier-ignore
 jest.mock('../../lib/theme', /* gc1-allow: nativewind vars() does not resolve 'react' in jest; stub theme hooks so screen tests don't blow up on import */ () => ({
+  useTheme: () => ({ colorScheme: 'light' }),
   useThemeColors: () => ({
     accent: '#0ea5e9',
     border: '#d4d4d8',
@@ -110,6 +111,11 @@ jest.mock('../../lib/theme', /* gc1-allow: nativewind vars() does not resolve 'r
     textInverse: '#ffffff',
     textPrimary: '#18181b',
     textSecondary: '#52525b',
+    warning: '#a16207',
+    proxyPreviewBackground: '#fff7ed',
+    proxyPreviewBorder: '#f59e0b',
+    proxyPreviewSceneBackground: '#fffaf3',
+    proxyPreviewTabBackground: '#fff7ed',
   }),
   useTokenVars: () => ({}),
 }));
@@ -668,6 +674,7 @@ describe('AppLayout', () => {
     // ("Viewing as " with an empty/literal name) would slip past the broader
     // /Viewing as/ regex. test-setup.ts initializes i18next synchronously
     // with en.json so {{name}} resolves at render.
+    screen.getByText('Parent preview');
     screen.getByText('Viewing as Alex');
 
     fireEvent.press(screen.getByTestId('proxy-banner-switch-back'));
@@ -757,6 +764,12 @@ describe('computeVisibleTabs', () => {
     const tabs = computeVisibleTabs('learner');
     expect(tabs).toEqual(new Set(['home', 'library', 'progress', 'more']));
     expect(tabs.has('own-learning')).toBe(false);
+  });
+
+  it('hides More during parent preview', () => {
+    const tabs = computeVisibleTabs('learner', true);
+    expect(tabs).toEqual(new Set(['home', 'library', 'progress']));
+    expect(tabs.has('more')).toBe(false);
   });
 });
 

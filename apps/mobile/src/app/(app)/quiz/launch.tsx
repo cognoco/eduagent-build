@@ -113,9 +113,15 @@ export default function QuizLaunchScreen(): React.ReactElement {
   const routeSubjectId = firstRouteParam(routeSubjectIdParam);
   const routeLanguageName = firstRouteParam(routeLanguageNameParam);
   const routeReturnTo = firstRouteParam(routeReturnToParam);
-  const effectiveActivityType = activityType ?? routeActivityType;
-  const effectiveSubjectId = subjectId ?? routeSubjectId ?? null;
-  const effectiveReturnTo = returnTo ?? routeReturnTo ?? null;
+  const effectiveActivityType = routeActivityType ?? activityType;
+  const effectiveSubjectId =
+    routeSubjectId !== null && routeSubjectId !== undefined
+      ? routeSubjectId
+      : (subjectId ?? null);
+  const effectiveReturnTo =
+    routeReturnTo !== null && routeReturnTo !== undefined
+      ? routeReturnTo
+      : (returnTo ?? null);
   const exitHref =
     effectiveReturnTo === 'practice' ? '/(app)/practice' : '/(app)/quiz';
   const generateRound = useGenerateRound();
@@ -173,8 +179,10 @@ export default function QuizLaunchScreen(): React.ReactElement {
   ]);
 
   useEffect(() => {
-    if (!activityType && routeActivityType) {
+    if (routeActivityType && activityType !== routeActivityType) {
       setActivityType(routeActivityType);
+    }
+    if (routeActivityType) {
       setSubjectId(routeSubjectId);
       setLanguageName(routeLanguageName);
       setReturnTo(routeReturnTo);

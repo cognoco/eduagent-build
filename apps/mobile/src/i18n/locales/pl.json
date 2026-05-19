@@ -135,7 +135,10 @@
           "title": "Naucz się czegoś nowego",
           "subtitle": "Zacznij temat albo utwórz przedmiot"
         }
-      }
+      },
+      "proxySessionSummariesTitle": "Podsumowania sesji są w widoku rodzica",
+      "proxySessionSummariesBody": "Notatki {{name}} pozostają prywatne, ale w profilu możesz zobaczyć bezpieczne dla rodzica podsumowania sesji.",
+      "proxySessionSummariesCta": "Zobacz podsumowania sesji {{name}}"
     },
     "notices": {
       "consentArchivedTitle": "{{name}}'s account was archived",
@@ -442,6 +445,10 @@
       "account": "Konto",
       "privacy": "Prywatność i dane",
       "help": "Pomoc i opinie"
+    },
+    "proxyPreview": {
+      "title": "Ustawienia są wstrzymane w podglądzie rodzica",
+      "description": "Wróć do swojego konta, aby zmieniać ustawienia. Podczas przeglądania jako dziecko ten obszar pozostaje zablokowany."
     }
   },
   "session": {
@@ -2165,7 +2172,8 @@
     "proxyBanner": {
       "viewing": "Przeglądasz jako {{name}}",
       "switchBackLabel": "Przełącz z powrotem na swoje konto",
-      "switchBack": "Przełącz z powrotem"
+      "switchBack": "Przełącz z powrotem",
+      "parentPreview": "Podgląd rodzica"
     },
     "postApproval": {
       "celebrationLabel": "Rodzic zatwierdził Twoje konto",

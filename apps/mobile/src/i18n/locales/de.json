@@ -118,6 +118,9 @@
       "emptySubjectsTitle": "Deine Fächer erscheinen hier",
       "emptySubjectsMessage": "Starte jetzt eins, oder nutze einfach Hausaufgabenhilfe, wenn du sie brauchst.",
       "addSubject": "Fach hinzufügen",
+      "proxySessionSummariesTitle": "Sitzungszusammenfassungen sind in deiner Elternansicht",
+      "proxySessionSummariesBody": "{{name}}s Notizen bleiben privat, aber du kannst elterngeeignete Sitzungszusammenfassungen im Profil sehen.",
+      "proxySessionSummariesCta": "{{name}}s Sitzungszusammenfassungen ansehen",
       "momentum": {
         "topicLearned": "{{n}} topic learned",
         "topicsLearned": "{{n}} topics learned"
@@ -305,6 +308,10 @@
       "sectionHeader": "Dein Lernen",
       "rowLabel": "Präferenzen",
       "screenTitle": "Lernpräferenzen"
+    },
+    "proxyPreview": {
+      "title": "Einstellungen sind in der Elternvorschau gesperrt",
+      "description": "Wechsle zurück zu deinem Konto, um Einstellungen zu ändern. Während du als Kind ansiehst, bleibt dieser Bereich gesperrt."
     },
     "mentorMemory": {
       "sectionHeader": "Was dein Mentor weiß",
@@ -2138,6 +2145,7 @@
       "errorMessage": "Bitte versuche es erneut"
     },
     "proxyBanner": {
+      "parentPreview": "Elternvorschau",
       "viewing": "Ansicht als {{name}}",
       "switchBackLabel": "Zurück zu deinem Konto wechseln",
       "switchBack": "Zurück wechseln"

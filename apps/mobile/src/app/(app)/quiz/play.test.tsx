@@ -4,6 +4,7 @@ import {
   screen,
   waitFor,
 } from '@testing-library/react-native';
+import { Platform } from 'react-native';
 
 const mockReplace = jest.fn();
 const mockDismissTo = jest.fn();
@@ -232,6 +233,50 @@ describe('QuizPlayScreen', () => {
     // Aria-label includes a unit so screen-reader users hear "Elapsed time:
     // 0 seconds" instead of just "0s".
     expect(elapsed.props.accessibilityLabel).toBe('Elapsed time: 0 seconds');
+  });
+
+  it('shows a visible next-question button after a non-final answer', async () => {
+    mockRound = {
+      id: 'round-visible-next',
+      activityType: 'capitals' as const,
+      theme: 'Europe',
+      total: 2,
+      questions: [
+        {
+          type: 'capitals' as const,
+          country: 'Slovakia',
+          options: ['Bratislava', 'Prague', 'Warsaw', 'Budapest'],
+          funFact: 'Bratislava sits on the Danube.',
+          isLibraryItem: true,
+          freeTextEligible: false,
+        },
+        {
+          type: 'capitals' as const,
+          country: 'France',
+          options: ['Paris', 'Lyon', 'Madrid', 'Rome'],
+          funFact: 'Paris has been a capital for centuries.',
+          isLibraryItem: true,
+          freeTextEligible: false,
+        },
+      ],
+    };
+
+    render(<QuizPlayScreen />);
+
+    fireEvent.press(screen.getByTestId('quiz-option-0'));
+
+    await waitFor(() => {
+      screen.getByTestId('quiz-next-question');
+    });
+    screen.getByText('Next question');
+    screen.getByText('Bratislava sits on the Danube.');
+
+    await new Promise((r) => setTimeout(r, 280));
+    fireEvent.press(screen.getByTestId('quiz-next-question'));
+
+    await waitFor(() => {
+      screen.getByText('France?');
+    });
   });
 });
 
@@ -1158,6 +1203,28 @@ describe('QuizPlayScreen — error feedback [BUG-799 / BUG-806]', () => {
 
     expect(mockDismissTo).toHaveBeenCalledWith('/(app)/quiz');
     expect(mockReplace).not.toHaveBeenCalledWith('/(app)/practice');
+  });
+
+  it('uses replace instead of dismissTo when confirming quit on web', () => {
+    const originalOS = Platform.OS;
+    Object.defineProperty(Platform, 'OS', {
+      configurable: true,
+      value: 'web',
+    });
+    try {
+      render(<QuizPlayScreen />);
+
+      fireEvent.press(screen.getByTestId('quiz-play-quit'));
+      fireEvent.press(screen.getByTestId('quiz-quit-confirm'));
+
+      expect(mockReplace).toHaveBeenCalledWith('/(app)/quiz');
+      expect(mockDismissTo).not.toHaveBeenCalled();
+    } finally {
+      Object.defineProperty(Platform, 'OS', {
+        configurable: true,
+        value: originalOS,
+      });
+    }
   });
 
   it('[QUIZ-11] malformed fallback back button returns directly to quiz index', () => {

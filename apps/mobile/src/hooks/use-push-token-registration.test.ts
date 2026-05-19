@@ -19,6 +19,7 @@ const mockMutateAsync = jest.fn().mockResolvedValue({ registered: true });
 let mockActiveProfile: Profile | null = createTestProfile({
   id: 'profile-1',
 });
+let mockProfiles: Profile[] | null = null;
 
 jest.mock('./use-settings', () => ({
   useRegisterPushToken: () => ({ mutateAsync: mockMutateAsync }),
@@ -38,8 +39,10 @@ jest.mock('expo-constants', () => {
 
 function createProfileWrapper() {
   function Wrapper({ children }: { children: ReactNode }) {
+    const profiles =
+      mockProfiles ?? (mockActiveProfile ? [mockActiveProfile] : []);
     const value: ProfileContextValue = {
-      profiles: mockActiveProfile ? [mockActiveProfile] : [],
+      profiles,
       activeProfile: mockActiveProfile,
       switchProfile: async () => ({ success: true }),
       isLoading: false,
@@ -74,6 +77,7 @@ describe('usePushTokenRegistration', () => {
       });
     // Restore resolved values after clearAllMocks
     mockMutateAsync.mockResolvedValue({ registered: true });
+    mockProfiles = null;
   });
 
   it('registers push token when notification permission is already granted', async () => {
@@ -237,6 +241,32 @@ describe('usePushTokenRegistration', () => {
     });
 
     expect(Notifications.getPermissionsAsync).not.toHaveBeenCalled();
+    expect(mockMutateAsync).not.toHaveBeenCalled();
+    expect(result.current.status).toBe('idle');
+  });
+
+  it('does not register the parent device while viewing as a child', async () => {
+    const ownerProfile = createTestProfile({
+      id: 'owner-profile',
+      isOwner: true,
+    });
+    const childProfile = createTestProfile({
+      id: 'child-profile',
+      isOwner: false,
+    });
+    mockActiveProfile = childProfile;
+    mockProfiles = [ownerProfile, childProfile];
+
+    const { result } = renderHook(() => usePushTokenRegistration(), {
+      wrapper: createProfileWrapper(),
+    });
+
+    await act(async () => {
+      appStateListeners.forEach((listener) => listener('active'));
+    });
+
+    expect(Notifications.getPermissionsAsync).not.toHaveBeenCalled();
+    expect(Notifications.getExpoPushTokenAsync).not.toHaveBeenCalled();
     expect(mockMutateAsync).not.toHaveBeenCalled();
     expect(result.current.status).toBe('idle');
   });

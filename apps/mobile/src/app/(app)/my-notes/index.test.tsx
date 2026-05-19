@@ -9,6 +9,7 @@ const mockFetch = createRoutedMockFetch({
 const mockPush = jest.fn();
 const mockBack = jest.fn();
 const mockReplace = jest.fn();
+let mockReturnTo: string | undefined;
 
 jest.mock(
   '../../../lib/api-client' /* gc1-allow: screen test drives production hooks through the fetch boundary */,
@@ -37,6 +38,7 @@ jest.mock(
 );
 
 jest.mock('expo-router', () => ({
+  useLocalSearchParams: () => ({ returnTo: mockReturnTo }),
   useRouter: () => ({
     push: mockPush,
     back: mockBack,
@@ -65,6 +67,7 @@ const MyNotesHubScreen = require('./index').default;
 describe('MyNotesHubScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockReturnTo = undefined;
   });
 
   it('shows the three archive doors and opens a selected list', () => {
@@ -76,10 +79,22 @@ describe('MyNotesHubScreen', () => {
 
     fireEvent.press(screen.getByTestId('my-notes-notes'));
 
-    expect(mockPush).toHaveBeenCalledWith('/(app)/my-notes/notes');
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/my-notes/[kind]',
+      params: { kind: 'notes', returnTo: 'own-learning' },
+    });
   });
 
-  it('falls back to Home when back has no stack', () => {
+  it('returns to own learner home by default', () => {
+    render(<MyNotesHubScreen />, { wrapper: createWrapper() });
+
+    fireEvent.press(screen.getByTestId('my-notes-back'));
+
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/own-learning');
+  });
+
+  it('honors an explicit learner home return target', () => {
+    mockReturnTo = 'learner-home';
     render(<MyNotesHubScreen />, { wrapper: createWrapper() });
 
     fireEvent.press(screen.getByTestId('my-notes-back'));

@@ -21,6 +21,11 @@ export interface ReportsListProps {
   testID?: string;
   /** Whether to show "New" badge for unviewed reports. Defaults to false. */
   showNewBadge?: boolean;
+  /**
+   * Restricts the "New" badge to a single report row. Pass null to suppress
+   * row badges while keeping showNewBadge available for a highlighted summary.
+   */
+  newReportId?: string | null;
 }
 
 type ReportListItem =
@@ -46,6 +51,7 @@ export function ReportsList({
   onPressWeekly,
   testID,
   showNewBadge = false,
+  newReportId,
 }: ReportsListProps): React.ReactElement {
   const { t } = useTranslation();
 
@@ -107,6 +113,10 @@ export function ReportsList({
             item.kind === 'weekly'
               ? `weekly-report-card-${item.report.id}`
               : `report-card-${item.report.id}`;
+          const canShowNewBadge =
+            newReportId === undefined
+              ? !item.report.viewedAt
+              : newReportId === item.report.id && !item.report.viewedAt;
 
           return (
             <Pressable
@@ -134,8 +144,11 @@ export function ReportsList({
                     {item.report.headlineStat.comparison}
                   </Text>
                 </View>
-                {showNewBadge && !item.report.viewedAt ? (
-                  <View className="bg-accent/15 rounded-full px-3 py-1">
+                {showNewBadge && canShowNewBadge ? (
+                  <View
+                    className="bg-accent/15 rounded-full px-3 py-1"
+                    testID="parentView.reports.newBadge"
+                  >
                     <Text className="text-caption font-semibold text-accent">
                       {t('parentView.reports.newBadge')}
                     </Text>

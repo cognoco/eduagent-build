@@ -135,7 +135,10 @@
           "title": "Lær noe nytt",
           "subtitle": "Start et tema eller bygg et fag"
         }
-      }
+      },
+      "proxySessionSummariesTitle": "Øktoppsummeringer finnes i foreldrevisningen",
+      "proxySessionSummariesBody": "Notatene til {{name}} forblir private, men du kan se foreldrevennlige øktoppsummeringer fra profilen.",
+      "proxySessionSummariesCta": "Se øktoppsummeringene til {{name}}"
     },
     "notices": {
       "consentArchivedTitle": "{{name}}s konto ble arkivert",
@@ -417,6 +420,10 @@
       "account": "Konto",
       "privacy": "Personvern og data",
       "help": "Hjelp og tilbakemeldinger"
+    },
+    "proxyPreview": {
+      "title": "Innstillinger er satt på pause i foreldrevisning",
+      "description": "Bytt tilbake til kontoen din for å endre innstillinger. Når du ser som et barn, er dette området låst."
     }
   },
   "session": {
@@ -2140,7 +2147,8 @@
     "proxyBanner": {
       "viewing": "Ser som {{name}}",
       "switchBackLabel": "Bytt tilbake til din konto",
-      "switchBack": "Bytt tilbake"
+      "switchBack": "Bytt tilbake",
+      "parentPreview": "Foreldrevisning"
     },
     "postApproval": {
       "celebrationLabel": "Forelder har godkjent kontoen din",

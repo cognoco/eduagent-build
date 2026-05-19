@@ -1,4 +1,5 @@
 import type { Href, Router } from 'expo-router';
+import { Platform } from 'react-native';
 
 import type { RewardBurstVariant } from '../../../components/common/RewardBurst';
 
@@ -8,6 +9,11 @@ type QuizIndexRouter = Pick<Router, 'replace'> &
   Partial<Pick<Router, 'dismissTo'>>;
 
 export function dismissToQuizIndex(router: QuizIndexRouter): void {
+  if (Platform.OS === 'web') {
+    router.replace(QUIZ_INDEX_HREF as Href);
+    return;
+  }
+
   if (router.dismissTo) {
     router.dismissTo(QUIZ_INDEX_HREF as Href);
     return;
