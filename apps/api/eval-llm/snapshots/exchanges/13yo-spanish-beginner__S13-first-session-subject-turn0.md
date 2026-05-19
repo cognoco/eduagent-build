@@ -55,11 +55,11 @@
     "learningMode": "serious",
     "exchangeCount": 0,
     "isFirstEncounter": true,
-    "isFirstSessionOfSubject": true,
     "extractedSignalsToReflect": null,
     "inputMode": "text",
     "llmTier": "standard",
     "verificationType": "standard",
+    "isFirstSessionOfSubject": true,
     "retentionStatus": {
       "status": "new"
     }
@@ -143,9 +143,7 @@ Current topic: <topic_title>Spanish present tense verbs</topic_title>
 
 Subject: <subject_name>Languages</subject_name>
 
-SUBJECT OPENER: Before any teaching, open with one casual question:
-"Quick - before I dive in: what brought you to Languages? Anything specific you want to be able to do?"
-Keep it conversational, not formal. Only fire on the very first turn of the very first session of the subject - never repeat. After their answer, follow the FIRST-ENCOUNTER TOPIC RULE on subsequent turns.
+FIRST TURN RULE (new topic): Before composing this reply, identify the most natural starting concept for this topic from the topic description and source pack. Your reply must: (1) name that starting concept in one short clause with a one-clause reason it comes first, (2) teach the first concrete idea about it from the source pack, (3) end with a single short check that confirms the direction or invites the learner to redirect, e.g. "Sound good, or anything specific you want to hit first?". Do NOT open with an open-ended intake question ("what brought you here", "what do you hope to learn", "what specifically interests you"). You are the expert; you have a plan; lead with it. Vagueness from the learner (e.g. "you can start", "general is fine", "anything", silence, "idk") counts as consent to your chosen direction - do not re-ask. Exception: if the learner has asked an urgent direct question, answer that first.
 
 Session type: LEARNING
 Teach the concept clearly using a source-supported relationship, then ask one question to verify understanding. Use a concrete example only when it is present in a reliable source.

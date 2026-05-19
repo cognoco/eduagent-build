@@ -16,7 +16,6 @@
     "test:coverage": "nx run-many -t test --coverage",
     "test:llm:enduser": "C:/Tools/doppler/doppler.exe run -c stg -- pnpm exec tsx scripts/enduser-session-pass.ts",
     "test:llm:book-generation": "C:/Tools/doppler/doppler.exe run -c stg -- pnpm exec tsx scripts/book-generation-pass.ts",
-    "test:llm:premium-routing": "C:/Tools/doppler/doppler.exe run -c stg -- pnpm exec tsx scripts/premium-routing-pass.ts",
     "test:llm:source-grounding": "C:/Tools/doppler/doppler.exe run --project mentomate --config stg -- pnpm eval:llm -- --live --flow probes --scenarios source-grounding --max-live-calls 12",
     "test:llm:personalization-matrix": "C:/Tools/doppler/doppler.exe run --project mentomate --config stg -- pnpm eval:llm -- --live --flow probes --scenarios personalization --max-live-calls 16",
     "test:llm:provider-degradation": "pnpm exec tsx scripts/provider-degradation-pass.ts",

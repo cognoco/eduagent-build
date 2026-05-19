@@ -25,6 +25,7 @@ import type { ProgressMetrics, TopicProgress } from '@eduagent/schemas';
 import { like } from 'drizzle-orm';
 import { ForbiddenError } from '../errors';
 import {
+  buildChildProgressSummariesBatch,
   countGuidedMetrics,
   countGuidedMetricsBatch,
   getChildDetail,
@@ -1573,5 +1574,108 @@ describe('dashboard service integration', () => {
     // Both session types must be counted in the this-week tally
     expect(children[0]!.sessionsThisWeek).toBe(2);
     expect(children[0]!.exchangesThisWeek).toBe(8); // 5 + 3
+  });
+
+  // [B72] buildChildProgressSummariesBatch previously ran an unbounded snapshot
+  // scan (no date filter). Children with multi-year history streamed thousands
+  // of snapshot rows per dashboard load. The function now applies a default
+  // 90-day window — old snapshots must be excluded by default.
+  it('B72: snapshot scan is bounded by default window — old snapshots are excluded', async () => {
+    const { profileId: parentProfileId } = await seedProfile({
+      displayName: 'B72 Parent',
+    });
+    const { profileId: childProfileId } = await seedProfile({
+      displayName: 'B72 Child',
+    });
+    await seedFamilyLink(parentProfileId, childProfileId);
+
+    // Recent snapshot (today) — within the default 90-day window.
+    const recent = buildProgressMetrics({ topicsMastered: 7 });
+    await seedProgressSnapshot({
+      profileId: childProfileId,
+      snapshotDate: isoDate(new Date()),
+      metrics: recent,
+    });
+
+    // Ancient snapshot (2 years ago) — far outside the 90-day window. If the
+    // scan were unbounded this would surface and skew the result.
+    const ancient = buildProgressMetrics({ topicsMastered: 999 });
+    await seedProgressSnapshot({
+      profileId: childProfileId,
+      snapshotDate: isoDate(subtractDays(new Date(), 730)),
+      metrics: ancient,
+    });
+
+    const summaries = await buildChildProgressSummariesBatch(db, [
+      {
+        childProfileId,
+        childName: 'B72 Child',
+        sessionsThisWeek: 1,
+        sessionsLastWeek: 0,
+        totalTimeThisWeekMinutes: 15,
+        subjectNames: [],
+        currentStreak: 0,
+      },
+    ]);
+
+    const summary = summaries.get(childProfileId);
+    expect(summary).toBeDefined();
+    // Latest snapshot picked is the recent one (7), NOT the ancient one (999).
+    expect(summary!.progress?.topicsMastered).toBe(7);
+    expect(summary!.progress?.topicsMastered).not.toBe(999);
+  });
+
+  // [B72] When the caller explicitly widens the window, ancient snapshots
+  // become visible — proves the windowDays parameter is wired, not ignored.
+  it('B72: explicit large windowDays surfaces ancient snapshots', async () => {
+    const { profileId: parentProfileId } = await seedProfile({
+      displayName: 'B72-Wide Parent',
+    });
+    const { profileId: childProfileId } = await seedProfile({
+      displayName: 'B72-Wide Child',
+    });
+    await seedFamilyLink(parentProfileId, childProfileId);
+
+    // Only an ancient snapshot exists.
+    const ancient = buildProgressMetrics({ topicsMastered: 42 });
+    await seedProgressSnapshot({
+      profileId: childProfileId,
+      snapshotDate: isoDate(subtractDays(new Date(), 365)),
+      metrics: ancient,
+    });
+
+    // Default 90-day window: latest snapshot is null (ancient excluded).
+    const defaultSummaries = await buildChildProgressSummariesBatch(db, [
+      {
+        childProfileId,
+        childName: 'B72-Wide Child',
+        sessionsThisWeek: 0,
+        sessionsLastWeek: 0,
+        totalTimeThisWeekMinutes: 0,
+        subjectNames: [],
+        currentStreak: 0,
+      },
+    ]);
+    expect(defaultSummaries.get(childProfileId)!.progress).toBeNull();
+
+    // Wider 400-day window: the ancient snapshot surfaces.
+    const widenedSummaries = await buildChildProgressSummariesBatch(
+      db,
+      [
+        {
+          childProfileId,
+          childName: 'B72-Wide Child',
+          sessionsThisWeek: 0,
+          sessionsLastWeek: 0,
+          totalTimeThisWeekMinutes: 0,
+          subjectNames: [],
+          currentStreak: 0,
+        },
+      ],
+      { windowDays: 400 },
+    );
+    expect(widenedSummaries.get(childProfileId)!.progress?.topicsMastered).toBe(
+      42,
+    );
   });
 });

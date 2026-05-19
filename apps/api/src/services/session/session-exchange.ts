@@ -125,7 +125,6 @@ const LANGUAGE_REGEX =
   /\b(how do (you|i) say|translate|in (french|spanish|german|czech|italian|portuguese|japanese|chinese|korean|arabic|russian|hindi|dutch|polish|swedish|norwegian|danish|finnish|greek|turkish|hungarian|romanian|thai|vietnamese|indonesian|malay|tagalog|swahili|hebrew|ukrainian|croatian|serbian|slovak|slovenian|bulgarian|latvian|lithuanian|estonian)|what('s| is) .+ in \w+)\b/i;
 
 const ADVANCED_MODEL_MIN_RUNG = 4;
-const OPENAI_ADVANCED_MODEL_MIN_RUNG = 5;
 const PLUS_ADVANCED_RUNG_ROUTING_REASON = 'plus_included_advanced_rung';
 const PLUS_STANDARD_RUNG_ROUTING_REASON = 'plus_standard_below_advanced_rung';
 const PREMIUM_ADDON_ADVANCED_RUNG_ROUTING_REASON =
@@ -140,24 +139,24 @@ export interface ExchangeLlmRouting {
   routingReason?: string;
 }
 
+// [B71] `advancedLlmProvider` was a per-request provider preference (e.g. force
+// Claude over GPT on advanced rungs) introduced in PR #309 but never wired into
+// any route handler, middleware, env var, or UI surface. It only flowed through
+// service-internal call chains and the manual `scripts/premium-routing-pass.ts`
+// probe. The parameter and its branches were removed in the pre-launch cleanup
+// pass — if per-profile provider preference becomes a real product feature, add
+// a config column + UI control + middleware injection in the same change.
 export function resolveExchangeLlmRouting(input: {
   subscriptionTier?: SubscriptionTier;
   requestedLlmTier?: LLMTier;
   effectiveRung: EscalationRung;
-  advancedLlmProvider?: PreferredLlmProvider;
 }): ExchangeLlmRouting {
   const isAdvancedRung = input.effectiveRung >= ADVANCED_MODEL_MIN_RUNG;
-  const preferredProvider =
-    input.advancedLlmProvider === 'openai' &&
-    input.effectiveRung < OPENAI_ADVANCED_MODEL_MIN_RUNG
-      ? undefined
-      : input.advancedLlmProvider;
 
   if (input.subscriptionTier === 'plus') {
     return isAdvancedRung
       ? {
           llmTier: 'premium',
-          ...(preferredProvider ? { preferredProvider } : {}),
           routingReason: PLUS_ADVANCED_RUNG_ROUTING_REASON,
         }
       : {
@@ -171,7 +170,6 @@ export function resolveExchangeLlmRouting(input: {
     return isAdvancedRung
       ? {
           llmTier: 'premium',
-          ...(preferredProvider ? { preferredProvider } : {}),
           routingReason: PREMIUM_ADDON_ADVANCED_RUNG_ROUTING_REASON,
         }
       : {
@@ -762,7 +760,6 @@ export async function prepareExchangeContext(
     homeworkMode?: 'help_me' | 'check_answer';
     llmTier?: LLMTier;
     subscriptionTier?: SubscriptionTier;
-    advancedLlmProvider?: PreferredLlmProvider;
     memoryFactsReadEnabled?: boolean;
     memoryFactsRelevanceEnabled?: boolean;
     semanticMemoryRetrievalEnabled?: boolean;
@@ -835,7 +832,6 @@ export async function prepareExchangeContext(
     profileRows,
     retentionRows,
     priorTopicSessionRows,
-    priorSubjectSessionRows,
     events,
     memory,
     metadataRows,
@@ -878,18 +874,6 @@ export async function prepareExchangeContext(
           )
           .limit(1)
       : Promise.resolve([]),
-    db
-      .select({ id: learningSessions.id })
-      .from(learningSessions)
-      .where(
-        and(
-          eq(learningSessions.profileId, profileId),
-          eq(learningSessions.subjectId, session.subjectId),
-          ne(learningSessions.id, sessionId),
-          gte(learningSessions.exchangeCount, 1),
-        ),
-      )
-      .limit(1),
     // [BUG-251] Defensive hard cap on the per-session event scan.
     // A natural session has at most MAX_EXCHANGES_PER_SESSION (50) exchange
     // pairs + a small number of ancillary events (drills, system marks).
@@ -1000,7 +984,6 @@ export async function prepareExchangeContext(
   const [profile] = profileRows;
   const isFirstEncounter =
     Boolean(session.topicId) && priorTopicSessionRows.length === 0;
-  const isFirstSessionOfSubject = priorSubjectSessionRows.length === 0;
   if (!profile) {
     // Auth middleware loads the profile before reaching this point, so a missing
     // row here means a referential-integrity break (deleted profile mid-request,
@@ -1295,7 +1278,6 @@ export async function prepareExchangeContext(
     subscriptionTier: options?.subscriptionTier,
     requestedLlmTier: options?.llmTier,
     effectiveRung,
-    advancedLlmProvider: options?.advancedLlmProvider,
   });
 
   // 5. Build prior learning context (FR40 — bridge FR)
@@ -1629,7 +1611,6 @@ export async function prepareExchangeContext(
       ? onboardingSignals.data
       : undefined,
     isFirstEncounter,
-    isFirstSessionOfSubject,
     extractedSignalsToReflect,
     // B.3: Consecutive correct-answer streak at the current escalation rung.
     // Used by the prompt to trigger adaptive escalation when streak >= 4.
@@ -1982,7 +1963,6 @@ export async function processMessage(
     voyageApiKey?: string;
     llmTier?: LLMTier;
     subscriptionTier?: SubscriptionTier;
-    advancedLlmProvider?: PreferredLlmProvider;
     clientId?: string;
     memoryFactsReadEnabled?: boolean;
     memoryFactsRelevanceEnabled?: boolean;
@@ -2151,7 +2131,6 @@ export async function streamMessage(
     voyageApiKey?: string;
     llmTier?: LLMTier;
     subscriptionTier?: SubscriptionTier;
-    advancedLlmProvider?: PreferredLlmProvider;
     clientId?: string;
     memoryFactsReadEnabled?: boolean;
     memoryFactsRelevanceEnabled?: boolean;

@@ -7,6 +7,7 @@
 
 import { Hono } from 'hono';
 import { ERROR_CODES } from '@eduagent/schemas';
+import { type Database, webhookIdempotencyKeys } from '@eduagent/database';
 import { apiError } from '../errors';
 import { inngest } from '../inngest/client';
 import { createLogger } from '../services/logger';
@@ -14,6 +15,46 @@ import { safeSend } from '../services/safe-non-core';
 import { captureException } from '../services/sentry';
 
 const logger = createLogger();
+
+// ---------------------------------------------------------------------------
+// [BUG-319 / CCR PR #254] Atomic webhook idempotency source key.
+//
+// The svix-id is unique per delivered message; the source tag namespaces it
+// so different webhook providers cannot collide on overlapping ID schemes.
+// ---------------------------------------------------------------------------
+const RESEND_WEBHOOK_SOURCE = 'resend';
+
+/**
+ * Attempt to atomically claim a webhook id. Returns:
+ *   - 'claimed'   — first delivery; processing should proceed
+ *   - 'replay'    — another concurrent / earlier delivery already claimed
+ *   - 'unavailable' — DB call failed; the caller decides the fallback
+ *
+ * Uses `INSERT ... ON CONFLICT DO NOTHING RETURNING webhook_id`. Postgres
+ * evaluates the unique constraint atomically: two concurrent inserts with the
+ * same (source, webhook_id) cannot both return a row.
+ */
+export async function claimWebhookId(
+  db: Database,
+  source: string,
+  webhookId: string,
+): Promise<'claimed' | 'replay' | 'unavailable'> {
+  try {
+    const rows = await db
+      .insert(webhookIdempotencyKeys)
+      .values({ source, webhookId })
+      .onConflictDoNothing({
+        target: [
+          webhookIdempotencyKeys.source,
+          webhookIdempotencyKeys.webhookId,
+        ],
+      })
+      .returning({ webhookId: webhookIdempotencyKeys.webhookId });
+    return rows.length === 0 ? 'replay' : 'claimed';
+  } catch {
+    return 'unavailable';
+  }
+}
 
 // ---------------------------------------------------------------------------
 // [CCR-PR120-M7] Svix-id replay deduplication
@@ -268,6 +309,9 @@ export const resendWebhookRoute = new Hono<{
     IDEMPOTENCY_KV?: KVNamespace;
     ENVIRONMENT?: string;
   };
+  Variables: {
+    db?: Database;
+  };
 }>().post('/webhooks/resend', async (c) => {
   const webhookId = c.req.header('svix-id');
   const webhookTimestamp = c.req.header('svix-timestamp');
@@ -317,10 +361,80 @@ export const resendWebhookRoute = new Hono<{
     );
   }
 
-  // [CCR-PR120-M7] Replay guard. Signature is valid, but a captured request
-  // can still be replayed within the 5-minute timestamp window without this.
+  // [BUG-319 / CCR PR #254] Atomic dedup via DB unique constraint.
+  //
+  // The DB is the authoritative gate — `INSERT ... ON CONFLICT DO NOTHING
+  // RETURNING` is evaluated atomically by Postgres, so two concurrent
+  // identical webhooks cannot both claim the same (source, webhook_id) pair.
+  // The previous KV-only check-then-write left a race window between the
+  // .get() and the .put() that two parallel deliveries could slip through.
+  //
+  // The KV fast-path is kept as an opportunistic short-circuit (read is
+  // cheap, propagation isn't atomic) — if the row exists in KV we can reject
+  // without touching the DB. But the DB INSERT is the ONLY source of truth
+  // for "was this webhook already processed?".
+  const db = c.get('db');
   const dedupKv = c.env.IDEMPOTENCY_KV;
   const dedupKey = `${SVIX_DEDUP_PREFIX}${webhookId}`;
+
+  if (db) {
+    const claim = await claimWebhookId(db, RESEND_WEBHOOK_SOURCE, webhookId);
+    if (claim === 'replay') {
+      logger.warn('[resend] Replay detected — duplicate svix-id rejected', {
+        event: 'resend.replay_rejected',
+        webhookId,
+        source: 'db',
+      });
+      return apiError(
+        c,
+        409,
+        ERROR_CODES.CONFLICT,
+        'Webhook already processed (svix-id replay)',
+      );
+    }
+    if (claim === 'unavailable') {
+      // DB unavailable: silent recovery is banned, escalate. We continue to
+      // KV-based protection (weaker) rather than 500-ing — webhook stays
+      // functional under DB outage.
+      logger.warn(
+        '[resend] DB dedup unavailable; falling back to KV (weaker guarantee)',
+        {
+          event: 'resend.dedup_db_unavailable',
+          webhookId,
+        },
+      );
+      await safeSend(
+        () =>
+          inngest.send({
+            name: 'app/resend-webhook.dedup_db_unavailable',
+            data: { webhookId, timestamp: new Date().toISOString() },
+          }),
+        'resend-webhook.dedup-db-unavailable',
+      );
+    }
+  } else if (
+    c.env.ENVIRONMENT === 'production' ||
+    c.env.ENVIRONMENT === 'staging'
+  ) {
+    // No DB middleware in a deployed environment means the atomic gate is
+    // off — surface the regression instead of silently weakening.
+    logger.warn('[resend] db not bound in middleware — atomic dedup disabled', {
+      event: 'resend.dedup_db_missing',
+      environment: c.env.ENVIRONMENT,
+    });
+    await safeSend(
+      () =>
+        inngest.send({
+          name: 'app/resend-webhook.dedup_db_missing',
+          data: {
+            environment: c.env.ENVIRONMENT,
+            timestamp: new Date().toISOString(),
+          },
+        }),
+      'resend-webhook.dedup-db-missing',
+    );
+  }
+
   if (dedupKv) {
     let alreadySeen = false;
     try {
@@ -469,4 +583,5 @@ export const resendWebhookRoute = new Hono<{
 export const __internal = {
   SVIX_DEDUP_PREFIX,
   SVIX_DEDUP_TTL_SECONDS,
+  RESEND_WEBHOOK_SOURCE,
 };

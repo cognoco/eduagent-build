@@ -473,15 +473,11 @@ export function buildSystemPrompt(
     !isLanguageMode &&
     !isRecitation &&
     !isReviewMode;
-  const isSubjectOpenerTurn =
-    context.isFirstSessionOfSubject === true &&
-    context.exchangeCount === 0 &&
-    !isLanguageMode &&
-    !isRecitation &&
-    !isReviewMode &&
-    context.sessionType === 'learning';
-  const isFirstEncounterTopicTurn =
-    isFirstEncounterTopic && !isSubjectOpenerTurn;
+  // The new-topic execution rule applies on turns 1-3 of a first-encounter
+  // topic. Turn 0 is covered by the FIRST TURN RULE (new topic) branch below,
+  // which seeds the lesson plan; the execution rule's job is to keep the
+  // model teaching it on subsequent turns instead of re-probing.
+  const isFirstEncounterTopicTurn = isFirstEncounterTopic && exchangeCount > 0;
   const signalsToReflect = serializeSignalsToReflect(
     context.extractedSignalsToReflect,
   );
@@ -690,7 +686,16 @@ export function buildSystemPrompt(
     );
   }
 
-  // First-exchange teaching rule — teach one concrete idea, then either probe or ask for action
+  // First-exchange teaching rule — anchor and execute.
+  //
+  // History: a May 2026 "first-encounter topic probe" pattern (SUBJECT OPENER +
+  // multi-turn intake) made the LLM ask 3-4 open-ended questions before
+  // teaching anything. Learners reading "what brought you to X / what do you
+  // hope to learn / share a bit more" three turns in a row read it as
+  // interrogation, not tutoring. Replaced with a single anchor-and-execute
+  // rule: the model picks a starting point from the topic description + source
+  // pack, states it briefly, and treats vagueness from the learner as consent
+  // to proceed. The learner overrides explicitly or not at all.
   if (
     !isRecitation &&
     !isReviewMode &&
@@ -698,19 +703,12 @@ export function buildSystemPrompt(
     context.sessionType === 'learning' &&
     !isLanguageMode
   ) {
-    if (isSubjectOpenerTurn) {
+    if (context.isFirstEncounter === true) {
       sections.push(
-        'SUBJECT OPENER: Before any teaching, open with one casual question:\n' +
-          `"Quick - before I dive in: what brought you to ${safeSubjectName}? Anything specific you want to be able to do?"\n` +
-          'Keep it conversational, not formal. Only fire on the very first turn of the very first session of the subject - never repeat. After their answer, follow the FIRST-ENCOUNTER TOPIC RULE on subsequent turns.',
-      );
-    } else if (context.isFirstEncounter === true) {
-      sections.push(
-        'FIRST TURN RULE: Your first response must teach exactly one concrete idea AND end with exactly one focused follow-up question about prior knowledge, a knowledge gap, or what the learner wants to do with this topic. ' +
-          'The final sentence must be that follow-up question. ' +
-          'Do not end this first response with a problem to solve or an explanation to give back. ' +
-          'Do not open with a fun fact, a curiosity hook, or a chatty invitation before teaching. ' +
-          'Start teaching immediately. ' +
+        'FIRST TURN RULE (new topic): Before composing this reply, identify the most natural starting concept for this topic from the topic description and source pack. ' +
+          'Your reply must: (1) name that starting concept in one short clause with a one-clause reason it comes first, (2) teach the first concrete idea about it from the source pack, (3) end with a single short check that confirms the direction or invites the learner to redirect, e.g. "Sound good, or anything specific you want to hit first?". ' +
+          'Do NOT open with an open-ended intake question ("what brought you here", "what do you hope to learn", "what specifically interests you"). You are the expert; you have a plan; lead with it. ' +
+          'Vagueness from the learner (e.g. "you can start", "general is fine", "anything", silence, "idk") counts as consent to your chosen direction - do not re-ask. ' +
           'Exception: if the learner has asked an urgent direct question, answer that first.',
       );
     } else {
@@ -727,11 +725,10 @@ export function buildSystemPrompt(
 
   if (isFirstEncounterTopicTurn) {
     sections.push(
-      'FIRST-ENCOUNTER TOPIC RULE: For the first 3-4 turns on a topic the learner has not seen before, weave one teaching nugget AND one focused follow-up question into each reply. ' +
-        'The follow-up should react to what the learner just said: confirm only source-supported facts, correct unsupported claims by naming what the source does support, or add one new source-supported piece of info, then ask about a knowledge gap or goal you spotted. ' +
-        'Track what they know, what they do not know, and what they want to do with it. ' +
-        'Switch to normal teaching once you have enough signal - by turn 4 at latest. ' +
-        'NEVER frame this as an interview, intake, or assessment. Just be a curious tutor.',
+      'NEW-TOPIC EXECUTION RULE: You already proposed a starting concept on turn 0. Continue teaching it. ' +
+        'Each reply should be mostly teaching content (a source-supported fact, example, or explanation) plus at most one short understanding-check question - not an intake or goal-discovery question. ' +
+        'If the learner overrides your direction, follow them. If they reply vaguely ("ok", "sure", "go on", "idk"), treat it as consent and keep teaching - do NOT ask another open-ended question. ' +
+        'NEVER frame this as an interview, intake, or assessment. You are a tutor executing a lesson plan, not gathering requirements.',
     );
   }
 

@@ -233,8 +233,6 @@ export interface ExchangeContext {
   onboardingSignals?: ExtractedInterviewSignals;
   /** True when this profile has not previously completed an exchange on this topic. */
   isFirstEncounter?: boolean;
-  /** True on the first session this profile has ever started for this subject. */
-  isFirstSessionOfSubject?: boolean;
   /** Topic-probe signals extracted from the prior learner turn, when available. */
   extractedSignalsToReflect?: {
     goals?: string;

@@ -1563,6 +1563,45 @@ describe('updateRetentionFromSession', () => {
     expect(db.update).toHaveBeenCalled();
   });
 
+  it('B73: optimistic lock WHERE clause uses strict equality on updatedAt, not a ±1ms range', async () => {
+    // Break test for B73: the previous implementation used a sql template
+    // producing `updated_at >= start AND updated_at < end` (a 2ms window)
+    // which silently allowed concurrent writers within 1ms of each other to
+    // overwrite stale reads. After tightening, the WHERE clause must compare
+    // updatedAt by strict equality so any divergent timestamp blocks the write.
+    const card = mockRetentionCardRow();
+    setupScopedRepo({ retentionCardFindFirst: card });
+
+    let capturedWhere: unknown = null;
+    const db = createMockDb();
+    (db.update as jest.Mock).mockReturnValue({
+      set: jest.fn().mockReturnValue({
+        where: jest.fn().mockImplementation((expr: unknown) => {
+          capturedWhere = expr;
+          const p = Promise.resolve(undefined);
+          (p as unknown as Record<string, unknown>).returning = jest
+            .fn()
+            .mockResolvedValue([{}]);
+          return p;
+        }),
+      }),
+    });
+
+    await updateRetentionFromSession(db, profileId, topicId, 4);
+
+    expect(capturedWhere).not.toBeNull();
+    // Render the captured WHERE expression to inspect operator usage.
+    const { PgDialect } = await import('drizzle-orm/pg-core');
+    const dialect = new PgDialect();
+    const rendered = dialect.sqlToQuery(capturedWhere as never).sql;
+
+    // Strict equality on updated_at — fingerprint of the tightened lock.
+    expect(rendered).toMatch(/"updated_at"\s*=\s*\$\d+/);
+    // The previous ±1ms range must NOT be present.
+    expect(rendered).not.toMatch(/"updated_at"\s*>=/);
+    expect(rendered).not.toMatch(/"updated_at"\s*<\s/);
+  });
+
   it('F-7: logs warning when optimistic lock conflict is detected (0 rows returned)', async () => {
     const card = mockRetentionCardRow();
     setupScopedRepo({ retentionCardFindFirst: card });

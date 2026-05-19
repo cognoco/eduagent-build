@@ -40,7 +40,12 @@ jest.mock(
 );
 
 import { Hono } from 'hono';
-import { resendWebhookRoute, verifyResendSignature } from './resend-webhook';
+import type { Database } from '@eduagent/database';
+import {
+  resendWebhookRoute,
+  verifyResendSignature,
+  claimWebhookId,
+} from './resend-webhook';
 import { inngest } from '../inngest/client';
 
 // ---------------------------------------------------------------------------
@@ -928,5 +933,309 @@ describe('[CCR-PR120-M7] svix-id replay dedup', () => {
         name: 'app/resend-webhook.dedup_prewrite_failed',
       }),
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [BUG-319 / CCR PR #254] Atomic dedup via DB unique constraint
+//
+// Break tests for the atomic INSERT ... ON CONFLICT DO NOTHING RETURNING
+// strategy that replaces the previous non-atomic KV check-then-write.
+// ---------------------------------------------------------------------------
+
+type ResendWebhookDb = {
+  insert: jest.Mock;
+  __claimedKeys: Set<string>;
+  __insertCallCount: number;
+};
+
+function makeFakeDb(opts?: { failWith?: Error }): ResendWebhookDb {
+  const claimedKeys = new Set<string>();
+  const insertMock = jest.fn();
+
+  const fake: ResendWebhookDb = {
+    insert: insertMock,
+    __claimedKeys: claimedKeys,
+    __insertCallCount: 0,
+  };
+
+  insertMock.mockImplementation((_table: unknown) => {
+    fake.__insertCallCount += 1;
+    let pendingKey: string | null = null;
+
+    const chain = {
+      values: (vals: { source: string; webhookId: string }) => {
+        pendingKey = `${vals.source}:${vals.webhookId}`;
+        return chain;
+      },
+      onConflictDoNothing: (_o: unknown) => chain,
+      returning: async (_cols: unknown) => {
+        if (opts?.failWith) throw opts.failWith;
+        if (pendingKey === null) return [];
+        if (claimedKeys.has(pendingKey)) return [];
+        claimedKeys.add(pendingKey);
+        return [{ webhookId: pendingKey.split(':')[1] }];
+      },
+    };
+    return chain;
+  });
+
+  return fake;
+}
+
+const asDb = (fake: ResendWebhookDb): Database => fake as unknown as Database;
+
+function buildAppWithDb(db: ResendWebhookDb | null) {
+  const a = new Hono();
+  a.use('*', async (c, next) => {
+    if (db) c.set('db' as never, asDb(db) as never);
+    await next();
+  });
+  a.route('/', resendWebhookRoute);
+  return a;
+}
+
+describe('[BUG-319] atomic DB-based webhook idempotency', () => {
+  beforeEach(() => {
+    (inngest.send as jest.Mock).mockClear();
+    mockLoggerWarn.mockClear();
+  });
+
+  it('claimWebhookId: sequential — first claimed, second replay', async () => {
+    const db = makeFakeDb();
+    expect(await claimWebhookId(asDb(db), 'resend', 'msg_seq_1')).toBe(
+      'claimed',
+    );
+    expect(await claimWebhookId(asDb(db), 'resend', 'msg_seq_1')).toBe(
+      'replay',
+    );
+    expect(db.__claimedKeys.has('resend:msg_seq_1')).toBe(true);
+  });
+
+  it('claimWebhookId: returns "unavailable" when DB throws', async () => {
+    const db = makeFakeDb({ failWith: new Error('db connection refused') });
+    expect(await claimWebhookId(asDb(db), 'resend', 'msg_unavail')).toBe(
+      'unavailable',
+    );
+  });
+
+  it('CONCURRENT: 3 parallel claims for same id — exactly ONE claimed', async () => {
+    const db = makeFakeDb();
+    const results = await Promise.all([
+      claimWebhookId(asDb(db), 'resend', 'msg_concurrent'),
+      claimWebhookId(asDb(db), 'resend', 'msg_concurrent'),
+      claimWebhookId(asDb(db), 'resend', 'msg_concurrent'),
+    ]);
+    expect(results.filter((r) => r === 'claimed').length).toBe(1);
+    expect(results.filter((r) => r === 'replay').length).toBe(2);
+    expect(db.__insertCallCount).toBe(3);
+    expect(db.__claimedKeys.size).toBe(1);
+  });
+
+  it('CONCURRENT: different ids are all claimed independently', async () => {
+    const db = makeFakeDb();
+    const results = await Promise.all([
+      claimWebhookId(asDb(db), 'resend', 'msg_a'),
+      claimWebhookId(asDb(db), 'resend', 'msg_b'),
+      claimWebhookId(asDb(db), 'resend', 'msg_c'),
+    ]);
+    expect(results).toEqual(['claimed', 'claimed', 'claimed']);
+    expect(db.__claimedKeys.size).toBe(3);
+  });
+
+  it('HTTP CONCURRENT: 3 identical parallel webhooks — exactly ONE Inngest dispatch', async () => {
+    const db = makeFakeDb();
+    const appWithDb = buildAppWithDb(db);
+    const rawBody = JSON.stringify({
+      type: 'email.bounced',
+      data: { email_id: 'e_race', to: 'r@example.com' },
+    });
+    const id = 'msg_http_race';
+    const ts = nowTimestamp();
+    const sig = await signPayload(rawBody, id, ts);
+    const headers = {
+      'Content-Type': 'application/json',
+      'svix-id': id,
+      'svix-timestamp': ts,
+      'svix-signature': sig,
+    };
+    const responses = await Promise.all([
+      appWithDb.request(
+        '/webhooks/resend',
+        { method: 'POST', headers, body: rawBody },
+        TEST_ENV,
+      ),
+      appWithDb.request(
+        '/webhooks/resend',
+        { method: 'POST', headers, body: rawBody },
+        TEST_ENV,
+      ),
+      appWithDb.request(
+        '/webhooks/resend',
+        { method: 'POST', headers, body: rawBody },
+        TEST_ENV,
+      ),
+    ]);
+    expect(responses.filter((r) => r.status === 200).length).toBe(1);
+    expect(responses.filter((r) => r.status === 409).length).toBe(2);
+    expect(inngest.send).toHaveBeenCalledTimes(1);
+    expect(inngest.send).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'app/email.bounced' }),
+    );
+  });
+
+  it('HTTP SEQUENTIAL: second identical webhook returns 409 — no double-process', async () => {
+    const db = makeFakeDb();
+    const appWithDb = buildAppWithDb(db);
+    const rawBody = JSON.stringify({
+      type: 'email.bounced',
+      data: { email_id: 'e_seq', to: 's@example.com' },
+    });
+    const id = 'msg_http_seq';
+    const ts = nowTimestamp();
+    const sig = await signPayload(rawBody, id, ts);
+    const headers = {
+      'Content-Type': 'application/json',
+      'svix-id': id,
+      'svix-timestamp': ts,
+      'svix-signature': sig,
+    };
+    const first = await appWithDb.request(
+      '/webhooks/resend',
+      { method: 'POST', headers, body: rawBody },
+      TEST_ENV,
+    );
+    expect(first.status).toBe(200);
+    expect(inngest.send).toHaveBeenCalledTimes(1);
+    (inngest.send as jest.Mock).mockClear();
+    const second = await appWithDb.request(
+      '/webhooks/resend',
+      { method: 'POST', headers, body: rawBody },
+      TEST_ENV,
+    );
+    expect(second.status).toBe(409);
+    expect((await second.json()).code).toBe('CONFLICT');
+    expect(inngest.send).not.toHaveBeenCalled();
+  });
+
+  it('HTTP DIFFERENT IDs: both processed normally', async () => {
+    const db = makeFakeDb();
+    const appWithDb = buildAppWithDb(db);
+    const makeReq = async (id: string, emailId: string) => {
+      const rawBody = JSON.stringify({
+        type: 'email.bounced',
+        data: { email_id: emailId, to: 'd@example.com' },
+      });
+      const ts = nowTimestamp();
+      const sig = await signPayload(rawBody, id, ts);
+      return appWithDb.request(
+        '/webhooks/resend',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'svix-id': id,
+            'svix-timestamp': ts,
+            'svix-signature': sig,
+          },
+          body: rawBody,
+        },
+        TEST_ENV,
+      );
+    };
+    const [r1, r2] = await Promise.all([
+      makeReq('msg_diff_a', 'e_a'),
+      makeReq('msg_diff_b', 'e_b'),
+    ]);
+    expect(r1.status).toBe(200);
+    expect(r2.status).toBe(200);
+    expect(inngest.send).toHaveBeenCalledTimes(2);
+    expect(db.__claimedKeys.size).toBe(2);
+  });
+
+  it('HTTP DB UNAVAILABLE: 200 with observability signal — no silent recovery', async () => {
+    const db = makeFakeDb({ failWith: new Error('db pool exhausted') });
+    const appWithDb = buildAppWithDb(db);
+    const rawBody = JSON.stringify({
+      type: 'email.delivered',
+      data: { to: 'u@example.com' },
+    });
+    const id = 'msg_db_down';
+    const ts = nowTimestamp();
+    const sig = await signPayload(rawBody, id, ts);
+    const res = await appWithDb.request(
+      '/webhooks/resend',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'svix-id': id,
+          'svix-timestamp': ts,
+          'svix-signature': sig,
+        },
+        body: rawBody,
+      },
+      TEST_ENV,
+    );
+    expect(res.status).toBe(200);
+    expect(mockLoggerWarn).toHaveBeenCalledWith(
+      expect.stringContaining('DB dedup unavailable'),
+      expect.objectContaining({ webhookId: id }),
+    );
+    expect(inngest.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'app/resend-webhook.dedup_db_unavailable',
+      }),
+    );
+  });
+
+  it('HTTP BREAK-TEST proof: bypassing claimWebhookId lets all 3 race winners through (regression-pair)', async () => {
+    // "Revert and watch it fail" half of the break-test pair: simulate the
+    // pre-fix world where the DB does NOT atomically block the second writer.
+    // All 3 parallel identical webhooks should dispatch an Inngest event.
+    const brokenDb: ResendWebhookDb = {
+      insert: jest.fn(() => ({
+        values: () => ({
+          onConflictDoNothing: () => ({
+            returning: async () => [{ webhookId: 'whatever' }],
+          }),
+        }),
+      })),
+      __claimedKeys: new Set(),
+      __insertCallCount: 0,
+    };
+    const appWithBrokenDb = buildAppWithDb(brokenDb);
+    const rawBody = JSON.stringify({
+      type: 'email.bounced',
+      data: { email_id: 'e_proof', to: 'p@example.com' },
+    });
+    const id = 'msg_proof';
+    const ts = nowTimestamp();
+    const sig = await signPayload(rawBody, id, ts);
+    const headers = {
+      'Content-Type': 'application/json',
+      'svix-id': id,
+      'svix-timestamp': ts,
+      'svix-signature': sig,
+    };
+    const responses = await Promise.all([
+      appWithBrokenDb.request(
+        '/webhooks/resend',
+        { method: 'POST', headers, body: rawBody },
+        TEST_ENV,
+      ),
+      appWithBrokenDb.request(
+        '/webhooks/resend',
+        { method: 'POST', headers, body: rawBody },
+        TEST_ENV,
+      ),
+      appWithBrokenDb.request(
+        '/webhooks/resend',
+        { method: 'POST', headers, body: rawBody },
+        TEST_ENV,
+      ),
+    ]);
+    expect(responses.every((r) => r.status === 200)).toBe(true);
+    expect(inngest.send).toHaveBeenCalledTimes(3);
   });
 });

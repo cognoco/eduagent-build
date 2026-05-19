@@ -64,7 +64,6 @@
     "learningMode": "serious",
     "exchangeCount": 2,
     "isFirstEncounter": false,
-    "isFirstSessionOfSubject": false,
     "extractedSignalsToReflect": null,
     "inputMode": "text",
     "llmTier": "standard",
