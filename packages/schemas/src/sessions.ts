@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { verificationTypeSchema } from './assessments.ts';
 import { isoDateField } from './common.ts';
+import { challengeRoundEvaluationItemSchema } from './llm-envelope.ts';
 import {
   celebrationReasonSchema,
   pendingCelebrationSchema,
@@ -142,6 +143,45 @@ export const homeworkSummarySchema = z.object({
 });
 export type HomeworkSummary = z.infer<typeof homeworkSummarySchema>;
 
+/**
+ * Challenge Round state machine — lives inside session metadata so a session
+ * close + resume preserves which question the learner was on. The server is
+ * the source of truth; mobile reads state via the session SSE stream.
+ *
+ * - `offered`: server has offered the round; learner has not yet responded.
+ * - `accepted`: learner tapped Accept; first question is being prepared.
+ * - `declined`: learner tapped Decline. Combined with `declinedDontAskAgain`
+ *   to gate within-session re-offers.
+ * - `active`: a question has been delivered and the learner's answer is awaited.
+ * - `drafting`: all questions answered; note is being drafted from solid items.
+ * - `complete`: drafted note saved or skipped; the round is fully finished.
+ * - `aborted`: learner closed the session or hit silence timeout mid-round.
+ */
+export const challengeRoundStateEnum = z.enum([
+  'offered',
+  'accepted',
+  'declined',
+  'active',
+  'drafting',
+  'complete',
+  'aborted',
+]);
+export type ChallengeRoundState = z.infer<typeof challengeRoundStateEnum>;
+
+export const challengeRoundSessionStateSchema = z.object({
+  state: challengeRoundStateEnum,
+  startedAt: z.string().datetime().optional(),
+  questionIndex: z.number().int().min(0).max(9).optional(),
+  totalQuestions: z.number().int().min(1).max(10).optional(),
+  offerCount: z.number().int().min(0).default(0),
+  topicId: z.string().uuid().optional(),
+  declinedDontAskAgain: z.boolean().default(false),
+  evaluations: z.array(challengeRoundEvaluationItemSchema).max(10).default([]),
+});
+export type ChallengeRoundSessionState = z.infer<
+  typeof challengeRoundSessionStateSchema
+>;
+
 export const sessionMetadataSchema = z
   .object({
     inputMode: inputModeSchema.optional(),
@@ -173,9 +213,18 @@ export const sessionMetadataSchema = z
     continuationDepth: z.enum(['low', 'mid', 'high']).optional(),
     reviewCalibrationAttempts: z.number().int().min(0).optional(),
     reviewCalibrationFiredAt: isoDateField.optional(),
+    /**
+     * Challenge Round state machine for this session. Server-owned; mobile
+     * reflects via session-streaming. Absent = no round has been offered.
+     */
+    challengeRound: challengeRoundSessionStateSchema.optional(),
   })
   .strip();
 export type SessionMetadata = z.infer<typeof sessionMetadataSchema>;
+
+export const sessionStartMetadataSchema = sessionMetadataSchema.omit({
+  challengeRound: true,
+});
 
 export const sessionStartSchema = z.object({
   subjectId: z.string().uuid(),
@@ -183,7 +232,7 @@ export const sessionStartSchema = z.object({
   sessionType: sessionTypeSchema.default('learning'),
   verificationType: z.enum(['standard', 'evaluate', 'teach_back']).optional(),
   inputMode: inputModeSchema.default('text'),
-  metadata: sessionMetadataSchema.optional(),
+  metadata: sessionStartMetadataSchema.optional(),
   rawInput: z.string().max(500).nullable().optional(),
 });
 export type SessionStartInput = z.infer<typeof sessionStartSchema>;

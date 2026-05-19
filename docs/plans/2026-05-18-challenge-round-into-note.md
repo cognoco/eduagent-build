@@ -1,5 +1,9 @@
 # Sunset Challenge Mode Toggle + Add Challenge Round Into Note — Implementation Plan
 
+> **AUTHORITATIVE TARGET DECISIONS (2026-05-19):** Storage targets, session-CRUD helper names, struggleStatusSchema placement, and Challenge Round LLM routing policy are resolved in `docs/plans/2026-05-18-challenge-round-targets.md` (Task 0.0 + 0.0a output). That doc OVERRIDES any inline references below to `topic_mastery_state`, `review_targets`, `topic-progress.ts`, `getSessionById`, or `getSession`. The real targets are: `assessments.mastery_challenge_verified_at` (CRIT-1), `needs_deepening_topics` extended with `source/concept/misconception/correction` (CRIT-2), `getSession()` already scoped via `createScopedRepository` (CRIT-3), `struggle-status.ts` mirroring `retention-status.ts` (CRIT-4), and a routing-only rung floor of 4 via a new `llmRoutingRung` field on `ExchangeContext` (ROUTING-1..5). When a section below says "decide between (a)/(b)/(c)" for those four findings, the decision has already been made — see the targets doc.
+>
+> **Phase 0 status:** complete (PR #325, merged 2026-05-19). PR B (target decisions): PR #331. Current PR (PR C — envelope + struggle-status): in flight.
+>
 > **Current recommendation (2026-05-19):** This plan is still worth doing, but it is no longer a single-PR plan. Execute it as a small workstream: first sunset the persistent mode toggle, then land Challenge Round behind explicit storage/routing/eval decisions. Treat the checkboxes below as a task bank, not as permission to start every task in one branch.
 >
 > **For agentic workers:** Follow `AGENTS.md`, `docs/project_context.md`, `docs/architecture.md`, and the repo skills (`project-memory`, `commit`, `deep-bugfixing` when reviewing). Do not use old `/commit` or "superpowers" instructions literally; replace them with the current Codex repo workflow.
@@ -391,7 +395,7 @@ List every exported function.
 Find the closest equivalents to `getSessionById` and `persistSessionMetadata`.
 ```
 
-Document the actual names. Update every plan reference (Tasks 8, 9, 11 — search for `getSessionById|persistSessionMetadata`) to use the real names. If the real helpers don't enforce `profileId` scoping the way the plan assumes (CLAUDE.md non-negotiable rule), add a Task 9.0 to either (i) extract `getSessionByIdScoped(sessionId, profileId)` with a break test that proves cross-profile access returns null, or (ii) inline the scoping check at every route handler. Decide which.
+Document the actual names. Update every plan reference (Tasks 8, 9, 11 — search for `getSessionById|persistSessionMetadata`) to use the real names. If the real helpers don't enforce `profileId` scoping the way the plan assumes (CLAUDE.md non-negotiable rule), add a Task 9.0 to either (i) extract `getSession(sessionId, profileId)` with a break test that proves cross-profile access returns null, or (ii) inline the scoping check at every route handler. Decide which.
 
 - [ ] **Step 4: Schema export of `struggleStatusSchema` (CRIT-4)**
 
@@ -2079,7 +2083,7 @@ Expected: new snapshots written under `apps/api/eval-llm/__snapshots__/`. Review
 
 - [ ] **Step 0: Confirm Task 0.0 spike is committed (CRIT-3)**
 
-Task 8 references `getSessionById` / `persistSessionMetadata`. Substitute the real names from the Task 0.0 spike decision doc before writing code. If the spike concluded a new `getSessionByIdScoped` helper needs extracting, do that as Step 0.5 here.
+Task 8 references `getSessionById` / `persistSessionMetadata`. Substitute the real names from the Task 0.0 spike decision doc before writing code. If the spike concluded a new `getSession` helper needs extracting, do that as Step 0.5 here.
 
 - [ ] **Step 0.5: Apply the routing-policy amendment before envelope work (ROUTING-1, ROUTING-2)**
 
@@ -2308,7 +2312,7 @@ describe('session exchange — challenge round dispatch', () => {
       content: JSON.stringify({ reply: 'try a challenge?', signals: { challenge_round_offer: true }, confidence: 'medium' }),
     });
     await processMessage(db, profile.id, session.id, { message: 'got it' });
-    const refetched = await getSessionByIdScoped(session.id, profile.id);
+    const refetched = await getSession(db, profile.id, session.id);
     expect(refetched.metadata.challengeRound.state).toBe('offered');
   });
 });
@@ -2443,7 +2447,13 @@ import { z } from 'zod';
 import { transitionChallengeState } from '@/services/challenge-round/state';
 import { evaluateChallengeReadiness } from '@/services/challenge-round/trigger';
 import { recordCooldown } from '@/services/challenge-round/cooldown';
-import { getSessionById, persistSessionMetadata } from '@/services/session/session-crud';
+// NOTE (2026-05-19 targets doc): `getSessionById` does not exist. Real helper is
+// `getSession(db, profileId, sessionId)` — already scoped via createScopedRepository.
+// `persistSessionMetadata` is a post-Task-8 extraction from the file-local
+// `updateSessionMetadata` in session-exchange.ts; keep it profile-scoped as
+// `persistSessionMetadata(db, profileId, sessionId, partial)`.
+import { persistSessionMetadata } from '@/services/session/session-metadata';
+import { getSession } from '@/services/session/session-crud';
 import { safeSend } from '@/services/safe-non-core';
 
 const maybeOfferSchema = z.object({ sessionId: z.string().uuid(), topicId: z.string().uuid() });
@@ -2454,8 +2464,9 @@ const abortSchema = z.object({ sessionId: z.string().uuid() });
 export const challengeRoundRoutes = new Hono()
   .post('/maybe-offer', async (c) => {
     const body = maybeOfferSchema.parse(await c.req.json());
+    const db = c.get('db');
     const profileId = c.get('profileId');
-    const session = await getSessionById(body.sessionId, profileId);
+    const session = await getSession(db, profileId, body.sessionId);
 
     // HIGH-2: pre-flight state check to avoid double-offer race with server-initiated path
     const currentState = session.metadata?.challengeRound?.state;
@@ -2470,40 +2481,45 @@ export const challengeRoundRoutes = new Hono()
       ...session.metadata,
       challengeRound: transitionChallengeState(session.metadata?.challengeRound, { type: 'offer', topicId: body.topicId }),
     };
-    await persistSessionMetadata(session.id, session.metadata);
+    await persistSessionMetadata(db, profileId, session.id, session.metadata);
     return c.json({ offered: true });
   })
   .post('/accept', async (c) => {
     const body = acceptSchema.parse(await c.req.json());
-    const session = await getSessionById(body.sessionId, c.get('profileId'));
+    const db = c.get('db');
+    const profileId = c.get('profileId');
+    const session = await getSession(db, profileId, body.sessionId);
     session.metadata = {
       ...session.metadata,
       challengeRound: transitionChallengeState(session.metadata?.challengeRound, { type: 'accept' }),
     };
-    await persistSessionMetadata(session.id, session.metadata);
+    await persistSessionMetadata(db, profileId, session.id, session.metadata);
     return c.json({ ok: true });
   })
   .post('/decline', async (c) => {
     const body = declineSchema.parse(await c.req.json());
     const db = c.get('db');
-    const session = await getSessionById(body.sessionId, c.get('profileId'));
+    const profileId = c.get('profileId');
+    const session = await getSession(db, profileId, body.sessionId);
     session.metadata = {
       ...session.metadata,
       challengeRound: transitionChallengeState(session.metadata?.challengeRound, { type: 'decline', dontAskAgain: body.dontAskAgain }),
     };
-    await persistSessionMetadata(session.id, session.metadata);
-    await recordCooldown(db, { profileId: c.get('profileId'), topicId: body.topicId, outcome: 0 });
+    await persistSessionMetadata(db, profileId, session.id, session.metadata);
+    await recordCooldown(db, { profileId, topicId: body.topicId, outcome: 0 });
     await safeSend('challenge.round.declined', { sessionId: body.sessionId, topicId: body.topicId });
     return c.json({ ok: true });
   })
   .post('/abort', async (c) => {
     const body = abortSchema.parse(await c.req.json());
-    const session = await getSessionById(body.sessionId, c.get('profileId'));
+    const db = c.get('db');
+    const profileId = c.get('profileId');
+    const session = await getSession(db, profileId, body.sessionId);
     session.metadata = {
       ...session.metadata,
       challengeRound: transitionChallengeState(session.metadata?.challengeRound, { type: 'abort' }),
     };
-    await persistSessionMetadata(session.id, session.metadata);
+    await persistSessionMetadata(db, profileId, session.id, session.metadata);
     return c.json({ ok: true });
   });
 ```

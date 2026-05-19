@@ -349,6 +349,100 @@ describe('sessionMetadataSchema', () => {
 });
 
 // ---------------------------------------------------------------------------
+// sessionMetadata.challengeRound — Challenge Round in-session state
+// (Task 2 of docs/plans/2026-05-18-challenge-round-into-note.md)
+// ---------------------------------------------------------------------------
+describe('sessionMetadata.challengeRound', () => {
+  it('defaults to undefined when not set', () => {
+    const m = sessionMetadataSchema.parse({});
+    expect(m.challengeRound).toBeUndefined();
+  });
+
+  it('accepts an active state with question progress', () => {
+    const m = sessionMetadataSchema.parse({
+      challengeRound: {
+        state: 'active',
+        startedAt: new Date('2026-05-19T12:00:00Z').toISOString(),
+        questionIndex: 1,
+        totalQuestions: 3,
+        offerCount: 1,
+        topicId: UUID,
+      },
+    });
+    expect(m.challengeRound?.state).toBe('active');
+    expect(m.challengeRound?.questionIndex).toBe(1);
+    expect(m.challengeRound?.totalQuestions).toBe(3);
+  });
+
+  it('defaults offerCount + declinedDontAskAgain + evaluations when absent', () => {
+    const m = sessionMetadataSchema.parse({
+      challengeRound: { state: 'offered' },
+    });
+    expect(m.challengeRound?.offerCount).toBe(0);
+    expect(m.challengeRound?.declinedDontAskAgain).toBe(false);
+    expect(m.challengeRound?.evaluations).toEqual([]);
+  });
+
+  it('rejects an unknown state value', () => {
+    expect(
+      sessionMetadataSchema.safeParse({
+        challengeRound: { state: 'frobnicated' },
+      }).success,
+    ).toBe(false);
+  });
+
+  it('preserves declined + dontAskAgain combination', () => {
+    const m = sessionMetadataSchema.parse({
+      challengeRound: {
+        state: 'declined',
+        offerCount: 1,
+        declinedDontAskAgain: true,
+      },
+    });
+    expect(m.challengeRound?.state).toBe('declined');
+    expect(m.challengeRound?.declinedDontAskAgain).toBe(true);
+  });
+
+  it('caps evaluations array at 10 items', () => {
+    const item = {
+      concept: 'x',
+      result: 'solid' as const,
+      evidence: 'ok',
+      answerEventId: 'e-1',
+      learnerQuote: 'q',
+    };
+    expect(
+      sessionMetadataSchema.safeParse({
+        challengeRound: {
+          state: 'drafting',
+          evaluations: Array.from({ length: 11 }, () => item),
+        },
+      }).success,
+    ).toBe(false);
+  });
+
+  it('accepts a complete round with evaluations attached', () => {
+    const m = sessionMetadataSchema.parse({
+      challengeRound: {
+        state: 'complete',
+        questionIndex: 2,
+        totalQuestions: 3,
+        evaluations: [
+          {
+            concept: 'a',
+            result: 'solid',
+            evidence: 'ok',
+            answerEventId: 'e-a',
+            learnerQuote: 'q-a',
+          },
+        ],
+      },
+    });
+    expect(m.challengeRound?.evaluations).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // sessionStartSchema
 // ---------------------------------------------------------------------------
 describe('sessionStartSchema', () => {
@@ -384,6 +478,24 @@ describe('sessionStartSchema', () => {
         rawInput: 'x'.repeat(501),
       }).success,
     ).toBe(false);
+  });
+
+  it('strips server-owned challengeRound metadata from client starts', () => {
+    const result = sessionStartSchema.parse({
+      subjectId: UUID,
+      metadata: {
+        inputMode: 'voice',
+        challengeRound: {
+          state: 'active',
+          offerCount: 1,
+          topicId: UUID,
+          evaluations: [],
+        },
+      },
+    });
+
+    expect(result.metadata).toEqual({ inputMode: 'voice' });
+    expect(result.metadata).not.toHaveProperty('challengeRound');
   });
 });
 
