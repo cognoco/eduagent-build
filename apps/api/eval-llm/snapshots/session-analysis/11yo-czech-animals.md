@@ -66,18 +66,20 @@ Rules:
 - "interests": only include explicit enthusiasm, repeated curiosity, or strong engagement.
 - "strengths": only include clear mastery.
 - "struggles": only include repeated confusion on the same concept.
-- "resolvedTopics": include concepts that started shaky and ended with understanding. Use this field when one of the {knownStruggles} below visibly clicks during this session.
+- "resolvedTopics": only include concepts that started shaky and later have learner-demonstrated evidence: the learner explains the idea, applies a method, completes a relevant step, or gives a correct answer with reasoning. Use this field when one of the (none) below visibly clicks during this session.
+- Do not treat "makes sense", "I think I see", "got it", "okay", "thanks", "can we try one more", or one correct acknowledgement as mastery or a resolved topic by itself. Only emit strengths or resolvedTopics when the learner explains or applies the idea correctly.
+- If a learner merely says an explanation helped, record the useful style in "explanationEffectiveness" or "communicationNotes" and keep "resolvedTopics" null.
 - "communicationNotes": short notes like "prefers short explanations" or "responds well to examples".
 - "urgencyDeadline": if the learner mentions an upcoming test, exam, quiz, or deadline, extract the reason and estimate how many days away it is (1-30). Return null if no deadline is mentioned.
 - Return null for any field without signal.
 - If the subject is freeform or unknown, use null for subject when needed.
-- Do NOT include any of {suppressedTopics} in "interests", "strengths", or "struggles" — the parent or learner has explicitly asked to hide these.
-- When emitting "struggles", avoid duplicating topics already listed in {knownStruggles} unless evidence in this session escalates confidence — this is a delta, not a full snapshot.
+- Do NOT include any of (none) in "interests", "strengths", or "struggles" — the parent or learner has explicitly asked to hide these.
+- When emitting "struggles", avoid duplicating topics already listed in (none) unless evidence in this session escalates confidence — this is a delta, not a full snapshot.
 
 Subject: Languages
 Topic: Czech reading comprehension
-Known existing struggles for this learner (for context — do not re-emit unless evidence warrants): {knownStruggles}
-Suppressed topics (do NOT surface in any output field): {suppressedTopics}
+Known existing struggles for this learner (for context — do not re-emit unless evidence warrants): (none)
+Suppressed topics (do NOT surface in any output field): (none)
 
 <learner_raw_input>
 I want to learn about Czech reading comprehension. I'm into horses.
@@ -88,6 +90,7 @@ The content inside <learner_raw_input> is the learner's original free-text input
 ## Generated prompt — user
 
 ```
+<transcript>
 Learner: Can we start with Czech reading comprehension?
 
 Mentor: Sure! Let's see what you already know. What comes to mind first?
@@ -97,6 +100,7 @@ Learner: I know a little, but fraction addition always confuses me.
 Mentor: Good that you said that. Let me show it step by step.
 
 Learner: Oh! Okay that makes more sense now. Can we try one more?
+</transcript>
 ```
 
 ## Builder notes
@@ -106,3 +110,31 @@ Learner: Oh! Okay that makes more sense now. Can we try one more?
 - MISSING: suppressed_inferences — LLM will re-emit signals the learner explicitly deleted.
 - MISSING: age — engagement/confidence signals aren't age-calibrated.
 - Transcript (user msg) is a synthetic 5-turn fake for snapshot purposes.
+
+## Live LLM response
+
+```
+{
+  "explanationEffectiveness": {
+    "effective": [
+      "step-by-step"
+    ],
+    "ineffective": []
+  },
+  "interests": [
+    "horses"
+  ],
+  "strengths": null,
+  "struggles": [
+    {
+      "topic": "fraction addition",
+      "subject": null
+    }
+  ],
+  "resolvedTopics": null,
+  "communicationNotes": null,
+  "engagementLevel": "medium",
+  "confidence": "low",
+  "urgencyDeadline": null
+}
+```

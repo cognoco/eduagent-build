@@ -49,6 +49,7 @@ closingLine rules:
 - One sentence that mirrors what the learner specifically did in this session
 - Mention the concept or skill they worked through
 - Not a grade and not generic praise
+- Stay evidence-bound: do not infer mastery, confidence, or "really understood" unless the transcript shows the learner demonstrating it
 - Tone: early teen (11-13): friendly, concrete, warm
 - Max 150 characters
 
@@ -56,14 +57,16 @@ takeaways rules:
 - 2 to 4 items
 - Each item is a single sentence in second person
 - Each item names a specific concept, connection, or skill from the transcript
+- Use practiced, noticed, connected, or asked about when evidence is partial; avoid mastered, nailed, aced, or fully understood
 - No markdown bullets in the JSON; return plain strings
 - Tone: early teen (11-13): friendly, concrete, warm
 - Max 200 characters per item
 
 A likely next topic is <next_topic>fossilization</next_topic>.
-If the connection is genuinely clear, set nextTopicReason to one sentence explaining why it follows from this session.
+If the connection is genuinely clear, set nextTopicReason to one short sentence explaining why it follows from this session.
 If the connection is weak or unclear, set nextTopicReason to null.
-Max 120 characters for nextTopicReason.
+nextTopicReason must be 12 words or fewer and max 120 characters.
+If your reason is longer, shorten it before returning JSON.
 ```
 
 ## Generated prompt — user
@@ -91,3 +94,19 @@ Mentor: Great. Put it in your own words one more time.
 - Age tier: early teen (11-13): friendly, concrete, warm
 - Next topic: fossilization
 - Transcript is a synthetic 8-turn learner recap fixture.
+
+## Live LLM response
+
+```
+```json
+{
+  "closingLine": "You connected a challenging step in a process back to its starting point, understanding how cycles like fossilization work.",
+  "takeaways": [
+    "You identified a confusing part of a process, asking for help to unpack it.",
+    "You connected the 'output' of a process back to its beginning, especially in the context of fossilization.",
+    "You noticed why understanding individual steps is important for grasping the entire process."
+  ],
+  "nextTopicReason": "You explored fossilization's processes, making it a clear next step."
+}
+```
+```

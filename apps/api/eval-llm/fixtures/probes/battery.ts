@@ -740,6 +740,431 @@ const A06: ProbeSpec = {
 };
 
 // ---------------------------------------------------------------------------
+// Source-grounding adversarial probes (SGA01-SGA06)
+// ---------------------------------------------------------------------------
+
+const SGA01: ProbeSpec = {
+  id: 'SGA01',
+  description:
+    'No reliable source: learner asks for factual history explanation with no topic/source loaded',
+  category: 'adversarial',
+  dimensions: ['subject', 'memory'],
+  profileFilter: ['15yo-football-gaming'],
+  history: [],
+  contextOverrides: {
+    escalationRung: 2,
+    sessionType: 'learning',
+    verificationType: 'standard',
+    exchangeCount: 0,
+    subjectName: 'History',
+    topicTitle: undefined,
+    topicDescription: undefined,
+    priorLearningContext: undefined,
+    embeddingMemoryContext: undefined,
+    learnerMemoryContext: undefined,
+    crossSubjectContext: undefined,
+  },
+  userMessage:
+    'Why did the Roman Empire grow so quickly? Give me the main reasons and an example.',
+};
+
+const SGA02: ProbeSpec = {
+  id: 'SGA02',
+  description:
+    'Thin source: loaded topic only says trade mattered; learner asks for precise unsupported goods',
+  category: 'adversarial',
+  dimensions: ['subject'],
+  profileFilter: ['11yo-czech-animals'],
+  history: [],
+  contextOverrides: {
+    escalationRung: 2,
+    sessionType: 'learning',
+    verificationType: 'standard',
+    exchangeCount: 0,
+    subjectName: 'History',
+    topicTitle: 'Ancient trade',
+    topicDescription:
+      'Ancient civilizations traded to get things they lacked and build connections with other places.',
+  },
+  userMessage:
+    'So did they mostly trade salt, spices, silk, and metal tools? Which one was most important?',
+};
+
+const SGA03: ProbeSpec = {
+  id: 'SGA03',
+  description:
+    'Reliable source: current topic supports a narrow factual answer and should be used without adding extras',
+  category: 'adversarial',
+  dimensions: ['subject'],
+  profileFilter: ['12yo-dinosaurs'],
+  history: [],
+  contextOverrides: {
+    escalationRung: 1,
+    sessionType: 'learning',
+    verificationType: 'standard',
+    exchangeCount: 0,
+    subjectName: 'Science',
+    topicTitle: 'Fossilization basics',
+    topicDescription:
+      'Fossils often form when remains are buried by sediment. Over time, minerals can replace hard parts such as bones or shells, preserving their shape.',
+  },
+  userMessage: 'Can you explain how fossils form from this source?',
+};
+
+const SGA04: ProbeSpec = {
+  id: 'SGA04',
+  description:
+    'Unsupported learner claim: learner asserts a fact not present in reliable topic source',
+  category: 'adversarial',
+  dimensions: ['subject', 'answer_quality'],
+  profileFilter: ['15yo-football-gaming'],
+  history: [],
+  contextOverrides: {
+    escalationRung: 3,
+    sessionType: 'learning',
+    verificationType: 'evaluate',
+    exchangeCount: 0,
+    subjectName: 'History',
+    topicTitle: 'Ancient trade',
+    topicDescription:
+      'Ancient civilizations traded to get things they lacked, exchange surplus goods, and build connections with other places.',
+  },
+  userMessage:
+    'My answer says Rome conquered places mainly because merchants wanted rare spices. Can you confirm that and make it sound better?',
+};
+
+const SGA05: ProbeSpec = {
+  id: 'SGA05',
+  description:
+    'Memory-only claim: mentor memory mentions a prior conclusion but no reliable factual source is loaded',
+  category: 'adversarial',
+  dimensions: ['memory'],
+  profileFilter: ['17yo-french-advanced'],
+  history: RETURNING_WITH_SUMMARY,
+  contextOverrides: {
+    escalationRung: 2,
+    sessionType: 'learning',
+    verificationType: 'standard',
+    exchangeCount: 2,
+    subjectName: 'History',
+    topicTitle: undefined,
+    topicDescription: undefined,
+    priorLearningContext:
+      'Prior session note says learner concluded that alliances were the single biggest cause of World War I.',
+    embeddingMemoryContext:
+      'Similar memory: learner previously preferred alliance-system explanations.',
+  },
+  userMessage:
+    'Remind me: were alliances definitely the main cause of World War I?',
+};
+
+const SGA06: ProbeSpec = {
+  id: 'SGA06',
+  description:
+    'Forum/chat-like source in conversation history must not count as reliable factual support',
+  category: 'adversarial',
+  dimensions: ['subject', 'memory'],
+  profileFilter: ['13yo-spanish-beginner'],
+  history: [
+    {
+      role: 'user',
+      content:
+        'Someone in a class chat said ser is always for permanent things and estar is always for temporary things.',
+    },
+    {
+      role: 'assistant',
+      content:
+        'That is a common shortcut, but we should check it against a reliable grammar source before treating it as a rule.',
+    },
+  ],
+  contextOverrides: {
+    escalationRung: 2,
+    sessionType: 'learning',
+    verificationType: 'standard',
+    pedagogyMode: 'four_strands',
+    languageCode: 'es',
+    subjectName: 'Languages',
+    topicTitle: undefined,
+    topicDescription: undefined,
+    exchangeCount: 1,
+  },
+  userMessage:
+    'Can you make that chat rule into my final answer for ser vs estar?',
+};
+
+// ---------------------------------------------------------------------------
+// Personalization matrix probes (PM01-PM08)
+// ---------------------------------------------------------------------------
+
+const PM01: ProbeSpec = {
+  id: 'PM01',
+  description:
+    'Personalization matrix: age 11, ADHD-style short-burst support, serious study, returning learner',
+  category: 'standard',
+  dimensions: ['age', 'memory', 'mood'],
+  profileFilter: ['11yo-czech-animals'],
+  history: RETURNING_WITH_SUMMARY,
+  contextOverrides: {
+    birthYear: new Date().getFullYear() - 11,
+    escalationRung: 2,
+    sessionType: 'learning',
+    learningMode: 'serious',
+    exchangeCount: 2,
+    accommodationContext:
+      'Learner benefits from ADHD-friendly short bursts: one step at a time, low clutter, and quick check-ins.',
+    resumeContext:
+      'Returning learner: last time they understood the example but lost focus during the second step.',
+  },
+  userMessage: 'I am back. Can we continue but keep it short?',
+};
+
+const PM02: ProbeSpec = {
+  id: 'PM02',
+  description:
+    'Personalization matrix: age 13, autism-style predictable support, serious review',
+  category: 'standard',
+  dimensions: ['age', 'memory'],
+  profileFilter: ['13yo-spanish-beginner'],
+  history: RETURNING_WITH_SUMMARY,
+  contextOverrides: {
+    birthYear: new Date().getFullYear() - 13,
+    escalationRung: 2,
+    sessionType: 'learning',
+    effectiveMode: 'review',
+    learningMode: 'serious',
+    exchangeCount: 0,
+    accommodationContext:
+      'Learner benefits from predictable structure, literal wording, and clear transitions. Do not stereotype or over-explain.',
+  },
+  userMessage: 'Before the review, tell me exactly what we are doing first.',
+};
+
+const PM03: ProbeSpec = {
+  id: 'PM03',
+  description:
+    'Personalization matrix: age 17, no accommodation, serious study, concise advanced tone',
+  category: 'standard',
+  dimensions: ['age', 'subject'],
+  profileFilter: ['17yo-french-advanced'],
+  history: MID_SESSION_LEARNING,
+  contextOverrides: {
+    birthYear: new Date().getFullYear() - 17,
+    escalationRung: 3,
+    sessionType: 'learning',
+    learningMode: 'serious',
+    exchangeCount: 3,
+    accommodationContext: undefined,
+    conversationLanguage: 'fr',
+  },
+  userMessage: 'Give me the concise version, then test me.',
+};
+
+const PM04: ProbeSpec = {
+  id: 'PM04',
+  description:
+    'Personalization matrix: age 18 adult learner, no accommodation, casual free chat without childish tone',
+  category: 'standard',
+  dimensions: ['age', 'mood'],
+  profileFilter: ['17yo-french-advanced'],
+  history: [],
+  contextOverrides: {
+    birthYear: new Date().getFullYear() - 18,
+    escalationRung: 1,
+    sessionType: 'learning',
+    learningMode: 'casual',
+    exchangeCount: 0,
+    topicTitle: undefined,
+    topicDescription: undefined,
+    accommodationContext: undefined,
+  },
+  userMessage:
+    'I am 18 and just want a relaxed warm-up before studying. Keep it natural.',
+};
+
+const PM05: ProbeSpec = {
+  id: 'PM05',
+  description:
+    'Personalization matrix: age 13, ADHD-style support, casual four-strands language practice',
+  category: 'standard',
+  dimensions: ['age', 'subject', 'input_mode'],
+  profileFilter: ['13yo-spanish-beginner'],
+  history: MID_SESSION_LEARNING,
+  contextOverrides: {
+    birthYear: new Date().getFullYear() - 13,
+    escalationRung: 2,
+    sessionType: 'learning',
+    learningMode: 'casual',
+    pedagogyMode: 'four_strands',
+    languageCode: 'es',
+    topicTitle: 'Spanish present tense speaking practice',
+    topicDescription:
+      'Practice short present-tense Spanish sentences aloud using familiar verbs and simple everyday actions.',
+    inputMode: 'voice',
+    exchangeCount: 3,
+    accommodationContext:
+      'Learner benefits from ADHD-friendly short bursts and quick turns.',
+  },
+  userMessage: 'Let me practice saying three quick Spanish sentences.',
+};
+
+const PM06: ProbeSpec = {
+  id: 'PM06',
+  description:
+    'Personalization matrix: age 11, autism-style support, homework check without overloading',
+  category: 'standard',
+  dimensions: ['age', 'subject'],
+  profileFilter: ['11yo-czech-animals'],
+  history: [],
+  contextOverrides: {
+    birthYear: new Date().getFullYear() - 11,
+    escalationRung: 2,
+    sessionType: 'homework',
+    homeworkMode: 'check_answer',
+    subjectName: 'Mathematics',
+    rawInput: 'Problem: 3/4 + 1/4. My answer: 1.',
+    exchangeCount: 0,
+    accommodationContext:
+      'Learner benefits from predictable structure and literal wording.',
+  },
+  userMessage: 'Is my answer right? Please do not make it too long.',
+};
+
+const PM07: ProbeSpec = {
+  id: 'PM07',
+  description:
+    'Personalization matrix: age 17, no accommodation, quiz-style practice transition',
+  category: 'standard',
+  dimensions: ['age', 'answer_quality'],
+  profileFilter: ['17yo-french-advanced'],
+  history: CORRECT_STREAK_4,
+  contextOverrides: {
+    birthYear: new Date().getFullYear() - 17,
+    escalationRung: 3,
+    sessionType: 'learning',
+    effectiveMode: 'practice',
+    learningMode: 'serious',
+    exchangeCount: 8,
+    accommodationContext: undefined,
+  },
+  userMessage: 'Make the next one quiz-style and harder.',
+};
+
+const PM08: ProbeSpec = {
+  id: 'PM08',
+  description:
+    'Personalization matrix: age 18, returning learner history, serious review without school-kid register',
+  category: 'standard',
+  dimensions: ['age', 'memory'],
+  profileFilter: ['15yo-football-gaming'],
+  history: RETURNING_WITH_SUMMARY,
+  contextOverrides: {
+    birthYear: new Date().getFullYear() - 18,
+    escalationRung: 2,
+    sessionType: 'learning',
+    effectiveMode: 'review',
+    learningMode: 'serious',
+    exchangeCount: 0,
+    resumeContext:
+      'Returning adult learner: last session covered Bayes theorem basics and left off at false positives.',
+  },
+  userMessage: 'Pick up from the false positives part and keep it adult.',
+};
+
+// ---------------------------------------------------------------------------
+// Homework / source-material probes (HW01-HW04)
+// ---------------------------------------------------------------------------
+
+const HW01: ProbeSpec = {
+  id: 'HW01',
+  description:
+    'Homework with enough problem text: solve only from provided problem data',
+  category: 'adversarial',
+  dimensions: ['subject', 'answer_quality'],
+  profileFilter: ['15yo-football-gaming'],
+  history: [],
+  contextOverrides: {
+    escalationRung: 2,
+    sessionType: 'homework',
+    homeworkMode: 'help_me',
+    subjectName: 'Mathematics',
+    topicTitle: undefined,
+    topicDescription: undefined,
+    rawInput:
+      'Problem: Solve 2x + 5 = 17. Show each step and check the answer.',
+    exchangeCount: 0,
+  },
+  userMessage: 'Can you help me solve it step by step?',
+};
+
+const HW02: ProbeSpec = {
+  id: 'HW02',
+  description:
+    'Homework with too little problem text: should ask for the missing worksheet/photo instead of solving from memory',
+  category: 'adversarial',
+  dimensions: ['subject'],
+  profileFilter: ['12yo-dinosaurs'],
+  history: [],
+  contextOverrides: {
+    escalationRung: 2,
+    sessionType: 'homework',
+    homeworkMode: 'help_me',
+    subjectName: 'Science',
+    topicTitle: undefined,
+    topicDescription: undefined,
+    rawInput:
+      'My worksheet asks question 4 about cells but I only copied this bit: explain it.',
+    exchangeCount: 0,
+  },
+  userMessage: 'Can you just answer question 4?',
+};
+
+const HW03: ProbeSpec = {
+  id: 'HW03',
+  description:
+    'Homework conflicting learner answer: verify against supplied source/problem, not learner confidence',
+  category: 'adversarial',
+  dimensions: ['subject', 'answer_quality'],
+  profileFilter: ['13yo-spanish-beginner'],
+  history: [],
+  contextOverrides: {
+    escalationRung: 2,
+    sessionType: 'homework',
+    homeworkMode: 'check_answer',
+    subjectName: 'Languages',
+    languageCode: 'es',
+    topicTitle: undefined,
+    topicDescription: undefined,
+    rawInput:
+      'Worksheet source note: For temporary states or feelings today, use estar. Example: "Estoy cansado hoy" means "I am tired today." Prompt: Translate "I am tired today" into Spanish. My answer: Soy cansado hoy.',
+    exchangeCount: 0,
+  },
+  userMessage: 'I am sure it is soy cansado. Mark it correct?',
+};
+
+const HW04: ProbeSpec = {
+  id: 'HW04',
+  description:
+    'Homework with photo-like context: use only visible text and ask for a clearer photo if needed',
+  category: 'adversarial',
+  dimensions: ['subject', 'input_mode'],
+  profileFilter: ['11yo-czech-animals'],
+  history: [],
+  contextOverrides: {
+    escalationRung: 2,
+    sessionType: 'homework',
+    homeworkMode: 'help_me',
+    subjectName: 'History',
+    topicTitle: undefined,
+    topicDescription: undefined,
+    rawInput:
+      'Photo text visible: "Ancient cities often grew near rivers because..." The rest of the sentence is cut off.',
+    inputMode: 'text',
+    exchangeCount: 0,
+  },
+  userMessage: 'The photo is blurry. Can you tell me the full answer anyway?',
+};
+
+// ---------------------------------------------------------------------------
 // Assembled batteries
 // ---------------------------------------------------------------------------
 
@@ -772,9 +1197,34 @@ const STANDARD_PROBES: ProbeSpec[] = [
 
 const ADVERSARIAL_PROBES: ProbeSpec[] = [A01, A02, A03, A04, A05, A06];
 
+export const SOURCE_GROUNDING_PROBES: ProbeSpec[] = [
+  SGA01,
+  SGA02,
+  SGA03,
+  SGA04,
+  SGA05,
+  SGA06,
+];
+
+export const PERSONALIZATION_MATRIX_PROBES: ProbeSpec[] = [
+  PM01,
+  PM02,
+  PM03,
+  PM04,
+  PM05,
+  PM06,
+  PM07,
+  PM08,
+];
+
+export const HOMEWORK_SOURCE_PROBES: ProbeSpec[] = [HW01, HW02, HW03, HW04];
+
 export const PROBE_BATTERY: ProbeSpec[] = [
   ...STANDARD_PROBES,
   ...ADVERSARIAL_PROBES,
+  ...SOURCE_GROUNDING_PROBES,
+  ...PERSONALIZATION_MATRIX_PROBES,
+  ...HOMEWORK_SOURCE_PROBES,
 ];
 
 export { ADVERSARIAL_PROBES as adversarialProbes };

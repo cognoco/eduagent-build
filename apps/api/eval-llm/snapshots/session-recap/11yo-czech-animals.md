@@ -49,6 +49,7 @@ closingLine rules:
 - One sentence that mirrors what the learner specifically did in this session
 - Mention the concept or skill they worked through
 - Not a grade and not generic praise
+- Stay evidence-bound: do not infer mastery, confidence, or "really understood" unless the transcript shows the learner demonstrating it
 - Tone: early teen (11-13): friendly, concrete, warm
 - Max 150 characters
 
@@ -56,14 +57,16 @@ takeaways rules:
 - 2 to 4 items
 - Each item is a single sentence in second person
 - Each item names a specific concept, connection, or skill from the transcript
+- Use practiced, noticed, connected, or asked about when evidence is partial; avoid mastered, nailed, aced, or fully understood
 - No markdown bullets in the JSON; return plain strings
 - Tone: early teen (11-13): friendly, concrete, warm
 - Max 200 characters per item
 
 A likely next topic is <next_topic>basic fractions</next_topic>.
-If the connection is genuinely clear, set nextTopicReason to one sentence explaining why it follows from this session.
+If the connection is genuinely clear, set nextTopicReason to one short sentence explaining why it follows from this session.
 If the connection is weak or unclear, set nextTopicReason to null.
-Max 120 characters for nextTopicReason.
+nextTopicReason must be 12 words or fewer and max 120 characters.
+If your reason is longer, shorten it before returning JSON.
 ```
 
 ## Generated prompt — user
@@ -91,3 +94,19 @@ Mentor: Great. Put it in your own words one more time.
 - Age tier: early teen (11-13): friendly, concrete, warm
 - Next topic: basic fractions
 - Transcript is a synthetic 8-turn learner recap fixture.
+
+## Live LLM response
+
+```
+```json
+{
+  "closingLine": "Today, you worked on understanding how fraction addition connects back to basic fractions and why specific steps matter.",
+  "takeaways": [
+    "You identified that fraction addition was a challenging part of your understanding.",
+    "You connected how fraction addition 'loops back into basic fractions' to understand the process better.",
+    "You noticed why a specific step in fraction addition matters by putting it into your own words."
+  ],
+  "nextTopicReason": "The session directly connected fraction addition back to basic fractions."
+}
+```
+```

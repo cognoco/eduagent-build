@@ -97,6 +97,8 @@ Return only the summary text. No JSON, markdown, bullets, labels, or quotes.
 Hard cap: 500 characters.
 Tone: warm, factual, calm, never shaming or alarming.
 Mention the child by name.
+Use only the inventory numbers and subject lines provided. Do not infer what the learner understood, enjoyed, mastered beyond the counts, or struggled with.
+Avoid generic praise such as "great job", "wonderful", or "amazing"; name the concrete activity or next step instead.
 ```
 
 ## Generated prompt — user
@@ -118,3 +120,9 @@ Write 1-2 sentences answering: where is this child now, what changed recently, a
 ## Builder notes
 
 - Progress summary for parent Progress surface; not a period report.
+
+## Live LLM response
+
+```
+Emma has completed 1 Spanish session, studying for 18 minutes and learning 42 vocabulary words. She has a current streak of 3 days. Her next step could be to continue exploring the remaining 7 Spanish topics.
+```

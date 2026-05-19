@@ -88,6 +88,25 @@ describe('buildRecapPrompt', () => {
     expect(match).not.toBeNull();
     expect(match![1]!.length).toBeLessThanOrEqual(120);
   });
+
+  it('asks for a short next-topic reason below the schema limit', () => {
+    const prompt = buildRecapPrompt(tier, 'Photosynthesis');
+    expect(prompt).toContain(
+      'nextTopicReason must be 12 words or fewer and max 120 characters.',
+    );
+    expect(prompt).toContain(
+      'If your reason is longer, shorten it before returning JSON.',
+    );
+  });
+
+  it('asks learner-facing recap artifacts to stay evidence-bound', () => {
+    const prompt = buildRecapPrompt(tier, 'Photosynthesis');
+
+    expect(prompt).toContain('Stay evidence-bound');
+    expect(prompt).toContain(
+      'avoid mastered, nailed, aced, or fully understood',
+    );
+  });
 });
 
 describe('buildRecapTranscriptText', () => {

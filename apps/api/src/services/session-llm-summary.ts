@@ -71,7 +71,7 @@ function formatZodIssuesForAudit(error: unknown): string {
       (issue) =>
         Array.isArray(issue.path) && issue.path.length > 0
           ? issue.path.join('.')
-          : 'root'
+          : 'root',
     );
     return paths.join(', ');
   }
@@ -80,7 +80,7 @@ function formatZodIssuesForAudit(error: unknown): string {
 }
 
 export function buildSessionSummaryTranscriptText(
-  events: ReadonlyArray<{ eventType: string; content: string }>
+  events: ReadonlyArray<{ eventType: string; content: string }>,
 ): string {
   return events
     .map((event) => {
@@ -96,7 +96,7 @@ export function buildSessionSummaryTranscriptText(
 }
 
 export function buildSessionSummaryPrompt(
-  input: SessionLlmSummaryPromptInput
+  input: SessionLlmSummaryPromptInput,
 ): PromptMessages {
   const notes = [
     input.subjectName ? `Subject: ${input.subjectName}` : 'Subject: unknown',
@@ -125,10 +125,13 @@ export function buildSessionSummaryPrompt(
       '',
       'Rules:',
       '- `narrative` must be 40-1500 characters, self-contained, and mention at least one topic from `topicsCovered` by name.',
+      '- At least one `topicsCovered` item must exactly match a phrase that appears in `narrative`; the provided topic title is usually the safest anchor.',
       '- `topicsCovered` must contain 1-20 concrete topic anchors from the transcript.',
       '- `sessionState` should be `completed` when the learner reached a clear stopping point, `paused-mid-topic` when the conversation stopped while a topic was still in progress, and `auto-closed` when the session was ended by the system (timeout, silence, or hard caps) rather than by an explicit close.',
       '- `reEntryRecommendation` must be 20-400 characters and tell the next mentor exactly where to pick up.',
       '- Keep the summary factual. Do not mention policies, prompts, or that this is an internal note.',
+      '- Stay evidence-bound to the transcript. Do not infer mastery, confidence, emotion, or understanding beyond what the learner actually said or demonstrated.',
+      '- If the learner only says "I think I see" or similar, write that they said they think they see the connection; do not upgrade it to "felt they understood", "mastered", or "clearly understood".',
     ].join('\n'),
     user: [
       safeSubject
@@ -150,7 +153,7 @@ interface PromptMessages {
 }
 
 function parseLlmSummaryResponse(
-  raw: string
+  raw: string,
 ):
   | { ok: true; summary: LlmSummary }
   | { ok: false; reason: string; zodError?: unknown } {
@@ -180,12 +183,12 @@ function parseLlmSummaryResponse(
 
 async function loadSummaryPromptInput(
   db: Database,
-  input: SessionLlmSummaryInput
+  input: SessionLlmSummaryInput,
 ): Promise<SessionLlmSummaryPromptInput | null> {
   const transcriptEvents = await db.query.sessionEvents.findMany({
     where: and(
       eq(sessionEvents.sessionId, input.sessionId),
-      eq(sessionEvents.profileId, input.profileId)
+      eq(sessionEvents.profileId, input.profileId),
     ),
     orderBy: [asc(sessionEvents.createdAt), asc(sessionEvents.id)],
     columns: {
@@ -196,7 +199,7 @@ async function loadSummaryPromptInput(
 
   const transcriptTurns = transcriptEvents.filter(
     (event) =>
-      event.eventType === 'user_message' || event.eventType === 'ai_response'
+      event.eventType === 'user_message' || event.eventType === 'ai_response',
   );
 
   if (transcriptTurns.length === 0) {
@@ -210,8 +213,8 @@ async function loadSummaryPromptInput(
         .where(
           and(
             eq(subjects.id, input.subjectId),
-            eq(subjects.profileId, input.profileId)
-          )
+            eq(subjects.profileId, input.profileId),
+          ),
         )
         .limit(1)
     : [null];
@@ -225,14 +228,14 @@ async function loadSummaryPromptInput(
         .from(curriculumTopics)
         .innerJoin(
           curriculumBooks,
-          eq(curriculumBooks.id, curriculumTopics.bookId)
+          eq(curriculumBooks.id, curriculumTopics.bookId),
         )
         .innerJoin(subjects, eq(subjects.id, curriculumBooks.subjectId))
         .where(
           and(
             eq(curriculumTopics.id, input.topicId),
-            eq(subjects.profileId, input.profileId)
-          )
+            eq(subjects.profileId, input.profileId),
+          ),
         )
         .limit(1)
     : [null];
@@ -246,7 +249,7 @@ async function loadSummaryPromptInput(
 
 export async function generateLlmSummary(
   db: Database,
-  input: SessionLlmSummaryInput
+  input: SessionLlmSummaryInput,
 ): Promise<LlmSummary | null> {
   const promptInput = await loadSummaryPromptInput(db, input);
   if (!promptInput) {
@@ -294,8 +297,8 @@ export async function generateLlmSummary(
   const scrubbedReason = lastZodError
     ? formatZodIssuesForAudit(lastZodError)
     : lastReason.startsWith('no JSON') || lastReason.startsWith('invalid JSON')
-    ? lastReason
-    : 'validation-failed';
+      ? lastReason
+      : 'validation-failed';
   captureException(new Error('session summary generation failed validation'), {
     profileId: input.profileId,
     extra: {
@@ -317,7 +320,7 @@ export async function generateLlmSummary(
 
 export async function generateAndStoreLlmSummary(
   db: Database,
-  input: SessionLlmSummaryInput
+  input: SessionLlmSummaryInput,
 ): Promise<LlmSummary | null> {
   const summary = await generateLlmSummary(db, input);
   if (!summary) {
@@ -332,8 +335,8 @@ export async function generateAndStoreLlmSummary(
           .where(
             and(
               eq(sessionSummaries.id, input.summaryId),
-              eq(sessionSummaries.profileId, input.profileId)
-            )
+              eq(sessionSummaries.profileId, input.profileId),
+            ),
           )
           .limit(1)
       : await db
@@ -342,8 +345,8 @@ export async function generateAndStoreLlmSummary(
           .where(
             and(
               eq(sessionSummaries.sessionId, input.sessionId),
-              eq(sessionSummaries.profileId, input.profileId)
-            )
+              eq(sessionSummaries.profileId, input.profileId),
+            ),
           )
           .limit(1);
 
@@ -374,8 +377,8 @@ export async function generateAndStoreLlmSummary(
     .where(
       and(
         eq(sessionSummaries.id, summaryRow.id),
-        eq(sessionSummaries.profileId, input.profileId)
-      )
+        eq(sessionSummaries.profileId, input.profileId),
+      ),
     );
 
   return summary;

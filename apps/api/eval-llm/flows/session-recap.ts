@@ -1,16 +1,80 @@
 import { learnerRecapLlmOutputSchema } from '@eduagent/schemas';
 import type { EvalProfile } from '../fixtures/profiles';
-import type { FlowDefinition, PromptMessages } from '../runner/types';
+import type {
+  FlowDefinition,
+  PromptMessages,
+  QualityIssue,
+} from '../runner/types';
 import {
   buildRecapPrompt,
   getAgeVoiceTierLabel,
 } from '../../src/services/session-recap';
 import { callLlm } from '../runner/llm-bootstrap';
+import {
+  containsAny,
+  parseFirstJsonObject,
+  qualityError,
+} from '../runner/quality';
 
 interface SessionRecapInput {
   transcriptText: string;
   ageVoiceTier: string;
   nextTopicTitle: string | null;
+}
+
+interface RecapLike {
+  closingLine?: unknown;
+  takeaways?: unknown;
+  nextTopicReason?: unknown;
+}
+
+function evaluateSessionRecapQuality(liveResponse: string): QualityIssue[] {
+  const parsed = parseFirstJsonObject<RecapLike>(liveResponse);
+  if (!parsed || typeof parsed.closingLine !== 'string') {
+    return [
+      qualityError(
+        'session-recap.parse',
+        'Live response did not contain a parseable learner recap.',
+      ),
+    ];
+  }
+
+  const takeaways = Array.isArray(parsed.takeaways)
+    ? parsed.takeaways.filter(
+        (value): value is string => typeof value === 'string',
+      )
+    : [];
+  const text = [
+    parsed.closingLine,
+    ...takeaways,
+    String(parsed.nextTopicReason ?? ''),
+  ].join(' ');
+
+  if (
+    containsAny(text, [
+      /\bmastered\b/i,
+      /\bnailed\b/i,
+      /\baced\b/i,
+      /\bfully understood\b/i,
+      /\breally understood\b/i,
+    ])
+  ) {
+    return [
+      qualityError(
+        'session-recap.overstated-learning',
+        'Learner-facing recap overstated mastery or understanding beyond the transcript evidence.',
+      ),
+    ];
+  }
+  if (containsAny(parsed.closingLine, [/\bgreat job\b/i, /\bwonderful\b/i])) {
+    return [
+      qualityError(
+        'session-recap.generic-praise',
+        'Closing line should mirror specific work, not generic praise.',
+      ),
+    ];
+  }
+  return [];
 }
 
 function synthesizeTranscript(profile: EvalProfile): string {
@@ -77,5 +141,9 @@ export const sessionRecapFlow: FlowDefinition<SessionRecapInput> = {
       ],
       { flow: 'session-recap', rung: 2 },
     );
+  },
+
+  evaluateQuality({ liveResponse }): QualityIssue[] {
+    return evaluateSessionRecapQuality(liveResponse);
   },
 };

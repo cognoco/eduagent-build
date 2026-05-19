@@ -48,7 +48,7 @@ export function bootstrapLlmProviders(): void {
   if (!geminiKey && !openaiKey && !anthropicKey) {
     throw new Error(
       'No LLM API keys found in environment. ' +
-        'Run with `doppler run -- pnpm eval:llm -- --live` to inject keys.'
+        'Run with `doppler run -- pnpm eval:llm -- --live` to inject keys.',
     );
   }
 
@@ -71,12 +71,15 @@ export function _resetBootstrap(): void {
  */
 export async function callLlm(
   messages: ChatMessage[],
-  opts: { flow: string; rung?: 1 | 2 | 3 | 4 | 5 } = { flow: 'eval' }
+  opts: { flow: string; rung?: 1 | 2 | 3 | 4 | 5; responseFormat?: 'json' } = {
+    flow: 'eval',
+  },
 ): Promise<string> {
   bootstrapLlmProviders();
   const result = await routeAndCall(messages, opts.rung ?? 2, {
     flow: opts.flow,
     sessionId: `eval-${opts.flow}`,
+    ...(opts.responseFormat ? { responseFormat: opts.responseFormat } : {}),
   });
   return result.response;
 }

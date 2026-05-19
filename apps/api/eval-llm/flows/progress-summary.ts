@@ -2,9 +2,14 @@ import { z } from 'zod';
 import type { KnowledgeInventory } from '@eduagent/schemas';
 
 import type { EvalProfile } from '../fixtures/profiles';
-import type { FlowDefinition, PromptMessages } from '../runner/types';
+import type {
+  FlowDefinition,
+  PromptMessages,
+  QualityIssue,
+} from '../runner/types';
 import { callLlm } from '../runner/llm-bootstrap';
 import { buildProgressSummaryPrompt } from '../../src/services/progress-summary';
+import { containsAny, qualityError } from '../runner/quality';
 
 interface ProgressSummaryInput {
   childName: string;
@@ -13,6 +18,7 @@ interface ProgressSummaryInput {
 }
 
 const unsafeLanguage = /\b(lazy|failed|behind|worrying|alarming|bad)\b/i;
+const genericPraise = /\b(great job|wonderful|amazing|excellent)\b/i;
 
 function makeInventory(profile: EvalProfile): KnowledgeInventory {
   const firstSubject = profile.strengths[0]?.subject ?? 'Math';
@@ -205,5 +211,17 @@ export const progressSummaryFlow: FlowDefinition<ProgressSummaryInput> = {
       ],
       { flow: 'progress-summary', rung: 2 },
     );
+  },
+
+  evaluateQuality({ liveResponse }): QualityIssue[] {
+    if (containsAny(liveResponse, [genericPraise])) {
+      return [
+        qualityError(
+          'progress-summary.generic-praise',
+          'Parent-facing progress summary should stay factual instead of using generic praise.',
+        ),
+      ];
+    }
+    return [];
   },
 };

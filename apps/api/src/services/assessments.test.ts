@@ -313,6 +313,9 @@ describe('evaluateAssessmentAnswer', () => {
     expect(messages[0]?.content).toContain(
       'ask direct production tasks: say hello',
     );
+    expect(messages[0]?.content).toContain(
+      'Avoid generic praise or overheated intensifiers',
+    );
     expect(messages[0]?.content).toContain('tiny realistic exchange');
     expect(messages[1]?.content).toContain(
       'Description: <topic_description>Meet people, say hello, and share simple personal details.</topic_description>',

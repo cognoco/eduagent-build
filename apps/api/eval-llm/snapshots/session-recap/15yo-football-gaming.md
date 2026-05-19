@@ -49,6 +49,7 @@ closingLine rules:
 - One sentence that mirrors what the learner specifically did in this session
 - Mention the concept or skill they worked through
 - Not a grade and not generic praise
+- Stay evidence-bound: do not infer mastery, confidence, or "really understood" unless the transcript shows the learner demonstrating it
 - Tone: teen (14-17): peer-adjacent, brief, sharp
 - Max 150 characters
 
@@ -56,14 +57,16 @@ takeaways rules:
 - 2 to 4 items
 - Each item is a single sentence in second person
 - Each item names a specific concept, connection, or skill from the transcript
+- Use practiced, noticed, connected, or asked about when evidence is partial; avoid mastered, nailed, aced, or fully understood
 - No markdown bullets in the JSON; return plain strings
 - Tone: teen (14-17): peer-adjacent, brief, sharp
 - Max 200 characters per item
 
 A likely next topic is <next_topic>US history: Civil War</next_topic>.
-If the connection is genuinely clear, set nextTopicReason to one sentence explaining why it follows from this session.
+If the connection is genuinely clear, set nextTopicReason to one short sentence explaining why it follows from this session.
 If the connection is weak or unclear, set nextTopicReason to null.
-Max 120 characters for nextTopicReason.
+nextTopicReason must be 12 words or fewer and max 120 characters.
+If your reason is longer, shorten it before returning JSON.
 ```
 
 ## Generated prompt — user
@@ -91,3 +94,20 @@ Mentor: Great. Put it in your own words one more time.
 - Age tier: teen (14-17): peer-adjacent, brief, sharp
 - Next topic: US history: Civil War
 - Transcript is a synthetic 8-turn learner recap fixture.
+
+## Live LLM response
+
+```
+```json
+{
+  "closingLine": "You asked about algebra equations and worked through factoring polynomials, connecting the output back to the process start.",
+  "takeaways": [
+    "You identified factoring polynomials as a tough spot in algebra equations.",
+    "You noticed how the steps in algebra could connect to other subjects like US history: Civil War.",
+    "You practiced making connections between the output of a process and its starting point.",
+    "You explained the importance of a step in your own words to solidify understanding."
+  ],
+  "nextTopicReason": "You connected to US history: Civil War, making it a good next topic."
+}
+```
+```

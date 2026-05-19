@@ -151,6 +151,8 @@ describe('buildProgressSummaryPrompt', () => {
     expect(result.user).toBeTruthy();
     expect(result.system).toContain('warm');
     expect(result.system).toContain('500');
+    expect(result.system).toContain('Use only the inventory numbers');
+    expect(result.system).toContain('Avoid generic praise');
   });
 
   it('embeds child name in XML tag', () => {

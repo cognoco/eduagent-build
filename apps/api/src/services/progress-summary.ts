@@ -113,6 +113,8 @@ export function buildProgressSummaryPrompt(input: {
       `Hard cap: ${MAX_PROGRESS_SUMMARY_CHARS} characters.`,
       'Tone: warm, factual, calm, never shaming or alarming.',
       'Mention the child by name.',
+      'Use only the inventory numbers and subject lines provided. Do not infer what the learner understood, enjoyed, mastered beyond the counts, or struggled with.',
+      'Avoid generic praise such as "great job", "wonderful", or "amazing"; name the concrete activity or next step instead.',
     ].join('\n'),
     user: [
       `<child_name>${childName}</child_name>`,

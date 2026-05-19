@@ -1,13 +1,58 @@
 import { llmSummarySchema } from '@eduagent/schemas';
 import type { EvalProfile } from '../fixtures/profiles';
-import type { FlowDefinition, PromptMessages } from '../runner/types';
+import type {
+  FlowDefinition,
+  PromptMessages,
+  QualityIssue,
+} from '../runner/types';
 import { buildSessionSummaryPrompt } from '../../src/services/session-llm-summary';
 import { callLlm } from '../runner/llm-bootstrap';
+import {
+  containsAny,
+  parseFirstJsonObject,
+  qualityError,
+} from '../runner/quality';
 
 interface SessionSummaryInput {
   transcriptText: string;
   subjectName: string | null;
   topicTitle: string | null;
+}
+
+interface SummaryLike {
+  narrative?: unknown;
+  reEntryRecommendation?: unknown;
+}
+
+function evaluateSessionSummaryQuality(liveResponse: string): QualityIssue[] {
+  const parsed = parseFirstJsonObject<SummaryLike>(liveResponse);
+  if (!parsed || typeof parsed.narrative !== 'string') {
+    return [
+      qualityError(
+        'session-summary.parse',
+        'Live response did not contain a parseable summary narrative.',
+      ),
+    ];
+  }
+  const text = `${parsed.narrative} ${String(
+    parsed.reEntryRecommendation ?? '',
+  )}`;
+  if (
+    containsAny(text, [
+      /\bfelt they understood\b/i,
+      /\bclearly understood\b/i,
+      /\bmastered\b/i,
+      /\bfully understood\b/i,
+    ])
+  ) {
+    return [
+      qualityError(
+        'session-summary.over-inferred-understanding',
+        'Retention summary upgraded partial learner wording into an unsupported understanding/mastery claim.',
+      ),
+    ];
+  }
+  return [];
 }
 
 function inferSubject(profile: EvalProfile): string | null {
@@ -69,14 +114,18 @@ export const sessionSummaryFlow: FlowDefinition<SessionSummaryInput> = {
 
   async runLive(
     _input: SessionSummaryInput,
-    messages: PromptMessages
+    messages: PromptMessages,
   ): Promise<string> {
     return callLlm(
       [
         { role: 'system', content: messages.system },
         { role: 'user', content: messages.user ?? '' },
       ],
-      { flow: 'session-summary', rung: 2 }
+      { flow: 'session-summary', rung: 2 },
     );
+  },
+
+  evaluateQuality({ liveResponse }): QualityIssue[] {
+    return evaluateSessionSummaryQuality(liveResponse);
   },
 };
