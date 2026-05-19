@@ -12,6 +12,33 @@
 
 ---
 
+## Adversarial Review Round 3 — Findings Applied (2026-05-19)
+
+Third pass. Round 2 left one substantive deliverable unfinished ([HIGH-B2] — adult-age gate listed in the summary but not actually written into Task 13). Round 3 finishes that work AND critiques the Round-1+Round-2 deltas themselves (the least-reviewed code in the plan), plus a handful of codebase claims earlier rounds asserted without verifying. Inline `[ID3]` markers below cite Round-3 findings.
+
+- **[OPT-C]** Coordinator decision (post-Round-3): defense-in-depth on the underage-parent problem. Both the client gate ([HIGH-A3]) AND a new server-side rule (Task 13b, added below) ship behind an **independent feature flag** `ADULT_OWNER_GATE_ENABLED` (mobile + API). This addresses the spec-vs-plan contradiction surfaced in [MEDIUM-E3] and closes the missing-server-rule gap surfaced in [HIGH-D3], while giving us a kill switch that toggles the gate off without disabling the whole preview-onboarding feature (`PREVIEW_ONBOARDING_ENABLED` stays separate). Cross-refs: [HIGH-D3] surfaced the missing server rule; [MEDIUM-E3] surfaced the spec-vs-plan contradiction; [HIGH-A3] is the client-side gate. With BOTH `ADULT_OWNER_GATE_ENABLED` flags OFF the system is identical to today's behaviour (no adult-age constraint). With BOTH ON, the client gate is pre-flight UX and the server rule is the actual barrier — if a request bypasses the client, the server returns 403 `ADULT_OWNER_REQUIRED`.
+
+- **[HIGH-A3]** Round 2's `[HIGH-B2]` follow-through was NOT done — Task 13 still ships without an adult-age gate. Now added in Step 1 (failing tests) + Step 3 (component code) of Task 13. Uses `computeAgeBracket(parentBirthYear) === 'adult'` (canonical helper exported from `@eduagent/schemas`, `packages/schemas/src/age.ts:39-49`) — the same definition `isAdultOwner()` uses (`packages/schemas/src/age.ts:51-62`) and the same shape `more/index.tsx:118` consumes for the existing "show add child" gate. Tests assert: underage parent (birth year giving < 18) cannot submit when `needsChild` is true; exactly 18 (boundary) DOES proceed; check is skipped entirely when `target === 'self'` (no child involved, server's 11+ floor is the only gate).
+- **[CRITICAL-A3]** The Task 11 gate ordering (the new code most likely to ship with a bug) has TWO latent gaps that the Round-2 sketch does not address. Both fixed inline below:
+  1. **Wizard branch fires for a signed-OUT user.** `useUser()`/`useAuth()` may report `isSignedIn=false` (e.g. token expiry mid-OAuth, sign-out race) AFTER the wizard branch reads `previewProbeState === 'present'`. The Round-2 ordering puts the wizard branch ABOVE the `if (!isSignedIn) return <Redirect href="/sign-in">` gate (`_layout.tsx:1539-1548` evidence) only because the wizard branch lives below the `isProfileLoading` check, but neither the plan text nor the sketch makes the auth precedence explicit. The wizard MUST sit after `!isSignedIn` (and after `isProfileLoading`/`profileLoadError`) — never before. Updated ordering: `!isLoaded` spinner → `!isSignedIn` redirect → `pendingAuthRedirect` spinner → `isProfileLoading` spinner → `profileLoadError` fallback → preview-probe-loading spinner → SaveWizardGate branch → `!activeProfile` CreateProfileGate → consent gates → Tabs.
+  2. **`previewProbeState === 'loading'` blocks the existing pending-auth-redirect spinner.** If the gate runs the new probe-loading spinner BEFORE the pending-auth-redirect block (`_layout.tsx:1550-1576`), users coming back from OAuth see the new spinner instead of the existing auth-redirect spinner, and the replay timeout (`pendingRedirectTimedOut`, `_layout.tsx:1437`) starts measuring against the wrong loader. The probe-loading spinner MUST sit AFTER the pending-auth-redirect block, not before. The Round-2 sketch's wording ("immediately BEFORE the `if (!activeProfile)` branch") IS the correct placement, but the loading-spinner inside that branch is duplicative with the existing pending-redirect spinner — the probe is fast (single `getItemAsync`) so the cleanest fix is to render `null` (or fall through to the existing `isProfileLoading` spinner if the probe is still resolving when `isProfileLoading` flips false). Updated below.
+- **[CRITICAL-B3]** The Round-2 plan removed `clearPreviewState()` from the layout effect but the Step-3 success path in Task 14 (lines 2326) STILL calls `await clearPreviewState()` — verified. However the wizard-as-inline-gate setup wires `onComplete()` from the wizard to the layout BEFORE clearing the state, and the success path navigates with `router.replace` before clearing on certain branches. Reading Task 14's `onLand` (lines 2316-2340): `switchProfile` → `clearPreviewState` → `router.replace`. Correct order. Confirmed: no leak. Marked verified inline.
+- **[HIGH-B3]** `simulateProfileCreated` is referenced in Task 11's failing-test sketch (around line 1488 area in the existing file — coordinator confirm exact line) but DOES NOT exist in `_layout.test.tsx`. Grep returns zero matches in the test file. Added a TODO with the contract the harness must satisfy (mutates `useProfile()` mock's `activeProfile`/`profiles` returns + flushes microtasks) so the implementer doesn't get stuck spelunking.
+- **[HIGH-C3]** `SaveWizardGate` defined inline inside `(app)/_layout.tsx` (1859 LOC file, multiple components already co-located: `CreateProfileGate` at line 640, `ConsentPendingGate`, `ConsentWithdrawnGate`, gate-content helpers). Adding one more function does NOT trigger `import/no-default-export` (the file's default export is `AppLayout`; other named functions are fine). Verified by reading file structure (`grep -n "^function\|^export default" _layout.tsx`). No nx-module-boundaries risk — same package, same directory. Import depth check: imports in `SaveWizardGate` (defined in `(app)/_layout.tsx`) must use `../../lib/...` (two levels up — `_layout.tsx` → `(app)/` → `app/` → `src/`), NOT `../../../lib/...`. The Round-2 Task 12 sketch (line 1635) correctly says `../../lib/...` in its narrative note but the test snippet on line 1639 still has the three-dot path. Fixed inline.
+- **[HIGH-D3]** Server has NO 18+ owner rule. `apps/api/src/services/profile.ts:184-191` enforces only the 11+ minimum (`belowMinimumAge`). The spec's Failure Modes table (`docs/specs/2026-05-18-...md:388`) claims "API rejects via existing 18+ rule on `createProfileWithLimitCheck()`" — that rule does not exist. So **the client gate added in [HIGH-A3] is the ONLY barrier** to a 13-year-old creating themselves as `isOwner=true` with a child linked underneath. This also means [HIGH-A3] is not redundant defense-in-depth; it is the entire defense. Flagged as an open question for the coordinator (server-side adult-owner check should probably exist too, but that's an API change outside this plan's scope).
+- **[MEDIUM-A3]** Plan asserts `ProfileProvider` at `profile.ts:154-174` "auto-activates the first profile the moment `profiles.length > 0`." The effect ACTUALLY only fires when `!savedExists` (line 158) — i.e. when there is no saved ID, or the saved ID doesn't match any profile in `profiles`. The Round-2 framing reads as if activation is unconditional. Net effect on the wizard is unchanged (after signup the user has no saved `ACTIVE_PROFILE_KEY`, so `!savedExists` is true, so auto-activate DOES fire) — but the wording is sloppy and could mislead the implementer. Corrected inline.
+- **[MEDIUM-B3]** `simulateProfileCreated` test harness contract documented in Task 11 (see [HIGH-B3]). Without this annotation an implementer will spend time grepping for a helper that does not exist.
+- **[MEDIUM-C3]** No telemetry plan. Per CLAUDE.md `safeSend()` convention for non-core dispatches: this feature should fire funnel events at `preview_intent_seen`, `preview_intent_selected`, `preview_topic_submitted`, `preview_value_prop_seen`, `preview_signup_started`, `preview_signup_completed`, `save_wizard_step_1`, `save_wizard_step_2`, `save_wizard_step_3`, `save_wizard_completed`. Currently the plan ships zero analytics. Without funnel events the feature is unmeasurable — exactly the "wired-but-untriggered" failure mode CLAUDE.md warns against. Added a small section in Task 15 noting this as deferred-to-follow-up (since the codebase's analytics conventions aren't grounded in this plan) but it MUST be on the post-merge punch list.
+- **[MEDIUM-D3]** Tab-shape handoff in Task 14 sits on a hardcoded `'/(app)/home'` route for the parent path AND for the `target === 'self'` solo path. Per CLAUDE.md profile-shapes table: solo owner (`target='self'`, no children) → learner tab shape, lands on `LearnerScreen`; parent with linked children (`target='child'` or `target='both'`) → guardian tab shape, lands on `ParentHomeScreen`. Both shapes appear to mount under `/(app)/home` (home tab is route `home`, presentation switches by `resolveTabShape` — see `_layout.tsx:1410`), so `/(app)/home` IS the correct destination for both. Confirmed not a bug — but the Task 14 test only asserts `replace` was called with `expect.stringMatching(/^\/\(app\)\//)` which is loose. Tightened the assertion inline.
+- **[MEDIUM-E3]** Spec Failure Modes line 388 says "no client-side pre-validation in v0" — this is in tension with [HIGH-A3]. The spec's framing assumed a server-side 18+ rule existed; since [HIGH-D3] shows it does not, the client gate is now the only barrier. Coordinator should decide: (a) ship client gate AND open a server-side ticket, or (b) skip the client gate and accept the risk for v0 since stores are blocked / no live users (per `project_pre_launch_no_users.md`). The plan now ships option (a); flagged for explicit confirmation. **[OPT-C] RESOLVED:** Coordinator chose defense-in-depth — client gate ([HIGH-A3], in Task 13) AND server rule (new Task 13b), both gated by independent `ADULT_OWNER_GATE_ENABLED` flag (mobile + API). The spec's "no client-side pre-validation" line is intentionally overridden by this decision. Follow-up: the spec doc (`docs/specs/2026-05-18-trial-intent-save-onboarding-v0.md:388`) should be amended in a separate PR to remove that line; spec amendment is out of scope for this plan-doc update.
+- **[MEDIUM-F3]** Failure Modes table in the plan (lines 2217-2223) does NOT have a row for "underage user attempts to save as owner with child" even after Round 2 named the [HIGH-B2] gate. Added a row inline.
+- **[MEDIUM-G3]** Task 15 AC coverage table maps 16 ACs and matches the spec's 16-AC count (verified by re-reading `docs/specs/2026-05-18-trial-intent-save-onboarding-v0.md:359-376`). No gap there. Confirmed.
+- **[LOW-A3]** Existing project canonical SecureStore API is `getItemAsync` / `setItemAsync` / `deleteItemAsync` (Async-suffixed), verified at `apps/mobile/src/lib/secure-storage.ts:80,94,112`. Task 3's module already uses the correct API. Confirmed.
+- **[LOW-B3]** `useProfiles` cache key IS `['profiles', userId]` (verified `apps/mobile/src/hooks/use-profiles.ts:28`). Round-1 claim accurate. Confirmed.
+- **[LOW-C3]** `pending-auth-redirect.ts:17` IS an in-memory variable (`let pendingAuthRedirectRecord: PendingAuthRedirectRecord | null = null`) — Round-2 `[MEDIUM-A2]` claim accurate. Confirmed.
+
+---
+
 ## Adversarial Review Round 2 — Findings Applied (2026-05-19)
 
 Second review pass after Round 1 missed two structural bugs in how the wizard mounts. Inline `[ID2]` markers below cite Round-2 findings.
@@ -91,15 +118,25 @@ Round-1 findings (folded in earlier in the day). Inline `[ID]` markers below cit
 
 ---
 
-## Task 0: Session-Start Helper Spike (BLOCKER, do not skip)
+## Task 0: Session-Start Helper Spike — RESOLVED (dual landing, branch on target)
 
-**Why:** Spec §First Session Handoff requires a decision *before* implementation: either (a) lift the existing session-start call site into a reusable helper and add it to scope, or (b) defer the topic-prefill leg and update wizard CTA copy. This spike eliminates the "pause mid-implementation" loop.
+**Resolution (2026-05-19):** Landing branches on the wizard's existing `target` / `intent` flag — no new branching logic, no new scope beyond the session-helper extraction below.
+
+- **`target = self` (solo adult OR any under-18 with own profile)** → **land in a session** for the saved `topicText`. Highest momentum; the actor at the device IS the learner. Requires a small session-start helper extraction (see Step 1).
+- **`target = child` (adult parent, `needsChild = true`)** → **land on `/(app)/home`**. The parent has finished the wizard but no child profile is linked yet at this point in the flow; dropping them into a session would attach progress to the wrong profile. Home is where they orient and tap "Add child" next.
+- **`target = both` with `bothPriority = self_first`** → treat as `self` (land in session for the parent themselves).
+- **`target = both` with `bothPriority = child_first`** → treat as `child` (land on home).
+
+**Why this beats a one-arm answer:**
+- Conversion driver for solo/kid learners is the first-session moment — they typed in a topic, they want to do it now.
+- Conversion driver for parents is "orient + hand off" — they need to see the app shell, find Add Child, and pre-vet what their kid will see. Forcing them into a session attached to the wrong profile undermines both.
+- The wizard already collects this signal; landing just reads it.
 
 **Files:**
 - Read: `apps/mobile/src/app/(app)/home.tsx` (or whichever screen owns the "Start a new session" affordance)
 - Read: `apps/mobile/src/hooks/use-create-session.ts` (or equivalent — discover via grep)
 
-- [ ] **Step 1: Find every existing session-start entry point.**
+- [ ] **Step 1: Find every existing session-start entry point and decide the helper shape.**
 
 Run from repo root:
 ```bash
@@ -107,26 +144,23 @@ grep -rn "sessions.\$post\|createSession\|startSession\|session-start" apps/mobi
 ```
 Open each hit. For each, note: (a) is it a hook/util or screen-local handler? (b) does it accept a topic string param? (c) does it `router.push` to the session route after success?
 
-- [ ] **Step 2: Decide (a) or (b).**
+Decision rule:
+- If a reusable hook (e.g., `useCreateSession`) already accepts a topic and navigates → use it directly in Task 14, no refactor needed.
+- If the only call site is buried in a screen component → extract the minimum slice into `apps/mobile/src/hooks/use-create-session.ts` (or matching neighbour). Keep extraction scoped: accept `{ topicText }`, return `{ start(): Promise<{ sessionId: string } | { error: string }> }`. Do NOT pull unrelated logic out of the host screen.
 
-Decision tree:
-- If a reusable hook (e.g., `useCreateSession`) already accepts a topic and navigates → option (a), zero additional scope. Use it directly in Task 14.
-- If the only call site is buried in a screen component → option (b) is the default to avoid scope creep. Add a one-line decision to spec §First Session Handoff.
+This extraction only runs on the `self` branch — the `child` branch has no session-start call, so it is unaffected by whatever shape the helper takes.
 
-- [ ] **Step 3: Record the decision in this plan.**
+- [ ] **Step 2: Record the helper path (or "inline hook reused as-is") in Task 14's spike-outcome line.**
 
 Open this file and replace the line below in Task 14:
 
-> **Spike outcome (fill in before starting Task 14):** [option (a) — helper at `<path>` / option (b) — defer topic prefill, CTA reads "Go to my learning"]
+> **Spike outcome (resolved 2026-05-19):** Dual landing — `target=self` → session via helper at `<path>`, `target=child` → `/(app)/home`. See Task 0.
 
-- [ ] **Step 4: Commit the spike decision.**
+- [ ] **Step 3: Commit the spike decision (if helper path differs from what is recorded here).**
 
-```bash
-git add docs/plans/2026-05-19-trial-intent-save-onboarding-v0.md
-git commit -m "docs(plan): record session-start spike outcome for trial v0"
-```
+If Step 1 surfaced a helper path not yet captured in Task 14, update this file and run `/commit` — never raw `git commit`. If the existing recorded shape is accurate, no commit needed in Task 0; it folds into Task 14's commit.
 
-No code shipped in Task 0.
+No production code shipped in Task 0 — only doc updates and helper-path discovery. The helper extraction itself ships in Task 14.
 
 ---
 
@@ -134,8 +168,9 @@ No code shipped in Task 0.
 
 **Files:**
 - Modify: `apps/mobile/src/lib/feature-flags.ts`
+- Modify: `apps/api/src/config.ts` (or whichever module exports the typed `config` object — confirm via grep; G4 governance lock: only `config.ts` may touch raw `process.env` outside the small allowlist) [OPT-C]
 
-- [ ] **Step 1: Add the flag.**
+- [ ] **Step 1: Add the mobile flags.**
 
 Edit `apps/mobile/src/lib/feature-flags.ts`:
 
@@ -152,25 +187,67 @@ export const FEATURE_FLAGS = {
   //   - (app)/_layout.tsx: preview/save tab entry not registered (defensive; route is unreachable anyway).
   // isFamilyCapableProfile() and the mentomate_preview_intent entry in sign-out-cleanup ship UNCONDITIONALLY.
   PREVIEW_ONBOARDING_ENABLED: true,
+
+  // [OPT-C] Independent adult-owner gate flag — toggles the 18+ requirement
+  // for a parent creating a child profile. Defense-in-depth: paired with the
+  // API-side ADULT_OWNER_GATE_ENABLED config (apps/api/src/config.ts).
+  //
+  // When false:
+  //   - save.tsx ProfileBasicsStep: the adult-age UI gate is bypassed.
+  //     `canSubmit` falls back to today's behaviour (only the existing
+  //     display-name + valid-4-digit-year checks; no adult-age check).
+  //     The `save-basics-adult-required` warning view is not rendered.
+  //   - With this flag OFF and the API flag also OFF, the system is
+  //     identical to today (no adult-age constraint exists anywhere).
+  //
+  // This flag is INDEPENDENT of PREVIEW_ONBOARDING_ENABLED. The preview
+  // feature can ship while the adult-owner gate stays off (or vice versa).
+  ADULT_OWNER_GATE_ENABLED: true,
 } as const;
 ```
 
-- [ ] **Step 2: Typecheck.**
+- [ ] **Step 2: Add the API config entry.** [OPT-C]
+
+Edit `apps/api/src/config.ts` (the canonical typed-config module — G4 governance pins this file; per `.archon/governance-constraints.md:94` it is the only place raw `process.env` may be read outside the small allowlist). Follow the existing patterns in that file (the implementer reads it to match the zod-parsed schema and `config.x` access style):
+
+1. Declare a new field on the config schema, e.g. `ADULT_OWNER_GATE_ENABLED: z.coerce.boolean().default(true)`.
+2. Parse it in the existing `init`/factory.
+3. Expose it as `config.ADULT_OWNER_GATE_ENABLED` (or whatever the existing camelCase/SCREAMING_SNAKE convention is — match the surrounding entries; do not invent a new style).
+
+Doppler note: this is a non-secret config value but follows the same "all environment values flow through Doppler" convention per CLAUDE.md (`doppler run -c <env>` injects it into `process.env` at start-up; the typed config reads from there). No new secret to add — just a boolean flag with a sensible default so it works locally without explicit configuration.
+
+**Default:** `true` (gate enforced by default in all environments).
+
+**When false:** Task 13b's server-side adult-owner rule is skipped entirely. The route falls through to today's behaviour (only the existing 11+ minimum-age check at `apps/api/src/services/profile.ts:184-191`).
+
+**Combination matrix:**
+
+| Mobile flag | API flag | Behaviour |
+|---|---|---|
+| ON | ON | Defense-in-depth. Client gate is pre-flight UX; server is the actual barrier. |
+| ON | OFF | Client gate enforced; server passes through. Acceptable if API has a hotfix to disable but mobile build is in flight. |
+| OFF | ON | Client allows underage submission; server rejects with 403 `ADULT_OWNER_REQUIRED` (surfaces as a toast — see Task 13b). Useful for testing the server rule from a non-gated client. |
+| OFF | OFF | **Today's behaviour.** No adult-age constraint anywhere. Acceptable only when the gate has been deliberately turned off (e.g. emergency rollback). |
+
+- [ ] **Step 3: Typecheck.**
 
 Run:
 ```bash
 cd apps/mobile && pnpm exec tsc --noEmit
+pnpm exec nx run api:typecheck
 ```
 Expected: passes.
 
-- [ ] **Step 3: Commit.**
+- [ ] **Step 4: Commit.**
 
 Use `/commit` (do NOT use raw `git commit`). Suggested message:
 ```
-feat(mobile): add PREVIEW_ONBOARDING_ENABLED feature flag
+feat: add PREVIEW_ONBOARDING_ENABLED + ADULT_OWNER_GATE_ENABLED feature flags
 
 Spec: docs/specs/2026-05-18-trial-intent-save-onboarding-v0.md
-Gate sites listed in feature-flags.ts comment.
+Mobile flags in feature-flags.ts; API flag in config.ts (G4 allowlist).
+ADULT_OWNER_GATE_ENABLED is independent of PREVIEW_ONBOARDING_ENABLED —
+toggling it OFF restores today's behaviour (no adult-age constraint). [OPT-C]
 ```
 
 ---
@@ -1479,8 +1556,24 @@ describe('AppLayout no-profile gate — preview branch', () => {
 
   // [CRITICAL-A2 / HIGH-A2] Wizard outlives the auto-activation transition.
   // First-profile POST flips profiles to non-empty; ProfileProvider auto-sets
-  // activeProfile (profile.ts:154-174). The wizard branch must remain above
-  // !activeProfile in the gate ordering so the wizard stays mounted.
+  // activeProfile via the !savedExists fallback (profile.ts:154-174 —
+  // [MEDIUM-A3]: the effect only fires when no valid saved id exists, which
+  // IS the post-signup state because the user has no ACTIVE_PROFILE_KEY yet).
+  // The wizard branch must remain above !activeProfile in the gate ordering
+  // so the wizard stays mounted across that transition.
+  //
+  // [HIGH-B3 / MEDIUM-B3] `simulateProfileCreated` is NOT a real helper in
+  // the existing _layout.test.tsx — grep returns zero hits. The implementer
+  // must add this harness during Task 11 Step 1. Required contract:
+  //   simulateProfileCreated(profile: Partial<Profile>): void
+  //     - Mutates the active useProfile() mock such that subsequent renders
+  //       return { profiles: [profile], activeProfile: profile, ... }.
+  //     - Flushes microtasks (await Promise.resolve()) so the next assertion
+  //       reads the post-update state.
+  //   Typical implementation pattern in test files: a closure-scoped mutable
+  //   state object backing the useProfile mock, plus a setter exposed by the
+  //   render helper. Mirror whatever the file's existing mocks already use
+  //   for activeProfile transitions; do NOT reinvent.
   it('keeps SaveWizardGate mounted after ProfileProvider auto-activates the first profile', async () => {
     await setPreviewState({
       intent: 'self',
@@ -1528,7 +1621,16 @@ import { getPreviewState } from '../../lib/preview-onboarding-state';
 // owned by the wizard's Step-3 success path (Task 14) and by sign-out.
 ```
 
-Inside the default `AppLayout` component, after the existing profile-loading state and immediately BEFORE the `if (!activeProfile)` branch (landmark — search for that exact conditional; line numbers drift) [MEDIUM-3], introduce the preview-state probe AND a wizard-done sentinel:
+Inside the default `AppLayout` component, after the existing profile-loading state and immediately BEFORE the `if (!activeProfile)` branch (landmark — search for that exact conditional; line numbers drift) [MEDIUM-3], introduce the preview-state probe AND a wizard-done sentinel.
+
+> [CRITICAL-A3] **Precedence rules** — these are non-negotiable. The new code MUST NOT precede any of:
+> 1. `if (!isLoaded)` spinner branch (`_layout.tsx:1533-1538` evidence) — auth not loaded yet; do not render any app UI.
+> 2. `if (!isSignedIn)` redirect-to-`/sign-in` branch (`_layout.tsx:1539-1548`) — signed-OUT user must not see the wizard. Without this ordering, a session-expired user with a `present` preview key sees the wizard, taps Continue, and 401s mid-POST.
+> 3. `pendingAuthRedirect && currentAppPath !== pendingAuthRedirect` spinner branch (`_layout.tsx:1550-1576`) — the OAuth-return redirect-replay loader has its own 15s timeout. The new probe-loading spinner must NOT replace or duplicate it.
+> 4. `isProfileLoading` spinner branch (`_layout.tsx:1582-1619`) — has its own 20s timeout.
+> 5. `profileLoadError` fallback branch (`_layout.tsx:1624-1655`) — error UI is independent of preview state.
+>
+> Final ordering: `!isLoaded` → `!isSignedIn` → `pendingAuthRedirect` spinner → `isProfileLoading` → `profileLoadError` → preview-probe-loading → SaveWizardGate branch → `!activeProfile` → consent gates → Tabs.
 
 ```tsx
 const [previewProbeState, setPreviewProbeState] = React.useState<
@@ -1632,12 +1734,15 @@ NO addition to `FULL_SCREEN_ROUTES`. The Round-1 plan added `'preview'` because 
 
 - [ ] **Step 2: Write failing test for Step 1 (where-to-save selection).**
 
-> Use the `(app)/_layout.test.tsx` harness from Task 11. The wizard is mounted by the layout's gate ordering (preview state present + wizardDone false), so tests render the layout, not a standalone `<SaveWizard />`. Imports adjust accordingly: `import { setPreviewState, clearPreviewState } from '../../lib/preview-onboarding-state';` (NOT `'../../../lib/...'`).
+> [HIGH-C3] Use the `(app)/_layout.test.tsx` harness from Task 11. The wizard is mounted by the layout's gate ordering (preview state present + wizardDone false), so tests render the layout, not a standalone `<SaveWizard />`. Import depth from `apps/mobile/src/app/(app)/_layout.test.tsx`: `../../lib/...` (`_layout.test.tsx` → `(app)/` → `app/` → `src/lib/`). DO NOT use `../../../lib/...` — that depth is correct for a hypothetical `(app)/preview/save.test.tsx`, which this plan no longer creates. The snippet below is updated to the correct two-dot path.
 
 ```tsx
 import { render, screen, fireEvent } from '@testing-library/react-native';
-import { setPreviewState, clearPreviewState } from '../../../lib/preview-onboarding-state';
-import SaveWizard from './save';
+import { setPreviewState, clearPreviewState } from '../../lib/preview-onboarding-state';
+// SaveWizardGate is internal to (app)/_layout.tsx; tests reach it by
+// rendering AppLayout under conditions that mount the wizard branch.
+// Do NOT add an export-for-tests of SaveWizardGate from _layout.tsx —
+// the gate is intentionally co-located and tested via the layout.
 
 describe('SaveWizard — Step 1', () => {
   beforeEach(async () => {
@@ -1940,6 +2045,138 @@ it('child target: creates parent first, then child (sequence assertion)', async 
   });
 });
 
+// [HIGH-A3 / HIGH-B2] Adult-age gate — client-side because the server has
+// NO 18+ owner rule (apps/api/src/services/profile.ts:184-191 only enforces
+// the 11+ minimum). Without this gate, a 13-year-old could create themselves
+// as isOwner=true with a child linked underneath via the wizard.
+it('underage parent (target=child) cannot submit; Continue stays disabled', async () => {
+  await setPreviewState({
+    intent: 'child', path: 'parent_value_prop',
+    createdAt: new Date().toISOString(),
+  });
+  // Fix "now" to a known year for deterministic adult-age arithmetic.
+  jest.useFakeTimers().setSystemTime(new Date('2026-05-19T00:00:00Z'));
+
+  render(<SaveWizard />);
+  fireEvent.press(await screen.findByTestId('save-wizard-step-1-continue'));
+
+  // 13-year-old parent (2026 - 13 = 2013) — computeAgeBracket returns 'child'.
+  fireEvent.changeText(screen.getByTestId('save-basics-parent-name'), 'TooYoung');
+  fireEvent.changeText(screen.getByTestId('save-basics-parent-birth-year'), '2013');
+  fireEvent.changeText(screen.getByTestId('save-basics-child-name'), 'Sam');
+  fireEvent.changeText(screen.getByTestId('save-basics-child-birth-year'), '2014');
+
+  const cta = screen.getByTestId('save-basics-continue');
+  expect(cta.props.accessibilityState?.disabled).toBe(true);
+
+  // Accessible error message visible (testID assertion + role).
+  expect(screen.getByTestId('save-basics-adult-required')).toBeTruthy();
+
+  jest.useRealTimers();
+});
+
+it('parent aged exactly 18 (target=child) is allowed to submit', async () => {
+  await setPreviewState({
+    intent: 'child', path: 'parent_value_prop',
+    createdAt: new Date().toISOString(),
+  });
+  jest.useFakeTimers().setSystemTime(new Date('2026-05-19T00:00:00Z'));
+  mockProfilesPostSequence([
+    { profile: makeOwnerProfile({ id: 'parent-1' }) },
+    { profile: makeChildProfile({ id: 'child-1' }) },
+  ]);
+
+  render(<SaveWizard />);
+  fireEvent.press(await screen.findByTestId('save-wizard-step-1-continue'));
+
+  // computeAgeBracket(2008, 2026) === 'adult' (age 18). Boundary must pass.
+  fireEvent.changeText(screen.getByTestId('save-basics-parent-name'), 'Pat');
+  fireEvent.changeText(screen.getByTestId('save-basics-parent-birth-year'), '2008');
+  fireEvent.changeText(screen.getByTestId('save-basics-child-name'), 'Sam');
+  fireEvent.changeText(screen.getByTestId('save-basics-child-birth-year'), '2014');
+
+  const cta = screen.getByTestId('save-basics-continue');
+  expect(cta.props.accessibilityState?.disabled).toBe(false);
+  expect(screen.queryByTestId('save-basics-adult-required')).toBeNull();
+
+  jest.useRealTimers();
+});
+
+// [OPT-C] Flag-off path: when ADULT_OWNER_GATE_ENABLED is false, the
+// adult-age UI gate is bypassed entirely (today's behaviour). Use the
+// jest.doMock + jest.isolateModules pattern mandated by [HIGH-3] /
+// [MEDIUM-D2] — never `(FEATURE_FLAGS as any).X = false` because the
+// constant is frozen and the override survives across tests.
+it('underage parent allowed through when ADULT_OWNER_GATE_ENABLED is false [OPT-C]', async () => {
+  jest.isolateModules(() => {
+    jest.doMock('../../../lib/feature-flags', () => ({
+      FEATURE_FLAGS: {
+        PREVIEW_ONBOARDING_ENABLED: true,
+        ADULT_OWNER_GATE_ENABLED: false,
+        COACH_BAND_ENABLED: true,
+        MIC_IN_PILL_ENABLED: true,
+        I18N_ENABLED: true,
+      },
+    }));
+    // Re-require SaveWizard inside the isolated registry so its
+    // top-level `import { FEATURE_FLAGS } from ...` picks up the doMock.
+    const { SaveWizard: SaveWizardFlagOff } = require('./save');
+
+    return (async () => {
+      await setPreviewState({
+        intent: 'child', path: 'parent_value_prop',
+        createdAt: new Date().toISOString(),
+      });
+      jest.useFakeTimers().setSystemTime(new Date('2026-05-19T00:00:00Z'));
+      mockProfilesPostSequence([
+        { profile: makeOwnerProfile({ id: 'parent-1' }) },
+        { profile: makeChildProfile({ id: 'child-1' }) },
+      ]);
+
+      render(<SaveWizardFlagOff />);
+      fireEvent.press(await screen.findByTestId('save-wizard-step-1-continue'));
+
+      // 13-year-old parent — would be blocked by the gate, but the flag
+      // is off, so the existing display-name + birth-year validations
+      // are the only checks. Continue must enable and submit must fire.
+      fireEvent.changeText(screen.getByTestId('save-basics-parent-name'), 'TooYoung');
+      fireEvent.changeText(screen.getByTestId('save-basics-parent-birth-year'), '2013');
+      fireEvent.changeText(screen.getByTestId('save-basics-child-name'), 'Sam');
+      fireEvent.changeText(screen.getByTestId('save-basics-child-birth-year'), '2014');
+
+      const cta = screen.getByTestId('save-basics-continue');
+      expect(cta.props.accessibilityState?.disabled).toBe(false);
+      // Warning view is NOT rendered when the flag is off.
+      expect(screen.queryByTestId('save-basics-adult-required')).toBeNull();
+
+      jest.useRealTimers();
+    })();
+  });
+});
+
+it('self target skips the adult gate (any age ≥ 11 allowed)', async () => {
+  await setPreviewState({
+    intent: 'self', path: 'learner_value_prop',
+    topicText: 'algebra', createdAt: new Date().toISOString(),
+  });
+  jest.useFakeTimers().setSystemTime(new Date('2026-05-19T00:00:00Z'));
+  mockProfilesPost({ profile: makeOwnerProfile() });
+
+  render(<SaveWizard />);
+  fireEvent.press(await screen.findByTestId('save-wizard-step-1-continue'));
+
+  // 13-year-old solo learner — adult gate must NOT apply. Server's 11+ check
+  // is the only floor for target='self'.
+  fireEvent.changeText(screen.getByTestId('save-basics-display-name'), 'Solo');
+  fireEvent.changeText(screen.getByTestId('save-basics-birth-year'), '2013');
+
+  const cta = screen.getByTestId('save-basics-continue');
+  expect(cta.props.accessibilityState?.disabled).toBe(false);
+  expect(screen.queryByTestId('save-basics-adult-required')).toBeNull();
+
+  jest.useRealTimers();
+});
+
 it('child failure after parent success keeps parent and shows retry', async () => {
   await setPreviewState({
     intent: 'child', path: 'parent_value_prop',
@@ -1973,6 +2210,14 @@ import { assertOk } from '../../../lib/assert-ok';
 import { formatApiError } from '../../../lib/format-api-error';
 import { setPreviewState } from '../../../lib/preview-onboarding-state';
 import type { Profile } from '@eduagent/schemas';
+// [HIGH-A3] Adult-age gate uses the canonical age-bracket helper —
+// computeAgeBracket(year) returns 'adult' iff age >= 18. Same definition
+// the existing isAdultOwner() helper uses (packages/schemas/src/age.ts:51).
+// DO NOT reintroduce the removed personaFromBirthYear fossil
+// (persona-fossil-guard.test.ts enforces).
+import { computeAgeBracket } from '@eduagent/schemas';
+// [OPT-C] Adult-owner gate is independently flagged via ADULT_OWNER_GATE_ENABLED.
+import { FEATURE_FLAGS } from '../../../lib/feature-flags';
 
 function ProfileBasicsStep({
   target,
@@ -2004,10 +2249,33 @@ function ProfileBasicsStep({
 
   const isValidYear = (s: string) => /^\d{4}$/.test(s) && Number(s) > 1900 && Number(s) <= new Date().getFullYear();
 
+  // [HIGH-A3 / HIGH-B2] Client-side adult-age gate. Server has NO 18+ rule
+  // (apps/api/src/services/profile.ts:184-191 only enforces 11+), so without
+  // this gate a 13-year-old could complete the wizard as isOwner=true with
+  // a child linked underneath. Skipped entirely when target === 'self' —
+  // the server's 11+ floor covers that case.
+  //
+  // computeAgeBracket(birthYear) returns 'adult' iff age >= 18. Same arithmetic
+  // isAdultOwner() in @eduagent/schemas uses; consistent with the rest of the
+  // codebase (e.g. more/index.tsx:118).
+  //
+  // [OPT-C] Gated by FEATURE_FLAGS.ADULT_OWNER_GATE_ENABLED. When OFF,
+  // `adultGateRequired` is false and `adultGatePasses` is trivially true —
+  // canSubmit falls back to today's behaviour (only the field validations
+  // matter). The defense-in-depth server-side rule (Task 13b) is the
+  // parallel barrier; toggling this flag without toggling the API flag
+  // leaves the server still enforcing 403 ADULT_OWNER_REQUIRED.
+  const parentIsAdult =
+    isValidYear(ownerYear) && computeAgeBracket(Number(ownerYear)) === 'adult';
+  const adultGateRequired =
+    FEATURE_FLAGS.ADULT_OWNER_GATE_ENABLED && needsChild;
+  const adultGatePasses = !adultGateRequired || parentIsAdult;
+
   const canSubmit =
     !loading &&
     (needsOwner ? ownerName.trim().length > 0 && isValidYear(ownerYear) : true) &&
-    (needsChild ? childName.trim().length > 0 && isValidYear(childBirthYear) : true);
+    (needsChild ? childName.trim().length > 0 && isValidYear(childBirthYear) : true) &&
+    adultGatePasses;
 
   const submit = useCallback(async () => {
     setError(null);
@@ -2150,6 +2418,26 @@ function ProfileBasicsStep({
         </View>
       )}
 
+      {/* [HIGH-A3] Adult-age gate inline message. Visible only when the parent
+         has entered a valid 4-digit year that resolves to under-18, while the
+         flow needs a child profile. Empty / partial input shows nothing
+         (avoid scolding mid-typing). The Continue button stays disabled
+         independent of this message — the message is the accessible
+         explanation; canSubmit is the actual enforcement. */}
+      {adultGateRequired && isValidYear(ownerYear) && !parentIsAdult && (
+        <View
+          className="bg-warning/10 rounded-card px-4 py-3 mb-3"
+          testID="save-basics-adult-required"
+          accessibilityRole="alert"
+          accessibilityLiveRegion="polite"
+        >
+          <Text className="text-warning text-body-sm">
+            To set up a child&apos;s learning, the account holder must be 18 or
+            older. You can still set up your own learning instead — pick
+            &quot;My learning&quot; on the previous step.
+          </Text>
+        </View>
+      )}
       {error && (
         <View className="bg-danger/10 rounded-card px-4 py-3 mb-3" testID="save-basics-error">
           <Text className="text-danger text-body-sm">{error}</Text>
@@ -2212,6 +2500,162 @@ Add `const [created, setCreated] = useState<{ parent: Profile; child?: Profile }
 
 ---
 
+## Task 13b: Server-Side Adult-Owner Rule [OPT-C]
+
+**Size:** Small (~10-15 lines server change, ~30-40 lines tests).
+
+**Files:**
+- Modify: `apps/api/src/services/profile.ts` — extend `createProfileWithLimitCheck()` (the function that owns the owner-vs-child decision inside the advisory-locked transaction; landmark — search for `pg_advisory_xact_lock(hashtext(${accountId})` and the `isFirstProfile` branch immediately downstream of it). Insertion point is BEFORE the row insert that would create the second profile (the child), AFTER the lock acquisition and the count-rows read that determines `isFirstProfile`. Line numbers drift; cite that landmark, not a fixed line. [MEDIUM-3]
+- Modify: `apps/api/src/services/profile.test.ts` (or the integration test file that already exercises `createProfileWithLimitCheck` — find via grep for `createProfileWithLimitCheck` inside `*.test.ts`).
+- Optional: `packages/schemas/src/errors.ts` — add `AdultOwnerRequiredError` class IF the existing hierarchy (`ForbiddenError` with `apiCode` parameter, see `errors.ts:30-41`) does not already cover the case cleanly. The existing `ForbiddenError(message, apiCode)` shape with `apiCode: 'ADULT_OWNER_REQUIRED'` is the lighter-weight option; new class is only warranted if the mobile side needs an `instanceof AdultOwnerRequiredError` discrimination beyond what `error.apiCode === 'ADULT_OWNER_REQUIRED'` provides.
+
+> [OPT-C] **Why this exists.** Round 3's `[HIGH-D3]` proved the server has NO 18+ owner rule today — it only enforces the 11+ minimum (`apps/api/src/services/profile.ts:184-191`, `belowMinimumAge`). Without this rule, the client-side gate added in Task 13 is the only barrier preventing a 13-year-old from completing the wizard as `isOwner=true` with a child linked underneath. The coordinator's `[OPT-C]` decision is defense-in-depth: ship both barriers and gate each behind an independent flag.
+
+> [OPT-C] **Rule.** When `createProfileWithLimitCheck()` is about to create a profile that will be classified as a CHILD (i.e. `isFirstProfile === false`, the path that links the new profile under the existing owner), and `FEATURE_FLAGS.ADULT_OWNER_GATE_ENABLED` (API config) is true, look up the owner profile that will be the parent of the new child and verify its computed age is ≥ 18. If not, throw `ForbiddenError('Account holder must be 18 or older to add a child profile', 'ADULT_OWNER_REQUIRED')`.
+
+> [OPT-C] **Age helper.** Use `computeAgeBracket(owner.birthYear) === 'adult'` from `@eduagent/schemas` (`packages/schemas/src/age.ts:39-49`). Verified: the `'adult'` bracket exists and is the canonical "18+" definition shared with the mobile client. **Do NOT use** `isAdultOwner(profile)` from `age.ts:51-62` — that helper layers `role` / `isOwner` checks on top of the age math which are tangential here (we already know the target profile is the owner because we just resolved it from the account's existing owner row). Plain `computeAgeBracket` is the right primitive. Confirmed by reading `packages/schemas/src/age.ts` end-to-end. [MEDIUM-3]
+
+> [OPT-C] **Flag gating.** Wrap the entire rule in `if (config.ADULT_OWNER_GATE_ENABLED) { ... }` (or whatever the field name resolves to in `apps/api/src/config.ts` — match Task 1 Step 2). When the API flag is OFF, the rule is skipped entirely; behaviour reverts to today's (only 11+ enforced). This is the kill switch.
+
+> [OPT-C] **Mobile error surfacing.** When the API returns 403 with `apiCode === 'ADULT_OWNER_REQUIRED'`, the `ProfileBasicsStep` `submit()` catch block already calls `formatApiError(err)` and assigns it to `setError(...)` — which renders the existing `save-basics-error` view. That's an acceptable baseline. If the client gate is also on (the expected production configuration), the user never sees this — the gate disables Continue pre-flight. If the user bypassed the client gate (e.g. a flag-off mobile build hitting a flag-on API), they see the formatted error. No NEW screen / route changes needed.
+
+- [ ] **Step 1: Write the failing break-test (red-green regression per CLAUDE.md Fix Development Rules).**
+
+The break-test is the negative-path security test mandated by CLAUDE.md (`Security fixes require a "break test."` — every CRITICAL/HIGH security fix gets a failing test that proves the attack would succeed without the fix). Pattern: write test, watch it pass with the fix in place, revert the fix, watch it fail, restore the fix.
+
+```ts
+// apps/api/src/services/profile.test.ts (or integration test)
+import { ForbiddenError } from '@eduagent/schemas';
+
+it('rejects child creation when owner is under 18 [OPT-C / HIGH-D3]', async () => {
+  // Seed: an account whose existing owner profile has a birth year putting
+  // them at 13 in the test's "now" frame. Use whatever test factories the
+  // file already uses for profile-with-account seeding — match neighbours.
+  const accountId = 'acc-underage-owner';
+  await seedOwnerProfile(accountId, { birthYear: 2013, isOwner: true });
+
+  // Attempt to add a child under that owner. With the [OPT-C] rule, this
+  // must throw ForbiddenError with apiCode ADULT_OWNER_REQUIRED. Pre-fix,
+  // the call succeeds.
+  await expect(
+    createProfileWithLimitCheck(db, accountId, {
+      displayName: 'Child', birthYear: 2014,
+    }),
+  ).rejects.toMatchObject({
+    name: 'ForbiddenError',
+    apiCode: 'ADULT_OWNER_REQUIRED',
+  });
+});
+
+it('allows child creation when owner is exactly 18 [OPT-C boundary]', async () => {
+  const accountId = 'acc-adult-owner';
+  await seedOwnerProfile(accountId, { birthYear: 2008, isOwner: true });
+  // With test "now" fixed to 2026, owner is age 18 — must succeed.
+  await expect(
+    createProfileWithLimitCheck(db, accountId, {
+      displayName: 'Child', birthYear: 2014,
+    }),
+  ).resolves.toMatchObject({ id: expect.any(String) });
+});
+
+it('allows child creation when flag is OFF (preserves today\'s behaviour) [OPT-C flag-off]', async () => {
+  // Toggle the config flag off for this test. Use whatever pattern the
+  // test file already uses for config overrides (a Jest setup file, a
+  // helper, or jest.replaceProperty on the imported config object). DO
+  // NOT mutate process.env directly mid-test — config is parsed once at
+  // module init, mutation has no effect.
+  withConfigOverride({ ADULT_OWNER_GATE_ENABLED: false }, async () => {
+    const accountId = 'acc-flag-off';
+    await seedOwnerProfile(accountId, { birthYear: 2013, isOwner: true });
+    await expect(
+      createProfileWithLimitCheck(db, accountId, {
+        displayName: 'Child', birthYear: 2014,
+      }),
+    ).resolves.toMatchObject({ id: expect.any(String) });
+  });
+});
+```
+
+- [ ] **Step 2: Run; confirm fail.** (First two tests fail — `ForbiddenError` not thrown / not the expected shape.)
+
+- [ ] **Step 3: Implement the rule.**
+
+Inside `createProfileWithLimitCheck()`, after the existing advisory-lock + count-rows read that determines `isFirstProfile`, and BEFORE the `db.insert(profiles)` that creates the child row, insert:
+
+```ts
+// [OPT-C] Adult-owner gate. When adding a CHILD (non-first profile),
+// require the account's existing owner to be ≥18. Gated by config flag
+// so the rule can be toggled off without code changes (kill switch).
+if (
+  config.ADULT_OWNER_GATE_ENABLED &&
+  !isFirstProfile  // landmark: same boolean the existing owner-vs-child
+                   // decision uses below. Match its exact source variable.
+) {
+  const ownerRow = await txDb
+    .select({ birthYear: profiles.birthYear })
+    .from(profiles)
+    .where(and(eq(profiles.accountId, accountId), eq(profiles.isOwner, true)))
+    .limit(1);
+  const ownerBirthYear = ownerRow[0]?.birthYear;
+  if (
+    ownerBirthYear == null ||
+    computeAgeBracket(ownerBirthYear) !== 'adult'
+  ) {
+    throw new ForbiddenError(
+      'Account holder must be 18 or older to add a child profile.',
+      'ADULT_OWNER_REQUIRED',
+    );
+  }
+}
+```
+
+Add the imports at the top of the file:
+```ts
+import { computeAgeBracket, ForbiddenError } from '@eduagent/schemas';
+```
+
+- [ ] **Step 4: Run tests; confirm pass.** All three tests green.
+
+- [ ] **Step 5: Verify the break-test pattern.** Revert the implementation lines (comment out the `if` block). Re-run — the first test must FAIL with `ForbiddenError not thrown`. Restore the implementation. Re-run — green again. This is the regression-pattern proof required by CLAUDE.md for security fixes.
+
+- [ ] **Step 6: Wire the route's error responder.**
+
+Confirm the API's error middleware maps `ForbiddenError` (with `apiCode: 'ADULT_OWNER_REQUIRED'`) to a 403 response that surfaces `apiCode` in the JSON body. Grep `apps/api/src/errors.ts` (the Hono-specific helper, NOT the schemas error class file) for `ForbiddenError` and confirm the existing handler already does this — if it does, no work needed. If not, extend it (one-line addition; the apiCode field is already on the class).
+
+The mobile API client middleware classifies HTTP responses into typed errors per CLAUDE.md ("Typed error hierarchy"). Confirm `apps/mobile/src/lib/api-client.ts` (or wherever the response classifier lives — grep for `ForbiddenError`) already maps 403 with `apiCode: 'ADULT_OWNER_REQUIRED'` to the mobile-side `ForbiddenError` instance. The existing `formatApiError(err)` in `ProfileBasicsStep` then formats the message for the toast. No new screen needed.
+
+- [ ] **Step 7: Migration / rollback.**
+
+**Migration:** none. This is a pure validation rule — no schema change, no data backfill.
+
+**Rollback:** flip `config.ADULT_OWNER_GATE_ENABLED` to false (Doppler env update; no redeploy required if the config is read on every request rather than at boot — verify with the `apps/api/src/config.ts` implementation). The mobile flag `FEATURE_FLAGS.ADULT_OWNER_GATE_ENABLED` requires a mobile build/OTA flip; the API flag is the immediate kill switch.
+
+**Rollback section per CLAUDE.md Schema And Deploy Safety:** Rollback IS possible. No data is lost — the rule rejects creation, never destroys. Recovery procedure: flip flag off, request retries succeed.
+
+- [ ] **Step 8: Failure-modes addendum.** Already added in the section below (see "Underage owner attempts to link child (server)" row).
+
+- [ ] **Step 9: Commit via `/commit`.** Suggested message:
+```
+feat(api): server-side adult-owner rule for child profile creation [OPT-C]
+
+When an account adds a child profile (non-first profile), require the
+existing owner to be ≥18. Gated by config.ADULT_OWNER_GATE_ENABLED so
+the rule can be toggled off without code changes.
+
+Closes [HIGH-D3] gap: client-side gate (Task 13 / HIGH-A3) was the
+only barrier; this adds defense-in-depth at the server boundary.
+
+Tests:
+- Underage owner + child create → 403 ADULT_OWNER_REQUIRED (break test).
+- Owner aged 18 boundary → succeeds.
+- Flag OFF → succeeds (preserves today's behaviour).
+
+Plan: docs/plans/2026-05-19-trial-intent-save-onboarding-v0.md §Task 13b
+Spec: docs/specs/2026-05-18-trial-intent-save-onboarding-v0.md
+```
+
+---
+
 ## Failure Modes Addendum (referenced from spec)
 
 | State | Trigger | User sees | Recovery |
@@ -2221,6 +2665,11 @@ Add `const [created, setCreated] = useState<{ parent: Profile; child?: Profile }
 | Child POST fails after owner POST succeeded | Network error mid-flight | Inline error banner + Retry button | Retry hits the same `submit()` — resume guard skips re-creating the owner; child POST retried. [HIGH-4] |
 | `setActive` succeeds but gate has stale preview state, user already has a profile | Sign-out → sign-in cycle with the same browser/session | Tabs render normally | `(app)/_layout.tsx` cleanup effect clears the SecureStore key when `activeProfile && profiles.length > 0`. Wizard is not reached. |
 | `pending-auth-redirect` lost on native cold-start | Process killed during OAuth round-trip | CreateProfileGate flash possible | Gate's async preview-state probe resolves `present` → `<Redirect>` to wizard. The pending-auth-redirect is a web-only optimization; native does not depend on it. [HIGH-1] |
+| Underage account-holder tries to set up a child | User enters birth year putting them at < 18 while `needsChild` (target ∈ `child` \| `both`) | Continue button disabled + inline warning at `save-basics-adult-required` explaining 18+ requirement and pointing back to the "My learning" branch | Client gate blocks submission. User can either (a) change birth year to ≥18 (only acceptable if it was a typo), or (b) go back to Step 1 and re-select target = `self`. Server has NO 18+ check ([HIGH-D3]), so the client is the only barrier. [HIGH-A3 / HIGH-B2] |
+| Wizard mounted while signed-out (token expired mid-OAuth) | Clerk session lapse between probe and mount | `<Redirect>` to `/sign-in` from the layout's `!isSignedIn` branch — wizard never reaches `useEffect` | Wizard branch sits AFTER `!isSignedIn` in gate ordering. Preview-state key survives on SecureStore through TTL, so re-signin lands back in wizard. [CRITICAL-A3] |
+| Underage owner attempts to link child (server, defense-in-depth) | Client gate bypassed (flag off on mobile, mobile build older than gate, or direct API call) — request reaches server with isFirstProfile=false and existing owner is < 18 | API returns 403 with `apiCode: ADULT_OWNER_REQUIRED`; mobile renders the existing `save-basics-error` view via `formatApiError(err)` showing "Account holder must be 18 or older to add a child profile." | User goes back to wizard Step 1 and re-selects target = `self`, OR (if the underage status is a birth-year typo) corrects it. No data created — the rule throws before insert. Server flag toggle (`config.ADULT_OWNER_GATE_ENABLED = false`) is the emergency kill switch. [OPT-C / Task 13b] |
+| Adult-owner gate flag off + underage user creates owner+child | Both `FEATURE_FLAGS.ADULT_OWNER_GATE_ENABLED` (mobile) AND `config.ADULT_OWNER_GATE_ENABLED` (API) are false | Account created with underage owner and linked child; 11+ floor still enforced. Identical to today's behaviour. | NOT a recovery — this is a configuration outcome, acceptable only when the gates are deliberately turned off (e.g. emergency rollback because the gate caused a regression). To restore protection, flip the API flag to true (takes effect immediately, no redeploy required if config is read per-request). [OPT-C] |
+| Server flag ON + client flag OFF + underage user attempts wizard | API enforces 18+; mobile build has UI gate disabled (mismatched flag state) | Client allows submission (no inline warning, Continue enabled); server rejects parent-or-child POST with 403 `ADULT_OWNER_REQUIRED`; the `save-basics-error` view surfaces "Account holder must be 18 or older to add a child profile." | User returns to wizard Step 1 and re-selects target = `self`, or corrects birth year if it was a typo. The mismatch is itself a release-coordination bug to flag — the mobile build should be brought into sync. [OPT-C] |
 
 ---
 
@@ -2230,7 +2679,10 @@ Add `const [created, setCreated] = useState<{ parent: Profile; child?: Profile }
 - Modify: `apps/mobile/src/app/(app)/preview/save.tsx`
 - Modify: `apps/mobile/src/app/(app)/preview/save.test.tsx`
 
-> **Spike outcome (fill in before starting Task 14):** [option (a) — helper at `<path>` / option (b) — defer topic prefill, CTA reads "Go to my learning"]
+> **Spike outcome (resolved 2026-05-19 in Task 0):** Dual landing keyed off the wizard's `target` flag.
+> - `target = self` (and `both` with `bothPriority = self_first`) → land in a session via the session-start helper (path: fill in once Task 0 Step 1 grep result is recorded; default expectation is `apps/mobile/src/hooks/use-create-session.ts`).
+> - `target = child` (and `both` with `bothPriority = child_first`) → `router.replace('/(app)/home')`. Saved topic surfaces as a card on home; "Add child" CTA is what closes the loop for this branch.
+> - CTA copy: `'Start lesson'` on the self-leaning branches, `'Open parent home'` on the child-leaning branches.
 
 > Hard Rule: use `router.replace` on landing so the preview stack is cleared (AC 13). Intra-wizard hops earlier are `setStep(...)` state changes, not router pushes.
 
@@ -2255,7 +2707,13 @@ it('self target: replaces history with first session route on success', async ()
   // ...drive through steps 1 + 2...
 
   await waitFor(() => {
-    expect(replace).toHaveBeenCalledWith(expect.stringMatching(/^\/\(app\)\//));
+    // [MEDIUM-D3 / Task 0 resolution] Self target lands in a session via the
+    // session-start helper. Assert the session route shape precisely — NOT
+    // a loose /(app)/ glob (would also match /home, which is the wrong
+    // branch for self).
+    expect(replace).toHaveBeenCalledWith(
+      expect.stringMatching(/^\/\(app\)\/own-learning\/session(\/|$)/),
+    );
   });
 });
 
@@ -2325,11 +2783,30 @@ function ConfirmStep({
 
       await clearPreviewState();
 
-      if (target === 'self' || (target === 'both' && previewState.bothPriority === 'self_first')) {
-        // OPTION (A): call shared session-start helper with previewState.topicText.
-        // OPTION (B): router.replace('/(app)/home') and let the user start a session manually.
-        // FILL IN BASED ON TASK 0 SPIKE OUTCOME.
+      // [Task 0 resolution] Dual landing on wizard target flag.
+      const isSelfBranch =
+        target === 'self' ||
+        (target === 'both' && previewState.bothPriority === 'self_first');
+
+      if (isSelfBranch) {
+        // Self / kid-with-own-profile / solo-adult: land in a session for the saved topic.
+        // Helper accepts { topicText } and resolves to { sessionId } on success.
+        const result = await startSessionForTopic({
+          topicText: previewState.topicText ?? null,
+        });
+        if ('error' in result) {
+          // Session-start failure falls through to home with the error surfaced
+          // via the existing landingError UI block. Do NOT silently swallow.
+          setLandingError(result.error);
+          router.replace('/(app)/home');
+          return;
+        }
+        router.replace(`/(app)/own-learning/session/${result.sessionId}`);
       } else {
+        // Parent branch (target=child or both with child_first): the child profile
+        // does not exist yet at this point in the flow, so a session would attach
+        // to the wrong profile. Land on home where the "Add child" CTA closes
+        // the loop and the saved topic surfaces as a card.
         router.replace('/(app)/home');
       }
     } catch (err) {
@@ -2367,7 +2844,7 @@ function ConfirmStep({
 }
 ```
 
-Add imports: `clearPreviewState` from `preview-onboarding-state`, `useProfile` from `../../../lib/profile`, `formatApiError` (already imported).
+Add imports: `clearPreviewState` from `preview-onboarding-state`, `useProfile` from `../../../lib/profile`, `formatApiError` (already imported), and `startSessionForTopic` from the session-start helper resolved in Task 0 Step 1 (likely `../../../hooks/use-create-session`).
 
 - [ ] **Step 4: Run tests; confirm pass.**
 
@@ -2419,6 +2896,14 @@ Instead, the existing route tests already assert the correct method:
 - `(app)/preview/save.test.tsx` — Task 14 already asserts `replace` was called with the landing route.
 
 Sweep those tests once: confirm every navigation assertion uses the matching method (`push` for hops, `replace` for landing). If any test was written with the wrong assertion, fix it now — that is the AC-16 verification step.
+
+- [ ] **Step 2b: Telemetry gap (deferred follow-up).** [MEDIUM-C3]
+
+This plan ships ZERO funnel events. Per CLAUDE.md's `safeSend()` convention for non-core dispatches (`apps/api/src/services/safe-non-core.ts`), conversion-critical flows like trial onboarding MUST emit funnel events or the feature is unmeasurable post-launch. The shape of the follow-up:
+
+- Events: `preview_intent_seen`, `preview_intent_selected` (with `intent` payload), `preview_topic_submitted`, `preview_value_prop_seen` (with `path` payload), `preview_signup_started`, `preview_signup_completed`, `save_wizard_step_1`, `save_wizard_step_2`, `save_wizard_step_3`, `save_wizard_completed` (with `target` + `parent_profile_id` + `child_profile_id?`).
+- Discovery step: grep `apps/mobile/src/lib/` for existing analytics modules — PostHog, Amplitude, Segment, or a thin in-house dispatcher. Mirror the existing pattern; do not invent a new analytics surface.
+- Why deferred from this PR: the analytics conventions aren't grounded in this plan and the spec doesn't specify event names; this is a discovery + design follow-up, not a code follow-up. Open a Notion task immediately after merge so it doesn't fall through. Without these events the funnel-conversion measurement that justifies the feature can't be done.
 
 - [ ] **Step 3: Run full mobile test sweep for changed files.**
 
