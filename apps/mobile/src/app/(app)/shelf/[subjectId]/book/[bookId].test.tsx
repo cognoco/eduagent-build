@@ -935,6 +935,7 @@ describe('BookScreen', () => {
       params: {
         sessionId: 'sess-1',
         subjectId: 'sub-1',
+        bookId: 'book-1',
         topicId: 'topic-1',
       },
     });

@@ -861,12 +861,13 @@ export default function BookScreen() {
         buildSessionDetailHref({
           sessionId: session.id,
           subjectId,
+          bookId,
           topicId: session.topicId,
           childProfileId: proxyChildProfileId,
         }),
       );
     },
-    [proxyChildProfileId, router, subjectId],
+    [bookId, proxyChildProfileId, router, subjectId],
   );
 
   const handleNoteSourcePress = useCallback(
@@ -875,12 +876,13 @@ export default function BookScreen() {
         buildSessionDetailHref({
           sessionId,
           subjectId,
+          bookId,
           topicId,
           childProfileId: proxyChildProfileId,
         }),
       );
     },
-    [proxyChildProfileId, router, subjectId],
+    [bookId, proxyChildProfileId, router, subjectId],
   );
 
   // --- Long-press: context menu for moving topic to a different book ---
