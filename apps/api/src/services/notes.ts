@@ -8,6 +8,7 @@ import {
   createScopedRepository,
   type Database,
 } from '@eduagent/database';
+import type { AllNote } from '@eduagent/schemas';
 import { ConflictError, NotFoundError } from '../errors';
 
 const MAX_NOTES_PER_TOPIC = 50;
@@ -19,20 +20,6 @@ type NoteRow = {
   content: string;
   createdAt: Date;
   updatedAt: Date;
-};
-
-export type AllNoteRow = {
-  id: string;
-  topicId: string;
-  topicTitle: string;
-  bookId: string;
-  bookTitle: string;
-  subjectId: string;
-  subjectName: string;
-  sessionId: string | null;
-  content: string;
-  createdAt: string;
-  updatedAt: string;
 };
 
 /**
@@ -323,7 +310,7 @@ export async function listAllNotes(
     limit?: number;
     subjectId?: string;
   } = {},
-): Promise<{ notes: AllNoteRow[]; nextCursor: string | null }> {
+): Promise<{ notes: AllNote[]; nextCursor: string | null }> {
   const limit = Math.min(Math.max(options.limit ?? 20, 1), 50);
   const conditions: SQL[] = [
     eq(topicNotes.profileId, profileId),

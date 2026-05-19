@@ -24,12 +24,17 @@ describe('exchangesFlow', () => {
   }
 
   describe('enumerateScenarios', () => {
-    it('returns 18 scenario inputs for a general (non-language) profile', () => {
+    it('returns 17 scenario inputs for a general (non-language) profile', () => {
       const scenarios =
         exchangesFlow.enumerateScenarios?.(generalProfile) ?? [];
-      expect(scenarios).toHaveLength(18);
+      expect(scenarios).toHaveLength(17);
       expect(scenarios.map((s) => s.scenarioId)).not.toContain(
         'S7-language-fluency',
+      );
+      // S13 (first-session-subject opener) removed when the subject-opener
+      // probe rule was replaced by the anchor-and-execute model.
+      expect(scenarios.map((s) => s.scenarioId)).not.toContain(
+        'S13-first-session-subject-turn0',
       );
       expect(scenarios.map((s) => s.scenarioId)).toEqual(
         expect.arrayContaining([
@@ -37,7 +42,6 @@ describe('exchangesFlow', () => {
           'S10-first-encounter-topic-turn0',
           'S11-first-encounter-topic-turn1',
           'S12-first-encounter-topic-turn3',
-          'S13-first-session-subject-turn0',
           'S14-returning-topic-turn0',
           'S15-review-mode-opener',
           'S16-app-help-notes',
@@ -55,10 +59,10 @@ describe('exchangesFlow', () => {
       );
     });
 
-    it('returns 19 scenarios for a language-learning profile (includes S7 + S9)', () => {
+    it('returns 18 scenarios for a language-learning profile (includes S7 + S9)', () => {
       const scenarios =
         exchangesFlow.enumerateScenarios?.(languageProfile) ?? [];
-      expect(scenarios).toHaveLength(19);
+      expect(scenarios).toHaveLength(18);
       expect(scenarios.map((s) => s.scenarioId)).toContain(
         'S7-language-fluency',
       );
@@ -221,36 +225,45 @@ describe('exchangesFlow', () => {
       expect(messages.system).not.toContain('spark curiosity');
     });
 
-    it('new-topic scenarios carry the current first-turn rules and returning topics keep 5b', () => {
+    it('first-encounter turn 0 anchors and executes; returning topic keeps the original 5b rule', () => {
       const scenarios =
         exchangesFlow.enumerateScenarios?.(generalProfile) ?? [];
-      const firstEncounter = scenarios.find(
+      const firstEncounterTurn0 = scenarios.find(
         (s) => s.scenarioId === 'S10-first-encounter-topic-turn0',
       );
-      const subjectOpener = scenarios.find(
-        (s) => s.scenarioId === 'S13-first-session-subject-turn0',
+      const firstEncounterTurn1 = scenarios.find(
+        (s) => s.scenarioId === 'S11-first-encounter-topic-turn1',
       );
       const returning = scenarios.find(
         (s) => s.scenarioId === 'S14-returning-topic-turn0',
       );
-      if (!firstEncounter || !subjectOpener || !returning) {
+      if (!firstEncounterTurn0 || !firstEncounterTurn1 || !returning) {
         throw new Error('first-encounter eval scenarios missing');
       }
 
-      const firstEncounterPrompt = exchangesFlow.buildPrompt(
-        firstEncounter.input,
+      const turn0Prompt = exchangesFlow.buildPrompt(
+        firstEncounterTurn0.input,
       ).system;
-      const subjectOpenerPrompt = exchangesFlow.buildPrompt(
-        subjectOpener.input,
+      const turn1Prompt = exchangesFlow.buildPrompt(
+        firstEncounterTurn1.input,
       ).system;
       const returningPrompt = exchangesFlow.buildPrompt(returning.input).system;
 
-      expect(firstEncounterPrompt).toContain('FIRST TURN RULE (new topic):');
-      expect(firstEncounterPrompt).toContain('end with a single short check');
-      expect(subjectOpenerPrompt).toContain('FIRST TURN RULE (new topic):');
-      expect(subjectOpenerPrompt).toContain('teach the first concrete idea');
-      expect(subjectOpenerPrompt).not.toContain('SUBJECT OPENER');
+      // Turn 0: anchor-and-execute, NOT an open-ended intake question.
+      expect(turn0Prompt).toContain('FIRST TURN RULE (new topic)');
+      expect(turn0Prompt).toContain(
+        'Do NOT open with an open-ended intake question',
+      );
+      expect(turn0Prompt).not.toContain('SUBJECT OPENER');
+      expect(turn0Prompt).not.toContain('what brought you to');
+
+      // Turns 1-3: keep teaching the proposed direction; vagueness = consent.
+      expect(turn1Prompt).toContain('NEW-TOPIC EXECUTION RULE');
+      expect(turn1Prompt).toContain('treat it as consent and keep teaching');
+
+      // Returning-topic first turn: original 5b rule still applies.
       expect(returningPrompt).toContain('exactly one learner action');
+      expect(returningPrompt).not.toContain('NEW-TOPIC EXECUTION RULE');
       expect(returningPrompt).not.toContain('FIRST TURN RULE (new topic)');
     });
 
