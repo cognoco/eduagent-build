@@ -68,26 +68,34 @@ jest.mock(
 );
 
 // i18n
-jest.mock('../../../i18n', () => ({
-  i18next: { language: 'en' },
-  LANGUAGE_LABELS: {
-    en: { native: 'English', english: 'English' },
-    nb: { native: 'Norsk', english: 'Norwegian' },
-  },
-  SUPPORTED_LANGUAGES: ['en', 'nb'],
-  setStoredLanguage: jest.fn().mockResolvedValue(undefined),
-}));
+jest.mock(
+  '../../../i18n' /* gc1-allow: language store is app-global native persistence */,
+  () => ({
+    i18next: { language: 'en' },
+    LANGUAGE_LABELS: {
+      en: { native: 'English', english: 'English' },
+      nb: { native: 'Norsk', english: 'Norwegian' },
+    },
+    SUPPORTED_LANGUAGES: ['en', 'nb'],
+    setStoredLanguage: jest.fn().mockResolvedValue(undefined),
+  }),
+);
 
 // Feature flags
-jest.mock('../../../lib/feature-flags', () => ({
-  FEATURE_FLAGS: { I18N_ENABLED: false },
-}));
+jest.mock(
+  '../../../lib/feature-flags' /* gc1-allow: screen test pins app-wide feature flag branch */,
+  () => ({
+    FEATURE_FLAGS: { I18N_ENABLED: false },
+  }),
+);
 
 const mockPlatformAlert = jest.fn();
-jest.mock('../../../lib/platform-alert', () => ({
-  // gc1-allow: wraps native Alert
-  platformAlert: (...args: unknown[]) => mockPlatformAlert(...args),
-}));
+jest.mock(
+  '../../../lib/platform-alert' /* gc1-allow: wraps native Alert */,
+  () => ({
+    platformAlert: (...args: unknown[]) => mockPlatformAlert(...args),
+  }),
+);
 
 // AccountSecurity component — renders if visible prop is true
 jest.mock(

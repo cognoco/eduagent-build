@@ -218,7 +218,7 @@ describe('findSessionSummaryRow', () => {
     // Patch createScopedRepository to return the mock — done via requireActual
     // so we only override the one function.
     const databaseModule = jest.requireActual('@eduagent/database') as {
-      createScopedRepository: typeof import('@eduagent/database').createScopedRepository;
+      createScopedRepository: (...args: unknown[]) => unknown;
     };
     const originalCreate = databaseModule.createScopedRepository;
     // Since we cannot re-mock an already imported binding without a jest.mock

@@ -22,13 +22,15 @@ jest.mock('expo-router', () => ({
   }),
 }));
 
-jest.mock('../../../lib/theme', () => ({
-  // gc1-allow: theme hook requires native ColorScheme
-  useThemeColors: () => ({
-    textPrimary: '#1f2937',
-    primary: '#6366f1',
+jest.mock(
+  '../../../lib/theme' /* gc1-allow: theme hook requires native ColorScheme */,
+  () => ({
+    useThemeColors: () => ({
+      textPrimary: '#1f2937',
+      primary: '#6366f1',
+    }),
   }),
-}));
+);
 
 jest.mock('@expo/vector-icons', () => ({
   Ionicons: ({ name }: { name: string }) => {
@@ -54,74 +56,82 @@ let mockIsLoading = false;
 let mockIsError = false;
 const mockRefetch = jest.fn();
 
-jest.mock('../../../hooks/use-assessments', () => ({
-  // gc1-allow: fetches from API
-  useAssessmentEligibleTopics: () => ({
-    data: mockTopics,
-    isLoading: mockIsLoading,
-    isError: mockIsError,
-    refetch: mockRefetch,
+jest.mock(
+  '../../../hooks/use-assessments' /* gc1-allow: assessment hook fetches from API via React Query */,
+  () => ({
+    useAssessmentEligibleTopics: () => ({
+      data: mockTopics,
+      isLoading: mockIsLoading,
+      isError: mockIsError,
+      refetch: mockRefetch,
+    }),
   }),
-}));
+);
 
 // ErrorFallback stub
-jest.mock('../../../components/common/ErrorFallback', () => ({
-  ErrorFallback: ({
-    message,
-    primaryAction,
-    secondaryAction,
-    testID,
-  }: {
-    variant?: string;
-    title?: string;
-    message: string;
-    primaryAction: { label: string; testID?: string; onPress: () => void };
-    secondaryAction?: { label: string; testID?: string; onPress: () => void };
-    testID?: string;
-  }) => {
-    const { Pressable, Text, View } = require('react-native');
-    return (
-      <View testID={testID ?? 'error-fallback'}>
-        <Text>{message}</Text>
-        <Pressable
-          onPress={primaryAction.onPress}
-          testID={primaryAction.testID ?? 'error-primary'}
-        >
-          <Text>{primaryAction.label}</Text>
-        </Pressable>
-        {secondaryAction ? (
+jest.mock(
+  '../../../components/common/ErrorFallback' /* gc1-allow: isolates fallback buttons for route-level state tests */,
+  () => ({
+    ErrorFallback: ({
+      message,
+      primaryAction,
+      secondaryAction,
+      testID,
+    }: {
+      variant?: string;
+      title?: string;
+      message: string;
+      primaryAction: { label: string; testID?: string; onPress: () => void };
+      secondaryAction?: { label: string; testID?: string; onPress: () => void };
+      testID?: string;
+    }) => {
+      const { Pressable, Text, View } = require('react-native');
+      return (
+        <View testID={testID ?? 'error-fallback'}>
+          <Text>{message}</Text>
           <Pressable
-            onPress={secondaryAction.onPress}
-            testID={secondaryAction.testID ?? 'error-secondary'}
+            onPress={primaryAction.onPress}
+            testID={primaryAction.testID ?? 'error-primary'}
           >
-            <Text>{secondaryAction.label}</Text>
+            <Text>{primaryAction.label}</Text>
           </Pressable>
-        ) : null}
-      </View>
-    );
-  },
-}));
+          {secondaryAction ? (
+            <Pressable
+              onPress={secondaryAction.onPress}
+              testID={secondaryAction.testID ?? 'error-secondary'}
+            >
+              <Text>{secondaryAction.label}</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      );
+    },
+  }),
+);
 
 // Button stub
-jest.mock('../../../components/common/Button', () => ({
-  Button: ({
-    label,
-    onPress,
-    testID,
-  }: {
-    label: string;
-    onPress: () => void;
-    testID?: string;
-    variant?: string;
-  }) => {
-    const { Pressable, Text } = require('react-native');
-    return (
-      <Pressable onPress={onPress} testID={testID ?? `btn-${label}`}>
-        <Text>{label}</Text>
-      </Pressable>
-    );
-  },
-}));
+jest.mock(
+  '../../../components/common/Button' /* gc1-allow: isolates shared button styling from navigation behavior tests */,
+  () => ({
+    Button: ({
+      label,
+      onPress,
+      testID,
+    }: {
+      label: string;
+      onPress: () => void;
+      testID?: string;
+      variant?: string;
+    }) => {
+      const { Pressable, Text } = require('react-native');
+      return (
+        <Pressable onPress={onPress} testID={testID ?? `btn-${label}`}>
+          <Text>{label}</Text>
+        </Pressable>
+      );
+    },
+  }),
+);
 
 const AssessmentPickerScreen = require('./assessment-picker')
   .default as React.ComponentType;

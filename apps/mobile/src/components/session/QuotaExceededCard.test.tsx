@@ -14,15 +14,16 @@ jest.mock('expo-router', () => ({
 // Mock the settings hook surface so the card can exercise notify state
 // without spinning the full API client / React Query infrastructure.
 const mockNotifyMutate = jest.fn();
-jest.mock('../../hooks/use-settings', () => ({
-  // gc1-allow: useNotifyParentSubscribe is a thin react-query wrapper around
-  // a real network mutation — mocked at the hook boundary so this UI test
-  // can drive sending/sent/failed states deterministically.
-  useNotifyParentSubscribe: () => ({
-    mutate: mockNotifyMutate,
-    isPending: false,
+jest.mock(
+  '../../hooks/use-settings' /* gc1-allow: useNotifyParentSubscribe is a thin react-query wrapper around a real network mutation */,
+  () => ({
+    // Mocked at the hook boundary so this UI test can drive sending/sent/failed states deterministically.
+    useNotifyParentSubscribe: () => ({
+      mutate: mockNotifyMutate,
+      isPending: false,
+    }),
   }),
-}));
+);
 
 const { QuotaExceededCard } = require('./QuotaExceededCard');
 

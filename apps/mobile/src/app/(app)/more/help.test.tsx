@@ -6,16 +6,20 @@ import { render, fireEvent, act } from '@testing-library/react-native';
 // ---------------------------------------------------------------------------
 
 const mockOpenFeedback = jest.fn();
-jest.mock('../../../components/feedback/FeedbackProvider', () => ({
-  // gc1-allow: FeedbackProvider requires native shake detection and modal host
-  useFeedbackContext: () => ({ openFeedback: mockOpenFeedback }),
-}));
+jest.mock(
+  '../../../components/feedback/FeedbackProvider' /* gc1-allow: FeedbackProvider requires native shake detection and modal host */,
+  () => ({
+    useFeedbackContext: () => ({ openFeedback: mockOpenFeedback }),
+  }),
+);
 
 const mockPlatformAlert = jest.fn();
-jest.mock('../../../lib/platform-alert', () => ({
-  // gc1-allow: wraps native Alert.alert
-  platformAlert: (...args: unknown[]) => mockPlatformAlert(...args),
-}));
+jest.mock(
+  '../../../lib/platform-alert' /* gc1-allow: wraps native Alert.alert */,
+  () => ({
+    platformAlert: (...args: unknown[]) => mockPlatformAlert(...args),
+  }),
+);
 
 // Mock Linking
 const mockOpenURL = jest.fn().mockResolvedValue(undefined);
@@ -31,27 +35,30 @@ jest.mock('react-native', () => {
 });
 
 // SettingsRow / SectionHeader stubs
-jest.mock('../../../components/more/settings-rows', () => {
-  const { Pressable, Text } = require('react-native');
-  return {
-    SectionHeader: ({ children }: { children: React.ReactNode }) => (
-      <Text>{children}</Text>
-    ),
-    SettingsRow: ({
-      label,
-      onPress,
-      testID,
-    }: {
-      label: string;
-      onPress?: () => void;
-      testID?: string;
-    }) => (
-      <Pressable onPress={onPress} testID={testID ?? `row-${label}`}>
-        <Text>{label}</Text>
-      </Pressable>
-    ),
-  };
-});
+jest.mock(
+  '../../../components/more/settings-rows' /* gc1-allow: isolates settings rows from NativeWind styling in screen test */,
+  () => {
+    const { Pressable, Text } = require('react-native');
+    return {
+      SectionHeader: ({ children }: { children: React.ReactNode }) => (
+        <Text>{children}</Text>
+      ),
+      SettingsRow: ({
+        label,
+        onPress,
+        testID,
+      }: {
+        label: string;
+        onPress?: () => void;
+        testID?: string;
+      }) => (
+        <Pressable onPress={onPress} testID={testID ?? `row-${label}`}>
+          <Text>{label}</Text>
+        </Pressable>
+      ),
+    };
+  },
+);
 
 const HelpScreen = require('./help').default as React.ComponentType;
 

@@ -31,25 +31,31 @@ let mockSearchParams: Record<string, string> = {
   totalSteps: '4',
 };
 
-jest.mock('../../../lib/theme', () => ({
-  // gc1-allow: theme hook requires native ColorScheme
-  useThemeColors: () => ({
-    primary: '#6366f1',
-    textSecondary: '#6b7280',
+jest.mock(
+  '../../../lib/theme' /* gc1-allow: theme hook requires native ColorScheme */,
+  () => ({
+    useThemeColors: () => ({
+      primary: '#6366f1',
+      textSecondary: '#6b7280',
+    }),
   }),
-}));
+);
 
 const mockGoBackOrReplace = jest.fn();
-jest.mock('../../../lib/navigation', () => ({
-  // gc1-allow: imports expo-router Router type
-  goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
-}));
+jest.mock(
+  '../../../lib/navigation' /* gc1-allow: imports expo-router Router type */,
+  () => ({
+    goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
+  }),
+);
 
 const mockPlatformAlert = jest.fn();
-jest.mock('../../../lib/platform-alert', () => ({
-  // gc1-allow: wraps native Alert
-  platformAlert: (...args: unknown[]) => mockPlatformAlert(...args),
-}));
+jest.mock(
+  '../../../lib/platform-alert' /* gc1-allow: wraps native Alert */,
+  () => ({
+    platformAlert: (...args: unknown[]) => mockPlatformAlert(...args),
+  }),
+);
 
 let mockActiveProfile: {
   id: string;
@@ -61,43 +67,55 @@ let mockActiveProfile: {
   pronouns: null,
 };
 
-jest.mock('../../../lib/profile', () => ({
-  // gc1-allow: profile context requires full provider tree
-  useProfile: () => ({ activeProfile: mockActiveProfile }),
-}));
+jest.mock(
+  '../../../lib/profile' /* gc1-allow: profile context requires full provider tree */,
+  () => ({
+    useProfile: () => ({ activeProfile: mockActiveProfile }),
+  }),
+);
 
 const mockUpdatePronounsMutate = jest.fn();
 let mockUpdatePronounsIsPending = false;
 
-jest.mock('../../../hooks/use-onboarding-dimensions', () => ({
-  // gc1-allow: fetches from API
-  useUpdatePronouns: () => ({
-    mutate: mockUpdatePronounsMutate,
-    isPending: mockUpdatePronounsIsPending,
+jest.mock(
+  '../../../hooks/use-onboarding-dimensions' /* gc1-allow: onboarding hook fetches from API via React Query */,
+  () => ({
+    useUpdatePronouns: () => ({
+      mutate: mockUpdatePronounsMutate,
+      isPending: mockUpdatePronounsIsPending,
+    }),
   }),
-}));
+);
 
 const mockStartFirstCurriculumMutate = jest.fn();
 
-jest.mock('../../../hooks/use-sessions', () => ({
-  // gc1-allow: fetches from API
-  useStartFirstCurriculumSession: () => ({
-    mutate: mockStartFirstCurriculumMutate,
-    isPending: false,
+jest.mock(
+  '../../../hooks/use-sessions' /* gc1-allow: session hook fetches from API via React Query */,
+  () => ({
+    useStartFirstCurriculumSession: () => ({
+      mutate: mockStartFirstCurriculumMutate,
+      isPending: false,
+    }),
   }),
-}));
+);
 
 // OnboardingStepIndicator stub
-jest.mock('../../../components/onboarding/OnboardingStepIndicator', () => ({
-  OnboardingStepIndicator: () => {
-    const { View } = require('react-native');
-    return <View testID="step-indicator" />;
-  },
-}));
+jest.mock(
+  '../../../components/onboarding/OnboardingStepIndicator' /* gc1-allow: screen test only needs step indicator presence */,
+  () => ({
+    OnboardingStepIndicator: () => {
+      const { View } = require('react-native');
+      return <View testID="step-indicator" />;
+    },
+  }),
+);
 
-jest.mock('../../../lib/onboarding-step-labels', () => ({
-  getOnboardingStepLabels: () => ['Step 1', 'Step 2', 'Step 3', 'Step 4'],
-}));
+jest.mock(
+  '../../../lib/onboarding-step-labels' /* gc1-allow: deterministic labels for route-param test */,
+  () => ({
+    getOnboardingStepLabels: () => ['Step 1', 'Step 2', 'Step 3', 'Step 4'],
+  }),
+);
 
 // @eduagent/schemas PRONOUNS_PROMPT_MIN_AGE
 jest.mock('@eduagent/schemas', () => ({

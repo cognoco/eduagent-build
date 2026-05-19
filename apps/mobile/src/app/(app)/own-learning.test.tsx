@@ -45,25 +45,28 @@ jest.mock(
 // pure function (activeProfile + profiles + isParentProxy → 'guardian' |
 // 'learner'); reproducing the contract here keeps the test focused on the
 // per-screen guard logic.
-jest.mock('./_layout', () => {
-  const { isGuardianProfile } = require('../../lib/profile');
-  return {
-    resolveTabShape: ({
-      activeProfile,
-      profiles,
-      isParentProxy,
-    }: {
-      activeProfile: { isOwner: boolean } | null;
-      profiles: ReadonlyArray<{ isOwner: boolean }>;
-      isParentProxy: boolean;
-    }) => {
-      if (!activeProfile) return 'guardian';
-      if (isParentProxy) return 'learner';
-      if (isGuardianProfile(activeProfile, profiles)) return 'guardian';
-      return 'learner';
-    },
-  };
-});
+jest.mock(
+  './_layout' /* gc1-allow: importing real layout pulls Tabs/Clerk native graph */,
+  () => {
+    const { isGuardianProfile } = require('../../lib/profile');
+    return {
+      resolveTabShape: ({
+        activeProfile,
+        profiles,
+        isParentProxy,
+      }: {
+        activeProfile: { isOwner: boolean } | null;
+        profiles: ReadonlyArray<{ isOwner: boolean }>;
+        isParentProxy: boolean;
+      }) => {
+        if (!activeProfile) return 'guardian';
+        if (isParentProxy) return 'learner';
+        if (isGuardianProfile(activeProfile, profiles)) return 'guardian';
+        return 'learner';
+      },
+    };
+  },
+);
 
 // [BUG-135] Stub Redirect so we can assert the guard's redirect output.
 jest.mock('expo-router', () => ({

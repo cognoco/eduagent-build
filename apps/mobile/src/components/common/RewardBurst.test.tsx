@@ -1,14 +1,6 @@
 import { render, screen } from '@testing-library/react-native';
 import { RewardBurst } from './RewardBurst';
 
-// RewardBurst uses useThemeColors — provide minimal theme context via mock.
-// ThemeContext provides a stable default (light scheme, no accent), so
-// the component can resolve textPrimary / textInverse from design-tokens.
-jest.mock('../../lib/theme', () => {
-  const actual = jest.requireActual('../../lib/theme');
-  return actual;
-});
-
 describe('RewardBurst', () => {
   it('renders without crashing with required variant prop', () => {
     const { toJSON } = render(
@@ -19,13 +11,17 @@ describe('RewardBurst', () => {
 
   it('renders the outer accessible container with testID', () => {
     render(<RewardBurst variant="vocabulary" testID="reward-burst" />);
-    const el = screen.getByTestId('reward-burst');
+    const el = screen.getByTestId('reward-burst', {
+      includeHiddenElements: true,
+    });
     expect(el).toBeTruthy();
   });
 
   it('hides from accessibility tree (decorative animation)', () => {
     render(<RewardBurst variant="vocabulary" testID="reward-burst" />);
-    const el = screen.getByTestId('reward-burst');
+    const el = screen.getByTestId('reward-burst', {
+      includeHiddenElements: true,
+    });
     expect(el.props.accessibilityElementsHidden).toBe(true);
     expect(el.props.importantForAccessibility).toBe('no-hide-descendants');
   });
@@ -49,12 +45,12 @@ describe('RewardBurst', () => {
         testID="reward-burst"
       />,
     );
-    screen.getByText('Great job!');
+    screen.getByText('Great job!', { includeHiddenElements: true });
   });
 
   it('uses variant label when message is not provided', () => {
     render(<RewardBurst variant="vocabulary" testID="reward-burst" />);
-    screen.getByText('Got it');
+    screen.getByText('Got it', { includeHiddenElements: true });
   });
 
   it('does not use hardcoded #000000 shadow or #ffffff text color', () => {

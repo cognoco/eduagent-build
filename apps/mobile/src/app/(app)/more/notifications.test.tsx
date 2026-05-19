@@ -27,65 +27,72 @@ let mockNotifLoading = false;
 const mockUpdateMutate = jest.fn();
 let mockUpdateIsPending = false;
 
-jest.mock('../../../hooks/use-settings', () => ({
-  // gc1-allow: fetches from API
-  useNotificationSettings: () => ({
-    data: mockNotifPrefs,
-    isLoading: mockNotifLoading,
+jest.mock(
+  '../../../hooks/use-settings' /* gc1-allow: settings hooks fetch from API via React Query */,
+  () => ({
+    useNotificationSettings: () => ({
+      data: mockNotifPrefs,
+      isLoading: mockNotifLoading,
+    }),
+    useUpdateNotificationSettings: () => ({
+      mutate: mockUpdateMutate,
+      isPending: mockUpdateIsPending,
+    }),
   }),
-  useUpdateNotificationSettings: () => ({
-    mutate: mockUpdateMutate,
-    isPending: mockUpdateIsPending,
-  }),
-}));
+);
 
 const mockPlatformAlert = jest.fn();
-jest.mock('../../../lib/platform-alert', () => ({
-  // gc1-allow: wraps native Alert
-  platformAlert: (...args: unknown[]) => mockPlatformAlert(...args),
-}));
+jest.mock(
+  '../../../lib/platform-alert' /* gc1-allow: wraps native Alert */,
+  () => ({
+    platformAlert: (...args: unknown[]) => mockPlatformAlert(...args),
+  }),
+);
 
 // ToggleRow / SectionHeader stubs
-jest.mock('../../../components/more/settings-rows', () => {
-  const { Switch, Text, View } = require('react-native');
-  return {
-    SectionHeader: ({
-      children,
-      testID,
-    }: {
-      children: React.ReactNode;
-      testID?: string;
-    }) => (
-      <View testID={testID}>
-        <Text>{children}</Text>
-      </View>
-    ),
-    ToggleRow: ({
-      label,
-      value,
-      onToggle,
-      disabled,
-      testID,
-    }: {
-      label: string;
-      description?: string;
-      value: boolean;
-      onToggle: (v: boolean) => void;
-      disabled?: boolean;
-      testID?: string;
-    }) => (
-      <View testID={testID ? `row-${testID}` : undefined}>
-        <Text>{label}</Text>
-        <Switch
-          value={value}
-          onValueChange={onToggle}
-          disabled={disabled}
-          testID={testID}
-        />
-      </View>
-    ),
-  };
-});
+jest.mock(
+  '../../../components/more/settings-rows' /* gc1-allow: isolates settings rows from NativeWind styling in screen test */,
+  () => {
+    const { Switch, Text, View } = require('react-native');
+    return {
+      SectionHeader: ({
+        children,
+        testID,
+      }: {
+        children: React.ReactNode;
+        testID?: string;
+      }) => (
+        <View testID={testID}>
+          <Text>{children}</Text>
+        </View>
+      ),
+      ToggleRow: ({
+        label,
+        value,
+        onToggle,
+        disabled,
+        testID,
+      }: {
+        label: string;
+        description?: string;
+        value: boolean;
+        onToggle: (v: boolean) => void;
+        disabled?: boolean;
+        testID?: string;
+      }) => (
+        <View testID={testID ? `row-${testID}` : undefined}>
+          <Text>{label}</Text>
+          <Switch
+            value={value}
+            onValueChange={onToggle}
+            disabled={disabled}
+            testID={testID}
+          />
+        </View>
+      ),
+    };
+  },
+);
 
 function createWrapper() {
   const queryClient = new QueryClient({
