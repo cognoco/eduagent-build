@@ -99,7 +99,11 @@ test('single learner UX screenshot crawl', async ({ page }) => {
   await gotoScreen(page, '/practice', 'practice-screen');
   await capture(page, '11-practice');
 
-  await gotoScreen(page, '/practice/assessment', 'assessment-picker-screen');
+  await gotoScreen(
+    page,
+    '/practice/assessment-picker',
+    'assessment-picker-screen',
+  );
   await capture(page, '12-assessment');
 
   await gotoScreen(page, '/dictation', 'dictation-choice-screen');
