@@ -135,7 +135,10 @@
           "title": "新しいことを学ぶ",
           "subtitle": "トピックを始めるか、科目を作成"
         }
-      }
+      },
+      "proxySessionSummariesTitle": "セッション要約は保護者ビューにあります",
+      "proxySessionSummariesBody": "{{name}}のメモは非公開のままですが、プロフィールから保護者向けのセッション要約を確認できます。",
+      "proxySessionSummariesCta": "{{name}}のセッション要約を見る"
     },
     "notices": {
       "consentArchivedTitle": "{{name}}'s account was archived",
@@ -417,6 +420,10 @@
       "account": "アカウント",
       "privacy": "プライバシーとデータ",
       "help": "ヘルプとフィードバック"
+    },
+    "proxyPreview": {
+      "title": "保護者プレビューでは設定は一時停止されています",
+      "description": "設定を変更するには自分のアカウントに戻ってください。子どもとして表示している間、このエリアはロックされます。"
     }
   },
   "session": {
@@ -2148,7 +2155,8 @@
     "proxyBanner": {
       "viewing": "{{name}}として表示中",
       "switchBackLabel": "自分のアカウントに戻る",
-      "switchBack": "戻る"
+      "switchBack": "戻る",
+      "parentPreview": "保護者プレビュー"
     },
     "postApproval": {
       "celebrationLabel": "保護者があなたのアカウントを承認しました",

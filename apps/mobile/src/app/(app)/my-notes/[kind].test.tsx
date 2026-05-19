@@ -18,6 +18,7 @@ const EVENT_ID = 'a0000000-0000-4000-a000-000000000060';
 const BOOK_ID = 'a0000000-0000-4000-a000-000000000070';
 
 let mockKind = 'sessions';
+let mockReturnTo: string | undefined;
 const mockPush = jest.fn();
 const mockBack = jest.fn();
 const mockReplace = jest.fn();
@@ -104,7 +105,7 @@ jest.mock(
 );
 
 jest.mock('expo-router', () => ({
-  useLocalSearchParams: () => ({ kind: mockKind }),
+  useLocalSearchParams: () => ({ kind: mockKind, returnTo: mockReturnTo }),
   useRouter: () => ({
     push: mockPush,
     back: mockBack,
@@ -134,6 +135,7 @@ describe('MyNotesListScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockKind = 'sessions';
+    mockReturnTo = undefined;
     mockFetch.setRoute('/progress/sessions', {
       sessions: [sessionRow],
       nextCursor: null,
@@ -171,6 +173,20 @@ describe('MyNotesListScreen', () => {
     fireEvent.changeText(screen.getByTestId('my-notes-search'), 'history');
     await waitFor(() => screen.getByTestId('my-notes-empty'));
     screen.getByText('No sessions yet');
+  });
+
+  it('returns to the My Notes hub with the learner context', async () => {
+    mockReturnTo = 'own-learning';
+    render(<MyNotesListScreen />, { wrapper: createWrapper() });
+
+    await waitFor(() => screen.getByText('Chemistry'));
+    fireEvent.press(screen.getByTestId('my-notes-list-back'));
+
+    expect(mockReplace).toHaveBeenCalledWith({
+      pathname: '/(app)/my-notes',
+      params: { returnTo: 'own-learning' },
+    });
+    expect(mockBack).not.toHaveBeenCalled();
   });
 
   it('renders notes and opens the source topic', async () => {
@@ -441,7 +457,10 @@ describe('MyNotesListScreen', () => {
     render(<MyNotesListScreen />, { wrapper: createWrapper() });
     fireEvent.press(screen.getByTestId('my-notes-list-back'));
 
-    expect(mockReplace).toHaveBeenCalledWith('/(app)/my-notes');
+    expect(mockReplace).toHaveBeenCalledWith({
+      pathname: '/(app)/my-notes',
+      params: { returnTo: 'own-learning' },
+    });
   });
 
   it('bookmark with null topicId falls back to session-summary navigation', async () => {

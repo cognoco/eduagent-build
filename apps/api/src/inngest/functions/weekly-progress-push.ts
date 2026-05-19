@@ -48,6 +48,10 @@ import { generateWeeklyReportData } from '../../services/weekly-report';
 import { getPracticeActivitySummary } from '../../services/practice-activity-summary';
 import { captureException } from '../../services/sentry';
 import { buildLegacyEmailIdempotencyKey } from '../../services/dedupe-key';
+import {
+  listEligibleSelfReportProfileIds,
+  listEligibleSelfReportProfileIdsAtLocalHour9,
+} from '../../services/solo-progress-reports';
 
 import {
   isoDate,
@@ -57,6 +61,11 @@ import {
 
 const weeklyProgressPushEventSchema = z.object({
   parentId: z.string().uuid(),
+  includeSelfReport: z.boolean().optional(),
+  reportWeekStart: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
 });
 
 type PreparedWeeklyProgressDigest =
@@ -71,7 +80,7 @@ type PreparedWeeklyProgressDigest =
       parentEmail: string | null;
     }
   | {
-      status: 'skipped' | 'throttled';
+      status: 'skipped' | 'throttled' | 'self_report_only';
       reason: string;
       parentId: string;
     };
@@ -98,6 +107,109 @@ export function isLocalHour9(timezone: string | null, nowUtc: Date): boolean {
   } catch {
     return nowUtc.getUTCHours() === 9;
   }
+}
+
+function startOfCurrentWeek(date: Date): Date {
+  const day = date.getUTCDay();
+  const mondayOffset = day === 0 ? -6 : 1 - day;
+  const monday = new Date(date);
+  monday.setUTCDate(monday.getUTCDate() + mondayOffset);
+  monday.setUTCHours(0, 0, 0, 0);
+  return monday;
+}
+
+async function persistWeeklySelfReportForProfile(
+  db: ReturnType<typeof getStepDatabase>,
+  profileId: string,
+  reportWeekStart: string,
+): Promise<
+  | { status: 'completed'; reportWeek: string }
+  | { status: 'skipped'; reason: string }
+> {
+  const reportWeekStartDate = new Date(`${reportWeekStart}T00:00:00.000Z`);
+  const activityWindowStart = subtractDays(reportWeekStartDate, 7);
+  const reportWindowEnd = subtractDays(reportWeekStartDate, 1);
+  const previousWindowEnd = subtractDays(reportWeekStartDate, 8);
+
+  const eligibleProfileIds = await listEligibleSelfReportProfileIds(db, {
+    start: activityWindowStart,
+    endExclusive: reportWeekStartDate,
+  });
+  if (!eligibleProfileIds.includes(profileId)) {
+    return { status: 'skipped', reason: 'ineligible_self_profile' };
+  }
+
+  const profile = await db.query.profiles.findFirst({
+    where: eq(profiles.id, profileId),
+    columns: { displayName: true },
+  });
+  if (!profile) {
+    return { status: 'skipped', reason: 'self_profile_missing' };
+  }
+  if (!profile.displayName || profile.displayName.trim().length === 0) {
+    captureException(new Error('weekly self report missing display name'), {
+      extra: {
+        profileId,
+        context: 'weekly-progress-push-self-report',
+        reason: 'self_display_name_missing',
+      },
+    });
+    return { status: 'skipped', reason: 'self_display_name_missing' };
+  }
+
+  const latest = await getLatestSnapshotOnOrBefore(
+    db,
+    profileId,
+    isoDate(reportWindowEnd),
+  );
+  if (!latest) {
+    return { status: 'skipped', reason: 'self_no_snapshot' };
+  }
+
+  const previous = await getLatestSnapshotOnOrBefore(
+    db,
+    profileId,
+    isoDate(previousWindowEnd),
+  );
+
+  const MAX_SNAPSHOT_GAP_MS = 14 * 24 * 60 * 60 * 1000;
+  const snapshotGapMs =
+    previous != null
+      ? new Date(`${latest.snapshotDate}T00:00:00Z`).getTime() -
+        new Date(`${previous.snapshotDate}T00:00:00Z`).getTime()
+      : 0;
+  const cappedPrevious = snapshotGapMs <= MAX_SNAPSHOT_GAP_MS ? previous : null;
+
+  const practiceSummary = await getPracticeActivitySummary(db, {
+    profileId,
+    period: {
+      start: activityWindowStart,
+      endExclusive: reportWeekStartDate,
+    },
+    previousPeriod: {
+      start: subtractDays(reportWeekStartDate, 14),
+      endExclusive: activityWindowStart,
+    },
+  });
+  const reportData = generateWeeklyReportData(
+    profile.displayName,
+    reportWeekStart,
+    latest.metrics,
+    cappedPrevious?.metrics ?? null,
+    practiceSummary,
+  );
+
+  await db
+    .insert(weeklyReports)
+    .values({
+      profileId,
+      childProfileId: profileId,
+      reportWeek: reportWeekStart,
+      reportData,
+    })
+    .onConflictDoNothing();
+
+  return { status: 'completed', reportWeek: reportWeekStart };
 }
 
 // ---------------------------------------------------------------------------
@@ -186,8 +298,38 @@ export const weeklyProgressPushCron = inngest.createFunction(
       );
     });
 
-    if (parentIds.length === 0) {
-      return { status: 'completed', queuedParents: 0 };
+    const nowUtc = new Date();
+    const currentWeekStart = startOfCurrentWeek(nowUtc);
+    const selfReportProfileIds = await step.run(
+      'find-weekly-self-report-profiles',
+      async () => {
+        const db = getStepDatabase();
+        return listEligibleSelfReportProfileIdsAtLocalHour9(
+          db,
+          {
+            start: subtractDays(currentWeekStart, 7),
+            endExclusive: currentWeekStart,
+          },
+          nowUtc,
+        );
+      },
+    );
+    const selfReportProfileIdSet = new Set(selfReportProfileIds);
+    const targetProfileIds = Array.from(
+      new Set([...parentIds, ...selfReportProfileIds]),
+    );
+    const reportWeekStart = isoDate(currentWeekStart);
+
+    if (targetProfileIds.length === 0) {
+      return {
+        status: 'completed',
+        queuedParents: 0,
+        totalParents: 0,
+        queuedSelfReports: 0,
+        totalSelfReports: 0,
+        queuedBatches: 0,
+        failedBatches: 0,
+      };
     }
 
     // [BUG-850 / F-SVC-021] Per-batch try/catch + Sentry escalation. Without
@@ -202,18 +344,30 @@ export const weeklyProgressPushCron = inngest.createFunction(
     let queuedBatches = 0;
     let failedBatches = 0;
     let queuedParents = 0;
-    for (let i = 0; i < parentIds.length; i += BATCH_SIZE) {
-      const batch = parentIds.slice(i, i + BATCH_SIZE);
+    let queuedSelfReports = 0;
+    for (let i = 0; i < targetProfileIds.length; i += BATCH_SIZE) {
+      const batch = targetProfileIds.slice(i, i + BATCH_SIZE);
       try {
         await step.sendEvent(
           `fan-out-weekly-progress-${i}`,
           batch.map((parentId) => ({
             name: 'app/weekly-progress-push.generate' as const,
-            data: { parentId },
+            data: {
+              parentId,
+              reportWeekStart,
+              ...(selfReportProfileIdSet.has(parentId)
+                ? { includeSelfReport: true }
+                : {}),
+            },
           })),
         );
         queuedBatches += 1;
-        queuedParents += batch.length;
+        queuedParents += batch.filter((profileId) =>
+          parentIds.includes(profileId),
+        ).length;
+        queuedSelfReports += batch.filter((profileId) =>
+          selfReportProfileIdSet.has(profileId),
+        ).length;
       } catch (err) {
         failedBatches += 1;
         captureException(err, {
@@ -222,6 +376,7 @@ export const weeklyProgressPushCron = inngest.createFunction(
             batchIndex: i,
             batchSize: batch.length,
             totalParents: parentIds.length,
+            totalSelfReports: selfReportProfileIds.length,
           },
         });
       }
@@ -231,6 +386,8 @@ export const weeklyProgressPushCron = inngest.createFunction(
       status: failedBatches === 0 ? 'completed' : 'partial',
       queuedParents,
       totalParents: parentIds.length,
+      queuedSelfReports,
+      totalSelfReports: selfReportProfileIds.length,
       queuedBatches,
       failedBatches,
     };
@@ -256,34 +413,45 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
     if (!parsed.success) {
       return { status: 'skipped', reason: 'invalid_payload' };
     }
-    const { parentId } = parsed.data;
+    const { parentId, includeSelfReport } = parsed.data;
+    const reportWeekStart =
+      parsed.data.reportWeekStart ?? isoDate(startOfCurrentWeek(new Date()));
 
     try {
       const prepared: PreparedWeeklyProgressDigest = await step.run(
         'prepare-weekly-progress-digest',
         async () => {
           const db = getStepDatabase();
+          const selfReportResult = includeSelfReport
+            ? await persistWeeklySelfReportForProfile(
+                db,
+                parentId,
+                reportWeekStart,
+              )
+            : null;
 
           const links = await db.query.familyLinks.findMany({
             where: eq(familyLinks.parentProfileId, parentId),
             columns: { childProfileId: true },
           });
           if (links.length === 0) {
+            if (selfReportResult?.status === 'completed') {
+              return {
+                status: 'self_report_only' as const,
+                reason: 'self_report_only',
+                parentId,
+              };
+            }
             return {
               status: 'skipped' as const,
-              reason: 'no_children',
+              reason: selfReportResult?.reason ?? 'no_children',
               parentId,
             };
           }
 
           // [BUG-524] Compute the Monday start date for this week's report
-          const now = new Date();
-          const day = now.getUTCDay();
-          const mondayOffset = day === 0 ? -6 : 1 - day;
-          const weekStartDate = new Date(now);
-          weekStartDate.setUTCDate(weekStartDate.getUTCDate() + mondayOffset);
-          weekStartDate.setUTCHours(0, 0, 0, 0);
-          const reportWeek = isoDate(weekStartDate);
+          const weekStartDate = new Date(`${reportWeekStart}T00:00:00.000Z`);
+          const reportWeek = reportWeekStart;
 
           const childSummaries: string[] = [];
           const struggleLines: ChildStruggleLine[] = [];
@@ -440,6 +608,13 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
           // Consent gate: if ALL linked children were redacted, skip entirely —
           // do not send an empty digest (push or email).
           if (childSummaries.length === 0) {
+            if (selfReportResult?.status === 'completed') {
+              return {
+                status: 'self_report_only' as const,
+                reason: 'self_report_only',
+                parentId,
+              };
+            }
             return {
               status: 'skipped' as const,
               reason: 'no_activity',
@@ -528,12 +703,13 @@ export const weeklyProgressPushGenerate = inngest.createFunction(
       // if the later notification-log write fails, retries reuse this step's
       // completed result instead of calling Resend a second time.
       let emailSent = false;
-      if (prepared.shouldSendEmail && prepared.parentEmail) {
+      const parentEmail = prepared.parentEmail;
+      if (prepared.shouldSendEmail && parentEmail) {
         const emailResult = await step.run(
           'send-weekly-progress-email',
           async () => {
             const emailPayload = formatWeeklyProgressEmail(
-              prepared.parentEmail!,
+              parentEmail,
               prepared.childSummaries,
               prepared.struggleLines,
             );

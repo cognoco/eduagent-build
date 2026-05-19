@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentProps,
+} from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -48,6 +55,7 @@ import { useStartFirstCurriculumSession } from '../../../../../hooks/use-session
 import { formatApiError } from '../../../../../lib/format-api-error';
 import { formatRelativeDate } from '../../../../../lib/format-relative-date';
 import { formatSourceLine } from '../../../../../lib/format-note-source';
+import { withOpacity } from '../../../../../lib/color-opacity';
 import { platformAlert } from '../../../../../lib/platform-alert';
 import { useThemeColors } from '../../../../../lib/theme';
 import { computeUpNextTopic } from '../../../../../lib/up-next-topic';
@@ -114,6 +122,121 @@ function groupSessionsByChapter(sessions: BookSession[]): GroupedChapter[] {
     chapter,
     sessions: items,
   }));
+}
+
+interface BookSectionStripProps {
+  testID: string;
+  icon: ComponentProps<typeof Ionicons>['name'];
+  label: string;
+  summary: string;
+  meta: string;
+  expanded: boolean;
+  accentColor: string;
+  onPress: () => void;
+}
+
+function BookSectionStrip({
+  testID,
+  icon,
+  label,
+  summary,
+  meta,
+  expanded,
+  accentColor,
+  onPress,
+}: BookSectionStripProps): React.ReactElement {
+  const colors = useThemeColors();
+
+  return (
+    <Pressable
+      testID={testID}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${label}. ${summary}. ${
+        expanded ? 'Collapse section' : 'Expand section'
+      }.`}
+      style={{
+        marginHorizontal: 20,
+        marginTop: 14,
+        borderRadius: 18,
+        borderWidth: 1,
+        borderColor: withOpacity(accentColor, 0.18),
+        backgroundColor: withOpacity(accentColor, 0.08),
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+      }}
+    >
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 12,
+        }}
+      >
+        <View
+          style={{
+            width: 34,
+            height: 34,
+            borderRadius: 999,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: colors.surface,
+          }}
+        >
+          <Ionicons name={icon} size={18} color={accentColor} />
+        </View>
+
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text
+            style={{
+              fontSize: 11,
+              lineHeight: 14,
+              fontWeight: '700',
+              color: withOpacity(accentColor, 0.92),
+            }}
+          >
+            {label}
+          </Text>
+          <Text
+            style={{
+              marginTop: 3,
+              fontSize: 15,
+              lineHeight: 20,
+              fontWeight: '600',
+              color: colors.textPrimary,
+            }}
+            numberOfLines={expanded ? 2 : 1}
+          >
+            {summary}
+          </Text>
+        </View>
+
+        <View
+          style={{
+            alignItems: 'flex-end',
+            justifyContent: 'center',
+            gap: 4,
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 13,
+              lineHeight: 16,
+              fontWeight: '700',
+              color: colors.textPrimary,
+            }}
+          >
+            {meta}
+          </Text>
+          <Ionicons
+            name={expanded ? 'chevron-up' : 'chevron-down'}
+            size={16}
+            color={colors.textSecondary}
+          />
+        </View>
+      </View>
+    </Pressable>
+  );
 }
 
 interface GroupedTopicChapter {
@@ -224,6 +347,7 @@ export default function BookScreen() {
   // --- Note add flow state ---
   const [showTopicPicker, setShowTopicPicker] = useState(false);
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
+  const [notesExpanded, setNotesExpanded] = useState(false);
   const [showNoteInput, setShowNoteInput] = useState(false);
   const [showBookCompletionBurst, setShowBookCompletionBurst] = useState(false);
   const [isExpandingThinTopicList, setIsExpandingThinTopicList] =
@@ -395,6 +519,14 @@ export default function BookScreen() {
       ),
     [notes],
   );
+  const noteCount = notes.length;
+  const noteSummary = notesQuery.isLoading
+    ? 'Loading notes...'
+    : noteCount === 0
+      ? 'Add your first note for this book'
+      : noteCount === 1
+        ? '1 note saved for this book'
+        : `${noteCount} notes saved for this book`;
 
   // --- Sessions data ---
   const sessions = useMemo(
@@ -987,6 +1119,12 @@ export default function BookScreen() {
     setEditingNote(null);
   }, []);
 
+  useEffect(() => {
+    if (showNoteInput || editingNote !== null) {
+      setNotesExpanded(true);
+    }
+  }, [editingNote, showNoteInput]);
+
   const handleNoteLongPress = useCallback(
     (noteId: string) => {
       const note = notes.find((n) => n.id === noteId);
@@ -1102,26 +1240,18 @@ export default function BookScreen() {
             </Text>
           </View>
 
-          {/* Notes section shimmer */}
+          {/* Notes section loading strip */}
           <View className="mb-4">
-            <Text className="mb-2 px-5 text-body-sm font-semibold text-text-secondary tracking-wide">
-              Your Notes
-            </Text>
-            <ShimmerSkeleton testID="book-notes-loading">
-              <View className="px-5">
-                {[0, 1].map((i) => (
-                  <View
-                    key={i}
-                    style={{
-                      height: 56,
-                      borderRadius: 8,
-                      marginBottom: 8,
-                      backgroundColor: themeColors.border,
-                    }}
-                  />
-                ))}
-              </View>
-            </ShimmerSkeleton>
+            <BookSectionStrip
+              testID="book-notes-strip-loading"
+              icon="create-outline"
+              label="Notes for this book"
+              summary="Loading notes..."
+              meta="..."
+              expanded={false}
+              accentColor={themeColors.accent}
+              onPress={() => undefined}
+            />
           </View>
 
           {/* Topics section shimmer */}
@@ -1366,62 +1496,82 @@ export default function BookScreen() {
 
         {/* YOUR NOTES section */}
         <View className="mb-4" testID="book-notes-section">
-          <Text className="mb-2 px-5 text-body-sm font-semibold text-text-secondary tracking-wide">
-            Your Notes
-          </Text>
-          {notesQuery.isLoading && !notesQuery.data ? (
-            <ShimmerSkeleton testID="book-notes-loading">
-              <View className="px-5">
-                {[0, 1].map((i) => (
-                  <View
-                    key={i}
-                    style={{
-                      height: 56,
-                      borderRadius: 8,
-                      marginBottom: 8,
-                      backgroundColor: themeColors.border,
-                    }}
-                  />
-                ))}
-              </View>
-            </ShimmerSkeleton>
-          ) : (
-            <>
-              {sortedNotes.map((note) => {
-                if (editingNote?.noteId === note.id) {
-                  return (
-                    <View key={note.id} className="px-5 mb-2">
-                      <NoteInput
-                        initialValue={editingNote.content}
-                        saving={updateNote.isPending}
-                        onSave={handleNoteEditSave}
-                        onCancel={handleNoteEditCancel}
+          <BookSectionStrip
+            testID="book-notes-strip"
+            icon="create-outline"
+            label="Notes for this book"
+            summary={noteSummary}
+            meta={notesQuery.isLoading ? '...' : String(noteCount)}
+            expanded={notesExpanded}
+            accentColor={themeColors.accent}
+            onPress={() => setNotesExpanded((current) => !current)}
+          />
+
+          {notesExpanded ? (
+            <View className="mt-3 mb-1">
+              {notesQuery.isLoading && !notesQuery.data ? (
+                <ShimmerSkeleton testID="book-notes-loading">
+                  <View className="px-5">
+                    {[0, 1].map((i) => (
+                      <View
+                        key={i}
+                        style={{
+                          height: 52,
+                          borderRadius: 8,
+                          marginBottom: 8,
+                          backgroundColor: themeColors.border,
+                        }}
                       />
-                    </View>
+                    ))}
+                  </View>
+                </ShimmerSkeleton>
+              ) : sortedNotes.length > 0 ? (
+                sortedNotes.map((note) => {
+                  if (editingNote?.noteId === note.id) {
+                    return (
+                      <View key={note.id} className="px-5 mb-2">
+                        <NoteInput
+                          initialValue={editingNote.content}
+                          saving={updateNote.isPending}
+                          onSave={handleNoteEditSave}
+                          onCancel={handleNoteEditCancel}
+                        />
+                      </View>
+                    );
+                  }
+                  const sourceSessionId = note.sessionId;
+                  return (
+                    <InlineNoteCard
+                      key={note.id}
+                      noteId={note.id}
+                      topicTitle={topicTitleMap.get(note.topicId) ?? 'Topic'}
+                      content={note.content}
+                      sourceLine={formatSourceLine(note)}
+                      updatedAt={note.updatedAt}
+                      onLongPress={handleNoteLongPress}
+                      onSourcePress={
+                        sourceSessionId
+                          ? () =>
+                              handleNoteSourcePress(
+                                sourceSessionId,
+                                note.topicId,
+                              )
+                          : undefined
+                      }
+                      testID={`note-${note.id}`}
+                    />
                   );
-                }
-                const sourceSessionId = note.sessionId;
-                return (
-                  <InlineNoteCard
-                    key={note.id}
-                    noteId={note.id}
-                    topicTitle={topicTitleMap.get(note.topicId) ?? 'Topic'}
-                    content={note.content}
-                    sourceLine={formatSourceLine(note)}
-                    updatedAt={note.updatedAt}
-                    onLongPress={handleNoteLongPress}
-                    onSourcePress={
-                      sourceSessionId
-                        ? () =>
-                            handleNoteSourcePress(sourceSessionId, note.topicId)
-                        : undefined
-                    }
-                    testID={`note-${note.id}`}
-                  />
-                );
-              })}
+                })
+              ) : (
+                <Text
+                  className="px-5 py-2 text-body-sm text-text-secondary"
+                  testID="book-notes-empty"
+                >
+                  No notes yet. Add one when something clicks.
+                </Text>
+              )}
               {showNoteInput && (
-                <View className="px-5 mb-2">
+                <View className="px-5 mb-2" testID="book-note-input-container">
                   <NoteInput
                     saving={createNote.isPending}
                     onSave={handleNoteSave}
@@ -1431,28 +1581,23 @@ export default function BookScreen() {
               )}
               <Pressable
                 onPress={handleNoteAddPress}
-                className="mx-5 mt-1 flex-row items-center py-2"
+                className="mx-5 mt-1 flex-row items-center py-3"
                 testID="book-add-note"
                 accessibilityRole="button"
                 accessibilityLabel={
                   sortedNotes.length === 0
-                    ? 'Add your first note'
+                    ? 'Add your first note for this book'
                     : 'Add a note'
                 }
               >
-                <Ionicons
-                  name="add-circle-outline"
-                  size={18}
-                  color={themeColors.primary}
-                />
-                <Text className="ms-1.5 text-body-sm font-semibold text-primary">
+                <Text className="text-body-sm font-medium text-primary">
                   {sortedNotes.length === 0
-                    ? '+ Add your first note'
+                    ? '+ Add your first note for this book'
                     : '+ Add a note'}
                 </Text>
               </Pressable>
-            </>
-          )}
+            </View>
+          ) : null}
         </View>
 
         {/* Error banners */}

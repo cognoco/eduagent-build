@@ -1,4 +1,9 @@
-import { render, screen, fireEvent } from '@testing-library/react-native';
+import {
+  render,
+  screen,
+  fireEvent,
+  within,
+} from '@testing-library/react-native';
 
 jest.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -329,6 +334,71 @@ describe('ChildReportsScreen', () => {
 
       fireEvent.press(screen.getByTestId('child-reports-back-to-latest'));
       screen.getByText('Topics mastered: 4');
+    });
+
+    it('puts the "New" badge on the latest weekly summary instead of older rows', () => {
+      mockUseChildWeeklyReports.mockReturnValue({
+        data: [
+          {
+            id: 'wr-latest',
+            reportWeek: '2026-05-18',
+            viewedAt: '2026-05-19T03:00:00Z',
+            createdAt: '2026-05-25T03:00:00Z',
+            headlineStat: {
+              label: 'Topics mastered',
+              value: '0',
+              comparison: "No activity this week — that's OK.",
+            },
+            thisWeek: {
+              totalSessions: 0,
+              totalActiveMinutes: 0,
+              topicsMastered: 0,
+              topicsExplored: 0,
+              vocabularyTotal: 0,
+              streakBest: 0,
+            },
+          },
+          {
+            id: 'wr-older',
+            reportWeek: '2026-05-04',
+            viewedAt: null,
+            createdAt: '2026-05-11T03:00:00Z',
+            headlineStat: {
+              label: 'Topics mastered',
+              value: '0',
+              comparison: "No activity this week — that's OK.",
+            },
+            thisWeek: {
+              totalSessions: 0,
+              totalActiveMinutes: 0,
+              topicsMastered: 0,
+              topicsExplored: 0,
+              vocabularyTotal: 0,
+              streakBest: 0,
+            },
+          },
+        ],
+        isLoading: false,
+        isError: false,
+        refetch: jest.fn(),
+      });
+      mockUseChildReports.mockReturnValue({
+        data: [],
+        isLoading: false,
+        isError: false,
+        refetch: jest.fn(),
+      });
+
+      render(<ChildReportsScreen />);
+
+      within(screen.getByTestId('reports-header-summary')).getByText(
+        'parentView.reports.newBadge',
+      );
+      expect(
+        within(screen.getByTestId('weekly-report-card-wr-older')).queryByText(
+          'parentView.reports.newBadge',
+        ),
+      ).toBeNull();
     });
 
     it('renders report cards when reports exist', () => {

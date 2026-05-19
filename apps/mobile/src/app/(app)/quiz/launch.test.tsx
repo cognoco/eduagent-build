@@ -235,6 +235,21 @@ describe('QuizLaunchScreen', () => {
     });
   });
 
+  it('uses the route activityType over stale quiz context', async () => {
+    mockFlowActivityType = 'capitals';
+    mockSearchParams = { activityType: 'guess_who' };
+
+    render(<QuizLaunchScreen />);
+
+    await waitFor(() => {
+      expect(mockMutate).toHaveBeenCalledWith(
+        { activityType: 'guess_who', subjectId: undefined },
+        expect.any(Object),
+      );
+    });
+    expect(mockSetActivityType).toHaveBeenCalledWith('guess_who');
+  });
+
   it('starts a vocabulary round from route params with subject context', async () => {
     mockFlowActivityType = null;
     mockSearchParams = {

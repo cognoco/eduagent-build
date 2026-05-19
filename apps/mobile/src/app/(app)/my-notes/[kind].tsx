@@ -15,7 +15,7 @@ import { useBookmarks } from '../../../hooks/use-bookmarks';
 import { useAllNotes } from '../../../hooks/use-notes';
 import { useProfileSessionsArchive } from '../../../hooks/use-progress';
 import { useProfile } from '../../../lib/profile';
-import { goBackOrReplace } from '../../../lib/navigation';
+import { OWN_LEARNING_RETURN_TO } from '../../../lib/navigation';
 import { useThemeColors } from '../../../lib/theme';
 
 type MyNotesKind = 'sessions' | 'notes' | 'bookmarks';
@@ -44,6 +44,14 @@ const VALID_KINDS = new Set(['sessions', 'notes', 'bookmarks']);
 function asKind(value: string | string[] | undefined): MyNotesKind {
   const raw = Array.isArray(value) ? value[0] : value;
   return VALID_KINDS.has(raw ?? '') ? (raw as MyNotesKind) : 'sessions';
+}
+
+function firstParam(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function myNotesReturnTo(value: string | string[] | undefined): string {
+  return firstParam(value) ?? OWN_LEARNING_RETURN_TO;
 }
 
 function titleForKind(kind: MyNotesKind): string {
@@ -306,8 +314,12 @@ export default function MyNotesListScreen(): React.ReactElement {
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
   const { activeProfile } = useProfile();
-  const params = useLocalSearchParams<{ kind?: string }>();
+  const params = useLocalSearchParams<{
+    kind?: string;
+    returnTo?: string | string[];
+  }>();
   const kind = asKind(params.kind);
+  const returnTo = myNotesReturnTo(params.returnTo);
   const [groupMode, setGroupMode] = useState<GroupMode>('date');
   const [query, setQuery] = useState('');
 
@@ -418,7 +430,10 @@ export default function MyNotesListScreen(): React.ReactElement {
             <View className="flex-row items-center mt-4">
               <Pressable
                 onPress={() =>
-                  goBackOrReplace(router, '/(app)/my-notes' as const)
+                  router.replace({
+                    pathname: '/(app)/my-notes',
+                    params: { returnTo },
+                  } as Href)
                 }
                 className="me-3 min-h-[44px] min-w-[44px] items-center justify-center"
                 accessibilityRole="button"

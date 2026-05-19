@@ -226,11 +226,21 @@ describe('MoreScreen landing', () => {
     });
   });
 
-  it('hides sign out in impersonation', () => {
+  it('locks More settings in parent preview', () => {
     mockIsParentProxy = true;
 
     render(<MoreScreen />, { wrapper: createWrapper() });
 
+    screen.getByTestId('more-proxy-preview-locked');
+    screen.getByText('Settings are paused in parent preview');
+    expect(screen.queryByTestId('more-row-learning-preferences')).toBeNull();
+    expect(screen.queryByTestId('more-row-mentor-memory')).toBeNull();
+    expect(screen.queryByTestId('more-row-mentor-language')).toBeNull();
+    expect(screen.queryByTestId('more-row-account')).toBeNull();
+    expect(screen.queryByTestId('more-row-notifications')).toBeNull();
+    expect(screen.queryByTestId('more-row-privacy')).toBeNull();
+    expect(screen.queryByTestId('more-row-help')).toBeNull();
+    expect(screen.queryByTestId('add-child-link')).toBeNull();
     expect(screen.queryByTestId('sign-out-button')).toBeNull();
   });
 

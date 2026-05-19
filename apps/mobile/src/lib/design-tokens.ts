@@ -45,6 +45,10 @@ export interface ThemeTokens {
     practiceChipBg: string;
     reward: string;
     rewardSoft: string;
+    proxyPreviewBackground: string;
+    proxyPreviewBorder: string;
+    proxyPreviewSceneBackground: string;
+    proxyPreviewTabBackground: string;
   };
   radii: {
     card: string;
@@ -109,6 +113,10 @@ export const tokens: Record<ColorScheme, ThemeTokens> = {
       practiceChipBg: 'rgba(255,255,255,0.86)',
       reward: '#d97706',
       rewardSoft: 'rgba(217, 119, 6, 0.12)',
+      proxyPreviewBackground: '#fff7ed',
+      proxyPreviewBorder: '#f59e0b',
+      proxyPreviewSceneBackground: '#fffaf3',
+      proxyPreviewTabBackground: '#fff7ed',
     },
     radii: { card: '16px', button: '12px', input: '10px' },
     spacing: { cardPadding: '24px' },
@@ -158,6 +166,10 @@ export const tokens: Record<ColorScheme, ThemeTokens> = {
       practiceChipBg: 'rgba(255,255,255,0.12)',
       reward: '#fbbf24',
       rewardSoft: 'rgba(251, 191, 36, 0.15)',
+      proxyPreviewBackground: '#3b2b14',
+      proxyPreviewBorder: '#f59e0b',
+      proxyPreviewSceneBackground: '#211a12',
+      proxyPreviewTabBackground: '#2a2118',
     },
     radii: { card: '16px', button: '12px', input: '10px' },
     spacing: { cardPadding: '24px' },
@@ -346,6 +358,11 @@ export function tokensToCssVars(t: ThemeTokens): Record<`--${string}`, string> {
     '--color-practice-chip-bg': t.colors.practiceChipBg,
     '--color-reward': t.colors.reward,
     '--color-reward-soft': t.colors.rewardSoft,
+    '--color-proxy-preview-background': t.colors.proxyPreviewBackground,
+    '--color-proxy-preview-border': t.colors.proxyPreviewBorder,
+    '--color-proxy-preview-scene-background':
+      t.colors.proxyPreviewSceneBackground,
+    '--color-proxy-preview-tab-background': t.colors.proxyPreviewTabBackground,
     '--radius-card': t.radii.card,
     '--radius-button': t.radii.button,
     '--radius-input': t.radii.input,

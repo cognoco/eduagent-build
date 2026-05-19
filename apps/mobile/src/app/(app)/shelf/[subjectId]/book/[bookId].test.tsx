@@ -402,6 +402,37 @@ describe('BookScreen', () => {
     getByText('0 of 2 topics finished');
   });
 
+  it('mirrors the topic notes strip and keeps book notes collapsed by default', () => {
+    mockUseBookNotes.mockReturnValue(
+      makeNotesQuery({
+        data: {
+          notes: [
+            {
+              id: 'note-1',
+              topicId: 'topic-1',
+              sessionId: null,
+              content: 'Plants use chlorophyll to capture light.',
+              createdAt: '2026-05-17T10:00:00.000Z',
+              updatedAt: '2026-05-17T10:00:00.000Z',
+            },
+          ],
+        },
+      }),
+    );
+
+    const { getByTestId, getByText, queryByText } = render(<BookScreen />);
+
+    getByText('Notes for this book');
+    getByText('1 note saved for this book');
+    expect(queryByText('Plants use chlorophyll to capture light.')).toBeNull();
+
+    fireEvent.press(getByTestId('book-notes-strip'));
+
+    getByTestId('note-note-1');
+    getByText('Plants use chlorophyll to capture light.');
+    getByText('+ Add a note');
+  });
+
   it('derives header progress from retention topics', () => {
     mockUseBookWithTopics.mockReturnValue(
       makeBookQuery({

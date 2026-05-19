@@ -705,11 +705,19 @@ export default function ProgressScreen(): React.ReactElement {
     (child) => child.id === selectedProfileId,
   );
   const selectedChildName = selectedChild?.displayName;
-  const progressPageTitle = isViewingSelf
-    ? t('progress.pageTitleMine')
-    : t('progress.pageTitleProfile', {
-        name: selectedChildName ?? t('progress.pageTitleFallbackName'),
-      });
+  const isParentProxyView = role === 'impersonated-child';
+  const progressPageTitle = isParentProxyView
+    ? t('progress.pageTitleProfile', {
+        name: activeProfile?.displayName ?? t('progress.pageTitleFallbackName'),
+      })
+    : isViewingSelf
+      ? t('progress.pageTitleMine')
+      : t('progress.pageTitleProfile', {
+          name: selectedChildName ?? t('progress.pageTitleFallbackName'),
+        });
+  const emptyProgressActionLabel = isParentProxyView
+    ? t('tabs.library')
+    : t('progress.startLearning');
   const practiceActivityCount = isViewingSelf
     ? (overallProgressQuery.data?.practiceActivityCount ?? 0)
     : 0;
@@ -795,6 +803,11 @@ export default function ProgressScreen(): React.ReactElement {
         profile_id_hash: hashProfileId(activeProfile.id),
         account_age_bucket: bucketAccountAge(activeProfile.createdAt),
       });
+    }
+
+    if (isParentProxyView) {
+      router.push('/(app)/library' as Href);
+      return;
     }
 
     if (firstActiveSubject) {
@@ -883,28 +896,20 @@ export default function ProgressScreen(): React.ReactElement {
         ) : progressSurfaceState === 'empty' ? (
           <View className="bg-coaching-card rounded-card p-5">
             <Text className="text-h3 font-semibold text-text-primary">
-              {firstActiveSubject
-                ? t('progress.empty.withSubjectTitle', {
-                    subject: firstActiveSubject.name,
-                  })
-                : t('progress.empty.title')}
+              {t('progress.empty.title')}
             </Text>
             <Text className="text-body text-text-secondary mt-2">
-              {firstActiveSubject
-                ? t('progress.empty.withSubjectSubtitle', {
-                    subject: firstActiveSubject.name,
-                  })
-                : t('progress.empty.subtitle')}
+              {t('progress.empty.subtitle')}
             </Text>
             <Pressable
               onPress={handleEmptyProgressAction}
               className="bg-primary rounded-button px-4 py-3 mt-4 items-center"
               accessibilityRole="button"
-              accessibilityLabel={t('progress.startLearning')}
+              accessibilityLabel={emptyProgressActionLabel}
               testID="progress-start-learning"
             >
               <Text className="text-body font-semibold text-text-inverse">
-                {t('progress.startLearning')}
+                {emptyProgressActionLabel}
               </Text>
             </Pressable>
           </View>

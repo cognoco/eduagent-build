@@ -216,6 +216,43 @@ describe('ReportsList — showNewBadge', () => {
 
     expect(screen.queryByText('New')).toBeNull();
   });
+
+  it('can suppress row badges when the latest report is highlighted elsewhere', () => {
+    render(
+      <ReportsList
+        monthlyReports={[]}
+        weeklyReports={[weeklyReport as never]}
+        onPressMonthly={jest.fn()}
+        onPressWeekly={jest.fn()}
+        showNewBadge
+        newReportId={null}
+      />,
+    );
+
+    expect(screen.queryByText('New')).toBeNull();
+  });
+
+  it('can restrict the "New" badge to one report row', () => {
+    const weeklyReport2 = {
+      ...weeklyReport,
+      id: 'weekly-2',
+      reportWeek: '2026-05-11',
+    };
+
+    render(
+      <ReportsList
+        monthlyReports={[]}
+        weeklyReports={[weeklyReport as never, weeklyReport2 as never]}
+        onPressMonthly={jest.fn()}
+        onPressWeekly={jest.fn()}
+        showNewBadge
+        newReportId="weekly-2"
+      />,
+    );
+
+    expect(screen.getAllByText('New')).toHaveLength(1);
+    screen.getByTestId('weekly-report-card-weekly-2');
+  });
 });
 
 describe('ReportsList — custom testID', () => {

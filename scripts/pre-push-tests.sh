@@ -58,6 +58,8 @@ export TS_NODE_COMPILER_OPTIONS='{"moduleResolution":"node10","module":"commonjs
 # ── Phase 1: Compute delta from stdin ───────────────────────────────────
 ALL_FILES=""
 REFS_CHECKED=0
+AFFECTED_BASE=""
+AFFECTED_HEAD=""
 
 while read -r local_ref local_sha remote_ref remote_sha; do
   # Branch deletion — nothing to validate
@@ -79,6 +81,11 @@ while read -r local_ref local_sha remote_ref remote_sha; do
     base="origin/main"
   else
     base="$remote_sha"
+  fi
+
+  if [[ -z "$AFFECTED_BASE" ]]; then
+    AFFECTED_BASE="$base"
+    AFFECTED_HEAD="$local_sha"
   fi
 
   ref_files=$(git diff --name-only --diff-filter=d "$base".."$local_sha" 2>/dev/null || true)
@@ -133,8 +140,7 @@ else
   if [[ "$TS_COUNT" -gt 100 ]]; then
     echo ""
     echo "pre-push: >100 TS files in delta, falling back to nx affected --exclude=mobile"
-    affected_files_csv="$(echo "$TS_FILES" | paste -sd, -)"
-    if ! NX_DAEMON=false pnpm exec nx affected -t test --files="$affected_files_csv" --exclude=mobile; then
+    if ! NX_DAEMON=false pnpm exec nx affected -t test --base="$AFFECTED_BASE" --head="$AFFECTED_HEAD" --exclude=mobile; then
       echo ""
       echo "pre-push: FAILED — nx affected tests failed"
       exit 1

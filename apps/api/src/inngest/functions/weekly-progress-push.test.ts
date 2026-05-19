@@ -122,6 +122,20 @@ jest.mock(
   }),
 );
 
+const mockListEligibleSelfReportProfileIds = jest.fn().mockResolvedValue([]);
+const mockListEligibleSelfReportProfileIdsAtLocalHour9 = jest
+  .fn()
+  .mockResolvedValue([]);
+jest.mock(
+  '../../services/solo-progress-reports' /* gc1-allow: unit test boundary */,
+  () => ({
+    listEligibleSelfReportProfileIds: (...args: unknown[]) =>
+      mockListEligibleSelfReportProfileIds(...args),
+    listEligibleSelfReportProfileIdsAtLocalHour9: (...args: unknown[]) =>
+      mockListEligibleSelfReportProfileIdsAtLocalHour9(...args),
+  }),
+);
+
 const mockSendPushNotification = jest.fn().mockResolvedValue({ sent: true });
 const mockSendEmail = jest.fn().mockResolvedValue({ sent: true });
 const mockFormatWeeklyProgressEmail = jest.fn(
@@ -287,6 +301,8 @@ beforeEach(() => {
   mockSendEmail.mockResolvedValue({ sent: true });
   mockGetRecentNotificationCount.mockResolvedValue(0);
   mockLogNotification.mockResolvedValue(undefined);
+  mockListEligibleSelfReportProfileIds.mockResolvedValue([]);
+  mockListEligibleSelfReportProfileIdsAtLocalHour9.mockResolvedValue([]);
 });
 
 // [BUG-260] The receiver function must cap parallelism. Without this,
@@ -513,7 +529,43 @@ describe('weekly progress parent eligibility', () => {
         payload: expect.arrayContaining([
           expect.objectContaining({
             name: 'app/weekly-progress-push.generate',
-            data: { parentId: 'parent-email-only' },
+            data: expect.objectContaining({ parentId: 'parent-email-only' }),
+          }),
+        ]),
+      }),
+    );
+  });
+
+  it('queues eligible self-report profiles through the proven weekly fan-out', async () => {
+    mockListEligibleSelfReportProfileIdsAtLocalHour9.mockResolvedValue([
+      PARENT_ID,
+    ]);
+
+    const { step, sendEventCalls } = createInngestStepRunner();
+    const handler = (
+      weeklyProgressPushCron as unknown as {
+        fn: (ctx: { step: typeof step }) => Promise<unknown>;
+      }
+    ).fn;
+
+    const result = (await handler({ step })) as {
+      queuedParents: number;
+      queuedSelfReports: number;
+    };
+
+    expect(result.queuedParents).toBe(0);
+    expect(result.queuedSelfReports).toBe(1);
+    expect(sendEventCalls).toContainEqual(
+      expect.objectContaining({
+        name: expect.any(String),
+        payload: expect.arrayContaining([
+          expect.objectContaining({
+            name: 'app/weekly-progress-push.generate',
+            data: expect.objectContaining({
+              parentId: PARENT_ID,
+              includeSelfReport: true,
+              reportWeekStart: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+            }),
           }),
         ]),
       }),
@@ -579,5 +631,42 @@ describe('weekly progress generate practice summary', () => {
         }),
       }),
     );
+  });
+
+  it('persists a self report without child links when includeSelfReport is set', async () => {
+    jest.useFakeTimers({ now: new Date('2026-05-19T12:00:00.000Z') });
+    mockDb.query.familyLinks.findMany.mockResolvedValue([]);
+    mockDb.query.profiles.findFirst.mockResolvedValue({ displayName: 'Alex' });
+    mockListEligibleSelfReportProfileIds.mockResolvedValue([PARENT_ID]);
+    mockGetLatestSnapshotOnOrBefore
+      .mockResolvedValueOnce({
+        snapshotDate: '2026-05-17',
+        metrics: CURRENT_METRICS,
+      })
+      .mockResolvedValueOnce({
+        snapshotDate: '2026-05-10',
+        metrics: PREVIOUS_METRICS,
+      });
+
+    const result = await executeGenerateSteps({
+      parentId: PARENT_ID,
+      includeSelfReport: true,
+      reportWeekStart: '2026-05-18',
+    });
+
+    expect(result).toEqual({
+      status: 'self_report_only',
+      reason: 'self_report_only',
+      parentId: PARENT_ID,
+    });
+    expect(mockWeeklyReportInsertValues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        profileId: PARENT_ID,
+        childProfileId: PARENT_ID,
+        reportWeek: '2026-05-18',
+      }),
+    );
+    expect(mockSendPushNotification).not.toHaveBeenCalled();
+    expect(mockSendEmail).not.toHaveBeenCalled();
   });
 });

@@ -18,7 +18,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as SecureStore from '../../lib/secure-storage';
 import { useProfile, isGuardianProfile } from '../../lib/profile';
 import { computeAgeBracket } from '@eduagent/schemas';
-import { useThemeColors, useTokenVars } from '../../lib/theme';
+import {
+  useThemeColors,
+  useTokenVars,
+  type ThemeColors,
+} from '../../lib/theme';
 import { useConsentStatus, useRequestConsent } from '../../hooks/use-consent';
 import {
   initNotificationHandler,
@@ -78,6 +82,12 @@ const LEARNER_TABS: ReadonlySet<string> = new Set([
   'more',
 ]);
 
+const PARENT_PROXY_TABS: ReadonlySet<string> = new Set([
+  'home',
+  'library',
+  'progress',
+]);
+
 export type TabShape = 'guardian' | 'learner';
 
 export function resolveTabShape({
@@ -95,7 +105,12 @@ export function resolveTabShape({
   return 'learner';
 }
 
-export function computeVisibleTabs(shape: TabShape = 'guardian'): Set<string> {
+export function computeVisibleTabs(
+  shape: TabShape = 'guardian',
+  isParentProxy = false,
+): Set<string> {
+  if (isParentProxy) return new Set(PARENT_PROXY_TABS);
+
   switch (shape) {
     case 'guardian':
       return new Set(GUARDIAN_TABS);
@@ -147,6 +162,15 @@ function TabIcon({ name, focused }: { name: string; focused: boolean }) {
   );
 }
 
+function getProxyChromeColors(colors: ThemeColors) {
+  return {
+    background: colors.proxyPreviewBackground,
+    border: colors.proxyPreviewBorder,
+    sceneBackground: colors.proxyPreviewSceneBackground,
+    tabBackground: colors.proxyPreviewTabBackground,
+  };
+}
+
 function ProxyBanner({
   childName,
   onSwitchBack,
@@ -157,35 +181,46 @@ function ProxyBanner({
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
   const { t } = useTranslation();
+  const proxyColors = getProxyChromeColors(colors);
 
   return (
     <View
-      className="flex-row items-center justify-between px-4 bg-surface-elevated border-b border-border"
+      className="flex-row items-center justify-between px-4 border-b"
       style={{
+        backgroundColor: proxyColors.background,
+        borderBottomColor: proxyColors.border,
+        borderBottomWidth: 2,
         paddingTop: insets.top,
-        height: 44 + insets.top,
+        height: 58 + insets.top,
       }}
       testID="proxy-banner"
     >
       <View className="flex-row items-center flex-1">
         <Ionicons
           name="eye-outline"
-          size={16}
-          color={colors.textSecondary}
-          style={{ marginRight: 6 }}
+          size={20}
+          color={colors.warning}
+          style={{ marginRight: 10 }}
         />
-        <Text
-          className="text-body-sm text-text-secondary flex-1"
-          numberOfLines={1}
-        >
-          {t('tabs.proxyBanner.viewing', { name: childName })}
-        </Text>
+        <View className="flex-1 pr-3">
+          <Text className="text-caption font-bold text-warning uppercase">
+            {t('tabs.proxyBanner.parentPreview')}
+          </Text>
+          <Text
+            className="text-body-sm font-semibold text-text-primary"
+            numberOfLines={1}
+          >
+            {t('tabs.proxyBanner.viewing', { name: childName })}
+          </Text>
+        </View>
       </View>
       <Pressable
         onPress={onSwitchBack}
         hitSlop={8}
         accessibilityRole="button"
         accessibilityLabel={t('tabs.proxyBanner.switchBackLabel')}
+        className="rounded-full border px-3 py-1.5"
+        style={{ borderColor: proxyColors.border }}
         testID="proxy-banner-switch-back"
       >
         <Text className="text-body-sm font-semibold text-primary">
@@ -1341,11 +1376,12 @@ export default function AppLayout() {
   } = useProfile();
   useMentorLanguageSync();
   const { isParentProxy, childProfile, parentProfile } = useParentProxy();
+  const proxyColors = getProxyChromeColors(colors);
   const role = useActiveProfileRole();
   const tabShape = resolveTabShape({ activeProfile, profiles, isParentProxy });
   const visibleTabs = React.useMemo(
-    () => computeVisibleTabs(tabShape),
-    [tabShape],
+    () => computeVisibleTabs(tabShape, isParentProxy),
+    [isParentProxy, tabShape],
   );
 
   // Sync Clerk auth state with RevenueCat identity (runs on auth change)
@@ -1661,7 +1697,11 @@ export default function AppLayout() {
               // F-003/F-016/F-055: on web, inactive tab scenes stay in the DOM.
               // An opaque sceneStyle prevents the previous tab from bleeding
               // through when switching to a full-screen route (session, quiz, etc.).
-              sceneStyle: { backgroundColor: colors.background },
+              sceneStyle: {
+                backgroundColor: isParentProxy
+                  ? proxyColors.sceneBackground
+                  : colors.background,
+              },
               tabBarStyle: isFullScreen
                 ? {
                     display: 'none',
@@ -1673,8 +1713,13 @@ export default function AppLayout() {
                     overflow: 'hidden' as const,
                   }
                 : {
-                    backgroundColor: colors.surface,
-                    borderTopColor: colors.border,
+                    backgroundColor: isParentProxy
+                      ? proxyColors.tabBackground
+                      : colors.surface,
+                    borderTopColor: isParentProxy
+                      ? proxyColors.border
+                      : colors.border,
+                    borderTopWidth: isParentProxy ? 2 : 1,
                     height: 56 + Math.max(insets.bottom, 24),
                     paddingBottom: Math.max(insets.bottom, 24),
                   },

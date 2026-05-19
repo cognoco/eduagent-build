@@ -945,13 +945,6 @@ export default function QuizPlayScreen(): React.ReactElement {
                 ) : null}
               </View>
             ) : null}
-            {currentQuestion.funFact ? (
-              <View className="rounded-card bg-surface p-4">
-                <Text className="text-body-sm text-text-secondary">
-                  {currentQuestion.funFact}
-                </Text>
-              </View>
-            ) : null}
             <Text
               className="mt-3 text-center text-caption text-text-secondary"
               testID="quiz-answer-feedback"
@@ -1003,7 +996,7 @@ export default function QuizPlayScreen(): React.ReactElement {
                   event?.stopPropagation?.();
                   handleContinue();
                 }}
-                className="mt-4 min-h-[48px] items-center justify-center rounded-button bg-primary px-5 py-3"
+                className="mt-4 min-h-[48px] flex-row items-center justify-center gap-2 rounded-button bg-primary px-5 py-3"
                 accessibilityRole="button"
                 accessibilityLabel="Next question"
                 testID="quiz-next-question"
@@ -1011,7 +1004,19 @@ export default function QuizPlayScreen(): React.ReactElement {
                 <Text className="text-body font-semibold text-text-inverse">
                   {t('quiz.play.nextQuestion')}
                 </Text>
+                <Ionicons
+                  name="arrow-forward"
+                  size={18}
+                  color={colors.textInverse}
+                />
               </Pressable>
+            ) : null}
+            {currentQuestion.funFact ? (
+              <View className="mt-4 rounded-card bg-surface p-4">
+                <Text className="text-body-sm text-text-secondary">
+                  {currentQuestion.funFact}
+                </Text>
+              </View>
             ) : null}
             {/* [BUG-469] Dispute button — lets user flag LLM's judgment as wrong */}
             {/* [BUG-927] Only surface dispute UI on incorrect answers. There's
