@@ -278,24 +278,6 @@
   "more": {
     "screenTitle": "More",
     "active": "Active",
-    "learningMode": {
-      "sectionHeader": "{{name}}'s Learning Mode",
-      "subtitle": "Applies to your own learning sessions.",
-      "subtitleWithChildren": "Applies to your own sessions. To change a child's, open their profile from the dashboard.",
-      "childPreferencesAccessLabel": "Open {{name}}'s profile preferences",
-      "childPreferencesLink": "To change {{name}}'s preferences, tap their profile on Home →",
-      "familyPreferencesLink": "To change a child's preferences, tap their profile on Home →",
-      "sheetTitle": "Learning mode",
-      "sheetEffectMessage": "Takes effect from your next message.",
-      "casual": {
-        "title": "Explorer",
-        "description": "Learn at your own pace. Your mentor is relaxed and encouraging. You earn points right away and can skip recaps."
-      },
-      "serious": {
-        "title": "Challenge mode",
-        "description": "Push yourself further. Your mentor keeps you on track. You earn points after proving you remember, and recaps help lock it in."
-      }
-    },
     "accommodation": {
       "sectionHeader": "Your learning accommodation",
       "viewAndManage": "View & manage",
@@ -2299,6 +2281,8 @@
     },
     "home": "Home",
     "homeLabel": "Home",
+    "familyHub": "Family Hub",
+    "familyHubLabel": "Family Hub",
     "myLearning": "My Learning",
     "myLearningLabel": "My Learning",
     "family": "Family",

@@ -101,20 +101,6 @@ tags:
       id: "chat-input"
     timeout: 10000
 
-# Learning mode is now controlled from the session header.
-- tapOn:
-    id: "learning-mode-header-button"
-- extendedWaitUntil:
-    visible:
-      id: "learning-mode-sheet"
-    timeout: 5000
-- assertVisible:
-    id: "session-learning-mode-casual"
-- assertVisible:
-    id: "session-learning-mode-serious"
-- tapOn:
-    id: "learning-mode-sheet-backdrop"
-
 # 5. Exchange 1: user question
 - tapOn:
     id: "chat-input"

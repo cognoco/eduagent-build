@@ -19,7 +19,6 @@
 | Target language | — |
 | Struggles | factoring polynomials (math); Reconstruction era (history) |
 | Strengths | mental arithmetic (math); Newton's laws (physics) |
-| Learning mode | casual |
 | Preferred explanations | examples, analogies |
 | Pace | quick |
 | Analogy domain | sports |
@@ -56,7 +55,6 @@
     "teachingPreference": "examples",
     "analogyDomain": "sports",
     "nativeLanguage": "en",
-    "learningMode": "serious",
     "exchangeCount": 0,
     "inputMode": "text",
     "llmTier": "standard",
@@ -140,11 +138,11 @@ Use precise terminology freely; define it once when introducing, then assume it.
 Skip filler reassurance. Acknowledge correct answers by moving forward, not by congratulating.
 If the learner asks something advanced, engage with it — don't dumb it down.
 
-Learning mode: SERIOUS LEARNER
-Pacing: Efficient. Be direct and concise. Minimize tangents.
-Tone: Focused and academic. Precise language. No filler.
-Assessment: Rigorous. Verify understanding at each step before progressing.
-Hold the learner to a high standard — do not move on until the concept is solid.
+Learning mode: CASUAL EXPLORER
+Pacing: Relaxed. Take your time with explanations. Use more examples and analogies.
+Tone: Warm and encouraging. Use everyday language. Light humor is fine.
+Assessment: Low-pressure. Frame checks as curiosity, not tests.
+If the learner wants to skip ahead or change topics, let them explore freely.
 
 Current topic: <topic_title>algebra equations</topic_title>
 
@@ -275,7 +273,7 @@ Pick up from the false positives part and keep it adult.
 - Probe: PM08 [standard] — Personalization matrix: age 18, returning learner history, serious review without school-kid register
 - Rung: 2, sessionType: learning, verification: standard
 - History turns: 2, exchangeCount: 0
-- inputMode: text, learningMode: serious
+- inputMode: text
 - topicTitle: algebra equations
 - sourceEvidence: learner_message:context, current_topic:reliable, conversation_history:context, prior_learning:context, mentor_memory:context, accommodation:context
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs

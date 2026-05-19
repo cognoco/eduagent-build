@@ -5,11 +5,9 @@ import { AccordionTopicList } from './AccordionTopicList';
 import { ProgressBar } from './ProgressBar';
 import { SubjectBookshelfMotif } from '../common/SubjectBookshelfMotif';
 import { formatMinutes } from '../../lib/format-relative-date';
-import {
-  getLearningSubjectTint,
-  type LearningSubjectTint,
-} from '../../lib/learning-subject-tints';
-import { useThemeColors } from '../../lib/theme';
+import type { LearningSubjectTint } from '../../lib/learning-subject-tints';
+import { getSubjectTint } from '../../lib/subject-tints';
+import { useTheme } from '../../lib/theme';
 
 // 'review' is planned for spaced-repetition scenarios but not yet wired.
 // Add it back here and to ACTION_LABEL + getContextualAction when implemented.
@@ -100,8 +98,8 @@ export function SubjectProgressRow({
   tint: providedTint,
   testID,
 }: SubjectProgressRowProps): React.ReactElement {
-  const colors = useThemeColors();
-  const tint = providedTint ?? getLearningSubjectTint(0, colors);
+  const { colorScheme } = useTheme();
+  const tint = providedTint ?? getSubjectTint(subject.subjectId, colorScheme);
   const [expanded, setExpanded] = useState(false);
   const isAccordionMode = !!childProfileId && !!subjectId && !onPress;
   const hasExpandableTopics =

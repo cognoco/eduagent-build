@@ -12,9 +12,6 @@ import {
 } from './snapshots';
 import { consentStatusSchema } from './consent';
 
-export const learningModeSchema = z.enum(['serious', 'casual']);
-export type LearningMode = z.infer<typeof learningModeSchema>;
-
 export const celebrationNameSchema = z.enum([
   'polar_star',
   'twin_stars',
@@ -104,11 +101,6 @@ export const notificationPrefsSchema = z.object({
 });
 export type NotificationPrefsInput = z.infer<typeof notificationPrefsSchema>;
 
-export const learningModeUpdateSchema = z.object({
-  mode: learningModeSchema,
-});
-export type LearningModeUpdate = z.infer<typeof learningModeUpdateSchema>;
-
 export const celebrationLevelUpdateSchema = z.object({
   celebrationLevel: celebrationLevelSchema,
   childProfileId: z.string().uuid().optional(),
@@ -154,13 +146,6 @@ export const getNotificationsResponseSchema = z.object({
 });
 export type GetNotificationsResponse = z.infer<
   typeof getNotificationsResponseSchema
->;
-
-export const getLearningModeResponseSchema = z.object({
-  mode: learningModeSchema,
-});
-export type GetLearningModeResponse = z.infer<
-  typeof getLearningModeResponseSchema
 >;
 
 export const getCelebrationLevelResponseSchema = z.object({

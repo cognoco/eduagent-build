@@ -19,7 +19,6 @@
 | Target language | — |
 | Struggles | long division (math); Austria vs Australia (geography) |
 | Strengths | dinosaur classification (science); reading comprehension (reading) |
-| Learning mode | casual |
 | Preferred explanations | humor, examples, stories |
 | Pace | quick |
 | Analogy domain | nature |
@@ -56,7 +55,6 @@
     "teachingPreference": "humor",
     "analogyDomain": "nature",
     "nativeLanguage": "en",
-    "learningMode": "casual",
     "exchangeCount": 0,
     "inputMode": "text",
     "llmTier": "standard",
@@ -266,7 +264,7 @@ Honestly I don't remember any of this, it's been ages.
 - Probe: P21 [standard] — Forgotten topic — 45 days since review, status forgotten (all profiles)
 - Rung: 1, sessionType: learning, verification: standard
 - History turns: 2, exchangeCount: 0
-- inputMode: text, learningMode: casual
+- inputMode: text
 - topicTitle: Mesozoic era
 - sourceEvidence: learner_message:context, current_topic:reliable, conversation_history:context, prior_learning:context, mentor_memory:context, accommodation:context
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs

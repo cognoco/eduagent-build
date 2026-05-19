@@ -98,7 +98,6 @@ import { OutboxFailedBanner } from '../../../components/durability/OutboxFailedB
 import { useTranslation } from 'react-i18next';
 import { SessionErrorBoundary } from './_components/SessionErrorBoundary';
 import { ConfirmationToast } from './_components/ConfirmationToast';
-import { useLearningModeControl } from './_components/LearningModeControl';
 import { useImageBase64 } from './_hooks/use-image-base64';
 import { useBookmarkHandler } from './_hooks/use-bookmark-handler';
 import { useSessionRecovery } from './_hooks/use-session-recovery';
@@ -951,13 +950,9 @@ function SessionScreenInner() {
     </Pressable>
   );
 
-  const { button: learningModeButton, sheet: learningModeSheet } =
-    useLearningModeControl();
-
   const headerRight = (
     <View className="flex-row flex-wrap items-center justify-end">
       {modeConfig.showTimer && <SessionTimer />}
-      {learningModeButton}
       <MilestoneDots count={milestonesReached.length} />
       {endSessionButton}
     </View>
@@ -1215,7 +1210,6 @@ function SessionScreenInner() {
           </>
         }
       />
-      {learningModeSheet}
       {activeProfile?.id ? (
         <OutboxFailedBanner profileId={activeProfile.id} flow="session" />
       ) : null}

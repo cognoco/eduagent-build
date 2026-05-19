@@ -151,7 +151,11 @@ jest.mock('../../components/feedback/FeedbackProvider', () => ({
 // Route: GET /subjects → { subjects: [] }
 
 const AppLayout = require('./_layout').default;
-const { computeVisibleTabs, resolveTabShape } = require('./_layout');
+const {
+  computeVisibleTabs,
+  resolveHomeTabPresentation,
+  resolveTabShape,
+} = require('./_layout');
 
 describe('AppLayout', () => {
   let testQueryClient: QueryClient;
@@ -822,6 +826,32 @@ describe('resolveTabShape', () => {
         isParentProxy: false,
       }),
     ).toBe('guardian');
+  });
+});
+
+describe('resolveHomeTabPresentation', () => {
+  it('names the guardian home tab Family Hub', () => {
+    expect(resolveHomeTabPresentation('guardian')).toEqual({
+      titleKey: 'tabs.familyHub',
+      accessibilityLabelKey: 'tabs.familyHubLabel',
+      iconName: 'Home',
+    });
+  });
+
+  it('names learner home My Learning', () => {
+    expect(resolveHomeTabPresentation('learner')).toEqual({
+      titleKey: 'tabs.myLearning',
+      accessibilityLabelKey: 'tabs.myLearningLabel',
+      iconName: 'School',
+    });
+  });
+
+  it('keeps parent preview on the learner label', () => {
+    expect(resolveHomeTabPresentation('guardian', true)).toEqual({
+      titleKey: 'tabs.myLearning',
+      accessibilityLabelKey: 'tabs.myLearningLabel',
+      iconName: 'School',
+    });
   });
 });
 

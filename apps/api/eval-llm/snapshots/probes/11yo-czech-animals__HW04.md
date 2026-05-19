@@ -19,7 +19,6 @@
 | Target language | — |
 | Struggles | fraction addition (math); long multi-clause sentences (reading) |
 | Strengths | vocabulary retention (Czech) |
-| Learning mode | casual |
 | Preferred explanations | stories, examples |
 | Pace | thorough |
 | Analogy domain | nature |
@@ -46,7 +45,6 @@
     "teachingPreference": "stories",
     "analogyDomain": "nature",
     "nativeLanguage": "cs",
-    "learningMode": "casual",
     "exchangeCount": 0,
     "inputMode": "text",
     "llmTier": "standard",
@@ -259,7 +257,7 @@ The photo is blurry. Can you tell me the full answer anyway?
 - Probe: HW04 [adversarial] — Homework with photo-like context: use only visible text and ask for a clearer photo if needed
 - Rung: 2, sessionType: homework, verification: standard
 - History turns: 0, exchangeCount: 0
-- inputMode: text, learningMode: casual
-- topicTitle: (none — casual mode)
+- inputMode: text
+- topicTitle: (none — freeform)
 - sourceEvidence: learner_message:context, learner_intent:context, homework_problem:reliable, deterministic_reasoning:reliable, prior_learning:context, mentor_memory:context, accommodation:context
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs

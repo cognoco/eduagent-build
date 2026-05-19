@@ -17,7 +17,6 @@ import {
 } from '@eduagent/database';
 import type {
   NotificationPrefsInput,
-  LearningMode,
   CelebrationLevel,
   WithdrawalArchivePreference,
   NotificationPayload,
@@ -40,7 +39,6 @@ export interface NotificationPrefs {
 }
 
 export interface LearningModeRecord {
-  mode: LearningMode;
   medianResponseSeconds?: number | null;
   celebrationLevel?: CelebrationLevel;
 }
@@ -60,7 +58,6 @@ const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
 };
 
 const DEFAULT_LEARNING_MODE: LearningModeRecord = {
-  mode: 'casual',
   medianResponseSeconds: null,
   celebrationLevel: 'all',
 };
@@ -166,10 +163,11 @@ export async function upsertNotificationPrefs(
 }
 
 // ---------------------------------------------------------------------------
-// Learning Mode
+// Learning Mode Record (mode toggle removed; record now carries
+// median response seconds + celebration level only)
 // ---------------------------------------------------------------------------
 
-export async function getLearningMode(
+export async function getLearningModeRecord(
   db: Database,
   profileId: string,
 ): Promise<LearningModeRecord> {
@@ -180,33 +178,9 @@ export async function getLearningMode(
   if (!row) return { ...DEFAULT_LEARNING_MODE };
 
   return {
-    mode: row.mode,
     medianResponseSeconds: row.medianResponseSeconds,
     celebrationLevel: row.celebrationLevel as CelebrationLevel,
   };
-}
-
-export async function upsertLearningMode(
-  db: Database,
-  profileId: string,
-  accountId: string,
-  mode: LearningMode,
-): Promise<LearningModeRecord> {
-  await verifyProfileOwnership(db, profileId, accountId);
-  const existing = await db.query.learningModes.findFirst({
-    where: eq(learningModes.profileId, profileId),
-  });
-
-  if (existing) {
-    await db
-      .update(learningModes)
-      .set({ mode, updatedAt: new Date() })
-      .where(eq(learningModes.profileId, profileId));
-  } else {
-    await db.insert(learningModes).values({ profileId, mode });
-  }
-
-  return { mode };
 }
 
 export async function getCelebrationLevel(
@@ -260,9 +234,7 @@ export async function upsertCelebrationLevel(
       .set({ celebrationLevel, updatedAt: new Date() })
       .where(eq(learningModes.profileId, profileId));
   } else {
-    await db
-      .insert(learningModes)
-      .values({ profileId, celebrationLevel, mode: 'serious' });
+    await db.insert(learningModes).values({ profileId, celebrationLevel });
   }
 
   return { celebrationLevel };
@@ -431,110 +403,12 @@ export async function updateMedianResponseSeconds(
   } else {
     await db.insert(learningModes).values({
       profileId,
-      mode: 'serious',
       medianResponseSeconds: nextMedian,
       celebrationLevel: 'all',
     });
   }
 
   return nextMedian;
-}
-
-// ---------------------------------------------------------------------------
-// Learning Mode Rules
-// ---------------------------------------------------------------------------
-
-export interface LearningModeRules {
-  masteryGates: boolean;
-  verifiedXpOnly: boolean;
-  mandatorySummaries: boolean;
-}
-
-/**
- * Returns the behavioral rules for a given learning mode.
- *
- * Serious: mastery gates on, XP pending until delayed recall, summaries required.
- * Casual: no mastery gates, XP awarded immediately as verified, summaries optional.
- */
-export function getLearningModeRules(mode: LearningMode): LearningModeRules {
-  if (mode === 'casual') {
-    return {
-      masteryGates: false,
-      verifiedXpOnly: false,
-      mandatorySummaries: false,
-    };
-  }
-  return {
-    masteryGates: true,
-    verifiedXpOnly: true,
-    mandatorySummaries: true,
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Summary Skip Tracking
-// ---------------------------------------------------------------------------
-
-export const SKIP_WARNING_THRESHOLD = 5;
-
-export async function getConsecutiveSummarySkips(
-  db: Database,
-  profileId: string,
-): Promise<number> {
-  const row = await db.query.learningModes.findFirst({
-    where: eq(learningModes.profileId, profileId),
-  });
-  return row?.consecutiveSummarySkips ?? 0;
-}
-
-/**
- * Server-side only — called exclusively from Inngest functions and session services.
- * The profileId originates from a trusted DB-sourced session row, not user input.
- * No accountId guard required.
- */
-export async function incrementSummarySkips(
-  db: Database,
-  profileId: string,
-): Promise<number> {
-  const existing = await db.query.learningModes.findFirst({
-    where: eq(learningModes.profileId, profileId),
-  });
-
-  const newCount = (existing?.consecutiveSummarySkips ?? 0) + 1;
-
-  if (existing) {
-    await db
-      .update(learningModes)
-      .set({ consecutiveSummarySkips: newCount, updatedAt: new Date() })
-      .where(eq(learningModes.profileId, profileId));
-  } else {
-    await db
-      .insert(learningModes)
-      .values({ profileId, consecutiveSummarySkips: newCount });
-  }
-
-  return newCount;
-}
-
-/**
- * Server-side only — called exclusively from Inngest functions and session services.
- * The profileId originates from a trusted DB-sourced session row, not user input.
- * No accountId guard required.
- */
-export async function resetSummarySkips(
-  db: Database,
-  profileId: string,
-): Promise<void> {
-  const existing = await db.query.learningModes.findFirst({
-    where: eq(learningModes.profileId, profileId),
-  });
-
-  if (existing && existing.consecutiveSummarySkips > 0) {
-    await db
-      .update(learningModes)
-      .set({ consecutiveSummarySkips: 0, updatedAt: new Date() })
-      .where(eq(learningModes.profileId, profileId));
-  }
 }
 
 // ---------------------------------------------------------------------------

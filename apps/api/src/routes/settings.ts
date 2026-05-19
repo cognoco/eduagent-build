@@ -3,7 +3,6 @@ import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import {
   notificationPrefsSchema,
-  learningModeUpdateSchema,
   pushTokenRegisterSchema,
   analogyDomainUpdateSchema,
   celebrationLevelQuerySchema,
@@ -12,7 +11,6 @@ import {
   familyPoolBreakdownSharingUpdateSchema,
   nativeLanguageUpdateSchema,
   getNotificationsResponseSchema,
-  getLearningModeResponseSchema,
   getCelebrationLevelResponseSchema,
   getWithdrawalArchivePreferenceResponseSchema,
   updateWithdrawalArchivePreferenceResponseSchema,
@@ -31,8 +29,6 @@ import { requireProfileId } from '../middleware/profile-scope';
 import {
   getNotificationPrefs,
   upsertNotificationPrefs,
-  getLearningMode,
-  upsertLearningMode,
   getCelebrationLevel,
   getChildCelebrationLevel,
   upsertCelebrationLevel,
@@ -44,9 +40,6 @@ import {
   registerPushToken,
 } from '../services/settings';
 import { notifyParentToSubscribe } from '../services/notifications';
-import { clearSessionStaticContextForProfile } from '../services/session/session-cache';
-import { captureException } from '../services/sentry';
-import { createLogger } from '../services/logger';
 import {
   getAnalogyDomain,
   getNativeLanguage,
@@ -75,8 +68,6 @@ const subjectParamSchema = z.object({
   subjectId: z.string().uuid(),
 });
 
-const logger = createLogger();
-
 export const settingsRoutes = new Hono<SettingsRouteEnv>()
   // Get notification preferences
   .get('/settings/notifications', async (c) => {
@@ -102,47 +93,6 @@ export const settingsRoutes = new Hono<SettingsRouteEnv>()
         body,
       );
       return c.json(getNotificationsResponseSchema.parse({ preferences }));
-    },
-  )
-
-  // Get learning mode
-  .get('/settings/learning-mode', async (c) => {
-    const db = c.get('db');
-    const profileId = requireProfileId(c.get('profileId'));
-    const result = await getLearningMode(db, profileId);
-    return c.json(getLearningModeResponseSchema.parse({ mode: result.mode }));
-  })
-
-  // Update learning mode
-  .put(
-    '/settings/learning-mode',
-    zValidator('json', learningModeUpdateSchema),
-    async (c) => {
-      const db = c.get('db');
-      const profileId = requireProfileId(c.get('profileId'));
-      const accountId = c.get('account').id;
-      const body = c.req.valid('json');
-      const result = await upsertLearningMode(
-        db,
-        profileId,
-        accountId,
-        body.mode,
-      );
-      try {
-        clearSessionStaticContextForProfile(profileId);
-      } catch (err) {
-        logger.warn('[settings] clearSessionStaticContext failed', {
-          event: 'settings.clear_session_context_failed',
-          profileId,
-          error: err instanceof Error ? err.message : String(err),
-        });
-        captureException(err, {
-          profileId,
-          extra: { context: 'clear-session-static-context' },
-        });
-        // best-effort — don't 500 a successful mode change on cache failure
-      }
-      return c.json(getLearningModeResponseSchema.parse({ mode: result.mode }));
     },
   )
 

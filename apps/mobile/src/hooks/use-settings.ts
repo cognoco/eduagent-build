@@ -7,7 +7,6 @@ import {
 } from '@tanstack/react-query';
 import type {
   NotificationPrefsInput,
-  LearningMode,
   AnalogyDomain,
   CelebrationLevel,
   LanguageCode,
@@ -52,30 +51,6 @@ export function useNotificationSettings(): UseQueryResult<NotificationPrefs> {
         await assertOk(res);
         const data = await res.json();
         return data.preferences;
-      } finally {
-        cleanup();
-      }
-    },
-    enabled: !!activeProfile,
-  });
-}
-
-export function useLearningMode(): UseQueryResult<LearningMode> {
-  const client = useApiClient();
-  const { activeProfile } = useProfile();
-
-  return useQuery({
-    queryKey: ['settings', 'learning-mode', activeProfile?.id],
-    queryFn: async ({ signal: querySignal }) => {
-      const { signal, cleanup } = combinedSignal(querySignal);
-      try {
-        const res = await client.settings['learning-mode'].$get(
-          {},
-          { init: { signal } },
-        );
-        await assertOk(res);
-        const data = await res.json();
-        return data.mode;
       } finally {
         cleanup();
       }
@@ -216,46 +191,6 @@ export function useUpdateNotificationSettings(): UseMutationResult<
     onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: ['settings', 'notifications', activeProfile?.id],
-      });
-    },
-  });
-}
-
-export function useUpdateLearningMode(): UseMutationResult<
-  LearningMode,
-  Error,
-  LearningMode,
-  { previous?: LearningMode }
-> {
-  const client = useApiClient();
-  const queryClient = useQueryClient();
-  const { activeProfile } = useProfile();
-
-  return useMutation({
-    mutationFn: async (mode: LearningMode) => {
-      const res = await client.settings['learning-mode'].$put({
-        json: { mode },
-      });
-      await assertOk(res);
-      const data = await res.json();
-      return data.mode;
-    },
-    onMutate: async (mode) => {
-      const queryKey = ['settings', 'learning-mode', activeProfile?.id];
-      await queryClient.cancelQueries({ queryKey });
-      const previous = queryClient.getQueryData<LearningMode>(queryKey);
-      queryClient.setQueryData(queryKey, mode);
-      return { previous };
-    },
-    onError: (_error, _mode, context) => {
-      const queryKey = ['settings', 'learning-mode', activeProfile?.id];
-      if (context?.previous !== undefined) {
-        queryClient.setQueryData(queryKey, context.previous);
-      }
-    },
-    onSettled: () => {
-      void queryClient.invalidateQueries({
-        queryKey: ['settings', 'learning-mode', activeProfile?.id],
       });
     },
   });

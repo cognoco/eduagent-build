@@ -3,7 +3,6 @@ import {
   type AgeBracket,
   type SessionType,
   type HomeworkMode,
-  type LearningMode,
 } from '@eduagent/schemas';
 import { buildAppHelpPromptBlock } from './app-help-map';
 import { getEscalationPromptGuidance } from './escalation';
@@ -188,24 +187,14 @@ export function getWorkedExampleGuidance(
   }
 }
 
-export function getLearningModeGuidance(mode: LearningMode): string {
-  if (mode === 'casual') {
-    return (
-      'Learning mode: CASUAL EXPLORER\n' +
-      'Pacing: Relaxed. Take your time with explanations. Use more examples and analogies.\n' +
-      'Tone: Warm and encouraging. Use everyday language. Light humor is fine.\n' +
-      'Assessment: Low-pressure. Frame checks as curiosity, not tests.\n' +
-      'If the learner wants to skip ahead or change topics, let them explore freely.'
-    );
-  }
-  return (
-    'Learning mode: SERIOUS LEARNER\n' +
-    'Pacing: Efficient. Be direct and concise. Minimize tangents.\n' +
-    'Tone: Focused and academic. Precise language. No filler.\n' +
-    'Assessment: Rigorous. Verify understanding at each step before progressing.\n' +
-    'Hold the learner to a high standard — do not move on until the concept is solid.'
-  );
-}
+// Default tone — lifted verbatim from the pre-sunset 'casual' branch of the
+// removed getLearningModeGuidance(). All sessions use this single tone now.
+export const DEFAULT_TONE_GUIDANCE =
+  'Learning mode: CASUAL EXPLORER\n' +
+  'Pacing: Relaxed. Take your time with explanations. Use more examples and analogies.\n' +
+  'Tone: Warm and encouraging. Use everyday language. Light humor is fine.\n' +
+  'Assessment: Low-pressure. Frame checks as curiosity, not tests.\n' +
+  'If the learner wants to skip ahead or change topics, let them explore freely.';
 
 function clampEvaluateRung(rung: EscalationRung): 1 | 2 | 3 | 4 {
   return Math.min(4, Math.max(1, rung)) as 1 | 2 | 3 | 4;
@@ -594,10 +583,8 @@ export function buildSystemPrompt(
     sections.push(buildAppHelpPromptBlock());
   }
 
-  // Learning mode — adjusts pacing and tone
-  if (context.learningMode) {
-    sections.push(getLearningModeGuidance(context.learningMode));
-  }
+  // Default tone — applied to every session post-sunset
+  sections.push(DEFAULT_TONE_GUIDANCE);
 
   if (onboardingSignals) {
     const signalLines: string[] = [

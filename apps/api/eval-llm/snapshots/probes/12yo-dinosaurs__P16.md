@@ -19,7 +19,6 @@
 | Target language | — |
 | Struggles | long division (math); Austria vs Australia (geography) |
 | Strengths | dinosaur classification (science); reading comprehension (reading) |
-| Learning mode | casual |
 | Preferred explanations | humor, examples, stories |
 | Pace | quick |
 | Analogy domain | nature |
@@ -64,7 +63,6 @@
     "teachingPreference": "humor",
     "analogyDomain": "nature",
     "nativeLanguage": "en",
-    "learningMode": "casual",
     "exchangeCount": 4,
     "inputMode": "text",
     "llmTier": "standard",
@@ -279,7 +277,7 @@ I got the first part right but the second part is still fuzzy for me.
 - Probe: P16 [standard] — Mixed performance mid-session — some right, some wrong (all profiles, exchangeCount 4)
 - Rung: 2, sessionType: learning, verification: standard
 - History turns: 4, exchangeCount: 4
-- inputMode: text, learningMode: casual
+- inputMode: text
 - topicTitle: Mesozoic era
 - sourceEvidence: learner_message:context, current_topic:reliable, conversation_history:context, prior_learning:context, mentor_memory:context, accommodation:context
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs

@@ -172,7 +172,6 @@ let mockSkipResult: Record<string, unknown> | Response = {
     aiFeedback: null,
     status: 'skipped',
   },
-  consecutiveSummarySkips: 1,
 };
 // The single mockFetch instance — its route map is updated per-test via setRoute().
 const mockFetch = createRoutedMockFetch({
@@ -339,7 +338,6 @@ describe('SessionSummaryScreen', () => {
         aiFeedback: null,
         status: 'skipped',
       },
-      consecutiveSummarySkips: 1,
     };
     mockParams.subjectName = 'Mathematics';
     mockParams.exchangeCount = '5';
@@ -723,44 +721,6 @@ describe('SessionSummaryScreen', () => {
 
     const skipButton = screen.getByTestId('skip-summary-button');
     await pressAsync(skipButton);
-
-    await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
-    });
-  });
-
-  it('shows a summary warning when the skip threshold is reached', async () => {
-    mockSkipResult = {
-      summary: {
-        id: 'summary-1',
-        sessionId: '660e8400-e29b-41d4-a716-446655440000',
-        content: '',
-        aiFeedback: null,
-        status: 'skipped',
-      },
-      consecutiveSummarySkips: 5,
-    };
-
-    render(<SessionSummaryScreen />, { wrapper: Wrapper });
-
-    await pressAsync(screen.getByTestId('skip-summary-button'));
-
-    await waitFor(() => {
-      expect(platformAlert).toHaveBeenCalledWith(
-        'Summaries help you learn',
-        'Students who reflect remember 2x more. Try it next time!',
-        expect.arrayContaining([expect.objectContaining({ text: 'Got it' })]),
-      );
-    });
-    expect(mockReplace).not.toHaveBeenCalled();
-
-    const promptButtons = (platformAlert as jest.Mock).mock.calls[0]?.[2] as
-      | Array<{ text?: string; onPress?: () => void }>
-      | undefined;
-    const okButton = promptButtons?.find((button) => button.text === 'Got it');
-    expect(okButton?.onPress).toBeInstanceOf(Function);
-
-    okButton?.onPress?.();
 
     await waitFor(() => {
       expect(mockReplace).toHaveBeenCalledWith('/(app)/home');

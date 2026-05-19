@@ -68,9 +68,14 @@ export default function AccommodationScreen(): React.ReactElement {
     }
   }, [activeProfile, canEditChildPreferences, isChildMode, router]);
 
+  const fallbackHref =
+    canEditChildPreferences && childProfileId
+      ? (`/(app)/child/${childProfileId}?mode=settings` as Href)
+      : ('/(app)/more/learning-preferences' as Href);
+
   const handleBack = useCallback(() => {
-    goBackOrReplace(router, '/(app)/more/learning-preferences' as const);
-  }, [router]);
+    goBackOrReplace(router, fallbackHref);
+  }, [fallbackHref, router]);
 
   const handleSelectAccommodation = useCallback(
     (mode: AccommodationMode) => {

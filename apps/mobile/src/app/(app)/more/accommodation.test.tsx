@@ -306,5 +306,29 @@ describe('AccommodationScreen', () => {
       );
       expect(mockBack).not.toHaveBeenCalled();
     });
+
+    it('replaces to the child settings route in child-editing mode', () => {
+      mockProfiles = [
+        mockActiveProfile,
+        {
+          id: 'child-1',
+          displayName: 'Mia',
+          isOwner: false,
+          birthYear: 2014,
+        },
+      ];
+      mockSearchParams = { childProfileId: 'child-1' };
+      mockChildLearnerProfile = { accommodationMode: 'none' };
+      mockCanGoBack.mockReturnValue(false);
+
+      render(<AccommodationScreen />, { wrapper: createWrapper() });
+
+      fireEvent.press(screen.getByTestId('accommodation-back'));
+
+      expect(mockReplace).toHaveBeenCalledWith(
+        '/(app)/child/child-1?mode=settings',
+      );
+      expect(mockBack).not.toHaveBeenCalled();
+    });
   });
 });

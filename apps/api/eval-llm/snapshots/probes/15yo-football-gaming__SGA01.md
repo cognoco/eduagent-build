@@ -19,7 +19,6 @@
 | Target language | — |
 | Struggles | factoring polynomials (math); Reconstruction era (history) |
 | Strengths | mental arithmetic (math); Newton's laws (physics) |
-| Learning mode | casual |
 | Preferred explanations | examples, analogies |
 | Pace | quick |
 | Analogy domain | sports |
@@ -42,7 +41,6 @@
     "teachingPreference": "examples",
     "analogyDomain": "sports",
     "nativeLanguage": "en",
-    "learningMode": "casual",
     "exchangeCount": 0,
     "inputMode": "text",
     "llmTier": "standard",
@@ -229,7 +227,7 @@ Why did the Roman Empire grow so quickly? Give me the main reasons and an exampl
 - Probe: SGA01 [adversarial] — No reliable source: learner asks for factual history explanation with no topic/source loaded
 - Rung: 2, sessionType: learning, verification: standard
 - History turns: 0, exchangeCount: 0
-- inputMode: text, learningMode: casual
-- topicTitle: (none — casual mode)
+- inputMode: text
+- topicTitle: (none — freeform)
 - sourceEvidence: learner_message:context, accommodation:context
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs

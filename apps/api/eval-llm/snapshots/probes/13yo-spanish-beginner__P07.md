@@ -19,7 +19,6 @@
 | Target language | es |
 | Struggles | ser vs estar (Spanish); irregular verbs (Spanish) |
 | Strengths | Spanish pronunciation (Spanish) |
-| Learning mode | serious |
 | Preferred explanations | step-by-step, examples |
 | Pace | thorough |
 | Analogy domain | nature |
@@ -62,7 +61,6 @@
       "la escuela",
       "el perro"
     ],
-    "learningMode": "serious",
     "exchangeCount": 2,
     "inputMode": "voice",
     "llmTier": "standard",
@@ -150,11 +148,11 @@ Avoid abstract jargon; when a technical term is unavoidable, define it once in p
 Keep the tone warm but calm — no performative enthusiasm, no baby talk.
 When they get something right, a brief "yes, that's it" is plenty.
 
-Learning mode: SERIOUS LEARNER
-Pacing: Efficient. Be direct and concise. Minimize tangents.
-Tone: Focused and academic. Precise language. No filler.
-Assessment: Rigorous. Verify understanding at each step before progressing.
-Hold the learner to a high standard — do not move on until the concept is solid.
+Learning mode: CASUAL EXPLORER
+Pacing: Relaxed. Take your time with explanations. Use more examples and analogies.
+Tone: Warm and encouraging. Use everyday language. Light humor is fine.
+Assessment: Low-pressure. Frame checks as curiosity, not tests.
+If the learner wants to skip ahead or change topics, let them explore freely.
 
 Current topic: <topic_title>Spanish present tense verbs</topic_title>
 
@@ -286,7 +284,7 @@ Okay, I want to practice speaking some Spanish sentences now.
 - Probe: P07 [standard] — 13yo Spanish learner on voice + four_strands — pronunciation coaching OK
 - Rung: 2, sessionType: learning, verification: standard
 - History turns: 2, exchangeCount: 2
-- inputMode: voice, learningMode: serious
+- inputMode: voice
 - topicTitle: Spanish present tense verbs
 - sourceEvidence: learner_message:context, current_topic:reliable, conversation_history:context, prior_learning:context, mentor_memory:context, accommodation:context
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs
