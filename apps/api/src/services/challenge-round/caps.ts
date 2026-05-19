@@ -13,6 +13,9 @@
 export const MAX_CHALLENGE_QUESTIONS = 3;
 export const MAX_CHALLENGE_ANSWER_CHARS = 2000;
 export const CHALLENGE_OFFER_COOLDOWN_HOURS = 24;
+// Initial guess (MED-3). TODO: calibrate after first ~100 production challenge
+// rounds by histogramming `validateNoteDraft().overlapRatio` per outcome.
+// Adjust up if hallucinated drafts pass; down if learner-grounded drafts fail.
 export const MIN_LEXICAL_OVERLAP_NOTE_DRAFT = 0.4;
 
 export function enforceChallengeQuestionCap(requested: number): number {
