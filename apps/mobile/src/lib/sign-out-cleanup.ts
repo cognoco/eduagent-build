@@ -85,6 +85,11 @@ export const GLOBAL_KEYS: ReadonlyArray<string> = [
   // [CR-SECURESTORE-REGISTRY-11] Previously-unregistered. BYOK waitlist is
   // account-scoped (see BUG-399 comment in subscription.tsx) — clears on sign-out.
   'byok-waitlist-joined',
+  // preview-onboarding-state.ts — pre-signup intent + topic (1h TTL).
+  // Spec: docs/specs/2026-05-18-trial-intent-save-onboarding-v0.md
+  // Unconditional: cleanup is harmless when key absent; prevents cross-account
+  // leak if feature flag is off but the key was written in a prior session.
+  'mentomate_preview_intent',
 ];
 
 // [CR-SECURESTORE-REGISTRY-11] Documented exceptions — specific callsites that

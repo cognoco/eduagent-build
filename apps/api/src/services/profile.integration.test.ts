@@ -28,6 +28,7 @@ import { createProfileWithLimitCheck, ProfileLimitError } from './profile';
 import { createSubscription } from './billing';
 import { getTierConfig } from './subscription';
 import type { ProfileCreateInput } from '@eduagent/schemas';
+import { ForbiddenError } from '@eduagent/schemas';
 
 // ---------------------------------------------------------------------------
 // DB setup — real connection
@@ -63,9 +64,55 @@ const FIRST_PROFILE_ACCOUNT = {
   email: `${PREFIX}-first-profile@integration.test`,
 };
 
+// [OPT-C] Adult-owner gate break-test accounts
+const OPT_C_PREFIX = 'integration-profile-optc';
+const OPT_C_UNDERAGE_EMAIL = `${OPT_C_PREFIX}-underage@integration.test`;
+const OPT_C_ADULT18_EMAIL = `${OPT_C_PREFIX}-adult18@integration.test`;
+const OPT_C_FLAG_OFF_EMAIL = `${OPT_C_PREFIX}-flagoff@integration.test`;
+
 // ---------------------------------------------------------------------------
 // Seed helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * Seeds an account with a single owner profile at the given birthYear.
+ * Returns the account row. A 'family' subscription is provisioned so
+ * subsequent createProfileWithLimitCheck calls are not blocked by the limit.
+ */
+async function seedOwnerAccount(
+  email: string,
+  clerkUserId: string,
+  ownerBirthYear: number,
+) {
+  const db = createIntegrationDb();
+  const [account] = await db
+    .insert(accounts)
+    .values({ clerkUserId, email })
+    .returning();
+
+  // Family subscription — cap = 4, well above what break tests need
+  const familyConfig = getTierConfig('family');
+  await createSubscription(
+    db,
+    account!.id,
+    'family',
+    familyConfig.monthlyQuota,
+    {
+      status: 'active',
+    },
+  );
+
+  // Insert owner profile directly (bypass createProfileWithLimitCheck) so the
+  // owner's birthYear is set independently of the gate logic under test.
+  await db.insert(profiles).values({
+    accountId: account!.id,
+    displayName: 'Owner',
+    birthYear: ownerBirthYear,
+    isOwner: true,
+  });
+
+  return { db, accountId: account!.id };
+}
 
 async function seedFixture() {
   const db = createIntegrationDb();
@@ -107,6 +154,9 @@ async function cleanup() {
     where: inArray(accounts.email, [
       ACCOUNT.email,
       FIRST_PROFILE_ACCOUNT.email,
+      OPT_C_UNDERAGE_EMAIL,
+      OPT_C_ADULT18_EMAIL,
+      OPT_C_FLAG_OFF_EMAIL,
     ]),
   });
   const ids = found.map((a: typeof accounts.$inferSelect) => a.id);
@@ -253,5 +303,98 @@ describe('[BUG-862] createProfileWithLimitCheck concurrent cap enforcement (inte
         displayName: 'Over-cap Child',
       }),
     ).rejects.toThrow(ProfileLimitError);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [OPT-C / HIGH-D3] Adult-owner gate break-tests
+//
+// Red-green regression per CLAUDE.md "Security fixes require a break test."
+// These tests are the canonical proof that the [OPT-C] server-side rule exists
+// and cannot be silently removed without CI failing.
+// ---------------------------------------------------------------------------
+
+describe('[OPT-C] createProfileWithLimitCheck adult-owner gate (integration)', () => {
+  // Age math uses new Date().getFullYear() inside computeAgeBracket.
+  // Birth years chosen so the owner's age in the current year (2026) places
+  // them firmly underage (2013 → 13) or at the 18 boundary (2008 → 18).
+  // These remain correct for 2026+; the boundary test (2008) should be
+  // revisited when currentYear reaches 2027 (owner turns 19, still passes).
+
+  it('[BREAK / OPT-C] rejects child creation when owner is under 18', async () => {
+    // Birth year 2013 → age 13 in 2026 — clearly underage.
+    const { accountId } = await seedOwnerAccount(
+      OPT_C_UNDERAGE_EMAIL,
+      `${OPT_C_PREFIX}-underage-user`,
+      2013,
+    );
+    const db = createIntegrationDb();
+
+    // Gate ON (default). Must throw ForbiddenError with ADULT_OWNER_REQUIRED.
+    // computeAgeBracket(2013, 2026) = 'adolescent' → not 'adult' → reject.
+    await expect(
+      createProfileWithLimitCheck(
+        db,
+        accountId,
+        { displayName: 'Child', birthYear: 2014 },
+        { adultOwnerGateEnabled: true },
+      ),
+    ).rejects.toMatchObject({
+      name: 'ForbiddenError',
+      apiCode: 'ADULT_OWNER_REQUIRED',
+    });
+
+    // Confirm that ForbiddenError is the correct class (instanceof guard)
+    await expect(
+      createProfileWithLimitCheck(
+        db,
+        accountId,
+        { displayName: 'Child', birthYear: 2014 },
+        { adultOwnerGateEnabled: true },
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
+  it('[OPT-C boundary] allows child creation when owner is exactly 18', async () => {
+    // Birth year 2008 → age 18 in 2026 — boundary. computeAgeBracket returns 'adult'.
+    // Note: computeAgeBracket uses currentYear - birthYear (overestimates by up to
+    // 11 months for users whose birthday hasn't occurred yet). At the boundary,
+    // the rule accepts — consistent with the mobile client gate behaviour.
+    const { accountId } = await seedOwnerAccount(
+      OPT_C_ADULT18_EMAIL,
+      `${OPT_C_PREFIX}-adult18-user`,
+      2008,
+    );
+    const db = createIntegrationDb();
+
+    // Gate ON. Owner age = 18 → 'adult' → must succeed.
+    await expect(
+      createProfileWithLimitCheck(
+        db,
+        accountId,
+        { displayName: 'Child', birthYear: 2015 },
+        { adultOwnerGateEnabled: true },
+      ),
+    ).resolves.toMatchObject({ id: expect.any(String) });
+  });
+
+  it('[OPT-C flag-off] allows child creation regardless of owner age when gate is disabled', async () => {
+    // Same underage owner (born 2013), but gate is explicitly OFF.
+    // Must succeed — identical to today's behaviour before this rule was added.
+    const { accountId } = await seedOwnerAccount(
+      OPT_C_FLAG_OFF_EMAIL,
+      `${OPT_C_PREFIX}-flagoff-user`,
+      2013,
+    );
+    const db = createIntegrationDb();
+
+    await expect(
+      createProfileWithLimitCheck(
+        db,
+        accountId,
+        { displayName: 'Child', birthYear: 2014 },
+        { adultOwnerGateEnabled: false },
+      ),
+    ).resolves.toMatchObject({ id: expect.any(String) });
   });
 });

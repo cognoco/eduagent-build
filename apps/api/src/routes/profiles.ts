@@ -25,7 +25,13 @@ import {
 } from '../services/profile';
 
 type ProfileEnv = {
-  Bindings: { DATABASE_URL: string; CLERK_JWKS_URL?: string };
+  Bindings: {
+    DATABASE_URL: string;
+    CLERK_JWKS_URL?: string;
+    // [OPT-C] Kill switch for the server-side adult-owner rule. Set to 'false'
+    // in Doppler to disable the gate (emergency rollback). Default 'true'.
+    ADULT_OWNER_GATE_ENABLED?: string;
+  };
   Variables: {
     user: AuthUser;
     db: Database;
@@ -62,7 +68,10 @@ export const profileRoutes = new Hono<ProfileEnv>()
     }
 
     try {
-      const profile = await createProfileWithLimitCheck(db, account.id, input);
+      const profile = await createProfileWithLimitCheck(db, account.id, input, {
+        // [OPT-C] Default 'true' when binding missing (safe default; matches config default).
+        adultOwnerGateEnabled: c.env?.ADULT_OWNER_GATE_ENABLED !== 'false',
+      });
 
       return c.json(profileResponseSchema.parse({ profile }), 201);
     } catch (err) {

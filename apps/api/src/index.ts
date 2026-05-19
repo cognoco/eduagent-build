@@ -299,7 +299,16 @@ app.onError((err, c) => {
   // try/catch. Important: we do NOT captureException for these — they are
   // expected domain outcomes, not server faults.
   if (err instanceof ForbiddenError) {
-    return c.json({ code: ERROR_CODES.FORBIDDEN, message: err.message }, 403);
+    // [OPT-C] apiCode threaded through so the mobile client can distinguish
+    // ADULT_OWNER_REQUIRED (and future apiCodes) from a generic 403.
+    return c.json(
+      {
+        code: ERROR_CODES.FORBIDDEN,
+        apiCode: err.apiCode,
+        message: err.message,
+      },
+      403,
+    );
   }
   if (err instanceof ConsentRequiredError) {
     return c.json(

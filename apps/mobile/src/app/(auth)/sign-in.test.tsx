@@ -12,6 +12,24 @@ import * as Linking from 'expo-linking';
 const mockReplace = jest.fn();
 const mockPush = jest.fn();
 
+// Mutable flag state so individual tests can toggle PREVIEW_ONBOARDING_ENABLED.
+// Defaults to true (matches the real feature-flags.ts value).
+let mockPreviewOnboardingEnabled = true;
+jest.mock(
+  '../../lib/feature-flags' /* gc1-allow: screen test pins flag branch for CTA visibility */,
+  () => ({
+    get FEATURE_FLAGS() {
+      return {
+        COACH_BAND_ENABLED: true,
+        MIC_IN_PILL_ENABLED: true,
+        I18N_ENABLED: true,
+        PREVIEW_ONBOARDING_ENABLED: mockPreviewOnboardingEnabled,
+        ADULT_OWNER_GATE_ENABLED: true,
+      };
+    },
+  }),
+);
+
 jest.mock('expo-router', () => ({
   useRouter: () => ({ replace: mockReplace, push: mockPush }),
   useLocalSearchParams: () => ({}),
@@ -1102,5 +1120,39 @@ describe('SignInScreen', () => {
       expect(mockReplace).not.toHaveBeenCalled();
       expect(mockPush).not.toHaveBeenCalled();
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// PREVIEW_ONBOARDING_ENABLED flag gate — Try MentoMate CTA
+// ---------------------------------------------------------------------------
+
+describe('SignInScreen — Try MentoMate CTA', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    clearTransitionState();
+    clearPendingAuthRedirect();
+    clearSessionExpiredNotice();
+    // Restore flag to default (on) before each test in this describe block
+    mockPreviewOnboardingEnabled = true;
+  });
+
+  afterEach(() => {
+    // Restore global default so other describe blocks are unaffected
+    mockPreviewOnboardingEnabled = true;
+  });
+
+  it('renders the Try MentoMate CTA when flag is on', async () => {
+    mockPreviewOnboardingEnabled = true;
+    render(<SignInScreen />);
+    await act(async () => undefined);
+    expect(screen.getByTestId('try-mentomate-cta')).toBeTruthy();
+  });
+
+  it('hides the CTA when flag is off', async () => {
+    mockPreviewOnboardingEnabled = false;
+    render(<SignInScreen />);
+    await act(async () => undefined);
+    expect(screen.queryByTestId('try-mentomate-cta')).toBeNull();
   });
 });

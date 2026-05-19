@@ -5,6 +5,7 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
   Dimensions,
   ActivityIndicator,
@@ -46,6 +47,7 @@ import {
   rememberPendingAuthRedirect,
 } from '../../lib/pending-auth-redirect';
 import { ErrorFallback } from '../../components/common/ErrorFallback';
+import { FEATURE_FLAGS } from '../../lib/feature-flags';
 
 // Use physical screen height (not window) so the content container always
 // overflows the ScrollView after adjustResize shrinks it for the keyboard.
@@ -1419,6 +1421,25 @@ export default function SignInScreen() {
                 testID="sign-up-link"
               />
             </View>
+
+            {FEATURE_FLAGS.PREVIEW_ONBOARDING_ENABLED && (
+              <View className="w-full mt-6 pt-6 border-t border-border">
+                <Text className="text-body-sm text-text-secondary text-center mb-3">
+                  New here?
+                </Text>
+                <Pressable
+                  onPress={() => router.push('/preview')}
+                  className="bg-surface rounded-button py-3.5 px-8 items-center w-full"
+                  testID="try-mentomate-cta"
+                  accessibilityRole="button"
+                  accessibilityLabel="Try MentoMate"
+                >
+                  <Text className="text-body font-semibold text-primary">
+                    Try MentoMate
+                  </Text>
+                </Pressable>
+              </View>
+            )}
           </View>
         </ScrollView>
       </View>

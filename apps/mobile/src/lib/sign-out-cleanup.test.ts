@@ -26,6 +26,12 @@ describe('clearProfileSecureStorageOnSignOut [BUG-723 / SEC-7]', () => {
     jest.restoreAllMocks();
   });
 
+  it('clears mentomate_preview_intent on sign-out', async () => {
+    await clearProfileSecureStorageOnSignOut([]);
+    const calledWith = mockDelete.mock.calls.map((c) => c[0] as string);
+    expect(calledWith).toContain('mentomate_preview_intent');
+  });
+
   it('clears global keys even when no profileIds are passed', async () => {
     await clearProfileSecureStorageOnSignOut([]);
     const calledWith = mockDelete.mock.calls.map((c) => c[0] as string);
