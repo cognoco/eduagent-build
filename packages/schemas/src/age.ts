@@ -27,9 +27,12 @@ export interface AgeGateProfile {
 /**
  * Computes an age bracket from birthYear for consent gating and voice selection.
  *
- * Three-way model (D-C4-3):
- *   - 'child'      — under 13 (COPPA/GDPR-K tier; strictest safety framing)
- *   - 'adolescent' — 13 to 17 inclusive
+ * Three-way model (D-C4-3), aligned to the strictly-11+ product constraint
+ * ([CR-2026-05-19-H11]). Pre-11 ages should never appear for real users — the
+ * 'child' bracket is retained as a defensive fallback for misconfigured or
+ * test-only birth years so callers can still switch exhaustively.
+ *   - 'child'      — under 11 (defensive only; product is strictly 11+)
+ *   - 'adolescent' — 11 to 17 inclusive
  *   - 'adult'      — 18 and above
  *
  * Uses `currentYear - birthYear`, which can overestimate by up to 11 months.
@@ -43,7 +46,7 @@ export function computeAgeBracket(
   const year = currentYear ?? new Date().getFullYear();
   const age = year - birthYear;
 
-  if (age < 13) return 'child';
+  if (age < 11) return 'child';
   if (age < 18) return 'adolescent';
   return 'adult';
 }

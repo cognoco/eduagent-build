@@ -3,6 +3,7 @@ import {
   makeEmbedderFromEnv,
   type EmbeddingFn,
 } from './embed-fact';
+import { EmbeddingDimensionMismatchError } from '../embeddings';
 
 describe('embedFactText', () => {
   it('returns the embedding vector when the fn succeeds', async () => {
@@ -65,7 +66,7 @@ describe('embedFactText', () => {
   it('classifies a 429 response as rate_limited', async () => {
     const fn: EmbeddingFn = async () => {
       throw new Error(
-        'Voyage AI embedding request failed (429): rate limit exceeded'
+        'Voyage AI embedding request failed (429): rate limit exceeded',
       );
     };
 
@@ -81,7 +82,7 @@ describe('embedFactText', () => {
   it('classifies a 400 response as invalid_input', async () => {
     const fn: EmbeddingFn = async () => {
       throw new Error(
-        'Voyage AI embedding request failed (400): bad request - input too long'
+        'Voyage AI embedding request failed (400): bad request - input too long',
       );
     };
 
@@ -99,7 +100,7 @@ describe('embedFactText', () => {
     async (status) => {
       const fn: EmbeddingFn = async () => {
         throw new Error(
-          `Voyage AI embedding request failed (${status}): auth failed`
+          `Voyage AI embedding request failed (${status}): auth failed`,
         );
       };
 
@@ -110,13 +111,13 @@ describe('embedFactText', () => {
         class: 'transient',
         reason: 'transient',
       });
-    }
+    },
   );
 
   it('classifies a 500 response as transient', async () => {
     const fn: EmbeddingFn = async () => {
       throw new Error(
-        'Voyage AI embedding request failed (500): internal server error'
+        'Voyage AI embedding request failed (500): internal server error',
       );
     };
 
@@ -126,6 +127,28 @@ describe('embedFactText', () => {
       ok: false,
       class: 'transient',
       reason: 'transient',
+    });
+  });
+
+  it('classifies an EmbeddingDimensionMismatchError as dimension_mismatch (NOT transient)', async () => {
+    // BREAK TEST: ensures dimension drift is NOT misclassified as transient
+    // (which would trigger Inngest retries that just keep producing the
+    // same wrong-sized vector). Must be its own discrete failure class.
+    const fn: EmbeddingFn = async () => {
+      throw new EmbeddingDimensionMismatchError({
+        expected: 1024,
+        actual: 512,
+        model: 'voyage-3.5',
+        provider: 'voyage',
+      });
+    };
+
+    const result = await embedFactText('some fact', fn);
+
+    expect(result).toMatchObject({
+      ok: false,
+      class: 'dimension_mismatch',
+      reason: 'dimension_mismatch',
     });
   });
 

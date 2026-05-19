@@ -31,6 +31,8 @@ const mockDatabaseModule = createDatabaseModuleMock({
   includeActual: true,
   db: createTransactionalMockDb({
     execute: jest.fn().mockResolvedValue(undefined),
+    // update is needed for the stubDbUpdate helper in /filing/request-retry tests
+    update: jest.fn(),
   }),
 });
 
@@ -151,6 +153,14 @@ jest.mock('../services/session' /* gc1-allow: pattern-a conversion */, () => {
     ...actual,
     getSessionTranscript: jest.fn().mockResolvedValue(null),
     backfillSessionTopicId: jest.fn().mockResolvedValue(undefined),
+    // [CR-2026-05-19-H34] getSession is the ownership guard — mock it so we
+    // can simulate (a) session owned by caller, (b) foreign session → null
+    // (IDOR break test), and (c) post-claim re-read for the 429/409 paths.
+    // claimSessionForFilingRetry stays as actual so the WHERE-guarded UPDATE
+    // is exercised against the mocked db.update chain (matches sessions.test
+    // pattern).
+    getSession: jest.fn(),
+    claimSessionForFilingRetry: actual.claimSessionForFilingRetry,
   };
 });
 
@@ -199,6 +209,7 @@ jest.mock('inngest/hono', () => ({
 // ---------------------------------------------------------------------------
 
 import { app } from '../index';
+import { getSession } from '../services/session';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 
 const TEST_ENV = {
@@ -247,6 +258,57 @@ describe('filing routes', () => {
   // -------------------------------------------------------------------------
 
   describe('POST /v1/filing/request-retry', () => {
+    // [CR-2026-05-19-H34] schema now requires UUID and handler verifies
+    // ownership + retry-count cap. Tests below build a valid session shape
+    // and drive the mocked getSession / db.update chain accordingly.
+    const SESSION_ID = '00000000-0000-4000-8000-000000000abc';
+
+    const makeSession = (
+      overrides: Partial<{
+        filingStatus: string | null;
+        filingRetryCount: number;
+        sessionType: string;
+      }> = {},
+    ) => ({
+      id: SESSION_ID,
+      subjectId: null,
+      topicId: null,
+      sessionType: overrides.sessionType ?? 'learning',
+      inputMode: 'text',
+      verificationType: null,
+      status: 'completed',
+      escalationRung: 1,
+      exchangeCount: 5,
+      startedAt: new Date().toISOString(),
+      lastActivityAt: new Date().toISOString(),
+      endedAt: new Date().toISOString(),
+      durationSeconds: 300,
+      wallClockSeconds: 310,
+      filedAt: null,
+      filingStatus:
+        overrides.filingStatus !== undefined
+          ? overrides.filingStatus
+          : 'filing_failed',
+      filingRetryCount: overrides.filingRetryCount ?? 0,
+    });
+
+    /** Stub db.update(...).set(...).where(...).returning() to resolve to `rows`. */
+    const stubDbUpdate = (rows: unknown[]) => {
+      const returningMock = jest.fn().mockResolvedValue(rows);
+      const whereMock = jest.fn().mockReturnValue({ returning: returningMock });
+      const setMock = jest.fn().mockReturnValue({ where: whereMock });
+      mockDatabaseModule.db.update = jest
+        .fn()
+        .mockReturnValue({ set: setMock });
+      return { returningMock, whereMock, setMock };
+    };
+
+    beforeEach(async () => {
+      (getSession as jest.Mock).mockReset();
+      const { inngest } = await import('../inngest/client');
+      (inngest.send as jest.Mock).mockClear();
+    });
+
     it('returns 401 without auth header', async () => {
       const res = await app.request(
         '/v1/filing/request-retry',
@@ -254,7 +316,7 @@ describe('filing routes', () => {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            sessionId: 'sess-1',
+            sessionId: SESSION_ID,
             sessionMode: 'freeform',
           }),
         },
@@ -267,13 +329,18 @@ describe('filing routes', () => {
     it('dispatches app/filing.retry event and returns queued: true', async () => {
       const { inngest } = await import('../inngest/client');
 
+      (getSession as jest.Mock).mockResolvedValueOnce(
+        makeSession({ filingStatus: 'filing_failed', filingRetryCount: 0 }),
+      );
+      stubDbUpdate([{ id: SESSION_ID }]);
+
       const res = await app.request(
         '/v1/filing/request-retry',
         {
           method: 'POST',
           headers: AUTH_HEADERS,
           body: JSON.stringify({
-            sessionId: 'sess-abc',
+            sessionId: SESSION_ID,
             sessionMode: 'freeform',
           }),
         },
@@ -288,7 +355,7 @@ describe('filing routes', () => {
         expect.objectContaining({
           name: 'app/filing.retry',
           data: expect.objectContaining({
-            sessionId: 'sess-abc',
+            sessionId: SESSION_ID,
             sessionMode: 'freeform',
             profileId: 'test-profile-id',
           }),
@@ -299,12 +366,17 @@ describe('filing routes', () => {
     it('defaults sessionMode to freeform when omitted', async () => {
       const { inngest } = await import('../inngest/client');
 
+      (getSession as jest.Mock).mockResolvedValueOnce(
+        makeSession({ filingStatus: 'filing_failed', filingRetryCount: 0 }),
+      );
+      stubDbUpdate([{ id: SESSION_ID }]);
+
       const res = await app.request(
         '/v1/filing/request-retry',
         {
           method: 'POST',
           headers: AUTH_HEADERS,
-          body: JSON.stringify({ sessionId: 'sess-xyz' }),
+          body: JSON.stringify({ sessionId: SESSION_ID }),
         },
         TEST_ENV,
       );
@@ -331,18 +403,145 @@ describe('filing routes', () => {
       expect(res.status).toBe(400);
     });
 
+    it('returns 400 when sessionId is not a UUID', async () => {
+      const res = await app.request(
+        '/v1/filing/request-retry',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            sessionId: 'sess-1',
+            sessionMode: 'freeform',
+          }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(400);
+    });
+
     it('returns 400 when sessionMode is an invalid value', async () => {
       const res = await app.request(
         '/v1/filing/request-retry',
         {
           method: 'POST',
           headers: AUTH_HEADERS,
-          body: JSON.stringify({ sessionId: 'sess-1', sessionMode: 'invalid' }),
+          body: JSON.stringify({
+            sessionId: SESSION_ID,
+            sessionMode: 'invalid',
+          }),
         },
         TEST_ENV,
       );
 
       expect(res.status).toBe(400);
+    });
+
+    // [CR-2026-05-19-H34] IDOR break test: any authenticated user could
+    // previously trigger app/filing.retry against any session UUID. getSession
+    // is scoped to (db, profileId, sessionId) and returns null for a session
+    // owned by a different profile — so a foreign-session call must 404 and
+    // MUST NOT reach inngest.send.
+    it('[CR-2026-05-19-H34] returns 404 when session belongs to a different profile (IDOR break test)', async () => {
+      const { inngest } = await import('../inngest/client');
+
+      // Foreign session: scoped read returns null
+      (getSession as jest.Mock).mockResolvedValueOnce(null);
+
+      const res = await app.request(
+        '/v1/filing/request-retry',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            sessionId: SESSION_ID,
+            sessionMode: 'freeform',
+          }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(404);
+      // No Inngest event MUST fire for a foreign session — that would consume
+      // quota and pollute run history attributed to the victim's profile.
+      expect(inngest.send).not.toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'app/filing.retry' }),
+      );
+    });
+
+    // [CR-2026-05-19-H34] Rate-gate break test: the per-session retry-count
+    // cap (max 3) is enforced atomically via claimSessionForFilingRetry's
+    // WHERE guard. If the same user exceeds the cap we must return 429 and
+    // MUST NOT dispatch the Inngest event.
+    it('[CR-2026-05-19-H34] returns 429 when filingRetryCount >= 3 (rate gate break test)', async () => {
+      const { inngest } = await import('../inngest/client');
+
+      const exhausted = makeSession({
+        filingStatus: 'filing_failed',
+        filingRetryCount: 3,
+      });
+      // Call 1: ownership pre-read — session exists
+      // Call 2: post-claim re-read to discriminate 429 vs 409
+      (getSession as jest.Mock)
+        .mockResolvedValueOnce(exhausted)
+        .mockResolvedValueOnce(exhausted);
+
+      // WHERE guard rejects (filingRetryCount < 3 is false) → 0 rows
+      stubDbUpdate([]);
+
+      const res = await app.request(
+        '/v1/filing/request-retry',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            sessionId: SESSION_ID,
+            sessionMode: 'freeform',
+          }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(429);
+      const body = await res.json();
+      expect(body.code).toBe('RATE_LIMITED');
+      expect(inngest.send).not.toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'app/filing.retry' }),
+      );
+    });
+
+    it('returns 409 when session is not in filing_failed state', async () => {
+      const { inngest } = await import('../inngest/client');
+
+      const wrongState = makeSession({
+        filingStatus: 'filing_recovered',
+        filingRetryCount: 0,
+      });
+      (getSession as jest.Mock)
+        .mockResolvedValueOnce(wrongState)
+        .mockResolvedValueOnce(wrongState);
+
+      stubDbUpdate([]);
+
+      const res = await app.request(
+        '/v1/filing/request-retry',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({
+            sessionId: SESSION_ID,
+            sessionMode: 'freeform',
+          }),
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(409);
+      const body = await res.json();
+      expect(body.code).toBe('CONFLICT');
+      expect(inngest.send).not.toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'app/filing.retry' }),
+      );
     });
   });
 

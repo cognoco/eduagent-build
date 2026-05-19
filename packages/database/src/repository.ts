@@ -846,6 +846,31 @@ export function createScopedRepository(db: Database, profileId: string) {
           limit,
         });
       },
+      /**
+       * [CR-2026-05-19-H10] Fetch the most-recent COMPLETED rounds for a
+       * given activity type. Used by the difficulty-bump check, which counts
+       * perfect-score completions toward the bump threshold. The status
+       * predicate is enforced in SQL — never filter status in application
+       * code after a bare `findRecentByActivity` call, because abandoned
+       * (prefetched-but-never-played) rounds will occupy slots in the
+       * `limit` window and the bump will silently never fire.
+       */
+      async findRecentCompletedByActivity(
+        activityType: (typeof quizRounds.$inferSelect)['activityType'],
+        limit: number,
+      ) {
+        return db.query.quizRounds.findMany({
+          where: scopedWhere(
+            quizRounds,
+            and(
+              eq(quizRounds.activityType, activityType),
+              eq(quizRounds.status, 'completed'),
+            ),
+          ),
+          orderBy: [desc(quizRounds.completedAt)],
+          limit,
+        });
+      },
       async findCompletedRecent(limit: number) {
         return db.query.quizRounds.findMany({
           where: scopedWhere(quizRounds, eq(quizRounds.status, 'completed')),
@@ -1025,7 +1050,8 @@ export function createScopedRepository(db: Database, profileId: string) {
         itemKey: string;
         itemAnswer: string;
       }) {
-        const nextReview = new Date();
+        const now = new Date();
+        const nextReview = new Date(now);
         nextReview.setDate(nextReview.getDate() + 1);
 
         const [row] = await db
@@ -1039,6 +1065,10 @@ export function createScopedRepository(db: Database, profileId: string) {
             interval: 1,
             repetitions: 0,
             nextReviewAt: nextReview,
+            // [CR-2026-05-19-H9] Initialize lastReviewedAt to the moment of
+            // the discovery answer. SM-2's first re-review will compute the
+            // inter-review gap from this timestamp.
+            lastReviewedAt: now,
           })
           .onConflictDoNothing({
             target: [
@@ -1061,6 +1091,12 @@ export function createScopedRepository(db: Database, profileId: string) {
           nextReviewAt: Date;
         },
       ) {
+        // [CR-2026-05-19-H9] `lastReviewedAt` is set ONLY here (and on initial
+        // insert in upsertFromCorrectAnswer). MC-streak writes
+        // (incrementMcSuccessCount / resetMcSuccessCount) must NOT touch this
+        // column, or SM-2's next-review interval math will be computed from a
+        // bogus "just reviewed" timestamp and items will resurface too soon.
+        const now = new Date();
         return db
           .update(quizMasteryItems)
           .set({
@@ -1068,7 +1104,8 @@ export function createScopedRepository(db: Database, profileId: string) {
             interval: values.interval,
             repetitions: values.repetitions,
             nextReviewAt: values.nextReviewAt,
-            updatedAt: new Date(),
+            lastReviewedAt: now,
+            updatedAt: now,
           })
           .where(
             and(

@@ -1,5 +1,8 @@
 import type { EmbeddingResult } from '../embeddings';
-import { generateEmbedding } from '../embeddings';
+import {
+  EmbeddingDimensionMismatchError,
+  generateEmbedding,
+} from '../embeddings';
 
 export type EmbeddingFn = (text: string) => Promise<EmbeddingResult>;
 
@@ -18,7 +21,8 @@ export type EmbedFailureClass =
   | 'rate_limited' // 429: back off and retry
   | 'transient' // 5xx or network error: retry with backoff
   | 'empty_text' // guard against malformed callers (not a real DB-data failure)
-  | 'no_voyage_key'; // configuration error: no API key present
+  | 'no_voyage_key' // configuration error: no API key present
+  | 'dimension_mismatch'; // Voyage returned a vector whose length != VECTOR_DIM — provider/config drift, do not retry
 
 export type EmbedFactOutcome =
   | { ok: true; vector: number[] }
@@ -34,6 +38,13 @@ export type FactEmbedder = (text: string) => Promise<EmbedFactOutcome>;
  * Anything else is treated as a transient (network / unknown) error.
  */
 function classifyVoyageError(err: unknown): EmbedFailureClass {
+  // Dimension mismatch is provider/config drift, not a transient failure —
+  // retrying will produce the same wrong-sized vector. Classify it before
+  // string-matching on the generic Voyage error pattern so it surfaces with
+  // a dedicated class to Inngest / Sentry.
+  if (err instanceof EmbeddingDimensionMismatchError) {
+    return 'dimension_mismatch';
+  }
   const message = err instanceof Error ? err.message : String(err);
   const match = /Voyage AI embedding request failed \((\d{3})\)/.exec(message);
   if (match) {
@@ -67,7 +78,7 @@ function classifyVoyageError(err: unknown): EmbedFailureClass {
  */
 export async function embedFactText(
   text: string,
-  fn: EmbeddingFn
+  fn: EmbeddingFn,
 ): Promise<EmbedFactOutcome> {
   // Defensive guard: `text` is NOT NULL in the DB schema so this path should
   // never fire with real data. Kept here to protect against malformed callers.

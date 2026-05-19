@@ -12,8 +12,37 @@ import { recordPracticeActivityEvent } from '../practice-activity-events';
 import { safeWrite, type DeferredActivityEvent } from '../safe-non-core';
 import { reviewVocabulary } from '../vocabulary';
 import { QUIZ_CONFIG } from './config';
-import { applyQuizSm2 } from './mastery-provider';
+import { applyQuizSm2, type MasterySm2Input } from './mastery-provider';
 import { computeCapitalsItemKey, computeGuessWhoItemKey } from './mastery-keys';
+
+/**
+ * [CR-2026-05-19-H9] Build the SM-2 input from an existing mastery row.
+ *
+ * Critical invariant: `lastReviewedAt` MUST come from the dedicated
+ * `last_reviewed_at` column, NOT from `updated_at`. `updated_at` is dirtied
+ * by MC-streak counter writes (incrementMcSuccessCount / resetMcSuccessCount)
+ * that run between real reviews. Using it would compress the SM-2 inter-
+ * review interval and resurface items sooner than the algorithm intends.
+ *
+ * Exported only for unit testing — kept as a tiny pure helper so the field
+ * mapping is provable in isolation, without spinning up a full DB.
+ */
+export function buildMasterySm2Input(existing: {
+  easeFactor: number;
+  interval: number;
+  repetitions: number;
+  lastReviewedAt: Date;
+  nextReviewAt: Date;
+  updatedAt: Date;
+}): MasterySm2Input {
+  return {
+    easeFactor: existing.easeFactor,
+    interval: existing.interval,
+    repetitions: existing.repetitions,
+    lastReviewedAt: existing.lastReviewedAt,
+    nextReviewAt: existing.nextReviewAt,
+  };
+}
 
 const logger = createLogger();
 
@@ -451,14 +480,10 @@ export async function completeQuizRound(
           itemKey,
         );
         if (existing) {
+          // [CR-2026-05-19-H9] Use the dedicated lastReviewedAt column,
+          // NOT updatedAt. See `buildMasterySm2Input` for the invariant.
           const sm2Result = applyQuizSm2(
-            {
-              easeFactor: existing.easeFactor,
-              interval: existing.interval,
-              repetitions: existing.repetitions,
-              lastReviewedAt: existing.updatedAt,
-              nextReviewAt: existing.nextReviewAt,
-            },
+            buildMasterySm2Input(existing),
             quality,
           );
           await txRepo.quizMasteryItems.updateSm2(

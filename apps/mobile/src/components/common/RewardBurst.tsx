@@ -12,6 +12,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { useThemeColors } from '../../lib/theme';
+import type { ThemeColors } from '../../lib/theme';
 import { BrandCelebration } from './BrandCelebration';
 
 export type RewardBurstVariant =
@@ -43,41 +44,51 @@ type RewardBurstProps = {
   testID?: string;
 };
 
-const VARIANT_CONFIG: Record<
+type VariantConfig = Record<
   RewardBurstVariant,
   { colors: string[]; icon: string; label: string }
-> = {
-  assessment: {
-    colors: ['#22c55e', '#f59e0b', '#38bdf8', '#a855f7', '#f43f5e'],
-    icon: '✓',
-    label: 'Solid work',
-  },
-  capitals: {
-    colors: ['#2563eb', '#14b8a6', '#facc15'],
-    icon: '★',
-    label: 'Correct',
-  },
-  dictation: {
-    colors: ['#d97706', '#f59e0b', '#fde68a'],
-    icon: 'D',
-    label: 'Nice',
-  },
-  guess_who: {
-    colors: ['#7c3aed', '#38bdf8', '#f0abfc'],
-    icon: '?',
-    label: 'Solved',
-  },
-  recite: {
-    colors: ['#6d28d9', '#a78bfa', '#f5d0fe'],
-    icon: 'R',
-    label: 'Strong',
-  },
-  vocabulary: {
-    colors: ['#059669', '#34d399', '#a7f3d0'],
-    icon: 'W',
-    label: 'Got it',
-  },
-};
+>;
+
+/**
+ * Build per-variant particle colour palettes from semantic theme tokens so
+ * colours respond to dark/light theme switching and future palette updates.
+ * Each variant maps to semantically appropriate tokens — quiz types use their
+ * practice-lane colour, breadth variants span the full semantic spectrum.
+ */
+function buildVariantConfig(c: ThemeColors): VariantConfig {
+  return {
+    assessment: {
+      colors: [c.success, c.warning, c.info, c.secondary, c.danger],
+      icon: '✓',
+      label: 'Solid work',
+    },
+    capitals: {
+      colors: [c.practiceQuiz, c.primary, c.warning],
+      icon: '★',
+      label: 'Correct',
+    },
+    dictation: {
+      colors: [c.practiceDictation, c.homeworkLane, c.warning],
+      icon: 'D',
+      label: 'Nice',
+    },
+    guess_who: {
+      colors: [c.secondary, c.info, c.accent],
+      icon: '?',
+      label: 'Solved',
+    },
+    recite: {
+      colors: [c.practiceRecite, c.accent, c.secondary],
+      icon: 'R',
+      label: 'Strong',
+    },
+    vocabulary: {
+      colors: [c.primary, c.practiceMint, c.success],
+      icon: 'W',
+      label: 'Got it',
+    },
+  };
+}
 
 const PARTICLE_COUNTS: Record<RewardBurstIntensity, number> = {
   answer: 16,
@@ -125,7 +136,7 @@ function buildParticles({
     const ring = 0.55 + (index % 5) * 0.12;
     const startWobble = ((index % 7) - 3) * 3;
     return {
-      color: colors[index % colors.length] ?? colors[0] ?? '#22c55e',
+      color: colors[index % colors.length] ?? colors[0] ?? '',
       delay: (index % 8) * (intensity === 'hero' ? 18 : 12),
       endX: Math.cos(angle) * spreadX * ring,
       endY:
@@ -154,7 +165,8 @@ export function RewardBurst({
   const { width, height } = useWindowDimensions();
   const reduceMotion = useReducedMotion();
   const colors = useThemeColors();
-  const config = VARIANT_CONFIG[variant];
+  const variantConfig = useMemo(() => buildVariantConfig(colors), [colors]);
+  const config = variantConfig[variant];
   const progress = useSharedValue(reduceMotion ? 1 : 0);
   const badgeScale = useSharedValue(reduceMotion ? 1 : 0.7);
   const badgeOpacity = useSharedValue(reduceMotion ? 1 : 0);
@@ -232,7 +244,7 @@ export function RewardBurst({
           styles.badge,
           badgeStyle,
           {
-            backgroundColor: config.colors[0],
+            backgroundColor: config.colors[0] ?? colors.reward,
             shadowColor: colors.textPrimary,
             top:
               intensity === 'hero'

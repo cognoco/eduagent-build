@@ -3,6 +3,7 @@
 // ---------------------------------------------------------------------------
 
 import type { Database } from '@eduagent/database';
+import { subscriptions, quotaPools } from '@eduagent/database';
 
 const mockCaptureException = jest.fn();
 
@@ -1489,6 +1490,50 @@ describe('handleTierChange', () => {
 
     expect(result).not.toBeNull();
     expect(result!.remainingQuestions).toBe(700);
+  });
+
+  // [CR-2026-05-19-H22] Break test — without the fix, handleTierChange updates
+  // quotaPools but never writes the new tier to subscriptions.tier, so the
+  // tier column and quota pool diverge silently. Asserts both tables receive
+  // an UPDATE so downstream readers (KV cache, metering middleware) see the
+  // new tier.
+  it('persists newTier to subscriptions table on Free -> Plus upgrade (CR-2026-05-19-H22)', async () => {
+    const sub = mockSubscriptionRow({ tier: 'free', status: 'active' });
+    const pool = mockQuotaPoolRow({ usedThisMonth: 0, monthlyLimit: 50 });
+    const db = createMockDb({
+      subscriptionFindFirst: sub,
+      quotaPoolFindFirst: pool,
+    });
+
+    const result = await handleTierChange(db, subscriptionId, 'plus');
+
+    expect(result).not.toBeNull();
+    expect(result!.previousTier).toBe('free');
+    expect(result!.newTier).toBe('plus');
+
+    // db.update should be called for BOTH the subscriptions row and the
+    // quotaPools row. Without the fix, only quotaPools is updated.
+    const updateMock = db.update as unknown as jest.Mock;
+    const tablesUpdated = updateMock.mock.calls.map((call) => call[0]);
+    expect(tablesUpdated).toContain(subscriptions);
+    expect(tablesUpdated).toContain(quotaPools);
+
+    // Verify the set() payload for the subscriptions update carries the new
+    // tier value — guards against an empty set({}) update slipping through.
+    const subscriptionUpdateCallIndex = tablesUpdated.indexOf(subscriptions);
+    const updateChain = updateMock.mock.results[subscriptionUpdateCallIndex]!
+      .value as { set: jest.Mock };
+    const setPayloads = updateChain.set.mock.calls.map(
+      (call: unknown[]) => call[0],
+    );
+    expect(
+      setPayloads.some(
+        (p: unknown) => (p as { tier?: string }).tier === 'plus',
+      ),
+    ).toBe(true);
+
+    // Quota pool side stays correct: monthlyLimit = Plus tier's 700.
+    expect(result!.newMonthlyLimit).toBe(700);
   });
 });
 

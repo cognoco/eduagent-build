@@ -31,6 +31,15 @@ export const quizMasteryItems = pgTable(
     repetitions: integer('repetitions').notNull().default(0),
     nextReviewAt: timestamp('next_review_at', { withTimezone: true }).notNull(),
     mcSuccessCount: integer('mc_success_count').notNull().default(0),
+    // [CR-2026-05-19-H9] Dedicated review timestamp for SM-2 interval math.
+    // `updatedAt` is dirtied by ANY row write (including MC streak counter
+    // updates), so it cannot be used as the SM-2 `lastReviewedAt`. This
+    // column is set only inside `updateSm2` and on initial insert, so the
+    // gap between reviews stays accurate even when other writes touch the
+    // row between rounds.
+    lastReviewedAt: timestamp('last_reviewed_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

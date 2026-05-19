@@ -72,19 +72,22 @@ export async function buildAndGenerateRound(
     libraryItems = await getDueMasteryItems(db, profileId, 'capitals');
   }
 
+  // [CR-2026-05-19-H10] Status filter is in SQL — see
+  // getRecentCompletedByActivity. We must NOT re-filter or check status here;
+  // doing so against a `findRecentByActivity` (any-status) result would let
+  // abandoned/prefetched rounds occupy the 3-row window and silently
+  // suppress the bump.
   const recentForBump = await getRecentCompletedByActivity(
     db,
     profileId,
     input.activityType,
     3,
   );
-  const completedForBump = recentForBump
-    .filter((r) => r.status === 'completed')
-    .map((r) => ({
-      score: r.score,
-      total: r.total,
-      completedAt: r.completedAt,
-    }));
+  const completedForBump = recentForBump.map((r) => ({
+    score: r.score,
+    total: r.total,
+    completedAt: r.completedAt,
+  }));
   const difficultyBump = shouldApplyDifficultyBump(completedForBump);
 
   const round = await generateQuizRound({

@@ -66,6 +66,18 @@ describe('RewardBurst', () => {
     expect(source).not.toContain("color: '#ffffff'");
   });
 
+  it('uses no hardcoded hex colours — all colours come from semantic tokens (BUG-377)', () => {
+    // Forward-only guard: prevents re-introducing raw hex literals into variant
+    // colour arrays or any inline style in this shared common component.
+    // Hex is only allowed in brand-fixed celebration components (CLAUDE.md exception).
+    const source = require('fs').readFileSync(
+      require('path').join(__dirname, 'RewardBurst.tsx'),
+      'utf8',
+    );
+    const hexMatches = source.match(/'#[0-9a-fA-F]{3,8}'/g) ?? [];
+    expect(hexMatches).toHaveLength(0);
+  });
+
   it('cancels animations on unmount', () => {
     const reanimated = require('react-native-reanimated');
     const cancelSpy = jest.spyOn(reanimated, 'cancelAnimation');

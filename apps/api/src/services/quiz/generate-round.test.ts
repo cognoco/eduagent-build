@@ -1,5 +1,6 @@
 import type { CapitalsQuestion, VocabularyQuestion } from '@eduagent/schemas';
 import type { LibraryItem } from './content-resolver';
+import { CAPITALS_DATA as CAPITALS_DATA_FOR_TEST } from './capitals-data';
 import {
   assembleRound,
   buildCapitalsDiscoveryRound,
@@ -23,7 +24,9 @@ describe('buildCapitalsPrompt', () => {
     expect(prompt).toContain('Paris');
     expect(prompt).toContain('Berlin');
     expect(prompt).toContain('Central Europe');
-    expect(prompt).toContain('13-17');
+    // [CR-2026-05-19-H11] Adolescent bracket spans 11-17 since the strictly-11+
+    // product reclassified 11-12 out of the 'child' bracket.
+    expect(prompt).toContain('11-17');
   });
 
   it('works without a theme preference', () => {
@@ -36,14 +39,18 @@ describe('buildCapitalsPrompt', () => {
     expect(prompt).toContain('Choose an age-appropriate theme');
   });
 
-  it('includes age description for child bracket', () => {
-    const prompt = buildCapitalsPrompt({
-      discoveryCount: 6,
-      ageBracket: 'child',
-      recentAnswers: [],
-    });
-
-    expect(prompt).toContain('under 13');
+  it('[CR-2026-05-19-H11] never emits kid-flavored "under 13" framing for any bracket', () => {
+    // Product is strictly 11+. The 'child' bracket is unreachable for real
+    // birth years and the prompt copy must not steer the LLM toward a
+    // simplified, age-inappropriate register for the 11-12 cohort.
+    for (const ageBracket of ['child', 'adolescent', 'adult'] as const) {
+      const prompt = buildCapitalsPrompt({
+        discoveryCount: 6,
+        ageBracket,
+        recentAnswers: [],
+      });
+      expect(prompt).not.toContain('under 13');
+    }
   });
 });
 
@@ -173,6 +180,29 @@ describe('buildCapitalsDiscoveryRound', () => {
       expect(new Set(question.distractors).size).toBe(3);
       expect(question.distractors).not.toContain(question.correctAnswer);
     }
+  });
+
+  // [CR-2026-05-19-H12] Empty-set break test. When every CAPITALS_DATA entry
+  // is in the exclusion pool (recentAnswers + excludedCountries +
+  // excludedAnswers), discovery returns an empty array. The call-site guard
+  // in `generateQuizRound` (capitals branch, `if discoveryRound.questions.length === 0 &&
+  // plan.discoveryCount > 0`) turns this empty result into an UpstreamLlmError
+  // instead of persisting a 0-question round that can never be completed.
+  it('[CR-2026-05-19-H12] returns an empty round when every capital is excluded', () => {
+    // Use the production data: when every entry sits in the exclusion pool,
+    // `buildCapitalsDiscoveryRound` returns []. The call-site guard in
+    // `generateQuizRound` converts that into an UpstreamLlmError.
+    const allCapitals = CAPITALS_DATA_FOR_TEST.map((entry) => entry.capital);
+    const allCountries = CAPITALS_DATA_FOR_TEST.map((entry) => entry.country);
+
+    const round = buildCapitalsDiscoveryRound({
+      discoveryCount: 8,
+      recentAnswers: allCapitals,
+      excludedCountries: allCountries,
+      excludedAnswers: allCapitals,
+    });
+
+    expect(round.questions).toHaveLength(0);
   });
 });
 

@@ -554,6 +554,13 @@
       "when": 1779221651591,
       "tag": "0078_practice_activity_events_source_type_check",
       "breakpoints": true
+    },
+    {
+      "idx": 81,
+      "version": "7",
+      "when": 1779494400000,
+      "tag": "0081_quiz_mastery_last_reviewed_at",
+      "breakpoints": true
     }
   ]
 }

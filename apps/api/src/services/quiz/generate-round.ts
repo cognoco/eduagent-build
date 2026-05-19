@@ -505,6 +505,17 @@ export async function generateQuizRound(params: GenerateParams): Promise<{
       excludedAnswers: plan.masteryItems.map((item) => item.answer),
     });
 
+    // [CR-2026-05-19-H12] Empty-set guard: if the candidate pool is fully
+    // exhausted by exclusions (recentAnswers + mastery exclusions cover every
+    // entry in CAPITALS_DATA), throw rather than persist a 0-question round
+    // that can never be completed. Mirrors the vocabulary (line ~574) and
+    // guess_who (line ~642) guards. We only throw when the discovery slot was
+    // actually requested — `discoveryCount > 0` — to avoid masking mastery-only
+    // rounds where discovery emptiness is expected.
+    if (discoveryRound.questions.length === 0 && plan.discoveryCount > 0) {
+      throw new UpstreamLlmError('No valid questions after validation');
+    }
+
     questions = injectMasteryQuestions(
       discoveryRound.questions,
       plan.masteryItems,
