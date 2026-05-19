@@ -132,6 +132,12 @@ export default function QuizLaunchScreen(): React.ReactElement {
   // panel. Kept distinct from timedOut (soft hint) so the two behaviours are
   // independently testable and can be tuned separately.
   const [hardTimedOut, setHardTimedOut] = useState(false);
+  // [BUG-271 / CCR PR #230] Retry attempts must re-arm the hard-timeout
+  // watchdog. Without this, the first fire latches and subsequent stalls in
+  // the same session run forever. Incremented on each Retry press; included in
+  // the watchdog effect's deps so the timer re-arms even when isPending is
+  // still true (e.g. a previously-stuck mutation that never resolved).
+  const [hardTimeoutAttempt, setHardTimeoutAttempt] = useState(0);
   const startedRef = useRef(false);
 
   const enterPlay = useCallback(
@@ -225,6 +231,8 @@ export default function QuizLaunchScreen(): React.ReactElement {
   // [BUG-UX-QUIZ-TIMEOUT] Hard 30s timeout: transition to an explicit error
   // panel if the mutation has not resolved. The soft nudge (timedOut) only
   // appends a text hint — this gives a full Retry / Go Back escape hatch.
+  // [BUG-271] `hardTimeoutAttempt` is a dep so Retry re-arms the watchdog.
+  // Otherwise the first fire latches and a second stall would run unbounded.
   useEffect(() => {
     if (!generateRound.isPending) {
       setHardTimedOut(false);
@@ -235,7 +243,7 @@ export default function QuizLaunchScreen(): React.ReactElement {
       ROUND_GENERATION_TIMEOUT_MS,
     );
     return () => clearTimeout(timer);
-  }, [generateRound.isPending]);
+  }, [generateRound.isPending, hardTimeoutAttempt]);
 
   // [F-Q-12] Removed the 3s auto-advance timer for challenge banners.
   // Kids reading slowly may miss the banner entirely if it auto-dismisses.
@@ -299,6 +307,10 @@ export default function QuizLaunchScreen(): React.ReactElement {
             label: t('common.retry'),
             onPress: () => {
               setHardTimedOut(false);
+              // [BUG-271] Bump the attempt counter to re-arm the watchdog
+              // effect even if generateRound.isPending stays true across
+              // the retry (the previous mutation never settled).
+              setHardTimeoutAttempt((n) => n + 1);
               startRound();
             },
             testID: 'quiz-launch-retry',

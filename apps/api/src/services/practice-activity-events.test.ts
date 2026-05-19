@@ -85,4 +85,32 @@ describe('buildPracticeActivityDedupeKey', () => {
       'activity=quiz|sourceType=a%3Ab|subtype=value(b%3Ac)|sourceId=topic-123|occurrence=null',
     );
   });
+
+  // [BUG-285] Recitation and fluency_drill events are both written from the
+  // session-exchange flow. They previously used inconsistent key shapes
+  // (recitation used a hand-rolled colon-joined key, fluency_drill used the
+  // canonical builder). Both must now build through the same canonical format
+  // so duplicate inserts dedupe correctly and operators can grep one shape.
+  it('builds the same key shape for recitation and fluency_drill session events', () => {
+    const recitation = buildPracticeActivityDedupeKey({
+      activityType: 'recitation',
+      activitySubtype: 'recitation',
+      sourceType: 'session_event',
+      sourceId: 'event-1',
+    });
+    const fluencyDrill = buildPracticeActivityDedupeKey({
+      activityType: 'fluency_drill',
+      activitySubtype: 'language',
+      sourceType: 'session_event',
+      sourceId: 'event-1',
+    });
+
+    // Both keys share the canonical pipe-delimited `activity=...|sourceType=...|subtype=...|sourceId=...|occurrence=...` format.
+    expect(recitation).toMatch(
+      /^activity=recitation\|sourceType=session_event\|subtype=value\(recitation\)\|sourceId=event-1\|occurrence=null$/,
+    );
+    expect(fluencyDrill).toMatch(
+      /^activity=fluency_drill\|sourceType=session_event\|subtype=value\(language\)\|sourceId=event-1\|occurrence=null$/,
+    );
+  });
 });

@@ -1317,32 +1317,41 @@ describe('session-completed integration', () => {
     const step = buildStep();
     const handler = getHandler();
 
-    const result = (await handler({
-      event: {
-        name: 'app/session.completed',
-        data: {
-          profileId,
-          sessionId,
-          subjectId,
-          topicId,
-          exchangeCount: 2,
-          summaryStatus: 'pending',
-          timestamp: now.toISOString(),
-          verificationType: null,
-          sessionType: 'learning',
-          qualityRating: 4,
-          mode: null,
-          reason: 'user_ended',
-        },
-      },
-      step,
-    })) as {
+    // BUG-331: wrap the handler call in try/finally so a handler throw cannot
+    // leak the spies into adjacent tests (which would silently force dedup on
+    // for unrelated scenarios and produce noisy false-positive coverage).
+    let result: {
       status: string;
       outcomes: Array<{ step: string; status: string }>;
     };
-
-    dedupEnabledSpy.mockRestore();
-    rolloutSpy.mockRestore();
+    try {
+      result = (await handler({
+        event: {
+          name: 'app/session.completed',
+          data: {
+            profileId,
+            sessionId,
+            subjectId,
+            topicId,
+            exchangeCount: 2,
+            summaryStatus: 'pending',
+            timestamp: now.toISOString(),
+            verificationType: null,
+            sessionType: 'learning',
+            qualityRating: 4,
+            mode: null,
+            reason: 'user_ended',
+          },
+        },
+        step,
+      })) as {
+        status: string;
+        outcomes: Array<{ step: string; status: string }>;
+      };
+    } finally {
+      dedupEnabledSpy.mockRestore();
+      rolloutSpy.mockRestore();
+    }
 
     // dedup-new-facts outcome is present and 'ok'
     const dedupOutcome = result.outcomes.find(

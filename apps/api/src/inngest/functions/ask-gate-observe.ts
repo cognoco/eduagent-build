@@ -9,37 +9,25 @@
 // making the ask-gate feature invisible to on-call monitoring and blocking
 // any future retry / escalation strategy.
 //
-// This follows the same observer pattern as payment-failed-observe.ts:
-// structured log + return-shape contract, no transformation or retry logic.
+// This follows the same observer pattern as payment-failed-observe.ts and
+// ask-classification-observe.ts: structured log + return-shape contract,
+// no transformation or retry logic. Schema drift escalates to Sentry so the
+// "silent recovery without escalation" rule (CLAUDE.md) is honoured.
 //
-// Event payload shapes (sender: apps/api/src/routes/sessions.ts):
-//   app/ask.gate_decision:
-//     { sessionId, meaningful, reason, method, exchangeCount,
-//       learnerWordCount, topicCount }
-//   app/ask.gate_timeout:
-//     { sessionId, exchangeCount }
+// Event payload shapes (shared with sender via `@eduagent/schemas`):
+//   app/ask.gate_decision  → askGateDecisionEventSchema
+//   app/ask.gate_timeout   → askGateTimeoutEventSchema
 // ---------------------------------------------------------------------------
 
-import { z } from 'zod';
+import {
+  askGateDecisionEventSchema,
+  askGateTimeoutEventSchema,
+} from '@eduagent/schemas';
 import { inngest } from '../client';
 import { createLogger } from '../../services/logger';
+import { captureException } from '../../services/sentry';
 
 const logger = createLogger();
-
-const askGateDecisionPayloadSchema = z.object({
-  sessionId: z.string().optional(),
-  meaningful: z.boolean().optional(),
-  reason: z.string().optional(),
-  method: z.string().optional(),
-  exchangeCount: z.number().optional(),
-  learnerWordCount: z.number().optional(),
-  topicCount: z.number().optional(),
-});
-
-const askGateTimeoutPayloadSchema = z.object({
-  sessionId: z.string().optional(),
-  exchangeCount: z.number().optional(),
-});
 
 export const askGateDecisionObserve = inngest.createFunction(
   {
@@ -48,12 +36,18 @@ export const askGateDecisionObserve = inngest.createFunction(
   },
   { event: 'app/ask.gate_decision' },
   async ({ event }) => {
-    const parseResult = askGateDecisionPayloadSchema.safeParse(event.data);
+    const parseResult = askGateDecisionEventSchema.safeParse(event.data);
     if (!parseResult.success) {
       logger.error('ask.gate_decision.schema_drift', {
         issues: parseResult.error.issues,
         rawData: event.data, // non-PII: sessionId is an internal ID; no user-identifying fields in payload
       });
+      captureException(
+        new Error(
+          '[ask-gate-decision] invalid event payload — schema drift or bad event',
+        ),
+        { extra: { issues: parseResult.error.issues, rawData: event.data } },
+      );
       return { status: 'schema_error' as const };
     }
     const data = parseResult.data;
@@ -85,12 +79,18 @@ export const askGateTimeoutObserve = inngest.createFunction(
   },
   { event: 'app/ask.gate_timeout' },
   async ({ event }) => {
-    const parseResult = askGateTimeoutPayloadSchema.safeParse(event.data);
+    const parseResult = askGateTimeoutEventSchema.safeParse(event.data);
     if (!parseResult.success) {
       logger.error('ask.gate_timeout.schema_drift', {
         issues: parseResult.error.issues,
         rawData: event.data, // non-PII: sessionId is an internal ID; no user-identifying fields in payload
       });
+      captureException(
+        new Error(
+          '[ask-gate-timeout] invalid event payload — schema drift or bad event',
+        ),
+        { extra: { issues: parseResult.error.issues, rawData: event.data } },
+      );
       return { status: 'schema_error' as const };
     }
     const data = parseResult.data;

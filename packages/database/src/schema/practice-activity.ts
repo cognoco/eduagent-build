@@ -71,6 +71,15 @@ export const practiceActivityEvents = pgTable(
       table.subjectId,
       table.completedAt,
     ),
+    // Forward-only allow-list for source_type. Mirrors celebration_events_source_type_known.
+    // Every production writer (assessments, dictation_result, quiz_round,
+    // quiz_mastery_item, retention_card, session_event, vocabulary_retention_card)
+    // appears here, plus 'integration_test' / 'topic' / 'book' for test fixtures.
+    // Update this allow-list whenever a new sourceType writer is introduced.
+    check(
+      'practice_activity_events_source_type_known',
+      sql`${table.sourceType} IN ('assessment', 'book', 'dictation_result', 'home_surface_pending_celebration', 'integration_test', 'quiz_mastery_item', 'quiz_round', 'retention_card', 'session_event', 'topic', 'vocabulary_retention_card')`,
+    ),
   ],
 );
 

@@ -57,13 +57,19 @@ function locateAssertion(failureMessage, rootDir) {
 }
 
 // GitHub Actions multi-line annotation messages need newlines URL-encoded.
+// [BUG-323] `=` must also be encoded — the annotation syntax is
+// `::error key=value,key=value::message`, so a literal `=` in a key/title
+// value (e.g. a Jest title containing `result === 42`) would terminate the
+// preceding key boundary and corrupt the annotation. `%` must always run
+// first so we don't double-encode our own escape sequences.
 function gaEscape(s) {
   return String(s)
     .replace(/%/g, '%25')
     .replace(/\r/g, '%0D')
     .replace(/\n/g, '%0A')
     .replace(/:/g, '%3A')
-    .replace(/,/g, '%2C');
+    .replace(/,/g, '%2C')
+    .replace(/=/g, '%3D');
 }
 
 class CiReporter {
@@ -148,3 +154,5 @@ class CiReporter {
 }
 
 module.exports = CiReporter;
+// [BUG-323] Exported for unit tests — see scripts/jest-ci-reporter.test.ts.
+module.exports.gaEscape = gaEscape;

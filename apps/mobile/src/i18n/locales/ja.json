@@ -776,7 +776,13 @@
       "keepPlaying": "続ける",
       "saveAndFinish": "保存して終了",
       "leaveWithoutSaving": "保存せずに終了",
-      "leaveQuizButton": "クイズをやめる"
+      "leaveQuizButton": "クイズをやめる",
+      "seeResultsLabel": "クイズの結果を見る",
+      "oneMoreLabel": "もう一度クイズを始める",
+      "nextQuestionLabel": "次の問題",
+      "disputeLabel": "この回答に異議を唱える",
+      "dismissLabel": "閉じる",
+      "saveAndFinishLabel": "進捗を保存してラウンドを終了"
     }
   },
   "dictation": {
@@ -1327,7 +1333,14 @@
     "listening": "聞き取り中...",
     "voiceHint": "宿題の問題を声に出して言ってください。",
     "stopDictatingProblemLabel": "問題の音声入力を停止",
-    "dictateProblemLabel": "問題を音声入力"
+    "dictateProblemLabel": "問題を音声入力",
+    "ocrError": {
+      "NOT_HOMEWORK": "この写真に明確な宿題の問題が見つかりませんでした。もっと近くから撮影するか、直接入力してください。",
+      "LOW_QUALITY": "この写真をはっきり読み取れませんでした。より明るい場所で、手ぶれなく撮影してみてください。",
+      "NO_TEXT": "この写真にテキストが見つかりませんでした。宿題がはっきり写り、十分な明るさがあることを確認してください。",
+      "ML_KIT_UNAVAILABLE": "このバージョンでは写真の読み取りが利用できません。アプリを最新版に更新すると使えるようになります。",
+      "CACHE_FAILED": "写真の準備中に問題が発生しました。もう一度試すか、問題を直接入力してください。"
+    }
   },
   "progress": {
     "pageTitle": "私の学習の旅",

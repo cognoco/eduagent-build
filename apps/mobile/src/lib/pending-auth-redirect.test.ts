@@ -67,10 +67,28 @@ describe('seedPendingAuthRedirectForTesting', () => {
     );
   });
 
+  // [BUG-324] The thrown error must spell out the required flag so the
+  // developer/CI operator hitting this guard knows what to set, not just
+  // that the helper is "dev-only".
+  it('throws with explicit EXPO_PUBLIC_E2E=true guidance when the flag is missing', () => {
+    delete process.env.EXPO_PUBLIC_E2E;
+    expect(() => seedPendingAuthRedirectForTesting('/library', 0)).toThrow(
+      /EXPO_PUBLIC_E2E=true/,
+    );
+  });
+
   it('throws when EXPO_PUBLIC_E2E is "false"', () => {
     process.env.EXPO_PUBLIC_E2E = 'false';
     expect(() => seedPendingAuthRedirectForTesting('/library', 0)).toThrow(
       'seedPendingAuthRedirectForTesting is dev-only',
+    );
+  });
+
+  // [BUG-324] Same explicit-flag guidance when the flag is set to "false".
+  it('throws with explicit EXPO_PUBLIC_E2E=true guidance when the flag is "false"', () => {
+    process.env.EXPO_PUBLIC_E2E = 'false';
+    expect(() => seedPendingAuthRedirectForTesting('/library', 0)).toThrow(
+      /EXPO_PUBLIC_E2E=true/,
     );
   });
 

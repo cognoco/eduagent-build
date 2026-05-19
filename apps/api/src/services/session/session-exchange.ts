@@ -97,7 +97,6 @@ import {
 } from './session-context-builders';
 import { projectAiResponseContent } from '../llm/project-response';
 import { isSubstantiveCalibrationAnswer } from './review-calibration';
-import { encodeDedupeSegment, joinDedupeKey } from '../dedupe-key';
 import {
   recordPracticeActivityEvent,
   type RecordPracticeActivityEventInput,
@@ -1874,6 +1873,10 @@ export async function persistExchangeResult(
   const effectiveMode = sessionMetadata?.['effectiveMode'];
 
   if (aiEventId && effectiveMode === 'recitation') {
+    // dedupeKey omitted — recordPracticeActivityEvent will use
+    // buildPracticeActivityDedupeKey() so the format is identical to the
+    // fluency_drill branch below. Standardised on the canonical builder so
+    // duplicate detection works the same way across both OCR/session flows.
     await recordSessionPracticeActivityEvent(db, {
       profileId,
       subjectId: session.subjectId,
@@ -1882,10 +1885,6 @@ export async function persistExchangeResult(
       completedAt: now,
       sourceType: 'session_event',
       sourceId: aiEventId,
-      dedupeKey: joinDedupeKey(
-        ['recitation', 'session_event', encodeDedupeSegment(aiEventId)],
-        ':',
-      ),
       metadata: {
         sessionId,
         exchangeCount: updated.exchangeCount,

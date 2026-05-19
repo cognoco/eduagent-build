@@ -2,6 +2,20 @@
 // Ask Gate Observe handlers — Tests [AUDIT-INNGEST-1 / PR-17-P1 / 2026-05-12]
 // ---------------------------------------------------------------------------
 
+const mockCaptureException = jest.fn();
+jest.mock(
+  '../../services/sentry' /* gc1-allow: observer test asserts captureException escalation on schema drift */,
+  () => {
+    const actual = jest.requireActual(
+      '../../services/sentry',
+    ) as typeof import('../../services/sentry');
+    return {
+      ...actual,
+      captureException: (...args: unknown[]) => mockCaptureException(...args),
+    };
+  },
+);
+
 const consoleLogSpy = jest
   .spyOn(console, 'log')
   .mockImplementation(() => undefined);
@@ -39,6 +53,7 @@ beforeEach(() => {
   consoleLogSpy.mockClear();
   consoleWarnSpy.mockClear();
   consoleErrorSpy.mockClear();
+  mockCaptureException.mockClear();
 });
 
 afterAll(() => {
@@ -95,6 +110,7 @@ describe('askGateDecisionObserve [PR-17-P1]', () => {
       meaningful: true,
       method: 'llm',
     });
+    expect(mockCaptureException).not.toHaveBeenCalled();
   });
 
   it('[BREAK] emits a structured info log with gate decision context (observability terminus)', async () => {
@@ -122,6 +138,7 @@ describe('askGateDecisionObserve [PR-17-P1]', () => {
   it('handles empty payload gracefully (all fields optional)', async () => {
     const result = await invoke(askGateDecisionObserve, {});
     expect(result).toMatchObject({ status: 'logged', sessionId: null });
+    expect(mockCaptureException).not.toHaveBeenCalled();
   });
 
   it('[BREAK] returns schema_error and logs schema_drift on type-mismatched payload', async () => {
@@ -135,6 +152,29 @@ describe('askGateDecisionObserve [PR-17-P1]', () => {
     const entry = lastJsonLine(consoleErrorSpy);
     expect(entry?.message).toBe('ask.gate_decision.schema_drift');
     expect(entry?.level).toBe('error');
+  });
+
+  // [BREAK / BUG-312] Schema drift must escalate to Sentry — silent
+  // logger.error alone fails the CLAUDE.md "Silent recovery without
+  // escalation" rule. Pinned to "called exactly once" so a future refactor
+  // can't downgrade the signal.
+  it('[BREAK / BUG-312] captures schema drift to Sentry exactly once with payload context', async () => {
+    await invoke(askGateDecisionObserve, {
+      sessionId: 123,
+      meaningful: 'yes',
+    } as unknown as Record<string, unknown>);
+
+    expect(mockCaptureException).toHaveBeenCalledTimes(1);
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.stringContaining('invalid event payload'),
+      }),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          issues: expect.any(Array),
+        }),
+      }),
+    );
   });
 });
 
@@ -160,6 +200,7 @@ describe('askGateTimeoutObserve [PR-17-P1]', () => {
       sessionId: 'sess-3',
       exchangeCount: 4,
     });
+    expect(mockCaptureException).not.toHaveBeenCalled();
   });
 
   it('[BREAK] emits a warn-level structured log for gate timeouts (fail_open path observability)', async () => {
@@ -191,5 +232,25 @@ describe('askGateTimeoutObserve [PR-17-P1]', () => {
     const entry = lastJsonLine(consoleErrorSpy);
     expect(entry?.message).toBe('ask.gate_timeout.schema_drift');
     expect(entry?.level).toBe('error');
+  });
+
+  // [BREAK / BUG-312] Same Sentry-escalation contract for the timeout
+  // observer; without this the schema-drift signal lives only in console logs.
+  it('[BREAK / BUG-312] captures schema drift to Sentry exactly once with payload context', async () => {
+    await invoke(askGateTimeoutObserve, {
+      exchangeCount: 'many',
+    } as unknown as Record<string, unknown>);
+
+    expect(mockCaptureException).toHaveBeenCalledTimes(1);
+    expect(mockCaptureException).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.stringContaining('invalid event payload'),
+      }),
+      expect.objectContaining({
+        extra: expect.objectContaining({
+          issues: expect.any(Array),
+        }),
+      }),
+    );
   });
 });

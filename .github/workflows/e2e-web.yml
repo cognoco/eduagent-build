@@ -75,6 +75,19 @@ jobs:
       EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY_PREVIEW }}
       PLAYWRIGHT_API_URL: ${{ vars.E2E_API_URL || 'https://api-stg.mentomate.com' }}
       PLAYWRIGHT_SKIP_LOCAL_API: '1'
+      # [BUG-326] Worker-count discriminator. The Playwright config
+      # (apps/mobile/playwright.config.ts) picks 1 vs 4 workers based on
+      # E2E_ENV, NOT on substring-matching the API URL. The default
+      # `api-stg.mentomate.com` is a custom-domain (non-rate-limited)
+      # staging API → safe for 4 parallel workers.
+      #
+      # If you change `vars.E2E_API_URL` to a *.workers.dev hostname (the
+      # shared Cloudflare-throttled tier), ALSO set `E2E_ENV: staging-cf`
+      # here so the config drops back to 1 worker. Conversely, if you
+      # repoint at a dedicated/local-cluster API that is NOT rate-limited,
+      # leave `E2E_ENV: staging` (or unset and rely on the default 4
+      # workers). See playwright.config.ts → `usesRateLimitedApi`.
+      E2E_ENV: staging
     steps:
       - uses: actions/checkout@v4
 

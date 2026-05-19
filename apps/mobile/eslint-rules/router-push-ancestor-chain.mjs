@@ -176,17 +176,37 @@ const rule = {
 
     /**
      * Collect every router.push pathname in a given body, preserving range
-     * order. KNOWN LIMITATION: the walk descends into conditional branches
-     * (`if`, `.forEach`, ternary), so a parent push that only runs on some
-     * code paths is treated as if it always runs. The rule accepts that
-     * false-negative because the alternative (control-flow analysis) is
-     * disproportionate for what is a heuristic guardrail, and a clearly
-     * misplaced parent push surfaces in review.
+     * order.
+     *
+     * Conditional branches (`if`, ternary, switch) are descended INTO — a
+     * parent push that only runs on some code paths is treated as if it
+     * always runs. The rule accepts that false-negative because the
+     * alternative (control-flow analysis) is disproportionate for what is
+     * a heuristic guardrail.
+     *
+     * Nested function bodies (arrow / function expression / function
+     * declaration) are NOT descended into. A parent push inside
+     * `.forEach((..) => { router.push(parent) })` runs in a separate
+     * synchronous scope from the outer body's later `router.push(child)`,
+     * so it must not satisfy the outer ancestor-chain check. Crossing this
+     * boundary used to silently mask missing pushes (bug #328).
      */
     function collectPushPathnamesUpTo(bodyNode, beforeRange) {
       const results = [];
-      function walk(n) {
+      function walk(n, isRoot) {
         if (!n || typeof n !== 'object') return;
+        // Stop at nested function boundaries — but allow the root body
+        // itself to be entered. Without the isRoot escape, the very first
+        // call would bail out if the body node is itself an
+        // ArrowFunctionExpression.
+        if (
+          !isRoot &&
+          (n.type === 'ArrowFunctionExpression' ||
+            n.type === 'FunctionExpression' ||
+            n.type === 'FunctionDeclaration')
+        ) {
+          return;
+        }
         if (
           n.type === 'CallExpression' &&
           isRouterPush(n.callee) &&
@@ -200,13 +220,13 @@ const rule = {
           if (key === 'parent' || key === 'loc' || key === 'range') continue;
           const child = n[key];
           if (Array.isArray(child)) {
-            for (const c of child) walk(c);
+            for (const c of child) walk(c, false);
           } else if (child && typeof child === 'object' && child.type) {
-            walk(child);
+            walk(child, false);
           }
         }
       }
-      walk(bodyNode);
+      walk(bodyNode, true);
       return results;
     }
 

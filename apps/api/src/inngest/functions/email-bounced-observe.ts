@@ -12,23 +12,21 @@
 // [SEC-6 / BUG-722] The email payload already masks recipient PII before
 // emitting the event. This handler logs the masked payload only.
 //
-// Event payload shape (sender: apps/api/src/routes/resend-webhook.ts):
-//   { type: 'email.bounced' | 'email.complained', to: string (masked),
-//     emailId: string | null, timestamp: string }
+// Event payload shape (shared with sender via `@eduagent/schemas`):
+//   app/email.bounced → emailBouncedEventSchema
+//
+// Note: both `email.bounced` and `email.complained` events from Resend are
+// multiplexed onto the single `app/email.bounced` Inngest event; the `type`
+// field on the payload distinguishes them. The structured-log `message`
+// reflects the original event type so dashboard queries can filter on it.
 // ---------------------------------------------------------------------------
 
-import { z } from 'zod';
+import { emailBouncedEventSchema } from '@eduagent/schemas';
 import { inngest } from '../client';
 import { createLogger } from '../../services/logger';
+import { captureException } from '../../services/sentry';
 
 const logger = createLogger();
-
-const emailBouncedPayloadSchema = z.object({
-  type: z.enum(['email.bounced', 'email.complained']).optional(),
-  to: z.string().optional(),
-  emailId: z.string().nullable().optional(),
-  timestamp: z.string().optional(),
-});
 
 export const emailBouncedObserve = inngest.createFunction(
   {
@@ -37,17 +35,32 @@ export const emailBouncedObserve = inngest.createFunction(
   },
   { event: 'app/email.bounced' },
   async ({ event }) => {
-    const parseResult = emailBouncedPayloadSchema.safeParse(event.data);
+    const parseResult = emailBouncedEventSchema.safeParse(event.data);
     if (!parseResult.success) {
       logger.error('email.bounced.schema_drift', {
         issues: parseResult.error.issues,
         rawData: event.data, // `to` is pre-masked by sender (resend-webhook.ts:maskEmail)
       });
+      captureException(
+        new Error(
+          '[email-bounced] invalid event payload — schema drift or bad event',
+        ),
+        { extra: { issues: parseResult.error.issues, rawData: event.data } },
+      );
       return { status: 'schema_error' as const };
     }
     const data = parseResult.data;
 
-    logger.warn('email.bounced.received', {
+    // Branch the log message on the resend event type so dashboard / on-call
+    // queries can filter `email.complained.received` separately from
+    // `email.bounced.received`. Bug-314: previously hard-coded to
+    // `email.bounced.received` for both signals, losing the complaint signal.
+    const logMessage =
+      data.type === 'email.complained'
+        ? 'email.complained.received'
+        : 'email.bounced.received';
+
+    logger.warn(logMessage, {
       type: data.type ?? null,
       to: data.to ?? null,
       emailId: data.emailId ?? null,

@@ -547,6 +547,13 @@
       "when": 1779183698465,
       "tag": "0077_demonic_justin_hammer",
       "breakpoints": true
+    },
+    {
+      "idx": 78,
+      "version": "7",
+      "when": 1779221651591,
+      "tag": "0078_practice_activity_events_source_type_check",
+      "breakpoints": true
     }
   ]
 }

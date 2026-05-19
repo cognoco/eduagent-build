@@ -317,6 +317,41 @@ describe('QuizLaunchScreen', () => {
       screen.getByTestId('quiz-launch-back');
     });
 
+    // [BUG-271 / CCR PR #230] Without retry re-arm the watchdog latches: once
+    // it fires the first time, a subsequent stall in the same session has no
+    // upper bound. The fix bumps a `hardTimeoutAttempt` state on each Retry
+    // press; that state is in the watchdog effect's deps so the timer
+    // re-arms even when `isPending` stays true across the retry.
+    it('[BUG-271] re-arms the watchdog after a Retry press [break test]', () => {
+      render(<QuizLaunchScreen />);
+
+      // First fire — error panel renders after 30s.
+      act(() => {
+        jest.advanceTimersByTime(30_000);
+      });
+      screen.getByTestId('quiz-launch-error-fallback');
+      screen.getByTestId('quiz-launch-retry');
+
+      // User taps Retry while the mutation is still pending (the stuck
+      // mutation never settled — startRound() is fired but isPending stays
+      // true; the React Query mutation queue dedupes the in-flight call).
+      fireEvent.press(screen.getByTestId('quiz-launch-retry'));
+
+      // The error panel disappears (setHardTimedOut(false)) and we're back on
+      // the loading state.
+      expect(screen.queryByTestId('quiz-launch-error-fallback')).toBeNull();
+      screen.getByTestId('quiz-launch-thinking-lamp');
+
+      // 30s later, the watchdog must fire AGAIN. Without the re-arm fix this
+      // assertion fails: the effect doesn't re-run because `isPending` did
+      // not transition, so no new timer is armed.
+      act(() => {
+        jest.advanceTimersByTime(30_000);
+      });
+      screen.getByTestId('quiz-launch-error-fallback');
+      screen.getByTestId('quiz-launch-retry');
+    });
+
     it('clears the safety timeout when mutation leaves pending before 30s (cleanup)', () => {
       const { rerender } = render(<QuizLaunchScreen />);
 

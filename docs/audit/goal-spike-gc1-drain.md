@@ -27,7 +27,26 @@ echo "Internal mocks without gc1-allow: $untagged"
 # Target: 0
 ```
 
-**Current baseline:** 288 internal mock calls across 92 API test files + 4 cross-package integration test files. 70 pre-existing `gc1-allow` annotations.
+**Current baseline (re-verified 2026-05-19, BUG-309):** 250 internal mock
+calls (`jest.mock('./...')` / `jest.mock('../...')`) across 105 API test files.
+0 internal mocks remain in `tests/integration/*.integration.test.ts` files
+(only allowlisted `@eduagent/database`, `services/stripe`, `services/sentry`,
+and Inngest transport stubs). 485 total `gc1-allow` annotations across the
+API+integration test suites.
+
+The original baseline (288 mocks, 92 files, 70 annotations) was the snapshot
+when the Pattern-A drain began; the numbers have shifted as files were
+converted and the annotation count grew because Pattern A pairs `gc1-allow`
+with each converted call site. Verify with:
+
+```bash
+# Internal mocks remaining (target: 0)
+grep -rE "jest\.mock\(['\"]\.\.?/" apps/api/src --include="*.test.ts" | wc -l
+grep -rE "jest\.mock\(['\"]\.\.?/" tests/integration --include="*.integration.test.ts" | wc -l
+
+# Total gc1-allow annotations
+grep -rE "gc1-allow" apps/api/src tests/integration --include="*.test.ts" --include="*.integration.test.ts" | wc -l
+```
 
 The final execution plan inverted Metric 2: `gc1-allow` became the audit marker
 for Pattern A conversions, not an exemption ceiling. Use the superseding plan for

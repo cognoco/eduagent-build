@@ -103,6 +103,7 @@ jest.mock('../services/ocr' /* gc1-allow: pattern-a conversion */, () => ({
 import { app } from '../index';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
 import { captureException } from '../services/sentry';
+import { OCR_CONSTRAINTS } from '@eduagent/schemas';
 
 const TEST_ENV = { ...BASE_AUTH_ENV };
 
@@ -417,6 +418,34 @@ describe('homework routes', () => {
       expect(body.details).toContain('image/jpeg');
       expect(body.details).toContain('image/png');
       expect(body.details).toContain('image/webp');
+    });
+
+    it('[BUG-283] returns 413 when Content-Length is larger than 2x the file cap, BEFORE parsing the body', async () => {
+      // Twice the per-file cap (5MB) plus 1 byte — should be rejected at the
+      // header check, before parseBody() consumes the multipart payload.
+      const oversizeContentLength = OCR_CONSTRAINTS.maxFileSizeBytes * 2 + 1;
+
+      const res = await app.request(
+        '/v1/ocr',
+        {
+          method: 'POST',
+          headers: {
+            ...OCR_HEADERS,
+            'Content-Length': String(oversizeContentLength),
+            'Content-Type':
+              'multipart/form-data; boundary=----WebKitFormBoundaryBUG283',
+          },
+          // Minimal body — the request never reaches parseBody() because the
+          // header check fires first; this proves the early-reject path.
+          body: '------WebKitFormBoundaryBUG283--\r\n',
+        },
+        TEST_ENV,
+      );
+
+      expect(res.status).toBe(413);
+      const body = await res.json();
+      expect(body.code).toBe('VALIDATION_ERROR');
+      expect(body.message).toContain('Request body too large');
     });
 
     it('returns 400 when file exceeds 5MB', async () => {

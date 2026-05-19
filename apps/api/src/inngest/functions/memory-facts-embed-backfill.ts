@@ -1,3 +1,13 @@
+// @inngest-admin: parent-chain (memory_facts.profile_id enforced)
+//
+// This is the hourly embedding backfill — it scans the global `memory_facts`
+// table to embed rows whose `embedding` is still NULL (e.g. legacy rows or
+// failed-Voyage-call rows). Every row carries its own `profileId`, and every
+// UPDATE in this file restricts to `memory_facts.profile_id = data.profile_id`
+// in the WHERE clause so a single rogue row cannot poison embeddings across
+// profiles. The cross-profile scan is intentional — it's a system-wide
+// maintenance job, not a per-user request.
+
 import { memoryFacts, vectorToDriver } from '@eduagent/database';
 import { and, asc, gt, isNull, sql } from 'drizzle-orm';
 

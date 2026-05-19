@@ -776,7 +776,13 @@
       "keepPlaying": "Fortsett å spille",
       "saveAndFinish": "Lagre og avslutt",
       "leaveWithoutSaving": "Forlat uten å lagre",
-      "leaveQuizButton": "Forlat quiz"
+      "leaveQuizButton": "Forlat quiz",
+      "seeResultsLabel": "Se quiz-resultater",
+      "oneMoreLabel": "Start en quiz til",
+      "nextQuestionLabel": "Neste spørsmål",
+      "disputeLabel": "Bestrid dette svaret",
+      "dismissLabel": "Lukk",
+      "saveAndFinishLabel": "Lagre fremdrift og avslutt runden"
     }
   },
   "dictation": {
@@ -1327,7 +1333,14 @@
     "listening": "Lytter...",
     "voiceHint": "Si lekseoppgaven høyt.",
     "stopDictatingProblemLabel": "Stopp diktering av oppgaven",
-    "dictateProblemLabel": "Dikter oppgave"
+    "dictateProblemLabel": "Dikter oppgave",
+    "ocrError": {
+      "NOT_HOMEWORK": "Vi fant ingen tydelig lekseoppgave i dette bildet. Prøv et nærmere bilde eller skriv den inn.",
+      "LOW_QUALITY": "Vi klarte ikke å lese bildet tydelig. Prøv med bedre belysning eller et stødigere grep.",
+      "NO_TEXT": "Vi fant ingen tekst i dette bildet. Sørg for at leksene er synlige og godt opplyst.",
+      "ML_KIT_UNAVAILABLE": "Bildelesing er ikke tilgjengelig i denne versjonen. En rask app-oppdatering fikser det.",
+      "CACHE_FAILED": "Vi hadde problemer med å klargjøre bildet. Prøv igjen eller skriv inn oppgaven."
+    }
   },
   "progress": {
     "pageTitle": "Min læringsreise",
