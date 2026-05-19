@@ -457,7 +457,10 @@ describe('MyNotesListScreen', () => {
     render(<MyNotesListScreen />, { wrapper: createWrapper() });
     fireEvent.press(screen.getByTestId('my-notes-list-back'));
 
-    expect(mockReplace).toHaveBeenCalledWith('/(app)/my-notes');
+    expect(mockReplace).toHaveBeenCalledWith({
+      pathname: '/(app)/my-notes',
+      params: { returnTo: 'own-learning' },
+    });
   });
 
   it('bookmark with null topicId falls back to session-summary navigation', async () => {

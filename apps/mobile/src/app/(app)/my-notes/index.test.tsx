@@ -143,10 +143,16 @@ describe('MyNotesHubScreen', () => {
     render(<MyNotesHubScreen />, { wrapper: createWrapper() });
 
     fireEvent.press(screen.getByTestId('my-notes-sessions'));
-    expect(mockPush).toHaveBeenCalledWith('/(app)/my-notes/sessions');
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/my-notes/[kind]',
+      params: { kind: 'sessions', returnTo: 'own-learning' },
+    });
     jest.clearAllMocks();
 
     fireEvent.press(screen.getByTestId('my-notes-bookmarks'));
-    expect(mockPush).toHaveBeenCalledWith('/(app)/my-notes/bookmarks');
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/my-notes/[kind]',
+      params: { kind: 'bookmarks', returnTo: 'own-learning' },
+    });
   });
 });
