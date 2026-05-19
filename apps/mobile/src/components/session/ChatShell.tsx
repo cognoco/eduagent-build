@@ -444,12 +444,19 @@ export function ChatShell({
   );
 
   const handleSend = useCallback(() => {
-    // [BUG-886] Hard guard against stale-instance taps on RN Web. Without
-    // this, a prior screen's ChatShell still in the DOM can fire onSend
-    // bound to the prior session's POST URL when the user taps the visually
-    // active Send button. The accessibility-tree changes below are the
-    // primary defense; this is the belt-and-braces backstop.
-    if (!isFocused) return;
+    // [BUG-886 / CCR PR #268] Hard guard against stale-instance taps on RN
+    // Web. Without this, a prior screen's ChatShell still in the DOM can
+    // fire onSend bound to the prior session's POST URL when the user taps
+    // the visually active Send button. The accessibility-tree changes below
+    // are the primary defense; this is the belt-and-braces backstop.
+    //
+    // IMPORTANT: gate on `isWebDormant` (web-only), NOT cross-platform
+    // `!isFocused`. On native (iOS/Android) the navigator only mounts the
+    // focused screen, so the stale-instance race does not exist — and
+    // `useIsFocused()` can race with the keyboard losing focus mid-tap,
+    // silently dropping legitimate Sends. Aligns with the same gating used
+    // by `editable` / `disabled` on the input row and Send Pressable.
+    if (isWebDormant) return;
     if (!input.trim() || isStreaming) return;
     const text = input.trim();
     setInput('');
@@ -458,7 +465,7 @@ export function ChatShell({
     // if user switched to text mode while TTS was still playing (BUG-344)
     stopSpeaking();
     onSend(text);
-  }, [input, isFocused, isStreaming, onDraftChange, onSend, stopSpeaking]);
+  }, [input, isWebDormant, isStreaming, onDraftChange, onSend, stopSpeaking]);
 
   // Voice record button toggle
   const handleVoicePress = useCallback(async () => {

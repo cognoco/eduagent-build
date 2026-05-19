@@ -99,7 +99,13 @@ export function resolveTabShape({
   profiles: ReadonlyArray<{ isOwner: boolean }>;
   isParentProxy: boolean;
 }): TabShape {
-  if (!activeProfile) return 'guardian';
+  // [CCR PR #215 / Bug 305] Default to 'learner' (4-tab least-privilege)
+  // when the profile is unknown or not yet loaded. The guardian shape
+  // surfaces the full 5-tab mentoring hub (own-learning); briefly showing
+  // that to a non-guardian leaks intent. A legitimate guardian seeing the
+  // learner shape for a render or two while the profile loads is harmless —
+  // the only difference is one extra tab appearing once data arrives.
+  if (!activeProfile) return 'learner';
   if (isParentProxy) return 'learner';
   if (isGuardianProfile(activeProfile, profiles)) return 'guardian';
   return 'learner';

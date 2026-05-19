@@ -20,13 +20,21 @@ const TEST_ONLY_PATTERNS = [
   /\bfrom\s+['"]jest\b/,
   /\bimport\b.*\bfrom\s+['"]@eduagent\/test-utils['"]/,
   /\brequire\(['"]react-test-renderer['"]\)/,
+  // Local test-utils/ dir is metro-blocked and excluded from this scan;
+  // production code must not reach into it.
+  /\bfrom\s+['"][^'"]*\/test-utils\/[^'"]+['"]/,
 ];
 
 function getAllSourceFiles(dir: string): string[] {
   const results: string[] = [];
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
-    if (entry.isDirectory() && entry.name !== 'node_modules') {
+    if (
+      entry.isDirectory() &&
+      entry.name !== 'node_modules' &&
+      entry.name !== 'test-utils' &&
+      entry.name !== '__mocks__'
+    ) {
       results.push(...getAllSourceFiles(full));
     } else if (
       entry.isFile() &&

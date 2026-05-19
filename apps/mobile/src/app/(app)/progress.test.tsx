@@ -248,14 +248,19 @@ jest.mock('../../hooks/use-progress', () => ({
 const mockUseSubjects = jest.fn(() => ({
   data: [] as Array<{ id: string; name: string; status: string }>,
 }));
-jest.mock(
-  '../../hooks/use-subjects' /* gc1-allow: hook requires QueryClientProvider; not runnable in unit env */,
-  () => ({
-    useSubjects: () => mockUseSubjects(),
-  }),
-);
+jest.mock('../../hooks/use-subjects', () => ({
+  // gc1-allow: useSubjects calls useApiClient() + useProfile() — requires
+  // QueryClientProvider + ProfileContext not available in this unit env.
+  // Only useSubjects is overridden; all other exports use the real impl.
+  ...jest.requireActual('../../hooks/use-subjects'),
+  useSubjects: () => mockUseSubjects(),
+}));
 const mockUseActiveProfileRole = jest.fn();
-jest.mock('../../hooks/use-active-profile-role' /* gc1-allow */, () => ({
+jest.mock('../../hooks/use-active-profile-role', () => ({
+  // gc1-allow: useActiveProfileRole calls useProfile() + useParentProxy() —
+  // both require React context providers not available in this unit env.
+  // Only the hook return is overridden; types and other exports use real impl.
+  ...jest.requireActual('../../hooks/use-active-profile-role'),
   useActiveProfileRole: () => mockUseActiveProfileRole(),
 }));
 let mockLinkedChildren: Profile[] = [];
@@ -266,6 +271,10 @@ let mockActiveProfile: Profile = {
   isOwner: true,
 } as Profile;
 jest.mock('../../lib/profile', () => ({
+  // gc1-allow: ProfileProvider + useProfile require SecureStore, QueryClient,
+  // and network (via useProfiles) — not runnable in this unit env without a
+  // full React context tree. useLinkedChildren is derived from useProfile.
+  ...jest.requireActual('../../lib/profile'),
   useProfile: () => ({
     activeProfile: mockActiveProfile,
     profiles: [],
@@ -273,11 +282,19 @@ jest.mock('../../lib/profile', () => ({
   useLinkedChildren: () => mockLinkedChildren,
 }));
 jest.mock('../../lib/analytics', () => ({
+  // gc1-allow: analytics.track calls Sentry.addBreadcrumb which is not
+  // initialised in the unit test env. Pure exports (bucketAccountAge,
+  // hashProfileId) also mocked as jest.fn() for call-site assertions.
+  ...jest.requireActual('../../lib/analytics'),
   bucketAccountAge: jest.fn(() => '91+'),
   hashProfileId: jest.fn((id: string) => `hashed-${id}`),
   track: jest.fn(),
 }));
 jest.mock('../../lib/api-client', () => ({
+  // gc1-allow: useApiClient calls useAuth() (Clerk) which requires ClerkProvider
+  // not available in this unit env. Typed error classes and other exports
+  // preserved via requireActual spread.
+  ...jest.requireActual('../../lib/api-client'),
   useApiClient: () => ({}),
 }));
 let mockSearchParams: { profileId?: string | string[] } = {};

@@ -146,6 +146,31 @@ export class BadRequestError extends Error {
   }
 }
 
+/**
+ * [CCR PR #215] Schema-drift fault: a DB row exists but does not validate
+ * against its expected zod schema. This is a server-side fault (data shape
+ * has drifted from code) — NOT a missing row. The global error handler maps
+ * this to HTTP 500 and reports to Sentry, while genuine missing-row cases
+ * remain `NotFoundError` → 404 (no Sentry capture).
+ *
+ * Callers should:
+ *   1. `captureException` with the offending row's primary key + zod issues
+ *   2. throw `new SchemaDriftError(resource, issues)` so the handler classifies
+ */
+export class SchemaDriftError extends Error {
+  readonly errorCode = 'SCHEMA_DRIFT' as const;
+  readonly resource: string;
+  readonly issues: unknown;
+
+  constructor(resource: string, issues?: unknown) {
+    super(`${resource} schema validation failed`);
+    this.name = 'SchemaDriftError';
+    this.resource = resource;
+    this.issues = issues;
+    Object.setPrototypeOf(this, SchemaDriftError.prototype);
+  }
+}
+
 export type QuotaExceededDetails = QuotaExceeded['details'];
 export type UpgradeOption = QuotaExceededDetails['upgradeOptions'][number];
 

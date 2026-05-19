@@ -1459,6 +1459,102 @@ export async function persistBookTopics(
   return result;
 }
 
+/**
+ * Orchestrates the "expand an already-generated thin book" flow.
+ *
+ * Called when a book has already been claimed/generated but has fewer than
+ * MIN_GENERATED_BOOK_TOPICS active topics, and the caller asked to expand it.
+ *
+ * Pipeline:
+ *   1. Build expansion context from priorKnowledge + existing topic titles.
+ *   2. Call generateBookTopics; on failure, capture and fall back to
+ *      buildFallbackBookTopics (deterministic).
+ *   3. Run prepareTopicExpansion to de-dupe against existing titles and
+ *      enforce MIN/MAX constraints.
+ *   4. Persist with appendToExisting=true and return the resulting book.
+ *
+ * Dependencies are injected so the service can be exercised without booting
+ * the route — keeps DI explicit, no global lookups.
+ *
+ * Extracted from apps/api/src/routes/books.ts (G1/G5: business logic must
+ * live in services, not route handlers).
+ */
+export async function expandExistingBookTopics(
+  db: Database,
+  profileId: string,
+  subjectId: string,
+  bookId: string,
+  existing: BookWithTopics,
+  priorKnowledge: string | undefined,
+  deps: {
+    learnerAge: number;
+    generateBookTopics: (
+      bookTitle: string,
+      bookDescription: string,
+      learnerAge: number,
+      context?: string,
+    ) => Promise<BookTopicGenerationResult>;
+    captureException: (
+      error: unknown,
+      context?: { profileId?: string; extra?: Record<string, unknown> },
+    ) => void;
+  },
+): Promise<BookWithTopics> {
+  const existingTopicTitles = existing.topics
+    .filter((topic) => !topic.skipped)
+    .map((topic) => topic.title)
+    .join(', ');
+  const expansionContext = [
+    priorKnowledge,
+    existingTopicTitles
+      ? `Existing starter topics in this book: ${existingTopicTitles}`
+      : null,
+  ]
+    .filter((value): value is string => !!value?.trim())
+    .join('\n');
+
+  let generated: BookTopicGenerationResult;
+  try {
+    generated = await deps.generateBookTopics(
+      existing.book.title,
+      existing.book.description ?? '',
+      deps.learnerAge,
+      expansionContext || undefined,
+    );
+  } catch (error) {
+    deps.captureException(error, {
+      profileId,
+      extra: {
+        phase: 'book_topic_expansion_fallback',
+        subjectId,
+        bookId,
+        bookTitle: existing.book.title,
+      },
+    });
+    generated = buildFallbackBookTopics(
+      existing.book.title,
+      existing.book.description ?? '',
+    );
+  }
+
+  const expansion = prepareTopicExpansion(
+    generated,
+    existing.topics,
+    existing.book.title,
+    existing.book.description,
+  );
+
+  return persistBookTopics(
+    db,
+    profileId,
+    subjectId,
+    bookId,
+    expansion.topics,
+    expansion.connections,
+    { appendToExisting: true },
+  );
+}
+
 export async function addCurriculumTopic(
   db: Database,
   profileId: string,

@@ -45,6 +45,36 @@ function subtractDays(date: Date, days: number): Date {
   return new Date(date.getTime() - days * 24 * 60 * 60 * 1000);
 }
 
+/**
+ * Returns a zeroed `ReportPracticeSummary` shape. Used as the fallback for
+ * profiles that have no practice activity in the requested window.
+ *
+ * IMPORTANT: Never substitute another profile's summary as a fallback —
+ * doing so leaks practice data across profiles in batch endpoints. Always
+ * call this helper for the missing-profile path.
+ */
+function emptyPracticeSummary(): ReportPracticeSummary {
+  return {
+    quizzesCompleted: 0,
+    reviewsCompleted: 0,
+    totals: {
+      activitiesCompleted: 0,
+      reviewsCompleted: 0,
+      pointsEarned: 0,
+      celebrations: 0,
+      distinctActivityTypes: 0,
+    },
+    scores: {
+      scoredActivities: 0,
+      score: 0,
+      total: 0,
+      accuracy: null,
+    },
+    byType: [],
+    bySubject: [],
+  };
+}
+
 function computeRetentionStatus(
   nextReviewAt: Date | null,
 ): 'strong' | 'fading' | 'weak' | 'forgotten' {
@@ -628,44 +658,21 @@ export async function getOverallProgressBatch(
 
   if (allSubjects.length === 0) {
     // Every profile has zero subjects — return empty results for each.
-    const emptyResult: OverallProgressResult = {
-      subjects: [],
-      totalTopicsCompleted: 0,
-      totalTopicsVerified: 0,
-      practiceActivityCount: 0,
-      practiceSummary: practiceSummaries.values().next().value ?? {
-        quizzesCompleted: 0,
-        reviewsCompleted: 0,
-        totals: {
-          activitiesCompleted: 0,
-          reviewsCompleted: 0,
-          pointsEarned: 0,
-          celebrations: 0,
-          distinctActivityTypes: 0,
-        },
-        scores: {
-          scoredActivities: 0,
-          score: 0,
-          total: 0,
-          accuracy: null,
-        },
-        byType: [],
-        bySubject: [],
-      },
-    };
+    // SECURITY: construct the empty practice summary per-profile from the
+    // zeroed default — NEVER take a fallback from another profile's
+    // summary (e.g. `practiceSummaries.values().next().value`), which
+    // would leak profile A's practice data into profile B's result when
+    // B has no own entry. See `emptyPracticeSummary()` doc.
     const result = new Map<string, OverallProgressResult>();
     for (const pid of profileIds) {
-      const ps = practiceSummaries.get(pid);
-      result.set(
-        pid,
-        ps
-          ? {
-              ...emptyResult,
-              practiceSummary: ps,
-              practiceActivityCount: ps.totals.activitiesCompleted,
-            }
-          : emptyResult,
-      );
+      const ps = practiceSummaries.get(pid) ?? emptyPracticeSummary();
+      result.set(pid, {
+        subjects: [],
+        totalTopicsCompleted: 0,
+        totalTopicsVerified: 0,
+        practiceActivityCount: ps.totals.activitiesCompleted,
+        practiceSummary: ps,
+      });
     }
     return result;
   }
@@ -820,25 +827,11 @@ export async function getOverallProgressBatch(
     const practiceSummary = practiceSummaries.get(profileId);
 
     if (profileSubjects.length === 0) {
-      const emptyPractice: ReportPracticeSummary = practiceSummary ?? {
-        quizzesCompleted: 0,
-        reviewsCompleted: 0,
-        totals: {
-          activitiesCompleted: 0,
-          reviewsCompleted: 0,
-          pointsEarned: 0,
-          celebrations: 0,
-          distinctActivityTypes: 0,
-        },
-        scores: {
-          scoredActivities: 0,
-          score: 0,
-          total: 0,
-          accuracy: null,
-        },
-        byType: [],
-        bySubject: [],
-      };
+      // SECURITY: `practiceSummary` is already keyed by this `profileId`
+      // (from the batch). Fall back to the zeroed default — never to
+      // another profile's data. See `emptyPracticeSummary()` doc.
+      const emptyPractice: ReportPracticeSummary =
+        practiceSummary ?? emptyPracticeSummary();
       result.set(profileId, {
         subjects: [],
         totalTopicsCompleted: 0,

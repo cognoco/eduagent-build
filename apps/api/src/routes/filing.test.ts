@@ -7,6 +7,10 @@ import {
   restoreTestFetch,
 } from '../test-utils/jwks-interceptor';
 import { clearJWKSCache } from '../middleware/jwt';
+import {
+  registerLlmProviderFixture,
+  llmStructuredJson,
+} from '../test-utils/llm-provider-fixtures';
 
 // ---------------------------------------------------------------------------
 // Mock database module — middleware creates a stub db per request
@@ -151,24 +155,6 @@ jest.mock('../services/session' /* gc1-allow: pattern-a conversion */, () => {
 });
 
 // ---------------------------------------------------------------------------
-// Mock LLM services — stub routeAndCall; all other exports via requireActual
-// ---------------------------------------------------------------------------
-
-jest.mock('../services/llm' /* gc1-allow: pattern-a conversion */, () => {
-  const actual = jest.requireActual(
-    '../services/llm',
-  ) as typeof import('../services/llm');
-  return {
-    ...actual,
-    routeAndCall: jest.fn().mockResolvedValue({ text: 'mocked' }),
-    registerProvider: jest.fn(),
-    getRegisteredProviders: jest.fn().mockReturnValue([]),
-    _clearProviders: jest.fn(),
-    _resetCircuits: jest.fn(),
-  };
-});
-
-// ---------------------------------------------------------------------------
 // Mock Sentry
 // ---------------------------------------------------------------------------
 
@@ -223,11 +209,26 @@ const TEST_ENV = {
 const AUTH_HEADERS = makeAuthHeaders();
 
 describe('filing routes', () => {
+  // LLM transport stays real — registerLlmProviderFixture keeps routeAndCall
+  // exercisable without mocking the LLM module. fileToLibrary is already
+  // stubbed via the filing service mock, so this provider is a safety net.
+  let llmFixture: ReturnType<typeof registerLlmProviderFixture>;
+
   beforeAll(() => {
     installTestJwksInterceptor();
+    llmFixture = registerLlmProviderFixture({
+      chatResponse: llmStructuredJson({
+        extracted: 'Test topic',
+        shelf: { name: 'Science' },
+        book: { name: 'Physics', emoji: '⚡', description: 'Physics book' },
+        chapter: { name: 'Mechanics' },
+        topic: { title: 'Newton Laws', description: 'Laws of motion' },
+      }),
+    });
   });
 
   afterAll(() => {
+    llmFixture.dispose();
     restoreTestFetch();
   });
 

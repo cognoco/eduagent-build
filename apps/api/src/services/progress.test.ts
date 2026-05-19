@@ -28,12 +28,20 @@ function mockPracticeSummary(
   };
 }
 
+const mockGetPracticeActivitySummaryBatch = jest
+  .fn<Promise<Map<string, unknown>>, [unknown, string[], unknown]>()
+  .mockResolvedValue(new Map());
+
 jest.mock(
   // gc1-allow: unit test boundary
   './practice-activity-summary',
   () => ({
     getPracticeActivitySummary: (...args: unknown[]) =>
       mockGetPracticeActivitySummary(...args),
+    getPracticeActivitySummaryBatch: (...args: unknown[]) =>
+      mockGetPracticeActivitySummaryBatch(
+        ...(args as [unknown, string[], unknown]),
+      ),
   }),
 );
 
@@ -44,6 +52,7 @@ import {
   getSubjectProgress,
   getTopicProgress,
   getOverallProgress,
+  getOverallProgressBatch,
   getContinueSuggestion,
   getLearningResumeTarget,
   getActiveSessionForTopic,
@@ -1689,5 +1698,107 @@ describe('getContinueSuggestion — profile isolation', () => {
     await getContinueSuggestion(db, callerProfileId);
 
     expect(createScopedRepository).toHaveBeenCalledWith(db, callerProfileId);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getOverallProgressBatch — SECURITY: cross-profile data leak break test
+// (CCR PR #309 finding 3658bce9-1f7c-81c8-9db1-e461ce18c442)
+//
+// Before fix, the "every profile has zero subjects" branch built a single
+// `emptyResult` with `practiceSummary: practiceSummaries.values().next().value`
+// — the FIRST profile's practice summary. Profiles missing from
+// `practiceSummaries` then received that shared object, leaking profile A's
+// practice data (points, scores, byType, bySubject) to profile B.
+//
+// The break test exercises the all-empty-subjects branch directly with
+// A populated and B explicitly absent from the practice summaries map.
+// ---------------------------------------------------------------------------
+
+describe('getOverallProgressBatch — cross-profile data leak (security)', () => {
+  function makeBatchDb(allSubjects: unknown[] = []): Database {
+    // The batch function only hits db.query.subjects.findMany in the
+    // all-empty-subjects branch we are testing — and the practice batch
+    // is module-mocked above so no other db paths execute.
+    return {
+      query: {
+        subjects: {
+          findMany: jest.fn().mockResolvedValue(allSubjects),
+        },
+      },
+    } as unknown as Database;
+  }
+
+  it('does NOT leak profile A practice summary into profile B when B has no practice data', async () => {
+    const profileA = '11111111-1111-1111-1111-111111111111';
+    const profileB = '22222222-2222-2222-2222-222222222222';
+
+    // Profile A: populated practice summary. Profile B: ABSENT from the map.
+    // (This is the worst-case shape that triggered the original leak —
+    // the get(B) returns undefined, so pre-fix code falls back to the
+    // shared emptyResult which was seeded from A's summary.)
+    const profileAPractice = {
+      quizzesCompleted: 7,
+      reviewsCompleted: 3,
+      totals: {
+        activitiesCompleted: 10,
+        reviewsCompleted: 3,
+        pointsEarned: 999, // sentinel — must NEVER appear in B's result
+        celebrations: 4,
+        distinctActivityTypes: 2,
+      },
+      scores: {
+        scoredActivities: 7,
+        score: 42,
+        total: 70,
+        accuracy: 0.6,
+      },
+      byType: [{ activityType: 'quiz', count: 7 }],
+      bySubject: [
+        {
+          subjectId: 'subj-a-secret',
+          subjectName: 'A Secret Subject',
+          count: 7,
+        },
+      ],
+    };
+
+    mockGetPracticeActivitySummaryBatch.mockResolvedValueOnce(
+      new Map<string, unknown>([[profileA, profileAPractice]]),
+    );
+
+    const db = makeBatchDb([]); // empty — triggers allSubjects.length===0 branch
+
+    const result = await getOverallProgressBatch(db, [profileA, profileB]);
+
+    // Profile A: gets its own data back unchanged.
+    const resultA = result.get(profileA);
+    expect(resultA).toBeDefined();
+    expect(resultA!.practiceSummary.totals.pointsEarned).toBe(999);
+    expect(resultA!.practiceSummary.bySubject).toEqual([
+      { subjectId: 'subj-a-secret', subjectName: 'A Secret Subject', count: 7 },
+    ]);
+
+    // Profile B: gets the ZEROED default, NOT profile A's summary.
+    // These assertions are what would fail under the pre-fix code, because
+    // B fell through to `emptyResult` whose practiceSummary was A's.
+    const resultB = result.get(profileB);
+    expect(resultB).toBeDefined();
+    expect(resultB!.practiceSummary.totals.pointsEarned).toBe(0);
+    expect(resultB!.practiceSummary.totals.activitiesCompleted).toBe(0);
+    expect(resultB!.practiceSummary.totals.celebrations).toBe(0);
+    expect(resultB!.practiceSummary.quizzesCompleted).toBe(0);
+    expect(resultB!.practiceSummary.reviewsCompleted).toBe(0);
+    expect(resultB!.practiceSummary.scores.score).toBe(0);
+    expect(resultB!.practiceSummary.scores.total).toBe(0);
+    expect(resultB!.practiceSummary.scores.accuracy).toBeNull();
+    expect(resultB!.practiceSummary.byType).toEqual([]);
+    expect(resultB!.practiceSummary.bySubject).toEqual([]);
+    expect(resultB!.practiceActivityCount).toBe(0);
+
+    // And — critically — B's practiceSummary must not be the SAME OBJECT
+    // as A's. Identity check catches any future regression where the
+    // fallback again uses .values().next().value.
+    expect(resultB!.practiceSummary).not.toBe(resultA!.practiceSummary);
   });
 });

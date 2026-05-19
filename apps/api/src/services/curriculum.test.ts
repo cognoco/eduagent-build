@@ -19,12 +19,15 @@ import {
   adaptCurriculumFromPerformance,
   persistBookTopics,
   previewCurriculumTopic,
+  expandExistingBookTopics,
 } from './curriculum';
 import type {
   CurriculumInput,
   CurriculumAdaptRequest,
   GeneratedBookTopic,
   GeneratedConnection,
+  BookTopicGenerationResult,
+  BookWithTopics,
 } from '@eduagent/schemas';
 import type { Database } from '@eduagent/database';
 
@@ -1786,5 +1789,274 @@ describe('[BUG-110+109] previewCurriculumTopic resilience', () => {
       .join('\n');
     expect(logged).toMatch(/curriculum\.preview_topic\.no_json/);
     consoleSpy.mockRestore();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// expandExistingBookTopics — orchestration extracted from books route handler
+// (G1/G5: business logic must live in services, not routes).
+// ---------------------------------------------------------------------------
+
+describe('expandExistingBookTopics', () => {
+  const BOOK_ID = 'book-1';
+
+  /**
+   * Mock DB shaped to satisfy the inner persistBookTopics call. It must:
+   *  - Return a subject row from subjects.findFirst (ownership check)
+   *  - Return a book row from curriculumBooks.findFirst (book ownership)
+   *  - Return a curriculum row from curricula.findFirst (ensureCurriculum)
+   *  - Return zero existing topics, then the freshly-inserted rows, then
+   *    the rows for getBookWithTopics
+   *  - Accept update/insert/transaction calls
+   */
+  function createMinimalDb(): Database {
+    const bookRow = {
+      id: BOOK_ID,
+      subjectId: SUBJECT_ID,
+      title: 'Ancient Egypt',
+      description: 'Explore pyramids',
+      emoji: '🏛️',
+      sortOrder: 1,
+      topicsGenerated: false,
+      createdAt: NOW,
+      updatedAt: NOW,
+    };
+    const postPersistBookRow = { ...bookRow, topicsGenerated: true };
+    const insertedRows = [
+      { ...mockTopicRow({ id: 't1', title: 'New Topic 1', sortOrder: 1 }) },
+      { ...mockTopicRow({ id: 't2', title: 'New Topic 2', sortOrder: 2 }) },
+      { ...mockTopicRow({ id: 't3', title: 'New Topic 3', sortOrder: 3 }) },
+      { ...mockTopicRow({ id: 't4', title: 'New Topic 4', sortOrder: 4 }) },
+      { ...mockTopicRow({ id: 't5', title: 'New Topic 5', sortOrder: 5 }) },
+    ];
+
+    const db = {
+      query: {
+        subjects: { findFirst: jest.fn().mockResolvedValue(mockSubjectRow()) },
+        curricula: {
+          findFirst: jest.fn().mockResolvedValue(mockCurriculumRow()),
+        },
+        curriculumBooks: {
+          findFirst: jest
+            .fn()
+            .mockResolvedValueOnce(bookRow)
+            .mockResolvedValueOnce(postPersistBookRow),
+        },
+        curriculumTopics: {
+          findMany: jest
+            .fn()
+            .mockResolvedValueOnce([]) // existing topic check inside persist
+            .mockResolvedValueOnce(insertedRows) // transaction re-read
+            .mockResolvedValueOnce(insertedRows), // getBookWithTopics
+          findFirst: jest.fn().mockResolvedValue(null),
+        },
+        assessments: { findMany: jest.fn().mockResolvedValue([]) },
+        retentionCards: { findMany: jest.fn().mockResolvedValue([]) },
+        sessionSummaries: { findMany: jest.fn().mockResolvedValue([]) },
+      },
+      update: jest.fn().mockReturnValue({
+        set: jest.fn().mockReturnValue({
+          where: jest.fn().mockResolvedValue(undefined),
+        }),
+      }),
+      insert: jest.fn().mockReturnValue({
+        values: jest.fn().mockReturnValue({
+          returning: jest.fn().mockResolvedValue([]),
+          onConflictDoNothing: jest.fn().mockResolvedValue(undefined),
+        }),
+      }),
+      select: jest.fn().mockReturnValue({
+        from: jest.fn().mockReturnValue({
+          where: jest.fn().mockResolvedValue([]),
+          innerJoin: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue([]),
+          }),
+        }),
+      }),
+      transaction: jest
+        .fn()
+        .mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) =>
+          fn(db),
+        ),
+    } as unknown as Database;
+    return db;
+  }
+
+  function existingBook(): BookWithTopics {
+    return {
+      book: {
+        id: BOOK_ID,
+        subjectId: SUBJECT_ID,
+        title: 'Ancient Egypt',
+        description: 'Explore pyramids and pharaohs',
+        emoji: '🏛️',
+        sortOrder: 1,
+        topicsGenerated: true,
+        createdAt: NOW.toISOString(),
+        updatedAt: NOW.toISOString(),
+      },
+      topics: [
+        {
+          id: 'existing-1',
+          curriculumId: CURRICULUM_ID,
+          title: 'Timeline of Egypt',
+          description: 'How it all began',
+          chapter: 'The Story',
+          sortOrder: 1,
+          relevance: 'core',
+          estimatedMinutes: 30,
+          bookId: BOOK_ID,
+          skipped: false,
+          source: 'generated',
+        },
+      ],
+      connections: [],
+      status: 'NOT_STARTED',
+      completedTopicCount: 0,
+      completedTopicIds: [],
+    } as unknown as BookWithTopics;
+  }
+
+  /** Stable generator output that satisfies MIN_GENERATED_BOOK_TOPICS (5). */
+  function generatorOutput(): BookTopicGenerationResult {
+    return {
+      topics: [
+        {
+          title: 'Old Kingdom',
+          description: 'Age of pyramid-builders',
+          chapter: 'Story',
+          sortOrder: 1,
+          estimatedMinutes: 30,
+        },
+        {
+          title: 'Middle Kingdom',
+          description: 'Reunification and stability',
+          chapter: 'Story',
+          sortOrder: 2,
+          estimatedMinutes: 30,
+        },
+        {
+          title: 'New Kingdom',
+          description: 'The age of empire',
+          chapter: 'Story',
+          sortOrder: 3,
+          estimatedMinutes: 30,
+        },
+        {
+          title: 'Daily Life',
+          description: 'What ordinary people did',
+          chapter: 'Society',
+          sortOrder: 4,
+          estimatedMinutes: 25,
+        },
+        {
+          title: 'Legacy',
+          description: 'Why Ancient Egypt still matters',
+          chapter: 'Society',
+          sortOrder: 5,
+          estimatedMinutes: 20,
+        },
+      ],
+      connections: [],
+    };
+  }
+
+  it('happy path: passes existing topic titles into expansion context and persists generated topics', async () => {
+    const generateBookTopics = jest.fn().mockResolvedValue(generatorOutput());
+    const captureException = jest.fn();
+    const db = createMinimalDb();
+
+    const result = await expandExistingBookTopics(
+      db,
+      PROFILE_ID,
+      SUBJECT_ID,
+      BOOK_ID,
+      existingBook(),
+      'I already know about pyramids',
+      { learnerAge: 12, generateBookTopics, captureException },
+    );
+
+    // Generator called with book title, description, learner age, and a
+    // context blob that includes both prior knowledge AND existing titles.
+    expect(generateBookTopics).toHaveBeenCalledTimes(1);
+    const [bookTitle, bookDesc, age, context] =
+      generateBookTopics.mock.calls[0];
+    expect(bookTitle).toBe('Ancient Egypt');
+    expect(bookDesc).toBe('Explore pyramids and pharaohs');
+    expect(age).toBe(12);
+    expect(context).toContain('I already know about pyramids');
+    expect(context).toContain(
+      'Existing starter topics in this book: Timeline of Egypt',
+    );
+
+    // Did NOT capture an exception (happy path).
+    expect(captureException).not.toHaveBeenCalled();
+
+    // Persisted via the transaction path (no existing topics in mock DB).
+    expect(db.transaction).toHaveBeenCalledTimes(1);
+
+    // Returns a BookWithTopics-shaped result.
+    expect(result.book.id).toBe(BOOK_ID);
+    expect(Array.isArray(result.topics)).toBe(true);
+  });
+
+  it('fallback path: when generateBookTopics throws, captureException is called and fallback topics are persisted', async () => {
+    const generateBookTopics = jest
+      .fn()
+      .mockRejectedValue(new Error('LLM upstream timeout'));
+    const captureException = jest.fn();
+    const db = createMinimalDb();
+
+    const result = await expandExistingBookTopics(
+      db,
+      PROFILE_ID,
+      SUBJECT_ID,
+      BOOK_ID,
+      existingBook(),
+      undefined,
+      { learnerAge: 12, generateBookTopics, captureException },
+    );
+
+    expect(generateBookTopics).toHaveBeenCalledTimes(1);
+    expect(captureException).toHaveBeenCalledTimes(1);
+    const [, sentryContext] = captureException.mock.calls[0];
+    expect(sentryContext).toMatchObject({
+      profileId: PROFILE_ID,
+      extra: expect.objectContaining({
+        phase: 'book_topic_expansion_fallback',
+        subjectId: SUBJECT_ID,
+        bookId: BOOK_ID,
+        bookTitle: 'Ancient Egypt',
+      }),
+    });
+
+    // Fallback still produces topics — persist still hit the transaction path.
+    expect(db.transaction).toHaveBeenCalledTimes(1);
+    expect(result.book.id).toBe(BOOK_ID);
+  });
+
+  it('omits expansion context when no priorKnowledge and no existing titles', async () => {
+    const generateBookTopics = jest.fn().mockResolvedValue(generatorOutput());
+    const captureException = jest.fn();
+    const db = createMinimalDb();
+
+    const bare = existingBook();
+    // Strip existing topics so the context blob has nothing to add.
+    (bare as unknown as { topics: unknown[] }).topics = [];
+
+    await expandExistingBookTopics(
+      db,
+      PROFILE_ID,
+      SUBJECT_ID,
+      BOOK_ID,
+      bare,
+      undefined,
+      { learnerAge: 14, generateBookTopics, captureException },
+    );
+
+    expect(generateBookTopics).toHaveBeenCalledTimes(1);
+    const [, , , context] = generateBookTopics.mock.calls[0];
+    // Service passes `undefined` (not empty string) when there's no context.
+    expect(context).toBeUndefined();
   });
 });

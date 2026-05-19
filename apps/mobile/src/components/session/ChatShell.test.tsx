@@ -15,6 +15,7 @@ import { ChatShell, type ChatMessage } from './ChatShell';
 const mockBack = jest.fn();
 const mockReplace = jest.fn();
 jest.mock('expo-router', () => ({
+  // gc1-allow: native-boundary — Expo Router is a platform nav module unavailable in Jest
   useRouter: () => ({
     back: mockBack,
     replace: mockReplace,
@@ -28,11 +29,13 @@ jest.mock('expo-router', () => ({
 // the dormant-instance behaviour.
 let mockIsFocused = true;
 jest.mock('@react-navigation/native', () => ({
+  // gc1-allow: native-boundary — React Navigation hooks require native navigation context unavailable in Jest
   useIsFocused: () => mockIsFocused,
 }));
 
 let mockSafeAreaInsets = { top: 0, bottom: 0, left: 0, right: 0 };
 jest.mock('react-native-safe-area-context', () => ({
+  // gc1-allow: native-boundary — safe area context requires native device metrics unavailable in Jest
   useSafeAreaInsets: () => mockSafeAreaInsets,
 }));
 
@@ -42,6 +45,7 @@ jest.mock('../../lib/math-format', () => ({ // gc1-allow: render tests only need
 }));
 
 jest.mock('@expo/vector-icons', () => {
+  // gc1-allow: native-boundary — vector icons requires native font assets unavailable in Jest
   const { Text } = require('react-native');
   return {
     Ionicons: ({ name, ...rest }: { name: string }) => (
@@ -1319,31 +1323,107 @@ describe('ChatShell', () => {
       mockIsFocused = true;
     });
 
-    it('does not call onSend when the screen is unfocused', async () => {
-      mockIsFocused = false;
-      const onSend = jest.fn();
-      renderChatShell({ onSend });
+    it('does not call onSend when the screen is unfocused (web only)', async () => {
+      // [CCR PR #268] The dormant-Send guard is web-only — `isWebDormant`
+      // gates the short-circuit. Force Platform.OS='web' so this assertion
+      // exercises the actual web stale-instance race; on native there is
+      // no second mounted instance.
+      const RN = require('react-native');
+      const originalPlatform = RN.Platform.OS;
+      Object.defineProperty(RN.Platform, 'OS', { get: () => 'web' });
 
-      // Type something into the input. With editable={!isStreaming &&
-      // isFocused} the field is disabled while unfocused, but onChangeText
-      // still fires through fireEvent — that is fine; the test cares about
-      // whether the Send press triggers onSend.
-      await act(async () => {
-        fireEvent.changeText(screen.getByTestId('chat-input'), 'hello');
-      });
-      await act(async () => {
-        fireEvent.press(screen.getByTestId('send-button'));
-      });
+      try {
+        mockIsFocused = false;
+        const onSend = jest.fn();
+        renderChatShell({ onSend });
 
-      expect(onSend).not.toHaveBeenCalled();
+        // Type something into the input. With editable gated by
+        // `isWebDormant` the field is disabled on web while unfocused,
+        // but onChangeText still fires through fireEvent — that is fine;
+        // the test cares about whether the Send press triggers onSend.
+        await act(async () => {
+          fireEvent.changeText(
+            screen.getByTestId('chat-input', {
+              includeHiddenElements: true,
+            }),
+            'hello',
+          );
+        });
+        await act(async () => {
+          fireEvent.press(
+            screen.getByTestId('send-button', {
+              includeHiddenElements: true,
+            }),
+          );
+        });
+
+        expect(onSend).not.toHaveBeenCalled();
+      } finally {
+        Object.defineProperty(RN.Platform, 'OS', {
+          get: () => originalPlatform,
+        });
+      }
     });
 
-    it('disables the Send Pressable while unfocused, even with non-empty input', () => {
-      mockIsFocused = false;
-      renderChatShell({ onSend: jest.fn() });
+    it('disables the Send Pressable while unfocused on web, even with non-empty input', async () => {
+      const RN = require('react-native');
+      const originalPlatform = RN.Platform.OS;
+      Object.defineProperty(RN.Platform, 'OS', { get: () => 'web' });
 
-      const send = screen.getByTestId('send-button');
-      expect(send.props.accessibilityState).toMatchObject({ disabled: true });
+      try {
+        mockIsFocused = false;
+        renderChatShell({ onSend: jest.fn() });
+
+        await act(async () => {
+          fireEvent.changeText(
+            screen.getByTestId('chat-input', {
+              includeHiddenElements: true,
+            }),
+            'hello',
+          );
+        });
+
+        const send = screen.getByTestId('send-button', {
+          includeHiddenElements: true,
+        });
+        expect(send.props.accessibilityState).toMatchObject({ disabled: true });
+      } finally {
+        Object.defineProperty(RN.Platform, 'OS', {
+          get: () => originalPlatform,
+        });
+      }
+    });
+
+    // [CCR PR #268] Regression: on native (iOS/Android) the stale-instance
+    // race does not exist because the navigator only mounts the focused
+    // screen. Previously `handleSend` short-circuited on cross-platform
+    // `!isFocused`, which races with keyboard-focus changes mid-tap and
+    // silently drops legitimate Sends — a dead interaction. The fix aligns
+    // the `handleSend` guard with `editable` / `disabled` (`isWebDormant`),
+    // so on native the press always fires onSend.
+    it('still calls onSend on native when useIsFocused is false [CCR PR #268]', async () => {
+      const RN = require('react-native');
+      const originalPlatform = RN.Platform.OS;
+      Object.defineProperty(RN.Platform, 'OS', { get: () => 'android' });
+
+      try {
+        mockIsFocused = false;
+        const onSend = jest.fn();
+        renderChatShell({ onSend });
+
+        await act(async () => {
+          fireEvent.changeText(screen.getByTestId('chat-input'), 'hello');
+        });
+        await act(async () => {
+          fireEvent.press(screen.getByTestId('send-button'));
+        });
+
+        expect(onSend).toHaveBeenCalledWith('hello');
+      } finally {
+        Object.defineProperty(RN.Platform, 'OS', {
+          get: () => originalPlatform,
+        });
+      }
     });
 
     it('removes the input row from web layout when unfocused', () => {

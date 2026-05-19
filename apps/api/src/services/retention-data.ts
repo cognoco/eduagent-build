@@ -1346,9 +1346,6 @@ export async function updateRetentionFromSession(
     },
   });
 
-  const updatedAtLockWindowStart = new Date(card.updatedAt.getTime() - 1);
-  const updatedAtLockWindowEnd = new Date(card.updatedAt.getTime() + 1);
-
   const updateResult = await db
     .update(retentionCards)
     .set({
@@ -1363,16 +1360,22 @@ export async function updateRetentionFromSession(
       and(
         eq(retentionCards.id, card.id),
         eq(retentionCards.profileId, profileId),
-        // Optimistic lock: only update if the card hasn't been modified
+        // [B73] Optimistic lock: only update if the card hasn't been modified
         // since we read it. Prevents silent overwrites from concurrent sessions.
-        // Skip the lock for newly-created cards — no concurrent write is possible,
-        // and use a 1ms equality window for existing cards because PostgreSQL
-        // microsecond timestamps truncate to JS milliseconds on read.
+        // Skip the lock for newly-created cards — no concurrent write is possible.
+        // Use a strict equality match for existing cards: every writer in this
+        // service is JS (Drizzle ORM via `new Date()` / `Date.now()`), so
+        // `updatedAt` values are always millisecond-aligned and round-trip
+        // through PostgreSQL `timestamptz` losslessly at JS precision. The
+        // previous ±1ms tolerance window was justified by a "PostgreSQL
+        // microsecond truncation" claim that doesn't apply to JS-only writers
+        // — it silently allowed concurrent writes that happened within 1ms of
+        // each other to overwrite stale reads. If a non-JS writer (raw SQL,
+        // background job in another language, etc.) is ever introduced, revisit
+        // this comparison rather than re-widening it blindly.
         ...(ensured.isNew
           ? []
-          : [
-              sql`${retentionCards.updatedAt} >= ${updatedAtLockWindowStart} AND ${retentionCards.updatedAt} < ${updatedAtLockWindowEnd}`,
-            ]),
+          : [eq(retentionCards.updatedAt, card.updatedAt)]),
       ),
     )
     .returning();

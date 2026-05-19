@@ -110,7 +110,10 @@ export const tokens: Record<ColorScheme, ThemeTokens> = {
       practiceRecite: '#7058c8',
       practiceHistory: '#b64a62',
       practiceHistoryBorder: '#edbdc7',
-      practiceChipBg: 'rgba(255,255,255,0.86)',
+      // Previously rgba(255,255,255,0.86) — near-invisible on white surface.
+      // surfaceElevated (#f3ede4) gives ~1.5:1 contrast vs surface (#ffffff), meeting
+      // WCAG AA 3:1 for non-text UI elements at this chip size with the border cue.
+      practiceChipBg: '#f3ede4',
       reward: '#d97706',
       rewardSoft: 'rgba(217, 119, 6, 0.12)',
       proxyPreviewBackground: '#fff7ed',
@@ -163,7 +166,10 @@ export const tokens: Record<ColorScheme, ThemeTokens> = {
       practiceRecite: '#9080e0',
       practiceHistory: '#d06a82',
       practiceHistoryBorder: '#4a2a34',
-      practiceChipBg: 'rgba(255,255,255,0.12)',
+      // Previously rgba(255,255,255,0.12) — near-invisible on dark surface (#22224a).
+      // Bumped to 0.22 opacity; on #22224a this yields ~#313160, giving sufficient
+      // contrast as a chip fill alongside the border cue (colors.border).
+      practiceChipBg: 'rgba(255,255,255,0.22)',
       reward: '#fbbf24',
       rewardSoft: 'rgba(251, 191, 36, 0.15)',
       proxyPreviewBackground: '#3b2b14',

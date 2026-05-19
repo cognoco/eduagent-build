@@ -135,8 +135,12 @@ describe('Surface ownership self-check: guard is not always-green', () => {
       {
         source: '../../hooks/use-progress',
         named: ['useProgressInventory'],
+        namedAliases: [
+          { exported: 'useProgressInventory', local: 'useProgressInventory' },
+        ],
         default: null,
         namespace: null,
+        namespaceAccesses: [],
       },
     ];
 
@@ -157,8 +161,12 @@ describe('Surface ownership self-check: guard is not always-green', () => {
       {
         source: '../../hooks/use-progress',
         named: ['useOverallProgress'],
+        namedAliases: [
+          { exported: 'useOverallProgress', local: 'useOverallProgress' },
+        ],
         default: null,
         namespace: null,
+        namespaceAccesses: [],
       },
     ];
 
@@ -179,8 +187,12 @@ describe('Surface ownership self-check: guard is not always-green', () => {
       {
         source: '../../hooks/use-progress',
         named: ['useProgressInventory'],
+        namedAliases: [
+          { exported: 'useProgressInventory', local: 'useProgressInventory' },
+        ],
         default: null,
         namespace: null,
+        namespaceAccesses: [],
       },
     ];
 
@@ -284,5 +296,370 @@ describe('Surface ownership: barrel map', () => {
       // Barrel file doesn't exist yet — that's fine, nothing to check.
       expect(true).toBe(true);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Bug A — Namespace-import bypass break test
+// ---------------------------------------------------------------------------
+
+describe('Surface ownership: namespace-import bypass (Bug A)', () => {
+  const tmpFiles: string[] = [];
+  const tmpDirs: string[] = [];
+
+  afterAll(() => {
+    for (const f of tmpFiles) {
+      try {
+        fs.unlinkSync(f);
+      } catch {
+        /* ignore */
+      }
+    }
+    for (const d of tmpDirs) {
+      try {
+        fs.rmdirSync(d);
+      } catch {
+        /* ignore */
+      }
+    }
+  });
+
+  it('flags `import * as P; P.useProgressInventory` on a session surface', () => {
+    // Write a synthetic file under the session surface and verify checkFile flags it.
+    const tmpDir = path.join(
+      REPO_ROOT,
+      'apps/mobile/src/app/(app)/session/_namespace_bypass_test',
+    );
+    fs.mkdirSync(tmpDir, { recursive: true });
+    const tmpPath = path.join(tmpDir, '_bypass.tmp.ts');
+    tmpFiles.push(tmpPath);
+    tmpDirs.push(tmpDir);
+
+    const tmpSource = `
+import * as P from '../../../../hooks/use-progress';
+export function Foo() {
+  const inv = P.useProgressInventory();
+  return inv;
+}
+`.trim();
+    fs.writeFileSync(tmpPath, tmpSource, 'utf-8');
+
+    const sessionRule = SURFACE_RULES.find(
+      (r: SurfaceRule) => r.label === 'Session screens',
+    )!;
+    const violations = checkFile(tmpPath, sessionRule, barrelMap, REPO_ROOT);
+
+    expect(violations.length).toBeGreaterThan(0);
+    expect(violations.map((v: Violation) => v.symbol)).toContain(
+      'useProgressInventory',
+    );
+  });
+
+  it('does NOT flag namespace imports that never access a forbidden member', () => {
+    const tmpDir = path.join(
+      REPO_ROOT,
+      'apps/mobile/src/app/(app)/session/_namespace_clean_test',
+    );
+    fs.mkdirSync(tmpDir, { recursive: true });
+    const tmpPath = path.join(tmpDir, '_clean.tmp.ts');
+    tmpFiles.push(tmpPath);
+    tmpDirs.push(tmpDir);
+
+    const tmpSource = `
+import * as P from '../../../../hooks/use-progress';
+export function Foo() {
+  // Touch a name that is not on the forbid list.
+  return P.someOtherHelper?.();
+}
+`.trim();
+    fs.writeFileSync(tmpPath, tmpSource, 'utf-8');
+
+    const sessionRule = SURFACE_RULES.find(
+      (r: SurfaceRule) => r.label === 'Session screens',
+    )!;
+    const violations = checkFile(tmpPath, sessionRule, barrelMap, REPO_ROOT);
+    expect(violations).toEqual([]);
+  });
+
+  it('collectImports captures namespace member accesses', () => {
+    const tmpPath = path.join(
+      REPO_ROOT,
+      'apps/mobile/src/lib/_surface-ownership-ns-accesses.tmp.ts',
+    );
+    tmpFiles.push(tmpPath);
+
+    const tmpSource = `
+import * as Lib from '../hooks/use-progress';
+export const a = Lib.useProgressInventory;
+export const b = Lib.someOtherSymbol();
+`.trim();
+    fs.writeFileSync(tmpPath, tmpSource, 'utf-8');
+
+    const records = collectImports(tmpPath);
+    const ns = records.find((r) => r.namespace === 'Lib');
+    expect(ns).toBeDefined();
+    expect(ns!.namespaceAccesses).toContain('useProgressInventory');
+    expect(ns!.namespaceAccesses).toContain('someOtherSymbol');
+  });
+
+  // Bug-A destructuring fix — break test (red-green validated)
+  // Destructuring from a namespace import: `const { useProgressInventory } = Hooks`
+  // is functionally identical to `Hooks.useProgressInventory` and must be flagged.
+  it('flags `const { forbiddenName } = NamespaceImport` on a session surface', () => {
+    const tmpDir = path.join(
+      REPO_ROOT,
+      'apps/mobile/src/app/(app)/session/_namespace_destructure_test',
+    );
+    fs.mkdirSync(tmpDir, { recursive: true });
+    const tmpPath = path.join(tmpDir, '_destructure.tmp.ts');
+    tmpFiles.push(tmpPath);
+    tmpDirs.push(tmpDir);
+
+    // Destructuring from a namespace import — bypasses PropertyAccessExpression
+    // and ElementAccessExpression detection without the new VariableDeclaration check.
+    const tmpSource = `
+import * as Hooks from '../../../../hooks/use-progress';
+const { useProgressInventory } = Hooks;
+export function Foo() {
+  return useProgressInventory();
+}
+`.trim();
+    fs.writeFileSync(tmpPath, tmpSource, 'utf-8');
+
+    const sessionRule = SURFACE_RULES.find(
+      (r: SurfaceRule) => r.label === 'Session screens',
+    )!;
+    const violations = checkFile(tmpPath, sessionRule, barrelMap, REPO_ROOT);
+
+    expect(violations.length).toBeGreaterThan(0);
+    expect(violations.map((v: Violation) => v.symbol)).toContain(
+      'useProgressInventory',
+    );
+  });
+
+  it('collectImports captures namespace accesses from destructuring', () => {
+    const tmpPath = path.join(
+      REPO_ROOT,
+      'apps/mobile/src/lib/_surface-ownership-ns-destructure.tmp.ts',
+    );
+    tmpFiles.push(tmpPath);
+
+    const tmpSource = `
+import * as Lib from '../hooks/use-progress';
+const { useProgressInventory, someOtherSymbol } = Lib;
+`.trim();
+    fs.writeFileSync(tmpPath, tmpSource, 'utf-8');
+
+    const records = collectImports(tmpPath);
+    const ns = records.find((r: ImportRecord) => r.namespace === 'Lib');
+    expect(ns).toBeDefined();
+    expect(ns!.namespaceAccesses).toContain('useProgressInventory');
+    expect(ns!.namespaceAccesses).toContain('someOtherSymbol');
+  });
+
+  it('flags destructuring with rename (`const { forbiddenName: alias } = Ns`)', () => {
+    const tmpDir = path.join(
+      REPO_ROOT,
+      'apps/mobile/src/app/(app)/session/_namespace_destructure_rename_test',
+    );
+    fs.mkdirSync(tmpDir, { recursive: true });
+    const tmpPath = path.join(tmpDir, '_destructure_rename.tmp.ts');
+    tmpFiles.push(tmpPath);
+    tmpDirs.push(tmpDir);
+
+    // Rename in destructuring: the property key is the forbidden name; the local
+    // binding is an alias. The guard must check the property key, not the alias.
+    const tmpSource = `
+import * as Hooks from '../../../../hooks/use-progress';
+const { useProgressInventory: innocentAlias } = Hooks;
+export function Foo() {
+  return innocentAlias();
+}
+`.trim();
+    fs.writeFileSync(tmpPath, tmpSource, 'utf-8');
+
+    const sessionRule = SURFACE_RULES.find(
+      (r: SurfaceRule) => r.label === 'Session screens',
+    )!;
+    const violations = checkFile(tmpPath, sessionRule, barrelMap, REPO_ROOT);
+
+    expect(violations.length).toBeGreaterThan(0);
+    expect(violations.map((v: Violation) => v.symbol)).toContain(
+      'useProgressInventory',
+    );
+  });
+
+  it('does NOT flag destructuring of non-forbidden members from namespace import', () => {
+    const tmpDir = path.join(
+      REPO_ROOT,
+      'apps/mobile/src/app/(app)/session/_namespace_destructure_clean_test',
+    );
+    fs.mkdirSync(tmpDir, { recursive: true });
+    const tmpPath = path.join(tmpDir, '_destructure_clean.tmp.ts');
+    tmpFiles.push(tmpPath);
+    tmpDirs.push(tmpDir);
+
+    const tmpSource = `
+import * as Hooks from '../../../../hooks/use-progress';
+const { someOtherHelper } = Hooks;
+export function Foo() {
+  return someOtherHelper?.();
+}
+`.trim();
+    fs.writeFileSync(tmpPath, tmpSource, 'utf-8');
+
+    const sessionRule = SURFACE_RULES.find(
+      (r: SurfaceRule) => r.label === 'Session screens',
+    )!;
+    const violations = checkFile(tmpPath, sessionRule, barrelMap, REPO_ROOT);
+    expect(violations).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Bug B — Barrel resolution wiring break test
+// ---------------------------------------------------------------------------
+
+describe('Surface ownership: barrel resolution wiring (Bug B)', () => {
+  const tmpFiles: string[] = [];
+  const tmpDirs: string[] = [];
+
+  afterAll(() => {
+    for (const f of tmpFiles) {
+      try {
+        fs.unlinkSync(f);
+      } catch {
+        /* ignore */
+      }
+    }
+    for (const d of tmpDirs) {
+      try {
+        fs.rmdirSync(d);
+      } catch {
+        /* ignore */
+      }
+    }
+  });
+
+  it('flags barrel-aliased forbidden symbol (export { useProgressInventory as innocentName })', () => {
+    // Build a synthetic barrel that aliases a forbidden symbol to a benign name.
+    // A consumer that imports the benign name from the barrel must still be flagged
+    // because the underlying symbol is on the forbid list.
+    const fakeOriginDir = path.join(
+      REPO_ROOT,
+      'apps/mobile/src/lib/_barrel_test_origin',
+    );
+    const fakeBarrelDir = path.join(
+      REPO_ROOT,
+      'apps/mobile/src/lib/_barrel_test_barrel',
+    );
+    fs.mkdirSync(fakeOriginDir, { recursive: true });
+    fs.mkdirSync(fakeBarrelDir, { recursive: true });
+    tmpDirs.push(fakeOriginDir, fakeBarrelDir);
+
+    const originPath = path.join(fakeOriginDir, 'use-progress.ts');
+    const barrelPath = path.join(fakeBarrelDir, 'index.ts');
+    const consumerDir = path.join(
+      REPO_ROOT,
+      'apps/mobile/src/app/(app)/session/_barrel_consumer_test',
+    );
+    fs.mkdirSync(consumerDir, { recursive: true });
+    tmpDirs.push(consumerDir);
+    const consumerPath = path.join(consumerDir, 'consumer.tmp.ts');
+
+    fs.writeFileSync(
+      originPath,
+      `export const useProgressInventory = () => null;\n`,
+      'utf-8',
+    );
+    fs.writeFileSync(
+      barrelPath,
+      `export { useProgressInventory as innocentName } from '../_barrel_test_origin/use-progress';\n`,
+      'utf-8',
+    );
+    fs.writeFileSync(
+      consumerPath,
+      `import { innocentName } from '../../../../lib/_barrel_test_barrel';\nexport const x = innocentName;\n`,
+      'utf-8',
+    );
+
+    tmpFiles.push(originPath, barrelPath, consumerPath);
+
+    // Build a barrel map that includes our synthetic barrel.
+    const augmentedMap = buildBarrelMap(REPO_ROOT, [
+      ...KNOWN_BARRELS,
+      'apps/mobile/src/lib/_barrel_test_barrel/index.ts',
+    ]);
+
+    const sessionRule = SURFACE_RULES.find(
+      (r: SurfaceRule) => r.label === 'Session screens',
+    )!;
+    const violations = checkFile(
+      consumerPath,
+      sessionRule,
+      augmentedMap,
+      REPO_ROOT,
+    );
+
+    expect(violations.length).toBeGreaterThan(0);
+    expect(violations.map((v: Violation) => v.symbol)).toContain(
+      'useProgressInventory',
+    );
+  });
+
+  it('barrel-resolved happy path: clean re-export with no forbidden underlying symbol is not flagged', () => {
+    const fakeOriginDir = path.join(
+      REPO_ROOT,
+      'apps/mobile/src/lib/_barrel_test_origin_clean',
+    );
+    const fakeBarrelDir = path.join(
+      REPO_ROOT,
+      'apps/mobile/src/lib/_barrel_test_barrel_clean',
+    );
+    fs.mkdirSync(fakeOriginDir, { recursive: true });
+    fs.mkdirSync(fakeBarrelDir, { recursive: true });
+    tmpDirs.push(fakeOriginDir, fakeBarrelDir);
+
+    const originPath = path.join(fakeOriginDir, 'helpers.ts');
+    const barrelPath = path.join(fakeBarrelDir, 'index.ts');
+    const consumerDir = path.join(
+      REPO_ROOT,
+      'apps/mobile/src/app/(app)/session/_barrel_consumer_clean_test',
+    );
+    fs.mkdirSync(consumerDir, { recursive: true });
+    tmpDirs.push(consumerDir);
+    const consumerPath = path.join(consumerDir, 'consumer.tmp.ts');
+
+    fs.writeFileSync(
+      originPath,
+      `export const friendlyHelper = () => null;\n`,
+      'utf-8',
+    );
+    fs.writeFileSync(
+      barrelPath,
+      `export { friendlyHelper } from '../_barrel_test_origin_clean/helpers';\n`,
+      'utf-8',
+    );
+    fs.writeFileSync(
+      consumerPath,
+      `import { friendlyHelper } from '../../../../lib/_barrel_test_barrel_clean';\nexport const x = friendlyHelper;\n`,
+      'utf-8',
+    );
+    tmpFiles.push(originPath, barrelPath, consumerPath);
+
+    const augmentedMap = buildBarrelMap(REPO_ROOT, [
+      ...KNOWN_BARRELS,
+      'apps/mobile/src/lib/_barrel_test_barrel_clean/index.ts',
+    ]);
+    const sessionRule = SURFACE_RULES.find(
+      (r: SurfaceRule) => r.label === 'Session screens',
+    )!;
+    const violations = checkFile(
+      consumerPath,
+      sessionRule,
+      augmentedMap,
+      REPO_ROOT,
+    );
+    expect(violations).toEqual([]);
   });
 });

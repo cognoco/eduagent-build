@@ -59,7 +59,8 @@ jest.mock(
         profiles: ReadonlyArray<{ isOwner: boolean }>;
         isParentProxy: boolean;
       }) => {
-        if (!activeProfile) return 'guardian';
+        // Mirror real contract: unknown profile → 'learner' (CCR PR #215 / Bug 305)
+        if (!activeProfile) return 'learner';
         if (isParentProxy) return 'learner';
         if (isGuardianProfile(activeProfile, profiles)) return 'guardian';
         return 'learner';
@@ -143,14 +144,19 @@ describe('OwnLearningScreen', () => {
     expect(capturedProps.activeProfile).toBe(mockActiveProfile);
   });
 
-  it('passes empty profiles array when activeProfile is null', () => {
+  // [CCR PR #215 / Bug 305] When activeProfile is null/unloaded,
+  // resolveTabShape now returns 'learner' (safer least-privilege default
+  // instead of guardian). Own-learning is a guardian-only tab, so the
+  // screen must redirect rather than render LearnerScreen without a
+  // confirmed profile.
+  it('redirects to /home when activeProfile is null (unknown profile defaults to learner shape)', () => {
     mockActiveProfile = null;
+    mockProfiles = [];
 
     render(<OwnLearningScreen />);
 
-    screen.getByTestId('learner-screen');
-    expect(capturedProps.profiles).toEqual([]);
-    expect(capturedProps.activeProfile).toBeNull();
+    screen.getByTestId('mock-redirect-/(app)/home');
+    expect(screen.queryByTestId('learner-screen')).toBeNull();
   });
 
   // ---------------------------------------------------------------------------

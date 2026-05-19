@@ -221,7 +221,7 @@ describe('exchangesFlow', () => {
       expect(messages.system).not.toContain('spark curiosity');
     });
 
-    it('first-encounter scenarios carry probe rules and the returning-topic scenario keeps 5b', () => {
+    it('new-topic scenarios carry the current first-turn rules and returning topics keep 5b', () => {
       const scenarios =
         exchangesFlow.enumerateScenarios?.(generalProfile) ?? [];
       const firstEncounter = scenarios.find(
@@ -245,14 +245,13 @@ describe('exchangesFlow', () => {
       ).system;
       const returningPrompt = exchangesFlow.buildPrompt(returning.input).system;
 
-      expect(firstEncounterPrompt).toContain('FIRST-ENCOUNTER TOPIC RULE');
-      expect(firstEncounterPrompt).toContain(
-        'end with exactly one focused follow-up question',
-      );
-      expect(subjectOpenerPrompt).toContain('SUBJECT OPENER');
-      expect(subjectOpenerPrompt).not.toContain('FIRST-ENCOUNTER TOPIC RULE:');
+      expect(firstEncounterPrompt).toContain('FIRST TURN RULE (new topic):');
+      expect(firstEncounterPrompt).toContain('end with a single short check');
+      expect(subjectOpenerPrompt).toContain('FIRST TURN RULE (new topic):');
+      expect(subjectOpenerPrompt).toContain('teach the first concrete idea');
+      expect(subjectOpenerPrompt).not.toContain('SUBJECT OPENER');
       expect(returningPrompt).toContain('exactly one learner action');
-      expect(returningPrompt).not.toContain('FIRST-ENCOUNTER TOPIC RULE');
+      expect(returningPrompt).not.toContain('FIRST TURN RULE (new topic)');
     });
 
     it('S15 review-mode opener contains calibration prompt and not the first-turn teaching rule', () => {

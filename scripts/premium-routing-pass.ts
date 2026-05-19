@@ -774,7 +774,9 @@ async function runCase(
     {
       llmTier: testCase.requestedLlmTier,
       subscriptionTier: testCase.subscriptionTier,
-      advancedLlmProvider: testCase.advancedProvider,
+      // [B71] advancedLlmProvider option removed — manual probe no longer
+      // forces a provider preference. testCase.advancedProvider is kept on
+      // the fixture only for analyzer assertions about expected providers.
       clientId: `${testCase.id}-${runId}`,
       memoryFactsReadEnabled: false,
       memoryFactsRelevanceEnabled: false,

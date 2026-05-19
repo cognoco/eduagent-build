@@ -34,7 +34,27 @@ type MockRow = Classification & {
   line: number;
   mockKind: MockKind;
   target: string;
+  annotation: string;
 };
+
+// Annotation status of a single jest.mock(...) call:
+//   bare                  -> no gc1-allow comment near the call AND no
+//                            requireActual(<target>) anywhere in the file.
+//                            These are the true forward-only violations.
+//   gc1-allow:<label>     -> a `gc1-allow:` comment is attached to the call
+//                            (same line, immediately above, or inside the
+//                            factory body's first line). The label is the
+//                            text immediately after the colon, trimmed.
+//   pattern-a             -> the file contains
+//                            `jest.requireActual('<target>')`, meaning the
+//                            mock factory delegates to the real module and
+//                            only overrides selected exports. The canonical
+//                            cleanup pattern.
+//   pattern-a; gc1-allow:<label> -> both are present.
+//
+// The CSV's `classification` column (P0..P3) still reflects raw risk class
+// from target+area. The new `annotation` column lets the summary separate
+// bare offenders from already-converted mocks.
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -93,6 +113,7 @@ function collectRows(): MockRow[] {
 
   for (const file of files) {
     const source = readFileSync(resolve(REPO_ROOT, file), 'utf-8');
+    const sourceLines = source.split(/\r?\n/);
     const sourceFile = ts.createSourceFile(
       file,
       source,
@@ -113,11 +134,18 @@ function collectRows(): MockRow[] {
           const { line } = sourceFile.getLineAndCharacterOfPosition(
             node.getStart(sourceFile),
           );
+          const annotation = detectAnnotation(
+            source,
+            sourceLines,
+            line,
+            target,
+          );
           rows.push({
             file,
             line: line + 1,
             mockKind,
             target,
+            annotation,
             ...classifyMock(file, target),
           });
         }
@@ -163,6 +191,54 @@ function collectTestFiles(dir: string, files: string[]): void {
       files.push(normalizePath(relative(REPO_ROOT, absPath)));
     }
   }
+}
+
+function detectAnnotation(
+  source: string,
+  sourceLines: string[],
+  zeroBasedLine: number,
+  target: string,
+): string {
+  // Look at: same line trailing comment, the line immediately above (a leading
+  // // comment), and the next line (start of the factory body which often holds
+  // an inline /* gc1-allow: ... */).
+  const windowStart = Math.max(0, zeroBasedLine - 1);
+  const windowEnd = Math.min(sourceLines.length - 1, zeroBasedLine + 1);
+  const windowText = sourceLines.slice(windowStart, windowEnd + 1).join('\n');
+
+  // Match `gc1-allow: <label>` and capture the label up to a newline,
+  // a `*/` block-comment terminator, or any `*` (avoids eating into a
+  // following block-comment `*`). Works for both `//` line comments and
+  // `/* */` block comments. Without an explicit terminator anchor, the
+  // capture would either swallow trailing source or fail to match line
+  // comments because `$` without the `m` flag means end-of-string.
+  const gc1Match = windowText.match(/gc1-allow\s*:\s*([^*\n\r]+)/i);
+  let gc1Label = '';
+  if (gc1Match) {
+    gc1Label = gc1Match[1].trim();
+    // Strip trailing comment delimiters or block-comment punctuation.
+    gc1Label = gc1Label.replace(/[*/]+$/, '').trim();
+  }
+
+  let isPatternA = false;
+  if (target && target !== '<non-literal>') {
+    const escapedTarget = target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const requireActualRe = new RegExp(
+      `requireActual\\s*\\(\\s*['"\`]${escapedTarget}['"\`]`,
+    );
+    isPatternA = requireActualRe.test(source);
+  }
+
+  if (isPatternA && gc1Label) {
+    return `pattern-a; gc1-allow: ${gc1Label}`;
+  }
+  if (isPatternA) {
+    return 'pattern-a';
+  }
+  if (gc1Label) {
+    return `gc1-allow: ${gc1Label}`;
+  }
+  return 'bare';
 }
 
 function getScriptKind(file: string): ts.ScriptKind {
@@ -575,6 +651,7 @@ function renderCsv(rows: MockRow[]): string {
     'retained_reason',
     'cleanup_batch',
     'basis',
+    'annotation',
   ];
 
   return (
@@ -591,6 +668,7 @@ function renderCsv(rows: MockRow[]): string {
           row.retainedReason,
           row.cleanupBatch,
           row.basis,
+          row.annotation,
         ]
           .map(csvCell)
           .join(','),
@@ -642,6 +720,38 @@ function printSummary(action: 'Generated' | 'Verified', rows: MockRow[]): void {
     (row) => row.file,
     12,
   )) {
+    console.log(`- ${file}: ${count}`);
+  }
+
+  // Annotation breakdown — distinguishes real risk (bare) from already-converted
+  // mocks (pattern-a or gc1-allow). The P1/P2 row counts above include both.
+  const internalish = rows.filter((row) => row.classification !== 'P3');
+  const byAnnotation = new Map<string, number>();
+  for (const row of internalish) {
+    const key = row.annotation.startsWith('bare')
+      ? 'bare'
+      : row.annotation.startsWith('pattern-a; gc1-allow')
+        ? 'pattern-a; gc1-allow'
+        : row.annotation.startsWith('pattern-a')
+          ? 'pattern-a'
+          : row.annotation.startsWith('gc1-allow')
+            ? 'gc1-allow'
+            : 'other';
+    byAnnotation.set(key, (byAnnotation.get(key) ?? 0) + 1);
+  }
+  console.log('\nInternal-ish by annotation status:');
+  for (const [key, count] of Array.from(byAnnotation).sort(
+    (a, b) => b[1] - a[1],
+  )) {
+    console.log(`- ${key}: ${count}`);
+  }
+
+  const bareRows = internalish.filter((row) => row.annotation === 'bare');
+  console.log(
+    `\nBARE internal-ish mocks (true forward-only risk): ${bareRows.length}`,
+  );
+  console.log('Top files with BARE mocks:');
+  for (const [file, count] of topCounts(bareRows, (row) => row.file, 12)) {
     console.log(`- ${file}: ${count}`);
   }
 }

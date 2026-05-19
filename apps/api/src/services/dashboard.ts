@@ -500,19 +500,35 @@ type ChildProgressOutput = {
   currentlyWorkingOn: DashboardChild['currentlyWorkingOn'];
 };
 
-async function buildChildProgressSummariesBatch(
+// [B72] Default window for the snapshot scan. The function only needs the
+// latest snapshot + one snapshot from ~7 days earlier (for weekly deltas), so
+// 90 days is generous slack against irregular snapshot cadence while keeping
+// the query bounded — children with multi-year histories no longer drag the
+// dashboard query into thousands of rows. Callers that need a longer view
+// (e.g. monthly/yearly progress reports) can pass an explicit `windowDays`.
+const DEFAULT_CHILD_PROGRESS_SNAPSHOT_WINDOW_DAYS = 90;
+
+export async function buildChildProgressSummariesBatch(
   db: Database,
   children: ChildProgressInput[],
+  options: { windowDays?: number } = {},
 ): Promise<Map<string, ChildProgressOutput>> {
   if (children.length === 0) return new Map();
 
   const profileIds = children.map((c) => c.childProfileId);
 
+  const windowDays =
+    options.windowDays ?? DEFAULT_CHILD_PROGRESS_SNAPSHOT_WINDOW_DAYS;
+  const snapshotWindowStart = isoDate(subtractDays(new Date(), windowDays));
+
   // 1. Fetch latest snapshots, live session counts, and currentlyWorkingOn
   //    for ALL children in 3 queries (constant count).
   const [allSnapshots, liveCountRows, allLearningProfiles] = await Promise.all([
     db.query.progressSnapshots.findMany({
-      where: inArray(progressSnapshots.profileId, profileIds),
+      where: and(
+        inArray(progressSnapshots.profileId, profileIds),
+        gte(progressSnapshots.snapshotDate, snapshotWindowStart),
+      ),
       orderBy: desc(progressSnapshots.snapshotDate),
     }),
     db

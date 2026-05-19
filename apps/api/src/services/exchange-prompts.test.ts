@@ -515,7 +515,7 @@ describe('buildSystemPrompt — numeric walkthroughs', () => {
 });
 
 describe('buildSystemPrompt — first-encounter topic probe', () => {
-  it('uses the subject opener on the first turn of a never-seen subject', () => {
+  it('uses the new-topic first-turn rule even on the first turn of a never-seen subject', () => {
     const prompt = buildSystemPrompt(
       makeContext({
         topicTitle: 'Photosynthesis',
@@ -525,13 +525,14 @@ describe('buildSystemPrompt — first-encounter topic probe', () => {
       }),
     );
 
-    expect(prompt).toContain('SUBJECT OPENER');
-    expect(prompt).toContain('what brought you to Italian');
-    expect(prompt).not.toContain('FIRST-ENCOUNTER TOPIC RULE:');
-    expect(prompt).not.toContain('end with exactly one learner action');
+    expect(prompt).toContain('FIRST TURN RULE (new topic):');
+    expect(prompt).toContain('identify the most natural starting concept');
+    expect(prompt).toContain('teach the first concrete idea');
+    expect(prompt).not.toContain('SUBJECT OPENER');
+    expect(prompt).not.toContain('what brought you to Italian');
   });
 
-  it('uses teach-while-probe on the first turn of a new topic in a known subject', () => {
+  it('uses the new-topic first-turn rule on the first turn of a new topic in a known subject', () => {
     const prompt = buildSystemPrompt(
       makeContext({
         topicTitle: 'Photosynthesis',
@@ -541,19 +542,15 @@ describe('buildSystemPrompt — first-encounter topic probe', () => {
       }),
     );
 
-    expect(prompt).toContain('FIRST-ENCOUNTER TOPIC RULE');
+    expect(prompt).toContain('FIRST TURN RULE (new topic):');
     expect(prompt).toContain(
-      'one teaching nugget AND one focused follow-up question',
+      'Vagueness from the learner (e.g. "you can start", "general is fine", "anything", silence, "idk") counts as consent',
     );
-    expect(prompt).toContain('confirm only source-supported facts');
-    expect(prompt).toContain('end with exactly one focused follow-up question');
+    expect(prompt).toContain('Do NOT open with an open-ended intake question');
     expect(prompt).not.toContain('end with exactly one learner action');
-    expect(prompt).toContain(
-      'NEVER frame this as an interview, intake, or assessment',
-    );
   });
 
-  it('keeps the topic-probe block through exchange 3 and removes it on exchange 4', () => {
+  it('keeps the new-topic execution block through exchange 3 and removes it on exchange 4', () => {
     const turn3Prompt = buildSystemPrompt(
       makeContext({
         topicTitle: 'Photosynthesis',
@@ -577,8 +574,8 @@ describe('buildSystemPrompt — first-encounter topic probe', () => {
       }),
     );
 
-    expect(turn3Prompt).toContain('FIRST-ENCOUNTER TOPIC RULE');
-    expect(turn4Prompt).not.toContain('FIRST-ENCOUNTER TOPIC RULE');
+    expect(turn3Prompt).toContain('NEW-TOPIC EXECUTION RULE');
+    expect(turn4Prompt).not.toContain('NEW-TOPIC EXECUTION RULE');
   });
 
   it('keeps the original first-turn action rule for returning topics', () => {
@@ -587,12 +584,11 @@ describe('buildSystemPrompt — first-encounter topic probe', () => {
         topicTitle: 'Photosynthesis',
         exchangeCount: 0,
         isFirstEncounter: false,
-        isFirstSessionOfSubject: false,
       }),
     );
 
     expect(prompt).toContain('end with exactly one learner action');
-    expect(prompt).not.toContain('FIRST-ENCOUNTER TOPIC RULE');
+    expect(prompt).not.toContain('FIRST TURN RULE (new topic)');
     expect(prompt).not.toContain('SUBJECT OPENER');
   });
 
@@ -613,9 +609,11 @@ describe('buildSystemPrompt — first-encounter topic probe', () => {
       }),
     );
 
-    expect(languagePrompt).not.toContain('FIRST-ENCOUNTER TOPIC RULE');
+    expect(languagePrompt).not.toContain('FIRST TURN RULE (new topic)');
+    expect(languagePrompt).not.toContain('NEW-TOPIC EXECUTION RULE');
     expect(languagePrompt).not.toContain('SUBJECT OPENER');
-    expect(reviewPrompt).not.toContain('FIRST-ENCOUNTER TOPIC RULE');
+    expect(reviewPrompt).not.toContain('FIRST TURN RULE (new topic)');
+    expect(reviewPrompt).not.toContain('NEW-TOPIC EXECUTION RULE');
     expect(reviewPrompt).not.toContain('SUBJECT OPENER');
   });
 
