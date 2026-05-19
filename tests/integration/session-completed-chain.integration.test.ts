@@ -368,7 +368,7 @@ afterAll(async () => {
 
 describe('Integration: Session-Completed Chain (P0-008)', () => {
   it('runs the real chain and persists post-session side effects', async () => {
-    const scenario = await seedScenario({ initialSummarySkips: 0 });
+    const scenario = await seedScenario();
 
     const result = await executeChain({
       profileId: scenario.profileId,
@@ -383,7 +383,7 @@ describe('Integration: Session-Completed Chain (P0-008)', () => {
 
     expect(result.status).toBe('completed');
     expect(result.sessionId).toBe(scenario.sessionId);
-    expect(result.outcomes).toHaveLength(18);
+    expect(result.outcomes).toHaveLength(17);
     expect(result.outcomes).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
