@@ -1065,6 +1065,11 @@
         "savedFromChat": "Salvo do chat",
         "emptyShort": "Nenhum chat salvo para este tópico",
         "emptyLong": "Ainda não há explicações salvas para este tópico."
+      },
+      "challengeVerifiedBadge": "Desafio verificado",
+      "practicedOftenHint": "Você pratica muito este tópico — continue assim!",
+      "relatedRail": {
+        "label": "Tópicos relacionados"
       }
     }
   },
@@ -1311,7 +1316,10 @@
     "languageGreetingContinuePrompt": "Agora adicione mais um cumprimento em {{language}} ou traduza para o inglês um dos cumprimentos que você escreveu.",
     "loadingReview": "Carregando sua verificação salva...",
     "pickerContinueForTopic": "Continuar avaliação para {{title}}",
-    "pickerInProgress": "Em andamento"
+    "pickerInProgress": "Em andamento",
+    "qualityRating": "Qualidade: {{rating}}/5",
+    "depthTransfer": "Compreensão aplicada",
+    "depthExplain": "Explicado com as próprias palavras"
   },
   "homework": {
     "permissionTitle": "É necessário acesso à câmera",

@@ -1110,6 +1110,11 @@
         "savedFromChat": "Saved from chat",
         "emptyShort": "No saved chat for this topic yet",
         "emptyLong": "No saved explanations for this topic yet."
+      },
+      "challengeVerifiedBadge": "Challenge verified",
+      "practicedOftenHint": "You practice this topic often — keep it up!",
+      "relatedRail": {
+        "label": "Related topics"
       }
     }
   },
@@ -1356,7 +1361,10 @@
     "studiedToday": "Studied today",
     "studiedYesterday": "Studied yesterday",
     "studiedDaysAgo": "Studied {{count}} days ago",
-    "topicPassedNote": "Nice work - this topic is marked as passed, and weak spots will come back through review when they need attention."
+    "topicPassedNote": "Nice work - this topic is marked as passed, and weak spots will come back through review when they need attention.",
+    "qualityRating": "Quality: {{rating}}/5",
+    "depthTransfer": "Applied understanding",
+    "depthExplain": "Explained in own words"
   },
   "homework": {
     "permissionTitle": "Camera Access Needed",

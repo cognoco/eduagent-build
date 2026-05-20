@@ -1065,6 +1065,11 @@
         "savedFromChat": "Zapisano z czatu",
         "emptyShort": "Brak zapisanych czatów w tym temacie",
         "emptyLong": "Brak zapisanych wyjaśnień w tym temacie."
+      },
+      "challengeVerifiedBadge": "Wyzwanie potwierdzone",
+      "practicedOftenHint": "Często ćwiczysz ten temat — tak trzymaj!",
+      "relatedRail": {
+        "label": "Powiązane tematy"
       }
     }
   },
@@ -1311,7 +1316,10 @@
     "languageGreetingContinuePrompt": "Teraz dodaj jeszcze jedno powitanie w języku {{language}} lub przetłumacz jedno z napisanych powitań na angielski.",
     "loadingReview": "Ładowanie zapisanego sprawdzenia...",
     "pickerContinueForTopic": "Kontynuuj sprawdzanie dla {{title}}",
-    "pickerInProgress": "W toku"
+    "pickerInProgress": "W toku",
+    "qualityRating": "Jakość: {{rating}}/5",
+    "depthTransfer": "Zastosowane rozumienie",
+    "depthExplain": "Wyjaśnione własnymi słowami"
   },
   "homework": {
     "permissionTitle": "Wymagany dostęp do aparatu",

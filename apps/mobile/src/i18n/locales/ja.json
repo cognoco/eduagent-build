@@ -1040,6 +1040,11 @@
         "savedFromChat": "チャットから保存",
         "emptyShort": "このトピックで保存されたチャットはまだありません",
         "emptyLong": "このトピックで保存された説明はまだありません。"
+      },
+      "challengeVerifiedBadge": "チャレンジ確認済み",
+      "practicedOftenHint": "このトピックをよく練習しています — 続けましょう！",
+      "relatedRail": {
+        "label": "関連トピック"
       }
     }
   },
@@ -1286,7 +1291,10 @@
     "languageGreetingContinuePrompt": "{{language}}でもう1つ挨拶を追加するか、書いた挨拶の1つを英語に訳してください。",
     "loadingReview": "保存したチェックを読み込み中...",
     "pickerContinueForTopic": "{{title}}の評価を続ける",
-    "pickerInProgress": "進行中"
+    "pickerInProgress": "進行中",
+    "qualityRating": "品質: {{rating}}/5",
+    "depthTransfer": "応用した理解",
+    "depthExplain": "自分の言葉で説明した"
   },
   "homework": {
     "permissionTitle": "カメラへのアクセスが必要です",

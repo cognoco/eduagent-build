@@ -1040,6 +1040,11 @@
         "savedFromChat": "Guardado del chat",
         "emptyShort": "Aún no hay chats guardados para este tema",
         "emptyLong": "Aún no hay explicaciones guardadas para este tema."
+      },
+      "challengeVerifiedBadge": "Desafío verificado",
+      "practicedOftenHint": "Practicas este tema con frecuencia — ¡sigue así!",
+      "relatedRail": {
+        "label": "Temas relacionados"
       }
     }
   },
@@ -1286,7 +1291,10 @@
     "languageGreetingContinuePrompt": "Ahora añade un saludo más en {{language}} o traduce al inglés uno de los que escribiste.",
     "loadingReview": "Cargando tu comprobación guardada...",
     "pickerContinueForTopic": "Continuar evaluación para {{title}}",
-    "pickerInProgress": "En curso"
+    "pickerInProgress": "En curso",
+    "qualityRating": "Calidad: {{rating}}/5",
+    "depthTransfer": "Comprensión aplicada",
+    "depthExplain": "Explicado con las propias palabras"
   },
   "homework": {
     "permissionTitle": "Se necesita acceso a la cámara",

@@ -1040,6 +1040,11 @@
         "savedFromChat": "Lagret fra chat",
         "emptyShort": "Ingen lagret chat for dette emnet ennå",
         "emptyLong": "Ingen lagrede forklaringer for dette emnet ennå."
+      },
+      "challengeVerifiedBadge": "Utfordring bekreftet",
+      "practicedOftenHint": "Du øver ofte på dette emnet — fortsett slik!",
+      "relatedRail": {
+        "label": "Relaterte emner"
       }
     }
   },
@@ -1286,7 +1291,10 @@
     "languageGreetingContinuePrompt": "Legg nå til én hilsen til på {{language}}, eller oversett en av hilsenene du skrev til engelsk.",
     "loadingReview": "Laster din lagrede sjekk ...",
     "pickerContinueForTopic": "Fortsett vurdering for {{title}}",
-    "pickerInProgress": "Pågår"
+    "pickerInProgress": "Pågår",
+    "qualityRating": "Kvalitet: {{rating}}/5",
+    "depthTransfer": "Anvendt forståelse",
+    "depthExplain": "Forklart med egne ord"
   },
   "homework": {
     "permissionTitle": "Kameratilgang nødvendig",
