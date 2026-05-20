@@ -297,6 +297,13 @@ jest.mock('../../lib/api-client', () => ({
   ...jest.requireActual('../../lib/api-client'),
   useApiClient: () => ({}),
 }));
+jest.mock('../../lib/app-context', () => ({
+  useAppContext: () => ({
+    mode: mockLinkedChildren.length > 0 ? 'family' : 'study',
+    setMode: jest.fn(),
+    familyCapable: mockLinkedChildren.length > 0,
+  }),
+}));
 let mockSearchParams: { profileId?: string | string[] } = {};
 jest.mock('expo-router', () => {
   const ReactReq = jest.requireActual<typeof import('react')>('react');

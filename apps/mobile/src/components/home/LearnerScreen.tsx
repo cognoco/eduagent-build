@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { router, type Href } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import type { Profile } from '@eduagent/schemas';
@@ -115,6 +115,7 @@ export function LearnerScreen({
   mode = null,
 }: LearnerScreenProps): React.ReactElement {
   const { t } = useTranslation();
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
   const { colorScheme } = useTheme();

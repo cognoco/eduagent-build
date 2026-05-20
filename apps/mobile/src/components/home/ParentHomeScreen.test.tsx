@@ -57,6 +57,16 @@ jest.mock(
 );
 
 jest.mock(
+  '../../lib/use-mode-switch' /* gc1-allow: mode switch invalidates TanStack queries; tests assert home routing only */,
+  () => ({
+    useModeSwitch: () => ({
+      switchMode: jest.fn(),
+      isSwitchingRef: { current: false },
+    }),
+  }),
+);
+
+jest.mock(
   '../../hooks/use-subscription' /* gc1-allow: external hook boundary — wraps TanStack query that requires QueryClient */,
   () => ({
     useSubscription: () => ({ data: { tier: 'family' } }),

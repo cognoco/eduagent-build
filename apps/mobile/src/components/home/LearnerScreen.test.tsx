@@ -106,7 +106,7 @@ const mockClearSessionRecoveryMarker = jest.fn();
 const mockIsRecoveryMarkerFresh = jest.fn();
 jest.mock('expo-router', () => ({
   router: { push: mockPush, replace: jest.fn() },
-  useRouter: () => ({ push: mockPush }),
+  useRouter: () => ({ push: mockPush, replace: jest.fn() }),
 }));
 
 jest.mock('react-native-safe-area-context', () => ({

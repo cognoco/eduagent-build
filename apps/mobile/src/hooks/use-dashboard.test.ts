@@ -15,6 +15,14 @@ import { queryKeys } from '../lib/query-keys';
 const mockFetch = jest.fn();
 const originalFetch = globalThis.fetch;
 
+jest.mock('../lib/app-context', () => ({
+  useAppContext: () => ({
+    mode: 'family',
+    setMode: jest.fn(),
+    familyCapable: true,
+  }),
+}));
+
 let queryClient: QueryClient;
 
 function createWrapper() {

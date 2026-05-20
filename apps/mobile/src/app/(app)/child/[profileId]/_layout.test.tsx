@@ -24,8 +24,16 @@ jest.mock('expo-router', () => {
     capturedScreens.push(props);
     return null;
   };
-  return { Stack: MockStack };
+  return {
+    Stack: MockStack,
+    useRouter: () => ({ replace: jest.fn() }),
+  };
 });
+
+jest.mock('../../../../components/guards/RequireFamilyContext', () => ({
+  RequireFamilyContext: ({ children }: { children: React.ReactNode }) =>
+    children,
+}));
 
 jest.mock('../../../../lib/theme', () => ({
   // gc1-allow: theme hook requires native ColorScheme unavailable in JSDOM

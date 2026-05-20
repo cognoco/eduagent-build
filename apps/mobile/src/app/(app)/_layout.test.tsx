@@ -1148,8 +1148,8 @@ describe('resolveTabShape', () => {
 });
 
 describe('resolveHomeTabPresentation', () => {
-  it('names the guardian home tab Family Hub', () => {
-    expect(resolveHomeTabPresentation('guardian')).toEqual({
+  it('names the guardian home tab Family Hub in family mode', () => {
+    expect(resolveHomeTabPresentation('guardian', false, 'family')).toEqual({
       titleKey: 'tabs.familyHub',
       accessibilityLabelKey: 'tabs.familyHubLabel',
       iconName: 'Home',
@@ -1165,7 +1165,7 @@ describe('resolveHomeTabPresentation', () => {
   });
 
   it('keeps parent preview on the learner label', () => {
-    expect(resolveHomeTabPresentation('guardian', true)).toEqual({
+    expect(resolveHomeTabPresentation('guardian', true, 'family')).toEqual({
       titleKey: 'tabs.myLearning',
       accessibilityLabelKey: 'tabs.myLearningLabel',
       iconName: 'School',
