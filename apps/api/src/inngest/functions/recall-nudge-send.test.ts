@@ -307,6 +307,32 @@ describe('[CR-RECALL-DEDUP-GUARD] getRecentNotificationCount DB failure — fail
     });
   });
 
+  it('emits app/notification.suppressed when getRecentNotificationCount throws', async () => {
+    const dbError = new Error('connection timeout');
+    mockGetRecentNotificationCount.mockRejectedValueOnce(dbError);
+
+    const { sendEventCalls } = await executeHandler({
+      profileId: 'p-err',
+      fadingCount: 2,
+      topTopicIds: [],
+    });
+
+    // sendEventCalls entries are { name: stepName, payload: { name: eventName, data: {...} } }
+    const suppressedCall = sendEventCalls.find(
+      (c) =>
+        (c.payload as { name?: string })?.name ===
+        'app/notification.suppressed',
+    );
+    expect(suppressedCall).toBeDefined();
+    expect(
+      (suppressedCall?.payload as { data?: Record<string, unknown> })?.data,
+    ).toMatchObject({
+      profileId: 'p-err',
+      notificationType: 'recall_nudge',
+      reason: 'dedup_check_failed',
+    });
+  });
+
   it('does NOT call captureException on the happy path', async () => {
     mockGetRecentNotificationCount.mockResolvedValueOnce(0);
     mockSendPushNotification.mockResolvedValueOnce({

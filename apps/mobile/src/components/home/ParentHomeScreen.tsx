@@ -37,6 +37,7 @@ import {
 } from '../family/WithdrawalCountdownBanner';
 import { NudgeActionSheet } from '../nudge/NudgeActionSheet';
 import { ParentTransitionNotice } from './ParentTransitionNotice';
+import { BaseCoachingCard } from '../coaching/BaseCoachingCard';
 
 const MAX_TONIGHT_PROMPTS = 3;
 
@@ -1166,7 +1167,8 @@ export function ParentHomeScreen({
           </Text>
           <Text className="text-body-sm text-text-secondary mt-1">
             {t('home.parent.studyActivation.body', {
-              defaultValue: 'Switch to My Learning when this is your study time.',
+              defaultValue:
+                'Switch to My Learning when this is your study time.',
             })}
           </Text>
           <Pressable
@@ -1192,31 +1194,13 @@ export function ParentHomeScreen({
 
         <View style={{ gap: 10 }}>
           {linkedChildren.length === 0 ? (
-            <View
-              className="bg-coaching-card rounded-card px-5 py-5"
+            <BaseCoachingCard
+              headline={t('home.parent.empty.title')}
+              subtext={t('home.parent.empty.body')}
+              primaryLabel={t('home.parent.empty.cta')}
+              onPrimary={handleAddChild}
               testID="add-first-child-screen"
-            >
-              <Text className="text-h3 font-bold text-text-primary">
-                {t('home.parent.empty.title')}
-              </Text>
-              <Text className="text-body text-text-secondary mt-2">
-                {t('home.parent.empty.body')}
-              </Text>
-              <Pressable
-                onPress={handleAddChild}
-                className="bg-primary rounded-button px-4 py-3 mt-5 items-center min-h-[48px] justify-center"
-                style={
-                  Platform.OS === 'web' ? { cursor: 'pointer' } : undefined
-                }
-                accessibilityRole="button"
-                accessibilityLabel={t('home.parent.empty.cta')}
-                testID="add-first-child-cta"
-              >
-                <Text className="text-body font-semibold text-text-inverse">
-                  {t('home.parent.empty.cta')}
-                </Text>
-              </Pressable>
-            </View>
+            />
           ) : null}
 
           {linkedChildren.map((child) => (

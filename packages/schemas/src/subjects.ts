@@ -65,6 +65,8 @@ export const subjectSchema = z.object({
   languageCode: languageCodeSchema.nullable().optional(),
   createdAt: isoDateField,
   updatedAt: isoDateField,
+  urgencyBoostUntil: z.union([isoDateField, z.null()]).optional(),
+  urgencyBoostReason: z.string().nullable().optional(),
 });
 export type Subject = z.infer<typeof subjectSchema>;
 

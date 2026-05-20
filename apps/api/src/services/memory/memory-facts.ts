@@ -48,11 +48,28 @@ export function emptyMemorySnapshot(): MemorySnapshot {
   };
 }
 
-export function hasMemoryFactsBackfillMarker(profile: {
+/**
+ * [BUG-365] Returns true if EITHER writer path has populated memory_facts
+ * for this profile — the one-time cron (stamps memoryFactsBackfilledAt) OR
+ * the runtime applyAnalysis path (stamps memoryFactsAnalysedAt).
+ *
+ * Kept under the historical name (alias) so existing callers compile.
+ */
+export function hasMemoryFactsMarker(profile: {
   memoryFactsBackfilledAt?: Date | string | null;
+  memoryFactsAnalysedAt?: Date | string | null;
 }): boolean {
-  return Boolean(profile.memoryFactsBackfilledAt);
+  return Boolean(
+    profile.memoryFactsBackfilledAt || profile.memoryFactsAnalysedAt,
+  );
 }
+
+/**
+ * @deprecated [BUG-365] Renamed to `hasMemoryFactsMarker` — the function
+ * now considers both the backfill-cron marker and the runtime-analysis
+ * marker. Alias preserves call-sites that have not yet been updated.
+ */
+export const hasMemoryFactsBackfillMarker = hasMemoryFactsMarker;
 
 function metadataRecord(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
@@ -68,7 +85,7 @@ function asStringArray(value: unknown): string[] {
 function reconstructStrength(
   text: string,
   metadata: Record<string, unknown>,
-  confidence: unknown
+  confidence: unknown,
 ): StrengthEntry | null {
   const subject =
     typeof metadata['subject'] === 'string' ? metadata['subject'] : '';
@@ -91,7 +108,7 @@ function reconstructStruggle(
   text: string,
   metadata: Record<string, unknown>,
   confidence: unknown,
-  observedAt: Date
+  observedAt: Date,
 ): StruggleEntry | null {
   const topic =
     typeof metadata['topic'] === 'string' ? metadata['topic'] : text;
@@ -121,7 +138,7 @@ function reconstructStruggle(
 
 function reconstructInterest(
   text: string,
-  metadata: Record<string, unknown>
+  metadata: Record<string, unknown>,
 ): InterestEntry {
   const label =
     typeof metadata['label'] === 'string' ? metadata['label'] : text;
@@ -144,7 +161,7 @@ export async function readMemorySnapshotFromFacts(
     memoryEnabled?: boolean;
     memoryInjectionEnabled?: boolean;
   } | null,
-  options?: { respectInjectionToggle?: boolean }
+  options?: { respectInjectionToggle?: boolean },
 ): Promise<MemorySnapshot> {
   const respectInjectionToggle = options?.respectInjectionToggle ?? true;
   const injectionEnabled =
@@ -163,7 +180,7 @@ export async function readMemorySnapshotFromFacts(
 
 export function appendMemoryFactToSnapshot(
   snapshot: MemorySnapshot,
-  row: MemoryFactSnapshotRow
+  row: MemoryFactSnapshotRow,
 ): void {
   const metadata = metadataRecord(row.metadata);
   switch (row.category) {
@@ -177,7 +194,7 @@ export function appendMemoryFactToSnapshot(
         row.text,
         metadata,
         row.confidence,
-        row.observedAt
+        row.observedAt,
       );
       if (entry) snapshot.struggles.push(entry);
       break;
@@ -241,7 +258,7 @@ export function buildProjectionFromMergedState(profile: {
 export async function replaceActiveMemoryFactsForProfile(
   db: MemoryFactsWriter,
   profileId: string,
-  projection: MemoryProjection
+  projection: MemoryProjection,
 ): Promise<void> {
   const existing = await db
     .select({
@@ -274,23 +291,28 @@ export async function replaceActiveMemoryFactsForProfile(
 export async function writeMemoryFactsForAnalysis(
   db: MemoryFactsWriter,
   profileId: string,
-  mergedState: Parameters<typeof buildProjectionFromMergedState>[0]
+  mergedState: Parameters<typeof buildProjectionFromMergedState>[0],
 ): Promise<void> {
   await replaceActiveMemoryFactsForProfile(
     db,
     profileId,
-    buildProjectionFromMergedState(mergedState)
+    buildProjectionFromMergedState(mergedState),
   );
+  // [BUG-365] Runtime applyAnalysis path stamps memoryFactsAnalysedAt —
+  // distinct from memoryFactsBackfilledAt, which is reserved for the
+  // one-time backfill cron. Conflating them previously broke orphan-fact
+  // recovery and audit logic because callers couldn't tell which path
+  // populated a profile's memory_facts rows.
   await db
     .update(learningProfiles)
-    .set({ memoryFactsBackfilledAt: new Date() })
+    .set({ memoryFactsAnalysedAt: new Date(), updatedAt: new Date() })
     .where(eq(learningProfiles.profileId, profileId));
 }
 
 export async function writeMemoryFactsForDeletion(
   db: MemoryFactsWriter,
   profileId: string,
-  mergedState: Parameters<typeof buildProjectionFromMergedState>[0]
+  mergedState: Parameters<typeof buildProjectionFromMergedState>[0],
 ): Promise<void> {
   await writeMemoryFactsForAnalysis(db, profileId, mergedState);
 }

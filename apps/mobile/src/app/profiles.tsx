@@ -10,8 +10,9 @@ import {
   Platform,
   KeyboardAvoidingView,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAuth } from '@clerk/clerk-expo';
 import { useTranslation } from 'react-i18next';
 import { useProfile, isGuardianProfile } from '../lib/profile';
 import { goBackOrReplace } from '../lib/navigation';
@@ -29,6 +30,7 @@ export default function ProfilesScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const { isLoaded, isSignedIn } = useAuth();
   const { profiles, activeProfile, switchProfile, isLoading } = useProfile();
   const { data: subscription } = useSubscription();
   const { data: familyData } = useFamilySubscription(
@@ -159,6 +161,7 @@ export default function ProfilesScreen() {
     switchInFlightRef.current = true;
     setIsSwitching(true);
     const timeoutId = setTimeout(() => {
+      switchInFlightRef.current = false;
       setIsSwitching(false);
       platformAlert('Taking longer than expected', 'Please try again.');
     }, 20_000);
@@ -219,6 +222,22 @@ export default function ProfilesScreen() {
     setPendingChildName('');
   };
 
+  // [BUG-375] Auth gate — deep-link entry must not show profile data to
+  // unauthenticated users. Guard before rendering any profile content.
+  if (!isLoaded) {
+    return (
+      <View
+        testID="profiles-auth-loading"
+        className="flex-1 bg-background items-center justify-center"
+      >
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
+  if (!isSignedIn) {
+    return <Redirect href="/sign-in" />;
+  }
+
   return (
     <View
       className="flex-1 bg-background"
@@ -270,7 +289,7 @@ export default function ProfilesScreen() {
             const initial = profile.displayName.charAt(0).toUpperCase();
             const roleLabel = isGuardianProfile(profile, profiles)
               ? 'Parent'
-              : 'Student';
+              : 'Learner';
 
             return (
               <Pressable

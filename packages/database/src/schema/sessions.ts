@@ -83,34 +83,43 @@ export const filingStatusEnum = pgEnum('filing_status', [
 //   • parseOnboardingDraftExtractedSignals(raw)
 // from @eduagent/schemas/db-jsonb before treating the value as the typed
 // shape. The $type<…> annotations below are TS hints only.
-export const onboardingDrafts = pgTable('onboarding_drafts', {
-  id: uuid('id')
-    .primaryKey()
-    .$defaultFn(() => generateUUIDv7()),
-  profileId: uuid('profile_id')
-    .notNull()
-    .references(() => profiles.id, { onDelete: 'cascade' }),
-  subjectId: uuid('subject_id')
-    .notNull()
-    .references(() => subjects.id, { onDelete: 'cascade' }),
-  exchangeHistory: jsonb('exchange_history')
-    .notNull()
-    .default([])
-    .$type<OnboardingDraftExchangeHistory>(),
-  extractedSignals: jsonb('extracted_signals')
-    .notNull()
-    .default({})
-    .$type<OnboardingDraftExtractedSignals>(),
-  status: draftStatusEnum('status').notNull().default('in_progress'),
-  failureCode: text('failure_code'),
-  expiresAt: timestamp('expires_at', { withTimezone: true }),
-  createdAt: timestamp('created_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+export const onboardingDrafts = pgTable(
+  'onboarding_drafts',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .$defaultFn(() => generateUUIDv7()),
+    profileId: uuid('profile_id')
+      .notNull()
+      .references(() => profiles.id, { onDelete: 'cascade' }),
+    subjectId: uuid('subject_id')
+      .notNull()
+      .references(() => subjects.id, { onDelete: 'cascade' }),
+    exchangeHistory: jsonb('exchange_history')
+      .notNull()
+      .default([])
+      .$type<OnboardingDraftExchangeHistory>(),
+    extractedSignals: jsonb('extracted_signals')
+      .notNull()
+      .default({})
+      .$type<OnboardingDraftExtractedSignals>(),
+    status: draftStatusEnum('status').notNull().default('in_progress'),
+    failureCode: text('failure_code'),
+    expiresAt: timestamp('expires_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  // [BUG-393] FK index — `profile_id` is the scoped-repo read predicate
+  // (`packages/database/src/repository.ts` → onboardingDrafts.findMany /
+  // findFirst via scopedWhere). Without an index every draft lookup
+  // scans the full table. `subject_id` cascade is rare (subject deletion
+  // is admin-only) so deferred.
+  (table) => [index('onboarding_drafts_profile_id_idx').on(table.profileId)],
+);
 
 export const learningSessions = pgTable(
   'learning_sessions',

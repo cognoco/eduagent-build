@@ -6,6 +6,7 @@ import type {
   AssessmentEvaluation,
   AssessmentRecord,
   AssessmentStatus,
+  VerificationDepth,
 } from '@eduagent/schemas';
 import {
   ChatShell,
@@ -137,6 +138,11 @@ export default function AssessmentScreen() {
     evaluation: AssessmentEvaluation;
     status: AssessmentStatus;
   } | null>(null);
+  // Track the depth at which this assessment session concluded so we can
+  // surface it in the result card. Captured from the active assessment record
+  // when synced (covers resumed sessions). New sessions default to 'recall'
+  // which is intentionally hidden (no chip rendered at recall depth).
+  const [finalDepth, setFinalDepth] = useState<VerificationDepth | null>(null);
 
   const [messages, setMessages] = useState<ChatMessage[]>(() =>
     buildAssessmentChatMessages({
@@ -158,6 +164,7 @@ export default function AssessmentScreen() {
     if (messages.some((message) => message.role === 'user')) return;
 
     setAssessmentId(assessment.id);
+    setFinalDepth(assessment.verificationDepth);
     setMessages(
       buildAssessmentChatMessages({
         openingMessage,
@@ -333,6 +340,24 @@ export default function AssessmentScreen() {
             : t('assessment.bands.needsReview');
   const weakAreas = terminalResult?.evaluation.weakAreas ?? [];
 
+  // Quality rating chip: show when present and non-zero (0 = not rated).
+  const qualityRating =
+    terminalResult != null &&
+    terminalResult.evaluation.qualityRating != null &&
+    terminalResult.evaluation.qualityRating > 0
+      ? terminalResult.evaluation.qualityRating
+      : null;
+
+  // Depth chip: only surface elevated depths (explain / transfer). 'recall' is
+  // the default baseline — labelling it adds noise without signal.
+  const showDepthChip = finalDepth === 'explain' || finalDepth === 'transfer';
+
+  // Show the chip row on passed / borderline branches (not on failed_exhausted).
+  const showChips =
+    terminalResult !== null &&
+    terminalResult.status !== 'failed_exhausted' &&
+    (qualityRating !== null || showDepthChip);
+
   const resultCard = terminalResult ? (
     <View
       testID="assessment-result-card"
@@ -344,6 +369,32 @@ export default function AssessmentScreen() {
           band: bandLabel,
         })}
       </Text>
+      {showChips ? (
+        <View className="flex-row flex-wrap gap-2">
+          {qualityRating !== null ? (
+            <View
+              testID="assessment-quality-rating"
+              className="bg-surface rounded-full px-3 py-1 border border-border"
+            >
+              <Text className="text-caption font-medium text-text-secondary">
+                {t('assessment.qualityRating', { rating: qualityRating })}
+              </Text>
+            </View>
+          ) : null}
+          {showDepthChip ? (
+            <View
+              testID="assessment-depth-label"
+              className="bg-accent/15 rounded-full px-3 py-1"
+            >
+              <Text className="text-caption font-semibold text-accent">
+                {finalDepth === 'transfer'
+                  ? t('assessment.depthTransfer')
+                  : t('assessment.depthExplain')}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+      ) : null}
       {terminalResult.status === 'borderline' ? (
         <>
           <Text className="text-body-sm text-text-secondary">

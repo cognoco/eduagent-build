@@ -23,7 +23,7 @@ import {
   getOrCreateLearningProfile,
 } from '../learner-profile';
 import {
-  hasMemoryFactsBackfillMarker,
+  hasMemoryFactsMarker,
   readMemorySnapshotFromFacts,
 } from './memory-facts';
 
@@ -63,7 +63,9 @@ export type MemoryProjection = {
   // ── Memory metadata (always from JSONB) ───────────────────────────────────
   suppressedInferences: string[];
   interestTimestamps: Record<string, string>;
+  // [BUG-365] Two distinct markers — see schema/learning-profiles.ts.
   memoryFactsBackfilledAt: Date | null | undefined;
+  memoryFactsAnalysedAt: Date | null | undefined;
 
   // ── Learning style (always from JSONB) ────────────────────────────────────
   learningStyle: LearningStyle;
@@ -97,6 +99,12 @@ export type MemoryProjection = {
  *     it through via toLearnerSelfView (it is part of the raw profile shape
  *     returned by that route) so it IS wired into the self-view adapter below.
  *
+ *   memoryFactsAnalysedAt — [BUG-365] runtime-analysis counterpart to
+ *     memoryFactsBackfilledAt. Wired into toLearnerSelfView only (same
+ *     rationale as memoryFactsBackfilledAt); deliberately absent from
+ *     toCuratedView because it is an internal writer-path audit column, not
+ *     a user-visible field.
+ *
  *   suppressedInferences — only in learner self-view (the raw profile); the
  *     curated view deliberately omits suppressed items per [F-PV-09].
  *
@@ -121,6 +129,7 @@ export type MemoryProjection = {
  */
 export const PROJECTION_OPT_OUT = new Set<keyof MemoryProjection>([
   'memoryFactsBackfilledAt', // internal marker; see note above
+  'memoryFactsAnalysedAt', // [BUG-365] runtime-stamp counterpart to backfilledAt
   'suppressedInferences', // learner self-view only; omitted from curated view
   'interestTimestamps', // learner self-view only; parents don't see timestamps
   'consentPromptDismissedAt', // learner self-view only; UI-level dismiss ts
@@ -183,6 +192,7 @@ function buildProjectionFromRow(
     suppressedInferences: unknown;
     interestTimestamps: unknown;
     memoryFactsBackfilledAt: Date | null | undefined;
+    memoryFactsAnalysedAt: Date | null | undefined;
     learningStyle: unknown;
     memoryEnabled: boolean;
     memoryCollectionEnabled: boolean;
@@ -221,6 +231,7 @@ function buildProjectionFromRow(
     suppressedInferences: asStringArray(row.suppressedInferences),
     interestTimestamps: asInterestTimestamps(row.interestTimestamps),
     memoryFactsBackfilledAt: row.memoryFactsBackfilledAt,
+    memoryFactsAnalysedAt: row.memoryFactsAnalysedAt,
 
     learningStyle: learningStyleParsed.success
       ? learningStyleParsed.data
@@ -282,8 +293,7 @@ async function buildProjectionForRow(
   row: Parameters<typeof buildProjectionFromRow>[0],
   options?: { memoryFactsReadEnabled?: boolean },
 ): Promise<MemoryProjection> {
-  const useFacts =
-    options?.memoryFactsReadEnabled && hasMemoryFactsBackfillMarker(row);
+  const useFacts = options?.memoryFactsReadEnabled && hasMemoryFactsMarker(row);
 
   if (!useFacts) {
     return buildProjectionFromRow(row);
@@ -339,6 +349,7 @@ export function toLearnerSelfView(projection: MemoryProjection): {
   effectivenessSessionCount: number;
   recentlyResolvedTopics: string[];
   memoryFactsBackfilledAt: Date | null | undefined;
+  memoryFactsAnalysedAt: Date | null | undefined;
 } {
   return {
     id: projection.id,
@@ -354,6 +365,7 @@ export function toLearnerSelfView(projection: MemoryProjection): {
     suppressedInferences: projection.suppressedInferences,
     interestTimestamps: projection.interestTimestamps,
     memoryFactsBackfilledAt: projection.memoryFactsBackfilledAt,
+    memoryFactsAnalysedAt: projection.memoryFactsAnalysedAt,
 
     learningStyle: projection.learningStyle,
 
@@ -381,7 +393,7 @@ export function toLearnerSelfView(projection: MemoryProjection): {
  *
  * Fields NOT wired (in PROJECTION_OPT_OUT): id, profileId, version,
  * createdAt, updatedAt, suppressedInferences, interestTimestamps,
- * memoryFactsBackfilledAt, consentPromptDismissedAt,
+ * memoryFactsBackfilledAt, memoryFactsAnalysedAt, consentPromptDismissedAt,
  * effectivenessSessionCount, recentlyResolvedTopics.
  */
 export function toCuratedView(projection: MemoryProjection): CuratedMemoryView {

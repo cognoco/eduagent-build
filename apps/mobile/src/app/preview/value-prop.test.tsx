@@ -1,4 +1,9 @@
-import { render, screen, fireEvent } from '@testing-library/react-native';
+import {
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+} from '@testing-library/react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import ValuePropScreen from './value-prop';
 import * as state from '../../lib/preview-onboarding-state';
@@ -23,6 +28,7 @@ describe('Preview ValuePropScreen', () => {
       topicText: 'algebra',
       createdAt: new Date().toISOString(),
     });
+    jest.spyOn(state, 'setPreviewState').mockResolvedValue();
   });
 
   it('learner variant renders sample dialogue marked as sample', () => {
@@ -30,6 +36,22 @@ describe('Preview ValuePropScreen', () => {
     render(<ValuePropScreen />);
     expect(screen.getByTestId('preview-value-prop-learner')).toBeTruthy();
     expect(screen.getByTestId('preview-sample-marker')).toBeTruthy();
+  });
+
+  it('renders geography-specific learner copy without formula text', async () => {
+    jest.spyOn(state, 'getPreviewState').mockResolvedValue({
+      intent: 'self',
+      path: 'learner_value_prop',
+      topicText: 'Geography: why deserts form',
+      createdAt: new Date().toISOString(),
+    });
+    (useLocalSearchParams as jest.Mock).mockReturnValue({ variant: 'learner' });
+    render(<ValuePropScreen />);
+
+    expect(
+      await screen.findByText(/desert is defined by low rainfall/i),
+    ).toBeTruthy();
+    expect(screen.queryByText(/formula/i)).toBeNull();
   });
 
   it('parent variant renders sample weekly insight marked as sample', () => {
@@ -51,5 +73,19 @@ describe('Preview ValuePropScreen', () => {
     render(<ValuePropScreen />);
     fireEvent.press(screen.getByTestId('preview-signup-cta'));
     expect(push).toHaveBeenCalledWith('/sign-up');
+  });
+
+  it('parent variant offers a path into the preview lesson', async () => {
+    (useLocalSearchParams as jest.Mock).mockReturnValue({ variant: 'parent' });
+    render(<ValuePropScreen />);
+
+    fireEvent.press(screen.getByTestId('preview-try-lesson-cta'));
+
+    await waitFor(() => {
+      expect(state.setPreviewState).toHaveBeenCalledWith(
+        expect.objectContaining({ path: 'learner_lesson' }),
+      );
+      expect(push).toHaveBeenCalledWith('/preview/topic');
+    });
   });
 });

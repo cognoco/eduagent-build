@@ -16,7 +16,7 @@
 # testID mapping:
 #   ParentHomeScreen.tsx:
 #     - add-first-child-screen          -> zero-state family dashboard card
-#     - add-first-child-cta             -> primary "Add your first child" CTA
+#     - add-first-child-screen-primary             -> primary "Add your first child" CTA
 #   create-profile.tsx:
 #     - create-profile-name             -> child name input (confirms navigation)
 appId: com.mentomate.app
@@ -45,13 +45,13 @@ tags:
     timeout: 10000
 
 - assertVisible:
-    id: 'add-first-child-cta'
+    id: 'add-first-child-screen-primary'
 
 - takeScreenshot: add-first-child-02-zero-state
 
 # ── Part 1: Tap add-first-child CTA → create-profile ──────────────────
 - tapOn:
-    id: 'add-first-child-cta'
+    id: 'add-first-child-screen-primary'
 
 # handleAddChild() checks tier (family/pro allowed) then pushes /create-profile?for=child.
 # parent-solo has a family-tier active subscription so no gate alert fires.

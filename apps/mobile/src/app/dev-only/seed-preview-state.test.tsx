@@ -6,6 +6,7 @@
  */
 
 import { render, waitFor } from '@testing-library/react-native';
+import { useAuth } from '@clerk/clerk-expo';
 
 import {
   clearPreviewState,
@@ -18,6 +19,10 @@ const mockReplace = jest.fn();
 jest.mock('expo-router', () => ({
   useLocalSearchParams: () => mockUseLocalSearchParams(),
   useRouter: () => ({ replace: mockReplace }),
+  // Redirect stub — seed-preview-state renders <Redirect> when not IS_E2E_BUILD.
+  // Tests set EXPO_PUBLIC_E2E=true so Redirect is never reached, but the mock
+  // must be present so the module resolves without error.
+  Redirect: () => null,
 }));
 
 const previousE2E = process.env.EXPO_PUBLIC_E2E;
@@ -35,6 +40,13 @@ describe('SeedPreviewStateScreen', () => {
       path: 'learner_value_prop',
       topicText: 'algebra',
       staleMs: '0',
+    });
+    // Default to signed-in so the isLoaded/isSignedIn guard in the useEffect
+    // doesn't block seeding in tests. Auth-gate behaviour is tested via the
+    // security guard in seed-preview-state.tsx itself; not repeated here.
+    (useAuth as jest.Mock).mockReturnValue({
+      isLoaded: true,
+      isSignedIn: true,
     });
   });
 

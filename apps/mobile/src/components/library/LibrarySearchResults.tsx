@@ -22,6 +22,8 @@ export interface EnrichedSubjectResult {
   isFinished: boolean;
   isPaused: boolean;
   status?: SubjectStatus;
+  urgencyBoostUntil?: string | null;
+  urgencyBoostReason?: string | null;
 }
 
 interface LibrarySearchResultsProps {
@@ -420,6 +422,8 @@ export function LibrarySearchResults({
                 subject.status ?? (subject.isPaused ? 'paused' : 'active')
               }
               tint={subjectTintsById?.get(subject.id)}
+              urgencyBoostUntil={subject.urgencyBoostUntil}
+              urgencyBoostReason={subject.urgencyBoostReason}
               onPress={onSubjectPress}
             />
           ))}

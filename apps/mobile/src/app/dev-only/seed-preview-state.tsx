@@ -1,3 +1,4 @@
+// gate: dev/test only — production users redirected to home.
 /**
  * Dev/E2E-only preview-state seed route.
  *
@@ -5,7 +6,8 @@
  * more than one hour. Dead in production and in non-E2E dev-client builds.
  */
 
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useAuth } from '@clerk/clerk-expo';
+import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
 
@@ -17,6 +19,7 @@ import {
 } from '../../lib/preview-onboarding-state';
 
 const IS_E2E_BUILD =
+  __DEV__ &&
   process.env.NODE_ENV !== 'production' &&
   process.env.EXPO_PUBLIC_E2E === 'true';
 
@@ -28,6 +31,7 @@ const VALID_INTENTS = new Set<PreviewIntent>([
 ]);
 
 const VALID_PATHS = new Set<PreviewPath>([
+  'learner_lesson',
   'learner_value_prop',
   'parent_value_prop',
 ]);
@@ -41,7 +45,7 @@ function parseIntent(value: string | undefined): PreviewIntent {
 function defaultPathForIntent(intent: PreviewIntent): PreviewPath {
   return intent === 'child' || intent === 'both'
     ? 'parent_value_prop'
-    : 'learner_value_prop';
+    : 'learner_lesson';
 }
 
 function parsePath(
@@ -55,6 +59,7 @@ function parsePath(
 
 export default function SeedPreviewStateScreen(): React.ReactElement | null {
   const router = useRouter();
+  const { isLoaded, isSignedIn } = useAuth();
   const [seeded, setSeeded] = useState(false);
   const { intent, path, topicText, staleMs } = useLocalSearchParams<{
     intent?: string;
@@ -65,6 +70,15 @@ export default function SeedPreviewStateScreen(): React.ReactElement | null {
 
   useEffect(() => {
     if (!IS_E2E_BUILD) return;
+    if (!isLoaded) return;
+    if (!isSignedIn) {
+      // [CR-2026-05-20-H3] Refuse to seed for unauthenticated callers — an
+      // attacker on an E2E APK could plant arbitrary preview state that
+      // manipulates the next preview-onboarding flow. Bounce to sign-in
+      // so the dead-end state is recoverable per UX Resilience Rules.
+      router.replace('/(auth)/sign-in');
+      return;
+    }
 
     const run = async () => {
       const parsedIntent = parseIntent(intent);
@@ -89,9 +103,13 @@ export default function SeedPreviewStateScreen(): React.ReactElement | null {
     };
 
     void run();
-  }, [intent, path, router, staleMs, topicText]);
+  }, [intent, isLoaded, isSignedIn, path, router, staleMs, topicText]);
 
   if (!IS_E2E_BUILD) {
+    return <Redirect href="/(app)/home" />;
+  }
+
+  if (!isLoaded || !isSignedIn) {
     return null;
   }
 

@@ -9,11 +9,13 @@ import {
   ScrollView,
   Modal,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import DateTimePicker, {
   type DateTimePickerEvent,
 } from '@react-native-community/datetimepicker';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Redirect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useAuth } from '@clerk/clerk-expo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQueryClient } from '@tanstack/react-query';
 import { useApiClient } from '../lib/api-client';
@@ -76,6 +78,7 @@ export default function CreateProfileScreen() {
   const colors = useThemeColors();
   const queryClient = useQueryClient();
   const client = useApiClient();
+  const { isLoaded, isSignedIn } = useAuth();
   const { activeProfile, profiles, switchProfile } = useProfile();
 
   // BUG-239: Detect whether the current user is a parent adding a child.
@@ -277,6 +280,22 @@ export default function CreateProfileScreen() {
     router,
     handleClose,
   ]);
+
+  // [BUG-375] Auth gate — deep-link entry must not show create-profile form to
+  // unauthenticated users. Guard before rendering any content.
+  if (!isLoaded) {
+    return (
+      <View
+        testID="create-profile-auth-loading"
+        className="flex-1 bg-background items-center justify-center"
+      >
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
+  if (!isSignedIn) {
+    return <Redirect href="/sign-in" />;
+  }
 
   return (
     <KeyboardAvoidingView

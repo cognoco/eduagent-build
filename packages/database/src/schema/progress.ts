@@ -141,6 +141,7 @@ export const notificationTypeEnum = pgEnum('notification_type', [
   'struggle_resolved',
   'dictation_review',
   'session_filing_failed',
+  // 'interview_ready': retained in DB enum (removal needs destructive migration); removed from typed payload union — no sender exists.
   'interview_ready',
   'nudge',
 ]);

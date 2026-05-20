@@ -12,7 +12,7 @@ import type {
   StruggleEntry,
 } from '@eduagent/schemas';
 import {
-  hasMemoryFactsBackfillMarker,
+  hasMemoryFactsMarker,
   readMemorySnapshotFromFacts,
 } from './memory/memory-facts';
 
@@ -56,7 +56,7 @@ function capitalize(s: string): string {
 }
 
 function serializeLearningStyle(
-  style: Record<string, unknown> | null
+  style: Record<string, unknown> | null,
 ): CuratedMemoryItem[] {
   if (!style || typeof style !== 'object') return [];
 
@@ -99,18 +99,18 @@ function buildStruggleItems(struggles: unknown[]): CuratedMemoryItem[] {
 function buildStringArrayItems(
   items: unknown[],
   category: MemoryCategoryKey,
-  formatter: (s: string) => string
+  formatter: (s: string) => string,
 ): CuratedMemoryItem[] {
   return items.flatMap((item) => {
     const value =
       typeof item === 'string'
         ? item
         : item &&
-          typeof item === 'object' &&
-          'label' in item &&
-          typeof item.label === 'string'
-        ? item.label
-        : null;
+            typeof item === 'object' &&
+            'label' in item &&
+            typeof item.label === 'string'
+          ? item.label
+          : null;
     if (!value) return [];
     return [
       {
@@ -149,7 +149,7 @@ export function buildCuratedMemoryView(profile: {
           ? buildStringArrayItems(
               profile.interests,
               'interests',
-              (v) => `Interested in ${v}`
+              (v) => `Interested in ${v}`,
             )
           : [];
         break;
@@ -168,13 +168,13 @@ export function buildCuratedMemoryView(profile: {
           ? buildStringArrayItems(
               profile.communicationNotes,
               'communicationNotes',
-              (v) => capitalize(v)
+              (v) => capitalize(v),
             )
           : [];
         break;
       case 'learningStyle':
         items = serializeLearningStyle(
-          (profile.learningStyle as Record<string, unknown> | null) ?? null
+          (profile.learningStyle as Record<string, unknown> | null) ?? null,
         );
         break;
     }
@@ -206,16 +206,18 @@ export async function buildCuratedMemoryViewForProfile(
   db: Database,
   profileId: string,
   profile: Parameters<typeof buildCuratedMemoryView>[0] & {
+    // [BUG-365] Either marker triggers a read through memory_facts.
     memoryFactsBackfilledAt?: Date | string | null;
+    memoryFactsAnalysedAt?: Date | string | null;
   },
-  options?: { memoryFactsReadEnabled?: boolean }
+  options?: { memoryFactsReadEnabled?: boolean },
 ): Promise<CuratedMemoryView> {
   const snapshot =
-    options?.memoryFactsReadEnabled && hasMemoryFactsBackfillMarker(profile)
+    options?.memoryFactsReadEnabled && hasMemoryFactsMarker(profile)
       ? await readMemorySnapshotFromFacts(
           createScopedRepository(db, profileId),
           profile,
-          { respectInjectionToggle: false }
+          { respectInjectionToggle: false },
         )
       : null;
 
@@ -228,6 +230,6 @@ export async function buildCuratedMemoryViewForProfile(
           struggles: snapshot.struggles,
           communicationNotes: snapshot.communicationNotes,
         }
-      : profile
+      : profile,
   );
 }

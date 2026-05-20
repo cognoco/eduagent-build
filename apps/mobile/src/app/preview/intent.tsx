@@ -1,13 +1,12 @@
 // TODO(telemetry): preview_intent_seen / preview_intent_selected / preview_topic_seen / preview_topic_entered / preview_value_prop_seen / preview_value_prop_cta — see docs/plans/2026-05-19-trial-intent-save-onboarding-v0.md MEDIUM-C3
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { View, Text, Pressable } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   setPreviewState,
   type PreviewIntent,
 } from '../../lib/preview-onboarding-state';
-import { goBackOrReplace } from '../../lib/navigation';
 import { track } from '../../lib/analytics';
 
 interface Option {
@@ -53,6 +52,12 @@ export default function PreviewIntentScreen() {
     track('preview_intent_seen');
   }, []);
 
+  useFocusEffect(
+    useCallback(() => {
+      setSubmitting(false);
+    }, []),
+  );
+
   const onSelect = async (intent: PreviewIntent) => {
     if (submitting) return;
     setSubmitting(true);
@@ -88,10 +93,7 @@ export default function PreviewIntentScreen() {
           bothPriority: 'child_first',
           createdAt,
         });
-        router.push({
-          pathname: '/preview/value-prop',
-          params: { variant: 'parent' },
-        });
+        router.push('/preview/both');
         return;
       }
       // not_sure → lesson fork (v0: same as self)
@@ -113,7 +115,7 @@ export default function PreviewIntentScreen() {
       testID="preview-intent"
     >
       <Pressable
-        onPress={() => goBackOrReplace(router, '/(auth)/sign-in' as const)}
+        onPress={() => router.replace('/(auth)/sign-in')}
         className="self-start min-h-[44px] justify-center mb-2"
         testID="preview-intent-back"
         accessibilityRole="button"
@@ -139,6 +141,7 @@ export default function PreviewIntentScreen() {
           testID={opt.testID}
           accessibilityRole="button"
           accessibilityLabel={opt.label}
+          accessibilityState={{ disabled: submitting }}
         >
           <Text className="text-body font-semibold text-text-primary mb-1">
             {opt.label}

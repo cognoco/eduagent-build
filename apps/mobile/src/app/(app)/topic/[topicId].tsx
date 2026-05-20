@@ -16,7 +16,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { Bookmark, RetentionStatus } from '@eduagent/schemas';
+import type {
+  Bookmark,
+  CurriculumTopic,
+  RetentionStatus,
+} from '@eduagent/schemas';
+import { useBookWithTopics } from '../../../hooks/use-books';
 import {
   useTopicProgress,
   useActiveSessionForTopic,
@@ -324,6 +329,9 @@ export default function TopicDetailScreen() {
   // F-4: Resume active/paused session instead of creating a new one
   const { data: activeSession } = useActiveSessionForTopic(topicId);
 
+  // Related topics: fetch book data (connections live in bookWithTopicsSchema)
+  const { data: bookWithTopics } = useBookWithTopics(subjectId, paramBookId);
+
   // Library v3: notes and sessions
   const { data: notesData, isLoading: notesLoading } = useTopicNotes(
     subjectId,
@@ -369,6 +377,26 @@ export default function TopicDetailScreen() {
   const isCriticalLoading = progressLoading || retentionLoading;
   const retentionStatus = deriveRetentionStatus(retentionCard);
   const topicName = topicProgress?.title ?? '';
+
+  // Signal 1: Related topics derived from topic_connections
+  const relatedTopics = useMemo((): CurriculumTopic[] => {
+    if (!topicId || !bookWithTopics) return [];
+    const { connections, topics } = bookWithTopics;
+    const topicMap = new Map(topics.map((t) => [t.id, t]));
+    return connections
+      .filter((c) => c.topicAId === topicId || c.topicBId === topicId)
+      .map((c) => {
+        const otherId = c.topicAId === topicId ? c.topicBId : c.topicAId;
+        return topicMap.get(otherId);
+      })
+      .filter((t): t is CurriculumTopic => t !== undefined && t.id !== topicId);
+  }, [topicId, bookWithTopics]);
+
+  // Signal 2: Challenge-round mastery verification
+  const isChallengeVerified = !!topicProgress?.masteryChallengeVerifiedAt;
+
+  // Signal 3: Practiced-often hint (failureCount >= 3 on retention card)
+  const showPracticedOftenHint = (retentionCard?.failureCount ?? 0) >= 3;
 
   const lastStudiedText = formatLastStudiedText(
     retentionCard?.lastReviewedAt ??
@@ -706,6 +734,77 @@ export default function TopicDetailScreen() {
               lastStudiedText={lastStudiedText}
             />
 
+            {/* Signal 2: Challenge-verified badge */}
+            {isChallengeVerified ? (
+              <View
+                testID="topic-challenge-verified-badge"
+                style={{
+                  marginHorizontal: 20,
+                  marginTop: 8,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  alignSelf: 'flex-start',
+                  gap: 6,
+                  backgroundColor: withOpacity(colors.success, 0.12),
+                  borderRadius: 999,
+                  paddingHorizontal: 12,
+                  paddingVertical: 5,
+                }}
+                accessibilityLabel={t('library.topic.challengeVerifiedBadge')}
+              >
+                <Ionicons
+                  name="shield-checkmark-outline"
+                  size={14}
+                  color={colors.success}
+                />
+                <Text
+                  style={{
+                    fontSize: 12,
+                    fontWeight: '700',
+                    color: colors.success,
+                    lineHeight: 16,
+                  }}
+                >
+                  {t('library.topic.challengeVerifiedBadge')}
+                </Text>
+              </View>
+            ) : null}
+
+            {/* Signal 3: Practiced-often hint */}
+            {showPracticedOftenHint ? (
+              <View
+                testID="topic-practiced-often-hint"
+                style={{
+                  marginHorizontal: 20,
+                  marginTop: 10,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 8,
+                  backgroundColor: withOpacity(colors.primary, 0.08),
+                  borderRadius: 12,
+                  paddingHorizontal: 14,
+                  paddingVertical: 10,
+                }}
+              >
+                <Ionicons
+                  name="sparkles-outline"
+                  size={16}
+                  color={colors.primary}
+                />
+                <Text
+                  style={{
+                    flex: 1,
+                    fontSize: 13,
+                    lineHeight: 18,
+                    color: colors.textPrimary,
+                    fontWeight: '500',
+                  }}
+                >
+                  {t('library.topic.practicedOftenHint')}
+                </Text>
+              </View>
+            ) : null}
+
             <TopicSectionStrip
               testID="topic-notes-strip"
               icon="create-outline"
@@ -901,6 +1000,77 @@ export default function TopicDetailScreen() {
                     No sessions yet. Start one below!
                   </Text>
                 )}
+              </View>
+            ) : null}
+
+            {/* Signal 1: Related topics rail — hidden when empty */}
+            {relatedTopics.length > 0 ? (
+              <View
+                testID="topic-related-rail"
+                style={{ marginTop: 20, marginBottom: 4 }}
+              >
+                <Text
+                  style={{
+                    marginHorizontal: 20,
+                    fontSize: 11,
+                    fontWeight: '700',
+                    lineHeight: 14,
+                    color: withOpacity(colors.textSecondary, 0.8),
+                    textTransform: 'uppercase',
+                    letterSpacing: 0.5,
+                    marginBottom: 10,
+                  }}
+                >
+                  {t('library.topic.relatedRail.label')}
+                </Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{
+                    paddingHorizontal: 20,
+                    gap: 10,
+                  }}
+                >
+                  {relatedTopics.map((related) => (
+                    <Pressable
+                      key={related.id}
+                      onPress={() =>
+                        router.push({
+                          pathname: '/(app)/topic/[topicId]',
+                          params: {
+                            topicId: related.id,
+                            subjectId: subjectId ?? '',
+                            bookId: paramBookId ?? '',
+                            chapter: related.chapter ?? '',
+                          },
+                        } as Href)
+                      }
+                      accessibilityRole="button"
+                      accessibilityLabel={related.title}
+                      style={{
+                        backgroundColor: withOpacity(colors.primary, 0.08),
+                        borderRadius: 16,
+                        borderWidth: 1,
+                        borderColor: withOpacity(colors.primary, 0.16),
+                        paddingHorizontal: 14,
+                        paddingVertical: 9,
+                        maxWidth: 220,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 14,
+                          fontWeight: '600',
+                          color: colors.primary,
+                          lineHeight: 18,
+                        }}
+                        numberOfLines={2}
+                      >
+                        {related.title}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
               </View>
             ) : null}
           </ScrollView>

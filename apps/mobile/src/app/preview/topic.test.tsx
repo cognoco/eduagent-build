@@ -14,18 +14,13 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
-// prettier-ignore
-jest.mock('../../lib/theme', /* gc1-allow: nativewind vars() does not resolve 'react' in jest; stub theme hooks so screen tests don't blow up on import */ () => ({
-  useThemeColors: () => ({ muted: '#71717a' }),
-  useTheme: () => ({ colorScheme: 'dark' }),
-  useTokenVars: () => ({}),
-}));
-
 describe('Preview TopicScreen', () => {
   const push = jest.fn();
+  const replace = jest.fn();
   beforeEach(() => {
-    (useRouter as jest.Mock).mockReturnValue({ push });
+    (useRouter as jest.Mock).mockReturnValue({ push, replace });
     push.mockReset();
+    replace.mockReset();
     jest.spyOn(state, 'getPreviewState').mockResolvedValue({
       intent: 'self',
       path: 'learner_value_prop',
@@ -34,19 +29,16 @@ describe('Preview TopicScreen', () => {
     jest.spyOn(state, 'setPreviewState').mockResolvedValue();
   });
 
-  it('stores topic and navigates to value-prop learner variant', async () => {
+  it('stores a selected geography sample and navigates to value-prop learner variant', async () => {
     render(<TopicScreen />);
-    fireEvent.changeText(
-      screen.getByTestId('preview-topic-input'),
-      'algebra basics',
-    );
-    fireEvent.press(screen.getByTestId('preview-topic-continue'));
+    fireEvent.press(screen.getByTestId('preview-topic-sample-geography'));
 
     await waitFor(() => {
       expect(state.setPreviewState).toHaveBeenCalledWith(
         expect.objectContaining({
-          topicText: 'algebra basics',
+          topicText: 'Geography: why deserts form',
           intent: 'self',
+          path: 'learner_value_prop',
         }),
       );
     });
@@ -56,9 +48,15 @@ describe('Preview TopicScreen', () => {
     });
   });
 
-  it('disables continue when topic is empty', () => {
+  it('does not render arbitrary free-text topic input', () => {
     render(<TopicScreen />);
-    const cta = screen.getByTestId('preview-topic-continue');
-    expect(cta.props.accessibilityState?.disabled).toBe(true);
+    expect(screen.queryByTestId('preview-topic-input')).toBeNull();
+    expect(screen.queryByText(/sun glasses/i)).toBeNull();
+  });
+
+  it('sends Back to sign in directly', () => {
+    render(<TopicScreen />);
+    fireEvent.press(screen.getByTestId('preview-topic-back'));
+    expect(replace).toHaveBeenCalledWith('/(auth)/sign-in');
   });
 });

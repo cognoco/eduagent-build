@@ -1,6 +1,8 @@
 import { Pressable, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '../../lib/theme';
 import { withOpacity } from '../../lib/color-opacity';
+import type { TopicRelevance } from '@eduagent/schemas';
 
 interface TopicStatusRowProps {
   state: 'continue-now' | 'started' | 'up-next' | 'done' | 'later';
@@ -8,6 +10,8 @@ interface TopicStatusRowProps {
   title: string;
   chapterName?: string;
   sessionCount?: number;
+  /** When present and not 'core', renders a small relevance label */
+  relevance?: TopicRelevance;
   onPress: () => void;
   testID?: string;
 }
@@ -34,9 +38,11 @@ export function TopicStatusRow({
   title,
   chapterName,
   sessionCount,
+  relevance,
   onPress,
   testID,
 }: TopicStatusRowProps) {
+  const { t } = useTranslation();
   const colors = useThemeColors();
   const isHero = state === 'up-next' && variant === 'hero';
   const accentColor = colors.accent ?? colors.warning ?? colors.primary;
@@ -110,6 +116,25 @@ export function TopicStatusRow({
       : null,
   ].filter(Boolean) as string[];
 
+  // Relevance label: skip 'core' (default, no noise)
+  const relevanceLabel =
+    relevance && relevance !== 'core'
+      ? t(`topic.relevance.${relevance}`)
+      : null;
+
+  // Colour mapping: emerging = accent (stands out), contemporary = muted info, recommended = subtle secondary
+  const relevanceLabelColor = (() => {
+    switch (relevance) {
+      case 'emerging':
+        return accentColor;
+      case 'contemporary':
+        return colors.info ?? colors.textSecondary;
+      case 'recommended':
+      default:
+        return colors.textSecondary;
+    }
+  })();
+
   return (
     <Pressable
       testID={testID}
@@ -150,11 +175,29 @@ export function TopicStatusRow({
             >
               {title}
             </Text>
-            {state === 'done' && chapterName ? (
-              <Text className="ms-3 shrink-0 text-caption text-text-secondary">
-                {chapterName}
-              </Text>
-            ) : null}
+            <View className="ms-3 flex-row items-center gap-2 shrink-0">
+              {relevanceLabel ? (
+                <Text
+                  testID={
+                    testID
+                      ? `topic-relevance-label-${testID}`
+                      : 'topic-relevance-label'
+                  }
+                  style={{
+                    fontSize: 10,
+                    fontWeight: '500',
+                    color: relevanceLabelColor,
+                  }}
+                >
+                  {relevanceLabel}
+                </Text>
+              ) : null}
+              {state === 'done' && chapterName ? (
+                <Text className="text-caption text-text-secondary">
+                  {chapterName}
+                </Text>
+              ) : null}
+            </View>
           </View>
 
           {state !== 'done' && chapterName ? (

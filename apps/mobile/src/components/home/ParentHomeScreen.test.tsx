@@ -293,7 +293,7 @@ describe('ParentHomeScreen', () => {
       'Add your first child profile and this screen will turn into tonight prompts, weekly recaps, nudges, and progress cards.',
     );
 
-    fireEvent.press(screen.getByTestId('add-first-child-cta'));
+    fireEvent.press(screen.getByTestId('add-first-child-screen-primary'));
 
     expect(mockPush).toHaveBeenCalledWith({
       pathname: '/create-profile',
@@ -383,8 +383,9 @@ describe('ParentHomeScreen', () => {
         lineHeight: 21,
       }),
     );
-    expect(screen.getAllByText('Fractions · 18 min this week').length)
-      .toBeGreaterThan(0);
+    expect(
+      screen.getAllByText('Fractions · 18 min this week').length,
+    ).toBeGreaterThan(0);
     screen.getByText('Emma · 18 min this week');
     screen.getByText('2 of 5 profiles used');
   });

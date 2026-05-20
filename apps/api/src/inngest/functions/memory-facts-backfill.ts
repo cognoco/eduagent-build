@@ -70,9 +70,13 @@ export const memoryFactsBackfill = inngest.createFunction(
           )
         : undefined;
 
+      // [BUG-365] Skip profiles whose memory_facts have already been
+      // populated by EITHER path — the cron writes via delete+insert and
+      // would wipe rows the runtime applyAnalysis path has already produced.
       const rows = await db.query.learningProfiles.findMany({
         where: and(
           isNull(learningProfiles.memoryFactsBackfilledAt),
+          isNull(learningProfiles.memoryFactsAnalysedAt),
           cursorFilter,
         ),
         columns: { profileId: true, createdAt: true },
@@ -127,7 +131,15 @@ export const memoryFactsBackfill = inngest.createFunction(
                   .where(eq(learningProfiles.profileId, profileId))
                   .for('update')
                   .limit(1);
-                if (!profile || profile.memoryFactsBackfilledAt) return null;
+                // [BUG-365] Skip if either marker is set — runtime
+                // applyAnalysis may have populated the row between the
+                // findMany query above and this FOR UPDATE acquisition.
+                if (
+                  !profile ||
+                  profile.memoryFactsBackfilledAt ||
+                  profile.memoryFactsAnalysedAt
+                )
+                  return null;
 
                 const built = buildBackfillRowsForProfile(profile);
 
@@ -193,9 +205,10 @@ export const memoryFactsBackfill = inngest.createFunction(
 
     // [BUG-148] Self-reinvoke when the run was capped, mirroring
     // filing-stranded-backfill. Termination: each self-trigger consumes the
-    // next MAX_PROFILES_PER_RUN slice; the `memoryFactsBackfilledAt IS NULL`
-    // filter is the natural ceiling — once every profile has been processed
-    // the chain stops because the next query returns no rows.
+    // next MAX_PROFILES_PER_RUN slice; the combined
+    // `memoryFactsBackfilledAt IS NULL AND memoryFactsAnalysedAt IS NULL`
+    // filter is the natural ceiling — once every profile has been processed by
+    // either path the chain stops because the next query returns no rows.
     let selfReinvoked = false;
     if (capped) {
       const last = profilesThisRun[profilesThisRun.length - 1];

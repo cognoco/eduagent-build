@@ -439,6 +439,7 @@ export const sessionSummarySchema = z.object({
   nextTopicReason: z.string().nullable(),
   baseXp: z.number().nullable().optional(),
   reflectionBonusXp: z.number().nullable().optional(),
+  purgedAt: z.string().datetime().nullable().optional(),
 });
 export type SessionSummary = z.infer<typeof sessionSummarySchema>;
 

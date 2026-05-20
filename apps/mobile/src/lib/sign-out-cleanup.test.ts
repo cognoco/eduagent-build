@@ -102,6 +102,16 @@ describe('clearProfileSecureStorageOnSignOut [BUG-723 / SEC-7]', () => {
     );
   });
 
+  it('[BUG-357] clears legacy un-scoped react-query persister blob on sign-out', async () => {
+    // Defense-in-depth on top of the identity-scoped persister key:
+    // pre-fix devices wrote to `eduagent-query-cache`; that orphan must be
+    // wiped on sign-out so it never gets re-used by a future code path.
+    await clearProfileSecureStorageOnSignOut(['profile-a']);
+    expect(AsyncStorage.multiRemove).toHaveBeenCalledWith(
+      expect.arrayContaining(['eduagent-query-cache']),
+    );
+  });
+
   // -------------------------------------------------------------------------
   // [BUG-128 / BREAK] Prefix-based AsyncStorage scan picks up summary-draft
   // (and any future multi-component-key writer) whose individual key shapes

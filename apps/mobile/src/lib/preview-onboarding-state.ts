@@ -4,7 +4,10 @@ export const PREVIEW_INTENT_KEY = 'mentomate_preview_intent';
 export const PREVIEW_TTL_MS = 60 * 60_000; // 1 hour
 
 export type PreviewIntent = 'self' | 'child' | 'both' | 'not_sure';
-export type PreviewPath = 'learner_value_prop' | 'parent_value_prop';
+export type PreviewPath =
+  | 'learner_lesson'
+  | 'learner_value_prop'
+  | 'parent_value_prop';
 export type SaveTarget = 'self' | 'child' | 'both';
 
 export interface PreviewOnboardingStateV0 {

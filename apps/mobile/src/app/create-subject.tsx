@@ -8,8 +8,15 @@ import {
   ScrollView,
   Dimensions,
   Pressable,
+  ActivityIndicator,
 } from 'react-native';
-import { useRouter, useLocalSearchParams, type Href } from 'expo-router';
+import {
+  Redirect,
+  useRouter,
+  useLocalSearchParams,
+  type Href,
+} from 'expo-router';
+import { useAuth } from '@clerk/clerk-expo';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -97,6 +104,7 @@ export default function CreateSubjectScreen() {
     chatTopic?: string;
   }>();
   const colors = useThemeColors();
+  const { isLoaded, isSignedIn } = useAuth();
   const createSubject = useCreateSubject();
   const resolveSubject = useResolveSubject();
   const apiClient = useApiClient();
@@ -315,6 +323,10 @@ export default function CreateSubjectScreen() {
         // [BUG-692] Don't show error alert if user already navigated away.
         if (cancelledRef.current) return;
         const rawMsg = err instanceof Error ? err.message : '';
+        // TODO(typed-error): The API does not yet return a typed error code for
+        // subject limits (no SUBJECT_LIMIT_EXCEEDED code in subjects.ts route).
+        // Replace with `errorHasCode(err, 'SUBJECT_LIMIT_EXCEEDED')` once the
+        // API adds a typed code — matching the create-profile.tsx pattern at line 238.
         setIsSubjectLimitError(
           /subject limit|max subjects|too many subjects/i.test(rawMsg),
         );
@@ -572,6 +584,22 @@ export default function CreateSubjectScreen() {
       : resolveState.phase === 'preparing'
         ? t('subject.preparingCurriculum')
         : t('subject.creatingSubject');
+
+  // [BUG-375] Auth gate — deep-link entry must not show create-subject form to
+  // unauthenticated users. Guard before rendering any content.
+  if (!isLoaded) {
+    return (
+      <View
+        testID="create-subject-auth-loading"
+        className="flex-1 bg-background items-center justify-center"
+      >
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
+  if (!isSignedIn) {
+    return <Redirect href="/sign-in" />;
+  }
 
   return (
     <KeyboardAvoidingView

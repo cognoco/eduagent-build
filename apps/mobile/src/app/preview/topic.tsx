@@ -1,53 +1,78 @@
 import { useEffect, useState } from 'react';
-import { View, Text, TextInput, Pressable } from 'react-native';
+import { View, Text, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useThemeColors } from '../../lib/theme';
 import {
   getPreviewState,
   setPreviewState,
   type PreviewOnboardingStateV0,
 } from '../../lib/preview-onboarding-state';
-import { goBackOrReplace } from '../../lib/navigation';
 import { track } from '../../lib/analytics';
 
-// [MEDIUM-5] Single-line topic cap. The value is persisted to SecureStore for
-// up to 1h pre-signup, so it WILL outlive the screen. Keeping the field short
-// discourages users from pasting longer free text that may contain PII (child
-// names, school names, learning disability descriptions), and the parent-vs-
-// learner branch never needs more than a couple of words to tailor copy.
-// Spec §Preview State (Minimal) accepts the truncated cap.
-const MAX_TOPIC_LEN = 80;
+interface SampleLesson {
+  id: string;
+  title: string;
+  description: string;
+  topicText: string;
+  testID: string;
+}
+
+const SAMPLE_LESSONS: ReadonlyArray<SampleLesson> = [
+  {
+    id: 'geography',
+    title: 'Geography',
+    description: 'Why some places become deserts',
+    topicText: 'Geography: why deserts form',
+    testID: 'preview-topic-sample-geography',
+  },
+  {
+    id: 'fractions',
+    title: 'Fractions',
+    description: 'Compare pieces without guessing',
+    topicText: 'Fractions: compare parts',
+    testID: 'preview-topic-sample-fractions',
+  },
+  {
+    id: 'writing',
+    title: 'Writing',
+    description: 'Plan a clear paragraph',
+    topicText: 'Writing: plan a paragraph',
+    testID: 'preview-topic-sample-writing',
+  },
+];
 
 export default function PreviewTopicScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const colors = useThemeColors();
   const [current, setCurrent] = useState<PreviewOnboardingStateV0 | null>(null);
-  const [topic, setTopic] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     void getPreviewState().then((s) => {
-      if (s) {
-        setCurrent(s);
-        if (s.topicText) setTopic(s.topicText);
-      }
+      if (s) setCurrent(s);
     });
   }, []);
 
-  const trimmed = topic.trim();
-  const canSubmit = trimmed.length > 0 && trimmed.length <= MAX_TOPIC_LEN;
-
-  const onContinue = async () => {
-    if (!canSubmit) return;
+  const onSelect = async (sample: SampleLesson) => {
+    if (submitting) return;
+    setSubmitting(true);
     // Re-fetch state in case the effect hadn't settled when the user pressed.
     const s = current ?? (await getPreviewState());
-    if (!s) return;
-    await setPreviewState({ ...s, topicText: trimmed });
+    const base: PreviewOnboardingStateV0 = s ?? {
+      intent: 'not_sure',
+      path: 'learner_value_prop',
+      createdAt: new Date().toISOString(),
+    };
+    await setPreviewState({
+      ...base,
+      path: 'learner_value_prop',
+      topicText: sample.topicText,
+    });
     track('preview_topic_submitted', {
-      intent: s.intent,
-      path: s.path,
-      topicLength: trimmed.length,
+      intent: base.intent,
+      path: 'learner_value_prop',
+      sampleId: sample.id,
+      topicLength: sample.topicText.length,
     });
     router.push({
       pathname: '/preview/value-prop',
@@ -62,7 +87,7 @@ export default function PreviewTopicScreen() {
       testID="preview-topic"
     >
       <Pressable
-        onPress={() => goBackOrReplace(router, '/(auth)/sign-in' as const)}
+        onPress={() => router.replace('/(auth)/sign-in')}
         className="self-start min-h-[44px] justify-center mb-2"
         testID="preview-topic-back"
         accessibilityRole="button"
@@ -73,35 +98,31 @@ export default function PreviewTopicScreen() {
         </Text>
       </Pressable>
       <Text className="text-h1 font-bold text-text-primary mb-2 text-center">
-        What should we help with?
+        Pick a sample lesson
       </Text>
       <Text className="text-body text-text-secondary mb-6 text-center">
-        A topic, a question, anything you&apos;re working on.
+        These are safe previews. Your own topic comes after signup.
       </Text>
-      <TextInput
-        value={topic}
-        onChangeText={setTopic}
-        maxLength={MAX_TOPIC_LEN}
-        placeholder="e.g. quadratic equations"
-        placeholderTextColor={colors.muted}
-        className="bg-surface text-text-primary text-body rounded-input px-4 py-3 mb-6"
-        autoFocus
-        testID="preview-topic-input"
-        accessibilityLabel="Topic"
-      />
-      <Pressable
-        onPress={() => void onContinue()}
-        disabled={!canSubmit}
-        className={`rounded-button py-3.5 items-center ${canSubmit ? 'bg-primary' : 'bg-primary/40'}`}
-        testID="preview-topic-continue"
-        accessibilityRole="button"
-        accessibilityState={{ disabled: !canSubmit }}
-        accessibilityLabel="Continue"
-      >
-        <Text className="text-body font-semibold text-text-inverse">
-          Continue
-        </Text>
-      </Pressable>
+      {SAMPLE_LESSONS.map((sample) => (
+        <Pressable
+          key={sample.id}
+          onPress={() => void onSelect(sample)}
+          disabled={submitting}
+          className="bg-surface rounded-card px-4 py-4 mb-3"
+          style={{ opacity: submitting ? 0.6 : 1 }}
+          testID={sample.testID}
+          accessibilityRole="button"
+          accessibilityLabel={sample.title}
+          accessibilityState={{ disabled: submitting }}
+        >
+          <Text className="text-body font-semibold text-text-primary mb-1">
+            {sample.title}
+          </Text>
+          <Text className="text-body-sm text-text-secondary">
+            {sample.description}
+          </Text>
+        </Pressable>
+      ))}
     </View>
   );
 }

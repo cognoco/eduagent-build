@@ -30,7 +30,11 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ClerkProvider, useClerk } from '@clerk/clerk-expo';
 import { tokenCache as nativeTokenCache } from '@clerk/clerk-expo/token-cache';
-import { QueryCache, QueryClient } from '@tanstack/react-query';
+import {
+  QueryCache,
+  QueryClient,
+  QueryClientProvider,
+} from '@tanstack/react-query';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { useAuth } from '@clerk/clerk-expo';
 import { ThemeContext, useThemeColors, useTokenVars } from '../lib/theme';
@@ -52,7 +56,7 @@ import { useNetworkStatus } from '../hooks/use-network-status';
 import { enableSentry, Sentry } from '../lib/sentry';
 import { configureRevenueCat } from '../lib/revenuecat';
 import { AnimatedSplash } from '../components/AnimatedSplash';
-import { asyncStoragePersister } from '../lib/query-persister';
+import { createScopedPersister } from '../lib/query-persister';
 import { shouldReportQueryErrorToSentry } from '../lib/query-error-reporting';
 
 // BUG-417: Clerk's default tokenCache uses expo-secure-store directly,
@@ -336,6 +340,12 @@ function ClerkGate({
   timedOut: boolean;
 }) {
   const { isLoaded } = useAuth();
+  // [L] ThemeContext is not yet mounted at this point (ClerkGate renders above
+  // it in the tree). Read the system color scheme directly so dark-mode users
+  // see a dark timeout screen instead of the default light palette.
+  const systemScheme = useColorScheme();
+  const gateColors =
+    systemScheme === 'dark' ? tokens.dark.colors : tokens.light.colors;
 
   useEffect(() => {
     if (isLoaded) onReady();
@@ -350,6 +360,7 @@ function ClerkGate({
             alignItems: 'center',
             justifyContent: 'center',
             padding: 24,
+            backgroundColor: gateColors.background,
           }}
         >
           <Text
@@ -358,6 +369,7 @@ function ClerkGate({
               fontWeight: '600',
               marginBottom: 8,
               textAlign: 'center',
+              color: gateColors.textPrimary,
             }}
           >
             Taking longer than expected
@@ -365,7 +377,7 @@ function ClerkGate({
           <Text
             style={{
               fontSize: 14,
-              color: tokens.light.colors.muted,
+              color: gateColors.muted,
               textAlign: 'center',
               marginBottom: 24,
             }}
@@ -380,7 +392,7 @@ function ClerkGate({
               )
             }
             style={{
-              backgroundColor: tokens.light.colors.primary,
+              backgroundColor: gateColors.primary,
               borderRadius: 12,
               paddingVertical: 14,
               paddingHorizontal: 32,
@@ -390,7 +402,7 @@ function ClerkGate({
           >
             <Text
               style={{
-                color: tokens.light.colors.textInverse,
+                color: gateColors.textInverse,
                 fontWeight: '600',
                 fontSize: 16,
               }}
@@ -428,6 +440,60 @@ class SplashErrorBoundary extends React.Component<
   override render() {
     return this.state.hasError ? null : this.props.children;
   }
+}
+
+/**
+ * [BUG-357] Identity-scoped persister wrapper.
+ *
+ * `PersistQueryClientProvider` reads from AsyncStorage once at mount and never
+ * re-reads (its internal `didRestore` ref latches). To prevent cross-account
+ * cache leakage we:
+ *   1. Derive the persister storage key from the Clerk `userId` so each
+ *      account has its own AsyncStorage partition.
+ *   2. Pass `userId` as the React `key` of the provider, forcing a fresh
+ *      mount — and therefore a fresh restore — whenever the signed-in
+ *      identity changes (sign-out + sign-in on the same device).
+ *
+ * Without (2), the previous user's already-rehydrated in-memory cache would
+ * survive across an account switch even though the new user's persister
+ * blob is correctly partitioned.
+ */
+function ScopedPersistProvider({ children }: { children: React.ReactNode }) {
+  const { userId, isSignedIn } = useAuth();
+  // Render an inert pass-through while signed out — there is no identity to
+  // scope to, and we explicitly do not want to rehydrate the previous user's
+  // cache during the signed-out window. The next sign-in will mount the
+  // PersistQueryClientProvider with the new user's scoped key.
+  if (!isSignedIn || !userId) {
+    return (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+  }
+  return (
+    <PersistQueryClientProvider
+      key={userId}
+      client={queryClient}
+      persistOptions={{
+        persister: createScopedPersister(userId),
+        maxAge: 24 * 60 * 60_000,
+      }}
+      onSuccess={() => {
+        // [CCR finding, 2026-05-14] Drop legacy root keys after the
+        // persister rehydrates AsyncStorage. PR 10 moved
+        // `useEvaluateEligibility` from
+        //   ['evaluate-eligibility', topicId, profileId]
+        // to ['retention', 'evaluate-eligibility', topicId, profileId].
+        // Warm-cache devices (any emulator with disk state from
+        // pre-PR-10 builds) would otherwise carry orphaned eligibility
+        // entries that no invalidation path reaches.
+        queryClient.removeQueries({
+          queryKey: ['evaluate-eligibility'],
+        });
+      }}
+    >
+      {children}
+    </PersistQueryClientProvider>
+  );
 }
 
 export default function RootLayout() {
@@ -548,26 +614,7 @@ export default function RootLayout() {
           tokenCache={tokenCache}
         >
           <ClerkGate onReady={onClerkReady} timedOut={clerkTimedOut}>
-            <PersistQueryClientProvider
-              client={queryClient}
-              persistOptions={{
-                persister: asyncStoragePersister,
-                maxAge: 24 * 60 * 60_000,
-              }}
-              onSuccess={() => {
-                // [CCR finding, 2026-05-14] Drop legacy root keys after the
-                // persister rehydrates AsyncStorage. PR 10 moved
-                // `useEvaluateEligibility` from
-                //   ['evaluate-eligibility', topicId, profileId]
-                // to ['retention', 'evaluate-eligibility', topicId, profileId].
-                // Warm-cache devices (any emulator with disk state from
-                // pre-PR-10 builds) would otherwise carry orphaned eligibility
-                // entries that no invalidation path reaches.
-                queryClient.removeQueries({
-                  queryKey: ['evaluate-eligibility'],
-                });
-              }}
-            >
+            <ScopedPersistProvider>
               <ProfileProvider>
                 <AppContextProvider>
                   <OutboxDrainProvider>
@@ -577,7 +624,7 @@ export default function RootLayout() {
                   </OutboxDrainProvider>
                 </AppContextProvider>
               </ProfileProvider>
-            </PersistQueryClientProvider>
+            </ScopedPersistProvider>
           </ClerkGate>
         </ClerkProvider>
       </SafeAreaProvider>

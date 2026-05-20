@@ -88,6 +88,19 @@ describe('llmResponseEnvelopeSchema', () => {
     expect(parsed.confidence).toBeUndefined();
   });
 
+  it('accepts private factual confidence for general-knowledge audit', () => {
+    const parsed = llmResponseEnvelopeSchema.parse({
+      reply: 'Yucca palms are drought-tolerant plants.',
+      private_sources: {
+        relied_on: ['general_knowledge'],
+        insufficient: false,
+        factual_confidence: '91%',
+      },
+    });
+
+    expect(parsed.private_sources?.factual_confidence).toBeCloseTo(0.91);
+  });
+
   it('accepts envelope with ui_hints showing note_prompt', () => {
     const parsed = llmResponseEnvelopeSchema.parse({
       reply: 'Great!',

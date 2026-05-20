@@ -33,6 +33,8 @@ export interface SnapshotInputs {
 }
 
 const SNAPSHOTS_DIR = path.resolve(__dirname, '..', 'snapshots');
+const SNAPSHOT_WRITE_ATTEMPTS = 4;
+const SNAPSHOT_WRITE_RETRY_DELAY_MS = 75;
 
 export async function ensureSnapshotDir(flowId: string): Promise<string> {
   const dir = path.join(SNAPSHOTS_DIR, flowId);
@@ -47,8 +49,36 @@ export async function writeSnapshot(inputs: SnapshotInputs): Promise<string> {
     : `${inputs.profile.id}.md`;
   const filePath = path.join(dir, fileName);
   const body = renderSnapshot(inputs);
-  await fs.writeFile(filePath, body, 'utf8');
+  await writeSnapshotFile(filePath, body);
   return filePath;
+}
+
+async function writeSnapshotFile(
+  filePath: string,
+  body: string,
+): Promise<void> {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= SNAPSHOT_WRITE_ATTEMPTS; attempt++) {
+    try {
+      await fs.writeFile(filePath, body, 'utf8');
+      return;
+    } catch (err) {
+      lastError = err;
+      if (attempt === SNAPSHOT_WRITE_ATTEMPTS) {
+        break;
+      }
+      await delay(SNAPSHOT_WRITE_RETRY_DELAY_MS * attempt);
+    }
+  }
+
+  throw lastError;
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 }
 
 function renderSnapshot(inputs: SnapshotInputs): string {

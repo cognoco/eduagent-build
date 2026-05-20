@@ -4,9 +4,9 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   getPreviewState,
+  setPreviewState,
   type PreviewOnboardingStateV0,
 } from '../../lib/preview-onboarding-state';
-import { goBackOrReplace } from '../../lib/navigation';
 import { track } from '../../lib/analytics';
 
 type Variant = 'learner' | 'parent';
@@ -27,6 +27,22 @@ export default function ValuePropScreen() {
 
   const variant: Variant = params.variant === 'parent' ? 'parent' : 'learner';
   const topic = previewState?.topicText ?? '';
+
+  const onTryLesson = async () => {
+    const base: PreviewOnboardingStateV0 = previewState ?? {
+      intent: 'not_sure',
+      path: 'learner_lesson',
+      createdAt: new Date().toISOString(),
+    };
+    await setPreviewState({
+      ...base,
+      path: 'learner_lesson',
+    });
+    track('preview_parent_try_lesson_selected', {
+      intent: base.intent,
+    });
+    router.push('/preview/topic');
+  };
 
   useEffect(() => {
     track('preview_value_prop_seen', {
@@ -51,7 +67,7 @@ export default function ValuePropScreen() {
       }
     >
       <Pressable
-        onPress={() => goBackOrReplace(router, '/(auth)/sign-in' as const)}
+        onPress={() => router.replace('/(auth)/sign-in')}
         className="self-start min-h-[44px] justify-center mb-2"
         testID="preview-value-prop-back"
         accessibilityRole="button"
@@ -64,7 +80,7 @@ export default function ValuePropScreen() {
       {variant === 'learner' ? (
         <LearnerVariant topic={topic} />
       ) : (
-        <ParentVariant />
+        <ParentVariant onTryLesson={() => void onTryLesson()} />
       )}
       <Pressable
         onPress={() => {
@@ -103,6 +119,8 @@ function SampleMarker() {
 }
 
 function LearnerVariant({ topic }: { topic: string }) {
+  const sample = getLearnerSample(topic);
+
   return (
     <View>
       <Text className="text-h1 font-bold text-text-primary mb-3">
@@ -114,28 +132,69 @@ function LearnerVariant({ topic }: { topic: string }) {
       </Text>
       <SampleMarker />
       <View className="bg-surface rounded-card p-4 mb-3 self-start max-w-[85%]">
-        <Text className="text-body-sm text-text-primary">
-          {topic
-            ? `Let's work on ${topic}. What part is tripping you up?`
-            : 'What are you working on today?'}
-        </Text>
+        <Text className="text-body-sm text-text-primary">{sample.mentor}</Text>
       </View>
       <View className="bg-primary/10 rounded-card p-4 mb-3 self-end max-w-[85%]">
-        <Text className="text-body-sm text-text-primary">
-          I get the formula but I don&apos;t know when to use it.
-        </Text>
+        <Text className="text-body-sm text-text-primary">{sample.learner}</Text>
       </View>
       <View className="bg-surface rounded-card p-4 self-start max-w-[85%]">
         <Text className="text-body-sm text-text-primary">
-          Good — that&apos;s the most useful question. Let me show you with a
-          concrete example…
+          {sample.followUp}
         </Text>
       </View>
     </View>
   );
 }
 
-function ParentVariant() {
+function getLearnerSample(topic: string): {
+  mentor: string;
+  learner: string;
+  followUp: string;
+} {
+  const normalized = topic.toLowerCase();
+
+  if (normalized.includes('geography')) {
+    return {
+      mentor:
+        'Let us try geography. A desert is defined by low rainfall, not heat. Why might land behind mountains stay dry?',
+      learner: 'Because the rain falls before the air gets there?',
+      followUp:
+        'Exactly. Mountains can squeeze moisture out on one side, leaving drier air on the other. That is called a rain shadow.',
+    };
+  }
+
+  if (normalized.includes('fraction')) {
+    return {
+      mentor:
+        'Let us compare fractions. If two pieces come from the same whole, the larger piece has the smaller bottom number.',
+      learner: 'So 1/2 is bigger than 1/3?',
+      followUp:
+        'Yes. Splitting something into two parts makes each part bigger than splitting it into three parts.',
+    };
+  }
+
+  if (normalized.includes('writing')) {
+    return {
+      mentor:
+        'Let us plan a paragraph. Start with the one thing you want the reader to believe.',
+      learner: 'So I should choose the main point before examples?',
+      followUp:
+        'Right. Once the main point is clear, the examples have a job instead of feeling random.',
+    };
+  }
+
+  return {
+    mentor:
+      topic.length > 0
+        ? `Let us work on ${topic}. I will show one idea, then ask a quick check.`
+        : 'Let us try a quick sample. I will show one idea, then ask a quick check.',
+    learner: 'I am not sure how to start.',
+    followUp:
+      'That is a good starting point. We will make the first step concrete, then build from there.',
+  };
+}
+
+function ParentVariant({ onTryLesson }: { onTryLesson: () => void }) {
   return (
     <View>
       <Text className="text-h1 font-bold text-text-primary mb-3">
@@ -159,6 +218,16 @@ function ParentVariant() {
           session.
         </Text>
       </View>
+      <Pressable
+        onPress={onTryLesson}
+        className="border border-border rounded-button py-3.5 px-8 items-center w-full mt-4"
+        testID="preview-try-lesson-cta"
+        accessibilityRole="button"
+      >
+        <Text className="text-body font-semibold text-primary">
+          Try a sample lesson first
+        </Text>
+      </Pressable>
     </View>
   );
 }

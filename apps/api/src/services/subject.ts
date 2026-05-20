@@ -77,6 +77,8 @@ function mapSubjectRow(
     languageCode: row.languageCode ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
+    urgencyBoostUntil: row.urgencyBoostUntil?.toISOString() ?? null,
+    urgencyBoostReason: row.urgencyBoostReason ?? null,
   };
 }
 

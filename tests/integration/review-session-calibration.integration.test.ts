@@ -40,12 +40,14 @@ import { registerProvider } from '../../apps/api/src/services/llm';
 // ---------------------------------------------------------------------------
 
 const mockCaptureException = jest.fn();
-jest.mock(
-  '../../apps/api/src/services/sentry' /* gc1-allow: external error-tracking boundary (Sentry SDK) */,
-  () => ({
-    captureException: (...args: unknown[]) => mockCaptureException(...args),
-  }),
-);
+jest.mock('@sentry/cloudflare', () => ({
+  withScope: (fn) =>
+    fn({ setUser: jest.fn(), setTag: jest.fn(), setExtra: jest.fn() }),
+  captureException: (...args) => mockCaptureException(...args),
+  captureMessage: jest.fn(),
+  addBreadcrumb: jest.fn(),
+  withSentry: (_config, handler) => handler,
+}));
 
 import { app } from '../../apps/api/src/index';
 import { handleReviewCalibrationGrade } from '../../apps/api/src/inngest/functions/review-calibration-grade';

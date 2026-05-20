@@ -55,18 +55,15 @@ import { mockVoyageAI, type MockHandle } from './external-mocks';
 
 const mockCaptureException = jest.fn();
 
-jest.mock(
-  '../../apps/api/src/services/sentry' /* gc1-allow: pattern-a conversion */,
-  () => {
-    const actual = jest.requireActual(
-      '../../apps/api/src/services/sentry',
-    ) as typeof import('../../apps/api/src/services/sentry');
-    return {
-      ...actual,
-      captureException: (...args: unknown[]) => mockCaptureException(...args),
-    };
-  },
-);
+jest.mock('@sentry/cloudflare', () => ({
+  withScope: (fn: (scope) => void) =>
+    fn({ setUser: jest.fn(), setTag: jest.fn(), setExtra: jest.fn() }),
+  captureException: (...args) => mockCaptureException(...args),
+  captureMessage: jest.fn(),
+  addBreadcrumb: jest.fn(),
+  // withSentry is called at module-level in apps/api/src/index.ts
+  withSentry: (_config, handler) => handler,
+}));
 
 import { sessionCompleted } from '../../apps/api/src/inngest/functions/session-completed';
 

@@ -8,6 +8,7 @@ import {
 import React from 'react';
 import { Alert } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useAuth } from '@clerk/clerk-expo';
 
 const mockBack = jest.fn();
 const mockReplace = jest.fn();
@@ -23,6 +24,11 @@ jest.mock('expo-router', () => ({
     push: mockPush,
   }),
   useLocalSearchParams: () => mockSearchParams,
+  // [BUG-375] Redirect stub so auth-gate tests can assert the redirect path.
+  Redirect: ({ href }: { href: string }) => {
+    const { Text } = require('react-native');
+    return <Text testID={`mock-redirect-${href}`}>redirect:{href}</Text>;
+  },
 }));
 
 jest.mock('react-native-safe-area-context', () => ({
@@ -66,6 +72,7 @@ jest.mock('../lib/theme', /* gc1-allow: nativewind vars() does not resolve 'reac
 // BUG-301: Made per-test overridable so isParentAddingChild can be tested.
 const mockUseProfile = jest.fn();
 jest.mock('../lib/profile', () => ({
+  ...jest.requireActual('../lib/profile'),
   useProfile: () => mockUseProfile(),
 }));
 
@@ -95,6 +102,12 @@ describe('CreateProfileScreen', () => {
       profiles: [],
     });
     jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    // [BUG-375] Default to signed-in so existing tests are unaffected by the
+    // new auth guard; auth-gate break tests override below.
+    (useAuth as jest.Mock).mockReturnValue({
+      isLoaded: true,
+      isSignedIn: true,
+    });
   });
 
   afterEach(() => {
@@ -737,6 +750,49 @@ describe('CreateProfileScreen', () => {
       expect(Alert.alert).not.toHaveBeenCalled();
       expect(mockBack).not.toHaveBeenCalled();
       expect(mockSwitchProfile).not.toHaveBeenCalled();
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // [BUG-375] Auth gate — deep-link entry to root-level screen
+  // ---------------------------------------------------------------------------
+  describe('auth gate [BUG-375]', () => {
+    it('redirects to /sign-in when an unauthenticated user opens a create-profile deep-link', () => {
+      (useAuth as jest.Mock).mockReturnValue({
+        isLoaded: true,
+        isSignedIn: false,
+      });
+
+      render(<CreateProfileScreen />, { wrapper: Wrapper });
+
+      screen.getByTestId('mock-redirect-/sign-in');
+      expect(screen.queryByTestId('create-profile-name')).toBeNull();
+      expect(screen.queryByTestId('create-profile-submit')).toBeNull();
+    });
+
+    it('shows a spinner (not redirect) while Clerk is still hydrating', () => {
+      (useAuth as jest.Mock).mockReturnValue({
+        isLoaded: false,
+        isSignedIn: false,
+      });
+
+      render(<CreateProfileScreen />, { wrapper: Wrapper });
+
+      screen.getByTestId('create-profile-auth-loading');
+      expect(screen.queryByTestId('mock-redirect-/sign-in')).toBeNull();
+    });
+
+    it('renders the form when the user is signed in', () => {
+      (useAuth as jest.Mock).mockReturnValue({
+        isLoaded: true,
+        isSignedIn: true,
+      });
+
+      render(<CreateProfileScreen />, { wrapper: Wrapper });
+
+      screen.getByTestId('create-profile-name');
+      screen.getByTestId('create-profile-submit');
+      expect(screen.queryByTestId('mock-redirect-/sign-in')).toBeNull();
     });
   });
 });

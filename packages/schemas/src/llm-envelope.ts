@@ -29,6 +29,15 @@ const privateReasonSchema = z.preprocess((value) => {
   return trimmed.length > 0 ? trimmed : undefined;
 }, z.string().min(1).max(1000).optional());
 
+const privateFactualConfidenceSchema = z.preprocess((value) => {
+  if (typeof value === 'number') return value;
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim().replace(/%$/, '');
+  const parsed = Number(trimmed);
+  if (!Number.isFinite(parsed)) return undefined;
+  return value.trim().endsWith('%') || parsed > 1 ? parsed / 100 : parsed;
+}, z.number().min(0).max(1).optional());
+
 const nullToUndefined = (value: unknown): unknown =>
   value === null ? undefined : value;
 
@@ -62,6 +71,7 @@ const privateSourcesSchema = z.preprocess(
       relied_on: privateReliedOnSchema.optional(),
       insufficient: privateInsufficientSchema.optional(),
       reason: privateReasonSchema.optional(),
+      factual_confidence: privateFactualConfidenceSchema,
     })
     .optional(),
 );

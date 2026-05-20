@@ -74,7 +74,7 @@ runtime-critical.
 | `consent-check-again` | `app/(app)/_layout.tsx` | ✅ smoke runtime | J-13 — re-check consent |
 | `profile-loading` | `app/(app)/_layout.tsx` | ✅ smoke runtime | J-14 — loading spinner |
 | `add-first-child-screen` | `components/home/LearnerScreen.tsx` | ✅ smoke runtime | J-15 — add first child empty state |
-| `add-first-child-cta` | `components/home/LearnerScreen.tsx` | ✅ smoke runtime | J-15 — add child CTA |
+| `add-first-child-screen-primary` | `components/coaching/BaseCoachingCard.tsx` | ✅ smoke runtime | J-15 — add child CTA (derived from BaseCoachingCard testID + `-primary`) |
 | `subject-topics-scroll` | `app/(app)/child/[profileId]/subject.tsx` | ✅ smoke runtime | J-16 — subject topics list |
 | `topic-card-{id}` | `components/coaching/TopicCard.tsx` | ✅ smoke runtime | J-16, J-17 — dynamic topic card |
 | `topic-detail-screen` | `app/(app)/child/[profileId]/topic.tsx` | ✅ smoke runtime | J-16, J-17 — topic detail |

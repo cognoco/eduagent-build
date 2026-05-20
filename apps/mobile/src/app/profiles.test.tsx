@@ -6,6 +6,7 @@ import {
   waitFor,
 } from '@testing-library/react-native';
 import type { Profile } from '../lib/profile';
+import { useAuth } from '@clerk/clerk-expo';
 
 const mockBack = jest.fn();
 const mockPush = jest.fn();
@@ -19,6 +20,11 @@ jest.mock('expo-router', () => ({
     replace: mockReplace,
     canGoBack: mockCanGoBack,
   }),
+  // [BUG-375] Redirect stub so auth-gate tests can assert the redirect path.
+  Redirect: ({ href }: { href: string }) => {
+    const { Text } = require('react-native');
+    return <Text testID={`mock-redirect-${href}`}>redirect:{href}</Text>;
+  },
 }));
 
 jest.mock('react-native-safe-area-context', () => ({
@@ -66,28 +72,38 @@ const childProfile: Profile = {
 const mockUseSubscription = jest.fn().mockReturnValue({ data: null });
 const mockUseFamilySubscription = jest.fn().mockReturnValue({ data: null });
 
-jest.mock('../hooks/use-subscription', () => ({
-  useSubscription: (...args: unknown[]) => mockUseSubscription(...args),
-  useFamilySubscription: (...args: unknown[]) =>
-    mockUseFamilySubscription(...args),
-}));
+jest.mock(
+  '../hooks/use-subscription',
+  /* gc1-allow: hooks require QueryClient + API client infra not available in unit test */ () => ({
+    useSubscription: (...args: unknown[]) => mockUseSubscription(...args),
+    useFamilySubscription: (...args: unknown[]) =>
+      mockUseFamilySubscription(...args),
+  }),
+);
 
 const mockMutate = jest.fn();
-jest.mock('../hooks/use-profiles', () => ({
-  useUpdateProfileName: () => ({
-    mutate: mockMutate,
-    isPending: false,
+jest.mock(
+  '../hooks/use-profiles',
+  /* gc1-allow: hook requires QueryClient + Clerk auth context not available in unit test */ () => ({
+    useUpdateProfileName: () => ({
+      mutate: mockMutate,
+      isPending: false,
+    }),
   }),
-}));
+);
 
-jest.mock('../lib/format-api-error', () => ({
-  formatApiError: (e: unknown) =>
-    e instanceof Error ? e.message : 'Unknown error',
-}));
+jest.mock(
+  '../lib/format-api-error',
+  /* gc1-allow: formatApiError calls i18next.t() which requires i18n initialisation not present in this test suite */ () => ({
+    formatApiError: (e: unknown) =>
+      e instanceof Error ? e.message : 'Unknown error',
+  }),
+);
 
 const mockPlatformAlert = jest.fn();
 jest.mock('../lib/platform-alert', () => ({
-  platformAlert: (...args: unknown[]) => mockPlatformAlert(...args),
+  ...jest.requireActual('../lib/platform-alert'),
+  platformAlert: mockPlatformAlert,
 }));
 
 jest.mock('../lib/profile', () => ({
@@ -110,6 +126,12 @@ describe('ProfilesScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockCanGoBack.mockReturnValue(true);
+    // [BUG-375] Default to signed-in so existing tests are unaffected by the
+    // new auth guard; auth-gate break tests override below.
+    (useAuth as jest.Mock).mockReturnValue({
+      isLoaded: true,
+      isSignedIn: true,
+    });
   });
 
   it('shows empty state when no profiles', () => {
@@ -501,5 +523,67 @@ describe('ProfilesScreen', () => {
     // On iOS, RN Modal keeps children mounted during the close animation so
     // rename-input stays in the tree, but the Modal itself reports visible=false.
     expect(screen.getByTestId('rename-modal').props.visible).toBe(false);
+  });
+
+  // ---------------------------------------------------------------------------
+  // [BUG-375] Auth gate — deep-link entry to root-level screen
+  // ---------------------------------------------------------------------------
+  describe('auth gate [BUG-375]', () => {
+    it('redirects to /sign-in when an unauthenticated user opens a profiles deep-link', () => {
+      (useAuth as jest.Mock).mockReturnValue({
+        isLoaded: true,
+        isSignedIn: false,
+      });
+
+      useProfile.mockReturnValue({
+        profiles: [],
+        activeProfile: null,
+        switchProfile: jest.fn(),
+        isLoading: false,
+      });
+
+      render(<ProfilesScreen />);
+
+      screen.getByTestId('mock-redirect-/sign-in');
+      expect(screen.queryByTestId('profiles-screen')).toBeNull();
+    });
+
+    it('shows a spinner (not redirect) while Clerk is still hydrating', () => {
+      (useAuth as jest.Mock).mockReturnValue({
+        isLoaded: false,
+        isSignedIn: false,
+      });
+
+      useProfile.mockReturnValue({
+        profiles: [],
+        activeProfile: null,
+        switchProfile: jest.fn(),
+        isLoading: false,
+      });
+
+      render(<ProfilesScreen />);
+
+      screen.getByTestId('profiles-auth-loading');
+      expect(screen.queryByTestId('mock-redirect-/sign-in')).toBeNull();
+    });
+
+    it('renders the profiles screen when the user is signed in', () => {
+      (useAuth as jest.Mock).mockReturnValue({
+        isLoaded: true,
+        isSignedIn: true,
+      });
+
+      useProfile.mockReturnValue({
+        profiles: [],
+        activeProfile: null,
+        switchProfile: jest.fn(),
+        isLoading: false,
+      });
+
+      render(<ProfilesScreen />);
+
+      screen.getByTestId('profiles-screen');
+      expect(screen.queryByTestId('mock-redirect-/sign-in')).toBeNull();
+    });
   });
 });
