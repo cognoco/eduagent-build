@@ -4,7 +4,11 @@
 
 import { renderHook, waitFor, act } from '@testing-library/react-native';
 import { QueryClient } from '@tanstack/react-query';
-import { createQueryWrapper } from '../test-utils/app-hook-test-utils';
+import {
+  createHookWrapper,
+  createTestProfile,
+} from '../test-utils/app-hook-test-utils';
+import { setActiveProfileId, NetworkError } from '../lib/api-client';
 import {
   useBooks,
   useBookWithTopics,
@@ -12,38 +16,33 @@ import {
 } from './use-books';
 
 const mockFetch = jest.fn();
-jest.mock('../lib/api-client', () => ({
-  useApiClient: () => {
-    const { hc } = require('hono/client');
-    return hc('http://localhost', {
-      fetch: async (...args: unknown[]) => {
-        const res = await mockFetch(...(args as Parameters<typeof fetch>));
-        if (!res.ok) {
-          const text = await res
-            .clone()
-            .text()
-            .catch(() => res.statusText);
-          throw new Error(`API error ${res.status}: ${text}`);
-        }
-        return res;
-      },
-    });
-  },
-}));
-
-jest.mock('../lib/profile', () => ({
-  useProfile: () => ({
-    activeProfile: { id: 'test-profile-id' },
-  }),
-}));
+const originalFetch = globalThis.fetch;
 
 let queryClient: QueryClient;
 
 function createWrapper() {
-  const w = createQueryWrapper();
+  const w = createHookWrapper({
+    activeProfile: createTestProfile({ id: 'test-profile-id' }),
+  });
   queryClient = w.queryClient;
   return w.wrapper;
 }
+
+beforeEach(() => {
+  mockFetch.mockReset();
+  jest.clearAllMocks();
+  globalThis.fetch = mockFetch as typeof fetch;
+  setActiveProfileId('test-profile-id');
+});
+
+afterEach(() => {
+  queryClient?.clear();
+  setActiveProfileId(undefined);
+});
+
+afterAll(() => {
+  globalThis.fetch = originalFetch;
+});
 
 const mockBooks = [
   {
@@ -95,15 +94,6 @@ const mockBookWithTopics = {
 // ---------------------------------------------------------------------------
 
 describe('useBooks', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient?.clear();
-  });
-
   it('returns books from API', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({ books: mockBooks }), { status: 200 }),
@@ -177,7 +167,9 @@ describe('useBooks', () => {
       expect(result.current.isError).toBe(true);
     });
 
-    expect(result.current.error?.message).toContain('Network request failed');
+    // The real useApiClient wraps fetch rejections in NetworkError with a
+    // user-friendly message (not the raw rejection message).
+    expect(result.current.error).toBeInstanceOf(NetworkError);
   });
 
   it('uses aggregate library books as initial shelf data when available', async () => {
@@ -228,15 +220,6 @@ describe('useBooks', () => {
 // ---------------------------------------------------------------------------
 
 describe('useBookWithTopics', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient?.clear();
-  });
-
   it('returns book with topics from API', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify(mockBookWithTopics), { status: 200 }),
@@ -295,15 +278,6 @@ describe('useBookWithTopics', () => {
 // ---------------------------------------------------------------------------
 
 describe('useGenerateBookTopics', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient?.clear();
-  });
-
   it('calls POST to generate book topics', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify(mockBookWithTopics), { status: 200 }),

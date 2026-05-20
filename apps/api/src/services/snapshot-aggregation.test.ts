@@ -224,6 +224,7 @@ function makeAssessmentRow(
     masteryScore: null,
     qualityRating: null,
     exchangeHistory: [],
+    masteryChallengeVerifiedAt: null,
     createdAt: new Date('2026-04-01T00:00:00.000Z'),
     updatedAt: new Date('2026-04-01T00:00:00.000Z'),
     ...overrides,

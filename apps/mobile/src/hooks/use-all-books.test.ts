@@ -1,6 +1,10 @@
 import { renderHook, waitFor } from '@testing-library/react-native';
 import { QueryClient } from '@tanstack/react-query';
-import { createQueryWrapper } from '../test-utils/app-hook-test-utils';
+import {
+  createHookWrapper,
+  createTestProfile,
+} from '../test-utils/app-hook-test-utils';
+import { setActiveProfileId } from '../lib/api-client';
 import { useAllBooks, type EnrichedBook } from './use-all-books';
 
 // ---------------------------------------------------------------------------
@@ -8,31 +12,7 @@ import { useAllBooks, type EnrichedBook } from './use-all-books';
 // ---------------------------------------------------------------------------
 
 const mockFetch = jest.fn();
-
-jest.mock('../lib/api-client', () => ({
-  useApiClient: () => {
-    const { hc } = require('hono/client');
-    return hc('http://localhost', {
-      fetch: async (...args: unknown[]) => {
-        const res = await mockFetch(...(args as Parameters<typeof fetch>));
-        if (!res.ok) {
-          const text = await res
-            .clone()
-            .text()
-            .catch(() => res.statusText);
-          throw new Error(`API error ${res.status}: ${text}`);
-        }
-        return res;
-      },
-    });
-  },
-}));
-
-jest.mock('../lib/profile', () => ({
-  useProfile: () => ({
-    activeProfile: { id: 'test-profile-id' },
-  }),
-}));
+const originalFetch = globalThis.fetch;
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -80,7 +60,9 @@ function makeLibraryBooksResponse(subjects: SubjectFixture[]) {
 let queryClient: QueryClient;
 
 function createWrapper() {
-  const w = createQueryWrapper();
+  const w = createHookWrapper({
+    activeProfile: createTestProfile({ id: 'test-profile-id' }),
+  });
   queryClient = w.queryClient;
   return w.wrapper;
 }
@@ -89,16 +71,23 @@ function createWrapper() {
 // Tests
 // ---------------------------------------------------------------------------
 
+beforeEach(() => {
+  mockFetch.mockReset();
+  jest.clearAllMocks();
+  globalThis.fetch = mockFetch as typeof fetch;
+  setActiveProfileId('test-profile-id');
+});
+
+afterEach(() => {
+  queryClient?.clear();
+  setActiveProfileId(undefined);
+});
+
+afterAll(() => {
+  globalThis.fetch = originalFetch;
+});
+
 describe('useAllBooks', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient.clear();
-  });
-
   it('returns enriched books from multiple subjects', async () => {
     mockFetch.mockResolvedValueOnce(
       makeLibraryBooksResponse([

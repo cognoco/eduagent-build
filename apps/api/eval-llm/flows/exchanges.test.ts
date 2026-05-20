@@ -36,6 +36,7 @@ describe('exchangesFlow', () => {
       expect(scenarios.map((s) => s.scenarioId)).not.toContain(
         'S13-first-session-subject-turn0',
       );
+      expect(scenarios).toHaveLength(20);
       expect(scenarios.map((s) => s.scenarioId)).toEqual(
         expect.arrayContaining([
           'S1-rung1-teach-new',
@@ -48,6 +49,9 @@ describe('exchangesFlow', () => {
           'S17-app-help-preferences',
           'S18-app-help-modes',
           'S19-app-help-memory',
+          'S20-challenge-offered',
+          'S21-challenge-active',
+          'S22-challenge-drafting',
           'S2-rung2-revisit',
           'S3-rung3-evaluate',
           'S4-rung4-teach-back',
@@ -59,14 +63,17 @@ describe('exchangesFlow', () => {
       );
     });
 
-    it('returns 18 scenarios for a language-learning profile (includes S7 + S9)', () => {
+    it('returns 21 scenarios for a language-learning profile (includes S7 + S9 + S20-S22)', () => {
       const scenarios =
         exchangesFlow.enumerateScenarios?.(languageProfile) ?? [];
-      expect(scenarios).toHaveLength(18);
+      expect(scenarios).toHaveLength(21);
       expect(scenarios.map((s) => s.scenarioId)).toContain(
         'S7-language-fluency',
       );
       expect(scenarios.map((s) => s.scenarioId)).toContain('S9-correct-streak');
+      expect(scenarios.map((s) => s.scenarioId)).toContain(
+        'S20-challenge-offered',
+      );
     });
 
     it('every scenario input has matching scenarioId and context', () => {

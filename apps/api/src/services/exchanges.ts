@@ -262,6 +262,10 @@ export interface ExchangeContext {
   } | null;
   /** Private source pack for the LLM. Built server-side per exchange. */
   sourceEvidence?: ExchangeSourceEvidence[];
+  /** True when evaluateChallengeReadiness allows offering a Challenge Round on this turn. */
+  challengeEligible?: boolean;
+  /** Current Challenge Round state machine snapshot from session metadata. */
+  challengeRound?: import('@eduagent/schemas').ChallengeRoundSessionState;
 }
 
 /** Result of processing a single exchange */

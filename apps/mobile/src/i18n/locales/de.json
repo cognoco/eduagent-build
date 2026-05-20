@@ -417,6 +417,21 @@
     }
   },
   "session": {
+    "challenge": {
+      "offerTitle": "Up for a challenge round?",
+      "tryIt": "Try it",
+      "notNow": "Not now",
+      "dontAskAgain": "Don't ask again",
+      "banner": {
+        "question": "Question {{index}} of {{total}}"
+      },
+      "draft": {
+        "title": "Here's what you know now",
+        "save": "Save note",
+        "edit": "Edit",
+        "skip": "Skip"
+      }
+    },
     "mentorMemory": {
       "title": "Was mein Mentor weiß",
       "subtitle": "Überprüfe, bearbeite oder füge hinzu, was dein Mentor sich merkt.",

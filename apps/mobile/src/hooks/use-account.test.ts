@@ -1,6 +1,10 @@
 import { renderHook, act, waitFor } from '@testing-library/react-native';
 import { QueryClient } from '@tanstack/react-query';
-import { createQueryWrapper } from '../test-utils/app-hook-test-utils';
+import {
+  createHookWrapper,
+  createTestProfile,
+} from '../test-utils/app-hook-test-utils';
+import { setActiveProfileId } from '../lib/api-client';
 import {
   useDeleteAccount,
   useCancelDeletion,
@@ -9,38 +13,35 @@ import {
 } from './use-account';
 
 const mockFetch = jest.fn();
-jest.mock('../lib/api-client', () => ({
-  useApiClient: () => {
-    const { hc } = require('hono/client');
-    return hc('http://localhost', { fetch: mockFetch });
-  },
-}));
-
-const mockUseAuth = jest.fn(() => ({
-  isSignedIn: true,
-  userId: 'user_A',
-}));
-jest.mock('@clerk/clerk-expo', () => ({
-  useAuth: () => mockUseAuth(),
-}));
+const originalFetch = globalThis.fetch;
 
 let queryClient: QueryClient;
 
 function createWrapper() {
-  const w = createQueryWrapper();
+  const w = createHookWrapper({
+    activeProfile: createTestProfile({ id: 'test-profile-id' }),
+  });
   queryClient = w.queryClient;
   return w.wrapper;
 }
 
-describe('useDeleteAccount', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-  afterEach(() => {
-    queryClient?.clear();
-  });
+beforeEach(() => {
+  mockFetch.mockReset();
+  jest.clearAllMocks();
+  globalThis.fetch = mockFetch as typeof fetch;
+  setActiveProfileId('test-profile-id');
+});
 
+afterEach(() => {
+  queryClient?.clear();
+  setActiveProfileId(undefined);
+});
+
+afterAll(() => {
+  globalThis.fetch = originalFetch;
+});
+
+describe('useDeleteAccount', () => {
   it('calls POST /account/delete', async () => {
     const response = {
       message: 'Deletion scheduled',
@@ -87,14 +88,6 @@ describe('useDeleteAccount', () => {
 });
 
 describe('useCancelDeletion', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-  afterEach(() => {
-    queryClient?.clear();
-  });
-
   it('calls POST /account/cancel-deletion', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({ message: 'Deletion cancelled' }), {
@@ -140,11 +133,17 @@ describe('useCancelDeletion', () => {
 
 describe('useDeletionStatus', () => {
   beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-  afterEach(() => {
-    queryClient?.clear();
+    // useDeletionStatus is gated on !!isSignedIn — ensure the global mock
+    // exposes isSignedIn:true so the query is enabled in each test.
+    const clerkMock = jest.requireMock('@clerk/clerk-expo') as {
+      useAuth: jest.Mock;
+    };
+    clerkMock.useAuth.mockReturnValue({
+      isLoaded: true,
+      isSignedIn: true,
+      userId: 'user_A',
+      getToken: jest.fn().mockResolvedValue('mock-token'),
+    });
   });
 
   it('calls GET /account/deletion-status', async () => {
@@ -180,7 +179,15 @@ describe('useDeletionStatus', () => {
   // and skip the fetch entirely. With userId-scoped keys, User B gets a fresh
   // fetch and User A's "scheduled: true" status never leaks across sign-out.
   it('[BREAK] does not serve user A deletion-status to user B (cross-account leak)', async () => {
-    mockUseAuth.mockReturnValue({ isSignedIn: true, userId: 'user_A' });
+    const clerkMock = jest.requireMock('@clerk/clerk-expo') as {
+      useAuth: jest.Mock;
+    };
+    clerkMock.useAuth.mockReturnValue({
+      isLoaded: true,
+      isSignedIn: true,
+      userId: 'user_A',
+      getToken: jest.fn().mockResolvedValue('mock-token'),
+    });
     mockFetch.mockResolvedValueOnce(
       new Response(
         JSON.stringify({
@@ -202,7 +209,12 @@ describe('useDeletionStatus', () => {
 
     // Switch identity (e.g. sign-out + new sign-in on shared device) WITHOUT
     // clearing the QueryClient — simulates the leak window.
-    mockUseAuth.mockReturnValue({ isSignedIn: true, userId: 'user_B' });
+    clerkMock.useAuth.mockReturnValue({
+      isLoaded: true,
+      isSignedIn: true,
+      userId: 'user_B',
+      getToken: jest.fn().mockResolvedValue('mock-token'),
+    });
     mockFetch.mockResolvedValueOnce(
       new Response(
         JSON.stringify({
@@ -252,14 +264,6 @@ describe('useDeletionStatus', () => {
 });
 
 describe('useExportData', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-  afterEach(() => {
-    queryClient?.clear();
-  });
-
   it('calls GET /account/export', async () => {
     const exportData = {
       account: { email: 'user@example.com', createdAt: '2026-01-01T00:00:00Z' },

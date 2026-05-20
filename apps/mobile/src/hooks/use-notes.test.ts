@@ -4,7 +4,11 @@
 
 import { renderHook, waitFor, act } from '@testing-library/react-native';
 import { QueryClient } from '@tanstack/react-query';
-import { createQueryWrapper } from '../test-utils/app-hook-test-utils';
+import {
+  createHookWrapper,
+  createTestProfile,
+} from '../test-utils/app-hook-test-utils';
+import { setActiveProfileId, NetworkError } from '../lib/api-client';
 import {
   useBookNotes,
   useCreateNote,
@@ -14,38 +18,33 @@ import {
 } from './use-notes';
 
 const mockFetch = jest.fn();
-jest.mock('../lib/api-client', () => ({
-  useApiClient: () => {
-    const { hc } = require('hono/client');
-    return hc('http://localhost', {
-      fetch: async (...args: unknown[]) => {
-        const res = await mockFetch(...(args as Parameters<typeof fetch>));
-        if (!res.ok) {
-          const text = await res
-            .clone()
-            .text()
-            .catch(() => res.statusText);
-          throw new Error(`API error ${res.status}: ${text}`);
-        }
-        return res;
-      },
-    });
-  },
-}));
-
-jest.mock('../lib/profile', () => ({
-  useProfile: () => ({
-    activeProfile: { id: 'test-profile-id' },
-  }),
-}));
+const originalFetch = globalThis.fetch;
 
 let queryClient: QueryClient;
 
 function createWrapper() {
-  const w = createQueryWrapper();
+  const w = createHookWrapper({
+    activeProfile: createTestProfile({ id: 'test-profile-id' }),
+  });
   queryClient = w.queryClient;
   return w.wrapper;
 }
+
+beforeEach(() => {
+  mockFetch.mockReset();
+  jest.clearAllMocks();
+  globalThis.fetch = mockFetch as typeof fetch;
+  setActiveProfileId('test-profile-id');
+});
+
+afterEach(() => {
+  queryClient?.clear();
+  setActiveProfileId(undefined);
+});
+
+afterAll(() => {
+  globalThis.fetch = originalFetch;
+});
 
 const mockNotes = [
   {
@@ -67,15 +66,6 @@ const mockBookNotesResponse = { notes: mockNotes };
 // ---------------------------------------------------------------------------
 
 describe('useBookNotes', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient?.clear();
-  });
-
   it('fetches and returns notes for a book', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(JSON.stringify(mockBookNotesResponse), { status: 200 }),
@@ -145,7 +135,10 @@ describe('useBookNotes', () => {
       expect(result.current.isError).toBe(true);
     });
 
-    expect(result.current.error?.message).toContain('Network request failed');
+    // The real customFetch wraps raw fetch rejections in NetworkError with a
+    // user-friendly message. Assert the typed error class rather than the
+    // internal rejection message that never reaches production.
+    expect(result.current.error).toBeInstanceOf(NetworkError);
   });
 });
 
@@ -154,15 +147,6 @@ describe('useBookNotes', () => {
 // ---------------------------------------------------------------------------
 
 describe('useCreateNote', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient?.clear();
-  });
-
   it('creates a note and triggers cache invalidation on success', async () => {
     const mockNote = {
       id: 'note-1',
@@ -304,15 +288,6 @@ function runInvalidatePredicate(
 }
 
 describe('useUpdateNote and useDeleteNoteById (profile-scoped invalidation)', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient?.clear();
-  });
-
   it('[BREAK] useUpdateNote invalidate-predicate matches active profile only', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
@@ -420,15 +395,6 @@ describe('useUpdateNote and useDeleteNoteById (profile-scoped invalidation)', ()
 });
 
 describe('useNoteTopicIds', () => {
-  beforeEach(() => {
-    mockFetch.mockReset();
-    jest.clearAllMocks();
-  });
-
-  afterEach(() => {
-    queryClient?.clear();
-  });
-
   it('fetches and returns topic IDs that have notes', async () => {
     mockFetch.mockResolvedValueOnce(
       new Response(
