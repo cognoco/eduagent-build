@@ -21,6 +21,7 @@ let mockLinkedChildren: Array<{
   isOwner: boolean;
 }> = [];
 let mockSubscriptionTier = 'plus';
+const mockSwitchProfile = jest.fn(async () => ({ success: true }));
 
 const mockFetch = createRoutedMockFetch({
   '/coaching-card': { coldStart: false, card: null, fallback: null },
@@ -89,6 +90,7 @@ jest.mock(
         pronouns: null,
         consentStatus: null,
       },
+      switchProfile: mockSwitchProfile,
     }),
     useLinkedChildren: () => mockLinkedChildren,
     useHasLinkedChildren: () => mockLinkedChildren.length > 0,
@@ -261,6 +263,7 @@ describe('LearnerScreen', () => {
     mockIsRecoveryMarkerFresh.mockReturnValue(true);
     mockLinkedChildren = [];
     mockSubscriptionTier = 'plus';
+    mockSwitchProfile.mockResolvedValue({ success: true });
     Wrapper = createWrapper();
   });
 
@@ -300,7 +303,10 @@ describe('LearnerScreen', () => {
 
     await waitFor(() => screen.getByTestId('home-my-notes'));
     fireEvent.press(screen.getByTestId('home-my-notes'));
-    expect(mockPush).toHaveBeenCalledWith('/(app)/my-notes');
+    expect(mockPush).toHaveBeenCalledWith({
+      pathname: '/(app)/my-notes',
+      params: { returnTo: 'learner-home' },
+    });
   });
 
   it('keeps home actions available when the subject list fails to load', async () => {
@@ -517,7 +523,41 @@ describe('LearnerScreen', () => {
       expect(screen.queryByTestId('home-add-subject-tile')).toBeNull();
       expect(screen.queryByTestId('home-my-notes')).toBeNull();
       screen.getByTestId('intent-proxy-placeholder');
-      screen.getByText(/Sessions are private to Alex/);
+      screen.getByText('Session recaps are in your parent view');
+      screen.getByTestId('proxy-view-session-summaries');
+    });
+  });
+
+  it('switches back to parent view before opening child session summaries', async () => {
+    mockFetch.setRoute('/subjects', {
+      subjects: [{ id: 'sub-1', name: 'Math', status: 'active' }],
+    });
+
+    render(
+      <LearnerScreen
+        {...defaultProps}
+        profiles={[
+          { id: 'owner-id', displayName: 'Parent', isOwner: true },
+          { id: 'child-id', displayName: 'Alex', isOwner: false },
+        ]}
+        activeProfile={{
+          id: 'child-id',
+          displayName: 'Alex',
+          isOwner: false,
+        }}
+      />,
+      { wrapper: Wrapper },
+    );
+
+    await waitFor(() => screen.getByTestId('proxy-view-session-summaries'));
+    fireEvent.press(screen.getByTestId('proxy-view-session-summaries'));
+
+    await waitFor(() => {
+      expect(mockSwitchProfile).toHaveBeenCalledWith('owner-id');
+      expect(mockPush).toHaveBeenCalledWith({
+        pathname: '/(app)/child/[profileId]',
+        params: { profileId: 'child-id' },
+      });
     });
   });
 

@@ -36,8 +36,9 @@ tags:
 
 # 3. Navigate to Library tab
 # BUG-10/BUG-30: Dev-client shows extra tabs, breaking point-tap positions.
-# Use accessibility label (tabBarAccessibilityLabel) for reliable matching.
-- tapOn: "Library Tab"
+# Use testID — survives i18n + copy edits and avoids matching the "Library" heading.
+- tapOn:
+    id: "tab-library"
 
 # 4. Wait for Library to load
 - extendedWaitUntil:

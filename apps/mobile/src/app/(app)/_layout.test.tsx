@@ -102,6 +102,7 @@ jest.mock('../../lib/profile', () => ({
 
 // prettier-ignore
 jest.mock('../../lib/theme', /* gc1-allow: nativewind vars() does not resolve 'react' in jest; stub theme hooks so screen tests don't blow up on import */ () => ({
+  useTheme: () => ({ colorScheme: 'light' }),
   useThemeColors: () => ({
     accent: '#0ea5e9',
     border: '#d4d4d8',
@@ -110,6 +111,11 @@ jest.mock('../../lib/theme', /* gc1-allow: nativewind vars() does not resolve 'r
     textInverse: '#ffffff',
     textPrimary: '#18181b',
     textSecondary: '#52525b',
+    warning: '#a16207',
+    proxyPreviewBackground: '#fff7ed',
+    proxyPreviewBorder: '#f59e0b',
+    proxyPreviewSceneBackground: '#fffaf3',
+    proxyPreviewTabBackground: '#fff7ed',
   }),
   useTokenVars: () => ({}),
 }));
@@ -145,7 +151,11 @@ jest.mock('../../components/feedback/FeedbackProvider', () => ({
 // Route: GET /subjects → { subjects: [] }
 
 const AppLayout = require('./_layout').default;
-const { computeVisibleTabs, resolveTabShape } = require('./_layout');
+const {
+  computeVisibleTabs,
+  resolveHomeTabPresentation,
+  resolveTabShape,
+} = require('./_layout');
 
 describe('AppLayout', () => {
   let testQueryClient: QueryClient;
@@ -668,6 +678,7 @@ describe('AppLayout', () => {
     // ("Viewing as " with an empty/literal name) would slip past the broader
     // /Viewing as/ regex. test-setup.ts initializes i18next synchronously
     // with en.json so {{name}} resolves at render.
+    screen.getByText('Parent preview');
     screen.getByText('Viewing as Alex');
 
     fireEvent.press(screen.getByTestId('proxy-banner-switch-back'));
@@ -758,6 +769,12 @@ describe('computeVisibleTabs', () => {
     expect(tabs).toEqual(new Set(['home', 'library', 'progress', 'more']));
     expect(tabs.has('own-learning')).toBe(false);
   });
+
+  it('hides More during parent preview', () => {
+    const tabs = computeVisibleTabs('learner', true);
+    expect(tabs).toEqual(new Set(['home', 'library', 'progress']));
+    expect(tabs.has('more')).toBe(false);
+  });
 });
 
 describe('resolveTabShape', () => {
@@ -801,14 +818,67 @@ describe('resolveTabShape', () => {
     ).toBe('learner');
   });
 
-  it('returns guardian when activeProfile is null', () => {
+  // [CCR PR #215 / Bug 305] Unknown/unloaded profile defaults to 'learner'
+  // (least-privilege 4-tab shape) rather than 'guardian' (full mentoring
+  // hub). A legitimate guardian briefly seeing the learner shape during
+  // profile load is acceptable; a non-guardian seeing the mentoring hub
+  // leaks intent.
+  it('returns learner when activeProfile is null', () => {
     expect(
       resolveTabShape({
         activeProfile: null,
         profiles: [],
         isParentProxy: false,
       }),
-    ).toBe('guardian');
+    ).toBe('learner');
+  });
+
+  it('returns learner when activeProfile is undefined', () => {
+    expect(
+      resolveTabShape({
+        activeProfile: undefined,
+        profiles: [],
+        isParentProxy: false,
+      }),
+    ).toBe('learner');
+  });
+
+  it('returns learner when activeProfile is null even with linked children present', () => {
+    // Defensive: if profiles[] has children but activeProfile hasn't loaded
+    // yet, we still pick the safer shape until activeProfile is known.
+    expect(
+      resolveTabShape({
+        activeProfile: null,
+        profiles: [{ isOwner: true }, { isOwner: false }],
+        isParentProxy: false,
+      }),
+    ).toBe('learner');
+  });
+});
+
+describe('resolveHomeTabPresentation', () => {
+  it('names the guardian home tab Family Hub', () => {
+    expect(resolveHomeTabPresentation('guardian')).toEqual({
+      titleKey: 'tabs.familyHub',
+      accessibilityLabelKey: 'tabs.familyHubLabel',
+      iconName: 'Home',
+    });
+  });
+
+  it('names learner home My Learning', () => {
+    expect(resolveHomeTabPresentation('learner')).toEqual({
+      titleKey: 'tabs.myLearning',
+      accessibilityLabelKey: 'tabs.myLearningLabel',
+      iconName: 'School',
+    });
+  });
+
+  it('keeps parent preview on the learner label', () => {
+    expect(resolveHomeTabPresentation('guardian', true)).toEqual({
+      titleKey: 'tabs.myLearning',
+      accessibilityLabelKey: 'tabs.myLearningLabel',
+      iconName: 'School',
+    });
   });
 });
 

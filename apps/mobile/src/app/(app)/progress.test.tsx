@@ -20,6 +20,7 @@ import {
   useProfileWeeklyReports,
   useRefreshProgressSnapshot,
 } from '../../hooks/use-progress';
+import { getSubjectTintMap } from '../../lib/subject-tints';
 import ProgressScreen from './progress/index';
 
 jest.mock('react-i18next', () => ({
@@ -55,6 +56,12 @@ jest.mock('react-i18next', () => ({
         return `Progress unlocks after you study ${opts?.subject ?? ''}`;
       if (key === 'progress.empty.withSubjectSubtitle')
         return `Study a topic in ${opts?.subject ?? ''} first.`;
+      if (key === 'progress.empty.title')
+        return 'Progress appears after the first study session';
+      if (key === 'progress.empty.subtitle')
+        return 'Sessions, mastery, reviews, and reports will appear here once there is something to measure.';
+      if (key === 'progress.startLearning') return 'Start learning';
+      if (key === 'tabs.library') return 'Library';
       if (key === 'progress.pageTitleMine') return 'My progress';
       if (key === 'progress.pageTitleProfile')
         return `${opts?.name ?? ''}'s progress`;
@@ -223,64 +230,73 @@ jest.mock('react-i18next', () => ({
   }),
 }));
 
-jest.mock(
-  '../../hooks/use-progress' /* gc1-allow: transport-boundary — hooks wrap useApiClient Hono RPC; requires mock fetch in unit tests */,
-  () => ({
-    ...jest.requireActual('../../hooks/use-progress'),
-    fetchLearningResumeTarget: jest.fn(),
-    useChildInventory: jest.fn(),
-    useChildProgressSummary: jest.fn(),
-    useLearningResumeTarget: jest.fn(),
-    useOverallProgress: jest.fn(),
-    useProgressInventory: jest.fn(),
-    useProgressMilestones: jest.fn(),
-    useProfileSessions: jest.fn(),
-    useProfileReports: jest.fn(),
-    useProfileWeeklyReports: jest.fn(),
-    useRefreshProgressSnapshot: jest.fn(),
-  }),
-);
+jest.mock('../../hooks/use-progress', () => ({
+  // gc1-allow: wraps useApiClient fetch boundary — needs network stub in unit tests
+  ...jest.requireActual('../../hooks/use-progress'),
+  fetchLearningResumeTarget: jest.fn(),
+  useChildInventory: jest.fn(),
+  useChildProgressSummary: jest.fn(),
+  useLearningResumeTarget: jest.fn(),
+  useOverallProgress: jest.fn(),
+  useProgressInventory: jest.fn(),
+  useProgressMilestones: jest.fn(),
+  useProfileSessions: jest.fn(),
+  useProfileReports: jest.fn(),
+  useProfileWeeklyReports: jest.fn(),
+  useRefreshProgressSnapshot: jest.fn(),
+}));
 const mockUseSubjects = jest.fn(() => ({
   data: [] as Array<{ id: string; name: string; status: string }>,
 }));
-jest.mock(
-  '../../hooks/use-subjects' /* gc1-allow: hook requires QueryClientProvider; not runnable in unit env */,
-  () => ({
-    useSubjects: () => mockUseSubjects(),
-  }),
-);
+jest.mock('../../hooks/use-subjects', () => ({
+  // gc1-allow: useSubjects calls useApiClient() + useProfile() — requires
+  // QueryClientProvider + ProfileContext not available in this unit env.
+  // Only useSubjects is overridden; all other exports use the real impl.
+  ...jest.requireActual('../../hooks/use-subjects'),
+  useSubjects: () => mockUseSubjects(),
+}));
 const mockUseActiveProfileRole = jest.fn();
-jest.mock('../../hooks/use-active-profile-role' /* gc1-allow */, () => ({
+jest.mock('../../hooks/use-active-profile-role', () => ({
+  // gc1-allow: useActiveProfileRole calls useProfile() + useParentProxy() —
+  // both require React context providers not available in this unit env.
+  // Only the hook return is overridden; types and other exports use real impl.
+  ...jest.requireActual('../../hooks/use-active-profile-role'),
   useActiveProfileRole: () => mockUseActiveProfileRole(),
 }));
 let mockLinkedChildren: Profile[] = [];
-jest.mock(
-  '../../lib/profile' /* gc1-allow: context-boundary — useProfile and useLinkedChildren read from ProfileContext.Provider which is not set up in these bare render() unit tests */,
-  () => ({
-    useProfile: () => ({
-      activeProfile: {
-        id: 'test-profile-id',
-        displayName: 'Test Learner',
-        createdAt: '2026-01-01T00:00:00Z',
-        isOwner: true,
-      },
-      profiles: [],
-    }),
-    useLinkedChildren: () => mockLinkedChildren,
+let mockActiveProfile: Profile = {
+  id: 'test-profile-id',
+  displayName: 'Test Learner',
+  createdAt: '2026-01-01T00:00:00Z',
+  isOwner: true,
+} as Profile;
+jest.mock('../../lib/profile', () => ({
+  // gc1-allow: ProfileProvider + useProfile require SecureStore, QueryClient,
+  // and network (via useProfiles) — not runnable in this unit env without a
+  // full React context tree. useLinkedChildren is derived from useProfile.
+  ...jest.requireActual('../../lib/profile'),
+  useProfile: () => ({
+    activeProfile: mockActiveProfile,
+    profiles: [],
   }),
-);
-// lib/analytics — real implementation: bucketAccountAge and hashProfileId are
-// pure functions; track() calls Sentry.addBreadcrumb which is globally stubbed
-// in test-setup.ts. No mock needed.
-jest.mock('../../lib/analytics', () =>
-  jest.requireActual('../../lib/analytics'),
-);
-jest.mock(
-  '../../lib/api-client' /* gc1-allow: transport-boundary — Hono RPC client requires a real HTTP transport; hooks are already mocked above so this stub is a safety net */,
-  () => ({
-    useApiClient: () => ({}),
-  }),
-);
+  useLinkedChildren: () => mockLinkedChildren,
+}));
+jest.mock('../../lib/analytics', () => ({
+  // gc1-allow: analytics.track calls Sentry.addBreadcrumb which is not
+  // initialised in the unit test env. Pure exports (bucketAccountAge,
+  // hashProfileId) also mocked as jest.fn() for call-site assertions.
+  ...jest.requireActual('../../lib/analytics'),
+  bucketAccountAge: jest.fn(() => '91+'),
+  hashProfileId: jest.fn((id: string) => `hashed-${id}`),
+  track: jest.fn(),
+}));
+jest.mock('../../lib/api-client', () => ({
+  // gc1-allow: useApiClient calls useAuth() (Clerk) which requires ClerkProvider
+  // not available in this unit env. Typed error classes and other exports
+  // preserved via requireActual spread.
+  ...jest.requireActual('../../lib/api-client'),
+  useApiClient: () => ({}),
+}));
 let mockSearchParams: { profileId?: string | string[] } = {};
 jest.mock('expo-router', () => {
   const ReactReq = jest.requireActual<typeof import('react')>('react');
@@ -540,6 +556,12 @@ describe('ProgressScreen — progressive disclosure', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockUseActiveProfileRole.mockReturnValue('owner');
+    mockActiveProfile = {
+      id: 'test-profile-id',
+      displayName: 'Test Learner',
+      createdAt: '2026-01-01T00:00:00Z',
+      isOwner: true,
+    } as Profile;
     mockUseSubjects.mockReturnValue({ data: [] });
     mockLinkedChildren = [];
     mockSearchParams = {};
@@ -811,6 +833,58 @@ describe('ProgressScreen — progressive disclosure', () => {
     screen.getByTestId('session-card-session-1');
   });
 
+  it('opens proxy recent sessions in the child-safe detail screen', () => {
+    mockUseActiveProfileRole.mockReturnValue('impersonated-child');
+    mockActiveProfile = {
+      id: 'child-id',
+      displayName: 'Lilly',
+      createdAt: '2026-01-01T00:00:00Z',
+      isOwner: false,
+    } as Profile;
+    mockHooks({
+      inventory: {
+        global: { ...baseGlobal, totalSessions: 3, totalActiveMinutes: 12 },
+        subjects: [fullSubject],
+        currentlyWorkingOn: [],
+      },
+      sessions: [
+        {
+          sessionId: 'session-1',
+          subjectId: 'subject-1',
+          subjectName: 'Math',
+          topicId: 'topic-1',
+          topicTitle: 'Fractions',
+          sessionType: 'learning',
+          startedAt: '2026-05-15T10:00:00Z',
+          endedAt: null,
+          exchangeCount: 3,
+          escalationRung: 1,
+          durationSeconds: 600,
+          wallClockSeconds: 600,
+          displayTitle: 'Learning',
+          displaySummary: 'Practiced comparing fractions.',
+          homeworkSummary: null,
+          highlight: null,
+          narrative: null,
+          conversationPrompt: null,
+          engagementSignal: null,
+        },
+      ],
+    });
+
+    render(<ProgressScreen />);
+
+    fireEvent.press(screen.getByTestId('progress-show-all-sessions'));
+    fireEvent.press(screen.getByTestId('session-card-session-1'));
+
+    expect(
+      jest.requireMock('expo-router').useRouter().push,
+    ).toHaveBeenCalledWith({
+      pathname: '/(app)/child/[profileId]/session/[sessionId]',
+      params: { profileId: 'child-id', sessionId: 'session-1' },
+    });
+  });
+
   it('renders empty latest report and recent focus states without duplicate surfaces', () => {
     mockLinkedChildren = [makeLinkedChild()];
     mockSearchParams = { profileId: 'child-1' };
@@ -882,7 +956,7 @@ describe('ProgressScreen — progressive disclosure', () => {
     expect(screen.queryByTestId('progress-new-learner-teaser')).toBeNull();
   });
 
-  it('points empty progress toward the first active subject when one exists', () => {
+  it('keeps overall empty progress global while opening the first active subject', () => {
     mockUseSubjects.mockReturnValue({
       data: [{ id: 'subject-italian', name: 'Italian', status: 'active' }],
     });
@@ -892,8 +966,94 @@ describe('ProgressScreen — progressive disclosure', () => {
 
     render(<ProgressScreen />);
 
-    screen.getByText('Progress unlocks after you study Italian');
-    screen.getByText('Study a topic in Italian first.');
+    screen.getByText('Progress appears after the first study session');
+    screen.getByText(
+      'Sessions, mastery, reviews, and reports will appear here once there is something to measure.',
+    );
+    expect(
+      screen.queryByText('Progress unlocks after you study Italian'),
+    ).toBeNull();
+    fireEvent.press(screen.getByTestId('progress-start-learning'));
+    expect(
+      jest.requireMock('expo-router').useRouter().push,
+    ).toHaveBeenCalledWith({
+      pathname: '/(app)/shelf/[subjectId]',
+      params: { subjectId: 'subject-italian' },
+    });
+  });
+
+  it('uses child-facing title and parent-safe action in proxy progress mode', () => {
+    mockUseActiveProfileRole.mockReturnValue('impersonated-child');
+    mockActiveProfile = {
+      id: 'child-id',
+      displayName: 'Lilly',
+      createdAt: '2026-01-01T00:00:00Z',
+      isOwner: false,
+    } as Profile;
+    mockUseSubjects.mockReturnValue({
+      data: [
+        { id: 'subject-programming', name: 'Programming', status: 'active' },
+      ],
+    });
+    mockHooks({
+      inventory: { global: { ...baseGlobal, totalSessions: 0 }, subjects: [] },
+    });
+
+    render(<ProgressScreen />);
+
+    screen.getByText("Lilly's progress");
+    screen.getByText('Progress appears after the first study session');
+    expect(screen.queryByText(/Programming/)).toBeNull();
+    screen.getByText('Library');
+
+    fireEvent.press(screen.getByTestId('progress-start-learning'));
+    expect(
+      jest.requireMock('expo-router').useRouter().push,
+    ).toHaveBeenCalledWith('/(app)/library');
+  });
+
+  it('keeps Lilly report visible in proxy mode even when inventory is empty', () => {
+    mockUseActiveProfileRole.mockReturnValue('impersonated-child');
+    mockActiveProfile = {
+      id: 'child-id',
+      displayName: 'Lilly',
+      createdAt: '2026-01-01T00:00:00Z',
+      isOwner: false,
+    } as Profile;
+    mockHooks({
+      inventory: { global: { ...baseGlobal, totalSessions: 0 }, subjects: [] },
+      weeklyReports: [
+        {
+          id: 'weekly-lilly',
+          reportWeek: '2026-05-11',
+          viewedAt: null,
+          createdAt: '2026-05-17T00:00:00Z',
+          headlineStat: {
+            label: 'topics mastered',
+            value: 2,
+            comparison: '+2 this week',
+          },
+          thisWeek: {
+            totalSessions: 4,
+            totalActiveMinutes: 95,
+            topicsMastered: 2,
+            topicsExplored: 6,
+            vocabularyTotal: 12,
+            streakBest: 3,
+          },
+        },
+      ],
+    });
+
+    render(<ProgressScreen />);
+
+    screen.getByText("Lilly's progress");
+    screen.getByTestId('progress-latest-report-card');
+    screen.getByText('2 topics mastered');
+    expect(
+      screen.queryByText('Progress appears after the first study session'),
+    ).toBeNull();
+    expect(useProfileWeeklyReports).toHaveBeenCalledWith('child-id');
   });
 
   it('opens the requested child progress profile from route params', () => {
@@ -1073,6 +1233,43 @@ describe('ProgressScreen — progressive disclosure', () => {
     screen.getByText('Latest report');
     screen.getByText('Recent sessions');
     expect(screen.queryByText('Your week')).toBeNull();
+  });
+
+  it('uses the shared subject tint map for progress subject rows', () => {
+    const biologySubject = {
+      ...fullSubject,
+      subjectId: 's2',
+      subjectName: 'Biology',
+      topics: { ...fullSubject.topics, mastered: 1, inProgress: 1 },
+      activeMinutes: 12,
+      sessionsCount: 2,
+    };
+    mockLinkedChildren = [makeLinkedChild()];
+    mockSearchParams = { profileId: 'child-1' };
+    mockHooks({
+      inventory: {
+        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 4 },
+        subjects: [fullSubject],
+      },
+      childInventory: {
+        global: { ...baseGlobal, totalSessions: 5, topicsMastered: 4 },
+        subjects: [fullSubject, biologySubject],
+      },
+      sessions: [],
+    });
+    const tintMap = getSubjectTintMap(['s1', 's2'], 'light');
+
+    render(<ProgressScreen />);
+
+    expect(
+      screen.getByTestId('progress-subject-s1-bookshelf').props.style
+        .borderColor,
+    ).toBe(`${tintMap.get('s1')!.solid}33`);
+    expect(
+      screen.getByTestId('progress-subject-s2-bookshelf').props.style
+        .borderColor,
+    ).toBe(`${tintMap.get('s2')!.solid}33`);
+    expect(tintMap.get('s1')?.solid).not.toBe(tintMap.get('s2')?.solid);
   });
 
   it('does not render the recent milestones block on the progress overview', () => {

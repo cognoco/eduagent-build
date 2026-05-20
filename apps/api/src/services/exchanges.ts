@@ -21,7 +21,6 @@ import type {
 } from './llm';
 import { createLogger } from './logger';
 import {
-  type LearningMode,
   type HomeworkMode,
   type InputMode,
   type SessionType,
@@ -203,8 +202,6 @@ export interface ExchangeContext {
   knownVocabulary?: string[];
   /** EVALUATE difficulty rung 1-4 (FR128-133) */
   evaluateDifficultyRung?: 1 | 2 | 3 | 4;
-  /** Learning mode: 'serious' (default) or 'casual' — affects tutoring tone */
-  learningMode?: LearningMode;
   /** SM-2 retention status for the current topic */
   retentionStatus?: {
     status: 'new' | 'strong' | 'fading' | 'weak' | 'forgotten';

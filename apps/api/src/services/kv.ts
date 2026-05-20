@@ -41,11 +41,26 @@ function subscriptionKey(accountId: string): string {
 export async function writeSubscriptionStatus(
   kv: KVNamespace,
   accountId: string,
-  status: CachedSubscriptionStatus
+  status: CachedSubscriptionStatus,
 ): Promise<void> {
   await kv.put(subscriptionKey(accountId), JSON.stringify(status), {
     expirationTtl: TTL_SECONDS,
   });
+}
+
+/**
+ * Deletes subscription status from KV. Used when authoritative state diverges
+ * from cache (e.g. after `safeRefundQuota` undoes a decrement) and we cannot
+ * recompute the post-refund counters cheaply — invalidate and let the next
+ * request backfill from DB.
+ *
+ * KVNamespace.delete is idempotent: deleting a missing key is a no-op.
+ */
+export async function deleteSubscriptionStatus(
+  kv: KVNamespace,
+  accountId: string,
+): Promise<void> {
+  await kv.delete(subscriptionKey(accountId));
 }
 
 /**
@@ -54,7 +69,7 @@ export async function writeSubscriptionStatus(
  */
 export async function readSubscriptionStatus(
   kv: KVNamespace,
-  accountId: string
+  accountId: string,
 ): Promise<CachedSubscriptionStatus | null> {
   const raw = await kv.get(subscriptionKey(accountId));
   if (!raw) {

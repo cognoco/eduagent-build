@@ -118,7 +118,6 @@ interface SkipSummaryResult {
     aiFeedback: string | null;
     status: 'skipped' | 'submitted' | 'accepted';
   };
-  consecutiveSummarySkips?: number;
 }
 
 export function useStartSession(subjectId: string): UseMutationResult<

@@ -1,5 +1,5 @@
 {
-  "id": "ba3e8bd1-e3e1-4d1c-a74e-a4ff842cfaf7",
+  "id": "e62099e8-a79d-4a1a-a1b0-58b9d823f16d",
   "prevId": "ddd2ea60-c609-411a-a23c-3119fa38fe8d",
   "version": "7",
   "dialect": "postgresql",
@@ -1292,7 +1292,12 @@
         }
       },
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "challenge_round_cooldowns_last_outcome_range": {
+          "name": "challenge_round_cooldowns_last_outcome_range",
+          "value": "\"challenge_round_cooldowns\".\"last_outcome\" IS NULL OR (\"challenge_round_cooldowns\".\"last_outcome\" >= 0 AND \"challenge_round_cooldowns\".\"last_outcome\" <= 3)"
+        }
+      },
       "isRLSEnabled": true
     },
     "public.dictation_results": {
@@ -6522,13 +6527,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
-        },
-        "last_reviewed_at": {
-          "notNull": true,
-          "default": "now()",
-          "name": "last_reviewed_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false
         }
       },
       "indexes": {
@@ -7051,7 +7049,12 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "practice_activity_events_source_type_known": {
+          "name": "practice_activity_events_source_type_known",
+          "value": "\"practice_activity_events\".\"source_type\" IN ('assessment', 'book', 'dictation_result', 'home_surface_pending_celebration', 'integration_test', 'quiz_mastery_item', 'quiz_round', 'retention_card', 'session_event', 'topic', 'vocabulary_retention_card')"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.webhook_idempotency_keys": {

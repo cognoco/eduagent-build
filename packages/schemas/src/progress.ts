@@ -11,9 +11,7 @@ import {
   reportPracticeSummarySchema,
 } from './snapshots';
 import { consentStatusSchema } from './consent';
-
-export const learningModeSchema = z.enum(['serious', 'casual']);
-export type LearningMode = z.infer<typeof learningModeSchema>;
+import { struggleStatusSchema } from './struggle-status';
 
 export const celebrationNameSchema = z.enum([
   'polar_star',
@@ -104,11 +102,6 @@ export const notificationPrefsSchema = z.object({
 });
 export type NotificationPrefsInput = z.infer<typeof notificationPrefsSchema>;
 
-export const learningModeUpdateSchema = z.object({
-  mode: learningModeSchema,
-});
-export type LearningModeUpdate = z.infer<typeof learningModeUpdateSchema>;
-
 export const celebrationLevelUpdateSchema = z.object({
   celebrationLevel: celebrationLevelSchema,
   childProfileId: z.string().uuid().optional(),
@@ -154,13 +147,6 @@ export const getNotificationsResponseSchema = z.object({
 });
 export type GetNotificationsResponse = z.infer<
   typeof getNotificationsResponseSchema
->;
-
-export const getLearningModeResponseSchema = z.object({
-  mode: learningModeSchema,
-});
-export type GetLearningModeResponse = z.infer<
-  typeof getLearningModeResponseSchema
 >;
 
 export const getCelebrationLevelResponseSchema = z.object({
@@ -255,7 +241,7 @@ export const topicProgressSchema = z.object({
   ]),
   retentionStatus: z.enum(['strong', 'fading', 'weak', 'forgotten']).nullable(),
   daysSinceLastReview: z.number().int().min(0).nullable(),
-  struggleStatus: z.enum(['normal', 'needs_deepening', 'blocked']),
+  struggleStatus: struggleStatusSchema,
   masteryScore: z.number().min(0).max(1).nullable(),
   summaryExcerpt: z.string().nullable(),
   xpStatus: z.enum(['pending', 'verified', 'decayed']).nullable(),

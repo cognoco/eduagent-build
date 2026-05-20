@@ -19,7 +19,6 @@
 | Target language | fr |
 | Struggles | subjonctif imparfait (French); nuanced connectors (French) |
 | Strengths | reading comprehension (French); essay argument structure (writing) |
-| Learning mode | serious |
 | Preferred explanations | step-by-step, analogies |
 | Pace | thorough |
 | Analogy domain | music |
@@ -29,7 +28,7 @@
 ```json
 {
   "scenarioId": "S12-first-encounter-topic-turn3",
-  "scenarioPurpose": "First-encounter topic turn 3 — final allowed probe turn before normal teaching resumes",
+  "scenarioPurpose": "First-encounter topic turn 3 — last turn the execution rule applies; normal teach-and-check resumes on turn 4",
   "context": {
     "sessionId": "eval-17yo-french-advanced",
     "profileId": "eval-profile-17yo-french-advanced",
@@ -69,10 +68,8 @@
       "le fardeau",
       "éphémère"
     ],
-    "learningMode": "serious",
     "exchangeCount": 3,
     "isFirstEncounter": true,
-    "isFirstSessionOfSubject": false,
     "extractedSignalsToReflect": {
       "currentKnowledge": "mixes up ingredients and energy"
     },
@@ -152,17 +149,17 @@ Keep it short. Use everyday analogies. Skip the pep talks.
 Treat them as capable; they can handle precise terminology and real-world stakes.
 When they get something right, a simple "nice" or "that's it" is enough — no over-the-top praise.
 
-Learning mode: SERIOUS LEARNER
-Pacing: Efficient. Be direct and concise. Minimize tangents.
-Tone: Focused and academic. Precise language. No filler.
-Assessment: Rigorous. Verify understanding at each step before progressing.
-Hold the learner to a high standard — do not move on until the concept is solid.
+Learning mode: CASUAL EXPLORER
+Pacing: Relaxed. Take your time with explanations. Use more examples and analogies.
+Tone: Warm and encouraging. Use everyday language. Light humor is fine.
+Assessment: Low-pressure. Frame checks as curiosity, not tests.
+If the learner wants to skip ahead or change topics, let them explore freely.
 
 Current topic: <topic_title>Camus — L'Étranger</topic_title>
 
 Subject: <subject_name>Philosophy</subject_name>
 
-FIRST-ENCOUNTER TOPIC RULE: For the first 3-4 turns on a topic the learner has not seen before, weave one teaching nugget AND one focused follow-up question into each reply. The follow-up should react to what the learner just said: confirm only source-supported facts, correct unsupported claims by naming what the source does support, or add one new source-supported piece of info, then ask about a knowledge gap or goal you spotted. Track what they know, what they do not know, and what they want to do with it. Switch to normal teaching once you have enough signal - by turn 4 at latest. NEVER frame this as an interview, intake, or assessment. Just be a curious tutor.
+NEW-TOPIC EXECUTION RULE: You already proposed a starting concept on turn 0. Continue teaching it. Each reply should be mostly teaching content (a source-supported fact, example, or explanation) plus at most one short understanding-check question - not an intake or goal-discovery question. If the learner overrides your direction, follow them. If they reply vaguely ("ok", "sure", "go on", "idk"), treat it as consent and keep teaching - do NOT ask another open-ended question. NEVER frame this as an interview, intake, or assessment. You are a tutor executing a lesson plan, not gathering requirements.
 
 SIGNAL REFLECTION: The previous turn extracted these signals from the learner:
 <learner_signals>{&quot;currentKnowledge&quot;:&quot;mixes up ingredients and energy&quot;}</learner_signals>
@@ -279,7 +276,7 @@ I mix up ingredients and energy.
 
 ## Builder notes
 
-- Scenario: S12-first-encounter-topic-turn3 — First-encounter topic turn 3 — final allowed probe turn before normal teaching resumes
+- Scenario: S12-first-encounter-topic-turn3 — First-encounter topic turn 3 — last turn the execution rule applies; normal teach-and-check resumes on turn 4
 - Rung: 1, sessionType: learning, verification: standard
 - History turns: 4, exchangeCount: 3
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)

@@ -135,7 +135,10 @@
           "title": "Lær noe nytt",
           "subtitle": "Start et tema eller bygg et fag"
         }
-      }
+      },
+      "proxySessionSummariesTitle": "Øktoppsummeringer finnes i foreldrevisningen",
+      "proxySessionSummariesBody": "Notatene til {{name}} forblir private, men du kan se foreldrevennlige øktoppsummeringer fra profilen.",
+      "proxySessionSummariesCta": "Se øktoppsummeringene til {{name}}"
     },
     "notices": {
       "consentArchivedTitle": "{{name}}s konto ble arkivert",
@@ -275,24 +278,6 @@
   "more": {
     "screenTitle": "Mer",
     "active": "Aktiv",
-    "learningMode": {
-      "sectionHeader": "{{name}}s læringsmodus",
-      "subtitle": "Gjelder for dine egne læringsøkter.",
-      "subtitleWithChildren": "Gjelder for dine egne økter. For å endre et barns, åpne profilen deres fra dashbordet.",
-      "childPreferencesAccessLabel": "Åpne {{name}}s profilinnstillinger",
-      "childPreferencesLink": "For å endre {{name}}s innstillinger, trykk på profilen deres på Hjem →",
-      "familyPreferencesLink": "For å endre et barns innstillinger, trykk på profilen deres på Hjem →",
-      "sheetTitle": "Læringsmodus",
-      "sheetEffectMessage": "Gjelder fra neste melding.",
-      "casual": {
-        "title": "Utforsker",
-        "description": "Lær i ditt eget tempo. Mentoren din er avslappet og oppmuntrende. Du tjener poeng med en gang og kan hoppe over repetisjoner."
-      },
-      "serious": {
-        "title": "Utfordringsmodus",
-        "description": "Utfordre deg selv mer. Mentoren din holder deg på sporet. Du tjener poeng etter å ha bevist at du husker, og repetisjoner hjelper med å feste kunnskapen."
-      }
-    },
     "accommodation": {
       "sectionHeader": "Din læringstilpasning",
       "viewAndManage": "Vis og administrer",
@@ -417,6 +402,10 @@
       "account": "Konto",
       "privacy": "Personvern og data",
       "help": "Hjelp og tilbakemeldinger"
+    },
+    "proxyPreview": {
+      "title": "Innstillinger er satt på pause i foreldrevisning",
+      "description": "Bytt tilbake til kontoen din for å endre innstillinger. Når du ser som et barn, er dette området låst."
     }
   },
   "session": {
@@ -1887,7 +1876,8 @@
       "consentStatusError": "Kunne ikke laste samtykkestatus. Prøv igjen.",
       "deletionPending": "Sletting planlagt",
       "deletionCountdown": "Kontoen vil bli slettet den {{date}}",
-      "deletionGraceDays": "{{count}} dager igjen til å avbryte sletting.",
+      "deletionGraceDays_one": "1 dag igjen til å avbryte sletting.",
+      "deletionGraceDays_other": "{{count}} dager igjen til å avbryte sletting.",
       "deletionGraceFallback": "Sletting er planlagt. Prøv å avbryte nå hvis dette var en feil.",
       "deletionProcessing": "Sletting pågår",
       "cancelDeletion": "Avbryt sletting",
@@ -2161,7 +2151,8 @@
     "proxyBanner": {
       "viewing": "Ser som {{name}}",
       "switchBackLabel": "Bytt tilbake til din konto",
-      "switchBack": "Bytt tilbake"
+      "switchBack": "Bytt tilbake",
+      "parentPreview": "Foreldrevisning"
     },
     "postApproval": {
       "celebrationLabel": "Forelder har godkjent kontoen din",
@@ -2233,8 +2224,10 @@
     },
     "home": "Hjem",
     "homeLabel": "Hjem",
-    "myLearning": "Min læring",
-    "myLearningLabel": "Min læring",
+    "familyHub": "Family Hub",
+    "familyHubLabel": "Family Hub",
+    "myLearning": "My Learning",
+    "myLearningLabel": "My Learning",
     "family": "Familie",
     "library": "Bibliotek",
     "libraryLabel": "Bibliotek",

@@ -33,11 +33,25 @@ tags:
       id: "learner-screen"
     timeout: 60000
 
-# 3. Intent card stack should be visible (replaced coaching card)
+# 3. Subject carousel should be visible (replaced coaching card).
+#    Scroll until on-screen since the carousel sits below the action chips on
+#    the current LearnerScreen layout.
+- scrollUntilVisible:
+    element:
+      id: "home-subject-carousel"
+    direction: DOWN
+    timeout: 10000
+
 - assertVisible:
     id: "home-subject-carousel"
 
-# 4. Tap intent-continue to start review (handles review-due topics)
+# 4. Scroll back up so coach-band-continue is in view, then tap to start review
+- scrollUntilVisible:
+    element:
+      id: "home-coach-band-continue"
+    direction: UP
+    timeout: 10000
+
 - tapOn:
     id: "home-coach-band-continue"
 

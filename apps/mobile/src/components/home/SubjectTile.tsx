@@ -1,5 +1,4 @@
 import { Pressable, View, Text } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { SubjectBookshelfMotif } from '../common/SubjectBookshelfMotif';
 
 export interface SubjectTileProps {
@@ -12,7 +11,6 @@ export interface SubjectTileProps {
   topicsTotal?: number;
   tintSolid: string;
   tintSoft: string;
-  icon: React.ComponentProps<typeof Ionicons>['name'];
   onPress?: () => void;
   testID: string;
 }

@@ -164,75 +164,10 @@ describe('Integration: settings routes', () => {
     expect(res.status).toBe(400);
   });
 
-  it('returns the real default learning mode when no row exists yet', async () => {
-    const profile = await createProfileFor(SETTINGS_USER, 'Settings Learner');
-
-    const res = await app.request(
-      '/v1/settings/learning-mode',
-      {
-        method: 'GET',
-        headers: buildAuthHeaders(
-          { sub: SETTINGS_USER.userId, email: SETTINGS_USER.email },
-          profile.id,
-        ),
-      },
-      TEST_ENV,
-    );
-
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ mode: 'casual' });
-  });
-
-  it('updates the learning mode and persists it', async () => {
-    const profile = await createProfileFor(SETTINGS_USER, 'Settings Learner');
-
-    const res = await app.request(
-      '/v1/settings/learning-mode',
-      {
-        method: 'PUT',
-        headers: buildAuthHeaders(
-          { sub: SETTINGS_USER.userId, email: SETTINGS_USER.email },
-          profile.id,
-        ),
-        body: JSON.stringify({ mode: 'serious' }),
-      },
-      TEST_ENV,
-    );
-
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ mode: 'serious' });
-
-    const db = getIntegrationDb();
-    const saved = await db.query.learningModes.findFirst({
-      where: eq(learningModes.profileId, profile.id),
-    });
-    expect(saved?.mode).toBe('serious');
-  });
-
-  it('rejects an invalid learning mode', async () => {
-    const profile = await createProfileFor(SETTINGS_USER, 'Settings Learner');
-
-    const res = await app.request(
-      '/v1/settings/learning-mode',
-      {
-        method: 'PUT',
-        headers: buildAuthHeaders(
-          { sub: SETTINGS_USER.userId, email: SETTINGS_USER.email },
-          profile.id,
-        ),
-        body: JSON.stringify({ mode: 'speedrun' }),
-      },
-      TEST_ENV,
-    );
-
-    expect(res.status).toBe(400);
-  });
-
   it('returns and updates the celebration level', async () => {
     const profile = await createProfileFor(SETTINGS_USER, 'Settings Learner');
     await seedLearningModeRecord({
       profileId: profile.id,
-      mode: 'casual',
       celebrationLevel: 'all',
     });
 

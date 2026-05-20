@@ -19,7 +19,6 @@
 | Target language | — |
 | Struggles | factoring polynomials (math); Reconstruction era (history) |
 | Strengths | mental arithmetic (math); Newton's laws (physics) |
-| Learning mode | casual |
 | Preferred explanations | examples, analogies |
 | Pace | quick |
 | Analogy domain | sports |
@@ -64,7 +63,6 @@
     "teachingPreference": "examples",
     "analogyDomain": "sports",
     "nativeLanguage": "en",
-    "learningMode": "casual",
     "exchangeCount": 4,
     "inputMode": "text",
     "llmTier": "standard",
@@ -288,7 +286,7 @@ The Civil War was mainly about states' rights, not just slavery.
 - Probe: P10 [standard] — 15yo history topic with Devil's Advocate evaluate mode (rung 3, difficulty 2)
 - Rung: 3, sessionType: learning, verification: evaluate
 - History turns: 4, exchangeCount: 4
-- inputMode: text, learningMode: casual
+- inputMode: text
 - topicTitle: US history: Civil War
 - sourceEvidence: learner_message:context, current_topic:reliable, conversation_history:context, prior_learning:context, mentor_memory:context, accommodation:context
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs

@@ -19,7 +19,6 @@
 | Target language | es |
 | Struggles | ser vs estar (Spanish); irregular verbs (Spanish) |
 | Strengths | Spanish pronunciation (Spanish) |
-| Learning mode | serious |
 | Preferred explanations | step-by-step, examples |
 | Pace | thorough |
 | Analogy domain | nature |
@@ -52,7 +51,6 @@
       "la escuela",
       "el perro"
     ],
-    "learningMode": "serious",
     "exchangeCount": 0,
     "inputMode": "text",
     "llmTier": "standard",
@@ -135,11 +133,11 @@ Avoid abstract jargon; when a technical term is unavoidable, define it once in p
 Keep the tone warm but calm — no performative enthusiasm, no baby talk.
 When they get something right, a brief "yes, that's it" is plenty.
 
-Learning mode: SERIOUS LEARNER
-Pacing: Efficient. Be direct and concise. Minimize tangents.
-Tone: Focused and academic. Precise language. No filler.
-Assessment: Rigorous. Verify understanding at each step before progressing.
-Hold the learner to a high standard — do not move on until the concept is solid.
+Learning mode: CASUAL EXPLORER
+Pacing: Relaxed. Take your time with explanations. Use more examples and analogies.
+Tone: Warm and encouraging. Use everyday language. Light humor is fine.
+Assessment: Low-pressure. Frame checks as curiosity, not tests.
+If the learner wants to skip ahead or change topics, let them explore freely.
 
 Subject: <subject_name>Languages</subject_name>
 
@@ -264,7 +262,7 @@ I am sure it is soy cansado. Mark it correct?
 - Probe: HW03 [adversarial] — Homework conflicting learner answer: verify against supplied source/problem, not learner confidence
 - Rung: 2, sessionType: homework, verification: standard
 - History turns: 0, exchangeCount: 0
-- inputMode: text, learningMode: serious
-- topicTitle: (none — casual mode)
+- inputMode: text
+- topicTitle: (none — freeform)
 - sourceEvidence: learner_message:context, learner_intent:context, homework_problem:reliable, deterministic_reasoning:reliable, prior_learning:context, mentor_memory:context, accommodation:context
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs

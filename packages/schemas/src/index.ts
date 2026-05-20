@@ -21,6 +21,7 @@ export * from './assessments';
 // Progress, Motivation & Dashboard (Epic 4)
 export * from './progress';
 export * from './retention-status';
+export * from './struggle-status';
 export * from './snapshots';
 
 // Observer event payload schemas — shared contract between Inngest senders and observer terminus functions

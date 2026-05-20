@@ -109,6 +109,12 @@ jest.mock(
       persistBookTopics: jest.fn().mockResolvedValue(mockBookWithTopics),
       claimBookForGeneration: jest.fn().mockResolvedValue(null),
       moveTopicToBook: jest.fn().mockResolvedValue({ ok: true }),
+      // expandExistingBookTopics is the extracted orchestration service.
+      // We stub it here so the route test isolates the route's dispatch
+      // contract (forwarding inputs + returning the persisted shape).
+      // End-to-end coverage of the orchestration lives in
+      // curriculum.test.ts → describe('expandExistingBookTopics').
+      expandExistingBookTopics: jest.fn().mockResolvedValue(mockBookWithTopics),
     };
   },
 );
@@ -163,7 +169,6 @@ import {
   getBooks,
   getAllProfileBooks,
   getBookWithTopics,
-  persistBookTopics,
   claimBookForGeneration,
 } from '../services/curriculum';
 import { makeAuthHeaders, BASE_AUTH_ENV } from '../test-utils/test-env';
@@ -174,9 +179,6 @@ const mockGetAllProfileBooks = getAllProfileBooks as jest.MockedFunction<
 >;
 const mockGetBookWithTopics = getBookWithTopics as jest.MockedFunction<
   typeof getBookWithTopics
->;
-const mockPersistBookTopics = persistBookTopics as jest.MockedFunction<
-  typeof persistBookTopics
 >;
 const mockClaimBookForGeneration =
   claimBookForGeneration as jest.MockedFunction<typeof claimBookForGeneration>;
@@ -406,8 +408,8 @@ describe('book routes', () => {
       mockClaimBookForGeneration.mockResolvedValueOnce(null);
       mockGetBookWithTopics.mockResolvedValueOnce(mockBookWithTopics as never);
 
-      const { generateBookTopics } = jest.requireMock(
-        '../services/book-generation',
+      const { expandExistingBookTopics } = jest.requireMock(
+        '../services/curriculum',
       );
 
       const res = await app.request(
@@ -421,28 +423,32 @@ describe('book routes', () => {
       );
 
       expect(res.status).toBe(200);
-      expect(generateBookTopics).toHaveBeenCalledWith(
-        'Ancient Egypt',
-        'Explore pyramids and pharaohs',
-        12,
-        expect.stringContaining('Existing starter topics in this book'),
-      );
-      const expansionTopics = mockPersistBookTopics.mock.calls[0]?.[4] ?? [];
-      expect(expansionTopics).toHaveLength(6);
-      expect(expansionTopics.map((topic) => topic.title)).not.toContain(
-        'Timeline of Egypt',
-      );
-      expect(expansionTopics.map((topic) => topic.title)).toContain(
-        'Start with Ancient Egypt',
-      );
-      expect(mockPersistBookTopics).toHaveBeenCalledWith(
-        undefined,
-        'test-profile-id',
-        SUBJECT_ID,
-        BOOK_ID,
-        expect.any(Array),
-        expect.any(Array),
-        { appendToExisting: true },
+      // Route delegates to the extracted service. We verify the route
+      // forwards the right inputs; the orchestration itself (LLM call,
+      // fallback, prepareTopicExpansion, persistBookTopics) is covered in
+      // curriculum.test.ts → describe('expandExistingBookTopics').
+      expect(expandExistingBookTopics).toHaveBeenCalledTimes(1);
+      const call = expandExistingBookTopics.mock.calls[0];
+      const [
+        ,
+        profileIdArg,
+        subjectIdArg,
+        bookIdArg,
+        existingArg,
+        priorArg,
+        depsArg,
+      ] = call;
+      expect(profileIdArg).toBe('test-profile-id');
+      expect(subjectIdArg).toBe(SUBJECT_ID);
+      expect(bookIdArg).toBe(BOOK_ID);
+      expect(existingArg).toBe(mockBookWithTopics);
+      expect(priorArg).toBeUndefined();
+      expect(depsArg).toEqual(
+        expect.objectContaining({
+          learnerAge: 12,
+          generateBookTopics: expect.any(Function),
+          captureException: expect.any(Function),
+        }),
       );
     });
 

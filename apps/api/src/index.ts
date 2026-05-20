@@ -22,6 +22,7 @@ import {
   RateLimitedError,
   UpstreamLlmError,
   BadRequestError,
+  SchemaDriftError,
 } from './errors';
 
 import { envValidationMiddleware } from './middleware/env-validation';
@@ -329,6 +330,28 @@ app.onError((err, c) => {
       400,
     );
   }
+  // [CCR PR #215] Schema-drift fault: a DB row exists but does not validate.
+  // Surface 500 so the client renders a real error (not 404 "missing").
+  // DO NOT call captureException here — the service layer (mapMonthlyReportRow /
+  // mapWeeklyReportRow) already captured the ZodError with rich row-level
+  // context (row PK, profileId, childProfileId, zod issues) before throwing.
+  // A second capture here would create duplicate Sentry events per drift,
+  // doubling noise and breaking Sentry issue grouping.
+  // Sentry capture is verified in: services/monthly-report.test.ts and
+  // services/weekly-report.test.ts (schema-drift break tests, CCR PR #215).
+  if (err instanceof SchemaDriftError) {
+    return c.json(
+      {
+        code: ERROR_CODES.INTERNAL_ERROR,
+        message:
+          c.env.ENVIRONMENT === 'production'
+            ? 'Internal server error'
+            : err.message,
+      },
+      500,
+    );
+  }
+
   if (err instanceof UpstreamLlmError) {
     // Track LLM-provider drift in Sentry; surface 502 so clients can retry.
     captureException(err, {

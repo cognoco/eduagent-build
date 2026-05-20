@@ -5,6 +5,7 @@ import { AppState, Platform } from 'react-native';
 import { useRegisterPushToken } from './use-settings';
 import { Sentry } from '../lib/sentry';
 import { useProfile } from '../lib/profile';
+import { useParentProxy } from './use-parent-proxy';
 
 export type PushRegistrationFailure =
   | 'permission_denied'
@@ -59,6 +60,7 @@ export function usePushTokenRegistration(): PushRegistrationState {
     status: 'idle',
   });
   const { activeProfile } = useProfile();
+  const { isParentProxy } = useParentProxy();
   const registerPushToken = useRegisterPushToken();
 
   const registerIfAllowed = useCallback(async () => {
@@ -68,6 +70,7 @@ export function usePushTokenRegistration(): PushRegistrationState {
 
     const activeProfileId = activeProfile?.id ?? null;
     if (!activeProfileId) return;
+    if (isParentProxy) return;
 
     try {
       const { status } = await Notifications.getPermissionsAsync();
@@ -149,7 +152,7 @@ export function usePushTokenRegistration(): PushRegistrationState {
       setState({ status: 'failed', reason: 'unsupported_device' });
       capturePushRegistrationFailure(err, 'unsupported_device');
     }
-  }, [activeProfile?.id, registerPushToken]);
+  }, [activeProfile?.id, isParentProxy, registerPushToken]);
 
   useEffect(() => {
     void registerIfAllowed();

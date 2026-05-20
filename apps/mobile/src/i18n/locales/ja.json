@@ -135,7 +135,10 @@
           "title": "新しいことを学ぶ",
           "subtitle": "トピックを始めるか、科目を作成"
         }
-      }
+      },
+      "proxySessionSummariesTitle": "セッション要約は保護者ビューにあります",
+      "proxySessionSummariesBody": "{{name}}のメモは非公開のままですが、プロフィールから保護者向けのセッション要約を確認できます。",
+      "proxySessionSummariesCta": "{{name}}のセッション要約を見る"
     },
     "notices": {
       "consentArchivedTitle": "{{name}}'s account was archived",
@@ -275,24 +278,6 @@
   "more": {
     "screenTitle": "その他",
     "active": "アクティブ",
-    "learningMode": {
-      "sectionHeader": "{{name}}さんの学習モード",
-      "subtitle": "ご自身の学習セッションに適用されます。",
-      "subtitleWithChildren": "ご自身のセッションに適用されます。お子様の設定を変更するには、ダッシュボードからプロフィールを開いてください。",
-      "childPreferencesAccessLabel": "{{name}}さんのプロフィール設定を開く",
-      "childPreferencesLink": "{{name}}さんの設定を変更するには、ホームでプロフィールをタップしてください →",
-      "familyPreferencesLink": "お子様の設定を変更するには、ホームでプロフィールをタップしてください →",
-      "sheetTitle": "学習モード",
-      "sheetEffectMessage": "次のメッセージから反映されます。",
-      "casual": {
-        "title": "エクスプローラー",
-        "description": "自分のペースで学習します。メンターはリラックスして励ましてくれます。すぐにポイントを獲得でき、要約をスキップできます。"
-      },
-      "serious": {
-        "title": "チャレンジモード",
-        "description": "さらに上を目指しましょう。メンターが学習をサポートします。覚えていることを証明した後にポイントを獲得し、要約で知識を定着させます。"
-      }
-    },
     "accommodation": {
       "sectionHeader": "あなたの学習サポート",
       "viewAndManage": "表示・管理",
@@ -417,6 +402,10 @@
       "account": "アカウント",
       "privacy": "プライバシーとデータ",
       "help": "ヘルプとフィードバック"
+    },
+    "proxyPreview": {
+      "title": "保護者プレビューでは設定は一時停止されています",
+      "description": "設定を変更するには自分のアカウントに戻ってください。子どもとして表示している間、このエリアはロックされます。"
     }
   },
   "session": {
@@ -1887,7 +1876,8 @@
       "consentStatusError": "同意ステータスを読み込めませんでした。もう一度お試しください。",
       "deletionPending": "削除予定",
       "deletionCountdown": "アカウントは{{date}}に削除されます",
-      "deletionGraceDays": "削除をキャンセルできる期間はあと{{count}}日です。",
+      "deletionGraceDays_one": "削除をキャンセルできる期間はあと1日です。",
+      "deletionGraceDays_other": "削除をキャンセルできる期間はあと{{count}}日です。",
       "deletionGraceFallback": "削除が予定されています。間違いの場合は今すぐキャンセルしてみてください。",
       "deletionProcessing": "削除処理中",
       "cancelDeletion": "削除をキャンセル",
@@ -2161,7 +2151,8 @@
     "proxyBanner": {
       "viewing": "{{name}}として表示中",
       "switchBackLabel": "自分のアカウントに戻る",
-      "switchBack": "戻る"
+      "switchBack": "戻る",
+      "parentPreview": "保護者プレビュー"
     },
     "postApproval": {
       "celebrationLabel": "保護者があなたのアカウントを承認しました",
@@ -2233,8 +2224,10 @@
     },
     "home": "ホーム",
     "homeLabel": "ホーム",
-    "myLearning": "マイ学習",
-    "myLearningLabel": "マイ学習",
+    "familyHub": "Family Hub",
+    "familyHubLabel": "Family Hub",
+    "myLearning": "My Learning",
+    "myLearningLabel": "My Learning",
     "family": "家族",
     "library": "ライブラリ",
     "libraryLabel": "ライブラリ",

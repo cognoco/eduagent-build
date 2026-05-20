@@ -1,6 +1,16 @@
 import { View } from 'react-native';
 
 import type { LearningSubjectTint } from '../../lib/learning-subject-tints';
+import { withOpacity } from '../../lib/color-opacity';
+
+// Hoisted to module scope — geometry/opacity only, no theme or prop dependencies.
+// Stable reference prevents FlatList row remounts on parent re-renders.
+const SPINE_STYLES = [
+  { height: 25, width: 7, opacity: 0.72, marginTop: 10 },
+  { height: 34, width: 9, opacity: 1, marginTop: 1 },
+  { height: 28, width: 8, opacity: 0.84, marginTop: 7, rotate: '-5deg' },
+  { height: 31, width: 8, opacity: 0.92, marginTop: 4 },
+];
 
 export function SubjectBookshelfMotif({
   testID,
@@ -9,13 +19,6 @@ export function SubjectBookshelfMotif({
   testID?: string;
   tint: LearningSubjectTint;
 }): React.ReactElement {
-  const spineStyles = [
-    { height: 25, width: 7, opacity: 0.72, marginTop: 10 },
-    { height: 34, width: 9, opacity: 1, marginTop: 1 },
-    { height: 28, width: 8, opacity: 0.84, marginTop: 7, rotate: '-5deg' },
-    { height: 31, width: 8, opacity: 0.92, marginTop: 4 },
-  ];
-
   return (
     <View
       testID={testID}
@@ -24,7 +27,7 @@ export function SubjectBookshelfMotif({
         width: 52,
         height: 44,
         borderRadius: 13,
-        borderColor: tint.solid + '33',
+        borderColor: withOpacity(tint.solid, 0.2),
         borderWidth: 1,
         justifyContent: 'flex-end',
         paddingHorizontal: 7,
@@ -39,7 +42,7 @@ export function SubjectBookshelfMotif({
           height: 34,
         }}
       >
-        {spineStyles.map((spine, index) => (
+        {SPINE_STYLES.map((spine, index) => (
           <View
             key={index}
             style={{

@@ -343,30 +343,34 @@ describe('ParentHomeScreen', () => {
     promptCardStyles.forEach((style) => {
       expect(style).toEqual(
         expect.objectContaining({
-          borderWidth: 1,
-          borderRadius: 18,
-          elevation: 2,
-          minHeight: 108,
-          shadowOpacity: 0.1,
+          borderRadius: 30,
+          minHeight: 58,
         }),
       );
       expect(style.backgroundColor).toEqual(expect.stringContaining('rgba('));
+      expect(style.borderWidth).toBeUndefined();
+      expect(style.elevation).toBeUndefined();
     });
     expect(
-      new Set(promptCardStyles.map((style) => style.borderColor)).size,
-    ).toBe(3);
+      new Set(promptCardStyles.map((style) => style.backgroundColor)).size,
+    ).toBe(1);
+    expect(resolvedStyle('parent-home-check-child-child-a')).toEqual(
+      expect.objectContaining({
+        shadowColor: expect.any(String),
+      }),
+    );
     expect(
       screen.getByTestId('parent-home-tonight-child-a-primary').props
         .accessibilityRole,
     ).toBeUndefined();
     expect(resolvedStyle('parent-home-tonight-icon-child-a-primary')).toEqual(
-      expect.objectContaining({ height: 58, width: 58 }),
+      expect.objectContaining({ height: 30, width: 30 }),
     );
     expect(resolvedStyle('parent-home-tonight-text-child-a-primary')).toEqual(
       expect.objectContaining({
-        backgroundColor: 'transparent',
-        fontSize: 21,
-        lineHeight: 30,
+        fontSize: 15,
+        fontWeight: '400',
+        lineHeight: 21,
       }),
     );
     screen.getByText('Fractions · 18 min this week');
@@ -489,6 +493,14 @@ describe('ParentHomeScreen', () => {
     );
     screen.getByText('Emma: What made Math click today?');
     screen.getByText('Liam: What would make starting feel easy tonight?');
+    expect(
+      resolvedStyle('parent-home-tonight-child-a-primary').backgroundColor,
+    ).not.toBe(
+      resolvedStyle('parent-home-tonight-child-b-primary').backgroundColor,
+    );
+    expect(
+      resolvedStyle('parent-home-check-child-child-a').shadowColor,
+    ).not.toBe(resolvedStyle('parent-home-check-child-child-b').shadowColor);
     const allPrompts = screen.getAllByTestId(/^parent-home-tonight-/);
     // Emma (5 sessions) must appear before Liam (0 sessions) regardless of input order
     expect(allPrompts.indexOf(emmaPrompt)).toBeLessThan(

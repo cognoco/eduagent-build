@@ -19,7 +19,6 @@
 | Target language | — |
 | Struggles | factoring polynomials (math); Reconstruction era (history) |
 | Strengths | mental arithmetic (math); Newton's laws (physics) |
-| Learning mode | casual |
 | Preferred explanations | examples, analogies |
 | Pace | quick |
 | Analogy domain | sports |
@@ -48,7 +47,6 @@
     "teachingPreference": "examples",
     "analogyDomain": "sports",
     "nativeLanguage": "en",
-    "learningMode": "casual",
     "exchangeCount": 0,
     "inputMode": "text",
     "llmTier": "standard",
@@ -267,7 +265,7 @@ My answer says Rome conquered places mainly because merchants wanted rare spices
 - Probe: SGA04 [adversarial] — Unsupported learner claim: learner asserts a fact not present in reliable topic source
 - Rung: 3, sessionType: learning, verification: evaluate
 - History turns: 0, exchangeCount: 0
-- inputMode: text, learningMode: casual
+- inputMode: text
 - topicTitle: Ancient trade
 - sourceEvidence: learner_message:context, current_topic:reliable, prior_learning:context, mentor_memory:context, accommodation:context
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs

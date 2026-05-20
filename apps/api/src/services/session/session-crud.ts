@@ -53,7 +53,6 @@ import { NotFoundError } from '../../errors';
 import { insertSessionEvent } from './session-events';
 import { getSubject } from '../subject';
 import { createPendingSessionSummary } from '../summaries';
-import { incrementSummarySkips } from '../settings';
 import { persistBookTopics } from '../curriculum';
 import { generateBookTopics } from '../book-generation';
 import { buildFallbackBookTopics } from '../book-generation-fallbacks';
@@ -1063,10 +1062,6 @@ export async function closeSession(
     session.topicId ?? null,
     effectiveSummaryStatus,
   );
-
-  if (effectiveSummaryStatus === 'skipped') {
-    await incrementSummarySkips(db, profileId);
-  }
 
   // FR92: Extract interleaved topic IDs from session metadata
   const interleavedTopicIds = await resolveInterleavedTopicIds(

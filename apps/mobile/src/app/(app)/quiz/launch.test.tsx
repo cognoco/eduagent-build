@@ -130,6 +130,12 @@ jest.mock(
   '../../../lib/navigation' /* gc1-allow: navigation helper mock keeps screen unit-scoped */,
   () => ({
     goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
+    homeHrefForReturnTo: (returnTo: string) =>
+      returnTo === 'practice'
+        ? '/(app)/practice'
+        : returnTo === 'own-learning'
+          ? '/(app)/own-learning'
+          : '/(app)/home',
   }),
 );
 
@@ -233,6 +239,21 @@ describe('QuizLaunchScreen', () => {
         expect.any(Object),
       );
     });
+  });
+
+  it('uses the route activityType over stale quiz context', async () => {
+    mockFlowActivityType = 'capitals';
+    mockSearchParams = { activityType: 'guess_who' };
+
+    render(<QuizLaunchScreen />);
+
+    await waitFor(() => {
+      expect(mockMutate).toHaveBeenCalledWith(
+        { activityType: 'guess_who', subjectId: undefined },
+        expect.any(Object),
+      );
+    });
+    expect(mockSetActivityType).toHaveBeenCalledWith('guess_who');
   });
 
   it('starts a vocabulary round from route params with subject context', async () => {
@@ -385,8 +406,13 @@ describe('QuizLaunchScreen', () => {
     });
 
     it('suppresses Retry for ForbiddenError-shaped launch failures', () => {
+      // [CCR PR #282] Real ForbiddenError shape: name + errorCode. The
+      // anti-spoofing guard in classifyApiError / extractApiErrorCode requires
+      // BOTH so a plain Error with only `name = 'ForbiddenError'` cannot
+      // impersonate the typed error.
       const forbidden = Object.assign(new Error('Insufficient permissions'), {
         name: 'ForbiddenError',
+        errorCode: 'FORBIDDEN',
       });
       mockGenerateRound = {
         mutate: mockMutate,
@@ -423,6 +449,54 @@ describe('QuizLaunchScreen', () => {
 
       screen.getByTestId('quiz-launch-error-fallback');
       expect(screen.queryByTestId('quiz-launch-retry')).toBeNull();
+      screen.getByTestId('quiz-launch-back');
+    });
+
+    // [CCR PR #282] QuotaExceeded is unretryable — recovery: 'none' should
+    // hide Retry. Uses real QuotaExceededError shape (name + code + details).
+    it('suppresses Retry for QuotaExceededError-shaped launch failures', () => {
+      const quota = Object.assign(new Error('Monthly quiz quota reached.'), {
+        name: 'QuotaExceededError',
+        code: 'QUOTA_EXCEEDED',
+        details: { tier: 'free', reason: 'monthly' },
+      });
+      mockGenerateRound = {
+        mutate: mockMutate,
+        isPending: false,
+        isError: true,
+        error: quota,
+      };
+
+      render(<QuizLaunchScreen />);
+
+      screen.getByTestId('quiz-launch-error-fallback');
+      expect(screen.queryByTestId('quiz-launch-retry')).toBeNull();
+      screen.getByTestId('quiz-launch-back');
+    });
+
+    // [CCR PR #282] Anti-spoofing: a plain Error whose only "typed" signal is
+    // a forged `name` must NOT be classified as an unretryable typed error.
+    // Falls through to unknown/retry — Retry IS shown. Mirrors the
+    // anti-spoofing guards in format-api-error.test.ts; this version proves
+    // the spoofing immunity reaches the screen.
+    it('does NOT suppress Retry for an error with only a spoofed .name', () => {
+      const spoofed = Object.assign(new Error('attacker-supplied message'), {
+        name: 'ForbiddenError',
+        // No errorCode / apiCode / code property — fails the shape guard.
+      });
+      mockGenerateRound = {
+        mutate: mockMutate,
+        isPending: false,
+        isError: true,
+        error: spoofed,
+      };
+
+      render(<QuizLaunchScreen />);
+
+      screen.getByTestId('quiz-launch-error-fallback');
+      // Retry IS shown — the spoofed name alone is not enough to mark the
+      // error unretryable.
+      screen.getByTestId('quiz-launch-retry');
       screen.getByTestId('quiz-launch-back');
     });
   });

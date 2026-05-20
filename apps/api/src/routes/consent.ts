@@ -35,7 +35,34 @@ import { notFound, forbidden, apiError } from '../errors';
 import { inngest } from '../inngest/client';
 import { safeSend } from '../services/safe-non-core';
 
-const CONSENT_RESPOND_RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
+// [BUG-655 / A-11] /consent/respond is unauthenticated (a parent clicks an
+// emailed link, no session). The token is a 122-bit UUID so brute-force is
+// infeasible, but the endpoint still needs rate limiting to prevent DoS and
+// to slow any future weakening of the token format. Same in-memory
+// sliding-window pattern as feedback.ts; cap is per source IP.
+//
+// [BUG-99 / A1-MED — ACCEPTED LIMITATION] Worker isolates each maintain
+// independent state. The effective ceiling is
+// CONSENT_RESPOND_RATE_LIMIT_MAX × N isolates per hour per IP. For this
+// endpoint we accept this as a known limitation because:
+//   1. The token is a 122-bit UUID — brute-forcing it at any rate is
+//      computationally infeasible. The rate limiter is defense-in-depth
+//      against a hypothetical future weakening of the token format, not a
+//      load-bearing security control.
+//   2. The endpoint is single-use — once a token is consumed (approved or
+//      denied), all subsequent attempts return 409 CONFLICT regardless of
+//      rate. The attack surface per IP is bounded by the number of issued
+//      tokens that are still pending in the 24h consent window.
+//   3. Cross-isolate accuracy requires Durable Objects (or a heavy-weight
+//      KV fixed-window counter that pays an extra round-trip per request
+//      and is still racy due to KV's eventual consistency, up to 60s).
+//      Neither is justified for a low-volume parent flow.
+//   4. Failure mode is bounded: even with 100 active isolates, the
+//      effective ceiling is 3000 attempts/IP/hr — still hostile to
+//      enumeration if the token format is ever weakened.
+// If traffic grows or the token format changes, revisit with a Durable
+// Object-backed limiter (CF Workers RPC pattern).
+const CONSENT_RESPOND_RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
 const CONSENT_RESPOND_RATE_LIMIT_MAX = 30;
 const CONSENT_RESPOND_MAP_MAX_ENTRIES = 10_000;
 const consentRespondTimestamps = new Map<string, number[]>();

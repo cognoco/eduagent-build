@@ -1292,7 +1292,12 @@
         }
       },
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "challenge_round_cooldowns_last_outcome_range": {
+          "name": "challenge_round_cooldowns_last_outcome_range",
+          "value": "\"challenge_round_cooldowns\".\"last_outcome\" IS NULL OR (\"challenge_round_cooldowns\".\"last_outcome\" >= 0 AND \"challenge_round_cooldowns\".\"last_outcome\" <= 3)"
+        }
+      },
       "isRLSEnabled": true
     },
     "public.dictation_results": {

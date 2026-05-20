@@ -19,7 +19,6 @@
 | Target language | — |
 | Struggles | factoring polynomials (math); Reconstruction era (history) |
 | Strengths | mental arithmetic (math); Newton's laws (physics) |
-| Learning mode | casual |
 | Preferred explanations | examples, analogies |
 | Pace | quick |
 | Analogy domain | sports |
@@ -56,7 +55,6 @@
     "teachingPreference": "examples",
     "analogyDomain": "sports",
     "nativeLanguage": "en",
-    "learningMode": "casual",
     "exchangeCount": 1,
     "inputMode": "text",
     "llmTier": "standard",
@@ -273,7 +271,7 @@ I know I need two numbers that multiply to 6 and add to 5.
 - Probe: P12 [standard] — 15yo homework session, help_me mode — guided problem-solving
 - Rung: 2, sessionType: homework, verification: standard
 - History turns: 2, exchangeCount: 1
-- inputMode: text, learningMode: casual
+- inputMode: text
 - topicTitle: algebra equations
 - sourceEvidence: learner_message:context, current_topic:reliable, homework_problem:reliable, deterministic_reasoning:reliable, conversation_history:context, prior_learning:context, mentor_memory:context, accommodation:context
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs

@@ -2,8 +2,7 @@ import type { Database } from '@eduagent/database';
 import {
   getNotificationPrefs,
   upsertNotificationPrefs,
-  getLearningMode,
-  upsertLearningMode,
+  getLearningModeRecord,
   getCelebrationLevel,
   upsertCelebrationLevel,
   getFamilyPoolBreakdownSharing,
@@ -11,11 +10,6 @@ import {
   upsertFamilyPoolBreakdownSharing,
   getMedianResponseSeconds,
   updateMedianResponseSeconds,
-  getLearningModeRules,
-  getConsecutiveSummarySkips,
-  incrementSummarySkips,
-  resetSummarySkips,
-  SKIP_WARNING_THRESHOLD,
   registerPushToken,
   getPushToken,
   getDailyNotificationCount,
@@ -203,68 +197,34 @@ describe('upsertNotificationPrefs', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Learning Mode
+// Learning Mode Record (mode toggle removed; record now carries
+// median response seconds + celebration level only)
 // ---------------------------------------------------------------------------
 
-describe('getLearningMode', () => {
-  it('returns default casual mode when no row exists', async () => {
+describe('getLearningModeRecord', () => {
+  it('returns defaults when no row exists', async () => {
     const db = createMockDb({ findFirstResult: undefined });
-    const result = await getLearningMode(db, profileId);
+    const result = await getLearningModeRecord(db, profileId);
 
     expect(result).toEqual({
-      mode: 'casual',
       medianResponseSeconds: null,
       celebrationLevel: 'all',
     });
   });
 
-  it('returns stored mode when row exists', async () => {
+  it('returns stored fields when row exists', async () => {
     const db = createMockDb({
       findFirstResult: {
-        mode: 'casual',
         medianResponseSeconds: 240,
         celebrationLevel: 'big_only',
       },
     });
-    const result = await getLearningMode(db, profileId);
+    const result = await getLearningModeRecord(db, profileId);
 
     expect(result).toEqual({
-      mode: 'casual',
       medianResponseSeconds: 240,
       celebrationLevel: 'big_only',
     });
-  });
-});
-
-describe('upsertLearningMode', () => {
-  it('inserts when no existing row', async () => {
-    const db = createMockDb({ findFirstResult: undefined });
-    const result = await upsertLearningMode(
-      db,
-      profileId,
-      TEST_ACCOUNT_ID,
-      'casual',
-    );
-
-    expect(result).toEqual({ mode: 'casual' });
-    expect(db.insert).toHaveBeenCalled();
-    expect(db.update).not.toHaveBeenCalled();
-  });
-
-  it('updates when row exists', async () => {
-    const db = createMockDb({
-      findFirstResult: { mode: 'serious' },
-    });
-    const result = await upsertLearningMode(
-      db,
-      profileId,
-      TEST_ACCOUNT_ID,
-      'casual',
-    );
-
-    expect(result).toEqual({ mode: 'casual' });
-    expect(db.update).toHaveBeenCalled();
-    expect(db.insert).not.toHaveBeenCalled();
   });
 });
 
@@ -377,107 +337,6 @@ describe('median response baseline', () => {
       180,
     );
     expect(db.update).toHaveBeenCalled();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Learning Mode Rules
-// ---------------------------------------------------------------------------
-
-describe('getLearningModeRules', () => {
-  it('returns strict rules for serious mode', () => {
-    const rules = getLearningModeRules('serious');
-
-    expect(rules).toEqual({
-      masteryGates: true,
-      verifiedXpOnly: true,
-      mandatorySummaries: true,
-    });
-  });
-
-  it('returns relaxed rules for casual mode', () => {
-    const rules = getLearningModeRules('casual');
-
-    expect(rules).toEqual({
-      masteryGates: false,
-      verifiedXpOnly: false,
-      mandatorySummaries: false,
-    });
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Summary Skip Tracking
-// ---------------------------------------------------------------------------
-
-describe('getConsecutiveSummarySkips', () => {
-  it('returns 0 when no row exists', async () => {
-    const db = createMockDb({ findFirstResult: undefined });
-    const result = await getConsecutiveSummarySkips(db, profileId);
-
-    expect(result).toBe(0);
-  });
-
-  it('returns stored count when row exists', async () => {
-    const db = createMockDb({
-      findFirstResult: { consecutiveSummarySkips: 7 },
-    });
-    const result = await getConsecutiveSummarySkips(db, profileId);
-
-    expect(result).toBe(7);
-  });
-});
-
-describe('incrementSummarySkips', () => {
-  it('inserts with count 1 when no existing row', async () => {
-    const db = createMockDb({ findFirstResult: undefined });
-    const result = await incrementSummarySkips(db, profileId);
-
-    expect(result).toBe(1);
-    expect(db.insert).toHaveBeenCalled();
-  });
-
-  it('updates incremented count when row exists', async () => {
-    const db = createMockDb({
-      findFirstResult: { consecutiveSummarySkips: 5 },
-    });
-    const result = await incrementSummarySkips(db, profileId);
-
-    expect(result).toBe(6);
-    expect(db.update).toHaveBeenCalled();
-  });
-});
-
-describe('resetSummarySkips', () => {
-  it('no-ops when no row exists', async () => {
-    const db = createMockDb({ findFirstResult: undefined });
-    await resetSummarySkips(db, profileId);
-
-    expect(db.update).not.toHaveBeenCalled();
-  });
-
-  it('no-ops when count is already 0', async () => {
-    const db = createMockDb({
-      findFirstResult: { consecutiveSummarySkips: 0 },
-    });
-    await resetSummarySkips(db, profileId);
-
-    expect(db.update).not.toHaveBeenCalled();
-  });
-
-  it('resets count to 0 when count is > 0', async () => {
-    const db = createMockDb({
-      findFirstResult: { consecutiveSummarySkips: 8 },
-    });
-    await resetSummarySkips(db, profileId);
-
-    expect(db.update).toHaveBeenCalled();
-  });
-});
-
-describe('SKIP_WARNING_THRESHOLD', () => {
-  it('remains 5', () => {
-    expect(SKIP_WARNING_THRESHOLD).toBe(5);
   });
 });
 

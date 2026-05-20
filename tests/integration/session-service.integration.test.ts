@@ -120,7 +120,7 @@ async function seedCurriculum(
   topicInputs: Array<{ title: string; chapter?: string }> = [
     { title: 'Photosynthesis', chapter: 'Foundations' },
     { title: 'Cellular Respiration', chapter: 'Foundations' },
-  ]
+  ],
 ) {
   const db = createIntegrationDb();
   const [curriculum] = await db
@@ -151,7 +151,7 @@ async function seedCurriculum(
         chapter: topic.chapter ?? null,
         sortOrder: index + 1,
         estimatedMinutes: 15,
-      }))
+      })),
     )
     .returning();
 
@@ -238,7 +238,7 @@ async function seedSessionEvents(input: {
       content: event.content,
       metadata: event.metadata ?? {},
       createdAt: event.createdAt,
-    }))
+    })),
   );
 }
 
@@ -338,12 +338,11 @@ describe('Integration: session service', () => {
       session.id,
       {
         summaryStatus: 'skipped',
-      }
+      },
     );
 
     const persistedSession = await loadSession(session.id);
     const summary = await loadSummary(session.id);
-    const learningMode = await loadLearningMode(profile.id);
 
     expect(result.summaryStatus).toBe('skipped');
     expect(result.interleavedTopicIds).toEqual(topics.map((topic) => topic.id));
@@ -351,7 +350,6 @@ describe('Integration: session service', () => {
     expect(persistedSession!.status).toBe('completed');
     expect(persistedSession!.durationSeconds).toBe(300);
     expect(summary!.status).toBe('skipped');
-    expect(learningMode!.consecutiveSummarySkips).toBe(1);
   });
 
   it('persists session input mode and system prompts into the real transcript path', async () => {
@@ -399,7 +397,7 @@ describe('Integration: session service', () => {
       session.id,
       {
         inputMode: 'voice',
-      }
+      },
     );
 
     await recordSystemPrompt(
@@ -407,23 +405,23 @@ describe('Integration: session service', () => {
       profile.id,
       session.id,
       'Take your time. I am here when you are ready.',
-      { source: 'silence-nudge' }
+      { source: 'silence-nudge' },
     );
 
     const transcript = await getSessionTranscript(
       createIntegrationDb(),
       profile.id,
-      session.id
+      session.id,
     );
     const persistedSession = await loadSession(session.id);
     const events = await loadSessionEvents(session.id);
 
     expect(updated.inputMode).toBe('voice');
     expect(
-      (persistedSession!.metadata as Record<string, unknown>)['inputMode']
+      (persistedSession!.metadata as Record<string, unknown>)['inputMode'],
     ).toBe('voice');
     expect(persistedSession!.lastActivityAt.getTime()).toBeGreaterThan(
-      beforeUpdate!.lastActivityAt.getTime()
+      beforeUpdate!.lastActivityAt.getTime(),
     );
     expect(events.map((event) => event.eventType)).toEqual([
       'user_message',
@@ -501,13 +499,13 @@ describe('Integration: session service', () => {
       createIntegrationDb(),
       profile.id,
       session.id,
-      payload
+      payload,
     );
     await syncHomeworkState(
       createIntegrationDb(),
       profile.id,
       session.id,
-      payload
+      payload,
     );
 
     const persistedSession = await loadSession(session.id);
@@ -607,20 +605,20 @@ describe('Integration: session service', () => {
     const beforeBackfill = await getBookSessions(
       createIntegrationDb(),
       profile.id,
-      book.id
+      book.id,
     );
 
     await backfillSessionTopicId(
       createIntegrationDb(),
       profile.id,
       freeformSession.id,
-      topics[0]!.id
+      topics[0]!.id,
     );
 
     const afterBackfill = await getBookSessions(
       createIntegrationDb(),
       profile.id,
-      book.id
+      book.id,
     );
 
     expect(beforeBackfill.map((session) => session.id)).toEqual([
@@ -675,7 +673,7 @@ describe('Integration: session service', () => {
 
     const results = await closeStaleSessions(
       createIntegrationDb(),
-      new Date('2026-04-10T10:00:00.000Z')
+      new Date('2026-04-10T10:00:00.000Z'),
     );
 
     const persistedStale = await loadSession(staleSession.id);
@@ -685,7 +683,7 @@ describe('Integration: session service', () => {
     const scopedResults = results.filter(
       (result) =>
         result.profileId === first.profile.id ||
-        result.profileId === second.profile.id
+        result.profileId === second.profile.id,
     );
 
     expect(scopedResults).toHaveLength(1);

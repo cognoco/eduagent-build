@@ -67,8 +67,10 @@ function formatReportWeek(reportWeek: string): string {
 
 function ReportsHeaderSummary({
   latestReport,
+  showNewBadge = false,
 }: {
   latestReport: WeeklyReportSummary | undefined;
+  showNewBadge?: boolean;
 }): React.ReactElement | null {
   const { t } = useTranslation();
   if (!latestReport?.headlineStat) return null;
@@ -78,9 +80,21 @@ function ReportsHeaderSummary({
       testID="reports-header-summary"
       className="bg-coaching-card rounded-card p-5 mt-4"
     >
-      <Text className="text-caption text-text-secondary">
-        {formatReportWeek(latestReport.reportWeek)}
-      </Text>
+      <View className="flex-row items-start justify-between">
+        <Text className="text-caption text-text-secondary flex-1 me-3">
+          {formatReportWeek(latestReport.reportWeek)}
+        </Text>
+        {showNewBadge ? (
+          <View
+            className="bg-accent/15 rounded-full px-3 py-1"
+            testID="parentView.reports.newBadge"
+          >
+            <Text className="text-caption font-semibold text-accent">
+              {t('parentView.reports.newBadge')}
+            </Text>
+          </View>
+        ) : null}
+      </View>
       <Text className="text-h3 font-semibold text-text-primary mt-2">
         {headlineStat.label}: {headlineStat.value}
       </Text>
@@ -186,6 +200,9 @@ export default function ChildReportsScreen(): React.ReactElement {
   const isViewingLatestWeeklyReport =
     !!selectedWeeklyReport &&
     selectedWeeklyReport.id === latestWeeklyReport?.id;
+  const hasUnviewedWeeklyReport = (weeklyReports ?? []).some(
+    (report) => !report.viewedAt,
+  );
 
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
@@ -220,7 +237,10 @@ export default function ChildReportsScreen(): React.ReactElement {
           </View>
         </View>
 
-        <ReportsHeaderSummary latestReport={selectedWeeklyReport} />
+        <ReportsHeaderSummary
+          latestReport={selectedWeeklyReport}
+          showNewBadge={isViewingLatestWeeklyReport && hasUnviewedWeeklyReport}
+        />
         {selectedWeeklyReport && !isViewingLatestWeeklyReport ? (
           <Pressable
             onPress={() =>
@@ -309,6 +329,7 @@ export default function ChildReportsScreen(): React.ReactElement {
                 setSelectedWeeklyReportId(reportId);
               }}
               showNewBadge
+              newReportId={latestWeeklyReport ? null : undefined}
             />
           </View>
         ) : (

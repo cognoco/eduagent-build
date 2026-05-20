@@ -19,7 +19,6 @@
 | Target language | fr |
 | Struggles | subjonctif imparfait (French); nuanced connectors (French) |
 | Strengths | reading comprehension (French); essay argument structure (writing) |
-| Learning mode | serious |
 | Preferred explanations | step-by-step, analogies |
 | Pace | thorough |
 | Analogy domain | music |
@@ -29,7 +28,7 @@
 ```json
 {
   "scenarioId": "S8-casual-freeform",
-  "scenarioPurpose": "Freeform / casual-mode branch (no topic, casual tone)",
+  "scenarioPurpose": "Freeform / casual branch (no topic)",
   "context": {
     "sessionId": "eval-17yo-french-advanced",
     "profileId": "eval-profile-17yo-french-advanced",
@@ -56,10 +55,8 @@
       "le fardeau",
       "éphémère"
     ],
-    "learningMode": "casual",
     "exchangeCount": 1,
     "isFirstEncounter": false,
-    "isFirstSessionOfSubject": false,
     "extractedSignalsToReflect": null,
     "inputMode": "text",
     "llmTier": "standard",
@@ -250,7 +247,7 @@ Can we just chat for a bit? Nothing heavy.
 
 ## Builder notes
 
-- Scenario: S8-casual-freeform — Freeform / casual-mode branch (no topic, casual tone)
+- Scenario: S8-casual-freeform — Freeform / casual branch (no topic)
 - Rung: 1, sessionType: learning, verification: standard
 - History turns: 1, exchangeCount: 1
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)

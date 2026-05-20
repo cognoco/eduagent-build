@@ -1,13 +1,24 @@
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, type Href } from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { goBackOrReplace } from '../../../lib/navigation';
+import {
+  OWN_LEARNING_RETURN_TO,
+  homeHrefForReturnTo,
+} from '../../../lib/navigation';
 import { useProfileSessions } from '../../../hooks/use-progress';
 import { useProfile } from '../../../lib/profile';
 import { useThemeColors } from '../../../lib/theme';
 
 type MyNotesKind = 'sessions' | 'notes' | 'bookmarks';
+
+function firstParam(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function myNotesReturnTo(value: string | string[] | undefined): string {
+  return firstParam(value) ?? OWN_LEARNING_RETURN_TO;
+}
 
 const HUB_ITEMS: Array<{
   kind: MyNotesKind;
@@ -50,6 +61,9 @@ export default function MyNotesHubScreen(): React.ReactElement {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
+  const params = useLocalSearchParams<{ returnTo?: string | string[] }>();
+  const returnTo = myNotesReturnTo(params.returnTo);
+  const homeHref = homeHrefForReturnTo(returnTo);
   const { activeProfile } = useProfile();
   const sessionsQuery = useProfileSessions(activeProfile?.id);
 
@@ -69,7 +83,7 @@ export default function MyNotesHubScreen(): React.ReactElement {
       >
         <View className="flex-row items-center mt-4 mb-6">
           <Pressable
-            onPress={() => goBackOrReplace(router, '/(app)/home' as const)}
+            onPress={() => router.replace(homeHref)}
             className="me-3 min-h-[44px] min-w-[44px] items-center justify-center"
             accessibilityRole="button"
             accessibilityLabel="Back"
@@ -92,7 +106,10 @@ export default function MyNotesHubScreen(): React.ReactElement {
             <Pressable
               key={item.kind}
               onPress={() =>
-                router.push(`/(app)/my-notes/${item.kind}` as Href)
+                router.push({
+                  pathname: '/(app)/my-notes/[kind]',
+                  params: { kind: item.kind, returnTo },
+                } as Href)
               }
               className="rounded-card border border-border bg-surface p-4 flex-row items-center"
               accessibilityRole="button"

@@ -1,5 +1,5 @@
 {
-  "id": "e62099e8-a79d-4a1a-a1b0-58b9d823f16d",
+  "id": "bd735255-3bc9-4ed9-8562-9a403816e627",
   "prevId": "81821d84-f8cc-4ca4-854d-6518d9f3d098",
   "version": "7",
   "dialect": "postgresql",
@@ -3986,21 +3986,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "mode": {
-          "name": "mode",
-          "type": "learning_mode",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'serious'"
-        },
-        "consecutive_summary_skips": {
-          "name": "consecutive_summary_skips",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
         "median_response_seconds": {
           "name": "median_response_seconds",
           "type": "integer",
@@ -6976,12 +6961,7 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {
-        "practice_activity_events_source_type_known": {
-          "name": "practice_activity_events_source_type_known",
-          "value": "\"practice_activity_events\".\"source_type\" IN ('assessment', 'book', 'dictation_result', 'home_surface_pending_celebration', 'integration_test', 'quiz_mastery_item', 'quiz_round', 'retention_card', 'session_event', 'topic', 'vocabulary_retention_card')"
-        }
-      },
+      "checkConstraints": {},
       "isRLSEnabled": false
     }
   },
@@ -7151,11 +7131,6 @@
       "name": "celebration_level",
       "schema": "public",
       "values": ["all", "big_only", "off"]
-    },
-    "public.learning_mode": {
-      "name": "learning_mode",
-      "schema": "public",
-      "values": ["serious", "casual"]
     },
     "public.notification_type": {
       "name": "notification_type",

@@ -119,6 +119,37 @@ export default function MoreScreen() {
     role,
     birthYear: activeProfile?.birthYear,
   });
+
+  if (isImpersonating) {
+    return (
+      <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
+        <View className="px-5 pt-4 pb-2">
+          <Text className="text-h1 font-bold text-text-primary">
+            {t('more.screenTitle')}
+          </Text>
+        </View>
+        <View className="px-5 pt-4">
+          <View
+            className="bg-warning/10 border border-warning/30 rounded-card px-4 py-4"
+            testID="more-proxy-preview-locked"
+          >
+            <Text className="text-body font-semibold text-text-primary">
+              {t('more.proxyPreview.title')}
+            </Text>
+            <Text className="text-body-sm text-text-secondary mt-2">
+              {t('more.proxyPreview.description')}
+            </Text>
+          </View>
+        </View>
+        <View className="mt-auto mb-8 items-center">
+          <Text className="text-caption text-text-secondary">
+            {t('more.appVersion')}
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View className="flex-1 bg-background" style={{ paddingTop: insets.top }}>
       <View className="px-5 pt-4 pb-2">

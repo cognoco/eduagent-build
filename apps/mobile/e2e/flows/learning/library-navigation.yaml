@@ -26,8 +26,10 @@
 #     - go-to-library                 -> "See your Library" link (always present)
 appId: com.mentomate.app
 tags:
-  - pr-blocking
+  - nightly
   - learning
+# DEMOTED 2026-05-19: same shelf inline-expand → push drift as book-detail.yaml.
+# Re-promote after rewrite to navigate to /shelf/[subjectId] and look for book-card-${BOOK_ID}.
 ---
 # ── Setup ──────────────────────────────────────────────────────────────
 - runFlow:

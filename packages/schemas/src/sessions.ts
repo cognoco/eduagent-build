@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { verificationTypeSchema } from './assessments.ts';
 import { isoDateField } from './common.ts';
+import { challengeRoundEvaluationItemSchema } from './llm-envelope.ts';
 import {
   celebrationReasonSchema,
   pendingCelebrationSchema,
@@ -142,6 +143,45 @@ export const homeworkSummarySchema = z.object({
 });
 export type HomeworkSummary = z.infer<typeof homeworkSummarySchema>;
 
+/**
+ * Challenge Round state machine — lives inside session metadata so a session
+ * close + resume preserves which question the learner was on. The server is
+ * the source of truth; mobile reads state via the session SSE stream.
+ *
+ * - `offered`: server has offered the round; learner has not yet responded.
+ * - `accepted`: learner tapped Accept; first question is being prepared.
+ * - `declined`: learner tapped Decline. Combined with `declinedDontAskAgain`
+ *   to gate within-session re-offers.
+ * - `active`: a question has been delivered and the learner's answer is awaited.
+ * - `drafting`: all questions answered; note is being drafted from solid items.
+ * - `complete`: drafted note saved or skipped; the round is fully finished.
+ * - `aborted`: learner closed the session or hit silence timeout mid-round.
+ */
+export const challengeRoundStateEnum = z.enum([
+  'offered',
+  'accepted',
+  'declined',
+  'active',
+  'drafting',
+  'complete',
+  'aborted',
+]);
+export type ChallengeRoundState = z.infer<typeof challengeRoundStateEnum>;
+
+export const challengeRoundSessionStateSchema = z.object({
+  state: challengeRoundStateEnum,
+  startedAt: z.string().datetime().optional(),
+  questionIndex: z.number().int().min(0).max(9).optional(),
+  totalQuestions: z.number().int().min(1).max(10).optional(),
+  offerCount: z.number().int().min(0).default(0),
+  topicId: z.string().uuid().optional(),
+  declinedDontAskAgain: z.boolean().default(false),
+  evaluations: z.array(challengeRoundEvaluationItemSchema).max(10).default([]),
+});
+export type ChallengeRoundSessionState = z.infer<
+  typeof challengeRoundSessionStateSchema
+>;
+
 export const sessionMetadataSchema = z
   .object({
     inputMode: inputModeSchema.optional(),
@@ -173,9 +213,18 @@ export const sessionMetadataSchema = z
     continuationDepth: z.enum(['low', 'mid', 'high']).optional(),
     reviewCalibrationAttempts: z.number().int().min(0).optional(),
     reviewCalibrationFiredAt: isoDateField.optional(),
+    /**
+     * Challenge Round state machine for this session. Server-owned; mobile
+     * reflects via session-streaming. Absent = no round has been offered.
+     */
+    challengeRound: challengeRoundSessionStateSchema.optional(),
   })
   .strip();
 export type SessionMetadata = z.infer<typeof sessionMetadataSchema>;
+
+export const sessionStartMetadataSchema = sessionMetadataSchema.omit({
+  challengeRound: true,
+});
 
 export const sessionStartSchema = z.object({
   subjectId: z.string().uuid(),
@@ -183,7 +232,7 @@ export const sessionStartSchema = z.object({
   sessionType: sessionTypeSchema.default('learning'),
   verificationType: z.enum(['standard', 'evaluate', 'teach_back']).optional(),
   inputMode: inputModeSchema.default('text'),
-  metadata: sessionMetadataSchema.optional(),
+  metadata: sessionStartMetadataSchema.optional(),
   rawInput: z.string().max(500).nullable().optional(),
 });
 export type SessionStartInput = z.infer<typeof sessionStartSchema>;
@@ -390,7 +439,6 @@ export const sessionSummarySchema = z.object({
   nextTopicReason: z.string().nullable(),
   baseXp: z.number().nullable().optional(),
   reflectionBonusXp: z.number().nullable().optional(),
-  consecutiveSummarySkips: z.number().optional(),
 });
 export type SessionSummary = z.infer<typeof sessionSummarySchema>;
 
@@ -402,7 +450,6 @@ export const skipSummaryResponseSchema = z.object({
     aiFeedback: true,
     status: true,
   }),
-  consecutiveSummarySkips: z.number().optional(),
   pipelineQueued: z.boolean().optional(),
 });
 export type SkipSummaryResponse = z.infer<typeof skipSummaryResponseSchema>;
@@ -510,3 +557,26 @@ export const outboxSpilloverResultSchema = z.object({
   written: z.number().int().nonnegative(),
 });
 export type OutboxSpilloverResult = z.infer<typeof outboxSpilloverResultSchema>;
+
+// [CCR PR #281 / B68] Idempotent session replay body — returned by the
+// metering middleware (`maybeReplayIdempotentSessionRequest`) when a request
+// carrying an Idempotency-Key for a `/sessions/:id/messages` or
+// `/sessions/:id/stream` POST has already been processed. The accompanying
+// `Idempotency-Replay: true` header is set on the response by the server.
+//
+// Canonical schema lives here so:
+//   - apps/api/src/middleware/metering.ts can type `c.json(...)` against it
+//   - apps/mobile/src/lib/api-client.ts can drop its local type alias and
+//     import this single source of truth (avoids future contract drift)
+//
+// `replayed` is `true` literal — the success branch only fires on a real
+// replay hit. `status` is `'persisted'` literal — replay only happens after
+// the original turn was committed end-to-end.
+export const maybeReplayResponseSchema = z.object({
+  replayed: z.literal(true),
+  clientId: z.string(),
+  status: z.literal('persisted'),
+  assistantTurnReady: z.boolean(),
+  latestExchangeId: z.string().nullable(),
+});
+export type MaybeReplayResponse = z.infer<typeof maybeReplayResponseSchema>;

@@ -503,13 +503,6 @@ export async function activateSubscriptionFromCheckout(
   // Sentry + Inngest so we can triage. Same-ID retries no-op silently.
   if (existing.stripeSubscriptionId) {
     if (existing.stripeSubscriptionId !== stripeSubscriptionId) {
-      // [BUG-111-CARRY] Guard: when lastStripeEventTimestamp is NULL we cannot
-      // determine whether the incoming Stripe event is older or newer than the
-      // row's last update. This happens for accounts activated via RevenueCat
-      // (where lastStripeEventTimestamp is NULL but lastRevenuecatEventTimestamp
-      // is recent). Falling through to `existingTs = 0` would let any incoming
-      // Stripe event win, silently overwriting an RC-activated row.
-      // Reject the incoming event and escalate so we can triage.
       if (existing.lastStripeEventTimestamp === null) {
         logger.warn(
           '[billing] checkout activation rejected — cannot determine event order (NULL lastStripeEventTimestamp)',
@@ -521,6 +514,7 @@ export async function activateSubscriptionFromCheckout(
             incomingStripeSubscriptionId: stripeSubscriptionId,
             existingTier: existing.tier,
             incomingTier: tier,
+            existingEventTimestamp: existing.lastStripeEventTimestamp,
             incomingEventTimestamp: eventTimestamp,
           },
         );
@@ -537,12 +531,11 @@ export async function activateSubscriptionFromCheckout(
               incomingStripeSubscriptionId: stripeSubscriptionId,
               existingTier: existing.tier,
               incomingTier: tier,
+              existingEventTimestamp: existing.lastStripeEventTimestamp,
               incomingEventTimestamp: eventTimestamp,
             },
           },
         );
-        // Non-core observability dispatch — must never throw (CLAUDE.md
-        // "Silent recovery without escalation is banned").
         await safeSend(
           () =>
             inngest.send({
@@ -554,6 +547,7 @@ export async function activateSubscriptionFromCheckout(
                 incomingStripeSubscriptionId: stripeSubscriptionId,
                 existingTier: existing.tier,
                 incomingTier: tier,
+                existingEventTimestamp: existing.lastStripeEventTimestamp,
                 incomingEventTimestamp: eventTimestamp,
                 timestamp: new Date().toISOString(),
               },
@@ -561,19 +555,19 @@ export async function activateSubscriptionFromCheckout(
           'billing.activate_checkout.divergent_sub',
           { accountId },
         );
-        // Return existing row unchanged — do not call db.update.
         return existing;
       }
 
       const incomingTs = new Date(eventTimestamp).getTime();
       const existingTs = new Date(existing.lastStripeEventTimestamp).getTime();
       const incomingIsNewer = incomingTs > existingTs;
+      const resolution = incomingIsNewer
+        ? 'updated_to_incoming'
+        : 'kept_existing_dropped_incoming';
 
       logger.warn('[billing] checkout activation with divergent Stripe sub', {
         event: 'billing.activate_checkout.divergent_sub',
-        resolution: incomingIsNewer
-          ? 'updated_to_incoming'
-          : 'kept_existing_dropped_incoming',
+        resolution,
         accountId,
         existingStripeSubscriptionId: existing.stripeSubscriptionId,
         incomingStripeSubscriptionId: stripeSubscriptionId,
@@ -591,9 +585,7 @@ export async function activateSubscriptionFromCheckout(
         {
           extra: {
             context: 'billing.activate_checkout.divergent_sub',
-            resolution: incomingIsNewer
-              ? 'updated_to_incoming'
-              : 'kept_existing_dropped_incoming',
+            resolution,
             accountId,
             existingStripeSubscriptionId: existing.stripeSubscriptionId,
             incomingStripeSubscriptionId: stripeSubscriptionId,
@@ -631,15 +623,12 @@ export async function activateSubscriptionFromCheckout(
           throw new Error(
             'Divergent-sub activation update did not return a row',
           );
-        // [BUG-111-CARRY] Non-core observability dispatch fires AFTER the DB
-        // write so the event is only emitted when the update actually succeeded.
-        // Sentry alone is not queryable as a time-series metric.
         await safeSend(
           () =>
             inngest.send({
               name: 'app/billing.activate_checkout.divergent_sub',
               data: {
-                resolution: 'updated_to_incoming',
+                resolution,
                 accountId,
                 existingStripeSubscriptionId: existing.stripeSubscriptionId,
                 incomingStripeSubscriptionId: stripeSubscriptionId,
@@ -656,14 +645,12 @@ export async function activateSubscriptionFromCheckout(
         return mapSubscriptionRow(updatedDivergent);
       }
       // Incoming is older — stale replay. Keep existing, no-op.
-      // Non-core observability dispatch — position doesn't matter here (no
-      // DB write to sequence against).
       await safeSend(
         () =>
           inngest.send({
             name: 'app/billing.activate_checkout.divergent_sub',
             data: {
-              resolution: 'kept_existing_dropped_incoming',
+              resolution,
               accountId,
               existingStripeSubscriptionId: existing.stripeSubscriptionId,
               incomingStripeSubscriptionId: stripeSubscriptionId,

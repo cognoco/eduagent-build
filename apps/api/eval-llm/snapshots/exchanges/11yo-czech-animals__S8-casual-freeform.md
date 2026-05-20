@@ -19,7 +19,6 @@
 | Target language | — |
 | Struggles | fraction addition (math); long multi-clause sentences (reading) |
 | Strengths | vocabulary retention (Czech) |
-| Learning mode | casual |
 | Preferred explanations | stories, examples |
 | Pace | thorough |
 | Analogy domain | nature |
@@ -29,7 +28,7 @@
 ```json
 {
   "scenarioId": "S8-casual-freeform",
-  "scenarioPurpose": "Freeform / casual-mode branch (no topic, casual tone)",
+  "scenarioPurpose": "Freeform / casual branch (no topic)",
   "context": {
     "sessionId": "eval-11yo-czech-animals",
     "profileId": "eval-profile-11yo-czech-animals",
@@ -50,10 +49,8 @@
     "teachingPreference": "stories",
     "analogyDomain": "nature",
     "nativeLanguage": "cs",
-    "learningMode": "casual",
     "exchangeCount": 1,
     "isFirstEncounter": false,
-    "isFirstSessionOfSubject": false,
     "extractedSignalsToReflect": null,
     "inputMode": "text",
     "llmTier": "standard",
@@ -244,7 +241,7 @@ Can we just chat for a bit? Nothing heavy.
 
 ## Builder notes
 
-- Scenario: S8-casual-freeform — Freeform / casual-mode branch (no topic, casual tone)
+- Scenario: S8-casual-freeform — Freeform / casual branch (no topic)
 - Rung: 1, sessionType: learning, verification: standard
 - History turns: 1, exchangeCount: 1
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)

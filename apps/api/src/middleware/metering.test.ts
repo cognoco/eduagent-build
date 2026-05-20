@@ -259,6 +259,10 @@ function createFakeKV() {
         store.set(key, value);
       },
     ),
+    // [B67] Expose delete so we can assert invalidation after safeRefundQuota.
+    delete: jest.fn(async (key: string) => {
+      store.delete(key);
+    }),
   } as unknown as KVNamespace;
   return {
     store,
@@ -279,6 +283,11 @@ function createFakeKV() {
         .mockReset()
         .mockImplementation(async (key: string, value: string) => {
           store.set(key, value);
+        });
+      (ns.delete as jest.Mock)
+        .mockReset()
+        .mockImplementation(async (key: string) => {
+          store.delete(key);
         });
     },
   };
@@ -612,6 +621,70 @@ describe('metering middleware', () => {
       expect(res.headers.get('X-Quota-Remaining')).toBeNull();
       expect(res.headers.get('X-Quota-Warning-Level')).toBeNull();
       expect(res.headers.get('X-Daily-Remaining')).toBeNull();
+    });
+
+    // [CCR PR #281 / B67] Break test — KV cache invalidation after
+    // safeRefundQuota. Before the fix, only response headers were stripped on
+    // the 4xx refund branch; the KV snapshot still encoded the (now-rolled-
+    // back) post-decrement counters. Any follow-up request served from cache
+    // would over-count usage by 1 and could spuriously emit
+    // QUOTA_EXCEEDED at the cap boundary.
+    //
+    // Setup: seed KV with a stale post-decrement state (free tier, daily cap
+    // 10, usedToday already 10 — i.e. cap reached as far as cache is
+    // concerned). Drive a 400 (POST without body) so shouldRefundAfterHandler
+    // fires. Expected: post-handler invalidates KV → next read returns null.
+    it('[CCR PR #281 / B67] invalidates SUBSCRIPTION_KV after safeRefundQuota', async () => {
+      mockEnsureFreeSubscription.mockResolvedValue(mockSubscription());
+      mockGetQuotaPool.mockResolvedValue(
+        mockQuota({ usedThisMonth: 100, dailyLimit: 10, usedToday: 1 }),
+      );
+      mockDecrementQuota.mockResolvedValue({
+        success: true,
+        source: 'monthly',
+        remainingMonthly: 399,
+        remainingTopUp: 0,
+        remainingDaily: 8,
+      });
+
+      // Stale snapshot: simulates the pre-refund cache state that would be
+      // written by either a prior request's post-decrement write or the
+      // backfill path. The exact numbers don't matter — what matters is that
+      // an entry exists before the request, and is gone after.
+      fakeKV.seed('test-account-id', {
+        subscriptionId: 'sub-1',
+        tier: 'plus',
+        status: 'active',
+        monthlyLimit: 500,
+        usedThisMonth: 101,
+        dailyLimit: 10,
+        usedToday: 2,
+      });
+      expect(fakeKV.storedData('test-account-id')).not.toBeNull();
+
+      const res = await app.request(
+        '/v1/sessions/a0000000-0000-4000-a000-000000000001/messages',
+        {
+          method: 'POST',
+          headers: AUTH_HEADERS,
+          body: JSON.stringify({}),
+        },
+        { ...TEST_ENV, SUBSCRIPTION_KV: fakeKV.namespace },
+      );
+
+      expect(res.status).toBe(400);
+      expect(mockSafeRefundQuota).toHaveBeenCalledWith(
+        expect.anything(),
+        'sub-1',
+        expect.objectContaining({ profileId: 'test-profile-id' }),
+      );
+      // KV must be invalidated — `delete` was called for the cache key, AND
+      // the underlying snapshot is gone. Either assertion fails before the
+      // fix.
+      expect(
+        (fakeKV.namespace as { delete: jest.Mock }).delete,
+      ).toHaveBeenCalledWith('sub:test-account-id');
+      expect(fakeKV.storedData('test-account-id')).toBeNull();
     });
 
     it('[BUG-623 / A-6] decrements quota for POST /sessions/:id/recall-bridge', async () => {

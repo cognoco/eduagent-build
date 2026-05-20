@@ -20,7 +20,6 @@ import { learningSessions } from './sessions';
 import { xpStatusEnum } from './assessments';
 import { generateUUIDv7 } from '../utils/uuid';
 
-export const learningModeEnum = pgEnum('learning_mode', ['serious', 'casual']);
 export const celebrationLevelEnum = pgEnum('celebration_level', [
   'all',
   'big_only',
@@ -175,10 +174,6 @@ export const learningModes = pgTable('learning_modes', {
     .notNull()
     .references(() => profiles.id, { onDelete: 'cascade' })
     .unique(),
-  mode: learningModeEnum('mode').notNull().default('serious'),
-  consecutiveSummarySkips: integer('consecutive_summary_skips')
-    .notNull()
-    .default(0),
   medianResponseSeconds: integer('median_response_seconds'),
   celebrationLevel: celebrationLevelEnum('celebration_level')
     .notNull()

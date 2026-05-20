@@ -256,7 +256,22 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
     responseHistory,
   } = opts;
 
-  const activeContinueRef = useRef<Promise<void> | null>(null);
+  // Serialization tail for concurrent continueWithMessage callers.
+  //
+  // Earlier shape was `while (activeContinueRef.current) await activeContinueRef.current;`
+  // followed by `activeContinueRef.current = currentTurn`. With N ≥ 3
+  // concurrent callers, all waiters unblocked on the same microtask when the
+  // holder resolved and read `ref.current === null` before any one of them
+  // could re-assign it — every caller then ran a parallel stream and the last
+  // assignment "won" the ref, stranding earlier turns.
+  //
+  // The replacement is an atomic chain-tail swap. Each caller reads the
+  // current tail and installs its own promise as the new tail in the SAME
+  // synchronous block (no `await` between read and write), so JS's
+  // run-to-completion semantics guarantee no two callers ever observe the
+  // same predecessor. Each caller then awaits its captured predecessor before
+  // running its own work, producing a strict FIFO chain.
+  const continueChainTailRef = useRef<Promise<void>>(Promise.resolve());
 
   const syncHomeworkMetadata = useCallback(
     async (
@@ -510,15 +525,20 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
 
   const continueWithMessage = useCallback(
     async (text: string, options?: ContinueMessageOptions) => {
-      while (activeContinueRef.current) {
-        await activeContinueRef.current;
-      }
-
+      // ATOMIC chain-tail swap — see `continueChainTailRef` doc above for
+      // why this replaced the prior `while (activeContinueRef.current)` poll.
+      // Read predecessor and install our own tail in a single sync block; do
+      // not put an `await` between these two statements or the race returns.
       let resolveCurrentTurn!: () => void;
       const currentTurn = new Promise<void>((resolve) => {
         resolveCurrentTurn = resolve;
       });
-      activeContinueRef.current = currentTurn;
+      const predecessor = continueChainTailRef.current;
+      continueChainTailRef.current = currentTurn;
+
+      // Wait for the prior turn to fully settle before doing any work.
+      // A rejected predecessor must not cancel us — swallow and proceed.
+      await predecessor.catch(() => undefined);
 
       let streamId: string | null = null;
       let resolvedSessionId: string | null = activeSessionId;
@@ -1029,8 +1049,13 @@ export function useSessionStreaming(opts: UseSessionStreamingOptions) {
             return prev;
           });
         }
-        if (activeContinueRef.current === currentTurn) {
-          activeContinueRef.current = null;
+        // If we are still the chain tail (no later caller appended), clear
+        // it back to a fresh resolved promise so the ref doesn't hold onto
+        // this turn's closure indefinitely. If a later caller already
+        // appended themselves, leave the tail alone — they reference this
+        // turn as their predecessor and will resolve their own tail.
+        if (continueChainTailRef.current === currentTurn) {
+          continueChainTailRef.current = Promise.resolve();
         }
         resolveCurrentTurn();
       }

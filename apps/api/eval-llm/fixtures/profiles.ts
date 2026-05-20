@@ -74,7 +74,6 @@ export interface EvalProfile {
   };
 
   // Style & pacing ------------------------------------------------------
-  learningMode: 'serious' | 'casual';
   preferredExplanations: Array<
     'stories' | 'examples' | 'diagrams' | 'analogies' | 'step-by-step' | 'humor'
   >;
@@ -127,7 +126,6 @@ export const PROFILES: EvalProfile[] = [
     ],
     strengths: [{ topic: 'vocabulary retention', subject: 'Czech' }],
     recentQuizAnswers: { capitals: [], vocabulary: [], guessWho: [] },
-    learningMode: 'casual',
     preferredExplanations: ['stories', 'examples'],
     pacePreference: 'thorough',
     analogyDomain: 'nature',
@@ -170,7 +168,6 @@ export const PROFILES: EvalProfile[] = [
       vocabulary: [],
       guessWho: ['Mary Anning'],
     },
-    learningMode: 'casual',
     preferredExplanations: ['humor', 'examples', 'stories'],
     pacePreference: 'quick',
     analogyDomain: 'nature',
@@ -209,7 +206,6 @@ export const PROFILES: EvalProfile[] = [
       vocabulary: ['el caballo', 'la escuela', 'el perro'],
       guessWho: [],
     },
-    learningMode: 'serious',
     preferredExplanations: ['step-by-step', 'examples'],
     pacePreference: 'thorough',
     analogyDomain: 'nature',
@@ -251,7 +247,6 @@ export const PROFILES: EvalProfile[] = [
       vocabulary: [],
       guessWho: ['Abraham Lincoln'],
     },
-    learningMode: 'casual',
     preferredExplanations: ['examples', 'analogies'],
     pacePreference: 'quick',
     analogyDomain: 'sports',
@@ -295,7 +290,6 @@ export const PROFILES: EvalProfile[] = [
       vocabulary: ["l'angoisse", 'le fardeau', 'éphémère'],
       guessWho: ['Jean-Paul Sartre', 'Albert Camus'],
     },
-    learningMode: 'serious',
     preferredExplanations: ['step-by-step', 'analogies'],
     pacePreference: 'thorough',
     analogyDomain: 'music',

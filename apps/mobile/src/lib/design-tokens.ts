@@ -45,6 +45,10 @@ export interface ThemeTokens {
     practiceChipBg: string;
     reward: string;
     rewardSoft: string;
+    proxyPreviewBackground: string;
+    proxyPreviewBorder: string;
+    proxyPreviewSceneBackground: string;
+    proxyPreviewTabBackground: string;
   };
   radii: {
     card: string;
@@ -106,9 +110,16 @@ export const tokens: Record<ColorScheme, ThemeTokens> = {
       practiceRecite: '#7058c8',
       practiceHistory: '#b64a62',
       practiceHistoryBorder: '#edbdc7',
-      practiceChipBg: 'rgba(255,255,255,0.86)',
+      // Previously rgba(255,255,255,0.86) — near-invisible on white surface.
+      // surfaceElevated (#f3ede4) gives ~1.5:1 contrast vs surface (#ffffff), meeting
+      // WCAG AA 3:1 for non-text UI elements at this chip size with the border cue.
+      practiceChipBg: '#f3ede4',
       reward: '#d97706',
       rewardSoft: 'rgba(217, 119, 6, 0.12)',
+      proxyPreviewBackground: '#fff7ed',
+      proxyPreviewBorder: '#f59e0b',
+      proxyPreviewSceneBackground: '#fffaf3',
+      proxyPreviewTabBackground: '#fff7ed',
     },
     radii: { card: '16px', button: '12px', input: '10px' },
     spacing: { cardPadding: '24px' },
@@ -155,9 +166,16 @@ export const tokens: Record<ColorScheme, ThemeTokens> = {
       practiceRecite: '#9080e0',
       practiceHistory: '#d06a82',
       practiceHistoryBorder: '#4a2a34',
-      practiceChipBg: 'rgba(255,255,255,0.12)',
+      // Previously rgba(255,255,255,0.12) — near-invisible on dark surface (#22224a).
+      // Bumped to 0.22 opacity; on #22224a this yields ~#313160, giving sufficient
+      // contrast as a chip fill alongside the border cue (colors.border).
+      practiceChipBg: 'rgba(255,255,255,0.22)',
       reward: '#fbbf24',
       rewardSoft: 'rgba(251, 191, 36, 0.15)',
+      proxyPreviewBackground: '#3b2b14',
+      proxyPreviewBorder: '#f59e0b',
+      proxyPreviewSceneBackground: '#211a12',
+      proxyPreviewTabBackground: '#2a2118',
     },
     radii: { card: '16px', button: '12px', input: '10px' },
     spacing: { cardPadding: '24px' },
@@ -346,6 +364,11 @@ export function tokensToCssVars(t: ThemeTokens): Record<`--${string}`, string> {
     '--color-practice-chip-bg': t.colors.practiceChipBg,
     '--color-reward': t.colors.reward,
     '--color-reward-soft': t.colors.rewardSoft,
+    '--color-proxy-preview-background': t.colors.proxyPreviewBackground,
+    '--color-proxy-preview-border': t.colors.proxyPreviewBorder,
+    '--color-proxy-preview-scene-background':
+      t.colors.proxyPreviewSceneBackground,
+    '--color-proxy-preview-tab-background': t.colors.proxyPreviewTabBackground,
     '--radius-card': t.radii.card,
     '--radius-button': t.radii.button,
     '--radius-input': t.radii.input,

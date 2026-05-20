@@ -135,7 +135,10 @@
           "title": "Aprender algo novo",
           "subtitle": "Comece um tópico ou crie uma matéria"
         }
-      }
+      },
+      "proxySessionSummariesTitle": "Os resumos das sessões ficam na visão dos pais",
+      "proxySessionSummariesBody": "As notas de {{name}} continuam privadas, mas você pode ver resumos de sessão seguros para os pais no perfil.",
+      "proxySessionSummariesCta": "Ver resumos de sessão de {{name}}"
     },
     "notices": {
       "consentArchivedTitle": "{{name}}'s account was archived",
@@ -300,24 +303,6 @@
   "more": {
     "screenTitle": "Mais",
     "active": "Ativo",
-    "learningMode": {
-      "sectionHeader": "Modo de Aprendizado de {{name}}",
-      "subtitle": "Aplica-se às suas próprias sessões de aprendizado.",
-      "subtitleWithChildren": "Aplica-se às suas próprias sessões. Para mudar a de uma criança, abra o perfil dela no painel.",
-      "childPreferencesAccessLabel": "Abrir preferências de perfil de {{name}}",
-      "childPreferencesLink": "Para alterar as preferências de {{name}}, toque no perfil na tela Início →",
-      "familyPreferencesLink": "Para alterar as preferências de uma criança, toque no perfil na tela Início →",
-      "sheetTitle": "Modo de aprendizagem",
-      "sheetEffectMessage": "Entra em vigor a partir da tua próxima mensagem.",
-      "casual": {
-        "title": "Explorador",
-        "description": "Aprenda no seu próprio ritmo. Seu mentor é relaxado e encorajador. Você ganha pontos imediatamente e pode pular as revisões."
-      },
-      "serious": {
-        "title": "Modo desafio",
-        "description": "Exija mais de si mesmo. Seu mentor mantém você no caminho certo. Você ganha pontos depois de provar que se lembra, e as revisões ajudam a fixar o conteúdo."
-      }
-    },
     "accommodation": {
       "sectionHeader": "Sua acomodação de aprendizagem",
       "viewAndManage": "Ver e gerenciar",
@@ -442,6 +427,10 @@
       "account": "Conta",
       "privacy": "Privacidade e dados",
       "help": "Ajuda e feedback"
+    },
+    "proxyPreview": {
+      "title": "Configurações pausadas na pré-visualização dos pais",
+      "description": "Volte para sua conta para alterar configurações. Enquanto visualiza como criança, esta área fica bloqueada."
     }
   },
   "session": {
@@ -1912,7 +1901,8 @@
       "consentStatusError": "Não foi possível carregar o status do consentimento. Tente novamente.",
       "deletionPending": "Exclusão agendada",
       "deletionCountdown": "A conta será excluída em {{date}}",
-      "deletionGraceDays": "Faltam {{count}} dias para cancelar a exclusão.",
+      "deletionGraceDays_one": "Falta 1 dia para cancelar a exclusão.",
+      "deletionGraceDays_other": "Faltam {{count}} dias para cancelar a exclusão.",
       "deletionGraceFallback": "A exclusão está agendada. Tente cancelar agora se isso foi um engano.",
       "deletionProcessing": "Exclusão em andamento",
       "cancelDeletion": "Cancelar exclusão",
@@ -2186,7 +2176,8 @@
     "proxyBanner": {
       "viewing": "Visualizando como {{name}}",
       "switchBackLabel": "Voltar para sua conta",
-      "switchBack": "Voltar"
+      "switchBack": "Voltar",
+      "parentPreview": "Pré-visualização dos pais"
     },
     "postApproval": {
       "celebrationLabel": "Seu pai/mãe aprovou sua conta",
@@ -2258,8 +2249,10 @@
     },
     "home": "Início",
     "homeLabel": "Início",
-    "myLearning": "Meu aprendizado",
-    "myLearningLabel": "Meu aprendizado",
+    "familyHub": "Family Hub",
+    "familyHubLabel": "Family Hub",
+    "myLearning": "My Learning",
+    "myLearningLabel": "My Learning",
     "family": "Família",
     "library": "Biblioteca",
     "libraryLabel": "Biblioteca",

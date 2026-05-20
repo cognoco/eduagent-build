@@ -55,9 +55,6 @@ import {
 import { FilingFailedBanner } from '../../components/session/FilingFailedBanner';
 import { MentorMemoryCue } from '../../components/session-summary/MentorMemoryCue';
 
-const SKIP_NUDGE_THRESHOLD = 3;
-const SKIP_WARNING_THRESHOLD = 5;
-
 export default function SessionSummaryScreen() {
   const {
     sessionId,
@@ -700,11 +697,8 @@ export default function SessionSummaryScreen() {
       if (skipSummary.isPending || skipInFlight.current) return;
       skipInFlight.current = true;
 
-      let skipResult:
-        | Awaited<ReturnType<typeof skipSummary.mutateAsync>>
-        | undefined;
       try {
-        skipResult = await skipSummary.mutateAsync();
+        await skipSummary.mutateAsync();
       } catch {
         skipInFlight.current = false;
         // S-3: Surface skip failures — bare catch { return } was silent.
@@ -733,47 +727,6 @@ export default function SessionSummaryScreen() {
         } catch {
           // Best effort — continue to skip-warning flow
         }
-      }
-
-      if (skipResult?.consecutiveSummarySkips === SKIP_NUDGE_THRESHOLD) {
-        platformAlert(
-          'Give it a try?',
-          'Reflecting helps you remember. Give it a try next time?',
-          [
-            {
-              text: t('common.ok'),
-              onPress: () => {
-                void (async () => {
-                  await maybePromptForRecall();
-                  finishSummaryNavigation();
-                })();
-              },
-            },
-          ],
-        );
-        return;
-      }
-
-      if (
-        skipResult?.consecutiveSummarySkips != null &&
-        skipResult.consecutiveSummarySkips >= SKIP_WARNING_THRESHOLD
-      ) {
-        platformAlert(
-          'Summaries help you learn',
-          'Students who reflect remember 2x more. Try it next time!',
-          [
-            {
-              text: 'Got it',
-              onPress: () => {
-                void (async () => {
-                  await maybePromptForRecall();
-                  finishSummaryNavigation();
-                })();
-              },
-            },
-          ],
-        );
-        return;
       }
     }
 

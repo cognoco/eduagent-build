@@ -17,6 +17,8 @@ jest.mock('react-i18next', () => ({
 
 const mockPush = jest.fn();
 const mockReplace = jest.fn();
+const mockBack = jest.fn();
+const mockCanGoBack = jest.fn(() => false);
 const mockGoBackOrReplace = jest.fn();
 let mockLocalSearchParams: { profileId: string; mode?: string } = {
   profileId: 'child-001',
@@ -24,8 +26,8 @@ let mockLocalSearchParams: { profileId: string; mode?: string } = {
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({
-    back: jest.fn(),
-    canGoBack: jest.fn(() => false),
+    back: mockBack,
+    canGoBack: mockCanGoBack,
     replace: mockReplace,
     push: mockPush,
   }),
@@ -39,6 +41,7 @@ jest.mock('react-native-safe-area-context', () => ({
 jest.mock(
   '../../../../lib/navigation' /* gc1-allow: route fallback helper is asserted through focused route behavior here */,
   () => ({
+    FAMILY_HOME_PATH: '/(app)/home',
     goBackOrReplace: (...args: unknown[]) => mockGoBackOrReplace(...args),
   }),
 );
@@ -415,6 +418,79 @@ describe('ChildDetailScreen — profile overview', () => {
     expect(screen.queryByTestId('consent-section')).toBeNull();
   });
 
+  it('back arrow returns to family home instead of whatever screen is in history', () => {
+    mockLocalSearchParams = { profileId: 'child-001', mode: 'progress' };
+    mockCanGoBack.mockReturnValue(true);
+
+    render(<ChildDetailScreen />);
+
+    fireEvent.press(screen.getByTestId('back-button'));
+
+    expect(mockBack).not.toHaveBeenCalled();
+    expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
+  });
+
+  it('hides subject memory status while the child is still a new learner', () => {
+    mockLocalSearchParams = { profileId: 'child-001', mode: 'progress' };
+    mockUseChildDetail.mockReturnValue({
+      data: {
+        displayName: 'Emma',
+        summary: 'Getting started',
+        currentStreak: 0,
+        totalXp: 0,
+        totalSessions: 2,
+        progress: null,
+        subjects: [
+          {
+            subjectId: '11111111-1111-7111-8111-111111111111',
+            name: 'Mathematics',
+            retentionStatus: 'strong',
+            rawInput: null,
+          },
+        ],
+      },
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+
+    render(<ChildDetailScreen />);
+
+    screen.getByTestId('subject-card-11111111-1111-7111-8111-111111111111');
+    expect(screen.queryByText('parentView.retention.strong.label')).toBeNull();
+    expect(screen.queryByText('strong')).toBeNull();
+  });
+
+  it('uses the friendly memory status label after there is enough activity', () => {
+    mockLocalSearchParams = { profileId: 'child-001', mode: 'progress' };
+    mockUseChildDetail.mockReturnValue({
+      data: {
+        displayName: 'Emma',
+        summary: 'Settled rhythm',
+        currentStreak: 0,
+        totalXp: 0,
+        totalSessions: 4,
+        progress: null,
+        subjects: [
+          {
+            subjectId: '11111111-1111-7111-8111-111111111111',
+            name: 'Mathematics',
+            retentionStatus: 'strong',
+            rawInput: null,
+          },
+        ],
+      },
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+
+    render(<ChildDetailScreen />);
+
+    screen.getByText(/parentView\.retention\.strong\.label/);
+    expect(screen.queryByText('strong')).toBeNull();
+  });
+
   it('uses a fresh progress nudge when the child studied recently', () => {
     mockLocalSearchParams = { profileId: 'child-001', mode: 'progress' };
     mockUseProfileSessions.mockReturnValue({
@@ -645,5 +721,59 @@ describe('ChildDetailScreen — profile overview', () => {
     fireEvent.press(screen.getByTestId('consent-status-retry'));
 
     expect(refetch).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// deletionGraceDays plural wiring — count=1 (singular) vs count=5 (plural)
+// ---------------------------------------------------------------------------
+
+describe('ChildDetailScreen — deletionGraceDays plural key routing', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    setupDefaultMocks();
+  });
+
+  function setupWithdrawnConsent(daysAgo: number) {
+    // respondedAt is daysAgo days in the past; grace period = 7 days
+    // daysRemaining = ceil((7 - daysAgo) * MS_PER_DAY / MS_PER_DAY) = 7 - daysAgo
+    const respondedAt = new Date(
+      Date.now() - daysAgo * 24 * 60 * 60 * 1000,
+    ).toISOString();
+    mockUseChildConsentStatus.mockReturnValue({
+      data: {
+        consentStatus: 'WITHDRAWN',
+        respondedAt,
+        consentType: 'GDPR',
+      },
+      isLoading: false,
+      isError: false,
+      refetch: jest.fn(),
+    });
+  }
+
+  it('passes count=1 to the translation key when 1 day remains in the grace period', () => {
+    // 6 days ago → 1 day remaining (7 - 6 = 1)
+    setupWithdrawnConsent(6);
+
+    render(<ChildDetailScreen />);
+
+    // The mock t() serialises opts: key + JSON, so count=1 must appear in the output
+    const banner = screen.getByTestId('grace-period-banner');
+    expect(banner).toHaveTextContent(
+      /parentView\.index\.deletionGraceDays.*"count":1/,
+    );
+  });
+
+  it('passes count=5 to the translation key when 5 days remain in the grace period', () => {
+    // 2 days ago → 5 days remaining (7 - 2 = 5)
+    setupWithdrawnConsent(2);
+
+    render(<ChildDetailScreen />);
+
+    const banner = screen.getByTestId('grace-period-banner');
+    expect(banner).toHaveTextContent(
+      /parentView\.index\.deletionGraceDays.*"count":5/,
+    );
   });
 });

@@ -19,7 +19,6 @@
 | Target language | — |
 | Struggles | long division (math); Austria vs Australia (geography) |
 | Strengths | dinosaur classification (science); reading comprehension (reading) |
-| Learning mode | casual |
 | Preferred explanations | humor, examples, stories |
 | Pace | quick |
 | Analogy domain | nature |
@@ -64,7 +63,6 @@
     "teachingPreference": "humor",
     "analogyDomain": "nature",
     "nativeLanguage": "en",
-    "learningMode": "casual",
     "exchangeCount": 5,
     "inputMode": "text",
     "llmTier": "standard",
@@ -287,7 +285,7 @@ Okay so fossilization is basically when an animal dies and gets buried really fa
 - Probe: P17 [standard] — 12yo dinosaur fan in Feynman teach-back mode (rung 4, teach_back)
 - Rung: 4, sessionType: learning, verification: teach_back
 - History turns: 4, exchangeCount: 5
-- inputMode: text, learningMode: casual
+- inputMode: text
 - topicTitle: fossilization
 - sourceEvidence: learner_message:context, current_topic:reliable, conversation_history:context, prior_learning:context, mentor_memory:context, accommodation:context
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs

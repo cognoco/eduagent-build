@@ -18,7 +18,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as SecureStore from '../../lib/secure-storage';
 import { useProfile, isGuardianProfile } from '../../lib/profile';
 import { computeAgeBracket } from '@eduagent/schemas';
-import { useThemeColors, useTokenVars } from '../../lib/theme';
+import {
+  useThemeColors,
+  useTokenVars,
+  type ThemeColors,
+} from '../../lib/theme';
 import { useConsentStatus, useRequestConsent } from '../../hooks/use-consent';
 import {
   initNotificationHandler,
@@ -78,6 +82,12 @@ const LEARNER_TABS: ReadonlySet<string> = new Set([
   'more',
 ]);
 
+const PARENT_PROXY_TABS: ReadonlySet<string> = new Set([
+  'home',
+  'library',
+  'progress',
+]);
+
 export type TabShape = 'guardian' | 'learner';
 
 export function resolveTabShape({
@@ -89,19 +99,53 @@ export function resolveTabShape({
   profiles: ReadonlyArray<{ isOwner: boolean }>;
   isParentProxy: boolean;
 }): TabShape {
-  if (!activeProfile) return 'guardian';
+  // [CCR PR #215 / Bug 305] Default to 'learner' (4-tab least-privilege)
+  // when the profile is unknown or not yet loaded. The guardian shape
+  // surfaces the full 5-tab mentoring hub (own-learning); briefly showing
+  // that to a non-guardian leaks intent. A legitimate guardian seeing the
+  // learner shape for a render or two while the profile loads is harmless —
+  // the only difference is one extra tab appearing once data arrives.
+  if (!activeProfile) return 'learner';
   if (isParentProxy) return 'learner';
   if (isGuardianProfile(activeProfile, profiles)) return 'guardian';
   return 'learner';
 }
 
-export function computeVisibleTabs(shape: TabShape = 'guardian'): Set<string> {
+export function computeVisibleTabs(
+  shape: TabShape = 'guardian',
+  isParentProxy = false,
+): Set<string> {
+  if (isParentProxy) return new Set(PARENT_PROXY_TABS);
+
   switch (shape) {
     case 'guardian':
       return new Set(GUARDIAN_TABS);
     case 'learner':
       return new Set(LEARNER_TABS);
   }
+}
+
+export function resolveHomeTabPresentation(
+  shape: TabShape,
+  isParentProxy = false,
+): {
+  titleKey: 'tabs.familyHub' | 'tabs.myLearning';
+  accessibilityLabelKey: 'tabs.familyHubLabel' | 'tabs.myLearningLabel';
+  iconName: 'Home' | 'School';
+} {
+  if (shape === 'guardian' && !isParentProxy) {
+    return {
+      titleKey: 'tabs.familyHub',
+      accessibilityLabelKey: 'tabs.familyHubLabel',
+      iconName: 'Home',
+    };
+  }
+
+  return {
+    titleKey: 'tabs.myLearning',
+    accessibilityLabelKey: 'tabs.myLearningLabel',
+    iconName: 'School',
+  };
 }
 
 // Routes where the entire tab bar is hidden (immersive / full-screen UX).
@@ -147,6 +191,15 @@ function TabIcon({ name, focused }: { name: string; focused: boolean }) {
   );
 }
 
+function getProxyChromeColors(colors: ThemeColors) {
+  return {
+    background: colors.proxyPreviewBackground,
+    border: colors.proxyPreviewBorder,
+    sceneBackground: colors.proxyPreviewSceneBackground,
+    tabBackground: colors.proxyPreviewTabBackground,
+  };
+}
+
 function ProxyBanner({
   childName,
   onSwitchBack,
@@ -157,35 +210,46 @@ function ProxyBanner({
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
   const { t } = useTranslation();
+  const proxyColors = getProxyChromeColors(colors);
 
   return (
     <View
-      className="flex-row items-center justify-between px-4 bg-surface-elevated border-b border-border"
+      className="flex-row items-center justify-between px-4 border-b"
       style={{
+        backgroundColor: proxyColors.background,
+        borderBottomColor: proxyColors.border,
+        borderBottomWidth: 2,
         paddingTop: insets.top,
-        height: 44 + insets.top,
+        height: 58 + insets.top,
       }}
       testID="proxy-banner"
     >
       <View className="flex-row items-center flex-1">
         <Ionicons
           name="eye-outline"
-          size={16}
-          color={colors.textSecondary}
-          style={{ marginRight: 6 }}
+          size={20}
+          color={colors.warning}
+          style={{ marginRight: 10 }}
         />
-        <Text
-          className="text-body-sm text-text-secondary flex-1"
-          numberOfLines={1}
-        >
-          {t('tabs.proxyBanner.viewing', { name: childName })}
-        </Text>
+        <View className="flex-1 pr-3">
+          <Text className="text-caption font-bold text-warning uppercase">
+            {t('tabs.proxyBanner.parentPreview')}
+          </Text>
+          <Text
+            className="text-body-sm font-semibold text-text-primary"
+            numberOfLines={1}
+          >
+            {t('tabs.proxyBanner.viewing', { name: childName })}
+          </Text>
+        </View>
       </View>
       <Pressable
         onPress={onSwitchBack}
         hitSlop={8}
         accessibilityRole="button"
         accessibilityLabel={t('tabs.proxyBanner.switchBackLabel')}
+        className="rounded-full border px-3 py-1.5"
+        style={{ borderColor: proxyColors.border }}
         testID="proxy-banner-switch-back"
       >
         <Text className="text-body-sm font-semibold text-primary">
@@ -1341,11 +1405,16 @@ export default function AppLayout() {
   } = useProfile();
   useMentorLanguageSync();
   const { isParentProxy, childProfile, parentProfile } = useParentProxy();
+  const proxyColors = getProxyChromeColors(colors);
   const role = useActiveProfileRole();
   const tabShape = resolveTabShape({ activeProfile, profiles, isParentProxy });
   const visibleTabs = React.useMemo(
-    () => computeVisibleTabs(tabShape),
-    [tabShape],
+    () => computeVisibleTabs(tabShape, isParentProxy),
+    [isParentProxy, tabShape],
+  );
+  const homeTabPresentation = resolveHomeTabPresentation(
+    tabShape,
+    isParentProxy,
   );
 
   // Sync Clerk auth state with RevenueCat identity (runs on auth change)
@@ -1661,7 +1730,11 @@ export default function AppLayout() {
               // F-003/F-016/F-055: on web, inactive tab scenes stay in the DOM.
               // An opaque sceneStyle prevents the previous tab from bleeding
               // through when switching to a full-screen route (session, quiz, etc.).
-              sceneStyle: { backgroundColor: colors.background },
+              sceneStyle: {
+                backgroundColor: isParentProxy
+                  ? proxyColors.sceneBackground
+                  : colors.background,
+              },
               tabBarStyle: isFullScreen
                 ? {
                     display: 'none',
@@ -1673,8 +1746,13 @@ export default function AppLayout() {
                     overflow: 'hidden' as const,
                   }
                 : {
-                    backgroundColor: colors.surface,
-                    borderTopColor: colors.border,
+                    backgroundColor: isParentProxy
+                      ? proxyColors.tabBackground
+                      : colors.surface,
+                    borderTopColor: isParentProxy
+                      ? proxyColors.border
+                      : colors.border,
+                    borderTopWidth: isParentProxy ? 2 : 1,
                     height: 56 + Math.max(insets.bottom, 24),
                     paddingBottom: Math.max(insets.bottom, 24),
                   },
@@ -1693,16 +1771,21 @@ export default function AppLayout() {
           <Tabs.Screen
             name="home"
             options={{
-              title: t('tabs.home'),
+              title: t(homeTabPresentation.titleKey),
               tabBarButtonTestID: 'tab-home',
-              tabBarAccessibilityLabel: t('tabs.homeLabel'),
+              tabBarAccessibilityLabel: t(
+                homeTabPresentation.accessibilityLabelKey,
+              ),
               // Lazy-load the Home tab so the initial mount only renders the
               // visible gate screens (consent, profile creation). The trade-off
               // is a brief spinner on the first Home tap, but it cuts ~200ms
               // off the critical auth→gate path on low-end devices.
               lazy: true,
               tabBarIcon: ({ focused }) => (
-                <TabIcon name="Home" focused={focused} />
+                <TabIcon
+                  name={homeTabPresentation.iconName}
+                  focused={focused}
+                />
               ),
             }}
           />

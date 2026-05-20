@@ -352,13 +352,12 @@ describe('resolveExchangeLlmRouting', () => {
     });
   });
 
-  it('routes Plus rung 4 to advanced help without selecting OpenAI', () => {
+  it('routes Plus rung 4 to advanced help (premium tier)', () => {
     expect(
       resolveExchangeLlmRouting({
         subscriptionTier: 'plus',
         requestedLlmTier: 'standard',
         effectiveRung: 4,
-        advancedLlmProvider: 'openai',
       }),
     ).toEqual({
       llmTier: 'premium',
@@ -366,17 +365,15 @@ describe('resolveExchangeLlmRouting', () => {
     });
   });
 
-  it('routes Plus rung 5+ to GPT when OpenAI is requested', () => {
+  it('routes Plus rung 5+ to premium tier', () => {
     expect(
       resolveExchangeLlmRouting({
         subscriptionTier: 'plus',
         requestedLlmTier: 'standard',
         effectiveRung: 5,
-        advancedLlmProvider: 'openai',
       }),
     ).toEqual({
       llmTier: 'premium',
-      preferredProvider: 'openai',
       routingReason: 'plus_included_advanced_rung',
     });
   });
@@ -395,28 +392,12 @@ describe('resolveExchangeLlmRouting', () => {
     });
   });
 
-  it('routes upgraded Family profiles to Claude from rung 4+', () => {
+  it('routes upgraded Family profiles to premium tier from rung 4+', () => {
     expect(
       resolveExchangeLlmRouting({
         subscriptionTier: 'family',
         requestedLlmTier: 'premium',
         effectiveRung: 4,
-        advancedLlmProvider: 'anthropic',
-      }),
-    ).toEqual({
-      llmTier: 'premium',
-      preferredProvider: 'anthropic',
-      routingReason: 'premium_profile_or_addon_advanced_rung',
-    });
-  });
-
-  it('defers upgraded Family GPT routing until rung 5+', () => {
-    expect(
-      resolveExchangeLlmRouting({
-        subscriptionTier: 'family',
-        requestedLlmTier: 'premium',
-        effectiveRung: 4,
-        advancedLlmProvider: 'openai',
       }),
     ).toEqual({
       llmTier: 'premium',
@@ -424,17 +405,15 @@ describe('resolveExchangeLlmRouting', () => {
     });
   });
 
-  it('routes upgraded Family profiles to GPT from rung 5+', () => {
+  it('routes upgraded Family profiles to premium tier from rung 5+', () => {
     expect(
       resolveExchangeLlmRouting({
         subscriptionTier: 'family',
         requestedLlmTier: 'premium',
         effectiveRung: 5,
-        advancedLlmProvider: 'openai',
       }),
     ).toEqual({
       llmTier: 'premium',
-      preferredProvider: 'openai',
       routingReason: 'premium_profile_or_addon_advanced_rung',
     });
   });

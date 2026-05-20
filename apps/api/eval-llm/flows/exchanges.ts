@@ -56,6 +56,11 @@ interface ScenarioSpec {
   history: HistoryTurn[];
   contextOverrides: Partial<ExchangeContext>;
   /**
+   * Freeform scenarios strip the base topicTitle so the prompt renders the
+   * no-topic branch (e.g. ask-anything / casual freeform exchanges).
+   */
+  freeform?: boolean;
+  /**
    * Filter out scenarios that only make sense for a subset of profiles.
    * Returning false means "this scenario is skipped for this profile".
    */
@@ -74,7 +79,6 @@ const SCENARIO_SPECS: readonly ScenarioSpec[] = [
       verificationType: 'standard',
       exchangeCount: 0,
       isFirstEncounter: false,
-      isFirstSessionOfSubject: false,
       retentionStatus: { status: 'new' },
     },
     appliesTo: () => true,
@@ -82,7 +86,7 @@ const SCENARIO_SPECS: readonly ScenarioSpec[] = [
   {
     id: 'S10-first-encounter-topic-turn0',
     purpose:
-      'First-encounter topic turn 0 — teach exactly one idea, then ask a focused prior-knowledge probe',
+      'First-encounter topic turn 0 — anchor on a starting concept with one-clause reason and execute; no open-ended intake question',
     history: [],
     contextOverrides: {
       escalationRung: 1,
@@ -90,7 +94,6 @@ const SCENARIO_SPECS: readonly ScenarioSpec[] = [
       verificationType: 'standard',
       exchangeCount: 0,
       isFirstEncounter: true,
-      isFirstSessionOfSubject: false,
       retentionStatus: { status: 'new' },
     },
     appliesTo: () => true,
@@ -98,7 +101,7 @@ const SCENARIO_SPECS: readonly ScenarioSpec[] = [
   {
     id: 'S11-first-encounter-topic-turn1',
     purpose:
-      'First-encounter topic turn 1 — react to the learner signal, teach one nugget, ask one follow-up',
+      'First-encounter topic turn 1 — continue teaching the proposed direction; vagueness from learner = consent, do not re-probe',
     history: [
       {
         role: 'assistant',
@@ -117,7 +120,6 @@ const SCENARIO_SPECS: readonly ScenarioSpec[] = [
       verificationType: 'standard',
       exchangeCount: 1,
       isFirstEncounter: true,
-      isFirstSessionOfSubject: false,
       retentionStatus: { status: 'new' },
       extractedSignalsToReflect: {
         currentKnowledge: 'knows plants need sunlight',
@@ -128,7 +130,7 @@ const SCENARIO_SPECS: readonly ScenarioSpec[] = [
   {
     id: 'S12-first-encounter-topic-turn3',
     purpose:
-      'First-encounter topic turn 3 — final allowed probe turn before normal teaching resumes',
+      'First-encounter topic turn 3 — last turn the execution rule applies; normal teach-and-check resumes on turn 4',
     history: [
       {
         role: 'assistant',
@@ -155,27 +157,10 @@ const SCENARIO_SPECS: readonly ScenarioSpec[] = [
       verificationType: 'standard',
       exchangeCount: 3,
       isFirstEncounter: true,
-      isFirstSessionOfSubject: false,
       retentionStatus: { status: 'new' },
       extractedSignalsToReflect: {
         currentKnowledge: 'mixes up ingredients and energy',
       },
-    },
-    appliesTo: () => true,
-  },
-  {
-    id: 'S13-first-session-subject-turn0',
-    purpose:
-      'Very first subject session turn 0 — subject-level opener wins over topic probe',
-    history: [],
-    contextOverrides: {
-      escalationRung: 1,
-      sessionType: 'learning',
-      verificationType: 'standard',
-      exchangeCount: 0,
-      isFirstEncounter: true,
-      isFirstSessionOfSubject: true,
-      retentionStatus: { status: 'new' },
     },
     appliesTo: () => true,
   },
@@ -190,7 +175,6 @@ const SCENARIO_SPECS: readonly ScenarioSpec[] = [
       verificationType: 'standard',
       exchangeCount: 0,
       isFirstEncounter: false,
-      isFirstSessionOfSubject: false,
       retentionStatus: { status: 'strong' },
     },
     appliesTo: () => true,
@@ -283,15 +267,15 @@ const SCENARIO_SPECS: readonly ScenarioSpec[] = [
   },
   {
     id: 'S8-casual-freeform',
-    purpose: 'Freeform / casual-mode branch (no topic, casual tone)',
+    purpose: 'Freeform / casual branch (no topic)',
     history: HISTORY_S8_FREEFORM,
     contextOverrides: {
       escalationRung: 1,
       sessionType: 'learning',
       verificationType: 'standard',
-      learningMode: 'casual',
       exchangeCount: 1,
     },
+    freeform: true,
     appliesTo: () => true,
   },
   {
@@ -334,7 +318,6 @@ const SCENARIO_SPECS: readonly ScenarioSpec[] = [
       verificationType: 'standard',
       exchangeCount: 1,
       isFirstEncounter: false,
-      isFirstSessionOfSubject: false,
       retentionStatus: { status: 'new' },
     },
     appliesTo: () => true,
@@ -349,7 +332,6 @@ const SCENARIO_SPECS: readonly ScenarioSpec[] = [
       verificationType: 'standard',
       exchangeCount: 1,
       isFirstEncounter: false,
-      isFirstSessionOfSubject: false,
       retentionStatus: { status: 'new' },
     },
     appliesTo: () => true,
@@ -364,7 +346,6 @@ const SCENARIO_SPECS: readonly ScenarioSpec[] = [
       verificationType: 'standard',
       exchangeCount: 1,
       isFirstEncounter: false,
-      isFirstSessionOfSubject: false,
       retentionStatus: { status: 'new' },
     },
     appliesTo: () => true,
@@ -379,7 +360,6 @@ const SCENARIO_SPECS: readonly ScenarioSpec[] = [
       verificationType: 'standard',
       exchangeCount: 1,
       isFirstEncounter: false,
-      isFirstSessionOfSubject: false,
       retentionStatus: { status: 'new' },
     },
     appliesTo: () => true,
@@ -508,10 +488,8 @@ function buildBaseContext(profile: EvalProfile): ExchangeContext {
     knownVocabulary: profile.recentQuizAnswers.vocabulary.length
       ? profile.recentQuizAnswers.vocabulary
       : undefined,
-    learningMode: profile.learningMode,
     exchangeCount: 0,
     isFirstEncounter: false,
-    isFirstSessionOfSubject: false,
     extractedSignalsToReflect: null,
     inputMode: 'text',
     llmTier: 'standard',
@@ -530,14 +508,13 @@ function buildScenarioContext(
     (t) => ({ role: t.role, content: t.content }),
   );
 
+  // Freeform scenarios strip the topicTitle so the prompt rendering tests the
+  // no-topic branch. All other scenarios keep the profile's chosen topic.
   return {
     ...base,
     ...spec.contextOverrides,
     exchangeHistory: history,
-    topicTitle:
-      spec.contextOverrides.learningMode === 'casual'
-        ? undefined
-        : base.topicTitle,
+    topicTitle: spec.freeform ? undefined : base.topicTitle,
   };
 }
 

@@ -17,11 +17,6 @@ import {
 } from '@eduagent/schemas';
 import { createPendingSessionSummary, evaluateSummary } from '../summaries';
 import { getSubject } from '../subject';
-import {
-  getConsecutiveSummarySkips,
-  incrementSummarySkips,
-  resetSummarySkips,
-} from '../settings';
 import { applyReflectionMultiplier, getSessionXpEntry } from '../xp';
 import { createLogger } from '../logger';
 import { captureException } from '../sentry';
@@ -34,7 +29,7 @@ const logger = createLogger();
 export async function getSessionSummary(
   db: Database,
   profileId: string,
-  sessionId: string
+  sessionId: string,
 ): Promise<SessionSummary | null> {
   const row = await findSessionSummaryRow(db, profileId, sessionId);
   if (!row) {
@@ -42,16 +37,11 @@ export async function getSessionSummary(
   }
 
   const xpInfo = await getSessionXpEntry(db, profileId, sessionId);
-  const consecutiveSummarySkips = await getConsecutiveSummarySkips(
-    db,
-    profileId
-  );
   const summary = mapSummaryRow(row);
   const enrichedSummary: SessionSummary = {
     ...summary,
     baseXp: xpInfo?.baseXp ?? null,
     reflectionBonusXp: xpInfo?.reflectionBonusXp ?? null,
-    consecutiveSummarySkips,
   };
   if (!row.nextTopicId) {
     return enrichedSummary;
@@ -67,8 +57,8 @@ export async function getSessionSummary(
       subjects,
       and(
         eq(curriculumBooks.subjectId, subjects.id),
-        eq(subjects.profileId, profileId)
-      )
+        eq(subjects.profileId, profileId),
+      ),
     )
     .where(eq(curriculumTopics.id, row.nextTopicId))
     .limit(1);
@@ -82,7 +72,7 @@ export async function getSessionSummary(
 export async function skipSummary(
   db: Database,
   profileId: string,
-  sessionId: string
+  sessionId: string,
 ): Promise<{
   summary: {
     id: string;
@@ -91,7 +81,6 @@ export async function skipSummary(
     aiFeedback: string | null;
     status: 'skipped' | 'submitted' | 'accepted';
   };
-  consecutiveSummarySkips?: number;
 }> {
   const session = await getSession(db, profileId, sessionId);
   if (!session) {
@@ -127,13 +116,8 @@ export async function skipSummary(
     sessionId,
     profileId,
     session.topicId ?? null,
-    'skipped'
+    'skipped',
   );
-
-  let consecutiveSummarySkips: number | undefined;
-  if (existingStatus !== 'skipped') {
-    consecutiveSummarySkips = await incrementSummarySkips(db, profileId);
-  }
 
   return {
     summary: {
@@ -143,7 +127,6 @@ export async function skipSummary(
       aiFeedback: row.aiFeedback ?? null,
       status: 'skipped',
     },
-    ...(consecutiveSummarySkips != null ? { consecutiveSummarySkips } : {}),
   };
 }
 
@@ -151,7 +134,7 @@ export async function submitSummary(
   db: Database,
   profileId: string,
   sessionId: string,
-  input: SummarySubmitInput
+  input: SummarySubmitInput,
 ): Promise<{
   summary: {
     id: string;
@@ -174,7 +157,7 @@ export async function submitSummary(
   const evaluation = await evaluateSummary(
     subject?.name ?? 'Unknown topic',
     'Session learning content',
-    input.content
+    input.content,
   );
 
   const finalStatus = evaluation.isAccepted ? 'accepted' : 'submitted';
@@ -195,8 +178,8 @@ export async function submitSummary(
       .where(
         and(
           eq(sessionSummaries.id, existing.id),
-          eq(sessionSummaries.profileId, profileId)
-        )
+          eq(sessionSummaries.profileId, profileId),
+        ),
       );
 
     finalRow = {
@@ -225,7 +208,6 @@ export async function submitSummary(
     finalRow = inserted;
   }
 
-  await resetSummarySkips(db, profileId);
   await applyReflectionMultiplier(db, profileId, sessionId);
   const xpInfo = await getSessionXpEntry(db, profileId, sessionId);
 
@@ -246,7 +228,7 @@ export async function submitSummary(
           {
             sessionId,
             topicId: session.topicId,
-          }
+          },
         );
       } else {
         logger.error('[submitSummary] Note creation failed (non-fatal)', {

@@ -21,7 +21,7 @@ import { isInGracePeriod } from '../../lib/consent-grace';
 import { useSubscription } from '../../hooks/use-subscription';
 import { useSubjects } from '../../hooks/use-subjects';
 import { getGreeting } from '../../lib/greeting';
-import { useHasLinkedChildren } from '../../lib/profile';
+import { useHasLinkedChildren, useProfile } from '../../lib/profile';
 import {
   LEARNER_HOME_RETURN_TO,
   homeHrefForReturnTo,
@@ -50,9 +50,6 @@ import { SubjectTile } from './SubjectTile';
 import type { TranslateKey } from '../../i18n';
 
 const CREATE_SUBJECT_FROM_HOME_HREF = '/create-subject' as const;
-
-const DEFAULT_SUBJECT_ICON: React.ComponentProps<typeof Ionicons>['name'] =
-  'book-outline';
 
 type HomeIntentAction = {
   testID: string;
@@ -126,6 +123,7 @@ export function LearnerScreen({
   const { data: dashboard } = useDashboard();
   const { data: quizDiscovery } = useQuizDiscoveryCard();
   const { data: subscription } = useSubscription();
+  const { switchProfile } = useProfile();
   const markQuizDiscoverySurfaced = useMarkQuizDiscoverySurfaced();
   const hasLinkedChildren = useHasLinkedChildren();
   const [recoveryMarker, setRecoveryMarker] =
@@ -136,6 +134,9 @@ export function LearnerScreen({
   const isParentProxy = Boolean(
     activeProfile && !activeProfile.isOwner && profiles.some((p) => p.isOwner),
   );
+  const parentProfile = isParentProxy
+    ? profiles.find((profile) => profile.isOwner)
+    : null;
   const [coachBandDismissed, setCoachBandDismissed] = useState(false);
   const totalTopicsCompleted = overallProgress?.totalTopicsCompleted ?? null;
   const totalSessions = progressInventory?.global.totalSessions ?? 0;
@@ -169,6 +170,19 @@ export function LearnerScreen({
   const dismissCoachBand = useCallback(() => {
     setCoachBandDismissed(true);
   }, []);
+
+  const openParentSessionSummaries = useCallback(async () => {
+    if (!activeProfile || !parentProfile) return;
+
+    const childProfileId = activeProfile.id;
+    const result = await switchProfile(parentProfile.id);
+    if (!result.success) return;
+
+    router.push({
+      pathname: '/(app)/child/[profileId]',
+      params: { profileId: childProfileId },
+    } as Href);
+  }, [activeProfile, parentProfile, switchProfile]);
 
   const [loadingTimedOut, setLoadingTimedOut] = useState(false);
   const subjectsLoadFailed = isError && !subjects;
@@ -275,7 +289,6 @@ export function LearnerScreen({
         topicsTotal: total,
         tintSolid: tint.solid,
         tintSoft: tint.soft,
-        icon: DEFAULT_SUBJECT_ICON,
       };
     });
   }, [subjects, overallProgress, resumeTarget, reviewSummary, colorScheme]);
@@ -473,7 +486,12 @@ export function LearnerScreen({
           </View>
           {!isParentProxy ? (
             <Pressable
-              onPress={() => router.push('/(app)/my-notes' as Href)}
+              onPress={() =>
+                router.push({
+                  pathname: '/(app)/my-notes',
+                  params: { returnTo: returnToTab },
+                } as Href)
+              }
               className="min-h-[56px] min-w-[64px] rounded-card border border-border bg-surface items-center justify-center px-2"
               accessibilityRole="button"
               accessibilityLabel="Open My Notes"
@@ -631,86 +649,110 @@ export function LearnerScreen({
                 )}
               </ScrollView>
             </>
-          ) : (
-            !isParentProxy && (
-              <>
-                {subjectsLoadFailed ? (
-                  <View
-                    testID="home-subjects-load-error"
-                    className="mx-5 rounded-2xl border border-border bg-surface items-center justify-center py-7"
-                    style={{ gap: 10 }}
-                  >
-                    <Ionicons
-                      name="cloud-offline-outline"
-                      size={30}
-                      color={colors.textSecondary}
-                      style={{ opacity: 0.65 }}
-                    />
-                    <Text className="text-body-sm font-semibold text-text-primary text-center px-6">
-                      We couldn't load your subjects right now
-                    </Text>
-                    <Text className="text-body-sm text-text-secondary text-center px-6">
-                      You can still start a session or try another action.
-                    </Text>
-                    <Pressable
-                      testID="home-subjects-load-retry"
-                      onPress={() => void refetch()}
-                      className="bg-surface-elevated rounded-xl px-5 py-2.5 mt-1"
-                      accessibilityRole="button"
-                      accessibilityLabel="Retry loading subjects"
-                    >
-                      <Text className="text-body-sm font-bold text-text-primary">
-                        Retry
-                      </Text>
-                    </Pressable>
-                  </View>
-                ) : (
-                  <View
-                    testID="home-empty-subjects"
-                    className="mx-5 rounded-2xl border border-dashed border-border items-center justify-center py-7"
-                    style={{ gap: 10 }}
-                  >
-                    <Ionicons
-                      name="book-outline"
-                      size={30}
-                      color={colors.textSecondary}
-                      style={{ opacity: 0.6 }}
-                    />
-                    <Text className="text-body-sm font-semibold text-text-primary text-center px-6">
-                      {t('home.learner.emptySubjectsTitle')}
-                    </Text>
-                    <Text className="text-body-sm text-text-secondary text-center px-6">
-                      {t('home.learner.emptySubjectsMessage')}
-                    </Text>
-                    <Pressable
-                      testID="home-add-first-subject"
-                      onPress={() =>
-                        router.push({
-                          pathname: CREATE_SUBJECT_FROM_HOME_HREF,
-                          params: { returnTo: returnToTab },
-                        } as Href)
-                      }
-                      className="bg-primary rounded-xl px-5 py-2.5 mt-1"
-                      accessibilityRole="button"
-                      accessibilityLabel={t('home.learner.addSubject')}
-                    >
-                      <Text className="text-body-sm font-bold text-text-inverse">
-                        {t('home.learner.addSubject')}
-                      </Text>
-                    </Pressable>
-                  </View>
-                )}
-              </>
+          ) : !isParentProxy ? (
+            subjectsLoadFailed ? (
+              <View
+                testID="home-subjects-load-error"
+                className="mx-5 rounded-2xl border border-border bg-surface items-center justify-center py-7"
+                style={{ gap: 10 }}
+              >
+                <Ionicons
+                  name="cloud-offline-outline"
+                  size={30}
+                  color={colors.textSecondary}
+                  style={{ opacity: 0.65 }}
+                />
+                <Text className="text-body-sm font-semibold text-text-primary text-center px-6">
+                  We couldn't load your subjects right now
+                </Text>
+                <Text className="text-body-sm text-text-secondary text-center px-6">
+                  You can still start a session or try another action.
+                </Text>
+                <Pressable
+                  testID="home-subjects-load-retry"
+                  onPress={() => void refetch()}
+                  className="bg-surface-elevated rounded-xl px-5 py-2.5 mt-1"
+                  accessibilityRole="button"
+                  accessibilityLabel="Retry loading subjects"
+                >
+                  <Text className="text-body-sm font-bold text-text-primary">
+                    Retry
+                  </Text>
+                </Pressable>
+              </View>
+            ) : (
+              <View
+                testID="home-empty-subjects"
+                className="mx-5 rounded-2xl border border-dashed border-border items-center justify-center py-7"
+                style={{ gap: 10 }}
+              >
+                <Ionicons
+                  name="book-outline"
+                  size={30}
+                  color={colors.textSecondary}
+                  style={{ opacity: 0.6 }}
+                />
+                <Text className="text-body-sm font-semibold text-text-primary text-center px-6">
+                  {t('home.learner.emptySubjectsTitle')}
+                </Text>
+                <Text className="text-body-sm text-text-secondary text-center px-6">
+                  {t('home.learner.emptySubjectsMessage')}
+                </Text>
+                <Pressable
+                  testID="home-add-first-subject"
+                  onPress={() =>
+                    router.push({
+                      pathname: CREATE_SUBJECT_FROM_HOME_HREF,
+                      params: { returnTo: returnToTab },
+                    } as Href)
+                  }
+                  className="bg-primary rounded-xl px-5 py-2.5 mt-1"
+                  accessibilityRole="button"
+                  accessibilityLabel={t('home.learner.addSubject')}
+                >
+                  <Text className="text-body-sm font-bold text-text-inverse">
+                    {t('home.learner.addSubject')}
+                  </Text>
+                </Pressable>
+              </View>
             )
-          )}
+          ) : null}
         </View>
 
         {isParentProxy && (
           <View testID="intent-proxy-placeholder" className="px-5 mt-4">
-            <Text className="text-body text-text-secondary text-center">
-              Sessions are private to{' '}
-              {activeProfile?.displayName ?? 'this learner'}
-            </Text>
+            <View className="rounded-card bg-primary-soft px-4 py-4">
+              <Text className="text-body font-semibold text-text-primary">
+                {t('home.learner.proxySessionSummariesTitle', {
+                  name: activeProfile?.displayName ?? 'this learner',
+                })}
+              </Text>
+              <Text className="text-body-sm text-text-secondary mt-1">
+                {t('home.learner.proxySessionSummariesBody', {
+                  name: activeProfile?.displayName ?? 'this learner',
+                })}
+              </Text>
+              {parentProfile ? (
+                <Pressable
+                  onPress={() => void openParentSessionSummaries()}
+                  className="self-start rounded-button bg-primary px-4 py-3 mt-3"
+                  accessibilityRole="button"
+                  accessibilityLabel={t(
+                    'home.learner.proxySessionSummariesCta',
+                    {
+                      name: activeProfile?.displayName ?? 'this learner',
+                    },
+                  )}
+                  testID="proxy-view-session-summaries"
+                >
+                  <Text className="text-body-sm font-semibold text-text-inverse">
+                    {t('home.learner.proxySessionSummariesCta', {
+                      name: activeProfile?.displayName ?? 'this learner',
+                    })}
+                  </Text>
+                </Pressable>
+              ) : null}
+            </View>
           </View>
         )}
       </ScrollView>

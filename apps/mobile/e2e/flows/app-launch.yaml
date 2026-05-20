@@ -7,6 +7,7 @@
 # show the expected entry point for a logged-out user?
 appId: com.mentomate.app
 tags:
+  - pr-blocking
   - smoke
 ---
 # seed-and-run.sh has already launched the app and landed it on the

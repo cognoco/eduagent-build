@@ -6,6 +6,19 @@ import type { Database } from '@eduagent/database';
 import { subscriptions, quotaPools } from '@eduagent/database';
 
 const mockCaptureException = jest.fn();
+const mockInngestSend = jest.fn().mockResolvedValue(undefined);
+
+jest.mock('../inngest/client' /* gc1-allow: pattern-a conversion */, () => {
+  const actual = jest.requireActual(
+    '../inngest/client',
+  ) as typeof import('../inngest/client');
+  return {
+    ...actual,
+    inngest: {
+      send: (...args: unknown[]) => mockInngestSend(...args),
+    },
+  };
+});
 
 jest.mock(
   './sentry' /* gc1-allow: Sentry is a true external boundary (error-reporting SaaS); captureException is intercepted here to assert that specific error escalations fire — not to suppress real Sentry calls in integration tests */,
@@ -60,6 +73,7 @@ const subscriptionId = 'sub-660e8400-e29b-41d4-a716-446655440000';
 
 beforeEach(() => {
   mockCaptureException.mockClear();
+  mockInngestSend.mockClear();
 });
 
 // ---------------------------------------------------------------------------

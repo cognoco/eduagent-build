@@ -582,6 +582,127 @@ describe('useSessionStreaming', () => {
       );
     });
 
+    // [BUG-292 / PR #268] Regression guard for the N≥3 concurrent-caller race.
+    //
+    // Original shape:
+    //   while (activeContinueRef.current) { await activeContinueRef.current; }
+    //   activeContinueRef.current = currentTurn;
+    //
+    // With three concurrent callers, all three observe `ref.current === null`
+    // on the same microtask tick and each writes its own promise into the ref
+    // (last writer wins). The check-then-act window between the while exit
+    // and the assignment means all three streams ran in parallel — duplicate
+    // continues — and earlier turns were stranded with their resolves never
+    // being awaited by the next entrant. The replacement is an atomic
+    // chain-tail swap: read predecessor + install self in one sync block,
+    // then await predecessor before doing any work.
+    //
+    // This test fires 3 concurrent callers, gates each stream so they
+    // overlap in time, and asserts strict FIFO serialization: at most one
+    // stream is in-flight at any moment AND streams start in submission order.
+    it('[BUG-292] serializes N≥3 concurrent callers — no duplicate concurrent streams', async () => {
+      // Each gate forces its stream to stay in-flight until released, so a
+      // racing implementation would have multiple streams running together.
+      const streamReleases: Array<() => void> = [];
+      const inflight: string[] = []; // texts currently in their stream body
+      const peakInflight = { value: 0 };
+      const startOrder: string[] = [];
+
+      const opts = makeOpts({
+        streamMessage: jest.fn(
+          async (
+            text: string,
+            onChunk: (accumulated: string) => void,
+            onComplete: (result: Record<string, unknown>) => Promise<void>,
+            _sessionId: string,
+          ) => {
+            startOrder.push(text);
+            inflight.push(text);
+            peakInflight.value = Math.max(peakInflight.value, inflight.length);
+
+            // Wait until this stream is explicitly released. This holds the
+            // chain so subsequent callers must queue behind us — a broken
+            // implementation would let them barge in and inflight.length
+            // would exceed 1.
+            await new Promise<void>((resolve) => {
+              streamReleases.push(resolve);
+            });
+
+            onChunk(`reply to ${text}`);
+            await onComplete({
+              aiEventId: `ai-event-${text}`,
+              exchangeCount: 1,
+              escalationRung: 0,
+              expectedResponseMinutes: 5,
+            });
+
+            inflight.splice(inflight.indexOf(text), 1);
+          },
+        ),
+      });
+      const { result } = renderHook(() => useSessionStreaming(opts as any));
+
+      // Fire three callers in one synchronous burst — this is the exact
+      // shape that triggered the race (taps in rapid succession, voice
+      // input flush concurrent with a manual send, reconnect colliding
+      // with an autosend, etc.).
+      let p1!: Promise<void>;
+      let p2!: Promise<void>;
+      let p3!: Promise<void>;
+      await act(async () => {
+        p1 = result.current.continueWithMessage('first');
+        p2 = result.current.continueWithMessage('second');
+        p3 = result.current.continueWithMessage('third');
+        // Let queued microtasks run so the first caller enters its stream.
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      // Only ONE caller may be inside streamMessage at this point. If the
+      // race were present, all three would be in their stream bodies and
+      // peakInflight.value would be 3.
+      expect(peakInflight.value).toBe(1);
+      expect(inflight).toEqual(['first']);
+      expect(opts.streamMessage).toHaveBeenCalledTimes(1);
+
+      // Release first → second should start, but not third.
+      await act(async () => {
+        streamReleases[0]?.();
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+        await p1;
+      });
+      expect(peakInflight.value).toBe(1);
+      expect(opts.streamMessage).toHaveBeenCalledTimes(2);
+      expect(inflight).toEqual(['second']);
+
+      // Release second → third runs.
+      await act(async () => {
+        streamReleases[1]?.();
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+        await p2;
+      });
+      expect(peakInflight.value).toBe(1);
+      expect(opts.streamMessage).toHaveBeenCalledTimes(3);
+      expect(inflight).toEqual(['third']);
+
+      await act(async () => {
+        streamReleases[2]?.();
+        await p3;
+      });
+
+      // Every caller was handled exactly once, in submission order, with
+      // strictly one stream in flight at any moment.
+      expect(opts.streamMessage).toHaveBeenCalledTimes(3);
+      expect(startOrder).toEqual(['first', 'second', 'third']);
+      expect(peakInflight.value).toBe(1);
+      expect(inflight).toEqual([]);
+    });
+
     it('stores retry payload before ensureSession for crash recovery', async () => {
       const lastRetryPayloadRef = { current: null as any };
       const opts = makeOpts({ lastRetryPayloadRef });

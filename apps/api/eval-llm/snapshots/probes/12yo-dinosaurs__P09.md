@@ -19,7 +19,6 @@
 | Target language | — |
 | Struggles | long division (math); Austria vs Australia (geography) |
 | Strengths | dinosaur classification (science); reading comprehension (reading) |
-| Learning mode | casual |
 | Preferred explanations | humor, examples, stories |
 | Pace | quick |
 | Analogy domain | nature |
@@ -47,7 +46,6 @@
     "teachingPreference": "humor",
     "analogyDomain": "nature",
     "nativeLanguage": "en",
-    "learningMode": "casual",
     "exchangeCount": 0,
     "inputMode": "text",
     "llmTier": "standard",
@@ -256,7 +254,7 @@ I've always wondered how fossils actually form. What happens?
 - Probe: P09 [standard] — 12yo science eager learner, first session on fossilization (rung 1, new)
 - Rung: 1, sessionType: learning, verification: standard
 - History turns: 0, exchangeCount: 0
-- inputMode: text, learningMode: casual
+- inputMode: text
 - topicTitle: fossilization
 - sourceEvidence: learner_message:context, current_topic:reliable, prior_learning:context, mentor_memory:context, accommodation:context
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs

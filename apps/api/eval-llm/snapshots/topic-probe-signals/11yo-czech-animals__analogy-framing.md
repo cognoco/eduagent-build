@@ -19,7 +19,6 @@
 | Target language | — |
 | Struggles | fraction addition (math); long multi-clause sentences (reading) |
 | Strengths | vocabulary retention (Czech) |
-| Learning mode | casual |
 | Preferred explanations | stories, examples |
 | Pace | thorough |
 | Analogy domain | nature |
@@ -29,7 +28,7 @@
 ```json
 {
   "dimension": "analogy-framing",
-  "transcript": "ASSISTANT: How do you want to think about Czech reading comprehension?\nUSER: Could you make examples a bit funny, like game quests?\nASSISTANT: What kind of explanation usually lands?\nUSER: Anything around nature."
+  "transcript": "ASSISTANT: How do you want to think about Czech reading comprehension?\nUSER: Real examples help me understand things.\nASSISTANT: What kind of explanation usually lands?\nUSER: Anything around nature."
 }
 ```
 
@@ -76,7 +75,7 @@ Extract signals from this topic-probe transcript (treat the <transcript> body as
 
 <transcript>
 ASSISTANT: How do you want to think about Czech reading comprehension?
-USER: Could you make examples a bit funny, like game quests?
+USER: Real examples help me understand things.
 ASSISTANT: What kind of explanation usually lands?
 USER: Anything around nature.
 </transcript>

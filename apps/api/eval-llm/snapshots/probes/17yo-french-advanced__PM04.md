@@ -19,7 +19,6 @@
 | Target language | fr |
 | Struggles | subjonctif imparfait (French); nuanced connectors (French) |
 | Strengths | reading comprehension (French); essay argument structure (writing) |
-| Learning mode | serious |
 | Preferred explanations | step-by-step, analogies |
 | Pace | thorough |
 | Analogy domain | music |
@@ -52,7 +51,6 @@
       "le fardeau",
       "éphémère"
     ],
-    "learningMode": "casual",
     "exchangeCount": 0,
     "inputMode": "text",
     "llmTier": "standard"
@@ -251,7 +249,7 @@ I am 18 and just want a relaxed warm-up before studying. Keep it natural.
 - Probe: PM04 [standard] — Personalization matrix: age 18 adult learner, no accommodation, casual free chat without childish tone
 - Rung: 1, sessionType: learning, verification: standard
 - History turns: 0, exchangeCount: 0
-- inputMode: text, learningMode: casual
-- topicTitle: (none — casual mode)
+- inputMode: text
+- topicTitle: (none — freeform)
 - sourceEvidence: learner_message:context, prior_learning:context, mentor_memory:context, accommodation:context
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs

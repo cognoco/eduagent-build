@@ -422,4 +422,175 @@ describe('normaliseSignals', () => {
     });
     expect(result.ready_to_finish).toBe(true);
   });
+
+  it('defaults challenge round fields to false / empty array', () => {
+    const result = normaliseSignals(undefined);
+    expect(result.challenge_round_offer).toBe(false);
+    expect(result.challenge_round_evaluation).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Challenge Round envelope extensions (Task 1) — see
+// docs/plans/2026-05-18-challenge-round-into-note.md
+// ---------------------------------------------------------------------------
+
+describe('challenge round envelope fields', () => {
+  it('accepts challenge_round_offer signal', () => {
+    const parsed = llmResponseEnvelopeSchema.parse({
+      reply: "You've got the basics — want a challenge round?",
+      signals: { challenge_round_offer: true },
+      confidence: 'medium',
+    });
+    expect(parsed.signals?.challenge_round_offer).toBe(true);
+  });
+
+  it('accepts challenge_round_evaluation per-concept results', () => {
+    const parsed = llmResponseEnvelopeSchema.parse({
+      reply: 'Strong work.',
+      signals: {
+        challenge_round_evaluation: [
+          {
+            concept: 'photosynthesis vs respiration',
+            result: 'solid',
+            evidence: 'learner described both directions of energy flow',
+            answerEventId: 'event-solid-1',
+            learnerQuote:
+              'photosynthesis stores energy in glucose and respiration releases it',
+          },
+          {
+            concept: 'role of ATP',
+            result: 'partial',
+            evidence: 'mentioned energy currency, missed structure',
+            answerEventId: 'event-partial-1',
+            learnerQuote: 'ATP is like energy money',
+          },
+          {
+            concept: 'where it happens',
+            result: 'misconception',
+            evidence: 'said nucleus instead of chloroplast',
+            correction: 'occurs in chloroplasts',
+            answerEventId: 'event-misconception-1',
+            learnerQuote: 'photosynthesis happens in the nucleus',
+          },
+        ],
+      },
+      confidence: 'high',
+    });
+    expect(parsed.signals?.challenge_round_evaluation).toHaveLength(3);
+    expect(parsed.signals?.challenge_round_evaluation?.[2]?.correction).toBe(
+      'occurs in chloroplasts',
+    );
+  });
+
+  it('rejects evaluation item missing answerEventId (HIGH-6 grounding requirement)', () => {
+    const result = llmResponseEnvelopeSchema.safeParse({
+      reply: 'OK.',
+      signals: {
+        challenge_round_evaluation: [
+          {
+            concept: 'x',
+            result: 'solid',
+            evidence: 'ok',
+            // missing answerEventId
+            learnerQuote: 'something',
+          },
+        ],
+      },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects evaluation item missing learnerQuote (HIGH-6 grounding requirement)', () => {
+    const result = llmResponseEnvelopeSchema.safeParse({
+      reply: 'OK.',
+      signals: {
+        challenge_round_evaluation: [
+          {
+            concept: 'x',
+            result: 'solid',
+            evidence: 'ok',
+            answerEventId: 'e-1',
+            // missing learnerQuote
+          },
+        ],
+      },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('caps challenge_round_evaluation array at 10 items', () => {
+    const item = {
+      concept: 'x',
+      result: 'solid' as const,
+      evidence: 'ok',
+      answerEventId: 'e-1',
+      learnerQuote: 'q',
+    };
+    const result = llmResponseEnvelopeSchema.safeParse({
+      reply: 'OK.',
+      signals: {
+        challenge_round_evaluation: Array.from({ length: 11 }, () => item),
+      },
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts challenge_round ui_hint', () => {
+    const parsed = llmResponseEnvelopeSchema.parse({
+      reply: 'Question 2 of 3.',
+      ui_hints: {
+        challenge_round: {
+          active: true,
+          question_index: 1,
+          total_questions: 3,
+        },
+      },
+      confidence: 'high',
+    });
+    expect(parsed.ui_hints?.challenge_round?.active).toBe(true);
+    expect(parsed.ui_hints?.challenge_round?.question_index).toBe(1);
+    expect(parsed.ui_hints?.challenge_round?.total_questions).toBe(3);
+  });
+
+  it('coerces null active in challenge_round ui_hint to false', () => {
+    const parsed = llmResponseEnvelopeSchema.parse({
+      reply: 'No round active.',
+      ui_hints: { challenge_round: { active: null } },
+    });
+    expect(parsed.ui_hints?.challenge_round?.active).toBe(false);
+  });
+
+  it('accepts note_draft ui_hint with content + sources', () => {
+    const parsed = llmResponseEnvelopeSchema.parse({
+      reply: "Here's what you know now.",
+      ui_hints: {
+        note_draft: {
+          content:
+            'Photosynthesis uses light to convert CO2 and water into glucose...',
+          source_concepts: ['photosynthesis vs respiration', 'role of ATP'],
+          source_answer_event_ids: ['event-solid-1', 'event-solid-2'],
+        },
+      },
+      confidence: 'high',
+    });
+    expect(parsed.ui_hints?.note_draft?.content).toMatch(/photosynthesis/i);
+    expect(parsed.ui_hints?.note_draft?.source_answer_event_ids).toHaveLength(
+      2,
+    );
+  });
+
+  it('rejects note_draft with empty source_answer_event_ids (HIGH-6)', () => {
+    const result = llmResponseEnvelopeSchema.safeParse({
+      reply: 'X.',
+      ui_hints: {
+        note_draft: {
+          content: 'something',
+          source_concepts: ['a'],
+          source_answer_event_ids: [],
+        },
+      },
+    });
+    expect(result.success).toBe(false);
+  });
 });

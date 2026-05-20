@@ -24,7 +24,7 @@ import type {
   MonthlyReportData,
   SubjectMonthlyDetail,
 } from '@eduagent/schemas';
-import { ForbiddenError } from '@eduagent/schemas';
+import { ForbiddenError, SchemaDriftError } from '@eduagent/schemas';
 import { routeAndCall } from './llm';
 import {
   generateMonthlyReportData,
@@ -1316,5 +1316,68 @@ describe('markMonthlyReportViewed — IDOR rejection', () => {
     await expect(
       markMonthlyReportViewed(db, UUID.parent, UUID.child, UUID.report),
     ).rejects.toThrow(ForbiddenError);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// [CCR PR #215] Schema-drift break tests — mapMonthlyReportRow
+//
+// Previously: row exists but doesn't validate → mapper returned null →
+// route treated it as 404 with no Sentry capture (schema drift invisible).
+// Now: throws SchemaDriftError + captureException with row PK + zod issues.
+// Missing-row path (row → null) is unchanged and still 404 with NO capture.
+// ---------------------------------------------------------------------------
+
+describe('mapMonthlyReportRow — schema drift vs missing row [CCR PR #215]', () => {
+  const { captureException: capMock } = require('./sentry') as {
+    captureException: jest.Mock;
+  };
+
+  beforeEach(() => {
+    capMock.mockClear();
+  });
+
+  it('missing row → returns null (route maps to 404), NO Sentry capture', async () => {
+    // findFirstResult undefined → service returns null without invoking mapper
+    const db = createMockDb({ findFirstResult: undefined });
+
+    const result = await getMonthlyReportForProfile(
+      db,
+      UUID.child,
+      UUID.report,
+    );
+
+    expect(result).toBeNull();
+    expect(capMock).not.toHaveBeenCalled();
+  });
+
+  it('row exists but invalid shape → throws SchemaDriftError + captures Sentry with row PK and zod issues', async () => {
+    // Force an invalid row: reportData is a primitive, not an object.
+    // monthlyReportRecordSchema requires reportData to match monthlyReportDataSchema (object).
+    const badRow = {
+      ...makeMonthlyReportRow(),
+      reportData: 'not-an-object' as unknown as MonthlyReportData,
+    };
+    const db = createMockDb({ findFirstResult: badRow });
+
+    await expect(
+      getMonthlyReportForProfile(db, UUID.child, UUID.report),
+    ).rejects.toBeInstanceOf(SchemaDriftError);
+
+    expect(capMock).toHaveBeenCalledTimes(1);
+    const [errArg, contextArg] = capMock.mock.calls[0];
+    // Captures the zod error and the offending row's primary key.
+    expect(errArg).toBeDefined();
+    expect(contextArg).toMatchObject({
+      profileId: UUID.parent,
+      extra: expect.objectContaining({
+        context: 'mapMonthlyReportRow',
+        reportId: UUID.report,
+        childProfileId: UUID.child,
+      }),
+    });
+    expect(contextArg.extra.issues).toBeDefined();
+    expect(Array.isArray(contextArg.extra.issues)).toBe(true);
+    expect((contextArg.extra.issues as unknown[]).length).toBeGreaterThan(0);
   });
 });

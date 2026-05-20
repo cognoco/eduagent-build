@@ -1,10 +1,16 @@
-import type {
-  CefrLevel,
-  GenerateRoundInput,
-  QuizActivityType,
-  QuizQuestion,
+import { eq } from 'drizzle-orm';
+import {
+  SubjectNotFoundError,
+  type CefrLevel,
+  type GenerateRoundInput,
+  type QuizActivityType,
+  type QuizQuestion,
 } from '@eduagent/schemas';
-import type { Database } from '@eduagent/database';
+import {
+  createScopedRepository,
+  subjects,
+  type Database,
+} from '@eduagent/database';
 import type { ProfileMeta } from '../../middleware/profile-scope';
 import { VocabularyContextError } from '../../errors';
 import { shouldApplyDifficultyBump } from './difficulty-bump';
@@ -64,7 +70,24 @@ export async function buildAndGenerateRound(
     cefrCeiling = context.cefrCeiling;
     allVocabulary = context.allVocabulary;
     libraryItems = context.libraryItems;
-  } else if (input.activityType === 'guess_who') {
+  } else if (input.subjectId) {
+    // [SECURITY] Non-vocabulary activities (`capitals`, `guess_who`) accept an
+    // optional client-supplied subjectId that gets persisted on the quiz round
+    // and later attached to `practice_activity_events`. Vocabulary validates
+    // ownership inside `getVocabularyRoundContext`; the other branches did
+    // not — so an attacker could tag rounds/events under another profile's
+    // subject (write-side IDOR). Verify ownership via the scoped repo before
+    // the round is created.
+    const ownershipRepo = createScopedRepository(db, profileId);
+    const subject = await ownershipRepo.subjects.findFirst(
+      eq(subjects.id, input.subjectId),
+    );
+    if (!subject) {
+      throw new SubjectNotFoundError();
+    }
+  }
+
+  if (input.activityType === 'guess_who') {
     const context = await getGuessWhoRoundContext(db, profileId);
     topicTitles = context.topicTitles;
     libraryItems = await getDueMasteryItems(db, profileId, 'guess_who');

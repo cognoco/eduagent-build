@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentProps,
+} from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -48,6 +55,7 @@ import { useStartFirstCurriculumSession } from '../../../../../hooks/use-session
 import { formatApiError } from '../../../../../lib/format-api-error';
 import { formatRelativeDate } from '../../../../../lib/format-relative-date';
 import { formatSourceLine } from '../../../../../lib/format-note-source';
+import { withOpacity } from '../../../../../lib/color-opacity';
 import { platformAlert } from '../../../../../lib/platform-alert';
 import { useThemeColors } from '../../../../../lib/theme';
 import { computeUpNextTopic } from '../../../../../lib/up-next-topic';
@@ -55,6 +63,9 @@ import {
   goBackOrReplace,
   pushLearningResumeTarget,
 } from '../../../../../lib/navigation';
+import { useProfile } from '../../../../../lib/profile';
+import { useActiveProfileRole } from '../../../../../hooks/use-active-profile-role';
+import { buildSessionDetailHref } from '../../../../../lib/session-detail-navigation';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -116,6 +127,121 @@ function groupSessionsByChapter(sessions: BookSession[]): GroupedChapter[] {
   }));
 }
 
+interface BookSectionStripProps {
+  testID: string;
+  icon: ComponentProps<typeof Ionicons>['name'];
+  label: string;
+  summary: string;
+  meta: string;
+  expanded: boolean;
+  accentColor: string;
+  onPress: () => void;
+}
+
+function BookSectionStrip({
+  testID,
+  icon,
+  label,
+  summary,
+  meta,
+  expanded,
+  accentColor,
+  onPress,
+}: BookSectionStripProps): React.ReactElement {
+  const colors = useThemeColors();
+
+  return (
+    <Pressable
+      testID={testID}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${label}. ${summary}. ${
+        expanded ? 'Collapse section' : 'Expand section'
+      }.`}
+      style={{
+        marginHorizontal: 20,
+        marginTop: 14,
+        borderRadius: 18,
+        borderWidth: 1,
+        borderColor: withOpacity(accentColor, 0.18),
+        backgroundColor: withOpacity(accentColor, 0.08),
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+      }}
+    >
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 12,
+        }}
+      >
+        <View
+          style={{
+            width: 34,
+            height: 34,
+            borderRadius: 999,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: colors.surface,
+          }}
+        >
+          <Ionicons name={icon} size={18} color={accentColor} />
+        </View>
+
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text
+            style={{
+              fontSize: 11,
+              lineHeight: 14,
+              fontWeight: '700',
+              color: withOpacity(accentColor, 0.92),
+            }}
+          >
+            {label}
+          </Text>
+          <Text
+            style={{
+              marginTop: 3,
+              fontSize: 15,
+              lineHeight: 20,
+              fontWeight: '600',
+              color: colors.textPrimary,
+            }}
+            numberOfLines={expanded ? 2 : 1}
+          >
+            {summary}
+          </Text>
+        </View>
+
+        <View
+          style={{
+            alignItems: 'flex-end',
+            justifyContent: 'center',
+            gap: 4,
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 13,
+              lineHeight: 16,
+              fontWeight: '700',
+              color: colors.textPrimary,
+            }}
+          >
+            {meta}
+          </Text>
+          <Ionicons
+            name={expanded ? 'chevron-up' : 'chevron-down'}
+            size={16}
+            color={colors.textSecondary}
+          />
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
 interface GroupedTopicChapter {
   chapter: string;
   topics: CurriculumTopic[];
@@ -157,6 +283,10 @@ export default function BookScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const themeColors = useThemeColors();
+  const { activeProfile } = useProfile();
+  const activeProfileRole = useActiveProfileRole();
+  const proxyChildProfileId =
+    activeProfileRole === 'impersonated-child' ? activeProfile?.id : undefined;
   const { t } = useTranslation();
   const params = useLocalSearchParams<{
     subjectId: string;
@@ -224,6 +354,7 @@ export default function BookScreen() {
   // --- Note add flow state ---
   const [showTopicPicker, setShowTopicPicker] = useState(false);
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
+  const [notesExpanded, setNotesExpanded] = useState(false);
   const [showNoteInput, setShowNoteInput] = useState(false);
   const [showBookCompletionBurst, setShowBookCompletionBurst] = useState(false);
   const [isExpandingThinTopicList, setIsExpandingThinTopicList] =
@@ -395,6 +526,14 @@ export default function BookScreen() {
       ),
     [notes],
   );
+  const noteCount = notes.length;
+  const noteSummary = notesQuery.isLoading
+    ? 'Loading notes...'
+    : noteCount === 0
+      ? 'Add your first note for this book'
+      : noteCount === 1
+        ? '1 note saved for this book'
+        : `${noteCount} notes saved for this book`;
 
   // --- Sessions data ---
   const sessions = useMemo(
@@ -519,6 +658,40 @@ export default function BookScreen() {
     return map;
   }, [topics]);
 
+  const continueNowTopic = useMemo(() => {
+    if (!continueNowTopicId) {
+      return null;
+    }
+    return topicById.get(continueNowTopicId) ?? null;
+  }, [continueNowTopicId, topicById]);
+
+  const visibleStartedTopicIds = useMemo(
+    () => startedTopicIds.filter((topicId) => topicById.has(topicId)),
+    [startedTopicIds, topicById],
+  );
+
+  const isBookComplete = useMemo(
+    () =>
+      activeTopics.length > 0 &&
+      activeTopics.every((topic) => topicStudiedIds.has(topic.id)),
+    [activeTopics, topicStudiedIds],
+  );
+
+  const resumeTargetTopicId = useMemo((): string | null => {
+    const topicId = resumeTargetQuery.data?.topicId;
+    if (!topicId || !topicById.has(topicId)) {
+      return null;
+    }
+    return topicId;
+  }, [resumeTargetQuery.data?.topicId, topicById]);
+
+  const primaryContinueTopicId =
+    (continueNowTopic ? continueNowTopic.id : null) ?? resumeTargetTopicId;
+
+  const primaryContinueTopic = primaryContinueTopicId
+    ? (topicById.get(primaryContinueTopicId) ?? null)
+    : null;
+
   const doneTopics = useMemo((): CurriculumTopic[] => {
     const lastSessionByTopicId = new Map<string, string>();
     for (const session of sessions) {
@@ -553,19 +726,22 @@ export default function BookScreen() {
   // --- Chapter-first topic grouping ---
   // Groups ALL active topics by chapter, with each topic annotated by its state.
   const chapterSections = useMemo(() => {
-    const upNextId = upNextTopic?.id ?? null;
+    const continueId = primaryContinueTopicId;
+    const upNextId = continueId ? null : (upNextTopic?.id ?? null);
     const groups = groupTopicsByChapter(activeTopics);
     return groups.map((group) => {
       type TopicWithState = {
         topic: CurriculumTopic;
-        state: 'started' | 'up-next' | 'done' | 'later';
+        state: 'continue-now' | 'started' | 'up-next' | 'done' | 'later';
         sessionCount: number;
       };
       const items: TopicWithState[] = [];
       for (const topic of group.topics) {
         if (topic.skipped) continue;
         let state: TopicWithState['state'];
-        if (topic.id === upNextId) {
+        if (topic.id === continueId) {
+          state = 'continue-now';
+        } else if (topic.id === upNextId) {
           state = 'up-next';
         } else if (topicStudiedIds.has(topic.id)) {
           state = 'done';
@@ -580,8 +756,14 @@ export default function BookScreen() {
           sessionCount: sessionCountByTopicId.get(topic.id) ?? 0,
         });
       }
-      // Sort: up-next first, then started, then later, then done
-      const stateOrder = { 'up-next': 0, started: 1, later: 2, done: 3 };
+      // Sort by the same decision priority as the sticky CTA.
+      const stateOrder = {
+        'continue-now': 0,
+        started: 1,
+        'up-next': 2,
+        later: 3,
+        done: 4,
+      };
       items.sort(
         (a, b) =>
           stateOrder[a.state] - stateOrder[b.state] ||
@@ -591,19 +773,13 @@ export default function BookScreen() {
     });
   }, [
     activeTopics,
+    primaryContinueTopicId,
     upNextTopic,
     topicStudiedIds,
     inProgressTopicIds,
     sessionCountByTopicId,
   ]);
   const hasMultipleChapters = chapterSections.length > 1;
-
-  const isBookComplete = useMemo(
-    () =>
-      activeTopics.length > 0 &&
-      activeTopics.every((topic) => topicStudiedIds.has(topic.id)),
-    [activeTopics, topicStudiedIds],
-  );
 
   useEffect(() => {
     if (wasBookComplete.current === null) {
@@ -634,18 +810,6 @@ export default function BookScreen() {
     isReadOnly,
     shouldAutoExpandThinTopicList,
   ]);
-
-  const continueNowTopic = useMemo(() => {
-    if (!continueNowTopicId) {
-      return null;
-    }
-    return topicById.get(continueNowTopicId) ?? null;
-  }, [continueNowTopicId, topicById]);
-
-  const visibleStartedTopicIds = useMemo(
-    () => startedTopicIds.filter((topicId) => topicById.has(topicId)),
-    [startedTopicIds, topicById],
-  );
 
   useEffect(() => {
     if (continueNowTopicId && !continueNowTopic) {
@@ -718,30 +882,32 @@ export default function BookScreen() {
   // --- Session press: navigate to session summary/transcript ---
   const handleSessionPress = useCallback(
     (session: BookSession) => {
-      router.push({
-        pathname: '/session-summary/[sessionId]',
-        params: {
+      router.push(
+        buildSessionDetailHref({
           sessionId: session.id,
           subjectId,
-          ...(session.topicId ? { topicId: session.topicId } : {}),
-        },
-      } as Href);
+          bookId,
+          topicId: session.topicId,
+          childProfileId: proxyChildProfileId,
+        }),
+      );
     },
-    [router, subjectId],
+    [bookId, proxyChildProfileId, router, subjectId],
   );
 
   const handleNoteSourcePress = useCallback(
     (sessionId: string, topicId?: string | null) => {
-      router.push({
-        pathname: '/session-summary/[sessionId]',
-        params: {
+      router.push(
+        buildSessionDetailHref({
           sessionId,
           subjectId,
-          ...(topicId ? { topicId } : {}),
-        },
-      } as Href);
+          bookId,
+          topicId,
+          childProfileId: proxyChildProfileId,
+        }),
+      );
     },
-    [router, subjectId],
+    [bookId, proxyChildProfileId, router, subjectId],
   );
 
   // --- Long-press: context menu for moving topic to a different book ---
@@ -801,13 +967,17 @@ export default function BookScreen() {
 
   // --- Start learning: follow the status-first CTA priority ---
   const handleStartLearning = useCallback(() => {
-    if (resumeTargetQuery.data) {
+    if (
+      resumeTargetQuery.data &&
+      primaryContinueTopicId &&
+      resumeTargetQuery.data.topicId === primaryContinueTopicId
+    ) {
       pushLearningResumeTarget(router, resumeTargetQuery.data);
       return;
     }
 
-    if (continueNowTopicId) {
-      const topic = topicById.get(continueNowTopicId);
+    if (primaryContinueTopicId) {
+      const topic = topicById.get(primaryContinueTopicId);
       if (topic) {
         router.push({
           pathname: '/(app)/topic/[topicId]',
@@ -841,10 +1011,15 @@ export default function BookScreen() {
           pathname: '/(app)/topic/[topicId]',
           params: { topicId: topic.id, subjectId, bookId },
         } as Href);
+        return;
       }
     }
+
+    if (resumeTargetQuery.data) {
+      pushLearningResumeTarget(router, resumeTargetQuery.data);
+    }
   }, [
-    continueNowTopicId,
+    primaryContinueTopicId,
     topicById,
     upNextTopic,
     startedTopicIds,
@@ -987,6 +1162,12 @@ export default function BookScreen() {
     setEditingNote(null);
   }, []);
 
+  useEffect(() => {
+    if (showNoteInput || editingNote !== null) {
+      setNotesExpanded(true);
+    }
+  }, [editingNote, showNoteInput]);
+
   const handleNoteLongPress = useCallback(
     (noteId: string) => {
       const note = notes.find((n) => n.id === noteId);
@@ -1102,26 +1283,18 @@ export default function BookScreen() {
             </Text>
           </View>
 
-          {/* Notes section shimmer */}
+          {/* Notes section loading strip */}
           <View className="mb-4">
-            <Text className="mb-2 px-5 text-body-sm font-semibold text-text-secondary tracking-wide">
-              Your Notes
-            </Text>
-            <ShimmerSkeleton testID="book-notes-loading">
-              <View className="px-5">
-                {[0, 1].map((i) => (
-                  <View
-                    key={i}
-                    style={{
-                      height: 56,
-                      borderRadius: 8,
-                      marginBottom: 8,
-                      backgroundColor: themeColors.border,
-                    }}
-                  />
-                ))}
-              </View>
-            </ShimmerSkeleton>
+            <BookSectionStrip
+              testID="book-notes-strip-loading"
+              icon="create-outline"
+              label="Notes for this book"
+              summary="Loading notes..."
+              meta="..."
+              expanded={false}
+              accentColor={themeColors.accent}
+              onPress={() => undefined}
+            />
           </View>
 
           {/* Topics section shimmer */}
@@ -1366,62 +1539,82 @@ export default function BookScreen() {
 
         {/* YOUR NOTES section */}
         <View className="mb-4" testID="book-notes-section">
-          <Text className="mb-2 px-5 text-body-sm font-semibold text-text-secondary tracking-wide">
-            Your Notes
-          </Text>
-          {notesQuery.isLoading && !notesQuery.data ? (
-            <ShimmerSkeleton testID="book-notes-loading">
-              <View className="px-5">
-                {[0, 1].map((i) => (
-                  <View
-                    key={i}
-                    style={{
-                      height: 56,
-                      borderRadius: 8,
-                      marginBottom: 8,
-                      backgroundColor: themeColors.border,
-                    }}
-                  />
-                ))}
-              </View>
-            </ShimmerSkeleton>
-          ) : (
-            <>
-              {sortedNotes.map((note) => {
-                if (editingNote?.noteId === note.id) {
-                  return (
-                    <View key={note.id} className="px-5 mb-2">
-                      <NoteInput
-                        initialValue={editingNote.content}
-                        saving={updateNote.isPending}
-                        onSave={handleNoteEditSave}
-                        onCancel={handleNoteEditCancel}
+          <BookSectionStrip
+            testID="book-notes-strip"
+            icon="create-outline"
+            label="Notes for this book"
+            summary={noteSummary}
+            meta={notesQuery.isLoading ? '...' : String(noteCount)}
+            expanded={notesExpanded}
+            accentColor={themeColors.accent}
+            onPress={() => setNotesExpanded((current) => !current)}
+          />
+
+          {notesExpanded ? (
+            <View className="mt-3 mb-1">
+              {notesQuery.isLoading && !notesQuery.data ? (
+                <ShimmerSkeleton testID="book-notes-loading">
+                  <View className="px-5">
+                    {[0, 1].map((i) => (
+                      <View
+                        key={i}
+                        style={{
+                          height: 52,
+                          borderRadius: 8,
+                          marginBottom: 8,
+                          backgroundColor: themeColors.border,
+                        }}
                       />
-                    </View>
+                    ))}
+                  </View>
+                </ShimmerSkeleton>
+              ) : sortedNotes.length > 0 ? (
+                sortedNotes.map((note) => {
+                  if (editingNote?.noteId === note.id) {
+                    return (
+                      <View key={note.id} className="px-5 mb-2">
+                        <NoteInput
+                          initialValue={editingNote.content}
+                          saving={updateNote.isPending}
+                          onSave={handleNoteEditSave}
+                          onCancel={handleNoteEditCancel}
+                        />
+                      </View>
+                    );
+                  }
+                  const sourceSessionId = note.sessionId;
+                  return (
+                    <InlineNoteCard
+                      key={note.id}
+                      noteId={note.id}
+                      topicTitle={topicTitleMap.get(note.topicId) ?? 'Topic'}
+                      content={note.content}
+                      sourceLine={formatSourceLine(note)}
+                      updatedAt={note.updatedAt}
+                      onLongPress={handleNoteLongPress}
+                      onSourcePress={
+                        sourceSessionId
+                          ? () =>
+                              handleNoteSourcePress(
+                                sourceSessionId,
+                                note.topicId,
+                              )
+                          : undefined
+                      }
+                      testID={`note-${note.id}`}
+                    />
                   );
-                }
-                const sourceSessionId = note.sessionId;
-                return (
-                  <InlineNoteCard
-                    key={note.id}
-                    noteId={note.id}
-                    topicTitle={topicTitleMap.get(note.topicId) ?? 'Topic'}
-                    content={note.content}
-                    sourceLine={formatSourceLine(note)}
-                    updatedAt={note.updatedAt}
-                    onLongPress={handleNoteLongPress}
-                    onSourcePress={
-                      sourceSessionId
-                        ? () =>
-                            handleNoteSourcePress(sourceSessionId, note.topicId)
-                        : undefined
-                    }
-                    testID={`note-${note.id}`}
-                  />
-                );
-              })}
+                })
+              ) : (
+                <Text
+                  className="px-5 py-2 text-body-sm text-text-secondary"
+                  testID="book-notes-empty"
+                >
+                  No notes yet. Add one when something clicks.
+                </Text>
+              )}
               {showNoteInput && (
-                <View className="px-5 mb-2">
+                <View className="px-5 mb-2" testID="book-note-input-container">
                   <NoteInput
                     saving={createNote.isPending}
                     onSave={handleNoteSave}
@@ -1431,28 +1624,23 @@ export default function BookScreen() {
               )}
               <Pressable
                 onPress={handleNoteAddPress}
-                className="mx-5 mt-1 flex-row items-center py-2"
+                className="mx-5 mt-1 flex-row items-center py-3"
                 testID="book-add-note"
                 accessibilityRole="button"
                 accessibilityLabel={
                   sortedNotes.length === 0
-                    ? 'Add your first note'
+                    ? 'Add your first note for this book'
                     : 'Add a note'
                 }
               >
-                <Ionicons
-                  name="add-circle-outline"
-                  size={18}
-                  color={themeColors.primary}
-                />
-                <Text className="ms-1.5 text-body-sm font-semibold text-primary">
+                <Text className="text-body-sm font-medium text-primary">
                   {sortedNotes.length === 0
-                    ? '+ Add your first note'
+                    ? '+ Add your first note for this book'
                     : '+ Add a note'}
                 </Text>
               </Pressable>
-            </>
-          )}
+            </View>
+          ) : null}
         </View>
 
         {/* Error banners */}
@@ -1536,10 +1724,9 @@ export default function BookScreen() {
           </View>
         ) : null}
 
-        {/* [BUG-895] "Continue now" section removed — the sticky CTA at the
-            bottom of the screen already exposes the same action and now
-            includes the topic title (▶ Continue: {title}). Keeping both
-            duplicated the affordance and bloated decision time. */}
+        {/* The sticky CTA and the highlighted topic row share the same
+            status-first target, but rows remain overview links. The green CTA
+            is the only learning-chat entry point on this list. */}
 
         {/* Topics grouped by chapter, then state within chapter */}
         {chapterSections.length > 0 ? (
@@ -1561,12 +1748,12 @@ export default function BookScreen() {
                         : undefined
                     }
                     title={topic.title}
-                    sessionCount={state === 'started' ? count : undefined}
-                    onPress={
-                      state === 'up-next'
-                        ? () => handleTopicStart(topic.id, topic.title)
-                        : () => handleTopicPress(topic.id)
+                    sessionCount={
+                      state === 'continue-now' || state === 'started'
+                        ? count
+                        : undefined
                     }
+                    onPress={() => handleTopicPress(topic.id)}
                     testID={`${state}-row-${topic.id}`}
                   />
                 ))}
@@ -1774,7 +1961,7 @@ export default function BookScreen() {
       {/* Sticky CTA - adapts to learner state */}
       {activeTopics.length > 0 && !isReadOnly
         ? (() => {
-            const hasContinue = !!continueNowTopic;
+            const hasContinue = !!primaryContinueTopic;
             const hasUpNext = !!upNextTopic;
             const hasStarted = visibleStartedTopicIds.length > 0;
 
@@ -1789,11 +1976,8 @@ export default function BookScreen() {
             let label: string;
             if (hasContinue) {
               // [BUG-895] Surface the topic title in the sticky CTA so the
-              // user knows exactly which topic they're resuming. Previously
-              // this was a generic "Continue learning" alongside an in-list
-              // "Continue now" section that named the topic — which made the
-              // page show two affordances for the same action.
-              const continueTitle = continueNowTopic?.title ?? '';
+              // user knows exactly which highlighted row they're resuming.
+              const continueTitle = primaryContinueTopic?.title ?? '';
               const truncatedContinueTitle =
                 continueTitle.length > 25
                   ? `${continueTitle.slice(0, 24)}...`

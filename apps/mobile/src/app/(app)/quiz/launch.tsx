@@ -12,7 +12,12 @@ import {
 import { DeskLampAnimation } from '../../../components/common';
 import { ErrorFallback } from '../../../components/common/ErrorFallback';
 import { useGenerateRound } from '../../../hooks/use-quiz';
+import { homeHrefForReturnTo } from '../../../lib/navigation';
 import { useThemeColors } from '../../../lib/theme';
+import {
+  classifyApiError,
+  extractApiErrorCode,
+} from '../../../lib/format-api-error';
 import { useQuizFlow } from './_layout';
 
 // [BUG-UX-QUIZ-TIMEOUT] Hard UI-level timeout: if the mutation is still pending
@@ -63,26 +68,6 @@ function parseRouteActivityType(
   return result.success ? result.data : null;
 }
 
-function errorCodeFrom(error: unknown): string | undefined {
-  if (!error || typeof error !== 'object') return undefined;
-
-  const apiError = error as {
-    errorCode?: unknown;
-    code?: unknown;
-    apiCode?: unknown;
-    name?: unknown;
-  };
-
-  if (typeof apiError.errorCode === 'string') return apiError.errorCode;
-  if (typeof apiError.code === 'string') return apiError.code;
-  if (typeof apiError.apiCode === 'string') return apiError.apiCode;
-  if (apiError.name === 'ForbiddenError') return 'FORBIDDEN';
-  if (apiError.name === 'ConsentRequiredError') return 'CONSENT_REQUIRED';
-  if (apiError.name === 'QuotaExceededError') return 'QUOTA_EXCEEDED';
-
-  return undefined;
-}
-
 export default function QuizLaunchScreen(): React.ReactElement {
   const { t } = useTranslation();
   const router = useRouter();
@@ -113,11 +98,18 @@ export default function QuizLaunchScreen(): React.ReactElement {
   const routeSubjectId = firstRouteParam(routeSubjectIdParam);
   const routeLanguageName = firstRouteParam(routeLanguageNameParam);
   const routeReturnTo = firstRouteParam(routeReturnToParam);
-  const effectiveActivityType = activityType ?? routeActivityType;
-  const effectiveSubjectId = subjectId ?? routeSubjectId ?? null;
-  const effectiveReturnTo = returnTo ?? routeReturnTo ?? null;
-  const exitHref =
-    effectiveReturnTo === 'practice' ? '/(app)/practice' : '/(app)/quiz';
+  const effectiveActivityType = routeActivityType ?? activityType;
+  const effectiveSubjectId =
+    routeSubjectId !== null && routeSubjectId !== undefined
+      ? routeSubjectId
+      : (subjectId ?? null);
+  const effectiveReturnTo =
+    routeReturnTo !== null && routeReturnTo !== undefined
+      ? routeReturnTo
+      : (returnTo ?? null);
+  const exitHref = effectiveReturnTo
+    ? homeHrefForReturnTo(effectiveReturnTo)
+    : ('/(app)/quiz' as Href);
   const generateRound = useGenerateRound();
   const generateRoundMutate = generateRound.mutate;
   const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
@@ -179,8 +171,10 @@ export default function QuizLaunchScreen(): React.ReactElement {
   ]);
 
   useEffect(() => {
-    if (!activityType && routeActivityType) {
+    if (routeActivityType && activityType !== routeActivityType) {
       setActivityType(routeActivityType);
+    }
+    if (routeActivityType) {
       setSubjectId(routeSubjectId);
       setLanguageName(routeLanguageName);
       setReturnTo(routeReturnTo);
@@ -327,19 +321,23 @@ export default function QuizLaunchScreen(): React.ReactElement {
   }
 
   if (generateRound.isError) {
-    // [ASSUMP-F3] [IMP-2] Hide the Retry button when retrying can't possibly
-    // help (quota exhausted, consent required). Classify on the typed error
-    // code from assertOk's ApiResponseError — never string-match on the
-    // formatted message, which can drift without test coverage.
-    const errorCode = errorCodeFrom(generateRound.error);
-    const isUnretryable =
-      errorCode === 'QUOTA_EXCEEDED' ||
-      errorCode === 'FORBIDDEN' ||
-      (errorCode != null && errorCode.startsWith('CONSENT_'));
+    // [CCR PR #282] [ASSUMP-F3] [IMP-2] Per the UX Resilience rule in CLAUDE.md,
+    // classification happens at the API-client boundary (lib/format-api-error)
+    // — NEVER inline in a screen. `classifyApiError` returns a structured
+    // recovery hint; we hide Retry whenever recovery is not 'retry' (quota /
+    // forbidden / consent-required all classify to non-retry). The code is
+    // extracted via the same boundary helper so quiz-specific copy
+    // (UPSTREAM_ERROR / TIMEOUT / RATE_LIMITED / VALIDATION_ERROR) still
+    // routes through friendlyErrorMessage.
+    const classified = classifyApiError(generateRound.error);
+    const errorCode = extractApiErrorCode(generateRound.error);
+    const isUnretryable = classified.recovery !== 'retry';
 
     // [F-Q-01] Route through friendlyErrorMessage so the panel never renders
-    // raw JSON envelopes or verbose API payloads. errorCode is classified first
-    // (before formatting) to avoid string-matching on formatted output.
+    // raw JSON envelopes or verbose API payloads. Prefer the classified
+    // (kid-friendly) message over the raw error.message so technical strings
+    // never leak — friendlyErrorMessage still gets first pass for quiz-specific
+    // copy keyed off the typed code.
     const rawMessage =
       generateRound.error instanceof Error && generateRound.error.message
         ? generateRound.error.message

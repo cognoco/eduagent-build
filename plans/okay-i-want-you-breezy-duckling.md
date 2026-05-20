@@ -29,11 +29,11 @@ Inputs available to this audit:
 ```bash
 # Read token retrieval (ZAF Global / prod / /observability)
 export LOGFIRE_READ_TOKEN=$(infisical secrets get LOGFIRE_READ_TOKEN \
-    --projectId 9ec75f86-d604-4cfa-902c-57cb1e372adc \
+    --projectId <INFISICAL_PROJECT_ID> \
     --env prod --path /observability --plain 2>/dev/null)
 
 # Base URL
-export LOGFIRE_BASE_URL=https://logfire-eu.pydantic.dev
+export LOGFIRE_BASE_URL=<LOGFIRE_PROD_URL>
 
 # Query pattern (MUST be GET with --data-urlencode, not POST)
 curl -s -G "$LOGFIRE_BASE_URL/v1/query" \

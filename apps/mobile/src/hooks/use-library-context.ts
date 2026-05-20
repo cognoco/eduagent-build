@@ -21,6 +21,7 @@ import { useApiClient } from '../lib/api-client';
 import { useProfile } from '../lib/profile';
 import { combinedSignal } from '../lib/query-timeout';
 import { assertOk } from '../lib/assert-ok';
+import { queryKeys } from '../lib/query-keys';
 import { deriveRetentionStatus, RETENTION_ORDER } from '../lib/retention-utils';
 import type { RetentionStatus } from '@eduagent/schemas';
 
@@ -66,15 +67,16 @@ export interface LibraryRetentionResponse {
  *
  * Encapsulates the `/library/retention` aggregate call. This is the single
  * place in the mobile codebase that fetches library retention data. The query
- * key is `['library', 'retention', activeProfile?.id]` — the same key used by
- * `setLibraryRetention` in tests.
+ * key comes from the typed registry: `queryKeys.library.retention(profileId)`
+ * (= `['library', 'retention', profileId]`) — the same shape used by
+ * `setLibraryRetention` in tests. Promoted to the registry per CCR PR #251.
  */
 export function useLibraryRetention(): UseQueryResult<LibraryRetentionResponse> {
   const apiClient = useApiClient();
   const { activeProfile } = useProfile();
 
   return useQuery<LibraryRetentionResponse>({
-    queryKey: ['library', 'retention', activeProfile?.id],
+    queryKey: queryKeys.library.retention(activeProfile?.id),
     queryFn: async ({ signal: querySignal }: { signal?: AbortSignal }) => {
       const { signal, cleanup } = combinedSignal(querySignal);
       try {

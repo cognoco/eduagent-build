@@ -14,6 +14,7 @@
 #   - apps/mobile/src/app/(auth)/sign-in.tsx (google-sso-button, openai-sso-button, sign-in-email, sign-in-password, sign-in-button)
 appId: com.mentomate.app
 tags:
+  - pr-blocking
   - nightly
   - auth
 ---

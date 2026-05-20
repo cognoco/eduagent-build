@@ -19,7 +19,6 @@
 | Target language | — |
 | Struggles | long division (math); Austria vs Australia (geography) |
 | Strengths | dinosaur classification (science); reading comprehension (reading) |
-| Learning mode | casual |
 | Preferred explanations | humor, examples, stories |
 | Pace | quick |
 | Analogy domain | nature |
@@ -29,7 +28,7 @@
 ```json
 {
   "scenarioId": "S8-casual-freeform",
-  "scenarioPurpose": "Freeform / casual-mode branch (no topic, casual tone)",
+  "scenarioPurpose": "Freeform / casual branch (no topic)",
   "context": {
     "sessionId": "eval-12yo-dinosaurs",
     "profileId": "eval-profile-12yo-dinosaurs",
@@ -50,10 +49,8 @@
     "teachingPreference": "humor",
     "analogyDomain": "nature",
     "nativeLanguage": "en",
-    "learningMode": "casual",
     "exchangeCount": 1,
     "isFirstEncounter": false,
-    "isFirstSessionOfSubject": false,
     "extractedSignalsToReflect": null,
     "inputMode": "text",
     "llmTier": "standard",
@@ -244,7 +241,7 @@ Can we just chat for a bit? Nothing heavy.
 
 ## Builder notes
 
-- Scenario: S8-casual-freeform — Freeform / casual-mode branch (no topic, casual tone)
+- Scenario: S8-casual-freeform — Freeform / casual branch (no topic)
 - Rung: 1, sessionType: learning, verification: standard
 - History turns: 1, exchangeCount: 1
 - Synthesized contexts: learnerMemoryContext (real buildMemoryBlock), embeddingMemoryContext (derived), priorLearningContext (derived), crossSubjectContext (derived)

@@ -1,5 +1,6 @@
-import type { DictationMode } from '@eduagent/schemas';
-import { createScopedRepository } from '@eduagent/database';
+import { eq } from 'drizzle-orm';
+import { SubjectNotFoundError, type DictationMode } from '@eduagent/schemas';
+import { createScopedRepository, subjects } from '@eduagent/database';
 import type { Database } from '@eduagent/database';
 import { recordPracticeActivityEvent } from '../practice-activity-events';
 import { safeWrite } from '../safe-non-core';
@@ -26,6 +27,22 @@ export async function recordDictationResult(
   profileId: string,
   input: RecordResultInput,
 ) {
+  // [SECURITY] Verify the caller owns the subject BEFORE writing anything.
+  // `input.subjectId` is client-supplied; without this check an attacker
+  // could plant `dictation_results` AND `practice_activity_events` rows
+  // tagged with another profile's subject (write-side IDOR). The check uses
+  // the scoped repository so `subjects.profile_id = $profileId` is enforced
+  // at the repo layer, matching the vocabulary path's pattern.
+  if (input.subjectId != null) {
+    const ownershipRepo = createScopedRepository(db, profileId);
+    const subject = await ownershipRepo.subjects.findFirst(
+      eq(subjects.id, input.subjectId),
+    );
+    if (!subject) {
+      throw new SubjectNotFoundError();
+    }
+  }
+
   const completedAt = new Date();
   const row = await db.transaction(async (tx) => {
     const txDb = tx as unknown as Database;

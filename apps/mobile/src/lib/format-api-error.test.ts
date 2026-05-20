@@ -1,11 +1,13 @@
 import {
   classifyApiError,
+  extractApiErrorCode,
   formatApiError,
   recoveryActions,
   type FormattedApiError,
 } from './format-api-error';
 import {
   BadRequestError,
+  ConsentRequiredError,
   ForbiddenError,
   NetworkError,
   NotFoundError,
@@ -315,6 +317,46 @@ describe('classifyApiError', () => {
     expect(result.recovery).not.toBe('sign-out');
   });
 
+  // [CCR PR #282] ConsentRequiredError — gated user actions cannot be
+  // retried by tapping a button; the parent must complete the consent
+  // flow off-screen first. Recovery is go-back, NOT retry.
+  it('classifies ConsentRequiredError as auth / go-back', () => {
+    const err = new ConsentRequiredError(
+      'Parent consent is required before launching this quiz.',
+      'CONSENT_REQUIRED',
+    );
+    const result = classifyApiError(err);
+    expect(result.category).toBe('auth');
+    expect(result.recovery).toBe('go-back');
+    expect(result.blocksManualEntry).toBe(true);
+    expect(result.message).toBe(
+      'Parent consent is required before launching this quiz.',
+    );
+  });
+
+  it('[BUG-947] classifies ConsentRequiredError-shaped error when instanceof fails (HMR)', () => {
+    const err = Object.assign(new Error('Parent consent is required.'), {
+      name: 'ConsentRequiredError',
+      errorCode: 'CONSENT_REQUIRED',
+    });
+    const result = classifyApiError(err);
+    expect(result.category).toBe('auth');
+    expect(result.recovery).toBe('go-back');
+  });
+
+  // [CCR PR #282] Anti-spoofing — a plain Error with only `name` forged but
+  // none of the required shape properties must NOT be classified as a typed
+  // ConsentRequiredError (or quota / forbidden). Falls through to the
+  // unknown/retry default. Mirrors the existing spoofing guards above.
+  it('does NOT classify a spoofed error.name="ConsentRequiredError" as auth / go-back', () => {
+    const err = new Error('attacker-supplied message');
+    err.name = 'ConsentRequiredError';
+    // No errorCode property — fails the shape guard.
+    const result = classifyApiError(err);
+    expect(result.category).not.toBe('auth');
+    expect(result.recovery).not.toBe('go-back');
+  });
+
   // --- Error codes on the error object ---
 
   it('classifies EXCHANGE_LIMIT_EXCEEDED code as quota / go-back', () => {
@@ -381,6 +423,66 @@ describe('classifyApiError', () => {
     expect(result.message).toBe(
       'That reply took too long. Tap reconnect to try again.',
     );
+  });
+});
+
+// [CCR PR #282] extractApiErrorCode — centralized boundary helper so screens
+// don't inline `error.name === '...'` switches. Mirrors the anti-spoofing
+// posture of classifyApiError.
+describe('extractApiErrorCode', () => {
+  it('extracts errorCode from a real ForbiddenError', () => {
+    const err = new ForbiddenError('No permission');
+    expect(extractApiErrorCode(err)).toBe('FORBIDDEN');
+  });
+
+  it('extracts code from a real QuotaExceededError', () => {
+    const err = new QuotaExceededError('Quota reached', QUOTA_DETAILS);
+    expect(extractApiErrorCode(err)).toBe('QUOTA_EXCEEDED');
+  });
+
+  it('extracts errorCode from a real ConsentRequiredError', () => {
+    const err = new ConsentRequiredError(
+      'Consent required',
+      'CONSENT_REQUIRED',
+    );
+    expect(extractApiErrorCode(err)).toBe('CONSENT_REQUIRED');
+  });
+
+  it('returns apiCode when present on a typed error (e.g. SUBJECT_INACTIVE)', () => {
+    const err = new ForbiddenError('Subject paused', 'SUBJECT_INACTIVE');
+    expect(extractApiErrorCode(err)).toBe('SUBJECT_INACTIVE');
+  });
+
+  it('returns code from plain Error with code property', () => {
+    const err = Object.assign(new Error('limit'), {
+      code: 'EXCHANGE_LIMIT_EXCEEDED',
+    });
+    expect(extractApiErrorCode(err)).toBe('EXCHANGE_LIMIT_EXCEEDED');
+  });
+
+  it('returns undefined for null / undefined / primitives', () => {
+    expect(extractApiErrorCode(null)).toBeUndefined();
+    expect(extractApiErrorCode(undefined)).toBeUndefined();
+    expect(extractApiErrorCode('string')).toBeUndefined();
+    expect(extractApiErrorCode(42)).toBeUndefined();
+  });
+
+  it('does NOT return FORBIDDEN for a spoofed name without errorCode shape', () => {
+    const err = new Error('attacker-supplied');
+    err.name = 'ForbiddenError';
+    expect(extractApiErrorCode(err)).toBeUndefined();
+  });
+
+  it('does NOT return CONSENT_REQUIRED for a spoofed name without errorCode shape', () => {
+    const err = new Error('attacker-supplied');
+    err.name = 'ConsentRequiredError';
+    expect(extractApiErrorCode(err)).toBeUndefined();
+  });
+
+  it('does NOT return QUOTA_EXCEEDED for a spoofed name without details shape', () => {
+    const err = new Error('attacker-supplied');
+    err.name = 'QuotaExceededError';
+    expect(extractApiErrorCode(err)).toBeUndefined();
   });
 });
 

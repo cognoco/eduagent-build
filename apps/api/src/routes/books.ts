@@ -23,7 +23,8 @@ import {
   persistBookTopics,
   claimBookForGeneration,
   moveTopicToBook,
-  prepareTopicExpansion,
+  expandExistingBookTopics,
+  generateBookTopicsWithFallback,
 } from '../services/curriculum';
 import { getBookSessions } from '../services/session';
 import { generateBookTopics } from '../services/book-generation';
@@ -138,57 +139,14 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
               MIN_GENERATED_BOOK_TOPICS
           ) {
             const learnerAge = await getProfileAge(db, profileId);
-            const existingTopicTitles = existing.topics
-              .filter((topic) => !topic.skipped)
-              .map((topic) => topic.title)
-              .join(', ');
-            const expansionContext = [
-              priorKnowledge,
-              existingTopicTitles
-                ? `Existing starter topics in this book: ${existingTopicTitles}`
-                : null,
-            ]
-              .filter((value): value is string => !!value?.trim())
-              .join('\n');
-            let generated: BookTopicGenerationResult;
-            try {
-              generated = await generateBookTopics(
-                existing.book.title,
-                existing.book.description ?? '',
-                learnerAge,
-                expansionContext || undefined,
-              );
-            } catch (error) {
-              captureException(error, {
-                profileId,
-                extra: {
-                  phase: 'book_topic_expansion_fallback',
-                  subjectId,
-                  bookId,
-                  bookTitle: existing.book.title,
-                },
-              });
-              generated = buildFallbackBookTopics(
-                existing.book.title,
-                existing.book.description ?? '',
-              );
-            }
-
-            const expansion = prepareTopicExpansion(
-              generated,
-              existing.topics,
-              existing.book.title,
-              existing.book.description,
-            );
-
-            const expanded = await persistBookTopics(
+            const expanded = await expandExistingBookTopics(
               db,
               profileId,
               subjectId,
               bookId,
-              expansion.topics,
-              expansion.connections,
-              { appendToExisting: true },
+              existing,
+              priorKnowledge,
+              { learnerAge, generateBookTopics, captureException },
             );
             return c.json(bookWithTopicsSchema.parse(expanded));
           }
@@ -197,29 +155,27 @@ export const bookRoutes = new Hono<BooksRouteEnv>()
 
         const learnerAge = await getProfileAge(db, profileId);
 
-        let generated: BookTopicGenerationResult;
-        try {
-          generated = await generateBookTopics(
+        const generated: BookTopicGenerationResult =
+          await generateBookTopicsWithFallback(
             claimed.title,
             claimed.description ?? '',
             learnerAge,
             priorKnowledge,
-          );
-        } catch (error) {
-          captureException(error, {
-            profileId,
-            extra: {
-              phase: 'book_topic_generation_fallback',
-              subjectId,
-              bookId,
-              bookTitle: claimed.title,
+            {
+              generateBookTopics,
+              captureException,
+              buildFallbackBookTopics,
+              sentryContext: {
+                profileId,
+                extra: {
+                  phase: 'book_topic_generation_fallback',
+                  subjectId,
+                  bookId,
+                  bookTitle: claimed.title,
+                },
+              },
             },
-          });
-          generated = buildFallbackBookTopics(
-            claimed.title,
-            claimed.description ?? '',
           );
-        }
 
         const persisted = await persistBookTopics(
           db,

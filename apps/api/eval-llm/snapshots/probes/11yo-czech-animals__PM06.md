@@ -19,7 +19,6 @@
 | Target language | — |
 | Struggles | fraction addition (math); long multi-clause sentences (reading) |
 | Strengths | vocabulary retention (Czech) |
-| Learning mode | casual |
 | Preferred explanations | stories, examples |
 | Pace | thorough |
 | Analogy domain | nature |
@@ -47,7 +46,6 @@
     "teachingPreference": "stories",
     "analogyDomain": "nature",
     "nativeLanguage": "cs",
-    "learningMode": "casual",
     "exchangeCount": 0,
     "inputMode": "text",
     "llmTier": "standard",
@@ -267,7 +265,7 @@ Is my answer right? Please do not make it too long.
 - Probe: PM06 [standard] — Personalization matrix: age 11, autism-style support, homework check without overloading
 - Rung: 2, sessionType: homework, verification: standard
 - History turns: 0, exchangeCount: 0
-- inputMode: text, learningMode: casual
+- inputMode: text
 - topicTitle: Czech reading comprehension
 - sourceEvidence: learner_message:context, learner_intent:context, current_topic:reliable, homework_problem:reliable, deterministic_reasoning:reliable, prior_learning:context, mentor_memory:context, accommodation:context
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs

@@ -1,4 +1,12 @@
-import { pgTable, uuid, timestamp, integer, unique } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
+import {
+  pgTable,
+  uuid,
+  timestamp,
+  integer,
+  unique,
+  check,
+} from 'drizzle-orm/pg-core';
 import { profiles } from './profiles';
 import { curriculumTopics } from './subjects';
 import { generateUUIDv7 } from '../utils/uuid';
@@ -49,5 +57,9 @@ export const challengeRoundCooldowns = pgTable(
       table.profileId,
       table.topicId,
     ),
+    check(
+      'challenge_round_cooldowns_last_outcome_range',
+      sql`${table.lastOutcome} IS NULL OR (${table.lastOutcome} >= 0 AND ${table.lastOutcome} <= 3)`,
+    ),
   ],
-);
+).enableRLS();

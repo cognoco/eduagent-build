@@ -118,6 +118,9 @@
       "emptySubjectsTitle": "Your subjects will show up here",
       "emptySubjectsMessage": "Start one now, or just use homework help when you need it.",
       "addSubject": "Add a subject",
+      "proxySessionSummariesTitle": "Session recaps are in your parent view",
+      "proxySessionSummariesBody": "{{name}}'s notes stay private, but you can see parent-safe session summaries from their profile.",
+      "proxySessionSummariesCta": "View {{name}}'s session summaries",
       "momentum": {
         "topicLearned": "{{n}} topic learned",
         "topicsLearned": "{{n}} topics learned"
@@ -275,24 +278,6 @@
   "more": {
     "screenTitle": "More",
     "active": "Active",
-    "learningMode": {
-      "sectionHeader": "{{name}}'s Learning Mode",
-      "subtitle": "Applies to your own learning sessions.",
-      "subtitleWithChildren": "Applies to your own sessions. To change a child's, open their profile from the dashboard.",
-      "childPreferencesAccessLabel": "Open {{name}}'s profile preferences",
-      "childPreferencesLink": "To change {{name}}'s preferences, tap their profile on Home →",
-      "familyPreferencesLink": "To change a child's preferences, tap their profile on Home →",
-      "sheetTitle": "Learning mode",
-      "sheetEffectMessage": "Takes effect from your next message.",
-      "casual": {
-        "title": "Explorer",
-        "description": "Learn at your own pace. Your mentor is relaxed and encouraging. You earn points right away and can skip recaps."
-      },
-      "serious": {
-        "title": "Challenge mode",
-        "description": "Push yourself further. Your mentor keeps you on track. You earn points after proving you remember, and recaps help lock it in."
-      }
-    },
     "accommodation": {
       "sectionHeader": "Your learning accommodation",
       "viewAndManage": "View & manage",
@@ -305,6 +290,10 @@
       "sectionHeader": "Your learning",
       "rowLabel": "Preferences",
       "screenTitle": "Your learning preferences"
+    },
+    "proxyPreview": {
+      "title": "Settings are paused in parent preview",
+      "description": "Switch back to your account to change settings. While viewing as a child, this area stays locked."
     },
     "mentorMemory": {
       "sectionHeader": "Mentor memory",
@@ -1567,8 +1556,8 @@
       "subtitle_other": "Complete {{count}} more sessions to see your full learning journey!"
     },
     "empty": {
-      "title": "Start your first session",
-      "subtitle": "Start your first session to see your progress here",
+      "title": "Progress appears after the first study session",
+      "subtitle": "Sessions, mastery, reviews, and reports will appear here once there is something to measure.",
       "withSubjectTitle": "Progress unlocks after you study {{subject}}",
       "withSubjectSubtitle": "Study a topic in {{subject}} first. Sessions, mastery, and reviews will appear here once there is something to measure."
     },
@@ -1958,7 +1947,8 @@
       "consentStatusError": "Could not load consent status. Please try again.",
       "deletionPending": "Deletion scheduled",
       "deletionCountdown": "Account will be deleted on {{date}}",
-      "deletionGraceDays": "{{count}} days left to cancel deletion.",
+      "deletionGraceDays_one": "1 day left to cancel deletion.",
+      "deletionGraceDays_other": "{{count}} days left to cancel deletion.",
       "deletionGraceFallback": "Deletion is scheduled. Try cancelling now if this was a mistake.",
       "deletionProcessing": "Deletion in progress",
       "cancelDeletion": "Cancel deletion",
@@ -2230,6 +2220,7 @@
       "errorMessage": "Please try again"
     },
     "proxyBanner": {
+      "parentPreview": "Parent preview",
       "viewing": "Viewing as {{name}}",
       "switchBackLabel": "Switch back to your account",
       "switchBack": "Switch back"
@@ -2304,6 +2295,8 @@
     },
     "home": "Home",
     "homeLabel": "Home",
+    "familyHub": "Family Hub",
+    "familyHubLabel": "Family Hub",
     "myLearning": "My Learning",
     "myLearningLabel": "My Learning",
     "family": "Family",

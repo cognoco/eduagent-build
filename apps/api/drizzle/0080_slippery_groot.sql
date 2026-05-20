@@ -6,6 +6,7 @@ CREATE TABLE "challenge_round_cooldowns" (
 	"last_outcome" integer,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "challenge_round_cooldowns_last_outcome_range" CHECK ("last_outcome" IS NULL OR ("last_outcome" >= 0 AND "last_outcome" <= 3)),
 	CONSTRAINT "challenge_round_cooldowns_profile_topic_unique" UNIQUE("profile_id","topic_id")
 );
 --> statement-breakpoint

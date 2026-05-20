@@ -216,6 +216,156 @@ describe('ReportsList — showNewBadge', () => {
 
     expect(screen.queryByText('New')).toBeNull();
   });
+
+  it('can suppress row badges when the latest report is highlighted elsewhere', () => {
+    render(
+      <ReportsList
+        monthlyReports={[]}
+        weeklyReports={[weeklyReport as never]}
+        onPressMonthly={jest.fn()}
+        onPressWeekly={jest.fn()}
+        showNewBadge
+        newReportId={null}
+      />,
+    );
+
+    expect(screen.queryByText('New')).toBeNull();
+  });
+
+  it('can restrict the "New" badge to one report row', () => {
+    const weeklyReport2 = {
+      ...weeklyReport,
+      id: 'weekly-2',
+      reportWeek: '2026-05-11',
+    };
+
+    render(
+      <ReportsList
+        monthlyReports={[]}
+        weeklyReports={[weeklyReport as never, weeklyReport2 as never]}
+        onPressMonthly={jest.fn()}
+        onPressWeekly={jest.fn()}
+        showNewBadge
+        newReportId="weekly-2"
+      />,
+    );
+
+    expect(screen.getAllByText('New')).toHaveLength(1);
+    screen.getByTestId('weekly-report-card-weekly-2');
+  });
+});
+
+describe('ReportsList — mixed YYYY-MM and YYYY-MM-DD sort (B34)', () => {
+  // Bug 34: lexicographic sort across mixed monthly (YYYY-MM) and weekly
+  // (YYYY-MM-DD) formats is wrong because '2026-04' < '2026-04-01' in plain
+  // string compare, even though they refer to the same calendar day.
+  //
+  // Expected (CORRECT) descending order after normalization (YYYY-MM → YYYY-MM-01):
+  //   weekly  2026-04-15  → '2026-04-15'
+  //   weekly  2026-04-01  → '2026-04-01'
+  //   monthly 2026-04     → '2026-04-01'  (ties with weekly 2026-04-01)
+  //   weekly  2026-03-31  → '2026-03-31'
+  //
+  // OLD (BROKEN) order — what the previous localeCompare produced:
+  //   weekly  2026-04-15  > '2026-04'  → fine
+  //   weekly  2026-04-01  > '2026-04'  → monthly sinks below the day-1 weekly (wrong-ish for a tie)
+  //   monthly 2026-04     > '2026-03-31' → fine
+  //   BUT '2026-04' < '2026-04-01' would have placed monthly AFTER all April weeklies,
+  //   which is the lexicographic bug this fix addresses.
+  it('sorts a mix of YYYY-MM and YYYY-MM-DD correctly (normalized compare)', () => {
+    const wkLate = {
+      ...weeklyReport,
+      id: 'wk-late',
+      reportWeek: '2026-04-15',
+    };
+    const wkEarly = {
+      ...weeklyReport,
+      id: 'wk-early',
+      reportWeek: '2026-04-01',
+    };
+    const wkMarch = {
+      ...weeklyReport,
+      id: 'wk-march',
+      reportWeek: '2026-03-31',
+    };
+    const monthApril = {
+      ...monthlyReport,
+      id: 'm-april',
+      reportMonth: '2026-04',
+    };
+
+    render(
+      <ReportsList
+        monthlyReports={[monthApril as never]}
+        weeklyReports={[wkLate as never, wkEarly as never, wkMarch as never]}
+        onPressMonthly={jest.fn()}
+        onPressWeekly={jest.fn()}
+      />,
+    );
+
+    const rows = screen.getAllByRole('button');
+    expect(rows).toHaveLength(4);
+
+    // Assert correct (normalized) descending order:
+    // 2026-04-15 must be first, 2026-03-31 must be last.
+    // The monthly 'm-april' (normalized to 2026-04-01) must appear AFTER
+    // 2026-04-15 and BEFORE 2026-03-31 — i.e., not sunk to the bottom by
+    // the old lexicographic bug.
+    expect(rows[0]).toHaveProp('testID', 'weekly-report-card-wk-late');
+    expect(rows[rows.length - 1]).toHaveProp(
+      'testID',
+      'weekly-report-card-wk-march',
+    );
+
+    const orderedIds = rows.map((r) => r.props.testID as string);
+    const aprilMonthlyIdx = orderedIds.indexOf('report-card-m-april');
+    const earlyAprilWeeklyIdx = orderedIds.indexOf(
+      'weekly-report-card-wk-early',
+    );
+    const marchWeeklyIdx = orderedIds.indexOf('weekly-report-card-wk-march');
+
+    // April monthly must NOT be the final row — the lexicographic bug
+    // ('2026-04' < '2026-04-01') would have placed it after all April
+    // weeklies, sinking toward 2026-03-31. After fix it sits in the
+    // April cluster, ABOVE the March weekly.
+    expect(aprilMonthlyIdx).toBeLessThan(marchWeeklyIdx);
+
+    // April monthly and April-01 weekly tie under normalization
+    // (both → 2026-04-01); both must appear ABOVE the March weekly.
+    expect(earlyAprilWeeklyIdx).toBeLessThan(marchWeeklyIdx);
+    expect(aprilMonthlyIdx).toBeLessThan(marchWeeklyIdx);
+  });
+
+  it("places a YYYY-MM monthly report ABOVE the previous month's last day", () => {
+    // Direct regression for the exact CCR example:
+    //   '2026-04' (monthly) should sort ABOVE '2026-03-31' (weekly).
+    // Old behavior: '2026-04' > '2026-03-31' lexicographically — by
+    // accident this case was correct. Kept as a regression guard so
+    // future "simplifications" don't regress it.
+    const monthApril = {
+      ...monthlyReport,
+      id: 'm-april-only',
+      reportMonth: '2026-04',
+    };
+    const wkMarch31 = {
+      ...weeklyReport,
+      id: 'wk-mar31',
+      reportWeek: '2026-03-31',
+    };
+
+    render(
+      <ReportsList
+        monthlyReports={[monthApril as never]}
+        weeklyReports={[wkMarch31 as never]}
+        onPressMonthly={jest.fn()}
+        onPressWeekly={jest.fn()}
+      />,
+    );
+
+    const rows = screen.getAllByRole('button');
+    expect(rows[0]).toHaveProp('testID', 'report-card-m-april-only');
+    expect(rows[1]).toHaveProp('testID', 'weekly-report-card-wk-mar31');
+  });
 });
 
 describe('ReportsList — custom testID', () => {

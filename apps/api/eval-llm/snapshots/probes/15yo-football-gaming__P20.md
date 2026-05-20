@@ -19,7 +19,6 @@
 | Target language | — |
 | Struggles | factoring polynomials (math); Reconstruction era (history) |
 | Strengths | mental arithmetic (math); Newton's laws (physics) |
-| Learning mode | casual |
 | Preferred explanations | examples, analogies |
 | Pace | quick |
 | Analogy domain | sports |
@@ -51,7 +50,6 @@
     "teachingPreference": "examples",
     "analogyDomain": "sports",
     "nativeLanguage": "en",
-    "learningMode": "casual",
     "exchangeCount": 1,
     "inputMode": "text",
     "llmTier": "standard",
@@ -250,7 +248,7 @@ Can we just talk about football for a bit?
 - Probe: P20 [standard] — 15yo freeform casual chat — no topic, just hanging out
 - Rung: 1, sessionType: learning, verification: standard
 - History turns: 1, exchangeCount: 1
-- inputMode: text, learningMode: casual
-- topicTitle: (none — casual mode)
+- inputMode: text
+- topicTitle: (none — freeform)
 - sourceEvidence: learner_message:context, conversation_history:context, prior_learning:context, mentor_memory:context, accommodation:context
 - expectedResponseSchema: llmResponseEnvelopeSchema — validates envelope shape on --live runs

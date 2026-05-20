@@ -1054,7 +1054,6 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
           result.sessionId,
           {
             summaryStatus: result.summaryStatus,
-            summaryTrackingHandled: result.summaryStatus === 'skipped',
           },
         );
         pipelineQueued = dispatch.pipelineQueued;
@@ -1192,7 +1191,6 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
         c.req.param('sessionId'),
         {
           summaryStatus: result.summary.status,
-          summaryTrackingHandled: true,
         },
       );
       pipelineQueued = dispatch.pipelineQueued;
@@ -1238,7 +1236,6 @@ export const sessionRoutes = new Hono<SessionRouteEnv>()
             qualityRating: qualityRatingFromSummaryStatus(
               result.summary.status,
             ),
-            summaryTrackingHandled: true,
           },
         );
         pipelineQueued = dispatch.pipelineQueued;
@@ -1326,7 +1323,6 @@ async function dispatchSessionCompletedEvent(
       | 'skipped'
       | 'auto_closed';
     qualityRating?: number;
-    summaryTrackingHandled?: boolean;
   },
 ): Promise<{ pipelineQueued: boolean }> {
   const completion = await getSessionCompletionContext(
@@ -1353,9 +1349,6 @@ async function dispatchSessionCompletedEvent(
         summaryStatus: options.summaryStatus,
         ...(options.qualityRating != null
           ? { qualityRating: options.qualityRating }
-          : {}),
-        ...(options.summaryTrackingHandled
-          ? { summaryTrackingHandled: true }
           : {}),
         timestamp: new Date().toISOString(),
       },

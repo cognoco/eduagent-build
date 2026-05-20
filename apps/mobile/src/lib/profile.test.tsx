@@ -273,46 +273,64 @@ describe('ProfileProvider', () => {
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
     });
-    queryClient.setQueryData(
-      ['subjects', 'owner-id'],
-      [{ id: 's1', name: 'Math' }],
-    );
-    queryClient.setQueryData(['progress', 'overview', 'owner-id'], {
-      subjects: [],
-    });
-    queryClient.setQueryData(['dashboard'], { children: [] });
-    queryClient.setQueryData(
-      ['books', 'subject-1', 'owner-id'],
-      [{ id: 'book-1' }],
-    );
-    queryClient.setQueryData(['book', 'subject-1', 'book-1', 'owner-id'], {
-      id: 'book-1',
-    });
-    queryClient.setQueryData(
-      ['book-suggestions', 'subject-1'],
-      [{ id: 'suggestion-1' }],
-    );
-    expect(queryClient.getQueryData(['subjects', 'owner-id'])).toBeTruthy();
-    expect(
-      queryClient.getQueryData(['progress', 'overview', 'owner-id']),
-    ).toBeTruthy();
+    const profileScopedQueries: Array<{
+      key: unknown[];
+      value: unknown;
+    }> = [
+      { key: ['subjects', 'owner-id'], value: [{ id: 's1', name: 'Math' }] },
+      { key: ['progress', 'overview', 'owner-id'], value: { subjects: [] } },
+      { key: ['dashboard'], value: { children: [] } },
+      { key: ['books', 'subject-1', 'owner-id'], value: [{ id: 'book-1' }] },
+      {
+        key: ['book', 'subject-1', 'book-1', 'owner-id'],
+        value: { id: 'book-1' },
+      },
+      {
+        key: ['book-suggestions', 'subject-1'],
+        value: [{ id: 'suggestion-1' }],
+      },
+      { key: ['book-sessions', 'subject-1', 'book-1', 'owner-id'], value: [] },
+      { key: ['bookmarks', 'owner-id'], value: [{ id: 'bookmark-1' }] },
+      {
+        key: ['session-bookmarks', 'owner-id', 'session-1'],
+        value: [{ id: 'bookmark-1' }],
+      },
+      { key: ['session-summary', 'session-1', 'owner-id'], value: {} },
+      { key: ['all-notes', 'owner-id'], value: [{ id: 'note-1' }] },
+      { key: ['book-notes', 'book-1', 'owner-id'], value: [{ id: 'note-1' }] },
+      {
+        key: ['topic-notes', 'topic-1', 'owner-id'],
+        value: [{ id: 'note-1' }],
+      },
+      { key: ['library', 'owner-id'], value: { subjects: [] } },
+      { key: ['library-search', 'math', 'owner-id'], value: { results: [] } },
+      {
+        key: ['learner-profile', 'owner-id'],
+        value: { accommodationMode: 'none' },
+      },
+      { key: ['language-progress', 'owner-id'], value: { words: [] } },
+      {
+        key: ['vocabulary', 'owner-id', 'subject-1'],
+        value: [{ id: 'word-1' }],
+      },
+      { key: ['quiz-recent', 'owner-id'], value: [] },
+      { key: ['quiz-stats', 'owner-id'], value: { rounds: 1 } },
+      { key: ['subject-sessions', 'subject-1', 'owner-id'], value: [] },
+      { key: ['topic-suggestions', 'subject-1', 'owner-id'], value: [] },
+      { key: ['resume-nudge', 'owner-id'], value: { topicId: 'topic-1' } },
+    ];
+    for (const { key, value } of profileScopedQueries) {
+      queryClient.setQueryData(key, value);
+    }
+    for (const { key } of profileScopedQueries) {
+      expect(queryClient.getQueryData(key)).toBeTruthy();
+    }
     await act(async () => {
       await result.current.switchProfile('child-id');
     });
-    expect(queryClient.getQueryData(['subjects', 'owner-id'])).toBeUndefined();
-    expect(
-      queryClient.getQueryData(['progress', 'overview', 'owner-id']),
-    ).toBeUndefined();
-    expect(queryClient.getQueryData(['dashboard'])).toBeUndefined();
-    expect(
-      queryClient.getQueryData(['books', 'subject-1', 'owner-id']),
-    ).toBeUndefined();
-    expect(
-      queryClient.getQueryData(['book', 'subject-1', 'book-1', 'owner-id']),
-    ).toBeUndefined();
-    expect(
-      queryClient.getQueryData(['book-suggestions', 'subject-1']),
-    ).toBeUndefined();
+    for (const { key } of profileScopedQueries) {
+      expect(queryClient.getQueryData(key)).toBeUndefined();
+    }
     expect(
       queryClient.getQueryData(['profiles', 'clerk-user-test']),
     ).toBeTruthy();

@@ -172,7 +172,6 @@ let mockSkipResult: Record<string, unknown> | Response = {
     aiFeedback: null,
     status: 'skipped',
   },
-  consecutiveSummarySkips: 1,
 };
 // The single mockFetch instance — its route map is updated per-test via setRoute().
 const mockFetch = createRoutedMockFetch({
@@ -339,7 +338,6 @@ describe('SessionSummaryScreen', () => {
         aiFeedback: null,
         status: 'skipped',
       },
-      consecutiveSummarySkips: 1,
     };
     mockParams.subjectName = 'Mathematics';
     mockParams.exchangeCount = '5';
@@ -350,8 +348,6 @@ describe('SessionSummaryScreen', () => {
     mockParams.sessionType = undefined;
     mockParams.subjectId = undefined;
     mockParams.topicId = undefined;
-    mockParams.filedSubjectId = undefined;
-    mockParams.filedBookId = undefined;
     mockTranscriptData = null;
     mockSessionSummaryData = null;
     mockTotalSessions = 0;
@@ -725,78 +721,6 @@ describe('SessionSummaryScreen', () => {
 
     const skipButton = screen.getByTestId('skip-summary-button');
     await pressAsync(skipButton);
-
-    await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
-    });
-  });
-
-  // [CR-2026-05-19-H10] When a session is filed to a shelf+book, finishSummaryNavigation
-  // must push the FULL ancestor chain (shelf, then book) on top of the replaced library
-  // tab — not just the leaf book. Otherwise router.back() falls through shelf to the
-  // tabs first-route (Home) and the user loses shelf context.
-  // See CLAUDE.md "Cross-tab / cross-stack router.push" rule and
-  // library.tsx handleBookPress for the canonical two-push pattern.
-  it('[CR-2026-05-19-H10] pushes shelf then book (full ancestor chain) when filed to a book', async () => {
-    mockParams.filedSubjectId = 'subject-filed-1';
-    mockParams.filedBookId = 'book-filed-1';
-
-    render(<SessionSummaryScreen />, { wrapper: Wrapper });
-
-    await pressAsync(screen.getByTestId('skip-summary-button'));
-
-    // 1) Replace at library root.
-    await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith('/(app)/library');
-    });
-
-    // 2) Both pushes fire, in order: parent shelf first, then book leaf.
-    await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledTimes(2);
-    });
-
-    expect(mockPush).toHaveBeenNthCalledWith(1, {
-      pathname: '/(app)/shelf/[subjectId]',
-      params: { subjectId: 'subject-filed-1' },
-    });
-    expect(mockPush).toHaveBeenNthCalledWith(2, {
-      pathname: '/(app)/shelf/[subjectId]/book/[bookId]',
-      params: { subjectId: 'subject-filed-1', bookId: 'book-filed-1' },
-    });
-  });
-
-  it('shows a summary warning when the skip threshold is reached', async () => {
-    mockSkipResult = {
-      summary: {
-        id: 'summary-1',
-        sessionId: '660e8400-e29b-41d4-a716-446655440000',
-        content: '',
-        aiFeedback: null,
-        status: 'skipped',
-      },
-      consecutiveSummarySkips: 5,
-    };
-
-    render(<SessionSummaryScreen />, { wrapper: Wrapper });
-
-    await pressAsync(screen.getByTestId('skip-summary-button'));
-
-    await waitFor(() => {
-      expect(platformAlert).toHaveBeenCalledWith(
-        'Summaries help you learn',
-        'Students who reflect remember 2x more. Try it next time!',
-        expect.arrayContaining([expect.objectContaining({ text: 'Got it' })]),
-      );
-    });
-    expect(mockReplace).not.toHaveBeenCalled();
-
-    const promptButtons = (platformAlert as jest.Mock).mock.calls[0]?.[2] as
-      | Array<{ text?: string; onPress?: () => void }>
-      | undefined;
-    const okButton = promptButtons?.find((button) => button.text === 'Got it');
-    expect(okButton?.onPress).toBeInstanceOf(Function);
-
-    okButton?.onPress?.();
 
     await waitFor(() => {
       expect(mockReplace).toHaveBeenCalledWith('/(app)/home');
