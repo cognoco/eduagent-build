@@ -30,7 +30,16 @@ arguments. Do not improvise beyond what is asked.
 4. **If no scope instruction is given,** stage all changes (`git add -A`).
    This is the only case where you stage everything.
 5. **NEVER edit, fix, or modify any source files.** You commit code. You
-   do not write code.
+   do not write code. This includes "clearing" cascade errors by
+   rebuilding `dist/`, editing gitignored files to silence tsc, or
+   touching another agent's WIP to make hooks pass. Other agents' broken
+   WIP is theirs to fix — stash it, don't fix it.
+6. **Small batches, fast landings.** Big commits across many scopes take
+   forever and trap each other on shared hook failures. If the staged
+   set is > 30 files OR spans 2+ top-level scopes (`apps/api`,
+   `apps/mobile`, `packages/`, `docs/`, `.claude/`), split into one
+   commit per scope. Land each batch with its own message and hook run.
+   Goal: every individual commit lands in under 2 minutes.
 
 ## Arguments
 
@@ -84,6 +93,14 @@ in `git reset` to avoid glob interpretation.
 Commit untracked files in the same batch as their dependencies (e.g.,
 `feedback.ts` together with the schema re-export it imports from) so the
 commit is self-contained.
+
+**Batching check (per rule 6):** After staging, run
+`git diff --cached --name-only | wc -l` and inspect the top-level
+prefixes. If > 30 files OR 2+ scopes, narrow the index to one scope
+(`git reset HEAD -- <other-scopes>`), commit that batch, then loop back
+to step 4 for the next scope. Land in scope-order: `docs/` / `.claude/`
+first (cheap hooks), then `packages/`, then `apps/api`, then
+`apps/mobile`.
 
 ### 5. Draft message
 
@@ -150,38 +167,39 @@ Do NOT use `--no-verify`. Let hooks run.
 
 If the commit fails, changes are still staged — nothing is lost.
 
-**First, classify each failing file by relatedness to the staged changes:**
-- **Tooling noise** — stale jest snapshot, lint config glitch, pre-existing
-  failure in code you didn't touch. Skip-and-ship is appropriate.
-- **Unrelated** — failing file is in a different logical scope from your
-  commit (different feature, different layer). Skip-and-ship is appropriate.
-- **Related** — failing file is a test for code you're committing, is in
-  the same logical scope, or is a typecheck failure in code your commit
-  depends on. **Do NOT skip-and-ship.** Fix the failure inline or split the
-  commit. Shipping half a feature is forbidden when failures are related.
-- **If unsure,** assume related.
+**Diagnostic first: are the failing files in your staged set?**
+Parse the failing file paths from the hook output. Compare against
+`git diff --cached --name-only`.
 
-**Then classify by failure type and apply the appropriate handling:**
-- **Lint/format errors**: lint-staged may have auto-fixed these. Re-stage
-  the fixed files (`git add` modified files) and retry.
-- **Type errors (tsc)**: parse file paths from tsc output. Unstage ONLY
-  those files with `git reset HEAD -- <file>`. Retry immediately.
-- **Test failures (jest)**: parse failing test file paths + their source
-  files (strip `.test.ts` / `.test.tsx`). Unstage both. Retry immediately.
-- **Type errors in unstaged files**: tsc checks the whole working tree.
-  Stash with `git stash push --keep-index -u -m "temp: unstaged WIP"`,
-  commit, then `git stash pop`. If output says "stash entry is kept," the
-  apply was **incomplete** — verify with `git stash show --stat 'stash@{0}'`
+- **Failing files NOT in your staged set** (other agents' broken WIP
+  poisoning whole-tree tsc/lint): this is the most common case under
+  concurrent agents. Stash unstaged WIP and retry **immediately** —
+  do not investigate the errors, they are not yours.
+  ```bash
+  git stash push --keep-index -u -m "temp: unstaged WIP"
+  git commit -m "..."
+  git stash pop
+  ```
+  If `git stash pop` reports "stash entry is kept," the apply was
+  **incomplete** — verify with `git stash show --stat 'stash@{0}'`
   before proceeding.
-- **NX boundary errors** ("Static imports of lazy-loaded libraries are
-  forbidden"): stale NX project graph. Run `pnpm exec nx reset`, re-stage,
-  retry.
 
-**Retry** with the reduced staged set. Do NOT fix code — just commit what
-passes.
+- **Failing files ARE in your staged set:** classify by relatedness.
+  - *Related* (test for code you're committing, same logical scope,
+    typecheck failure your commit depends on): **stop and report.**
+    Do not split, do not skip-and-ship — the caller must fix the code.
+  - *Unrelated tooling noise* (stale snapshots, lint config glitch,
+    pre-existing failure you didn't touch): unstage those files and
+    retry once.
+  - *NX boundary errors* ("Static imports of lazy-loaded libraries are
+    forbidden"): stale NX graph. Run `pnpm exec nx reset`, re-stage,
+    retry once.
 
-**Maximum 2 attempts.** If still failing, report which files were excluded
-and why, and what errors remain. Do NOT keep retrying.
+**Retry budget: 1 retry, then stop.** If the stash-and-retry (or
+unstage-and-retry) still fails, report what's stuck and why. Do NOT
+investigate the errors, do NOT rebuild `dist/`, do NOT edit code to
+clear cascade errors — that is the caller's job. Per rule 5, you commit
+code, you do not write it.
 
 Excluded files remain as unstaged changes — they are NOT lost.
 
