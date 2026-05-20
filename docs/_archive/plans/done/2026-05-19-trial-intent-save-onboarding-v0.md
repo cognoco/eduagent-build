@@ -12,6 +12,23 @@
 
 ---
 
+## Completion Note (2026-05-20)
+
+This v0 plan is complete and archived in `docs/_archive/plans/done/`.
+
+Shipped shape:
+- Client-only preview flow: `/preview` landing, intent, topic, and value-prop screens.
+- Post-signup save wizard: inline `SaveWizardGate` inside `(app)/_layout.tsx`, not a nested route.
+- Preview state: in-memory + 1-hour SecureStore TTL, warm-memory TTL enforcement, sign-out cleanup, and E2E seed helper.
+- Profile save: self, child, and both flows; created-owner resume guard; retryable child-creation failure without parent rollback.
+- Adult-owner protection: mobile gate plus API `ADULT_OWNER_REQUIRED` rule behind independent `ADULT_OWNER_GATE_ENABLED` flags.
+- Funnel telemetry: preview intent/value-prop/signup events plus save-wizard step and completion events.
+- E2E artifacts: Maestro flows under `apps/mobile/e2e/flows/onboarding/preview-*.yaml`.
+
+Validation note: focused unit/integration coverage exists in the touched mobile/API suites. Maestro flows were added as runnable artifacts but not executed in this archival PR; run them from an E2E dev-client build with `EXPO_PUBLIC_E2E=true`.
+
+---
+
 ## Adversarial Review Round 3 — Findings Applied (2026-05-19)
 
 Third pass. Round 2 left one substantive deliverable unfinished ([HIGH-B2] — adult-age gate listed in the summary but not actually written into Task 13). Round 3 finishes that work AND critiques the Round-1+Round-2 deltas themselves (the least-reviewed code in the plan), plus a handful of codebase claims earlier rounds asserted without verifying. Inline `[ID3]` markers below cite Round-3 findings.
@@ -2880,7 +2897,7 @@ Walk: sign-in → Try MentoMate → Me → topic "algebra" → learner value-pro
 | 6 | Wizard self→child override | Same generic test as AC 5 — `overrides intent when user picks a different target` | ✅ |
 | 7 | Parent lands on parent home + `isFamilyCapableProfile` true | Landing → `(app)/_layout.test.tsx` → `SaveWizard — Step 3` → `child target: replaces history with /(app)/home on CTA press`. Helper → `profile.test.ts` → `isFamilyCapableProfile` (5 cases). Composition coverage; the test does not chain these into a single assertion. | ✅ (composition) |
 | 8 | Solo owner lands on learner home | Landing → `SaveWizard — Step 3` → `self target: replaces history with session route on CTA press` lands at `/(app)/session`, and `resolveTabShape` → `returns learner for a solo owner with no linked profiles` proves the tab shape. (Self-branch lands in *session* per Task 0 resolution — stronger than the spec's "learner home" claim; tab shell remains learner.) | ✅ (composition) |
-| 9 | Parent ok, child fails, no rollback | Step 3 `switchProfile failure surfaces error in landing error block` covers landing-time failure. The specific scenario — owner POST succeeds + child POST fails mid-Step-2 with the `[HIGH-4]` resume guard skipping re-creation of the owner on retry — has implementation in `_layout.tsx` (`createdOwnerProfileId` cache check) but **no dedicated test**. | ⚠️ **Gap — see follow-up below** |
+| 9 | Parent ok, child fails, no rollback | `(app)/_layout.test.tsx` → `SaveWizard — Step 2 (Profile Basics)` → `keeps parent profile and retries only child after child creation fails`. The test drives parent POST success + child POST failure, asserts retry UI and parent cache retention, then retries and proves only the child POST is repeated. | ✅ |
 | 10 | 1-hour TTL expiry | `preview-onboarding-state.test.ts` → `treats expired key as absent` | ✅ |
 | 11 | Sign-out clears key | `sign-out-cleanup.test.ts` → `clears mentomate_preview_intent on sign-out` | ✅ |
 | 12 | No preview state → CreateProfileGate unchanged | Pre-existing `AppLayout` describe block covers no-profile fallback to `CreateProfileGate`. The new preview branch only activates when state is present (gated by `previewProbeState === 'present'` in `_layout.tsx`), so a missing state preserves the original behaviour by construction. | ✅ (structural) |
@@ -2889,11 +2906,7 @@ Walk: sign-in → Try MentoMate → Me → topic "algebra" → learner value-pro
 | 15 | Flag off: no CTA, no route, gate falls through | `sign-in.test.tsx` → `SignInScreen — Try MentoMate CTA` → `hides the CTA when flag is off`; `(app)/_layout.test.tsx` → `falls through to CreateProfileGate when flag is off, even with stale preview state` | ✅ |
 | 16 | Navigation discipline (push for hops, replace for landing) | Hops: `preview/intent.test.tsx`, `preview/topic.test.tsx`, `preview/value-prop.test.tsx` all assert `push`. Landing: `_layout.test.tsx` Step 3 tests assert `replace`. Behavioural; no grep-over-source test. | ✅ |
 
-**Gap follow-up (AC 9 — open after this PR lands):**
-- Add a Step 2 test to `(app)/_layout.test.tsx` → `SaveWizard — Step 2 (Profile Basics)`: scenario `[HIGH-4] resumes from createdOwnerProfileId on retry after child POST fails`. Drive Step 2 once with success for the parent POST + failure for the child POST → assert error surfaced + parent profile present in cache + retry skips the re-create-parent call.
-- File: `apps/mobile/src/app/(app)/_layout.test.tsx`.
-- Estimate: ~30 min — the resume guard implementation already exists; this is test-only.
-- Why deferred from this PR: the audit caught it after wave 5b shipped; surfacing it here without ballooning Task 15's scope keeps the audit honest. Per CLAUDE.md "Sweep when you fix": this is the only gap, so a single follow-up issue (not a new lint guard) is the proportionate response.
+**AC 9 follow-up status:** completed 2026-05-20 in `(app)/_layout.test.tsx`.
 
 - [ ] **Step 2: Cover AC 16 behaviorally inside existing route tests.** [MEDIUM-1]
 
@@ -2905,13 +2918,13 @@ Instead, the existing route tests already assert the correct method:
 
 Sweep those tests once: confirm every navigation assertion uses the matching method (`push` for hops, `replace` for landing). If any test was written with the wrong assertion, fix it now — that is the AC-16 verification step.
 
-- [ ] **Step 2b: Telemetry gap (deferred follow-up).** [MEDIUM-C3]
+- [x] **Step 2b: Telemetry gap.** [MEDIUM-C3]
 
 This plan ships ZERO funnel events. Per CLAUDE.md's `safeSend()` convention for non-core dispatches (`apps/api/src/services/safe-non-core.ts`), conversion-critical flows like trial onboarding MUST emit funnel events or the feature is unmeasurable post-launch. The shape of the follow-up:
 
 - Events: `preview_intent_seen`, `preview_intent_selected` (with `intent` payload), `preview_topic_submitted`, `preview_value_prop_seen` (with `path` payload), `preview_signup_started`, `preview_signup_completed`, `save_wizard_step_1`, `save_wizard_step_2`, `save_wizard_step_3`, `save_wizard_completed` (with `target` + `parent_profile_id` + `child_profile_id?`).
 - Discovery step: grep `apps/mobile/src/lib/` for existing analytics modules — PostHog, Amplitude, Segment, or a thin in-house dispatcher. Mirror the existing pattern; do not invent a new analytics surface.
-- Why deferred from this PR: the analytics conventions aren't grounded in this plan and the spec doesn't specify event names; this is a discovery + design follow-up, not a code follow-up. Open a Notion task immediately after merge so it doesn't fall through. Without these events the funnel-conversion measurement that justifies the feature can't be done.
+- Status 2026-05-20: implemented with the existing mobile `track()` breadcrumb dispatcher. Event names use the plan taxonomy: `preview_intent_seen`, `preview_intent_selected`, `preview_topic_submitted`, `preview_value_prop_seen`, `preview_signup_started`, `preview_signup_completed`, `save_wizard_step_1`, `save_wizard_step_2`, `save_wizard_step_3`, and `save_wizard_completed`.
 
 - [ ] **Step 3: Run full mobile test sweep for changed files.**
 
@@ -2944,14 +2957,15 @@ pnpm exec nx lint mobile
 
 ---
 
-## Task 16: E2E Smoke Flows (Maestro)
+## Task 16: E2E Smoke Flows (Maestro) — ARTIFACTS ADDED 2026-05-20
 
 **Files:**
-- Create: `apps/mobile/e2e/preview-self.yaml`
-- Create: `apps/mobile/e2e/preview-parent.yaml`
-- Create: `apps/mobile/e2e/preview-both-child-first.yaml`
-- Create: `apps/mobile/e2e/preview-override-target.yaml`
-- Create: `apps/mobile/e2e/preview-expired-state.yaml`
+- Created: `apps/mobile/e2e/flows/onboarding/preview-self.yaml`
+- Created: `apps/mobile/e2e/flows/onboarding/preview-parent.yaml`
+- Created: `apps/mobile/e2e/flows/onboarding/preview-both-child-first.yaml`
+- Created: `apps/mobile/e2e/flows/onboarding/preview-override-target.yaml`
+- Created: `apps/mobile/e2e/flows/onboarding/preview-expired-state.yaml`
+- Created helper: `apps/mobile/e2e/flows/_setup/sign-up-preview-user.yaml`
 
 > If the E2E directory layout differs, find existing flows via `ls apps/mobile/e2e` or wherever `.yaml` Maestro flows live. Mirror their structure (waitForAnimationToEnd, testID selectors, adb reverse setup) rather than copying from this plan literally.
 
@@ -2959,7 +2973,7 @@ pnpm exec nx lint mobile
 
 Memory pointer: `project_e2e_emulator_infra.md` / `feedback_agent_owns_e2e_infra.md`. Agent owns emulator + Metro + proxy + adb-reverse. Start the device, install the app, point at the staging API as configured in existing E2E flows.
 
-- [ ] **Step 2: Write each flow.**
+- [x] **Step 2: Write each flow.**
 
 Flow 1 — Self learner:
 - Launch app
@@ -2990,6 +3004,8 @@ Flow 4 — Save target overrides intent: pick `child` pre-signup, switch to `sav
 Flow 5 — Expired state: requires a dev/E2E-only seed mechanism. [LOW-1] Use `seedPreviewStateForTesting(state, staleMs)` from Task 3 (mirrors the existing `seedPendingAuthRedirectForTesting` pattern, gated by `EXPO_PUBLIC_E2E === 'true'`). Expose it through a debug-only screen or RN dev-menu hook so a Maestro flow can trigger it; then launch app, assert lands at intent screen (key deleted lazily on read).
 
 - [ ] **Step 3: Run smoke locally.**
+
+Not run in this PR. Requires an E2E dev-client build with `EXPO_PUBLIC_E2E=true` and live Clerk test-mode signup; operator will run directly from a branch of `main`.
 
 ```bash
 # Use the project's Maestro invocation — check existing scripts.

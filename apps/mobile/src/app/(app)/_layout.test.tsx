@@ -18,7 +18,11 @@ import {
   clearPreviewState,
   getPreviewState,
 } from '../../lib/preview-onboarding-state';
-import { createRoutedMockFetch } from '../../test-utils/mock-api-routes';
+import {
+  createRoutedMockFetch,
+  extractJsonBody,
+  fetchCallsMatching,
+} from '../../test-utils/mock-api-routes';
 
 const mockFetch = createRoutedMockFetch();
 
@@ -1639,6 +1643,92 @@ describe('SaveWizard — Step 2 (Profile Basics)', () => {
         flags.FEATURE_FLAGS as { ADULT_OWNER_GATE_ENABLED: boolean }
       ).ADULT_OWNER_GATE_ENABLED = original;
     }
+  });
+
+  it('keeps parent profile and retries only child after child creation fails', async () => {
+    await setPreviewState({
+      intent: 'child',
+      path: 'parent_value_prop',
+      createdAt: new Date().toISOString(),
+    });
+    testQueryClient.setQueryData(['profiles', 'test-user'], []);
+
+    let postCount = 0;
+    mockFetch.setRoute('/profiles', (_url: string, init?: RequestInit) => {
+      if (init?.method !== 'POST') {
+        return { profiles: [] };
+      }
+      postCount++;
+      if (postCount === 1) {
+        return new Response(
+          JSON.stringify({
+            profile: {
+              id: 'parent-1',
+              displayName: 'Parent',
+              birthYear: 1985,
+              isOwner: true,
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      if (postCount === 2) {
+        return new Response(
+          JSON.stringify({ error: { message: 'Child creation failed' } }),
+          { status: 500, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      return new Response(
+        JSON.stringify({
+          profile: {
+            id: 'child-1',
+            displayName: 'Kid',
+            birthYear: 2014,
+            isOwner: false,
+          },
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      );
+    });
+
+    renderWizardLayout();
+    await screen.findByTestId('save-wizard-step-1');
+    fireEvent.press(screen.getByTestId('save-wizard-step-1-continue'));
+
+    await screen.findByTestId('save-basics-parent-name');
+    fireEvent.changeText(
+      screen.getByTestId('save-basics-parent-name'),
+      'Parent',
+    );
+    fireEvent.changeText(
+      screen.getByTestId('save-basics-parent-birth-year'),
+      '1985',
+    );
+    fireEvent.changeText(screen.getByTestId('save-basics-child-name'), 'Kid');
+    fireEvent.changeText(
+      screen.getByTestId('save-basics-child-birth-year'),
+      '2014',
+    );
+    fireEvent.press(screen.getByTestId('save-basics-continue'));
+
+    await screen.findByTestId('save-basics-child-error');
+    expect(screen.getByTestId('save-basics-retry-child')).toBeTruthy();
+
+    await expect(getPreviewState()).resolves.toEqual(
+      expect.objectContaining({ createdOwnerProfileId: 'parent-1' }),
+    );
+
+    fireEvent.press(screen.getByTestId('save-basics-retry-child'));
+
+    await screen.findByTestId('save-wizard-step-3');
+    const postBodies = fetchCallsMatching(mockFetch, '/profiles')
+      .filter((call) => call.init?.method === 'POST')
+      .map((call) => extractJsonBody<{ displayName: string }>(call.init));
+    expect(postBodies).toEqual([
+      expect.objectContaining({ displayName: 'Parent' }),
+      expect.objectContaining({ displayName: 'Kid' }),
+      expect.objectContaining({ displayName: 'Kid' }),
+    ]);
   });
 });
 
